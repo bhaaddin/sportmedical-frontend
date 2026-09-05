@@ -21,6 +21,7 @@ import NotificationCenter from './components/NotificationCenter';
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Login = lazy(() => import('./pages/Login'));
 const IntakeQuestionnaire = lazy(() => import('./pages/public/IntakeQuestionnaire'));
+const IntakeReviewQueue = lazy(() => import('./pages/IntakeReviewQueue'));
 const DashboardPage = lazy(() => import('./pages/Dashboard'));
 const DiagnosticForm = lazy(() => import('./pages/DiagnosticForm'));
 const PatientList = lazy(() => import('./pages/PatientList'));
@@ -373,6 +374,7 @@ export default function App() {
                     <Route path="/accounting-export" element={<RequireAdmin><AccountingExportPage /></RequireAdmin>} />
                     <Route path="/worker-schedule" element={<WorkerSchedulePage />} />
                     <Route path="/reports" element={<Reports />} />
+                    <Route path="/intake-review" element={<RequireAdmin><IntakeReviewQueue /></RequireAdmin>} />
                     <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
                     <Route path="/codebook" element={<CodebookPage />} />
                     <Route path="/system-health" element={<SystemHealthPage />} />
