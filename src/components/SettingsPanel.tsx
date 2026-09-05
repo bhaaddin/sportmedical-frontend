@@ -7,6 +7,7 @@ import {
   Box, Typography, Tabs, Tab, Card, CardContent, Switch, TextField,
   Button, Grid, Chip, Slider, Divider, List, ListItem, ListItemText,
   ListItemSecondaryAction, IconButton, Tooltip,
+  MenuItem,
 } from '@mui/material';
 import {
   Palette, CalendarMonth, Receipt, People, Delete, Edit, Add, RestartAlt,

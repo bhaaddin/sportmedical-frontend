@@ -3,6 +3,7 @@ import {
   Box, Paper, Typography, TextField, Button, Grid, Chip,
   Alert, CircularProgress, Divider, Card, CardContent, LinearProgress,
   Slider, Stepper, Step, StepLabel, StepConnector, stepConnectorClasses,
+  Avatar,
 } from '@mui/material';
 import { Science, Send, Warning, ArrowBack, ArrowForward, Check, Person, Favorite, FitnessCenter, Notes } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';

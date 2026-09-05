@@ -4,6 +4,7 @@ import {
   ListItemText, Divider, Switch, TextField, Button, Tabs, Tab, Skeleton,
   Chip, Snackbar, Alert, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Avatar, MenuItem, Slider,
+  Paper,
 } from '@mui/material';
 import {
   AdminPanelSettings, Security, History, Settings, People, Palette,

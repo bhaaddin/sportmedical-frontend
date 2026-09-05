@@ -28,6 +28,7 @@ import type { Patient } from '../api/patients';
 import BreakManager, { type CalendarLockout } from '../components/BreakManager';
 import ForceOverrideModal from '../components/ForceOverrideModal';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
+import toast from 'react-hot-toast';
 
 /* ── Czech holiday check (simple, no API call) ── */
 const czechHolidays = new Set([
