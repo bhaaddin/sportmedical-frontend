@@ -3,7 +3,7 @@ import {
   Box, Typography, Card, CardContent, Grid, List, ListItem, ListItemIcon,
   ListItemText, Divider, Switch, TextField, Button, Tabs, Tab, Skeleton,
   Chip, Snackbar, Alert, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Avatar, MenuItem, Slider,
+  TableHead, TableRow, Avatar, MenuItem, Slider, Paper,
 } from '@mui/material';
 import {
   AdminPanelSettings, Security, History, Settings, People, Palette,
@@ -63,7 +63,7 @@ function Toggle({ checked, onChange, label, description }: {
 /*  MAIN ADMIN PAGE                            */
 /* ─────────────────────────────────────────── */
 export default function Admin() {
-  const [mainTab, setMainTab] = useState(0); // 0 = Public, 1 = Worker, 2 = Audit, 3 = Security, 4 = System Health
+  const [mainTab, setMainTab] = useState(0); // 0 = Public, 1 = Worker, 2 = Booking rules, 3 = Audit, 4 = Security, 5 = System Health
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [auditCount, setAuditCount] = useState(0);
   const [patientCount, setPatientCount] = useState(0);
@@ -71,6 +71,8 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [auditLoading, setAuditLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // PUBLIC SETTINGS state
   const [pub, setPub] = useState({
@@ -130,6 +132,89 @@ export default function Admin() {
   const updatePub = (key: string, val: any) => setPub(p => ({ ...p, [key]: val }));
   const updateWrk = (key: string, val: any) => setWrk(p => ({ ...p, [key]: val }));
 
+  // BOOKING RULES state (keys: booking.*)
+  const [rules, setRules] = useState({
+    maxDaysAhead: 60,
+    cancelDeadlineHours: 24,
+    slotStepMinutes: 15,
+    noShowLimit: 3,
+  });
+  const updateRules = (key: string, val: any) => setRules(p => ({ ...p, [key]: val }));
+
+  function coerceValue(current: unknown, raw: unknown): unknown {
+    if (typeof current === 'boolean') {
+      if (typeof raw === 'boolean') return raw;
+      if (typeof raw === 'string') {
+        const s = raw.trim().toLowerCase();
+        if (s === 'true' || s === '1' || s === 'ano') return true;
+        if (s === 'false' || s === '0' || s === 'ne') return false;
+        return current;
+      }
+      if (typeof raw === 'number') return raw !== 0;
+      return current;
+    }
+    if (typeof current === 'number') {
+      const n = typeof raw === 'number' ? raw : Number(raw);
+      return Number.isFinite(n) ? n : current;
+    }
+    if (Array.isArray(current)) {
+      if (Array.isArray(raw)) return raw;
+      if (typeof raw === 'string') {
+        try {
+          const parsed: unknown = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+        } catch { /* fall through to comma-split */ }
+        return raw.split(',').map(s => Number(s.trim())).filter(n => Number.isFinite(n));
+      }
+      return current;
+    }
+    if (typeof raw === 'string') return raw;
+    if (raw === null || raw === undefined) return current;
+    return String(raw);
+  }
+
+  // Load persisted settings: GET /api/Settings → merge into pub/wrk/rules. Never crash when backend is down.
+  useEffect(() => {
+    client.get('/api/Settings')
+      .then(r => {
+        const payload = r.data?.value ?? r.data;
+        const arr: Array<{ key?: string; Key?: string; value?: unknown; Value?: unknown }> =
+          Array.isArray(payload) ? payload : payload?.items ?? [];
+        if (!Array.isArray(arr)) return;
+        const map = new Map<string, unknown>();
+        for (const item of arr) {
+          const k = item.key ?? item.Key;
+          const v = item.value ?? item.Value;
+          if (typeof k === 'string') map.set(k, v);
+        }
+        setPub(prev => {
+          const next = { ...prev };
+          (Object.keys(next) as Array<keyof typeof prev>).forEach(field => {
+            const v = map.get(`pub.${field}`);
+            if (v !== undefined) (next as Record<string, unknown>)[field] = coerceValue(prev[field], v);
+          });
+          return next;
+        });
+        setWrk(prev => {
+          const next = { ...prev };
+          (Object.keys(next) as Array<keyof typeof prev>).forEach(field => {
+            const v = map.get(`wrk.${field}`);
+            if (v !== undefined) (next as Record<string, unknown>)[field] = coerceValue(prev[field], v);
+          });
+          return next;
+        });
+        setRules(prev => {
+          const next = { ...prev };
+          (Object.keys(next) as Array<keyof typeof prev>).forEach(field => {
+            const v = map.get(`booking.${field}`);
+            if (v !== undefined) (next as Record<string, unknown>)[field] = coerceValue(prev[field], v);
+          });
+          return next;
+        });
+      })
+      .catch(() => { /* keep defaults silently */ });
+  }, []);
+
   // Load stats
   useEffect(() => {
     Promise.all([
@@ -149,7 +234,7 @@ export default function Admin() {
 
   // Load audit
   useEffect(() => {
-    if (mainTab === 2) {
+    if (mainTab === 3) {
       setAuditLoading(true);
       Promise.all([
         client.get('/api/audit?take=50').then(r => r.data?.value ?? r.data ?? []).catch(() => []),
@@ -161,9 +246,22 @@ export default function Admin() {
     }
   }, [mainTab]);
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const body: Record<string, string> = {};
+      for (const [k, v] of Object.entries(pub)) body[`pub.${k}`] = Array.isArray(v) ? JSON.stringify(v) : String(v);
+      for (const [k, v] of Object.entries(wrk)) body[`wrk.${k}`] = Array.isArray(v) ? JSON.stringify(v) : String(v);
+      for (const [k, v] of Object.entries(rules)) body[`booking.${k}`] = String(v);
+      await client.put('/api/settings/bulk', body);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      setSaveError('Uložení se nezdařilo. Zkontrolujte připojení k serveru a zkuste to znovu.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -226,6 +324,7 @@ export default function Admin() {
         >
           <Tab icon={<Public />} label="Veřejný web" />
           <Tab icon={<Work />} label="Zaměstnanci" />
+          <Tab icon={<EventAvailable />} label="Pravidla rezervací" />
           <Tab icon={<History />} label="Auditní log" />
           <Tab icon={<Security />} label="Bezpečnost" />
           <Tab icon={<MonitorHeart />} label="Zdraví systému" />
@@ -434,10 +533,10 @@ export default function Admin() {
 
           {/* Save button */}
           <motion.div custom={5} variants={sectionAnim} initial="hidden" animate="visible">
-            <Button variant="contained" startIcon={<Save />} onClick={handleSave}
+            <Button variant="contained" startIcon={<Save />} onClick={handleSave} disabled={saving}
               sx={{ mb: 4, bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 700,
                 boxShadow: '0 4px 16px rgba(13,115,119,0.3)', '&:hover': { bgcolor: '#095456' } }}>
-              Uložit nastavení veřejného webu
+              {saving ? 'Ukládám…' : 'Uložit nastavení veřejného webu'}
             </Button>
           </motion.div>
         </Box>
@@ -591,19 +690,66 @@ export default function Admin() {
 
           {/* Save button */}
           <motion.div custom={5} variants={sectionAnim} initial="hidden" animate="visible">
-            <Button variant="contained" startIcon={<Save />} onClick={handleSave}
+            <Button variant="contained" startIcon={<Save />} onClick={handleSave} disabled={saving}
               sx={{ mb: 4, bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 700,
                 boxShadow: '0 4px 16px rgba(13,115,119,0.3)', '&:hover': { bgcolor: '#095456' } }}>
-              Uložit nastavení zaměstnanců
+              {saving ? 'Ukládám…' : 'Uložit nastavení zaměstnanců'}
             </Button>
           </motion.div>
         </Box>
       )}
 
       {/* ═══════════════════════════════════════════ */}
-      {/*  TAB 2: AUDIT LOG                          */}
+      {/*  TAB 2: BOOKING RULES (Pravidla rezervací)   */}
       {/* ═══════════════════════════════════════════ */}
       {mainTab === 2 && (
+        <Box>
+          <motion.div custom={0} variants={sectionAnim} initial="hidden" animate="visible">
+            <Card sx={{ mb: 3 }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                  <EventAvailable sx={{ color: '#0D7377' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>Pravidla rezervací</Typography>
+                </Box>
+                <Grid container spacing={3}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField fullWidth label="Maximální předstih rezervace (dny)" type="number"
+                      value={rules.maxDaysAhead}
+                      onChange={e => updateRules('maxDaysAhead', Number(e.target.value))} sx={fieldSx} />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField fullWidth label="Lhůta pro zrušení (hodiny)" type="number"
+                      value={rules.cancelDeadlineHours}
+                      onChange={e => updateRules('cancelDeadlineHours', Number(e.target.value))} sx={fieldSx} />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField fullWidth label="Krok rezervačního slotu (minuty)" type="number"
+                      value={rules.slotStepMinutes}
+                      onChange={e => updateRules('slotStepMinutes', Number(e.target.value))} sx={fieldSx} />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField fullWidth label="Limit nedostavení se" type="number"
+                      value={rules.noShowLimit}
+                      onChange={e => updateRules('noShowLimit', Number(e.target.value))} sx={fieldSx} />
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          </motion.div>
+          <motion.div custom={1} variants={sectionAnim} initial="hidden" animate="visible">
+            <Button variant="contained" startIcon={<Save />} onClick={handleSave} disabled={saving}
+              sx={{ mb: 4, bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 700,
+                boxShadow: '0 4px 16px rgba(13,115,119,0.3)', '&:hover': { bgcolor: '#095456' } }}>
+              {saving ? 'Ukládám…' : 'Uložit pravidla rezervací'}
+            </Button>
+          </motion.div>
+        </Box>
+      )}
+
+      {/* ═══════════════════════════════════════════ */}
+      {/*  TAB 3: AUDIT LOG                          */}
+      {/* ═══════════════════════════════════════════ */}
+      {mainTab === 3 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           {auditLoading ? (
             <Skeleton variant="rounded" height={400} sx={{ borderRadius: 3 }} />
@@ -655,9 +801,9 @@ export default function Admin() {
       )}
 
       {/* ═══════════════════════════════════════════ */}
-      {/*  TAB 3: SECURITY                           */}
+      {/*  TAB 4: SECURITY                           */}
       {/* ═══════════════════════════════════════════ */}
-      {mainTab === 3 && (
+      {mainTab === 4 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, md: 6 }}>
@@ -711,14 +857,18 @@ export default function Admin() {
       )}
 
       {/* ═══════════════════════════════════════════ */}
-      {/*  TAB 4: SYSTEM HEALTH                      */}
+      {/*  TAB 5: SYSTEM HEALTH                      */}
       {/* ═══════════════════════════════════════════ */}
-      {mainTab === 4 && <SystemHealth />}
+      {mainTab === 5 && <SystemHealth />}
 
       {/* Snackbar */}
       <Snackbar open={saved} autoHideDuration={3000} onClose={() => setSaved(false)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
         <Alert severity="success" variant="filled" sx={{ borderRadius: 2 }}>Nastavení uloženo!</Alert>
+      </Snackbar>
+      <Snackbar open={saveError !== null} autoHideDuration={5000} onClose={() => setSaveError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+        <Alert severity="error" variant="filled" sx={{ borderRadius: 2 }} onClose={() => setSaveError(null)}>{saveError}</Alert>
       </Snackbar>
     </Box>
   );
