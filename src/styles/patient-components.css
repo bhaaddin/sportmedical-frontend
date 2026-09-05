@@ -1,0 +1,247 @@
+/* CGM MEDISTAR Patient-Facing CSS Components */
+
+/* Hero */
+.hero {
+  background: linear-gradient(135deg, var(--color-brand-primary) 0%, var(--color-brand-primary-dark) 100%);
+  color: var(--text-inverse);
+  padding: var(--spacing-16) 0;
+}
+.hero__title {
+  font-size: var(--font-size-5xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  margin-bottom: var(--spacing-4);
+}
+.hero__subtitle {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-light);
+  opacity: 0.9;
+  margin-bottom: var(--spacing-6);
+}
+.hero__cta {
+  display: flex;
+  gap: var(--spacing-4);
+  flex-wrap: wrap;
+}
+
+/* Service Cards */
+.service-card {
+  background: var(--bg-paper);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-6);
+  text-align: center;
+  transition: all var(--transition-duration-normal) var(--transition-ease);
+  border: 1px solid var(--border-light);
+}
+.service-card:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-lg);
+}
+.service-card__icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto var(--spacing-4);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-4xl);
+}
+.service-card__title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--spacing-2);
+}
+.service-card__description {
+  color: var(--text-secondary);
+  line-height: var(--line-height-relaxed);
+}
+
+/* Testimonial Card */
+.testimonial-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-6);
+  min-width: 350px;
+}
+.testimonial-card__quote {
+  font-style: italic;
+  margin-bottom: var(--spacing-4);
+  line-height: var(--line-height-relaxed);
+}
+.testimonial-card__author {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+/* Booking Form */
+.booking-form {
+  background: var(--bg-paper);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-8);
+}
+.booking-form__option {
+  background: var(--bg-default);
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-4);
+  cursor: pointer;
+  transition: all var(--transition-duration-fast) var(--transition-ease);
+}
+.booking-form__option:hover { border-color: var(--color-brand-primary); }
+.booking-form__option.selected {
+  border-color: var(--color-brand-primary);
+  background: rgba(25, 118, 210, 0.05);
+}
+.booking-form__time-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+  padding: var(--spacing-2) var(--spacing-3);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-duration-fast) var(--transition-ease);
+}
+.booking-form__time-slot.selected {
+  background: var(--color-brand-primary);
+  color: var(--text-inverse);
+  border-color: var(--color-brand-primary);
+}
+.booking-form__time-slot.disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Pricing */
+.pricing-table {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--spacing-6);
+}
+.pricing-card {
+  background: var(--bg-paper);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-8);
+  text-align: center;
+}
+.pricing-card.featured {
+  border: 2px solid var(--color-brand-primary);
+  transform: scale(1.05);
+}
+.pricing-card__price {
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-brand-primary);
+  margin: var(--spacing-4) 0;
+}
+
+/* FAQ */
+.faq-item {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-3);
+  overflow: hidden;
+}
+.faq-item__question {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-4);
+  background: var(--bg-paper);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium);
+}
+.faq-item__answer {
+  padding: var(--spacing-4);
+  background: var(--bg-default);
+  line-height: var(--line-height-relaxed);
+}
+
+/* Contact Form */
+.contact-form {
+  background: var(--bg-paper);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-8);
+}
+.contact-form__input {
+  width: 100%;
+  padding: var(--spacing-3);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  transition: border-color var(--transition-duration-fast) var(--transition-ease);
+}
+.contact-form__input:focus {
+  outline: none;
+  border-color: var(--color-brand-primary);
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+}
+
+/* Navigation */
+.nav {
+  background: var(--bg-paper);
+  box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-index-sticky);
+}
+.nav__container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+}
+.nav__logo {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-brand-primary);
+  text-decoration: none;
+}
+.nav__link {
+  color: var(--text-primary);
+  text-decoration: none;
+  font-weight: var(--font-weight-medium);
+  transition: color var(--transition-duration-fast) var(--transition-ease);
+}
+.nav__link:hover { color: var(--color-brand-primary); }
+
+/* Footer */
+.footer {
+  background: #1a1a1a;
+  color: var(--text-inverse);
+  padding: var(--spacing-16) 0 var(--spacing-8);
+}
+.footer__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-8);
+}
+.footer__link {
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  display: block;
+  padding: var(--spacing-1) 0;
+  transition: color var(--transition-duration-fast) var(--transition-ease);
+}
+.footer__link:hover { color: var(--text-inverse); }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .hero__title { font-size: var(--font-size-3xl); }
+  .hero__subtitle { font-size: var(--font-size-lg); }
+  .pricing-card.featured { transform: none; }
+  .nav__links { display: none; }
+}
+@media (max-width: 600px) {
+  .hero { padding: var(--spacing-8) 0; }
+  .hero__cta { flex-direction: column; }
+}

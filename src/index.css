@@ -1,0 +1,124 @@
+/* ── Global Reset & Polish ── */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  background: #F5F7FA;
+  color: #1A1A2E;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ── Custom Scrollbar ── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c0c0c0;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a0a0a0;
+}
+
+/* ── Smooth transitions for interactive elements ── */
+a, button, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Table row hover effect ── */
+.patient-row {
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.patient-row:hover {
+  background-color: #f8f9fa;
+}
+
+/* ── Selection color ── */
+::selection {
+  background: rgba(13, 115, 119, 0.2);
+  color: #0D7377;
+}
+
+/* ── Focus visible outline ── */
+:focus-visible {
+  outline: 2px solid #0D7377;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Skip link (accessibility) ── */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #0D7377;
+  color: white;
+  padding: 8px 16px;
+  z-index: 10000;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 0 0 8px 0;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* ── Screen reader only (visually hidden, accessible) ── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ── ARIA live region (for screen readers) ── */
+[aria-live] {
+  position: relative;
+}
+
+/* ── Loading spinner animation ── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ── Card hover lift utility ── */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}

@@ -1,0 +1,93 @@
+/* CGM MEDISTAR Print Styles */
+
+@media print {
+  .no-print, nav, aside, .sidebar, .header-actions,
+  .MuiDrawer-root, .MuiAppBar-root, button,
+  .MuiIconButton-root, .MuiFab-root {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+    line-height: 1.5;
+  }
+
+  .page-container {
+    margin: 0;
+    padding: 0;
+    max-width: 100%;
+  }
+
+  h1 { font-size: 24pt; margin-bottom: 12pt; }
+  h2 { font-size: 18pt; margin-bottom: 10pt; }
+  h3 { font-size: 14pt; margin-bottom: 8pt; }
+  p { margin-bottom: 8pt; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16pt;
+    page-break-inside: avoid;
+  }
+
+  th, td {
+    border: 1px solid #ccc;
+    padding: 6pt 8pt;
+    text-align: left;
+  }
+
+  th {
+    background-color: #f0f0f0 !important;
+    font-weight: bold;
+  }
+
+  tr:nth-child(even) {
+    background-color: #f9f9f9 !important;
+  }
+
+  .MuiCard-root {
+    border: 1px solid #ccc;
+    box-shadow: none;
+    page-break-inside: avoid;
+  }
+
+  a { color: black; text-decoration: underline; }
+  img { max-width: 100%; height: auto; }
+
+  .page-break { page-break-before: always; }
+  .no-break { page-break-inside: avoid; }
+
+  @page {
+    margin: 2cm;
+    size: A4;
+  }
+
+  .header-print, .footer-print {
+    position: fixed;
+    left: 0;
+    right: 0;
+  }
+
+  .header-print {
+    top: 0;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 8pt;
+  }
+
+  .footer-print {
+    bottom: 0;
+    border-top: 1px solid #ccc;
+    padding-top: 8pt;
+    font-size: 10pt;
+    color: #666;
+  }
+}
+
+.print-only { display: none; }
+
+@media print {
+  .print-only { display: block; }
+  .no-print { display: none !important; }
+}
