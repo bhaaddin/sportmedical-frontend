@@ -57,7 +57,82 @@ export default function PatientForm() {
   });
   const step0Valid = form.firstName.trim().length >= 1 && form.lastName.trim().length >= 1 && form.dateOfBirth !== '';
 
+  const [vitals, setVitals] = useState({
+    heartRate: 72,
+    bloodPressure: '120',
+    bloodPressureDiastolic: '80',
+    temperature: 36.6,
+    heartRateTrend: 'stable',
+    bloodPressureTrend: 'stable',
+    temperatureTrend: 'stable',
+    trendDirection: 'stable' as 'up' | 'down' | 'stable',
+    lastUpdate: '--:--',
+  });
+  const [alerts, setAlerts] = useState<Array<{title: string; message: string; severity: 'info' | 'warning' | 'error' }>>([]);
+
   const update = (field: string, value: any) => setForm(prev => ({ ...prev, [field]: value }));
+
+  // ── Simulated real-time CGM vital signs monitoring ────────────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVitals(prev => {
+        const randomChange = (Math.random() - 0.5) * 5;
+        const newHr = Math.max(60, Math.min(100, prev.heartRate + Math.round(randomChange)));
+        const newBpSystolic = Math.max(90, Math.min(140, parseInt(prev.bloodPressure) + Math.round(randomChange * 0.4)));
+        const newTemp = Math.max(36.0, Math.min(37.5, parseFloat(prev.temperature) + Math.round(randomChange * 0.2)));
+        const directions = ['up', 'down', 'stable'] as const;
+        const getRandomDir = () => directions[Math.floor(Math.random() * directions.length)];
+        const trendDirection =
+          (newHr > prev.heartRate ? 'up' : newHr < prev.heartRate ? 'down' : 'stable');
+        return {
+          heartRate: newHr,
+          bloodPressure: newBpSystolic.toString(),
+          bloodPressureDiastolic: parseInt(prev.bloodPressureDiastolic) + Math.round(randomChange * 0.2).toString(),
+          temperature: parseFloat(prev.temperature).toFixed(1),
+          heartRateTrend: getRandomDir(),
+          bloodPressureTrend: getRandomDir(),
+          temperatureTrend: getRandomDir(),
+          trendDirection,
+          lastUpdate: new Date().toLocaleTimeString([], { minute: '2-digit', hour: '2-digit' }),
+        };
+      });
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ── Simulated alerts generation based on vitals ─────────────────────
+  useEffect(() => {
+    const newAlerts: AlertData[] = [];
+    if (vitals.heartRate > 90) {
+      newAlerts.push({
+        title: 'Srdeční frekvence',
+        message: ` ${vitals.heartRate} bpm - mírně zvýšená`,
+        severity: 'warning',
+      });
+    }
+    if (vitals.heartRate < 50) {
+      newAlerts.push({
+        title: 'Srdeční frekvence',
+        message: ` ${vitals.heartRate} bpm - snížená, pozor`,
+        severity: 'error',
+      });
+    }
+    if (vitals.temperature > 37.2) {
+      newAlerts.push({
+        title: 'Teplota',
+        message: ` ${vitals.temperature} °C - horečka`,
+        severity: 'warning',
+      });
+    }
+    if (vitals.temperature < 36.0) {
+      newAlerts.push({
+        title: 'Teplota',
+        message: ` ${vitals.temperature} °C - hypotermie`,
+        severity: 'error',
+      });
+    }
+    setAlerts(newAlerts);
+  }, [vitals]);
 
   // Smart birth-number: auto-format + derive birth date + sex
   const [rcValid, setRcValid] = useState<boolean | null>(null);
@@ -210,6 +285,13 @@ export default function PatientForm() {
 
   return (
     <Box sx={{ maxWidth: 1000, mx: 'auto' }}>
+      {/* CGM MONITORING BANNER - Inspirované CGM MEDISTAR */}
+      <Box sx={{ mt: 2, p: 2, borderRadius: 3, bgcolor: '#F0F9FF', border: '1px solid #0D7377' }}>
+        <Typography variant="body1" color="#0D7377">
+          <strong>Reálný čas monitorování (CGM Inspirované):</strong> 
+          Srdeční: {vitals.heartRate} bpm, Krevní: {vitals.bloodPressure}/{vitals.bloodPressureDiastolic} mmHg, Teplota: {vitals.temperature} °C
+        </Typography>
+      </Box>
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <Button startIcon={<ArrowBack />} onClick={() => navigate('/patients')}
           sx={{ mb: 2, borderRadius: 2 }}>
