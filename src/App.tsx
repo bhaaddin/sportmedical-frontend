@@ -70,6 +70,10 @@ const WorkerSchedulePage = lazy(() => import('./pages/admin/WorkerScheduleSettin
 const CashierPage = lazy(() => import('./pages/CashierPage'));
 const ClubsPage = lazy(() => import('./pages/ClubsPage'));
 const AccountingExportPage = lazy(() => import('./pages/AccountingExportPage'));
+const ProvozPage = lazy(() => import('./pages/admin/Provoz'));
+const OznameniPage = lazy(() => import('./pages/admin/Oznameni'));
+const ZabezpeceniPage = lazy(() => import('./pages/admin/Zabezpeceni'));
+const DohledPage = lazy(() => import('./pages/admin/Dohled'));
 
 /* ── Loading spinner for Suspense ── */
 function PageLoader() {
@@ -372,6 +376,10 @@ export default function App() {
                     <Route path="/worker-schedule" element={<WorkerSchedulePage />} />
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
+                    <Route path="/admin/provoz" element={<RequireAdmin><ProvozPage /></RequireAdmin>} />
+                    <Route path="/admin/oznameni" element={<RequireAdmin><OznameniPage /></RequireAdmin>} />
+                    <Route path="/admin/zabezpeceni" element={<RequireAdmin><ZabezpeceniPage /></RequireAdmin>} />
+                    <Route path="/admin/dohled" element={<RequireAdmin><DohledPage /></RequireAdmin>} />
                     <Route path="/codebook" element={<CodebookPage />} />
                     <Route path="/system-health" element={<SystemHealthPage />} />
                     <Route path="/staff-management" element={<RequireAdmin><StaffManagementPage /></RequireAdmin>} />

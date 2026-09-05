@@ -13,6 +13,7 @@ import {
   MonitorHeart, AdminPanelSettings, AttachMoney, Warning, FitnessCenter,
   Flag, MedicalServices, Psychology, EventAvailable, Watch, Group, Book,
   Menu, ChevronLeft, Search, Moon, Sun, KeyboardArrowDown, Schedule,
+  Shield, PointOfSale, MarkEmailRead, Speed,
 } from '@mui/icons-material';
 import { useAppStore } from '../store/useAppStore';
 import { format } from 'date-fns';
@@ -47,6 +48,10 @@ const menuItems = [
   { text: 'Číselník (ICD-10)', icon: <Book />, path: '/codebook' },
   { text: 'Monitoring', icon: <MonitorHeart />, path: '/system-health' },
   { text: 'Administrace', icon: <AdminPanelSettings />, path: '/admin' },
+  { text: 'Provoz', icon: <PointOfSale />, path: '/admin/provoz' },
+  { text: 'Oznámení', icon: <MarkEmailRead />, path: '/admin/oznameni' },
+  { text: 'Zabezpečení', icon: <Shield />, path: '/admin/zabezpeceni' },
+  { text: 'Dohled', icon: <Speed />, path: '/admin/dohled' },
   { text: 'Nastavení', icon: <Settings />, path: '/settings' },
 ];
 
