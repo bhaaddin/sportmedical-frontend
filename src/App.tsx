@@ -20,6 +20,7 @@ import NotificationCenter from './components/NotificationCenter';
 /* ── Lazy-loaded routes (code-split per page) ── */
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Login = lazy(() => import('./pages/Login'));
+const IntakeQuestionnaire = lazy(() => import('./pages/public/IntakeQuestionnaire'));
 const DashboardPage = lazy(() => import('./pages/Dashboard'));
 const DiagnosticForm = lazy(() => import('./pages/DiagnosticForm'));
 const PatientList = lazy(() => import('./pages/PatientList'));
@@ -334,6 +335,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Suspense fallback={<PageLoader />}><Login /></Suspense>} />
+            <Route path="/dotaznik" element={<Suspense fallback={<PageLoader />}><IntakeQuestionnaire /></Suspense>} />
             <Route path="/book" element={<Suspense fallback={<PageLoader />}><BookAppointment /></Suspense>} />
             <Route path="/book/:slug" element={<Suspense fallback={<PageLoader />}><BookAppointment /></Suspense>} />
             <Route path="/*" element={
