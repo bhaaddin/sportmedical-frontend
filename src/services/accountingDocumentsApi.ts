@@ -1,4 +1,4 @@
-import axios from 'axios';
+import client from '../api/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -103,47 +103,47 @@ export interface CreatePPDData {
 
 export const accountingDocumentsApi = {
   createInvoice: async (data: CreateInvoiceData): Promise<AccountingDocument> => {
-    const response = await axios.post(`${API_BASE}/accounting/documents/invoices`, data);
+    const response = await client.post(`${API_BASE}/accounting/documents/invoices`, data);
     return response.data;
   },
 
   createPPD: async (data: CreatePPDData): Promise<AccountingDocument> => {
-    const response = await axios.post(`${API_BASE}/accounting/documents/ppd`, data);
+    const response = await client.post(`${API_BASE}/accounting/documents/ppd`, data);
     return response.data;
   },
 
   getById: async (id: string): Promise<AccountingDocument> => {
-    const response = await axios.get(`${API_BASE}/accounting/documents/${id}`);
+    const response = await client.get(`${API_BASE}/accounting/documents/${id}`);
     return response.data;
   },
 
   getByPatient: async (patientId: string): Promise<AccountingDocument[]> => {
-    const response = await axios.get(`${API_BASE}/accounting/documents`, {
+    const response = await client.get(`${API_BASE}/accounting/documents`, {
       params: { patientId },
     });
     return response.data;
   },
 
   getByDateRange: async (startDate: string, endDate: string): Promise<AccountingDocument[]> => {
-    const response = await axios.get(`${API_BASE}/accounting/documents`, {
+    const response = await client.get(`${API_BASE}/accounting/documents`, {
       params: { startDate, endDate },
     });
     return response.data;
   },
 
   downloadPdf: async (id: string): Promise<Blob> => {
-    const response = await axios.get(`${API_BASE}/accounting/documents/${id}/pdf`, {
+    const response = await client.get(`${API_BASE}/accounting/documents/${id}/pdf`, {
       responseType: 'blob',
     });
     return response.data;
   },
 
   markAsPaid: async (id: string): Promise<void> => {
-    await axios.post(`${API_BASE}/accounting/documents/${id}/paid`);
+    await client.post(`${API_BASE}/accounting/documents/${id}/paid`);
   },
 
   cancel: async (id: string): Promise<void> => {
-    await axios.post(`${API_BASE}/accounting/documents/${id}/cancel`);
+    await client.post(`${API_BASE}/accounting/documents/${id}/cancel`);
   },
 };
 

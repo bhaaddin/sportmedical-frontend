@@ -1,4 +1,4 @@
-import axios from 'axios';
+import client from '../api/client';
 import { useQuery } from '@tanstack/react-query';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -87,24 +87,24 @@ export interface AnalyticsReport {
 export const analyticsApi = {
   getDashboard: async (date?: string): Promise<DashboardMetrics> => {
     const params = date ? { date } : {};
-    const response = await axios.get(`${API_BASE}/analytics/dashboard`, { params });
+    const response = await client.get(`${API_BASE}/analytics/dashboard`, { params });
     return response.data;
   },
 
   getReport: async (dateFrom: string, dateTo: string): Promise<AnalyticsReport> => {
-    const response = await axios.get(`${API_BASE}/analytics/report`, {
+    const response = await client.get(`${API_BASE}/analytics/report`, {
       params: { dateFrom, dateTo },
     });
     return response.data;
   },
 
   getDemographics: async (): Promise<PatientDemographics[]> => {
-    const response = await axios.get(`${API_BASE}/analytics/demographics`);
+    const response = await client.get(`${API_BASE}/analytics/demographics`);
     return response.data;
   },
 
   exportCsv: async (dateFrom: string, dateTo: string): Promise<Blob> => {
-    const response = await axios.get(`${API_BASE}/analytics/export/csv`, {
+    const response = await client.get(`${API_BASE}/analytics/export/csv`, {
       params: { dateFrom, dateTo },
       responseType: 'blob',
     });
@@ -112,7 +112,7 @@ export const analyticsApi = {
   },
 
   exportExcel: async (dateFrom: string, dateTo: string): Promise<Blob> => {
-    const response = await axios.get(`${API_BASE}/analytics/export/excel`, {
+    const response = await client.get(`${API_BASE}/analytics/export/excel`, {
       params: { dateFrom, dateTo },
       responseType: 'blob',
     });
