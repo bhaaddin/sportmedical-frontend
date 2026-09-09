@@ -293,7 +293,9 @@
         "holiday": "svátek",
         "other": "zavřeno"
       },
-      "jumpTo": "Přejít na datum"
+      "jumpTo": "Přejít na datum",
+      "month": "Měsíc",
+      "more": "+{{count}} další"
     }
   }
 }
