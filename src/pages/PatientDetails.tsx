@@ -18,8 +18,6 @@ import { diagnosticsApi } from '../api/diagnostics';
 import type { DiagnosticSession } from '../api/diagnostics';
 import { documentsApi } from '../api/documents';
 import type { PatientDocument } from '../api/documents';
-import { publicBookingApi } from '../api/publicBooking';
-import { BookingDocumentView } from '../components/booking/BookingDocuments';
 import { ConsentManager } from '../components/ConsentManager';
 
 /* ── Helpers ── */
@@ -101,7 +99,6 @@ export default function PatientDetails() {
   const [docs, setDocs] = useState<PatientDocument[]>([]);
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState<string | null>(null);
-  const [bookingDocs, setBookingDocs] = useState<any>(undefined);
   const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -112,20 +109,6 @@ export default function PatientDetails() {
       patientsApi.getProfile(id).then(setProfile).catch(() => {});
     }
   }, [id]);
-
-  // Load booking questionnaire/GDPR/signature once patient is known
-  useEffect(() => {
-    if (!patient) return;
-    const dob = typeof patient.dateOfBirth === 'string'
-      ? patient.dateOfBirth.slice(0, 10)
-      : new Date(patient.dateOfBirth).toISOString().slice(0, 10);
-    publicBookingApi.adminGetPatientDocuments({
-      email: (patient as any).email ?? '',
-      firstName: patient.firstName,
-      lastName: patient.lastName,
-      birthDate: dob,
-    }).then(setBookingDocs).catch(() => setBookingDocs(null));
-  }, [patient]);
 
   if (!patient) {
     return (
@@ -283,32 +266,6 @@ export default function PatientDetails() {
                   </Grid>
                 ))}
               </Grid>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
-
-      {/* ── Booking documents (questionnaire + GDPR + signature) ── */}
-      {bookingDocs !== undefined && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <Card sx={{ mb: 3, borderRadius: 3 }}>
-            <CardContent>
-              <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-                <Description sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Dokumenty z online rezervace
-              </Typography>
-              {bookingDocs === null ? (
-                <Typography variant="body2" color="text.secondary">
-                  K pacientovi zatím není přiřazen žádný online dotazník.
-                </Typography>
-              ) : (
-                <>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    {bookingDocs.eventName} · {new Date(bookingDocs.startAt).toLocaleDateString('cs-CZ')}
-                  </Typography>
-                  <BookingDocumentView data={bookingDocs.consents} />
-                </>
-              )}
             </CardContent>
           </Card>
         </motion.div>

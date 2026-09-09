@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import { Add, Cancel, Undo, Refresh } from '@mui/icons-material';
 import { cashierApi, PaymentMethod, type CashierTransaction } from '../services/cashierApi';
-import { publicBookingApi } from '../api/publicBooking';
+import { servicesApi } from '../api/services';
 import { patientsApi, type Patient } from '../api/patients';
 import toast from 'react-hot-toast';
 
@@ -35,14 +35,17 @@ export default function CashierPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const [s, t, ev] = await Promise.all([
+      const [s, t, svc] = await Promise.all([
         cashierApi.getDashboard().catch(() => null),
         cashierApi.getTransactions(today).catch(() => []),
-        publicBookingApi.adminGetAll().catch(() => []),
+        servicesApi.getAll().catch(() => []),
       ]);
       setStats(s);
       setTransactions(t);
-      setServices(ev);
+      /* The picker used to be fed from the public-booking event types, a table
+         with no rows: the payment dialog demands a service and could never list
+         one. It reads the real service catalogue now. */
+      setServices(svc);
     } finally {
       setLoading(false);
     }
