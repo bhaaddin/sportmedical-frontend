@@ -213,9 +213,9 @@
       "from": "Od",
       "to": "Do",
       "cycleEvery": "Každý týden",
-      "cycleEven": "Sudý týden",
-      "cycleOdd": "Lichý týden",
-      "cycleNth": "Každý N-tý týden",
+      "cycleEven": "Každý druhý týden — od prvního týdne období",
+      "cycleOdd": "Každý druhý týden — od druhého týdne období",
+      "cycleNth": "Každý N-tý týden — od začátku období",
       "everyNth": "Každý N-tý",
       "preview": "Platí: {{dates}}",
       "previewNone": "V tomto období na tento den nepadne žádný termín.",
@@ -234,7 +234,7 @@
       },
       "impactLength": "Délka",
       "minutes": "{{minutes}} min",
-      "previewStale": "Uložte změnu, ať se ukázka data přepočítá na serveru."
+      "previewLoading": "Načítám data…"
     },
     "exceptions": {
       "title": "Výjimky",

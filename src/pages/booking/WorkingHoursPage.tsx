@@ -32,7 +32,6 @@ import { calendarsApi } from "../../api/calendars";
 import { workingHoursApi } from "../../api/workingHours";
 import type {
   ImpactReport,
-  PreviewDay,
   SchedulePeriod,
   SchedulePeriodInput,
   WorkingHour,
@@ -43,7 +42,6 @@ import { DayActivityGrid } from "../../components/booking/DayActivityGrid";
 import { errorText } from "../../components/booking/errorText";
 import {
   addDaysToDateOnly,
-  dayOfWeekOf,
   formatDateOnly,
   formatPragueTime,
   toDateOnly,
@@ -174,21 +172,6 @@ export default function WorkingHoursPage() {
     queryFn: () => calendarsApi.getAccess(activeCalendarId),
     enabled: activeCalendarId !== "",
     staleTime: CODEBOOK_STALE_MS,
-  });
-
-  /**
-   * One call for the whole window (7.3), shared by all seven rows. This is the
-   * only source of "which dates does this row fall on".
-   */
-  const previewQuery = useQuery({
-    queryKey: ["preview", activeCalendarId, today],
-    queryFn: () =>
-      workingHoursApi.preview(
-        activeCalendarId,
-        today,
-        addDaysToDateOnly(today, PREVIEW_DAYS),
-      ),
-    enabled: activeCalendarId !== "",
   });
 
   const savePeriod = useMutation({
@@ -430,7 +413,6 @@ export default function WorkingHoursPage() {
                             (h) => h.dayOfWeek === dayOfWeek,
                           ) ?? null
                         }
-                        preview={previewQuery.data ?? []}
                         workers={(workersQuery.data ?? []).map((w) => ({
                           id: w.userId,
                           name: w.displayName,
@@ -618,7 +600,6 @@ interface DayRowProps {
   calendarId: string;
   existing: WorkingHour | null;
   workers: { id: string; name: string }[];
-  preview: PreviewDay[];
 }
 
 function DayRow({
@@ -627,7 +608,6 @@ function DayRow({
   calendarId,
   existing,
   workers,
-  preview,
 }: DayRowProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -688,23 +668,35 @@ function DayRow({
    * A day the owner has just edited but not saved has no preview yet, which the
    * row says instead of showing dates that no longer match the switches.
    */
-  const previewDates = useMemo(
-    () =>
-      preview
-        .filter(
-          (day) =>
-            dayOfWeekOf(day.date) === dayOfWeek &&
-            day.isOpen &&
-            !day.isChangedByOverride &&
-            day.date >= period.validFrom &&
-            (period.validTo === null || day.date <= period.validTo) &&
-            (value.workerUserId === null ||
-              day.workerUserId === value.workerUserId),
-        )
-        .slice(0, 5)
-        .map((day) => day.date),
-    [preview, dayOfWeek, period.validFrom, period.validTo, value.workerUserId],
-  );
+  /**
+   * 4.2 `…/cycle`: the dates this row's cycle falls on, asked of the server's
+   * own rule for the values currently in the switches - so the owner sees real
+   * dates while still deciding, and this side never computes them again.
+   *
+   * "Even" and "odd" are counted from the start of the period, not from the
+   * calendar year, which is exactly why the dates are shown rather than
+   * described.
+   */
+  const cycleQuery = useQuery({
+    queryKey: [
+      'cycle', calendarId, period.id, dayOfWeek,
+      value.repeatEveryNWeeks, value.weekOffset, period.validFrom, period.validTo,
+    ],
+    queryFn: () =>
+      workingHoursApi.cycleDates(
+        calendarId,
+        period.id,
+        dayOfWeek,
+        value.repeatEveryNWeeks,
+        value.weekOffset,
+        period.validFrom,
+        period.validTo ?? addDaysToDateOnly(period.validFrom, PREVIEW_DAYS),
+      ),
+    enabled: isActive,
+    placeholderData: (previous) => previous,
+  });
+
+  const previewDates = (cycleQuery.data ?? []).slice(0, 5);
 
   return (
     <TableRow hover>
@@ -822,8 +814,8 @@ function DayRow({
         ) : null}
         {isActive ? (
           <Typography sx={{ mt: 1, fontSize: 13, color: "text.secondary" }}>
-            {dirty
-              ? t("booking.workingHours.previewStale")
+            {cycleQuery.isPending
+              ? t("booking.workingHours.previewLoading")
               : previewDates.length > 0
                 ? t("booking.workingHours.preview", {
                     dates: previewDates

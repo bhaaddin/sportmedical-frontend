@@ -2,6 +2,7 @@ import client from './client';
 import { toBookingError } from './apiError';
 import {
   dayActivityGridSchema,
+  cycleDatesSchema,
   impactReportSchema,
   parseResponse,
   previewListSchema,
@@ -150,6 +151,29 @@ export const workingHoursApi = {
         params: { from, to },
       });
       return parseResponse(previewListSchema, res.data);
+    }),
+
+  /**
+   * The dates a candidate cycle falls on (4.2). Pure: it stores nothing and
+   * reads no saved row, so the picker can show real dates while the owner is
+   * still deciding - and they come from the server's own rule rather than from
+   * a second implementation of it on this side.
+   */
+  cycleDates: (
+    calendarId: string,
+    periodId: string,
+    dayOfWeek: number,
+    repeatEveryNWeeks: number,
+    weekOffset: number,
+    from: string,
+    to: string,
+  ): Promise<string[]> =>
+    request(async () => {
+      const res = await client.get(
+        `/api/calendars/${calendarId}/periods/${periodId}/cycle`,
+        { params: { dayOfWeek, repeatEveryNWeeks, weekOffset, from, to } },
+      );
+      return parseResponse(cycleDatesSchema, res.data);
     }),
 
   /* ── Day-activity grid (5.7) ── */

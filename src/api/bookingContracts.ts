@@ -438,6 +438,20 @@ export const previewDaySchema = z.object({
 export type PreviewDay = z.infer<typeof previewDaySchema>;
 export const previewListSchema = z.array(previewDaySchema);
 
+/**
+ * The dates a week cycle falls on - 4.2 `…/periods/{pid}/cycle`.
+ *
+ * A different question from `preview`: this one is the raw cycle, with no
+ * exception, holiday or other row applied. It answers "when does this cycle
+ * land", which is what belongs under the cycle picker, and it answers it for a
+ * candidate the owner has not saved yet.
+ *
+ * Week 0 is the week `validFrom` falls in, counted from its Monday - so "even"
+ * and "odd" here are even and odd **from the start of the period**, never
+ * calendar weeks of the year.
+ */
+export const cycleDatesSchema = z.array(dateOnly);
+
 const timeOfDay = z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, { message: 'expected HH:mm' });
 
 export const workingHourSchema = z.object({
