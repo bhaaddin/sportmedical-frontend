@@ -337,6 +337,31 @@
       "completed": "Dokončeno",
       "overridden": "Přetlačeno",
       "unknown": "Neznámá akce ({{code}})"
+    },
+    "day": {
+      "title": "Dnešní přehled",
+      "previous": "Předchozí den",
+      "next": "Nejbližší",
+      "nextDay": "Následující den",
+      "today": "Dnes",
+      "booked": "Objednáno",
+      "arrived": "Přišlo",
+      "didNotCome": "Nepřišlo",
+      "cancelled": "Zrušeno",
+      "lateIsDisplayOnly": "jen zobrazení, nikam se nezapisuje",
+      "byActivity": "Podle činnosti",
+      "byCalendar": "Podle kalendáře",
+      "nothingBooked": "Nic objednáno.",
+      "lateList": "Mají zpoždění",
+      "nobodyLate": "Nikdo nemá zpoždění.",
+      "loadingName": "načítá se…",
+      "freeToday": "Volné ještě dnes",
+      "minutes": "{{count}} min",
+      "noneLeft": "Dnes už nic.",
+      "unused": "Nevyužito",
+      "unusedOf": "{{unused}} min z {{working}} ({{percent}} % využití)",
+      "noWorkingHours": "Tento den nemá pracovní dobu.",
+      "noCalendarChosen": "Vyberte alespoň jeden kalendář."
     }
   }
 }

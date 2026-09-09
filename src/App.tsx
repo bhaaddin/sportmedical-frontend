@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react
 import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Avatar, IconButton, Menu, MenuItem, Badge, CircularProgress, Button } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import i18n from './i18n';
-import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Group, Search, AttachMoney, Schedule, EventBusy } from '@mui/icons-material';
+import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Group, Search, AttachMoney, Schedule, EventBusy, Today } from '@mui/icons-material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -75,6 +75,8 @@ const BookingWorkingHoursPage = lazy(() => import('./pages/booking/WorkingHoursP
 const BookingExceptionsPage = lazy(() => import('./pages/booking/ExceptionsPage'));
 /* Booking phase 1, stage 3: the calendar grid */
 const BookingGridPage = lazy(() => import('./pages/booking/CalendarGridPage'));
+/* Booking phase 1, stage 4: the appointment detail and the day at a glance */
+const BookingDayOverviewPage = lazy(() => import('./pages/booking/DayOverviewPage'));
 const CashierPage = lazy(() => import('./pages/CashierPage'));
 const ClubsPage = lazy(() => import('./pages/ClubsPage'));
 const AccountingExportPage = lazy(() => import('./pages/AccountingExportPage'));
@@ -132,6 +134,7 @@ const menuGroups: MenuItemGroup[] = [
     label: 'Tým a rezervace',
     items: [
       { text: 'Plánování', icon: <CalendarMonth />, path: '/planovani' },
+      { text: 'Dnešní přehled', icon: <Today />, path: '/dnes' },
       { text: 'Můj rozvrh', icon: <CalendarMonth />, path: '/worker-schedule' },
       { text: 'Kluby', icon: <Group />, path: '/clubs' },
       { text: 'Účetní export', icon: <Receipt />, path: '/accounting-export', adminOnly: true },
@@ -383,6 +386,7 @@ export default function App() {
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/intake-review" element={<RequireAdmin><IntakeReviewQueue /></RequireAdmin>} />
                     <Route path="/planovani" element={<BookingGridPage />} />
+                    <Route path="/dnes" element={<BookingDayOverviewPage />} />
                     <Route path="/calendars" element={<RequireAdmin><BookingCalendarsPage /></RequireAdmin>} />
                     <Route path="/activities" element={<RequireAdmin><BookingActivitiesPage /></RequireAdmin>} />
                     <Route path="/working-hours" element={<RequireAdmin><BookingWorkingHoursPage /></RequireAdmin>} />
