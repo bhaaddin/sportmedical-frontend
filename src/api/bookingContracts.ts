@@ -45,6 +45,16 @@ export const calendarSchema = z.object({
   displayStepMinutes: z.number().int().positive(),
   isActive: z.boolean(),
   sortOrder: z.number().int(),
+  /**
+   * 4.1: both are optional and unset means "no limit". They only bite on public
+   * booking (4.4), which is phase 2 - which is exactly why they are read and
+   * carried here. Under the v27 rule a `PUT` that leaves them out **deletes**
+   * them, so a screen that never showed them would still be able to throw them
+   * away, and nobody would notice until phase 2 arrived and the limits were
+   * gone.
+   */
+  publicMinimumNoticeMinutes: z.number().int().nullish().transform((v) => v ?? null),
+  publicHorizonDays: z.number().int().nullish().transform((v) => v ?? null),
 });
 export type Calendar = z.infer<typeof calendarSchema>;
 
@@ -57,6 +67,9 @@ export const calendarInputSchema = z.object({
   displayStepMinutes: z.number().int().positive(),
   isActive: z.boolean(),
   sortOrder: z.number().int(),
+  /** Carried, not edited - see the note on `calendarSchema`. */
+  publicMinimumNoticeMinutes: z.number().int().nullable(),
+  publicHorizonDays: z.number().int().nullable(),
 });
 export type CalendarInput = z.infer<typeof calendarInputSchema>;
 
@@ -395,17 +408,47 @@ export const createAppointmentInputSchema = z.object({
   holdMinutes: z.number().int().positive().optional(),
   /** 6.4: an override never goes out without a reason typed by a person. */
   overrideReason: z.string().trim().min(1).optional(),
+  /**
+   * 5.9 step 4, and 4.5 since v26. Free text; the server trims the edges and
+   * truncates beyond 2 000 characters rather than refusing the booking, so a
+   * long note never costs somebody their slot.
+   */
+  note: z.string().nullable().optional(),
 });
 export type CreateAppointmentInput = z.infer<typeof createAppointmentInputSchema>;
 
+/**
+ * `AppointmentView` - what `POST`, `/confirm`, `/time` and, since v26,
+ * `GET .../appointments/{id}` all answer with. The whole shape, from the table
+ * 4.5 keeps, rather than the handful of fields the first draft guessed at.
+ *
+ * `activityName` and `checkedInUtc` are here because this lane asked for them:
+ * without the name the detail would hold a guid and have to fetch the whole
+ * activity codebook for one label, and without the arrival time it could not
+ * say "přišel v 9:12" about a fact the server already had. The booking lane
+ * added both in v27 - and found, while doing it, that completing an appointment
+ * had been wiping `checkedInUtc`.
+ *
+ * The patient's name is deliberately absent and will stay absent: identity
+ * belongs to the register, so the detail asks for it by `patientId`.
+ */
 export const appointmentSchema = z.object({
   id: z.string(),
   calendarId: z.string(),
   patientId: z.string(),
   activityId: z.string(),
+  /** Empty when the activity is gone, so it is never assumed to be there. */
+  activityName: z.string().nullish().transform((v) => v ?? ''),
   startUtc: isoUtc,
   endUtc: isoUtc,
   status: bookingStatusSchema,
+  source: z.number().int().nullish().transform((v) => v ?? null),
+  workerUserId: z.string().nullish().transform((v) => v ?? null),
+  heldUntilUtc: isoUtc.nullish().transform((v) => v ?? null),
+  overrideReason: z.string().nullish().transform((v) => v ?? null),
+  /** 5.8, v26. `null` when there is none - never an empty string. */
+  note: z.string().nullish().transform((v) => v ?? null),
+  checkedInUtc: isoUtc.nullish().transform((v) => v ?? null),
 }).passthrough();
 export type Appointment = z.infer<typeof appointmentSchema>;
 

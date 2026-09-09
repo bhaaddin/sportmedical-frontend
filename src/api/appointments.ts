@@ -1,6 +1,7 @@
 import client from './client';
 import { toBookingError } from './apiError';
 import {
+  appointmentSchema,
   availabilityListSchema,
   bookedAppointmentSchema,
   dayAppointmentListSchema,
@@ -9,6 +10,7 @@ import {
   parseResponse,
   timeBlockListSchema,
   timeBlockSchema,
+  type Appointment,
   type AvailabilitySlot,
   type BookedAppointment,
   type CreateAppointmentInput,
@@ -116,6 +118,23 @@ export const appointmentsApi = {
         params: { date: requireDate(date, 'date') },
       });
       return parseResponse(dayAppointmentListSchema, res.data);
+    }),
+
+  /**
+   * One appointment, by id - 4.5 since v26.
+   *
+   * The detail screen reads from here rather than from the row the grid holds:
+   * a link to an appointment has something to live on, and a change made in
+   * another window shows up instead of a stale copy. A calendar the user may
+   * not see answers `404`, never `403` (6.5), and so does an id that is not
+   * there - the two are indistinguishable on purpose.
+   */
+  get: (calendarId: string, id: string): Promise<Appointment> =>
+    request(async () => {
+      const res = await client.get(
+        `/api/calendars/${requireId(calendarId, 'calendarId')}/appointments/${id}`,
+      );
+      return parseResponse(appointmentSchema, res.data);
     }),
 
   /* ── Booking (4.5) ── */

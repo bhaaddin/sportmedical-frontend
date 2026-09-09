@@ -217,9 +217,10 @@ export default function CalendarGridPage() {
   }, [days, previewQueries.data]);
 
   /**
-   * The row the detail is opened on. There is no `GET .../appointments/{id}` in
-   * 4.5, so the detail is fed from the row the grid already holds rather than
-   * from a request that does not exist.
+   * Which appointment the detail is opened on. Only its id and calendar are
+   * taken from here - the detail reads the appointment itself from
+   * `GET .../appointments/{id}` (4.5, v26), so a change made elsewhere shows up
+   * instead of a stale copy of this row.
    */
   const openAppointment = useMemo(
     () =>
@@ -450,10 +451,11 @@ export default function CalendarGridPage() {
 
       {/* 5.8. The row is gone from the answer once it is cancelled, so the
           dialog closes itself rather than showing a stale copy. */}
-      {openAppointment ? (
+      {openAppointment?.calendarId ? (
         <AppointmentDetail
-          appointment={openAppointment}
-          calendar={calendarById.get(openAppointment.calendarId ?? "")}
+          appointmentId={openAppointment.id}
+          calendarId={openAppointment.calendarId}
+          calendar={calendarById.get(openAppointment.calendarId)}
           open
           onClose={() => setOpenId(null)}
           onChanged={() => void appointmentsQuery.refetch()}

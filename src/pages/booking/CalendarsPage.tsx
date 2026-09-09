@@ -50,6 +50,9 @@ function emptyDraft(sortOrder: number): CalendarInput {
     displayStepMinutes: 15,
     isActive: true,
     sortOrder,
+    /* 4.1: unset means "no limit", which is the right default for a new one. */
+    publicMinimumNoticeMinutes: null,
+    publicHorizonDays: null,
   };
 }
 
@@ -119,6 +122,14 @@ export default function CalendarsPage() {
       displayStepMinutes: calendar.displayStepMinutes,
       isActive: calendar.isActive,
       sortOrder: calendar.sortOrder,
+      /*
+       * Carried through untouched. This screen does not offer them - they are
+       * public-booking limits and public booking is phase 2 - but v27 makes a
+       * `PUT` the whole entity, so leaving them out of the body would delete
+       * them. Renaming a calendar must not quietly drop its limits.
+       */
+      publicMinimumNoticeMinutes: calendar.publicMinimumNoticeMinutes,
+      publicHorizonDays: calendar.publicHorizonDays,
     });
     save.reset();
   };

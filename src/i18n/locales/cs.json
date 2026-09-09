@@ -334,7 +334,13 @@
       "history": "Historie",
       "historyEmpty": "Historie je prázdná.",
       "unknownActor": "neznámý uživatel",
-      "close": "Zavřít"
+      "close": "Zavřít",
+      "title": "Termín",
+      "noActivity": "Činnost už neexistuje",
+      "note": "Poznámka",
+      "noNote": "Bez poznámky. Zapisuje se při objednání.",
+      "heldUntil": "drženo do",
+      "overridden": "Přetlačeno"
     },
     "history": {
       "booked": "Objednáno",
