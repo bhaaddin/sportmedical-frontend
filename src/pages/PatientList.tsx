@@ -4,7 +4,7 @@ import {
   Box, Typography, Paper, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Avatar, Chip, InputAdornment, Grid, Card, CardContent, IconButton, Tooltip, ToggleButton, ToggleButtonGroup,
 } from '@mui/material';
-import { Search, PersonAdd, People, ViewList, ViewModule, LocalHospital } from '@mui/icons-material';
+import { Search, PersonAdd, People, ViewList, ViewModule, LocalHospital, HowToReg } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
@@ -46,11 +46,17 @@ export default function PatientList() {
             </Typography>
             <Typography variant="body2" color="text.secondary">{patients.length} registrovaných pacientů</Typography>
           </Box>
-          <Button variant="contained" startIcon={<PersonAdd />} onClick={() => navigate('/patients/new')}
-            sx={{ bgcolor: '#0D7377', borderRadius: 3, px: 3, py: 1.2, fontWeight: 600, boxShadow: '0 4px 16px rgba(13,115,119,0.3)',
-              '&:hover': { bgcolor: '#095456', boxShadow: '0 6px 20px rgba(13,115,119,0.4)' } }}>
-            Nový pacient
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <Button variant="outlined" startIcon={<PersonAdd />} onClick={() => navigate('/patients/new')}
+              sx={{ borderRadius: 3, px: 3, py: 1.2, fontWeight: 600 }}>
+              Nový pacient
+            </Button>
+            <Button variant="contained" startIcon={<HowToReg />} onClick={() => navigate('/patients/register')}
+              sx={{ bgcolor: '#0D7377', borderRadius: 3, px: 3, py: 1.2, fontWeight: 600, boxShadow: '0 4px 16px rgba(13,115,119,0.3)',
+                '&:hover': { bgcolor: '#095456', boxShadow: '0 6px 20px rgba(13,115,119,0.4)' } }}>
+              Registrace pacienta
+            </Button>
+          </Box>
         </Box>
       </motion.div>
 
