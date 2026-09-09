@@ -64,6 +64,18 @@ function requireDate(value: string | undefined | null, field: string): string {
   return value;
 }
 
+/**
+ * The same guard for a required identifier. `availability` without
+ * `activityId` used to answer a misleading 404 "činnost nenalezena" and now
+ * answers 400 naming the field; either way the screen should not have sent it.
+ */
+function requireId(value: string | undefined | null, field: string): string {
+  if (!value) {
+    throw new Error(`Chybí povinný údaj: ${field}`);
+  }
+  return value;
+}
+
 /** Times always go out with `Z`; a time without a zone is a safety net, not a contract. */
 function asUtcInstant(value: string | Date): string {
   return typeof value === 'string' ? new Date(value).toISOString() : value.toISOString();
@@ -237,7 +249,7 @@ export const appointmentsApi = {
     request(async () => {
       const res = await client.get(`/api/calendars/${calendarId}/availability`, {
         params: {
-          activityId,
+          activityId: requireId(activityId, 'activityId'),
           from: requireDate(from, 'from'),
           to: requireDate(to, 'to'),
         },
