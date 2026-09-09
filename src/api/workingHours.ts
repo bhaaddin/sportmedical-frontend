@@ -206,9 +206,21 @@ export const workingHoursApi = {
 
   /* ── Exceptions (5.5) ── */
 
-  listExceptions: (calendarId: string): Promise<ScheduleException[]> =>
+  /**
+   * The range is required. The contract's list of endpoints with mandatory
+   * dates does not mention this one, but the server answers `400` with
+   * `errors: { from, to }` without it - so the screen names the window it is
+   * asking about instead of appearing to show every exception there is.
+   */
+  listExceptions: (
+    calendarId: string,
+    from: string,
+    to: string,
+  ): Promise<ScheduleException[]> =>
     request(async () => {
-      const res = await client.get(`/api/calendars/${calendarId}/exceptions`);
+      const res = await client.get(`/api/calendars/${calendarId}/exceptions`, {
+        params: { from, to },
+      });
       return parseResponse(scheduleExceptionListSchema, res.data);
     }),
 

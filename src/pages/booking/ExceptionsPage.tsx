@@ -29,7 +29,7 @@ import { workingHoursApi } from "../../api/workingHours";
 import type { ScheduleExceptionInput } from "../../api/bookingContracts";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { errorText } from "../../components/booking/errorText";
-import { formatDateOnly, toDateOnly } from "../../utils/time";
+import { addDaysToDateOnly, formatDateOnly, toDateOnly } from "../../utils/time";
 
 /**
  * Exceptions - contract screen 5.5: closed, different hours, different worker.
@@ -79,9 +79,14 @@ export default function ExceptionsPage() {
   const calendars = calendarsQuery.data ?? [];
   const activeCalendarId = calendarId || calendars[0]?.id || "";
 
+  /** The window the list covers; the endpoint requires a range. */
+  const windowFrom = addDaysToDateOnly(today, -90);
+  const windowTo = addDaysToDateOnly(today, 365);
+
   const exceptionsQuery = useQuery({
-    queryKey: ["exceptions", activeCalendarId],
-    queryFn: () => workingHoursApi.listExceptions(activeCalendarId),
+    queryKey: ["exceptions", activeCalendarId, windowFrom, windowTo],
+    queryFn: () =>
+      workingHoursApi.listExceptions(activeCalendarId, windowFrom, windowTo),
     enabled: activeCalendarId !== "",
   });
 
@@ -148,7 +153,11 @@ export default function ExceptionsPage() {
             {t("booking.exceptions.title")}
           </Typography>
           <Typography sx={{ color: "text.secondary" }}>
-            {t("booking.exceptions.subtitle")}
+            {t("booking.exceptions.subtitle")}{" "}
+            {t("booking.exceptions.window", {
+              from: formatDateOnly(windowFrom),
+              to: formatDateOnly(windowTo),
+            })}
           </Typography>
         </Box>
         <Button

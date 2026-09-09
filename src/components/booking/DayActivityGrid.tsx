@@ -177,7 +177,16 @@ export function DayActivityGrid({ calendarId, periodId, workingDays }: DayActivi
                 const works = workingDays.has(dayOfWeek);
                 // Unsaved state is the client's to mark; the saved state is the
                 // server's, and it names the day in the warning context (3.1).
-                const bookableNothing = works && forDay.size === 0;
+                /*
+                 * "Working hours but nothing offered" is true in one of three
+                 * cases only. `OfferedOn` reads the period as a whole: with no
+                 * choices anywhere, every activity is offered; with choices
+                 * somewhere, a day without them offers nothing; a day with them
+                 * offers exactly those. Warning on the first case would say a
+                 * day offers nothing when it in fact offers everything.
+                 */
+                const anyDayChosen = [...grid.values()].some((ids) => ids.size > 0);
+                const bookableNothing = works && anyDayChosen && forDay.size === 0;
                 const flaggedByServer = edited === null && flaggedDays.has(dayOfWeek);
                 return (
                   <TableRow key={dayOfWeek} hover>

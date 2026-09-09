@@ -253,11 +253,12 @@
         "closed": "Zavřeno",
         "differentHours": "Jiný čas",
         "differentWorker": "Jiný pracovník"
-      }
+      },
+      "window": "Zobrazeno {{from}} – {{to}}."
     },
     "dayActivities": {
       "title": "Činnosti podle dnů",
-      "subtitle": "Co se v tomto období dělá který den. Uložení nahradí celou mřížku — den bez zaškrtnutí zůstane bez činností.",
+      "subtitle": "Co se v tomto období dělá který den. Uložení nahradí celou mřížku. Když není zaškrtnuto nic nikde, nabízí se všechny činnosti; jakmile je zaškrtnuto někde, den bez zaškrtnutí nenabídne nic.",
       "noActivities": "Nejprve založte činnost — bez činnosti se do kalendáře nedá objednat.",
       "offersNothing": "má pracovní dobu, ale žádnou činnost — nenabídne nic",
       "notWorking": "nepracovní den",
