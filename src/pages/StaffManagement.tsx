@@ -43,13 +43,6 @@ interface LoginAccount {
   mustChangePassword: boolean;
 }
 
-interface ServiceOption {
-  id: string;
-  slug: string;
-  name: string;
-  providerName: string;
-}
-
 /* ── Role config ── */
 const ROLE_LABELS: Record<string, string> = {
   Admin: 'Administrátor',
