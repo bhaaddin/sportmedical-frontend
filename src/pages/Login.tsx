@@ -53,6 +53,16 @@ export default function Login() {
       if (err.response?.data?.code === 'account.password_change_required') {
         setMustChange(true);
         setError('');
+      } else if (!err.response) {
+        /*
+         * Nothing answered - the server is down, or the network is. Saying
+         * "Neplatné přihlašovací údaje" here is a claim the screen cannot make:
+         * nobody checked the password. It sends people off to hunt for a
+         * credential that was right all along, which is exactly what it did.
+         */
+        setError('Server neodpovídá. Zkontrolujte, že běží, a zkuste to znovu.');
+      } else if (err.response.status >= 500) {
+        setError('Server odpověděl chybou. S přihlašovacími údaji to nesouvisí.');
       } else {
         setError(err.response?.data?.message || 'Neplatné přihlašovací údaje');
       }
