@@ -21,9 +21,29 @@ const files = [];
   }
 })('src');
 
-const MINE =
-  /^src\/(pages\/booking\/|components\/booking\/(AsyncSection|ColorSelect|CalendarAccessDialog|errorText|DayActivityGrid))/;
-const mine = files.filter((f) => MINE.test(f));
+/*
+ * Which files this lane owns. It is a denylist on purpose: an allowlist of
+ * component names went stale the first time a new screen was added - the audit
+ * printed a clean run that had never looked at the new file. A list that has to
+ * be extended before it can catch anything catches nothing.
+ *
+ * These three predate this lane and belong to other work.
+ */
+const NOT_MINE = [
+  'src/components/booking/AddressPicker.tsx',
+  'src/components/booking/BookingDocuments.tsx',
+  'src/components/booking/WaitlistManager.tsx',
+];
+
+const MINE = /^src\/(pages|components)\/booking\//;
+const mine = files.filter((f) => MINE.test(f) && !NOT_MINE.includes(f));
+
+/* An exclusion for a file that no longer exists hides nothing and would quietly
+   outlive the reason it was written. */
+const stale = NOT_MINE.filter((f) => !files.includes(f));
+if (stale.length > 0) {
+  console.log('ZASTARALÁ VÝNIMKA (súbor neexistuje): ' + stale.join(', '));
+}
 
 let problems = 0;
 

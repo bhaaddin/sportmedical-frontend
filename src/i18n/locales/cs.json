@@ -273,7 +273,7 @@
       "Cancelled": "Zrušeno",
       "Waitlisted": "Čekací listina",
       "unknown": "Neznámý stav",
-      "late": "Mešká"
+      "late": "Má zpoždění"
     },
     "grid": {
       "title": "Kalendář",
@@ -296,6 +296,47 @@
       "jumpTo": "Přejít na datum",
       "month": "Měsíc",
       "more": "+{{count}} další"
+    },
+    "detail": {
+      "patient": "Pacient",
+      "patientMissing": "Pacienta se nepodařilo načíst.",
+      "noPhone": "telefon neuveden",
+      "noEmail": "e-mail neuveden",
+      "checkedInAt": "přišel v",
+      "noCalendar": "U tohoto termínu chybí kalendář, takže ho odsud měnit nelze. Otevřete ho z kalendáře, do kterého patří.",
+      "arrived": "Přišel",
+      "noShow": "Nepřišel",
+      "undo": "Vrátit na objednán",
+      "complete": "Dokončit",
+      "move": "Přesunout",
+      "moveTo": "Přesunout na",
+      "noFreeTime": "V následujících dvou týdnech není volný čas.",
+      "cancel": "Zrušit termín",
+      "cancelConfirm": "Zrušit termín",
+      "cancelIsFinal": "Zrušení se nedá vzít zpět. Napište důvod — uloží se do historie.",
+      "keep": "Ponechat",
+      "reason": "Důvod",
+      "confirmNoShow": "Pacient je označen jako přítomný. Opravdu nepřišel?",
+      "confirmComplete": "Dokončený termín už zrušit nejde. Dokončit?",
+      "notAllowed": "V tomto stavu tuto změnu provést nelze.",
+      "yes": "Ano",
+      "no": "Ne",
+      "history": "Historie",
+      "historyEmpty": "Historie je prázdná.",
+      "unknownActor": "neznámý uživatel",
+      "close": "Zavřít"
+    },
+    "history": {
+      "booked": "Objednáno",
+      "confirmed": "Potvrzeno",
+      "rescheduled": "Přesunuto",
+      "cancelled": "Zrušeno",
+      "arrived": "Přišel",
+      "noShow": "Nepřišel",
+      "undone": "Vráceno zpět",
+      "completed": "Dokončeno",
+      "overridden": "Přetlačeno",
+      "unknown": "Neznámá akce ({{code}})"
     }
   }
 }

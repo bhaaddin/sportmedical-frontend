@@ -30,6 +30,7 @@ import {
   type PreviewDay,
 } from "../../api/bookingContracts";
 import { AsyncSection } from "../../components/booking/AsyncSection";
+import { AppointmentDetail } from "../../components/booking/AppointmentDetail";
 import { readableTextOn } from "../../utils/calendarPalette";
 import {
   addDaysToDateOnly,
@@ -214,6 +215,19 @@ export default function CalendarGridPage() {
     if (earliest > latest) return DEFAULT_OPEN;
     return { start: Math.max(0, earliest - 1), end: Math.min(24, latest) };
   }, [days, previewQueries.data]);
+
+  /**
+   * The row the detail is opened on. There is no `GET .../appointments/{id}` in
+   * 4.5, so the detail is fed from the row the grid already holds rather than
+   * from a request that does not exist.
+   */
+  const openAppointment = useMemo(
+    () =>
+      openId === null
+        ? null
+        : ((appointmentsQuery.data ?? []).find((a) => a.id === openId) ?? null),
+    [openId, appointmentsQuery.data],
+  );
 
   const byDay = useMemo(() => {
     const map = new Map<string, DayAppointment[]>();
@@ -416,7 +430,6 @@ export default function CalendarGridPage() {
               byDay={byDay}
               calendarById={calendarById}
               now={now}
-              openId={openId}
               onOpen={setOpenId}
             />
           ) : (
@@ -434,6 +447,18 @@ export default function CalendarGridPage() {
           )}
         </AsyncSection>
       </AsyncSection>
+
+      {/* 5.8. The row is gone from the answer once it is cancelled, so the
+          dialog closes itself rather than showing a stale copy. */}
+      {openAppointment ? (
+        <AppointmentDetail
+          appointment={openAppointment}
+          calendar={calendarById.get(openAppointment.calendarId ?? "")}
+          open
+          onClose={() => setOpenId(null)}
+          onChanged={() => void appointmentsQuery.refetch()}
+        />
+      ) : null}
     </Box>
   );
 }
@@ -452,9 +477,8 @@ function DayList({
   byDay,
   calendarById,
   now,
-  openId,
   onOpen,
-}: SharedProps & { openId: string | null }) {
+}: SharedProps) {
   const { t } = useTranslation();
 
   return (
@@ -479,7 +503,6 @@ function DayList({
                     appointment={appointment}
                     calendar={calendarById.get(appointment.calendarId ?? "")}
                     now={now}
-                    expanded={openId === appointment.id}
                     onOpen={onOpen}
                     layout="row"
                   />
@@ -600,7 +623,6 @@ function MonthGrid({
                     appointment={appointment}
                     calendar={calendarById.get(appointment.calendarId ?? "")}
                     now={now}
-                    expanded={false}
                     onOpen={onOpen}
                     layout="compact"
                   />
@@ -796,7 +818,6 @@ function DayColumn({
               appointment={appointment}
               calendar={calendarById.get(appointment.calendarId ?? "")}
               now={now}
-              expanded={false}
               onOpen={onOpen}
               layout="block"
             />
@@ -845,14 +866,12 @@ function AppointmentButton({
   appointment,
   calendar,
   now,
-  expanded,
   onOpen,
   layout,
 }: {
   appointment: DayAppointment;
   calendar?: { id: string; name: string; color: string };
   now: Date;
-  expanded: boolean;
   onOpen: (id: string) => void;
   layout: "row" | "block" | "compact";
 }) {
@@ -870,7 +889,7 @@ function AppointmentButton({
       component="button"
       type="button"
       onClick={() => onOpen(appointment.id)}
-      aria-expanded={expanded}
+      aria-haspopup="dialog"
       sx={{
         display: "block",
         width: "100%",

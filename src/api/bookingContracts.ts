@@ -259,6 +259,40 @@ export function isLateStatus(code: number): boolean {
 }
 
 /**
+ * Which status changes 4.5 allows, transcribed from the transition table the
+ * booking lane restored from `AppointmentStatusRule.CanMove` - not from memory,
+ * and not from what the buttons happen to be called.
+ *
+ * The screen asks this before it offers a button. A refused move comes back as
+ * `409`, which 6.3 says to treat as an outcome rather than an error - but an
+ * action that can never succeed should not be offered in the first place.
+ *
+ * Two entries are deliberate and easy to mistake for bugs:
+ *   - `2 -> 5` exists. Marking a present patient absent is how a mis-click gets
+ *     corrected, so it is allowed and merely confirmed (4.5, v23 note).
+ *   - `3 -> 4` does not. A completed appointment happened; it cannot be undone.
+ *     Until 9. 9. 2026 the table let it through and the entity refused, which
+ *     is how the `500` this lane reported came about.
+ */
+export function canChangeStatus(from: number, to: number): boolean {
+  // Cancelling: anything except an appointment already cancelled or completed.
+  if (to === 4) return from !== 3 && from !== 4;
+  switch (from) {
+    case 0: // Scheduled
+      return to === 1 || to === 2 || to === 5;
+    case 1: // Confirmed
+      return to === 2 || to === 5;
+    case 2: // CheckedIn
+      return to === 0 || to === 3 || to === 5;
+    case 5: // NoShow
+      return to === 0 || to === 2;
+    default:
+      // Completed, Cancelled, Waitlisted and anything unknown: nowhere but 4.
+      return false;
+  }
+}
+
+/**
  * A day of one calendar - 4.5 `GET /api/calendars/{id}/day`.
  *
  * `isRunningLate` arrives computed but is never stored (6.2); the screen
