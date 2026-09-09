@@ -12,7 +12,6 @@ import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import PatientDrawer from './components/PatientDrawer';
 import { useAppStore } from './store/useAppStore';
 import NetworkBanner from './components/NetworkBanner';
-import NewBookingNotifier from './components/NewBookingNotifier';
 import { AccessibilityProvider } from './components/AccessibilityProvider';
 import UniversalSearch from './components/UniversalSearch';
 import NotificationCenter from './components/NotificationCenter';
@@ -418,7 +417,6 @@ export default function App() {
           <PatientDrawer />
           <UniversalSearch />
           <NetworkBanner />
-          <NewBookingNotifier />
           <Toaster position="top-right" />
         </BrowserRouter>
       </QueryClientProvider>

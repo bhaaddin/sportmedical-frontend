@@ -6,7 +6,7 @@
    - Notification types: appointment, document, system, alert
    - WebSocket real-time updates
    ══════════════════════════════════════════════════════════════ */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, IconButton, Badge, Popover, List, ListItem, ListItemIcon,
   ListItemText, Button, Divider, Chip, Skeleton, Tooltip,
@@ -90,56 +90,6 @@ export default function NotificationCenter() {
   }, [fetchNotifications]);
 
   /* ── Real booking notifications (poll admin bookings) ── */
-  const seenBookings = useRef<Set<string>>(new Set());
-  const bookingsBaseline = useRef(true);
-
-  useEffect(() => {
-    if (!localStorage.getItem('token')) return;
-    try {
-      seenBookings.current = new Set(JSON.parse(localStorage.getItem('seen_booking_ids') || '[]'));
-    } catch { /* ignore */ }
-
-    const checkBookings = async () => {
-      try {
-        const res = await client.get('/api/booking/admin/bookings');
-        const list = res.data?.value ?? res.data ?? [];
-        if (!Array.isArray(list)) return;
-        const fresh: any[] = [];
-        list.forEach((b: any) => {
-          const id = String(b.id ?? '');
-          if (!id || seenBookings.current.has(id)) return;
-          seenBookings.current.add(id);
-          if (!bookingsBaseline.current) fresh.push(b);
-        });
-        localStorage.setItem('seen_booking_ids', JSON.stringify([...seenBookings.current].slice(-200)));
-        bookingsBaseline.current = false;
-        if (fresh.length > 0) {
-          const notes: Notification[] = fresh.map((b: any) => {
-            const when = b.startAt
-              ? new Date(b.startAt).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' }) +
-                ' ' + new Date(b.startAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })
-              : '';
-            return {
-              id: `booking:${b.id}`,
-              type: 'appointment' as const,
-              title: 'Nová rezervace',
-              message: `${b.inviteeName ?? ''} — ${b.eventName ?? ''} (${when})`,
-              timestamp: b.createdAt ?? new Date().toISOString(),
-              read: false,
-              actionUrl: '/booking-management',
-            };
-          });
-          setNotifications(prev => [...notes, ...prev]);
-        }
-      } catch { /* ignore — retry next poll */ }
-    };
-
-    checkBookings();
-    const iv = setInterval(checkBookings, 30000);
-    const onCreated = () => checkBookings();
-    window.addEventListener('booking:created', onCreated);
-    return () => { clearInterval(iv); window.removeEventListener('booking:created', onCreated); };
-  }, []);
 
   /* ── Real-time sync ── */
   useRealtimeSync({

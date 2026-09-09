@@ -344,13 +344,6 @@ ${weekDays.map(day => {
     }).catch(() => {});
   }, [weekDays]);
 
-  /* ── Refresh when a new online booking arrives ── */
-  useEffect(() => {
-    const onNewBooking = () => refresh();
-    window.addEventListener('booking:created', onNewBooking);
-    return () => window.removeEventListener('booking:created', onNewBooking);
-  }, [refresh]);
-
   /* ── Navigate ── */
   const navigateWeek = (dir: number) => {
     const d = new Date(currentDate);
