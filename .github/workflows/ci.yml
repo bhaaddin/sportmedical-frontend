@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Gating step. tsc -b returns non-zero on any type error, which fails
+      # the job. `vite build` does not typecheck, so without this step type
+      # errors accumulate unnoticed.
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Kept running after a failed typecheck so one run reports everything.
+      - name: Lint
+        if: ${{ !cancelled() }}
+        run: npm run lint
+
+      - name: Build
+        if: ${{ !cancelled() }}
+        run: npm run build
