@@ -50,8 +50,6 @@ const TeamsPage = lazy(() => import('./pages/Teams'));
 const PosudekPage = lazy(() => import('./pages/Posudek'));
 const TrainingLoadPage = lazy(() => import('./pages/TrainingLoad'));
 const ClientIntakePage = lazy(() => import('./pages/ClientIntake'));
-const BookAppointment = lazy(() => import('./pages/BookAppointment'));
-const BookingManagement = lazy(() => import('./pages/BookingManagement'));
 const CodebookPage = lazy(() => import('./pages/Codebook'));
 const SystemHealthPage = lazy(() => import('./pages/SystemHealth'));
 const StaffManagementPage = lazy(() => import('./pages/StaffManagement'));
@@ -135,7 +133,6 @@ const menuGroups: MenuItemGroup[] = [
     label: 'Tým a rezervace',
     items: [
       { text: 'Plánování', icon: <CalendarMonth />, path: '/planovani' },
-      { text: 'Rezervace', icon: <EventAvailable />, path: '/booking-management' },
       { text: 'Můj rozvrh', icon: <CalendarMonth />, path: '/worker-schedule' },
       { text: 'Kluby', icon: <Group />, path: '/clubs' },
       { text: 'Účetní export', icon: <Receipt />, path: '/accounting-export', adminOnly: true },
@@ -351,8 +348,6 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Suspense fallback={<PageLoader />}><Login /></Suspense>} />
             <Route path="/dotaznik" element={<Suspense fallback={<PageLoader />}><IntakeQuestionnaire /></Suspense>} />
-            <Route path="/book" element={<Suspense fallback={<PageLoader />}><BookAppointment /></Suspense>} />
-            <Route path="/book/:slug" element={<Suspense fallback={<PageLoader />}><BookAppointment /></Suspense>} />
             <Route path="/*" element={
               <AuthGuard>
                 <Layout>
@@ -382,7 +377,6 @@ export default function App() {
                     <Route path="/posudek" element={<PosudekPage />} />
                     <Route path="/inventory" element={<InventoryPage />} />
                     <Route path="/staff" element={<StaffPage />} />
-                    <Route path="/booking-management" element={<BookingManagement />} />
                     <Route path="/cashier" element={<CashierPage />} />
                     <Route path="/clubs" element={<ClubsPage />} />
                     <Route path="/accounting-export" element={<RequireAdmin><AccountingExportPage /></RequireAdmin>} />
