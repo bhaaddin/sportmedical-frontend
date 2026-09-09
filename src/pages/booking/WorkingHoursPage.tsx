@@ -418,6 +418,7 @@ export default function WorkingHoursPage() {
                           id: w.userId,
                           name: w.displayName,
                         }))}
+                        workersFailed={workersQuery.isError}
                       />
                     ))}
                   </TableBody>
@@ -601,6 +602,8 @@ interface DayRowProps {
   calendarId: string;
   existing: WorkingHour | null;
   workers: { id: string; name: string }[];
+  /** Told apart from "no workers exist", which is a different statement. */
+  workersFailed: boolean;
 }
 
 function DayRow({
@@ -609,6 +612,7 @@ function DayRow({
   calendarId,
   existing,
   workers,
+  workersFailed,
 }: DayRowProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -815,8 +819,10 @@ function DayRow({
         ) : null}
         {isActive ? (
           <Typography sx={{ mt: 1, fontSize: 13, color: "text.secondary" }}>
-            {cycleQuery.isPending
-              ? t("booking.workingHours.previewLoading")
+            {!cycleQuery.isSuccess
+              ? cycleQuery.isError
+                ? t("booking.workingHours.previewFailed")
+                : t("booking.workingHours.previewLoading")
               : previewDates.length > 0
                 ? t("booking.workingHours.preview", {
                     dates: previewDates
@@ -834,6 +840,8 @@ function DayRow({
           size="small"
           fullWidth
           label={t("booking.workingHours.worker")}
+          error={workersFailed}
+          helperText={workersFailed ? t("booking.workingHours.workersFailed") : undefined}
           value={value.workerUserId ?? ""}
           disabled={!value.isActive}
           onChange={(e) =>
@@ -841,6 +849,14 @@ function DayRow({
           }
         >
           <MenuItem value="">{t("booking.workingHours.noWorker")}</MenuItem>
+          {/* A row can name a worker the failed list cannot spell out. Showing
+              the plain "Nikdo" there would say nobody is assigned, which is a
+              claim about the data rather than about the missing answer. */}
+          {value.workerUserId && !workers.some((x) => x.id === value.workerUserId) ? (
+            <MenuItem value={value.workerUserId}>
+              {t("booking.workingHours.workerUnknown")}
+            </MenuItem>
+          ) : null}
           {workers.map((worker) => (
             <MenuItem key={worker.id} value={worker.id}>
               {worker.name}

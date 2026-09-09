@@ -230,8 +230,11 @@ export default function ExceptionsPage() {
                             exception.startTime && exception.endTime
                               ? `${exception.startTime.slice(0, 5)}–${exception.endTime.slice(0, 5)}`
                               : null,
-                            workers.find((w) => w.id === exception.workerUserId)
-                              ?.name ?? null,
+                            exception.workerUserId
+                              ? (workers.find((w) => w.id === exception.workerUserId)
+                                  ?.name ??
+                                t("booking.workingHours.workerUnknown"))
+                              : null,
                           ]
                             .filter(Boolean)
                             .join(" · ") || "-"}
@@ -332,6 +335,12 @@ export default function ExceptionsPage() {
                   select
                   fullWidth
                   label={t("booking.workingHours.worker")}
+                  error={workersQuery.isError}
+                  helperText={
+                    workersQuery.isError
+                      ? t("booking.workingHours.workersFailed")
+                      : undefined
+                  }
                   value={draft.workerUserId ?? ""}
                   onChange={(e) =>
                     setDraft({ ...draft, workerUserId: e.target.value || null })
