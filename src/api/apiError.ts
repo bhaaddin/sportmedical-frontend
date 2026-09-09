@@ -77,7 +77,16 @@ export function toBookingError(error: unknown): BookingApiError {
 
     const kind = KIND_BY_STATUS[status] ?? 'server';
     // 3.2 shows the server's message only for the two input-shaped failures.
-    const showsServerMessage = kind === 'validation' || kind === 'domainRule';
+    /*
+     * 3.2 shows the server's own message for the input-shaped failures, and for
+     * a conflict too. A 409 used to mean one thing - someone took the slot -
+     * and the screen could say so from a fixed sentence. It now also refuses a
+     * cancellation of an appointment that already happened, so a fixed sentence
+     * would tell the operator their slot was taken when it was not. The server
+     * says which it is; the fixed wording stays as the fallback.
+     */
+    const showsServerMessage =
+      kind === 'validation' || kind === 'domainRule' || kind === 'conflict';
     return new BookingApiError(
       kind,
       status,
