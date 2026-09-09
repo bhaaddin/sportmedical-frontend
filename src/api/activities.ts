@@ -43,9 +43,16 @@ export const activitiesApi = {
       return parseResponse(activitySaveResultSchema, res.data);
     }),
 
+  /** 4.3: this discards. The row stays in the list with `isActive: false`. */
   remove: (id: string): Promise<void> =>
     request(async () => {
       await client.delete(`/api/activities/${id}`);
+    }),
+
+  /** ...and this is the way back, which the screen owed the owner. */
+  restore: (id: string): Promise<void> =>
+    request(async () => {
+      await client.post(`/api/activities/${id}/restore`, {});
     }),
 };
 

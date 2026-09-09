@@ -28,6 +28,10 @@ import PublicIcon from "@mui/icons-material/Public";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { activitiesApi } from "../../api/activities";
+import { servicesApi } from "../../api/services";
+import RestoreIcon from "@mui/icons-material/Restore";
+import MenuItem from "@mui/material/MenuItem";
+import { warningKey } from "../../api/bookingContracts";
 import type {
   Activity,
   ActivityInput,
@@ -59,6 +63,7 @@ function emptyDraft(sortOrder: number): ActivityInput {
     publicNote: "",
     isPubliclyBookable: false,
     sortOrder,
+    serviceItemId: null,
   };
 }
 
@@ -78,6 +83,13 @@ export default function ActivitiesPage() {
     staleTime: CODEBOOK_STALE_MS,
   });
 
+  /* The price list itself belongs to the `app` lane; this screen only points at it. */
+  const servicesQuery = useQuery({
+    queryKey: ["services"],
+    queryFn: servicesApi.getAll,
+    staleTime: CODEBOOK_STALE_MS,
+  });
+
   const activities = useMemo(
     () =>
       [...(activitiesQuery.data?.activities ?? [])].sort(
@@ -93,7 +105,7 @@ export default function ActivitiesPage() {
    */
   const warnings: ActivityWarning[] = (
     activitiesQuery.data?.warnings ?? []
-  ).filter((warning) => !dismissed.has(warning.code));
+  ).filter((warning) => !dismissed.has(warningKey(warning)));
 
   const closeDialog = () => {
     setDraft(null);
@@ -121,6 +133,13 @@ export default function ActivitiesPage() {
     },
   });
 
+  const restore = useMutation({
+    mutationFn: (id: string) => activitiesApi.restore(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["activities"] });
+    },
+  });
+
   const openCreate = () => {
     setEditing(null);
     setDraft(emptyDraft(activities.length));
@@ -136,6 +155,12 @@ export default function ActivitiesPage() {
       publicNote: activity.publicNote,
       isPubliclyBookable: activity.isPubliclyBookable,
       sortOrder: activity.sortOrder,
+      /*
+       * 4.3 (v25): `PUT` is the whole activity, and a missing `serviceItemId`
+       * clears the link. Carrying it here is the difference between renaming an
+       * activity and quietly taking its price away.
+       */
+      serviceItemId: activity.serviceItemId,
     });
     save.reset();
   };
@@ -174,11 +199,11 @@ export default function ActivitiesPage() {
 
       {warnings.map((warning) => (
         <Alert
-          key={warning.code}
+          key={warningKey(warning)}
           severity="warning"
           sx={{ mb: 2 }}
           onClose={() =>
-            setDismissed((prev) => new Set(prev).add(warning.code))
+            setDismissed((prev) => new Set(prev).add(warningKey(warning)))
           }
         >
           {warning.message}
@@ -206,6 +231,7 @@ export default function ActivitiesPage() {
                 <TableCell>
                   {t("booking.activities.column.publicNote")}
                 </TableCell>
+                <TableCell>{t("booking.activities.column.price")}</TableCell>
                 <TableCell>{t("booking.activities.column.public")}</TableCell>
                 <TableCell align="right">
                   {t("booking.common.actions")}
@@ -214,7 +240,11 @@ export default function ActivitiesPage() {
             </TableHead>
             <TableBody>
               {activities.map((activity) => (
-                <TableRow key={activity.id} hover>
+                <TableRow
+                  key={activity.id}
+                  hover
+                  sx={{ opacity: activity.isActive ? 1 : 0.55 }}
+                >
                   <TableCell>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <Box
@@ -230,6 +260,15 @@ export default function ActivitiesPage() {
                       <Typography sx={{ fontWeight: 600 }}>
                         {activity.name}
                       </Typography>
+                      {/* 4.3: a discard keeps the row and its slug. Say so in
+                          words - the dimming alone is not the message (7.1). */}
+                      {activity.isActive ? null : (
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label={t("booking.activities.discarded")}
+                        />
+                      )}
                     </Box>
                   </TableCell>
                   <TableCell>
@@ -246,6 +285,18 @@ export default function ActivitiesPage() {
                   </TableCell>
                   <TableCell sx={{ maxWidth: 320 }}>
                     {activity.publicNote || "-"}
+                  </TableCell>
+                  {/*
+                    4.3 (v25): read through the link, never stored here. No link
+                    means no price - written as such, because "0 Kč" would read
+                    as free rather than as unpriced.
+                  */}
+                  <TableCell>
+                    {activity.priceCzk === null
+                      ? t("booking.activities.noPrice")
+                      : t("booking.activities.priceValue", {
+                          price: activity.priceCzk,
+                        })}
                   </TableCell>
                   <TableCell>
                     {/* Icon plus text: colour and icon alone would not carry it (7.1). */}
@@ -269,14 +320,26 @@ export default function ActivitiesPage() {
                         <EditIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title={t("booking.common.delete")}>
-                      <IconButton
-                        aria-label={t("booking.common.delete")}
-                        onClick={() => setConfirmDelete(activity)}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+                    {activity.isActive ? (
+                      <Tooltip title={t("booking.common.delete")}>
+                        <IconButton
+                          aria-label={t("booking.common.delete")}
+                          onClick={() => setConfirmDelete(activity)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    ) : (
+                      <Tooltip title={t("booking.activities.restore")}>
+                        <IconButton
+                          aria-label={t("booking.activities.restore")}
+                          disabled={restore.isPending}
+                          onClick={() => restore.mutate(activity.id)}
+                        >
+                          <RestoreIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -328,6 +391,58 @@ export default function ActivitiesPage() {
                 value={draft.color}
                 onChange={(color) => setDraft({ ...draft, color })}
               />
+              {/*
+                4.3 (v25). The price is not typed here and never was: the
+                activity points at an item in the price list and the price is
+                read through that. Choosing "no link" is allowed - it is what
+                `price.unlinked` warns about, not what it forbids.
+
+                The duration is deliberately not kept in step with the item's:
+                the owner sets it, and a difference is reported by
+                `price.duration_drift` rather than corrected behind their back.
+              */}
+              <TextField
+                select
+                fullWidth
+                label={t("booking.activities.serviceItem")}
+                value={draft.serviceItemId ?? ""}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    serviceItemId: e.target.value === "" ? null : e.target.value,
+                  })
+                }
+                helperText={
+                  servicesQuery.isError
+                    ? t("booking.activities.serviceItemUnavailable")
+                    : t("booking.activities.serviceItemHelp")
+                }
+                error={servicesQuery.isError}
+              >
+                <MenuItem value="">
+                  {t("booking.activities.noServiceItem")}
+                </MenuItem>
+                {/*
+                  A link the owner already has stays selectable even when the
+                  item is archived or gone from the list - otherwise opening the
+                  dialog would silently drop it on the next save.
+                */}
+                {(servicesQuery.data ?? []).map((item) => (
+                  <MenuItem key={item.id} value={item.id}>
+                    {item.name} · {t("booking.activities.priceValue", {
+                      price: item.priceCzk,
+                    })}
+                  </MenuItem>
+                ))}
+                {draft.serviceItemId &&
+                !(servicesQuery.data ?? []).some(
+                  (item) => item.id === draft.serviceItemId,
+                ) ? (
+                  <MenuItem value={draft.serviceItemId}>
+                    {t("booking.activities.serviceItemUnknown")}
+                  </MenuItem>
+                ) : null}
+              </TextField>
               <TextField
                 fullWidth
                 multiline

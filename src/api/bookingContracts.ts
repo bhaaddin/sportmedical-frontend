@@ -92,6 +92,16 @@ export const activitySchema = z.object({
   publicNote: z.string().nullish().transform((v) => v ?? ''),
   isPubliclyBookable: z.boolean(),
   sortOrder: z.number().int(),
+  /** 4.3: `DELETE` discards rather than deletes, so the row stays in the list. */
+  isActive: z.boolean(),
+  /**
+   * 4.3 (v25): the price has one home, and it is the price list. The activity
+   * only points at an item; `priceCzk` is read through that link on every
+   * answer and is `null` - not zero - when there is no link. Two lists of the
+   * same eight things drift apart, so there is no second list.
+   */
+  serviceItemId: z.string().nullish().transform((v) => v ?? null),
+  priceCzk: z.number().nullish().transform((v) => v ?? null),
 });
 export type Activity = z.infer<typeof activitySchema>;
 
@@ -104,6 +114,13 @@ export const activityInputSchema = z.object({
   publicNote: z.string().trim(),
   isPubliclyBookable: z.boolean(),
   sortOrder: z.number().int(),
+  /**
+   * 4.3 (v25): `PUT` is the whole activity. Left out or sent as `null`, this
+   * **clears the link to the price list** - so every screen that edits an
+   * activity has to send back the one it was given, untouched, or renaming an
+   * activity would quietly take its price away.
+   */
+  serviceItemId: z.string().nullable(),
 });
 export type ActivityInput = z.infer<typeof activityInputSchema>;
 
@@ -133,6 +150,13 @@ export const warningContextSchema = z
   .object({
     affectedDays: z.array(affectedDaySchema).nullish().transform((v) => v ?? []),
     dayOfWeek: z.number().int().min(0).max(6).nullish().transform((v) => v ?? null),
+    /**
+     * 4.3 (v25): the four `price.*` warnings are about one activity each, so
+     * the same code can arrive several times in one answer. Everything that
+     * lists or dismisses a warning has to key on this too - keying on the code
+     * alone would show one row and hide the rest.
+     */
+    activityId: z.string().nullish().transform((v) => v ?? null),
   })
   .partial()
   .passthrough();
@@ -143,6 +167,17 @@ export const activityWarningSchema = z.object({
   context: warningContextSchema.nullish().transform((v) => v ?? null),
 });
 export type ActivityWarning = z.infer<typeof activityWarningSchema>;
+
+/**
+ * What makes a warning one warning. The code alone does not: since v25 four of
+ * them are per activity, so `price.unlinked` legitimately arrives once for
+ * every activity without a price.
+ */
+export function warningKey(warning: ActivityWarning): string {
+  return warning.context?.activityId
+    ? `${warning.code}:${warning.context.activityId}`
+    : warning.code;
+}
 
 /** Every day a warning names, whichever of the two context shapes it uses. */
 export function warningDays(warning: ActivityWarning): number[] {

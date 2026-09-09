@@ -186,8 +186,18 @@
         "publicNote": "Poznámka pro pacienta",
         "public": "Veřejná",
         "color": "Barva",
-        "order": "Pořadí"
-      }
+        "order": "Pořadí",
+        "price": "Cena"
+      },
+      "noPrice": "bez ceny",
+      "priceValue": "{{price}} Kč",
+      "discarded": "vyřazeno",
+      "restore": "Vrátit do nabídky",
+      "serviceItem": "Položka ceníku",
+      "noServiceItem": "— bez vazby na ceník —",
+      "serviceItemHelp": "Cena se čte z ceníku přes tuto vazbu. Zde se nezadává.",
+      "serviceItemUnavailable": "Ceník se nepodařilo načíst. Stávající vazba zůstane, dokud ji nezměníte.",
+      "serviceItemUnknown": "Stávající vazba (položka není v seznamu)"
     },
     "workingHours": {
       "title": "Pracovní doba",
