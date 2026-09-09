@@ -381,6 +381,7 @@ export default function WorkingHoursPage() {
             </Typography>
             <AsyncSection
               isLoading={hoursQuery.isLoading}
+              isSettled={hoursQuery.isSuccess}
               error={hoursQuery.error}
               isEmpty={false}
               emptyText=""

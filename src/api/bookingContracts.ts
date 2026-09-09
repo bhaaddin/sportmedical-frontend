@@ -456,6 +456,7 @@ const timeOfDay = z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, { message: 'expecte
 
 export const workingHourSchema = z.object({
   id: z.string(),
+  schedulePeriodId: z.string().nullish().transform((v) => v ?? null),
   /** 0 = Sunday, as .NET DayOfWeek serialises it. */
   dayOfWeek: z.number().int().min(0).max(6),
   startTime: timeOfDay,
@@ -465,12 +466,25 @@ export const workingHourSchema = z.object({
   repeatEveryNWeeks: z.number().int().positive(),
   weekOffset: z.number().int().min(0),
   workerUserId: z.string().nullish().transform((v) => v ?? null),
-  isActive: z.boolean(),
+  /** The name to show; the identifier alone is of no use on screen. */
+  workerDisplayName: z.string().nullish().transform((v) => v ?? null),
+  /**
+   * The contract lists this, the API does not send it - a row existing is what
+   * makes the day a working day, and removing the day removes the row. Treated
+   * as true when absent rather than rejecting the whole answer, which is what
+   * silently emptied this screen.
+   */
+  isActive: z.boolean().nullish().transform((v) => v ?? true),
 });
 export type WorkingHour = z.infer<typeof workingHourSchema>;
 export const workingHourListSchema = z.array(workingHourSchema);
 
-export const workingHourInputSchema = workingHourSchema.omit({ id: true });
+/** What the client may set. The period and the worker name belong to the server. */
+export const workingHourInputSchema = workingHourSchema.omit({
+  id: true,
+  schedulePeriodId: true,
+  workerDisplayName: true,
+});
 export type WorkingHourInput = z.infer<typeof workingHourInputSchema>;
 
 export const scheduleExceptionSchema = z.object({
