@@ -12,15 +12,39 @@ import { useTranslation } from 'react-i18next';
 import { calendarsApi } from '../../api/calendars';
 import { workingHoursApi } from '../../api/workingHours';
 import type {
-  ImpactReport, SchedulePeriod, SchedulePeriodInput, WorkingHour, WorkingHourInput,
+  ImpactReport, PreviewDay, SchedulePeriod, SchedulePeriodInput, WorkingHour, WorkingHourInput,
 } from '../../api/bookingContracts';
 import { AsyncSection } from '../../components/booking/AsyncSection';
 import { DayActivityGrid } from '../../components/booking/DayActivityGrid';
 import { errorText } from '../../components/booking/errorText';
-import { formatDateOnly, formatPragueTime, toDateOnly } from '../../utils/time';
 import {
-  cycleToMode, modeToCycle, previewCycleDates, type CycleMode,
-} from '../../utils/weekCycle';
+  addDaysToDateOnly, dayOfWeekOf, formatDateOnly, formatPragueTime, toDateOnly,
+} from '../../utils/time';
+
+/**
+ * The cycle picker's four labels are only a way of writing
+ * `repeatEveryNWeeks`/`weekOffset` in words - no dates are derived here.
+ * Which dates a row falls on comes from `…/preview` and from nowhere else.
+ */
+type CycleMode = 'every' | 'even' | 'odd' | 'everyNth';
+
+function cycleToMode(cycle: { repeatEveryNWeeks: number; weekOffset: number }): CycleMode {
+  if (cycle.repeatEveryNWeeks <= 1) return 'every';
+  if (cycle.repeatEveryNWeeks === 2) return cycle.weekOffset % 2 === 0 ? 'even' : 'odd';
+  return 'everyNth';
+}
+
+function modeToCycle(mode: CycleMode, everyNth = 3): { repeatEveryNWeeks: number; weekOffset: number } {
+  switch (mode) {
+    case 'every': return { repeatEveryNWeeks: 1, weekOffset: 0 };
+    case 'even': return { repeatEveryNWeeks: 2, weekOffset: 0 };
+    case 'odd': return { repeatEveryNWeeks: 2, weekOffset: 1 };
+    case 'everyNth': return { repeatEveryNWeeks: Math.max(2, everyNth), weekOffset: 0 };
+  }
+}
+
+/** Days of preview asked for at once, enough for five turns of a long cycle. */
+const PREVIEW_DAYS = 200;
 
 /**
  * Working hours - contract screen 5.4, the hardest one.
@@ -102,10 +126,21 @@ export default function WorkingHoursPage() {
     staleTime: CODEBOOK_STALE_MS,
   });
 
+  /**
+   * One call for the whole window (7.3), shared by all seven rows. This is the
+   * only source of "which dates does this row fall on".
+   */
+  const previewQuery = useQuery({
+    queryKey: ['preview', activeCalendarId, today],
+    queryFn: () =>
+      workingHoursApi.preview(activeCalendarId, today, addDaysToDateOnly(today, PREVIEW_DAYS)),
+    enabled: activeCalendarId !== '',
+  });
+
   const savePeriod = useMutation({
-    mutationFn: (input: SchedulePeriodInput) =>
+    mutationFn: ({ input, token }: { input: SchedulePeriodInput; token?: string }) =>
       editingPeriod
-        ? workingHoursApi.updatePeriod(activeCalendarId, editingPeriod.id, input)
+        ? workingHoursApi.updatePeriod(activeCalendarId, editingPeriod.id, input, token)
         : workingHoursApi.createPeriod(activeCalendarId, input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['periods', activeCalendarId] });
@@ -133,11 +168,11 @@ export default function WorkingHoursPage() {
       const report = await workingHoursApi.periodImpact(
         activeCalendarId, editingPeriod.id, input.validFrom, input.validTo,
       );
-      return report.affectedCount > 0 ? report : null;
+      return report.appointments.length > 0 ? report : null;
     },
     onSuccess: (report, input) => {
-      // Nobody is hit, so there is nothing to acknowledge.
-      if (report === null) savePeriod.mutate(input);
+      // Nobody is stranded, so there is no token to carry.
+      if (report === null) savePeriod.mutate({ input });
       else setImpact(report);
     },
   });
@@ -160,7 +195,7 @@ export default function WorkingHoursPage() {
     if (!periodDraft) return;
     // A new period strands nobody; only a change of validity can.
     if (editingPeriod) checkImpactThenSave.mutate(periodDraft);
-    else savePeriod.mutate(periodDraft);
+    else savePeriod.mutate({ input: periodDraft });
   };
 
   return (
@@ -304,10 +339,10 @@ export default function WorkingHoursPage() {
                         dayOfWeek={dayOfWeek}
                         period={activePeriod}
                         calendarId={activeCalendarId}
-                        today={today}
                         existing={
                           (hoursQuery.data ?? []).find((h) => h.dayOfWeek === dayOfWeek) ?? null
                         }
+                        preview={previewQuery.data ?? []}
                         workers={(workersQuery.data ?? []).map((w) => ({
                           id: w.userId,
                           name: w.displayName,
@@ -404,7 +439,7 @@ export default function WorkingHoursPage() {
       {/* 4.2: who the shortened validity would strand. Never saved silently. */}
       <Dialog open={impact !== null} onClose={() => setImpact(null)} fullWidth maxWidth="md">
         <DialogTitle>
-          {t('booking.workingHours.impactTitle', { count: impact?.affectedCount ?? 0 })}
+          {t('booking.workingHours.impactTitle', { count: impact?.appointments.length ?? 0 })}
         </DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
@@ -415,21 +450,24 @@ export default function WorkingHoursPage() {
               <TableHead>
                 <TableRow>
                   <TableCell>{t('booking.workingHours.impactWhen')}</TableCell>
-                  <TableCell>{t('booking.workingHours.impactPatient')}</TableCell>
-                  <TableCell>{t('booking.workingHours.impactActivity')}</TableCell>
-                  <TableCell>{t('booking.workingHours.impactReason')}</TableCell>
+                  <TableCell>{t('booking.workingHours.impactLength')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {(impact?.bookings ?? []).map((booking) => (
-                  <TableRow key={booking.id}>
+                {/* 4.2 sends no patient here on purpose: a name has no business
+                    on the working-hours screen. Who needs to know who opens the
+                    appointment where they have the right to. */}
+                {(impact?.appointments ?? []).map((appointment) => (
+                  <TableRow key={appointment.appointmentId}>
                     <TableCell>
-                      {formatDateOnly(booking.startUtc.slice(0, 10))}{' '}
-                      {formatPragueTime(booking.startUtc)}
+                      {formatDateOnly(appointment.startUtc.slice(0, 10))}{' '}
+                      {formatPragueTime(appointment.startUtc)}
                     </TableCell>
-                    <TableCell>{booking.patientName}</TableCell>
-                    <TableCell>{booking.activityName}</TableCell>
-                    <TableCell>{t(`booking.workingHours.reason.${booking.reason}`)}</TableCell>
+                    <TableCell>
+                      {t('booking.workingHours.minutes', {
+                        minutes: appointment.durationMinutes,
+                      })}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -441,9 +479,11 @@ export default function WorkingHoursPage() {
           <Button
             color="warning"
             variant="contained"
-            disabled={savePeriod.isPending}
+            disabled={savePeriod.isPending || !impact?.token}
             onClick={() =>
-              periodDraft && savePeriod.mutate({ ...periodDraft, acknowledgedImpact: true })
+              periodDraft &&
+              impact?.token &&
+              savePeriod.mutate({ input: periodDraft, token: impact.token })
             }
           >
             {t('booking.workingHours.impactConfirm')}
@@ -458,12 +498,12 @@ interface DayRowProps {
   dayOfWeek: number;
   period: SchedulePeriod;
   calendarId: string;
-  today: string;
   existing: WorkingHour | null;
   workers: { id: string; name: string }[];
+  preview: PreviewDay[];
 }
 
-function DayRow({ dayOfWeek, period, calendarId, today, existing, workers }: DayRowProps) {
+function DayRow({ dayOfWeek, period, calendarId, existing, workers, preview }: DayRowProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [edited, setEdited] = useState<WorkingHourInput | null>(null);
@@ -493,7 +533,7 @@ function DayRow({ dayOfWeek, period, calendarId, today, existing, workers }: Day
   const save = useMutation({
     mutationFn: (input: WorkingHourInput) =>
       existing
-        ? workingHoursApi.updateWorkingHour(calendarId, period.id, existing.id, input)
+        ? workingHoursApi.updateWorkingHour(calendarId, existing.id, input)
         : workingHoursApi.createWorkingHour(calendarId, period.id, input),
     onSuccess: async () => {
       await invalidate();
@@ -502,30 +542,39 @@ function DayRow({ dayOfWeek, period, calendarId, today, existing, workers }: Day
   });
 
   const remove = useMutation({
-    mutationFn: () => workingHoursApi.deleteWorkingHour(calendarId, period.id, existing?.id ?? ''),
+    mutationFn: () => workingHoursApi.deleteWorkingHour(calendarId, existing?.id ?? ''),
     onSuccess: async () => {
       await invalidate();
       setEdited(null);
     },
   });
 
+  const { isActive } = value;
+
   /**
-   * The dates this row actually lands on. 5.4 is explicit that without it
-   * nobody knows what they set, so it recomputes as the cycle changes.
+   * The dates this row actually lands on, read off the server's preview (4.2).
+   * 5.4 is explicit that without them nobody knows what they set - but they are
+   * not computed here: a second computation of the cycle would agree with the
+   * server right up until one of the two changed.
+   *
+   * A day the owner has just edited but not saved has no preview yet, which the
+   * row says instead of showing dates that no longer match the switches.
    */
-  const { isActive, repeatEveryNWeeks, weekOffset } = value;
-  const preview = useMemo(
+  const previewDates = useMemo(
     () =>
-      isActive
-        ? previewCycleDates(
-            dayOfWeek,
-            { repeatEveryNWeeks, weekOffset },
-            period.validFrom,
-            period.validTo,
-            today,
-          )
-        : [],
-    [dayOfWeek, isActive, repeatEveryNWeeks, weekOffset, period.validFrom, period.validTo, today],
+      preview
+        .filter(
+          (day) =>
+            dayOfWeekOf(day.date) === dayOfWeek &&
+            day.isOpen &&
+            !day.isChangedByOverride &&
+            day.date >= period.validFrom &&
+            (period.validTo === null || day.date <= period.validTo) &&
+            (value.workerUserId === null || day.workerUserId === value.workerUserId),
+        )
+        .slice(0, 5)
+        .map((day) => day.date),
+    [preview, dayOfWeek, period.validFrom, period.validTo, value.workerUserId],
   );
 
   return (
@@ -624,13 +673,15 @@ function DayRow({ dayOfWeek, period, calendarId, today, existing, workers }: Day
             }
           />
         ) : null}
-        {value.isActive ? (
+        {isActive ? (
           <Typography sx={{ mt: 1, fontSize: 13, color: 'text.secondary' }}>
-            {preview.length > 0
-              ? t('booking.workingHours.preview', {
-                  dates: preview.map((d) => formatDateOnly(d)).join(' · '),
-                })
-              : t('booking.workingHours.previewNone')}
+            {dirty
+              ? t('booking.workingHours.previewStale')
+              : previewDates.length > 0
+                ? t('booking.workingHours.preview', {
+                    dates: previewDates.map((d) => formatDateOnly(d)).join(' · '),
+                  })
+                : t('booking.workingHours.previewNone')}
           </Typography>
         ) : null}
       </TableCell>

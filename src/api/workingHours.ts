@@ -4,6 +4,7 @@ import {
   dayActivityGridSchema,
   impactReportSchema,
   parseResponse,
+  previewListSchema,
   schedulePeriodListSchema,
   schedulePeriodSchema,
   scheduleExceptionListSchema,
@@ -13,6 +14,7 @@ import {
   type DayActivityGrid,
   type DayActivityRow,
   type ImpactReport,
+  type PreviewDay,
   type SchedulePeriod,
   type SchedulePeriodInput,
   type ScheduleException,
@@ -53,13 +55,24 @@ export const workingHoursApi = {
       return parseResponse(schedulePeriodSchema, res.data);
     }),
 
+  /**
+   * 4.2: when `impact` listed anyone, the save carries that report's token or
+   * the server refuses it with `409`. The token also ages - if someone booked
+   * into the window in the meantime it stops matching, and the list has to be
+   * looked at again. Both are the mechanism working.
+   */
   updatePeriod: (
     calendarId: string,
     periodId: string,
     input: SchedulePeriodInput,
+    acknowledgedToken?: string,
   ): Promise<SchedulePeriod> =>
     request(async () => {
-      const res = await client.put(`/api/calendars/${calendarId}/periods/${periodId}`, input);
+      const res = await client.put(
+        `/api/calendars/${calendarId}/periods/${periodId}`,
+        input,
+        { params: acknowledgedToken ? { acknowledgedToken } : undefined },
+      );
       return parseResponse(schedulePeriodSchema, res.data);
     }),
 
@@ -69,9 +82,9 @@ export const workingHoursApi = {
     }),
 
   /**
-   * Who a change of validity would hit - asked before saving, never as a
-   * reaction to an error (4.2). If it reports anyone, the save has to carry
-   * `acknowledgedImpact`, so the list cannot be skipped silently.
+   * Who a change of validity would strand - asked before saving, never as a
+   * reaction to an error (4.2). If it lists anyone, the save has to carry the
+   * token from this answer, so the list cannot be skipped silently.
    */
   periodImpact: (
     calendarId: string,
@@ -111,21 +124,32 @@ export const workingHoursApi = {
 
   updateWorkingHour: (
     calendarId: string,
-    periodId: string,
     id: string,
     input: WorkingHourInput,
   ): Promise<WorkingHour> =>
     request(async () => {
-      const res = await client.put(
-        `/api/calendars/${calendarId}/periods/${periodId}/working-hours/${id}`,
-        input,
-      );
+      // 4.2: the row is addressed on the calendar, not under the period.
+      const res = await client.put(`/api/calendars/${calendarId}/working-hours/${id}`, input);
       return parseResponse(workingHourSchema, res.data);
     }),
 
-  deleteWorkingHour: (calendarId: string, periodId: string, id: string): Promise<void> =>
+  deleteWorkingHour: (calendarId: string, id: string): Promise<void> =>
     request(async () => {
-      await client.delete(`/api/calendars/${calendarId}/periods/${periodId}/working-hours/${id}`);
+      await client.delete(`/api/calendars/${calendarId}/working-hours/${id}`);
+    }),
+
+  /**
+   * How the calendar turns out day by day (4.2) - the source for both the
+   * working-hours screen and the dates shown under a week cycle. Max 400 days
+   * per call, and the range is required: a missing date is a `400`, never an
+   * empty list that reads like a closed clinic.
+   */
+  preview: (calendarId: string, from: string, to: string): Promise<PreviewDay[]> =>
+    request(async () => {
+      const res = await client.get(`/api/calendars/${calendarId}/preview`, {
+        params: { from, to },
+      });
+      return parseResponse(previewListSchema, res.data);
     }),
 
   /* ── Day-activity grid (5.7) ── */

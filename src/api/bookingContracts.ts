@@ -242,63 +242,127 @@ export const readinessSchema = z.object({
 export type Readiness = z.infer<typeof readinessSchema>;
 
 /**
- * What the grid draws. Names and colours ride along on purpose (4.5) - the grid
- * must not fetch them separately.
+ * A day of one calendar - 4.5 `GET /api/calendars/{id}/day`.
+ *
+ * `isRunningLate` arrives computed but is never stored (6.2); the screen
+ * recomputes it locally with `isLate` so the number moves without a reload.
  */
-export const bookingListItemSchema = z.object({
+export const dayAppointmentSchema = z.object({
   id: z.string(),
-  calendarId: z.string(),
-  calendarName: z.string(),
-  calendarColor: z.string(),
+  patientId: z.string(),
   activityId: z.string(),
   activityName: z.string(),
-  activityColor: z.string(),
-  durationMinutes: z.number().int().positive(),
   startUtc: isoUtc,
   endUtc: isoUtc,
   status: bookingStatusSchema,
-  source: bookingSourceSchema,
-  patientId: z.string().nullish().transform((v) => v ?? null),
-  patientName: z.string(),
-  phone: z.string().nullish().transform((v) => v ?? ''),
-  email: z.string().nullish().transform((v) => v ?? ''),
-  workerUserId: z.string().nullish().transform((v) => v ?? null),
-  workerName: z.string().nullish().transform((v) => v ?? null),
-  readiness: readinessSchema,
-  partnerOrderId: z.string().nullish().transform((v) => v ?? null),
-  partnerName: z.string().nullish().transform((v) => v ?? null),
+  isRunningLate: z.boolean(),
+  checkedInUtc: isoUtc.nullish().transform((v) => v ?? null),
 });
-export type BookingListItem = z.infer<typeof bookingListItemSchema>;
+export type DayAppointment = z.infer<typeof dayAppointmentSchema>;
+export const dayAppointmentListSchema = z.array(dayAppointmentSchema);
 
-export const bookingListSchema = z.array(bookingListItemSchema);
-
-export const bookingDetailSchema = bookingListItemSchema.extend({
-  note: z.string().nullish().transform((v) => v ?? ''),
-  createdAt: isoUtc,
-  createdBy: z.string(),
-  cancelReason: z.string().nullish().transform((v) => v ?? null),
-  cancelledAt: isoUtc.nullish().transform((v) => v ?? null),
-  cancelledBy: z.string().nullish().transform((v) => v ?? null),
-  overrideReason: z.string().nullish().transform((v) => v ?? null),
-  checkedInAt: isoUtc.nullish().transform((v) => v ?? null),
+/** 4.5: who booked it, who moved it, who cancelled it and why. */
+export const historyLineSchema = z.object({
+  action: z.number().int(),
+  actorId: z.string(),
+  actorDisplayName: z.string().nullish().transform((v) => v ?? null),
+  atUtc: isoUtc,
+  reason: z.string().nullish().transform((v) => v ?? null),
+  oldValue: z.string().nullish().transform((v) => v ?? null),
+  newValue: z.string().nullish().transform((v) => v ?? null),
 });
-export type BookingDetail = z.infer<typeof bookingDetailSchema>;
+export type HistoryLine = z.infer<typeof historyLineSchema>;
+export const historyListSchema = z.array(historyLineSchema);
 
-export const createBookingInputSchema = z.object({
+/** Same tolerance as for statuses: an unknown action renders as unknown. */
+export const HISTORY_ACTIONS: Record<number, string> = {
+  0: 'booked', 1: 'confirmed', 2: 'rescheduled', 3: 'cancelled',
+  4: 'arrived', 5: 'noShow', 6: 'undone', 7: 'completed', 8: 'overridden',
+};
+
+/** Who is booking - 4.5. */
+export const BOOKING_SOURCE = { staff: 0, online: 1, partner: 2 } as const;
+
+export const createAppointmentInputSchema = z.object({
+  patientId: z.string().min(1),
   calendarId: z.string(),
   activityId: z.string(),
   startUtc: isoUtc,
-  patientId: z.string().nullable(),
-  firstName: z.string().trim().min(1),
-  lastName: z.string().trim().min(1),
-  dateOfBirth: dateOnly,
-  phone: z.string().trim(),
-  email: z.string().trim(),
-  note: z.string().trim().optional(),
+  source: z.number().int().min(0).max(2),
+  /** Holds the slot instead of booking it; confirmed separately, expires by itself. */
+  holdMinutes: z.number().int().positive().optional(),
   /** 6.4: an override never goes out without a reason typed by a person. */
   overrideReason: z.string().trim().min(1).optional(),
 });
-export type CreateBookingInput = z.infer<typeof createBookingInputSchema>;
+export type CreateAppointmentInput = z.infer<typeof createAppointmentInputSchema>;
+
+export const appointmentSchema = z.object({
+  id: z.string(),
+  calendarId: z.string(),
+  patientId: z.string(),
+  activityId: z.string(),
+  startUtc: isoUtc,
+  endUtc: isoUtc,
+  status: bookingStatusSchema,
+}).passthrough();
+export type Appointment = z.infer<typeof appointmentSchema>;
+
+/** 4.5: booking answers with the appointment and any non-blocking warnings. */
+export const bookedAppointmentSchema = z.object({
+  appointment: appointmentSchema,
+  warnings: z.array(activityWarningSchema).nullish().transform((v) => v ?? []),
+});
+export type BookedAppointment = z.infer<typeof bookedAppointmentSchema>;
+
+/* ── 4.6 Day summary ── */
+
+const namedCountSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  count: z.number().int(),
+});
+
+/**
+ * 4.6 `GET /api/day/summary`. `freeMinutesLeft` is minutes, never places:
+ * the owner decided that on 9. 9. 2026, because the same 90 minutes is two
+ * slots or three depending on the activity. Do not divide it.
+ */
+export const daySummarySchema = z.object({
+  date: dateOnly,
+  booked: z.number().int(),
+  arrived: z.number().int(),
+  runningLate: z.number().int(),
+  didNotCome: z.number().int(),
+  cancelled: z.number().int(),
+  byActivity: z.array(namedCountSchema).nullish().transform((v) => v ?? []),
+  byCalendar: z.array(namedCountSchema).nullish().transform((v) => v ?? []),
+  workingMinutes: z.number().int(),
+  bookedMinutes: z.number().int(),
+  unusedMinutes: z.number().int(),
+  freeMinutesLeft: z.number().int(),
+  nextAppointment: z
+    .object({
+      appointmentId: z.string(),
+      calendarId: z.string(),
+      calendarName: z.string(),
+      activityName: z.string(),
+      startUtc: isoUtc,
+    })
+    .nullish()
+    .transform((v) => v ?? null),
+});
+export type DaySummary = z.infer<typeof daySummarySchema>;
+
+/* ── 4.5 Time blocks ── */
+
+export const timeBlockSchema = z.object({
+  id: z.string(),
+  startUtc: isoUtc,
+  endUtc: isoUtc,
+  reason: z.string().nullish().transform((v) => v ?? ''),
+});
+export type TimeBlock = z.infer<typeof timeBlockSchema>;
+export const timeBlockListSchema = z.array(timeBlockSchema);
 
 export { dateOnly as dateOnlySchema, isoUtc as isoUtcSchema };
 
@@ -317,35 +381,60 @@ export const schedulePeriodInputSchema = z.object({
   name: z.string().trim().min(1),
   validFrom: dateOnly,
   validTo: dateOnly.nullable(),
-  /** 4.2: mandatory once `impact` reports affected bookings, or the PUT is 422. */
-  acknowledgedImpact: z.boolean().optional(),
 });
 export type SchedulePeriodInput = z.infer<typeof schedulePeriodInputSchema>;
 
-/** Why an already booked appointment is hit by a change of validity (4.2). */
-export const impactReasonSchema = z.enum([
-  'OutsideNewValidity',
-  'DayNoLongerWorking',
-  'OutsideNewWorkingHours',
-]);
-export type ImpactReason = z.infer<typeof impactReasonSchema>;
+/**
+ * Who a change of validity would strand - 4.2, v14.
+ *
+ * The row carries no patient: a name has no business on the working-hours
+ * screen, so the API does not send one. Whoever needs to know who opens the
+ * appointment where they have the right to.
+ *
+ * The `token` is the acknowledgement. It ages: if someone books into the
+ * window between looking and saving, the save is refused and the list has to be
+ * fetched again. That is the mechanism working, not a fault.
+ */
+export const impactedAppointmentSchema = z.object({
+  appointmentId: z.string(),
+  startUtc: isoUtc,
+  durationMinutes: z.number().int().positive(),
+});
+export type ImpactedAppointment = z.infer<typeof impactedAppointmentSchema>;
 
 export const impactReportSchema = z.object({
-  affectedCount: z.number().int(),
-  bookings: z
-    .array(
-      z.object({
-        id: z.string(),
-        startUtc: isoUtc,
-        activityName: z.string(),
-        patientName: z.string(),
-        reason: impactReasonSchema,
-      }),
-    )
-    .nullish()
-    .transform((v) => v ?? []),
+  periodId: z.string(),
+  validFrom: dateOnly,
+  validTo: dateOnly.nullish().transform((v) => v ?? null),
+  appointments: z.array(impactedAppointmentSchema).nullish().transform((v) => v ?? []),
+  token: z.string().nullish().transform((v) => v ?? null),
 });
 export type ImpactReport = z.infer<typeof impactReportSchema>;
+
+/**
+ * How the calendar turns out on a given day - 4.2 `…/preview`, after the
+ * period, the cycle, an exception and a holiday have all been applied.
+ *
+ * This is the only source of "which dates does this row fall on". The lane used
+ * to compute that locally in `utils/weekCycle.ts`; that file is gone, because a
+ * second computation of the same thing is exactly what 6.1 forbids - it agreed
+ * with the server right up until one of the two changed.
+ */
+export const previewDaySchema = z.object({
+  date: dateOnly,
+  isOpen: z.boolean(),
+  closedBecause: z.string().nullish().transform((v) => v ?? null),
+  startTime: z.string().nullish().transform((v) => v ?? null),
+  endTime: z.string().nullish().transform((v) => v ?? null),
+  breakStart: z.string().nullish().transform((v) => v ?? null),
+  breakEnd: z.string().nullish().transform((v) => v ?? null),
+  workerUserId: z.string().nullish().transform((v) => v ?? null),
+  workerDisplayName: z.string().nullish().transform((v) => v ?? null),
+  isChangedByOverride: z.boolean(),
+  offeredActivityIds: z.array(z.string()).nullish().transform((v) => v ?? []),
+});
+export type PreviewDay = z.infer<typeof previewDaySchema>;
+export const previewListSchema = z.array(previewDaySchema);
 
 const timeOfDay = z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, { message: 'expected HH:mm' });
 

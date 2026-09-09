@@ -220,17 +220,9 @@
       "preview": "Platí: {{dates}}",
       "previewNone": "V tomto období na tento den nepadne žádný termín.",
       "impactTitle": "Změna zasáhne {{count}} objednaných termínů",
-      "impactLead": "Tyto termíny už jsou objednané a nová platnost je nechá mimo pracovní dobu. Uložením je nezrušíte, ale zůstanou mimo — rozhodněte se.",
+      "impactLead": "Tyto termíny už jsou objednané a nová platnost je nechá mimo pracovní dobu. Uložením je nezrušíte, ale zůstanou mimo — rozhodněte se. Kdo je objednaný, zjistíte v samotném termínu.",
       "impactWhen": "Kdy",
-      "impactPatient": "Pacient",
-      "impactActivity": "Činnost",
-      "impactReason": "Důvod",
       "impactConfirm": "Rozumím, uložit i tak",
-      "reason": {
-        "OutsideNewValidity": "Mimo novou platnost období",
-        "DayNoLongerWorking": "Den už není pracovní",
-        "OutsideNewWorkingHours": "Mimo novou pracovní dobu"
-      },
       "weekday": {
         "0": "Neděle",
         "1": "Pondělí",
@@ -239,7 +231,10 @@
         "4": "Čtvrtek",
         "5": "Pátek",
         "6": "Sobota"
-      }
+      },
+      "impactLength": "Délka",
+      "minutes": "{{minutes}} min",
+      "previewStale": "Uložte změnu, ať se ukázka data přepočítá na serveru."
     },
     "exceptions": {
       "title": "Výjimky",

@@ -104,6 +104,11 @@ export function toDateOnly(date: Date): DateOnly {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/** Day of week of a date-only value, 0 = Sunday as .NET spells it on the wire. */
+export function dayOfWeekOf(date: DateOnly): number {
+  return parseDateOnly(date).getDay();
+}
+
 /** Parses `yyyy-MM-dd` to local midnight — never through `new Date(string)`. */
 export function parseDateOnly(date: DateOnly): Date {
   const [year, month, day] = date.split('-').map(Number);
