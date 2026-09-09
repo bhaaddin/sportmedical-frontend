@@ -152,20 +152,19 @@ export function formatDateOnly(date: DateOnly): string {
 
 /**
  * Contract 6.2: "late" is never a stored state and is never sent back. It is
- * recomputed on the client so the number moves without a reload.
+ * recomputed here so the number moves without a reload.
  *
- * 4.5 writes the rule out as a formula, and this is it verbatim:
- *
- *     late = (status == Scheduled || status == Confirmed) && startUtc < now
- *
- * Nowhere else and no other way. `GET /api/dashboard/today` computes its own
- * `late` from the same formula, so the two numbers cannot drift apart. Anyone
- * who has arrived, finished, was marked absent, cancelled or is waitlisted is
- * not late, and neither is an unknown status.
+ * 4.5 writes the rule as a formula and this is it: an appointment still
+ * expected - Scheduled or Confirmed - whose time has passed. The status is the
+ * numeric code from the API; `isLateStatus` in the contracts module owns which
+ * codes those are, so this file never repeats the mapping.
  */
-export function isLate(startUtc: string, status: string, now: Date = new Date()): boolean {
-  const stillExpected = status === 'Scheduled' || status === 'Confirmed';
-  return stillExpected && new Date(startUtc).getTime() < now.getTime();
+export function isLate(
+  startUtc: string,
+  statusIsStillExpected: boolean,
+  now: Date = new Date(),
+): boolean {
+  return statusIsStillExpected && new Date(startUtc).getTime() < now.getTime();
 }
 
 function pad(value: number): string {

@@ -191,55 +191,72 @@ export const availabilityListSchema = z.array(availabilitySlotSchema);
  * and classified here. An unknown status renders as unknown and counts towards
  * nothing.
  */
-export const KNOWN_BOOKING_STATUSES = [
-  'Scheduled',
-  'Confirmed',
-  'CheckedIn',
-  'Completed',
-  'NoShow',
-  'Cancelled',
-  'Waitlisted',
+/**
+ * 4.5 (v18): `status` travels as a number, and these are the seven the domain
+ * has. The contract named them in prose until v11, then lost the table in a
+ * rewrite; the names below come from the table the booking lane restored from
+ * `AppointmentStatus`, not from a guess on this side.
+ *
+ * ⚠️ This is NOT the same numbering as `HistoryLine.action`. `3` is
+ * *completed* as a status and *cancelled* as an action; `4` is *cancelled* as
+ * a status and *arrived* as an action. One shared table would be silently wrong
+ * half the time, so the two live apart and neither is derived from the other.
+ */
+export const BOOKING_STATUS_NAMES = [
+  "Scheduled",
+  "Confirmed",
+  "CheckedIn",
+  "Completed",
+  "Cancelled",
+  "NoShow",
+  "Waitlisted",
 ] as const;
 
-export type KnownBookingStatus = (typeof KNOWN_BOOKING_STATUSES)[number];
-export type BookingStatus = KnownBookingStatus | (string & {});
+export type KnownBookingStatus = (typeof BOOKING_STATUS_NAMES)[number];
 
-export const bookingStatusSchema = z.string();
+/** Parsed as a plain number: an unknown code must not bring the list down. */
+export const bookingStatusSchema = z.number().int();
 
-export function isKnownBookingStatus(status: string): status is KnownBookingStatus {
-  return (KNOWN_BOOKING_STATUSES as readonly string[]).includes(status);
+/** The name of a status code, or null when the code is one we do not know. */
+export function statusName(code: number): KnownBookingStatus | null {
+  return BOOKING_STATUS_NAMES[code] ?? null;
 }
 
 /** Which day-overview tally a status belongs to (4.5). `none` counts nowhere. */
-export type StatusTally = 'booked' | 'arrived' | 'noShow' | 'cancelled' | 'none' | 'unknown';
+export type StatusTally =
+  | "booked"
+  | "arrived"
+  | "noShow"
+  | "cancelled"
+  | "none"
+  | "unknown";
 
-export function statusTally(status: string): StatusTally {
-  switch (status) {
-    case 'Scheduled':
-    case 'Confirmed':
-      return 'booked';
-    case 'CheckedIn':
-    case 'Completed':
-      return 'arrived';
-    case 'NoShow':
-      return 'noShow';
-    case 'Cancelled':
-      return 'cancelled';
-    case 'Waitlisted':
-      return 'none';
+export function statusTally(code: number): StatusTally {
+  switch (code) {
+    case 0: // Scheduled
+    case 1: // Confirmed
+      return "booked";
+    case 2: // CheckedIn
+    case 3: // Completed
+      return "arrived";
+    case 4: // Cancelled
+      return "cancelled";
+    case 5: // NoShow
+      return "noShow";
+    case 6: // Waitlisted - this API does not produce it yet
+      return "none";
     default:
-      return 'unknown';
+      return "unknown";
   }
 }
 
-export const bookingSourceSchema = z.enum(['Staff', 'Online', 'Partner']);
-export type BookingSource = z.infer<typeof bookingSourceSchema>;
-
-export const readinessSchema = z.object({
-  isReady: z.boolean(),
-  missing: z.array(z.string()).nullish().transform((v) => v ?? []),
-});
-export type Readiness = z.infer<typeof readinessSchema>;
+/**
+ * 6.2, written as 4.5 writes it: only an appointment still expected can be
+ * late. Takes the numeric code, so the old string comparison cannot come back.
+ */
+export function isLateStatus(code: number): boolean {
+  return code === 0 || code === 1;
+}
 
 /**
  * A day of one calendar - 4.5 `GET /api/calendars/{id}/day`.
@@ -276,11 +293,25 @@ export const historyLineSchema = z.object({
 export type HistoryLine = z.infer<typeof historyLineSchema>;
 export const historyListSchema = z.array(historyLineSchema);
 
-/** Same tolerance as for statuses: an unknown action renders as unknown. */
-export const HISTORY_ACTIONS: Record<number, string> = {
-  0: 'booked', 1: 'confirmed', 2: 'rescheduled', 3: 'cancelled',
-  4: 'arrived', 5: 'noShow', 6: 'undone', 7: 'completed', 8: 'overridden',
+/**
+ * History actions - a **different** numbering from `status` above. Same
+ * tolerance: an unknown action renders as unknown rather than dropping the row.
+ */
+export const HISTORY_ACTION_NAMES: Record<number, string> = {
+  0: "booked",
+  1: "confirmed",
+  2: "rescheduled",
+  3: "cancelled",
+  4: "arrived",
+  5: "noShow",
+  6: "undone",
+  7: "completed",
+  8: "overridden",
 };
+
+export function historyActionName(code: number): string | null {
+  return HISTORY_ACTION_NAMES[code] ?? null;
+}
 
 /** Who is booking - 4.5. */
 export const BOOKING_SOURCE = { staff: 0, online: 1, partner: 2 } as const;

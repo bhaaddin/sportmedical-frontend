@@ -23,6 +23,8 @@ import { calendarsApi } from "../../api/calendars";
 import { appointmentsApi } from "../../api/appointments";
 import { workingHoursApi } from "../../api/workingHours";
 import {
+  isLateStatus,
+  statusName,
   statusTally,
   type DayAppointment,
   type PreviewDay,
@@ -60,7 +62,13 @@ import {
 type ViewMode = "day" | "week";
 
 const SLOT_MINUTES = 30;
-const ROW_HEIGHT = 26;
+/**
+ * Pixels per slot. A booking shows two lines - time with activity, and the
+ * status in words, which 7.1 requires because colour may not carry it alone -
+ * so the shortest slot has to be tall enough for both. At 26 a half-hour
+ * booking overflowed its slot by 18px and sat on top of the next one.
+ */
+const ROW_HEIGHT = 46;
 const DEFAULT_OPEN = { start: 7, end: 19 };
 
 /** Monday of the week a date falls in. */
@@ -676,11 +684,12 @@ function AppointmentButton({
 }) {
   const { t } = useTranslation();
   const color = calendar?.color ?? "#37474F";
-  const late = isLate(appointment.startUtc, appointment.status, now);
+  const late = isLate(appointment.startUtc, isLateStatus(appointment.status), now);
   const tally = statusTally(appointment.status);
-  const statusLabel = t(`booking.status.${appointment.status}`, {
-    defaultValue: t("booking.status.unknown"),
-  });
+  const name = statusName(appointment.status);
+  const statusLabel = name
+    ? t(`booking.status.${name}`)
+    : t("booking.status.unknown");
 
   return (
     <Box
