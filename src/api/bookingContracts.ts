@@ -552,8 +552,25 @@ export type DayActivityRow = z.infer<typeof dayActivityRowSchema>;
  * is the same whether it was just written or only read. So the owner sees
  * `working_day_without_activity` when the screen opens, not only after a save.
  */
-export const dayActivityGridSchema = z.object({
-  rows: z.array(dayActivityRowSchema).nullish().transform((v) => v ?? []),
-  warnings: z.array(activityWarningSchema).nullish().transform((v) => v ?? []),
-});
-export type DayActivityGrid = z.infer<typeof dayActivityGridSchema>;
+const dayActivityRowsSchema = z.array(dayActivityRowSchema);
+
+/**
+ * The read answers with a bare array of rows; the documented `{ rows, warnings }`
+ * object is accepted too, because the contract carried both shapes at once and
+ * either may turn up. Rejecting the array is what silently emptied screen 5.7.
+ */
+export const dayActivityGridSchema = z
+  .union([
+    dayActivityRowsSchema,
+    z.object({
+      rows: dayActivityRowsSchema.nullish().transform((v) => v ?? []),
+      days: dayActivityRowsSchema.nullish().transform((v) => v ?? []),
+      warnings: z.array(activityWarningSchema).nullish().transform((v) => v ?? []),
+    }),
+  ])
+  .transform((value) =>
+    Array.isArray(value)
+      ? { rows: value, warnings: [] as ActivityWarning[] }
+      : { rows: value.rows.length > 0 ? value.rows : value.days, warnings: value.warnings },
+  );
+export type DayActivityGrid = { rows: DayActivityRow[]; warnings: ActivityWarning[] };

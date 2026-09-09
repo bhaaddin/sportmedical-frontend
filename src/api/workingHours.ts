@@ -196,10 +196,10 @@ export const workingHoursApi = {
     rows: DayActivityRow[],
   ): Promise<DayActivityGrid> =>
     request(async () => {
-      // The body is the bare row array; the answer carries the warnings (3.1).
+      // v19: the body is { days: [...] }; the older contract said a bare array.
       const res = await client.put(
         `/api/calendars/${calendarId}/periods/${periodId}/day-activities`,
-        rows,
+        { days: rows },
       );
       return parseResponse(dayActivityGridSchema, res.data);
     }),

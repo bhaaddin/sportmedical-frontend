@@ -136,6 +136,7 @@ export function DayActivityGrid({ calendarId, periodId, workingDays }: DayActivi
 
       <AsyncSection
         isLoading={activitiesQuery.isLoading || gridQuery.isLoading}
+        isSettled={activitiesQuery.isSuccess && gridQuery.isSuccess}
         error={activitiesQuery.error ?? gridQuery.error}
         isEmpty={activities.length === 0}
         emptyText={t('booking.dayActivities.noActivities')}
@@ -236,7 +237,9 @@ export function DayActivityGrid({ calendarId, periodId, workingDays }: DayActivi
         <Box sx={{ mt: 2 }}>
           <Button
             variant="contained"
-            disabled={edited === null || save.isPending}
+            /* A full replacement must never go out from a grid that never
+               loaded: that would erase every day. */
+            disabled={edited === null || save.isPending || !gridQuery.isSuccess}
             onClick={() => save.mutate()}
           >
             {t('booking.common.save')}
