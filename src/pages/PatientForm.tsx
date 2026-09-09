@@ -1,549 +1,786 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate, useParams } from "react-router-dom";
 import {
-  Box, Typography, Paper, TextField, Button, Grid, MenuItem, Alert, CircularProgress,
-  IconButton, Chip, Stepper, Step, StepLabel,
-} from '@mui/material';
-import { ArrowBack, Save, PersonAdd, Add, Delete, ArrowForward } from '@mui/icons-material';
-import { motion, AnimatePresence } from 'framer-motion';
-import { patientsApi } from '../api/patients';
-import client from '../api/client';
-import toast from 'react-hot-toast';
-import { formatRodneCislo, parseRodneCislo } from '../utils/rodneCislo';
-import AddressPicker, { formatAddress, type AddressValue } from '../components/booking/AddressPicker';
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import LockIcon from "@mui/icons-material/Lock";
+import { toast } from "react-hot-toast";
+import client from "../api/client";
+import { patientsApi } from "../api/patients";
+import { patientIdentityApi } from "../api/patientIdentity";
+import patientRegistryApi, {
+  type AddressLocality,
+  type AddressPoint,
+  type InsuranceRegistrationKind,
+  type ResidenceType,
+} from "../api/patientRegistry";
 
-interface RegOption { code: string; displayValue: string; }
-interface ContactRow { channel: string; value: string; note: string; }
+/**
+ * Editing a patient - the `app` lane's contract,
+ * `docs/engineering/patient-identity-write-contract.md`.
+ *
+ * This screen used to be one five-step form that sent everything to
+ * `PUT /api/patients/{id}` and `PUT /api/patients/{id}/profile`. The second of
+ * those wrote the birth number, insurance number, insurer and address as plain
+ * text into a table of its own: no validation, no author, no reason, and
+ * invisible to the patient registry. The clinic ended up with two answers to
+ * "what is this patient's birth number", and the one this screen showed was the
+ * one nobody governed - so a typo corrected here stayed a typo everywhere it
+ * mattered.
+ *
+ * Those four fields are now read-only here and change through two routes that
+ * ask why, record who, and run the checks registration runs. The profile save
+ * sends them back exactly as it received them, which the contract supports as
+ * the ordinary load-edit-save round trip; changing one there is refused with a
+ * 409 naming the fields, and that refusal is a backstop, not the normal path.
+ */
 
-const INSURERS = [
-  { code: '111', label: '111 — Všeobecná zdravotní pojišťovna' },
-  { code: '201', label: '201 — Vojenská zdravotní pojišťovna' },
-  { code: '205', label: '205 — Česká průmyslová zdravotní pojišťovna' },
-  { code: '207', label: '207 — Oborová zdravotní pojišťovna' },
-  { code: '209', label: '209 — Zaměstnanecká pojišťovna Škoda' },
-  { code: '211', label: '211 — Zdravotní pojišťovna ministerstva vnitra' },
-  { code: '213', label: '213 — Revírní bratrská pokladna' },
+type Sex = "Male" | "Female" | "NotSpecified" | "Unknown";
+
+interface Contact {
+  channel: string;
+  value: string;
+  note: string;
+}
+
+/** The four fields this screen may show but not write. */
+interface GovernedIdentity {
+  birthNumber: string;
+  insuranceNumber: string;
+  healthInsurerCode: string;
+  address: string;
+}
+
+type Demographics = {
+  firstName: string;
+  lastName: string;
+  preferredName: string;
+  dateOfBirth: string;
+  sex: Sex;
+};
+
+type ProfileFields = {
+  titlesBeforeName: string;
+  titlesAfterName: string;
+  insuredFrom: string;
+  insuranceType: string;
+  citizenship: string;
+  treatingDoctors: string;
+  occupation: string;
+  employer: string;
+  employmentType: string;
+  notes: string;
+};
+
+const EMPTY_DEMOGRAPHICS: Demographics = {
+  firstName: "",
+  lastName: "",
+  preferredName: "",
+  dateOfBirth: "",
+  sex: "Male",
+};
+
+const EMPTY_PROFILE: ProfileFields = {
+  titlesBeforeName: "",
+  titlesAfterName: "",
+  insuredFrom: "",
+  insuranceType: "",
+  citizenship: "",
+  treatingDoctors: "",
+  occupation: "",
+  employer: "",
+  employmentType: "",
+  notes: "",
+};
+
+const EMPTY_GOVERNED: GovernedIdentity = {
+  birthNumber: "",
+  insuranceNumber: "",
+  healthInsurerCode: "",
+  address: "",
+};
+
+const SEX_OPTIONS: { value: Sex; label: string }[] = [
+  { value: "Male", label: "Muž" },
+  { value: "Female", label: "Žena" },
+  { value: "NotSpecified", label: "Neuvedeno" },
 ];
 
-const fieldSx = { '& .MuiOutlinedInput-root': { borderRadius: 2 } };
-
 export default function PatientForm() {
+  const { id: patientId } = useParams();
   const navigate = useNavigate();
-  const { id: editId } = useParams();
-  const isEdit = !!editId;
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [duplicate, setDuplicate] = useState<any>(null);
-  const lastCheckedKey = useRef('');
-  const [step, setStep] = useState(0);
 
-  const FORM_STEPS = ['Osobní údaje', 'Pojištění', 'Adresa', 'Kontakty', 'Zaměstnání'];
-  const [titlesBefore, setTitlesBefore] = useState<RegOption[]>([]);
-  const [titlesAfter, setTitlesAfter] = useState<RegOption[]>([]);
-
-  const [form, setForm] = useState({
-    lastName: '', firstName: '', titleBefore: '', titleAfter: '',
-    birthNumber: '', dateOfBirth: '', sex: 'Male', citizenship: 'Česko',
-    insuranceNumber: '', insurerCode: '', insuredFrom: '', insuranceType: '',
-    treatingDoctors: '', address: '', city: '',
-    occupation: '', employer: '', employmentType: '', notes: '',
+  /**
+   * Loaded through the same machinery as the booking screens: a query, and the
+   * edited value laid over the server's answer. An effect that copies a
+   * response into form state has to decide when to overwrite what the user is
+   * typing, and gets it wrong at exactly the wrong moment.
+   */
+  const patientQuery = useQuery({
+    queryKey: ["patient-edit", patientId],
+    queryFn: async () => {
+      const [patient, prof] = await Promise.all([
+        patientsApi.getById(patientId!),
+        patientsApi.getProfile(patientId!),
+      ]);
+      const p = (prof ?? {}) as Record<string, string | null>;
+      let contacts: Contact[] = [];
+      try {
+        contacts = JSON.parse(p.contactsJson ?? "[]") as Contact[];
+      } catch {
+        contacts = [];
+      }
+      return {
+        demographics: {
+          firstName: patient?.firstName ?? "",
+          lastName: patient?.lastName ?? "",
+          preferredName: (patient as { preferredName?: string })?.preferredName ?? "",
+          dateOfBirth: (patient?.dateOfBirth ?? "").slice(0, 10),
+          sex: ((patient?.sex as Sex) ?? "Male") as Sex,
+        },
+        profile: {
+          titlesBeforeName: p.titlesBeforeName ?? "",
+          titlesAfterName: p.titlesAfterName ?? "",
+          insuredFrom: (p.insuredFrom ?? "").slice(0, 10),
+          insuranceType: p.insuranceType ?? "",
+          citizenship: p.citizenship ?? "",
+          treatingDoctors: p.treatingDoctors ?? "",
+          occupation: p.occupation ?? "",
+          employer: p.employer ?? "",
+          employmentType: p.employmentType ?? "",
+          notes: p.notes ?? "",
+        },
+        /* Held exactly as the server gave them and sent back untouched. */
+        governed: {
+          birthNumber: p.birthNumber ?? "",
+          insuranceNumber: p.insuranceNumber ?? "",
+          healthInsurerCode: p.healthInsurerCode ?? "",
+          address: p.address ?? "",
+        } as GovernedIdentity,
+        contacts,
+      };
+    },
+    enabled: Boolean(patientId),
   });
-  const [contacts, setContacts] = useState<ContactRow[]>([
-    { channel: 'phone', value: '', note: '' },
-    { channel: 'email', value: '', note: '' },
-  ]);
-  const [addressParts, setAddressParts] = useState<AddressValue>({
-    region: '', city: '', psc: '', street: '', number: '',
-  });
-  const step0Valid = form.firstName.trim().length >= 1 && form.lastName.trim().length >= 1 && form.dateOfBirth !== '';
 
-  const [vitals, setVitals] = useState({
-    heartRate: 72,
-    bloodPressure: '120',
-    bloodPressureDiastolic: '80',
-    temperature: 36.6,
-    heartRateTrend: 'stable',
-    bloodPressureTrend: 'stable',
-    temperatureTrend: 'stable',
-    trendDirection: 'stable' as 'up' | 'down' | 'stable',
-    lastUpdate: '--:--',
-  });
-  const [alerts, setAlerts] = useState<Array<{title: string; message: string; severity: 'info' | 'warning' | 'error' }>>([]);
+  const [editedDemographics, setEditedDemographics] = useState<Demographics | null>(null);
+  const [editedProfile, setEditedProfile] = useState<ProfileFields | null>(null);
 
-  const update = (field: string, value: any) => setForm(prev => ({ ...prev, [field]: value }));
+  const demographics = editedDemographics ?? patientQuery.data?.demographics ?? EMPTY_DEMOGRAPHICS;
+  const profile = editedProfile ?? patientQuery.data?.profile ?? EMPTY_PROFILE;
+  const governed = patientQuery.data?.governed ?? EMPTY_GOVERNED;
+  const contacts = patientQuery.data?.contacts ?? [];
 
-  // ── Simulated real-time CGM vital signs monitoring ────────────────
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setVitals(prev => {
-        const randomChange = (Math.random() - 0.5) * 5;
-        const newHr = Math.max(60, Math.min(100, prev.heartRate + Math.round(randomChange)));
-        const newBpSystolic = Math.max(90, Math.min(140, parseInt(prev.bloodPressure) + Math.round(randomChange * 0.4)));
-        const newTemp = Math.max(36.0, Math.min(37.5, parseFloat(prev.temperature) + Math.round(randomChange * 0.2)));
-        const directions = ['up', 'down', 'stable'] as const;
-        const getRandomDir = () => directions[Math.floor(Math.random() * directions.length)];
-        const trendDirection =
-          (newHr > prev.heartRate ? 'up' : newHr < prev.heartRate ? 'down' : 'stable');
-        return {
-          heartRate: newHr,
-          bloodPressure: newBpSystolic.toString(),
-          bloodPressureDiastolic: parseInt(prev.bloodPressureDiastolic) + Math.round(randomChange * 0.2).toString(),
-          temperature: parseFloat(prev.temperature).toFixed(1),
-          heartRateTrend: getRandomDir(),
-          bloodPressureTrend: getRandomDir(),
-          temperatureTrend: getRandomDir(),
-          trendDirection,
-          lastUpdate: new Date().toLocaleTimeString([], { minute: '2-digit', hour: '2-digit' }),
-        };
-      });
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
+  const setDemographics = setEditedDemographics;
+  const setProfile = setEditedProfile;
 
-  // ── Simulated alerts generation based on vitals ─────────────────────
-  useEffect(() => {
-    const newAlerts: AlertData[] = [];
-    if (vitals.heartRate > 90) {
-      newAlerts.push({
-        title: 'Srdeční frekvence',
-        message: ` ${vitals.heartRate} bpm - mírně zvýšená`,
-        severity: 'warning',
-      });
-    }
-    if (vitals.heartRate < 50) {
-      newAlerts.push({
-        title: 'Srdeční frekvence',
-        message: ` ${vitals.heartRate} bpm - snížená, pozor`,
-        severity: 'error',
-      });
-    }
-    if (vitals.temperature > 37.2) {
-      newAlerts.push({
-        title: 'Teplota',
-        message: ` ${vitals.temperature} °C - horečka`,
-        severity: 'warning',
-      });
-    }
-    if (vitals.temperature < 36.0) {
-      newAlerts.push({
-        title: 'Teplota',
-        message: ` ${vitals.temperature} °C - hypotermie`,
-        severity: 'error',
-      });
-    }
-    setAlerts(newAlerts);
-  }, [vitals]);
+  const [savingDemographics, setSavingDemographics] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [insuranceOpen, setInsuranceOpen] = useState(false);
+  const [addressOpen, setAddressOpen] = useState(false);
 
-  // Smart birth-number: auto-format + derive birth date + sex
-  const [rcValid, setRcValid] = useState<boolean | null>(null);
-  const handleBirthNumber = (raw: string) => {
-    const formatted = formatRodneCislo(raw);
-    const parsed = parseRodneCislo(formatted);
-    setRcValid(raw.replace(/[^0-9]/g, '').length >= 9 ? parsed.valid : null);
-    setForm(prev => ({
-      ...prev,
-      birthNumber: formatted,
-      ...(parsed.valid ? { dateOfBirth: parsed.dateOfBirth, sex: parsed.sex } : {}),
-    }));
+  const load = () => {
+    setEditedDemographics(null);
+    setEditedProfile(null);
+    void patientQuery.refetch();
   };
 
-  useEffect(() => {
-    client.get('/api/v1/patient-registration/options')
-      .then(r => {
-        const d = r.data?.value ?? r.data ?? {};
-        setTitlesBefore(d.titlesBeforeName ?? []);
-        setTitlesAfter(d.titlesAfterName ?? []);
-      })
-      .catch(() => {});
-  }, []);
-
-  // Edit mode: load patient + profile
-  useEffect(() => {
-    if (!editId) return;
-    Promise.all([
-      patientsApi.getById(editId).catch(() => null),
-      patientsApi.getProfile(editId).catch(() => null),
-    ]).then(([p, prof]: any[]) => {
-      if (p) {
-        setForm(f => ({
-          ...f,
-          lastName: p.lastName ?? '', firstName: p.firstName ?? '',
-          dateOfBirth: (p.dateOfBirth ?? '').slice(0, 10), sex: p.sex ?? 'Male',
-        }));
-      }
-      if (prof) {
-        const contacts = (() => { try { return JSON.parse(prof.contactsJson ?? '[]'); } catch { return []; } })();
-        // Split saved "street number, city, psc" back into steps
-        const addrParts = String(prof.address ?? '').split(',').map((s: string) => s.trim());
-        if (addrParts.length >= 2) {
-          const streetNum = addrParts[0].match(/^(.*)\s+(\S+)$/);
-          setAddressParts({
-            region: '',
-            city: addrParts[1] ?? '',
-            psc: addrParts[2] ?? '',
-            street: streetNum ? streetNum[1] : addrParts[0],
-            number: streetNum ? streetNum[2] : '',
-          });
-        }
-        setForm(f => ({
-          ...f,
-          titleBefore: prof.titlesBeforeName ?? '', titleAfter: prof.titlesAfterName ?? '',
-          birthNumber: prof.birthNumber ?? '', insuranceNumber: prof.insuranceNumber ?? '',
-          insurerCode: prof.healthInsurerCode ?? '', insuredFrom: (prof.insuredFrom ?? '').slice(0, 10),
-          insuranceType: prof.insuranceType ?? '', treatingDoctors: prof.treatingDoctors ?? '',
-          address: prof.address ?? '', occupation: prof.occupation ?? '', employer: prof.employer ?? '',
-          employmentType: prof.employmentType ?? '', notes: prof.notes ?? '',
-        }));
-        const rows = contacts.length > 0 ? contacts : [{ channel: 'phone', value: '', note: '' }, { channel: 'email', value: '', note: '' }];
-        setContacts(rows.map((c: any) => ({ channel: c.channel ?? 'phone', value: c.value ?? '', note: c.note ?? '' })));
-      }
-    });
-  }, [editId]);
-
-  const email = contacts.find(c => c.channel === 'email')?.value ?? '';
-  const phone = contacts.find(c => c.channel === 'phone')?.value ?? '';
-
-  const handleSubmit = async () => {
-    if (!form.firstName || !form.lastName || !form.dateOfBirth) {
-      setError('Vyplňte povinné údaje (Jméno, Příjmení, Datum narození)');
-      return;
-    }
-    setLoading(true);
-    setError('');
+  const saveDemographics = async () => {
+    if (!patientId) return;
+    setSavingDemographics(true);
     try {
-      // Duplicate check (create mode): same name + birth date already exists?
-      // Second submit with unchanged data proceeds anyway (confirmed different person).
-      if (!isEdit) {
-        try {
-          const found = await patientsApi.search(form.lastName);
-          const dup = (found ?? []).find((p: any) =>
-            (p.firstName ?? '').toLowerCase() === form.firstName.trim().toLowerCase() &&
-            String(p.dateOfBirth ?? '').slice(0, 10) === form.dateOfBirth);
-          const dupKey = dup ? `${dup.id}` : '';
-          const formKey = `${form.firstName.trim().toLowerCase()}|${form.lastName.trim().toLowerCase()}|${form.dateOfBirth}`;
-          if (dup && duplicate?.id !== dup.id && lastCheckedKey.current !== formKey + dup.id) {
-            setDuplicate(dup);
-            lastCheckedKey.current = formKey + dup.id;
-            setLoading(false);
-            return;
-          }
-        } catch { /* search failed — continue with create */ }
-      }
-      const email = contacts.find(c => c.channel === 'email')?.value ?? '';
-      const phone = contacts.find(c => c.channel === 'phone')?.value ?? '';
-      let patientId = editId;
-      if (isEdit && editId) {
-        await patientsApi.update(editId, {
-          firstName: form.firstName,
-          lastName: form.lastName,
-          dateOfBirth: form.dateOfBirth,
-        });
-        patientId = editId;
-      } else {
-        const patient = await patientsApi.create({
-          firstName: form.firstName,
-          lastName: form.lastName,
-          dateOfBirth: form.dateOfBirth,
-          sex: form.sex,
-          preferredName: undefined,
-          email: email || undefined,
-          phone: phone || undefined,
-          registrationBusinessDate: new Date().toISOString().split('T')[0],
-        });
-        patientId = patient.id;
-      }
-      await client.put(`/api/patients/${patientId}/profile`, {
-        titlesBeforeName: form.titleBefore,
-        titlesAfterName: form.titleAfter,
-        birthNumber: form.birthNumber,
-        insuranceNumber: form.insuranceNumber || form.birthNumber,
-        healthInsurerCode: form.insurerCode,
-        insuredFrom: form.insuredFrom,
-        insuranceType: form.insuranceType,
-        citizenship: form.citizenship,
-        address: formatAddress(addressParts) || form.address,
-        treatingDoctors: form.treatingDoctors,
-        occupation: form.occupation,
-        employer: form.employer,
-        employmentType: form.employmentType,
-        notes: form.notes,
-        contactsJson: JSON.stringify(contacts.filter(c => c.value.trim() !== '')),
+      await patientsApi.update(patientId, {
+        firstName: demographics.firstName,
+        lastName: demographics.lastName,
+        dateOfBirth: demographics.dateOfBirth,
       });
-      toast.success(isEdit ? 'Pacient upraven!' : 'Pacient úspěšně vytvořen!');
-      navigate(`/patients/${patientId}`);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Neznámá chyba — zkontrolujte připojení k backendu';
-      setError(msg);
-      toast.error(`Chyba při ukládání pacienta: ${msg}`);
+      toast.success("Jméno a demografie uloženy.");
+      load();
+    } catch {
+      toast.error("Uložení se nezdařilo.");
     } finally {
-      setLoading(false);
+      setSavingDemographics(false);
     }
   };
 
-  const setContact = (i: number, patch: Partial<ContactRow>) =>
-    setContacts(prev => prev.map((c, idx) => idx === i ? { ...c, ...patch } : c));
+  const saveProfile = async () => {
+    if (!patientId) return;
+    setSavingProfile(true);
+    try {
+      /* The four governed fields go back exactly as they arrived. */
+      await client.put(`/api/patients/${patientId}/profile`, {
+        ...profile,
+        ...governed,
+        contactsJson: JSON.stringify(contacts.filter((c) => c.value.trim() !== "")),
+      });
+      toast.success("Ostatní údaje uloženy.");
+      load();
+    } catch (error) {
+      const refused = (
+        error as { response?: { data?: { refusedFields?: string[]; message?: string } } }
+      )?.response?.data;
+      if (refused?.refusedFields?.length) {
+        toast.error(
+          `Server odmítl změnu identity: ${refused.refusedFields.join(", ")}. Použijte tlačítko Opravit.`,
+        );
+      } else {
+        toast.error("Uložení se nezdařilo.");
+      }
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  if (!patientId) return null;
+
+  if (patientQuery.isPending) {
+    return <Typography sx={{ p: 3 }}>Načítám…</Typography>;
+  }
+
+  if (patientQuery.isError) {
+    return (
+      <Box sx={{ maxWidth: 900, mx: "auto", p: 2 }}>
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={load}>
+              Zkusit znovu
+            </Button>
+          }
+        >
+          Pacienta se nepodařilo načíst.
+        </Alert>
+      </Box>
+    );
+  }
 
   return (
-    <Box sx={{ maxWidth: 1000, mx: 'auto' }}>
-      {/* CGM MONITORING BANNER - Inspirované CGM MEDISTAR */}
-      <Box sx={{ mt: 2, p: 2, borderRadius: 3, bgcolor: '#F0F9FF', border: '1px solid #0D7377' }}>
-        <Typography variant="body1" color="#0D7377">
-          <strong>Reálný čas monitorování (CGM Inspirované):</strong> 
-          Srdeční: {vitals.heartRate} bpm, Krevní: {vitals.bloodPressure}/{vitals.bloodPressureDiastolic} mmHg, Teplota: {vitals.temperature} °C
-        </Typography>
-      </Box>
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <Button startIcon={<ArrowBack />} onClick={() => navigate('/patients')}
-          sx={{ mb: 2, borderRadius: 2 }}>
-          Zpět na pacienty
-        </Button>
-        <Typography variant="h4" gutterBottom sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <PersonAdd color="primary" /> {isEdit ? 'Upravit pacienta' : 'Nový pacient'}
-        </Typography>
-      </motion.div>
+    <Box sx={{ maxWidth: 900, mx: "auto" }}>
+      <Typography variant="h4" sx={{ fontWeight: 800, mb: 3 }}>
+        Úprava pacienta
+      </Typography>
 
-      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
-
-      {duplicate && (
-        <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
-          Podobný pacient již existuje: <strong>{duplicate.firstName} {duplicate.lastName}</strong>
-          {' '}({String(duplicate.dateOfBirth ?? '').slice(0, 10)}).
-          {' '}<Link to={`/patients/${duplicate.id}`}>Otevřít záznam</Link>
-          {' '}— nebo pokračujte v uložení, pokud jde o jinou osobu.
-        </Alert>
-      )}
-
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-        <Paper sx={{ p: 4, borderRadius: 3 }}>
-          <Stepper activeStep={step} sx={{ mb: 3 }}>
-            {FORM_STEPS.map(label => (
-              <Step key={label} completed={step > FORM_STEPS.indexOf(label)}>
-                <StepLabel>{label}</StepLabel>
-              </Step>
-            ))}
-          </Stepper>
-
-          <AnimatePresence mode="wait">
-          {step === 0 && (
-          <motion.div key="s0" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.22 }}>
-          {/* ── Identity ── */}
-          <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>Osobní údaje</Typography>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField fullWidth required label="Příjmení" value={form.lastName}
-                onChange={e => update('lastName', e.target.value)} sx={fieldSx} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField fullWidth required label="Jméno" value={form.firstName}
-                onChange={e => update('firstName', e.target.value)} sx={fieldSx} />
-            </Grid>
-            <Grid size={{ xs: 6, sm: 3 }}>
-              <TextField fullWidth select label="Titul před" value={form.titleBefore}
-                onChange={e => update('titleBefore', e.target.value)} sx={fieldSx}>
-                <MenuItem value="">—</MenuItem>
-                {titlesBefore.map(t => <MenuItem key={t.code} value={t.displayValue}>{t.displayValue}</MenuItem>)}
+      {/* 1. Name and demographics — route 1 */}
+      <Card sx={{ mb: 3, borderRadius: 2 }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            Jméno a demografie
+          </Typography>
+          <Stack spacing={2}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField
+                fullWidth
+                label="Jméno"
+                value={demographics.firstName}
+                onChange={(e) =>
+                  setDemographics({ ...demographics, firstName: e.target.value })
+                }
+              />
+              <TextField
+                fullWidth
+                label="Příjmení"
+                value={demographics.lastName}
+                onChange={(e) =>
+                  setDemographics({ ...demographics, lastName: e.target.value })
+                }
+              />
+            </Stack>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField
+                fullWidth
+                type="date"
+                label="Datum narození"
+                value={demographics.dateOfBirth}
+                onChange={(e) =>
+                  setDemographics({ ...demographics, dateOfBirth: e.target.value })
+                }
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+              <TextField
+                select
+                fullWidth
+                label="Pohlaví"
+                value={demographics.sex}
+                onChange={(e) =>
+                  setDemographics({ ...demographics, sex: e.target.value as Sex })
+                }
+              >
+                {SEX_OPTIONS.map((o) => (
+                  <MenuItem key={o.value} value={o.value}>
+                    {o.label}
+                  </MenuItem>
+                ))}
               </TextField>
-            </Grid>
-            <Grid size={{ xs: 6, sm: 3 }}>
-              <TextField fullWidth select label="Titul za" value={form.titleAfter}
-                onChange={e => update('titleAfter', e.target.value)} sx={fieldSx}>
-                <MenuItem value="">—</MenuItem>
-                {titlesAfter.map(t => <MenuItem key={t.code} value={t.displayValue}>{t.displayValue}</MenuItem>)}
-              </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField fullWidth label="Rodné číslo" value={form.birthNumber}
-                onChange={e => handleBirthNumber(e.target.value)} placeholder="900101/1234" sx={fieldSx}
-                helperText={rcValid === false ? 'Neplatné rodné číslo' : rcValid === true ? '✓ Datum narození a pohlaví doplněny' : 'Lomítko se doplní samo'}
-                error={rcValid === false} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField fullWidth required label="Datum narození" type="date"
-                value={form.dateOfBirth} onChange={e => update('dateOfBirth', e.target.value)}
-                InputLabelProps={{ shrink: true }} sx={fieldSx} />
-            </Grid>
-            <Grid size={{ xs: 6, sm: 3 }}>
-              <TextField fullWidth select label="Pohlaví" value={form.sex}
-                onChange={e => update('sex', e.target.value)} sx={fieldSx}>
-                <MenuItem value="Male">Muž</MenuItem>
-                <MenuItem value="Female">Žena</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid size={{ xs: 6, sm: 3 }}>
-              <TextField fullWidth label="Státní příslušnost" value={form.citizenship}
-                onChange={e => update('citizenship', e.target.value)} sx={fieldSx} />
-            </Grid>
-          </Grid>
+            </Stack>
+            <Box>
+              <Button
+                variant="contained"
+                onClick={saveDemographics}
+                disabled={savingDemographics}
+              >
+                Uložit
+              </Button>
+            </Box>
+          </Stack>
+        </CardContent>
+      </Card>
 
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-            <Button variant="contained" endIcon={<ArrowForward />} onClick={() => setStep(1)}
-              disabled={!step0Valid}
-              sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 600 }}>
-              Pokračovat
+      {/* 2. Identity — read-only, changed through the governed routes */}
+      <Card sx={{ mb: 3, borderRadius: 2 }}>
+        <CardContent>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1 }}>
+            <LockIcon fontSize="small" color="action" />
+            <Typography variant="h6">Identita</Typography>
+          </Stack>
+          <Typography sx={{ color: "text.secondary", mb: 2 }}>
+            Rodné číslo, pojištění a adresa se mění jen se zdůvodněním — každá
+            změna se zapisuje s autorem a důvodem do registru pacientů.
+          </Typography>
+
+          <Stack spacing={1.5}>
+            <ReadOnlyRow label="Rodné číslo" value={governed.birthNumber} />
+            <ReadOnlyRow label="Číslo pojištěnce" value={governed.insuranceNumber} />
+            <ReadOnlyRow label="Zdravotní pojišťovna" value={governed.healthInsurerCode} />
+            <Divider />
+            <ReadOnlyRow label="Adresa" value={governed.address} />
+          </Stack>
+
+          <Stack direction="row" spacing={1} sx={{ mt: 2, flexWrap: "wrap", gap: 1 }}>
+            <Button
+              startIcon={<EditIcon />}
+              variant="outlined"
+              onClick={() => setInsuranceOpen(true)}
+            >
+              Opravit pojištění
             </Button>
-          </Box>
-          {!step0Valid && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right', mt: 1 }}>
-              Vyplňte Jméno, Příjmení a Datum narození
-            </Typography>
-          )}
-          </motion.div>
-          )}
-
-          {step === 1 && (
-          <motion.div key="s1" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.22 }}>
-          {/* ── Insurance ── */}
-          <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>Pojištění</Typography>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField fullWidth label="Číslo pojištěnce" value={form.insuranceNumber}
-                onChange={e => update('insuranceNumber', e.target.value)}
-                placeholder="Není-li vyplněno, použije se rodné číslo" sx={fieldSx} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField fullWidth select label="ZP — zdravotní pojišťovna" value={form.insurerCode}
-                onChange={e => update('insurerCode', e.target.value)} sx={fieldSx}>
-                <MenuItem value="">—</MenuItem>
-                {INSURERS.map(i => <MenuItem key={i.code} value={i.code}>{i.label}</MenuItem>)}
-              </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField fullWidth label="Pojištěn od" type="date" value={form.insuredFrom}
-                onChange={e => update('insuredFrom', e.target.value)}
-                InputLabelProps={{ shrink: true }} sx={fieldSx} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField fullWidth label="Druh pojištění" value={form.insuranceType}
-                onChange={e => update('insuranceType', e.target.value)}
-                placeholder="např. veřejné, komerční..." sx={fieldSx} />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField fullWidth label="Registrující / ošetřující lékaři" value={form.treatingDoctors}
-                onChange={e => update('treatingDoctors', e.target.value)}
-                placeholder="Jména oddělená čárkou" sx={fieldSx} />
-            </Grid>
-          </Grid>
-
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-            <Button startIcon={<ArrowBack />} onClick={() => setStep(0)}>Zpět</Button>
-            <Button variant="contained" endIcon={<ArrowForward />} onClick={() => setStep(2)}
-              sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 600 }}>
-              Pokračovat
+            <Button
+              startIcon={<EditIcon />}
+              variant="outlined"
+              onClick={() => setAddressOpen(true)}
+            >
+              Opravit adresu
             </Button>
-          </Box>
-          </motion.div>
-          )}
+          </Stack>
+        </CardContent>
+      </Card>
 
-          {step === 2 && (
-          <motion.div key="s2" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.22 }}>
-          {/* ── Address (stepped: kraj → město → ulice → PSČ) ── */}
-          <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>Adresa</Typography>
-          <Box sx={{ mb: 1 }}>
-            <AddressPicker value={addressParts} onChange={setAddressParts} />
-          </Box>
+      {/* 3. Everything else — route 2 */}
+      <Card sx={{ mb: 3, borderRadius: 2 }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            Ostatní
+          </Typography>
+          <Stack spacing={2}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField
+                fullWidth
+                label="Titul před jménem"
+                value={profile.titlesBeforeName}
+                onChange={(e) =>
+                  setProfile({ ...profile, titlesBeforeName: e.target.value })
+                }
+              />
+              <TextField
+                fullWidth
+                label="Titul za jménem"
+                value={profile.titlesAfterName}
+                onChange={(e) =>
+                  setProfile({ ...profile, titlesAfterName: e.target.value })
+                }
+              />
+            </Stack>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField
+                fullWidth
+                label="Povolání"
+                value={profile.occupation}
+                onChange={(e) => setProfile({ ...profile, occupation: e.target.value })}
+              />
+              <TextField
+                fullWidth
+                label="Zaměstnavatel"
+                value={profile.employer}
+                onChange={(e) => setProfile({ ...profile, employer: e.target.value })}
+              />
+            </Stack>
+            <TextField
+              fullWidth
+              label="Ošetřující lékaři"
+              value={profile.treatingDoctors}
+              onChange={(e) =>
+                setProfile({ ...profile, treatingDoctors: e.target.value })
+              }
+            />
+            <TextField
+              fullWidth
+              multiline
+              minRows={3}
+              label="Poznámky"
+              value={profile.notes}
+              onChange={(e) => setProfile({ ...profile, notes: e.target.value })}
+            />
+            <Box>
+              <Button variant="contained" onClick={saveProfile} disabled={savingProfile}>
+                Uložit
+              </Button>
+            </Box>
+          </Stack>
+        </CardContent>
+      </Card>
 
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-            <Button startIcon={<ArrowBack />} onClick={() => setStep(1)}>Zpět</Button>
-            <Button variant="contained" endIcon={<ArrowForward />} onClick={() => setStep(3)}
-              sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 600 }}>
-              Pokračovat
-            </Button>
-          </Box>
-          </motion.div>
-          )}
+      <Button onClick={() => navigate(`/patients/${patientId}`)}>Zpět na pacienta</Button>
 
-          {step === 3 && (
-          <motion.div key="s3" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.22 }}>
-          {/* ── Contacts ── */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="subtitle1" fontWeight={700}>Kontakty</Typography>
-            <Button size="small" startIcon={<Add />}
-              onClick={() => setContacts(prev => [...prev, { channel: 'phone', value: '', note: '' }])}>
-              Přidat kontakt
-            </Button>
-          </Box>
-          {contacts.map((c, i) => (
-            <Grid container spacing={2} sx={{ mb: 1.5 }} key={i}>
-              <Grid size={{ xs: 12, sm: 4 }}>
-                <TextField fullWidth size="small" label={i < 2 ? (c.channel === 'phone' ? 'Mobil / pevná linka' : 'Email') : 'Kontakt'}
-                  value={c.value} onChange={e => setContact(i, { value: e.target.value })} sx={fieldSx} />
-              </Grid>
-              <Grid size={{ xs: 6, sm: 3 }}>
-                <TextField fullWidth size="small" select label="Druh kontaktu" value={c.channel}
-                  onChange={e => setContact(i, { channel: e.target.value })} sx={fieldSx}>
-                  <MenuItem value="phone">Telefon</MenuItem>
-                  <MenuItem value="email">Email</MenuItem>
-                  <MenuItem value="other">Jiný</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid size={{ xs: 10, sm: 4 }}>
-                <TextField fullWidth size="small" label="Poznámka" value={c.note}
-                  onChange={e => setContact(i, { note: e.target.value })} sx={fieldSx} />
-              </Grid>
-              <Grid size={{ xs: 2, sm: 1 }} sx={{ display: 'flex', alignItems: 'center' }}>
-                {contacts.length > 1 && (
-                  <IconButton size="small" color="error"
-                    onClick={() => setContacts(prev => prev.filter((_, idx) => idx !== i))}>
-                    <Delete fontSize="small" />
-                  </IconButton>
-                )}
-              </Grid>
-            </Grid>
-          ))}
-
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-            <Button startIcon={<ArrowBack />} onClick={() => setStep(2)}>Zpět</Button>
-            <Button variant="contained" endIcon={<ArrowForward />} onClick={() => setStep(4)}
-              sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 600 }}>
-              Pokračovat
-            </Button>
-          </Box>
-          </motion.div>
-          )}
-
-          {step === 4 && (
-          <motion.div key="s4" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.22 }}>
-          {/* ── Work ── */}
-          <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>Zaměstnání</Typography>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid size={{ xs: 12, sm: 4 }}>
-              <TextField fullWidth label="Povolání" value={form.occupation}
-                onChange={e => update('occupation', e.target.value)} sx={fieldSx} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 4 }}>
-              <TextField fullWidth label="Zaměstnavatel" value={form.employer}
-                onChange={e => update('employer', e.target.value)} sx={fieldSx} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 4 }}>
-              <TextField fullWidth label="Druh zaměstnání" value={form.employmentType}
-                onChange={e => update('employmentType', e.target.value)} sx={fieldSx} />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField fullWidth multiline rows={2} label="Poznámka" value={form.notes}
-                onChange={e => update('notes', e.target.value)} sx={fieldSx} />
-            </Grid>
-          </Grid>
-
-          <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-            <Button startIcon={<ArrowBack />} onClick={() => setStep(3)}>Zpět</Button>
-            <Box sx={{ flex: 1 }} />
-            <Button variant="outlined" onClick={() => navigate('/patients')}
-              sx={{ borderRadius: 2, px: 3 }}>
-              Zrušit
-            </Button>
-            <Button variant="contained" startIcon={loading ? <CircularProgress size={20} /> : <Save />}
-              onClick={handleSubmit} disabled={loading}
-              sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 600,
-                boxShadow: '0 4px 16px rgba(13,115,119,0.3)',
-                '&:hover': { bgcolor: '#095456' } }}>
-              {loading ? 'Ukládání...' : (isEdit ? 'Uložit změny' : 'Uložit pacienta')}
-            </Button>
-          </Box>
-          </motion.div>
-          )}
-          </AnimatePresence>
-        </Paper>
-      </motion.div>
+      {/* Mounted only while open: the dialog's opening state is its initial
+          state, so there is no effect resetting fields after the fact. */}
+      {insuranceOpen ? (
+        <InsuranceDialog
+          patientId={patientId}
+          current={governed}
+          onClose={() => setInsuranceOpen(false)}
+          onSaved={() => {
+            setInsuranceOpen(false);
+            load();
+          }}
+        />
+      ) : null}
+      {addressOpen ? (
+        <AddressDialog
+          patientId={patientId}
+          onClose={() => setAddressOpen(false)}
+          onSaved={() => {
+            setAddressOpen(false);
+            load();
+          }}
+        />
+      ) : null}
     </Box>
+  );
+}
+
+function ReadOnlyRow({ label, value }: { label: string; value: string }) {
+  return (
+    <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+      <Typography sx={{ color: "text.secondary", minWidth: 180 }}>{label}</Typography>
+      <Typography sx={{ fontWeight: 600 }}>{value || "—"}</Typography>
+    </Box>
+  );
+}
+
+/**
+ * Route 3. The insurance number is typed twice on purpose: a mistyped one is
+ * silent - it looks like a number and belongs to somebody else.
+ */
+function InsuranceDialog({
+  patientId,
+  current,
+  onClose,
+  onSaved,
+}: {
+  patientId: string;
+  current: GovernedIdentity;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [kind, setKind] = useState<InsuranceRegistrationKind>("CzechPublicHealthInsurance");
+  const [birthNumber, setBirthNumber] = useState(current.birthNumber);
+  const [number, setNumber] = useState(current.insuranceNumber);
+  const [confirmation, setConfirmation] = useState("");
+  const [insurer, setInsurer] = useState(current.healthInsurerCode);
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const mismatch = confirmation !== "" && confirmation !== number;
+  const canSave = reason.trim() !== "" && !mismatch && confirmation !== "" && !saving;
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await patientIdentityApi.updateAdministrativeProfile(
+        patientId,
+        {
+          insuranceRegistrationKind: kind,
+          birthNumber: birthNumber || null,
+          healthInsuranceNumber: number || null,
+          healthInsuranceNumberConfirmation: confirmation || null,
+          healthInsurerCode: insurer || null,
+          insuranceEvidenceSource: "InsuranceCardInspected",
+          identityDocumentType: null,
+          identityDocumentIssuingCountryCode: null,
+          identityDocumentNumber: null,
+        },
+        reason,
+      );
+      toast.success(result.changed ? "Pojištění opraveno." : "Beze změny — hodnoty se shodují.");
+      onSaved();
+    } catch (e) {
+      const body = (e as { response?: { data?: { message?: string } } })?.response?.data;
+      setError(body?.message ?? "Opravu se nepodařilo uložit.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Oprava pojištění</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField
+            select
+            fullWidth
+            label="Druh registrace"
+            value={kind}
+            onChange={(e) => setKind(e.target.value as InsuranceRegistrationKind)}
+          >
+            <MenuItem value="CzechPublicHealthInsurance">České veřejné zdravotní pojištění</MenuItem>
+            <MenuItem value="NoCzechHealthInsuranceNumber">Bez českého čísla pojištěnce</MenuItem>
+          </TextField>
+          <TextField
+            fullWidth
+            label="Rodné číslo"
+            value={birthNumber}
+            onChange={(e) => setBirthNumber(e.target.value)}
+          />
+          <TextField
+            fullWidth
+            label="Číslo pojištěnce"
+            value={number}
+            onChange={(e) => setNumber(e.target.value)}
+          />
+          <TextField
+            fullWidth
+            label="Číslo pojištěnce ještě jednou"
+            value={confirmation}
+            onChange={(e) => setConfirmation(e.target.value)}
+            error={mismatch}
+            helperText={mismatch ? "Čísla se neshodují." : "Opište číslo znovu, ne kopírujte."}
+          />
+          <TextField
+            fullWidth
+            label="Zdravotní pojišťovna"
+            value={insurer}
+            onChange={(e) => setInsurer(e.target.value)}
+          />
+          <TextField
+            required
+            fullWidth
+            multiline
+            minRows={2}
+            label="Důvod změny"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            helperText="Bez důvodu se změna identity neuloží."
+          />
+          {error ? <Alert severity="error">{error}</Alert> : null}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Zrušit</Button>
+        <Button variant="contained" disabled={!canSave} onClick={save}>
+          Uložit opravu
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/** Route 4. The address is a RÚIAN point, never free text. */
+function AddressDialog({
+  patientId,
+  onClose,
+  onSaved,
+}: {
+  patientId: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [residenceType, setResidenceType] = useState<ResidenceType>(
+    "PermanentResidenceInCzechia",
+  );
+  const [query, setQuery] = useState("");
+  const [localities, setLocalities] = useState<AddressLocality[]>([]);
+  const [locality, setLocality] = useState<AddressLocality | null>(null);
+  const [houseNumber, setHouseNumber] = useState("");
+  const [points, setPoints] = useState<AddressPoint[]>([]);
+  const [pointCode, setPointCode] = useState<number | null>(null);
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const datasetQuery = useQuery({
+    queryKey: ["address-dataset-status"],
+    queryFn: () => patientRegistryApi.getAddressDatasetStatus(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const datasetLoaded = datasetQuery.data?.loaded ?? null;
+
+  const searchLocalities = async (text: string) => {
+    setQuery(text);
+    if (text.trim().length < 2) return;
+    try {
+      setLocalities(await patientRegistryApi.searchLocalities(text));
+    } catch {
+      setLocalities([]);
+    }
+  };
+
+  /** A point needs the locality and the house number; the search takes both. */
+  const findPoints = async (value: AddressLocality | null, number: string) => {
+    setPointCode(null);
+    if (!value || number.trim() === "") {
+      setPoints([]);
+      return;
+    }
+    try {
+      setPoints(
+        await patientRegistryApi.searchAddressPoints({
+          streetCode: value.streetCode,
+          municipalityPartCode: value.municipalityPartCode,
+          number,
+        }),
+      );
+    } catch {
+      setPoints([]);
+    }
+  };
+
+  const save = async () => {
+    if (pointCode === null) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await patientIdentityApi.updateResidenceAddress(
+        patientId,
+        residenceType,
+        pointCode,
+        reason,
+      );
+      toast.success(result.changed ? "Adresa opravena." : "Beze změny — adresa se shoduje.");
+      onSaved();
+    } catch (e) {
+      const body = (e as { response?: { data?: { message?: string } } })?.response?.data;
+      setError(body?.message ?? "Opravu se nepodařilo uložit.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Oprava adresy</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {datasetLoaded === false ? (
+            <Alert severity="error">
+              Adresní registr RÚIAN není v této instalaci nahraný. Bez adresního bodu
+              nelze adresu opravit — dataset musí nejdřív naimportovat správce.
+            </Alert>
+          ) : null}
+
+          <TextField
+            select
+            fullWidth
+            label="Typ pobytu"
+            value={residenceType}
+            onChange={(e) => setResidenceType(e.target.value as ResidenceType)}
+          >
+            <MenuItem value="PermanentResidenceInCzechia">Trvalý pobyt v ČR</MenuItem>
+            <MenuItem value="ReportedResidenceInCzechia">Hlášený pobyt v ČR</MenuItem>
+          </TextField>
+
+          <TextField
+            fullWidth
+            label="Ulice nebo obec"
+            value={query}
+            onChange={(e) => void searchLocalities(e.target.value)}
+            disabled={datasetLoaded === false}
+          />
+          {localities.length > 0 ? (
+            <TextField
+              select
+              fullWidth
+              label="Vyberte lokalitu"
+              value={locality?.displayValue ?? ""}
+              onChange={(e) => {
+                const found = localities.find((l) => l.displayValue === e.target.value);
+                setLocality(found ?? null);
+                void findPoints(found ?? null, houseNumber);
+              }}
+            >
+              {localities.map((l) => (
+                <MenuItem key={l.displayValue} value={l.displayValue}>
+                  {l.displayValue}
+                </MenuItem>
+              ))}
+            </TextField>
+          ) : null}
+          {locality ? (
+            <TextField
+              fullWidth
+              label="Číslo popisné / orientační"
+              value={houseNumber}
+              onChange={(e) => {
+                setHouseNumber(e.target.value);
+                void findPoints(locality, e.target.value);
+              }}
+            />
+          ) : null}
+          {points.length > 0 ? (
+            <TextField
+              select
+              fullWidth
+              label="Adresní bod"
+              value={pointCode ?? ""}
+              onChange={(e) => setPointCode(Number(e.target.value))}
+            >
+              {points.map((p) => (
+                <MenuItem key={p.addressPointCode} value={p.addressPointCode}>
+                  {p.formattedAddress}
+                </MenuItem>
+              ))}
+            </TextField>
+          ) : null}
+
+          <TextField
+            required
+            fullWidth
+            multiline
+            minRows={2}
+            label="Důvod změny"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            helperText="Bez důvodu se změna adresy neuloží."
+          />
+          {error ? <Alert severity="error">{error}</Alert> : null}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Zrušit</Button>
+        <Button
+          variant="contained"
+          disabled={reason.trim() === "" || pointCode === null || saving}
+          onClick={save}
+        >
+          Uložit opravu
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
