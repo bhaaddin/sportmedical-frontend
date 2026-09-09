@@ -1,6 +1,6 @@
-import { Alert, Box, Button, Skeleton, Stack, Typography } from '@mui/material';
-import { useTranslation } from 'react-i18next';
-import { errorText } from './errorText';
+import { Alert, Box, Button, Skeleton, Stack, Typography } from "@mui/material";
+import { useTranslation } from "react-i18next";
+import { errorText } from "./errorText";
 
 /**
  * The four states every booking screen owes the user (contract 5): loading,
@@ -12,6 +12,13 @@ interface AsyncSectionProps {
   isLoading: boolean;
   error: unknown;
   isEmpty: boolean;
+  /**
+   * Whether the answer has actually arrived. Without it, a query that is
+   * between two retries has no data, no error and no loading flag - and the
+   * screen states "you have none", which is a claim it cannot make yet. An
+   * unanswered question is not an empty answer.
+   */
+  isSettled?: boolean;
   emptyText: string;
   emptyAction?: { label: string; onClick: () => void };
   onRetry?: () => void;
@@ -24,6 +31,7 @@ export function AsyncSection({
   isLoading,
   error,
   isEmpty,
+  isSettled = true,
   emptyText,
   emptyAction,
   onRetry,
@@ -32,7 +40,8 @@ export function AsyncSection({
 }: AsyncSectionProps) {
   const { t } = useTranslation();
 
-  if (isLoading) {
+  // Nothing known yet counts as loading, never as empty.
+  if (isLoading || (!isSettled && isEmpty && !error)) {
     return (
       <Stack spacing={1} aria-busy="true" aria-live="polite">
         {Array.from({ length: skeletonRows }, (_, i) => (
@@ -49,7 +58,7 @@ export function AsyncSection({
         action={
           onRetry ? (
             <Button color="inherit" size="small" onClick={onRetry}>
-              {t('booking.common.retry')}
+              {t("booking.common.retry")}
             </Button>
           ) : undefined
         }
@@ -63,14 +72,14 @@ export function AsyncSection({
     return (
       <Box
         sx={{
-          border: '1px dashed',
-          borderColor: 'divider',
+          border: "1px dashed",
+          borderColor: "divider",
           borderRadius: 2,
           p: 4,
-          textAlign: 'center',
+          textAlign: "center",
         }}
       >
-        <Typography sx={{ mb: emptyAction ? 2 : 0, color: 'text.secondary' }}>
+        <Typography sx={{ mb: emptyAction ? 2 : 0, color: "text.secondary" }}>
           {emptyText}
         </Typography>
         {emptyAction ? (
@@ -84,4 +93,3 @@ export function AsyncSection({
 
   return <>{children}</>;
 }
-

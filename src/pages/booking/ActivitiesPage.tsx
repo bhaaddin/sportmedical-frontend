@@ -1,21 +1,45 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState } from "react";
 import {
-  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControlLabel, IconButton, Stack, Switch, Table, TableBody, TableCell, TableHead,
-  TableRow, TextField, Tooltip, Typography,
-} from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import PublicIcon from '@mui/icons-material/Public';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
-import { activitiesApi } from '../../api/activities';
-import type { Activity, ActivityInput, ActivityWarning } from '../../api/bookingContracts';
-import { AsyncSection } from '../../components/booking/AsyncSection';
-import { errorText } from '../../components/booking/errorText';
-import { ColorSelect } from '../../components/booking/ColorSelect';
-import { DEFAULT_PALETTE_ENTRY, readableTextOn } from '../../utils/calendarPalette';
+  Alert,
+  Box,
+  Button,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  IconButton,
+  Stack,
+  Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TextField,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import PublicIcon from "@mui/icons-material/Public";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { activitiesApi } from "../../api/activities";
+import type {
+  Activity,
+  ActivityInput,
+  ActivityWarning,
+} from "../../api/bookingContracts";
+import { AsyncSection } from "../../components/booking/AsyncSection";
+import { errorText } from "../../components/booking/errorText";
+import { ColorSelect } from "../../components/booking/ColorSelect";
+import {
+  DEFAULT_PALETTE_ENTRY,
+  readableTextOn,
+} from "../../utils/calendarPalette";
 
 /**
  * Activities - contract screen 5.6.
@@ -29,10 +53,10 @@ const CODEBOOK_STALE_MS = 5 * 60 * 1000;
 
 function emptyDraft(sortOrder: number): ActivityInput {
   return {
-    name: '',
+    name: "",
     durationMinutes: 30,
     color: DEFAULT_PALETTE_ENTRY.hex,
-    publicNote: '',
+    publicNote: "",
     isPubliclyBookable: false,
     sortOrder,
   };
@@ -49,13 +73,16 @@ export default function ActivitiesPage() {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   const activitiesQuery = useQuery({
-    queryKey: ['activities'],
+    queryKey: ["activities"],
     queryFn: activitiesApi.list,
     staleTime: CODEBOOK_STALE_MS,
   });
 
   const activities = useMemo(
-    () => [...(activitiesQuery.data?.activities ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
+    () =>
+      [...(activitiesQuery.data?.activities ?? [])].sort(
+        (a, b) => a.sortOrder - b.sortOrder,
+      ),
     [activitiesQuery.data],
   );
 
@@ -64,9 +91,9 @@ export default function ActivitiesPage() {
    * remainder is visible on opening the screen - it is a state of the codebook,
    * not the outcome of the last save.
    */
-  const warnings: ActivityWarning[] = (activitiesQuery.data?.warnings ?? []).filter(
-    (warning) => !dismissed.has(warning.code),
-  );
+  const warnings: ActivityWarning[] = (
+    activitiesQuery.data?.warnings ?? []
+  ).filter((warning) => !dismissed.has(warning.code));
 
   const closeDialog = () => {
     setDraft(null);
@@ -75,10 +102,12 @@ export default function ActivitiesPage() {
 
   const save = useMutation({
     mutationFn: (input: ActivityInput) =>
-      editing ? activitiesApi.update(editing.id, input) : activitiesApi.create(input),
+      editing
+        ? activitiesApi.update(editing.id, input)
+        : activitiesApi.create(input),
     onSuccess: async () => {
       // The save went through either way; the refetched list carries the warnings.
-      await queryClient.invalidateQueries({ queryKey: ['activities'] });
+      await queryClient.invalidateQueries({ queryKey: ["activities"] });
       setDismissed(new Set());
       closeDialog();
     },
@@ -87,7 +116,7 @@ export default function ActivitiesPage() {
   const remove = useMutation({
     mutationFn: (id: string) => activitiesApi.remove(id),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['activities'] });
+      await queryClient.invalidateQueries({ queryKey: ["activities"] });
       setConfirmDelete(null);
     },
   });
@@ -111,27 +140,35 @@ export default function ActivitiesPage() {
     save.reset();
   };
 
-  const nameIsValid = (draft?.name ?? '').trim().length > 0;
+  const nameIsValid = (draft?.name ?? "").trim().length > 0;
   const durationIsValid = (draft?.durationMinutes ?? 0) > 0;
 
   return (
-    <Box sx={{ maxWidth: 1100, mx: 'auto' }}>
+    <Box sx={{ maxWidth: 1100, mx: "auto" }}>
       <Box
         sx={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          flexWrap: 'wrap', gap: 2, mb: 3,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 2,
+          mb: 3,
         }}
       >
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 800 }}>
-            {t('booking.activities.title')}
+            {t("booking.activities.title")}
           </Typography>
-          <Typography sx={{ color: 'text.secondary' }}>
-            {t('booking.activities.subtitle')}
+          <Typography sx={{ color: "text.secondary" }}>
+            {t("booking.activities.subtitle")}
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
-          {t('booking.activities.new')}
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={openCreate}
+        >
+          {t("booking.activities.new")}
         </Button>
       </Box>
 
@@ -140,7 +177,9 @@ export default function ActivitiesPage() {
           key={warning.code}
           severity="warning"
           sx={{ mb: 2 }}
-          onClose={() => setDismissed((prev) => new Set(prev).add(warning.code))}
+          onClose={() =>
+            setDismissed((prev) => new Set(prev).add(warning.code))
+          }
         >
           {warning.message}
         </Alert>
@@ -148,42 +187,55 @@ export default function ActivitiesPage() {
 
       <AsyncSection
         isLoading={activitiesQuery.isLoading}
+        isSettled={activitiesQuery.isSuccess}
         error={activitiesQuery.error}
         isEmpty={activities.length === 0}
-        emptyText={t('booking.activities.empty')}
-        emptyAction={{ label: t('booking.activities.new'), onClick: openCreate }}
+        emptyText={t("booking.activities.empty")}
+        emptyAction={{
+          label: t("booking.activities.new"),
+          onClick: openCreate,
+        }}
         onRetry={() => void activitiesQuery.refetch()}
       >
-        <Box sx={{ overflowX: 'auto' }}>
+        <Box sx={{ overflowX: "auto" }}>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>{t('booking.activities.column.name')}</TableCell>
-                <TableCell>{t('booking.activities.column.duration')}</TableCell>
-                <TableCell>{t('booking.activities.column.publicNote')}</TableCell>
-                <TableCell>{t('booking.activities.column.public')}</TableCell>
-                <TableCell align="right">{t('booking.common.actions')}</TableCell>
+                <TableCell>{t("booking.activities.column.name")}</TableCell>
+                <TableCell>{t("booking.activities.column.duration")}</TableCell>
+                <TableCell>
+                  {t("booking.activities.column.publicNote")}
+                </TableCell>
+                <TableCell>{t("booking.activities.column.public")}</TableCell>
+                <TableCell align="right">
+                  {t("booking.common.actions")}
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {activities.map((activity) => (
                 <TableRow key={activity.id} hover>
                   <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <Box
                         aria-hidden
                         sx={{
-                          width: 14, height: 14, borderRadius: '3px',
-                          backgroundColor: activity.color, flexShrink: 0,
+                          width: 14,
+                          height: 14,
+                          borderRadius: "3px",
+                          backgroundColor: activity.color,
+                          flexShrink: 0,
                         }}
                       />
-                      <Typography sx={{ fontWeight: 600 }}>{activity.name}</Typography>
+                      <Typography sx={{ fontWeight: 600 }}>
+                        {activity.name}
+                      </Typography>
                     </Box>
                   </TableCell>
                   <TableCell>
                     <Chip
                       size="small"
-                      label={t('booking.activities.durationValue', {
+                      label={t("booking.activities.durationValue", {
                         minutes: activity.durationMinutes,
                       })}
                       sx={{
@@ -192,30 +244,34 @@ export default function ActivitiesPage() {
                       }}
                     />
                   </TableCell>
-                  <TableCell sx={{ maxWidth: 320 }}>{activity.publicNote || '-'}</TableCell>
+                  <TableCell sx={{ maxWidth: 320 }}>
+                    {activity.publicNote || "-"}
+                  </TableCell>
                   <TableCell>
                     {/* Icon plus text: colour and icon alone would not carry it (7.1). */}
                     {activity.isPubliclyBookable ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                      >
                         <PublicIcon fontSize="small" />
-                        {t('booking.activities.publicYes')}
+                        {t("booking.activities.publicYes")}
                       </Box>
                     ) : (
-                      t('booking.activities.publicNo')
+                      t("booking.activities.publicNo")
                     )}
                   </TableCell>
                   <TableCell align="right">
-                    <Tooltip title={t('booking.common.edit')}>
+                    <Tooltip title={t("booking.common.edit")}>
                       <IconButton
-                        aria-label={t('booking.common.edit')}
+                        aria-label={t("booking.common.edit")}
                         onClick={() => openEdit(activity)}
                       >
                         <EditIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title={t('booking.common.delete')}>
+                    <Tooltip title={t("booking.common.delete")}>
                       <IconButton
-                        aria-label={t('booking.common.delete')}
+                        aria-label={t("booking.common.delete")}
                         onClick={() => setConfirmDelete(activity)}
                       >
                         <DeleteIcon fontSize="small" />
@@ -229,9 +285,16 @@ export default function ActivitiesPage() {
         </Box>
       </AsyncSection>
 
-      <Dialog open={draft !== null} onClose={closeDialog} fullWidth maxWidth="sm">
+      <Dialog
+        open={draft !== null}
+        onClose={closeDialog}
+        fullWidth
+        maxWidth="sm"
+      >
         <DialogTitle>
-          {editing ? t('booking.activities.editTitle') : t('booking.activities.newTitle')}
+          {editing
+            ? t("booking.activities.editTitle")
+            : t("booking.activities.newTitle")}
         </DialogTitle>
         <DialogContent>
           {draft ? (
@@ -240,25 +303,28 @@ export default function ActivitiesPage() {
                 autoFocus
                 required
                 fullWidth
-                label={t('booking.activities.column.name')}
+                label={t("booking.activities.column.name")}
                 value={draft.name}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                error={draft.name !== '' && !nameIsValid}
+                error={draft.name !== "" && !nameIsValid}
               />
               <TextField
                 required
                 fullWidth
                 type="number"
-                label={t('booking.activities.column.duration')}
+                label={t("booking.activities.column.duration")}
                 value={draft.durationMinutes}
                 onChange={(e) =>
-                  setDraft({ ...draft, durationMinutes: Number(e.target.value) || 0 })
+                  setDraft({
+                    ...draft,
+                    durationMinutes: Number(e.target.value) || 0,
+                  })
                 }
                 error={!durationIsValid}
-                helperText={t('booking.activities.durationHelp')}
+                helperText={t("booking.activities.durationHelp")}
               />
               <ColorSelect
-                label={t('booking.activities.column.color')}
+                label={t("booking.activities.column.color")}
                 value={draft.color}
                 onChange={(color) => setDraft({ ...draft, color })}
               />
@@ -266,50 +332,64 @@ export default function ActivitiesPage() {
                 fullWidth
                 multiline
                 minRows={2}
-                label={t('booking.activities.column.publicNote')}
+                label={t("booking.activities.column.publicNote")}
                 value={draft.publicNote}
-                onChange={(e) => setDraft({ ...draft, publicNote: e.target.value })}
+                onChange={(e) =>
+                  setDraft({ ...draft, publicNote: e.target.value })
+                }
               />
               <TextField
                 fullWidth
                 type="number"
-                label={t('booking.activities.column.order')}
+                label={t("booking.activities.column.order")}
                 value={draft.sortOrder}
-                onChange={(e) => setDraft({ ...draft, sortOrder: Number(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setDraft({ ...draft, sortOrder: Number(e.target.value) || 0 })
+                }
               />
               <FormControlLabel
                 control={
                   <Switch
                     checked={draft.isPubliclyBookable}
                     onChange={(e) =>
-                      setDraft({ ...draft, isPubliclyBookable: e.target.checked })
+                      setDraft({
+                        ...draft,
+                        isPubliclyBookable: e.target.checked,
+                      })
                     }
                   />
                 }
-                label={t('booking.activities.publicLabel')}
+                label={t("booking.activities.publicLabel")}
               />
               {/* 422 keeps the form filled in, so the message sits inside the dialog. */}
-              {save.error ? <Alert severity="error">{errorText(save.error, t)}</Alert> : null}
+              {save.error ? (
+                <Alert severity="error">{errorText(save.error, t)}</Alert>
+              ) : null}
             </Stack>
           ) : null}
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeDialog}>{t('booking.common.cancel')}</Button>
+          <Button onClick={closeDialog}>{t("booking.common.cancel")}</Button>
           <Button
             variant="contained"
             disabled={!nameIsValid || !durationIsValid || save.isPending}
             onClick={() => draft && save.mutate(draft)}
           >
-            {t('booking.common.save')}
+            {t("booking.common.save")}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={confirmDelete !== null} onClose={() => setConfirmDelete(null)}>
-        <DialogTitle>{t('booking.activities.deleteTitle')}</DialogTitle>
+      <Dialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+      >
+        <DialogTitle>{t("booking.activities.deleteTitle")}</DialogTitle>
         <DialogContent>
           <Typography>
-            {t('booking.activities.deleteBody', { name: confirmDelete?.name ?? '' })}
+            {t("booking.activities.deleteBody", {
+              name: confirmDelete?.name ?? "",
+            })}
           </Typography>
           {remove.error ? (
             <Alert severity="error" sx={{ mt: 2 }}>
@@ -318,14 +398,16 @@ export default function ActivitiesPage() {
           ) : null}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDelete(null)}>{t('booking.common.cancel')}</Button>
+          <Button onClick={() => setConfirmDelete(null)}>
+            {t("booking.common.cancel")}
+          </Button>
           <Button
             color="error"
             variant="contained"
             disabled={remove.isPending}
             onClick={() => confirmDelete && remove.mutate(confirmDelete.id)}
           >
-            {t('booking.common.delete')}
+            {t("booking.common.delete")}
           </Button>
         </DialogActions>
       </Dialog>

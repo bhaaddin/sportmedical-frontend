@@ -17,7 +17,7 @@ import {
   type HistoryLine,
   type TimeBlock,
 } from './bookingContracts';
-import type { DateOnly } from '../utils/time';
+import { addDaysToDateOnly, type DateOnly } from '../utils/time';
 
 /**
  * Appointments, blocks, the day and its summary - contract 4.4, 4.5 and 4.6.
@@ -32,6 +32,15 @@ import type { DateOnly } from '../utils/time';
  *  - the calendar is in the path, never in the body, because access is checked
  *    on it and a calendar the user may not see answers 404, never 403 (6.5).
  */
+
+/** 4.5: the server refuses a wider window with a 400, so say so before the trip. */
+const MAX_RANGE_DAYS = 62;
+
+function assertRangeWithinLimit(from: DateOnly, to: DateOnly): void {
+  if (to < from || addDaysToDateOnly(from, MAX_RANGE_DAYS) < to) {
+    throw new Error(`Rozsah smí být nejvýše ${MAX_RANGE_DAYS} dní`);
+  }
+}
 
 async function request<T>(run: () => Promise<T>): Promise<T> {
   try {
@@ -61,6 +70,32 @@ function asUtcInstant(value: string | Date): string {
 }
 
 export const appointmentsApi = {
+  /* ── The whole visible window (4.5) ── */
+
+  /**
+   * What fills the grid: one request for the entire range and every shown
+   * calendar, not one per day (7.3). A week across three calendars used to be
+   * twenty-one calls, because until v15 this endpoint did not exist and the
+   * contract pointed at one that never had.
+   *
+   * Rows arrive sorted by `startUtc` and then by calendar, so the grid does not
+   * sort. Leaving `calendarIds` out means every calendar the user may see, and
+   * one they may not see simply does not appear - it is not betrayed by a 404
+   * either (6.5).
+   */
+  range: (from: DateOnly, to: DateOnly, calendarIds?: string[]): Promise<DayAppointment[]> =>
+    request(async () => {
+      assertRangeWithinLimit(from, to);
+      const res = await client.get('/api/day', {
+        params: {
+          from: requireDate(from, 'from'),
+          to: requireDate(to, 'to'),
+          calendarIds: calendarIds && calendarIds.length > 0 ? calendarIds.join(',') : undefined,
+        },
+      });
+      return parseResponse(dayAppointmentListSchema, res.data);
+    }),
+
   /* ── The day of one calendar (4.5) ── */
 
   day: (calendarId: string, date: DateOnly): Promise<DayAppointment[]> =>

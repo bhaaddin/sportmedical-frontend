@@ -249,6 +249,8 @@ export type Readiness = z.infer<typeof readinessSchema>;
  */
 export const dayAppointmentSchema = z.object({
   id: z.string(),
+  /** Which column the row belongs to; present on the range answer and on /day. */
+  calendarId: z.string().nullish().transform((v) => v ?? null),
   patientId: z.string(),
   activityId: z.string(),
   activityName: z.string(),

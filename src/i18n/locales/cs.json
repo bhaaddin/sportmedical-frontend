@@ -270,6 +270,25 @@
       "Waitlisted": "Čekací listina",
       "unknown": "Neznámý stav",
       "late": "Mešká"
+    },
+    "grid": {
+      "title": "Kalendář",
+      "day": "Den",
+      "week": "Týden",
+      "today": "Dnes",
+      "previous": "Předchozí",
+      "next": "Další",
+      "now": "Teď",
+      "noCalendars": "Zatím nemáte žádný aktivní kalendář. Bez kalendáře není co zobrazit.",
+      "emptyDay": "V tomto dni nejsou žádné termíny.",
+      "previewFailed": "Pracovní dobu se nepodařilo načíst — termíny jsou zobrazené, ale bez pozadí pracovní doby.",
+      "closed": {
+        "noPeriod": "mimo období",
+        "notAWorkingDay": "nepracovní den",
+        "override": "výjimka",
+        "holiday": "svátek",
+        "other": "zavřeno"
+      }
     }
   }
 }

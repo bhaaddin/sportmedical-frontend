@@ -1,15 +1,25 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState } from "react";
 import {
-  Alert, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControlLabel, Stack, Tooltip, Typography,
-} from '@mui/material';
-import LockIcon from '@mui/icons-material/Lock';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
-import { calendarsApi } from '../../api/calendars';
-import type { Calendar, CalendarAccessEntry } from '../../api/bookingContracts';
-import { AsyncSection } from './AsyncSection';
-import { errorText } from './errorText';
+  Alert,
+  Box,
+  Button,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  Stack,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import LockIcon from "@mui/icons-material/Lock";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { calendarsApi } from "../../api/calendars";
+import type { Calendar, CalendarAccessEntry } from "../../api/bookingContracts";
+import { AsyncSection } from "./AsyncSection";
+import { errorText } from "./errorText";
 
 /**
  * Who sees this calendar — contract 5.3.
@@ -25,14 +35,18 @@ interface CalendarAccessDialogProps {
   onClose: () => void;
 }
 
-export function CalendarAccessDialog({ calendar, open, onClose }: CalendarAccessDialogProps) {
+export function CalendarAccessDialog({
+  calendar,
+  open,
+  onClose,
+}: CalendarAccessDialogProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   /** Null until the user ticks something; the server's answer stands until then. */
   const [edited, setEdited] = useState<Set<string> | null>(null);
 
   const accessQuery = useQuery({
-    queryKey: ['calendar-access', calendar.id],
+    queryKey: ["calendar-access", calendar.id],
     queryFn: () => calendarsApi.getAccess(calendar.id),
     enabled: open,
   });
@@ -41,7 +55,10 @@ export function CalendarAccessDialog({ calendar, open, onClose }: CalendarAccess
 
   const selected = useMemo(
     () =>
-      edited ?? new Set(entries.filter((entry) => entry.hasAccess).map((entry) => entry.userId)),
+      edited ??
+      new Set(
+        entries.filter((entry) => entry.hasAccess).map((entry) => entry.userId),
+      ),
     [edited, entries],
   );
 
@@ -53,7 +70,9 @@ export function CalendarAccessDialog({ calendar, open, onClose }: CalendarAccess
   const explicitlyGranted = useMemo(
     () =>
       entries
-        .filter((entry) => entry.lockedBy === null && selected.has(entry.userId))
+        .filter(
+          (entry) => entry.lockedBy === null && selected.has(entry.userId),
+        )
         .map((entry) => entry.userId),
     [entries, selected],
   );
@@ -62,7 +81,9 @@ export function CalendarAccessDialog({ calendar, open, onClose }: CalendarAccess
     // 6.6: a settings change is never optimistic — it waits for the server.
     mutationFn: () => calendarsApi.setAccess(calendar.id, explicitlyGranted),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['calendar-access', calendar.id] });
+      await queryClient.invalidateQueries({
+        queryKey: ["calendar-access", calendar.id],
+      });
       onClose();
     },
   });
@@ -77,13 +98,16 @@ export function CalendarAccessDialog({ calendar, open, onClose }: CalendarAccess
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{t('booking.access.title', { name: calendar.name })}</DialogTitle>
+      <DialogTitle>
+        {t("booking.access.title", { name: calendar.name })}
+      </DialogTitle>
       <DialogContent>
         <AsyncSection
           isLoading={accessQuery.isLoading}
+          isSettled={accessQuery.isSuccess}
           error={accessQuery.error}
           isEmpty={entries.length === 0}
-          emptyText={t('booking.access.empty')}
+          emptyText={t("booking.access.empty")}
           onRetry={() => void accessQuery.refetch()}
           skeletonRows={5}
         >
@@ -91,23 +115,31 @@ export function CalendarAccessDialog({ calendar, open, onClose }: CalendarAccess
             {entries.map((entry) => (
               <Box
                 key={entry.userId}
-                sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
               >
                 <FormControlLabel
                   control={
                     <Checkbox
-                      checked={entry.lockedBy ? true : selected.has(entry.userId)}
+                      checked={
+                        entry.lockedBy ? true : selected.has(entry.userId)
+                      }
                       disabled={Boolean(entry.lockedBy)}
                       onChange={() => toggle(entry)}
-                      slotProps={{ input: { 'aria-label': entry.displayName } }}
+                      slotProps={{ input: { "aria-label": entry.displayName } }}
                     />
                   }
                   label={
                     <Box>
-                      <Typography component="span">{entry.displayName}</Typography>
+                      <Typography component="span">
+                        {entry.displayName}
+                      </Typography>
                       <Typography
                         component="span"
-                        sx={{ ml: 1, color: 'text.secondary', fontSize: 13 }}
+                        sx={{ ml: 1, color: "text.secondary", fontSize: 13 }}
                       >
                         {entry.role}
                       </Typography>
@@ -118,8 +150,11 @@ export function CalendarAccessDialog({ calendar, open, onClose }: CalendarAccess
                   <Tooltip title={t(`booking.access.locked.${entry.lockedBy}`)}>
                     <Box
                       sx={{
-                        display: 'flex', alignItems: 'center', gap: 0.5,
-                        color: 'text.secondary', fontSize: 13,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0.5,
+                        color: "text.secondary",
+                        fontSize: 13,
                       }}
                     >
                       <LockIcon fontSize="small" />
@@ -139,13 +174,13 @@ export function CalendarAccessDialog({ calendar, open, onClose }: CalendarAccess
         ) : null}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>{t('booking.common.cancel')}</Button>
+        <Button onClick={onClose}>{t("booking.common.cancel")}</Button>
         <Button
           variant="contained"
           onClick={() => save.mutate()}
           disabled={save.isPending || accessQuery.isLoading}
         >
-          {t('booking.common.save')}
+          {t("booking.common.save")}
         </Button>
       </DialogActions>
     </Dialog>

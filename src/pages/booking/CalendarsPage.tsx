@@ -1,22 +1,42 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState } from "react";
 import {
-  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControlLabel, IconButton, Stack, Switch, Table, TableBody, TableCell, TableHead,
-  TableRow, TextField, Tooltip, Typography,
-} from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import GroupIcon from '@mui/icons-material/Group';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
-import { calendarsApi } from '../../api/calendars';
-import type { Calendar, CalendarInput } from '../../api/bookingContracts';
-import { AsyncSection } from '../../components/booking/AsyncSection';
-import { errorText } from '../../components/booking/errorText';
-import { CalendarAccessDialog } from '../../components/booking/CalendarAccessDialog';
-import { ColorSelect } from '../../components/booking/ColorSelect';
-import { DEFAULT_PALETTE_ENTRY, readableTextOn } from '../../utils/calendarPalette';
+  Alert,
+  Box,
+  Button,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  IconButton,
+  Stack,
+  Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TextField,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import GroupIcon from "@mui/icons-material/Group";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { calendarsApi } from "../../api/calendars";
+import type { Calendar, CalendarInput } from "../../api/bookingContracts";
+import { AsyncSection } from "../../components/booking/AsyncSection";
+import { errorText } from "../../components/booking/errorText";
+import { CalendarAccessDialog } from "../../components/booking/CalendarAccessDialog";
+import { ColorSelect } from "../../components/booking/ColorSelect";
+import {
+  DEFAULT_PALETTE_ENTRY,
+  readableTextOn,
+} from "../../utils/calendarPalette";
 
 /** Calendars - contract screen 5.2, stage 1 of the running order in part 8. */
 
@@ -24,9 +44,9 @@ const CODEBOOK_STALE_MS = 5 * 60 * 1000; // 7.3: minutes for codebooks, not seco
 
 function emptyDraft(sortOrder: number): CalendarInput {
   return {
-    name: '',
+    name: "",
     color: DEFAULT_PALETTE_ENTRY.hex,
-    location: '',
+    location: "",
     displayStepMinutes: 15,
     isActive: true,
     sortOrder,
@@ -43,17 +63,21 @@ export default function CalendarsPage() {
   const [confirmDelete, setConfirmDelete] = useState<Calendar | null>(null);
 
   const calendarsQuery = useQuery({
-    queryKey: ['calendars'],
+    queryKey: ["calendars"],
     queryFn: calendarsApi.list,
     staleTime: CODEBOOK_STALE_MS,
   });
 
   const calendars = useMemo(
-    () => [...(calendarsQuery.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
+    () =>
+      [...(calendarsQuery.data ?? [])].sort(
+        (a, b) => a.sortOrder - b.sortOrder,
+      ),
     [calendarsQuery.data],
   );
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['calendars'] });
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["calendars"] });
 
   const closeDialog = () => {
     setDraft(null);
@@ -63,7 +87,9 @@ export default function CalendarsPage() {
   // 6.6: settings changes wait for the server. Nothing here is optimistic.
   const save = useMutation({
     mutationFn: (input: CalendarInput) =>
-      editing ? calendarsApi.update(editing.id, input) : calendarsApi.create(input),
+      editing
+        ? calendarsApi.update(editing.id, input)
+        : calendarsApi.create(input),
     onSuccess: async () => {
       await invalidate();
       closeDialog();
@@ -97,46 +123,57 @@ export default function CalendarsPage() {
     save.reset();
   };
 
-  const nameIsValid = (draft?.name ?? '').trim().length > 0;
+  const nameIsValid = (draft?.name ?? "").trim().length > 0;
 
   return (
-    <Box sx={{ maxWidth: 1100, mx: 'auto' }}>
+    <Box sx={{ maxWidth: 1100, mx: "auto" }}>
       <Box
         sx={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          flexWrap: 'wrap', gap: 2, mb: 3,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 2,
+          mb: 3,
         }}
       >
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 800 }}>
-            {t('booking.calendars.title')}
+            {t("booking.calendars.title")}
           </Typography>
-          <Typography sx={{ color: 'text.secondary' }}>
-            {t('booking.calendars.subtitle')}
+          <Typography sx={{ color: "text.secondary" }}>
+            {t("booking.calendars.subtitle")}
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
-          {t('booking.calendars.new')}
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={openCreate}
+        >
+          {t("booking.calendars.new")}
         </Button>
       </Box>
 
       <AsyncSection
         isLoading={calendarsQuery.isLoading}
+        isSettled={calendarsQuery.isSuccess}
         error={calendarsQuery.error}
         isEmpty={calendars.length === 0}
-        emptyText={t('booking.calendars.empty')}
-        emptyAction={{ label: t('booking.calendars.new'), onClick: openCreate }}
+        emptyText={t("booking.calendars.empty")}
+        emptyAction={{ label: t("booking.calendars.new"), onClick: openCreate }}
         onRetry={() => void calendarsQuery.refetch()}
       >
-        <Box sx={{ overflowX: 'auto' }}>
+        <Box sx={{ overflowX: "auto" }}>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>{t('booking.calendars.column.name')}</TableCell>
-                <TableCell>{t('booking.calendars.column.location')}</TableCell>
-                <TableCell>{t('booking.calendars.column.step')}</TableCell>
-                <TableCell>{t('booking.calendars.column.state')}</TableCell>
-                <TableCell align="right">{t('booking.common.actions')}</TableCell>
+                <TableCell>{t("booking.calendars.column.name")}</TableCell>
+                <TableCell>{t("booking.calendars.column.location")}</TableCell>
+                <TableCell>{t("booking.calendars.column.step")}</TableCell>
+                <TableCell>{t("booking.calendars.column.state")}</TableCell>
+                <TableCell align="right">
+                  {t("booking.common.actions")}
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -144,28 +181,35 @@ export default function CalendarsPage() {
                 <TableRow key={calendar.id} hover>
                   <TableCell>
                     {/* 7.1: the colour is decoration; the name carries the meaning. */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <Box
                         aria-hidden
                         sx={{
-                          width: 14, height: 14, borderRadius: '3px',
-                          backgroundColor: calendar.color, flexShrink: 0,
+                          width: 14,
+                          height: 14,
+                          borderRadius: "3px",
+                          backgroundColor: calendar.color,
+                          flexShrink: 0,
                         }}
                       />
-                      <Typography sx={{ fontWeight: 600 }}>{calendar.name}</Typography>
+                      <Typography sx={{ fontWeight: 600 }}>
+                        {calendar.name}
+                      </Typography>
                     </Box>
                   </TableCell>
-                  <TableCell>{calendar.location || '-'}</TableCell>
+                  <TableCell>{calendar.location || "-"}</TableCell>
                   <TableCell>
-                    {t('booking.calendars.stepValue', { minutes: calendar.displayStepMinutes })}
+                    {t("booking.calendars.stepValue", {
+                      minutes: calendar.displayStepMinutes,
+                    })}
                   </TableCell>
                   <TableCell>
                     <Chip
                       size="small"
                       label={
                         calendar.isActive
-                          ? t('booking.calendars.active')
-                          : t('booking.calendars.inactive')
+                          ? t("booking.calendars.active")
+                          : t("booking.calendars.inactive")
                       }
                       sx={
                         calendar.isActive
@@ -178,25 +222,25 @@ export default function CalendarsPage() {
                     />
                   </TableCell>
                   <TableCell align="right">
-                    <Tooltip title={t('booking.access.action')}>
+                    <Tooltip title={t("booking.access.action")}>
                       <IconButton
-                        aria-label={t('booking.access.action')}
+                        aria-label={t("booking.access.action")}
                         onClick={() => setAccessFor(calendar)}
                       >
                         <GroupIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title={t('booking.common.edit')}>
+                    <Tooltip title={t("booking.common.edit")}>
                       <IconButton
-                        aria-label={t('booking.common.edit')}
+                        aria-label={t("booking.common.edit")}
                         onClick={() => openEdit(calendar)}
                       >
                         <EditIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title={t('booking.common.delete')}>
+                    <Tooltip title={t("booking.common.delete")}>
                       <IconButton
-                        aria-label={t('booking.common.delete')}
+                        aria-label={t("booking.common.delete")}
                         onClick={() => setConfirmDelete(calendar)}
                       >
                         <DeleteIcon fontSize="small" />
@@ -210,9 +254,16 @@ export default function CalendarsPage() {
         </Box>
       </AsyncSection>
 
-      <Dialog open={draft !== null} onClose={closeDialog} fullWidth maxWidth="sm">
+      <Dialog
+        open={draft !== null}
+        onClose={closeDialog}
+        fullWidth
+        maxWidth="sm"
+      >
         <DialogTitle>
-          {editing ? t('booking.calendars.editTitle') : t('booking.calendars.newTitle')}
+          {editing
+            ? t("booking.calendars.editTitle")
+            : t("booking.calendars.newTitle")}
         </DialogTitle>
         <DialogContent>
           {draft ? (
@@ -221,69 +272,85 @@ export default function CalendarsPage() {
                 autoFocus
                 required
                 fullWidth
-                label={t('booking.calendars.column.name')}
+                label={t("booking.calendars.column.name")}
                 value={draft.name}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                error={draft.name !== '' && !nameIsValid}
+                error={draft.name !== "" && !nameIsValid}
               />
               <ColorSelect
-                label={t('booking.calendars.column.color')}
+                label={t("booking.calendars.column.color")}
                 value={draft.color}
                 onChange={(color) => setDraft({ ...draft, color })}
               />
               <TextField
                 fullWidth
-                label={t('booking.calendars.column.location')}
+                label={t("booking.calendars.column.location")}
                 value={draft.location}
-                onChange={(e) => setDraft({ ...draft, location: e.target.value })}
+                onChange={(e) =>
+                  setDraft({ ...draft, location: e.target.value })
+                }
               />
               <TextField
                 fullWidth
                 type="number"
-                label={t('booking.calendars.column.step')}
+                label={t("booking.calendars.column.step")}
                 value={draft.displayStepMinutes}
                 onChange={(e) =>
-                  setDraft({ ...draft, displayStepMinutes: Number(e.target.value) || 0 })
+                  setDraft({
+                    ...draft,
+                    displayStepMinutes: Number(e.target.value) || 0,
+                  })
                 }
-                helperText={t('booking.calendars.stepHelp')}
+                helperText={t("booking.calendars.stepHelp")}
               />
               <TextField
                 fullWidth
                 type="number"
-                label={t('booking.calendars.column.order')}
+                label={t("booking.calendars.column.order")}
                 value={draft.sortOrder}
-                onChange={(e) => setDraft({ ...draft, sortOrder: Number(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setDraft({ ...draft, sortOrder: Number(e.target.value) || 0 })
+                }
               />
               <FormControlLabel
                 control={
                   <Switch
                     checked={draft.isActive}
-                    onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })}
+                    onChange={(e) =>
+                      setDraft({ ...draft, isActive: e.target.checked })
+                    }
                   />
                 }
-                label={t('booking.calendars.active')}
+                label={t("booking.calendars.active")}
               />
-              {save.error ? <Alert severity="error">{errorText(save.error, t)}</Alert> : null}
+              {save.error ? (
+                <Alert severity="error">{errorText(save.error, t)}</Alert>
+              ) : null}
             </Stack>
           ) : null}
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeDialog}>{t('booking.common.cancel')}</Button>
+          <Button onClick={closeDialog}>{t("booking.common.cancel")}</Button>
           <Button
             variant="contained"
             disabled={!nameIsValid || save.isPending}
             onClick={() => draft && save.mutate(draft)}
           >
-            {t('booking.common.save')}
+            {t("booking.common.save")}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={confirmDelete !== null} onClose={() => setConfirmDelete(null)}>
-        <DialogTitle>{t('booking.calendars.deleteTitle')}</DialogTitle>
+      <Dialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+      >
+        <DialogTitle>{t("booking.calendars.deleteTitle")}</DialogTitle>
         <DialogContent>
           <Typography>
-            {t('booking.calendars.deleteBody', { name: confirmDelete?.name ?? '' })}
+            {t("booking.calendars.deleteBody", {
+              name: confirmDelete?.name ?? "",
+            })}
           </Typography>
           {remove.error ? (
             <Alert severity="error" sx={{ mt: 2 }}>
@@ -292,20 +359,26 @@ export default function CalendarsPage() {
           ) : null}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDelete(null)}>{t('booking.common.cancel')}</Button>
+          <Button onClick={() => setConfirmDelete(null)}>
+            {t("booking.common.cancel")}
+          </Button>
           <Button
             color="error"
             variant="contained"
             disabled={remove.isPending}
             onClick={() => confirmDelete && remove.mutate(confirmDelete.id)}
           >
-            {t('booking.common.delete')}
+            {t("booking.common.delete")}
           </Button>
         </DialogActions>
       </Dialog>
 
       {accessFor ? (
-        <CalendarAccessDialog calendar={accessFor} open onClose={() => setAccessFor(null)} />
+        <CalendarAccessDialog
+          calendar={accessFor}
+          open
+          onClose={() => setAccessFor(null)}
+        />
       ) : null}
     </Box>
   );
