@@ -4,7 +4,7 @@ import {
   Box, Typography, Paper, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Avatar, Chip, InputAdornment, Grid, Card, CardContent, IconButton, Tooltip, ToggleButton, ToggleButtonGroup,
 } from '@mui/material';
-import { Search, PersonAdd, People, ViewList, ViewModule, LocalHospital, HowToReg } from '@mui/icons-material';
+import { Search, People, ViewList, ViewModule, LocalHospital, HowToReg } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
@@ -47,10 +47,10 @@ export default function PatientList() {
             <Typography variant="body2" color="text.secondary">{patients.length} registrovaných pacientů</Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 1.5 }}>
-            <Button variant="outlined" startIcon={<PersonAdd />} onClick={() => navigate('/patients/new')}
-              sx={{ borderRadius: 3, px: 3, py: 1.2, fontWeight: 600 }}>
-              Nový pacient
-            </Button>
+            {/* One way in. The thinner "Nový pacient" form wrote to a different
+                endpoint and skipped the address, birth number and insurer, so
+                which button the operator pressed decided how complete the record
+                was. Editing an existing patient still uses that form. */}
             <Button variant="contained" startIcon={<HowToReg />} onClick={() => navigate('/patients/register')}
               sx={{ bgcolor: '#0D7377', borderRadius: 3, px: 3, py: 1.2, fontWeight: 600, boxShadow: '0 4px 16px rgba(13,115,119,0.3)',
                 '&:hover': { bgcolor: '#095456', boxShadow: '0 6px 20px rgba(13,115,119,0.4)' } }}>

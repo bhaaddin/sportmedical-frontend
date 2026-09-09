@@ -116,7 +116,7 @@ export default function Dashboard() {
   const quickActions = [
     { label: 'Nová diagnostika', icon: <Science />, path: '/diagnostics/new', color: '#0D7377', gradient: 'linear-gradient(135deg, #0D7377 0%, #14A3A8 100%)' },
     { label: 'Kalendář', icon: <CalendarMonth />, path: '/calendar', color: '#2E7D32', gradient: 'linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%)' },
-    { label: 'Nový pacient', icon: <PersonAdd />, path: '/patients/new', color: '#0288D1', gradient: 'linear-gradient(135deg, #0288D1 0%, #039BE5 100%)' },
+    { label: 'Registrace pacienta', icon: <PersonAdd />, path: '/patients/register', color: '#0288D1', gradient: 'linear-gradient(135deg, #0288D1 0%, #039BE5 100%)' },
     { label: 'Fakturace', icon: <Receipt />, path: '/billing', color: '#ED6C02', gradient: 'linear-gradient(135deg, #ED6C02 0%, #FF9800 100%)' },
   ];
 

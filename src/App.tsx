@@ -362,7 +362,6 @@ export default function App() {
                     <Route path="/calendar" element={<CalendarPage />} />
                     <Route path="/patients" element={<PatientList />} />
                     <Route path="/patients/register" element={<PatientRegistrationPage />} />
-                    <Route path="/patients/new" element={<PatientFormPage />} />
                     <Route path="/patients/:id/edit" element={<PatientFormPage />} />
                     <Route path="/patients/:id" element={<PatientDetails />} />
                     <Route path="/measurements" element={<MeasurementsPage />} />
