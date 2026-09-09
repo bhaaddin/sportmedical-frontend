@@ -141,12 +141,7 @@ export const calendarApi = {
   },
 
   cancel: async (id: string): Promise<void> => {
-    // Backend uses POST /api/appointments/{id}/cancel, not DELETE
     await client.post(`/api/scheduling/appointments/${id}/cancel`);
-  },
-
-  cancelByToken: async (token: string): Promise<void> => {
-    await client.post(`/api/public/booking/cancel/${token}`);
   },
 
   update: async (id: string, data: Partial<Appointment>): Promise<Appointment> => {
