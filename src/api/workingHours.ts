@@ -1,0 +1,182 @@
+import client from './client';
+import { toBookingError } from './apiError';
+import {
+  dayActivityGridSchema,
+  impactReportSchema,
+  parseResponse,
+  schedulePeriodListSchema,
+  schedulePeriodSchema,
+  scheduleExceptionListSchema,
+  scheduleExceptionSchema,
+  workingHourListSchema,
+  workingHourSchema,
+  type DayActivityGrid,
+  type DayActivityRow,
+  type ImpactReport,
+  type SchedulePeriod,
+  type SchedulePeriodInput,
+  type ScheduleException,
+  type ScheduleExceptionInput,
+  type WorkingHour,
+  type WorkingHourInput,
+} from './bookingContracts';
+
+/**
+ * Working hours, validity periods and exceptions - contract 4.2, screens 5.4
+ * and 5.5.
+ *
+ * Replaces `src/services/workingHoursApi.ts`, which spoke a different model:
+ * a week-parity enum, no validity periods, and slot generation the contract
+ * rules out entirely - free times are computed live and never generated ahead.
+ */
+
+async function request<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    throw toBookingError(error);
+  }
+}
+
+export const workingHoursApi = {
+  /* ── Validity periods ── */
+
+  listPeriods: (calendarId: string): Promise<SchedulePeriod[]> =>
+    request(async () => {
+      const res = await client.get(`/api/calendars/${calendarId}/periods`);
+      return parseResponse(schedulePeriodListSchema, res.data);
+    }),
+
+  createPeriod: (calendarId: string, input: SchedulePeriodInput): Promise<SchedulePeriod> =>
+    request(async () => {
+      const res = await client.post(`/api/calendars/${calendarId}/periods`, input);
+      return parseResponse(schedulePeriodSchema, res.data);
+    }),
+
+  updatePeriod: (
+    calendarId: string,
+    periodId: string,
+    input: SchedulePeriodInput,
+  ): Promise<SchedulePeriod> =>
+    request(async () => {
+      const res = await client.put(`/api/calendars/${calendarId}/periods/${periodId}`, input);
+      return parseResponse(schedulePeriodSchema, res.data);
+    }),
+
+  deletePeriod: (calendarId: string, periodId: string): Promise<void> =>
+    request(async () => {
+      await client.delete(`/api/calendars/${calendarId}/periods/${periodId}`);
+    }),
+
+  /**
+   * Who a change of validity would hit - asked before saving, never as a
+   * reaction to an error (4.2). If it reports anyone, the save has to carry
+   * `acknowledgedImpact`, so the list cannot be skipped silently.
+   */
+  periodImpact: (
+    calendarId: string,
+    periodId: string,
+    validFrom: string,
+    validTo: string | null,
+  ): Promise<ImpactReport> =>
+    request(async () => {
+      const res = await client.get(`/api/calendars/${calendarId}/periods/${periodId}/impact`, {
+        params: { validFrom, validTo: validTo ?? undefined },
+      });
+      return parseResponse(impactReportSchema, res.data);
+    }),
+
+  /* ── Days of the week within a period ── */
+
+  listWorkingHours: (calendarId: string, periodId: string): Promise<WorkingHour[]> =>
+    request(async () => {
+      const res = await client.get(
+        `/api/calendars/${calendarId}/periods/${periodId}/working-hours`,
+      );
+      return parseResponse(workingHourListSchema, res.data);
+    }),
+
+  createWorkingHour: (
+    calendarId: string,
+    periodId: string,
+    input: WorkingHourInput,
+  ): Promise<WorkingHour> =>
+    request(async () => {
+      const res = await client.post(
+        `/api/calendars/${calendarId}/periods/${periodId}/working-hours`,
+        input,
+      );
+      return parseResponse(workingHourSchema, res.data);
+    }),
+
+  updateWorkingHour: (
+    calendarId: string,
+    periodId: string,
+    id: string,
+    input: WorkingHourInput,
+  ): Promise<WorkingHour> =>
+    request(async () => {
+      const res = await client.put(
+        `/api/calendars/${calendarId}/periods/${periodId}/working-hours/${id}`,
+        input,
+      );
+      return parseResponse(workingHourSchema, res.data);
+    }),
+
+  deleteWorkingHour: (calendarId: string, periodId: string, id: string): Promise<void> =>
+    request(async () => {
+      await client.delete(`/api/calendars/${calendarId}/periods/${periodId}/working-hours/${id}`);
+    }),
+
+  /* ── Day-activity grid (5.7) ── */
+
+  listDayActivities: (calendarId: string, periodId: string): Promise<DayActivityGrid> =>
+    request(async () => {
+      const res = await client.get(
+        `/api/calendars/${calendarId}/periods/${periodId}/day-activities`,
+      );
+      return parseResponse(dayActivityGridSchema, res.data);
+    }),
+
+  /**
+   * A full replacement for the period, never a merge: a day left out of the
+   * body ends up with no activities (4.2).
+   */
+  saveDayActivities: (
+    calendarId: string,
+    periodId: string,
+    rows: DayActivityRow[],
+  ): Promise<DayActivityGrid> =>
+    request(async () => {
+      // The body is the bare row array; the answer carries the warnings (3.1).
+      const res = await client.put(
+        `/api/calendars/${calendarId}/periods/${periodId}/day-activities`,
+        rows,
+      );
+      return parseResponse(dayActivityGridSchema, res.data);
+    }),
+
+  /* ── Exceptions (5.5) ── */
+
+  listExceptions: (calendarId: string): Promise<ScheduleException[]> =>
+    request(async () => {
+      const res = await client.get(`/api/calendars/${calendarId}/exceptions`);
+      return parseResponse(scheduleExceptionListSchema, res.data);
+    }),
+
+  createException: (
+    calendarId: string,
+    input: ScheduleExceptionInput,
+  ): Promise<ScheduleException> =>
+    request(async () => {
+      const res = await client.post(`/api/calendars/${calendarId}/exceptions`, input);
+      return parseResponse(scheduleExceptionSchema, res.data);
+    }),
+
+  deleteException: (calendarId: string, id: string): Promise<void> =>
+    request(async () => {
+      await client.delete(`/api/calendars/${calendarId}/exceptions/${id}`);
+    }),
+};
+
+export default workingHoursApi;

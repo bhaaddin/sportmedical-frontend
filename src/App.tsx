@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react
 import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Avatar, IconButton, Menu, MenuItem, Badge, CircularProgress, Button } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import i18n from './i18n';
-import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Group, Search, AttachMoney } from '@mui/icons-material';
+import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Group, Search, AttachMoney, Schedule, EventBusy } from '@mui/icons-material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -37,6 +37,7 @@ const MeasurementsPage = lazy(() => import('./pages/Measurements'));
 const AdminPage = lazy(() => import('./pages/Admin'));
 const CenikPage = lazy(() => import('./pages/Cenik'));
 const PatientFormPage = lazy(() => import('./pages/PatientForm'));
+const PatientRegistrationPage = lazy(() => import('./pages/PatientRegistration'));
 const InjuriesPage = lazy(() => import('./pages/Injuries'));
 const WellnessPage = lazy(() => import('./pages/Wellness'));
 const RtpPage = lazy(() => import('./pages/Rtp'));
@@ -69,6 +70,12 @@ const MultiClinicPage = lazy(() => import('./pages/MultiClinic'));
 const ApiKeysPage = lazy(() => import('./pages/ApiKeys'));
 const PatientRecordsPage = lazy(() => import('./pages/PatientRecords'));
 const WorkerSchedulePage = lazy(() => import('./pages/admin/WorkerScheduleSettings'));
+/* Booking phase 1, stage 1: calendars, access and activities */
+const BookingCalendarsPage = lazy(() => import('./pages/booking/CalendarsPage'));
+const BookingActivitiesPage = lazy(() => import('./pages/booking/ActivitiesPage'));
+/* Booking phase 1, stage 2: working hours, periods, cycle and exceptions */
+const BookingWorkingHoursPage = lazy(() => import('./pages/booking/WorkingHoursPage'));
+const BookingExceptionsPage = lazy(() => import('./pages/booking/ExceptionsPage'));
 const CashierPage = lazy(() => import('./pages/CashierPage'));
 const ClubsPage = lazy(() => import('./pages/ClubsPage'));
 const AccountingExportPage = lazy(() => import('./pages/AccountingExportPage'));
@@ -136,6 +143,10 @@ const menuGroups: MenuItemGroup[] = [
     label: '',
     adminOnly: true,
     items: [
+      { text: 'Kalendáře', icon: <CalendarMonth />, path: '/calendars' },
+      { text: 'Činnosti', icon: <EventAvailable />, path: '/activities' },
+      { text: 'Pracovní doba', icon: <Schedule />, path: '/working-hours' },
+      { text: 'Výjimky', icon: <EventBusy />, path: '/exceptions' },
       { text: 'Administrace', icon: <AdminPanelSettings />, path: '/admin' },
       { text: 'Nastavení', icon: <Settings />, path: '/settings' },
     ],
@@ -347,6 +358,7 @@ export default function App() {
                     <Route path="/" element={<DashboardPage />} />
                     <Route path="/calendar" element={<CalendarPage />} />
                     <Route path="/patients" element={<PatientList />} />
+                    <Route path="/patients/register" element={<PatientRegistrationPage />} />
                     <Route path="/patients/new" element={<PatientFormPage />} />
                     <Route path="/patients/:id/edit" element={<PatientFormPage />} />
                     <Route path="/patients/:id" element={<PatientDetails />} />
@@ -375,6 +387,10 @@ export default function App() {
                     <Route path="/worker-schedule" element={<WorkerSchedulePage />} />
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/intake-review" element={<RequireAdmin><IntakeReviewQueue /></RequireAdmin>} />
+                    <Route path="/calendars" element={<RequireAdmin><BookingCalendarsPage /></RequireAdmin>} />
+                    <Route path="/activities" element={<RequireAdmin><BookingActivitiesPage /></RequireAdmin>} />
+                    <Route path="/working-hours" element={<RequireAdmin><BookingWorkingHoursPage /></RequireAdmin>} />
+                    <Route path="/exceptions" element={<RequireAdmin><BookingExceptionsPage /></RequireAdmin>} />
                     <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
                     <Route path="/codebook" element={<CodebookPage />} />
                     <Route path="/system-health" element={<SystemHealthPage />} />

@@ -101,5 +101,180 @@
     "week": "Týden",
     "month": "Měsíc",
     "day": "Den"
+  },
+  "booking": {
+    "common": {
+      "save": "Uložit",
+      "cancel": "Zrušit",
+      "delete": "Smazat",
+      "edit": "Upravit",
+      "actions": "Akce",
+      "retry": "Zkusit znovu"
+    },
+    "errors": {
+      "validation": "Zadané údaje nejsou platné.",
+      "forbidden": "Na tento kalendář nemáte přístup.",
+      "notFound": "Záznam se nenašel.",
+      "conflict": "Tento čas mezitím obsadil někdo jiný. Vyberte prosím jiný.",
+      "domainRule": "Tuto změnu nelze uložit.",
+      "rateLimited": "Příliš mnoho pokusů, zkuste to za chvíli.",
+      "server": "Něco se pokazilo. Zkuste to prosím znovu.",
+      "offline": "Server je nedostupný. Zkontrolujte připojení."
+    },
+    "colors": {
+      "blue": "Modrá",
+      "indigo": "Indigová",
+      "teal": "Petrolejová",
+      "green": "Zelená",
+      "olive": "Olivová",
+      "amber": "Jantarová",
+      "orange": "Oranžová",
+      "red": "Červená",
+      "pink": "Růžová",
+      "purple": "Fialová",
+      "brown": "Hnědá",
+      "slate": "Břidlicová"
+    },
+    "calendars": {
+      "title": "Kalendáře",
+      "subtitle": "Služby, do kterých se objednává. Každý má vlastní barvu, místo a krok zobrazení.",
+      "new": "Nový kalendář",
+      "newTitle": "Nový kalendář",
+      "editTitle": "Úprava kalendáře",
+      "empty": "Zatím nemáte žádný kalendář. Kalendář je služba, do které se objednává — třeba Prohlídky nebo Diagnostika.",
+      "active": "Aktivní",
+      "inactive": "Neaktivní",
+      "stepValue": "{{minutes}} min",
+      "stepHelp": "Po kolika minutách se v mřížce nabízí čas.",
+      "deleteTitle": "Smazat kalendář?",
+      "deleteBody": "Opravdu smazat kalendář „{{name}}“? Tuto akci nelze vrátit zpět.",
+      "column": {
+        "name": "Název",
+        "location": "Místo",
+        "step": "Krok zobrazení",
+        "state": "Stav",
+        "color": "Barva",
+        "order": "Pořadí"
+      }
+    },
+    "access": {
+      "title": "Kdo vidí kalendář „{{name}}“",
+      "action": "Přístupy",
+      "empty": "Nejsou k dispozici žádní uživatelé.",
+      "locked": {
+        "role": "Vlastník a administrátor mají přístup vždy",
+        "assignedWorker": "Pracovník je přiřazen ke dni tohoto kalendáře"
+      }
+    },
+    "activities": {
+      "title": "Činnosti",
+      "subtitle": "Co se v kalendáři provádí. Délka je libovolná, přestávka patří k pracovní době, ne k činnosti.",
+      "new": "Nová činnost",
+      "newTitle": "Nová činnost",
+      "editTitle": "Úprava činnosti",
+      "empty": "Zatím nemáte žádnou činnost. Bez činnosti se do kalendáře nedá objednat.",
+      "durationValue": "{{minutes}} min",
+      "durationHelp": "Libovolný počet minut. Není omezeno výběrem ani krokem po 15.",
+      "publicYes": "Veřejná",
+      "publicNo": "Jen interní",
+      "publicLabel": "Lze objednat z webu",
+      "deleteTitle": "Smazat činnost?",
+      "deleteBody": "Opravdu smazat činnost „{{name}}“? Tuto akci nelze vrátit zpět.",
+      "column": {
+        "name": "Název",
+        "duration": "Délka",
+        "publicNote": "Poznámka pro pacienta",
+        "public": "Veřejná",
+        "color": "Barva",
+        "order": "Pořadí"
+      }
+    },
+    "workingHours": {
+      "title": "Pracovní doba",
+      "subtitle": "Období platnosti, dny v týdnu, cyklus a pracovník. Přestávka patří sem, ne k činnosti.",
+      "noCalendars": "Nejprve založte kalendář — pracovní doba se nastavuje ke konkrétnímu kalendáři.",
+      "calendar": "Kalendář",
+      "periods": "Období platnosti",
+      "newPeriod": "Nové období",
+      "editPeriod": "Upravit období",
+      "noPeriods": "Toto období zatím nemá žádnou platnost. Bez období se nedá nastavit ani jeden den.",
+      "periodName": "Název období",
+      "validFrom": "Platí od",
+      "validTo": "Platí do",
+      "validToHelp": "Prázdné = bez konce.",
+      "overlap": "Toto období se překrývá s jiným. Překrývající se období nelze uložit.",
+      "days": "Dny v týdnu — {{name}}",
+      "day": "Den",
+      "hours": "Pracovní doba",
+      "lunch": "Oběd",
+      "cycle": "Cyklus",
+      "worker": "Pracovník",
+      "noWorker": "Nikdo",
+      "from": "Od",
+      "to": "Do",
+      "cycleEvery": "Každý týden",
+      "cycleEven": "Sudý týden",
+      "cycleOdd": "Lichý týden",
+      "cycleNth": "Každý N-tý týden",
+      "everyNth": "Každý N-tý",
+      "preview": "Platí: {{dates}}",
+      "previewNone": "V tomto období na tento den nepadne žádný termín.",
+      "impactTitle": "Změna zasáhne {{count}} objednaných termínů",
+      "impactLead": "Tyto termíny už jsou objednané a nová platnost je nechá mimo pracovní dobu. Uložením je nezrušíte, ale zůstanou mimo — rozhodněte se.",
+      "impactWhen": "Kdy",
+      "impactPatient": "Pacient",
+      "impactActivity": "Činnost",
+      "impactReason": "Důvod",
+      "impactConfirm": "Rozumím, uložit i tak",
+      "reason": {
+        "OutsideNewValidity": "Mimo novou platnost období",
+        "DayNoLongerWorking": "Den už není pracovní",
+        "OutsideNewWorkingHours": "Mimo novou pracovní dobu"
+      },
+      "weekday": {
+        "0": "Neděle",
+        "1": "Pondělí",
+        "2": "Úterý",
+        "3": "Středa",
+        "4": "Čtvrtek",
+        "5": "Pátek",
+        "6": "Sobota"
+      }
+    },
+    "exceptions": {
+      "title": "Výjimky",
+      "subtitle": "Jednotlivé dny, které se chovají jinak než pravidelná pracovní doba.",
+      "new": "Nová výjimka",
+      "newTitle": "Nová výjimka",
+      "empty": "Zatím nejsou žádné výjimky. Výjimka je jeden konkrétní den — zavřeno, jiný čas nebo jiný pracovník.",
+      "date": "Datum",
+      "kindColumn": "Typ",
+      "detail": "Podrobnost",
+      "reason": "Důvod",
+      "kind": {
+        "closed": "Zavřeno",
+        "differentHours": "Jiný čas",
+        "differentWorker": "Jiný pracovník"
+      }
+    },
+    "dayActivities": {
+      "title": "Činnosti podle dnů",
+      "subtitle": "Co se v tomto období dělá který den. Uložení nahradí celou mřížku — den bez zaškrtnutí zůstane bez činností.",
+      "noActivities": "Nejprve založte činnost — bez činnosti se do kalendáře nedá objednat.",
+      "offersNothing": "má pracovní dobu, ale žádnou činnost — nenabídne nic",
+      "notWorking": "nepracovní den",
+      "cellLabel": "{{activity}} v {{day}}"
+    },
+    "status": {
+      "Scheduled": "Objednán",
+      "Confirmed": "Potvrzen",
+      "CheckedIn": "Přišel",
+      "Completed": "Hotovo",
+      "NoShow": "Nepřišel",
+      "Cancelled": "Zrušeno",
+      "Waitlisted": "Čekací listina",
+      "unknown": "Neznámý stav",
+      "late": "Mešká"
+    }
   }
 }
