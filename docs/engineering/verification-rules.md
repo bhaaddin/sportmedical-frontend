@@ -81,3 +81,51 @@ Medzivýstupy patria do vlastného priečinka relácie, nie do zdieľaného `/tm
 `.github/workflows/ci.yml` má `npm run typecheck` ako krok, ktorý zhadzuje job.
 `npm run build` je holé `vite build` a **netypuje** — zelený build sám o sebe
 nič neoveruje a nesmie sa za overenie vydávať.
+
+---
+
+# Zmazaná funkcia nikdy nenechá tichú medzeru
+
+Druhé pravidlo repozitára. Schválil ho vlastník 9. 9. 2026, platí pre všetky
+pruhy a v backendovom repozitári je v `AGENTS.md` vedľa toho vyššie.
+
+## Pravidlo
+
+> Zmazaná funkcia dostane buď náhradu, alebo výslovnú poznámku, kam sa
+> presunula či kedy príde. **Nikdy tichú medzeru.**
+
+## Prečo
+
+Toto je to isté pravidlo ako „zelená, ktorá nič neoverila", len obrátené
+k používateľovi namiesto k nástroju. Prázdne miesto na obrazovke je tvrdenie:
+hovorí *„tu nič nie je"*. Keď funkcia zmizne bez slova, obsluha si to tvrdenie
+prečíta ako údaj o pacientovi, nie ako stav vývoja — a nemá ako to rozlíšiť.
+
+Zmiznutá karta „Dokumenty z online rezervace" nevyzerá ako odstránená funkcia.
+Vyzerá ako pacient, ktorý žiadne dokumenty nemá.
+
+## Aký tvar sa žiada
+
+**Náhrada, keď funkcia niekam odišla.** V správe pracovníkov zmizla väzba
+pracovník → služba. Na jej mieste je veta, ktorá povie kam:
+
+> Nastavuje se u pracovní doby kalendáře — na každý den se přiřazuje pracovník,
+> takže rozvrh a to, kdo službu provádí, jsou na jednom místě a nemohou se
+> rozejít.
+
+Admin, ktorý to nastavenie hľadá, sa dozvie kam ísť, namiesto aby hľadal pole,
+ktoré tam už nie je.
+
+**Poznámka, keď funkcia ešte len príde.** Na detaile pacienta zmizli dokumenty
+z online objednania, lebo online objednávanie je fáza 2. Na ich mieste stojí, že
+je to fáza 2 a čo to znamená — nie prázdno.
+
+## Kedy sa pravidlo neuplatňuje
+
+Na funkciu, ktorá tam **nikdy nebola**. Keď kontrakt výslovne hovorí nerobiť na
+niečo miesto — ako `PODKLADY ✓ / ⚠` v 4.6 — miesto sa nerobí a poznámka sa
+nepíše. Pravidlo je o tom, čo používateľ stratil, nie o zozname všetkého, čo by
+raz mohlo byť.
+
+Dôvod patrí do kódu, aby ho ďalší čitateľ našiel: `DayOverviewPage.tsx` má
+v hlavičke napísané, prečo tam tá riadka nie je.
