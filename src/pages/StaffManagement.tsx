@@ -78,30 +78,17 @@ export default function StaffManagement() {
     firstName: '', lastName: '', email: '', phone: '',
     role: 'Doctor', specialization: '', isActive: true, services: [],
   });
-  const [services, setServices] = useState<ServiceOption[]>([]);
   const [accounts, setAccounts] = useState<LoginAccount[]>([]);
 
   /* ── Load staff + services + login accounts ── */
   useEffect(() => {
     loadStaff();
-    loadServices();
     loadAccounts();
   }, []);
 
   const splitName = (full: string) => {
     const parts = (full || '').trim().split(/\s+/);
     return { firstName: parts[0] || '', lastName: parts.slice(1).join(' ') || '' };
-  };
-
-  const loadServices = async () => {
-    try {
-      const res = await client.get('/api/booking/event-types');
-      const data = res.data?.value ?? res.data ?? [];
-      const list = Array.isArray(data) ? data : [];
-      setServices(list.map((e: any) => ({ id: e.id, slug: e.slug, name: e.name, providerName: e.providerName ?? '' })));
-    } catch {
-      setServices([]);
-    }
   };
 
   const loadAccounts = async () => {
@@ -132,18 +119,6 @@ export default function StaffManagement() {
           isActive: m.isActive ?? true, services: [],
         };
       });
-      // Attach services by matching provider name
-      try {
-        const evRes = await client.get('/api/booking/event-types');
-        const evData = evRes.data?.value ?? evRes.data ?? [];
-        const evList = Array.isArray(evData) ? evData : [];
-        mapped.forEach(s => {
-          const full = `${s.firstName} ${s.lastName}`.trim();
-          s.services = evList.filter((e: any) =>
-            String(e.providerName ?? '').split(',').map((x: string) => x.trim()).includes(full)
-          ).map((e: any) => e.id);
-        });
-      } catch { /* ignore */ }
       setStaff(mapped);
     } catch {
       setStaff([]);
@@ -171,29 +146,6 @@ export default function StaffManagement() {
       } else {
         await client.post('/api/staff', payload);
       }
-
-      // Assign selected services to this doctor (patient bookings → his calendar)
-      try {
-        const prevServices = editingStaff?.services ?? [];
-        const nextServices = formData.services ?? [];
-        const toAssign = nextServices.filter(id => !prevServices.includes(id));
-        const toUnassign = prevServices.filter(id => !nextServices.includes(id));
-        const setProvider = async (id: string, provider: string) => {
-          const get = await client.get(`/api/booking/event-types/${id}`);
-          const full = get.data?.value ?? get.data;
-          const cur = String(full.providerName ?? '').split(',').map((s: string) => s.trim()).filter(Boolean);
-          const next = provider
-            ? (cur.includes(provider) ? cur : [...cur, provider])
-            : cur.filter((n: string) => n !== fullName);
-          await client.put(`/api/booking/event-types/${id}`, { ...full, providerName: next.join(', ') });
-        };
-        for (const id of toAssign) await setProvider(id, fullName);
-        for (const id of toUnassign) {
-          const ev = services.find(s => s.id === id);
-          if (ev && ev.providerName.split(',').map(s => s.trim()).includes(fullName)) await setProvider(id, '');
-        }
-        await loadServices();
-      } catch { /* service sync failed — staff saved */ }
 
       // New member → also create login account (email + generated password)
       if (!editingStaff && formData.email) {
@@ -363,7 +315,7 @@ export default function StaffManagement() {
                       <Chip label={ROLE_LABELS[member.role]} size="small"
                         sx={{ bgcolor: ROLE_COLORS[member.role] + '18', color: ROLE_COLORS[member.role], fontWeight: 500 }} />
                     </TableCell>
-                    <TableCell>{member.specialization || (member.services ?? []).map(id => services.find(s => s.id === id)?.name).filter(Boolean).join(', ') || '—'}</TableCell>
+                    <TableCell>{member.specialization || '—'}</TableCell>
                     <TableCell>
                       {(() => {
                         const acc = accountFor(member.email);
@@ -441,34 +393,11 @@ export default function StaffManagement() {
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
                 Služby, které pracovník provádí
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Rezervace těchto služeb půjdou do jeho kalendáře a oznámení.
+              <Typography variant="body2" color="text.secondary">
+                Nastavuje se u pracovní doby kalendáře — na každý den se
+                přiřazuje pracovník, takže rozvrh a to, kdo službu provádí, jsou
+                na jednom místě a nemohou se rozejít.
               </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                {services.length === 0 && (
-                  <Typography variant="body2" color="text.secondary">Žádné služby k výběru</Typography>
-                )}
-                {services.map(s => {
-                  const selected = (formData.services ?? []).includes(s.id);
-                  const takenByOther = s.providerName && s.providerName !== `${formData.firstName ?? ''} ${formData.lastName ?? ''}`.trim();
-                  return (
-                    <Chip
-                      key={s.id}
-                      label={s.providerName && !selected ? `${s.name} (${s.providerName})` : s.name}
-                      onClick={() => {
-                        const cur = formData.services ?? [];
-                        setFormData({
-                          ...formData,
-                          services: selected ? cur.filter(id => id !== s.id) : [...cur, s.id],
-                        });
-                      }}
-                      color={selected ? 'primary' : 'default'}
-                      variant={selected ? 'filled' : 'outlined'}
-                      sx={takenByOther && !selected ? { opacity: 0.7 } : undefined}
-                    />
-                  );
-                })}
-              </Box>
             </Grid>
             <Grid size={{ xs: 12 }}>
               <FormControlLabel control={<Switch checked={formData.isActive}

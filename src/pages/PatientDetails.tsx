@@ -282,6 +282,19 @@ export default function PatientDetails() {
         </motion.div>
       )}
 
+      {/* Where the "Dokumenty z online rezervace" card was. It read a table
+          stage 9 drops, which had no rows and nobody to write them, so it never
+          showed a document. Saying so beats leaving a gap the operator reads as
+          "this patient has none". */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+        <Alert severity="info" sx={{ mb: 3, borderRadius: 3 }}>
+          <strong>Dotazník a dokumenty z online objednání — fáze 2.</strong>{' '}
+          Online objednávání pacientem se teprve staví. Dokud nebude, dorazí
+          dotazník a souhlasy jen z příjmu v ordinaci; tady se nic nezobrazí ani
+          neztratí.
+        </Alert>
+      </motion.div>
+
       {/* ── Metrics Cards (latest session) ── */}
       {latest && (
         <Grid container spacing={2} sx={{ mb: 3 }}>
