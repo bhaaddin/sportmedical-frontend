@@ -40,8 +40,9 @@ export function AsyncSection({
 }: AsyncSectionProps) {
   const { t } = useTranslation();
 
-  // Nothing known yet counts as loading, never as empty.
-  if (isLoading || (!isSettled && isEmpty && !error)) {
+  // No answer yet is never content and never emptiness — not while retrying,
+  // not between two attempts. Only a settled query may draw the screen.
+  if (isLoading || (!isSettled && !error)) {
     return (
       <Stack spacing={1} aria-busy="true" aria-live="polite">
         {Array.from({ length: skeletonRows }, (_, i) => (

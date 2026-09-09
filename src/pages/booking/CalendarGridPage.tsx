@@ -8,6 +8,7 @@ import {
   Stack,
   ToggleButton,
   ToggleButtonGroup,
+  TextField,
   Tooltip,
   Typography,
   useMediaQuery,
@@ -192,17 +193,25 @@ export default function CalendarGridPage() {
   const step = view === "day" ? 1 : 7;
   const todayKey = toDateOnly(now);
 
-  /* 7.1: the grid is reachable from the keyboard and is not a focus trap. */
+  /**
+   * 7.1: the grid steps with the keyboard and is not a focus trap.
+   *
+   * The container carries `tabIndex` because a plain div receives no key events
+   * of its own - the first version of this handler never fired at all, which
+   * only showed up when the screen was actually driven from a keyboard.
+   * `PageUp`/`PageDown` rather than Alt+Arrow, which the browser takes for its
+   * own history navigation.
+   */
   const onGridKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "Escape") {
       setOpenId(null);
       return;
     }
-    if (event.key === "ArrowLeft" && event.altKey) {
+    if (event.key === "PageUp") {
       setAnchor(addDaysToDateOnly(anchor, -step));
       event.preventDefault();
     }
-    if (event.key === "ArrowRight" && event.altKey) {
+    if (event.key === "PageDown") {
       setAnchor(addDaysToDateOnly(anchor, step));
       event.preventDefault();
     }
@@ -214,7 +223,12 @@ export default function CalendarGridPage() {
       : `${formatDateOnly(days[0])} – ${formatDateOnly(days[6])}`;
 
   return (
-    <Box sx={{ maxWidth: 1400, mx: "auto" }} onKeyDown={onGridKeyDown}>
+    <Box
+      tabIndex={0}
+      aria-label={t("booking.grid.title")}
+      sx={{ maxWidth: 1400, mx: "auto", outline: "none" }}
+      onKeyDown={onGridKeyDown}
+    >
       <Box
         sx={{
           display: "flex",
@@ -247,6 +261,17 @@ export default function CalendarGridPage() {
           >
             {t("booking.grid.today")}
           </Button>
+          {/* Without this the only way to reach a month back was to press the
+              arrow week by week - thirty-five presses to reach January. */}
+          <TextField
+            type="date"
+            size="small"
+            label={t("booking.grid.jumpTo")}
+            value={anchor}
+            onChange={(e) => e.target.value && setAnchor(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+            sx={{ width: 170 }}
+          />
           <Tooltip title={t("booking.grid.next")}>
             <IconButton
               aria-label={t("booking.grid.next")}
@@ -312,7 +337,11 @@ export default function CalendarGridPage() {
 
         <AsyncSection
           isLoading={appointmentsQuery.isLoading}
-          error={appointmentsQuery.error}
+          isSettled={appointmentsQuery.isSuccess && !appointmentsQuery.isPlaceholderData}
+          /* With placeholder data the query stays 'success', so a failed fetch
+             never reaches `error` — it lands in `failureReason`. Reading only
+             `error` made a broken week look like an empty one. */
+          error={appointmentsQuery.error ?? appointmentsQuery.failureReason}
           isEmpty={false}
           emptyText=""
           onRetry={() => void appointmentsQuery.refetch()}
