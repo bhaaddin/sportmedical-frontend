@@ -77,6 +77,18 @@ export const CLAIM_STATUSES = [
 
 export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
 
+/**
+ * A batch answer we cannot read is not an empty batch — it is an unanswered
+ * question, and it must not turn into a green result. Throwing here puts the
+ * caller on its own error path instead of letting it report a success.
+ */
+function assertBatchResult<T>(payload: unknown, requiredKey: string): T {
+  if (payload && typeof payload === 'object' && requiredKey in payload) {
+    return payload as T;
+  }
+  throw new Error(`Odpověď serveru neobsahuje "${requiredKey}"`);
+}
+
 export const billingApi = {
   /* ── Basic CRUD ── */
   getInvoices: async (): Promise<Invoice[]> => {
@@ -113,24 +125,20 @@ export const billingApi = {
   },
 
   /* ── Batch operations ── */
+  /*
+   * These two used to swallow a failed request and report success anyway, which
+   * left every selected invoice showing "Odesláno" although nothing had been
+   * sent and no error had been shown. A failure has to be visible: both callers
+   * already roll back and warn in their own catch, and now that actually runs.
+   */
   batchVerify: async (claimIds: string[]): Promise<BatchVerifyResult> => {
-    try {
-      const res = await client.post('/api/billing/invoices/batch-verify', { claimIds });
-      return res.data?.value ?? res.data ?? { validIds: claimIds, invalidIds: [], errors: {} };
-    } catch {
-      // Fallback: all valid if endpoint doesn't exist yet
-      return { validIds: claimIds, invalidIds: [], errors: {} };
-    }
+    const res = await client.post('/api/billing/invoices/batch-verify', { claimIds });
+    return assertBatchResult<BatchVerifyResult>(res.data, 'validIds');
   },
 
   batchSubmit: async (claimIds: string[]): Promise<BatchSubmitResult> => {
-    try {
-      const res = await client.post('/api/billing/invoices/batch-submit', { claimIds });
-      return res.data?.value ?? res.data ?? { succeededIds: claimIds, failedIds: [], errors: {} };
-    } catch {
-      // Fallback: simulate success
-      return { succeededIds: claimIds, failedIds: [], errors: {} };
-    }
+    const res = await client.post('/api/billing/invoices/batch-submit', { claimIds });
+    return assertBatchResult<BatchSubmitResult>(res.data, 'succeededIds');
   },
 
   /* ── Stats ── */
