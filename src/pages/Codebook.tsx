@@ -11,7 +11,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import {
   Box, Typography, Paper, Card, CardContent, TextField, IconButton, Tooltip,
-  Chip, Button, Divider, List, ListItem, ListItemText, Collapse,
+  Chip, Button, Divider, List, ListItemButton, ListItemText, Collapse,
   Dialog, DialogTitle, DialogContent, DialogActions, Alert, Skeleton,
   Badge, InputAdornment,
   Grid, MenuItem,
@@ -20,7 +20,7 @@ import {
   Search, Star, StarBorder, ExpandMore, ExpandLess, Close, Add,
   ArrowBack, Edit, Save, Book, FilterList, LocalHospital,
 } from '@mui/icons-material';
-import { List as VirtualList } from 'react-window';
+import { List as VirtualList, useListRef } from 'react-window';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   getCachedICDCodes, setCachedICDCodes,
@@ -138,7 +138,8 @@ export default function Codebook() {
   const [editNotes, setEditNotes] = useState('');
   const [assignTargetPatientId, setAssignTargetPatientId] = useState<string | null>(null);
   const [patients, setPatients] = useState<Patient[]>([]);
-  const listRef = useRef<VirtualList>(null);
+  /* v2 gives the ref its own type; `List` is a component, not one. */
+  const listRef = useListRef(null);
   const currentUserRole = useAppStore((s) => s.currentUserRole);
 
   /* ── Load codes (from cache or generate demo) ── */
@@ -207,7 +208,22 @@ export default function Codebook() {
   };
 
   /* ── Virtual row renderer ── */
-  const VirtualRow = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
+  /*
+   * `react-window` v2 hands the row its own aria attributes and calls this
+   * through `rowComponent` rather than as a child. The old signature was v1's.
+   *
+   * The styling below used to be a `css={{...}}` prop. Nothing in this project
+   * configures emotion's JSX transform - no `jsxImportSource`, no pragma in
+   * this file - so that object went to the DOM as an unknown attribute and the
+   * rows have never had any of it: no striping, no padding, no highlight on the
+   * selected row. It is a plain `style` now, merged after the positioning style
+   * the list supplies, which it must not overwrite.
+   */
+  const VirtualRow = useCallback(({ index, style, ariaAttributes }: {
+    index: number;
+    style: React.CSSProperties;
+    ariaAttributes: { 'aria-posinset': number; 'aria-setsize': number; role: 'listitem' };
+  }) => {
     const code = filteredCodes[index];
     if (!code) return null;
     const isSelected = selectedCode?.id === code.id;
@@ -215,19 +231,26 @@ export default function Codebook() {
 
     return (
       <div
-        style={style}
-        onClick={() => setSelectedCode(code)}
-        role="option"
-        aria-selected={isSelected}
+        {...ariaAttributes}
+        /* A `listitem` may not be `aria-selected`; `aria-current` is the one
+           that says "this is the row you are looking at". */
+        aria-current={isSelected ? 'true' : undefined}
         aria-label={`${code.code} — ${code.description}`}
+        onClick={() => setSelectedCode(code)}
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === 'Enter') setSelectedCode(code);
-          if (e.key === 'ArrowDown' && listRef.current) listRef.current.scrollToItem(index + 1, 'smart');
-          if (e.key === 'ArrowUp' && listRef.current) listRef.current.scrollToItem(index - 1, 'smart');
+          /* v2 renamed `scrollToItem` and takes a config object rather than
+             positional arguments. `align` still accepts `smart`; `auto` is used
+             here because moving one row does not need the smart heuristic. */
+          if (e.key === 'ArrowDown' && listRef.current)
+            listRef.current.scrollToRow({ index: index + 1, align: 'auto' });
+          if (e.key === 'ArrowUp' && listRef.current)
+            listRef.current.scrollToRow({ index: index - 1, align: 'auto' });
         }}
         className="codebook-row"
-        css={{
+        style={{
+          ...style,
           display: 'flex',
           alignItems: 'center',
           padding: '0 16px',
@@ -315,15 +338,21 @@ export default function Codebook() {
           fullWidth size="small"
           placeholder="Hledat podle kódu nebo popisu (např. M54.5, bolest zad)..."
           value={search} onChange={(e) => setSearch(e.target.value)}
-          InputProps={{
-            startAdornment: <InputAdornment position="start"><Search /></InputAdornment>,
-            endAdornment: search && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearch('')}>
-                  <Close fontSize="small" />
-                </IconButton>
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+              endAdornment: search ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearch('')}>
+                    <Close fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
+            },
           }}
           sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
           aria-label="Vyhledávání v číselníku ICD-10"
@@ -338,21 +367,20 @@ export default function Codebook() {
             <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Kategorie</Typography>
           </Box>
           <List dense sx={{ overflow: 'auto', flex: 1, maxHeight: 'calc(100vh - 340px)' }}>
-            <ListItem
-              button
+            {/* `ListItem button` went away; a clickable row is `ListItemButton`. */}
+            <ListItemButton
               onClick={() => setActiveCategory(null)}
               selected={!activeCategory}
               sx={{ borderRadius: 1, mx: 0.5, mb: 0.5 }}
             >
               <ListItemText primary="Všechny kódy" secondary={`${codes.length} kódů`} />
-            </ListItem>
+            </ListItemButton>
             <Divider sx={{ my: 0.5 }} />
             {categories.map(([prefix, count]) => {
               const cat = ICD_CATEGORIES.find((c) => c.prefix === prefix);
               return (
-                <ListItem
+                <ListItemButton
                   key={prefix}
-                  button
                   onClick={() => setActiveCategory(activeCategory === prefix ? null : prefix)}
                   selected={activeCategory === prefix}
                   sx={{ borderRadius: 1, mx: 0.5, mb: 0.5 }}
@@ -372,7 +400,7 @@ export default function Codebook() {
                       </Typography>
                     }
                   />
-                </ListItem>
+                </ListItemButton>
               );
             })}
           </List>
@@ -388,15 +416,14 @@ export default function Codebook() {
           </Box>
 
           <VirtualList
-            ref={listRef}
-            height={500}
-            width="100%"
-            itemCount={filteredCodes.length}
-            itemSize={ROW_HEIGHT}
+            listRef={listRef}
+            style={{ height: 500, width: '100%' }}
+            rowCount={filteredCodes.length}
+            rowHeight={ROW_HEIGHT}
+            rowComponent={VirtualRow}
+            rowProps={{}}
             overscanCount={10}
-          >
-            {VirtualRow}
-          </VirtualList>
+          />
         </Paper>
 
         {/* Detail Panel */}
