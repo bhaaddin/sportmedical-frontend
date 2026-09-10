@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import {
   Box, Typography, Paper, Tabs, Tab, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, Button, Avatar, List,
-  ListItem, ListItemIcon, ListItemText, Grid, Card, CardContent, Skeleton
+  ListItem, ListItemIcon, ListItemText, Grid, Card, CardContent, Skeleton, Alert
 } from '@mui/material';
 import {
   Person as PersonIcon, Event as EventIcon, Description as DocIcon,
@@ -32,6 +32,14 @@ export default function PatientRecords() {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(true);
+  /*
+   * "Could not ask" is not "does not exist". The load used to swallow every
+   * failure into `catch {}` and the screen then said "Pacient nenalezen" - so
+   * a backend blip, a dropped connection or a 502 all read as a claim about
+   * the patient. Caught live: the API restarted for a moment, one request came
+   * back `502`, and this screen told me Anna Černá was not there.
+   */
+  const [failed, setFailed] = useState(false);
 
   const patientId = window.location.pathname.split('/').pop();
 
@@ -40,14 +48,33 @@ export default function PatientRecords() {
   }, [patientId]);
 
   const loadPatient = async () => {
+    setLoading(true);
+    setFailed(false);
     try {
       const res = await client.get(`/api/patients/${patientId}`);
       setPatient(res.data);
-    } catch { /* handle error */ }
-    finally { setLoading(false); }
+    } catch (err: any) {
+      /* A 404 is the register answering; anything else is it not answering. */
+      if (err?.response?.status !== 404) setFailed(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) return <Skeleton variant="rounded" height={400} />;
+
+  if (failed) {
+    return (
+      <Alert
+        severity="error"
+        action={<Button size="small" color="inherit" onClick={loadPatient}>Zkusit znovu</Button>}
+      >
+        Kartu pacienta se nepodařilo načíst. Neznamená to, že pacient neexistuje
+        — server neodpověděl.
+      </Alert>
+    );
+  }
+
   if (!patient) return <Typography>Pacient nenalezen</Typography>;
 
   return (
