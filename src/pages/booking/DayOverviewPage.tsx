@@ -40,11 +40,11 @@ import { errorText } from "../../components/booking/errorText";
  *
  * Two decisions worth stating, because both look like omissions:
  *
- *   - **The `PODKLADY ✓ / ⚠` line appears only when the register can answer.**
- *     It came back in v29 after change 43, which had removed it, was itself
- *     reversed. While `summary.paperwork` is `null` the line is absent
- *     altogether - not "✓ 0 ⚠ 0", which would tell the desk everything is in
- *     order on the strength of nobody having looked.
+ *   - **The `PODKLADY ✓ / ⚠` line appears only when there is an answer.** It
+ *     came back in v29 after change 43, which had removed it, was itself
+ *     reversed, and the values went live in v32. When `summary.paperwork` is
+ *     `null` the line is absent altogether - not "✓ 0 ⚠ 0", which would tell
+ *     the desk everything is in order on the strength of nobody having looked.
  *   - **"Free today" is minutes, not places.** The plan drew "4 places"; the
  *     owner settled on minutes on 9. 9. 2026, because the same ninety minutes is
  *     two slots or three depending on the activity. Nothing here divides it.

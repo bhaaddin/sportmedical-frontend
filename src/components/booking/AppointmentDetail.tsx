@@ -52,11 +52,12 @@ import { errorText } from "./errorText";
  * stale copy of a row.
  *
  * Readiness of the paperwork is here as of v29, after change 43 - which had
- * removed it - was itself reversed. It is drawn only when the register can
- * answer: `null` means nobody has looked, and that is shown as nothing at all.
- * "Nobody looked" and "something is missing" are different claims, and the
- * whole reason the field was held back for so long was that it used to make
- * the second one about people who had handed everything in.
+ * removed it - was itself reversed; the values went live in v32. It is drawn
+ * only when there is an answer: `null` means the register does not know this
+ * patient, and that is shown as nothing at all. "Nobody could look" and
+ * "something is missing" are different claims, and the whole reason the field
+ * was held back for so long was that it used to make the second one about
+ * people who had handed everything in.
  *
  * Everything the screen writes goes through the transition table in
  * `canChangeStatus`, so a button the server would refuse is never offered. And
@@ -307,9 +308,9 @@ function DetailBody({
       </Stack>
 
       {/*
-        4.5, v29. Rendered only when there is an answer - see `paperworkSchema`.
-        While the register cannot say, this whole block is absent rather than
-        reassuring.
+        4.5, v29; live since v32. Rendered only when there is an answer - see
+        `paperworkSchema`. When the register does not know the patient this
+        whole block is absent rather than reassuring.
       */}
       {appointment.paperwork ? (
         <Alert severity={appointment.paperwork.ready ? "success" : "warning"}>

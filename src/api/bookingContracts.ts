@@ -235,11 +235,12 @@ export const availabilityListSchema = z.array(availabilitySlotSchema);
  *
  * Three things about this field are load-bearing:
  *
- *   - **`null` is not `{ ready: false }`.** It means the register cannot answer
- *     yet, and it is drawn as nothing at all - no tick, no warning triangle.
- *     "Nobody has looked" and "something is missing" are different claims, and
- *     a screen that conflates them tells people to chase paperwork that was
- *     handed in, or reassures them about paperwork nobody checked.
+ *   - **`null` is not `{ ready: false }`.** Since v32 the values are live, and
+ *     `null` narrowed to one case: the register does not know this patient. It
+ *     is still drawn as nothing at all - no tick, no warning triangle. "Nobody
+ *     could look" and "something is missing" are different claims, and a screen
+ *     that conflates them tells people to chase paperwork that was handed in,
+ *     or reassures them about paperwork nobody checked.
  *   - **The reasons are words.** They were going to be integers; this lane
  *     asked for strings and the booking lane agreed in v30. A number would have
  *     bought one more lookup table of the kind that has already gone missing
