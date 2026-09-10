@@ -17,7 +17,7 @@ import type { Patient } from '../api/patients';
 import { diagnosticsApi } from '../api/diagnostics';
 import type { DiagnosticSession } from '../api/diagnostics';
 import { documentsApi } from '../api/documents';
-import type { PatientDocument } from '../api/documents';
+import type { PatientDocument, DocumentTemplate } from '../api/documents';
 import { ConsentManager } from '../components/ConsentManager';
 
 /* ── Helpers ── */
@@ -54,11 +54,21 @@ function getBpLabel(sys: number, dia: number) {
   return { text: 'Vysoké', color: '#D32F2F' };
 }
 
-const requiredDocs = [
-  { type: 'Vypis', label: 'Výpis ze zdravotní dokumentace', firstVisitOnly: true },
-  { type: 'Dotaznik', label: 'Dotazník před prohlídkou', firstVisitOnly: false },
-  { type: 'GDPR', label: 'GDPR souhlas', firstVisitOnly: true },
-];
+/*
+ * Which documents a visit requires is the document service's answer, not this
+ * screen's. It used to be this list, written out here:
+ *
+ *     Vypis · Dotaznik · GDPR
+ *
+ * Two things were wrong with that. The `app` lane is deleting the Dotazník and
+ * GDPR templates - each described something that is really carried elsewhere,
+ * and nothing was ever signed against either - and a hard-coded list would have
+ * gone on demanding them forever, with nothing able to satisfy a template that
+ * no longer exists. And a clinic that adds a required document would not see it
+ * here at all.
+ *
+ * `GET /api/documents/templates` already says which are active and required.
+ */
 
 /* ── Metric Card ── */
 function MetricCard({ icon, label, value, unit, color, prevValue, higherIsBetter = true, delay = 0 }: {
@@ -104,12 +114,14 @@ export default function PatientDetails() {
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
+  const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
 
   useEffect(() => {
     if (id) {
       patientsApi.getById(id).then(setPatient).catch(() => {});
       diagnosticsApi.getByPatient(id).then(setSessions).catch(() => {});
       documentsApi.getPatientDocuments(id).then(setDocs).catch(() => {});
+      documentsApi.getTemplates().then(setTemplates).catch(() => setTemplates([]));
       patientsApi.getProfile(id).then(setProfile).catch(() => {});
     }
   }, [id]);
@@ -154,8 +166,33 @@ export default function PatientDetails() {
   const displayPhone = patient.phone || profileContacts.find(c => c.channel === 'phone')?.value || '';
   const latest = sessions[0];
   const previous = sessions[1];
-  const hasRequiredDoc = (docType: string) => docs.some(d => d.status === 'Signed' || d.status === 'Active');
-  const missingDocs = requiredDocs.filter(rd => !hasRequiredDoc(rd.type));
+  /*
+   * This used to ignore its own argument:
+   *
+   *     const hasRequiredDoc = (docType: string) =>
+   *       docs.some(d => d.status === 'Signed' || d.status === 'Active');
+   *
+   * `docType` was never read, so one signed document of any kind marked every
+   * requirement satisfied - a patient with a single unrelated form on file
+   * looked like a patient whose paperwork was complete. It matches the
+   * template now.
+   */
+  const hasRequiredDoc = (templateId: string) =>
+    docs.some(
+      (d) =>
+        d.templateId === templateId &&
+        (d.status === 'Signed' || d.status === 'Active'),
+    );
+
+  const requiredDocs = templates
+    .filter((t) => t.isActive && t.requiredForVisit)
+    .map((t) => ({
+      id: t.id,
+      label: t.name,
+      firstVisitOnly: t.firstVisitOnly,
+    }));
+
+  const missingDocs = requiredDocs.filter((rd) => !hasRequiredDoc(rd.id));
   const bp = latest ? getBpLabel(latest.systolicBloodPressure, latest.diastolicBloodPressure) : null;
 
   const handleDownloadPdf = async (sessionId: string) => {
@@ -363,9 +400,9 @@ export default function PatientDetails() {
                 </Box>
                 <Divider sx={{ mb: 2 }} />
                 {requiredDocs.map(rd => {
-                  const hasDoc = hasRequiredDoc(rd.type);
+                  const hasDoc = hasRequiredDoc(rd.id);
                   return (
-                    <Box key={rd.type} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, borderBottom: '1px solid #f5f5f5' }}>
+                    <Box key={rd.id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, borderBottom: '1px solid #f5f5f5' }}>
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 500 }}>{rd.label}</Typography>
                         {rd.firstVisitOnly && (
