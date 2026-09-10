@@ -37,6 +37,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: npm run lint
 
+      # Typecheck and build see none of what these cover: a chip that renders
+      # the word "undefined", a tile that counts cancelled appointments as
+      # today's, a query that sends the wrong parameter names and gets a
+      # cheerful empty list back. Every one of those shipped green.
+      - name: Test
+        if: ${{ !cancelled() }}
+        run: npm test
+
       - name: Build
         if: ${{ !cancelled() }}
         run: npm run build
