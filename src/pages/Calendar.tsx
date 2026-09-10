@@ -165,7 +165,7 @@ export default function Calendar() {
   const [showBreakManager, setShowBreakManager] = useState(false);
 
   /* Snackbar */
-  const [snack, setSnack] = useState({ open: false, msg: '', severity: 'success' as 'success' | 'error' });
+  const [snack, setSnack] = useState({ open: false, msg: '', severity: 'success' as 'success' | 'error' | 'warning' });
 
   /* ── Keyboard navigation ── */
   const [selectedCell, setSelectedCell] = useState<{ day: number; hour: number } | null>(null);
@@ -591,8 +591,26 @@ ${weekDays.map(day => {
     }
     try {
       if (editMode === 'edit' && editingId) {
-        await calendarApi.update(editingId, form as any);
-        setSnack({ open: true, msg: 'Schůzka upravena', severity: 'success' });
+        /*
+         * `PUT /api/scheduling/appointments/{id}` answers `200` for a write it
+         * did not perform - measured on 10. 9. 2026 against a running server on
+         * an appointment owned by the booking calendar: the response was `200`
+         * and the appointment stayed where it was, history and all. So the
+         * answer is compared with what was asked for, and the screen says what
+         * actually happened rather than what was requested.
+         */
+        const saved = await calendarApi.update(editingId, form as any);
+        const asked = new Date(form.startTime as string).getTime();
+        const got = new Date(saved.startTime).getTime();
+        if (Number.isFinite(asked) && Number.isFinite(got) && asked !== got) {
+          setSnack({
+            open: true,
+            msg: 'Schůzka se nezměnila — server ji nechal na původním čase. Pokud vznikla v rezervačním systému, upravte ji v Plánování.',
+            severity: 'warning',
+          });
+        } else {
+          setSnack({ open: true, msg: 'Schůzka upravena', severity: 'success' });
+        }
       } else {
         await calendarApi.create(form);
         setSnack({ open: true, msg: 'Schůzka vytvořena', severity: 'success' });
@@ -612,8 +630,11 @@ ${weekDays.map(day => {
       setSnack({ open: true, msg: 'Schůzka zrušena', severity: 'success' });
       setDialogOpen(false);
       refresh();
-    } catch {
-      setSnack({ open: true, msg: 'Chyba při mazání', severity: 'error' });
+    } catch (err: any) {
+      /* The server's message names the screen to use instead; dropping it left
+         the operator with "Chyba při mazání" and nowhere to go. */
+      const msg = err?.response?.data?.message || err?.message || 'Neznámá chyba';
+      setSnack({ open: true, msg: `Zrušení se nezdařilo: ${msg}`, severity: 'error' });
     }
   };
 
@@ -637,32 +658,74 @@ ${weekDays.map(day => {
   };
 
   /* ── Force override from modal ── */
-  const handleForceOverride = () => {
-    // Remove conflicting appointments (admin override)
-    conflictAppts.forEach(a => {
-      calendarApi.cancel(a.id).catch(() => {});
-    });
-    setSnack({ open: true, msg: `${conflictAppts.length} schůzek přepsáno`, severity: 'success' });
+  /*
+   * Every cancel here used to be fired with `.catch(() => {})` and the screen
+   * announced the full count as overwritten regardless. An appointment that
+   * belongs to the booking calendar is refused by this surface, so the count
+   * was a claim about work that had not been done - and the operator went on
+   * believing the slot was free.
+   */
+  const handleForceOverride = async () => {
+    const results = await Promise.allSettled(
+      conflictAppts.map(a => calendarApi.cancel(a.id)),
+    );
+    const failed = results.filter(r => r.status === 'rejected');
+    const done = results.length - failed.length;
+
+    if (failed.length === 0) {
+      setSnack({ open: true, msg: `${done} schůzek přepsáno`, severity: 'success' });
+    } else {
+      const first: any = (failed[0] as PromiseRejectedResult).reason;
+      const why = first?.response?.data?.message || first?.message || 'server odmítl';
+      setSnack({
+        open: true,
+        msg: `Přepsáno ${done} z ${results.length}. Zbytek zůstal: ${why}`,
+        severity: 'warning',
+      });
+    }
     refresh();
   };
 
-  const handleShiftExisting = () => {
-    // Shift conflicting appointments forward by the drag duration
+  /*
+   * A move here is a create plus a cancel, and the order matters. It used to
+   * create the replacement first and then cancel the original with the failure
+   * swallowed - so when the cancel was refused the patient ended up in the
+   * diary twice while the screen reported a move. Cancel first: if the original
+   * will not go, nothing is created and the operator is told why.
+   */
+  const handleShiftExisting = async () => {
     const shiftMinutes = dragEndMin - dragStartMin;
-    conflictAppts.forEach(a => {
+    let moved = 0;
+    const refused: string[] = [];
+
+    for (const a of conflictAppts) {
+      try {
+        await calendarApi.cancel(a.id);
+      } catch (err: any) {
+        refused.push(err?.response?.data?.message || err?.message || 'server odmítl');
+        continue;
+      }
       const s = new Date(a.startTime);
       const e = new Date(a.endTime);
       s.setMinutes(s.getMinutes() + shiftMinutes);
       e.setMinutes(e.getMinutes() + shiftMinutes);
-      calendarApi.create({
+      await calendarApi.create({
         ...a,
         startTime: s.toISOString(),
         endTime: e.toISOString(),
-      } as any).then(() => {
-        calendarApi.cancel(a.id);
-      }).catch(() => {});
-    });
-    setSnack({ open: true, msg: `${conflictAppts.length} schůzek přesunuto`, severity: 'success' });
+      } as any);
+      moved += 1;
+    }
+
+    setSnack(
+      refused.length === 0
+        ? { open: true, msg: `${moved} schůzek přesunuto`, severity: 'success' }
+        : {
+            open: true,
+            msg: `Přesunuto ${moved} z ${conflictAppts.length}. Zbytek zůstal na místě: ${refused[0]}`,
+            severity: 'warning',
+          },
+    );
     refresh();
   };
 
