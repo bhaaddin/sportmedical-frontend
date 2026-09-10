@@ -62,13 +62,23 @@ import {
  *     DELETE …/blocks/{id} -> 200 and it leaves
  *     POST   …/appointments into a blocked time -> 409
  *
- * And one thing that does not hold, which is why the warning below is on the
- * screen rather than in a comment: `GET …/availability` still offers a time a
- * block covers. Booking refuses it at 409, so nobody is double-booked - but
- * the picker will show a slot that then fails. Reported to the booking lane;
- * this screen says so out loud instead of letting a receptionist find out from
- * a patient on the phone. Filtering blocks out client-side would be a second
- * availability calculation, which 6.1 forbids.
+ * This screen first shipped carrying a warning that a blocked time still
+ * appeared among the offered slots: the 409 was real (a database exclusion
+ * constraint) but `AvailabilityService` only ever read appointments, never
+ * blocks. Reported to the booking lane with both measurements rather than
+ * patched here - filtering blocks client-side would have been a second
+ * availability calculation, which 6.1 forbids precisely so the client and the
+ * server cannot tell a receptionist different things.
+ *
+ * They matched blocks by overlap rather than by start, which is the better
+ * rule and one this lane had not thought to test: a block can be an afternoon
+ * or a fortnight, and one that began yesterday still covers this morning.
+ * Re-measured here against the running server before the warning came off:
+ *
+ *     block one offered slot        -> 8 slots become 7, that one gone
+ *     block 20:00 yesterday->07:00  -> 8 become 6, the two before 07:00 gone
+ *     the slot at exactly 07:00     -> still offered, so the end is exclusive
+ *     release the block             -> all eight back
  */
 
 const CODEBOOK_STALE_MS = 5 * 60 * 1000;
@@ -194,15 +204,6 @@ export default function BlockedTimePage() {
           {t("booking.blocks.new")}
         </Button>
       </Box>
-
-      {/*
-        Said on the screen, not only in the code: today a block stops the
-        booking (409) but does not remove the time from the offered slots.
-        Whoever uses this should know before a patient tells them.
-      */}
-      <Alert severity="info" sx={{ mb: 3 }}>
-        {t("booking.blocks.availabilityCaveat")}
-      </Alert>
 
       <AsyncSection
         isLoading={calendarsQuery.isLoading}

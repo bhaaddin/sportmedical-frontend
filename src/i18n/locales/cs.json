@@ -496,8 +496,7 @@
       "reasonRequired": "Uveďte důvod. Bez něj se za tři týdny nepozná, jestli tam blok patří, nebo je to omyl.",
       "endBeforeStart": "Konec musí být později než začátek.",
       "save": "Zablokovat",
-      "release": "Uvolnit čas",
-      "availabilityCaveat": "Zablokovaný čas zatím nezmizí ze seznamu volných termínů — objednání se odmítne až při potvrzení. Řeší se to na straně serveru."
+      "release": "Uvolnit čas"
     }
   }
 }
