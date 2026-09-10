@@ -102,7 +102,7 @@ export default function Rtp() {
       {/* Patient ID input for loading protocols */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Grid container spacing={2} alignItems="center">
+          <Grid container spacing={2} sx={{ alignItems: 'center' }}>
             <Grid size={{ xs: 8 }}>
               <TextField fullWidth label="ID pacienta" value={form.patientId}
                 onChange={e => update('patientId', e.target.value)} />

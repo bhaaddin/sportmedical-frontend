@@ -20,7 +20,7 @@ function getPatientName(patientId: string, patients: Patient[]): string {
   return p ? `${p.firstName} ${p.lastName}` : patientId.slice(0, 8);
 }
 
-const deviceConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+const deviceConfig: Record<string, { label: string; color: string; icon: React.ReactElement }> = {
   InBody770: { label: 'InBody 770', color: '#9C27B0', icon: <MonitorWeight /> },
   ForceDecks: { label: 'ForceDecks', color: '#0D7377', icon: <Speed /> },
   HumanTrak: { label: 'HumanTrak', color: '#2E7D32', icon: <FitnessCenter /> },

@@ -305,8 +305,8 @@ function Layout({ children }: { children: React.ReactNode }) {
                         {item.icon}
                       </ListItemIcon>
                       {sidebarOpen && (
-                        <ListItemText primary={item.text} primaryTypographyProps={{
-                          sx: { fontWeight: isActive ? 600 : 400, fontSize: 14, whiteSpace: 'nowrap' },
+                        <ListItemText primary={item.text} slotProps={{
+                          primary: { sx: { fontWeight: isActive ? 600 : 400, fontSize: 14, whiteSpace: 'nowrap' } },
                         }} />
                       )}
                     </ListItemButton>

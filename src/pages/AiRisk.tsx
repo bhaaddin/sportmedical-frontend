@@ -32,7 +32,7 @@ export default function AiRisk() {
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Grid container spacing={2} alignItems="center">
+          <Grid container spacing={2} sx={{ alignItems: 'center' }}>
             <Grid size={{ xs: 8 }}><TextField fullWidth label="ID pacienta" value={patientId} onChange={e => setPatientId(e.target.value)} /></Grid>
             <Grid size={{ xs: 4 }}><Button fullWidth variant="contained" onClick={handleAssess} disabled={loading}
               sx={{ bgcolor: '#0D7377', py: 1.5 }}>{loading ? 'Hodnotím...' : 'Vyhodnotit riziko'}</Button></Grid>

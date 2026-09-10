@@ -13,7 +13,7 @@ import { staffApi } from '../api/staff';
 import type { StaffMember } from '../api/staff';
 import toast from 'react-hot-toast';
 
-const roleConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+const roleConfig: Record<string, { label: string; color: string; icon: React.ReactElement }> = {
   Admin: { label: 'Administrátor', color: '#D32F2F', icon: <AdminPanelSettings fontSize="small" /> },
   Doctor: { label: 'Lékař', color: '#0D7377', icon: <MedicalServices fontSize="small" /> },
   Nurse: { label: 'Sestra', color: '#2E7D32', icon: <Healing fontSize="small" /> },

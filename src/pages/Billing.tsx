@@ -389,7 +389,7 @@ export default function Billing() {
 
       {/* ── Filters ── */}
       <Paper sx={{ p: 2, mb: 2, borderRadius: 2 }}>
-        <Grid container spacing={2} alignItems="center">
+        <Grid container spacing={2} sx={{ alignItems: 'center' }}>
           <Grid size={{ xs: 12, md: 4 }}>
             <TextField
               fullWidth size="small" placeholder="Hledat faktury..."

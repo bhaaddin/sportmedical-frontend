@@ -5,6 +5,7 @@ import {
   Slider, Stepper, Step, StepLabel, StepConnector, stepConnectorClasses,
   Avatar,
 } from '@mui/material';
+import type { StepIconProps } from '@mui/material/StepIcon';
 import { Science, Send, Warning, ArrowBack, ArrowForward, Check, Person, Favorite, FitnessCenter, Notes } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -222,7 +223,7 @@ export default function DiagnosticForm() {
           {steps.map((step) => (
             <Step key={step.label}>
               <StepLabel
-                StepIconComponent={({ active, completed }) => (
+                slots={{ stepIcon: ({ active, completed }: StepIconProps) => (
                   <motion.div animate={{ scale: active ? 1.15 : 1 }} transition={{ type: 'spring', stiffness: 400 }}>
                     <Avatar sx={{
                       width: 32, height: 32, fontSize: 16,
@@ -233,7 +234,7 @@ export default function DiagnosticForm() {
                       {completed ? <Check sx={{ fontSize: 18 }} /> : step.icon}
                     </Avatar>
                   </motion.div>
-                )}
+                ) }}
               >
                 {step.label}
               </StepLabel>
