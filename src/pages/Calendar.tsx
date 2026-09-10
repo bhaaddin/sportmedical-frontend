@@ -612,12 +612,25 @@ ${weekDays.map(day => {
           setSnack({ open: true, msg: 'Schůzka upravena', severity: 'success' });
         }
       } else {
+        /*
+         * `POST /api/scheduling/appointments` is `410 Gone` since 10. 9. 2026.
+         * The server's message names the replacement route; this names the
+         * screen, which is what the person in front of it needs.
+         */
         await calendarApi.create(form);
         setSnack({ open: true, msg: 'Schůzka vytvořena', severity: 'success' });
       }
       setDialogOpen(false);
       refresh();
     } catch (err: any) {
+      if (err?.response?.status === 410) {
+        setSnack({
+          open: true,
+          msg: 'Tato obrazovka už schůzky nezakládá. Objednejte v Plánování — tam se termín zapíše i s ochranou proti dvojímu obsazení.',
+          severity: 'warning',
+        });
+        return;
+      }
       const msg = err?.response?.data?.message || err?.message || 'Neznámá chyba — zkontrolujte připojení k backendu';
       setSnack({ open: true, msg: `Chyba při ukládání: ${msg}`, severity: 'error' });
     }
@@ -687,46 +700,27 @@ ${weekDays.map(day => {
   };
 
   /*
-   * A move here is a create plus a cancel, and the order matters. It used to
-   * create the replacement first and then cancel the original with the failure
-   * swallowed - so when the cancel was refused the patient ended up in the
-   * diary twice while the screen reported a move. Cancel first: if the original
-   * will not go, nothing is created and the operator is told why.
+   * This cannot work any more, and the safe thing is to say so rather than to
+   * try. A move here was a create plus a cancel; since 10. 9. 2026
+   * `POST /api/scheduling/appointments` answers `410 Gone` - the surface wrote
+   * appointments with no calendar and no double-booking guard, and the booking
+   * lane closed it once 5.9 existed.
+   *
+   * Either ordering is now wrong. Create-then-cancel leaves the patient in the
+   * diary twice, which is what it used to do. Cancel-then-create - the fix
+   * written yesterday, before the surface closed - would cancel the original
+   * and then fail to recreate it, which is worse: an appointment simply gone.
+   *
+   * So nothing is cancelled and nothing is created. Moving an appointment
+   * belongs in Plánování, which moves it in one operation that keeps the
+   * occupancy row with it.
    */
-  const handleShiftExisting = async () => {
-    const shiftMinutes = dragEndMin - dragStartMin;
-    let moved = 0;
-    const refused: string[] = [];
-
-    for (const a of conflictAppts) {
-      try {
-        await calendarApi.cancel(a.id);
-      } catch (err: any) {
-        refused.push(err?.response?.data?.message || err?.message || 'server odmítl');
-        continue;
-      }
-      const s = new Date(a.startTime);
-      const e = new Date(a.endTime);
-      s.setMinutes(s.getMinutes() + shiftMinutes);
-      e.setMinutes(e.getMinutes() + shiftMinutes);
-      await calendarApi.create({
-        ...a,
-        startTime: s.toISOString(),
-        endTime: e.toISOString(),
-      } as any);
-      moved += 1;
-    }
-
-    setSnack(
-      refused.length === 0
-        ? { open: true, msg: `${moved} schůzek přesunuto`, severity: 'success' }
-        : {
-            open: true,
-            msg: `Přesunuto ${moved} z ${conflictAppts.length}. Zbytek zůstal na místě: ${refused[0]}`,
-            severity: 'warning',
-          },
-    );
-    refresh();
+  const handleShiftExisting = () => {
+    setSnack({
+      open: true,
+      msg: 'Přesunout je potřeba v Plánování — tato obrazovka už schůzky nezakládá. Otevřete termín v Plánování a použijte „Přesunout“.',
+      severity: 'warning',
+    });
   };
 
   /* ── Current time position ── */
