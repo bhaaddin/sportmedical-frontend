@@ -105,7 +105,7 @@ export default function WorkerAccessManager({ staffId, onUpdate }: Props) {
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <AccessTime color="primary" />
-                <Typography variant="subtitle1" fontWeight={600}>Časová omezení</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Časová omezení</Typography>
               </Box>
               <Grid container spacing={2}>
                 <Grid size={{ xs: 6 }}>
@@ -140,7 +140,7 @@ export default function WorkerAccessManager({ staffId, onUpdate }: Props) {
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <LocationOn color="primary" />
-                <Typography variant="subtitle1" fontWeight={600}>Přístupová omezení</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Přístupová omezení</Typography>
               </Box>
               <TextField fullWidth size="small" label="Povolené IP rozsahy"
                 value={access.restrictions.allowedIpRanges.join(', ')}

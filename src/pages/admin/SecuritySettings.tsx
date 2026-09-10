@@ -57,7 +57,7 @@ export default function SecuritySettings() {
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight={700}>Bezpečnostní nastavení</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 700 }}>Bezpečnostní nastavení</Typography>
         <Button variant="contained" startIcon={<Save />} onClick={handleSave}>Uložit</Button>
       </Box>
       {saved && <Alert severity="success" sx={{ mb: 3 }}>Nastavení uloženo</Alert>}
@@ -91,9 +91,9 @@ export default function SecuritySettings() {
           <Typography variant="h6">Zásady hesel</Typography>
         </Box>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="number" label="Min. délka" value={settings.passwordMinLength} onChange={(e) => update('passwordMinLength', parseInt(e.target.value) || 0)} /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="number" label="Platnost hesla (dní)" value={settings.passwordExpiryDays} onChange={(e) => update('passwordExpiryDays', parseInt(e.target.value) || 0)} /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="number" label="Historie hesel" value={settings.passwordHistoryCount} onChange={(e) => update('passwordHistoryCount', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="number" label="Min. délka" value={settings.passwordMinLength} onChange={(e) => update('passwordMinLength', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="number" label="Platnost hesla (dní)" value={settings.passwordExpiryDays} onChange={(e) => update('passwordExpiryDays', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="number" label="Historie hesel" value={settings.passwordHistoryCount} onChange={(e) => update('passwordHistoryCount', parseInt(e.target.value) || 0)} /></Grid>
           <Grid size={{ xs: 12 }}>
             <FormControlLabel control={<Switch checked={settings.passwordRequireUppercase} onChange={(e) => update('passwordRequireUppercase', e.target.checked)} />} label="Velká písmena" />
             <FormControlLabel control={<Switch checked={settings.passwordRequireLowercase} onChange={(e) => update('passwordRequireLowercase', e.target.checked)} />} label="Malá písmena" />
@@ -107,10 +107,10 @@ export default function SecuritySettings() {
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>Správa relací</Typography>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="number" label="Timeout (min)" value={settings.sessionTimeoutMinutes} onChange={(e) => update('sessionTimeoutMinutes', parseInt(e.target.value) || 0)} /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="number" label="Max relací" value={settings.maxConcurrentSessions} onChange={(e) => update('maxConcurrentSessions', parseInt(e.target.value) || 0)} /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="number" label="Zapamatovat (dní)" value={settings.rememberMeDays} onChange={(e) => update('rememberMeDays', parseInt(e.target.value) || 0)} /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.sessionExtendOnActivity} onChange={(e) => update('sessionExtendOnActivity', e.target.checked)} />} label="Prodloužit aktivitou" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="number" label="Timeout (min)" value={settings.sessionTimeoutMinutes} onChange={(e) => update('sessionTimeoutMinutes', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="number" label="Max relací" value={settings.maxConcurrentSessions} onChange={(e) => update('maxConcurrentSessions', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="number" label="Zapamatovat (dní)" value={settings.rememberMeDays} onChange={(e) => update('rememberMeDays', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.sessionExtendOnActivity} onChange={(e) => update('sessionExtendOnActivity', e.target.checked)} />} label="Prodloužit aktivitou" /></Grid>
         </Grid>
       </Paper>
 
@@ -139,10 +139,10 @@ export default function SecuritySettings() {
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>Retence dat</Typography>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="number" label="Audit log (dní)" value={settings.auditLogRetentionDays} onChange={(e) => update('auditLogRetentionDays', parseInt(e.target.value) || 0)} /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="number" label="Login log (dní)" value={settings.loginLogRetentionDays} onChange={(e) => update('loginLogRetentionDays', parseInt(e.target.value) || 0)} /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="number" label="Zálohy (dní)" value={settings.backupRetentionDays} onChange={(e) => update('backupRetentionDays', parseInt(e.target.value) || 0)} /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="number" label="Data pacientů (roky)" value={settings.patientDataRetentionYears} onChange={(e) => update('patientDataRetentionYears', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="number" label="Audit log (dní)" value={settings.auditLogRetentionDays} onChange={(e) => update('auditLogRetentionDays', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="number" label="Login log (dní)" value={settings.loginLogRetentionDays} onChange={(e) => update('loginLogRetentionDays', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="number" label="Zálohy (dní)" value={settings.backupRetentionDays} onChange={(e) => update('backupRetentionDays', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="number" label="Data pacientů (roky)" value={settings.patientDataRetentionYears} onChange={(e) => update('patientDataRetentionYears', parseInt(e.target.value) || 0)} /></Grid>
         </Grid>
       </Paper>
 
@@ -150,10 +150,10 @@ export default function SecuritySettings() {
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom>Auditování</Typography>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.auditLoginEnabled} onChange={(e) => update('auditLoginEnabled', e.target.checked)} />} label="Logovat přihlášení" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.auditDataChanges} onChange={(e) => update('auditDataChanges', e.target.checked)} />} label="Logovat změny dat" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.auditExportEnabled} onChange={(e) => update('auditExportEnabled', e.target.checked)} />} label="Logovat exporty" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.auditViewEnabled} onChange={(e) => update('auditViewEnabled', e.target.checked)} />} label="Logovat zobrazení" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.auditLoginEnabled} onChange={(e) => update('auditLoginEnabled', e.target.checked)} />} label="Logovat přihlášení" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.auditDataChanges} onChange={(e) => update('auditDataChanges', e.target.checked)} />} label="Logovat změny dat" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.auditExportEnabled} onChange={(e) => update('auditExportEnabled', e.target.checked)} />} label="Logovat exporty" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.auditViewEnabled} onChange={(e) => update('auditViewEnabled', e.target.checked)} />} label="Logovat zobrazení" /></Grid>
         </Grid>
       </Paper>
     </Box>

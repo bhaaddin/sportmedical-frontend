@@ -239,7 +239,7 @@ export function HealthQuestionnaire({ answers, onChange, showGyn }: {
       </Alert>
 
       <Accordion defaultExpanded>
-        <AccordionSummary expandIcon={<ExpandMore />}><Typography fontWeight={700}>1. Identifikační a sportovní údaje</Typography></AccordionSummary>
+        <AccordionSummary expandIcon={<ExpandMore />}><Typography sx={{ fontWeight: 700 }}>1. Identifikační a sportovní údaje</Typography></AccordionSummary>
         <AccordionDetails>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 4 }}>
@@ -278,7 +278,7 @@ export function HealthQuestionnaire({ answers, onChange, showGyn }: {
       </Accordion>
 
       <Accordion>
-        <AccordionSummary expandIcon={<ExpandMore />}><Typography fontWeight={700}>2. Osobní anamnéza</Typography></AccordionSummary>
+        <AccordionSummary expandIcon={<ExpandMore />}><Typography sx={{ fontWeight: 700 }}>2. Osobní anamnéza</Typography></AccordionSummary>
         <AccordionDetails>
           <YesNoRow label="Navštěvujete pravidelně odborného lékaře / jste dlouhodobě sledován?" value={answers.lekar} onChange={v => set({ lekar: v })} detail detailValue={answers.lekarObor} onDetail={v => set({ lekarObor: v })} detailLabel="Obor (nutné přinést lékařskou zprávu):" />
           <YesNoRow label="Absolvoval jste sportovní lékařskou prohlídku?" value={answers.prohlidka} onChange={v => set({ prohlidka: v })} detail detailValue={answers.prohlidkaKde} onDetail={v => set({ prohlidkaKde: v })} detailLabel="Kde a kdy:" />
@@ -290,7 +290,7 @@ export function HealthQuestionnaire({ answers, onChange, showGyn }: {
       </Accordion>
 
       <Accordion>
-        <AccordionSummary expandIcon={<ExpandMore />}><Typography fontWeight={700}>3. Operace a úrazy</Typography></AccordionSummary>
+        <AccordionSummary expandIcon={<ExpandMore />}><Typography sx={{ fontWeight: 700 }}>3. Operace a úrazy</Typography></AccordionSummary>
         <AccordionDetails>
           <YesNoRow label="Chirurgický zákrok / operace?" value={answers.operace} onChange={v => set({ operace: v })} detail detailValue={answers.operaceDetail} onDetail={v => set({ operaceDetail: v })} detailLabel="Typ a rok:" />
           <YesNoRow label="Zlomenina nebo vykloubení?" value={answers.zlomenina} onChange={v => set({ zlomenina: v })} detail detailValue={answers.zlomeninaDetail} onDetail={v => set({ zlomeninaDetail: v })} detailLabel="Část těla, rok:" />
@@ -299,7 +299,7 @@ export function HealthQuestionnaire({ answers, onChange, showGyn }: {
       </Accordion>
 
       <Accordion>
-        <AccordionSummary expandIcon={<ExpandMore />}><Typography fontWeight={700}>4. Alergie a kůže</Typography></AccordionSummary>
+        <AccordionSummary expandIcon={<ExpandMore />}><Typography sx={{ fontWeight: 700 }}>4. Alergie a kůže</Typography></AccordionSummary>
         <AccordionDetails>
           <YesNoRow label="Alergie na léky, potraviny, jiné látky?" value={answers.alergie} onChange={v => set({ alergie: v })} detail detailValue={answers.alergieDetail} onDetail={v => set({ alergieDetail: v })} detailLabel="Specifikujte:" />
           <YesNoRow label="Ekzém, vyrážka, svědění, puchýře?" value={answers.ekzem} onChange={v => set({ ekzem: v })} />
@@ -309,7 +309,7 @@ export function HealthQuestionnaire({ answers, onChange, showGyn }: {
 
       {showGyn && (
         <Accordion>
-          <AccordionSummary expandIcon={<ExpandMore />}><Typography fontWeight={700}>5. Gynekologická anamnéza</Typography></AccordionSummary>
+          <AccordionSummary expandIcon={<ExpandMore />}><Typography sx={{ fontWeight: 700 }}>5. Gynekologická anamnéza</Typography></AccordionSummary>
           <AccordionDetails>
             <Grid container spacing={2} sx={{ mb: 1 }}>
               <Grid size={{ xs: 12, sm: 6 }}>
@@ -325,7 +325,7 @@ export function HealthQuestionnaire({ answers, onChange, showGyn }: {
       )}
 
       <Accordion>
-        <AccordionSummary expandIcon={<ExpandMore />}><Typography fontWeight={700}>6. Onemocnění (ano/ne)</Typography></AccordionSummary>
+        <AccordionSummary expandIcon={<ExpandMore />}><Typography sx={{ fontWeight: 700 }}>6. Onemocnění (ano/ne)</Typography></AccordionSummary>
         <AccordionDetails>
           {DISEASE_GROUPS.map(g => (
             <Box key={g.title} sx={{ mb: 2 }}>
@@ -354,7 +354,7 @@ export function HealthQuestionnaire({ answers, onChange, showGyn }: {
       </Accordion>
 
       <Accordion>
-        <AccordionSummary expandIcon={<ExpandMore />}><Typography fontWeight={700}>7. Rodinná anamnéza</Typography></AccordionSummary>
+        <AccordionSummary expandIcon={<ExpandMore />}><Typography sx={{ fontWeight: 700 }}>7. Rodinná anamnéza</Typography></AccordionSummary>
         <AccordionDetails>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Onemocnění v rodině</Typography>
           {FAMILY_DISEASES.map(n => {
@@ -488,7 +488,7 @@ export function BookingDocumentView({ data }: { data: any }) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700 }} sx={{ mb: 1 }}>
           Zdravotní dotazník {data.signedAt ? `— podepsáno ${new Date(data.signedAt).toLocaleDateString('cs-CZ')}` : ''}
         </Typography>
         {h?.sport?.hlavniSport && (
@@ -509,7 +509,7 @@ export function BookingDocumentView({ data }: { data: any }) {
       </Paper>
 
       <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="subtitle2" fontWeight={700}>GDPR souhlas</Typography>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>GDPR souhlas</Typography>
         <Typography variant="body2" color={data.gdprConsented ? 'success.main' : 'error.main'}>
           {data.gdprConsented ? '✓ Udělen' : '✗ Chybí'}
         </Typography>
@@ -522,7 +522,7 @@ export function BookingDocumentView({ data }: { data: any }) {
 
       {data.guardian && (
         <Paper variant="outlined" sx={{ p: 2, borderColor: '#ED6C02' }}>
-          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }} sx={{ mb: 1 }}>
             Zákonný zástupce: {data.guardian.zastupceJmeno}
           </Typography>
           <Typography variant="body2">
@@ -535,7 +535,7 @@ export function BookingDocumentView({ data }: { data: any }) {
 
       {data.signature && (
         <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }} sx={{ mb: 1 }}>
             <Edit sx={{ fontSize: 14, mr: 0.5, verticalAlign: 'middle' }} />Podpis
           </Typography>
           <Box component="img" src={data.signature} alt="Podpis" sx={{ maxWidth: 300, border: '1px solid #eee', borderRadius: 1, bgcolor: '#fafafa' }} />

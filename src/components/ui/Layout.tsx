@@ -144,7 +144,7 @@ export function StatsCard({
           <Typography variant="body2" color="text.secondary" gutterBottom>
             {title}
           </Typography>
-          <Typography variant="h4" fontWeight={600}>
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>
             {value}
           </Typography>
           {change && (

@@ -54,7 +54,7 @@ export default function NotificationSettings() {
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight={700}>Nastavení notifikací</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 700 }}>Nastavení notifikací</Typography>
         <Button variant="contained" startIcon={<Save />} onClick={handleSave}>Uložit</Button>
       </Box>
 
@@ -70,7 +70,7 @@ export default function NotificationSettings() {
         </Box>
         {settings.emailEnabled && (
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12 }} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>Poskytovatel</InputLabel>
                 <Select label="Poskytovatel" value={settings.emailProvider}
@@ -82,11 +82,11 @@ export default function NotificationSettings() {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid size={{ xs: 12 }} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField fullWidth size="small" label="Odesílatel" value={settings.emailFrom}
                 onChange={(e) => update('emailFrom', e.target.value)} />
             </Grid>
-            <Grid size={{ xs: 12 }} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField fullWidth size="small" label="Odpověď na" value={settings.emailReplyTo}
                 onChange={(e) => update('emailReplyTo', e.target.value)} />
             </Grid>
@@ -108,7 +108,7 @@ export default function NotificationSettings() {
         </Box>
         {settings.smsEnabled && (
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12 }} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>Poskytovatel</InputLabel>
                 <Select label="Poskytovatel" value={settings.smsProvider}
@@ -119,11 +119,11 @@ export default function NotificationSettings() {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid size={{ xs: 12 }} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField fullWidth size="small" label="Číslo odesílatele" value={settings.smsFrom}
                 onChange={(e) => update('smsFrom', e.target.value)} />
             </Grid>
-            <Grid size={{ xs: 12 }} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField fullWidth size="small" label="Šablona SMS" value={settings.smsTemplate}
                 onChange={(e) => update('smsTemplate', e.target.value)} />
             </Grid>
@@ -143,7 +143,7 @@ export default function NotificationSettings() {
           <Typography variant="h6">Připomínky termínů</Typography>
         </Box>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12 }} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <Card variant="outlined">
               <CardContent>
                 <FormControlLabel control={<Switch checked={settings.reminder1Enabled}
@@ -154,7 +154,7 @@ export default function NotificationSettings() {
               </CardContent>
             </Card>
           </Grid>
-          <Grid size={{ xs: 12 }} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <Card variant="outlined">
               <CardContent>
                 <FormControlLabel control={<Switch checked={settings.reminder2Enabled}
@@ -165,7 +165,7 @@ export default function NotificationSettings() {
               </CardContent>
             </Card>
           </Grid>
-          <Grid size={{ xs: 12 }} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <Card variant="outlined">
               <CardContent>
                 <FormControlLabel control={<Switch checked={settings.reminder3Enabled}
@@ -183,16 +183,16 @@ export default function NotificationSettings() {
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>Následná péče</Typography>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12 }} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <FormControlLabel control={<Switch checked={settings.followUpEnabled}
               onChange={(e) => update('followUpEnabled', e.target.checked)} />} label="Automatická následná zpráva" />
           </Grid>
-          <Grid size={{ xs: 12 }} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField fullWidth size="small" type="number" label="Dny po termínu"
               value={settings.followUpDaysAfter} disabled={!settings.followUpEnabled}
               onChange={(e) => update('followUpDaysAfter', parseInt(e.target.value) || 0)} />
           </Grid>
-          <Grid size={{ xs: 12 }} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Kanál</InputLabel>
               <Select label="Kanál" value={settings.followUpType} disabled={!settings.followUpEnabled}
@@ -219,17 +219,17 @@ export default function NotificationSettings() {
             <FormControlLabel control={<Switch checked={settings.quietHoursEnabled}
               onChange={(e) => update('quietHoursEnabled', e.target.checked)} />} label="Zapnout tiché hodiny" />
           </Grid>
-          <Grid size={{ xs: 6 }} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <TextField fullWidth size="small" type="time" label="Začátek" value={settings.quietHoursStart}
               InputLabelProps={{ shrink: true }} disabled={!settings.quietHoursEnabled}
               onChange={(e) => update('quietHoursStart', e.target.value)} />
           </Grid>
-          <Grid size={{ xs: 6 }} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <TextField fullWidth size="small" type="time" label="Konec" value={settings.quietHoursEnd}
               InputLabelProps={{ shrink: true }} disabled={!settings.quietHoursEnabled}
               onChange={(e) => update('quietHoursEnd', e.target.value)} />
           </Grid>
-          <Grid size={{ xs: 12 }} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <FormControlLabel control={<Switch checked={settings.quietHoursWeekend}
               onChange={(e) => update('quietHoursWeekend', e.target.checked)} disabled={!settings.quietHoursEnabled} />}
               label="Víkend – žádné notifikace" />

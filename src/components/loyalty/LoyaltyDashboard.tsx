@@ -55,7 +55,7 @@ export default function LoyaltyDashboard({ customerId }: { customerId: string })
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
               <Avatar sx={{ width: 64, height: 64, bgcolor: 'rgba(255,255,255,0.2)' }}><Stars sx={{ fontSize: 32 }} /></Avatar>
               <Box>
-                <Typography variant="h4" fontWeight={700}>{data.points.total}</Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700 }}>{data.points.total}</Typography>
                 <Typography variant="body1" sx={{ opacity: 0.9 }}>Věrnostních bodů</Typography>
               </Box>
             </Box>

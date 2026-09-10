@@ -60,7 +60,7 @@ export default function PatientSettings() {
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight={700}>Nastavení pacientů</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 700 }}>Nastavení pacientů</Typography>
         <Button variant="contained" startIcon={<Save />} onClick={handleSave}>Uložit</Button>
       </Box>
       {saved && <Alert severity="success" sx={{ mb: 3 }}>Nastavení uloženo</Alert>}
@@ -72,10 +72,10 @@ export default function PatientSettings() {
           <Typography variant="h6">Registrace pacientů</Typography>
         </Box>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.allowSelfRegistration} onChange={(e) => update('allowSelfRegistration', e.target.checked)} />} label="Samo registrace" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.requireEmailVerification} onChange={(e) => update('requireEmailVerification', e.target.checked)} />} label="Ověřit e-mail" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.requirePhoneVerification} onChange={(e) => update('requirePhoneVerification', e.target.checked)} />} label="Ověřit telefon" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.autoCreateAccount} onChange={(e) => update('autoCreateAccount', e.target.checked)} />} label="Auto vytvoření účtu" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.allowSelfRegistration} onChange={(e) => update('allowSelfRegistration', e.target.checked)} />} label="Samo registrace" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.requireEmailVerification} onChange={(e) => update('requireEmailVerification', e.target.checked)} />} label="Ověřit e-mail" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.requirePhoneVerification} onChange={(e) => update('requirePhoneVerification', e.target.checked)} />} label="Ověřit telefon" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.autoCreateAccount} onChange={(e) => update('autoCreateAccount', e.target.checked)} />} label="Auto vytvoření účtu" /></Grid>
         </Grid>
       </Paper>
 
@@ -86,10 +86,10 @@ export default function PatientSettings() {
           <Typography variant="h6">Vstupní formulář</Typography>
         </Box>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.intakeRequireAllergies} onChange={(e) => update('intakeRequireAllergies', e.target.checked)} />} label="Alergie (povinné)" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.intakeRequireMedications} onChange={(e) => update('intakeRequireMedications', e.target.checked)} />} label="Léky (povinné)" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.intakeRequireInsurance} onChange={(e) => update('intakeRequireInsurance', e.target.checked)} />} label="Pojištění (povinné)" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.intakeRequireEmergencyContact} onChange={(e) => update('intakeRequireEmergencyContact', e.target.checked)} />} label="Kontakt (povinný)" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.intakeRequireAllergies} onChange={(e) => update('intakeRequireAllergies', e.target.checked)} />} label="Alergie (povinné)" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.intakeRequireMedications} onChange={(e) => update('intakeRequireMedications', e.target.checked)} />} label="Léky (povinné)" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.intakeRequireInsurance} onChange={(e) => update('intakeRequireInsurance', e.target.checked)} />} label="Pojištění (povinné)" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.intakeRequireEmergencyContact} onChange={(e) => update('intakeRequireEmergencyContact', e.target.checked)} />} label="Kontakt (povinný)" /></Grid>
           <Grid size={{ xs: 12 }}>
             <Typography variant="body2" color="text.secondary" gutterBottom>Vlastní pole vstupního formuláře:</Typography>
             {settings.intakeCustomFields.map(field => (
@@ -104,14 +104,14 @@ export default function PatientSettings() {
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>GDPR a soukromí</Typography>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.gdprRequired} onChange={(e) => update('gdprRequired', e.target.checked)} />} label="GDPR souhlas povinný" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" label="Verze GDPR" value={settings.gdprConsentVersion} onChange={(e) => update('gdprConsentVersion', e.target.value)} /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="number" label="Retence (roky)" value={settings.gdprDataRetentionYears} onChange={(e) => update('gdprDataRetentionYears', parseInt(e.target.value) || 0)} /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.gdprMarketingConsent} onChange={(e) => update('gdprMarketingConsent', e.target.checked)} />} label="Marketing souhlas" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.gdprRightToErasure} onChange={(e) => update('gdprRightToErasure', e.target.checked)} />} label="Právo na výmaz" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.gdprPortabilityEnabled} onChange={(e) => update('gdprPortabilityEnabled', e.target.checked)} />} label="Přenositelnost dat" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.maskRodneCisloInUI} onChange={(e) => update('maskRodneCisloInUI', e.target.checked)} />} label="Maskovat rodné číslo" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.auditPatientAccess} onChange={(e) => update('auditPatientAccess', e.target.checked)} />} label="Audit přístupu k datům" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.gdprRequired} onChange={(e) => update('gdprRequired', e.target.checked)} />} label="GDPR souhlas povinný" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" label="Verze GDPR" value={settings.gdprConsentVersion} onChange={(e) => update('gdprConsentVersion', e.target.value)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="number" label="Retence (roky)" value={settings.gdprDataRetentionYears} onChange={(e) => update('gdprDataRetentionYears', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.gdprMarketingConsent} onChange={(e) => update('gdprMarketingConsent', e.target.checked)} />} label="Marketing souhlas" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.gdprRightToErasure} onChange={(e) => update('gdprRightToErasure', e.target.checked)} />} label="Právo na výmaz" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.gdprPortabilityEnabled} onChange={(e) => update('gdprPortabilityEnabled', e.target.checked)} />} label="Přenositelnost dat" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.maskRodneCisloInUI} onChange={(e) => update('maskRodneCisloInUI', e.target.checked)} />} label="Maskovat rodné číslo" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.auditPatientAccess} onChange={(e) => update('auditPatientAccess', e.target.checked)} />} label="Audit přístupu k datům" /></Grid>
         </Grid>
       </Paper>
 
@@ -119,9 +119,9 @@ export default function PatientSettings() {
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>Dokumenty</Typography>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="number" label="Max velikost (MB)" value={settings.maxUploadSizeMB} onChange={(e) => update('maxUploadSizeMB', parseInt(e.target.value) || 0)} /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.requireDocumentCategory} onChange={(e) => update('requireDocumentCategory', e.target.checked)} />} label="Kategorie povinná" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.autoTagDocuments} onChange={(e) => update('autoTagDocuments', e.target.checked)} />} label="Auto-označení" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="number" label="Max velikost (MB)" value={settings.maxUploadSizeMB} onChange={(e) => update('maxUploadSizeMB', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.requireDocumentCategory} onChange={(e) => update('requireDocumentCategory', e.target.checked)} />} label="Kategorie povinná" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.autoTagDocuments} onChange={(e) => update('autoTagDocuments', e.target.checked)} />} label="Auto-označení" /></Grid>
           <Grid size={{ xs: 12 }}>
             <Typography variant="body2" color="text.secondary">Povolené typy: {settings.allowedFileTypes.join(', ')}</Typography>
           </Grid>
@@ -132,12 +132,12 @@ export default function PatientSettings() {
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>Pacientský portál</Typography>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.patientPortalEnabled} onChange={(e) => update('patientPortalEnabled', e.target.checked)} />} label="Portál zapnut" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.patientCanViewRecords} onChange={(e) => update('patientCanViewRecords', e.target.checked)} />} label="Zobrazit záznamy" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.patientCanBookOnline} onChange={(e) => update('patientCanBookOnline', e.target.checked)} />} label="Online rezervace" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.patientCanCancelOnline} onChange={(e) => update('patientCanCancelOnline', e.target.checked)} />} label="Online zrušení" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.patientCanPayOnline} onChange={(e) => update('patientCanPayOnline', e.target.checked)} />} label="Online platba" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.patientCanMessageDoctor} onChange={(e) => update('patientCanMessageDoctor', e.target.checked)} />} label="Zprávy lékaři" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.patientPortalEnabled} onChange={(e) => update('patientPortalEnabled', e.target.checked)} />} label="Portál zapnut" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.patientCanViewRecords} onChange={(e) => update('patientCanViewRecords', e.target.checked)} />} label="Zobrazit záznamy" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.patientCanBookOnline} onChange={(e) => update('patientCanBookOnline', e.target.checked)} />} label="Online rezervace" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.patientCanCancelOnline} onChange={(e) => update('patientCanCancelOnline', e.target.checked)} />} label="Online zrušení" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.patientCanPayOnline} onChange={(e) => update('patientCanPayOnline', e.target.checked)} />} label="Online platba" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.patientCanMessageDoctor} onChange={(e) => update('patientCanMessageDoctor', e.target.checked)} />} label="Zprávy lékaři" /></Grid>
         </Grid>
       </Paper>
 
@@ -145,11 +145,11 @@ export default function PatientSettings() {
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom>Lékařská anamnéza</Typography>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.trackAllergies} onChange={(e) => update('trackAllergies', e.target.checked)} />} label="Alergie" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.trackMedications} onChange={(e) => update('trackMedications', e.target.checked)} />} label="Léky" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.trackFamilyHistory} onChange={(e) => update('trackFamilyHistory', e.target.checked)} />} label="Rodinná anamnéza" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.trackVaccinations} onChange={(e) => update('trackVaccinations', e.target.checked)} />} label="Očkování" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.trackLabResults} onChange={(e) => update('trackLabResults', e.target.checked)} />} label="Výsledky lab." /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.trackAllergies} onChange={(e) => update('trackAllergies', e.target.checked)} />} label="Alergie" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.trackMedications} onChange={(e) => update('trackMedications', e.target.checked)} />} label="Léky" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.trackFamilyHistory} onChange={(e) => update('trackFamilyHistory', e.target.checked)} />} label="Rodinná anamnéza" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.trackVaccinations} onChange={(e) => update('trackVaccinations', e.target.checked)} />} label="Očkování" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.trackLabResults} onChange={(e) => update('trackLabResults', e.target.checked)} />} label="Výsledky lab." /></Grid>
         </Grid>
       </Paper>
     </Box>

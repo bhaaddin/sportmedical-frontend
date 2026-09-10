@@ -63,7 +63,7 @@ export default function CommunityFeed({ customerId }: { customerId: string }) {
               <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
                 <Avatar src={post.author.avatar}>{post.author.name[0]}</Avatar>
                 <Box>
-                  <Typography variant="subtitle1" fontWeight={600}>{post.author.name}</Typography>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{post.author.name}</Typography>
                   <Typography variant="caption" color="text.secondary">{new Date(post.createdAt).toLocaleDateString('cs-CZ')}</Typography>
                 </Box>
               </Box>

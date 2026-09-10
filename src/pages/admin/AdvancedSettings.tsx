@@ -47,7 +47,7 @@ export default function AdvancedSettings() {
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight={700}>Pokročilá nastavení</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 700 }}>Pokročilá nastavení</Typography>
         <Button variant="contained" startIcon={<Save />} onClick={handleSave}>Uložit</Button>
       </Box>
       {saved && <Alert severity="success" sx={{ mb: 3 }}>Nastavení uloženo</Alert>}
@@ -62,7 +62,7 @@ export default function AdvancedSettings() {
           <Grid size={{ xs: 12 }}><FormControlLabel control={<Switch checked={settings.aiEnabled} onChange={(e) => update('aiEnabled', e.target.checked)} />} label="AI zapnuto" /></Grid>
           {settings.aiEnabled && (
             <>
-              <Grid size={{ xs: 6 }} sm={3}>
+              <Grid size={{ xs: 6, sm: 3 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Poskytovatel</InputLabel>
                   <Select label="Poskytovatel" value={settings.aiProvider} onChange={(e) => update('aiProvider', e.target.value)}>
@@ -72,7 +72,7 @@ export default function AdvancedSettings() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid size={{ xs: 6 }} sm={3}>
+              <Grid size={{ xs: 6, sm: 3 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Model</InputLabel>
                   <Select label="Model" value={settings.aiModel} onChange={(e) => update('aiModel', e.target.value)}>
@@ -82,7 +82,7 @@ export default function AdvancedSettings() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid size={{ xs: 12 }} sm={6}><TextField fullWidth size="small" type="password" label="API Key" value={settings.aiApiKey} onChange={(e) => update('aiApiKey', e.target.value)} /></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth size="small" type="password" label="API Key" value={settings.aiApiKey} onChange={(e) => update('aiApiKey', e.target.value)} /></Grid>
               <Grid size={{ xs: 12 }}>
                 <FormControlLabel control={<Switch checked={settings.aiAutoSuggestDiagnosis} onChange={(e) => update('aiAutoSuggestDiagnosis', e.target.checked)} />} label="Auto návrh diagnózy" />
                 <FormControlLabel control={<Switch checked={settings.aiAutoSuggestTreatment} onChange={(e) => update('aiAutoSuggestTreatment', e.target.checked)} />} label="Auto návrh léčby" />
@@ -103,7 +103,7 @@ export default function AdvancedSettings() {
           <Grid size={{ xs: 12 }}><FormControlLabel control={<Switch checked={settings.telemedicineEnabled} onChange={(e) => update('telemedicineEnabled', e.target.checked)} />} label="Telemedicína zapnuta" /></Grid>
           {settings.telemedicineEnabled && (
             <>
-              <Grid size={{ xs: 6 }} sm={3}>
+              <Grid size={{ xs: 6, sm: 3 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Poskytovatel</InputLabel>
                   <Select label="Poskytovatel" value={settings.telemedicineProvider} onChange={(e) => update('telemedicineProvider', e.target.value)}>
@@ -113,9 +113,9 @@ export default function AdvancedSettings() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="number" label="Max délka (min)" value={settings.telemedicineMaxDuration} onChange={(e) => update('telemedicineMaxDuration', parseInt(e.target.value) || 0)} /></Grid>
-              <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.telemedicineAutoRecord} onChange={(e) => update('telemedicineAutoRecord', e.target.checked)} />} label="Auto nahrávání" /></Grid>
-              <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.telemedicineRequireConsent} onChange={(e) => update('telemedicineRequireConsent', e.target.checked)} />} label="Vyžadovat souhlas" /></Grid>
+              <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="number" label="Max délka (min)" value={settings.telemedicineMaxDuration} onChange={(e) => update('telemedicineMaxDuration', parseInt(e.target.value) || 0)} /></Grid>
+              <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.telemedicineAutoRecord} onChange={(e) => update('telemedicineAutoRecord', e.target.checked)} />} label="Auto nahrávání" /></Grid>
+              <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.telemedicineRequireConsent} onChange={(e) => update('telemedicineRequireConsent', e.target.checked)} />} label="Vyžadovat souhlas" /></Grid>
             </>
           )}
         </Grid>
@@ -128,10 +128,10 @@ export default function AdvancedSettings() {
           <Typography variant="h6">Analytika</Typography>
         </Box>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.analyticsEnabled} onChange={(e) => update('analyticsEnabled', e.target.checked)} />} label="Analytika zapnuta" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.analyticsAnonymize} onChange={(e) => update('analyticsAnonymize', e.target.checked)} />} label="Anonymizovat" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.analyticsTrackAppointments} onChange={(e) => update('analyticsTrackAppointments', e.target.checked)} />} label="Sledovat termíny" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.analyticsTrackRevenue} onChange={(e) => update('analyticsTrackRevenue', e.target.checked)} />} label="Sledovat tržby" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.analyticsEnabled} onChange={(e) => update('analyticsEnabled', e.target.checked)} />} label="Analytika zapnuta" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.analyticsAnonymize} onChange={(e) => update('analyticsAnonymize', e.target.checked)} />} label="Anonymizovat" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.analyticsTrackAppointments} onChange={(e) => update('analyticsTrackAppointments', e.target.checked)} />} label="Sledovat termíny" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.analyticsTrackRevenue} onChange={(e) => update('analyticsTrackRevenue', e.target.checked)} />} label="Sledovat tržby" /></Grid>
         </Grid>
       </Paper>
 
@@ -139,8 +139,8 @@ export default function AdvancedSettings() {
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom>Widget a SEO</Typography>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.bookingWidgetEnabled} onChange={(e) => update('bookingWidgetEnabled', e.target.checked)} />} label="Booking widget" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.bookingWidgetEnabled} onChange={(e) => update('bookingWidgetEnabled', e.target.checked)} />} label="Booking widget" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Pozice</InputLabel>
               <Select label="Pozice" value={settings.widgetPosition} onChange={(e) => update('widgetPosition', e.target.value)}>
@@ -150,9 +150,9 @@ export default function AdvancedSettings() {
               </Select>
             </FormControl>
           </Grid>
-          <Grid size={{ xs: 12 }} sm={6}><TextField fullWidth size="small" label="Text tlačítka" value={settings.widgetText} onChange={(e) => update('widgetText', e.target.value)} /></Grid>
-          <Grid size={{ xs: 12 }} sm={6}><TextField fullWidth size="small" label="Meta titulek" value={settings.metaTitle} onChange={(e) => update('metaTitle', e.target.value)} /></Grid>
-          <Grid size={{ xs: 12 }} sm={6}><TextField fullWidth size="small" label="Meta popis" value={settings.metaDescription} onChange={(e) => update('metaDescription', e.target.value)} /></Grid>
+          <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth size="small" label="Text tlačítka" value={settings.widgetText} onChange={(e) => update('widgetText', e.target.value)} /></Grid>
+          <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth size="small" label="Meta titulek" value={settings.metaTitle} onChange={(e) => update('metaTitle', e.target.value)} /></Grid>
+          <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth size="small" label="Meta popis" value={settings.metaDescription} onChange={(e) => update('metaDescription', e.target.value)} /></Grid>
         </Grid>
       </Paper>
     </Box>

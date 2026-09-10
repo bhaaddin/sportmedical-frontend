@@ -75,7 +75,7 @@ export default function ServiceSettings() {
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight={700}>Nastavení služeb</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 700 }}>Nastavení služeb</Typography>
         <Button variant="contained" startIcon={<Save />} onClick={handleSave}>Uložit</Button>
       </Box>
 
@@ -111,15 +111,15 @@ export default function ServiceSettings() {
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>Globální mezeru mezi termíny</Typography>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <TextField fullWidth type="number" label="Před termínem (min)" value={globalBuffer.before}
               onChange={(e) => setGlobalBuffer(prev => ({ ...prev, before: parseInt(e.target.value) || 0 }))} />
           </Grid>
-          <Grid size={{ xs: 6 }} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <TextField fullWidth type="number" label="Po termínu (min)" value={globalBuffer.after}
               onChange={(e) => setGlobalBuffer(prev => ({ ...prev, after: parseInt(e.target.value) || 0 }))} />
           </Grid>
-          <Grid size={{ xs: 12 }} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <FormControlLabel control={<Switch checked={autoConfirm} onChange={(e) => setAutoConfirm(e.target.checked)} />}
               label="Automaticky potvrdit termíny" />
           </Grid>
@@ -135,11 +135,11 @@ export default function ServiceSettings() {
         {services.map(service => (
           <Card key={service.id} variant="outlined" sx={{ mb: 2, p: 2 }}>
             <Grid container spacing={2} alignItems="center">
-              <Grid size={{ xs: 12 }} sm={3}>
+              <Grid size={{ xs: 12, sm: 3 }}>
                 <TextField size="small" fullWidth label="Název" value={service.name}
                   onChange={(e) => updateService(service.id, 'name', e.target.value)} />
               </Grid>
-              <Grid size={{ xs: 6 }} sm={2}>
+              <Grid size={{ xs: 6, sm: 2 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Kategorie</InputLabel>
                   <Select label="Kategorie" value={service.category}
@@ -148,31 +148,31 @@ export default function ServiceSettings() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid size={{ xs: 6 }} sm={1}>
+              <Grid size={{ xs: 6, sm: 1 }}>
                 <TextField size="small" fullWidth type="number" label="Min" value={service.duration}
                   onChange={(e) => updateService(service.id, 'duration', parseInt(e.target.value) || 0)} />
               </Grid>
-              <Grid size={{ xs: 6 }} sm={1}>
+              <Grid size={{ xs: 6, sm: 1 }}>
                 <TextField size="small" fullWidth type="number" label="Cena (Kč)" value={service.price}
                   onChange={(e) => updateService(service.id, 'price', parseInt(e.target.value) || 0)} />
               </Grid>
-              <Grid size={{ xs: 6 }} sm={1}>
+              <Grid size={{ xs: 6, sm: 1 }}>
                 <TextField size="small" fullWidth type="number" label="Před (min)" value={service.bufferBefore}
                   onChange={(e) => updateService(service.id, 'bufferBefore', parseInt(e.target.value) || 0)} />
               </Grid>
-              <Grid size={{ xs: 6 }} sm={1}>
+              <Grid size={{ xs: 6, sm: 1 }}>
                 <TextField size="small" fullWidth type="number" label="Po (min)" value={service.bufferAfter}
                   onChange={(e) => updateService(service.id, 'bufferAfter', parseInt(e.target.value) || 0)} />
               </Grid>
-              <Grid size={{ xs: 6 }} sm={1}>
+              <Grid size={{ xs: 6, sm: 1 }}>
                 <TextField size="small" fullWidth type="number" label="Max/den" value={service.maxPerDay}
                   onChange={(e) => updateService(service.id, 'maxPerDay', parseInt(e.target.value) || 0)} />
               </Grid>
-              <Grid size={{ xs: 6 }} sm={1}>
+              <Grid size={{ xs: 6, sm: 1 }}>
                 <FormControlLabel control={<Switch size="small" checked={service.isActive}
                   onChange={(e) => updateService(service.id, 'isActive', e.target.checked)} />} label="" />
               </Grid>
-              <Grid size={{ xs: 6 }} sm={1}>
+              <Grid size={{ xs: 6, sm: 1 }}>
                 <Button size="small" color="error" startIcon={<Delete />}
                   onClick={() => setServices(prev => prev.filter(s => s.id !== service.id))} />
               </Grid>
@@ -185,19 +185,19 @@ export default function ServiceSettings() {
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>Storno podmínky</Typography>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12 }} sm={3}>
+          <Grid size={{ xs: 12, sm: 3 }}>
             <TextField fullWidth type="number" label="Bezplatné zrušení (hod)" value={cancellationPolicy.freeCancellationHours}
               onChange={(e) => setCancellationPolicy(prev => ({ ...prev, freeCancellationHours: parseInt(e.target.value) || 0 }))} />
           </Grid>
-          <Grid size={{ xs: 12 }} sm={3}>
+          <Grid size={{ xs: 12, sm: 3 }}>
             <TextField fullWidth type="number" label="Poplatek pozdní zrušení (%)" value={cancellationPolicy.lateCancelFeePercent}
               onChange={(e) => setCancellationPolicy(prev => ({ ...prev, lateCancelFeePercent: parseInt(e.target.value) || 0 }))} />
           </Grid>
-          <Grid size={{ xs: 12 }} sm={3}>
+          <Grid size={{ xs: 12, sm: 3 }}>
             <TextField fullWidth type="number" label="Poplatek nedostavení (%)" value={cancellationPolicy.noShowFeePercent}
               onChange={(e) => setCancellationPolicy(prev => ({ ...prev, noShowFeePercent: parseInt(e.target.value) || 0 }))} />
           </Grid>
-          <Grid size={{ xs: 12 }} sm={3}>
+          <Grid size={{ xs: 12, sm: 3 }}>
             <FormControlLabel control={<Switch checked={cancellationPolicy.allowOnlineCancel}
               onChange={(e) => setCancellationPolicy(prev => ({ ...prev, allowOnlineCancel: e.target.checked }))} />}
               label="Online zrušení" />

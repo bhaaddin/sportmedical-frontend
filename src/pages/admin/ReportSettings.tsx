@@ -42,7 +42,7 @@ export default function ReportSettings() {
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight={700}>Nastavení reportů</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 700 }}>Nastavení reportů</Typography>
         <Button variant="contained" startIcon={<Save />} onClick={handleSave}>Uložit</Button>
       </Box>
       {saved && <Alert severity="success" sx={{ mb: 3 }}>Nastavení uloženo</Alert>}
@@ -54,7 +54,7 @@ export default function ReportSettings() {
           <Typography variant="h6">Výchozí nastavení reportů</Typography>
         </Box>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Formát</InputLabel>
               <Select label="Formát" value={settings.defaultReportFormat} onChange={(e) => update('defaultReportFormat', e.target.value)}>
@@ -64,7 +64,7 @@ export default function ReportSettings() {
               </Select>
             </FormControl>
           </Grid>
-          <Grid size={{ xs: 6 }} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Typ grafu</InputLabel>
               <Select label="Typ grafu" value={settings.defaultChartType} onChange={(e) => update('defaultChartType', e.target.value)}>
@@ -75,7 +75,7 @@ export default function ReportSettings() {
               </Select>
             </FormControl>
           </Grid>
-          <Grid size={{ xs: 6 }} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Jazyk</InputLabel>
               <Select label="Jazyk" value={settings.reportLanguage} onChange={(e) => update('reportLanguage', e.target.value)}>
@@ -85,7 +85,7 @@ export default function ReportSettings() {
               </Select>
             </FormControl>
           </Grid>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="number" label="Max řádků" value={settings.maxRowsPerReport} onChange={(e) => update('maxRowsPerReport', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="number" label="Max řádků" value={settings.maxRowsPerReport} onChange={(e) => update('maxRowsPerReport', parseInt(e.target.value) || 0)} /></Grid>
           <Grid size={{ xs: 12 }}>
             <FormControlLabel control={<Switch checked={settings.includeCharts} onChange={(e) => update('includeCharts', e.target.checked)} />} label="Zahrnout grafy" />
             <FormControlLabel control={<Switch checked={settings.includeTables} onChange={(e) => update('includeTables', e.target.checked)} />} label="Zahrnout tabulky" />

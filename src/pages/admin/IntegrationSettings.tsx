@@ -63,7 +63,7 @@ export default function IntegrationSettings() {
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight={700}>Integrace</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 700 }}>Integrace</Typography>
         <Button variant="contained" startIcon={<Save />} onClick={handleSave}>Uložit</Button>
       </Box>
       {saved && <Alert severity="success" sx={{ mb: 3 }}>Nastavení uloženo</Alert>}
@@ -76,10 +76,10 @@ export default function IntegrationSettings() {
           <Typography variant="h6">Synchronizace kalendáře</Typography>
         </Box>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.googleCalendarEnabled} onChange={(e) => update('googleCalendarEnabled', e.target.checked)} />} label="Google Calendar" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.outlookEnabled} onChange={(e) => update('outlookEnabled', e.target.checked)} />} label="Outlook" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.appleHealthEnabled} onChange={(e) => update('appleHealthEnabled', e.target.checked)} />} label="Apple Health" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.googleCalendarEnabled} onChange={(e) => update('googleCalendarEnabled', e.target.checked)} />} label="Google Calendar" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.outlookEnabled} onChange={(e) => update('outlookEnabled', e.target.checked)} />} label="Outlook" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.appleHealthEnabled} onChange={(e) => update('appleHealthEnabled', e.target.checked)} />} label="Apple Health" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Smer synchronizace</InputLabel>
               <Select label="Smer synchronizace" value={settings.syncDirection} onChange={(e) => update('syncDirection', e.target.value)}>
@@ -101,11 +101,11 @@ export default function IntegrationSettings() {
           <Typography variant="h6">E-mail (SMTP)</Typography>
         </Box>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" label="SMTP host" value={settings.smtpHost} onChange={(e) => update('smtpHost', e.target.value)} /></Grid>
-          <Grid size={{ xs: 6 }} sm={2}><TextField fullWidth size="small" type="number" label="Port" value={settings.smtpPort} onChange={(e) => update('smtpPort', parseInt(e.target.value) || 0)} /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" label="Uživatel" value={settings.smtpUser} onChange={(e) => update('smtpUser', e.target.value)} /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="password" label="Heslo" value={settings.smtpPassword} onChange={(e) => update('smtpPassword', e.target.value)} /></Grid>
-          <Grid size={{ xs: 6 }} sm={1}><FormControlLabel control={<Switch checked={settings.smtpSsl} onChange={(e) => update('smtpSsl', e.target.checked)} />} label="SSL" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" label="SMTP host" value={settings.smtpHost} onChange={(e) => update('smtpHost', e.target.value)} /></Grid>
+          <Grid size={{ xs: 6, sm: 2 }}><TextField fullWidth size="small" type="number" label="Port" value={settings.smtpPort} onChange={(e) => update('smtpPort', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" label="Uživatel" value={settings.smtpUser} onChange={(e) => update('smtpUser', e.target.value)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="password" label="Heslo" value={settings.smtpPassword} onChange={(e) => update('smtpPassword', e.target.value)} /></Grid>
+          <Grid size={{ xs: 6, sm: 1 }}><FormControlLabel control={<Switch checked={settings.smtpSsl} onChange={(e) => update('smtpSsl', e.target.checked)} />} label="SSL" /></Grid>
           <Grid size={{ xs: 12 }}><Button variant="outlined" onClick={testEmailConnection} disabled={testingEmail}>{testingEmail ? 'Testuji...' : 'Otestovat připojení'}</Button></Grid>
         </Grid>
       </Paper>
@@ -117,9 +117,9 @@ export default function IntegrationSettings() {
           <Typography variant="h6">Platební brána</Typography>
         </Box>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12 }} sm={4}><TextField fullWidth size="small" label="Stripe Public Key" value={settings.stripePublicKey} onChange={(e) => update('stripePublicKey', e.target.value)} /></Grid>
-          <Grid size={{ xs: 12 }} sm={4}><TextField fullWidth size="small" type="password" label="Stripe Secret Key" value={settings.stripeSecretKey} onChange={(e) => update('stripeSecretKey', e.target.value)} /></Grid>
-          <Grid size={{ xs: 12 }} sm={4}><TextField fullWidth size="small" type="password" label="Webhook Secret" value={settings.stripeWebhookSecret} onChange={(e) => update('stripeWebhookSecret', e.target.value)} /></Grid>
+          <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth size="small" label="Stripe Public Key" value={settings.stripePublicKey} onChange={(e) => update('stripePublicKey', e.target.value)} /></Grid>
+          <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth size="small" type="password" label="Stripe Secret Key" value={settings.stripeSecretKey} onChange={(e) => update('stripeSecretKey', e.target.value)} /></Grid>
+          <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth size="small" type="password" label="Webhook Secret" value={settings.stripeWebhookSecret} onChange={(e) => update('stripeWebhookSecret', e.target.value)} /></Grid>
         </Grid>
       </Paper>
 
@@ -130,8 +130,8 @@ export default function IntegrationSettings() {
           <Typography variant="h6">API přístup</Typography>
         </Box>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.apiEnabled} onChange={(e) => update('apiEnabled', e.target.checked)} />} label="API zapnuto" /></Grid>
-          <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="number" label="Rate limit (pož/den)" value={settings.apiRateLimit} onChange={(e) => update('apiRateLimit', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.apiEnabled} onChange={(e) => update('apiEnabled', e.target.checked)} />} label="API zapnuto" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="number" label="Rate limit (pož/den)" value={settings.apiRateLimit} onChange={(e) => update('apiRateLimit', parseInt(e.target.value) || 0)} /></Grid>
           <Grid size={{ xs: 12 }}>
             <Typography variant="body2" color="text.secondary">API Key: {settings.apiKey}</Typography>
             <Button size="small" sx={{ mt: 1 }} onClick={() => update('apiKey', 'sk_' + Math.random().toString(36).slice(2))}>Vygenerovat nový klíč</Button>
@@ -143,10 +143,10 @@ export default function IntegrationSettings() {
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom>AI asistent</Typography>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }} sm={3}><FormControlLabel control={<Switch checked={settings.aiDiagnosisEnabled} onChange={(e) => update('aiDiagnosisEnabled', e.target.checked)} />} label="AI diagnostika" /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.aiDiagnosisEnabled} onChange={(e) => update('aiDiagnosisEnabled', e.target.checked)} />} label="AI diagnostika" /></Grid>
           {settings.aiDiagnosisEnabled && (
             <>
-              <Grid size={{ xs: 6 }} sm={3}>
+              <Grid size={{ xs: 6, sm: 3 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Poskytovatel</InputLabel>
                   <Select label="Poskytovatel" value={settings.aiProvider} onChange={(e) => update('aiProvider', e.target.value)}>
@@ -156,8 +156,8 @@ export default function IntegrationSettings() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid size={{ xs: 6 }} sm={3}><TextField fullWidth size="small" type="password" label="API Key" value={settings.aiApiKey} onChange={(e) => update('aiApiKey', e.target.value)} /></Grid>
-              <Grid size={{ xs: 6 }} sm={3}>
+              <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="password" label="API Key" value={settings.aiApiKey} onChange={(e) => update('aiApiKey', e.target.value)} /></Grid>
+              <Grid size={{ xs: 6, sm: 3 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Model</InputLabel>
                   <Select label="Model" value={settings.aiModel} onChange={(e) => update('aiModel', e.target.value)}>

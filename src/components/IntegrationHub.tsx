@@ -54,7 +54,7 @@ export default function IntegrationHub() {
 
       <Grid container spacing={3}>
         {integrations.map((integration) => (
-          <Grid size={{ xs: 12, md: 6 }} lg={4} key={integration.id}>
+          <Grid size={{ xs: 12, md: 6, lg: 4 }} key={integration.id}>
             <Card variant="outlined" sx={{ height: '100%' }}>
               <CardContent>
                 <Box display="flex" alignItems="center" gap={1} mb={2}>

@@ -137,7 +137,7 @@ export default function Sidebar({
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
         <Avatar sx={{ bgcolor: '#0D7377', width: 36, height: 36 }}>CM</Avatar>
         {!collapsed && (
-          <Typography variant="subtitle1" fontWeight={600} noWrap>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>
             CGM MEDISTAR
           </Typography>
         )}
