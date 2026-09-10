@@ -177,7 +177,6 @@ export default function Measurements() {
           <TableBody>
             {filtered.filter(m => m.deviceType === Object.keys(deviceConfig)[tab]).map((m, i) => {
               const device = deviceConfig[m.deviceType] || deviceConfig.InBody770;
-              const mainMetrics = Object.entries(m.data).slice(0, 3);
               return (
                 <motion.tr key={m.id}
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}

@@ -3,19 +3,23 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
-export enum ExportFormat {
-  CSV = 0,
-  PohodaXml = 1,
-  MoneyS3Xml = 2,
-  IdokladXml = 3,
-}
+export const ExportFormat = {
+  CSV: 0,
+  PohodaXml: 1,
+  MoneyS3Xml: 2,
+  IdokladXml: 3,
+} as const;
 
-export enum ExportType {
-  Invoices = 0,
-  CreditNotes = 1,
-  Payments = 2,
-  All = 3,
-}
+export type ExportFormat = (typeof ExportFormat)[keyof typeof ExportFormat];
+
+export const ExportType = {
+  Invoices: 0,
+  CreditNotes: 1,
+  Payments: 2,
+  All: 3,
+} as const;
+
+export type ExportType = (typeof ExportType)[keyof typeof ExportType];
 
 export interface ExportResult {
   id: string;

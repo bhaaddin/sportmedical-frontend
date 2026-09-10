@@ -1,11 +1,13 @@
 import client from '../api/client';
 
-export enum PaymentMethod {
-  Cash = 0,
-  Card = 1,
-  ClubBilling = 2,
-  BankTransfer = 3,
-}
+export const PaymentMethod = {
+  Cash: 0,
+  Card: 1,
+  ClubBilling: 2,
+  BankTransfer: 3,
+} as const;
+
+export type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod];
 
 export interface CashierTransaction {
   id: string;

@@ -192,7 +192,13 @@ export default function Reports() {
                 <ResponsiveContainer width="100%" height={240}>
                   <PieChart>
                     <Pie data={sexDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={100}
-                      paddingAngle={5} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                      paddingAngle={5} dataKey="value" /* recharts may pass no `percent` for an empty slice; `NaN%` on a chart
+                         is the same lie as `undefined` in a field. */
+                      label={({ name, percent }) =>
+                        percent === undefined
+                          ? String(name)
+                          : `${name} ${(percent * 100).toFixed(0)}%`
+                      }>
                       {sexDistribution.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
                     </Pie>
                     <Tooltip />

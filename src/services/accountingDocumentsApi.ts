@@ -3,20 +3,24 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
-export enum AccountingDocumentType {
-  PPD = 0,
-  Invoice = 1,
-  CreditNote = 2,
-  Proforma = 3,
-}
+export const AccountingDocumentType = {
+  PPD: 0,
+  Invoice: 1,
+  CreditNote: 2,
+  Proforma: 3,
+} as const;
 
-export enum AccountingDocumentStatus {
-  Draft = 0,
-  Sent = 1,
-  Paid = 2,
-  Overdue = 3,
-  Cancelled = 4,
-}
+export type AccountingDocumentType = (typeof AccountingDocumentType)[keyof typeof AccountingDocumentType];
+
+export const AccountingDocumentStatus = {
+  Draft: 0,
+  Sent: 1,
+  Paid: 2,
+  Overdue: 3,
+  Cancelled: 4,
+} as const;
+
+export type AccountingDocumentStatus = (typeof AccountingDocumentStatus)[keyof typeof AccountingDocumentStatus];
 
 export interface LineItem {
   description: string;

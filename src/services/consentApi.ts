@@ -3,13 +3,15 @@ import client from '../api/client';
 
 const API_BASE = '/api';
 
-export enum ConsentType {
-  Treatment = 0,
-  Marketing = 1,
-  Communication = 2,
-  ClubSharing = 3,
-  DataExport = 4,
-}
+export const ConsentType = {
+  Treatment: 0,
+  Marketing: 1,
+  Communication: 2,
+  ClubSharing: 3,
+  DataExport: 4,
+} as const;
+
+export type ConsentType = (typeof ConsentType)[keyof typeof ConsentType];
 
 export interface Consent {
   id: string;
