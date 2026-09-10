@@ -8,7 +8,7 @@
    - Admin editing (RBAC protected)
    - Drag-to-assign to patient
    ══════════════════════════════════════════════════════════════ */
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Box, Typography, Paper, Card, CardContent, TextField, IconButton, Tooltip,
   Chip, Button, Divider, List, ListItemButton, ListItemText, Collapse,
@@ -293,7 +293,7 @@ export default function Codebook() {
         <Chip label={code.category} size="small" sx={{ fontSize: 10, height: 20, ml: 1 }} />
       </div>
     );
-  }, [filteredCodes, selectedCode, favorites, toggleFavorite]);
+  }, [filteredCodes, selectedCode, favorites, toggleFavorite, listRef]);
 
   if (loading) {
     return (
