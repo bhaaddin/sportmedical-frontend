@@ -79,6 +79,7 @@ const BookingGridPage = lazy(() => import('./pages/booking/CalendarGridPage'));
 const BookingDayOverviewPage = lazy(() => import('./pages/booking/DayOverviewPage'));
 /* Booking phase 1, stage 5: partner reservations */
 const BookingPartnerOrdersPage = lazy(() => import('./pages/booking/PartnerOrdersPage'));
+const BookingBlockedTimePage = lazy(() => import('./pages/booking/BlockedTimePage'));
 const CashierPage = lazy(() => import('./pages/CashierPage'));
 const ClubsPage = lazy(() => import('./pages/ClubsPage'));
 const AccountingExportPage = lazy(() => import('./pages/AccountingExportPage'));
@@ -137,6 +138,7 @@ const menuGroups: MenuItemGroup[] = [
       { text: 'Plánování', icon: <CalendarMonth />, path: '/planovani' },
       { text: 'Dnešní přehled', icon: <Today />, path: '/dnes' },
       { text: 'Vyhrazení', icon: <Group />, path: '/vyhrazeni' },
+      { text: 'Blokovaný čas', icon: <EventBusy />, path: '/blokovany-cas' },
       { text: 'Můj rozvrh', icon: <CalendarMonth />, path: '/worker-schedule' },
       { text: 'Kluby', icon: <Group />, path: '/clubs' },
       { text: 'Účetní export', icon: <Receipt />, path: '/accounting-export', adminOnly: true },
@@ -390,6 +392,7 @@ export default function App() {
                     <Route path="/planovani" element={<BookingGridPage />} />
                     <Route path="/dnes" element={<BookingDayOverviewPage />} />
                     <Route path="/vyhrazeni" element={<BookingPartnerOrdersPage />} />
+                    <Route path="/blokovany-cas" element={<BookingBlockedTimePage />} />
                     <Route path="/calendars" element={<RequireAdmin><BookingCalendarsPage /></RequireAdmin>} />
                     <Route path="/activities" element={<RequireAdmin><BookingActivitiesPage /></RequireAdmin>} />
                     <Route path="/working-hours" element={<RequireAdmin><BookingWorkingHoursPage /></RequireAdmin>} />

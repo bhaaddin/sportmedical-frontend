@@ -81,6 +81,30 @@ export function startOfPragueDay(date: DateOnly): Date {
 }
 
 /**
+ * A Prague wall-clock time on a Prague date, as the instant it really is.
+ *
+ * Not `startOfPragueDay(date) + hours * 3600000`. That adds elapsed hours to a
+ * day whose wall clock may not have 24 of them, so on the two clock-change
+ * days it lands an hour out. Caught by measuring rather than by reasoning:
+ * blocking 13:00 on 25. 10. 2026 through that arithmetic stored 11:00Z and
+ * came back on screen as 12:00 - an hour earlier than the operator typed, on
+ * the one day of the year nobody would think to check.
+ *
+ * Same two-pass guess-and-correct as `startOfPragueDay`, for the same reason:
+ * the offset has to be read at the answer, not at the guess.
+ */
+export function pragueWallClockToInstant(date: DateOnly, time: string): Date {
+  const [year, month, day] = date.split('-').map(Number);
+  const [hours, minutes] = time.split(':').map(Number);
+  const wall = Date.UTC(year, month - 1, day, hours, minutes, 0);
+  let guess = new Date(wall);
+  for (let i = 0; i < 2; i += 1) {
+    guess = new Date(wall - pragueOffsetMs(guess));
+  }
+  return guess;
+}
+
+/**
  * How many hours that Prague day actually has: 23, 24 or 25.
  *
  * Contract 3.3: the day and week grids must not compute their height as
