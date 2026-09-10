@@ -78,8 +78,8 @@ export default function StaffSettings() {
           <Card key={shift.id} variant="outlined" sx={{ mb: 1, p: 2 }}>
             <Grid container spacing={1} alignItems="center">
               <Grid size={{ xs: 12, sm: 3 }}><TextField size="small" fullWidth label="Název" value={shift.name} onChange={(e) => updateShift(shift.id, 'name', e.target.value)} /></Grid>
-              <Grid size={{ xs: 6, sm: 2 }}><TextField size="small" fullWidth type="time" label="Začátek" value={shift.startTime} InputLabelProps={{ shrink: true }} onChange={(e) => updateShift(shift.id, 'startTime', e.target.value)} /></Grid>
-              <Grid size={{ xs: 6, sm: 2 }}><TextField size="small" fullWidth type="time" label="Konec" value={shift.endTime} InputLabelProps={{ shrink: true }} onChange={(e) => updateShift(shift.id, 'endTime', e.target.value)} /></Grid>
+              <Grid size={{ xs: 6, sm: 2 }}><TextField size="small" fullWidth type="time" label="Začátek" value={shift.startTime} slotProps={{ inputLabel: { shrink: true } }} onChange={(e) => updateShift(shift.id, 'startTime', e.target.value)} /></Grid>
+              <Grid size={{ xs: 6, sm: 2 }}><TextField size="small" fullWidth type="time" label="Konec" value={shift.endTime} slotProps={{ inputLabel: { shrink: true } }} onChange={(e) => updateShift(shift.id, 'endTime', e.target.value)} /></Grid>
               <Grid size={{ xs: 6, sm: 2 }}><TextField size="small" fullWidth type="number" label="Pauza (min)" value={shift.breakMinutes} onChange={(e) => updateShift(shift.id, 'breakMinutes', parseInt(e.target.value) || 0)} /></Grid>
               <Grid size={{ xs: 6, sm: 3 }}><Button color="error" startIcon={<Delete />} onClick={() => setShiftTemplates(prev => prev.filter(s => s.id !== shift.id))}>Smazat</Button></Grid>
             </Grid>

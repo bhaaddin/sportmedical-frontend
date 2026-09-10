@@ -73,13 +73,13 @@ export default function ScheduleManager({ staffId, onSave }: ScheduleManagerProp
               <FormControlLabel control={<Switch checked={day.isWorking} onChange={(e) => updateDaySchedule(index, { isWorking: e.target.checked })} />} label="Pracovní den" />
               {day.isWorking && (
                 <>
-                  <TextField size="small" type="time" value={day.startTime} onChange={(e) => updateDaySchedule(index, { startTime: e.target.value })} InputLabelProps={{ shrink: true }} sx={{ width: 120 }} />
+                  <TextField size="small" type="time" value={day.startTime} onChange={(e) => updateDaySchedule(index, { startTime: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 120 }} />
                   <Typography>-</Typography>
-                  <TextField size="small" type="time" value={day.endTime} onChange={(e) => updateDaySchedule(index, { endTime: e.target.value })} InputLabelProps={{ shrink: true }} sx={{ width: 120 }} />
+                  <TextField size="small" type="time" value={day.endTime} onChange={(e) => updateDaySchedule(index, { endTime: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 120 }} />
                   <Typography variant="body2" color="text.secondary">Přestávka:</Typography>
-                  <TextField size="small" type="time" value={day.breakStart || ''} onChange={(e) => updateDaySchedule(index, { breakStart: e.target.value })} InputLabelProps={{ shrink: true }} sx={{ width: 120 }} />
+                  <TextField size="small" type="time" value={day.breakStart || ''} onChange={(e) => updateDaySchedule(index, { breakStart: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 120 }} />
                   <Typography>-</Typography>
-                  <TextField size="small" type="time" value={day.breakEnd || ''} onChange={(e) => updateDaySchedule(index, { breakEnd: e.target.value })} InputLabelProps={{ shrink: true }} sx={{ width: 120 }} />
+                  <TextField size="small" type="time" value={day.breakEnd || ''} onChange={(e) => updateDaySchedule(index, { breakEnd: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 120 }} />
                 </>
               )}
             </Box>
@@ -89,11 +89,11 @@ export default function ScheduleManager({ staffId, onSave }: ScheduleManagerProp
         <Grid size={{ xs: 12, md: 4 }}>
           <Typography variant="subtitle1" gutterBottom>Speciální dny</Typography>
           <Paper sx={{ p: 2, mb: 2 }}>
-            <TextField fullWidth size="small" type="date" label="Datum" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ mb: 2 }} />
+            <TextField fullWidth size="small" type="date" label="Datum" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ mb: 2 }} />
             <TextField fullWidth size="small" label="Důvod" value={specialReason} onChange={(e) => setSpecialReason(e.target.value)} sx={{ mb: 2 }} />
             <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-              <TextField size="small" type="time" value={specialStartTime} onChange={(e) => setSpecialStartTime(e.target.value)} InputLabelProps={{ shrink: true }} />
-              <TextField size="small" type="time" value={specialEndTime} onChange={(e) => setSpecialEndTime(e.target.value)} InputLabelProps={{ shrink: true }} />
+              <TextField size="small" type="time" value={specialStartTime} onChange={(e) => setSpecialStartTime(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+              <TextField size="small" type="time" value={specialEndTime} onChange={(e) => setSpecialEndTime(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
             </Box>
             <Button fullWidth variant="outlined" onClick={addSpecialDay} disabled={!selectedDate}>Přidat speciální den</Button>
           </Paper>

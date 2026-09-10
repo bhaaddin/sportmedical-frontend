@@ -83,8 +83,8 @@ export default function ClinicSettings() {
           <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth size="small" label="Adresa" value={settings.address} onChange={(e) => update('address', e.target.value)} /></Grid>
           <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth size="small" label="Město" value={settings.city} onChange={(e) => update('city', e.target.value)} /></Grid>
           <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth size="small" label="PSČ" value={settings.postalCode} onChange={(e) => update('postalCode', e.target.value)} /></Grid>
-          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="time" label="Otevírací doba" value={settings.defaultOpenTime} InputLabelProps={{ shrink: true }} onChange={(e) => update('defaultOpenTime', e.target.value)} /></Grid>
-          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="time" label="Zavírací doba" value={settings.defaultCloseTime} InputLabelProps={{ shrink: true }} onChange={(e) => update('defaultCloseTime', e.target.value)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="time" label="Otevírací doba" value={settings.defaultOpenTime} slotProps={{ inputLabel: { shrink: true } }} onChange={(e) => update('defaultOpenTime', e.target.value)} /></Grid>
+          <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="time" label="Zavírací doba" value={settings.defaultCloseTime} slotProps={{ inputLabel: { shrink: true } }} onChange={(e) => update('defaultCloseTime', e.target.value)} /></Grid>
           <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.weekendEnabled} onChange={(e) => update('weekendEnabled', e.target.checked)} />} label="Víkend" /></Grid>
           <Grid size={{ xs: 6, sm: 3 }}><FormControlLabel control={<Switch checked={settings.holidayEnabled} onChange={(e) => update('holidayEnabled', e.target.checked)} />} label="Svátky" /></Grid>
         </Grid>

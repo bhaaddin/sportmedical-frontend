@@ -174,22 +174,22 @@ export default function BreakManager({ lockouts, onAdd, onRemove, onForceUnlock,
             <Grid size={{ xs: 6 }}>
               <TextField fullWidth type="number" label="Začátek (hodina)" value={newLockout.startHour}
                 onChange={(e) => setNewLockout((p) => ({ ...p, startHour: Math.max(0, Math.min(23, Number(e.target.value))) }))}
-                inputProps={{ min: 0, max: 23 }} />
+                slotProps={{ htmlInput: { min: 0, max: 23 } }} />
             </Grid>
             <Grid size={{ xs: 6 }}>
               <TextField fullWidth type="number" label="Začátek (minuta)" value={newLockout.startMinute}
                 onChange={(e) => setNewLockout((p) => ({ ...p, startMinute: Math.max(0, Math.min(59, Number(e.target.value))) }))}
-                inputProps={{ min: 0, max: 59 }} />
+                slotProps={{ htmlInput: { min: 0, max: 59 } }} />
             </Grid>
             <Grid size={{ xs: 6 }}>
               <TextField fullWidth type="number" label="Konec (hodina)" value={newLockout.endHour}
                 onChange={(e) => setNewLockout((p) => ({ ...p, endHour: Math.max(0, Math.min(23, Number(e.target.value))) }))}
-                inputProps={{ min: 0, max: 23 }} />
+                slotProps={{ htmlInput: { min: 0, max: 23 } }} />
             </Grid>
             <Grid size={{ xs: 6 }}>
               <TextField fullWidth type="number" label="Konec (minuta)" value={newLockout.endMinute}
                 onChange={(e) => setNewLockout((p) => ({ ...p, endMinute: Math.max(0, Math.min(59, Number(e.target.value))) }))}
-                inputProps={{ min: 0, max: 59 }} />
+                slotProps={{ htmlInput: { min: 0, max: 59 } }} />
             </Grid>
             <Grid size={{ xs: 12 }}>
               <TextField fullWidth select label="Typ uzamčení" value={newLockout.type}

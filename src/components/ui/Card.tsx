@@ -1,4 +1,4 @@
-import { Card as MuiCard, CardProps as MuiCardProps, CardContent, CardActions } from '@mui/material';
+import { Card as MuiCard, type CardProps as MuiCardProps, CardContent, CardActions } from '@mui/material';
 import { styled } from '@mui/material/styles';
 
 interface CardProps extends MuiCardProps {

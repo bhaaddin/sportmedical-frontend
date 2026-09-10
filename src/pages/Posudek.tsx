@@ -66,7 +66,7 @@ export default function Posudek() {
           <FormControlLabel control={<Checkbox checked={form.isCleared} onChange={e => update('isCleared', e.target.checked)} />}
             label="Způsobilý ke sportu" />
           {!form.isCleared && <TextField fullWidth label="Omezení" value={form.clearanceConditions} onChange={e => update('clearanceConditions', e.target.value)} sx={{ mt: 1 }} />}
-          <TextField fullWidth type="date" label="Platnost do" value={form.validUntil} onChange={e => update('validUntil', e.target.value)} InputLabelProps={{ shrink: true }} sx={{ mt: 2 }} />
+          <TextField fullWidth type="date" label="Platnost do" value={form.validUntil} onChange={e => update('validUntil', e.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ mt: 2 }} />
         </CardContent>
       </Card>
 

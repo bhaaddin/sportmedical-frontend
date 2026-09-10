@@ -1,4 +1,4 @@
-import { TextField, TextFieldProps, InputAdornment } from '@mui/material';
+import { TextField, type TextFieldProps, InputAdornment } from '@mui/material';
 import { styled } from '@mui/material/styles';
 
 interface InputProps extends TextFieldProps {

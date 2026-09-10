@@ -190,12 +190,12 @@ export default function Settings() {
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField fullWidth label="Začátek pracovní doby" type="time" defaultValue="08:00"
-                  InputLabelProps={{ shrink: true }}
+                  slotProps={{ inputLabel: { shrink: true } }}
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField fullWidth label="Konec pracovní doby" type="time" defaultValue="17:00"
-                  InputLabelProps={{ shrink: true }}
+                  slotProps={{ inputLabel: { shrink: true } }}
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
               </Grid>
             </Grid>

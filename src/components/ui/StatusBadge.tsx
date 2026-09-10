@@ -1,4 +1,4 @@
-import { Chip, ChipProps, Box } from '@mui/material';
+import { Chip, type ChipProps, Box } from '@mui/material';
 import { styled } from '@mui/material/styles';
 
 type StatusType =

@@ -37,7 +37,7 @@ import {
   useCreateClub,
   useUpdateClub,
   clubsApi,
-  Club,
+  type Club,
 } from '../services/clubsApi';
 
 export const ClubManager: React.FC = () => {
@@ -170,7 +170,7 @@ export const ClubManager: React.FC = () => {
               <TextField fullWidth label="Název" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
-              <TextField fullWidth label="IČO" value={formData.ico} onChange={(e) => setFormData({ ...formData, ico: e.target.value })} inputProps={{ maxLength: 8 }} />
+              <TextField fullWidth label="IČO" value={formData.ico} onChange={(e) => setFormData({ ...formData, ico: e.target.value })} slotProps={{ htmlInput: { maxLength: 8 } }} />
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField fullWidth label="DIČ" value={formData.dic} onChange={(e) => setFormData({ ...formData, dic: e.target.value })} />

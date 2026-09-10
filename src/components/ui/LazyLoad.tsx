@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, ReactNode } from 'react';
+import { useRef, useState, useEffect, type ReactNode } from 'react';
 import { Box } from '@mui/material';
 import { ContentSkeleton } from './LoadingStates';
 

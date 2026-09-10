@@ -78,7 +78,7 @@ export default function RecurringAppointmentDialog({ open, onClose, onSave, appo
               <Grid container spacing={2}>
                 <Grid size={{ xs: 6 }}>
                   <TextField fullWidth type="date" label="Koncové datum" value={pattern.endDate}
-                    onChange={(e) => setPattern({ ...pattern, endDate: e.target.value })} InputLabelProps={{ shrink: true }} />
+                    onChange={(e) => setPattern({ ...pattern, endDate: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} />
                 </Grid>
                 <Grid size={{ xs: 6 }}>
                   <TextField fullWidth type="number" label="Max počet" value={pattern.count}

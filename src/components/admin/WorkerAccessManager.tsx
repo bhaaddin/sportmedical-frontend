@@ -122,13 +122,13 @@ export default function WorkerAccessManager({ staffId, onUpdate }: Props) {
                   <TextField fullWidth size="small" type="time" label="Začátek směny"
                     value={access.restrictions.startTime}
                     onChange={(e) => updateRestriction('startTime', e.target.value)}
-                    InputLabelProps={{ shrink: true }} />
+                    slotProps={{ inputLabel: { shrink: true } }} />
                 </Grid>
                 <Grid size={{ xs: 6 }}>
                   <TextField fullWidth size="small" type="time" label="Konec směny"
                     value={access.restrictions.endTime}
                     onChange={(e) => updateRestriction('endTime', e.target.value)}
-                    InputLabelProps={{ shrink: true }} />
+                    slotProps={{ inputLabel: { shrink: true } }} />
                 </Grid>
               </Grid>
             </CardContent>

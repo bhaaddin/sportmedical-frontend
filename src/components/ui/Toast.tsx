@@ -1,4 +1,4 @@
-import { toast, Toaster, ToastOptions } from 'react-hot-toast';
+import { toast, Toaster, type ToastOptions } from 'react-hot-toast';
 import { Box, Typography, IconButton } from '@mui/material';
 import { CheckCircle, Error, Warning, Info, Close } from '@mui/icons-material';
 

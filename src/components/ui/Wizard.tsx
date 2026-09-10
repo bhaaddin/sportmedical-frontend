@@ -1,4 +1,4 @@
-import { useState, ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Box, Stepper, Step, StepLabel, Button, Typography } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 

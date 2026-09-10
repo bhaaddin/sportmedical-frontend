@@ -1222,11 +1222,11 @@ ${weekDays.map(day => {
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField fullWidth label="Začátek" type="datetime-local" value={form.startTime}
-                onChange={e => setForm(p => ({ ...p, startTime: e.target.value }))} InputLabelProps={{ shrink: true }} />
+                onChange={e => setForm(p => ({ ...p, startTime: e.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField fullWidth label="Konec" type="datetime-local" value={form.endTime}
-                onChange={e => setForm(p => ({ ...p, endTime: e.target.value }))} InputLabelProps={{ shrink: true }} />
+                onChange={e => setForm(p => ({ ...p, endTime: e.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField fullWidth select label="Sál" value={form.room}

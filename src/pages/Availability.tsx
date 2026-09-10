@@ -151,7 +151,7 @@ export default function Availability() {
               </TextField>
             </Grid>
             <Grid size={{ xs: 12 }}><TextField fullWidth label="Důvod" value={form.reason} onChange={e => update('reason', e.target.value)} /></Grid>
-            <Grid size={{ xs: 12 }}><TextField fullWidth type="date" label="Očekávaný návrat" value={form.expectedReturnDate} onChange={e => update('expectedReturnDate', e.target.value)} InputLabelProps={{ shrink: true }} /></Grid>
+            <Grid size={{ xs: 12 }}><TextField fullWidth type="date" label="Očekávaný návrat" value={form.expectedReturnDate} onChange={e => update('expectedReturnDate', e.target.value)} slotProps={{ inputLabel: { shrink: true } }} /></Grid>
           </Grid>
         </DialogContent>
         <DialogActions>

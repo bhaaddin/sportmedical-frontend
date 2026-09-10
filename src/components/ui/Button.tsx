@@ -1,4 +1,4 @@
-import { Button as MuiButton, ButtonProps as MuiButtonProps } from '@mui/material';
+import { Button as MuiButton, type ButtonProps as MuiButtonProps } from '@mui/material';
 import { styled } from '@mui/material/styles';
 
 interface ButtonProps extends MuiButtonProps {

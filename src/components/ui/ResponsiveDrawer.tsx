@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { Drawer, Box, IconButton, Typography, useMediaQuery, useTheme } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 

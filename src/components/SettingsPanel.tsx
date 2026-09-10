@@ -113,11 +113,11 @@ export default function SettingsPanel() {
                   <Grid container spacing={2}>
                     <Grid size={{ xs: 6 }}>
                       <TextField fullWidth size="small" label="Začátek dne" type="time" defaultValue="06:00"
-                        InputLabelProps={{ shrink: true }} />
+                        slotProps={{ inputLabel: { shrink: true } }} />
                     </Grid>
                     <Grid size={{ xs: 6 }}>
                       <TextField fullWidth size="small" label="Konec dne" type="time" defaultValue="22:00"
-                        InputLabelProps={{ shrink: true }} />
+                        slotProps={{ inputLabel: { shrink: true } }} />
                     </Grid>
                   </Grid>
 

@@ -52,8 +52,8 @@ const AnalyticsPage: React.FC = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4">Analytika</Typography>
         <Box display="flex" gap={2} alignItems="center">
-          <TextField type="date" label="Od" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
-          <TextField type="date" label="Do" value={dateTo} onChange={(e) => setDateTo(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
+          <TextField type="date" label="Od" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} size="small" />
+          <TextField type="date" label="Do" value={dateTo} onChange={(e) => setDateTo(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} size="small" />
           <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => handleExport('csv')}>CSV</Button>
           <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => handleExport('excel')}>Excel</Button>
           <Tooltip title="Obnovit data"><IconButton onClick={handleRefresh}><RefreshIcon /></IconButton></Tooltip>

@@ -41,8 +41,8 @@ import {
   useCreateSmsTemplate,
   useUpdateSmsTemplate,
   templatesApi,
-  EmailTemplate,
-  SmsTemplate,
+  type EmailTemplate,
+  type SmsTemplate,
 } from '../services/templatesApi';
 
 interface TabPanelProps {

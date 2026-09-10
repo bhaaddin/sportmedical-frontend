@@ -52,11 +52,11 @@ export default function ReportsAnalytics() {
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, md: 4 }}>
           <TextField fullWidth type="date" label="Od" value={dateRange.start}
-            onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })} InputLabelProps={{ shrink: true }} />
+            onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} />
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
           <TextField fullWidth type="date" label="Do" value={dateRange.end}
-            onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })} InputLabelProps={{ shrink: true }} />
+            onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} />
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
           <Button variant="contained" fullWidth sx={{ bgcolor: '#0D7377', '&:hover': { bgcolor: '#095456' } }}>

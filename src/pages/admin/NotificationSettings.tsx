@@ -221,12 +221,12 @@ export default function NotificationSettings() {
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
             <TextField fullWidth size="small" type="time" label="Začátek" value={settings.quietHoursStart}
-              InputLabelProps={{ shrink: true }} disabled={!settings.quietHoursEnabled}
+              slotProps={{ inputLabel: { shrink: true } }} disabled={!settings.quietHoursEnabled}
               onChange={(e) => update('quietHoursStart', e.target.value)} />
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
             <TextField fullWidth size="small" type="time" label="Konec" value={settings.quietHoursEnd}
-              InputLabelProps={{ shrink: true }} disabled={!settings.quietHoursEnabled}
+              slotProps={{ inputLabel: { shrink: true } }} disabled={!settings.quietHoursEnabled}
               onChange={(e) => update('quietHoursEnd', e.target.value)} />
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>

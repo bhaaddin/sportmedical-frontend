@@ -1,7 +1,7 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import {
   Box, InputLabel, FormHelperText,
-  Switch, SwitchProps, FormControl, FormControlLabel,
+  Switch, type SwitchProps, FormControl, FormControlLabel,
   Checkbox, Radio, RadioGroup, FormGroup
 } from '@mui/material';
 import { styled } from '@mui/material/styles';

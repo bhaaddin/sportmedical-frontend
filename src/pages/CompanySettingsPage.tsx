@@ -190,7 +190,7 @@ export const CompanySettingsPage: React.FC = () => {
                         onChange={handleInputChange('ico')}
                         error={!!validationErrors.ico}
                         helperText={validationErrors.ico}
-                        inputProps={{ maxLength: 8 }}
+                        slotProps={{ htmlInput: { maxLength: 8 } }}
                         placeholder="12345678"
                         size="small"
                       />
@@ -303,7 +303,7 @@ export const CompanySettingsPage: React.FC = () => {
                   label="Kód banky"
                   value={form.bankCode}
                   onChange={handleInputChange('bankCode')}
-                  inputProps={{ maxLength: 4 }}
+                  slotProps={{ htmlInput: { maxLength: 4 } }}
                 />
               </Grid>
 

@@ -1,4 +1,4 @@
-import { useState, ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Menu, MenuItem, ListItemIcon, ListItemText, Divider, Box } from '@mui/material';
 
 interface DropdownItem {

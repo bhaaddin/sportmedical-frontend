@@ -61,10 +61,10 @@ export default function BillingSystem({ patientName = '' }: Props) {
           <TextField fullWidth label="Pacient" value={patientName} />
         </Grid>
         <Grid size={{ xs: 6, md: 3 }}>
-          <TextField fullWidth type="date" label="Datum" defaultValue={new Date().toISOString().slice(0, 10)} InputLabelProps={{ shrink: true }} />
+          <TextField fullWidth type="date" label="Datum" defaultValue={new Date().toISOString().slice(0, 10)} slotProps={{ inputLabel: { shrink: true } }} />
         </Grid>
         <Grid size={{ xs: 6, md: 3 }}>
-          <TextField fullWidth type="date" label="Splatnost" defaultValue={new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)} InputLabelProps={{ shrink: true }} />
+          <TextField fullWidth type="date" label="Splatnost" defaultValue={new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)} slotProps={{ inputLabel: { shrink: true } }} />
         </Grid>
       </Grid>
 

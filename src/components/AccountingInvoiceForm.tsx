@@ -24,7 +24,7 @@ import {
   Receipt as ReceiptIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
-import { useCreateInvoice, LineItem, CreateInvoiceData } from '../services/accountingDocumentsApi';
+import { useCreateInvoice, type LineItem, type CreateInvoiceData } from '../services/accountingDocumentsApi';
 
 interface AccountingInvoiceFormProps {
   patientId?: string;
@@ -150,7 +150,7 @@ export const AccountingInvoiceForm: React.FC<AccountingInvoiceFormProps> = ({
                 label="IČO"
                 value={formData.customerIco}
                 onChange={(e) => setFormData({ ...formData, customerIco: e.target.value })}
-                inputProps={{ maxLength: 8 }}
+                slotProps={{ htmlInput: { maxLength: 8 } }}
               />
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
@@ -191,7 +191,7 @@ export const AccountingInvoiceForm: React.FC<AccountingInvoiceFormProps> = ({
                 label="Kód banky"
                 value={formData.bankCode}
                 onChange={(e) => setFormData({ ...formData, bankCode: e.target.value })}
-                inputProps={{ maxLength: 4 }}
+                slotProps={{ htmlInput: { maxLength: 4 } }}
               />
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
@@ -208,7 +208,7 @@ export const AccountingInvoiceForm: React.FC<AccountingInvoiceFormProps> = ({
                 label="Variabilní symbol"
                 value={formData.variableSymbol}
                 onChange={(e) => setFormData({ ...formData, variableSymbol: e.target.value })}
-                inputProps={{ maxLength: 10 }}
+                slotProps={{ htmlInput: { maxLength: 10 } }}
               />
             </Grid>
 
@@ -254,7 +254,7 @@ export const AccountingInvoiceForm: React.FC<AccountingInvoiceFormProps> = ({
                             size="small"
                             value={item.quantity}
                             onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
-                            inputProps={{ min: 0, step: 0.01 }}
+                            slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
                           />
                         </TableCell>
                         <TableCell>
@@ -271,7 +271,7 @@ export const AccountingInvoiceForm: React.FC<AccountingInvoiceFormProps> = ({
                             size="small"
                             value={item.unitPrice}
                             onChange={(e) => updateItem(index, 'unitPrice', Number(e.target.value))}
-                            inputProps={{ min: 0, step: 0.01 }}
+                            slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
                           />
                         </TableCell>
                         <TableCell>
@@ -280,7 +280,7 @@ export const AccountingInvoiceForm: React.FC<AccountingInvoiceFormProps> = ({
                             size="small"
                             value={item.vatRate}
                             onChange={(e) => updateItem(index, 'vatRate', Number(e.target.value))}
-                            inputProps={{ min: 0, max: 100 }}
+                            slotProps={{ htmlInput: { min: 0, max: 100 } }}
                           />
                         </TableCell>
                         <TableCell align="right">
@@ -329,7 +329,7 @@ export const AccountingInvoiceForm: React.FC<AccountingInvoiceFormProps> = ({
                 label="Splatnost"
                 value={formData.dueDate}
                 onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                InputLabelProps={{ shrink: true }}
+                slotProps={{ inputLabel: { shrink: true } }}
                 required
               />
             </Grid>

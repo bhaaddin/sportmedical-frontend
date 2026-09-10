@@ -12,7 +12,7 @@ import {
 import toast from 'react-hot-toast';
 import {
   useExportHistory, useExportAccounting, useDeleteExport,
-  accountingExportApi, ExportFormat, ExportType, ExportResult,
+  accountingExportApi, ExportFormat, ExportType, type ExportResult,
 } from '../services/accountingExportApi';
 
 const formatLabels: Record<ExportFormat, string> = {
@@ -121,11 +121,11 @@ const AccountingExportPage: React.FC = () => {
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField fullWidth type="date" label="Od" value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)} InputLabelProps={{ shrink: true }} />
+                    onChange={(e) => setDateFrom(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField fullWidth type="date" label="Do" value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)} InputLabelProps={{ shrink: true }} />
+                    onChange={(e) => setDateTo(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
                 </Grid>
                 <Grid size={{ xs: 12 }}>
                   <Button variant="contained" fullWidth size="large" onClick={handleExport}

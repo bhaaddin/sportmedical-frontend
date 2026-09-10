@@ -1,4 +1,4 @@
-import { useState, ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Box, Stepper, Step, StepLabel, Button, Typography, Paper, IconButton } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 

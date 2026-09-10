@@ -1,4 +1,4 @@
-import { Badge, BadgeProps, Tooltip } from '@mui/material';
+import { Badge, type BadgeProps, Tooltip } from '@mui/material';
 
 interface NotificationBadgeProps extends BadgeProps {
   count: number;

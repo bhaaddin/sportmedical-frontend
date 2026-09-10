@@ -96,12 +96,12 @@ export default function AccountingExportPage() {
             <Grid size={{ xs: 6, sm: 2 }}>
               <TextField fullWidth type="date" label="Od" value={form.from}
                 onChange={e => setForm(f => ({ ...f, from: e.target.value }))}
-                InputLabelProps={{ shrink: true }} />
+                slotProps={{ inputLabel: { shrink: true } }} />
             </Grid>
             <Grid size={{ xs: 6, sm: 2 }}>
               <TextField fullWidth type="date" label="Do" value={form.to}
                 onChange={e => setForm(f => ({ ...f, to: e.target.value }))}
-                InputLabelProps={{ shrink: true }} />
+                slotProps={{ inputLabel: { shrink: true } }} />
             </Grid>
             <Grid size={{ xs: 12, sm: 2 }} sx={{ display: 'flex', alignItems: 'center' }}>
               <Button variant="contained" onClick={runExport} disabled={doExport.isPending}

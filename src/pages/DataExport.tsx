@@ -124,9 +124,9 @@ export default function DataExport() {
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2 }}>Časové období</Typography>
               <TextField fullWidth type="date" label="Od" value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ mb: 2 }} />
+                onChange={(e) => setDateFrom(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ mb: 2 }} />
               <TextField fullWidth type="date" label="Do" value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)} InputLabelProps={{ shrink: true }} />
+                onChange={(e) => setDateTo(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
             </CardContent>
           </Card>
         </Grid>
