@@ -228,6 +228,47 @@ export type AvailabilitySlot = z.infer<typeof availabilitySlotSchema>;
 
 export const availabilityListSchema = z.array(availabilitySlotSchema);
 
+/* ── Paperwork readiness (4.5, v29; codes v30) ── */
+
+/**
+ * Whether the patient's paperwork is in order for this appointment.
+ *
+ * Three things about this field are load-bearing:
+ *
+ *   - **`null` is not `{ ready: false }`.** It means the register cannot answer
+ *     yet, and it is drawn as nothing at all - no tick, no warning triangle.
+ *     "Nobody has looked" and "something is missing" are different claims, and
+ *     a screen that conflates them tells people to chase paperwork that was
+ *     handed in, or reassures them about paperwork nobody checked.
+ *   - **The reasons are words.** They were going to be integers; this lane
+ *     asked for strings and the booking lane agreed in v30. A number would have
+ *     bought one more lookup table of the kind that has already gone missing
+ *     twice here - `status` lost its table for six versions, and `status`
+ *     against `action` still trips people up.
+ *   - **An unknown reason is drawn as unknown**, the same tolerance the status
+ *     codes get. A new code must never take the screen down.
+ */
+export const PAPERWORK_REASONS = [
+  'questionnaire_missing',
+  'questionnaire_expired',
+  'report_missing',
+] as const;
+export type PaperworkReason = (typeof PAPERWORK_REASONS)[number];
+
+export const paperworkSchema = z
+  .object({
+    ready: z.boolean(),
+    missing: z.array(z.string()).nullish().transform((v) => v ?? []),
+  })
+  .nullish()
+  .transform((v) => v ?? null);
+export type Paperwork = z.infer<typeof paperworkSchema>;
+
+/** True for a reason the contract names; anything else is shown as unknown. */
+export function isKnownPaperworkReason(code: string): code is PaperworkReason {
+  return (PAPERWORK_REASONS as readonly string[]).includes(code);
+}
+
 /* ── 4.5 Bookings ── */
 
 /**
@@ -358,6 +399,8 @@ export const dayAppointmentSchema = z.object({
   status: bookingStatusSchema,
   isRunningLate: z.boolean(),
   checkedInUtc: isoUtc.nullish().transform((v) => v ?? null),
+  /** 4.5, v29: the same field the detail carries, so the grid can mark it. */
+  paperwork: paperworkSchema,
 });
 export type DayAppointment = z.infer<typeof dayAppointmentSchema>;
 export const dayAppointmentListSchema = z.array(dayAppointmentSchema);
@@ -449,6 +492,8 @@ export const appointmentSchema = z.object({
   /** 5.8, v26. `null` when there is none - never an empty string. */
   note: z.string().nullish().transform((v) => v ?? null),
   checkedInUtc: isoUtc.nullish().transform((v) => v ?? null),
+  /** 4.5, v29. `null` while the register cannot answer - see `paperworkSchema`. */
+  paperwork: paperworkSchema,
 }).passthrough();
 export type Appointment = z.infer<typeof appointmentSchema>;
 
@@ -485,6 +530,31 @@ export const daySummarySchema = z.object({
   bookedMinutes: z.number().int(),
   unusedMinutes: z.number().int(),
   freeMinutesLeft: z.number().int(),
+  /**
+   * 4.6, v29: the `PODKLADY ✓ n ⚠ m` line, counted across the appointments that
+   * will happen - cancelled ones do not count - with `who` already assembled,
+   * so 5.12 never has to walk the day's appointments to build the list.
+   */
+  paperwork: z
+    .object({
+      ready: z.number().int(),
+      missing: z.number().int(),
+      who: z
+        .array(
+          z.object({
+            appointmentId: z.string(),
+            patientId: z.string(),
+            calendarId: z.string(),
+            activityName: z.string(),
+            startUtc: isoUtc,
+            missing: z.array(z.string()).nullish().transform((v) => v ?? []),
+          }),
+        )
+        .nullish()
+        .transform((v) => v ?? []),
+    })
+    .nullish()
+    .transform((v) => v ?? null),
   nextAppointment: z
     .object({
       appointmentId: z.string(),

@@ -922,6 +922,24 @@ function AppointmentButton({
       </Box>{" "}
       {appointment.activityName}
       {/*
+        4.5, v29: ✓ or ⚠ for the paperwork, and nothing at all while the
+        register cannot answer. The mark carries a label of its own, because a
+        symbol is not a word and 7.1 does not accept one standing alone.
+      */}
+      {appointment.paperwork ? (
+        <Box
+          component="span"
+          aria-label={
+            appointment.paperwork.ready
+              ? t("booking.paperwork.ready")
+              : t("booking.paperwork.line")
+          }
+          sx={{ ml: 0.5 }}
+        >
+          {appointment.paperwork.ready ? "✓" : "⚠"}
+        </Box>
+      ) : null}
+      {/*
         A month cell has one line to spare, so the status goes on the same line
         and the calendar name is dropped - but it is still there in words, never
         colour alone (7.1). The fuller second line is for the day and week.

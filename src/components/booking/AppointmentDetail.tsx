@@ -24,6 +24,7 @@ import { BookingApiError } from "../../api/apiError";
 import {
   canChangeStatus,
   historyActionName,
+  isKnownPaperworkReason,
   isLateStatus,
   statusName,
   statusTally,
@@ -50,11 +51,12 @@ import { errorText } from "./errorText";
  * to live on, and a change made in another window shows up here instead of a
  * stale copy of a row.
  *
- * One thing 5.8 asks for is still not here, and the reason is worth keeping:
- * **readiness of the paperwork**. Change 43 removed it from 4.6 and says not to
- * make room for it — until the `app` lane has cleaned up three document
- * templates it would report a missing consent to people who signed one. A tick
- * that lies is worse than no tick.
+ * Readiness of the paperwork is here as of v29, after change 43 - which had
+ * removed it - was itself reversed. It is drawn only when the register can
+ * answer: `null` means nobody has looked, and that is shown as nothing at all.
+ * "Nobody looked" and "something is missing" are different claims, and the
+ * whole reason the field was held back for so long was that it used to make
+ * the second one about people who had handed everything in.
  *
  * Everything the screen writes goes through the transition table in
  * `canChangeStatus`, so a button the server would refuse is never offered. And
@@ -303,6 +305,26 @@ function DetailBody({
           />
         ) : null}
       </Stack>
+
+      {/*
+        4.5, v29. Rendered only when there is an answer - see `paperworkSchema`.
+        While the register cannot say, this whole block is absent rather than
+        reassuring.
+      */}
+      {appointment.paperwork ? (
+        <Alert severity={appointment.paperwork.ready ? "success" : "warning"}>
+          {appointment.paperwork.ready
+            ? t("booking.paperwork.ready")
+            : appointment.paperwork.missing
+                .map((code) =>
+                  isKnownPaperworkReason(code)
+                    ? t(`booking.paperwork.${code}`)
+                    : /* An unknown reason is shown as unknown, never dropped. */
+                      t("booking.paperwork.unknown", { code }),
+                )
+                .join(" · ")}
+        </Alert>
+      ) : null}
 
       {/* 6.4: an override was made by a person, for a reason they typed. */}
       {appointment.overrideReason ? (

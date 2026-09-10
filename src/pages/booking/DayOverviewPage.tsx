@@ -22,7 +22,7 @@ import { appointmentsApi } from "../../api/appointments";
 import { calendarsApi } from "../../api/calendars";
 import { patientsApi } from "../../api/patients";
 import { BookingApiError } from "../../api/apiError";
-import { isLateStatus } from "../../api/bookingContracts";
+import { isKnownPaperworkReason, isLateStatus } from "../../api/bookingContracts";
 import type { DayAppointment } from "../../api/bookingContracts";
 import {
   addDaysToDateOnly,
@@ -40,10 +40,11 @@ import { errorText } from "../../components/booking/errorText";
  *
  * Two decisions worth stating, because both look like omissions:
  *
- *   - **No `PODKLADY ✓ / ⚠` line.** 4.6 says it is not in this summary and asks
- *     in as many words not to make room for it: until the `app` lane finishes
- *     three document templates it would report a missing consent to somebody who
- *     had just signed one.
+ *   - **The `PODKLADY ✓ / ⚠` line appears only when the register can answer.**
+ *     It came back in v29 after change 43, which had removed it, was itself
+ *     reversed. While `summary.paperwork` is `null` the line is absent
+ *     altogether - not "✓ 0 ⚠ 0", which would tell the desk everything is in
+ *     order on the strength of nobody having looked.
  *   - **"Free today" is minutes, not places.** The plan drew "4 places"; the
  *     owner settled on minutes on 9. 9. 2026, because the same ninety minutes is
  *     two slots or three depending on the activity. Nothing here divides it.
@@ -380,6 +381,75 @@ export default function DayOverviewPage() {
                   </Stack>
                 </AsyncSection>
               </Box>
+
+              {/* ── Paperwork (4.6, v29): only when there is an answer ── */}
+              {summary.paperwork ? (
+                <Box>
+                  <Stack
+                    direction="row"
+                    spacing={2}
+                    sx={{ alignItems: "baseline", mb: 1, flexWrap: "wrap" }}
+                  >
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                      {t("booking.paperwork.line")}
+                    </Typography>
+                    <Typography variant="body2">
+                      ✓ {summary.paperwork.ready}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontWeight: summary.paperwork.missing > 0 ? 700 : 400,
+                      }}
+                    >
+                      ⚠ {summary.paperwork.missing}
+                    </Typography>
+                  </Stack>
+                  {/*
+                    `who` arrives assembled (4.6), so this never walks the day's
+                    appointments to work out who is short of what.
+                  */}
+                  {summary.paperwork.who.length === 0 ? (
+                    <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                      {t("booking.paperwork.nobodyMissing")}
+                    </Typography>
+                  ) : (
+                    <Stack divider={<Divider />}>
+                      {summary.paperwork.who.map((row) => (
+                        <Stack
+                          key={row.appointmentId}
+                          direction="row"
+                          spacing={2}
+                          sx={{
+                            py: 0.75,
+                            flexWrap: "wrap",
+                            alignItems: "baseline",
+                          }}
+                        >
+                          <Typography sx={{ fontWeight: 700, minWidth: 56 }}>
+                            {formatPragueTime(row.startUtc)}
+                          </Typography>
+                          <Typography variant="body2">
+                            {row.activityName}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "warning.main" }}
+                          >
+                            {row.missing
+                              .map((code) =>
+                                isKnownPaperworkReason(code)
+                                  ? t(`booking.paperwork.${code}`)
+                                  : t("booking.paperwork.unknown", { code }),
+                              )
+                              .join(" · ")}
+                          </Typography>
+                        </Stack>
+                      ))}
+                    </Stack>
+                  )}
+                </Box>
+              ) : null}
 
               {/* ── Minutes: free, next, and what stayed empty ── */}
               <Paper variant="outlined" sx={{ p: 2 }}>

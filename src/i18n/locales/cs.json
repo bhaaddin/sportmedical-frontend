@@ -378,6 +378,15 @@
       "unusedOf": "{{unused}} min z {{working}} ({{percent}} % využití)",
       "noWorkingHours": "Tento den nemá pracovní dobu.",
       "noCalendarChosen": "Vyberte alespoň jeden kalendář."
+    },
+    "paperwork": {
+      "ready": "Podklady jsou v pořádku.",
+      "questionnaire_missing": "Chybí dotazník",
+      "questionnaire_expired": "Dotazník je starší než 2 roky",
+      "report_missing": "Chybí výpis od předchozího lékaře",
+      "unknown": "Neznámý požadavek ({{code}})",
+      "line": "Podklady",
+      "nobodyMissing": "Nikomu nic nechybí."
     }
   }
 }
