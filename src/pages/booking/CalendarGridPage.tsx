@@ -305,7 +305,17 @@ export default function CalendarGridPage() {
           <Typography sx={{ color: "text.secondary" }}>{rangeLabel}</Typography>
         </Box>
 
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+        {/*
+          7.2. `spacing` alone put these five controls on one line and let them
+          run off the side of a phone: measured at 375px, the date field's right
+          edge sat at 457px with nothing to scroll to, so "jump to date" simply
+          could not be reached. Wrapping needs `gap` rather than `spacing`,
+          which lays out with margins and breaks across wrapped lines.
+        */}
+        <Stack
+          direction="row"
+          sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}
+        >
           <Tooltip title={t("booking.grid.previous")}>
             <IconButton
               aria-label={t("booking.grid.previous")}

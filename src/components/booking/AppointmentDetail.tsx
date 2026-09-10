@@ -26,6 +26,7 @@ import {
   historyActionName,
   isKnownPaperworkReason,
   isLateStatus,
+  isTerminalStatus,
   statusName,
   statusTally,
 } from "../../api/bookingContracts";
@@ -434,17 +435,34 @@ function DetailBody({
             confirmText={t("booking.detail.confirmComplete")}
             onClick={() => statusMutation.mutate({ to: COMPLETED })}
           />
-          <Button
-            size="small"
-            variant="outlined"
-            disabled={busy}
-            onClick={() => {
-              setConflict(null);
-              setMoving((was) => !was);
-            }}
+          {/*
+            A completed or cancelled appointment cannot be moved - the server
+            answers `409`, which is right, but offering the button and then
+            refusing it wastes somebody's click and teaches them nothing. Found
+            in the browser: the move panel opened on a finished appointment and
+            listed times it could never accept.
+          */}
+          <Tooltip
+            title={
+              isTerminalStatus(appointment.status)
+                ? t("booking.detail.notAllowed")
+                : ""
+            }
           >
-            {t("booking.detail.move")}
-          </Button>
+            <Box component="span">
+              <Button
+                size="small"
+                variant="outlined"
+                disabled={busy || isTerminalStatus(appointment.status)}
+                onClick={() => {
+                  setConflict(null);
+                  setMoving((was) => !was);
+                }}
+              >
+                {t("booking.detail.move")}
+              </Button>
+            </Box>
+          </Tooltip>
           <Button
             size="small"
             color="error"
@@ -519,7 +537,12 @@ function DetailBody({
           currentStartUtc={appointment.startUtc}
           busy={busy}
           onPick={(startUtc) => rescheduleMutation.mutate(startUtc)}
-          error={rescheduleMutation.error}
+          /*
+            A conflict already has its own calm line above (6.3); passing it
+            down as well printed the server's sentence twice. Only a real
+            failure belongs inside the panel.
+          */
+          error={conflict ? null : rescheduleMutation.error}
         />
       ) : null}
 
@@ -716,6 +739,24 @@ function RescheduleOffer({
 }
 
 /**
+ * 3.3: UTC on the wire, Prague on the screen. `oldValue` and `newValue` are
+ * free text - for a booking or a move they carry an instant, for other actions
+ * they may carry anything - so an instant is recognised and converted, and
+ * everything else is passed through untouched.
+ *
+ * Found in the browser, not by reading: the history of a freshly booked
+ * appointment read `— → 2026-09-15T06:00:00.0000000Z`, which is the wire
+ * talking to the person at the desk.
+ */
+function historyValue(value: string | null): string {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  return /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(parsed.getTime())
+    ? formatPragueDateTime(value)
+    : value;
+}
+
+/**
  * One history line. `action` is the *second* numbering of 4.5, not the status
  * one — `3` here is "cancelled" while `3` as a status is "completed". An
  * unknown action is drawn as unknown and never drops the row.
@@ -738,7 +779,7 @@ function HistoryRow({ line }: { line: HistoryLine }) {
       </Typography>
       {line.oldValue || line.newValue ? (
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
-          {line.oldValue ?? "—"} → {line.newValue ?? "—"}
+          {historyValue(line.oldValue)} → {historyValue(line.newValue)}
         </Typography>
       ) : null}
       {line.reason ? (

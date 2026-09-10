@@ -383,6 +383,20 @@ export function canChangeStatus(from: number, to: number): boolean {
 }
 
 /**
+ * A status nothing leaves. Derived from the transition table rather than
+ * written out, so it follows the table instead of having to be remembered
+ * alongside it: today that is `3` completed and `4` cancelled, and if 4.5 ever
+ * opens a way out of one of them this answer changes with it.
+ *
+ * It is what "still open" means, and a move is only offered while an
+ * appointment is still open - the server refuses the rest with `409`, and an
+ * action that can never succeed should not be offered in the first place.
+ */
+export function isTerminalStatus(code: number): boolean {
+  return BOOKING_STATUS_NAMES.every((_name, to) => !canChangeStatus(code, to));
+}
+
+/**
  * A day of one calendar - 4.5 `GET /api/calendars/{id}/day`.
  *
  * `isRunningLate` arrives computed but is never stored (6.2); the screen
