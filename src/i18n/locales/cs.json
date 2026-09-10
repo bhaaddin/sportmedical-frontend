@@ -474,10 +474,11 @@
       "noOtherPartners": "Jiný partner na tomto kalendáři není.",
       "dueToday": "Dnes je splatné",
       "sendingIsPhase2": "Odeslání je fáze 2 — tento seznam říká, co by se mělo poslat, neposílá to.",
-      "missingActions": "Poslat připomínku a zrušit odkaz zatím nejsou — API pro ně nemá cestu. Nahlášeno pruhu booking.",
       "noticesFailed": "Splatné lhůty se nepodařilo načíst. Neznamená to, že dnes nic splatného není — znamená to, že se to nezjistilo.",
       "closedDay": "V těchto dnech je zavřeno, okno tam nepokryje nic: {{days}}",
-      "hoursFailed": "Pracovní dobu se nepodařilo načíst, takže pokrytí zatím nelze spočítat. Zkuste to znovu — neukládejte naslepo."
+      "hoursFailed": "Pracovní dobu se nepodařilo načíst, takže pokrytí zatím nelze spočítat. Zkuste to znovu — neukládejte naslepo.",
+      "revokeLink": "Zrušit odkaz",
+      "reminderIsPhase2": "Připomínka partnerovi je spočítaná na {{when}}, odesílání je fáze 2 — tato obrazovka nic neposílá."
     }
   }
 }

@@ -39,13 +39,18 @@ import { errorText } from "../../components/booking/errorText";
  *
  *   - *uvoľniť* → `POST .../windows/{id}/release` ✓
  *   - *predĺžiť lehotu* → `PUT .../deadlines` ✓
- *   - *poslať pripomienku* → nothing. `notices` says what is due; 4.7 puts the
- *     sending in phase 2.
- *   - *zrušiť odkaz* → nothing. `isRevoked` is on the view and no route sets it.
+ *   - *zrušiť odkaz* → `POST .../revoke`, added in v36 **because this screen
+ *     ran out of routes**: `isRevoked` was a state on the view that nothing
+ *     could reach, and `Revoke()` had been sitting on the entity since stage 7
+ *     with no caller.
+ *   - *poslať pripomienku* → nothing, and nothing is planned for phase 1. The
+ *     computation is done - `windows[].partnerReminderDate` - and the sending
+ *     rides on the same outbox as patient reminders in phase 2. So the date is
+ *     shown and no button pretends to send it.
  *
- * Neither is left as a dead button or a silent gap: the screen says what is
- * missing and why, which is the repository rule about a removed function
- * applied to one that has not arrived yet.
+ * The one that is missing is not left as a dead button or a silent gap: the
+ * screen says what is absent and why, which is the repository rule about a
+ * removed function applied to one that has not arrived yet.
  */
 
 export default function PartnerOrdersPage() {
@@ -102,6 +107,12 @@ export default function PartnerOrdersPage() {
       setNewDeadline("");
       reload();
     },
+  });
+
+  const revoke = useMutation({
+    mutationFn: (order: PartnerOrder) =>
+      partnerOrdersApi.revoke(order.calendarId, order.id),
+    onSuccess: reload,
   });
 
   const orders = ordersQuery.data ?? [];
@@ -216,15 +227,20 @@ export default function PartnerOrdersPage() {
           skeletonRows={4}
         >
           <Stack spacing={2}>
+            {revoke.error ? (
+              <Alert severity="error">{errorText(revoke.error, t)}</Alert>
+            ) : null}
             {orders.map((order) => (
               <OrderCard
                 key={order.id}
                 order={order}
+                busy={revoke.isPending}
                 onRelease={(w) => setReleasing({ order, window: w })}
                 onExtend={() => {
                   setExtending(order);
                   setNewDeadline("");
                 }}
+                onRevoke={() => revoke.mutate(order)}
               />
             ))}
           </Stack>
@@ -299,12 +315,16 @@ export default function PartnerOrdersPage() {
 /** One partner order, laid out as 5.11 draws it. */
 function OrderCard({
   order,
+  busy,
   onRelease,
   onExtend,
+  onRevoke,
 }: {
   order: PartnerOrder;
+  busy: boolean;
   onRelease: (w: PartnerWindow) => void;
   onExtend: () => void;
+  onRevoke: () => void;
 }) {
   const { t } = useTranslation();
   const today = toDateOnly(new Date());
@@ -460,6 +480,19 @@ function OrderCard({
         <Button size="small" onClick={onExtend}>
           {t("booking.partner.extend")}
         </Button>
+        {/*
+          Revoking shuts the door; it does not put anybody out. Whoever already
+          has an appointment keeps it, and the order stays in the list marked as
+          revoked - which says more than it disappearing would.
+        */}
+        <Button
+          size="small"
+          color="warning"
+          disabled={busy || order.isRevoked}
+          onClick={onRevoke}
+        >
+          {t("booking.partner.revokeLink")}
+        </Button>
       </Stack>
 
       {/*
@@ -468,7 +501,11 @@ function OrderCard({
         beats leaving the gap for somebody to rediscover.
       */}
       <Typography variant="caption" sx={{ color: "text.secondary" }}>
-        {t("booking.partner.missingActions")}
+        {t("booking.partner.reminderIsPhase2", {
+          when: order.windows[0]?.partnerReminderDate
+            ? formatDateOnly(order.windows[0].partnerReminderDate)
+            : "—",
+        })}
       </Typography>
     </Paper>
   );

@@ -159,6 +159,24 @@ export const partnerOrdersApi = {
       return parseResponse(partnerOrderSchema, res.data);
     }),
 
+  /**
+   * Closing the link - 4.7 as of v36, after this lane found that `isRevoked`
+   * was a state on the view with no route that could reach it. `Revoke()` had
+   * been on the entity since stage 7 and nobody had ever called it.
+   *
+   * It shuts the door rather than putting people out: the order, its items and
+   * its windows all stay, anybody already booked keeps their appointment, and
+   * the token stops opening. Revoking twice answers `200`, not an error.
+   */
+  revoke: (calendarId: string, id: string): Promise<PartnerOrder> =>
+    request(async () => {
+      const res = await client.post(
+        `/api/calendars/${calendarId}/partner-orders/${id}/revoke`,
+        {},
+      );
+      return parseResponse(partnerOrderSchema, res.data);
+    }),
+
   /** What falls due on a day. 4.7: it says what should be sent; sending is phase 2. */
   notices: (calendarId: string, date: DateOnly): Promise<PartnerNotice[]> =>
     request(async () => {
