@@ -21,7 +21,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { appointmentsApi } from "../../api/appointments";
 import { activitiesApi } from "../../api/activities";
 import { calendarsApi } from "../../api/calendars";
-import { patientsApi } from "../../api/patients";
+import { searchPatientsForBooking } from "../../api/patientLookup";
 import type { Patient } from "../../api/patients";
 import { BookingApiError } from "../../api/apiError";
 import { isKnownPaperworkReason } from "../../api/bookingContracts";
@@ -115,7 +115,7 @@ export function NewAppointmentDialog({
 
   const searchQuery = useQuery({
     queryKey: ["patient-search", submitted],
-    queryFn: () => patientsApi.search(submitted),
+    queryFn: () => searchPatientsForBooking(submitted),
     enabled: open && submitted.trim().length > 0,
   });
 
