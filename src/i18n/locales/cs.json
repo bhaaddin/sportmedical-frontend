@@ -387,6 +387,35 @@
       "unknown": "Neznámý požadavek ({{code}})",
       "line": "Podklady",
       "nobodyMissing": "Nikomu nic nechybí."
+    },
+    "new": {
+      "title": "Objednat termín",
+      "step1": "1. Vyhledat pacienta",
+      "step2": "2. Kalendář a činnost",
+      "step3": "3. Čas z nabídky",
+      "step4": "4. Poznámka",
+      "search": "Hledat",
+      "searchLabel": "Jméno, příjmení nebo rodné číslo",
+      "notFound": "Nikdo se nenašel. Pacienta je potřeba nejprve založit v registru — objednání pacienta nezakládá. Vyhledávání zatím rozlišuje diakritiku, tak zkuste i „Černá“ místo „Cerna“.",
+      "registerLink": "Založit pacienta v registru",
+      "changePatient": "Změnit pacienta",
+      "calendar": "Kalendář",
+      "activity": "Činnost",
+      "fromDate": "Nabídka od",
+      "noFreeTime": "V tomto rozsahu není volný čas. Zkuste jiné datum nebo jinou činnost.",
+      "changeTime": "Změnit čas",
+      "noteHelp": "Volný text, uloží se k termínu. Později se zatím upravit nedá.",
+      "book": "Objednat",
+      "bookedTitle": "Termín je objednaný",
+      "bookedAt": "Objednáno na {{when}}.",
+      "another": "Objednat další",
+      "overrideOpen": "Objednat mimo nabídku",
+      "overrideExplain": "Čas mimo nabídku se zapíše jen s důvodem — ten se uloží k termínu a je vidět v historii.",
+      "overrideTime": "Čas",
+      "overrideReason": "Důvod přetlačení",
+      "overrideBook": "Přetlačit a objednat",
+      "noCalendars": "Nemáte přístup k žádnému kalendáři. Bez kalendáře nelze objednat.",
+      "noActivities": "Není zavedena žádná činnost. Nejprve ji přidejte v Činnostech."
     }
   }
 }

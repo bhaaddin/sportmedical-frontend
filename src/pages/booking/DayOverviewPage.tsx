@@ -33,6 +33,7 @@ import {
   toDateOnly,
 } from "../../utils/time";
 import { AsyncSection } from "../../components/booking/AsyncSection";
+import { NewAppointmentDialog } from "../../components/booking/NewAppointmentDialog";
 import { errorText } from "../../components/booking/errorText";
 
 /**
@@ -66,6 +67,8 @@ export default function DayOverviewPage() {
   const [date, setDate] = useState<string>(toDateOnly(new Date()));
   const [selected, setSelected] = useState<Set<string> | null>(null);
   const [now, setNow] = useState(() => new Date());
+  /* 5.9: "spustiteľný z kalendára aj z prehľadu". */
+  const [booking, setBooking] = useState(false);
 
   /* 6.2: the clock moves, so the count moves with it. */
   useEffect(() => {
@@ -216,6 +219,13 @@ export default function DayOverviewPage() {
             aria-label={t("booking.day.nextDay")}
           >
             <ChevronRightIcon fontSize="small" />
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            onClick={() => setBooking(true)}
+          >
+            {t("booking.new.title")}
           </Button>
         </Stack>
       </Stack>
@@ -495,6 +505,19 @@ export default function DayOverviewPage() {
           ) : null}
         </AsyncSection>
       </AsyncSection>
+
+      {booking ? (
+        <NewAppointmentDialog
+          open
+          onClose={() => setBooking(false)}
+          onBooked={() => {
+            void queryClient.invalidateQueries({ queryKey: ["day-summary"] });
+            void queryClient.invalidateQueries({ queryKey: ["day-range"] });
+          }}
+          initialDate={date}
+          initialCalendarId={shownIds.length === 1 ? shownIds[0] : undefined}
+        />
+      ) : null}
     </Box>
   );
 }

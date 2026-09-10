@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Alert,
   Box,
@@ -40,6 +40,7 @@ import {
   pragueDateKey,
 } from "../../utils/time";
 import { AsyncSection } from "./AsyncSection";
+import { AvailabilityPanel } from "./AvailabilityPicker";
 import { errorText } from "./errorText";
 
 /**
@@ -531,12 +532,19 @@ function DetailBody({
 
       {/* ── Moving, which only ever offers what the server offered (6.1) ── */}
       {moving ? (
-        <RescheduleOffer
+        <AvailabilityPanel
+          title={t("booking.detail.moveTo")}
           calendarId={calendarId}
           activityId={appointment.activityId}
-          currentStartUtc={appointment.startUtc}
+          from={pragueDateKey(appointment.startUtc)}
+          to={addDaysToDateOnly(
+            pragueDateKey(appointment.startUtc),
+            RESCHEDULE_WINDOW_DAYS,
+          )}
+          excludeStartUtc={appointment.startUtc}
           busy={busy}
           onPick={(startUtc) => rescheduleMutation.mutate(startUtc)}
+          emptyText={t("booking.detail.noFreeTime")}
           /*
             A conflict already has its own calm line above (6.3); passing it
             down as well printed the server's sentence twice. Only a real
@@ -641,100 +649,6 @@ function StatusButton({
     button
   ) : (
     <Tooltip title={t("booking.detail.notAllowed")}>{button}</Tooltip>
-  );
-}
-
-/**
- * The times a move may go to. 6.1 is absolute: the client never works out what
- * is free, it asks `GET /api/calendars/{id}/availability` and offers exactly
- * what comes back.
- */
-function RescheduleOffer({
-  calendarId,
-  activityId,
-  currentStartUtc,
-  busy,
-  onPick,
-  error,
-}: {
-  calendarId: string;
-  activityId: string;
-  currentStartUtc: string;
-  busy: boolean;
-  onPick: (startUtc: string) => void;
-  error: unknown;
-}) {
-  const { t } = useTranslation();
-  const from = pragueDateKey(currentStartUtc);
-  const to = addDaysToDateOnly(from, RESCHEDULE_WINDOW_DAYS);
-
-  const offer = useQuery({
-    queryKey: ["availability", calendarId, activityId, from, to],
-    queryFn: () =>
-      appointmentsApi.getAvailability(calendarId, activityId, from, to),
-  });
-
-  const byDay = useMemo(() => {
-    const groups = new Map<string, string[]>();
-    for (const slot of offer.data ?? []) {
-      // The slot the appointment already occupies is not a move.
-      if (slot.startUtc === currentStartUtc) continue;
-      const key = pragueDateKey(slot.startUtc);
-      const list = groups.get(key) ?? [];
-      list.push(slot.startUtc);
-      groups.set(key, list);
-    }
-    return [...groups.entries()];
-  }, [offer.data, currentStartUtc]);
-
-  return (
-    <Box
-      sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 2 }}
-    >
-      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-        {t("booking.detail.moveTo")}
-      </Typography>
-      {error ? (
-        <Alert severity="error" sx={{ mb: 1 }}>
-          {errorText(error, t)}
-        </Alert>
-      ) : null}
-      <AsyncSection
-        isLoading={offer.isLoading}
-        error={offer.error}
-        isSettled={offer.isSuccess || offer.isError}
-        isEmpty={byDay.length === 0}
-        emptyText={t("booking.detail.noFreeTime")}
-        onRetry={() => void offer.refetch()}
-        skeletonRows={3}
-      >
-        <Stack spacing={1.5}>
-          {byDay.map(([day, starts]) => (
-            <Box key={day}>
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                {formatPragueDate(starts[0])}
-              </Typography>
-              <Stack
-                direction="row"
-                sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.5 }}
-              >
-                {starts.map((startUtc) => (
-                  <Button
-                    key={startUtc}
-                    size="small"
-                    variant="outlined"
-                    disabled={busy}
-                    onClick={() => onPick(startUtc)}
-                  >
-                    {formatPragueTime(startUtc)}
-                  </Button>
-                ))}
-              </Stack>
-            </Box>
-          ))}
-        </Stack>
-      </AsyncSection>
-    </Box>
   );
 }
 

@@ -31,6 +31,7 @@ import {
 } from "../../api/bookingContracts";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { AppointmentDetail } from "../../components/booking/AppointmentDetail";
+import { NewAppointmentDialog } from "../../components/booking/NewAppointmentDialog";
 import { readableTextOn } from "../../utils/calendarPalette";
 import {
   addDaysToDateOnly,
@@ -104,6 +105,8 @@ export default function CalendarGridPage() {
   const [anchor, setAnchor] = useState<string>(toDateOnly(new Date()));
   const [selected, setSelected] = useState<Set<string> | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  /* 5.9: the dialog is reachable from the calendar and from the overview. */
+  const [booking, setBooking] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const gridRef = useRef<HTMLDivElement | null>(null);
 
@@ -330,6 +333,9 @@ export default function CalendarGridPage() {
           >
             {t("booking.grid.today")}
           </Button>
+          <Button variant="contained" onClick={() => setBooking(true)}>
+            {t("booking.new.title")}
+          </Button>
           {/* Without this the only way to reach a month back was to press the
               arrow week by week - thirty-five presses to reach January. */}
           <TextField
@@ -461,6 +467,16 @@ export default function CalendarGridPage() {
 
       {/* 5.8. The row is gone from the answer once it is cancelled, so the
           dialog closes itself rather than showing a stale copy. */}
+      {booking ? (
+        <NewAppointmentDialog
+          open
+          onClose={() => setBooking(false)}
+          onBooked={() => void appointmentsQuery.refetch()}
+          initialDate={anchor}
+          initialCalendarId={shown.length === 1 ? shown[0].id : undefined}
+        />
+      ) : null}
+
       {openAppointment?.calendarId ? (
         <AppointmentDetail
           appointmentId={openAppointment.id}
