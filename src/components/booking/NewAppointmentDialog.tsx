@@ -22,7 +22,7 @@ import { appointmentsApi } from "../../api/appointments";
 import { activitiesApi } from "../../api/activities";
 import { calendarsApi } from "../../api/calendars";
 import { searchAllPatients, searchRegistry } from "../../api/patientLookup";
-import type { Patient } from "../../api/patients";
+import type { PatientOption } from "../../api/patientLookup";
 import { BookingApiError } from "../../api/apiError";
 import { isKnownPaperworkReason } from "../../api/bookingContracts";
 import { usePermission } from "../../auth/usePermission";
@@ -105,7 +105,7 @@ export function NewAppointmentDialog({
   } | null>(null);
   /* v33: the wider search is a second, deliberate step - never the default. */
   const [alsoUnregistered, setAlsoUnregistered] = useState(false);
-  const [patient, setPatient] = useState<Patient | null>(null);
+  const [patient, setPatient] = useState<PatientOption | null>(null);
 
   /* ── Steps 2 to 5 ── */
   const [calendarId, setCalendarId] = useState(initialCalendarId ?? "");
@@ -300,10 +300,7 @@ export function NewAppointmentDialog({
             {patient ? (
               <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                 <Chip
-                  label={
-                    patient.fullName ??
-                    `${patient.lastName} ${patient.firstName}`
-                  }
+                  label={patient.name || patient.id}
                   onDelete={() => setPatient(null)}
                 />
                 <Button size="small" onClick={() => setPatient(null)}>
@@ -680,8 +677,8 @@ function PatientList({
   patients,
   onPick,
 }: {
-  patients: Patient[];
-  onPick: (p: Patient) => void;
+  patients: PatientOption[];
+  onPick: (p: PatientOption) => void;
 }) {
   return (
     <Stack divider={<Divider />}>
@@ -705,11 +702,10 @@ function PatientList({
           }}
         >
           <Typography sx={{ fontWeight: 600 }}>
-            {p.fullName || `${p.lastName} ${p.firstName}`.trim() || p.id}
+            {p.name || p.id}
           </Typography>
           <Typography variant="caption" sx={{ color: "text.secondary" }}>
             {p.dateOfBirth ? p.dateOfBirth.slice(0, 10) : "—"}
-            {p.phone ? ` · ${p.phone}` : ""}
           </Typography>
         </Box>
       ))}

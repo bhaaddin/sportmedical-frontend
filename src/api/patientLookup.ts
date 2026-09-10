@@ -1,81 +1,51 @@
 import client from './client';
 import { toBookingError } from './apiError';
-import type { Patient } from './patients';
+import { patientRegistryApi } from './patientRegistry';
 
 /**
  * Finding a patient in order to book them - booking contract 5.9 step 1, as
  * v33 describes it.
  *
- * There are two live surfaces and they answer different questions. This matters
- * more than it looks, so both are here with the difference written down rather
- * than one of them chosen quietly.
+ * Two live surfaces answer different questions, and the difference is written
+ * down here rather than one of them being picked quietly:
  *
- *   - **`GET /api/v1/patients`** - the registry. Takes `firstName`,
- *     `lastName`, `dateOfBirth`; **rejects anything else with `400`** rather
- *     than ignoring it, which is the right way round. This is the supported
- *     search and the one that answers "is this person registered here".
- *   - **`GET /api/patients?query=`** - free text over `core.patients`, and it
- *     returns **every** row, including people the registry cannot see.
+ *   - **the registry** (`patientRegistryApi.searchPatients`, `GET
+ *     /api/v1/patients`) - takes `firstName` / `lastName` / `dateOfBirth`, and
+ *     refuses anything else with `400` instead of ignoring it. This answers
+ *     "is this person registered at this clinic".
+ *   - **`GET /api/patients?query=`** - free text over every row, including
+ *     people the registry cannot see.
  *
- * On the gate database today the registry finds nobody at all: all five
- * patients are rows from an older seed that were never registered. They exist
- * and can be booked; the registry simply does not know them. So a dialog that
- * searched only the registry would report "nobody" about people who are
- * plainly there, and a dialog that searched only the free-text surface would
- * never notice that a record is unregistered - which is a thing to fix, not a
- * thing to book on top of.
+ * Both matter. On the gate database most patients are rows from an older seed
+ * that were never registered: they exist and can be booked, and the registry
+ * does not know them. A dialog that asked only the registry would report
+ * "nobody" about people who are plainly there; one that asked only the
+ * free-text surface would never notice a record is unregistered - which is a
+ * thing to put right, not a thing to book on top of and forget.
  *
- * **Both surfaces distinguish diacritics.** `Novák` finds him, `Novak` finds
- * nobody, while case is handled. A receptionist on the phone types without
- * diacritics. That is why an empty result on this screen never says "this
- * person does not exist" - it cannot know that, and saying it is how the
- * second Jan Novák gets created.
+ * **Both distinguish diacritics.** `Novák` finds him, `Novak` finds nobody,
+ * while case is handled either way. A receptionist on the phone types without
+ * diacritics, so an empty result on this screen never says "this person does
+ * not exist". It cannot know that.
  *
- * Measured against the running API on 10. 9. 2026, not read from the contract:
+ * The registry row was measured, not assumed - registered live on 10. 9. 2026
+ * and read off the wire:
  *
- *   /api/v1/patients                 -> 400, "Požadavek obsahuje neplatné údaje."
- *   /api/v1/patients?lastName=Novák  -> 200, zero rows
- *   /api/v1/patients?query=Nov       -> 400, unknown parameter refused
- *   /api/patients?query=Nov          -> 200, Jan Novák
- *   /api/patients?query=Novak        -> 200, zero rows
+ *     [{ "patientId": "e5aa…", "fullName": "Overovaci Pacient",
+ *        "dateOfBirth": "1985-03-14", "sex": "Male",
+ *        "status": "Active", "revision": 1 }]
+ *
+ * A bare array, six fields, and **no `firstName` or `lastName`** - the name
+ * comes back joined even though the search takes it in halves.
  */
 
-/** Rows arrive in more than one wrapper depending on the surface. */
-function extractItems(data: unknown): unknown[] {
-  if (Array.isArray(data)) return data;
-  const box = data as { items?: unknown[]; data?: { items?: unknown[] } } | null;
-  if (Array.isArray(box?.items)) return box.items;
-  if (Array.isArray(box?.data?.items)) return box.data.items;
-  return [];
-}
-
-/**
- * The registry's rows, read defensively.
- *
- * The gate database has no registered patient, so the success shape of
- * `/api/v1/patients` could not be observed - only its `400` and its empty
- * `200`. Rather than assume field names that have never been seen, every field
- * is taken if present and the row still renders without them. When the `app`
- * lane has a registered patient to look at, this is the function to check
- * against a real answer.
- */
-function toPatient(row: unknown): Patient {
-  const r = row as Record<string, unknown>;
-  const str = (key: string): string | undefined =>
-    typeof r[key] === 'string' ? (r[key] as string) : undefined;
-
-  return {
-    id: str('id') ?? str('patientId') ?? '',
-    firstName: str('firstName') ?? str('givenName') ?? '',
-    lastName: str('lastName') ?? str('familyName') ?? str('surname') ?? '',
-    dateOfBirth: str('dateOfBirth') ?? str('birthDate') ?? '',
-    sex: str('sex') ?? '',
-    fullName: str('fullName') ?? str('displayName'),
-    email: str('email'),
-    phone: str('phone') ?? str('phoneNumber'),
-    createdAtUtc: str('createdAtUtc') ?? '',
-    updatedAtUtc: str('updatedAtUtc') ?? '',
-  };
+/** What this screen needs of a patient, from either surface. */
+export interface PatientOption {
+  id: string;
+  name: string;
+  dateOfBirth: string | null;
+  /** False when the row exists but the registry does not know it (v33). */
+  registered: boolean;
 }
 
 export interface RegistryQuery {
@@ -84,39 +54,80 @@ export interface RegistryQuery {
   dateOfBirth?: string;
 }
 
-/** The supported search: registered patients only. Needs at least one field. */
-export async function searchRegistry(query: RegistryQuery): Promise<Patient[]> {
-  const params: Record<string, string> = {};
-  if (query.firstName?.trim()) params.firstName = query.firstName.trim();
-  if (query.lastName?.trim()) params.lastName = query.lastName.trim();
-  if (query.dateOfBirth?.trim()) params.dateOfBirth = query.dateOfBirth.trim();
+/**
+ * The supported search: registered patients only.
+ *
+ * It goes through `patientRegistryApi`, whose `PatientSearchResult` is the
+ * repository's own typed statement of this row. An earlier version of this file
+ * guessed the field names defensively instead - `firstName ?? givenName`,
+ * `lastName ?? familyName ?? surname` - which happened to work because it also
+ * read `fullName`, but was guesswork standing next to a declared type nobody
+ * had looked for.
+ */
+export async function searchRegistry(query: RegistryQuery): Promise<PatientOption[]> {
+  const criteria = {
+    firstName: query.firstName?.trim() || undefined,
+    lastName: query.lastName?.trim() || undefined,
+    dateOfBirth: query.dateOfBirth?.trim() || undefined,
+  };
 
-  /* The registry answers `400` to an empty query, and it is right to. */
-  if (Object.keys(params).length === 0) return [];
-
-  try {
-    const res = await client.get('/api/v1/patients', { params });
-    return extractItems(res.data).map(toPatient);
-  } catch (error) {
-    throw toBookingError(error);
+  /* The registry answers `400` to a query with no criterion, and is right to. */
+  if (!criteria.firstName && !criteria.lastName && !criteria.dateOfBirth) {
+    return [];
   }
+
+  const rows = await patientRegistryApi.searchPatients(criteria);
+  return rows.map((r) => ({
+    id: r.patientId,
+    name: r.fullName,
+    dateOfBirth: r.dateOfBirth ?? null,
+    registered: true,
+  }));
 }
 
 /**
  * The wider search: every row, registered or not.
  *
- * Offered only after the registry found nothing, and its hits are labelled.
- * A record here that the registry does not know is a record to put right -
+ * Offered only after the registry found nothing, and its hits are labelled. A
+ * record here that the registry does not know is a record to put right -
  * booking on top of it is allowed, creating a second one is not.
+ *
+ * This surface has no typed client of its own because it returns whatever
+ * `core.patients` holds, so the fields are read one at a time and a row
+ * survives any of them being absent.
  */
-export async function searchAllPatients(query: string): Promise<Patient[]> {
+export async function searchAllPatients(query: string): Promise<PatientOption[]> {
   if (!query.trim()) return [];
+
   try {
     const res = await client.get('/api/patients', {
       params: { query: query.trim() },
     });
-    return extractItems(res.data).map(toPatient);
+    return extractItems(res.data).map(toOption);
   } catch (error) {
     throw toBookingError(error);
   }
+}
+
+function extractItems(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data;
+  const box = data as { items?: unknown[]; data?: { items?: unknown[] } } | null;
+  if (Array.isArray(box?.items)) return box.items;
+  if (Array.isArray(box?.data?.items)) return box.data.items;
+  return [];
+}
+
+function toOption(row: unknown): PatientOption {
+  const r = row as Record<string, unknown>;
+  const str = (key: string): string | undefined =>
+    typeof r[key] === 'string' ? (r[key] as string) : undefined;
+
+  const joined = [str('lastName'), str('firstName')].filter(Boolean).join(' ');
+
+  return {
+    id: str('id') ?? str('patientId') ?? '',
+    name: str('fullName') ?? joined ?? '',
+    dateOfBirth: str('dateOfBirth') ?? null,
+    registered: false,
+  };
 }
