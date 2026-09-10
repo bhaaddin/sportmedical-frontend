@@ -17,8 +17,8 @@ export default function GdprPage() {
   };
 
   return (
-    <Box maxWidth="lg" mx="auto">
-      <Box display="flex" alignItems="center" gap={1} mb={3}>
+    <Box sx={{ mx: 'auto', maxWidth: 'lg' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
         <SecurityIcon color="primary" sx={{ fontSize: 32 }} />
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 800 }}>GDPR a Souhlasy</Typography>

@@ -165,7 +165,7 @@ export const ConsentManager: React.FC<ConsentManagerProps> = ({
 
   if (isLoading) {
     return (
-      <Box display="flex" justifyContent="center" p={3}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
         <CircularProgress />
       </Box>
     );
@@ -174,7 +174,7 @@ export const ConsentManager: React.FC<ConsentManagerProps> = ({
   return (
     <Card>
       <CardContent>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h6">Správa souhlasů (GDPR)</Typography>
           <Box>
             {isAdminUser && (
@@ -199,10 +199,10 @@ export const ConsentManager: React.FC<ConsentManagerProps> = ({
 
           return (
             <React.Fragment key={type}>
-              <Box py={2}>
-                <Box display="flex" alignItems="center" justifyContent="space-between">
-                  <Box flex={1}>
-                    <Box display="flex" alignItems="center" gap={1}>
+              <Box sx={{ py: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Typography variant="subtitle1">
                         {info.label}
                       </Typography>
@@ -214,15 +214,15 @@ export const ConsentManager: React.FC<ConsentManagerProps> = ({
                       {info.description}
                     </Typography>
                   </Box>
-                  <Box display="flex" alignItems="center" gap={2}>
-                    <Box textAlign="right">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box sx={{ textAlign: 'right' }}>
                       <Chip
                         label={statusInfo.label}
                         color={statusInfo.color}
                         size="small"
                       />
                       {consent && (
-                        <Typography variant="caption" display="block" color="text.secondary">
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                           Udělen: {new Date(consent.grantedAt).toLocaleDateString('cs-CZ')}
                         </Typography>
                       )}

@@ -54,14 +54,37 @@ export default function PatientRecords() {
     <Box>
       {/* Patient Header */}
       <Paper sx={{ p: 3, mb: 3 }}>
-        <Box display="flex" alignItems="center" gap={3}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
           <Avatar sx={{ width: 80, height: 80, bgcolor: '#0D7377', fontSize: 32 }}>
             {patient.firstName[0]}{patient.lastName[0]}
           </Avatar>
-          <Box flex={1}>
+          <Box sx={{ flex: 1 }}>
             <Typography variant="h4" sx={{ fontWeight: 700 }}>{patient.firstName} {patient.lastName}</Typography>
-            <Typography color="text.secondary">{patient.email} • {patient.phone}</Typography>
-            <Chip label={`Pojišťovna: ${patient.insuranceCompany}`} size="small" sx={{ mt: 1 }} />
+            {/*
+              These three used to be printed whatever they held. With no
+              contact on file the line rendered as a lone bullet, and with no
+              insurer the chip read "Pojišťovna: undefined" - the word
+              `undefined` shown to a person about a patient. An absent value is
+              said in words now, or the chip is not drawn at all.
+            */}
+            <Typography color="text.secondary">
+              {[patient.email, patient.phone].filter(Boolean).join(' • ') ||
+                'Kontakt neuveden'}
+            </Typography>
+            {patient.insuranceCompany ? (
+              <Chip
+                label={`Pojišťovna: ${patient.insuranceCompany}`}
+                size="small"
+                sx={{ mt: 1 }}
+              />
+            ) : (
+              <Chip
+                label="Pojišťovna neuvedena"
+                size="small"
+                variant="outlined"
+                sx={{ mt: 1 }}
+              />
+            )}
           </Box>
           <Button variant="outlined" startIcon={<PrintIcon />}>Tisknout</Button>
         </Box>
