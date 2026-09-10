@@ -65,6 +65,33 @@ describe('a patient with no insurer and no contact', () => {
   });
 });
 
+/*
+ * The overview tab labelled the e-mail as "Adresa:" - a label naming a field
+ * this patient does not have, over a value it was not describing. Found in the
+ * failure output of the test above, which prints the whole rendered card.
+ *
+ * What would have to break for these to fail: putting the wrong label back, or
+ * dropping the fallback so an empty value leaves a bare label again.
+ */
+describe('the overview tab', () => {
+  it('labels the e-mail as an e-mail, and claims no address it does not have', async () => {
+    get.mockResolvedValue({ ...{ data: { ...bare, email: 'jan@example.cz' } } });
+    render(<PatientRecords />);
+
+    expect(await screen.findByText('E-mail: jan@example.cz')).toBeInTheDocument();
+    expect(screen.queryByText(/^Adresa:/)).not.toBeInTheDocument();
+  });
+
+  it('says a missing contact in words rather than leaving a bare label', async () => {
+    get.mockResolvedValue({ data: bare });
+    render(<PatientRecords />);
+
+    expect(await screen.findByText('E-mail: neuveden')).toBeInTheDocument();
+    expect(screen.getByText('Telefon: neuveden')).toBeInTheDocument();
+    expect(screen.queryByText(/^(E-mail|Telefon):\s*$/)).not.toBeInTheDocument();
+  });
+});
+
 describe('a patient who does have the details', () => {
   it('shows the insurer and joins contact with a single bullet', async () => {
     get.mockResolvedValue({

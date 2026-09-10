@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Grid, Paper, Typography, Card, CardContent, Avatar,
@@ -117,6 +117,20 @@ export default function Dashboard() {
     }).finally(() => setLoading(false));
   }, []);
 
+  /*
+   * A copy, because `.sort()` reorders in place and this array is React state.
+   * Sorting it directly during render mutated the very value the component was
+   * rendering from - it works until something else reads that state expecting
+   * the order it was given, and then the bug surfaces somewhere unrelated.
+   */
+  const sortedAppointments = useMemo(
+    () =>
+      [...todayAppointments].sort(
+        (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+      ),
+    [todayAppointments],
+  );
+
   const quickActions = [
     { label: 'Nová diagnostika', icon: <Science />, path: '/diagnostics/new', color: '#0D7377', gradient: 'linear-gradient(135deg, #0D7377 0%, #14A3A8 100%)' },
     { label: 'Plánování', icon: <CalendarMonth />, path: '/planovani', color: '#2E7D32', gradient: 'linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%)' },
@@ -181,8 +195,7 @@ export default function Dashboard() {
                 </Box>
               ) : (
                 <Box>
-                  {todayAppointments
-                    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+                  {sortedAppointments
                     .map((appt, i) => {
                       const color = SERVICE_COLORS[appt.serviceType] || '#0D7377';
                       const start = new Date(appt.startTime);

@@ -132,8 +132,21 @@ export default function PatientRecords() {
         <Card>
           <CardContent>
             <Typography variant="h6" sx={{ mb: 2 }}>Kontaktní údaje</Typography>
-            <Typography>Adresa: {patient.email}</Typography>
-            <Typography>Telefon: {patient.phone}</Typography>
+            {/*
+              This said "Adresa:" and printed the e-mail underneath it. The
+              patient this screen loads carries no address at all - there is no
+              such field on it - so the label was naming something that was
+              never there and mislabelling something that was. Renamed to what
+              it actually shows. An address belongs here, but it has to come
+              from the register first; inventing a label for it again would
+              repeat the same fault.
+
+              Both lines also printed a bare label with nothing after it when
+              the value was empty, the way the insurance chip used to print
+              "undefined". An absent value is said in words.
+            */}
+            <Typography>E-mail: {patient.email || 'neuveden'}</Typography>
+            <Typography>Telefon: {patient.phone || 'neuveden'}</Typography>
           </CardContent>
         </Card>
       )}

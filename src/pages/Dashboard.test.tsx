@@ -85,6 +85,35 @@ describe('"Dnes v kalendari"', () => {
     expect(screen.queryByText('Zrušený Termín')).not.toBeInTheDocument();
   });
 
+  /*
+   * The timeline used to call `.sort()` straight on the state array, which
+   * reorders in place - a component rewriting the value it renders from. That
+   * is fixed (the sort now runs on a copy), but there is deliberately no test
+   * asserting the mutation itself, and the reason is worth writing down.
+   *
+   * One was written and it was worthless: `setTodayAppointments` stores
+   * `appts.filter(...)`, which is already a new array, so the in-place sort
+   * only ever reordered an internal copy nothing else could observe. Putting
+   * `.sort()` back on the state left all 26 tests green. It asserted something
+   * that was true either way.
+   *
+   * What is left is the behaviour that can actually break: the day comes out
+   * in time order whatever order it arrived in. Removing the sort turns this
+   * red, which is the whole test the fix can honestly support.
+   */
+  it('still draws the day in chronological order, whatever order it arrived in', async () => {
+    getAppointments.mockResolvedValue([
+      { ...at(9, 'Scheduled', 'late'), patientName: 'Druhý Pacient' },
+      { ...at(8, 'Scheduled', 'early'), patientName: 'První Pacient' },
+    ]);
+
+    const { container } = render(<MemoryRouter><Dashboard /></MemoryRouter>);
+    await screen.findByText('První Pacient');
+
+    const text = container.textContent ?? '';
+    expect(text.indexOf('První Pacient')).toBeLessThan(text.indexOf('Druhý Pacient'));
+  });
+
   it('shows the empty state when every appointment of the day was cancelled', async () => {
     getAppointments.mockResolvedValue([at(8, 'Cancelled', 'a'), at(9, 'Cancelled', 'b')]);
 
