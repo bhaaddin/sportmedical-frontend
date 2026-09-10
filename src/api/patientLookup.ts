@@ -23,10 +23,14 @@ import { patientRegistryApi } from './patientRegistry';
  * free-text surface would never notice a record is unregistered - which is a
  * thing to put right, not a thing to book on top of and forget.
  *
- * **Both distinguish diacritics.** `Novák` finds him, `Novak` finds nobody,
- * while case is handled either way. A receptionist on the phone types without
- * diacritics, so an empty result on this screen never says "this person does
- * not exist". It cannot know that.
+ * **Diacritics no longer matter** - `Novak` finds Novák on every surface as of
+ * 10. 9. 2026, on rows the migration backfilled as well as on ones written
+ * since. Verified through HTTP on all three: `Cerna` finds Anna Černá, who is
+ * an old seed row, and `Novakova` finds Žofie Nováková through the registry.
+ *
+ * An empty result still never says "this person does not exist", because it
+ * still cannot know that: the registry only sees patients with a provenance
+ * row, and most of this database has none.
  *
  * The registry row was measured, not assumed - registered live on 10. 9. 2026
  * and read off the wire:
