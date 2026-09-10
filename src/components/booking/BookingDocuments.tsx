@@ -488,7 +488,7 @@ export function BookingDocumentView({ data }: { data: any }) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700 }} sx={{ mb: 1 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
           Zdravotní dotazník {data.signedAt ? `— podepsáno ${new Date(data.signedAt).toLocaleDateString('cs-CZ')}` : ''}
         </Typography>
         {h?.sport?.hlavniSport && (
@@ -522,7 +522,7 @@ export function BookingDocumentView({ data }: { data: any }) {
 
       {data.guardian && (
         <Paper variant="outlined" sx={{ p: 2, borderColor: '#ED6C02' }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }} sx={{ mb: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
             Zákonný zástupce: {data.guardian.zastupceJmeno}
           </Typography>
           <Typography variant="body2">
@@ -535,7 +535,7 @@ export function BookingDocumentView({ data }: { data: any }) {
 
       {data.signature && (
         <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }} sx={{ mb: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
             <Edit sx={{ fontSize: 14, mr: 0.5, verticalAlign: 'middle' }} />Podpis
           </Typography>
           <Box component="img" src={data.signature} alt="Podpis" sx={{ maxWidth: 300, border: '1px solid #eee', borderRadius: 1, bgcolor: '#fafafa' }} />

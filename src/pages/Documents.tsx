@@ -58,16 +58,35 @@ export default function Documents() {
     }
   }, [selectedPatient]);
 
-  const handleUpload = async (file: File) => {
-    if (!selectedPatient || !uploadDialog.templateId) return;
-    try {
-      await documentsApi.upload(selectedPatient, uploadDialog.templateId, file);
-      toast.success('Dokument nahrán');
-      setUploadDialog({ open: false, templateId: '' });
-      documentsApi.getPatientDocuments(selectedPatient).then(setPatientDocs).catch(() => {});
-    } catch {
-      toast.error('Chyba při nahrávání');
-    }
+  /*
+   * There is no upload endpoint in this API, and this screen has been offering
+   * one. Measured against the running server on 10. 9. 2026, with a control
+   * sample so a `404` could be told apart from a request that never arrived:
+   *
+   *   POST /api/documents/upload  (JSON)       400, and it wants `FilePath`
+   *   POST /api/documents/upload  (multipart)  415 Unsupported Media Type
+   *   POST /api/documents/files                404
+   *   POST /api/files/upload                   404
+   *   POST /api/documents/nezmysel             404   <- the control
+   *
+   * `documentsApi.upload` posts `{ patientId, templateId, filePath }` as JSON,
+   * where `filePath` is a **string path to a file that already exists on the
+   * server**. Handing it a `File` serialised to `{}`, so every attempt went out
+   * malformed, came back `400`, and the user was told "Chyba při nahrávání" -
+   * an error with nothing in it, which they would reasonably read as a problem
+   * with their PDF.
+   *
+   * The type error could have been silenced by passing `file.name`. That would
+   * have been worse than the bug: a bare filename is a plausible-looking path,
+   * the call might well have succeeded, and the patient would have a document
+   * registered against a file that is not there. A visible failure is better
+   * than a false success.
+   *
+   * So nothing is sent. The dialog says what is missing and the picker is gone
+   * until there is somewhere for a file to go. Reported to the `app` lane.
+   */
+  const handleUpload = async (_file: File) => {
+    toast.error('Nahrávání souborů zatím není — chybí koncový bod na serveru.');
   };
 
   const getDocStatus = (templateId: string) => {
@@ -230,17 +249,20 @@ export default function Documents() {
           <Typography variant="h6" sx={{ fontWeight: 700 }}>Nahrát dokument</Typography>
         </DialogTitle>
         <DialogContent>
-          <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
-            Vyberte PDF soubor pro nahrání
+          {/*
+            The picker is not drawn, because there is nothing behind it. Saying
+            so beats a button that takes a file and loses it.
+          */}
+          <Alert severity="warning" sx={{ borderRadius: 2 }}>
+            <Typography sx={{ fontWeight: 600, mb: 0.5 }}>
+              Nahrát soubor zatím nelze
+            </Typography>
+            <Typography variant="body2">
+              Server pro dokumenty přijímá jen cestu k souboru, který už na něm
+              je — koncový bod pro nahrání zatím neexistuje. Dokud nebude, soubor
+              se sem dostat nedá; nahlášeno.
+            </Typography>
           </Alert>
-          <Button variant="outlined" component="label" startIcon={<CloudUpload />}
-            sx={{ width: '100%', py: 3, borderRadius: 2, borderStyle: 'dashed', borderWidth: 2 }}>
-            Vybrat soubor
-            <input type="file" hidden accept=".pdf" onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleUpload(file);
-            }} />
-          </Button>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setUploadDialog({ open: false, templateId: '' })} sx={{ borderRadius: 2 }}>Zrušit</Button>
