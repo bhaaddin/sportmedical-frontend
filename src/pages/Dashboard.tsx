@@ -109,13 +109,17 @@ export default function Dashboard() {
       calendarApi.getAppointments(todayStr, tomorrow.toISOString()).catch(() => []),
     ]).then(([pats, appts]) => {
       setPatients(pats);
-      setTodayAppointments(appts);
+      /* The legacy read hands back cancelled appointments too, with status
+         "Cancelled" - 8 of 13 rows on the day this was measured. Counting the
+         rows made "Dnes v kalendari" report them as booked today. Dropped
+         once, here, so the three tiles and the list below cannot disagree. */
+      setTodayAppointments(appts.filter((a) => a.status !== 'Cancelled'));
     }).finally(() => setLoading(false));
   }, []);
 
   const quickActions = [
     { label: 'Nová diagnostika', icon: <Science />, path: '/diagnostics/new', color: '#0D7377', gradient: 'linear-gradient(135deg, #0D7377 0%, #14A3A8 100%)' },
-    { label: 'Kalendář', icon: <CalendarMonth />, path: '/calendar', color: '#2E7D32', gradient: 'linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%)' },
+    { label: 'Plánování', icon: <CalendarMonth />, path: '/planovani', color: '#2E7D32', gradient: 'linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%)' },
     { label: 'Registrace pacienta', icon: <PersonAdd />, path: '/patients/register', color: '#0288D1', gradient: 'linear-gradient(135deg, #0288D1 0%, #039BE5 100%)' },
     { label: 'Fakturace', icon: <Receipt />, path: '/billing', color: '#ED6C02', gradient: 'linear-gradient(135deg, #ED6C02 0%, #FF9800 100%)' },
   ];
@@ -162,7 +166,7 @@ export default function Dashboard() {
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>Dnešní harmonogram</Typography>
                   <Typography variant="body2" color="text.secondary">Časová osa dnešních schůzek</Typography>
                 </Box>
-                <Button size="small" onClick={() => navigate('/calendar')} sx={{ color: '#0D7377', fontWeight: 600 }}>
+                <Button size="small" onClick={() => navigate('/planovani')} sx={{ color: '#0D7377', fontWeight: 600 }}>
                   Zobrazit kalendář →
                 </Button>
               </Box>
@@ -170,7 +174,7 @@ export default function Dashboard() {
                 <Box sx={{ textAlign: 'center', py: 4, bgcolor: '#f8f9fa', borderRadius: 2 }}>
                   <CalendarMonth sx={{ fontSize: 48, color: '#ddd', mb: 1 }} />
                   <Typography color="text.secondary">Žádné schůzky na dnešek</Typography>
-                  <Button variant="contained" size="small" onClick={() => navigate('/calendar')}
+                  <Button variant="contained" size="small" onClick={() => navigate('/planovani')}
                     sx={{ mt: 1, bgcolor: '#0D7377', borderRadius: 2 }}>
                     Otevřít kalendář
                   </Button>

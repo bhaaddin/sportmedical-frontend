@@ -121,7 +121,13 @@ export default function PatientDrawer() {
 
     patientsApi.getById(drawerPatientId).then(setPatient).catch(() => {});
     calendarApi.getAppointments().then(appts => {
-      setAppointments(appts.filter(a => a.patientId === drawerPatientId).slice(0, 5));
+      /* Cancelled ones come back from this read as well; showing them among a
+         patient's last five made cancelled visits look like kept ones. */
+      setAppointments(
+        appts
+          .filter(a => a.patientId === drawerPatientId && a.status !== 'Cancelled')
+          .slice(0, 5),
+      );
     }).catch(() => {});
     diagnosticsApi.getByPatient(drawerPatientId).then(setSessions).catch(() => {});
 

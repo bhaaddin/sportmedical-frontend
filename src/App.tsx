@@ -27,7 +27,7 @@ const PatientList = lazy(() => import('./pages/PatientList'));
 const PatientDetails = lazy(() => import('./pages/PatientDetails'));
 const Reports = lazy(() => import('./pages/Reports'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
-const CalendarPage = lazy(() => import('./pages/Calendar'));
+const CalendarMovedPage = lazy(() => import('./pages/CalendarMoved'));
 const BillingPage = lazy(() => import('./pages/Billing'));
 const StaffPage = lazy(() => import('./pages/Staff'));
 const InventoryPage = lazy(() => import('./pages/Inventory'));
@@ -125,7 +125,6 @@ const menuGroups: MenuItemGroup[] = [
     label: '',
     items: [
       { text: 'Pacienti', icon: <People />, path: '/patients' },
-      { text: 'Kalendář', icon: <CalendarMonth />, path: '/calendar' },
       { text: 'Diagnostika', icon: <Science />, path: '/diagnostics/new' },
       { text: 'Fakturace', icon: <Receipt />, path: '/billing' },
       { text: 'Pokladna', icon: <AttachMoney />, path: '/cashier' },
@@ -359,7 +358,7 @@ export default function App() {
                   <Suspense fallback={<PageLoader />}>
                   <Routes>
                     <Route path="/" element={<DashboardPage />} />
-                    <Route path="/calendar" element={<CalendarPage />} />
+                    <Route path="/calendar" element={<CalendarMovedPage />} />
                     <Route path="/patients" element={<PatientList />} />
                     <Route path="/patients/register" element={<PatientRegistrationPage />} />
                     <Route path="/patients/:id/edit" element={<PatientFormPage />} />

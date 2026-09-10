@@ -62,7 +62,7 @@ export default function UniversalSearch() {
   /* ── Static page results for navigation ── */
   const pages: SearchResult[] = useMemo(() => [
     { id: 'p-dashboard', title: 'Dashboard', subtitle: 'Přehled', type: 'page', icon: <Settings />, path: '/', color: '#0D7377' },
-    { id: 'p-calendar', title: 'Kalendář', subtitle: 'Správa termínů', type: 'page', icon: <CalendarMonth />, path: '/calendar', color: '#0D7377' },
+    { id: 'p-calendar', title: 'Plánování', subtitle: 'Správa termínů', type: 'page', icon: <CalendarMonth />, path: '/planovani', color: '#0D7377' },
     { id: 'p-patients', title: 'Pacienti', subtitle: 'Seznam pacientů', type: 'page', icon: <People />, path: '/patients', color: '#0288D1' },
     { id: 'p-billing', title: 'Fakturace', subtitle: 'Správa faktur', type: 'page', icon: <Receipt />, path: '/billing', color: '#ED6C02' },
     { id: 'p-injuries', title: 'Poranění', subtitle: 'Evidence poranění', type: 'page', icon: <Warning />, path: '/injuries', color: '#D32F2F' },
@@ -141,10 +141,14 @@ export default function UniversalSearch() {
 
       /* Appointments */
       if (appointments.status === 'fulfilled') {
+        /* This read returns cancelled appointments too, and search offered them
+           with no sign they were cancelled - a receptionist reading the result
+           would have told a patient a slot was still theirs. */
         for (const a of appointments.value.filter(
-          x => x.patientName?.toLowerCase().includes(lower) ||
+          x => x.status !== 'Cancelled' &&
+              (x.patientName?.toLowerCase().includes(lower) ||
                x.serviceType?.toLowerCase().includes(lower) ||
-               x.practitionerName?.toLowerCase().includes(lower)
+               x.practitionerName?.toLowerCase().includes(lower))
         ).slice(0, 3)) {
           found.push({
             id: `apt-${a.id}`,
@@ -152,7 +156,7 @@ export default function UniversalSearch() {
             subtitle: `${a.patientName || a.patientId} · ${new Date(a.startTime).toLocaleDateString('cs-CZ')}`,
             type: 'appointment',
             icon: <CalendarMonth />,
-            path: '/calendar',
+            path: '/planovani',
             color: '#0D7377',
           });
         }

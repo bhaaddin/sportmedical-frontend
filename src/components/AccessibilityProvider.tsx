@@ -38,7 +38,7 @@ export function AccessibilityProvider({ children }: { children: React.ReactNode 
       // Alt+2 → Calendar
       if (e.altKey && e.key === '2') {
         e.preventDefault();
-        window.location.href = '/calendar';
+        window.location.href = '/planovani';
       }
       // Alt+3 → Patients
       if (e.altKey && e.key === '3') {

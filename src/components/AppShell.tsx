@@ -21,7 +21,7 @@ import { cs } from 'date-fns/locale';
 /* ── Navigation items ── */
 const menuItems = [
   { text: 'Dashboard', icon: <Dashboard />, path: '/' },
-  { text: 'Kalendář', icon: <CalendarMonth />, path: '/calendar' },
+  { text: 'Plánování', icon: <CalendarMonth />, path: '/planovani' },
   { text: 'Pacienti', icon: <People />, path: '/patients' },
   { text: 'Měření', icon: <MonitorHeart />, path: '/measurements' },
   { text: 'Diagnostics', icon: <Science />, path: '/diagnostics/new' },
