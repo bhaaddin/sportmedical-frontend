@@ -269,8 +269,13 @@ export default function UniversalSearch() {
                 <ListItemText
                   primary={r.title}
                   secondary={r.subtitle}
-                  primaryTypographyProps={{ fontWeight: 600, fontSize: 14 }}
-                  secondaryTypographyProps={{ fontSize: 12, color: 'text.secondary' }}
+                  slotProps={{
+                    /* One `slotProps` per element - two of them and JSX keeps
+                       only the later. And these are system shorthands, so they
+                       belong in `sx` rather than on the Typography itself. */
+                    primary: { sx: { fontWeight: 600, fontSize: 14 } },
+                    secondary: { sx: { fontSize: 12, color: 'text.secondary' } },
+                  }}
                 />
                 <Chip label={typeLabel[r.type]} size="small"
                   sx={{ bgcolor: `${r.color}12`, color: r.color, fontSize: 10, height: 20 }} />

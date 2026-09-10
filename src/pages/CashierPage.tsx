@@ -11,6 +11,14 @@ import { servicesApi } from '../api/services';
 import { patientsApi, type Patient } from '../api/patients';
 import toast from 'react-hot-toast';
 
+/** The four the API has (4.x `PaymentMethod`); anything else falls back to cash. */
+function toPaymentMethod(value: string): PaymentMethod {
+  const n = Number(value);
+  return (Object.values(PaymentMethod) as number[]).includes(n)
+    ? (n as PaymentMethod)
+    : PaymentMethod.Cash;
+}
+
 const METHOD_LABELS: Record<number, string> = {
   [PaymentMethod.Cash]: 'Hotovost',
   [PaymentMethod.Card]: 'Karta',
@@ -29,7 +37,12 @@ export default function CashierPage() {
   const [services, setServices] = useState<any[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({ serviceId: '', patientId: '', paymentMethod: PaymentMethod.Cash as number, discount: 0 });
+  const [form, setForm] = useState({
+    serviceId: '',
+    patientId: '',
+    paymentMethod: PaymentMethod.Cash as PaymentMethod,
+    discount: 0,
+  });
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
@@ -200,8 +213,15 @@ export default function CashierPage() {
               onChange={(_, v) => setForm(f => ({ ...f, patientId: v?.id ?? '' }))}
               renderInput={params => <TextField {...params} label="Pacient (začněte psát)" />}
             />
+            {/*
+              The state used to be widened to `number`, which let any integer
+              through as a payment method. It is the union of the four real ones
+              now, and the select's value is checked against them rather than
+              cast - a select cannot produce anything else today, but nothing
+              stops the next person reading this value from somewhere that can.
+            */}
             <TextField select fullWidth label="Způsob platby" value={form.paymentMethod}
-              onChange={e => setForm(f => ({ ...f, paymentMethod: Number(e.target.value) }))}>
+              onChange={e => setForm(f => ({ ...f, paymentMethod: toPaymentMethod(e.target.value) }))}>
               {Object.entries(METHOD_LABELS).map(([v, l]) => (
                 <MenuItem key={v} value={Number(v)}>{l}</MenuItem>
               ))}

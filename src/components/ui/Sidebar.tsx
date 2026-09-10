@@ -111,10 +111,10 @@ export default function Sidebar({
             <>
               <ListItemText
                 primary={item.label}
-                primaryTypographyProps={{
+                slotProps={{ primary: {
                   fontSize: '0.875rem',
                   fontWeight: active ? 600 : 400,
-                }}
+                } }}
               />
               {hasChildren && (isExpanded ? <ExpandLess /> : <ExpandMore />)}
             </>

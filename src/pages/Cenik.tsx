@@ -81,9 +81,9 @@ export default function Cenik() {
           placeholder="Hledat službu..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          InputProps={{
+          slotProps={{ input: {
             startAdornment: <InputAdornment position="start"><Search /></InputAdornment>,
-          }}
+          } }}
           sx={{ mb: 3, '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
         />
       </motion.div>

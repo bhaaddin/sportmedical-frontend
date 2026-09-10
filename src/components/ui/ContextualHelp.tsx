@@ -40,7 +40,7 @@ export default function ContextualHelp({ title = 'Nápověda', items, defaultExp
           {items.map((item) => (
             <ListItem key={item.id} alignItems="flex-start">
               <ListItemIcon sx={{ minWidth: 40, mt: 0.5 }}>{item.icon || typeIcons[item.type || 'info']}</ListItemIcon>
-              <ListItemText primary={item.title} secondary={item.content} primaryTypographyProps={{ variant: 'subtitle2' }} secondaryTypographyProps={{ variant: 'body2' }} />
+              <ListItemText primary={item.title} secondary={item.content} slotProps={{ primary: { variant: 'subtitle2' }, secondary: { variant: 'body2' } }} />
             </ListItem>
           ))}
         </List>
