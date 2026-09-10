@@ -21,7 +21,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { appointmentsApi } from "../../api/appointments";
 import { activitiesApi } from "../../api/activities";
 import { calendarsApi } from "../../api/calendars";
-import { searchPatientsForBooking } from "../../api/patientLookup";
+import { searchAllPatients, searchRegistry } from "../../api/patientLookup";
 import type { Patient } from "../../api/patients";
 import { BookingApiError } from "../../api/apiError";
 import { isKnownPaperworkReason } from "../../api/bookingContracts";
@@ -90,9 +90,21 @@ export function NewAppointmentDialog({
   const queryClient = useQueryClient();
   const mayOverride = usePermission("calendar:force_override");
 
-  /* ── Step 1: the patient, and nothing else until there is one ── */
-  const [term, setTerm] = useState("");
-  const [submitted, setSubmitted] = useState("");
+  /*
+   * ── Step 1: the patient, and nothing else until there is one ──
+   *
+   * Two fields rather than one box, because that is what the registry takes
+   * (`firstName`, `lastName`); a single free-text box would have to guess which
+   * half of "Jan Novák" is which, and guess wrong on "Anna Marie Černá".
+   */
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [submitted, setSubmitted] = useState<{
+    firstName: string;
+    lastName: string;
+  } | null>(null);
+  /* v33: the wider search is a second, deliberate step - never the default. */
+  const [alsoUnregistered, setAlsoUnregistered] = useState(false);
   const [patient, setPatient] = useState<Patient | null>(null);
 
   /* ── Steps 2 to 5 ── */
@@ -114,9 +126,22 @@ export function NewAppointmentDialog({
   } | null>(null);
 
   const searchQuery = useQuery({
-    queryKey: ["patient-search", submitted],
-    queryFn: () => searchPatientsForBooking(submitted),
-    enabled: open && submitted.trim().length > 0,
+    queryKey: ["patient-registry", submitted?.firstName, submitted?.lastName],
+    queryFn: () => searchRegistry(submitted ?? {}),
+    enabled: open && submitted !== null,
+  });
+
+  /*
+   * The same terms against every row, registered or not. Runs only when the
+   * operator asks for it, after the registry came back empty.
+   */
+  const widerQuery = useQuery({
+    queryKey: ["patient-all", submitted?.firstName, submitted?.lastName],
+    queryFn: () =>
+      searchAllPatients(
+        [submitted?.lastName, submitted?.firstName].filter(Boolean).join(" "),
+      ),
+    enabled: open && alsoUnregistered && submitted !== null,
   });
 
   const calendarsQuery = useQuery({
@@ -182,9 +207,16 @@ export function NewAppointmentDialog({
     },
   });
 
+  const submit = () => {
+    setAlsoUnregistered(false);
+    setSubmitted({ firstName, lastName });
+  };
+
   const reset = () => {
-    setTerm("");
-    setSubmitted("");
+    setFirstName("");
+    setLastName("");
+    setSubmitted(null);
+    setAlsoUnregistered(false);
     setPatient(null);
     setActivityId("");
     setStartUtc(null);
@@ -279,88 +311,116 @@ export function NewAppointmentDialog({
                 </Button>
               </Stack>
             ) : (
-              <Stack spacing={1}>
-                <Stack direction="row" spacing={1}>
+              <Stack spacing={1.5}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                   <TextField
                     fullWidth
                     size="small"
                     autoFocus
-                    label={t("booking.new.searchLabel")}
-                    value={term}
-                    onChange={(e) => setTerm(e.target.value)}
+                    label={t("booking.new.firstName")}
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") setSubmitted(term);
+                      if (e.key === "Enter") submit();
+                    }}
+                  />
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label={t("booking.new.lastName")}
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") submit();
                     }}
                   />
                   <Button
                     variant="outlined"
-                    disabled={term.trim().length === 0}
-                    onClick={() => setSubmitted(term)}
+                    disabled={
+                      firstName.trim().length === 0 &&
+                      lastName.trim().length === 0
+                    }
+                    onClick={submit}
                   >
                     {t("booking.new.search")}
                   </Button>
                 </Stack>
 
-                {submitted.trim().length > 0 ? (
+                {submitted ? (
                   <AsyncSection
                     isLoading={searchQuery.isLoading}
                     isSettled={searchQuery.isSuccess || searchQuery.isError}
                     error={searchQuery.error}
                     isEmpty={(searchQuery.data ?? []).length === 0}
                     /*
-                      5.9: an empty result must not read as "this person does
-                      not exist" - that is how the second Anna Černá gets
-                      created. Two true things are said instead: the register
-                      is where a patient is created, and the search still
-                      distinguishes diacritics (reported to the `app` lane on
-                      10. 9. 2026; delete this half of the sentence when they
-                      fix it).
+                      5.9 and v33: an empty result must never read as "this
+                      person does not exist". It cannot know that. Both searches
+                      distinguish diacritics, and the registry does not see
+                      records that were never registered - so the sentence says
+                      what an empty answer actually means and offers the wider
+                      search rather than the "create" button.
                     */
-                    emptyText={t("booking.new.notFound")}
+                    emptyText={t("booking.new.notFoundRegistry")}
                     onRetry={() => void searchQuery.refetch()}
                     skeletonRows={2}
                   >
-                    <Stack divider={<Divider />}>
-                      {(searchQuery.data ?? []).slice(0, 12).map((p) => (
-                        <Box
-                          key={p.id}
-                          component="button"
-                          type="button"
-                          onClick={() => setPatient(p)}
-                          sx={{
-                            textAlign: "left",
-                            border: "none",
-                            background: "none",
-                            font: "inherit",
-                            cursor: "pointer",
-                            py: 1,
-                            "&:focus-visible": {
-                              outline: "3px solid",
-                              outlineColor: "primary.main",
-                            },
-                          }}
-                        >
-                          <Typography sx={{ fontWeight: 600 }}>
-                            {p.fullName ?? `${p.lastName} ${p.firstName}`}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            sx={{ color: "text.secondary" }}
-                          >
-                            {p.dateOfBirth?.slice(0, 10) ?? "—"}
-                            {p.phone ? ` · ${p.phone}` : ""}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Stack>
+                    <PatientList
+                      patients={searchQuery.data ?? []}
+                      onPick={setPatient}
+                    />
                   </AsyncSection>
                 ) : null}
 
-                {searchQuery.isSuccess &&
+                {/*
+                  v33. Offered only once the registry came back empty, and
+                  never as the default: a hit here that the registry does not
+                  know means "exists but is not registered" - something to put
+                  right, not a reason to create a second person.
+                */}
+                {submitted &&
+                searchQuery.isSuccess &&
                 (searchQuery.data ?? []).length === 0 ? (
-                  <MuiLink component={RouterLink} to="/patients/register">
-                    {t("booking.new.registerLink")}
-                  </MuiLink>
+                  <Stack spacing={1}>
+                    {!alsoUnregistered ? (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => setAlsoUnregistered(true)}
+                      >
+                        {t("booking.new.searchWider")}
+                      </Button>
+                    ) : (
+                      <Box>
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ fontWeight: 600, mb: 0.5 }}
+                        >
+                          {t("booking.new.unregisteredTitle")}
+                        </Typography>
+                        <AsyncSection
+                          isLoading={widerQuery.isLoading}
+                          isSettled={widerQuery.isSuccess || widerQuery.isError}
+                          error={widerQuery.error}
+                          isEmpty={(widerQuery.data ?? []).length === 0}
+                          emptyText={t("booking.new.notFoundAnywhere")}
+                          onRetry={() => void widerQuery.refetch()}
+                          skeletonRows={2}
+                        >
+                          <Alert severity="warning" sx={{ mb: 1 }}>
+                            {t("booking.new.unregisteredWarning")}
+                          </Alert>
+                          <PatientList
+                            patients={widerQuery.data ?? []}
+                            onPick={setPatient}
+                          />
+                        </AsyncSection>
+                      </Box>
+                    )}
+
+                    <MuiLink component={RouterLink} to="/patients/register">
+                      {t("booking.new.registerLink")}
+                    </MuiLink>
+                  </Stack>
                 ) : null}
               </Stack>
             )}
@@ -608,6 +668,52 @@ export function NewAppointmentDialog({
         </Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+/**
+ * The rows a search came back with. One component for both surfaces, so the
+ * registry's answer and the wider one cannot start looking different from each
+ * other by accident.
+ */
+function PatientList({
+  patients,
+  onPick,
+}: {
+  patients: Patient[];
+  onPick: (p: Patient) => void;
+}) {
+  return (
+    <Stack divider={<Divider />}>
+      {patients.slice(0, 12).map((p) => (
+        <Box
+          key={p.id}
+          component="button"
+          type="button"
+          onClick={() => onPick(p)}
+          sx={{
+            textAlign: "left",
+            border: "none",
+            background: "none",
+            font: "inherit",
+            cursor: "pointer",
+            py: 1,
+            "&:focus-visible": {
+              outline: "3px solid",
+              outlineColor: "primary.main",
+            },
+          }}
+        >
+          <Typography sx={{ fontWeight: 600 }}>
+            {p.fullName || `${p.lastName} ${p.firstName}`.trim() || p.id}
+          </Typography>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            {p.dateOfBirth ? p.dateOfBirth.slice(0, 10) : "—"}
+            {p.phone ? ` · ${p.phone}` : ""}
+          </Typography>
+        </Box>
+      ))}
+    </Stack>
   );
 }
 

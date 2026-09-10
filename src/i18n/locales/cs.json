@@ -395,8 +395,6 @@
       "step3": "3. Čas z nabídky",
       "step4": "4. Poznámka",
       "search": "Hledat",
-      "searchLabel": "Jméno, příjmení nebo rodné číslo",
-      "notFound": "Nikdo se nenašel. Pacienta je potřeba nejprve založit v registru — objednání pacienta nezakládá. Vyhledávání zatím rozlišuje diakritiku, tak zkuste i „Černá“ místo „Cerna“.",
       "registerLink": "Založit pacienta v registru",
       "changePatient": "Změnit pacienta",
       "calendar": "Kalendář",
@@ -415,7 +413,14 @@
       "overrideReason": "Důvod přetlačení",
       "overrideBook": "Přetlačit a objednat",
       "noCalendars": "Nemáte přístup k žádnému kalendáři. Bez kalendáře nelze objednat.",
-      "noActivities": "Není zavedena žádná činnost. Nejprve ji přidejte v Činnostech."
+      "noActivities": "Není zavedena žádná činnost. Nejprve ji přidejte v Činnostech.",
+      "firstName": "Jméno",
+      "lastName": "Příjmení",
+      "notFoundRegistry": "V registru nikdo takový není. Prázdný výsledek ale neznamená, že pacient neexistuje: hledání zatím rozlišuje diakritiku (zkuste „Novák“ místo „Novak“) a starší záznamy nemusí být v registru vedené. Než založíte nového, prohledejte i neregistrované.",
+      "searchWider": "Hledat i mezi neregistrovanými",
+      "unregisteredTitle": "Neregistrované záznamy",
+      "unregisteredWarning": "Tito lidé v systému jsou, ale register je nevede. Objednat je lze. Nezakládejte je znovu — vznikl by druhý záznam a rozdělil by historii vyšetření. Chybějící registraci nahlaste.",
+      "notFoundAnywhere": "Nenašlo se nic ani mezi neregistrovanými. Zkuste jiný tvar jména s diakritikou; teprve potom zakládejte nového pacienta."
     }
   }
 }
