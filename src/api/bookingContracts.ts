@@ -27,9 +27,22 @@ export function parseResponse<T>(schema: z.ZodType<T>, payload: unknown): T {
   return schema.parse(unwrapApiResult(payload));
 }
 
+/**
+ * An instant on the wire. 3.3 says UTC, and this holds the API to it - but UTC
+ * has two spellings and the same server uses both: appointments come back
+ * `2026-09-15T06:00:00Z` while partner orders come back
+ * `2026-09-10T09:22:00.297664+00:00`. Both are the same moment.
+ *
+ * Insisting on the `Z` form cost a screen: the partner list parsed clean in
+ * every field except two timestamps, and the whole page rendered nothing.
+ * A zero offset is accepted; a non-zero one is still refused, because that
+ * would be a real breach of 3.3 rather than a spelling of it.
+ */
 const isoUtc = z
   .string()
-  .refine((v) => v.endsWith('Z'), { message: 'expected an ISO 8601 instant in UTC' });
+  .refine((v) => /(?:Z|[+-]00:00)$/.test(v), {
+    message: 'expected an ISO 8601 instant in UTC',
+  });
 
 const dateOnly = z
   .string()
@@ -518,6 +531,107 @@ export const bookedAppointmentSchema = z.object({
   warnings: z.array(activityWarningSchema).nullish().transform((v) => v ?? []),
 });
 export type BookedAppointment = z.infer<typeof bookedAppointmentSchema>;
+
+
+/* ── 4.7 Partner reservations (screens 5.10, 5.11) ── */
+
+/**
+ * What kind of partner an order belongs to.
+ *
+ * A **third** numeric enum in this contract, after `status` and the history
+ * `action`, and the only one the document does not tabulate - 4.7 says "klub /
+ * agentúra / iné" in prose and the API takes `0` / `1` / `2`. Measured on
+ * 10. 9. 2026 by sending each: all three are accepted, and the strings that
+ * would match the prose are refused with `400`.
+ *
+ * The order is taken from the prose in 4.7 and is therefore the one thing here
+ * that is inferred rather than measured. Reported to the booking lane; until
+ * they tabulate it, an unknown value renders as unknown rather than guessing.
+ */
+export const PARTNER_TYPE_NAMES: Record<number, string> = {
+  0: 'club',
+  1: 'agency',
+  2: 'other',
+};
+export function partnerTypeName(code: number): string | null {
+  return PARTNER_TYPE_NAMES[code] ?? null;
+}
+
+/** One activity a partner asked for. Counts come from appointments (4.7). */
+export const partnerOrderItemSchema = z.object({
+  activityId: z.string(),
+  activityName: z.string().nullish().transform((v) => v ?? ''),
+  durationMinutes: z.number().int(),
+  requestedCount: z.number().int(),
+  bookedCount: z.number().int(),
+  remaining: z.number().int(),
+  requiredMinutes: z.number().int(),
+});
+export type PartnerOrderItem = z.infer<typeof partnerOrderItemSchema>;
+
+/**
+ * A day and time held for the partner.
+ *
+ * **The deadline lives here, not on the order.** 4.7 is explicit: `releaseDate`
+ * is per window, and extending it is a `PUT` on the order's `deadlines` rather
+ * than an `/extend` action, which does not exist.
+ */
+export const partnerWindowSchema = z.object({
+  id: z.string(),
+  date: dateOnly,
+  startTime: z.string(),
+  endTime: z.string(),
+  coveredMinutes: z.number().int(),
+  releaseDate: dateOnly.nullish().transform((v) => v ?? null),
+  warnDate: dateOnly.nullish().transform((v) => v ?? null),
+  partnerReminderDate: dateOnly.nullish().transform((v) => v ?? null),
+  releasedAt: isoUtc.nullish().transform((v) => v ?? null),
+  isExclusive: z.boolean(),
+});
+export type PartnerWindow = z.infer<typeof partnerWindowSchema>;
+
+/**
+ * 4.7 `PartnerOrderView`.
+ *
+ * `bookedCount`, `remaining` and the minute totals are **computed from
+ * appointments on every read**. The screen must never keep a running total of
+ * its own beside them - 4.7 says so, and two numbers over one fact drift.
+ */
+export const partnerOrderSchema = z.object({
+  id: z.string(),
+  calendarId: z.string(),
+  partnerName: z.string(),
+  partnerType: z.number().int(),
+  note: z.string().nullish().transform((v) => v ?? ''),
+  contactEmail: z.string().nullish().transform((v) => v ?? null),
+  linkSentAt: isoUtc.nullish().transform((v) => v ?? null),
+  expiresAt: isoUtc.nullish().transform((v) => v ?? null),
+  isRevoked: z.boolean(),
+  requestedCount: z.number().int(),
+  bookedCount: z.number().int(),
+  requiredMinutes: z.number().int(),
+  coveredMinutes: z.number().int(),
+  missingMinutes: z.number().int(),
+  items: z.array(partnerOrderItemSchema).nullish().transform((v) => v ?? []),
+  windows: z.array(partnerWindowSchema).nullish().transform((v) => v ?? []),
+});
+export type PartnerOrder = z.infer<typeof partnerOrderSchema>;
+export const partnerOrderListSchema = z.array(partnerOrderSchema);
+
+/** 4.7: what falls due on a given day. Sending it is phase 2. */
+export const partnerNoticeSchema = z.object({
+  kind: z.string(),
+  orderId: z.string(),
+  partnerName: z.string(),
+  contactEmail: z.string().nullish().transform((v) => v ?? null),
+  windowId: z.string(),
+  windowDate: dateOnly,
+  releaseDate: dateOnly.nullish().transform((v) => v ?? null),
+  bookedCount: z.number().int(),
+  requestedCount: z.number().int(),
+});
+export type PartnerNotice = z.infer<typeof partnerNoticeSchema>;
+export const partnerNoticeListSchema = z.array(partnerNoticeSchema);
 
 /* ── 4.6 Day summary ── */
 
