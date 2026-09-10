@@ -394,7 +394,7 @@ export default function Billing() {
             <TextField
               fullWidth size="small" placeholder="Hledat faktury..."
               value={search} onChange={(e) => setSearch(e.target.value)}
-              InputProps={{ startAdornment: <Search sx={{ mr: 1, color: '#999' }} fontSize="small" /> }}
+              slotProps={{ input: { startAdornment: <Search sx={{ mr: 1, color: '#999' }} fontSize="small" /> } }}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
           </Grid>

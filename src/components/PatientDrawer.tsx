@@ -534,10 +534,10 @@ export default function PatientDrawer() {
                 placeholder="Hledat podle kódu nebo názvu..."
                 value={diagQuery}
                 onChange={(e) => handleDiagSearch(e.target.value)}
-                InputProps={{
+                slotProps={{ input: {
                   startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
                   endAdornment: diagLoading ? <CircularProgress size={20} /> : null,
-                }}
+                } }}
                 sx={{ mb: 2, mt: 1 }}
               />
               <List sx={{ maxHeight: 300, overflow: 'auto', p: 0 }}>

@@ -160,7 +160,10 @@ export default function InventoryPage() {
                 <motion.tr key={item.id}
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.03 }}
-                  style={{ bgcolor: isLow ? '#FFF8E1' : 'inherit' }}>
+                  /* `bgcolor` is an MUI system prop, not a CSS property, and
+                     this is a `motion.tr` with a plain `style` - so the low
+                     stock highlight has never appeared. */
+                  style={{ backgroundColor: isLow ? '#FFF8E1' : 'inherit' }}>
                   <TableCell>
                     <Typography sx={{ fontWeight: 500 }}>{item.name}</Typography>
                   </TableCell>

@@ -116,7 +116,7 @@ export default function AuditLog() {
       <Paper sx={{ p: 2, mb: 3, borderRadius: 3 }}>
         <TextField fullWidth size="small" placeholder="Hledat v auditním logu..."
           value={search} onChange={(e) => setSearch(e.target.value)}
-          InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: '#999' }} fontSize="small" /> }}
+          slotProps={{ input: { startAdornment: <SearchIcon sx={{ mr: 1, color: '#999' }} fontSize="small" /> } }}
           sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
       </Paper>
 

@@ -30,7 +30,9 @@ export function usePermissions<T extends readonly Permission[]>(permissions: T):
   const role = useAppStore((s) => s.currentUserRole);
   const result = {} as Record<T[number], boolean>;
   for (const p of permissions) {
-    result[p] = roleHasPermission(role, p);
+    /* `p` is `T[number]`, which is exactly the key type; the cast is only
+       needed because a `Record` built empty is not yet known to have it. */
+    result[p as T[number]] = roleHasPermission(role, p);
   }
   return result;
 }

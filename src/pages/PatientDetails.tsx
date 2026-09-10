@@ -32,8 +32,12 @@ function trendIcon(current: number, previous: number, higherIsBetter: boolean) {
 
 function trendPct(current: number, previous: number) {
   if (!previous) return null;
-  const pct = ((current - previous) / previous * 100).toFixed(1);
-  return `${pct > 0 ? '+' : ''}${pct}%`;
+  const pct = ((current - previous) / previous) * 100;
+  /* The sign used to be decided by comparing the formatted string to zero,
+     which JavaScript makes work by coercion - until the value is not finite,
+     and then the patient's card reads "NaN%". */
+  if (!Number.isFinite(pct)) return null;
+  return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
 }
 
 function getVo2Color(vo2: number) {

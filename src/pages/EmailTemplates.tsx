@@ -78,9 +78,14 @@ export default function EmailTemplates() {
   /* ── Save template ── */
   const handleSave = async () => {
     try {
-      const url = editingTemplate ? `/api/email/templates/${editingTemplate.id}` : '/api/email/templates';
-      const method = editingTemplate ? 'PUT' : 'POST';
-      await client[method.toLowerCase()](url, formData);
+      /* Indexing the axios instance by a string name gave up its types
+         entirely - a typo in `method` would have been an `undefined is not a
+         function` at the click, not at the build. */
+      if (editingTemplate) {
+        await client.put(`/api/email/templates/${editingTemplate.id}`, formData);
+      } else {
+        await client.post('/api/email/templates', formData);
+      }
       setSnackbar({ open: true, message: 'Šablona uložena', severity: 'success' });
       setOpenDialog(false);
       loadTemplates();

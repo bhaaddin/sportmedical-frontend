@@ -55,14 +55,14 @@ export default function Input({
       size={size}
       error={error}
       helperText={helperText}
-      InputProps={{
+      slotProps={{ input: {
         startAdornment: startIcon ? (
           <InputAdornment position="start">{startIcon}</InputAdornment>
         ) : undefined,
         endAdornment: endIcon ? (
           <InputAdornment position="end">{endIcon}</InputAdornment>
         ) : undefined,
-      }}
+      } }}
       {...props}
     />
   );
