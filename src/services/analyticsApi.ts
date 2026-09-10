@@ -20,7 +20,19 @@ export interface HourlyMetric {
   completed: number;
   cancelled: number;
   revenue: number;
-  occupancyRate: number;
+  /**
+   * `null` means the rate is not known, and it is `null` for everything today:
+   * it used to be computed from a table with no rows and no write path, so a
+   * "0 % occupancy" was nought divided by nought presented as a measurement of
+   * an empty clinic (`app` lane, 10. 9. 2026).
+   *
+   * When the capacity port lands, `null` and `0` stop being the same thing:
+   * `null` will mean the clinic was not open - a Sunday, a holiday - and `0`
+   * will mean it was open and nobody came, which is a real number and must be
+   * shown. So a screen may not render an em dash for both. It can also exceed
+   * 100: an appointment booked outside opening hours is a real appointment.
+   */
+  occupancyRate: number | null;
 }
 
 export interface DailyMetric {
@@ -52,7 +64,19 @@ export interface DashboardMetrics {
   cancelledToday: number;
   noShowToday: number;
   pendingToday: number;
-  occupancyRate: number;
+  /**
+   * `null` means the rate is not known, and it is `null` for everything today:
+   * it used to be computed from a table with no rows and no write path, so a
+   * "0 % occupancy" was nought divided by nought presented as a measurement of
+   * an empty clinic (`app` lane, 10. 9. 2026).
+   *
+   * When the capacity port lands, `null` and `0` stop being the same thing:
+   * `null` will mean the clinic was not open - a Sunday, a holiday - and `0`
+   * will mean it was open and nobody came, which is a real number and must be
+   * shown. So a screen may not render an em dash for both. It can also exceed
+   * 100: an appointment booked outside opening hours is a real appointment.
+   */
+  occupancyRate: number | null;
   completionRate: number;
   cancellationRate: number;
   noShowRate: number;
