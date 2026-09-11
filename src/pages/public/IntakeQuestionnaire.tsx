@@ -52,6 +52,8 @@ import {
   submitIntake,
 } from '../../api/publicIntake';
 import type { IntakeInsurance, IntakeResponse } from '../../api/publicIntake';
+import PublicAddressPicker from '../../components/public/PublicAddressPicker';
+import type { AddressPoint } from '../../api/addressLookup';
 
 /* ── Form state ── */
 
@@ -98,7 +100,9 @@ const EMPTY_FORM: FormState = {
   websiteUrl: '',
 };
 
-type Errors = Partial<Record<keyof FormState, string>>;
+/* `address` is not in FormState - the picker holds the whole chosen point in
+   its own state, not a string - but it still needs somewhere to report. */
+type Errors = Partial<Record<keyof FormState | 'address', string>>;
 
 const STEPS = ['Kdo jste', 'Kontakt', 'Pojištění', 'Souhlasy', 'Rekapitulace'];
 
@@ -119,6 +123,13 @@ const collect = (errors: Errors, field: keyof FormState, result: { ok: boolean; 
 export default function IntakeQuestionnaire() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  /*
+   * Kept whole rather than as a bare code: the submission needs only
+   * `addressPointCode`, but the screen has to show the patient which address
+   * they picked, and re-deriving that from the number would mean asking the
+   * register again for something it already said.
+   */
+  const [addressPoint, setAddressPoint] = useState<AddressPoint | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -156,6 +167,11 @@ export default function IntakeQuestionnaire() {
     if (index === 1) {
       collect(next, 'email', validateEmail(form.email));
       collect(next, 'phone', validatePhone({ regionCode: form.phoneRegion, number: form.phone }));
+      /* The API refuses the whole submission without it, so stop here rather
+         than at the end with four steps to walk back through. */
+      if (addressPoint === null) {
+        next.address = 'Vyberte prosím adresu ze seznamu.';
+      }
     }
 
     if (index === 2) {
@@ -241,6 +257,7 @@ export default function IntakeQuestionnaire() {
               : null,
         },
         contact: { email: form.email.trim(), phone: phone.value },
+        address: { ruianAddressPointCode: addressPoint!.addressPointCode },
         insurance: buildInsurance(),
         consents: [
           { policyCode: 'treatment', granted: form.consentTreatment },
@@ -464,6 +481,21 @@ export default function IntakeQuestionnaire() {
               error={errors.phone !== undefined}
               helperText={errors.phone ?? 'Například 601 234 567'}
             />
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                Adresa trvalého pobytu
+              </Typography>
+              <PublicAddressPicker
+                value={addressPoint}
+                onChange={(point) => {
+                  setAddressPoint(point);
+                  if (point !== null) {
+                    setErrors((previous) => ({ ...previous, address: undefined }));
+                  }
+                }}
+                error={errors.address}
+              />
+            </Box>
           </Box>
         )}
 
@@ -601,6 +633,12 @@ export default function IntakeQuestionnaire() {
             )}
             <SummaryRow label="E-mail" value={form.email} />
             <SummaryRow label="Telefon" value={form.phone} />
+            {/* The one value the patient picked from a list rather than typed,
+                so the recap is the only place they can check it was the right
+                building before it becomes their registered address. */}
+            {addressPoint !== null && (
+              <SummaryRow label="Adresa" value={addressPoint.formattedAddress} />
+            )}
             {form.hasCzechInsurance ? (
               <SummaryRow
                 label="Pojištění"

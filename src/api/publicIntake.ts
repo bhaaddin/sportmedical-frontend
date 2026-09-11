@@ -81,9 +81,23 @@ export interface IntakeConsent {
   granted: boolean;
 }
 
+/**
+ * Where the patient lives, as the register spells it.
+ *
+ * One field, and it is the code - not the street, not the town, not the postal
+ * code. The server looks those up itself, so there is nothing here to mistype
+ * and nothing to disagree with the catalogue about. Required: without it the
+ * whole submission is refused with `errors.Address`, which is how it was found
+ * that this form could never be submitted at all.
+ */
+export interface IntakeAddress {
+  ruianAddressPointCode: number;
+}
+
 export interface IntakeRequest {
   identity: IntakeIdentity;
   contact: IntakeContact;
+  address: IntakeAddress;
   insurance: IntakeInsurance;
   /** Must include a granted 'treatment' consent or the server rejects. */
   consents: IntakeConsent[];
