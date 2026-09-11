@@ -25,6 +25,7 @@ import {
   formatNotificationTime,
   groupLabel,
   newSinceBoundary,
+  splitAppointmentWhen,
 } from './notifications/notificationList';
 import toast from 'react-hot-toast';
 
@@ -132,9 +133,35 @@ function NotificationLine({
             </Box>
           }
           secondary={
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: 13 }}>
-              {row.message}
-            </Typography>
+            /*
+              The appointment's own time, named. Unlabelled it sat beside the
+              arrival time meaning the opposite thing, and read as one thing
+              said twice.
+
+              Only labelled when a trailing date and time is actually
+              recognised; otherwise the sentence renders exactly as the server
+              wrote it. The server naming the field is the real fix and has
+              been asked for - this cannot claim anything it has not read.
+            */
+            (() => {
+              const split = splitAppointmentWhen(row.message);
+              if (split === null) {
+                return (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: 13 }}>
+                    {row.message}
+                  </Typography>
+                );
+              }
+              return (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: 13 }}>
+                  {split.rest}
+                  {' · '}
+                  <Box component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                    termín {split.when}
+                  </Box>
+                </Typography>
+              );
+            })()
           }
         />
         <IconButton

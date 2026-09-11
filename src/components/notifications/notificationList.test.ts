@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildNotificationSections,
+  splitAppointmentWhen,
   dayHeading,
   exactNotificationTime,
   formatNotificationTime,
@@ -283,6 +284,41 @@ describe('the new-since line', () => {
       lastSeenAt: '2026-09-11T12:00:00Z',
     });
     expect(newSinceBoundary(allOld)).toBeNull();
+  });
+});
+
+describe('splitAppointmentWhen', () => {
+  it('picks the appointment time off the end and leaves the rest alone', () => {
+    expect(splitAppointmentWhen('Ordinace · Odběr · 24. 9. 2026 10:00')).toEqual({
+      rest: 'Ordinace · Odběr',
+      when: '24. 9. 2026 10:00',
+    });
+  });
+
+  it('copes with the spacing the server happens to use', () => {
+    expect(splitAppointmentWhen('Ordinace · Kontrola · 1.10.2026 9:05')?.when).toBe(
+      '1.10.2026 9:05',
+    );
+  });
+
+  /*
+   * The guard, and the reason this is allowed to exist at all. Anything it
+   * does not recognise it declines, and the line renders exactly as it does
+   * today - so a reworded sentence costs a label, never a wrong one.
+   */
+  it('declines anything that is not a trailing date and time', () => {
+    expect(splitAppointmentWhen('Cara Gama · ZD-2026-417034')).toBeNull();
+    expect(splitAppointmentWhen('Ordinace · Odběr')).toBeNull();
+    expect(splitAppointmentWhen('')).toBeNull();
+    expect(splitAppointmentWhen('24. 9. 2026 10:00')).toBeNull();
+  });
+
+  it('declines a date that is not at the end, rather than guessing', () => {
+    expect(splitAppointmentWhen('24. 9. 2026 10:00 · Ordinace')).toBeNull();
+  });
+
+  it('does not mistake a reference number for a time', () => {
+    expect(splitAppointmentWhen('Test Zivy · ZD-2026-242997')).toBeNull();
   });
 });
 

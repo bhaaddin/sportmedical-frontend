@@ -264,6 +264,38 @@ export function newSinceBoundary(sections: DaySection[]): { sectionKey: string; 
   return null;
 }
 
+/**
+ * A booking notification's message ends with the time of the appointment, and
+ * unlabelled it sits next to the arrival time meaning the opposite thing:
+ *
+ *     přišlo 10:31                            ← when the message arrived
+ *     Ordinace · Odběr · 24. 9. 2026 10:00    ← when the patient comes
+ *
+ * Reported by the owner as "what are those two times supposed to represent".
+ *
+ * The message is prose composed on the server, so this does not take it apart:
+ * it looks for a trailing `D. M. YYYY HH:MM` and labels only that. Anything
+ * else - a reworded sentence, a different order, no date at all - returns null
+ * and the line is rendered exactly as it is today.
+ *
+ * That guard is the whole point. Parsing prose is fragile, but a parse that
+ * either recognises its own pattern or declines cannot produce a wrong label;
+ * the worst it can do is stop adding one. The right fix is the server naming
+ * the field, and that has been asked for - this is what the screen can say in
+ * the meantime without claiming anything it has not read.
+ */
+export function splitAppointmentWhen(
+  message: string,
+): { rest: string; when: string } | null {
+  const match = /^(.*?)[\s·]*(\d{1,2}\.\s*\d{1,2}\.\s*\d{4}\s+\d{1,2}:\d{2})\s*$/.exec(
+    message,
+  );
+  if (match === null) return null;
+  const rest = match[1].replace(/[\s·]+$/, '');
+  if (rest === '') return null;
+  return { rest, when: match[2] };
+}
+
 /** `8 nových termínů` - the plural Czech actually uses. */
 export function groupLabel(kind: string, count: number): string {
   const noun = GROUP_NOUNS[kind];
