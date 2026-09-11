@@ -73,12 +73,23 @@ import {
  * They matched blocks by overlap rather than by start, which is the better
  * rule and one this lane had not thought to test: a block can be an afternoon
  * or a fortnight, and one that began yesterday still covers this morning.
- * Re-measured here against the running server before the warning came off:
+ * Measured against the server of the day, it held, and the warning came off.
  *
- *     block one offered slot        -> 8 slots become 7, that one gone
- *     block 20:00 yesterday->07:00  -> 8 become 6, the two before 07:00 gone
- *     the slot at exactly 07:00     -> still offered, so the end is exclusive
- *     release the block             -> all eight back
+ * It is back. 5092 was moved to a different database and a different published
+ * build, and this one does not carry that fix. Measured again on 11. 9. 2026,
+ * after logging in to the new environment:
+ *
+ *     POST …/blocks            -> 201, and the row is in the list, times right
+ *     GET  …/availability      -> the blocked slot is STILL OFFERED
+ *     POST …/appointments      -> 409 "Tento čas už je obsazený."
+ *
+ * So the sentence goes back on the screen. It is not a retraction of the
+ * earlier measurement - that one was true about the server that answered then.
+ * It is the difference between "the fix exists" and "the fix is running here",
+ * which is the distinction three lanes have each got wrong once this week.
+ *
+ * The warning goes when this environment measures clean, not when someone
+ * says the fix is merged.
  */
 
 const CODEBOOK_STALE_MS = 5 * 60 * 1000;
@@ -204,6 +215,15 @@ export default function BlockedTimePage() {
           {t("booking.blocks.new")}
         </Button>
       </Box>
+
+      {/*
+        Said on the screen, not only in the code: on this server a block stops
+        the booking (409) but does not remove the time from the offered slots.
+        Whoever uses this should know before a patient tells them.
+      */}
+      <Alert severity="info" sx={{ mb: 3 }}>
+        {t("booking.blocks.availabilityCaveat")}
+      </Alert>
 
       <AsyncSection
         isLoading={calendarsQuery.isLoading}
