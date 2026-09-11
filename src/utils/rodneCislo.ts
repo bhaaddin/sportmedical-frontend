@@ -28,18 +28,38 @@ export function parseRodneCislo(raw: string): ParsedRC {
   if (month > 20) month -= 20; // foreigner variant
   if (month < 1 || month > 12 || day < 1 || day > 31) return empty;
 
-  const fullYear = digits.length === 9
-    ? (year < 54 ? 1900 + year : 1800 + year)
-    : (parseInt(digits, 10) % 11 === 0 ? (year < 54 ? 2000 + year : 1900 + year) : NaN);
-  if (digits.length === 10) {
-    // modulo-11 (with the /1000 remainder-10 → 0 exception)
-    const n = parseInt(digits.slice(0, 10), 10);
-    const mod = n % 11;
-    if (mod !== 0) {
-      if (!(mod === 10 && digits[9] === '0')) return empty;
-    }
-  }
-  if (isNaN(fullYear)) return empty;
+  /*
+   * Ten digits: divisible by eleven, no exception. Owner's decision on
+   * 10. 9. 2026, and it matches what the backend already enforces in
+   * `CzechBirthNumber` - one rule, in two places that agree.
+   *
+   * What was here before was not a looser rule, it was a hole. It tested
+   * `whole % 11 === 10`, which is the signature of a *wrong* check digit; the
+   * historic exception gives `whole % 11 === 1`, because a first-nine remainder
+   * of ten was written as a check digit of zero. So the branch let bad numbers
+   * through the checksum and rejected the ones it was meant to admit. Nothing
+   * showed, because `fullYear` was computed as NaN on the same condition and
+   * discarded them three lines later - two mistakes cancelling.
+   *
+   * Whether those exception numbers were ever issued to anyone is not known
+   * here. The `app` lane said so plainly, this lane cannot measure it either,
+   * and it reached us once as "never issued" through a third party who had not
+   * measured it. It is written down as an assumption, not a fact. It does not
+   * change the rule: a typo that slips through surfaces on an insurer's
+   * invoice, which is worse than refusing a number at the desk.
+   */
+  if (digits.length === 10 && parseInt(digits, 10) % 11 !== 0) return empty;
+
+  /* Nine digits stopped being issued in 1954, so a year of 54 or more is the
+     previous century. Ten-digit numbers start there, so it is the other way. */
+  const fullYear =
+    digits.length === 9
+      ? year < 54
+        ? 1900 + year
+        : 1800 + year
+      : year < 54
+        ? 2000 + year
+        : 1900 + year;
 
   const dob = new Date(fullYear, month - 1, day);
   if (dob.getFullYear() !== fullYear || dob.getMonth() !== month - 1 || dob.getDate() !== day) return empty;
@@ -54,18 +74,3 @@ export function parseRodneCislo(raw: string): ParsedRC {
     isFemale,
   };
 }
-
-// Major Czech cities for fast address autocomplete (full RUIAN needs Postgres + state dataset)
-export const CZECH_CITIES = [
-  'Praha', 'Brno', 'Ostrava', 'Plzeň', 'Liberec', 'Olomouc', 'České Budějovice',
-  'Hradec Králové', 'Ústí nad Labem', 'Pardubice', 'Zlín', 'Havířov', 'Kladno',
-  'Most', 'Opava', 'Frýdek-Místek', 'Karvina', 'Jihlava', 'Teplice', 'Děčín',
-  'Karlovy Vary', 'Chomutov', 'Jablonec nad Nisou', 'Mladá Boleslav', 'Prostějov',
-  'Přerov', 'Česká Lípa', 'Třebíč', 'Třinec', 'Tábor', 'Znojmo', 'Příbram',
-  'Cheb', 'Kolín', 'Trutnov', 'Písek', 'Kroměříž', 'Vsetín', 'Šumperk',
-  'Uherské Hradiště', 'Hodonín', 'Břeclav', 'Vyškov', 'Blansko', 'Náchod',
-  'Beroun', 'Kutná Hora', 'Chrudim', 'Strakonice', 'Klatovy', 'Jindřichův Hradec',
-  'Litoměřice', 'Žďár nad Sázavou', 'Sokolov', 'Opava', 'Nový Jičín', 'Krnov',
-  'Jeseník', 'Šumperk', 'Rakovník', 'Mělník', 'Nymburk', 'Brandýs nad Labem',
-  'Říčany', 'Černošice', 'Hostivice', 'Jesenice', 'Vlašim', 'Benešov',
-];
