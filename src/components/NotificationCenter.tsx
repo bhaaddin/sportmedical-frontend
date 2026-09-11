@@ -169,10 +169,6 @@ export default function NotificationCenter() {
     try {
       const res = await client.get('/api/notifications');
       const data = res.data?.value ?? res.data;
-      /* The marker travels with the list when the server has one. Read
-         defensively: today it sends a bare array and there is no envelope. */
-      const seen = res.data?.lastSeenAt ?? res.data?.value?.lastSeenAt ?? null;
-      if (typeof seen === 'string') setLastSeenAt(seen);
       setNotifications(prev => {
         const api = Array.isArray(data) ? data : data?.items ?? [];
         const bookingNotes = prev.filter(n => n.id.startsWith('booking:'));
@@ -185,9 +181,32 @@ export default function NotificationCenter() {
     }
   }, []);
 
+  /*
+   * The marker has its own path rather than riding in the list.
+   *
+   * The list answers with a bare array, and wrapping it in an envelope for the
+   * sake of one value would change the shape for every caller. Two requests
+   * cost a round trip; a changed shape costs a working screen.
+   */
+  const fetchLastSeen = useCallback(async () => {
+    try {
+      const res = await client.get('/api/notifications/seen');
+      const at = res.data?.lastSeenAtUtc ?? null;
+      /* null means this viewer has never opened the panel. No line is drawn
+         then: above everything it states a truth that helps nobody, below
+         everything it states a falsehood. */
+      setLastSeenAt(typeof at === 'string' ? at : null);
+    } catch {
+      /* Older servers have no such route. No marker, no line - the rest of the
+         list is unaffected. */
+      setLastSeenAt(null);
+    }
+  }, []);
+
   useEffect(() => {
     fetchNotifications();
-  }, [fetchNotifications]);
+    void fetchLastSeen();
+  }, [fetchNotifications, fetchLastSeen]);
 
   /*
    * The list from the server is the truth; the socket is only the fast path.
@@ -233,8 +252,29 @@ export default function NotificationCenter() {
     setAnchorEl(event.currentTarget);
   };
 
+  /*
+   * Stamped on close, not on open.
+   *
+   * On open the line would move out from under the person reading: they glance
+   * away, come back, and the mark telling them where they stopped is gone. It
+   * has to survive the whole of one look.
+   *
+   * The server only ever moves it forward, so two tabs closed in the wrong
+   * order cannot drag it backwards and redraw the line across things already
+   * read.
+   */
   const handleClose = () => {
     setAnchorEl(null);
+    void (async () => {
+      try {
+        const res = await client.post('/api/notifications/seen');
+        const at = res.data?.lastSeenAtUtc ?? null;
+        if (typeof at === 'string') setLastSeenAt(at);
+      } catch {
+        /* Failing to stamp shows the line again next time - a repeat, not a
+           loss. Nothing here is worth interrupting anybody over. */
+      }
+    })();
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;

@@ -14,11 +14,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const get = vi.fn();
+const getList = vi.fn();
+const getSeen = vi.fn();
+const post = vi.fn();
 const patch = vi.fn();
 const del = vi.fn();
+
+/* Two paths now: the list, and the "when did I last look" marker on its own
+   route. Routed here by url so a test can move one without the other. */
+const get = vi.fn((url: string) =>
+  url === '/api/notifications/seen' ? getSeen() : getList(),
+);
+
 vi.mock('../api/client', () => ({
-  default: { get, patch, delete: del, post: vi.fn(), put: vi.fn() },
+  default: { get, patch, delete: del, post, put: vi.fn() },
 }));
 vi.mock('../hooks/useRealtimeSync', () => ({ useRealtimeSync: () => ({}) }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
@@ -38,7 +47,9 @@ const row = (id: string, over: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
-  get.mockReset();
+  getList.mockReset().mockResolvedValue({ data: [] });
+  getSeen.mockReset().mockResolvedValue({ data: { lastSeenAtUtc: null } });
+  post.mockReset().mockResolvedValue({ data: { lastSeenAtUtc: new Date().toISOString() } });
   patch.mockReset().mockResolvedValue({});
   del.mockReset().mockResolvedValue({});
 });
@@ -53,13 +64,13 @@ const openPanel = async () => {
 
 describe('the notification panel', () => {
   it('heads the list with the day', async () => {
-    get.mockResolvedValue({ data: [row('a')] });
+    getList.mockResolvedValue({ data: [row('a')] });
     await openPanel();
     expect(await screen.findByText('Dnes')).toBeInTheDocument();
   });
 
   it('collapses a run of the same kind into one line, and opens it', async () => {
-    get.mockResolvedValue({
+    getList.mockResolvedValue({
       data: [
         row('a', { kind: 'intake.submitted', timestamp: minutesAgo(3) }),
         row('b', { kind: 'intake.submitted', timestamp: minutesAgo(4) }),
@@ -82,7 +93,7 @@ describe('the notification panel', () => {
   });
 
   it('says how many of a group are unread', async () => {
-    get.mockResolvedValue({
+    getList.mockResolvedValue({
       data: [
         row('a', { kind: 'intake.submitted', read: false, timestamp: minutesAgo(3) }),
         row('b', { kind: 'intake.submitted', read: true, timestamp: minutesAgo(4) }),
@@ -99,7 +110,7 @@ describe('the notification panel', () => {
    * them is the title, and a title is prose.
    */
   it('leaves rows ungrouped when the server sends no kind', async () => {
-    get.mockResolvedValue({
+    getList.mockResolvedValue({
       data: [row('a', { timestamp: minutesAgo(3) }), row('b', { timestamp: minutesAgo(4) })],
     });
 
@@ -111,7 +122,7 @@ describe('the notification panel', () => {
   });
 
   it('offers the exact moment on a row whose label is relative', async () => {
-    get.mockResolvedValue({ data: [row('a', { timestamp: minutesAgo(12) })] });
+    getList.mockResolvedValue({ data: [row('a', { timestamp: minutesAgo(12) })] });
 
     await openPanel();
 
@@ -122,7 +133,7 @@ describe('the notification panel', () => {
   });
 
   it('orders newest first and does not float unread to the top', async () => {
-    get.mockResolvedValue({
+    getList.mockResolvedValue({
       data: [
         row('older-unread', { timestamp: minutesAgo(30), read: false, message: 'starší' }),
         row('newer-read', { timestamp: minutesAgo(2), read: true, message: 'novější' }),
@@ -137,7 +148,7 @@ describe('the notification panel', () => {
   });
 
   it('draws no "new since" line while the server has not said when we last looked', async () => {
-    get.mockResolvedValue({ data: [row('a'), row('b', { timestamp: minutesAgo(90) })] });
+    getList.mockResolvedValue({ data: [row('a'), row('b', { timestamp: minutesAgo(90) })] });
 
     await openPanel();
     await screen.findByText('Pacient a');
@@ -146,19 +157,44 @@ describe('the notification panel', () => {
   });
 
   it('draws the line once the server does say', async () => {
-    get.mockResolvedValue({
-      data: {
-        items: [
-          row('new', { timestamp: minutesAgo(2), message: 'po pohledu' }),
-          row('seen', { timestamp: minutesAgo(90), message: 'před pohledem' }),
-        ],
-        lastSeenAt: minutesAgo(30),
-      },
-      lastSeenAt: minutesAgo(30),
+    getList.mockResolvedValue({
+      data: [
+        row('new', { timestamp: minutesAgo(2), message: 'po pohledu' }),
+        row('seen', { timestamp: minutesAgo(90), message: 'před pohledem' }),
+      ],
     });
+    getSeen.mockResolvedValue({ data: { lastSeenAtUtc: minutesAgo(30) } });
 
     await openPanel();
 
     expect(await screen.findByText(/Nové od vašeho posledního pohledu/)).toBeInTheDocument();
+  });
+
+  /*
+   * Stamped on closing, never on opening. On opening, the line would move out
+   * from under the person reading the list.
+   */
+  it('marks the panel seen when it closes, not when it opens', async () => {
+    getList.mockResolvedValue({ data: [row('a')] });
+
+    const user = await openPanel();
+    await screen.findByText('Pacient a');
+    expect(post).not.toHaveBeenCalled();
+
+    await user.keyboard('{Escape}');
+
+    expect(post).toHaveBeenCalledWith('/api/notifications/seen');
+  });
+
+  it('shows no line when this viewer has never looked', async () => {
+    getList.mockResolvedValue({
+      data: [row('a'), row('b', { timestamp: minutesAgo(90) })],
+    });
+    getSeen.mockResolvedValue({ data: { lastSeenAtUtc: null } });
+
+    await openPanel();
+    await screen.findByText('Pacient a');
+
+    expect(screen.queryByText(/Nové od vašeho posledního pohledu/)).not.toBeInTheDocument();
   });
 });
