@@ -27,6 +27,7 @@ import {
   newSinceBoundary,
   splitAppointmentWhen,
 } from './notifications/notificationList';
+import { formatPragueDateTime } from '../utils/time';
 import toast from 'react-hot-toast';
 
 /* ── Types ── */
@@ -144,6 +145,29 @@ function NotificationLine({
               been asked for - this cannot claim anything it has not read.
             */
             (() => {
+              /*
+                The appointment's time, preferred from the field and only then
+                from the sentence.
+ 
+                `occursAtUtc` is an instant, so it formats through the one
+                Prague formatter this codebase has. `splitAppointmentWhen` is
+                the fallback and stays until the field is actually populated -
+                nothing sends it yet, and dropping the parse now would trade a
+                label that works for one that does not exist.
+              */
+              if (typeof row.occursAtUtc === 'string' && row.occursAtUtc !== '') {
+                const split = splitAppointmentWhen(row.message);
+                return (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: 13 }}>
+                    {split === null ? row.message : split.rest}
+                    {' · '}
+                    <Box component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                      termín {formatPragueDateTime(row.occursAtUtc)}
+                    </Box>
+                  </Typography>
+                );
+              }
+
               const split = splitAppointmentWhen(row.message);
               if (split === null) {
                 return (

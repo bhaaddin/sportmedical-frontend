@@ -29,6 +29,22 @@ export interface NotificationRow {
    * exactly the inference this field exists to replace.
    */
   kind?: string | null;
+  /**
+   * Display text for whoever the notification is about. Not a key: for an
+   * intake it is the name a person typed into a form, and they may never
+   * become a patient at all.
+   */
+  patientName?: string | null;
+  activityName?: string | null;
+  /**
+   * When the appointment is - an instant, not a formatted string, so Prague
+   * formatting stays in `utils/time.ts` and there is never a second one to
+   * disagree with it.
+   *
+   * `null` where there is nothing to say: an intake is not scheduled for
+   * anything. Distinct from absent, which means the row predates the field.
+   */
+  occursAtUtc?: string | null;
 }
 
 const pragueDay = new Intl.DateTimeFormat('en-CA', {

@@ -207,6 +207,44 @@ describe('the notification panel', () => {
     expect(post).toHaveBeenCalledWith('/api/notifications/seen');
   });
 
+  /*
+   * The field wins over the sentence once anything populates it. Nothing does
+   * yet, which is why the parse stays.
+   */
+  it('takes the appointment time from occursAtUtc when the server sends it', async () => {
+    getList.mockResolvedValue({
+      data: [
+        row('a', {
+          title: 'Nový termín',
+          message: 'Ordinace · Odběr · 24. 9. 2026 10:00',
+          occursAtUtc: '2026-10-01T07:30:00Z',
+        }),
+      ],
+    });
+
+    await openPanel();
+
+    /* 07:30Z is 09:30 in Prague - read through the one formatter, not from
+       the sentence, which still says 24. 9. */
+    expect(await screen.findByText(/termín 1\. 10\. 2026 09:30/)).toBeInTheDocument();
+    expect(screen.queryByText(/24\. 9\. 2026 10:00/)).not.toBeInTheDocument();
+  });
+
+  it('falls back to the sentence while occursAtUtc is null, as it is today', async () => {
+    getList.mockResolvedValue({
+      data: [
+        row('a', {
+          title: 'Nový termín',
+          message: 'Ordinace · Odběr · 24. 9. 2026 10:00',
+          occursAtUtc: null,
+        }),
+      ],
+    });
+
+    await openPanel();
+    expect(await screen.findByText(/termín 24\. 9\. 2026 10:00/)).toBeInTheDocument();
+  });
+
   it('shows no line when this viewer has never looked', async () => {
     getList.mockResolvedValue({
       data: [row('a'), row('b', { timestamp: minutesAgo(90) })],
