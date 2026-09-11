@@ -33,13 +33,11 @@ const getAll = vi.fn();
 vi.mock('../api/appointments', () => ({ appointmentsApi: { range } }));
 vi.mock('../api/patients', () => ({ patientsApi: { getAll } }));
 
-/* rAF never fires in a hidden document and the tile animates from zero, so
-   drive it deterministically instead of waiting on a real frame. */
+/* rAF never fires in a hidden document, which is exactly the case the counter
+   now has to survive, so it is stubbed to do nothing at all here: the numbers
+   below must be right with no frames whatsoever. */
 beforeEach(() => {
-  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
-    cb(performance.now() + 10_000);
-    return 1;
-  });
+  vi.stubGlobal('requestAnimationFrame', () => 1);
   vi.stubGlobal('cancelAnimationFrame', () => {});
   getAll.mockReset().mockResolvedValue([
     { id: 'p1', firstName: 'Jana', lastName: 'Marková' },
@@ -84,6 +82,24 @@ const renderDashboard = () =>
     </MemoryRouter>,
   );
 
+describe('the stat tiles', () => {
+  /*
+   * The counter animates on requestAnimationFrame, and a browser does not fire
+   * it for a document it is not painting. The display started at 0 and only
+   * moved inside the frame callback, so a backgrounded tab showed every tile
+   * as zero while the lists beside them held data. Seen twice for real before
+   * it was fixed.
+   */
+  it('shows the number even when no animation frame ever arrives', async () => {
+    range.mockResolvedValue([at(8, 0, 'a'), at(9, 0, 'b'), at(10, 3, 'c')]);
+
+    renderDashboard();
+
+    const card = await tile('Dnes v kalendáři');
+    expect(await card.findByText('3', {}, { timeout: 3000 })).toBeInTheDocument();
+  });
+});
+
 describe('"Dnes v kalendari"', () => {
   it('asks for today, and for one day only', async () => {
     renderDashboard();
@@ -107,8 +123,10 @@ describe('"Dnes v kalendari"', () => {
 
     renderDashboard();
 
+    /* The counter settles a beat after the animation would have ended, so the
+       wait is longer than the default second. */
     const card = await tile('Dnes v kalendáři');
-    expect(await card.findByText('2')).toBeInTheDocument();
+    expect(await card.findByText('2', {}, { timeout: 3000 })).toBeInTheDocument();
     expect(card.queryByText('5')).not.toBeInTheDocument();
   });
 

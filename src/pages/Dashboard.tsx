@@ -21,21 +21,47 @@ import { toDateOnly, formatPragueTime } from '../utils/time';
 import { DashboardSkeleton } from '../components/SkeletonLoader';
 
 /* ── Animated counter ── */
+/**
+ * Counts up to `value` - and shows `value` even when it cannot count.
+ *
+ * The animation runs on `requestAnimationFrame`, which a browser does not fire
+ * for a document it is not painting: a backgrounded tab, a restored session, a
+ * headless run. The display began at 0 and only ever moved inside the frame
+ * callback, so in those cases every tile on this screen sat at zero
+ * indefinitely - the first numbers anyone sees, all reading nothing, on a
+ * screen whose data had loaded perfectly well.
+ *
+ * Caught twice before it was fixed: once as "all four tiles show 0 while the
+ * lists below them have data", and again the next day as "the tile says 0 and
+ * the timeline under it shows two appointments". Both times the data was right
+ * and the counter was lying about it.
+ *
+ * So the frame loop is now an embellishment with a deadline: if the animation
+ * has not arrived at the value by the time it was supposed to, the value is
+ * simply shown. A number that cannot animate must still be correct.
+ */
 function AnimatedNumber({ value, duration = 1.2 }: { value: number; duration?: number }) {
   const [display, setDisplay] = useState(0);
-  const ref = useRef<number | null>(null);
+  const frame = useRef<number | null>(null);
 
   useEffect(() => {
     const start = performance.now();
-    const from = 0;
     const animate = (now: number) => {
       const progress = Math.min((now - start) / (duration * 1000), 1);
       const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplay(Math.round(from + (value - from) * eased));
-      if (progress < 1) ref.current = requestAnimationFrame(animate);
+      setDisplay(Math.round(value * eased));
+      if (progress < 1) frame.current = requestAnimationFrame(animate);
     };
-    ref.current = requestAnimationFrame(animate);
-    return () => { if (ref.current) cancelAnimationFrame(ref.current); };
+    frame.current = requestAnimationFrame(animate);
+
+    /* The guarantee. Fires a little after the animation should have finished;
+       if frames did arrive this sets what is already there. */
+    const settle = setTimeout(() => setDisplay(value), duration * 1000 + 50);
+
+    return () => {
+      if (frame.current) cancelAnimationFrame(frame.current);
+      clearTimeout(settle);
+    };
   }, [value, duration]);
 
   return <>{display}</>;
