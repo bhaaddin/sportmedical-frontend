@@ -48,16 +48,63 @@ export interface IntakeCandidate {
   fields: IntakeFieldComparison[];
 }
 
+/*
+ * What `GET /api/patients/intake-review` actually returns - measured against
+ * the running API on 11. 9. 2026, not transcribed from a contract.
+ *
+ * The types here previously described a shape the server has never sent:
+ * `submittedAt`, `submittedName`, `submittedDateOfBirth`, `fingerprint` and
+ * `candidates` were all invented on this side. The screen read
+ * `entry.candidates.length` and threw `Cannot read properties of undefined`
+ * the moment anybody opened the queue with a row in it - which nobody could do
+ * until there was a login and a submission on the same day.
+ *
+ * The list is deliberately a summary. Duplicate candidates are expensive to
+ * compute, so they live in the detail call and are fetched when a reviewer
+ * actually opens a row. Asking for them per row would make a queue of two
+ * hundred questionnaires do two hundred matches nobody looks at.
+ */
 export interface IntakeQueueEntry {
   intakeId: string;
   referenceNumber: string;
-  submittedAt: string;
-  submittedName: string;
-  submittedDateOfBirth: string;
-  outcome: IntakeOutcome;
+  givenName: string;
+  familyName: string;
+  dateOfBirth: string;
+  sex: string;
+  /*
+   * A number on the wire: 0 CreateNew, 1 ReviewRequired, 2 AutoAssignToExisting.
+   * Mapped through `outcomeOf` rather than compared directly - the numbers are
+   * positions in a server-side enum, and this codebase has already been bitten
+   * by two numeric enums whose order was load-bearing.
+   */
+  outcome: number;
+  topScore: number;
+  suppliedBirthNumber: boolean;
+  hasCzechPublicHealthInsurance: boolean;
+  submittedAtUtc: string;
+}
+
+/** The detail, where the duplicate candidates are. */
+export interface IntakeReviewDetail {
+  submission: IntakeQueueEntry;
+  email: string;
+  phone: string;
   candidates: IntakeCandidate[];
-  /** Guards the resolve call against data that moved underneath the reviewer. */
-  fingerprint: string;
+}
+
+const OUTCOME_BY_NUMBER: Record<number, IntakeOutcome> = {
+  0: IntakeOutcome.CreateNew,
+  1: IntakeOutcome.ReviewRequired,
+  2: IntakeOutcome.AutoAssignToExisting,
+};
+
+/**
+ * The wire number as a name. An unknown number is not guessed at and not
+ * defaulted to something harmless - a reviewer must not be shown "založit
+ * nového" because a value they have never seen fell through to it.
+ */
+export function outcomeOf(value: number): IntakeOutcome | null {
+  return OUTCOME_BY_NUMBER[value] ?? null;
 }
 
 /* ── Actions ── */
@@ -79,13 +126,21 @@ export interface ResolveIntakeRequest {
   candidateRevision?: number;
   /** Audited. Required for Reject, optional otherwise. */
   reason?: string;
-  fingerprint: string;
 }
 
 /* ── Calls ── */
 
 export async function fetchIntakeQueue(): Promise<IntakeQueueEntry[]> {
   const response = await client.get<IntakeQueueEntry[]>('/api/patients/intake-review');
+  return response.data;
+}
+
+export async function fetchIntakeDetail(
+  intakeId: string,
+): Promise<IntakeReviewDetail> {
+  const response = await client.get<IntakeReviewDetail>(
+    `/api/patients/intake-review/${intakeId}`,
+  );
   return response.data;
 }
 

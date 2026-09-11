@@ -28,12 +28,19 @@ import {
 } from '@mui/material';
 import { CheckCircle, Warning, PersonAdd, Block, Refresh } from '@mui/icons-material';
 import {
+  IntakeOutcome,
   IntakeResolution,
+  fetchIntakeDetail,
   fetchIntakeQueue,
   isStaleResolution,
+  outcomeOf,
   resolveIntake,
 } from '../api/intakeReview';
-import type { IntakeCandidate, IntakeQueueEntry } from '../api/intakeReview';
+import type {
+  IntakeCandidate,
+  IntakeQueueEntry,
+  IntakeReviewDetail,
+} from '../api/intakeReview';
 
 export default function IntakeReviewQueue() {
   const [entries, setEntries] = useState<IntakeQueueEntry[]>([]);
@@ -42,6 +49,30 @@ export default function IntakeReviewQueue() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<IntakeQueueEntry | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  /*
+   * Candidates are not in the list - the server sends a summary and computes
+   * matches only on demand. So a row is opened, and only then does anybody pay
+   * for the matching. Kept per intake id rather than as one "open row" so
+   * reopening a row the reviewer already looked at does not re-ask.
+   */
+  const [details, setDetails] = useState<Record<string, IntakeReviewDetail>>({});
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [detailFailed, setDetailFailed] = useState<string | null>(null);
+
+  const openEntry = async (entry: IntakeQueueEntry): Promise<void> => {
+    const next = openId === entry.intakeId ? null : entry.intakeId;
+    setOpenId(next);
+    setDetailFailed(null);
+    if (next === null || details[entry.intakeId] !== undefined) return;
+    try {
+      const detail = await fetchIntakeDetail(entry.intakeId);
+      setDetails((current) => ({ ...current, [entry.intakeId]: detail }));
+    } catch {
+      /* Not "no candidates" - nobody was asked. Saying the former would let a
+         reviewer create a duplicate patient believing none existed. */
+      setDetailFailed(entry.intakeId);
+    }
+  };
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -74,7 +105,6 @@ export default function IntakeReviewQueue() {
         patientId: candidate?.patientId,
         candidateRevision: candidate?.revision,
         reason,
-        fingerprint: entry.fingerprint,
       });
       setEntries((current) => current.filter((e) => e.intakeId !== entry.intakeId));
     } catch (caught) {
@@ -136,28 +166,96 @@ export default function IntakeReviewQueue() {
           <Paper key={entry.intakeId} sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3, mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                {entry.submittedName}
+                {entry.givenName} {entry.familyName}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                nar. {entry.submittedDateOfBirth}
+                nar. {entry.dateOfBirth}
               </Typography>
               <Chip
                 size="small"
                 label={entry.referenceNumber}
                 sx={{ fontFamily: 'monospace', fontSize: 11 }}
               />
+              {/*
+                What the matcher concluded, in words. It arrives as a number -
+                0, 1, 2 - and an unrecognised one is shown as unknown rather
+                than folded into a safe-looking default: a reviewer told
+                "založit nového" because a value fell through would create the
+                duplicate the queue exists to prevent.
+              */}
+              {(() => {
+                const outcome = outcomeOf(entry.outcome);
+                if (outcome === null) {
+                  return (
+                    <Chip
+                      size="small"
+                      color="warning"
+                      label={`neznámý výsledek (${entry.outcome})`}
+                    />
+                  );
+                }
+                return (
+                  <Chip
+                    size="small"
+                    color={outcome === IntakeOutcome.ReviewRequired ? 'warning' : 'default'}
+                    label={
+                      outcome === IntakeOutcome.ReviewRequired
+                        ? 'Ke kontrole'
+                        : outcome === IntakeOutcome.AutoAssignToExisting
+                          ? 'Shoda s pacientem'
+                          : 'Nový pacient'
+                    }
+                  />
+                );
+              })()}
               <Box sx={{ flexGrow: 1 }} />
               <Typography variant="caption" color="text.secondary">
-                {new Date(entry.submittedAt).toLocaleString('cs-CZ')}
+                {new Date(entry.submittedAtUtc).toLocaleString('cs-CZ')}
               </Typography>
             </Box>
 
-            {entry.candidates.length === 0 ? (
+            {/*
+              The summary row carries `topScore` but never the candidates, so
+              until a reviewer opens the record there is nothing to compare -
+              and "no similar patient" must not be printed before anybody has
+              looked, or somebody creates a duplicate believing it was checked.
+            */}
+            <Box sx={{ mb: 2 }}>
+              <Button size="small" onClick={() => void openEntry(entry)}>
+                {openId === entry.intakeId
+                  ? 'Skrýt možné shody'
+                  : entry.topScore > 0
+                    ? `Zobrazit možné shody (nejvyšší skóre ${entry.topScore})`
+                    : 'Zobrazit možné shody'}
+              </Button>
+            </Box>
+
+            {openId === entry.intakeId && detailFailed === entry.intakeId && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                Možné shody se nepodařilo načíst. Neznamená to, že žádné nejsou —
+                zkuste to prosím znovu, než záznam vyřídíte.
+              </Alert>
+            )}
+
+            {openId === entry.intakeId &&
+              detailFailed !== entry.intakeId &&
+              details[entry.intakeId] === undefined && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                  <CircularProgress size={20} />
+                </Box>
+              )}
+
+            {openId === entry.intakeId &&
+            details[entry.intakeId] !== undefined &&
+            details[entry.intakeId].candidates.length === 0 ? (
               <Alert severity="info" sx={{ mb: 2 }}>
                 Žádný podobný pacient nenalezen. Lze rovnou založit nového.
               </Alert>
             ) : (
-              entry.candidates.map((candidate) => (
+              (openId === entry.intakeId
+                ? (details[entry.intakeId]?.candidates ?? [])
+                : []
+              ).map((candidate: IntakeCandidate) => (
                 <Box key={candidate.patientId} sx={{ mb: 2 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
