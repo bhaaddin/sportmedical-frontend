@@ -14,8 +14,10 @@ import {
 } from 'recharts';
 import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
-import { calendarApi } from '../api/calendar';
-import type { Appointment } from '../api/calendar';
+import { appointmentsApi } from '../api/appointments';
+import type { DayAppointment } from '../api/bookingContracts';
+import { statusName, statusTally } from '../api/bookingContracts';
+import { toDateOnly, formatPragueTime } from '../utils/time';
 import { DashboardSkeleton } from '../components/SkeletonLoader';
 
 /* ── Animated counter ── */
@@ -46,6 +48,16 @@ function getGreeting(): string {
   if (h < 17) return 'Dobrý den';
   return 'Dobrý večer';
 }
+
+const STATUS_LABELS: Record<string, string> = {
+  Scheduled: 'Naplánováno',
+  Confirmed: 'Potvrzeno',
+  CheckedIn: 'Přišel',
+  Completed: 'Hotovo',
+  Cancelled: 'Zrušeno',
+  NoShow: 'Nepřišel',
+  Waitlisted: 'Náhradník',
+};
 
 const SERVICE_COLORS: Record<string, string> = {
   'Základní prohlídka': '#0D7377',
@@ -94,26 +106,54 @@ function StatCard({ title, value, icon, color, subtitle, delay = 0 }: {
 export default function Dashboard() {
   const navigate = useNavigate();
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
+  const [todayAppointments, setTodayAppointments] = useState<DayAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
+  /*
+   * "Dnes v kalendari" now asks the booking API, and it asks for today.
+   *
+   * It used to read `/api/scheduling/appointments?fromUtc=&toUtc=`, and that
+   * endpoint ignores its own date range. Measured with a control: asking for
+   * the year 2020 returns the same four appointments from September 2026. So
+   * the tile labelled "Schuzek dnes" was a count of every appointment that has
+   * ever existed - on 11. 9. 2026 it showed 2 for a day with none, and the two
+   * it counted were eleven and thirteen days away.
+   *
+   * The booking endpoint honours the range, which is the reason to move rather
+   * than to filter here: a client-side date filter would paper over a read that
+   * cannot be trusted for anything else either.
+   *
+   * It carries no patient name, only `patientId`, so the names come from the
+   * patient list this screen already loads. A patient missing from that list
+   * shows as an id rather than as an empty row - a nameless appointment is
+   * still an appointment somebody has to keep.
+   */
   useEffect(() => {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const today = toDateOnly(new Date());
 
     Promise.all([
       patientsApi.getAll().catch(() => []),
-      calendarApi.getAppointments(todayStr, tomorrow.toISOString()).catch(() => []),
+      appointmentsApi.range(today, today).catch(() => []),
     ]).then(([pats, appts]) => {
       setPatients(pats);
-      /* The legacy read hands back cancelled appointments too, with status
-         "Cancelled" - 8 of 13 rows on the day this was measured. Counting the
-         rows made "Dnes v kalendari" report them as booked today. Dropped
-         once, here, so the three tiles and the list below cannot disagree. */
-      setTodayAppointments(appts.filter((a) => a.status !== 'Cancelled'));
+      /*
+       * Cancelled and no-show rows are not today's work; kept and completed
+       * ones are. `statusTally` owns that mapping - the day overview counts by
+       * the same function, so the two screens cannot drift.
+       *
+       * Not `isTerminalStatus`, which was tried first and is a different
+       * question: it answers "can this still change?". Completed is terminal
+       * and would have vanished from the tile, while NoShow is not terminal -
+       * it can be undone - and would have been counted as work still to do.
+       * Exactly inverted, and the tests caught it.
+       */
+      setTodayAppointments(
+        appts.filter((a) => {
+          const tally = statusTally(a.status);
+          return tally === 'booked' || tally === 'arrived';
+        }),
+      );
     }).finally(() => setLoading(false));
   }, []);
 
@@ -126,10 +166,17 @@ export default function Dashboard() {
   const sortedAppointments = useMemo(
     () =>
       [...todayAppointments].sort(
-        (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+        (a, b) => a.startUtc.localeCompare(b.startUtc),
       ),
     [todayAppointments],
   );
+
+  /* The day rows carry `patientId` only; the names are in the list already
+     loaded above. An unknown id is shown rather than swallowed. */
+  const patientName = (patientId: string): string => {
+    const found = patients.find((p) => p.id === patientId);
+    return found ? `${found.firstName} ${found.lastName}` : patientId.slice(0, 8);
+  };
 
   const quickActions = [
     { label: 'Nová diagnostika', icon: <Science />, path: '/diagnostics/new', color: '#0D7377', gradient: 'linear-gradient(135deg, #0D7377 0%, #14A3A8 100%)' },
@@ -163,10 +210,10 @@ export default function Dashboard() {
           <StatCard title="Dnes v kalendáři" value={todayAppointments.length} icon={<CalendarMonth />} color="#2E7D32" subtitle="Schůzek dnes" delay={0.1} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard title="Diagnostika" value={todayAppointments.filter(a => a.serviceType?.includes('diagnostika') || a.serviceType?.includes('Diagnostika')).length} icon={<Science />} color="#0288D1" subtitle="Dnes" delay={0.2} />
+          <StatCard title="Diagnostika" value={todayAppointments.filter(a => a.activityName.toLowerCase().includes('diagnost')).length} icon={<Science />} color="#0288D1" subtitle="Dnes" delay={0.2} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard title="Čekající" value={todayAppointments.filter(a => a.status === 'Scheduled').length} icon={<Warning />} color="#ED6C02" subtitle="Ke zpracování" delay={0.3} />
+          <StatCard title="Čekající" value={todayAppointments.filter(a => statusName(a.status) === 'Scheduled').length} icon={<Warning />} color="#ED6C02" subtitle="Ke zpracování" delay={0.3} />
         </Grid>
       </Grid>
 
@@ -197,9 +244,7 @@ export default function Dashboard() {
                 <Box>
                   {sortedAppointments
                     .map((appt, i) => {
-                      const color = SERVICE_COLORS[appt.serviceType] || '#0D7377';
-                      const start = new Date(appt.startTime);
-                      const end = new Date(appt.endTime);
+                      const color = SERVICE_COLORS[appt.activityName] || '#0D7377';
                       return (
                         <motion.div key={appt.id}
                           initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
@@ -210,17 +255,25 @@ export default function Dashboard() {
                             <Box sx={{ width: 4, height: 40, borderRadius: 2, bgcolor: color }} />
                             <Box sx={{ minWidth: 100 }}>
                               <Typography variant="caption" sx={{ fontWeight: 600, color: color }}>
-                                {start.getHours().toString().padStart(2, '0')}:{start.getMinutes().toString().padStart(2, '0')} — {end.getHours().toString().padStart(2, '0')}:{end.getMinutes().toString().padStart(2, '0')}
+                                {/* 3.3: UTC on the wire, Prague on the screen. `getHours()`
+                                    read the runner's own zone, which is only the same
+                                    thing while everybody sits in Prague. */}
+                                {formatPragueTime(appt.startUtc)} — {formatPragueTime(appt.endUtc)}
                               </Typography>
                             </Box>
                             <Box sx={{ flex: 1 }}>
-                              <Typography sx={{ fontWeight: 500 }}>{appt.patientName}</Typography>
-                              <Typography variant="caption" color="text.secondary">{appt.serviceType} • {appt.room}</Typography>
+                              <Typography sx={{ fontWeight: 500 }}>{patientName(appt.patientId)}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {appt.activityName}
+                                {appt.paperwork && !appt.paperwork.ready ? ' • chybí podklady' : ''}
+                              </Typography>
                             </Box>
-                            <Chip label={appt.status === 'Scheduled' ? 'Naplánováno' : appt.status === 'Completed' ? 'Hotovo' : appt.status}
+                            {/* An unknown code is shown as the code, not folded into
+                                a familiar-looking label. */}
+                            <Chip label={STATUS_LABELS[statusName(appt.status) ?? ''] ?? `stav ${appt.status}`}
                               size="small" sx={{
-                                bgcolor: appt.status === 'Completed' ? '#2E7D3214' : '#0D737714',
-                                color: appt.status === 'Completed' ? '#2E7D32' : '#0D7377',
+                                bgcolor: statusName(appt.status) === 'Completed' ? '#2E7D3214' : '#0D737714',
+                                color: statusName(appt.status) === 'Completed' ? '#2E7D32' : '#0D7377',
                                 fontWeight: 500,
                               }} />
                           </Box>

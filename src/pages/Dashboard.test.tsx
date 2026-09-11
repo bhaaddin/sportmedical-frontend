@@ -1,51 +1,68 @@
 /*
- * Cancelled appointments are not today's work, and this is the screen that
- * says how much of it there is.
+ * "Dnes v kalendáři" must count today, and must count only work that still
+ * stands.
  *
- * The read behind this tile returns cancelled rows undistinguished, and the
- * tile used to be the raw row count. Measured against the running API on
- * 2026-09-10 that read 13 where the truth was 5 - eight of the thirteen were
- * cancelled. It is the first number anyone sees on opening the application.
+ * Two separate faults lived in this tile, both measured against the running
+ * API rather than reasoned about:
  *
- * What would have to break for these to fail: removing the filter, moving it
- * to one render site and not the others, or the reader dropping `status` from
- * the rows it maps.
+ * 1. It read `/api/scheduling/appointments?fromUtc=&toUtc=`, and that endpoint
+ *    ignores its own range - asking for the year 2020 returned the same four
+ *    appointments from September 2026. So a tile labelled "Schůzek dnes" was a
+ *    count of every appointment that has ever existed. On 11. 9. 2026 it showed
+ *    2 for a day with none, and the two it counted were eleven and thirteen
+ *    days away.
+ *
+ * 2. Before that, it counted cancelled rows as booked: 13 where the truth was
+ *    5, eight of them cancelled.
+ *
+ * The screen now asks the booking API, which honours the range, and drops
+ * terminal statuses through `isTerminalStatus` rather than repeating the code
+ * table here.
+ *
+ * What would have to break for these to fail: asking for a range other than
+ * today, counting terminal statuses again, dropping the sort, or rendering a
+ * patient id where a name was available.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-const getAppointments = vi.fn();
+const range = vi.fn();
 const getAll = vi.fn();
 
-vi.mock('../api/calendar', () => ({ calendarApi: { getAppointments } }));
+vi.mock('../api/appointments', () => ({ appointmentsApi: { range } }));
 vi.mock('../api/patients', () => ({ patientsApi: { getAll } }));
 
-/* rAF never fires in a hidden document, and the tile animates its number from
-   zero, so drive it deterministically instead of waiting on a real frame. */
+/* rAF never fires in a hidden document and the tile animates from zero, so
+   drive it deterministically instead of waiting on a real frame. */
 beforeEach(() => {
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
     cb(performance.now() + 10_000);
     return 1;
   });
   vi.stubGlobal('cancelAnimationFrame', () => {});
-  getAll.mockReset().mockResolvedValue([]);
-  getAppointments.mockReset();
+  getAll.mockReset().mockResolvedValue([
+    { id: 'p1', firstName: 'Jana', lastName: 'Marková' },
+    { id: 'p2', firstName: 'Anna', lastName: 'Černá' },
+  ]);
+  range.mockReset().mockResolvedValue([]);
 });
 
 const { default: Dashboard } = await import('./Dashboard');
 
-const at = (hour: number, status: string, id: string) => ({
+/** Status codes as the contract numbers them: 0 Scheduled … 4 Cancelled, 5 NoShow. */
+const at = (hourUtc: number, status: number, id: string, patientId = 'p1') => ({
   id,
-  patientId: 'p1',
-  patientName: 'Jan Novák',
-  serviceType: 'Consultation',
-  practitionerName: '',
-  room: '',
-  startTime: `2026-09-29T0${hour}:00:00Z`,
-  endTime: `2026-09-29T0${hour}:30:00Z`,
+  calendarId: 'c1',
+  patientId,
+  activityId: 'a1',
+  activityName: 'Kontrola',
+  startUtc: `2026-09-29T${String(hourUtc).padStart(2, '0')}:00:00Z`,
+  endUtc: `2026-09-29T${String(hourUtc).padStart(2, '0')}:30:00Z`,
   status,
-  notes: '',
+  isRunningLate: false,
+  checkedInUtc: null,
+  paperwork: { ready: true, missing: [] },
 });
 
 const tile = async (title: string) => {
@@ -53,71 +70,92 @@ const tile = async (title: string) => {
   return within(label.closest('.MuiCard-root') as HTMLElement);
 };
 
+/* The names also appear in "Naposledy pacienti", so every assertion about the
+   timeline is scoped to the timeline card rather than to the whole page. */
+const timeline = async () => {
+  const heading = await screen.findByText('Dnešní harmonogram');
+  return within(heading.closest('.MuiCard-root') as HTMLElement);
+};
+
+const renderDashboard = () =>
+  render(
+    <MemoryRouter>
+      <Dashboard />
+    </MemoryRouter>,
+  );
+
 describe('"Dnes v kalendari"', () => {
+  it('asks for today, and for one day only', async () => {
+    renderDashboard();
+    await screen.findByText('Dnes v kalendáři');
+
+    const today = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const expected = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+
+    expect(range).toHaveBeenCalledWith(expected, expected);
+  });
+
   it('counts only the appointments that still stand', async () => {
-    getAppointments.mockResolvedValue([
-      at(8, 'Scheduled', 'a'),
-      at(9, 'Completed', 'b'),
-      at(1, 'Cancelled', 'c'),
-      at(2, 'Cancelled', 'd'),
-      at(3, 'Cancelled', 'e'),
+    range.mockResolvedValue([
+      at(8, 0, 'a'), // Scheduled
+      at(9, 3, 'b'), // Completed
+      at(1, 4, 'c'), // Cancelled
+      at(2, 4, 'd'),
+      at(3, 5, 'e'), // NoShow
     ]);
 
-    render(<MemoryRouter><Dashboard /></MemoryRouter>);
+    renderDashboard();
 
     const card = await tile('Dnes v kalendáři');
     expect(await card.findByText('2')).toBeInTheDocument();
     expect(card.queryByText('5')).not.toBeInTheDocument();
   });
 
-  /* Asserted by name rather than by the printed time: the row formats with
-     getHours(), so the hour it draws depends on the runner's timezone and a
-     literal "08:00" would pass or fail by geography. */
   it('does not list a cancelled appointment in the day timeline either', async () => {
-    getAppointments.mockResolvedValue([
-      { ...at(8, 'Scheduled', 'a'), patientName: 'Zůstává Platný' },
-      { ...at(9, 'Cancelled', 'gone'), patientName: 'Zrušený Termín' },
-    ]);
+    range.mockResolvedValue([at(8, 0, 'a', 'p1'), at(9, 4, 'gone', 'p2')]);
 
-    render(<MemoryRouter><Dashboard /></MemoryRouter>);
+    renderDashboard();
 
-    expect(await screen.findByText('Zůstává Platný')).toBeInTheDocument();
-    expect(screen.queryByText('Zrušený Termín')).not.toBeInTheDocument();
+    const card = await timeline();
+    expect(await card.findByText('Jana Marková')).toBeInTheDocument();
+    expect(card.queryByText('Anna Černá')).not.toBeInTheDocument();
   });
 
   /*
    * The timeline used to call `.sort()` straight on the state array, which
-   * reorders in place - a component rewriting the value it renders from. That
-   * is fixed (the sort now runs on a copy), but there is deliberately no test
-   * asserting the mutation itself, and the reason is worth writing down.
-   *
-   * One was written and it was worthless: `setTodayAppointments` stores
-   * `appts.filter(...)`, which is already a new array, so the in-place sort
-   * only ever reordered an internal copy nothing else could observe. Putting
-   * `.sort()` back on the state left all 26 tests green. It asserted something
-   * that was true either way.
-   *
-   * What is left is the behaviour that can actually break: the day comes out
-   * in time order whatever order it arrived in. Removing the sort turns this
-   * red, which is the whole test the fix can honestly support.
+   * reorders in place. That is fixed by sorting a copy, but there is no test
+   * asserting the mutation itself and the reason is worth recording: one was
+   * written and it was worthless. The rows are filtered into a new array
+   * before they reach state, so the in-place sort only ever reordered an
+   * internal copy nothing could observe, and putting `.sort()` back left every
+   * test green. What is left is the behaviour that can actually break.
    */
-  it('still draws the day in chronological order, whatever order it arrived in', async () => {
-    getAppointments.mockResolvedValue([
-      { ...at(9, 'Scheduled', 'late'), patientName: 'Druhý Pacient' },
-      { ...at(8, 'Scheduled', 'early'), patientName: 'První Pacient' },
-    ]);
+  it('draws the day in time order whatever order it arrived in', async () => {
+    range.mockResolvedValue([at(9, 0, 'late', 'p2'), at(8, 0, 'early', 'p1')]);
 
-    const { container } = render(<MemoryRouter><Dashboard /></MemoryRouter>);
-    await screen.findByText('První Pacient');
+    renderDashboard();
 
-    const text = container.textContent ?? '';
-    expect(text.indexOf('První Pacient')).toBeLessThan(text.indexOf('Druhý Pacient'));
+    const card = await timeline();
+    await card.findByText('Jana Marková');
+    const text = (await timeline()).getByText('Jana Marková').closest('.MuiCard-root')?.textContent ?? '';
+    expect(text.indexOf('Jana Marková')).toBeLessThan(text.indexOf('Anna Černá'));
+  });
+
+  it('shows a name rather than an id when the patient is known', async () => {
+    range.mockResolvedValue([at(8, 0, 'a', 'p1')]);
+
+    renderDashboard();
+
+    const card = await timeline();
+    expect(await card.findByText('Jana Marková')).toBeInTheDocument();
+    expect(card.queryByText(/^p1$/)).not.toBeInTheDocument();
   });
 
   it('shows the empty state when every appointment of the day was cancelled', async () => {
-    getAppointments.mockResolvedValue([at(8, 'Cancelled', 'a'), at(9, 'Cancelled', 'b')]);
+    range.mockResolvedValue([at(8, 4, 'a'), at(9, 5, 'b')]);
 
-    render(<MemoryRouter><Dashboard /></MemoryRouter>);
+    renderDashboard();
 
     expect(await screen.findByText('Žádné schůzky na dnešek')).toBeInTheDocument();
   });
