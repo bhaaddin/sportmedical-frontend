@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import {
   Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon,
-  Person as PersonIcon, Refresh as RefreshIcon
+  Person as PersonIcon, Refresh as RefreshIcon, LockReset as LockResetIcon
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import client from '../api/client';
@@ -96,6 +96,23 @@ export default function StaffManagement() {
 
   const accountFor = (email: string) =>
     accounts.find(a => (a.email || '').toLowerCase() === (email || '').toLowerCase());
+
+  /*
+   * Login accounts with no staff record behind them.
+   *
+   * This screen was built as if every account belongs to a staff member, and
+   * rendered from `/api/staff` alone. That endpoint returned an empty list
+   * while `/api/v1/users` held two live accounts - so the table said "Žádní
+   * zaměstnanci" and both real logins, including the owner's, were invisible.
+   *
+   * It mattered on 11. 9. 2026: the owner could not log in, and the one screen
+   * that can reset a password showed nobody to reset it for. An account with no
+   * HR record still signs in and still forgets its password, so it is listed
+   * here rather than left out of the only place that can help it.
+   */
+  const orphanAccounts = accounts.filter(
+    a => !staff.some(m => (m.email || '').toLowerCase() === (a.email || '').toLowerCase()),
+  );
 
   const loadStaff = async () => {
     setLoading(true);
@@ -282,7 +299,7 @@ export default function StaffManagement() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {staff.length === 0 ? (
+              {staff.length === 0 && orphanAccounts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
                     <PersonIcon sx={{ fontSize: 48, color: '#ddd', mb: 1 }} />
@@ -344,6 +361,56 @@ export default function StaffManagement() {
                   </motion.tr>
                 ))
               )}
+
+              {/*
+                Accounts that can sign in but have no staff record. Listed
+                plainly rather than hidden: this is the only screen that can
+                reset a password, so an account missing from it is an account
+                nobody can help.
+              */}
+              {orphanAccounts.map((acc) => (
+                <TableRow key={acc.userId}>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Avatar sx={{ bgcolor: '#90A4AE', width: 36, height: 36 }}>
+                        {(acc.displayName || acc.email || '?').trim()[0]}
+                      </Avatar>
+                      <Box>
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {acc.displayName || acc.email}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          jen přihlašovací účet, bez karty zaměstnance
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </TableCell>
+                  <TableCell>{acc.role}</TableCell>
+                  <TableCell>{acc.email}</TableCell>
+                  <TableCell>—</TableCell>
+                  <TableCell>—</TableCell>
+                  <TableCell>
+                    <Chip size="small" color="success" label="Účet aktivní" />
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      color={acc.isActive ? 'success' : 'default'}
+                      label={acc.isActive ? 'Aktivní' : 'Neaktivní'}
+                    />
+                  </TableCell>
+                  <TableCell align="right">
+                    <Tooltip title="Resetovat heslo">
+                      <IconButton
+                        aria-label={`Resetovat heslo pro ${acc.email}`}
+                        onClick={() => void handleResetPassword(acc.email)}
+                      >
+                        <LockResetIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </TableContainer>

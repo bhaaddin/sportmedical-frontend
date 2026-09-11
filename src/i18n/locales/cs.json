@@ -498,6 +498,9 @@
       "save": "Zablokovat",
       "release": "Uvolnit čas",
       "availabilityCaveat": "Zablokovaný čas zatím nezmizí ze seznamu volných termínů — objednání se odmítne až při potvrzení. Řeší se to na straně serveru."
+    },
+    "appointmentLink": {
+      "missing": "Odkaz na termín je neúplný. Otevřete termín prosím z plánování."
     }
   }
 }

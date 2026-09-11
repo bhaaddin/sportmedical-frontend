@@ -374,11 +374,35 @@ export default function IntakeQuestionnaire() {
 
       <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3 }}>
         {/* Honeypot — visually hidden, never focusable. */}
+        {/*
+          The bot trap. A non-empty value makes the server discard the
+          submission - and hand back a plausible-looking reference number - so
+          anything that fills this field silently loses a real patient who
+          believes they registered.
+ 
+          Given that cost, the field is named for nothing a browser autofills.
+          `website`, `url`, `company` and the rest are exactly what heuristic
+          autofill reaches for; `hp-leave-blank` is not a field any browser has
+          a value for. `autoComplete="off"` alone is advisory and browsers
+          ignore it when they think they know better.
+ 
+          Positioned off-screen rather than `display: none`, because a trap a
+          bot can detect is a trap that catches nothing.
+ 
+          Worth recording how this was investigated, since it nearly became the
+          wrong fix: a submission really was discarded here, and the first
+          explanation offered was browser autofill. It was not. This field is
+          the FIRST input in the DOM, and a test harness had written into
+          `document.querySelectorAll('input')[0]` - the trap - believing it was
+          the given-name box. The cause was the measuring, not the browser. The
+          hardening below stands on its own merits, not on that incident.
+        */}
         <Box
           aria-hidden
           sx={{ position: 'absolute', left: '-9999px', width: 1, height: 1, overflow: 'hidden' }}
         >
           <input
+            name="hp-leave-blank"
             tabIndex={-1}
             autoComplete="off"
             value={form.websiteUrl}

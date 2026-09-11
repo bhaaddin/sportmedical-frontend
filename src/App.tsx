@@ -80,6 +80,7 @@ const BookingDayOverviewPage = lazy(() => import('./pages/booking/DayOverviewPag
 /* Booking phase 1, stage 5: partner reservations */
 const BookingPartnerOrdersPage = lazy(() => import('./pages/booking/PartnerOrdersPage'));
 const BookingBlockedTimePage = lazy(() => import('./pages/booking/BlockedTimePage'));
+const AppointmentLinkPage = lazy(() => import('./pages/booking/AppointmentLinkPage'));
 const CashierPage = lazy(() => import('./pages/CashierPage'));
 const ClubsPage = lazy(() => import('./pages/ClubsPage'));
 const AccountingExportPage = lazy(() => import('./pages/AccountingExportPage'));
@@ -393,6 +394,11 @@ export default function App() {
                     <Route path="/dnes" element={<BookingDayOverviewPage />} />
                     <Route path="/vyhrazeni" element={<BookingPartnerOrdersPage />} />
                     <Route path="/blokovany-cas" element={<BookingBlockedTimePage />} />
+                    {/* Where a booking notification's actionUrl points. */}
+                    <Route
+                      path="/kalendar/:calendarId/termin/:appointmentId"
+                      element={<AppointmentLinkPage />}
+                    />
                     <Route path="/calendars" element={<RequireAdmin><BookingCalendarsPage /></RequireAdmin>} />
                     <Route path="/activities" element={<RequireAdmin><BookingActivitiesPage /></RequireAdmin>} />
                     <Route path="/working-hours" element={<RequireAdmin><BookingWorkingHoursPage /></RequireAdmin>} />
