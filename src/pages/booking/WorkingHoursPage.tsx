@@ -717,6 +717,23 @@ function DayRow({
           }
           label={t(`booking.workingHours.weekday.${dayOfWeek}`)}
         />
+        {/*
+          A day with no saved working hours still shows times, because
+          `emptyWorkingHour` offers 08:00-16:00 as a starting point for setting
+          one up. Without saying so, the grid reads as though the day were
+          already open: measured against a calendar whose server rows were
+          Monday to Friday, Saturday and Sunday both displayed 08:00-16:00.
+          The only other signal was the absence of a delete button, which is
+          not a thing anybody notices.
+        */}
+        {existing === null && (
+          <Typography
+            variant="caption"
+            sx={{ display: "block", color: "text.secondary", ml: 4 }}
+          >
+            {t("booking.workingHours.notSetYet")}
+          </Typography>
+        )}
       </TableCell>
 
       <TableCell sx={{ verticalAlign: "top", pt: 2 }}>

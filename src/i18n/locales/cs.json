@@ -247,7 +247,8 @@
       "previewLoading": "Načítám data…",
       "previewFailed": "Data se nepodařilo načíst — nevím, na které dny cyklus padne.",
       "workerUnknown": "Pracovník — jméno se nenačetlo",
-      "workersFailed": "Seznam pracovníků se nepodařilo načíst — prázdný výběr neznamená, že žádní nejsou."
+      "workersFailed": "Seznam pracovníků se nepodařilo načíst — prázdný výběr neznamená, že žádní nejsou.",
+      "notSetYet": "zatím nenastaveno — časy níže jsou jen návrh"
     },
     "exceptions": {
       "title": "Výjimky",
