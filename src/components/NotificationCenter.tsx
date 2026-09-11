@@ -6,18 +6,26 @@
    - Notification types: appointment, document, system, alert
    - WebSocket real-time updates
    ══════════════════════════════════════════════════════════════ */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box, Typography, IconButton, Badge, Popover, List, ListItem, ListItemIcon,
-  ListItemText, Button, Divider, Chip, Skeleton, Tooltip,
+  ListItemText, Button, Divider, Skeleton, Tooltip,
 } from '@mui/material';
 import {
-  Notifications, CalendarMonth, Description, Warning, CheckCircle,
-  Info, Delete, DoneAll, Settings,
+  Notifications, CalendarMonth, Description, Warning,
+  Info, Delete, DoneAll, Settings, ExpandMore, ExpandLess,
 } from '@mui/icons-material';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import client from '../api/client';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
+import {
+  buildNotificationSections,
+  exactNotificationTime,
+  type NotificationRow,
+  formatNotificationTime,
+  groupLabel,
+  newSinceBoundary,
+} from './notifications/notificationList';
 import toast from 'react-hot-toast';
 
 /* ── Types ── */
@@ -29,6 +37,8 @@ export interface Notification {
   timestamp: string;
   read: boolean;
   actionUrl?: string;
+  /** Machine-readable event, used for grouping. Absent means "do not group". */
+  kind?: string | null;
 }
 
 /* ── Notification config ── */
@@ -60,11 +70,97 @@ const NOTIFICATION_CONFIG: Record<string, { icon: React.ReactNode; color: string
   },
 };
 
+/**
+ * One notification. Lives apart from the list so a row inside an expanded
+ * group and a row standing on its own are the same thing, not two things that
+ * drift.
+ */
+function NotificationLine({
+  row,
+  inset = false,
+  onOpen,
+  onDelete,
+}: {
+  /* The list's own shape, not the component's narrower one: a row inside a
+     group and a row on its own must be the same thing. */
+  row: NotificationRow;
+  inset?: boolean;
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
+  const config = NOTIFICATION_CONFIG[row.type] ?? NOTIFICATION_CONFIG.info;
+  return (
+    <>
+      <ListItem
+        sx={{
+          py: 1.5,
+          pl: inset ? 5 : 2,
+          pr: 2,
+          bgcolor: row.read ? 'transparent' : '#F5F9FF',
+          borderLeft: row.read ? '3px solid transparent' : `3px solid ${config.color}`,
+          '&:hover': { bgcolor: '#F5F5F5' },
+          cursor: 'pointer',
+        }}
+        onClick={onOpen}
+      >
+        <ListItemIcon sx={{ minWidth: 44 }}>
+          <Box sx={{ color: config.color, bgcolor: config.bgColor, p: 1, borderRadius: 2 }}>
+            {config.icon}
+          </Box>
+        </ListItemIcon>
+        <ListItemText
+          primary={
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: row.read ? 400 : 600 }}>
+                {row.title}
+              </Typography>
+              {/* The exact moment is reachable everywhere, including where the
+                  label is relative - so "Před 12 min" is never all anybody can
+                  find out. */}
+              <Tooltip title={exactNotificationTime(row.timestamp)}>
+                <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                  {formatNotificationTime(row.timestamp)}
+                </Typography>
+              </Tooltip>
+            </Box>
+          }
+          secondary={
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: 13 }}>
+              {row.message}
+            </Typography>
+          }
+        />
+        <IconButton
+          size="small"
+          aria-label="Smazat oznámení"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          sx={{ ml: 1 }}
+        >
+          <Delete sx={{ fontSize: 16 }} />
+        </IconButton>
+      </ListItem>
+      <Divider />
+    </>
+  );
+}
+
 /* ══════════════════════════════════════════════════════════════ */
 export default function NotificationCenter() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  /*
+   * When this viewer last opened the panel, straight from the server.
+   *
+   * Null until the server sends it, and then no "new since" line is drawn at
+   * all - a divider in the wrong place is worse than no divider, because it
+   * makes a confident claim about what somebody has already seen.
+   */
+  const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
   const open = Boolean(anchorEl);
   const popoverId = open ? 'notification-popover' : undefined;
 
@@ -73,6 +169,10 @@ export default function NotificationCenter() {
     try {
       const res = await client.get('/api/notifications');
       const data = res.data?.value ?? res.data;
+      /* The marker travels with the list when the server has one. Read
+         defensively: today it sends a bare array and there is no envelope. */
+      const seen = res.data?.lastSeenAt ?? res.data?.value?.lastSeenAt ?? null;
+      if (typeof seen === 'string') setLastSeenAt(seen);
       setNotifications(prev => {
         const api = Array.isArray(data) ? data : data?.items ?? [];
         const bookingNotes = prev.filter(n => n.id.startsWith('booking:'));
@@ -139,6 +239,24 @@ export default function NotificationCenter() {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  /*
+   * Rebuilt only when the rows or the marker change - not on every render, so
+   * a group does not silently re-collapse while somebody is reading it open.
+   */
+  const sections = useMemo(
+    () => buildNotificationSections(notifications, { lastSeenAt }),
+    [notifications, lastSeenAt],
+  );
+  const boundary = useMemo(() => newSinceBoundary(sections), [sections]);
+
+  const toggleGroup = (key: string) =>
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
   const markAsRead = async (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
     const note = notifications.find(n => n.id === id);
@@ -172,17 +290,6 @@ export default function NotificationCenter() {
     }
   };
 
-  const formatTime = (timestamp: string) => {
-    const diff = Date.now() - new Date(timestamp).getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return 'Právě teď';
-    if (minutes < 60) return `Před ${minutes} min`;
-    if (hours < 24) return `Před ${hours}h`;
-    return `Před ${days} dny`;
-  };
 
   return (
     <>
@@ -253,64 +360,135 @@ export default function NotificationCenter() {
         ) : (
           <List sx={{ p: 0, maxHeight: 360, overflow: 'auto' }}>
             <AnimatePresence>
-              {notifications.map((notification) => {
-                const config = NOTIFICATION_CONFIG[notification.type] || NOTIFICATION_CONFIG.info;
-                return (
-                  <motion.div
-                    key={notification.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ duration: 0.2 }}
+              {sections.map((section) => (
+                <Box key={section.key}>
+                  {/* Day heading. Sticky so it stays readable while scrolling
+                      a long day, which is the case it exists for. */}
+                  <Box
+                    sx={{
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 1,
+                      px: 2,
+                      py: 0.75,
+                      bgcolor: '#FAFAFA',
+                      borderBottom: '1px solid #eee',
+                    }}
                   >
-                    <ListItem
-                      sx={{
-                        py: 1.5,
-                        px: 2,
-                        bgcolor: notification.read ? 'transparent' : '#F5F9FF',
-                        borderLeft: notification.read ? '3px solid transparent' : `3px solid ${config.color}`,
-                        '&:hover': { bgcolor: '#F5F5F5' },
-                        cursor: 'pointer',
-                      }}
-                      onClick={() => markAsRead(notification.id)}
+                    <Typography
+                      variant="caption"
+                      sx={{ fontWeight: 700, color: 'text.secondary', letterSpacing: 0.4 }}
                     >
-                      <ListItemIcon sx={{ minWidth: 44 }}>
-                        <Box sx={{ color: config.color, bgcolor: config.bgColor, p: 1, borderRadius: 2 }}>
-                          {config.icon}
-                        </Box>
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography variant="body2" sx={{ fontWeight: notification.read ? 400 : 600 }}>
-                              {notification.title}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                              {formatTime(notification.timestamp)}
-                            </Typography>
-                          </Box>
-                        }
-                        secondary={
-                          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: 13 }}>
-                            {notification.message}
-                          </Typography>
-                        }
-                      />
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteNotification(notification.id);
-                        }}
-                        sx={{ ml: 1 }}
+                      {section.heading}
+                    </Typography>
+                  </Box>
+
+                  {section.entries.map((item, index) => {
+                    const showBoundary =
+                      boundary !== null &&
+                      boundary.sectionKey === section.key &&
+                      boundary.index === index;
+
+                    const divider = showBoundary ? (
+                      <Box
+                        key={`${section.key}-boundary`}
+                        sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 0.5 }}
                       >
-                        <Delete sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </ListItem>
-                    <Divider />
-                  </motion.div>
-                );
-              })}
+                        <Box sx={{ flex: 1, height: '1px', bgcolor: '#0D7377' }} />
+                        <Typography variant="caption" sx={{ color: '#0D7377', fontWeight: 700 }}>
+                          Nové od vašeho posledního pohledu
+                        </Typography>
+                        <Box sx={{ flex: 1, height: '1px', bgcolor: '#0D7377' }} />
+                      </Box>
+                    ) : null;
+
+                    if (item.entry === 'group') {
+                      const groupKey = `${section.key}-${item.kind}-${item.timestamp}`;
+                      const isOpen = expanded.has(groupKey);
+                      const config =
+                        NOTIFICATION_CONFIG[item.rows[0].type] ?? NOTIFICATION_CONFIG.info;
+                      return (
+                        <Box key={groupKey}>
+                          {divider}
+                          <ListItem
+                            sx={{
+                              py: 1.25,
+                              px: 2,
+                              bgcolor: item.unreadCount > 0 ? '#F5F9FF' : 'transparent',
+                              borderLeft:
+                                item.unreadCount > 0
+                                  ? `3px solid ${config.color}`
+                                  : '3px solid transparent',
+                              cursor: 'pointer',
+                              '&:hover': { bgcolor: '#F5F5F5' },
+                            }}
+                            onClick={() => toggleGroup(groupKey)}
+                          >
+                            <ListItemIcon sx={{ minWidth: 44 }}>
+                              <Box
+                                sx={{ color: config.color, bgcolor: config.bgColor, p: 1, borderRadius: 2 }}
+                              >
+                                {config.icon}
+                              </Box>
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: item.unreadCount > 0 ? 600 : 400 }}
+                                  >
+                                    {groupLabel(item.kind, item.rows.length)}
+                                  </Typography>
+                                  <Tooltip title={exactNotificationTime(item.timestamp)}>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                      sx={{ whiteSpace: 'nowrap' }}
+                                    >
+                                      {formatNotificationTime(item.timestamp)}
+                                    </Typography>
+                                  </Tooltip>
+                                </Box>
+                              }
+                              secondary={
+                                <Typography variant="caption" color="text.secondary">
+                                  {item.unreadCount > 0
+                                    ? `${item.unreadCount} nepřečtených`
+                                    : 'vše přečteno'}
+                                </Typography>
+                              }
+                            />
+                            {isOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                          </ListItem>
+                          <Divider />
+                          {isOpen &&
+                            item.rows.map((row) => (
+                              <NotificationLine
+                                key={row.id}
+                                row={row}
+                                inset
+                                onOpen={() => markAsRead(row.id)}
+                                onDelete={() => deleteNotification(row.id)}
+                              />
+                            ))}
+                        </Box>
+                      );
+                    }
+
+                    return (
+                      <Box key={item.row.id}>
+                        {divider}
+                        <NotificationLine
+                          row={item.row}
+                          onOpen={() => markAsRead(item.row.id)}
+                          onDelete={() => deleteNotification(item.row.id)}
+                        />
+                      </Box>
+                    );
+                  })}
+                </Box>
+              ))}
             </AnimatePresence>
           </List>
         )}
