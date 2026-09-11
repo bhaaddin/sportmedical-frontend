@@ -46,6 +46,11 @@ export function useRealtimeSync(options: {
    * told.
    */
   onReconnected?: () => void;
+  /**
+   * The hub's "look again" nudge. Carries nothing on purpose, so this takes no
+   * argument: the only correct response is to reload from the server.
+   */
+  onNotificationsChanged?: () => void;
 } = {}) {
   const { enabled = true } = options;
   const [syncState, setSyncState] = useState<SyncState>({
@@ -78,6 +83,11 @@ export function useRealtimeSync(options: {
     const unsubscribers: (() => void)[] = [];
 
     /* ── Connection events ── */
+    unsubscribers.push(
+      socketService.on('notificationsChanged', () => {
+        options.onNotificationsChanged?.();
+      }),
+    );
     unsubscribers.push(
       socketService.on(SOCKET_EVENTS.CONNECTED, (data?: { afterGap?: boolean }) => {
         setSyncState((s) => ({ ...s, connected: true, reconnecting: false }));

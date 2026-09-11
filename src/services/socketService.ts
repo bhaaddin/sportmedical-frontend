@@ -141,12 +141,25 @@ class SocketService {
     });
 
     /*
-     * Server-sent hub messages. `notification` is what the bell listens for;
-     * the rest of SOCKET_EVENTS is forwarded verbatim so existing listeners
-     * keep working if and when the hub starts sending those names.
+     * `notificationsChanged` is the name the hub actually sends, and it is
+     * deliberately empty. It is not a notification - it is the sentence "look
+     * again". Whoever receives it reloads the list; nothing is rendered from
+     * the message itself.
+     *
+     * That design is worth keeping straight, because the obvious alternative
+     * is worse: if the push carried the row, a screen could be assembled from
+     * whichever messages happened to arrive - and that is always a subset. A
+     * dropped connection, a laptop that slept, a proxy timeout, and the browser
+     * shows a list nobody knows is incomplete. Carrying nothing makes the nudge
+     * losable without consequence: the worst case is a notification arriving a
+     * moment later, which the poll catches anyway.
+     *
+     * This side listened for `notification` instead, so the hub spoke and
+     * nothing heard it. Three days of a bell that wrote its rows, delivered
+     * them to the right person and rendered them - and never moved on its own.
      */
-    connection.on('notification', (payload: unknown) => {
-      this.emit('notification', payload);
+    connection.on('notificationsChanged', () => {
+      this.emit('notificationsChanged', null);
     });
     for (const name of Object.values(SOCKET_EVENTS)) {
       if (name === SOCKET_EVENTS.CONNECTED || name === SOCKET_EVENTS.DISCONNECTED
