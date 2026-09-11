@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Paper, Typography, TextField, Button, Alert,
-  InputAdornment, IconButton, CircularProgress, Link,
+  InputAdornment, IconButton, CircularProgress,
 } from '@mui/material';
 import { Visibility, VisibilityOff, LocalHospital, Email, Lock } from '@mui/icons-material';
 import { motion } from 'framer-motion';
@@ -186,8 +186,31 @@ export default function Login() {
               }}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
 
+            {/*
+              This was `<Link href="#">Zapomenuté heslo?</Link>` - a link that
+              looked like a way out and did nothing when clicked.
+
+              The person who has forgotten their password is the only person who
+              ever clicks it, so the silence lands on exactly the one who cannot
+              afford it. It happened to the owner of this system on 11. 9. 2026,
+              which is how it was found.
+
+              There is no anonymous reset to point it at, and that is measured,
+              not assumed: the API has two password routes and both require a
+              session - `/api/v1/account/password` (change your own) and
+              `/api/v1/users/{id}/reset-password` (admin, [Authorize]). Building
+              a self-service reset to fill the gap would be a security surface
+              invented on the side of another task - what proves the identity of
+              whoever asks, how long a link lives, what happens to open
+              sessions. That is its own job with its own brief.
+
+              So it says what is true instead. Less pretty, and it stops
+              promising.
+            */}
             <Box sx={{ textAlign: 'right', mt: 0.5, mb: 1 }}>
-              <Link href="#" underline="hover" sx={{ fontSize: 13, color: '#0D7377' }}>Zapomenuté heslo?</Link>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                Zapomenuté heslo? Nové vám nastaví správce v sekci Tým.
+              </Typography>
             </Box>
 
             <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
@@ -203,9 +226,14 @@ export default function Login() {
               </Button>
             </motion.div>
 
+            {/*
+              The same fault again, two lines down: "Požádat o přístup" was also
+              `href="#"`. There is no self-registration - an account is only ever
+              created by an administrator through `POST /api/v1/users` on the
+              Tým screen - so the invitation to ask for one led nowhere.
+            */}
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 3 }}>
-              Nemáte účet?{' '}
-              <Link href="#" underline="hover" sx={{ color: '#0D7377', fontWeight: 600 }}>Požádat o přístup</Link>
+              Nemáte účet? Přístup zakládá správce ordinace.
             </Typography>
           </motion.form>
           )}
