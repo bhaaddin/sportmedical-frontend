@@ -114,12 +114,19 @@ function NotificationLine({
               <Typography variant="body2" sx={{ fontWeight: row.read ? 400 : 600 }}>
                 {row.title}
               </Typography>
-              {/* The exact moment is reachable everywhere, including where the
-                  label is relative - so "Před 12 min" is never all anybody can
-                  find out. */}
-              <Tooltip title={exactNotificationTime(row.timestamp)}>
+              {/*
+                Labelled, because a booking notification carries two times and
+                they mean opposite things: this one is when the message
+                arrived, and the one inside the message is when the patient is
+                actually coming. Side by side and unlabelled they read as one
+                thing said twice - which is how it was first reported.
+ 
+                The exact moment stays on the tooltip, so "Před 12 min" is
+                never all anybody can find out.
+              */}
+              <Tooltip title={`přišlo ${exactNotificationTime(row.timestamp)}`}>
                 <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                  {formatNotificationTime(row.timestamp)}
+                  přišlo {formatNotificationTime(row.timestamp)}
                 </Typography>
               </Tooltip>
             </Box>
@@ -480,13 +487,13 @@ export default function NotificationCenter() {
                                   >
                                     {groupLabel(item.kind, item.rows.length)}
                                   </Typography>
-                                  <Tooltip title={exactNotificationTime(item.timestamp)}>
+                                  <Tooltip title={`přišlo ${exactNotificationTime(item.timestamp)}`}>
                                     <Typography
                                       variant="caption"
                                       color="text.secondary"
                                       sx={{ whiteSpace: 'nowrap' }}
                                     >
-                                      {formatNotificationTime(item.timestamp)}
+                                      přišlo {formatNotificationTime(item.timestamp)}
                                     </Typography>
                                   </Tooltip>
                                 </Box>

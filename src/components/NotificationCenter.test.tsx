@@ -126,10 +126,31 @@ describe('the notification panel', () => {
 
     await openPanel();
 
-    const label = await screen.findByText('Před 12 min');
-    /* MUI puts the tooltip text on the element's aria-label / title chain. */
+    /* The column is labelled, because a booking notification carries two
+       times: when it arrived, and when the patient is coming. */
+    const label = await screen.findByText(/přišlo Před 12 min/);
+    expect(label).toBeInTheDocument();
     const holder = label.closest('[aria-label], [title]');
     expect(holder ?? label.parentElement).toBeTruthy();
+  });
+
+  it('says which time it is showing, so it cannot be read as the appointment time', async () => {
+    getList.mockResolvedValue({
+      data: [
+        row('a', {
+          title: 'Nový termín',
+          message: 'Ordinace · Odběr · 24. 9. 2026 10:00',
+          timestamp: minutesAgo(20),
+        }),
+      ],
+    });
+
+    await openPanel();
+
+    /* Both times on one row: the arrival is labelled, the appointment time
+       stays inside the server's own sentence. */
+    expect(await screen.findByText(/přišlo Před 20 min/)).toBeInTheDocument();
+    expect(screen.getByText(/24\. 9\. 2026 10:00/)).toBeInTheDocument();
   });
 
   it('orders newest first and does not float unread to the top', async () => {
