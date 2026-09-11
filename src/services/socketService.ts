@@ -1,9 +1,47 @@
 /* ══════════════════════════════════════════════════════════════
-   WEBSOCKET SERVICE
-   Singleton service for real-time communication.
-   Features: auto-reconnect, exponential backoff, JWT auth,
-   event channels, heartbeat ping/pong.
+   REAL-TIME SERVICE
+   Singleton over the SignalR hub at /hubs/notifications.
+   Same surface as before: init / connect / on / off / send.
    ══════════════════════════════════════════════════════════════ */
+
+/*
+ * This opened a raw `new WebSocket(url)` and SignalR refused every one of them.
+ *
+ * SignalR is not a plain socket. It requires `POST …/negotiate`, then a socket
+ * carrying the `connectionToken` that answer returns as `?id=`, then a protocol
+ * handshake frame. A raw socket skips all three and is rejected before any
+ * message is exchanged, whatever the authentication does.
+ *
+ * The mistake was diagnosed a day earlier - in a throwaway test of mine, which
+ * failed for exactly this reason and which I described at the time as "a raw
+ * WebSocket without the connectionToken, which SignalR always refuses". It did
+ * not occur to me to look for the same thing in this file. `@microsoft/signalr`
+ * was in package.json the whole time, unused.
+ *
+ * It took two lanes two days to find, because the failure splits: `negotiate`
+ * is an ordinary request and succeeded, while the upgrade failed - which reads
+ * like a transport problem and sent both lanes hunting through proxy config.
+ * The other half was real and is fixed on the server: the hub read its token
+ * only from the `Authorization` header, and a browser cannot put a header on a
+ * WebSocket, so SignalR sends it as `?access_token=`.
+ *
+ * Three rules the owner asked for, and where each one lives here:
+ *
+ *   1. The list from the server is the truth; this is only the fast path. The
+ *      bell reloads from `/api/notifications` - nothing here is the record.
+ *   2. After every reconnect, ask again. `onreconnected` emits CONNECTED, and
+ *      the bell treats that as "refetch", because a gap in the socket is
+ *      exactly when something was missed.
+ *   3. When the socket will not run, fall back to asking on a timer. Handled by
+ *      the bell rather than here: the worst that may happen is "a minute late",
+ *      never "not at all".
+ */
+import {
+  HubConnection,
+  HubConnectionBuilder,
+  HubConnectionState,
+  LogLevel,
+} from '@microsoft/signalr';
 
 type EventCallback = (data: any) => void;
 
@@ -49,107 +87,107 @@ export const SOCKET_EVENTS = {
 type SocketEventName = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];
 
 class SocketService {
-  private ws: WebSocket | null = null;
+  private connection: HubConnection | null = null;
   private listeners: Map<string, Set<EventCallback>> = new Map();
-  private reconnectAttempts = 0;
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-  private pingTimer: ReturnType<typeof setInterval> | null = null;
-  private isConnecting = false;
   private isManualClose = false;
+  private starting: Promise<void> | null = null;
 
-  private config: SocketConfig = {
-    url: '',
-    maxReconnectAttempts: 10,
-    initialReconnectDelay: 1000,
-    maxReconnectDelay: 30000,
-    heartbeatInterval: 30000,
-  };
+  private config: SocketConfig = { url: '' };
 
   /* ── Initialize ── */
   init(config: Partial<SocketConfig> = {}) {
     this.config = { ...this.config, ...config };
     if (!this.config.url) {
-      const base = import.meta.env.VITE_API_BASE_URL || window.location.origin;
-      this.config.url = base.replace(/^http/, 'ws') + '/hubs/notifications';
+      /*
+       * A path, not a ws:// URL. The SignalR client negotiates over HTTP first
+       * and picks the transport itself, so handing it `ws://` would leave it
+       * nothing to POST to. Relative keeps it on the dev proxy as well.
+       */
+      this.config.url = '/hubs/notifications';
     }
   }
 
   /* ── Connect ── */
   connect() {
-    if (this.ws?.readyState === WebSocket.OPEN || this.isConnecting) return;
+    if (this.connection?.state === HubConnectionState.Connected) return;
+    if (this.starting) return;
     this.isManualClose = false;
-    this.isConnecting = true;
+    if (!this.config.url) this.init();
 
-    try {
-      const token = localStorage.getItem('token');
-      const url = token
-        ? `${this.config.url}?access_token=${token}`
-        : this.config.url;
+    const connection = new HubConnectionBuilder()
+      .withUrl(this.config.url, {
+        /* Read per attempt, not captured once: after a re-login the old token
+           would otherwise be retried until the attempts ran out. */
+        accessTokenFactory: () => localStorage.getItem('token') ?? '',
+      })
+      /* The client's own backoff, rather than a hand-rolled one. It also falls
+         back to another transport when WebSocket cannot be established. */
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.Warning)
+      .build();
 
-      this.ws = new WebSocket(url);
+    connection.onreconnecting(() => {
+      this.emit(SOCKET_EVENTS.RECONNECTING, { timestamp: Date.now() });
+    });
 
-      this.ws.onopen = () => {
-        this.isConnecting = false;
-        this.reconnectAttempts = 0;
-        this.startHeartbeat();
-        this.emit(SOCKET_EVENTS.CONNECTED, { timestamp: Date.now() });
-        console.log('[SocketService] Connected');
-      };
+    /* Rule 2: a reconnect means there is a gap, and whoever listens has to go
+       and look rather than assume nothing happened inside it. */
+    connection.onreconnected(() => {
+      this.emit(SOCKET_EVENTS.CONNECTED, { timestamp: Date.now(), afterGap: true });
+    });
 
-      this.ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === 'pong') return; // heartbeat response
-          this.emit(msg.event || msg.type, msg.data ?? msg);
-        } catch {
-          // Non-JSON message, emit raw
-          this.emit('raw', event.data);
-        }
-      };
+    connection.onclose(() => {
+      this.emit(SOCKET_EVENTS.DISCONNECTED, { timestamp: Date.now() });
+    });
 
-      this.ws.onclose = (event) => {
-        this.isConnecting = false;
-        this.stopHeartbeat();
-        this.emit(SOCKET_EVENTS.DISCONNECTED, { code: event.code, reason: event.reason });
-        console.log('[SocketService] Disconnected', event.code);
-
-        if (!this.isManualClose) {
-          this.scheduleReconnect();
-        }
-      };
-
-      this.ws.onerror = (error) => {
-        console.error('[SocketService] Error:', error);
-        this.isConnecting = false;
-      };
-    } catch (err) {
-      console.error('[SocketService] Connection failed:', err);
-      this.isConnecting = false;
-      this.scheduleReconnect();
+    /*
+     * Server-sent hub messages. `notification` is what the bell listens for;
+     * the rest of SOCKET_EVENTS is forwarded verbatim so existing listeners
+     * keep working if and when the hub starts sending those names.
+     */
+    connection.on('notification', (payload: unknown) => {
+      this.emit('notification', payload);
+    });
+    for (const name of Object.values(SOCKET_EVENTS)) {
+      if (name === SOCKET_EVENTS.CONNECTED || name === SOCKET_EVENTS.DISCONNECTED
+          || name === SOCKET_EVENTS.RECONNECTING) continue;
+      connection.on(name, (payload: unknown) => this.emit(name, payload));
     }
+
+    this.connection = connection;
+    this.starting = connection
+      .start()
+      .then(() => {
+        this.emit(SOCKET_EVENTS.CONNECTED, { timestamp: Date.now() });
+      })
+      .catch((err: unknown) => {
+        /*
+         * Not fatal and not silent. The bell polls when this does not come up,
+         * so a failure here costs freshness, never correctness - but it is said
+         * out loud so nobody debugging an un-ringing bell has to guess.
+         */
+        console.warn('[SocketService] hub unavailable, falling back to polling:', err);
+        this.emit(SOCKET_EVENTS.DISCONNECTED, { timestamp: Date.now(), failedToStart: true });
+      })
+      .finally(() => {
+        this.starting = null;
+      });
   }
 
   /* ── Disconnect ── */
   disconnect() {
     this.isManualClose = true;
-    this.stopHeartbeat();
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-    if (this.ws) {
-      this.ws.close(1000, 'Manual disconnect');
-      this.ws = null;
-    }
-    this.reconnectAttempts = 0;
+    const connection = this.connection;
+    this.connection = null;
+    void connection?.stop();
   }
 
   /* ── Send message ── */
   send(event: string, data?: any) {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ event, data }));
-    }
+    if (this.connection?.state !== HubConnectionState.Connected) return;
+    /* Unknown hub methods reject; a real-time nicety must not surface as an
+       unhandled rejection in a clinic. */
+    void this.connection.invoke(event, data).catch(() => {});
   }
 
   /* ── Subscribe to event ── */
@@ -187,65 +225,23 @@ class SocketService {
     });
   }
 
-  /* ── Reconnect with exponential backoff ── */
-  private scheduleReconnect() {
-    if (this.reconnectAttempts >= (this.config.maxReconnectAttempts ?? 10)) {
-      console.warn('[SocketService] Max reconnect attempts reached');
-      return;
-    }
-
-    const delay = Math.min(
-      (this.config.initialReconnectDelay ?? 1000) * Math.pow(2, this.reconnectAttempts),
-      this.config.maxReconnectDelay ?? 30000,
-    );
-
-    this.reconnectAttempts++;
-    this.emit(SOCKET_EVENTS.RECONNECTING, {
-      attempt: this.reconnectAttempts,
-      nextInMs: delay,
-    });
-
-    console.log(`[SocketService] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-
-    this.reconnectTimer = setTimeout(() => {
-      this.connect();
-    }, delay);
-  }
-
-  /* ── Heartbeat ── */
-  private startHeartbeat() {
-    this.stopHeartbeat();
-    this.heartbeatTimer = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({ type: 'ping' }));
-      }
-    }, this.config.heartbeatInterval ?? 30000);
-  }
-
-  private stopHeartbeat() {
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = null;
-    }
-  }
-
   /* ── Connection status ── */
   get isConnected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
+    return this.connection?.state === HubConnectionState.Connected;
   }
 
   get connectionState(): string {
-    switch (this.ws?.readyState) {
-      case WebSocket.OPEN:
+    switch (this.connection?.state) {
+      case HubConnectionState.Connected:
         return 'connected';
-      case WebSocket.CONNECTING:
+      case HubConnectionState.Connecting:
         return 'connecting';
-      case WebSocket.CLOSING:
+      case HubConnectionState.Reconnecting:
+        return 'reconnecting';
+      case HubConnectionState.Disconnecting:
         return 'closing';
-      case WebSocket.CLOSED:
-        return 'closed';
       default:
-        return 'disconnected';
+        return this.isManualClose ? 'disconnected' : 'closed';
     }
   }
 }

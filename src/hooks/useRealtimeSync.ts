@@ -39,6 +39,13 @@ export function useRealtimeSync(options: {
   onClaimUpdated?: (data: any) => void;
   onForceLogout?: () => void;
   onMaintenanceMode?: (data: { enabled: boolean; message?: string }) => void;
+  /**
+   * Called when the socket comes back after dropping. Separate from
+   * `onSlotCreated` and friends on purpose: nothing announces what happened
+   * during a gap, so whoever cares has to go and ask rather than wait to be
+   * told.
+   */
+  onReconnected?: () => void;
 } = {}) {
   const { enabled = true } = options;
   const [syncState, setSyncState] = useState<SyncState>({
@@ -72,8 +79,9 @@ export function useRealtimeSync(options: {
 
     /* ── Connection events ── */
     unsubscribers.push(
-      socketService.on(SOCKET_EVENTS.CONNECTED, () => {
+      socketService.on(SOCKET_EVENTS.CONNECTED, (data?: { afterGap?: boolean }) => {
         setSyncState((s) => ({ ...s, connected: true, reconnecting: false }));
+        if (data?.afterGap) options.onReconnected?.();
       }),
     );
     unsubscribers.push(

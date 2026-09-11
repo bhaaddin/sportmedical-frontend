@@ -89,6 +89,32 @@ export default function NotificationCenter() {
     fetchNotifications();
   }, [fetchNotifications]);
 
+  /*
+   * The list from the server is the truth; the socket is only the fast path.
+   *
+   * So the bell also asks on a timer, and keeps asking whether the hub is up or
+   * not. Three days were spent on a bell that did not ring, and for two of them
+   * nobody could tell whether the row was missing or merely undelivered - a
+   * distinction that costs nothing to remove: the worst this may do is show a
+   * notification a minute late, never not at all.
+   *
+   * Sixty seconds, and only while the tab is being looked at. A background tab
+   * polling forever is a cost with no reader.
+   */
+  useEffect(() => {
+    const POLL_MS = 60_000;
+    const tick = () => {
+      if (!document.hidden) void fetchNotifications();
+    };
+    const timer = setInterval(tick, POLL_MS);
+    /* Coming back to the tab is the moment the list is most likely stale. */
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, [fetchNotifications]);
+
   /* ── Real booking notifications (poll admin bookings) ── */
 
   /* ── Real-time sync ── */
@@ -96,6 +122,8 @@ export default function NotificationCenter() {
     onSlotCreated: () => fetchNotifications(),
     onSlotUpdated: () => fetchNotifications(),
     onSlotDeleted: () => fetchNotifications(),
+    /* After a gap in the socket, do not assume nothing happened inside it. */
+    onReconnected: () => fetchNotifications(),
   });
 
   /* ── Handlers ── */
