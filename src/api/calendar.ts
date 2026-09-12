@@ -71,50 +71,20 @@ function extractItems<T>(data: any): T[] {
 }
 
 /** Convert frontend form data to backend request format */
-export function toBackendRequest(data: {
-  patientId: string;
-  serviceType?: string;
-  startTime?: string;
-  endTime?: string;
-  practitionerName?: string;
-  room?: string;
-  notes?: string;
-  id?: string;
-}): CreateAppointmentRequest {
-  // Map frontend serviceType names to backend AppointmentType enum
-  const typeMap: Record<string, BackendAppointmentType> = {
-    'Základní prohlídka': 'Examination',
-    'Komplexní prohlídka': 'Examination',
-    'Spiroergometrie': 'Test',
-    'Základní diagnostika': 'Test',
-    'Komplexní diagnostika': 'Test',
-    'VO2max': 'Test',
-    'InBody770': 'Test',
-    'Video kompenzační plány': 'Therapy',
-  };
-
-  const serviceType = data.serviceType || '';
-  const type: BackendAppointmentType = typeMap[serviceType] || 'Consultation';
-
-  // Calculate duration from startTime and endTime
-  let durationMinutes = 60; // default 1 hour
-  if (data.startTime && data.endTime) {
-    const start = new Date(data.startTime).getTime();
-    const end = new Date(data.endTime).getTime();
-    durationMinutes = Math.max(15, Math.round((end - start) / 60000));
-  }
-
-  return {
-    patientId: data.patientId,
-    startUtc: data.startTime ? new Date(data.startTime).toISOString() : new Date().toISOString(),
-    durationMinutes: durationMinutes,
-    serviceType: serviceType,
-    clinic: 'SportMedical',
-    room: data.room || 'GreenLine 5.patro',
-    practitionerName: data.practitionerName || '',
-    notes: data.notes,
-  };
-}
+/*
+ * `toBackendRequest` stood here and mapped a screen appointment into the
+ * shape `POST /api/scheduling/appointments` wanted. Its only two callers
+ * were `create` and `update`, which are gone with the route that closed, so
+ * it went with them.
+ *
+ * It is worth saying what it held, because that part should not come back:
+ * a hardcoded table turning Czech activity names - "Spiroergometrie",
+ * "VO2max", "InBody770" - into three backend types, with "Consultation" as
+ * the fallback for anything unrecognised. Rename an activity in the
+ * settings and it would silently become a consultation. Activities are
+ * server-side rows with ids; nothing on this side should be deciding what
+ * one is by reading its Czech name.
+ */
 
 export const calendarApi = {
   getAppointments: async (from?: string, to?: string): Promise<Appointment[]> => {
@@ -127,27 +97,22 @@ export const calendarApi = {
     return items.map(mapDtoToAppointment);
   },
 
-  getById: async (id: string): Promise<Appointment> => {
-    const res = await client.get(`/api/scheduling/appointments/${id}`);
-    const dto: AppointmentDto = res.data?.value ?? res.data;
-    return mapDtoToAppointment(dto);
-  },
-
-  create: async (data: Partial<Appointment>): Promise<Appointment> => {
-    const request = toBackendRequest(data as any);
-    const res = await client.post('/api/scheduling/appointments', request);
-    const dto: AppointmentDto = res.data?.value ?? res.data;
-    return mapDtoToAppointment(dto);
-  },
-
-  cancel: async (id: string): Promise<void> => {
-    await client.post(`/api/scheduling/appointments/${id}/cancel`);
-  },
-
-  update: async (id: string, data: Partial<Appointment>): Promise<Appointment> => {
-    const request = toBackendRequest(data as any);
-    const res = await client.put(`/api/scheduling/appointments/${id}`, request);
-    const dto: AppointmentDto = res.data?.value ?? res.data;
-    return mapDtoToAppointment(dto);
-  },
+  /*
+   * `getById`, `create`, `cancel` and `update` stood here and nothing called
+   * any of them - measured across the whole of `src`, not assumed.
+   *
+   * They are gone rather than kept, because a dead function in a live file is
+   * worse than a dead file: it compiles, it reads as available, and the next
+   * person to want "book an appointment" finds it and wires it up. What they
+   * would get is the booking lane's `410` for creating and `409` for changing
+   * an appointment that belongs to a calendar - a failure that looks like a
+   * bug in their own new code rather than a route that was closed on purpose.
+   *
+   * Booking on this system goes through the calendar:
+   * `POST /api/calendars/{calendarId}/appointments` in `api/appointments.ts`,
+   * which is what every screen actually uses.
+   *
+   * Reading stays. `GET /api/scheduling/appointments` is untouched by that
+   * change and has two live callers - `PatientDrawer` and `UniversalSearch`.
+   */
 };
