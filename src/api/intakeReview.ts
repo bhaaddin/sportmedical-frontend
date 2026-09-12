@@ -29,23 +29,49 @@ export type IntakeOutcome = (typeof IntakeOutcome)[keyof typeof IntakeOutcome];
  * already masked per the viewer's role, so the client never has to decide
  * what a Staff user may see.
  */
-export interface IntakeFieldComparison {
-  field: string;
-  label: string;
-  submitted: string | null;
-  candidate: string | null;
-  matches: boolean;
-  /** True for birth number and insurance number — rendered with a warning affordance. */
-  sensitive: boolean;
+/*
+ * What the server says about a possible duplicate - measured against the
+ * running API on 12. 9. 2026.
+ *
+ * Booleans, never values. The reviewer learns *which* fields agree without
+ * being shown another patient's name, birth number or telephone, which is
+ * enough to decide "same person?" in almost every case. That is the server's
+ * design and this screen keeps it: to see the actual record, the reviewer
+ * opens the patient's card deliberately, and that is an act with an audit
+ * trail behind it.
+ */
+export interface IntakeMatchSignals {
+  /** Birth number or insurer-assigned number - the identifier that settles it alone. */
+  anchorMatches: boolean;
+  emailMatches: boolean;
+  emailIsVerified: boolean;
+  phoneMatches: boolean;
+  phoneIsVerified: boolean;
+  givenNameMatches: boolean;
+  familyNameMatches: boolean;
+  dateOfBirthMatches: boolean;
+  /** Both together - the pair that identifies a person in practice. */
+  nameAndDateOfBirthMatch: boolean;
 }
 
+/*
+ * A candidate as the wire actually carries it.
+ *
+ * This interface previously also declared `revision`, `fullName` and a
+ * `fields` array of before/after comparisons. None of the three has ever been
+ * sent. `fields` was read with `.map` the moment a reviewer pressed "Zobrazit
+ * možné shody" on a row that had candidates, and took the whole screen down
+ * with `Cannot read properties of undefined`.
+ *
+ * That is the same fault this file's comment below already records for the
+ * queue summary - it was fixed one level up and missed here, because the crash
+ * needs a row that actually has a duplicate to reach it.
+ */
 export interface IntakeCandidate {
   patientId: string;
-  revision: number;
-  fullName: string;
   score: number;
-  outcome: IntakeOutcome;
-  fields: IntakeFieldComparison[];
+  outcome: number;
+  signals: IntakeMatchSignals;
 }
 
 /*
@@ -109,6 +135,25 @@ export function outcomeOf(value: number): IntakeOutcome | null {
 
 /* ── Actions ── */
 
+/*
+ * Three separate endpoints, not one `resolve` with a discriminator.
+ *
+ * This file used to POST every decision to
+ * `/api/patients/intake-review/resolve`, a route the server does not have -
+ * it answers 405, because the path matches the GET-only detail route with
+ * "resolve" standing in for an id. So every button on the queue was inert:
+ * the screen listed submissions nobody could act on, and the failure looked
+ * like a network error rather than a missing route.
+ *
+ * Measured from the running API's OpenAPI document on 12. 9. 2026:
+ *
+ *     POST /{intakeId}/link      { patientId, reason }   merge into a patient
+ *     POST /{intakeId}/register  (no body)               create a new patient
+ *     POST /{intakeId}/dismiss   { reason }              reject
+ *
+ * There is no `candidateRevision` anywhere on the wire; the optimistic
+ * concurrency this file claimed does not exist server-side.
+ */
 export const IntakeResolution = {
   Merge: 'Merge',
   CreateNew: 'CreateNew',
@@ -116,17 +161,6 @@ export const IntakeResolution = {
 } as const;
 
 export type IntakeResolution = (typeof IntakeResolution)[keyof typeof IntakeResolution];
-
-export interface ResolveIntakeRequest {
-  intakeId: string;
-  resolution: IntakeResolution;
-  /** Required for Merge — which candidate the intake belongs to. */
-  patientId?: string;
-  /** Required for Merge — the revision the reviewer actually saw. */
-  candidateRevision?: number;
-  /** Audited. Required for Reject, optional otherwise. */
-  reason?: string;
-}
 
 /* ── Calls ── */
 
@@ -144,8 +178,31 @@ export async function fetchIntakeDetail(
   return response.data;
 }
 
-export async function resolveIntake(request: ResolveIntakeRequest): Promise<void> {
-  await client.post('/api/patients/intake-review/resolve', request);
+const reviewPath = (intakeId: string, action: string): string =>
+  `/api/patients/intake-review/${intakeId}/${action}`;
+
+/**
+ * Attach the submission to an existing patient.
+ *
+ * The reason is required by the server, and rightly: merging two records is
+ * the one action here that cannot be undone by looking at it again later.
+ */
+export async function linkIntake(
+  intakeId: string,
+  patientId: string,
+  reason: string,
+): Promise<void> {
+  await client.post(reviewPath(intakeId, 'link'), { patientId, reason });
+}
+
+/** Create a new patient from the submission. Takes no body. */
+export async function registerIntake(intakeId: string): Promise<void> {
+  await client.post(reviewPath(intakeId, 'register'), {});
+}
+
+/** Turn the submission away. Audited with the reason. */
+export async function dismissIntake(intakeId: string, reason: string): Promise<void> {
+  await client.post(reviewPath(intakeId, 'dismiss'), { reason });
 }
 
 /** True when the server refused because the data moved since the queue was loaded. */

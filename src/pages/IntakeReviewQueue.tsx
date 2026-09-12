@@ -23,10 +23,11 @@ import {
   Divider,
   Paper,
   TextField,
-  Tooltip,
   Typography,
 } from '@mui/material';
-import { CheckCircle, Warning, PersonAdd, Block, Refresh } from '@mui/icons-material';
+import { CheckCircle, PersonAdd, Block, Refresh } from '@mui/icons-material';
+import { Link as RouterLink } from 'react-router-dom';
+import { formatDateOnly } from '../utils/time';
 import {
   IntakeOutcome,
   IntakeResolution,
@@ -34,10 +35,13 @@ import {
   fetchIntakeQueue,
   isStaleResolution,
   outcomeOf,
-  resolveIntake,
+  linkIntake,
+  registerIntake,
+  dismissIntake,
 } from '../api/intakeReview';
 import type {
   IntakeCandidate,
+  IntakeMatchSignals,
   IntakeQueueEntry,
   IntakeReviewDetail,
 } from '../api/intakeReview';
@@ -49,6 +53,10 @@ export default function IntakeReviewQueue() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<IntakeQueueEntry | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  /* Merging asks for a reason too - the server requires one, and it is the
+     only action here that cannot be re-read from the record afterwards. */
+  const [merging, setMerging] = useState<{ entry: IntakeQueueEntry; candidate: IntakeCandidate } | null>(null);
+  const [mergeReason, setMergeReason] = useState('');
   /*
    * Candidates are not in the list - the server sends a summary and computes
    * matches only on demand. So a row is opened, and only then does anybody pay
@@ -90,6 +98,10 @@ export default function IntakeReviewQueue() {
     void load();
   }, [load]);
 
+  /*
+   * One handler, three endpoints. The server has no single "resolve" route -
+   * that was this screen's invention, and it answered 405 for every button.
+   */
   const resolve = async (
     entry: IntakeQueueEntry,
     resolution: IntakeResolution,
@@ -99,13 +111,19 @@ export default function IntakeReviewQueue() {
     setBusyId(entry.intakeId);
     setError(null);
     try {
-      await resolveIntake({
-        intakeId: entry.intakeId,
-        resolution,
-        patientId: candidate?.patientId,
-        candidateRevision: candidate?.revision,
-        reason,
-      });
+      if (resolution === IntakeResolution.Merge) {
+        /* Guarded rather than assumed: `link` refuses without both, and a 400
+           here would read to the reviewer as "the server is broken". */
+        if (candidate === undefined || reason === undefined || reason.trim() === '') {
+          setError('K sloučení je potřeba vybraný pacient a důvod.');
+          return;
+        }
+        await linkIntake(entry.intakeId, candidate.patientId, reason.trim());
+      } else if (resolution === IntakeResolution.CreateNew) {
+        await registerIntake(entry.intakeId);
+      } else {
+        await dismissIntake(entry.intakeId, (reason ?? '').trim());
+      }
       setEntries((current) => current.filter((e) => e.intakeId !== entry.intakeId));
     } catch (caught) {
       setError(
@@ -169,7 +187,10 @@ export default function IntakeReviewQueue() {
                 {entry.givenName} {entry.familyName}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                nar. {entry.dateOfBirth}
+                {/* A birth date is a date, not an instant: formatted with no
+                    zone conversion, and in Czech like everything around it.
+                    It rendered as `1989-11-09` next to a Czech timestamp. */}
+                nar. {formatDateOnly(entry.dateOfBirth)}
               </Typography>
               <Chip
                 size="small"
@@ -257,44 +278,39 @@ export default function IntakeReviewQueue() {
                 : []
               ).map((candidate: IntakeCandidate) => (
                 <Box key={candidate.patientId} sx={{ mb: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      Možná shoda: {candidate.fullName}
+                      Možná shoda
                     </Typography>
                     <Chip
                       size="small"
                       color={candidate.score >= 80 ? 'warning' : 'default'}
                       label={`skóre ${candidate.score}`}
                     />
+                    {/* The server sends no name for the candidate, only which
+                        fields agree. Opening the card is the deliberate act
+                        that shows the record itself. */}
+                    <Button
+                      size="small"
+                      component={RouterLink}
+                      to={`/patients/${candidate.patientId}`}
+                      target="_blank"
+                    >
+                      Otevřít kartu pacienta
+                    </Button>
                   </Box>
 
-                  <Box
-                    sx={{
-                      display: 'grid',
-                      gridTemplateColumns: { xs: '1fr', sm: '160px 1fr 1fr' },
-                      gap: 0.5,
-                      fontSize: 14,
-                    }}
-                  >
-                    <Typography variant="caption" color="text.secondary" />
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                      Z dotazníku
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                      Stávající pacient
-                    </Typography>
-
-                    {candidate.fields.map((field) => (
-                      <FieldRow key={field.field} field={field} />
-                    ))}
-                  </Box>
+                  <SignalSummary signals={candidate.signals} />
 
                   <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
                     <Button
                       size="small"
                       variant="contained"
                       disabled={busyId === entry.intakeId}
-                      onClick={() => void resolve(entry, IntakeResolution.Merge, candidate)}
+                      onClick={() => {
+                        setMergeReason('');
+                        setMerging({ entry, candidate });
+                      }}
                     >
                       Sloučit s tímto pacientem
                     </Button>
@@ -335,6 +351,42 @@ export default function IntakeReviewQueue() {
       {/* Rejection is the one action that destroys a patient's submission, so
           it asks for a reason. Every resolution is audited; this one needs the
           "why" to be readable a year later. */}
+      <Dialog open={merging !== null} onClose={() => setMerging(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Sloučit s pacientem</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Dotazník se připojí ke stávajícímu pacientovi. Důvod se uloží do
+            auditu spolu s vaším jménem a časem.
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            minRows={3}
+            autoFocus
+            label="Důvod sloučení"
+            placeholder="Např. shoduje se rodné číslo i telefon, ověřeno u pacienta."
+            value={mergeReason}
+            onChange={(event) => setMergeReason(event.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMerging(null)}>Zrušit</Button>
+          <Button
+            variant="contained"
+            disabled={mergeReason.trim().length < 3}
+            onClick={() => {
+              const pending = merging;
+              setMerging(null);
+              if (pending !== null) {
+                void resolve(pending.entry, IntakeResolution.Merge, pending.candidate, mergeReason.trim());
+              }
+            }}
+          >
+            Sloučit
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={rejecting !== null} onClose={() => setRejecting(null)} fullWidth maxWidth="sm">
         <DialogTitle>Zamítnout dotazník</DialogTitle>
         <DialogContent>
@@ -374,43 +426,66 @@ export default function IntakeReviewQueue() {
   );
 }
 
-function FieldRow({ field }: { field: { label: string; submitted: string | null; candidate: string | null; matches: boolean; sensitive: boolean } }) {
-  const differs = !field.matches;
+/*
+ * What the server will say about a duplicate, and nothing more.
+ *
+ * The match result is booleans only - no name, no birth number, no telephone.
+ * This renders them as two plain lists, because "which fields agree" is the
+ * question the reviewer is holding, and a grid of "—" against "—" answered it
+ * worse while looking like it held data.
+ *
+ * `anchorMatches` is drawn apart and first: the birth number or insurer number
+ * settles the question on its own, and a reviewer who sees it should not have
+ * to weigh the rest.
+ */
+function SignalSummary({ signals }: { signals: IntakeMatchSignals }) {
+  const named: Array<{ label: string; matches: boolean; note?: string }> = [
+    { label: 'jméno', matches: signals.givenNameMatches },
+    { label: 'příjmení', matches: signals.familyNameMatches },
+    { label: 'datum narození', matches: signals.dateOfBirthMatches },
+    {
+      label: 'e-mail',
+      matches: signals.emailMatches,
+      note: signals.emailMatches && !signals.emailIsVerified ? 'neověřený' : undefined,
+    },
+    {
+      label: 'telefon',
+      matches: signals.phoneMatches,
+      note: signals.phoneMatches && !signals.phoneIsVerified ? 'neověřený' : undefined,
+    },
+  ];
+
+  const agreeing = named.filter((f) => f.matches);
+  const differing = named.filter((f) => !f.matches);
+  const render = (f: { label: string; note?: string }) =>
+    f.note === undefined ? f.label : `${f.label} (${f.note})`;
 
   return (
-    <>
-      <Typography variant="body2" color="text.secondary" sx={{ py: 0.5 }}>
-        {field.label}
-        {field.sensitive && (
-          <Tooltip title="Citlivý identifikátor — zobrazeno podle vaší role">
-            <Warning sx={{ fontSize: 13, ml: 0.5, verticalAlign: 'middle', color: 'text.disabled' }} />
-          </Tooltip>
-        )}
+    <Box sx={{ fontSize: 14 }}>
+      {signals.anchorMatches && (
+        <Typography variant="body2" sx={{ fontWeight: 700, color: 'warning.dark', mb: 0.5 }}>
+          Shoduje se rodné číslo nebo číslo pojištěnce — jde téměř jistě o stejnou osobu.
+        </Typography>
+      )}
+      {signals.nameAndDateOfBirthMatch && !signals.anchorMatches && (
+        <Typography variant="body2" sx={{ fontWeight: 700, color: 'warning.dark', mb: 0.5 }}>
+          Shoduje se jméno i datum narození.
+        </Typography>
+      )}
+
+      <Typography variant="body2" color="text.secondary">
+        <Box component="span" sx={{ fontWeight: 700 }}>Shoduje se: </Box>
+        {agreeing.length === 0 ? 'nic z porovnávaných údajů' : agreeing.map(render).join(', ')}
       </Typography>
-      <Typography
-        variant="body2"
-        sx={{
-          py: 0.5,
-          px: 1,
-          borderRadius: 1,
-          fontWeight: differs ? 700 : 400,
-          bgcolor: differs ? 'warning.light' : 'transparent',
-        }}
-      >
-        {field.submitted ?? '—'}
+      <Typography variant="body2" color="text.secondary">
+        <Box component="span" sx={{ fontWeight: 700 }}>Neshoduje se: </Box>
+        {differing.length === 0 ? 'nic — všechny porovnávané údaje sedí' : differing.map(render).join(', ')}
       </Typography>
-      <Typography
-        variant="body2"
-        sx={{
-          py: 0.5,
-          px: 1,
-          borderRadius: 1,
-          fontWeight: differs ? 700 : 400,
-          bgcolor: differs ? 'warning.light' : 'transparent',
-        }}
-      >
-        {field.candidate ?? '—'}
+
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+        Server porovnává údaje na své straně a posílá jen výsledek, ne hodnoty
+        druhého pacienta. Konkrétní záznam si otevřete tlačítkem výše.
       </Typography>
-    </>
+    </Box>
   );
 }
