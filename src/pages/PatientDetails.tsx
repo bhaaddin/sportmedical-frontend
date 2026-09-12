@@ -19,7 +19,6 @@ import type { DiagnosticSession } from '../api/diagnostics';
 import { documentsApi, DOCUMENT_SATISFIES_REQUIREMENT } from '../api/documents';
 import MedicalReports from '../components/documents/MedicalReports';
 import type { PatientDocument, DocumentTemplate } from '../api/documents';
-import { ConsentManager } from '../components/ConsentManager';
 
 /* ── Helpers ── */
 function trendIcon(current: number, previous: number, higherIsBetter: boolean) {
@@ -336,16 +335,22 @@ export default function PatientDetails() {
         </motion.div>
       )}
 
-      {/* ── Consent lifecycle (grant / revoke / export) ── */}
-      {id && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <Card sx={{ mb: 3, borderRadius: 3 }}>
-            <CardContent>
-              <ConsentManager patientId={id} />
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+      {/*
+        The consent-management card stood here and is gone with its server.
+        It read a table that had never held a row, so it told the desk
+        "Neudělen" about every patient - including the ones who had consented,
+        whose consent sits in `patient_intake_consents` where the intake wrote
+        it. At GDPR that is wrong in both directions: somebody concludes the
+        data may not be processed when it may, or grants a second consent
+        beside the real one and nobody can later say which applies.
+        (`/api/patients/{id}/consents` now answers 404; measured.)
+
+        The owner drew the wider conclusion: the patient gives consent when
+        registering, so the desk has nothing to manage - only something to see.
+        A single line saying when it was given and under which policy version
+        is coming from the other lane; it is not here yet, and a line that is
+        absent is better than one that says "not given" to somebody who did.
+      */}
 
       {/* Where the "Dokumenty z online rezervace" card was. It read a table
           stage 9 drops, which had no rows and nobody to write them, so it never

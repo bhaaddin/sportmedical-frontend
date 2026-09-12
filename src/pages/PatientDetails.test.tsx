@@ -30,9 +30,6 @@ const getTemplates = vi.fn();
 
 vi.mock('../api/patients', () => ({ patientsApi: { getById, getProfile } }));
 vi.mock('../api/diagnostics', () => ({ diagnosticsApi: { getByPatient, downloadPdf: vi.fn() } }));
-/* A child with its own calls; this test is about the banner, not consents. */
-vi.mock('../components/ConsentManager', () => ({ ConsentManager: () => null }));
-
 vi.mock('../api/documents', async () => {
   const actual = await vi.importActual<typeof import('../api/documents')>('../api/documents');
   return { ...actual, documentsApi: { getPatientDocuments, getTemplates } };

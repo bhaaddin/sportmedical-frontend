@@ -55,7 +55,6 @@ const SystemHealthPage = lazy(() => import('./pages/SystemHealth'));
 const StaffManagementPage = lazy(() => import('./pages/StaffManagement'));
 const EmailTemplatesPage = lazy(() => import('./pages/EmailTemplates'));
 const AuditLogPage = lazy(() => import('./pages/AuditLog'));
-const GdprPage = lazy(() => import('./pages/GdprPage'));
 const PatientImportPage = lazy(() => import('./pages/PatientImport'));
 const DataExportPage = lazy(() => import('./pages/DataExport'));
 const NotificationSettingsPage = lazy(() => import('./pages/NotificationSettings'));
@@ -413,7 +412,6 @@ export default function App() {
                     <Route path="/patient-records/:id" element={<PatientRecordsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/client-intake" element={<ClientIntakePage />} />
-                    <Route path="/gdpr" element={<GdprPage />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                   </Suspense>

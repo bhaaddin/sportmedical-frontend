@@ -139,12 +139,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         to: '/documents',
       },
       {
-        id: 'gdpr',
-        label: 'GDPR a souhlasy',
-        description: 'Souhlasy se zpracováním a žádosti pacientů',
-        to: '/gdpr',
-      },
-      {
         id: 'emaily',
         label: 'E-mailové šablony',
         description: 'Text a vzhled e-mailů, které chodí pacientům',
