@@ -145,6 +145,32 @@ describe('what the row says', () => {
   });
 
   /*
+   * "107" is the register's word for cardiology and nobody else's. Seen on the
+   * real screen: the row read `107`, which a receptionist has no reason to be
+   * able to decode.
+   */
+  it('names the specialty rather than showing its number', () => {
+    expect(specialtyLabel(doc({ specialtyCode: '107', specialtyOther: null }), { 107: 'Kardiologie' }))
+      .toBe('Kardiologie');
+  });
+
+  it('fetches the name from the server and shows it', async () => {
+    specialties.mockResolvedValue([{ code: '606', name: 'Ortopedie', isCommon: true }]);
+    renderList([doc({ specialtyCode: '606', specialtyOther: null })]);
+
+    expect(await screen.findByText('Ortopedie')).toBeInTheDocument();
+    expect(specialties).toHaveBeenCalledWith('606', 5);
+  });
+
+  /* Better a number than a blank row when the lookup fails. */
+  it('keeps showing the code when the name cannot be fetched', async () => {
+    specialties.mockRejectedValue(new Error('offline'));
+    renderList([doc({ specialtyCode: '606', specialtyOther: null })]);
+
+    expect(await screen.findByText('606')).toBeInTheDocument();
+  });
+
+  /*
    * The whole reason the review step exists. Without this, "waiting" is a
    * delay with no explanation and the person looking at it has no idea why
    * they are being asked.

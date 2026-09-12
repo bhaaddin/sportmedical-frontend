@@ -17,7 +17,7 @@
  * older" is the first thing a doctor asks of a stack of these, and the day
  * somebody got round to scanning them says nothing about it.
  */
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert, Box, Button, Card, CardContent, Chip, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, IconButton, Stack, Tooltip, Typography,
@@ -49,9 +49,23 @@ export function byReportDate(a: PatientDocument, b: PatientDocument): number {
   return b.reportDate.localeCompare(a.reportDate);
 }
 
-export function specialtyLabel(doc: PatientDocument): string {
+/**
+ * What the row calls this report.
+ *
+ * `names` maps a code to its name. Without it the row reads "107", which is
+ * the register's word for cardiology and nobody else's - a receptionist has no
+ * reason to know the numbers, and a list of them is unreadable at a glance.
+ * The code is kept as the fallback rather than hidden: it is still better than
+ * a blank while the names are loading, or if the lookup fails.
+ */
+export function specialtyLabel(
+  doc: PatientDocument,
+  names: Record<string, string> = {},
+): string {
   if (doc.specialtyOther !== null && doc.specialtyOther !== '') return doc.specialtyOther;
-  if (doc.specialtyCode !== null && doc.specialtyCode !== '') return doc.specialtyCode;
+  if (doc.specialtyCode !== null && doc.specialtyCode !== '') {
+    return names[doc.specialtyCode] ?? doc.specialtyCode;
+  }
   return 'Neurčený obor';
 }
 
@@ -63,7 +77,57 @@ export default function MedicalReports({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const reports = documents.filter(isMedicalReport).sort(byReportDate);
+  const reports = useMemo(
+    () => documents.filter(isMedicalReport).sort(byReportDate),
+    [documents],
+  );
+
+  /*
+   * Code to name, resolved from the server rather than from a copy kept here.
+   * One lookup per distinct code - a patient has a handful, not hundreds - and
+   * the codes are asked for by code, which the suggester matches exactly.
+   *
+   * A copy of the register on this side is the thing to avoid: it drifts, and
+   * then the screen names a specialty the server has since renamed. The
+   * register was rebuilt from the ministry's own source today precisely
+   * because an older copy had six names wrong.
+   */
+  const [names, setNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const codes = [
+      ...new Set(
+        reports
+          .map((d) => d.specialtyCode)
+          .filter((c): c is string => typeof c === 'string' && c !== ''),
+      ),
+    ].filter((c) => names[c] === undefined);
+
+    if (codes.length === 0) return;
+    let cancelled = false;
+
+    void Promise.all(
+      codes.map((code) =>
+        documentsApi
+          .specialties(code, 5)
+          .then((found) => [code, found.find((f) => f.code === code)?.name] as const)
+          .catch(() => [code, undefined] as const),
+      ),
+    ).then((pairs) => {
+      if (cancelled) return;
+      const resolved: Record<string, string> = {};
+      for (const [code, name] of pairs) {
+        if (name !== undefined) resolved[code] = name;
+      }
+      if (Object.keys(resolved).length > 0) {
+        setNames((current) => ({ ...current, ...resolved }));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reports, names]);
 
   const openEdit = (doc: PatientDocument) => {
     setDraft({ specialtyCode: doc.specialtyCode, specialtyOther: doc.specialtyOther });
@@ -145,7 +209,7 @@ export default function MedicalReports({
                   }}
                 >
                   <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                    <Typography sx={{ fontWeight: 600 }}>{specialtyLabel(doc)}</Typography>
+                    <Typography sx={{ fontWeight: 600 }}>{specialtyLabel(doc, names)}</Typography>
                     {/* Truthiness on purpose. The type says `string | null`,
                         and a server that simply omits the field sends neither -
                         `undefined !== null` is true, and `formatDateOnly`
