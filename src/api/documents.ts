@@ -27,7 +27,18 @@ export const DOCUMENT_SATISFIES_REQUIREMENT: DocumentStatus = 'SignedOff';
 export interface PatientDocument {
   id: string;
   patientId: string;
-  templateId: string;
+  /*
+   * Null for a medical report from another doctor - those belong to no
+   * template, which is exactly what keeps them out of the required-document
+   * rules: the readiness check pairs `d.templateId === template.id`, and a
+   * document with no template has nothing to pair with.
+   *
+   * Typed nullable on 12. 9. 2026, the day the server made it so. Left as
+   * `string` it would have compiled and thrown at runtime the first time a
+   * cardiology report reached a screen - which is the kind of break nobody
+   * sees until a patient is standing at the desk.
+   */
+  templateId: string | null;
   templateName?: string;
   uploadedAt: string;
   signedAt?: string;

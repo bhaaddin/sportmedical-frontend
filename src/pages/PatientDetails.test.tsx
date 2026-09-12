@@ -141,3 +141,34 @@ describe('the missing-paperwork banner', () => {
     expect(await screen.findByText(/Chybí: Výpis/)).toBeInTheDocument();
   });
 });
+
+/*
+ * Added the day `templateId` became nullable on the server.
+ *
+ * A medical report from another doctor - cardiology, orthopaedics - carries no
+ * template, and that absence is the whole guarantee that it cannot satisfy a
+ * required document. The guarantee is a consequence of the shape rather than a
+ * rule anybody has to remember, which is why it is worth a test: one
+ * `?? something` on either side and it is gone silently.
+ */
+describe('documents that belong to no template', () => {
+  it('does not let a cardiology report stand in for the výpis', async () => {
+    getPatientDocuments.mockResolvedValue([
+      { ...doc('SignedOff'), templateId: null },
+    ]);
+
+    renderCard();
+    expect(await screen.findByText(/Chybí: Výpis/)).toBeInTheDocument();
+  });
+
+  it('still clears the banner when the výpis itself is there beside it', async () => {
+    getPatientDocuments.mockResolvedValue([
+      { ...doc('SignedOff'), id: 'report', templateId: null },
+      doc('SignedOff'),
+    ]);
+
+    renderCard();
+    await screen.findByText('Cesta Jedna');
+    expect(banner()).not.toBeInTheDocument();
+  });
+});
