@@ -10,15 +10,33 @@
  * waits ninety seconds for an upload the server was always going to refuse.
  */
 
-/** What a person may hand us. */
-export const ACCEPTED_MIME_TYPES = [
+/*
+ * What the server stores, confirmed by its owner on 12. 9. 2026. It sniffs the
+ * content as well as the name, so a renamed file does not get through - these
+ * checks only save somebody the wait.
+ */
+export const SERVER_ACCEPTED_MIME_TYPES = [
   'application/pdf',
   'image/jpeg',
   'image/png',
-  'image/heic',
-  'image/heif',
   'image/webp',
 ] as const;
+
+/*
+ * HEIC is accepted here and nowhere else: the server refuses it, and this is
+ * the format every iPhone shoots by default. It is converted to JPEG in the
+ * browser before anything is sent, so what reaches the server is always on the
+ * list above. If that conversion ever fails, the file must not be sent.
+ */
+export const CONVERTED_MIME_TYPES = ['image/heic', 'image/heif'] as const;
+
+export const ACCEPTED_MIME_TYPES = [
+  ...SERVER_ACCEPTED_MIME_TYPES,
+  ...CONVERTED_MIME_TYPES,
+] as const;
+
+/** Names we accept when the browser reports no type at all, which iOS often does. */
+const ACCEPTED_EXTENSIONS = /\.(pdf|jpe?g|png|webp|heic|heif)$/i;
 
 /**
  * The attribute on the file input.
@@ -95,12 +113,18 @@ export function checkFile(file: { name: string; type: string; size: number }): F
     };
   }
 
+  /*
+   * Narrow on purpose. This used to accept any `image/*`, which let a GIF or a
+   * TIFF through to an upload the server was always going to refuse - exactly
+   * the wait this check exists to prevent. The type is trusted when the
+   * browser gives one, and the name when it does not.
+   */
   const type = file.type.toLowerCase();
   const acceptable =
-    (ACCEPTED_MIME_TYPES as readonly string[]).includes(type) ||
-    type.startsWith('image/') ||
-    isHeic(file) ||
-    isPdf(file);
+    type === ''
+      ? ACCEPTED_EXTENSIONS.test(file.name)
+      : (ACCEPTED_MIME_TYPES as readonly string[]).includes(type) ||
+        ACCEPTED_EXTENSIONS.test(file.name);
 
   if (!acceptable) {
     return {
@@ -108,7 +132,7 @@ export function checkFile(file: { name: string; type: string; size: number }): F
       reason: 'unsupported-type',
       message:
         'Tenhle typ souboru přijmout neumíme. Pošlete PDF nebo fotografii ' +
-        '(JPG, PNG, HEIC).',
+        '(JPG, PNG, WEBP nebo HEIC z iPhonu).',
     };
   }
 

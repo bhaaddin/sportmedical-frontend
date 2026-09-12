@@ -17,6 +17,8 @@ import {
   scanFileName,
   MAX_FILE_BYTES,
   FILE_INPUT_ACCEPT,
+  ACCEPTED_MIME_TYPES,
+  SERVER_ACCEPTED_MIME_TYPES,
 } from './documentFile';
 
 const file = (over: Partial<{ name: string; type: string; size: number }> = {}) => ({
@@ -54,6 +56,39 @@ describe('what we accept', () => {
     expect(isPdf(file())).toBe(true);
     expect(isImage(file())).toBe(false);
     expect(isImage(file({ name: 'f.png', type: 'image/png' }))).toBe(true);
+  });
+
+  /*
+   * The server takes PDF, JPEG, PNG and WEBP, and sniffs the content as well
+   * as the name - confirmed by its owner on 12. 9. 2026. Anything else must be
+   * refused here, or somebody waits through an upload that was always going to
+   * be rejected. This check used to accept any `image/*`.
+   */
+  it.each([
+    ['image/gif', 'animace.gif'],
+    ['image/tiff', 'sken.tif'],
+    ['image/bmp', 'obrazek.bmp'],
+    ['image/svg+xml', 'kresba.svg'],
+  ])('turns away %s, which the server does not store', (type, name) => {
+    const result = checkFile(file({ name, type }));
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('unsupported-type');
+  });
+
+  it('takes WEBP, which the server does store', () => {
+    expect(checkFile(file({ name: 'foto.webp', type: 'image/webp' })).ok).toBe(true);
+  });
+
+  /* HEIC is on our list and not on the server's - it is converted to JPEG in
+     the browser before anything is sent. */
+  it('keeps HEIC out of what the server is ever asked to store', () => {
+    expect(SERVER_ACCEPTED_MIME_TYPES).not.toContain('image/heic');
+    expect(ACCEPTED_MIME_TYPES).toContain('image/heic');
+  });
+
+  it('matches the size limit the server enforces', () => {
+    expect(MAX_FILE_BYTES).toBe(25 * 1024 * 1024);
   });
 
   it('turns away a file it cannot do anything with', () => {
