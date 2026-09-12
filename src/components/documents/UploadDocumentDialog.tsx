@@ -19,7 +19,7 @@
 import { useRef, useState } from 'react';
 import {
   Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
-  IconButton, LinearProgress, Stack, Typography,
+  Divider, IconButton, LinearProgress, Stack, TextField, Typography,
 } from '@mui/material';
 import {
   Close, CloudUpload, DocumentScanner as ScannerIcon,
@@ -35,12 +35,20 @@ import {
 import {
   heicToJpeg, loadImage, imageToCanvas, rotateCanvas, canvasToBlob,
 } from '../../services/documentMedia';
+import SpecialtyPicker, { type SpecialtyValue } from './SpecialtyPicker';
 
 export interface UploadDocumentDialogProps {
   open: boolean;
   onClose: () => void;
   patientId: string;
-  template: DocumentTemplate;
+  /*
+   * The required document being filled, or `null` for a report from another
+   * doctor. `null` is not an omission - it is what keeps a report out of the
+   * required-document rules, because the readiness check pairs documents to
+   * templates and a report has nothing to pair with. Choosing a specialty
+   * appears in that mode and only in it.
+   */
+  template: DocumentTemplate | null;
   /** Fired once the server has the document, so the caller can refresh. */
   onUploaded: (document: PatientDocument) => void;
 }
@@ -59,6 +67,14 @@ export default function UploadDocumentDialog({
   const [scannerOpen, setScannerOpen] = useState(false);
   const [uploaded, setUploaded] = useState<PatientDocument | null>(null);
   const [signing, setSigning] = useState(false);
+  const [specialty, setSpecialty] = useState<SpecialtyValue>({
+    specialtyCode: null,
+    specialtyOther: null,
+  });
+  const [reportDate, setReportDate] = useState('');
+
+  const isReport = template === null;
+  const title = isReport ? 'Lékařská zpráva od jiného lékaře' : template.name;
 
   const fileInput = useRef<HTMLInputElement | null>(null);
   const cameraInput = useRef<HTMLInputElement | null>(null);
@@ -145,9 +161,12 @@ export default function UploadDocumentDialog({
       const payload = await fileToSend();
       const document = await documentsApi.upload(
         patientId,
-        template.id,
+        template?.id ?? null,
         payload,
         setProgress,
+        isReport
+          ? { ...specialty, reportDate: reportDate === '' ? null : reportDate }
+          : undefined,
       );
       setUploaded(document);
       setPhase('uploaded');
@@ -180,7 +199,7 @@ export default function UploadDocumentDialog({
       <Dialog open={open && !scannerOpen} onClose={close} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <CloudUpload sx={{ color: '#0D7377' }} />
-          {template.name}
+          {title}
           <Box sx={{ flex: 1 }} />
           <IconButton onClick={close} aria-label="Zavřít"><Close /></IconButton>
         </DialogTitle>
@@ -230,6 +249,24 @@ export default function UploadDocumentDialog({
                 Sken najde okraje dokumentu sám, narovná ho a zmenší — z fotky
                 udělá něco, co vypadá jako ze skeneru.
               </Typography>
+
+              {/* Only for a report: which doctor wrote it and when. Asked here
+                  rather than afterwards, because afterwards means somebody has
+                  to remember to come back, and nobody does. */}
+              {isReport && (
+                <Stack spacing={2} sx={{ pt: 1 }}>
+                  <Divider />
+                  <SpecialtyPicker value={specialty} onChange={setSpecialty} />
+                  <TextField
+                    type="date"
+                    label="Datum zprávy"
+                    value={reportDate}
+                    onChange={(event) => setReportDate(event.target.value)}
+                    helperText="Datum na zprávě, ne datum nahrání — podle něj se řadí."
+                    slotProps={{ inputLabel: { shrink: true } }}
+                  />
+                </Stack>
+              )}
             </Stack>
           )}
 
@@ -347,8 +384,8 @@ export default function UploadDocumentDialog({
       <DocumentScanner
         open={scannerOpen}
         onClose={() => setScannerOpen(false)}
-        fileName={scanFileName(template.name)}
-        title={`Naskenovat: ${template.name}`}
+        fileName={scanFileName(title)}
+        title={`Naskenovat: ${title}`}
         onScanned={(scanned) => {
           setScannerOpen(false);
           void accept(scanned);

@@ -124,14 +124,20 @@ export const documentsApi = {
    */
   upload: async (
     patientId: string,
-    templateId: string,
+    /* Null for a report from another doctor - it belongs to no template, and
+       that absence is what keeps it out of the required-document rules. */
+    templateId: string | null,
     file: File,
     onProgress?: (fraction: number) => void,
+    report?: { specialtyCode: string | null; specialtyOther: string | null; reportDate: string | null },
   ): Promise<PatientDocument> => {
     const form = new FormData();
     form.append('file', file, file.name);
     form.append('patientId', patientId);
-    form.append('templateId', templateId);
+    if (templateId !== null) form.append('templateId', templateId);
+    if (report?.specialtyCode != null) form.append('specialtyCode', report.specialtyCode);
+    if (report?.specialtyOther != null) form.append('specialtyOther', report.specialtyOther);
+    if (report?.reportDate != null) form.append('reportDate', report.reportDate);
 
     const res = await client.post('/api/documents/upload', form, {
       /*

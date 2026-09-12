@@ -9,7 +9,7 @@ import {
   ArrowBack, Science, TrendingUp, TrendingDown, CalendarToday, Description,
   Warning, CheckCircle, Error, MonitorHeart, FitnessCenter, Bloodtype,
   Download, Add, ExpandMore, ExpandLess, Person, Phone, Email, Cake,
-  Shield, LocalHospital, Spa,
+  Shield, LocalHospital, Spa, CloudUpload,
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { patientsApi } from '../api/patients';
@@ -18,6 +18,7 @@ import { diagnosticsApi } from '../api/diagnostics';
 import type { DiagnosticSession } from '../api/diagnostics';
 import { documentsApi, DOCUMENT_SATISFIES_REQUIREMENT } from '../api/documents';
 import MedicalReports from '../components/documents/MedicalReports';
+import UploadDocumentDialog from '../components/documents/UploadDocumentDialog';
 import type { PatientDocument, DocumentTemplate } from '../api/documents';
 
 /* ── Helpers ── */
@@ -115,6 +116,9 @@ export default function PatientDetails() {
   const [loadingPdf, setLoadingPdf] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
+  /* Which document is being uploaded. `null` closed, a template for a required
+     one, and `'report'` for a medical report from another doctor. */
+  const [uploadTemplate, setUploadTemplate] = useState<DocumentTemplate | null | 'report'>(null);
 
   /* Pulled out so accepting or reclassifying a report can refresh the same
      list the paperwork banner reads - otherwise the two disagree until the
@@ -335,6 +339,19 @@ export default function PatientDetails() {
         </motion.div>
       )}
 
+      {/* One dialog for both: a required document carries its template, a
+          report from another doctor carries none - and that absence is what
+          keeps it out of the required-document rules. */}
+      {id !== undefined && uploadTemplate !== null && (
+        <UploadDocumentDialog
+          open
+          onClose={() => setUploadTemplate(null)}
+          patientId={id}
+          template={uploadTemplate === 'report' ? null : uploadTemplate}
+          onUploaded={reloadDocuments}
+        />
+      )}
+
       {/*
         The consent-management card stood here and is gone with its server.
         It read a table that had never held a row, so it told the desk
@@ -438,13 +455,33 @@ export default function PatientDetails() {
                           <Typography variant="caption" color="text.secondary">Pouze 1. návštěva</Typography>
                         )}
                       </Box>
-                      {hasDoc ? (
-                        <Chip icon={<CheckCircle />} label="Hotovo" size="small"
-                          sx={{ bgcolor: '#2E7D3214', color: '#2E7D32', fontWeight: 500 }} />
-                      ) : (
-                        <Chip icon={<Error />} label="Chybí" size="small"
-                          sx={{ bgcolor: '#D32F2F14', color: '#D32F2F', fontWeight: 500 }} />
-                      )}
+                      {/*
+                        The upload lives here now, beside the thing it is
+                        missing. It used to live on a separate Documents screen
+                        where you first had to find the patient again in a
+                        dropdown - having arrived from that patient's own card.
+                        Seeing that a výpis is missing and being unable to do
+                        anything about it is most of a screen's work and none
+                        of its use.
+                      */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {hasDoc ? (
+                          <Chip icon={<CheckCircle />} label="Hotovo" size="small"
+                            sx={{ bgcolor: '#2E7D3214', color: '#2E7D32', fontWeight: 500 }} />
+                        ) : (
+                          <Chip icon={<Error />} label="Chybí" size="small"
+                            sx={{ bgcolor: '#D32F2F14', color: '#D32F2F', fontWeight: 500 }} />
+                        )}
+                        <Button
+                          size="small"
+                          variant={hasDoc ? 'text' : 'contained'}
+                          startIcon={<CloudUpload />}
+                          onClick={() => setUploadTemplate(templates.find((t) => t.id === rd.id) ?? null)}
+                          sx={hasDoc ? undefined : { bgcolor: '#0D7377' }}
+                        >
+                          {hasDoc ? 'Nahradit' : 'Nahrát'}
+                        </Button>
+                      </Box>
                     </Box>
                   );
                 })}
@@ -469,7 +506,7 @@ export default function PatientDetails() {
             <MedicalReports
               documents={docs}
               onChanged={reloadDocuments}
-              onAdd={() => navigate(`/documents?patient=${patient.id}`)}
+              onAdd={() => setUploadTemplate('report')}
             />
           </motion.div>
         </Grid>
