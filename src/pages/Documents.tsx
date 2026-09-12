@@ -6,7 +6,7 @@ import {
   TableContainer,
 } from '@mui/material';
 import {
-  Description, Upload, CheckCircle, Pending, Error, VerifiedUser, PersonSearch,
+  Description, Upload, CheckCircle, Pending, Error, VerifiedUser,
   Info, Download, CloudUpload, Assignment,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
@@ -16,15 +16,33 @@ import UploadDocumentDialog from '../components/documents/UploadDocumentDialog';
 import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
 
-const typeConfig: Record<string, { label: string; color: string; icon: React.ReactNode; required: boolean }> = {
-  Vypis: { label: 'Výpis ze zdravotní dokumentace', color: '#D32F2F', icon: <Description />, required: true },
-  Dotaznik: { label: 'Dotazník před prohlídkou', color: '#ED6C02', icon: <Assignment />, required: true },
-  GDPR: { label: 'GDPR souhlas', color: '#0288D1', icon: <VerifiedUser />, required: true },
-  Guardian: { label: 'Zákonný zástupce (mladší 18)', color: '#9C27B0', icon: <PersonSearch />, required: true },
-  InfoProhlidka: { label: 'Info prohlídka', color: '#2E7D32', icon: <Info />, required: false },
-  InfoDiagnostika: { label: 'Info diagnostika', color: '#0D7377', icon: <Info />, required: false },
-  InfoSport: { label: 'Info sport', color: '#FF5722', icon: <Info />, required: false },
+/*
+ * Colour and icon only. The name and whether it is required come from the
+ * template itself, because the server is the one that knows.
+ *
+ * This used to be the whole truth about document types, and it was a list of
+ * seven with its own labels and its own `required` flag. Six of the seven no
+ * longer exist - `Dotaznik`, `GDPR` and `Guardian` were deleted as second
+ * copies of rules that live elsewhere - so the screen drew six cards saying
+ * "Šablona není k dispozici" for types nobody can create.
+ *
+ * Worse at the other end: the upload list read `typeConfig[t.type] ||
+ * typeConfig.InfoProhlidka`, so `Informovaný souhlas`, `Ceník` and `Podmínky`
+ * all came out labelled "Info prohlídka". Three identical cards, none of them
+ * named what they were, and the fallback looked deliberate enough that it took
+ * the owner asking "what does Info prohlídka mean" to find it.
+ *
+ * An unknown type now gets a neutral colour and keeps its own name.
+ */
+const TYPE_STYLE: Record<string, { color: string; icon: React.ReactNode }> = {
+  Vypis: { color: '#D32F2F', icon: <Description /> },
+  InformovanySouhlas: { color: '#0288D1', icon: <VerifiedUser /> },
+  Cenik: { color: '#2E7D32', icon: <Assignment /> },
+  Podminky: { color: '#0D7377', icon: <Info /> },
 };
+
+const styleFor = (type: string) =>
+  TYPE_STYLE[type] ?? { color: '#607D8B', icon: <Description /> };
 
 /*
  * Keyed by `DocumentStatus` so the compiler requires every state to be
@@ -163,37 +181,42 @@ export default function Documents() {
       {/* Templates Tab */}
       {tab === 0 && (
         <Grid container spacing={2}>
-          {Object.entries(typeConfig).map(([type, config], i) => {
-            const template = templates.find(t => t.type === type);
+          {/* Driven by what the server has, so a card cannot describe a type
+              that no longer exists. */}
+          {templates.map((template, i) => {
+            const style = styleFor(template.type);
             return (
-              <Grid key={type} size={{ xs: 12, sm: 6, md: 4 }}>
+              <Grid key={template.id} size={{ xs: 12, sm: 6, md: 4 }}>
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-                  <Card sx={{ height: '100%', borderLeft: `4px solid ${config.color}`, position: 'relative' }}>
-                    {config.required && (
+                  <Card sx={{ height: '100%', borderLeft: `4px solid ${style.color}`, position: 'relative' }}>
+                    {template.requiredForVisit && (
                       <Chip label="Povinný" size="small"
                         sx={{ position: 'absolute', top: 8, right: 8, bgcolor: '#D32F2F14', color: '#D32F2F', fontWeight: 600 }} />
                     )}
                     <CardContent>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-                        <Box sx={{ color: config.color }}>{config.icon}</Box>
-                        <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 15 }}>{config.label}</Typography>
+                        <Box sx={{ color: style.color }}>{style.icon}</Box>
+                        <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 15 }}>{template.name}</Typography>
                       </Box>
-                      {template && (
-                        <Box sx={{ mt: 2 }}>
-                          <Typography variant="body2" color="text.secondary">Verze: {template.version}</Typography>
-                          {template.ageGated && <Chip label="Věkově omezený" size="small" sx={{ mt: 0.5 }} />}
-                          {template.firstVisitOnly && <Chip label="Pouze 1. návštěva" size="small" sx={{ mt: 0.5, ml: 0.5 }} />}
-                        </Box>
+                      {template.description !== '' && (
+                        <Typography variant="body2" color="text.secondary">{template.description}</Typography>
                       )}
-                      {!template && (
-                        <Alert severity="info" sx={{ mt: 2, borderRadius: 1 }}>Šablona není k dispozici</Alert>
-                      )}
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="body2" color="text.secondary">Verze: {template.version}</Typography>
+                        {template.ageGated && <Chip label="Věkově omezený" size="small" sx={{ mt: 0.5 }} />}
+                        {template.firstVisitOnly && <Chip label="Pouze 1. návštěva" size="small" sx={{ mt: 0.5, ml: 0.5 }} />}
+                      </Box>
                     </CardContent>
                   </Card>
                 </motion.div>
               </Grid>
             );
           })}
+          {templates.length === 0 && (
+            <Grid size={12}>
+              <Alert severity="info">Zatím nejsou nastavené žádné šablony dokumentů.</Alert>
+            </Grid>
+          )}
         </Grid>
       )}
 
@@ -238,13 +261,13 @@ export default function Documents() {
           <Grid container spacing={2}>
             {templates.map((tmpl) => {
               const existing = getDocStatus(tmpl.id);
-              const cfg = typeConfig[tmpl.type] || typeConfig.InfoProhlidka;
+              const style = styleFor(tmpl.type);
               return (
                 <Grid key={tmpl.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                  <Card sx={{ borderLeft: `3px solid ${existing ? '#2E7D32' : cfg.color}` }}>
+                  <Card sx={{ borderLeft: `3px solid ${existing ? '#2E7D32' : style.color}` }}>
                     <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Box>
-                        <Typography sx={{ fontWeight: 600, fontSize: 14 }}>{cfg.label}</Typography>
+                        <Typography sx={{ fontWeight: 600, fontSize: 14 }}>{tmpl.name}</Typography>
                         {/* The third place the raw enum reached a Czech
                             screen. Same map as the list above. */}
                         {existing && (
