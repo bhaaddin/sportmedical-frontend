@@ -74,23 +74,39 @@ export default function SpecialtyPicker({
   }, [input]);
 
   /*
-   * What is shown in the box. A chosen code shows its name; free text shows
-   * itself. Kept derived rather than stored so the two can never disagree -
-   * a box reading "Kardiologie" while the value holds something else is a lie
-   * nobody would catch until the record was filed.
+   * The name of whatever is chosen, remembered rather than looked up.
+   *
+   * It used to be derived from `options`, and `options` is refetched on every
+   * keystroke - including the one the selection itself causes. So a moment
+   * after picking Kardiologie the list no longer held it, the lookup fell
+   * through to a placeholder built from the code, and the box read "107 107":
+   * the code twice, once as the code and once standing in for the missing
+   * name. On screen it appeared, flickered, and turned into that.
+   *
+   * Remembering the name at the moment of choosing cannot flicker, because
+   * nothing else can change it.
    */
+  const [chosenName, setChosenName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (value.specialtyCode === null) {
+      setChosenName(null);
+      return;
+    }
+    const known = options.find((o) => o.code === value.specialtyCode);
+    if (known !== undefined) setChosenName(known.name);
+  }, [value.specialtyCode, options]);
+
   const selected = useMemo<Specialty | string | null>(() => {
     if (value.specialtyCode !== null) {
-      return (
-        options.find((o) => o.code === value.specialtyCode) ?? {
-          code: value.specialtyCode,
-          name: value.specialtyCode,
-          isCommon: false,
-        }
-      );
+      return {
+        code: value.specialtyCode,
+        name: chosenName ?? '',
+        isCommon: false,
+      };
     }
     return value.specialtyOther;
-  }, [value, options]);
+  }, [value, chosenName]);
 
   return (
     <Box>
@@ -101,8 +117,14 @@ export default function SpecialtyPicker({
         value={selected}
         loading={loading}
         filterOptions={(x) => x}
+        /*
+         * The name alone. The code belongs in the dropdown, where it helps
+         * somebody recognise the right row and lets them search by it - in the
+         * box afterwards it is clutter nobody reads, and when the name was
+         * missing it printed twice.
+         */
         getOptionLabel={(option) =>
-          typeof option === 'string' ? option : `${option.code} ${option.name}`
+          typeof option === 'string' ? option : option.name === '' ? option.code : option.name
         }
         isOptionEqualToValue={(option, current) =>
           typeof option !== 'string' &&
@@ -121,10 +143,14 @@ export default function SpecialtyPicker({
         }}
         onChange={(_, next) => {
           if (next === null) {
+            setChosenName(null);
             onChange({ specialtyCode: null, specialtyOther: null });
           } else if (typeof next === 'string') {
+            setChosenName(null);
             onChange({ specialtyCode: null, specialtyOther: next });
           } else {
+            /* Remembered here, where the name is certainly known. */
+            setChosenName(next.name);
             onChange({ specialtyCode: next.code, specialtyOther: null });
           }
         }}
