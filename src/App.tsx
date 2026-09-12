@@ -2,8 +2,9 @@ import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react
 import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Avatar, IconButton, Menu, MenuItem, Badge, CircularProgress, Button } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import i18n from './i18n';
-import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Group, Search, AttachMoney, Schedule, EventBusy, Today } from '@mui/icons-material';
+import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Group, Search, AttachMoney, Schedule, EventBusy, Today, Description } from '@mui/icons-material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { isAdminRole, currentUserRole } from './auth/roles';
 import { Toaster } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useState, lazy, Suspense, useRef, useCallback } from 'react';
@@ -59,7 +60,6 @@ const PatientImportPage = lazy(() => import('./pages/PatientImport'));
 const DataExportPage = lazy(() => import('./pages/DataExport'));
 const NotificationSettingsPage = lazy(() => import('./pages/NotificationSettings'));
 const BackupRestorePage = lazy(() => import('./pages/BackupRestore'));
-const LicenseManagementPage = lazy(() => import('./pages/LicenseManagement'));
 const CustomFieldsPage = lazy(() => import('./pages/CustomFields'));
 const WorkflowAutomationPage = lazy(() => import('./pages/WorkflowAutomation'));
 const ReportSchedulingPage = lazy(() => import('./pages/ReportScheduling'));
@@ -104,17 +104,9 @@ interface MenuItemGroup {
   items: { text: string; icon: React.ReactNode; path: string; adminOnly?: boolean }[];
 }
 
-export function isAdminRole(role?: string): boolean {
-  return ['Owner', 'Administrator', 'Admin', 'SuperAdmin'].includes(role ?? '');
-}
-
-export function currentUserRole(): string {
-  try {
-    return JSON.parse(localStorage.getItem('user') || '{}').role ?? '';
-  } catch {
-    return '';
-  }
-}
+/* Moved to `auth/roles.ts`: Settings needs them too, and importing them from
+   here would close a circle with the lazy import of Settings below. */
+export { isAdminRole, currentUserRole } from './auth/roles';
 
 const menuGroups: MenuItemGroup[] = [
   {
@@ -123,38 +115,38 @@ const menuGroups: MenuItemGroup[] = [
       { text: 'Přehled', icon: <Dashboard />, path: '/' },
     ],
   },
+  /*
+   * Daily work only. Everything anybody sets up once - calendars, activities,
+   * working hours, exceptions, the team, the public site, the audit log - now
+   * lives behind Nastavení, grouped the way the API already groups it.
+   *
+   * The sidebar was twenty entries, and the four somebody opens every morning
+   * sat among sixteen they open twice a year. Documents were not there at all:
+   * the screen existed and could only be reached by typing its address.
+   */
   {
     label: '',
     items: [
-      { text: 'Pacienti', icon: <People />, path: '/patients' },
-      { text: 'Diagnostika', icon: <Science />, path: '/diagnostics/new' },
-      { text: 'Fakturace', icon: <Receipt />, path: '/billing' },
-      { text: 'Pokladna', icon: <AttachMoney />, path: '/cashier' },
-      { text: 'GDPR', icon: <Warning />, path: '/gdpr' },
-    ],
-  },
-  {
-    label: 'Tým a rezervace',
-    items: [
-      { text: 'Plánování', icon: <CalendarMonth />, path: '/planovani' },
       { text: 'Dnešní přehled', icon: <Today />, path: '/dnes' },
-      { text: 'Vyhrazení', icon: <Group />, path: '/vyhrazeni' },
-      { text: 'Blokovaný čas', icon: <EventBusy />, path: '/blokovany-cas' },
-      { text: 'Můj rozvrh', icon: <CalendarMonth />, path: '/worker-schedule' },
-      { text: 'Kluby', icon: <Group />, path: '/clubs' },
+      { text: 'Plánování', icon: <CalendarMonth />, path: '/planovani' },
+      { text: 'Pacienti', icon: <People />, path: '/patients' },
+      { text: 'Dokumenty', icon: <Description />, path: '/documents' },
+      { text: 'Diagnostika', icon: <Science />, path: '/diagnostics/new' },
+    ],
+  },
+  {
+    label: 'Peníze',
+    items: [
+      { text: 'Pokladna', icon: <AttachMoney />, path: '/cashier' },
+      { text: 'Fakturace', icon: <Receipt />, path: '/billing' },
       { text: 'Účetní export', icon: <Receipt />, path: '/accounting-export', adminOnly: true },
-      { text: 'Tým', icon: <Group />, path: '/staff-management', adminOnly: true },
     ],
   },
   {
     label: '',
-    adminOnly: true,
     items: [
-      { text: 'Kalendáře', icon: <CalendarMonth />, path: '/calendars' },
-      { text: 'Činnosti', icon: <EventAvailable />, path: '/activities' },
-      { text: 'Pracovní doba', icon: <Schedule />, path: '/working-hours' },
-      { text: 'Výjimky', icon: <EventBusy />, path: '/exceptions' },
-      { text: 'Administrace', icon: <AdminPanelSettings />, path: '/admin' },
+      { text: 'Kluby', icon: <Group />, path: '/clubs' },
+      { text: 'Můj rozvrh', icon: <CalendarMonth />, path: '/worker-schedule' },
       { text: 'Nastavení', icon: <Settings />, path: '/settings' },
     ],
   },
@@ -413,7 +405,6 @@ export default function App() {
                     <Route path="/data-export" element={<DataExportPage />} />
                     <Route path="/notification-settings" element={<NotificationSettingsPage />} />
                     <Route path="/backup-restore" element={<BackupRestorePage />} />
-                    <Route path="/license-management" element={<LicenseManagementPage />} />
                     <Route path="/custom-fields" element={<CustomFieldsPage />} />
                     <Route path="/workflow-automation" element={<WorkflowAutomationPage />} />
                     <Route path="/report-scheduling" element={<ReportSchedulingPage />} />
