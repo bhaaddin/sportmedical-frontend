@@ -143,7 +143,12 @@ export function parseBirthNumber(input: string): ValidationResult<ParsedBirthNum
   } else if (Number(canonical) % 11 !== 0) {
     return fail(
       'birthNumber.checksum_invalid',
-      'Rodné číslo není platné — zkontrolujte prosím, zda jste ho opsali správně.',
+      /* Optional field: say so, rather than leaving somebody stuck on a number
+         they have copied correctly. About a thousand numbers issued before
+         1985 fail this check legitimately, and a foreign number fails it by
+         not being a Czech birth number at all. */
+      'Rodné číslo neprošlo kontrolou. Zkontrolujte opis — pokud je správný, ' +
+        'nechte pole prázdné a pokračujte, není povinné.',
     );
   }
 
@@ -191,7 +196,10 @@ export function validateInsuranceNumber(input: string): ValidationResult<string>
   if (!/^\d{9,10}$/.test(trimmed)) {
     return fail(
       'insuranceNumber.format_invalid',
-      'Číslo pojištěnce musí mít 9 nebo 10 číslic. Najdete ho na kartičce pojištěnce.',
+      /* The form has a branch for people without Czech insurance; somebody
+         typing a foreign number here has no way of knowing that. */
+      'Číslo pojištěnce musí mít 9 nebo 10 číslic. Najdete ho na kartičce ' +
+        'pojištěnce. Pokud české pojištění nemáte, zvolte výše „Nemám české pojištění".',
     );
   }
   return pass(trimmed);

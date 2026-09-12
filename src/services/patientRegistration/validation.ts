@@ -121,7 +121,17 @@ function validateInsurance(form: RegistrationFormState, errors: FieldErrors): vo
     if (insuranceNumber.length === 0) {
       errors.healthInsuranceNumber = 'Číslo pojištěnce je povinné.';
     } else if (insuranceNumber.length !== 9 && insuranceNumber.length !== 10) {
-      errors.healthInsuranceNumber = 'Číslo pojištěnce má devět nebo deset číslic.';
+      /*
+       * The form already has a mode for people with no Czech insurance number,
+       * and somebody typing a foreign one here cannot tell it exists.
+       *
+       * The mode is described rather than quoted: its label comes from the
+       * server (`options.insuranceRegistrationKinds`), so a quotation here
+       * would point at a button by a name it might not have.
+       */
+      errors.healthInsuranceNumber =
+        'Číslo pojištěnce má devět nebo deset číslic. Pokud pacient české ' +
+        'pojištění nemá, přepněte výše způsob evidence pojištění.';
     }
 
     // The registry demands the second entry only for an insurer-assigned
@@ -143,7 +153,24 @@ function validateInsurance(form: RegistrationFormState, errors: FieldErrors): vo
     if (birthNumber.length > 0) {
       const parsed = parseBirthNumber(birthNumber);
       if (parsed === null) {
-        errors.birthNumber = 'Rodné číslo není platné.';
+        /*
+         * Says what to do, not only that something is wrong.
+         *
+         * "Rodné číslo není platné" left the receptionist with a patient at
+         * the desk holding an ID card and nowhere to go. The number is
+         * optional here - the registry does not need it - so the way out is to
+         * clear the field, and nothing said so.
+         *
+         * The reason for the rejection is deliberately not distinguished. A
+         * mistyped digit, a foreign number that is not a Czech birth number at
+         * all, and one of the roughly thousand numbers issued under the
+         * remainder-ten exception before 1985 all lead to the same advice.
+         * Splitting the message three ways would need a reason this function
+         * does not return, and would not change what anybody does next.
+         */
+        errors.birthNumber =
+          'Rodné číslo neprošlo kontrolou. Zkontrolujte opis — pokud je správný, ' +
+          'nechte pole prázdné a pokračujte, není povinné.';
       } else if (form.dateOfBirth.length > 0 && parsed.dateOfBirth !== form.dateOfBirth) {
         errors.birthNumber = 'Rodné číslo neodpovídá datu narození.';
       } else if (form.sex !== '' && parsed.sex !== form.sex) {
