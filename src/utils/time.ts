@@ -168,9 +168,20 @@ export function formatPragueDateTime(instant: Date | string): string {
   return `${formatPragueDate(instant)} ${formatPragueTime(instant)}`;
 }
 
-/** `14. 10. 2026` for a date-only value, with no zone conversion at all. */
-export function formatDateOnly(date: DateOnly): string {
-  const [year, month, day] = date.split('-').map(Number);
+/**
+ * `14. 10. 2026` for a date-only value, with no zone conversion at all.
+ *
+ * Returns an empty string rather than throwing when handed something that is
+ * not a date. Every caller feeds this from the server, and a field the server
+ * omits arrives as `undefined` however the type is written - which used to
+ * split, throw, and take a whole screen down over a missing date. A blank cell
+ * is a far smaller failure than a blank page.
+ */
+export function formatDateOnly(date: DateOnly | null | undefined): string {
+  if (typeof date !== 'string') return '';
+  const parts = date.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return '';
+  const [year, month, day] = parts;
   return `${day}. ${month}. ${year}`;
 }
 

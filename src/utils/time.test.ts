@@ -12,7 +12,7 @@
  * offset instead of asking the zone.
  */
 import { describe, it, expect } from 'vitest';
-import { pragueWallClockToInstant, startOfPragueDay, hoursInPragueDay } from './time';
+import { pragueWallClockToInstant, startOfPragueDay, hoursInPragueDay, formatDateOnly } from './time';
 
 const pragueClock = (d: Date) =>
   new Intl.DateTimeFormat('cs-CZ', {
@@ -74,5 +74,31 @@ describe('pragueWallClockToInstant', () => {
         startOfPragueDay(date).toISOString(),
       );
     }
+  });
+});
+
+
+/*
+ * `formatDateOnly` is handed server data everywhere it is used, and a field the
+ * server omits arrives as `undefined` however the type is written. It used to
+ * split that and throw, which took a whole screen down over a missing date.
+ *
+ * Found while wiring medical reports onto the patient card: a fixture that
+ * predated `reportDate` - the same shape any older document has - crashed it.
+ */
+describe('formatDateOnly on data the server may not send', () => {
+  it('formats a real date', () => {
+    expect(formatDateOnly('2026-10-14')).toBe('14. 10. 2026');
+  });
+
+  it('returns nothing rather than throwing when the field is absent', () => {
+    expect(formatDateOnly(undefined)).toBe('');
+    expect(formatDateOnly(null)).toBe('');
+  });
+
+  it('returns nothing for something that is not a date at all', () => {
+    expect(formatDateOnly('' as never)).toBe('');
+    expect(formatDateOnly('kdysi' as never)).toBe('');
+    expect(formatDateOnly('2026-10' as never)).toBe('');
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Grid, Card, CardContent, Avatar, Button, Divider, Chip,
@@ -17,6 +17,7 @@ import type { Patient } from '../api/patients';
 import { diagnosticsApi } from '../api/diagnostics';
 import type { DiagnosticSession } from '../api/diagnostics';
 import { documentsApi, DOCUMENT_SATISFIES_REQUIREMENT } from '../api/documents';
+import MedicalReports from '../components/documents/MedicalReports';
 import type { PatientDocument, DocumentTemplate } from '../api/documents';
 import { ConsentManager } from '../components/ConsentManager';
 
@@ -116,15 +117,23 @@ export default function PatientDetails() {
   const [profile, setProfile] = useState<any>(null);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
 
+  /* Pulled out so accepting or reclassifying a report can refresh the same
+     list the paperwork banner reads - otherwise the two disagree until the
+     page is reloaded, and the banner is the thing people trust. */
+  const reloadDocuments = useCallback(() => {
+    if (id === undefined) return;
+    documentsApi.getPatientDocuments(id).then(setDocs).catch(() => {});
+  }, [id]);
+
   useEffect(() => {
     if (id) {
       patientsApi.getById(id).then(setPatient).catch(() => {});
       diagnosticsApi.getByPatient(id).then(setSessions).catch(() => {});
-      documentsApi.getPatientDocuments(id).then(setDocs).catch(() => {});
       documentsApi.getTemplates().then(setTemplates).catch(() => setTemplates([]));
       patientsApi.getProfile(id).then(setProfile).catch(() => {});
+      reloadDocuments();
     }
-  }, [id]);
+  }, [id, reloadDocuments]);
 
   if (!patient) {
     return (
@@ -436,6 +445,27 @@ export default function PatientDetails() {
                 })}
               </CardContent>
             </Card>
+          </motion.div>
+
+          {/*
+            Its own card, below the required ones and deliberately not among
+            them. A required document answers "may this person be seen"; a
+            report answers "what else is going on". Mixing them would let a
+            cardiology report stand in for the výpis - which the shape already
+            prevents, since a report carries no template, but putting them in
+            one list is how somebody later decides the shape is inconvenient.
+          */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            style={{ marginTop: 24 }}
+          >
+            <MedicalReports
+              documents={docs}
+              onChanged={reloadDocuments}
+              onAdd={() => navigate(`/documents?patient=${patient.id}`)}
+            />
           </motion.div>
         </Grid>
 

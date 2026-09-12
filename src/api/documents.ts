@@ -14,6 +14,12 @@ export interface DocumentTemplate {
   isActive: boolean;
 }
 
+/*
+ * Staff means the person was standing there holding the paper; Patient means
+ * it arrived from outside and somebody has to look at it before it counts.
+ */
+export type DocumentSource = 'Staff' | 'Patient';
+
 export type DocumentStatus =
   | 'Pending'
   | 'SignedOff'
@@ -56,6 +62,23 @@ export interface PatientDocument {
    * error instead of a warning nobody can clear.
    */
   status: DocumentStatus;
+  /*
+   * Who put this here. Taken by the server from the session, never from the
+   * form - it decides whether the document counts immediately, and anything a
+   * caller can set is something a caller can grant themselves.
+   */
+  source: DocumentSource;
+  uploadedByUserId: string | null;
+  reviewedByUserId: string | null;
+  reviewedAtUtc: string | null;
+  /** Set only on a medical report from another doctor. */
+  specialtyCode: string | null;
+  /** What the person typed when no code fitted. */
+  specialtyOther: string | null;
+  /** What the patient said it was - a hint for the reviewer, never the answer. */
+  specialtySuggestedByPatient: string | null;
+  /** The date on the report, not the date it was uploaded. Date only, no zone. */
+  reportDate: string | null;
   appointmentId?: string;
   notes: string;
 }
@@ -143,4 +166,48 @@ export const documentsApi = {
     const res = await client.post(`/api/documents/${documentId}/sign`);
     return res.data?.value ?? res.data;
   },
+
+  /**
+   * Accept or turn away a document the patient sent in.
+   *
+   * The server records who did it. That is the point of the step: for a
+   * document somebody carried to the desk there is nothing to decide, but for
+   * one that arrived from a phone there is - and in a year the question will
+   * be "who said this was the výpis", which needs an answer.
+   */
+  review: async (documentId: string, accepted: boolean): Promise<PatientDocument> => {
+    const res = await client.post(
+      `/api/documents/${documentId}/review?accepted=${accepted ? 'true' : 'false'}`,
+    );
+    return res.data?.value ?? res.data;
+  },
+
+  /** Put a medical report under a different specialty. */
+  reclassify: async (
+    documentId: string,
+    specialty: { specialtyCode: string | null; specialtyOther: string | null },
+  ): Promise<PatientDocument> => {
+    const res = await client.post(`/api/documents/${documentId}/reclassify`, specialty);
+    return res.data?.value ?? res.data;
+  },
+
+  /**
+   * The specialty suggester.
+   *
+   * Searching, ordering and the synonyms all live on the server on purpose.
+   * Keeping a copy of the list here would let the two drift, and a suggester
+   * that offers a specialty the server will not accept is worse than no
+   * suggester. An empty query returns what a clinic actually uses.
+   */
+  specialties: async (q: string, take = 10): Promise<Specialty[]> => {
+    const res = await client.get('/api/documents/specialties', { params: { q, take } });
+    return res.data?.value ?? res.data ?? [];
+  },
 };
+
+export interface Specialty {
+  code: string;
+  name: string;
+  /** Offered before anybody types. */
+  isCommon: boolean;
+}
