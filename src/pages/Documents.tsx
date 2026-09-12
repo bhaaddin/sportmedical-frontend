@@ -11,7 +11,7 @@ import {
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { documentsApi } from '../api/documents';
-import type { DocumentTemplate, PatientDocument } from '../api/documents';
+import type { DocumentTemplate, DocumentStatus, PatientDocument } from '../api/documents';
 import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
 import toast from 'react-hot-toast';
@@ -26,11 +26,35 @@ const typeConfig: Record<string, { label: string; color: string; icon: React.Rea
   InfoSport: { label: 'Info sport', color: '#FF5722', icon: <Info />, required: false },
 };
 
-const statusIcon: Record<string, React.ReactNode> = {
+/*
+ * Keyed by `DocumentStatus` so the compiler requires every state to be
+ * handled. The previous map was keyed by `string` and listed `Uploaded` and
+ * `Signed`, neither of which the server has ever sent - so a signed document
+ * drew no icon at all, and `Superseded` and `Rejected` were not there either.
+ */
+const STATUS_ICON: Record<DocumentStatus, React.ReactNode> = {
   Pending: <Pending sx={{ color: '#ED6C02' }} />,
-  Uploaded: <CheckCircle sx={{ color: '#0288D1' }} />,
-  Signed: <CheckCircle sx={{ color: '#2E7D32' }} />,
+  SignedOff: <CheckCircle sx={{ color: '#2E7D32' }} />,
   Expired: <Error sx={{ color: '#D32F2F' }} />,
+  Superseded: <Error sx={{ color: '#9E9E9E' }} />,
+  Rejected: <Error sx={{ color: '#D32F2F' }} />,
+};
+
+/** The chip said `SignedOff` in English on a Czech screen. */
+const STATUS_LABEL: Record<DocumentStatus, string> = {
+  Pending: 'Čeká na podpis',
+  SignedOff: 'Podepsáno',
+  Expired: 'Vypršelo',
+  Superseded: 'Nahrazeno',
+  Rejected: 'Zamítnuto',
+};
+
+const STATUS_COLOR: Record<DocumentStatus, string> = {
+  Pending: '#ED6C02',
+  SignedOff: '#2E7D32',
+  Expired: '#D32F2F',
+  Superseded: '#9E9E9E',
+  Rejected: '#D32F2F',
 };
 
 export default function Documents() {
@@ -192,14 +216,14 @@ export default function Documents() {
                 {patientDocs.map((doc, i) => (
                   <motion.div key={doc.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}>
                     <ListItem sx={{ py: 1.5 }}>
-                      <ListItemIcon>{statusIcon[doc.status]}</ListItemIcon>
+                      <ListItemIcon>{STATUS_ICON[doc.status]}</ListItemIcon>
                       <ListItemText
                         primary={<Typography sx={{ fontWeight: 500 }}>{doc.templateName}</Typography>}
                         secondary={`Nahráno: ${new Date(doc.uploadedAt).toLocaleDateString('cs-CZ')}${doc.signedAt ? ` • Podepsáno: ${new Date(doc.signedAt).toLocaleDateString('cs-CZ')}` : ''}`}
                       />
-                      <Chip label={doc.status} size="small" sx={{
-                        bgcolor: doc.status === 'Signed' ? '#2E7D3214' : doc.status === 'Expired' ? '#D32F2F14' : '#ED6C0214',
-                        color: doc.status === 'Signed' ? '#2E7D32' : doc.status === 'Expired' ? '#D32F2F' : '#ED6C02',
+                      <Chip label={STATUS_LABEL[doc.status]} size="small" sx={{
+                        bgcolor: `${STATUS_COLOR[doc.status]}14`,
+                        color: STATUS_COLOR[doc.status],
                         fontWeight: 500,
                       }} />
                       <Tooltip title="Stáhnout"><IconButton size="small"><Download fontSize="small" /></IconButton></Tooltip>

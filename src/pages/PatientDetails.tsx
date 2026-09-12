@@ -16,7 +16,7 @@ import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
 import { diagnosticsApi } from '../api/diagnostics';
 import type { DiagnosticSession } from '../api/diagnostics';
-import { documentsApi } from '../api/documents';
+import { documentsApi, DOCUMENT_SATISFIES_REQUIREMENT } from '../api/documents';
 import type { PatientDocument, DocumentTemplate } from '../api/documents';
 import { ConsentManager } from '../components/ConsentManager';
 
@@ -177,11 +177,26 @@ export default function PatientDetails() {
    * looked like a patient whose paperwork was complete. It matches the
    * template now.
    */
+  /*
+   * `'Signed'` and `'Active'` were compared here, and the server has never
+   * sent either. Its `DocumentStatus` is
+   * `Pending | SignedOff | Expired | Superseded | Rejected`, so the test could
+   * not pass for any document, for any patient, ever - "Chybí: Výpis ze
+   * zdravotní dokumentace" stayed on a card whose výpis was uploaded and
+   * signed.
+   *
+   * Found by walking one patient end to end: registration, approval, upload,
+   * sign - and the warning did not move. The server agreed it was complete
+   * (`/documents/patient/{id}/summary` flipped `hasVypis` to true on signing);
+   * only this line disagreed.
+   *
+   * `SignedOff` alone counts. Expired and Rejected plainly do not, and
+   * Superseded means a newer document exists - that newer one is the signed
+   * one, and it is in this same list.
+   */
   const hasRequiredDoc = (templateId: string) =>
     docs.some(
-      (d) =>
-        d.templateId === templateId &&
-        (d.status === 'Signed' || d.status === 'Active'),
+      (d) => d.templateId === templateId && d.status === DOCUMENT_SATISFIES_REQUIREMENT,
     );
 
   const requiredDocs = templates

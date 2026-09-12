@@ -14,6 +14,16 @@ export interface DocumentTemplate {
   isActive: boolean;
 }
 
+export type DocumentStatus =
+  | 'Pending'
+  | 'SignedOff'
+  | 'Expired'
+  | 'Superseded'
+  | 'Rejected';
+
+/** Signed off is the only state that satisfies a required-document rule. */
+export const DOCUMENT_SATISFIES_REQUIREMENT: DocumentStatus = 'SignedOff';
+
 export interface PatientDocument {
   id: string;
   patientId: string;
@@ -23,7 +33,18 @@ export interface PatientDocument {
   signedAt?: string;
   expiryAt?: string;
   filePath: string;
-  status: string;
+  /*
+   * The server's `DocumentStatus`, as names on the wire - measured against the
+   * running API on 12. 9. 2026, and matching the domain enum:
+   *
+   *     Pending  SignedOff  Expired  Superseded  Rejected
+   *
+   * Typed as a union rather than `string`, because this screen spent its whole
+   * life comparing it to `'Signed'` and `'Active'` - two values the server has
+   * never sent and the enum has never held. A union makes that a compile
+   * error instead of a warning nobody can clear.
+   */
+  status: DocumentStatus;
   appointmentId?: string;
   notes: string;
 }
