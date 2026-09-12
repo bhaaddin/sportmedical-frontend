@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react';
 import {
   Box, Typography, Paper, Card, CardContent, Button, Grid, Chip, IconButton, Tooltip,
-  Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, List, ListItem,
+  TextField, MenuItem, List, ListItem,
   ListItemIcon, ListItemText, Divider, Alert, Skeleton, Tabs, Tab,
   TableContainer,
 } from '@mui/material';
 import {
   Description, Upload, CheckCircle, Pending, Error, VerifiedUser, PersonSearch,
-  HealthAndSafety, Info, Download, Visibility, CloudUpload, Assignment,
+  Info, Download, CloudUpload, Assignment,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { documentsApi } from '../api/documents';
 import type { DocumentTemplate, DocumentStatus, PatientDocument } from '../api/documents';
+import UploadDocumentDialog from '../components/documents/UploadDocumentDialog';
 import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
-import toast from 'react-hot-toast';
 
 const typeConfig: Record<string, { label: string; color: string; icon: React.ReactNode; required: boolean }> = {
   Vypis: { label: 'Výpis ze zdravotní dokumentace', color: '#D32F2F', icon: <Description />, required: true },
@@ -65,6 +65,7 @@ export default function Documents() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
   const [uploadDialog, setUploadDialog] = useState<{ open: boolean; templateId: string }>({ open: false, templateId: '' });
+  const uploadTemplate = templates.find((t) => t.id === uploadDialog.templateId);
 
   useEffect(() => {
     Promise.all([
@@ -109,9 +110,6 @@ export default function Documents() {
    * So nothing is sent. The dialog says what is missing and the picker is gone
    * until there is somewhere for a file to go. Reported to the `app` lane.
    */
-  const handleUpload = async (_file: File) => {
-    toast.error('Nahrávání souborů zatím není — chybí koncový bod na serveru.');
-  };
 
   const getDocStatus = (templateId: string) => {
     return patientDocs.find(d => d.templateId === templateId);
@@ -238,7 +236,7 @@ export default function Documents() {
           {/* Upload buttons for each template */}
           <Typography variant="h6" sx={{ fontWeight: 700, mt: 4, mb: 2 }}>Nahrát dokument</Typography>
           <Grid container spacing={2}>
-            {templates.map((tmpl, i) => {
+            {templates.map((tmpl) => {
               const existing = getDocStatus(tmpl.id);
               const cfg = typeConfig[tmpl.type] || typeConfig.InfoProhlidka;
               return (
@@ -247,9 +245,19 @@ export default function Documents() {
                     <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Box>
                         <Typography sx={{ fontWeight: 600, fontSize: 14 }}>{cfg.label}</Typography>
+                        {/* The third place the raw enum reached a Czech
+                            screen. Same map as the list above. */}
                         {existing && (
-                          <Chip icon={<CheckCircle />} label={existing.status} size="small"
-                            sx={{ mt: 0.5, bgcolor: '#2E7D3214', color: '#2E7D32' }} />
+                          <Chip
+                            icon={STATUS_ICON[existing.status] === undefined ? undefined : <CheckCircle />}
+                            label={STATUS_LABEL[existing.status]}
+                            size="small"
+                            sx={{
+                              mt: 0.5,
+                              bgcolor: `${STATUS_COLOR[existing.status]}14`,
+                              color: STATUS_COLOR[existing.status],
+                            }}
+                          />
                         )}
                       </Box>
                       <Button size="small" variant={existing ? 'outlined' : 'contained'} startIcon={<Upload />}
@@ -267,31 +275,37 @@ export default function Documents() {
         </motion.div>
       )}
 
-      {/* Upload Dialog */}
-      <Dialog open={uploadDialog.open} onClose={() => setUploadDialog({ open: false, templateId: '' })}>
-        <DialogTitle>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>Nahrát dokument</Typography>
-        </DialogTitle>
-        <DialogContent>
-          {/*
-            The picker is not drawn, because there is nothing behind it. Saying
-            so beats a button that takes a file and loses it.
-          */}
-          <Alert severity="warning" sx={{ borderRadius: 2 }}>
-            <Typography sx={{ fontWeight: 600, mb: 0.5 }}>
-              Nahrát soubor zatím nelze
-            </Typography>
-            <Typography variant="body2">
-              Server pro dokumenty přijímá jen cestu k souboru, který už na něm
-              je — koncový bod pro nahrání zatím neexistuje. Dokud nebude, soubor
-              se sem dostat nedá; nahlášeno.
-            </Typography>
-          </Alert>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setUploadDialog({ open: false, templateId: '' })} sx={{ borderRadius: 2 }}>Zrušit</Button>
-        </DialogActions>
-      </Dialog>
+      {/*
+        The real thing now. This was a notice saying uploading was impossible
+        because the server had no endpoint for it - measured on 12. 9. 2026,
+        `POST /api/documents/upload` exists, takes multipart, and returns the
+        stored document. The belief came from this lane's own client, which
+        posted a *path* to a file supposedly already on the server.
+      */}
+      {selectedPatient !== '' && uploadTemplate !== undefined && (
+        <UploadDocumentDialog
+          open={uploadDialog.open}
+          onClose={() => setUploadDialog({ open: false, templateId: '' })}
+          patientId={selectedPatient}
+          template={uploadTemplate}
+          /*
+           * Refresh the list, but do not close - the dialog closes itself once
+           * the document is signed or the signature is deliberately deferred.
+           *
+           * Closing here defeated the whole point: the upload succeeded, the
+           * dialog vanished, and the document sat unsigned. An unsigned
+           * document does not satisfy a requirement, so the patient's card
+           * kept saying the výpis was missing while the list beside it said
+           * "Čeká na podpis". Seen exactly that way on screen before this.
+           */
+          onUploaded={() => {
+            documentsApi
+              .getPatientDocuments(selectedPatient)
+              .then(setPatientDocs)
+              .catch(() => {});
+          }}
+        />
+      )}
     </Box>
   );
 }
