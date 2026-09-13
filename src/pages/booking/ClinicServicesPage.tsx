@@ -15,8 +15,9 @@
  */
 import { useState } from 'react';
 import {
-  Alert, Box, Button, Card, CardContent, Chip, Dialog, DialogActions,
-  DialogContent, DialogTitle, IconButton, Stack, TextField, Tooltip, Typography,
+  Alert, Box, Button, Card, CardContent, Checkbox, Chip, Dialog, DialogActions,
+  DialogContent, DialogTitle, IconButton, ListItemText, MenuItem, Stack,
+  TextField, Tooltip, Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -29,11 +30,17 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { clinicServicesApi } from '../../api/clinicServices';
 import type { ClinicService, ClinicServiceInput } from '../../api/clinicServices';
+import { activitiesApi } from '../../api/activities';
+import { calendarsApi } from '../../api/calendars';
+import type { Activity, Calendar } from '../../api/bookingContracts';
 import { AsyncSection } from '../../components/booking/AsyncSection';
 import { errorText } from '../../components/booking/errorText';
 import {
   SERVICE_GAP_TEXT, countsText, deletionWillBeRefused, serviceGap,
 } from './clinicServiceState';
+import {
+  linkChanges, movedFrom, offerable, partialFailureText, under,
+} from './serviceLinks';
 
 const emptyDraft = (sortOrder: number): ClinicServiceInput => ({
   name: '',
@@ -52,6 +59,10 @@ export default function ClinicServicesPage() {
   const [draft, setDraft] = useState<ClinicServiceInput | null>(null);
   const [editing, setEditing] = useState<ClinicService | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ClinicService | null>(null);
+  /* What is ticked in the dialog, before it is saved. */
+  const [pickedActivities, setPickedActivities] = useState<string[]>([]);
+  const [pickedCalendars, setPickedCalendars] = useState<string[]>([]);
+  const [partlyFailed, setPartlyFailed] = useState<string[]>([]);
 
   const servicesQuery = useQuery({
     queryKey: ['clinic-services'],
@@ -60,13 +71,119 @@ export default function ClinicServicesPage() {
   });
   const services = [...(servicesQuery.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['clinic-services'] });
-  const closeDialog = () => { setDraft(null); setEditing(null); };
+  /*
+   * The two lists that can be ticked. Fetched here rather than on the screens
+   * that own them, because the owner asked for the assignment to happen where
+   * the service is - "okienko rozrolovacie kde si to uz len vybriem" - and
+   * sending him elsewhere to do it is the thing he has now sent back twice.
+   */
+  const activitiesQuery = useQuery({
+    queryKey: ['activities'],
+    queryFn: activitiesApi.list,
+    staleTime: 5 * 60 * 1000,
+  });
+  const calendarsQuery = useQuery({
+    queryKey: ['calendars'],
+    queryFn: calendarsApi.list,
+    staleTime: 5 * 60 * 1000,
+  });
+  const allActivities: Activity[] = activitiesQuery.data?.activities ?? [];
+  const allCalendars: Calendar[] = calendarsQuery.data ?? [];
+
+  const invalidate = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['clinic-services'] }),
+    queryClient.invalidateQueries({ queryKey: ['activities'] }),
+    queryClient.invalidateQueries({ queryKey: ['calendars'] }),
+  ]);
+  const closeDialog = () => {
+    setDraft(null);
+    setEditing(null);
+    setPartlyFailed([]);
+  };
+
+  const serviceNameOf = (id: string) => services.find((svc) => svc.id === id)?.name ?? null;
+
+  /*
+   * One button, several writes.
+   *
+   * The server keeps the link on the other side - a činnost names its service
+   * and a calendar names the one it runs - so assigning from here is a `PUT`
+   * per moved item. That is a screen's job, not his.
+   *
+   * `PUT` is the whole entity in this lane (3.1), so every field is sent back
+   * as it came. Leaving one out is not "no change", it is clearing it: drop
+   * `serviceItemId` and the činnost quietly loses its price.
+   *
+   * `allSettled`, not `all`: some of these can fail while others go through,
+   * and the dialog must not close looking finished. The ones that failed are
+   * named.
+   */
+  const applyLinks = async (serviceId: string): Promise<string[]> => {
+    const activityMoves = linkChanges(allActivities, serviceId, pickedActivities, false);
+    const calendarMoves = linkChanges(allCalendars, serviceId, pickedCalendars, true);
+
+    const writes: { name: string; run: () => Promise<unknown> }[] = [];
+
+    for (const id of activityMoves.attach) {
+      const a = allActivities.find((x) => x.id === id);
+      if (a === undefined) continue;
+      writes.push({
+        name: a.name,
+        run: () => activitiesApi.update(a.id, {
+          name: a.name,
+          durationMinutes: a.durationMinutes,
+          color: a.color,
+          publicNote: a.publicNote,
+          isPubliclyBookable: a.isPubliclyBookable,
+          sortOrder: a.sortOrder,
+          serviceItemId: a.serviceItemId,
+          clinicServiceId: serviceId,
+        }),
+      });
+    }
+
+    for (const id of [...calendarMoves.attach, ...calendarMoves.detach]) {
+      const c = allCalendars.find((x) => x.id === id);
+      if (c === undefined) continue;
+      const goesTo = calendarMoves.attach.includes(id) ? serviceId : null;
+      writes.push({
+        name: c.name,
+        run: () => calendarsApi.update(c.id, {
+          name: c.name,
+          color: c.color,
+          location: c.location,
+          displayStepMinutes: c.displayStepMinutes,
+          isActive: c.isActive,
+          sortOrder: c.sortOrder,
+          clinicServiceId: goesTo,
+          publicMinimumNoticeMinutes: c.publicMinimumNoticeMinutes,
+          publicHorizonDays: c.publicHorizonDays,
+        }),
+      });
+    }
+
+    const results = await Promise.allSettled(writes.map((w) => w.run()));
+    return writes
+      .filter((_, i) => results[i].status === 'rejected')
+      .map((w) => w.name);
+  };
 
   const save = useMutation({
-    mutationFn: (input: ClinicServiceInput) =>
-      editing ? clinicServicesApi.update(editing.id, input) : clinicServicesApi.create(input),
-    onSuccess: async () => { await invalidate(); closeDialog(); },
+    mutationFn: async (input: ClinicServiceInput) => {
+      const saved = editing
+        ? await clinicServicesApi.update(editing.id, input)
+        : await clinicServicesApi.create(input);
+      /* After the service exists, so a brand new one can be ticked in the
+         same breath rather than saved and then reopened. */
+      return { saved, failed: await applyLinks(saved.id) };
+    },
+    onSuccess: async ({ failed }) => {
+      await invalidate();
+      /* Open, with the names, when some of it did not go through. Closing on
+         a partial success is the screen saying it did something it did not. */
+      if (failed.length > 0) { setPartlyFailed(failed); return; }
+      closeDialog();
+    },
   });
 
   const remove = useMutation({
@@ -85,6 +202,9 @@ export default function ClinicServicesPage() {
   const openCreate = () => {
     setEditing(null);
     setDraft(emptyDraft(services.length));
+    setPickedActivities([]);
+    setPickedCalendars([]);
+    setPartlyFailed([]);
     save.reset();
   };
 
@@ -95,10 +215,27 @@ export default function ClinicServicesPage() {
       description: service.description,
       sortOrder: service.sortOrder,
     });
+    /* Ticked as they actually are. A picker that opens empty is a picker that
+       clears everything the moment somebody saves a renamed service. */
+    setPickedActivities(under(allActivities, service.id));
+    setPickedCalendars(under(allCalendars, service.id));
+    setPartlyFailed([]);
     save.reset();
   };
 
   const nameIsValid = (draft?.name ?? '').trim() !== '';
+
+  /*
+   * What the dialog offers to tick.
+   *
+   * A retired one is not offered - except when it is already under this
+   * service, where hiding it would make the service look emptier than it is
+   * and unticking would be the only way to save.
+   */
+  const editingId = editing?.id ?? '';
+  const activityOptions = offerable(allActivities, editingId);
+  const calendarOptions = offerable(allCalendars, editingId);
+
 
   return (
     <Box>
@@ -177,42 +314,26 @@ export default function ClinicServicesPage() {
                   {/* Said on the row, because it is invisible everywhere else:
                       a service with no činnosti or no calendar offers nothing,
                       and looks exactly like one that works. */}
-                  {/* Said on the row, and with the way in.
-                      A služba does not own its činnosti - the link lives on
-                      the činnost and the server takes it from no other side -
-                      so this screen can name the gap and cannot close it. The
-                      owner met exactly that: a warning telling him to assign
-                      činnosti, above a dialog with nowhere to assign them.
-                      These carry the service to the screen that can. */}
+                  {/*
+                    * Said on the row, and fixed on the row.
+                    *
+                    * This button used to leave the screen - first to a blank
+                    * form, then to a list to edit one row at a time. Both came
+                    * back. It opens the service now, where the two pickers
+                    * are, and the assignment happens in one place.
+                    *
+                    * "Založit novou" stays inside the dialog for when nothing
+                    * exists to tick, which is the only case where leaving is
+                    * the right answer.
+                    */}
                   {gap !== 'none' && (
                     <Alert
                       severity="warning"
                       sx={{ mt: 1.5 }}
                       action={
-                        <Stack direction="row" spacing={1}>
-                          {(gap === 'no-activities' || gap === 'nothing-set-up') && (
-                            <Button
-                              color="inherit"
-                              size="small"
-                              onClick={() => navigate('/activities', {
-                                state: { clinicServiceId: service.id },
-                              })}
-                            >
-                              Přidat činnost
-                            </Button>
-                          )}
-                          {(gap === 'no-calendar' || gap === 'nothing-set-up') && (
-                            <Button
-                              color="inherit"
-                              size="small"
-                              onClick={() => navigate('/calendars', {
-                                state: { clinicServiceId: service.id },
-                              })}
-                            >
-                              Přiřadit kalendář
-                            </Button>
-                          )}
-                        </Stack>
+                        <Button color="inherit" size="small" onClick={() => openEdit(service)}>
+                          Přiřadit
+                        </Button>
                       }
                     >
                       {SERVICE_GAP_TEXT[gap]}
@@ -255,18 +376,137 @@ export default function ClinicServicesPage() {
                 onChange={(e) => setDraft({ ...draft, sortOrder: Number(e.target.value) || 0 })}
                 sx={{ width: 160 }}
               />
-              {/* Asked for here and not offered, which is a question the
-                  dialog should answer rather than leave. The server takes the
-                  link from one side only - the činnost names its service, and
-                  the calendar names the one it runs. So this says where, and
-                  the row's buttons take you there. */}
-              {editing !== null && (
-                <Typography variant="body2" color="text.secondary">
-                  Činnosti a kalendáře se nepřiřazují odsud. Činnost si svou službu
-                  vybírá sama v Nastavení → Činnosti, kalendář v Nastavení → Kalendáře.
-                </Typography>
+              {/*
+                * Ticked here, because this is where he looked for it - twice.
+                *
+                * The server keeps the link on the other side, so saving this
+                * is a `PUT` per moved item. That is this screen's work to do,
+                * not an errand to hand back to him: "to mi fakt nevies spravit
+                * do pcici okienko rozrolovacie kde si to uz len vybriem".
+                */}
+              <TextField
+                select
+                label="Činnosti"
+                value={pickedActivities}
+                onChange={(e) => setPickedActivities(
+                  typeof e.target.value === 'string'
+                    ? e.target.value.split(',')
+                    : (e.target.value as unknown as string[]),
+                )}
+                slotProps={{
+                  select: {
+                    multiple: true,
+                    renderValue: (picked) => (picked as string[])
+                      .map((id) => allActivities.find((a) => a.id === id)?.name ?? id)
+                      .join(', '),
+                  },
+                }}
+                helperText={
+                  activityOptions.length === 0
+                    ? 'Zatím žádná činnost — není co zaškrtnout.'
+                    : 'Činnost patří pod jednu službu — zaškrtnutím se sem přesune.'
+                }
+                fullWidth
+              >
+                {activityOptions.map((a) => {
+                  const from = movedFrom(allActivities, a.id, serviceNameOf);
+                  const isHere = a.clinicServiceId === editingId;
+                  return (
+                    /* Already here cannot be unticked: the server refuses a
+                       činnost with no service, so there is nowhere to put it.
+                       Saying so beats offering a save that ends in a 400. */
+                    <MenuItem key={a.id} value={a.id} disabled={isHere}>
+                      <Checkbox checked={pickedActivities.includes(a.id)} />
+                      <ListItemText
+                        primary={a.name}
+                        secondary={
+                          isHere ? 'Patří sem — přesunout jde jen na jiné službě'
+                            : from !== null ? `Přesune se sem z „${from}“` : undefined
+                        }
+                      />
+                    </MenuItem>
+                  );
+                })}
+              </TextField>
+
+              <TextField
+                select
+                label="Kalendáře"
+                value={pickedCalendars}
+                onChange={(e) => setPickedCalendars(
+                  typeof e.target.value === 'string'
+                    ? e.target.value.split(',')
+                    : (e.target.value as unknown as string[]),
+                )}
+                slotProps={{
+                  select: {
+                    multiple: true,
+                    renderValue: (picked) => (picked as string[])
+                      .map((id) => allCalendars.find((c) => c.id === id)?.name ?? id)
+                      .join(', '),
+                  },
+                }}
+                helperText={
+                  calendarOptions.length === 0
+                    ? 'Zatím žádný kalendář — není co zaškrtnout.'
+                    : 'Kalendář provozuje jednu službu — odškrtnutím ji přestane nabízet.'
+                }
+                fullWidth
+              >
+                {calendarOptions.map((c) => {
+                  const from = movedFrom(allCalendars, c.id, serviceNameOf);
+                  const isHere = c.clinicServiceId === editingId;
+                  return (
+                    <MenuItem key={c.id} value={c.id}>
+                      <Checkbox checked={pickedCalendars.includes(c.id)} />
+                      <ListItemText
+                        primary={c.name}
+                        secondary={
+                          isHere || from === null ? undefined : `Přesune se sem z „${from}“`
+                        }
+                      />
+                    </MenuItem>
+                  );
+                })}
+              </TextField>
+
+              {/*
+                * The one case where leaving this screen is still right: there
+                * is nothing to tick, so something has to be made first. The
+                * service goes with it and the form opens ready for it.
+                *
+                * Only when the picker is empty, and only for a service that
+                * already exists - there is nothing to hand over otherwise, and
+                * navigating away from a half-typed new service would lose it.
+                */}
+              {editing !== null && (activityOptions.length === 0 || calendarOptions.length === 0) && (
+                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                  {activityOptions.length === 0 && (
+                    <Button
+                      size="small"
+                      onClick={() => navigate('/activities', {
+                        state: { clinicServiceId: editing.id },
+                      })}
+                    >
+                      Založit činnost
+                    </Button>
+                  )}
+                  {calendarOptions.length === 0 && (
+                    <Button
+                      size="small"
+                      onClick={() => navigate('/calendars', {
+                        state: { clinicServiceId: editing.id },
+                      })}
+                    >
+                      Založit kalendář
+                    </Button>
+                  )}
+                </Stack>
               )}
-              {save.error ? <Alert severity="error">{errorText(save.error, t)}</Alert> : null}
+
+              {partlyFailed.length > 0 && (
+                <Alert severity="warning">{partialFailureText(partlyFailed)}</Alert>
+              )}
             </Stack>
           )}
         </DialogContent>
