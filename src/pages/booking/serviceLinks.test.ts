@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  linkChanges, movedFrom, nothingToApply, offerable, partialFailureText, under,
+  movedFrom, offerable, partialFailureText, toAttach, under,
 } from './serviceLinks';
 import type { LinkableItem } from './serviceLinks';
 
@@ -65,34 +65,30 @@ describe('what the ticks mean', () => {
     item('c', { clinicServiceId: 's2' }),
   ];
 
-  it('moves in the newly ticked', () => {
-    expect(linkChanges(items, 's1', ['a', 'b'], true))
-      .toEqual({ attach: ['b'], detach: [] });
+  it('writes the newly ticked', () => {
+    expect(toAttach(items, 's1', ['a', 'b'])).toEqual(['b']);
   });
 
-  it('takes away the unticked, where the server allows it', () => {
-    expect(linkChanges(items, 's1', [], true))
-      .toEqual({ attach: [], detach: ['a'] });
+  it('writes nothing for one that is already here', () => {
+    expect(toAttach(items, 's1', ['a'])).toEqual([]);
   });
 
   /*
-   * A činnost must belong to a service, so unticking one has nowhere to put
-   * it. The screen does not offer that, and this does not invent it either -
-   * the two have to agree, or a save would send a `null` the server refuses.
+   * Only ever an addition, for kalendáře as much as for činnosti. Booking put
+   * the same rule on both: one with no service offers nothing on any day and
+   * says nothing about why, so a field that must not be empty gets no road
+   * back to empty. Unticking is not offered and is not computed either - the
+   * screen and this have to agree, or a save would send a null the server
+   * (once caught up) refuses.
    */
-  it('never takes a činnost away, because the server refuses one with no service', () => {
-    expect(linkChanges(items, 's1', [], false))
-      .toEqual({ attach: [], detach: [] });
+  it('never takes anything away, whatever is left unticked', () => {
+    expect(toAttach(items, 's1', [])).toEqual([]);
+    expect(toAttach(items, 's1', ['c'])).toEqual(['c']);
   });
 
-  it('still moves činnosti in', () => {
-    expect(linkChanges(items, 's1', ['a', 'c'], false))
-      .toEqual({ attach: ['c'], detach: [] });
-  });
-
-  it('calls no change no change', () => {
-    expect(nothingToApply(linkChanges(items, 's1', ['a'], true))).toBe(true);
-    expect(nothingToApply(linkChanges(items, 's1', ['a', 'b'], true))).toBe(false);
+  /* Something leaves a service only by being ticked on another one. */
+  it('moves one across from another service', () => {
+    expect(toAttach(items, 's2', ['a'])).toEqual(['a']);
   });
 });
 

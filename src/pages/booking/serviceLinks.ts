@@ -47,33 +47,36 @@ export function offerable(
   return items.filter((i) => i.isActive || i.clinicServiceId === serviceId);
 }
 
-export interface LinkChanges {
-  /** Move these under this service. */
-  attach: string[];
-  /** Take these away from it. Always empty for činnosti - see the note above. */
-  detach: string[];
-}
-
 /**
- * The difference between what is under the service and what was ticked.
+ * Which of the ticked ones have to be written.
  *
- * `canDetach` is the server's rule, passed in rather than guessed: false for
- * činnosti, true for kalendáře. With it false, unticking is simply not a
- * change - the screen does not offer it and this will not invent it either.
+ * Only ever an addition. Neither a činnost nor a kalendář may be left without
+ * a service - booking put the same rule on both, and for the same reason: one
+ * with no service offers nothing on any day and says nothing about why. A
+ * field that must not be empty must not have a road back to empty either, or
+ * the rule holds only until the next save.
+ *
+ * So a row already under this service cannot be unticked, and the only way
+ * something leaves is by being ticked on another service. That is also what
+ * anybody actually wants - "move it to Diagnostika", never "leave it with
+ * nothing".
+ *
+ * Measured on the live contract on 14. 9. 2026, because the running API is
+ * behind the code and still allows the empty state:
+ *
+ *     SaveCalendar.required          [name, color, location, displayStep, sortOrder]
+ *     SaveCalendar.clinicServiceId   ['null','string']
+ *
+ * When `clinicServiceId` appears in `required` and stops accepting null, the
+ * server has caught up with the rule this screen already follows.
  */
-export function linkChanges(
+export function toAttach(
   items: readonly LinkableItem[],
   serviceId: string,
   chosen: readonly string[],
-  canDetach: boolean,
-): LinkChanges {
+): string[] {
   const now = new Set(under(items, serviceId));
-  const wanted = new Set(chosen);
-
-  const attach = [...wanted].filter((id) => !now.has(id));
-  const detach = canDetach ? [...now].filter((id) => !wanted.has(id)) : [];
-
-  return { attach, detach };
+  return chosen.filter((id) => !now.has(id));
 }
 
 /**
@@ -93,11 +96,6 @@ export function movedFrom(
   if (item === undefined) return null;
   if (item.clinicServiceId === null) return null;
   return serviceNameOf(item.clinicServiceId);
-}
-
-/** Nothing ticked and nothing unticked is a save with no links to write. */
-export function nothingToApply(changes: LinkChanges): boolean {
-  return changes.attach.length === 0 && changes.detach.length === 0;
 }
 
 /**

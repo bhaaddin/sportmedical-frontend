@@ -197,16 +197,44 @@ describe('ticking what belongs under the service', () => {
     });
   });
 
-  /* A calendar's service is nullable, so taking it away is a real action. */
-  it('takes the service off an unticked calendar', async () => {
+  /*
+   * A calendar's service cannot be taken away either.
+   *
+   * Booking answered this directly when asked: a calendar with no service
+   * offers nothing on any day and says nothing about why, so a field that must
+   * not be empty gets no road back to empty - otherwise the rule holds only
+   * until the next save. The running API still accepts a null here
+   * (`SaveCalendar.clinicServiceId` is `['null','string']` and not in
+   * `required`, measured 14. 9. 2026); the screen does not offer it anyway,
+   * because that is where the server is going and the state was never useful.
+   */
+  it('will not let a calendar be freed, and says why', async () => {
     listCalendars.mockResolvedValue([cal({ clinicServiceId: 's1' })]);
     await openTheService();
+
+    await userEvent.click(screen.getByLabelText(/Kalendáře/));
+    const listbox = await screen.findByRole('listbox');
+    const row = within(listbox).getByRole('option', { name: /Ordinace/ });
+
+    expect(row).toHaveAttribute('aria-disabled', 'true');
+    expect(row).toHaveTextContent(/přepnout jde jen na jiné službě/i);
+  });
+
+  /* It leaves only by being ticked on another service. */
+  it('moves a calendar across from another service', async () => {
+    listClinicServices.mockResolvedValue([svc(), svc({ id: 's2', name: 'Sportovní diagnostika' })]);
+    listCalendars.mockResolvedValue([cal({ clinicServiceId: 's2' })]);
+    show();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Upravit službu Sportovní lékařské prohlídky/i }),
+    );
+    await screen.findByLabelText(/Název/);
 
     await pick(/Kalendáře/, 'Ordinace');
     await userEvent.click(screen.getByRole('button', { name: /Uložit/i }));
 
     await waitFor(() => expect(updateCalendar).toHaveBeenCalled());
-    expect(updateCalendar.mock.calls[0][1]).toMatchObject({ clinicServiceId: null });
+    expect(updateCalendar.mock.calls[0][1]).toMatchObject({ clinicServiceId: 's1' });
   });
 
   /*

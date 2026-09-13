@@ -39,7 +39,7 @@ import {
   SERVICE_GAP_TEXT, countsText, deletionWillBeRefused, serviceGap,
 } from './clinicServiceState';
 import {
-  linkChanges, movedFrom, offerable, partialFailureText, under,
+  movedFrom, offerable, partialFailureText, toAttach, under,
 } from './serviceLinks';
 
 const emptyDraft = (sortOrder: number): ClinicServiceInput => ({
@@ -119,12 +119,12 @@ export default function ClinicServicesPage() {
    * named.
    */
   const applyLinks = async (serviceId: string): Promise<string[]> => {
-    const activityMoves = linkChanges(allActivities, serviceId, pickedActivities, false);
-    const calendarMoves = linkChanges(allCalendars, serviceId, pickedCalendars, true);
+    const activityMoves = toAttach(allActivities, serviceId, pickedActivities);
+    const calendarMoves = toAttach(allCalendars, serviceId, pickedCalendars);
 
     const writes: { name: string; run: () => Promise<unknown> }[] = [];
 
-    for (const id of activityMoves.attach) {
+    for (const id of activityMoves) {
       const a = allActivities.find((x) => x.id === id);
       if (a === undefined) continue;
       writes.push({
@@ -142,10 +142,9 @@ export default function ClinicServicesPage() {
       });
     }
 
-    for (const id of [...calendarMoves.attach, ...calendarMoves.detach]) {
+    for (const id of calendarMoves) {
       const c = allCalendars.find((x) => x.id === id);
       if (c === undefined) continue;
-      const goesTo = calendarMoves.attach.includes(id) ? serviceId : null;
       writes.push({
         name: c.name,
         run: () => calendarsApi.update(c.id, {
@@ -155,7 +154,7 @@ export default function ClinicServicesPage() {
           displayStepMinutes: c.displayStepMinutes,
           isActive: c.isActive,
           sortOrder: c.sortOrder,
-          clinicServiceId: goesTo,
+          clinicServiceId: serviceId,
           publicMinimumNoticeMinutes: c.publicMinimumNoticeMinutes,
           publicHorizonDays: c.publicHorizonDays,
         }),
@@ -449,7 +448,7 @@ export default function ClinicServicesPage() {
                 helperText={
                   calendarOptions.length === 0
                     ? 'Zatím žádný kalendář — není co zaškrtnout.'
-                    : 'Kalendář provozuje jednu službu — odškrtnutím ji přestane nabízet.'
+                    : 'Kalendář provozuje jednu službu — zaškrtnutím se sem přepne.'
                 }
                 fullWidth
               >
@@ -457,12 +456,17 @@ export default function ClinicServicesPage() {
                   const from = movedFrom(allCalendars, c.id, serviceNameOf);
                   const isHere = c.clinicServiceId === editingId;
                   return (
-                    <MenuItem key={c.id} value={c.id}>
+                    /* Cannot be unticked, same as a činnost. A calendar with
+                       no service offers nothing on any day and says nothing
+                       about why, so there is no road back to empty - it
+                       leaves only by being ticked on another service. */
+                    <MenuItem key={c.id} value={c.id} disabled={isHere}>
                       <Checkbox checked={pickedCalendars.includes(c.id)} />
                       <ListItemText
                         primary={c.name}
                         secondary={
-                          isHere || from === null ? undefined : `Přesune se sem z „${from}“`
+                          isHere ? 'Provozuje tuhle službu — přepnout jde jen na jiné službě'
+                            : from !== null ? `Přesune se sem z „${from}“` : undefined
                         }
                       />
                     </MenuItem>
