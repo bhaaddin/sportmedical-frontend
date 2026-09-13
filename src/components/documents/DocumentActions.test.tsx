@@ -26,11 +26,15 @@ vi.mock('../../api/documents', async () => {
 });
 vi.mock('../../api/patients', () => ({ patientsApi: { getAll } }));
 
+import type { PatientDocument } from '../../api/documents';
+
 const { default: DocumentActions, lastOfItsKind } = await import('./DocumentActions');
 
 const VYPIS = 'tmpl-vypis';
 
-const doc = (over: Record<string, unknown> = {}) =>
+/* Typed as the real thing so a field the server adds cannot be forgotten here
+   without the compiler noticing. */
+const doc = (over: Partial<PatientDocument> = {}): PatientDocument =>
   ({
     id: 'd1',
     patientId: 'p1',
@@ -62,7 +66,7 @@ const doc = (over: Record<string, unknown> = {}) =>
     invalidatedByUserId: null,
     invalidatedAtUtc: null,
     ...over,
-  }) as Parameters<typeof lastOfItsKind>[0];
+  }) as PatientDocument;
 
 beforeEach(() => {
   content.mockReset().mockResolvedValue('blob:fake');
@@ -76,7 +80,7 @@ beforeEach(() => {
   globalThis.URL.revokeObjectURL = vi.fn();
 });
 
-const renderActions = (over: Record<string, unknown> = {}, all?: ReturnType<typeof doc>[]) => {
+const renderActions = (over: Partial<PatientDocument> = {}, all?: PatientDocument[]) => {
   const d = doc(over);
   const onChanged = vi.fn();
   render(
