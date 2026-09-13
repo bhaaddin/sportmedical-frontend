@@ -20,6 +20,7 @@ import { documentsApi, DOCUMENT_SATISFIES_REQUIREMENT } from '../api/documents';
 import MedicalReports from '../components/documents/MedicalReports';
 import UploadDocumentDialog from '../components/documents/UploadDocumentDialog';
 import ConsentLine from '../components/patients/ConsentLine';
+import DocumentActions from '../components/documents/DocumentActions';
 import type { PatientDocument, DocumentTemplate } from '../api/documents';
 
 /* ── Helpers ── */
@@ -458,6 +459,10 @@ export default function PatientDetails() {
                 <Divider sx={{ mb: 2 }} />
                 {requiredDocs.map(rd => {
                   const hasDoc = hasRequiredDoc(rd.id);
+                  /* The one on file, so it can be opened or corrected. */
+                  const filedDoc = docs.find(
+                    (d) => d.templateId === rd.id && d.status === DOCUMENT_SATISFIES_REQUIREMENT,
+                  );
                   return (
                     <Box key={rd.id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, borderBottom: '1px solid #f5f5f5' }}>
                       <Box>
@@ -497,6 +502,17 @@ export default function PatientDetails() {
                         >
                           {hasDoc ? 'Nahradit' : 'Nahrát'}
                         </Button>
+                        {/* Open it, move it, strike it out. Opening was
+                            impossible at any level until the server grew a way
+                            to read a stored file. */}
+                        {filedDoc !== undefined && (
+                          <DocumentActions
+                            document={filedDoc}
+                            patientDocuments={docs}
+                            patientName={patient.firstName}
+                            onChanged={reloadDocuments}
+                          />
+                        )}
                       </Box>
                     </Box>
                   );
@@ -521,6 +537,7 @@ export default function PatientDetails() {
           >
             <MedicalReports
               documents={docs}
+              patientName={patient.firstName}
               onChanged={reloadDocuments}
               onAdd={() => setUploadTemplate('report')}
             />

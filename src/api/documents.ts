@@ -20,6 +20,34 @@ export interface DocumentTemplate {
  */
 export type DocumentSource = 'Staff' | 'Patient';
 
+/*
+ * Why a document was struck out. A fixed list, and the server refuses anything
+ * else with a 400.
+ *
+ * "Belongs to another patient" is deliberately absent. It is the first thing
+ * anybody would reach for, and the one case where invalidating is the wrong
+ * answer: the document is fine, it is filed in the wrong place, and the fix is
+ * to move it. Leaving it off the list pushes people to the move.
+ */
+export const INVALIDATION_REASONS = [
+  'unreadable',
+  'wrong_document',
+  'outdated',
+  'duplicate',
+  'other',
+] as const;
+
+export type InvalidationReason = (typeof INVALIDATION_REASONS)[number];
+
+/** Said the way somebody at a desk would say it. */
+export const INVALIDATION_REASON_LABEL: Record<InvalidationReason, string> = {
+  unreadable: 'Nečitelné',
+  wrong_document: 'Špatný dokument',
+  outdated: 'Zastaralé',
+  duplicate: 'Duplicitní',
+  other: 'Jiný důvod',
+};
+
 export type DocumentStatus =
   | 'Pending'
   | 'SignedOff'
@@ -87,6 +115,27 @@ export interface PatientDocument {
   specialtySuggestedByPatient: string | null;
   /** The date on the report, not the date it was uploaded. Date only, no zone. */
   reportDate: string | null;
+
+  /*
+   * Where this document came from, if it was filed under the wrong patient
+   * and moved. Kept for the history, deliberately not drawn on the old
+   * patient's card - a row there would still be one patient's card talking
+   * about somebody else.
+   */
+  movedFromPatientId: string | null;
+  movedByUserId: string | null;
+  movedAtUtc: string | null;
+
+  /*
+   * Why this document no longer counts. `Invalidated` is not a separate
+   * status: an invalidated document stops being `SignedOff`, which is what
+   * the readiness rules count, so it falls out of them without any further
+   * arrangement.
+   */
+  invalidationReasonCode: InvalidationReason | null;
+  invalidationNote: string | null;
+  invalidatedByUserId: string | null;
+  invalidatedAtUtc: string | null;
   appointmentId?: string;
   notes: string;
 }
@@ -216,6 +265,50 @@ export const documentsApi = {
   specialties: async (q: string, take = 10): Promise<Specialty[]> => {
     const res = await client.get('/api/documents/specialties', { params: { q, take } });
     return res.data?.value ?? res.data ?? [];
+  },
+
+  /**
+   * The file itself, as a blob URL the browser can show.
+   *
+   * Fetched rather than linked: the endpoint needs the bearer token, and an
+   * `<a href>` or an `<iframe src>` carries no headers. The server sends
+   * `Content-Disposition: inline`, so a PDF or a photograph opens instead of
+   * downloading.
+   *
+   * The caller owns the URL it gets back and must revoke it - an object URL
+   * pins its blob in memory until it does, and these are scans.
+   */
+  content: async (documentId: string): Promise<string> => {
+    const res = await client.get(`/api/documents/${documentId}/content`, {
+      responseType: 'blob',
+    });
+    return URL.createObjectURL(res.data as Blob);
+  },
+
+  /**
+   * File this document under a different patient.
+   *
+   * The readiness rules follow it: a výpis moved away stops counting for the
+   * patient it left, which is correct and is why the screen warns first.
+   */
+  move: async (documentId: string, toPatientId: string): Promise<PatientDocument> => {
+    const res = await client.post(
+      `/api/documents/${documentId}/move?toPatientId=${toPatientId}`,
+    );
+    return res.data?.value ?? res.data;
+  },
+
+  /** Strike a document out, with a reason from the fixed list. */
+  invalidate: async (
+    documentId: string,
+    reasonCode: InvalidationReason,
+    note: string,
+  ): Promise<PatientDocument> => {
+    const res = await client.post(`/api/documents/${documentId}/invalidate`, {
+      reasonCode,
+      note,
+    });
+    return res.data?.value ?? res.data;
   },
 };
 

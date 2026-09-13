@@ -26,12 +26,14 @@ import {
   Add, Edit, MedicalInformation, PersonOutlined, Check, Close, Badge as BadgeIcon,
 } from '@mui/icons-material';
 import SpecialtyPicker, { type SpecialtyValue } from './SpecialtyPicker';
-import { documentsApi } from '../../api/documents';
+import { documentsApi, INVALIDATION_REASON_LABEL } from '../../api/documents';
 import type { PatientDocument } from '../../api/documents';
+import DocumentActions from './DocumentActions';
 import { formatDateOnly } from '../../utils/time';
 
 export interface MedicalReportsProps {
   documents: PatientDocument[];
+  patientName: string;
   onChanged: () => void;
   onAdd: () => void;
 }
@@ -78,7 +80,7 @@ export function specialtyLabel(doc: PatientDocument): string {
 }
 
 export default function MedicalReports({
-  documents, onChanged, onAdd,
+  documents, patientName, onChanged, onAdd,
 }: MedicalReportsProps) {
   const [editing, setEditing] = useState<PatientDocument | null>(null);
   const [draft, setDraft] = useState<SpecialtyValue>({ specialtyCode: null, specialtyOther: null });
@@ -199,10 +201,32 @@ export default function MedicalReports({
                         <Chip size="small" variant="outlined" icon={<BadgeIcon />} label="Zkontrolováno" />
                       </Tooltip>
                     )}
+                    {/* Struck out: kept on the card, no longer counted, and
+                        saying why rather than simply vanishing. */}
+                    {doc.invalidatedAtUtc !== null && (
+                      <Tooltip title={doc.invalidationNote ?? ''}>
+                        <Chip
+                          size="small"
+                          color="default"
+                          variant="outlined"
+                          label={`Zneplatněno — ${
+                            doc.invalidationReasonCode === null
+                              ? 'bez důvodu'
+                              : INVALIDATION_REASON_LABEL[doc.invalidationReasonCode]
+                          }`}
+                        />
+                      </Tooltip>
+                    )}
                     <Box sx={{ flex: 1 }} />
                     <IconButton size="small" onClick={() => openEdit(doc)} aria-label="Změnit obor">
                       <Edit fontSize="small" />
                     </IconButton>
+                    <DocumentActions
+                      document={doc}
+                      patientDocuments={documents}
+                      patientName={patientName}
+                      onChanged={onChanged}
+                    />
                   </Stack>
 
                   {waiting && (

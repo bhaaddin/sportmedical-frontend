@@ -50,6 +50,13 @@ const doc = (over: Partial<Doc> = {}): Doc =>
     reviewedAtUtc: null,
     specialtyCode: '107',
     specialtyName: 'Kardiologie',
+    movedFromPatientId: null,
+    movedByUserId: null,
+    movedAtUtc: null,
+    invalidationReasonCode: null,
+    invalidationNote: null,
+    invalidatedByUserId: null,
+    invalidatedAtUtc: null,
     specialtyOther: null,
     specialtySuggestedByPatient: null,
     reportDate: '2026-03-01',
@@ -63,7 +70,7 @@ beforeEach(() => {
 });
 
 const renderList = (documents: Doc[], onChanged = vi.fn()) => {
-  render(<MedicalReports documents={documents} onChanged={onChanged} onAdd={vi.fn()} />);
+  render(<MedicalReports documents={documents} patientName="Anna" onChanged={onChanged} onAdd={vi.fn()} />);
   return onChanged;
 };
 
@@ -118,7 +125,7 @@ describe('the order they are shown in', () => {
   it('draws no date chip at all when the server never sent one', () => {
     const withoutDate = { ...doc(), reportDate: undefined } as unknown as Doc;
     const { container } = render(
-      <MedicalReports documents={[withoutDate]} onChanged={vi.fn()} onAdd={vi.fn()} />,
+      <MedicalReports documents={[withoutDate]} patientName="Anna" onChanged={vi.fn()} onAdd={vi.fn()} />,
     );
 
     expect(screen.getByText('Kardiologie')).toBeInTheDocument();
