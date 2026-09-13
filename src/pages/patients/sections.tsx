@@ -9,7 +9,7 @@
  * page into the main bundle and undo its lazy loading. The same shape caught
  * `auth/roles` earlier today.
  */
-import { Dashboard, Description } from '@mui/icons-material';
+import { Dashboard, Description, Event } from '@mui/icons-material';
 
 export interface PatientSection {
   id: string;
@@ -22,6 +22,7 @@ export interface PatientSection {
 export const PATIENT_SECTIONS: PatientSection[] = [
   { id: 'prehled', label: 'Přehled', path: '', icon: <Dashboard /> },
   { id: 'dokumenty', label: 'Dokumenty', path: 'dokumenty', icon: <Description /> },
+  { id: 'terminy', label: 'Termíny', path: 'terminy', icon: <Event /> },
 ];
 
 /** Where a section lives for a given patient. */

@@ -29,6 +29,7 @@ const PatientList = lazy(() => import('./pages/PatientList'));
 const PatientDetails = lazy(() => import('./pages/PatientDetails'));
 const PatientLayout = lazy(() => import('./pages/patients/PatientLayout'));
 const PatientDocumentsPage = lazy(() => import('./pages/patients/PatientDocumentsPage'));
+const PatientAppointmentsPage = lazy(() => import('./pages/patients/PatientAppointmentsPage'));
 const Reports = lazy(() => import('./pages/Reports'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
 const CalendarMovedPage = lazy(() => import('./pages/CalendarMoved'));
@@ -429,6 +430,7 @@ export default function App() {
                     <Route path="/patients/:id" element={<PatientLayout />}>
                       <Route index element={<PatientDetails />} />
                       <Route path="dokumenty" element={<PatientDocumentsPage />} />
+                      <Route path="terminy" element={<PatientAppointmentsPage />} />
                     </Route>
                     <Route path="/measurements" element={<MeasurementsPage />} />
                     <Route path="/diagnostics/new" element={<DiagnosticForm />} />
