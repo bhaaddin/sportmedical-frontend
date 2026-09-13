@@ -84,8 +84,16 @@ describe('what is still missing', () => {
     ]);
   });
 
-  /* The case that was broken: uploaded, signed, and still warning. */
-  it('is satisfied by a document that is signed off', () => {
+  /*
+   * The case that was broken: uploaded, signed, and still warning.
+   *
+   * The same template is asked about twice on purpose. "Nothing missing" is
+   * also what a `missingRequired` that always returned `[]` would say, and
+   * that is the same warning going permanently quiet - the other half of the
+   * same bug, and the half nobody notices.
+   */
+  it('is satisfied by a document that is signed off, and only then', () => {
+    expect(missingRequired([template()], [])).toHaveLength(1);
     expect(missingRequired([template()], [doc('SignedOff')])).toHaveLength(0);
   });
 

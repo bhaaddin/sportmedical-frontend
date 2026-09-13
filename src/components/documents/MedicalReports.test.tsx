@@ -210,8 +210,12 @@ describe('reviewing what a patient sent', () => {
 
   /* A document the staff carried in has nothing to decide - the owner's point
      exactly: he can see what he is uploading. */
+  /* The document is looked for first: "no accept button" is equally true of a
+     list that drew nothing, and a staff report missing from the list is the
+     worse fault of the two. */
   it('asks nothing about a document the staff uploaded', () => {
-    renderList([doc({ source: 'Staff', status: 'SignedOff' })]);
+    renderList([doc({ source: 'Staff', status: 'SignedOff', specialtyOther: 'Ortopedie' })]);
+    expect(screen.getByText('Ortopedie')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Přijmout' })).not.toBeInTheDocument();
   });
 

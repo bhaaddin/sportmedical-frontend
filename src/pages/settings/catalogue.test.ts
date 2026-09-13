@@ -217,7 +217,13 @@ describe('the sidebar and the settings do not overlap', () => {
   });
 
   it('offers no settings screen from the sidebar as well', () => {
-    const both = allDestinations().filter((to) => sidebarPaths.includes(to));
+    const destinations = allDestinations();
+    /* Both sides asserted to exist first. An empty catalogue overlaps nothing
+       either, and this is the test somebody would be handed as the proof. */
+    expect(destinations.length).toBeGreaterThan(5);
+    expect(destinations).toContain('/cenik');
+
+    const both = destinations.filter((to) => sidebarPaths.includes(to));
     expect(both, `v liště i v nastavení: ${both.join(', ')}`).toEqual([]);
   });
 
