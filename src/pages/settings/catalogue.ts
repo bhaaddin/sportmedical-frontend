@@ -49,7 +49,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'provoz',
     label: 'Kalendáře a provoz',
-    description: 'Kdy se pracuje, co se dělá a kdo co vidí',
+    description: 'Kdy se pracuje, co se dělá, co to stojí a kdo co vidí',
     items: [
       {
         id: 'kalendare',
@@ -64,6 +64,19 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         description: 'Co se v ordinaci dělá a jak dlouho to trvá',
         to: '/activities',
         adminOnly: true,
+      },
+      {
+        /*
+         * Beside Činnosti, not off in Ordinace where this first went. An
+         * činnost carries a `serviceItemId` pointing at a row of this list and
+         * takes its price from it; splitting the two across sections split one
+         * thing in half. The owner went looking for the price list next to the
+         * činnosti, which is exactly where it belongs.
+         */
+        id: 'cenik',
+        label: 'Ceník služeb',
+        description: 'Ceny a délky výkonů — odsud si činnost bere svou cenu',
+        to: '/cenik',
       },
       {
         id: 'pracovni-doba',
@@ -124,17 +137,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         description: 'Název, adresa, telefon a co se ukazuje pacientům',
         to: '/admin',
         adminOnly: true,
-      },
-      {
-        /*
-         * Real, full, and unreachable until now: eight services with prices,
-         * durations and categories, and no way into it but typing the address.
-         * The owner asked where the price list was; the answer was nowhere.
-         */
-        id: 'cenik',
-        label: 'Ceník služeb',
-        description: 'Co ordinace nabízí, jak dlouho to trvá a kolik to stojí',
-        to: '/cenik',
       },
     ],
   },

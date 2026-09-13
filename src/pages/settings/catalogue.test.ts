@@ -143,3 +143,40 @@ describe('finding the way back', () => {
     expect(settingsItemAt('/cenikovy-prehled')).toBeNull();
   });
 });
+
+/*
+ * The price list and the činnosti, kept together.
+ *
+ * The price list first went into "Ordinace", on the reasoning that what the
+ * practice charges is a fact about the practice. That reasoning ignored how
+ * the two are actually wired: an činnost carries a `serviceItemId` pointing at
+ * a row of the price list and takes its price from it. They are two halves of
+ * one thing, and the owner went looking for the price list beside the
+ * činnosti - where it was not - and could not find it.
+ */
+describe('the price list and the činnosti', () => {
+  const sectionOf = (id: string) =>
+    SETTINGS_SECTIONS.find((s) => s.items.some((i) => i.id === id));
+
+  it('live in the same section', () => {
+    expect(sectionOf('cenik')?.id).toBe(sectionOf('cinnosti')?.id);
+  });
+
+  /* Next to each other, not at opposite ends of a seven-row list. */
+  it('sit next to each other in it', () => {
+    const items = sectionOf('cinnosti')?.items ?? [];
+    const gap = Math.abs(
+      items.findIndex((i) => i.id === 'cenik') - items.findIndex((i) => i.id === 'cinnosti'),
+    );
+    expect(gap).toBe(1);
+  });
+
+  /* A receptionist may not open Činnosti, so the price list must not be the
+     row that drags an otherwise empty section onto her screen - nor vanish
+     from his. Both are admin-visible; only the price list is open to all. */
+  it('is offered to a receptionist even though činnosti are not', () => {
+    const plain = visibleSections(false).flatMap((s) => s.items.map((i) => i.id));
+    expect(plain).toContain('cenik');
+    expect(plain).not.toContain('cinnosti');
+  });
+});
