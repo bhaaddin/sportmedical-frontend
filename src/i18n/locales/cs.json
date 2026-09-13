@@ -269,11 +269,12 @@
     },
     "dayActivities": {
       "title": "Činnosti podle dnů",
-      "subtitle": "Co se v tomto období dělá který den. Uložení nahradí celou mřížku. Když není zaškrtnuto nic nikde, nabízí se všechny činnosti; jakmile je zaškrtnuto někde, den bez zaškrtnutí nenabídne nic.",
+      "subtitle": "Co se v tomto období dělá který den. Na co tu není zaškrtnuto, na to se ten den nedá objednat. Uložení nahradí celou mřížku.",
       "noActivities": "Nejprve založte činnost — bez činnosti se do kalendáře nedá objednat.",
       "offersNothing": "má pracovní dobu, ale žádnou činnost — nenabídne nic",
       "notWorking": "nepracovní den",
-      "cellLabel": "{{activity}} v {{day}}"
+      "cellLabel": "{{activity}} v {{day}}",
+      "nothingAnywhere": "V tomhle období není zaškrtnutá žádná činnost, takže se na tenhle kalendář nedá objednat nic — ani v dny, kdy se pracuje. Zaškrtněte, co se který den dělá, a uložte."
     },
     "status": {
       "Scheduled": "Objednán",

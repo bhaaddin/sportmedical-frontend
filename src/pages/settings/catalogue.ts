@@ -68,7 +68,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       {
         id: 'pracovni-doba',
         label: 'Pracovní doba',
-        description: 'Hodiny podle dnů, obědová pauza, kdo slouží',
+        description: 'Hodiny podle dnů, obědová pauza, kdo slouží a co se který den dělá',
         to: '/working-hours',
         adminOnly: true,
       },

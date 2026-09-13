@@ -13,6 +13,7 @@ import type { ActivityWarning, DayActivityRow } from '../../api/bookingContracts
 import { AsyncSection } from './AsyncSection';
 import { errorText } from './errorText';
 import { readableTextOn } from '../../utils/calendarPalette';
+import { offersNothingAtAll, offersNothingOn } from './dayActivityRule';
 
 /**
  * Which activity is done on which day - contract screen 5.7.
@@ -123,6 +124,17 @@ export function DayActivityGrid({ calendarId, periodId, workingDays }: DayActivi
         {t('booking.dayActivities.subtitle')}
       </Typography>
 
+      {/*
+        * Said once, loudly, because it is a different fact from "Tuesday is
+        * empty": an untouched grid means this calendar cannot be booked at
+        * all, on any day, and the booking screen gives no hint why.
+        */}
+      {offersNothingAtAll(grid, workingDays) ? (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          {t('booking.dayActivities.nothingAnywhere')}
+        </Alert>
+      ) : null}
+
       {warnings.map((warning) => (
         <Alert
           key={warning.code}
@@ -177,16 +189,7 @@ export function DayActivityGrid({ calendarId, periodId, workingDays }: DayActivi
                 const works = workingDays.has(dayOfWeek);
                 // Unsaved state is the client's to mark; the saved state is the
                 // server's, and it names the day in the warning context (3.1).
-                /*
-                 * "Working hours but nothing offered" is true in one of three
-                 * cases only. `OfferedOn` reads the period as a whole: with no
-                 * choices anywhere, every activity is offered; with choices
-                 * somewhere, a day without them offers nothing; a day with them
-                 * offers exactly those. Warning on the first case would say a
-                 * day offers nothing when it in fact offers everything.
-                 */
-                const anyDayChosen = [...grid.values()].some((ids) => ids.size > 0);
-                const bookableNothing = works && anyDayChosen && forDay.size === 0;
+                const bookableNothing = offersNothingOn(dayOfWeek, grid, workingDays);
                 const flaggedByServer = edited === null && flaggedDays.has(dayOfWeek);
                 return (
                   <TableRow key={dayOfWeek} hover>
