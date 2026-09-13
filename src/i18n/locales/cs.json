@@ -155,7 +155,11 @@
         "state": "Stav",
         "color": "Barva",
         "order": "Pořadí"
-      }
+      },
+      "deactivateAction": "Zneaktivnit — nové objednání už nepůjde",
+      "activateAction": "Znovu aktivovat",
+      "showInactive": "Zobrazit neaktivní ({{count}})",
+      "deleteWarning": "Smazání je trvalé. Zmizí i období, pracovní doba, činnosti podle dnů, výjimky, blokovaný čas a přístupy. Pokud kalendář jen dosloužil, zneaktivněte jej — objednané termíny zůstanou."
     },
     "access": {
       "title": "Kdo vidí kalendář „{{name}}“",

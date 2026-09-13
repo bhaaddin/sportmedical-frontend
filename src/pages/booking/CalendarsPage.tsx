@@ -23,11 +23,14 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import EditIcon from "@mui/icons-material/Edit";
 import GroupIcon from "@mui/icons-material/Group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { calendarsApi } from "../../api/calendars";
+import { hiddenCount, offerDeactivateInstead, visibleCalendars } from "./calendarLifecycle";
 import type { Calendar, CalendarInput } from "../../api/bookingContracts";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { errorText } from "../../components/booking/errorText";
@@ -64,6 +67,12 @@ export default function CalendarsPage() {
   const [draft, setDraft] = useState<CalendarInput | null>(null);
   const [accessFor, setAccessFor] = useState<Calendar | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Calendar | null>(null);
+  /*
+   * Hidden by default. The owner's complaint is a crowded screen, and the
+   * answer to a crowded screen is to hide what is finished with, not to
+   * delete it - deleting takes the appointments with it. Contract v37, 4.1.
+   */
+  const [showInactive, setShowInactive] = useState(false);
 
   const calendarsQuery = useQuery({
     queryKey: ["calendars"],
@@ -71,13 +80,15 @@ export default function CalendarsPage() {
     staleTime: CODEBOOK_STALE_MS,
   });
 
-  const calendars = useMemo(
+  const allCalendars = useMemo(
     () =>
       [...(calendarsQuery.data ?? [])].sort(
         (a, b) => a.sortOrder - b.sortOrder,
       ),
     [calendarsQuery.data],
   );
+  const hidden = hiddenCount(allCalendars);
+  const calendars = visibleCalendars(allCalendars, showInactive);
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["calendars"] });
@@ -105,6 +116,18 @@ export default function CalendarsPage() {
       await invalidate();
       setConfirmDelete(null);
     },
+  });
+
+  /*
+   * Its own button, not a switch inside the edit form. Deactivating is an act
+   * with a consequence somebody should mean - no new bookings from that moment
+   * - and it used to share a button with deleting, which is what the owner
+   * objected to: "neaktívny je keď ho zneaktívnim, a nie keď ho odstránim".
+   */
+  const setActive = useMutation({
+    mutationFn: ({ id, active }: { id: string; active: boolean }) =>
+      active ? calendarsApi.activate(id) : calendarsApi.deactivate(id),
+    onSuccess: invalidate,
   });
 
   const openCreate = () => {
@@ -156,13 +179,29 @@ export default function CalendarsPage() {
             {t("booking.calendars.subtitle")}
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={openCreate}
-        >
-          {t("booking.calendars.new")}
-        </Button>
+        <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+          {/* Offered only when something is hidden. A switch that never
+              changes anything is furniture, and it would sit here forever on
+              a clinic that never deactivates a calendar. */}
+          {hidden > 0 ? (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showInactive}
+                  onChange={(e) => setShowInactive(e.target.checked)}
+                />
+              }
+              label={t("booking.calendars.showInactive", { count: hidden })}
+            />
+          ) : null}
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={openCreate}
+          >
+            {t("booking.calendars.new")}
+          </Button>
+        </Stack>
       </Box>
 
       <AsyncSection
@@ -249,9 +288,37 @@ export default function CalendarsPage() {
                         <EditIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
+                    <Tooltip
+                      title={
+                        calendar.isActive
+                          ? t("booking.calendars.deactivateAction")
+                          : t("booking.calendars.activateAction")
+                      }
+                    >
+                      <IconButton
+                        aria-label={`${
+                          calendar.isActive
+                            ? t("booking.calendars.deactivateAction")
+                            : t("booking.calendars.activateAction")
+                        } — ${calendar.name}`}
+                        disabled={setActive.isPending}
+                        onClick={() =>
+                          setActive.mutate({
+                            id: calendar.id,
+                            active: !calendar.isActive,
+                          })
+                        }
+                      >
+                        {calendar.isActive ? (
+                          <VisibilityOffIcon fontSize="small" />
+                        ) : (
+                          <PlayArrowIcon fontSize="small" />
+                        )}
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title={t("booking.common.delete")}>
                       <IconButton
-                        aria-label={t("booking.common.delete")}
+                        aria-label={`${t("booking.common.delete")} — ${calendar.name}`}
                         onClick={() => setConfirmDelete(calendar)}
                       >
                         <DeleteIcon fontSize="small" />
@@ -323,17 +390,14 @@ export default function CalendarsPage() {
                   setDraft({ ...draft, sortOrder: Number(e.target.value) || 0 })
                 }
               />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={draft.isActive}
-                    onChange={(e) =>
-                      setDraft({ ...draft, isActive: e.target.checked })
-                    }
-                  />
-                }
-                label={t("booking.calendars.active")}
-              />
+              {/*
+                * The active switch used to live here, saving through `PUT`.
+                * Activating and deactivating have their own routes now
+                * (4.1, changes 87 and 88) and their own button in the list,
+                * so a switch here would be a second way to do one thing
+                * through a different door. The `PUT` still carries the
+                * calendar's current `isActive` untouched.
+                */}
               {save.error ? (
                 <Alert severity="error">{errorText(save.error, t)}</Alert>
               ) : null}
@@ -363,8 +427,20 @@ export default function CalendarsPage() {
               name: confirmDelete?.name ?? "",
             })}
           </Typography>
+          {/* It really deletes now - periods, hours, day activities,
+              exceptions, blocks and access go with it. Saying so is the
+              difference between this and the button it used to be. */}
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            {t("booking.calendars.deleteWarning")}
+          </Alert>
           {remove.error ? (
             <Alert severity="error" sx={{ mt: 2 }}>
+              {/*
+                * Shown as it arrived. A 409 here carries the count - "obsahuje
+                * 12 termínů" - and the count is the whole message: without it
+                * nobody knows whether this is a calendar with one stray
+                * appointment or a year of work.
+                */}
               {errorText(remove.error, t)}
             </Alert>
           ) : null}
@@ -373,6 +449,23 @@ export default function CalendarsPage() {
           <Button onClick={() => setConfirmDelete(null)}>
             {t("booking.common.cancel")}
           </Button>
+          {/* The way the server's own message points. Offered only once it
+              has refused, so it is an answer to what just happened rather
+              than a second button to weigh up front. */}
+          {offerDeactivateInstead(confirmDelete, remove.error !== null) ? (
+            <Button
+              variant="outlined"
+              disabled={setActive.isPending}
+              onClick={() => {
+                setActive.mutate(
+                  { id: confirmDelete.id, active: false },
+                  { onSuccess: () => setConfirmDelete(null) },
+                );
+              }}
+            >
+              {t("booking.calendars.deactivateAction")}
+            </Button>
+          ) : null}
           <Button
             color="error"
             variant="contained"

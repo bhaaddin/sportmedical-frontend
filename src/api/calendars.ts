@@ -46,9 +46,32 @@ export const calendarsApi = {
       return parseResponse(calendarSchema, res.data);
     }),
 
+  /*
+   * Contract v37, 4.1 changes 87 and 88. `DELETE` used to deactivate; since
+   * 13. 9. 2026 it deletes, and the two became different buttons because the
+   * owner said they were different things: "neaktívny je keď ho zneaktívnim,
+   * a nie keď ho odstránim".
+   *
+   * `409` is the interesting answer, not a failure: the calendar carried
+   * appointments or partner orders, and the server's message says how many.
+   * That message is shown as it arrives - `apiError.ts` keeps a 409's own text
+   * - because "nelze smazat" without the number leaves nobody knowing what to
+   * do next.
+   */
   remove: (id: string): Promise<void> =>
     request(async () => {
       await client.delete(`/api/calendars/${id}`);
+    }),
+
+  /** Stops new bookings. Existing appointments stand and nobody is cancelled. */
+  deactivate: (id: string): Promise<void> =>
+    request(async () => {
+      await client.post(`/api/calendars/${id}/deactivate`);
+    }),
+
+  activate: (id: string): Promise<void> =>
+    request(async () => {
+      await client.post(`/api/calendars/${id}/activate`);
     }),
 
   getAccess: (id: string): Promise<CalendarAccessEntry[]> =>
