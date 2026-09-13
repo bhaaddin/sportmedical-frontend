@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 import { appointmentsApi } from "../../api/appointments";
 import { activitiesApi } from "../../api/activities";
+import { workingHoursApi } from "../../api/workingHours";
 import { calendarsApi } from "../../api/calendars";
 import { searchAllPatients, searchRegistry } from "../../api/patientLookup";
 import type { PatientOption } from "../../api/patientLookup";
@@ -33,6 +34,8 @@ import {
 } from "../../utils/time";
 import { AsyncSection } from "./AsyncSection";
 import { AvailabilityPicker } from "./AvailabilityPicker";
+import { rangeOffersNothing } from "../../pages/booking/dayState";
+import { isAdminRole, currentUserRole } from "../../auth/roles";
 import { errorText } from "./errorText";
 
 /**
@@ -167,6 +170,26 @@ export function NewAppointmentDialog({
     () => (activitiesQuery.data?.activities ?? []).filter((a) => a.isActive),
     [activitiesQuery.data],
   );
+
+  /*
+   * Why the list of times can be empty, asked of the server rather than
+   * guessed at (6.1 again - this reads the answer, it does not compute one).
+   *
+   * Booking stopped a calendar with nothing assigned from offering the whole
+   * catalogue on 13. 9. 2026, which was right: a sports examination could be
+   * booked into the blood-draw room. What it left behind is a calendar that
+   * answers `availability` with `200` and an empty array - a reply that looks
+   * fine and means something else. "V tomto rozsahu není volný čas, zkuste
+   * jiné datum nebo jinou činnost" is then three pieces of advice, all of them
+   * wrong, so the reason has to be read and said.
+   */
+  const offerTo = addDaysToDateOnly(from, OFFER_WINDOW_DAYS);
+  const previewQuery = useQuery({
+    queryKey: ["preview", calendarId, from, offerTo],
+    queryFn: () => workingHoursApi.preview(calendarId, from, offerTo),
+    enabled: open && calendarId !== "",
+  });
+  const nothingAssigned = rangeOffersNothing(previewQuery.data ?? []);
 
   const book = useMutation({
     mutationFn: (input: {
@@ -545,16 +568,34 @@ export function NewAppointmentDialog({
                   calendarId={calendarId}
                   activityId={activityId}
                   from={from}
-                  to={addDaysToDateOnly(from, OFFER_WINDOW_DAYS)}
+                  to={offerTo}
                   busy={book.isPending}
                   onPick={(picked) => {
                     setConflict(null);
                     setStartUtc(picked);
                     setOverriding(false);
                   }}
-                  emptyText={t("booking.new.noFreeTime")}
+                  emptyText={
+                    nothingAssigned
+                      ? t("booking.grid.noActivitiesWhy")
+                      : t("booking.new.noFreeTime")
+                  }
                 />
               )}
+
+              {/* The way out, offered only to somebody who can take it: the
+                  assignment screen is admin-only, so pointing a receptionist
+                  at a door she cannot open would be a second dead end. */}
+              {nothingAssigned && !startUtc && isAdminRole(currentUserRole()) ? (
+                <Button
+                  size="small"
+                  component={RouterLink}
+                  to="/working-hours"
+                  sx={{ mt: 1 }}
+                >
+                  {t("booking.grid.noActivitiesWhere")}
+                </Button>
+              ) : null}
 
               {/*
                 6.4. Not an ordinary action: only a role that may override sees

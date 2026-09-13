@@ -306,7 +306,10 @@
       },
       "jumpTo": "Přejít na datum",
       "month": "Měsíc",
-      "more": "+{{count}} další"
+      "more": "+{{count}} další",
+      "noActivities": "bez činností",
+      "noActivitiesWhy": "Tenhle kalendář nemá přiřazené žádné činnosti, takže se na něj nejde objednat. Den je jinak otevřený.",
+      "noActivitiesWhere": "Přiřadit činnosti"
     },
     "detail": {
       "patient": "Pacient",

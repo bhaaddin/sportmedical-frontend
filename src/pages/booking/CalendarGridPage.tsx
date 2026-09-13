@@ -19,6 +19,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import TodayIcon from "@mui/icons-material/Today";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import type { SxProps, Theme } from "@mui/material";
 import { calendarsApi } from "../../api/calendars";
 import { appointmentsApi } from "../../api/appointments";
 import { workingHoursApi } from "../../api/workingHours";
@@ -44,6 +45,35 @@ import {
   startOfPragueDay,
   toDateOnly,
 } from "../../utils/time";
+import { dayState, dayStateLabelKey, isShaded } from "./dayState";
+import type { DayState } from "./dayState";
+
+/**
+ * The word in the corner of a day.
+ *
+ * Three states, three words, because they are three different next steps: a
+ * shut day is about the timetable, a day with nothing to book is about what
+ * the calendar has been told it does, and an open day says nothing at all.
+ * Collapsing the middle one into "zavřeno" - which is what the old fallback
+ * did - sends a receptionist to check the hours of a day whose hours are fine.
+ */
+function DayStateLabel({ state, sx }: { state: DayState; sx?: SxProps<Theme> }) {
+  const { t } = useTranslation();
+  const key = dayStateLabelKey(state);
+  if (key === null) return null;
+
+  const text = t(key, { defaultValue: t("booking.grid.closed.other") });
+
+  return (
+    <Tooltip
+      title={
+        state.kind === "nothing-to-book" ? t("booking.grid.noActivitiesWhy") : ""
+      }
+    >
+      <Typography sx={sx}>{text}</Typography>
+    </Tooltip>
+  );
+}
 
 /**
  * The calendar grid - contract screen 5.1.
@@ -604,7 +634,7 @@ function MonthGrid({
 
         {days.map((dayKey) => {
           const appointments = byDay.get(dayKey) ?? [];
-          const closed = (previewByDate.get(dayKey) ?? []).find((p) => !p.isOpen);
+          const state = dayState(previewByDate.get(dayKey) ?? []);
           const outsideMonth = dayKey.slice(0, 7) !== anchorMonth;
           const shownHere = appointments.slice(0, MAX_PER_DAY);
           const hidden = appointments.length - shownHere.length;
@@ -612,7 +642,7 @@ function MonthGrid({
             <Box
               key={dayKey}
               sx={{
-                backgroundColor: closed ? "action.hover" : "background.paper",
+                backgroundColor: isShaded(state) ? "action.hover" : "background.paper",
                 minHeight: 104,
                 p: 0.5,
                 opacity: outsideMonth ? 0.5 : 1,
@@ -635,13 +665,10 @@ function MonthGrid({
                 >
                   {Number(dayKey.slice(8, 10))}.
                 </Typography>
-                {closed?.closedBecause ? (
-                  <Typography sx={{ fontSize: 10, color: "text.secondary" }}>
-                    {t(`booking.grid.closed.${closed.closedBecause}`, {
-                      defaultValue: t("booking.grid.closed.other"),
-                    })}
-                  </Typography>
-                ) : null}
+                <DayStateLabel
+                  state={state}
+                  sx={{ fontSize: 10, color: "text.secondary" }}
+                />
               </Box>
 
               <Stack spacing={0.25}>
@@ -789,7 +816,7 @@ function DayColumn({
   const visibleMinutes = Math.min(openSpan.end - openSpan.start, dayHours) * 60;
   const topOffset = openSpan.start * 60;
 
-  const closed = preview.find((p) => !p.isOpen);
+  const state = dayState(preview);
 
   return (
     <Box
@@ -798,26 +825,21 @@ function DayColumn({
         height: visibleMinutes * pixelsPerMinute,
         borderLeft: "1px solid",
         borderColor: "divider",
-        backgroundColor: closed ? "action.hover" : "transparent",
+        backgroundColor: isShaded(state) ? "action.hover" : "transparent",
       }}
     >
       {/* Outside working hours is shaded, never hidden: the owner has to see
           where the day ends, and why it is closed if it is (5.1). */}
-      {closed?.closedBecause ? (
-        <Typography
-          sx={{
-            position: "absolute",
-            top: 4,
-            left: 4,
-            fontSize: 11,
-            color: "text.secondary",
-          }}
-        >
-          {t(`booking.grid.closed.${closed.closedBecause}`, {
-            defaultValue: t("booking.grid.closed.other"),
-          })}
-        </Typography>
-      ) : null}
+      <DayStateLabel
+        state={state}
+        sx={{
+          position: "absolute",
+          top: 4,
+          left: 4,
+          fontSize: 11,
+          color: "text.secondary",
+        }}
+      />
 
       {isToday ? (
         <NowLine now={now} dayKey={dayKey} topOffset={topOffset} />
