@@ -314,7 +314,9 @@
       "more": "+{{count}} další",
       "noActivities": "bez činností",
       "noActivitiesWhy": "Tenhle kalendář nemá přiřazené žádné činnosti, takže se na něj nejde objednat. Den je jinak otevřený.",
-      "noActivitiesWhere": "Přiřadit činnosti"
+      "noActivitiesWhere": "Přiřadit činnosti",
+      "inactiveHidden": "{{names}} se tu nezobrazuje, protože je zneaktivněný — nic nového se do něj objednat nedá. Už objednané termíny platí a jsou vidět dál.",
+      "inactiveWhere": "Spravovat kalendáře"
     },
     "detail": {
       "patient": "Pacient",

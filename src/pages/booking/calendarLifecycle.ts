@@ -53,3 +53,20 @@ export function offerDeactivateInstead(
 ): boolean {
   return deleteFailed && calendar !== null && calendar.isActive;
 }
+
+/**
+ * The ones the grid leaves out, so it can name them instead of dropping them.
+ *
+ * The planning grid draws only active calendars - an inactive one's hours no
+ * longer count - and until now that meant a calendar simply vanished from the
+ * chip row with no explanation, while its appointments went on being drawn
+ * among everyone else's. "Kam sa podela Ordinace" is the question that
+ * follows, and the screen had no answer on it.
+ *
+ * Paired with `visibleCalendars` on purpose: between them every calendar is
+ * either drawn or named, and `everyCalendarIsShownOrNamed` in the tests holds
+ * that. A calendar in neither is one that disappeared.
+ */
+export function inactiveAmong<T extends CalendarLike>(calendars: readonly T[]): T[] {
+  return calendars.filter((c) => !c.isActive);
+}

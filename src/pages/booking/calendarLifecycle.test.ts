@@ -9,7 +9,9 @@
  * and when the other door is offered. The deleting itself is the server's.
  */
 import { describe, it, expect } from 'vitest';
-import { hiddenCount, offerDeactivateInstead, visibleCalendars } from './calendarLifecycle';
+import {
+  hiddenCount, inactiveAmong, offerDeactivateInstead, visibleCalendars,
+} from './calendarLifecycle';
 
 const cal = (name: string, isActive: boolean) => ({ name, isActive });
 
@@ -76,5 +78,43 @@ describe('the other door, after a refusal', () => {
 
   it('is not offered when the dialog is closed', () => {
     expect(offerDeactivateInstead(null, true)).toBe(false);
+  });
+});
+
+/*
+ * Nothing disappears without being named.
+ *
+ * Booking asked for the two silences to be told apart: a calendar that offers
+ * nothing because it was deactivated, and one that offers nothing because no
+ * činnosti are assigned. The fixes are opposite - explaining the second as the
+ * first sends somebody to activate a calendar that is already active, and it
+ * does not help - and the live data has one of each.
+ *
+ * On the planning grid the deactivated one did not even offer an empty
+ * calendar: it vanished from the chip row entirely while its appointments
+ * stayed on screen.
+ */
+describe('every calendar is either shown or named', () => {
+  const cases = [
+    [] as { name: string; isActive: boolean }[],
+    [cal('a', true)],
+    [cal('a', false)],
+    [cal('a', true), cal('b', false), cal('c', true)],
+  ];
+
+  it.each(cases.map((c, i) => [i, c]))('holds for case %i', (_i, list) => {
+    const drawn = visibleCalendars(list as never[], false);
+    const named = inactiveAmong(list as never[]);
+    expect(drawn.length + named.length).toBe((list as never[]).length);
+    /* And never both, which would draw a calendar and announce it missing. */
+    for (const c of named) expect(drawn).not.toContain(c);
+  });
+
+  it('names exactly the inactive ones', () => {
+    expect(inactiveAmong(ALL).map((c) => c.name)).toEqual(['Ordinace']);
+  });
+
+  it('says nothing when every calendar is active', () => {
+    expect(inactiveAmong([cal('a', true), cal('b', true)])).toEqual([]);
   });
 });

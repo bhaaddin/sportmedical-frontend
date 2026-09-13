@@ -19,6 +19,8 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import TodayIcon from "@mui/icons-material/Today";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { Link as RouterLink } from "react-router-dom";
+import { Link as MuiLink } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material";
 import { calendarsApi } from "../../api/calendars";
 import { appointmentsApi } from "../../api/appointments";
@@ -46,6 +48,7 @@ import {
   toDateOnly,
 } from "../../utils/time";
 import { dayState, dayStateLabelKey, isShaded } from "./dayState";
+import { inactiveAmong } from "./calendarLifecycle";
 import type { DayState } from "./dayState";
 
 /**
@@ -154,6 +157,20 @@ export default function CalendarGridPage() {
 
   const calendars = useMemo(
     () => (calendarsQuery.data ?? []).filter((c) => c.isActive),
+    [calendarsQuery.data],
+  );
+
+  /*
+   * Named, not silently dropped.
+   *
+   * An inactive calendar is not drawn here - its hours no longer count and
+   * nothing new can be booked into it - and until now it simply vanished from
+   * the chip row. "Kam sa podela Ordinace" is then the question, and the
+   * screen has no answer on it. Its appointments are still drawn among the
+   * rest, which makes the disappearance stranger rather than cleaner.
+   */
+  const hiddenInactive = useMemo(
+    () => inactiveAmong(calendarsQuery.data ?? []),
     [calendarsQuery.data],
   );
 
@@ -407,6 +424,27 @@ export default function CalendarGridPage() {
         onRetry={() => void calendarsQuery.refetch()}
         skeletonRows={3}
       >
+        {/*
+          * Two different silences, said apart.
+          *
+          * A calendar can offer nothing because it was deactivated, or because
+          * it has no činnosti assigned - and the fixes are opposite. Explaining
+          * an unassigned calendar as "deactivated" sends somebody to activate
+          * one that is already active, and it does not help. This line covers
+          * the first; `dayState`'s "bez činností" covers the second.
+          */}
+        {hiddenInactive.length > 0 ? (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            {t("booking.grid.inactiveHidden", {
+              names: hiddenInactive.map((c) => c.name).join(", "),
+              count: hiddenInactive.length,
+            })}{" "}
+            <MuiLink component={RouterLink} to="/calendars">
+              {t("booking.grid.inactiveWhere")}
+            </MuiLink>
+          </Alert>
+        ) : null}
+
         {/* Multiple calendars at once: the owner wants Prohlídky and Diagnostika
             side by side, told apart by colour and by name. */}
         <Stack
