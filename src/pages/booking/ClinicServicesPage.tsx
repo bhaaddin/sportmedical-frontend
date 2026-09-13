@@ -25,6 +25,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { clinicServicesApi } from '../../api/clinicServices';
 import type { ClinicService, ClinicServiceInput } from '../../api/clinicServices';
@@ -46,6 +47,7 @@ export default function ClinicServicesPage() {
      turn that fallback into a blank alert. */
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const [draft, setDraft] = useState<ClinicServiceInput | null>(null);
   const [editing, setEditing] = useState<ClinicService | null>(null);
@@ -175,8 +177,44 @@ export default function ClinicServicesPage() {
                   {/* Said on the row, because it is invisible everywhere else:
                       a service with no činnosti or no calendar offers nothing,
                       and looks exactly like one that works. */}
+                  {/* Said on the row, and with the way in.
+                      A služba does not own its činnosti - the link lives on
+                      the činnost and the server takes it from no other side -
+                      so this screen can name the gap and cannot close it. The
+                      owner met exactly that: a warning telling him to assign
+                      činnosti, above a dialog with nowhere to assign them.
+                      These carry the service to the screen that can. */}
                   {gap !== 'none' && (
-                    <Alert severity="warning" sx={{ mt: 1.5 }}>
+                    <Alert
+                      severity="warning"
+                      sx={{ mt: 1.5 }}
+                      action={
+                        <Stack direction="row" spacing={1}>
+                          {(gap === 'no-activities' || gap === 'nothing-set-up') && (
+                            <Button
+                              color="inherit"
+                              size="small"
+                              onClick={() => navigate('/activities', {
+                                state: { clinicServiceId: service.id },
+                              })}
+                            >
+                              Přidat činnost
+                            </Button>
+                          )}
+                          {(gap === 'no-calendar' || gap === 'nothing-set-up') && (
+                            <Button
+                              color="inherit"
+                              size="small"
+                              onClick={() => navigate('/calendars', {
+                                state: { clinicServiceId: service.id },
+                              })}
+                            >
+                              Přiřadit kalendář
+                            </Button>
+                          )}
+                        </Stack>
+                      }
+                    >
                       {SERVICE_GAP_TEXT[gap]}
                     </Alert>
                   )}
@@ -217,6 +255,17 @@ export default function ClinicServicesPage() {
                 onChange={(e) => setDraft({ ...draft, sortOrder: Number(e.target.value) || 0 })}
                 sx={{ width: 160 }}
               />
+              {/* Asked for here and not offered, which is a question the
+                  dialog should answer rather than leave. The server takes the
+                  link from one side only - the činnost names its service, and
+                  the calendar names the one it runs. So this says where, and
+                  the row's buttons take you there. */}
+              {editing !== null && (
+                <Typography variant="body2" color="text.secondary">
+                  Činnosti a kalendáře se nepřiřazují odsud. Činnost si svou službu
+                  vybírá sama v Nastavení → Činnosti, kalendář v Nastavení → Kalendáře.
+                </Typography>
+              )}
               {save.error ? <Alert severity="error">{errorText(save.error, t)}</Alert> : null}
             </Stack>
           )}

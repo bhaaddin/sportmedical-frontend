@@ -16,6 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 
 const listCalendars = vi.fn();
@@ -59,9 +60,42 @@ beforeEach(() => {
   ]);
 });
 
-const withQueries = (ui: ReactNode) => {
+/*
+ * Says whether the router state is still carrying a handoff.
+ *
+ * The screen spends it when the dialog closes, so this is how a test sees
+ * that happen. It is NOT a signal that the decision was made - a handoff the
+ * screen refuses is left exactly where it is - which is why the tests that
+ * assert "nothing opened" wait on the services arriving instead.
+ */
+function HandoffProbe() {
+  const { state } = useLocation();
+  return <div>{state === null ? 'předání spotřebováno' : 'předání čeká'}</div>;
+}
+
+/* The client the last render was given, so a test can wait for the services
+   to have actually landed. Asserting "no dialog" before then is satisfied by
+   a screen that has not decided anything yet - a test that passes whether the
+   guard exists or not, which is how the retired-service check first slipped
+   through untested. */
+let lastClient: QueryClient;
+const servicesHaveArrived = () =>
+  waitFor(() => expect(lastClient.getQueryData(['clinic-services'])).toBeDefined());
+
+/* A router, because the screen reads `useLocation().state` - the Služby
+   screen hands a service over that way when it sends somebody here to close a
+   gap it can see and cannot fix. `state` carries the handoff. */
+const withQueries = (ui: ReactNode, state: unknown = null) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
+  lastClient = client;
+  return (
+    <MemoryRouter initialEntries={[{ pathname: '/calendars', state }]}>
+      <QueryClientProvider client={client}>
+        {ui}
+        <HandoffProbe />
+      </QueryClientProvider>
+    </MemoryRouter>
+  );
 };
 
 const openNew = async () => {
@@ -166,5 +200,38 @@ describe('a calendar already saved without a service', () => {
     render(withQueries(<CalendarsPage />));
 
     expect(await screen.findByText(/Služba už neexistuje/)).toBeInTheDocument();
+  });
+});
+
+/*
+ * Arriving from a služba that no calendar runs.
+ *
+ * The same handoff as on the činnosti screen and for the same reason: the
+ * Služby screen can see that nothing runs the service and cannot fix it from
+ * there, so its button sends the service here.
+ */
+describe('being sent here from a service nothing runs', () => {
+  it('opens the form ready for that service', async () => {
+    render(withQueries(<CalendarsPage />, { clinicServiceId: 's2' }));
+
+    await screen.findByLabelText(/Název/);
+    expect(screen.getByLabelText(/Služba/)).toHaveTextContent('Sportovní diagnostika');
+  });
+
+  it('opens nothing when nobody was sent', async () => {
+    render(withQueries(<CalendarsPage />));
+
+    await screen.findByRole('button', { name: /Nový kalendář/i });
+    expect(screen.queryByLabelText(/Název/)).not.toBeInTheDocument();
+  });
+
+  /* The service could have been retired between the click and the load. */
+  it('opens nothing for a service that is no longer offered', async () => {
+    listClinicServices.mockResolvedValue([svc('s9', 'Zrušená služba', false)]);
+    render(withQueries(<CalendarsPage />, { clinicServiceId: 's9' }));
+
+    /* After the decision, not before it. */
+    await servicesHaveArrived();
+    expect(screen.queryByLabelText(/Název/)).not.toBeInTheDocument();
   });
 });

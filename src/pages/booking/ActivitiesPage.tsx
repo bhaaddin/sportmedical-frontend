@@ -30,6 +30,8 @@ import { useTranslation } from "react-i18next";
 import { activitiesApi } from "../../api/activities";
 import { servicesApi } from "../../api/services";
 import { clinicServicesApi } from "../../api/clinicServices";
+import { useLocation, useNavigate } from "react-router-dom";
+import { handoffFrom, handoffIsOfferable } from "./serviceHandoff";
 import RestoreIcon from "@mui/icons-material/Restore";
 import MenuItem from "@mui/material/MenuItem";
 import { warningKey } from "../../api/bookingContracts";
@@ -74,6 +76,9 @@ function emptyDraft(sortOrder: number): ActivityInput {
 export default function ActivitiesPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [editing, setEditing] = useState<Activity | null>(null);
   const [draft, setDraft] = useState<ActivityInput | null>(null);
@@ -123,6 +128,13 @@ export default function ActivitiesPage() {
   const closeDialog = () => {
     setDraft(null);
     setEditing(null);
+    /* Spend the handoff on the way out, not on the way in. Clearing it before
+       the dialog was drawn is what broke this in the browser: StrictMode
+       mounts twice, the first mount emptied the history entry, and the second
+       had nothing left to open. */
+    if (location.state !== null) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
   };
 
   const save = useMutation({
@@ -183,6 +195,36 @@ export default function ActivitiesPage() {
     });
     save.reset();
   };
+
+  /*
+   * Arriving from a služba that is missing this.
+   *
+   * The Služby screen can name that gap and cannot close it - the server takes
+   * the link from this side only - so it sends the service here and the form
+   * opens ready for it. Without this the button would land somebody on a list
+   * and leave them to find the same service again in a dropdown, which is the
+   * errand the button was added to save.
+   *
+   * Decided while rendering rather than in an effect, and the handoff is spent
+   * when the dialog closes rather than when it opens. The first version did
+   * the opposite and was green in every test and dead in the browser:
+   * StrictMode mounts twice, the first mount cleared the history entry, and
+   * the second found nothing to act on. `render` in the tests does not double
+   * mount, so nothing saw it. There is a StrictMode test below now.
+   */
+  const handedOver = handoffFrom(location.state);
+  const handoffUsable =
+    handedOver !== null
+    && handoffIsOfferable(handedOver, clinicServicesQuery.data) === true;
+
+  /* Which handoff has already opened a form. Without it, closing the dialog
+     while the state is still on the history entry would reopen it forever. */
+  const [handoffTaken, setHandoffTaken] = useState<string | null>(null);
+  if (handoffUsable && handedOver !== handoffTaken) {
+    setHandoffTaken(handedOver);
+    setEditing(null);
+    setDraft({ ...emptyDraft(activities.length), clinicServiceId: handedOver });
+  }
 
   const nameIsValid = (draft?.name ?? "").trim().length > 0;
 

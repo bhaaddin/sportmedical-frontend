@@ -32,6 +32,8 @@ import { useTranslation } from "react-i18next";
 import MenuItem from "@mui/material/MenuItem";
 import { calendarsApi } from "../../api/calendars";
 import { clinicServicesApi } from "../../api/clinicServices";
+import { useLocation, useNavigate } from "react-router-dom";
+import { handoffFrom, handoffIsOfferable } from "./serviceHandoff";
 import { hiddenCount, offerDeactivateInstead, visibleCalendars } from "./calendarLifecycle";
 import type { Calendar, CalendarInput } from "../../api/bookingContracts";
 import { AsyncSection } from "../../components/booking/AsyncSection";
@@ -67,6 +69,9 @@ function emptyDraft(sortOrder: number): CalendarInput {
 export default function CalendarsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [editing, setEditing] = useState<Calendar | null>(null);
   const [draft, setDraft] = useState<CalendarInput | null>(null);
@@ -119,6 +124,13 @@ export default function CalendarsPage() {
   const closeDialog = () => {
     setDraft(null);
     setEditing(null);
+    /* Spend the handoff on the way out, not on the way in. Clearing it before
+       the dialog was drawn is what broke this in the browser: StrictMode
+       mounts twice, the first mount emptied the history entry, and the second
+       had nothing left to open. */
+    if (location.state !== null) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
   };
 
   // 6.6: settings changes wait for the server. Nothing here is optimistic.
@@ -182,6 +194,36 @@ export default function CalendarsPage() {
     });
     save.reset();
   };
+
+  /*
+   * Arriving from a služba that is missing this.
+   *
+   * The Služby screen can name that gap and cannot close it - the server takes
+   * the link from this side only - so it sends the service here and the form
+   * opens ready for it. Without this the button would land somebody on a list
+   * and leave them to find the same service again in a dropdown, which is the
+   * errand the button was added to save.
+   *
+   * Decided while rendering rather than in an effect, and the handoff is spent
+   * when the dialog closes rather than when it opens. The first version did
+   * the opposite and was green in every test and dead in the browser:
+   * StrictMode mounts twice, the first mount cleared the history entry, and
+   * the second found nothing to act on. `render` in the tests does not double
+   * mount, so nothing saw it. There is a StrictMode test below now.
+   */
+  const handedOver = handoffFrom(location.state);
+  const handoffUsable =
+    handedOver !== null
+    && handoffIsOfferable(handedOver, servicesQuery.data) === true;
+
+  /* Which handoff has already opened a form. Without it, closing the dialog
+     while the state is still on the history entry would reopen it forever. */
+  const [handoffTaken, setHandoffTaken] = useState<string | null>(null);
+  if (handoffUsable && handedOver !== handoffTaken) {
+    setHandoffTaken(handedOver);
+    setEditing(null);
+    setDraft({ ...emptyDraft(calendars.length), clinicServiceId: handedOver });
+  }
 
   const nameIsValid = (draft?.name ?? "").trim().length > 0;
 

@@ -17,6 +17,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import { StrictMode } from 'react';
 import type { ReactNode } from 'react';
 
 const listActivities = vi.fn();
@@ -55,9 +57,42 @@ beforeEach(() => {
 
 /* Retries off: a failing query would hold the test open and report a timeout
    instead of the failure. */
-const withQueries = (ui: ReactNode) => {
+/*
+ * Says whether the router state is still carrying a handoff.
+ *
+ * The screen spends it when the dialog closes, so this is how a test sees
+ * that happen. It is NOT a signal that the decision was made - a handoff the
+ * screen refuses is left exactly where it is - which is why the tests that
+ * assert "nothing opened" wait on the services arriving instead.
+ */
+function HandoffProbe() {
+  const { state } = useLocation();
+  return <div>{state === null ? 'předání spotřebováno' : 'předání čeká'}</div>;
+}
+
+/* The client the last render was given, so a test can wait for the services
+   to have actually landed. Asserting "no dialog" before then is satisfied by
+   a screen that has not decided anything yet - a test that passes whether the
+   guard exists or not, which is how the retired-service check first slipped
+   through untested. */
+let lastClient: QueryClient;
+const servicesHaveArrived = () =>
+  waitFor(() => expect(lastClient.getQueryData(['clinic-services'])).toBeDefined());
+
+/* A router, because the screen reads `useLocation().state` - the Služby
+   screen hands a service over that way when it sends somebody here to close a
+   gap it can see and cannot fix. `state` carries the handoff. */
+const withQueries = (ui: ReactNode, state: unknown = null) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
+  lastClient = client;
+  return (
+    <MemoryRouter initialEntries={[{ pathname: '/activities', state }]}>
+      <QueryClientProvider client={client}>
+        {ui}
+        <HandoffProbe />
+      </QueryClientProvider>
+    </MemoryRouter>
+  );
 };
 
 const openNew = async () => {
@@ -156,5 +191,89 @@ describe('the service a činnost belongs to', () => {
 
     expect(await screen.findByText(/Služby se nepodařilo načíst/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Uložit/i })).toBeDisabled();
+  });
+});
+
+/*
+ * Arriving from a služba that has no činnost.
+ *
+ * The owner opened "Upravit službu", looked for somewhere to assign činnosti,
+ * and found none - the server takes that link from this side only, so the
+ * Služby screen can name the gap and cannot close it. Its button sends the
+ * service here. If it landed him on a plain list he would have to find the
+ * same service again in a dropdown, which is the errand the button was added
+ * to save.
+ */
+describe('being sent here from a service with no činnost', () => {
+  it('opens the form ready for that service', async () => {
+    render(withQueries(<ActivitiesPage />, { clinicServiceId: 's2' }));
+
+    await screen.findByLabelText(/Název/);
+    expect(screen.getByLabelText(/Služba/)).toHaveTextContent('Sportovní diagnostika');
+  });
+
+  /* A page somebody simply opened is not a handoff, and opening a dialog over
+     it would be a screen acting on its own. */
+  it('opens nothing when nobody was sent', async () => {
+    render(withQueries(<ActivitiesPage />));
+
+    await screen.findByRole('button', { name: /Nová činnost/i });
+    expect(screen.queryByLabelText(/Název/)).not.toBeInTheDocument();
+  });
+
+  /*
+   * A retired service is not in the picker, so pre-selecting one would open a
+   * dialog showing nothing above a save that never moves. Opening plain is the
+   * better failure - and the handoff can be stale, since the service could
+   * have been retired between the click and the load.
+   */
+  it('opens nothing for a service that is no longer offered', async () => {
+    listClinicServices.mockResolvedValue([svc('s9', 'Zrušená služba', false)]);
+    render(withQueries(<ActivitiesPage />, { clinicServiceId: 's9' }));
+
+    /* After the decision, not before it. Asserting on the button alone is
+       satisfied while the services are still in flight, and then the guard
+       could be deleted without this noticing - which it was. */
+    await servicesHaveArrived();
+    expect(screen.queryByLabelText(/Název/)).not.toBeInTheDocument();
+  });
+
+  /* Router state that means something else entirely must not open a form. */
+  it('opens nothing for state that carries no service', async () => {
+    render(withQueries(<ActivitiesPage />, { from: '/sluzby' }));
+
+    /* Nothing consumes it, so it stays put - and no dialog appears either. */
+    await screen.findByRole('button', { name: /Nová činnost/i });
+    expect(await screen.findByText('předání čeká')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Název/)).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * The application runs in StrictMode and these tests did not.
+ *
+ * Worth saying plainly what this does and does not guard. The first version of
+ * this handoff spent it in an effect on the way in - mount, read the service,
+ * clear the history entry, open the form. Every test here was green and in the
+ * browser nothing opened. I put StrictMode down as the cause, wrote this test,
+ * and then put the broken version back to check: it stayed green. So StrictMode
+ * is NOT the mechanism, and I never proved what was. What is measured is the
+ * two shapes in the browser - the effect version left the entry emptied with no
+ * dialog, the version that spends the handoff on the way out opens ready, both
+ * confirmed on screen on 13. 9. 2026.
+ *
+ * This test therefore guards one real thing and not the bug it was written for:
+ * that the screen behaves under the double invocation the application actually
+ * runs with. Kept for that, labelled for that.
+ */
+describe('the way the application actually mounts', () => {
+  it('still opens ready for the service when mounted twice', async () => {
+    render(withQueries(
+      <StrictMode><ActivitiesPage /></StrictMode>,
+      { clinicServiceId: 's2' },
+    ));
+
+    await screen.findByLabelText(/Název/);
+    expect(screen.getByLabelText(/Služba/)).toHaveTextContent('Sportovní diagnostika');
   });
 });
