@@ -53,7 +53,11 @@ describe('measured against a day', () => {
   /*
    * The boundary decides a real day: on it a patient is either seen or sent
    * home. "Platí do 3. 5." reads as 3 May included, so it is valid that day.
-   * Stated as an assumption in the module and asked of booking.
+   *
+   * Asked of booking rather than guessed, and confirmed: their rule is
+   * `appointmentDay <= until`. A výpis issued 3. 5. 2026 covers an examination
+   * on 3. 5. 2027 and not on 4. 5. 2027. It is a warning and not a bar, so of
+   * the two readings the lenient one is right.
    */
   it('counts the last day as still valid', () => {
     expect(LAST_DAY_IS_INCLUSIVE).toBe(true);
@@ -64,20 +68,27 @@ describe('measured against a day', () => {
   /*
    * The whole reason a date is sent and not a count. One výpis, two screens,
    * two true answers.
+   *
+   * Said as wording and not as a gate, deliberately. Whether somebody may be
+   * seen for an appointment is `ready`/`missing` from the server, computed
+   * against that appointment's own day; deciding it here would be a second
+   * copy of that rule, and the copies would disagree near midnight - booking
+   * takes the appointment's day from its UTC instant and this file takes local
+   * midnights.
    */
-  it('gives different answers for today and for the day of an appointment', () => {
+  it('says one thing about today and another about a day months away', () => {
     const until = '2026-10-01';
     expect(reportStandsOn(until, '2026-09-13')).toBe(true);
     expect(reportStandsOn(until, '2026-11-20')).toBe(false);
   });
 
-  it('takes a Date as readily as a string, since the appointment carries one', () => {
+  it('takes a Date as readily as a string, since a screen may hold one', () => {
     expect(reportStandsOn('2026-10-01', new Date(2026, 8, 13))).toBe(true);
     expect(reportStandsOn('2026-10-01', new Date(2026, 10, 20))).toBe(false);
   });
 
   /* Local midnights, so a time of day cannot move the answer across a day. */
-  it('ignores the time of day on the appointment', () => {
+  it('ignores the time of day it is asked about', () => {
     const early = new Date(2026, 9, 1, 0, 5);
     const late = new Date(2026, 9, 1, 23, 55);
     expect(reportStandsOn('2026-10-01', early)).toBe(true);

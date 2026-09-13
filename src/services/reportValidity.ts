@@ -14,6 +14,19 @@
  * One value, two questions, and the choosing happens here rather than on the
  * server having guessed which was being asked.
  *
+ * WHAT THIS IS NOT
+ *
+ * It is not the gate. Whether a patient may be seen for a given appointment is
+ * answered by the server, in `ready` and `missing` on that appointment's own
+ * `PaperworkView`, computed against that appointment's day. Calling
+ * `reportStandsOn` to decide that would be a second copy of a rule that
+ * already exists - the fault this project spends most of its time removing -
+ * and the two copies would not even agree: booking takes the appointment's day
+ * from its UTC instant, this file takes local midnights, and those differ for
+ * an appointment just after midnight.
+ *
+ * So: this works out what to SAY. What is ALLOWED comes from the server.
+ *
  * `null` means there is no valid výpis, and it means that for every reason at
  * once - never uploaded, expired, or uploaded with nobody filling in the date.
  * The owner asked for one sentence for all of them: "treba doplniť výpis", no
@@ -33,12 +46,16 @@ export type ReportValidity =
  * The last day it counts, not the first day it does not.
  *
  * "Platí do 3. 5." is read by everybody as "3. 5. included", so a výpis whose
- * `reportValidUntil` is today is valid today. This is an assumption, stated
- * loudly because it is worth one question: it decides a real day, and on that
- * day a patient is either seen or sent home.
+ * `reportValidUntil` is today is valid today. It was worth asking, because it
+ * decides a real day and on that day a patient is either seen or sent home.
  *
- * Asked of booking; until they answer, inclusive is the reading that matches
- * the words and the one where the mistake is the milder of the two.
+ * Asked of booking and confirmed: their rule is `appointmentDay <= until`, not
+ * `<`, and for the same reason plus one more - it is a warning, not a bar, so
+ * of the two readings the lenient one is right. A výpis issued 3. 5. 2026
+ * covers an examination on 3. 5. 2027 and not on 4. 5. 2027.
+ *
+ * The year itself is added on their side and never here: `AddYears(1)`, not
+ * 365 days, so a leap year cannot quietly shorten it.
  */
 export const LAST_DAY_IS_INCLUSIVE = true;
 
