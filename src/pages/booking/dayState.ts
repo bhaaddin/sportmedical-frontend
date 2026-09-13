@@ -44,16 +44,39 @@ export type DayState =
 export const NO_ACTIVITIES = 'noActivities';
 
 export function dayState(preview: readonly DayPreviewLike[]): DayState {
-  const shut = preview.find((p) => !p.isOpen);
-  if (shut !== undefined) return { kind: 'closed', because: shut.closedBecause };
+  /*
+   * The rows are one per calendar, and the answer is about the day. That
+   * distinction was got wrong first time round and was on screen: with two
+   * calendars drawn together, Úterý was labelled "bez činností" because the
+   * second one had none, while the first was offering two činnosti that very
+   * day - and Pondělí was greyed as "nepracovní den" because the first was
+   * shut, while the second was open. `find` answers "is any of them", and the
+   * question is "are all of them".
+   *
+   * So: anything on offer anywhere means the day is a normal day.
+   */
+  if (preview.some((p) => (p.offeredActivityIds ?? []).length > 0)) {
+    return { kind: 'open' };
+  }
 
   /*
-   * Deliberately after the closed check. A shut day is shut whatever else is
-   * true of it, and telling somebody to assign činnosti to a holiday would be
-   * advice that changes nothing.
+   * Nothing on offer. If even one calendar is open, the day is not shut - it
+   * is a working day with nothing to book, which is the other message and the
+   * other fix.
    */
-  const empty = preview.find((p) => p.closedBecause === NO_ACTIVITIES);
-  if (empty !== undefined) return { kind: 'nothing-to-book' };
+  if (preview.some((p) => p.isOpen)) {
+    return preview.some((p) => p.closedBecause === NO_ACTIVITIES)
+      ? { kind: 'nothing-to-book' }
+      : { kind: 'open' };
+  }
+
+  /*
+   * Every calendar shut. The reason is the first one's - with several shut for
+   * different reasons there is no single true answer, and naming one is better
+   * than naming none on a day nobody is in.
+   */
+  const shut = preview.find((p) => !p.isOpen);
+  if (shut !== undefined) return { kind: 'closed', because: shut.closedBecause };
 
   return { kind: 'open' };
 }
