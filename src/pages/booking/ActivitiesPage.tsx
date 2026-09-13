@@ -321,9 +321,22 @@ export default function ActivitiesPage() {
                       </IconButton>
                     </Tooltip>
                     {activity.isActive ? (
-                      <Tooltip title={t("booking.common.delete")}>
+                      /*
+                        * Not "Smazat". `DELETE /api/activities/{id}` retires:
+                        * the row stays, keeps its slug, is marked "vyřazeno",
+                        * and the button that undoes it sits two columns along
+                        * this very row. The dialog said "Tuto akci nelze
+                        * vrátit zpět" while the undo was on screen beside it.
+                        *
+                        * Wording only. Činnosti may yet get the split the
+                        * calendars got (a real DELETE, a 409 with a count, and
+                        * deactivate/activate of their own); building that now
+                        * would be work thrown away. A sentence that is false
+                        * today is false whatever the contract becomes.
+                        */
+                      <Tooltip title={t("booking.activities.retireAction")}>
                         <IconButton
-                          aria-label={t("booking.common.delete")}
+                          aria-label={`${t("booking.activities.retireAction")} — ${activity.name}`}
                           onClick={() => setConfirmDelete(activity)}
                         >
                           <DeleteIcon fontSize="small" />
@@ -516,13 +529,14 @@ export default function ActivitiesPage() {
           <Button onClick={() => setConfirmDelete(null)}>
             {t("booking.common.cancel")}
           </Button>
+          {/* Not `error` either: red is the colour of the irreversible, and
+              this is undone by a button on the same row. */}
           <Button
-            color="error"
             variant="contained"
             disabled={remove.isPending}
             onClick={() => confirmDelete && remove.mutate(confirmDelete.id)}
           >
-            {t("booking.common.delete")}
+            {t("booking.activities.retireAction")}
           </Button>
         </DialogActions>
       </Dialog>

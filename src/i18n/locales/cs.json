@@ -182,8 +182,8 @@
       "publicYes": "Veřejná",
       "publicNo": "Jen interní",
       "publicLabel": "Lze objednat z webu",
-      "deleteTitle": "Smazat činnost?",
-      "deleteBody": "Opravdu smazat činnost „{{name}}“? Tuto akci nelze vrátit zpět.",
+      "deleteTitle": "Vyřadit činnost z nabídky?",
+      "deleteBody": "„{{name}}“ se přestane nabízet při objednávání. Zůstane v tomhle seznamu označená jako vyřazená a kdykoli ji můžete vrátit tlačítkem „Vrátit do nabídky“.",
       "column": {
         "name": "Název",
         "duration": "Délka",
@@ -201,7 +201,8 @@
       "noServiceItem": "— bez vazby na ceník —",
       "serviceItemHelp": "Cena se čte z ceníku přes tuto vazbu. Zde se nezadává.",
       "serviceItemUnavailable": "Ceník se nepodařilo načíst. Stávající vazba zůstane, dokud ji nezměníte.",
-      "serviceItemUnknown": "Stávající vazba (položka není v seznamu)"
+      "serviceItemUnknown": "Stávající vazba (položka není v seznamu)",
+      "retireAction": "Vyřadit z nabídky"
     },
     "workingHours": {
       "title": "Pracovní doba",
