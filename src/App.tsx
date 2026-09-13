@@ -26,6 +26,8 @@ const DashboardPage = lazy(() => import('./pages/Dashboard'));
 const DiagnosticForm = lazy(() => import('./pages/DiagnosticForm'));
 const PatientList = lazy(() => import('./pages/PatientList'));
 const PatientDetails = lazy(() => import('./pages/PatientDetails'));
+const PatientLayout = lazy(() => import('./pages/patients/PatientLayout'));
+const PatientDocumentsPage = lazy(() => import('./pages/patients/PatientDocumentsPage'));
 const Reports = lazy(() => import('./pages/Reports'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
 const CalendarMovedPage = lazy(() => import('./pages/CalendarMoved'));
@@ -354,7 +356,13 @@ export default function App() {
                     <Route path="/patients" element={<PatientList />} />
                     <Route path="/patients/register" element={<PatientRegistrationPage />} />
                     <Route path="/patients/:id/edit" element={<PatientFormPage />} />
-                    <Route path="/patients/:id" element={<PatientDetails />} />
+                    {/* One patient, with sections that are pages of their own -
+                        each carries the patient id, so every one of them can be
+                        linked to, bookmarked and reopened. */}
+                    <Route path="/patients/:id" element={<PatientLayout />}>
+                      <Route index element={<PatientDetails />} />
+                      <Route path="dokumenty" element={<PatientDocumentsPage />} />
+                    </Route>
                     <Route path="/measurements" element={<MeasurementsPage />} />
                     <Route path="/diagnostics/new" element={<DiagnosticForm />} />
                     <Route path="/billing" element={<BillingPage />} />

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Grid, Card, CardContent, Avatar, Button, Divider, Chip,
-  List, ListItem, ListItemText, Skeleton, Alert, IconButton, Tooltip,
+  Box, Typography, Grid, Card, CardContent, Button, Divider, Chip,
+  List, Skeleton, Alert, IconButton, Tooltip,
   Paper, LinearProgress, Collapse,
 } from '@mui/material';
 import {
-  ArrowBack, Science, TrendingUp, TrendingDown, CalendarToday, Description,
-  Warning, CheckCircle, Error, MonitorHeart, FitnessCenter, Bloodtype,
+  ArrowBack, Science, TrendingUp, TrendingDown, Description,
+  CheckCircle, Error, MonitorHeart, FitnessCenter, Bloodtype,
   Download, Add, ExpandMore, ExpandLess, Person, Phone, Email, Cake,
   Shield, LocalHospital, Spa, CloudUpload,
 } from '@mui/icons-material';
@@ -19,7 +19,6 @@ import type { DiagnosticSession } from '../api/diagnostics';
 import { documentsApi, DOCUMENT_SATISFIES_REQUIREMENT } from '../api/documents';
 import MedicalReports from '../components/documents/MedicalReports';
 import UploadDocumentDialog from '../components/documents/UploadDocumentDialog';
-import ConsentLine from '../components/patients/ConsentLine';
 import DocumentActions from '../components/documents/DocumentActions';
 import type { PatientDocument, DocumentTemplate } from '../api/documents';
 
@@ -237,75 +236,12 @@ export default function PatientDetails() {
 
   return (
     <Box>
-      {/* Back button */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <Button startIcon={<ArrowBack />} onClick={() => navigate('/patients')}
-          sx={{ mb: 2, borderRadius: 2, fontWeight: 500 }}>
-          Zpět na pacienty
-        </Button>
-      </motion.div>
-
-      {/* Missing docs warning */}
-      {missingDocs.length > 0 && (
-        <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }} icon={<Warning />}>
-          Chybí: {missingDocs.map(d => d.label).join(', ')}
-        </Alert>
-      )}
-
-      {/* ── Patient Header ── */}
-      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4 }}>
-        <Card sx={{ mb: 3, overflow: 'hidden' }}>
-          <Box sx={{ height: 80, background: 'linear-gradient(135deg, #0D7377 0%, #14A3A8 50%, #1A1A2E 100%)' }} />
-          <CardContent sx={{ pt: 0, mt: -4 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2 }}>
-                <Avatar sx={{
-                  bgcolor: '#0D7377', width: 72, height: 72, fontSize: 28, fontWeight: 700,
-                  border: '4px solid white', boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-                }}>
-                  {patient.firstName[0]}{patient.lastName[0]}
-                </Avatar>
-                <Box sx={{ pb: 0.5 }}>
-                  <Typography variant="h4" sx={{ fontWeight: 800 }}>{patient.firstName} {patient.lastName}</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
-                    <Chip size="small" label={`Věk ${age}`} />
-                    {birthInfo.isToday ? (
-                      <Chip size="small" label="🎂 Dnes má narozeniny!" color="success" sx={{ fontWeight: 700 }} />
-                    ) : (
-                      <Chip size="small" label={`Narozeniny za ${birthInfo.days} ${birthInfo.days === 1 ? 'den' : birthInfo.days < 5 ? 'dny' : 'dní'} (${birthInfo.next.toLocaleDateString('cs-CZ')})`} variant="outlined" />
-                    )}
-                    {birthInfo.isMinor && (
-                      <Chip size="small" label="Nezletilý — nutný zákonný zástupce" color="warning" />
-                    )}
-                    <Chip size="small" label={patient.sex === 'Male' ? 'Muž' : 'Žena'}
-                      sx={{ bgcolor: '#0D737714', color: '#0D7377' }} />
-                    <Chip size="small" label={`${sessions.length} sezení`} variant="outlined" />
-                    {displayEmail && (
-                      <Chip size="small" icon={<Email sx={{ fontSize: 14 }} />} label={displayEmail} variant="outlined" />
-                    )}
-                    {displayPhone && (
-                      <Chip size="small" icon={<Phone sx={{ fontSize: 14 }} />} label={displayPhone} variant="outlined" />
-                    )}
-                  </Box>
-                </Box>
-              </Box>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button variant="outlined" startIcon={<Description />}
-                  onClick={() => navigate(`/patients/${patient.id}/edit`)}
-                  sx={{ borderColor: '#0D7377', color: '#0D7377', borderRadius: 2 }}>
-                  Upravit
-                </Button>
-                <Button variant="contained" startIcon={<Science />}
-                  onClick={() => navigate(`/diagnostics/new?patientId=${patient.id}`)}
-                  sx={{ bgcolor: '#0D7377', borderRadius: 2, fontWeight: 600, boxShadow: '0 4px 16px rgba(13,115,119,0.3)', '&:hover': { bgcolor: '#095456' } }}>
-                  Nová diagnostika
-                </Button>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      </motion.div>
-
+      {/*
+        The name, the missing-paperwork banner, the consent line and the
+        section tabs live in `patients/PatientLayout` now, so they stay on
+        screen whichever section is open. What is left here is the overview
+        itself.
+      */}
       {/* ── Extended profile (registration data) ── */}
       {profile && (profile.birthNumber || profile.healthInsurerCode || profile.address) && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -352,16 +288,6 @@ export default function PatientDetails() {
           template={uploadTemplate === 'report' ? null : uploadTemplate}
           onUploaded={reloadDocuments}
         />
-      )}
-
-      {/* One line, read from where the registration form writes it. See the
-          component for why "nothing recorded" must not draw as "refused". */}
-      {id !== undefined && (
-        <Card sx={{ mb: 3, borderRadius: 3 }}>
-          <CardContent sx={{ py: 1.5 }}>
-            <ConsentLine patientId={id} />
-          </CardContent>
-        </Card>
       )}
 
       {/*
@@ -448,100 +374,18 @@ export default function PatientDetails() {
             </Card>
           </motion.div>
 
-          {/* Document Status */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <Card>
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Shield sx={{ color: '#0D7377', fontSize: 20 }} />
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>Povinné dokumenty</Typography>
-                </Box>
-                <Divider sx={{ mb: 2 }} />
-                {requiredDocs.map(rd => {
-                  const hasDoc = hasRequiredDoc(rd.id);
-                  /* The one on file, so it can be opened or corrected. */
-                  const filedDoc = docs.find(
-                    (d) => d.templateId === rd.id && d.status === DOCUMENT_SATISFIES_REQUIREMENT,
-                  );
-                  return (
-                    <Box key={rd.id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, borderBottom: '1px solid #f5f5f5' }}>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>{rd.label}</Typography>
-                        {rd.description !== '' && (
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                            {rd.description}
-                          </Typography>
-                        )}
-                        {rd.firstVisitOnly && (
-                          <Typography variant="caption" color="text.secondary">Pouze 1. návštěva</Typography>
-                        )}
-                      </Box>
-                      {/*
-                        The upload lives here now, beside the thing it is
-                        missing. It used to live on a separate Documents screen
-                        where you first had to find the patient again in a
-                        dropdown - having arrived from that patient's own card.
-                        Seeing that a výpis is missing and being unable to do
-                        anything about it is most of a screen's work and none
-                        of its use.
-                      */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {hasDoc ? (
-                          <Chip icon={<CheckCircle />} label="Hotovo" size="small"
-                            sx={{ bgcolor: '#2E7D3214', color: '#2E7D32', fontWeight: 500 }} />
-                        ) : (
-                          <Chip icon={<Error />} label="Chybí" size="small"
-                            sx={{ bgcolor: '#D32F2F14', color: '#D32F2F', fontWeight: 500 }} />
-                        )}
-                        <Button
-                          size="small"
-                          variant={hasDoc ? 'text' : 'contained'}
-                          startIcon={<CloudUpload />}
-                          onClick={() => setUploadTemplate(templates.find((t) => t.id === rd.id) ?? null)}
-                          sx={hasDoc ? undefined : { bgcolor: '#0D7377' }}
-                        >
-                          {hasDoc ? 'Nahradit' : 'Nahrát'}
-                        </Button>
-                        {/* Open it, move it, strike it out. Opening was
-                            impossible at any level until the server grew a way
-                            to read a stored file. */}
-                        {filedDoc !== undefined && (
-                          <DocumentActions
-                            document={filedDoc}
-                            patientDocuments={docs}
-                            patientName={patient.firstName}
-                            onChanged={reloadDocuments}
-                          />
-                        )}
-                      </Box>
-                    </Box>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/*
-            Its own card, below the required ones and deliberately not among
-            them. A required document answers "may this person be seen"; a
-            report answers "what else is going on". Mixing them would let a
-            cardiology report stand in for the výpis - which the shape already
-            prevents, since a report carries no template, but putting them in
-            one list is how somebody later decides the shape is inconvenient.
-          */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 }}
-            style={{ marginTop: 24 }}
+          {/* Documents moved to their own section at
+              /patients/:id/dokumenty - one page about one patient's papers,
+              with room for the actions that had nowhere to go here. */}
+          <Button
+            fullWidth
+            variant="outlined"
+            startIcon={<Description />}
+            onClick={() => navigate(`/patients/${patient.id}/dokumenty`)}
+            sx={{ mt: 2, borderColor: '#0D7377', color: '#0D7377' }}
           >
-            <MedicalReports
-              documents={docs}
-              patientName={patient.firstName}
-              onChanged={reloadDocuments}
-              onAdd={() => setUploadTemplate('report')}
-            />
-          </motion.div>
+            Dokumenty pacienta
+          </Button>
         </Grid>
 
         {/* ── Right Column: Diagnostic Sessions ── */}
