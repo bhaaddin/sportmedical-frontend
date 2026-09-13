@@ -73,8 +73,22 @@ export function ruleHealth(
 export const RULE_HEALTH_TEXT: Record<Exclude<RuleHealth, 'ok'>, string> = {
   'service-deleted':
     'Služba už neexistuje — pravidlo neplatí pro žádný termín a nikoho na nic neupozorní. Smažte ho.',
+  /*
+   * "Zatím", not "nikdy" - the word was wrong and it mattered.
+   *
+   * A rule hangs on the service and needs neither a činnost nor a calendar:
+   * `AddAsync` checks that the template exists and that the service exists,
+   * and nothing else. So it stands from the moment it is written and applies
+   * to a činnost added six months later - which is the whole reason it hangs
+   * on the service rather than on the činnost.
+   *
+   * What is true today is only that nothing can be booked under an empty
+   * service, so there is nothing for the rule to act on yet. Saying "nikdy"
+   * invited somebody to delete a rule that was perfectly good.
+   */
   'service-empty':
-    'Ta služba nemá zatím žádnou činnost, takže se pod ni nedá objednat a pravidlo se nikdy neuplatní.',
+    'Ta služba zatím nemá žádnou činnost, takže se pod ni nedá objednat — '
+    + 'pravidlo platí, ale zatím nemá na co. Uplatní se, jakmile pod ni nějaká činnost přibude.',
 };
 
 /**

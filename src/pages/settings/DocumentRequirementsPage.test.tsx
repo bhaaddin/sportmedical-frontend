@@ -113,7 +113,7 @@ describe('the list of rules', () => {
     listClinicServices.mockResolvedValue([svc('s1', 'Sportovní lékařské prohlídky', { activities: 0 })]);
     show();
 
-    expect(await screen.findByText(/nemá zatím žádnou činnost/)).toBeInTheDocument();
+    expect(await screen.findByText(/zatím nemá na co/)).toBeInTheDocument();
   });
 
   it('says nothing about a rule whose service is there and used', async () => {
@@ -122,7 +122,7 @@ describe('the list of rules', () => {
 
     await screen.findByText('Výpis ze zdravotní dokumentace');
     expect(screen.queryByText(/Služba už neexistuje/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/nemá zatím žádnou činnost/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/zatím nemá na co/)).not.toBeInTheDocument();
   });
 });
 
