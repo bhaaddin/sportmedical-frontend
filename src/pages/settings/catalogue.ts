@@ -125,6 +125,17 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         to: '/admin',
         adminOnly: true,
       },
+      {
+        /*
+         * Real, full, and unreachable until now: eight services with prices,
+         * durations and categories, and no way into it but typing the address.
+         * The owner asked where the price list was; the answer was nowhere.
+         */
+        id: 'cenik',
+        label: 'Ceník služeb',
+        description: 'Co ordinace nabízí, jak dlouho to trvá a kolik to stojí',
+        to: '/cenik',
+      },
     ],
   },
   {
