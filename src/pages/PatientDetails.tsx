@@ -19,6 +19,7 @@ import type { DiagnosticSession } from '../api/diagnostics';
 import { documentsApi, DOCUMENT_SATISFIES_REQUIREMENT } from '../api/documents';
 import MedicalReports from '../components/documents/MedicalReports';
 import UploadDocumentDialog from '../components/documents/UploadDocumentDialog';
+import ConsentLine from '../components/patients/ConsentLine';
 import type { PatientDocument, DocumentTemplate } from '../api/documents';
 
 /* ── Helpers ── */
@@ -350,6 +351,16 @@ export default function PatientDetails() {
           template={uploadTemplate === 'report' ? null : uploadTemplate}
           onUploaded={reloadDocuments}
         />
+      )}
+
+      {/* One line, read from where the registration form writes it. See the
+          component for why "nothing recorded" must not draw as "refused". */}
+      {id !== undefined && (
+        <Card sx={{ mb: 3, borderRadius: 3 }}>
+          <CardContent sx={{ py: 1.5 }}>
+            <ConsentLine patientId={id} />
+          </CardContent>
+        </Card>
       )}
 
       {/*

@@ -73,6 +73,14 @@ export interface PatientDocument {
   reviewedAtUtc: string | null;
   /** Set only on a medical report from another doctor. */
   specialtyCode: string | null;
+  /*
+   * The name for that code, resolved by the server.
+   *
+   * Null when there is no code, and also when the register no longer has one -
+   * entries are retired, and a report filed under a retired code still has to
+   * be readable. So this is a convenience, never the thing to branch on.
+   */
+  specialtyName: string | null;
   /** What the person typed when no code fitted. */
   specialtyOther: string | null;
   /** What the patient said it was - a hint for the reviewer, never the answer. */

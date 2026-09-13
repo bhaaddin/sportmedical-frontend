@@ -49,6 +49,7 @@ const doc = (over: Partial<Doc> = {}): Doc =>
     reviewedByUserId: null,
     reviewedAtUtc: null,
     specialtyCode: '107',
+    specialtyName: 'Kardiologie',
     specialtyOther: null,
     specialtySuggestedByPatient: null,
     reportDate: '2026-03-01',
@@ -120,7 +121,7 @@ describe('the order they are shown in', () => {
       <MedicalReports documents={[withoutDate]} onChanged={vi.fn()} onAdd={vi.fn()} />,
     );
 
-    expect(screen.getByText('107')).toBeInTheDocument();
+    expect(screen.getByText('Kardiologie')).toBeInTheDocument();
     for (const chip of container.querySelectorAll('.MuiChip-label')) {
       expect(chip.textContent?.trim()).not.toBe('');
     }
@@ -140,34 +141,35 @@ describe('what the row says', () => {
   });
 
   it('falls back to the code, and then to saying it is unknown', () => {
-    expect(specialtyLabel(doc({ specialtyCode: '107', specialtyOther: null }))).toBe('107');
-    expect(specialtyLabel(doc({ specialtyCode: null, specialtyOther: null }))).toBe('Neurčený obor');
+    expect(specialtyLabel(doc({ specialtyCode: '107', specialtyName: null, specialtyOther: null }))).toBe('107');
+    expect(specialtyLabel(doc({ specialtyCode: null, specialtyName: null, specialtyOther: null }))).toBe('Neurčený obor');
   });
 
   /*
    * "107" is the register's word for cardiology and nobody else's. Seen on the
    * real screen: the row read `107`, which a receptionist has no reason to be
-   * able to decode.
+   * able to decode. The name comes from the server beside the code now - this
+   * screen no longer resolves it, so there is only one place deciding what a
+   * code is called.
    */
   it('names the specialty rather than showing its number', () => {
-    expect(specialtyLabel(doc({ specialtyCode: '107', specialtyOther: null }), { 107: 'Kardiologie' }))
+    expect(specialtyLabel(doc({ specialtyCode: '107', specialtyName: 'Kardiologie' })))
       .toBe('Kardiologie');
   });
 
-  it('fetches the name from the server and shows it', async () => {
-    specialties.mockResolvedValue([{ code: '606', name: 'Ortopedie', isCommon: true }]);
-    renderList([doc({ specialtyCode: '606', specialtyOther: null })]);
-
-    expect(await screen.findByText('Ortopedie')).toBeInTheDocument();
-    expect(specialties).toHaveBeenCalledWith('606', 5);
+  it('shows the name the server sent', () => {
+    renderList([doc({ specialtyCode: '606', specialtyName: 'Ortopedie', specialtyOther: null })]);
+    expect(screen.getByText('Ortopedie')).toBeInTheDocument();
   });
 
-  /* Better a number than a blank row when the lookup fails. */
-  it('keeps showing the code when the name cannot be fetched', async () => {
-    specialties.mockRejectedValue(new Error('offline'));
-    renderList([doc({ specialtyCode: '606', specialtyOther: null })]);
-
-    expect(await screen.findByText('606')).toBeInTheDocument();
+  /*
+   * The register retires entries, and then the server can no longer name an
+   * old code. A report filed under one still has to be readable - better the
+   * number than a blank row.
+   */
+  it('keeps showing the code when the register no longer names it', () => {
+    renderList([doc({ specialtyCode: '606', specialtyName: null, specialtyOther: null })]);
+    expect(screen.getByText('606')).toBeInTheDocument();
   });
 
   /*
