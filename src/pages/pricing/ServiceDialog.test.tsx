@@ -48,7 +48,7 @@ const withQueries = (ui: ReactNode) => {
 };
 
 const { default: ServiceDialog } = await import('./ServiceDialog');
-const { default: Cenik } = await import('../Cenik');
+const { default: Cenik, categoryColour } = await import('../Cenik');
 
 const service = (over: Partial<ServiceItem> = {}): ServiceItem => ({
   id: 's1',
@@ -369,5 +369,77 @@ describe('what the category tells the patient to bring', () => {
     await openNew();
     expect(screen.queryByText(/je nová kategorie/)).not.toBeInTheDocument();
     expect(screen.queryByText(/musí\s+doložit/)).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * An empty price list is the normal state now.
+ *
+ * The eight demo rows - and the four categories that came with them - were a
+ * seed the owner never wrote. His words on 13. 9. 2026: "zmaz to, tie
+ * kategórie som nikdy nerobil". They are gone from the database and from the
+ * code, so nothing reappears, and a new installation opens on nothing.
+ *
+ * The screen used to answer that with "V ceníku nic takového není" - the
+ * search-result sentence - over three zeroes and a search box, which is a
+ * question nobody asked and furniture over nothing.
+ */
+describe('a price list with nothing in it', () => {
+  beforeEach(() => { getAll.mockResolvedValue([]); });
+
+  it('says it is empty and offers the first step', async () => {
+    render(withQueries(<Cenik />));
+
+    expect(await screen.findByText('Ceník je prázdný')).toBeInTheDocument();
+    expect(screen.getByText(/Přidejte první položku/)).toBeInTheDocument();
+  });
+
+  it('does not answer with the words for a failed search', async () => {
+    render(withQueries(<Cenik />));
+    await screen.findByText('Ceník je prázdný');
+
+    expect(screen.queryByText(/nic takového není/)).not.toBeInTheDocument();
+  });
+
+  /* Three zeroes and a search box over nothing. */
+  it('shows no totals and nothing to search', async () => {
+    render(withQueries(<Cenik />));
+    await screen.findByText('Ceník je prázdný');
+
+    expect(screen.queryByText('Celkem položek')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/Hledat v ceníku/)).not.toBeInTheDocument();
+  });
+
+  /* And the totals come back with the first row, so this is not "hidden
+     forever" by accident. */
+  it('shows them again once there is something', async () => {
+    getAll.mockResolvedValue([service()]);
+    render(withQueries(<Cenik />));
+
+    expect(await screen.findByText('Celkem položek')).toBeInTheDocument();
+    expect(screen.queryByText('Ceník je prázdný')).not.toBeInTheDocument();
+  });
+});
+
+describe('the colour of a category', () => {
+  /*
+   * Any category, not four of them. The fixed map named exactly the seed's
+   * own - so the owner's inventions would have been grey while the demo data
+   * kept its colours.
+   */
+  it('gives a colour to a category nobody planned for', () => {
+    const mine = categoryColour('Rehabilitace');
+    expect(mine.text).not.toBe('#666');
+    expect(mine.bg).not.toBe('#F5F5F5');
+  });
+
+  it('gives the same category the same colour every time', () => {
+    expect(categoryColour('Prohlídka')).toEqual(categoryColour('Prohlídka'));
+    expect(categoryColour(' Prohlídka ')).toEqual(categoryColour('Prohlídka'));
+  });
+
+  it('falls back to grey only for no category at all', () => {
+    expect(categoryColour('')).toMatchObject({ text: '#666' });
+    expect(categoryColour('   ')).toMatchObject({ text: '#666' });
   });
 });

@@ -33,12 +33,34 @@ import { servicesApi } from '../api/services';
 import type { ServiceItem } from '../api/services';
 import ServiceDialog from './pricing/ServiceDialog';
 
-const categoryColors: Record<string, { bg: string; text: string }> = {
-  'Prohlídka': { bg: '#E8F5E9', text: '#2E7D32' },
-  'Diagnostika': { bg: '#E3F2FD', text: '#1565C0' },
-  'Měření': { bg: '#FFF3E0', text: '#E65100' },
-  'Terapie': { bg: '#F3E5F5', text: '#7B1FA2' },
-};
+/*
+ * A colour for any category, rather than for four of them.
+ *
+ * There used to be a fixed map here: Prohlídka, Diagnostika, Měření, Terapie.
+ * Those four came from a seed the owner never wrote - his words, on
+ * 13. 9. 2026: "zmaz to, tie kategórie som nikdy nerobil". The seed is gone
+ * from the database and from the code, and a map naming those four would have
+ * given them colours and everything the owner invents himself grey.
+ *
+ * Derived from the name, so it is stable for a given category and there is no
+ * list to keep in step with anything.
+ */
+const CATEGORY_PALETTE = [
+  { bg: '#E8F5E9', text: '#2E7D32' },
+  { bg: '#E3F2FD', text: '#1565C0' },
+  { bg: '#FFF3E0', text: '#E65100' },
+  { bg: '#F3E5F5', text: '#7B1FA2' },
+  { bg: '#E0F7FA', text: '#00838F' },
+  { bg: '#FCE4EC', text: '#AD1457' },
+];
+
+export function categoryColour(category: string): { bg: string; text: string } {
+  const name = category.trim();
+  if (name === '') return { bg: '#F5F5F5', text: '#666' };
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.codePointAt(0)!) % 100_000;
+  return CATEGORY_PALETTE[hash % CATEGORY_PALETTE.length];
+}
 
 export default function Cenik() {
   const [services, setServices] = useState<ServiceItem[]>([]);
@@ -103,7 +125,36 @@ export default function Cenik() {
 
       {failed !== null && <Alert severity="warning" sx={{ mb: 2 }}>{failed}</Alert>}
 
+      {/*
+        * An empty price list is the normal state of a new installation now -
+        * the eight demo rows were a seed and it has been removed from the code
+        * as well as the database, so nothing reappears. Three zeroes and a
+        * search box over nothing are furniture; this says what to do instead.
+        */}
+      {!loading && services.length === 0 && failed === null && (
+        <Card sx={{ borderRadius: 3, textAlign: 'center', py: 6 }}>
+          <CardContent>
+            <AttachMoney sx={{ fontSize: 40, color: 'text.disabled' }} />
+            <Typography variant="h6" sx={{ fontWeight: 700, mt: 1 }}>
+              Ceník je prázdný
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 3 }}>
+              Přidejte první položku — co ordinace nabízí a kolik to stojí.
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => setEditing(null)}
+              sx={{ borderRadius: 2, px: 3, bgcolor: '#0D7377' }}
+            >
+              Nová položka
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats Cards */}
+      {services.length > 0 && (
       <Grid container spacing={3} sx={{ mb: 3 }}>
         {[
           { label: 'Celkem položek', value: totalServices, color: '#0D7377' },
@@ -124,8 +175,10 @@ export default function Cenik() {
           </Grid>
         ))}
       </Grid>
+      )}
 
       {/* Search */}
+      {services.length > 0 && (
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
         <TextField
           fullWidth
@@ -138,6 +191,7 @@ export default function Cenik() {
           sx={{ mb: 3, '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
         />
       </motion.div>
+      )}
 
       {/* Service Cards */}
       {loading ? (
@@ -151,7 +205,7 @@ export default function Cenik() {
       ) : (
         <Grid container spacing={3}>
           {filtered.map((service, i) => {
-            const colors = categoryColors[service.category] || { bg: '#F5F5F5', text: '#666' };
+            const colors = categoryColour(service.category);
             return (
               <Grid key={service.id} size={{ xs: 12, sm: 6, md: 4 }}>
                 <motion.div
@@ -220,7 +274,10 @@ export default function Cenik() {
         </Grid>
       )}
 
-      {!loading && filtered.length === 0 && (
+      {/* Only about the search. An empty price list has its own words above -
+          "nic takového není" answers a question nobody asked when there is
+          nothing to search through. */}
+      {!loading && services.length > 0 && filtered.length === 0 && (
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <Typography variant="h6" color="text.secondary">V ceníku nic takového není</Typography>
         </Box>
