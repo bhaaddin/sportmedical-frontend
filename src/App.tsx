@@ -2,9 +2,10 @@ import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react
 import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Avatar, IconButton, Menu, MenuItem, Badge, CircularProgress, Button } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import i18n from './i18n';
-import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Group, Search, AttachMoney, Schedule, EventBusy, Today, Description } from '@mui/icons-material';
+import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Group, Search, AttachMoney, Schedule, EventBusy, Today, Description, ArrowBack } from '@mui/icons-material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { isAdminRole, currentUserRole } from './auth/roles';
+import { PATIENT_SECTIONS, patientInPath, sectionPath } from './pages/patients/sections';
 import { Toaster } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useState, lazy, Suspense, useRef, useCallback } from 'react';
@@ -169,6 +170,16 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  /*
+   * Inside a patient the sidebar becomes that patient's, and the application's
+   * own menu steps aside. The owner's rule: while you are in somebody's file,
+   * everything on screen is about them.
+   *
+   * It is the same navigation either way - a column of links on the left -
+   * so nobody has to learn a second way of getting around; only its contents
+   * change, and the way back out is the first thing in it.
+   */
+  const patientId = patientInPath(location.pathname);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -263,7 +274,63 @@ function Layout({ children }: { children: React.ReactNode }) {
         }}
       >
         <List sx={{ px: 0.5, pt: 1 }}>
-          {menuGroups
+          {patientId !== null && (
+            <Box sx={{ mb: 1 }}>
+              <ListItemButton
+                component={Link as any}
+                to="/patients"
+                title={!sidebarOpen ? 'Zpět na pacienty' : undefined}
+                sx={{
+                  borderRadius: 2, mb: 0.5, py: 1.0, minHeight: 44,
+                  justifyContent: sidebarOpen ? 'initial' : 'center',
+                  px: sidebarOpen ? 2 : 1.5,
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 40, justifyContent: 'center' }}>
+                  <ArrowBack />
+                </ListItemIcon>
+                {sidebarOpen && (
+                  <ListItemText primary="Zpět na pacienty" slotProps={{
+                    primary: { sx: { fontSize: 14, whiteSpace: 'nowrap' } },
+                  }} />
+                )}
+              </ListItemButton>
+              <Box sx={{ mx: 1.5, my: 1, borderTop: '1px solid #e0e0e0' }} />
+              {PATIENT_SECTIONS.map((section) => {
+                const to = sectionPath(patientId, section);
+                const isActive = location.pathname === to;
+                return (
+                  <ListItemButton
+                    key={section.id}
+                    component={Link as any}
+                    to={to}
+                    selected={isActive}
+                    title={!sidebarOpen ? section.label : undefined}
+                    sx={{
+                      borderRadius: 2, mb: 0.5, py: 1.0, minHeight: 44,
+                      justifyContent: sidebarOpen ? 'initial' : 'center',
+                      px: sidebarOpen ? 2 : 1.5,
+                      '&.Mui-selected': { bgcolor: '#E0F2F1', color: '#0D7377', boxShadow: 'inset 3px 0 0 #0D7377' },
+                      '&:hover': { bgcolor: '#E0F2F1' },
+                    }}
+                  >
+                    <ListItemIcon sx={{
+                      color: isActive ? '#0D7377' : 'inherit', minWidth: 40, justifyContent: 'center',
+                    }}>
+                      {section.icon}
+                    </ListItemIcon>
+                    {sidebarOpen && (
+                      <ListItemText primary={section.label} slotProps={{
+                        primary: { sx: { fontWeight: isActive ? 600 : 400, fontSize: 14, whiteSpace: 'nowrap' } },
+                      }} />
+                    )}
+                  </ListItemButton>
+                );
+              })}
+            </Box>
+          )}
+
+          {patientId === null && menuGroups
             .filter(group => !group.adminOnly || isAdminRole(currentUserRole()))
             .map((group, gi) => (
             <Box key={gi}>

@@ -30,8 +30,9 @@ vi.mock('../../api/documents', async () => {
 });
 vi.mock('../../api/client', () => ({ default: { get: getConsents } }));
 
-const { default: PatientLayout, missingRequired, activeSection, PATIENT_SECTIONS } =
+const { default: PatientLayout, missingRequired, activeSection } =
   await import('./PatientLayout');
+const { PATIENT_SECTIONS, patientInPath, sectionPath } = await import('./sections');
 
 const VYPIS = 'tmpl-vypis';
 
@@ -151,14 +152,27 @@ describe('the sections', () => {
     expect(screen.queryByText('PŘEHLED')).not.toBeInTheDocument();
   });
 
-  it('links each tab to the patient in the address', async () => {
-    renderLayout();
-    await screen.findByText('Cesta Jedna');
+  /*
+   * The sidebar draws these, not this page - inside a patient the
+   * application's own menu steps aside. So what is worth holding here is that
+   * every section has an address under the patient, which is what makes it a
+   * page rather than a panel.
+   */
+  it('gives every section an address under the patient', () => {
+    for (const section of PATIENT_SECTIONS) {
+      expect(sectionPath('p1', section)).toMatch(/^\/patients\/p1/);
+    }
+    expect(sectionPath('p1', PATIENT_SECTIONS[0])).toBe('/patients/p1');
+  });
 
-    expect(screen.getByRole('tab', { name: 'Dokumenty' })).toHaveAttribute(
-      'href',
-      '/patients/p1/dokumenty',
-    );
+  /* Which addresses put the sidebar inside one person, and which leave it as
+     the application's. */
+  it('knows the list and a new registration are inside nobody', () => {
+    expect(patientInPath('/patients/p1')).toBe('p1');
+    expect(patientInPath('/patients/p1/dokumenty')).toBe('p1');
+    expect(patientInPath('/patients')).toBeNull();
+    expect(patientInPath('/patients/register')).toBeNull();
+    expect(patientInPath('/dnes')).toBeNull();
   });
 
   it('works out which section an address is in', () => {
@@ -170,7 +184,7 @@ describe('the sections', () => {
   });
 
   it('has a tab for every section and no duplicates', () => {
-    const ids = PATIENT_SECTIONS.map((s) => s.id);
+    const ids = PATIENT_SECTIONS.map((section) => section.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 });

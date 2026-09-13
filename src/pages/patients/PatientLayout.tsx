@@ -13,24 +13,19 @@
  * paperwork are on screen wherever you are inside the patient.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Outlet, useParams, useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
+import { Outlet, useParams, useNavigate } from 'react-router-dom';
 import {
   Alert, Avatar, Box, Button, Card, CardContent, Chip, CircularProgress,
-  Stack, Tab, Tabs, Typography,
+  Stack, Typography,
 } from '@mui/material';
 import { ArrowBack, Edit, Science } from '@mui/icons-material';
+import { PATIENT_SECTIONS } from './sections';
 import { patientsApi } from '../../api/patients';
 import type { Patient } from '../../api/patients';
 import { documentsApi, DOCUMENT_SATISFIES_REQUIREMENT } from '../../api/documents';
 import type { DocumentTemplate, PatientDocument } from '../../api/documents';
 import ConsentLine from '../../components/patients/ConsentLine';
 import { formatDateOnly } from '../../utils/time';
-
-/** The sections a patient has. Kept as data so the tabs and the routes cannot drift. */
-export const PATIENT_SECTIONS = [
-  { id: 'prehled', label: 'Přehled', path: '' },
-  { id: 'dokumenty', label: 'Dokumenty', path: 'dokumenty' },
-] as const;
 
 export interface PatientContext {
   patient: Patient;
@@ -64,7 +59,6 @@ export function missingRequired(
 export default function PatientLayout() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [documents, setDocuments] = useState<PatientDocument[]>([]);
@@ -106,17 +100,12 @@ export default function PatientLayout() {
   }
 
   const missing = missingRequired(templates, documents);
-  const current = activeSection(location.pathname, id);
   const initials = `${patient.firstName?.[0] ?? ''}${patient.lastName?.[0] ?? ''}`;
 
   const context: PatientContext = { patient, documents, templates, reloadDocuments };
 
   return (
     <Box>
-      <Button startIcon={<ArrowBack />} onClick={() => navigate('/patients')} sx={{ mb: 2 }}>
-        Zpět na pacienty
-      </Button>
-
       {/* Stays on screen whichever section is open: somebody who walked away
           from the overview should not lose sight of what is missing. */}
       {missing.length > 0 && (
@@ -164,20 +153,9 @@ export default function PatientLayout() {
         </CardContent>
       </Card>
 
-      {/* Real links, not state. Each section has its own address, so it can be
-          opened in a second tab, bookmarked, and come back on a reload. */}
-      <Tabs value={current} sx={{ mb: 2 }}>
-        {PATIENT_SECTIONS.map((section) => (
-          <Tab
-            key={section.id}
-            value={section.id}
-            label={section.label}
-            component={RouterLink}
-            to={section.path === '' ? `/patients/${id}` : `/patients/${id}/${section.path}`}
-          />
-        ))}
-      </Tabs>
-
+      {/* The sections are in the sidebar now, where the owner asked for them:
+          while you are inside somebody's file, the navigation on the left is
+          theirs and not the application's. */}
       <Outlet context={context} />
     </Box>
   );
