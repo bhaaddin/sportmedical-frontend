@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   LAST_DAY_IS_INCLUSIVE, remainingText, reportStandsOn, reportValidity,
+  validUntilFromIssued,
 } from './reportValidity';
 
 const TODAY = '2026-09-13';
@@ -121,5 +122,43 @@ describe('what the card says about the time left', () => {
   it('says měsíce and měsíců where Czech does', () => {
     expect(remainingText(120)).toContain('měsíce');
     expect(remainingText(180)).toContain('měsíců');
+  });
+});
+
+/*
+ * The year, worked out here because the server's own answer is not reachable
+ * from the patient card. A second copy of a rule, taken knowingly and marked
+ * for deletion - see the function's own note.
+ */
+describe('a year from the day it was issued', () => {
+  it('is the same day next year', () => {
+    expect(validUntilFromIssued('2026-05-03')).toBe('2027-05-03');
+  });
+
+  /*
+   * 29 February has no anniversary. A plain date would roll it to 1 March -
+   * a day of validity nobody granted - so it is pulled back to the last day of
+   * the month instead, which never invents one. Booking guards the same thing
+   * with `AddYears(1)` rather than 365 days.
+   */
+  it('does not invent 1 March out of a leap day', () => {
+    expect(validUntilFromIssued('2028-02-29')).toBe('2029-02-28');
+  });
+
+  it('keeps 29 February when the next year has one', () => {
+    expect(validUntilFromIssued('2027-02-28')).toBe('2028-02-28');
+  });
+
+  it('has nothing to say without an issue date', () => {
+    expect(validUntilFromIssued(null)).toBeNull();
+    expect(validUntilFromIssued(undefined)).toBeNull();
+    expect(validUntilFromIssued('kdysi')).toBeNull();
+  });
+
+  /* End to end: issued, a year on, and still valid on the last day. */
+  it('lines up with the validity it feeds', () => {
+    const until = validUntilFromIssued('2026-05-03');
+    expect(reportStandsOn(until, '2027-05-03')).toBe(true);
+    expect(reportStandsOn(until, '2027-05-04')).toBe(false);
   });
 });

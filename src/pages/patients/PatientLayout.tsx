@@ -26,6 +26,7 @@ import { documentsApi, DOCUMENT_SATISFIES_REQUIREMENT } from '../../api/document
 import type { DocumentTemplate, PatientDocument } from '../../api/documents';
 import ConsentLine from '../../components/patients/ConsentLine';
 import { formatDateOnly } from '../../utils/time';
+import { reportStandsOn, validUntilFromIssued } from '../../services/reportValidity';
 
 export interface PatientContext {
   patient: Patient;
@@ -39,6 +40,28 @@ export function activeSection(pathname: string, patientId: string): string {
   const rest = pathname.replace(`/patients/${patientId}`, '').replace(/^\//, '');
   const match = PATIENT_SECTIONS.find((s) => s.path !== '' && rest.startsWith(s.path));
   return match?.id ?? 'prehled';
+}
+
+/**
+ * Whether one document settles one requirement.
+ *
+ * Signed off, and still in date. A výpis that has run out is not a výpis the
+ * patient has - the owner said so plainly: "keď platnosť uplynie, hláška je
+ * jedna a jednoduchá, treba doplniť výpis, rovnaká ako keď výpis nikdy nebol".
+ *
+ * Without the second half the banner and the row said different things about
+ * the same document: the row read "Chybí — platnost skončila 3. 5. 2025" while
+ * the banner above it said nothing at all.
+ */
+function satisfies(template: DocumentTemplate, document: PatientDocument): boolean {
+  if (document.templateId !== template.id) return false;
+  if (document.status !== DOCUMENT_SATISFIES_REQUIREMENT) return false;
+
+  if (template.type !== 'Vypis') return true;
+  const until = validUntilFromIssued(document.reportDate);
+  /* No issue date means no year to count. Calling that expired would turn a
+     blank field into a missing document. */
+  return until === null || reportStandsOn(until);
 }
 
 export interface PaperworkGaps {
@@ -82,12 +105,7 @@ export function paperworkGaps(
 ): PaperworkGaps {
   const missing = templates
     .filter((t) => t.isActive && t.requiredForVisit)
-    .filter(
-      (t) =>
-        !documents.some(
-          (d) => d.templateId === t.id && d.status === DOCUMENT_SATISFIES_REQUIREMENT,
-        ),
-    );
+    .filter((t) => !documents.some((d) => satisfies(t, d)));
 
   return {
     always: missing.filter((t) => !t.firstVisitOnly),

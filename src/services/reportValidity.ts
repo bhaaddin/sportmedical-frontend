@@ -141,3 +141,53 @@ export function remainingText(daysLeft: number): string {
     (_m, n: string) => (Number(n) >= 5 ? `${n} měsíců` : `${n} měsíce`),
   );
 }
+
+/**
+ * How long a výpis is good for, worked out from the day it was issued.
+ *
+ * THIS IS A SECOND COPY OF A RULE AND IT IS MEANT TO BE DELETED.
+ *
+ * The rule is the owner's and he stated it plainly: a výpis is good for a year
+ * from its date of issue. Booking implements it as `issued.AddYears(1)` and
+ * sends the answer as `reportValidUntil` on `PaperworkView`. That is the value
+ * this file is built around and the one that should be used.
+ *
+ * It is not on the running server, it hangs off an appointment, and the patient
+ * card has no appointment. So the card could either say nothing about validity
+ * at all - which is what it did, and what the owner asked about twice - or work
+ * it out from `reportDate`, which it does have.
+ *
+ * Two copies of "a year" can drift, and if the rule ever becomes two years this
+ * one goes wrong silently. That is the cost, it is real, and it is taken
+ * knowingly rather than hidden: the moment a server-sent date is available,
+ * pass that to `reportValidity` instead and delete this function. Nothing else
+ * needs to change, because everything else already takes a date.
+ */
+export const VYPIS_VALID_MONTHS = 12;
+
+export function validUntilFromIssued(
+  issued: DateOnlyString | null | undefined,
+): DateOnlyString | null {
+  if (issued === null || issued === undefined) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(issued);
+  if (match === null) return null;
+  const [, y, m, d] = match;
+
+  /*
+   * Whole years, not 365 days: a leap year in between would quietly shorten it
+   * by a day, and booking guards the same thing with `AddYears(1)`.
+   *
+   * 29 February is the case that needs saying out loud. A výpis issued on
+   * 29. 2. 2028 has no anniversary in 2029; `Date` would roll it to 1 March,
+   * which is a day of validity nobody granted. It is pulled back to 28
+   * February - the last day of the month it was issued in - which is the
+   * reading that never invents a day.
+   */
+  const year = Number(y) + Math.floor(VYPIS_VALID_MONTHS / 12);
+  const month = Number(m);
+  const lastOfMonth = new Date(year, month, 0).getDate();
+  const day = Math.min(Number(d), lastOfMonth);
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${year}-${pad(month)}-${pad(day)}`;
+}

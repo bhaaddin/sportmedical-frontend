@@ -52,8 +52,11 @@ const template = (over: Partial<DocumentTemplate> = {}): DocumentTemplate =>
     ...over,
   }) as DocumentTemplate;
 
-const doc = (status: DocumentStatus, templateId: string | null = VYPIS): PatientDocument =>
-  ({ id: 'd1', templateId, status }) as PatientDocument;
+const doc = (
+  status: DocumentStatus,
+  templateId: string | null = VYPIS,
+  reportDate: string | null = null,
+): PatientDocument => ({ id: 'd1', templateId, status, reportDate }) as PatientDocument;
 
 beforeEach(() => {
   getById.mockReset().mockResolvedValue({
@@ -235,5 +238,44 @@ describe('a patient who is not there', () => {
 
     expect(await screen.findByText(/Tenhle pacient neexistuje/)).toBeInTheDocument();
     expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * A výpis that has run out is not a výpis the patient has.
+ *
+ * The owner: "keď platnosť uplynie, hláška je jedna a jednoduchá - treba
+ * doplniť výpis, rovnaká ako keď výpis nikdy nebol, bez strašenia."
+ *
+ * Before this, the row and the banner disagreed about the same document: the
+ * row read "Chybí — platnost skončila 3. 5. 2025" while the banner above it
+ * said nothing at all. Two statements about one fact, and the quiet one was
+ * the wrong one.
+ */
+describe('a výpis that has expired', () => {
+  it('does not settle the requirement', () => {
+    expect(paperworkGaps([template()], [doc('SignedOff', VYPIS, '2020-01-01')]).firstVisitOnly)
+      .toHaveLength(1);
+  });
+
+  it('while one still in date does', () => {
+    const nextYear = new Date();
+    nextYear.setMonth(nextYear.getMonth() - 1);
+    const recent = nextYear.toISOString().slice(0, 10);
+    expect(paperworkGaps([template()], [doc('SignedOff', VYPIS, recent)]).firstVisitOnly)
+      .toHaveLength(0);
+  });
+
+  /* A blank issue date is a blank field, not an expired document. */
+  it('counts one with no issue date rather than calling it expired', () => {
+    expect(paperworkGaps([template()], [doc('SignedOff', VYPIS, null)]).firstVisitOnly)
+      .toHaveLength(0);
+  });
+
+  /* Only the výpis has a year - nothing else may be aged out. */
+  it('never expires a document of another kind', () => {
+    const other = template({ id: 'other', type: 'InformovanySouhlas', firstVisitOnly: false });
+    expect(paperworkGaps([other], [doc('SignedOff', 'other', '2015-01-01')]).always)
+      .toHaveLength(0);
   });
 });

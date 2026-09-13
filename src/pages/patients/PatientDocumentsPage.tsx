@@ -94,15 +94,38 @@ export default function PatientDocumentsPage() {
                   * "Hotovo" answers a question nobody has.
                   */}
                 {row.tone === 'on-file' ? (
-                  <Typography variant="body2" color="text.secondary">
-                    {row.text}
-                  </Typography>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="body2" color="text.secondary">{row.text}</Typography>
+                    {row.detail !== undefined && (
+                      <Typography variant="caption" color="text.secondary">
+                        {row.detail}
+                      </Typography>
+                    )}
+                  </Box>
+                ) : row.tone === 'expiring' ? (
+                  /* Amber, and only here: still valid, and this is the cheap
+                     moment to replace it - while the patient is in the room. */
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="body2" sx={{ color: '#ED6C02', fontWeight: 500 }}>
+                      {row.text}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#ED6C02' }}>
+                      {row.detail}
+                    </Typography>
+                  </Box>
                 ) : row.tone === 'first-visit' ? (
                   <Chip label={row.text} size="small"
                     sx={{ bgcolor: '#0288D114', color: '#0288D1', fontWeight: 500 }} />
                 ) : (
-                  <Chip icon={<ErrorIcon />} label={row.text} size="small"
-                    sx={{ bgcolor: '#D32F2F14', color: '#D32F2F', fontWeight: 500 }} />
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Chip icon={<ErrorIcon />} label={row.text} size="small"
+                      sx={{ bgcolor: '#D32F2F14', color: '#D32F2F', fontWeight: 500 }} />
+                    {row.detail !== undefined && (
+                      <Typography variant="caption" sx={{ display: 'block', color: '#D32F2F' }}>
+                        {row.detail}
+                      </Typography>
+                    )}
+                  </Box>
                 )}
 
                 <Button

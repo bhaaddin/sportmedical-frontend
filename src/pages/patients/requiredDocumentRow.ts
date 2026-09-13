@@ -30,15 +30,32 @@
  * never computed. Asked for; not guessed at.
  */
 import { formatDateOnly } from '../../utils/time';
+import { remainingText, reportValidity, validUntilFromIssued } from '../../services/reportValidity';
 import type { DocumentTemplate, PatientDocument } from '../../api/documents';
 
-export type RequiredRowTone = 'missing' | 'first-visit' | 'on-file';
+export type RequiredRowTone =
+  | 'missing'      // red: nothing on file, or what is on file has run out
+  | 'first-visit'  // blue: worth knowing, nothing to do today
+  | 'expiring'     // amber: still good, and the cheap moment to fix it is now
+  | 'on-file';     // grey: a fact, not an achievement
 
 export interface RequiredRowState {
   tone: RequiredRowTone;
   /** What the row says where a verdict used to be. */
   text: string;
+  /** The second line, when the first does not hold everything. */
+  detail?: string;
 }
+
+/*
+ * How close to the end counts as close.
+ *
+ * A month, because that is the window where the fix is still cheap: a výpis
+ * running out in three weeks can be asked for at this visit, while the patient
+ * is in the room. Without it the first anybody hears of it is the day somebody
+ * has to be sent home.
+ */
+export const EXPIRING_SOON_DAYS = 30;
 
 /**
  * The document's own date, which is the one worth reading.
@@ -59,8 +76,37 @@ function dateOf(document: PatientDocument): string {
 export function requiredRowState(
   template: DocumentTemplate,
   filed: PatientDocument | undefined,
+  today: Date = new Date(),
 ): RequiredRowState {
-  if (filed !== undefined) return { tone: 'on-file', text: dateOf(filed) };
+  if (filed !== undefined) {
+    /*
+     * Only the výpis runs out. Other required documents have no validity of
+     * their own, so asking after one would invent a deadline nobody set.
+     */
+    const until =
+      template.type === 'Vypis' ? validUntilFromIssued(filed.reportDate) : null;
+
+    if (until !== null) {
+      const validity = reportValidity(until, today);
+
+      /*
+       * An expired výpis is a missing výpis, and says the same sentence. The
+       * owner asked for exactly that: "keď platnosť uplynie, hláška je jedna a
+       * jednoduchá - treba doplniť výpis, rovnaká ako keď výpis nikdy nebol,
+       * bez strašenia".
+       */
+      if (validity.kind !== 'valid') {
+        return { tone: 'missing', text: 'Chybí', detail: `platnost skončila ${formatDateOnly(until)}` };
+      }
+
+      const text = `${dateOf(filed)} · platí do ${formatDateOnly(until)}`;
+      return validity.daysLeft <= EXPIRING_SOON_DAYS
+        ? { tone: 'expiring', text, detail: remainingText(validity.daysLeft) }
+        : { tone: 'on-file', text, detail: remainingText(validity.daysLeft) };
+    }
+
+    return { tone: 'on-file', text: dateOf(filed) };
+  }
 
   /*
    * Not "Chybí" for a document only a first visit needs. Measured against the
