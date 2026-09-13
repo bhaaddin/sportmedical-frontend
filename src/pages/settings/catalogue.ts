@@ -202,3 +202,29 @@ export function visibleSections(isAdmin: boolean): SettingsSection[] {
 export function allDestinations(): string[] {
   return SETTINGS_SECTIONS.flatMap((s) => s.items.map((i) => i.to));
 }
+
+/**
+ * Which settings screen an address is, if it is one.
+ *
+ * Exists so the way back can be drawn once, by the layout, instead of pasted
+ * into fourteen pages. All fourteen destinations in this file were checked on
+ * 13. 9. 2026 and not one of them had a back control, a breadcrumb or anything
+ * else: clicking into any settings screen left the reader with the sidebar's
+ * gear as the only route out, and the sidebar is collapsed to icons.
+ *
+ * Sub-paths count as the same screen - `/working-hours/anything` is still
+ * Pracovní doba - so a screen that grows a detail view does not silently lose
+ * its way back.
+ */
+export function settingsItemAt(
+  pathname: string,
+): { item: SettingsItem; section: SettingsSection } | null {
+  for (const section of SETTINGS_SECTIONS) {
+    for (const item of section.items) {
+      if (pathname === item.to || pathname.startsWith(`${item.to}/`)) {
+        return { item, section };
+      }
+    }
+  }
+  return null;
+}

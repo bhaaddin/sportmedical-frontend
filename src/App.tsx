@@ -6,6 +6,7 @@ import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logou
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { isAdminRole, currentUserRole } from './auth/roles';
 import { PATIENT_SECTIONS, patientInPath, sectionPath } from './pages/patients/sections';
+import { settingsItemAt } from './pages/settings/catalogue';
 import { Toaster } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useState, lazy, Suspense, useRef, useCallback } from 'react';
@@ -181,6 +182,7 @@ function Layout({ children }: { children: React.ReactNode }) {
    * change, and the way back out is the first thing in it.
    */
   const patientId = patientInPath(location.pathname);
+  const settingsHere = settingsItemAt(location.pathname);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -387,6 +389,35 @@ function Layout({ children }: { children: React.ReactNode }) {
           bgcolor: '#F5F7FA', minHeight: '100vh', overflow: 'auto',
         }}
       >
+        {/*
+          * The way out of a settings screen, drawn once for all fourteen of
+          * them. Not one had one: clicking into any of them left the gear in a
+          * collapsed icon sidebar as the only route back, which is a route
+          * nobody finds by looking.
+          *
+          * It names where it goes rather than promising "back". `navigate(-1)`
+          * would be a guess - somebody can arrive here from the booking screen
+          * or by typing the address - and a control that lands somewhere
+          * different each time is worse than none.
+          */}
+        {settingsHere !== null && (
+          <Box sx={{ mb: 2 }}>
+            <Button
+              component={Link as any}
+              to="/settings"
+              startIcon={<ArrowBack />}
+              size="small"
+              sx={{ color: 'text.secondary', textTransform: 'none' }}
+            >
+              Nastavení
+              <Box component="span" sx={{ mx: 0.75, color: 'text.disabled' }}>/</Box>
+              <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                {settingsHere.section.label}
+              </Box>
+            </Button>
+          </Box>
+        )}
+
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}

@@ -15,6 +15,7 @@ import {
   SETTINGS_SECTIONS,
   visibleSections,
   allDestinations,
+  settingsItemAt,
 } from './catalogue';
 
 /* Vite hands us the file's text; `node:fs` would need Node types this project
@@ -92,5 +93,53 @@ describe('what each person sees', () => {
   it('drops a section entirely once nothing in it is hers', () => {
     const plain = visibleSections(false);
     expect(plain.map((s) => s.id)).not.toContain('system');
+  });
+});
+
+/*
+ * The way back out.
+ *
+ * On 13. 9. 2026 all fourteen destinations here were opened and not one had a
+ * back control, a breadcrumb, or anything else - the gear in a collapsed icon
+ * sidebar was the only route out of any of them. It is drawn once by the
+ * layout now, off this lookup.
+ *
+ * The first test below walks the same list the lookup walks, so it cannot
+ * fail for a row someone adds - it guards the matching, not the catalogue. A
+ * row pointing at a route that does not exist is caught further up, by the
+ * test that holds every destination against App.tsx.
+ */
+describe('finding the way back', () => {
+  it('recognises every destination in the catalogue', () => {
+    for (const section of SETTINGS_SECTIONS) {
+      for (const item of section.items) {
+        const found = settingsItemAt(item.to);
+        expect(found, `no way back from ${item.to}`).not.toBeNull();
+        expect(found?.item.id).toBe(item.id);
+        expect(found?.section.id).toBe(section.id);
+      }
+    }
+  });
+
+  /* A detail view under a settings screen is still that screen. */
+  it('recognises a sub-path as the screen it sits under', () => {
+    expect(settingsItemAt('/working-hours/period-3')?.item.id).toBe('pracovni-doba');
+  });
+
+  /*
+   * The opposite failure, and the easier one to ship: a breadcrumb on every
+   * screen in the application. Settings itself is not a settings sub-screen.
+   */
+  it('says nothing about screens that are not settings', () => {
+    for (const path of ['/settings', '/planovani', '/patients', '/dnes', '/']) {
+      expect(settingsItemAt(path), `${path} should have no crumb`).toBeNull();
+    }
+  });
+
+  /* `/calendar` is the old moved-calendar page; `/calendars` is the settings
+     one. A prefix match instead of a segment match would confuse them. */
+  it('does not mistake a shorter neighbouring route for a settings one', () => {
+    expect(settingsItemAt('/calendar')).toBeNull();
+    expect(settingsItemAt('/cenikovy-prehled')).toBeNull();
   });
 });
