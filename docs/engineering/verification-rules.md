@@ -76,11 +76,51 @@ Výstup typechecku písaný do `/tmp` prepísala iná relácia bežiaca na tom i
 stroji a porovnanie „predtým verzus teraz" potom porovnávalo dva rôzne nástroje.
 Medzivýstupy patria do vlastného priečinka relácie, nie do zdieľaného `/tmp`.
 
+### Meranie v prostredí, do ktorého v tom istom čase zasahuje niekto iný
+
+To isté o poschodie vyššie: nie súbor v zdieľanom `/tmp`, ale zdieľaná
+**databáza**. Stalo sa to 13. 9. 2026 dvakrát za jeden deň.
+
+Termíny: mriežka kreslila termíny, `GET /api/scheduling/appointments` hlásil
+nulu. Vyzeralo to ako nedôveryhodný endpoint a tvrdil som to ďalej. V
+skutočnosti som porovnával snímku obrazovky spred cudzieho mazania s meraním po
+ňom — endpoint hovoril pravdu celý čas.
+
+Dokumenty: `upload` vrátil 200, dokument bol na obrazovke, `GET …/content`
+vrátil 404. Vyzeralo to ako chyba v `/content`. Bol to ten istý dokument
+zmazaný uprostred merania.
+
+Ten druhý sa chytil tým, že sa meralo **znova** — nahratie a stiahnutie v
+jednom volaní vrátilo 200 a správne bajty. Ten prvý sa nechytil, lebo sa
+namiesto druhého merania usudzovalo z prvého.
+
+Pravidlo, kde sa čo meria, je napísané v `SportMedical.Booking` v
+`docs/engineering/databases-and-environments.md` a neopakuje sa tu: pruh si
+svoje tvrdenia dokazuje na vlastnej databáze, `sportmedical_dev` je prostredie
+vlastníka. Jediná vec, ktorá sa inde overiť nedá, je, či **beží nový build** —
+a veľká časť overovania z tohto repozitára je práve to, keďže preklikať
+obrazovku sa inde nedá. Tam to pravidlo neplatí, platí menšie: **povedať to
+ostatným pruhom skôr, než sa začne merať.** Oznámenie, nie žiadosť o povolenie.
+
 ## Čo to znamená pre CI
 
 `.github/workflows/ci.yml` má `npm run typecheck` ako krok, ktorý zhadzuje job.
-`npm run build` je holé `vite build` a **netypuje** — zelený build sám o sebe
-nič neoveruje a nesmie sa za overenie vydávať.
+
+`npm run build` je holé `vite build` a **netypuje**. Zelený build sa preto
+nesmie vydávať za overenie typov — ale netreba ho ani odpísať ako kontrolu,
+ktorá nehovorí nič, ako tu stálo predtým. Zmerané 13. 9. 2026 na `{/* … */}`
+vo vetve ternárneho operátora:
+
+```
+tsc      exit=0   pustil
+vitest   exit=0   pustil
+build    exit=1   chytil
+```
+
+`tsc` prečíta `{/* */}` ako objektový literál; testy ten súbor nikdy
+neimportovali. Odmietol to jedine JSX parser v builde. Typecheck, build a beh
+sú tri samostatné otázky a ani jedna z nich nenahrádza druhú — to je to, čo o
+nich v `CLAUDE.local.md` stojí, a čítalo sa to tu jednostranne.
 
 ---
 
