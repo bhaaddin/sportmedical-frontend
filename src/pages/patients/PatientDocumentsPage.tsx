@@ -82,19 +82,26 @@ export default function PatientDocumentsPage() {
                       {template.description}
                     </Typography>
                   )}
-                  {template.firstVisitOnly && (
-                    <Typography variant="caption" color="text.secondary">
-                      Pouze 1. návštěva
-                    </Typography>
-                  )}
                 </Box>
 
-                {filed === undefined ? (
-                  <Chip icon={<ErrorIcon />} label="Chybí" size="small"
-                    sx={{ bgcolor: '#D32F2F14', color: '#D32F2F', fontWeight: 500 }} />
-                ) : (
+                {/*
+                  * Three states, not two. A first-visit document that is not
+                  * on file is not "Chybí" - measured against the server, a
+                  * returning patient with no výpis has nothing missing at all
+                  * (`check?isFirstVisit=false` -> allRequiredPresent). Red
+                  * here while the banner above says "Při první návštěvě je
+                  * potřeba" would be the same screen saying two things about
+                  * one document, and the red one would be the wrong one.
+                  */}
+                {filed !== undefined ? (
                   <Chip icon={<CheckCircle />} label="Hotovo" size="small"
                     sx={{ bgcolor: '#2E7D3214', color: '#2E7D32', fontWeight: 500 }} />
+                ) : template.firstVisitOnly ? (
+                  <Chip label="Při 1. návštěvě" size="small"
+                    sx={{ bgcolor: '#0288D114', color: '#0288D1', fontWeight: 500 }} />
+                ) : (
+                  <Chip icon={<ErrorIcon />} label="Chybí" size="small"
+                    sx={{ bgcolor: '#D32F2F14', color: '#D32F2F', fontWeight: 500 }} />
                 )}
 
                 <Button
