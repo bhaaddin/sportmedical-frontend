@@ -8,7 +8,7 @@
  * keeps finding: not a broken thing, an invisible one.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
@@ -16,11 +16,14 @@ import type { ReactNode } from 'react';
 const listRules = vi.fn();
 const addRule = vi.fn();
 const removeRule = vi.fn();
+const updateRule = vi.fn();
 const listClinicServices = vi.fn();
 const getTemplates = vi.fn();
 
 vi.mock('../../api/documentRequirements', () => ({
-  documentRequirementsApi: { list: listRules, add: addRule, remove: removeRule },
+  documentRequirementsApi: {
+    list: listRules, add: addRule, remove: removeRule, update: updateRule,
+  },
 }));
 vi.mock('../../api/clinicServices', () => ({
   clinicServicesApi: { list: listClinicServices },
@@ -34,9 +37,14 @@ const { default: DocumentRequirementsPage } = await import('./DocumentRequiremen
 const svc = (id: string, name: string, over: Record<string, unknown> = {}) =>
   ({ id, name, description: '', sortOrder: 0, isActive: true, activities: 3, calendars: 1, ...over });
 
-const tpl = (id: string, name: string, isActive = true) =>
+/* The type matters: booking only checks a `Vypis` when an appointment is made,
+   so it decides whether a blocking rule blocks anything at all. Every template
+   in the first version of these fixtures was typed `Vypis`, which made the
+   "this will not happen" case unreachable - the test looked for a warning the
+   fixture could never produce. */
+const tpl = (id: string, name: string, type = 'Vypis', isActive = true) =>
   ({
-    id, name, type: 'Vypis', version: 1, fileUrl: '', requiredForVisit: true,
+    id, name, type, version: 1, fileUrl: '', requiredForVisit: true,
     firstVisitOnly: false, ageGated: false, minimumAge: 0, description: '', isActive,
   });
 
@@ -47,6 +55,10 @@ const rule = (over: Record<string, unknown> = {}) => ({
   clinicServiceId: 's1',
   serviceName: 'Sportovní lékařské prohlídky',
   serviceExists: true,
+  validityMonths: 12,
+  warnDaysBefore: 30,
+  firstVisitOnly: false,
+  blocksBooking: false,
   ...over,
 });
 
@@ -54,13 +66,14 @@ beforeEach(() => {
   listRules.mockReset().mockResolvedValue([]);
   addRule.mockReset().mockResolvedValue(rule());
   removeRule.mockReset().mockResolvedValue(undefined);
+  updateRule.mockReset().mockImplementation(async () => rule());
   listClinicServices.mockReset().mockResolvedValue([
     svc('s1', 'Sportovní lékařské prohlídky'),
     svc('s2', 'Sportovní diagnostika'),
   ]);
   getTemplates.mockReset().mockResolvedValue([
     tpl('t1', 'Výpis ze zdravotní dokumentace'),
-    tpl('t2', 'Informovaný souhlas'),
+    tpl('t2', 'Informovaný souhlas', 'InformovanySouhlas'),
   ]);
 });
 
@@ -209,5 +222,185 @@ describe('removing a rule', () => {
     );
 
     await waitFor(() => expect(removeRule).toHaveBeenCalledWith('r2'));
+  });
+});
+
+/*
+ * The four settings.
+ *
+ * Until the server grew them a rule was "šablona × služba" and everything it
+ * did was fixed in the source. The owner's words: "to pravidlo musi mat
+ * nastavenia ... a nastavit ci vsetky veci ktore su teraz v kode natvrdo".
+ */
+const openSettings = async () => {
+  show();
+  await userEvent.click(await screen.findByRole('button', { name: /Upravit pravidlo/i }));
+  await screen.findByLabelText(/Platnost/);
+};
+
+describe('what a rule does, on its row', () => {
+  /* Four settings behind a pencil are four settings nobody reads. */
+  it('says it in a sentence, not in field names', async () => {
+    listRules.mockResolvedValue([rule()]);
+    show();
+
+    expect(await screen.findByText(/Platí 12 měsíců od vystavení/)).toBeInTheDocument();
+    expect(screen.getByText(/upozorní 30 dní předem/)).toBeInTheDocument();
+    expect(screen.getByText(/při každé návštěvě/)).toBeInTheDocument();
+  });
+
+  it('says plainly when a rule turns people away', async () => {
+    listRules.mockResolvedValue([rule({ blocksBooking: true })]);
+    show();
+
+    expect(await screen.findByText(/bez něj nejde objednat/)).toBeInTheDocument();
+  });
+
+  /*
+   * Booking only checks the výpis when an appointment is made, so this rule
+   * refuses nothing whatever the switch says. A promise the system does not
+   * keep is the shape this project keeps deleting.
+   */
+  it('says when the blocking will not actually happen', async () => {
+    listRules.mockResolvedValue([
+      rule({ templateId: 't2', templateName: 'Informovaný souhlas', blocksBooking: true }),
+    ]);
+    show();
+
+    expect(await screen.findByText(/kontroluje jen výpis/)).toBeInTheDocument();
+  });
+
+  it('says nothing of the sort for a výpis', async () => {
+    listRules.mockResolvedValue([rule({ blocksBooking: true })]);
+    show();
+
+    await screen.findByText('Výpis ze zdravotní dokumentace');
+    expect(screen.queryByText(/kontroluje jen výpis/)).not.toBeInTheDocument();
+  });
+});
+
+describe('changing the settings', () => {
+  it('opens with what the rule actually has', async () => {
+    listRules.mockResolvedValue([rule({ validityMonths: 24, warnDaysBefore: 14 })]);
+    await openSettings();
+
+    expect(screen.getByLabelText(/Platnost/)).toHaveValue(24);
+    expect(screen.getByLabelText(/Upozornit předem/)).toHaveValue(14);
+  });
+
+  /* `PUT` takes all four and all four are required, so a save is the whole
+     block - never just the field that moved. */
+  it('sends all four, not just the one that changed', async () => {
+    listRules.mockResolvedValue([rule({ firstVisitOnly: true })]);
+    await openSettings();
+
+    await userEvent.clear(screen.getByLabelText(/Platnost/));
+    await userEvent.type(screen.getByLabelText(/Platnost/), '6');
+    await userEvent.click(screen.getByRole('button', { name: /Uložit/i }));
+
+    await waitFor(() => expect(updateRule).toHaveBeenCalled());
+    expect(updateRule.mock.calls[0][0]).toBe('r1');
+    expect(updateRule.mock.calls[0][1]).toEqual({
+      validityMonths: 6,
+      warnDaysBefore: 30,
+      firstVisitOnly: true,
+      blocksBooking: false,
+    });
+  });
+
+  /* Zero is not empty: it is "never expires", and it has to be saveable. */
+  it('lets zero through, because zero means never', async () => {
+    listRules.mockResolvedValue([rule()]);
+    await openSettings();
+
+    await userEvent.clear(screen.getByLabelText(/Platnost/));
+    await userEvent.type(screen.getByLabelText(/Platnost/), '0');
+
+    expect(screen.getByRole('button', { name: /Uložit/i })).toBeEnabled();
+    expect(screen.getByText(/Nevyprší/)).toBeInTheDocument();
+  });
+
+  it('holds the save shut on a negative number, and says which field', async () => {
+    listRules.mockResolvedValue([rule()]);
+    await openSettings();
+
+    /* `fireEvent`, not `type`: a number input drops a typed leading minus, so
+       the field would end up at 3 and the test would be checking nothing. A
+       paste puts it there, and so does the server's own 400. */
+    fireEvent.change(screen.getByLabelText(/Platnost/), { target: { value: '-3' } });
+
+    expect(await screen.findByText(/nemůže být záporná/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Uložit/i })).toBeDisabled();
+    expect(updateRule).not.toHaveBeenCalled();
+  });
+});
+
+describe('the switch that turns people away', () => {
+  /*
+   * Not another switch in a row. It reverses the owner's own rule from plan
+   * 2.4 - paperwork always warns, because the patient is on the telephone and
+   * needs a slot now. So turning it on is asked about.
+   */
+  it('asks before it lets the blocking be saved', async () => {
+    listRules.mockResolvedValue([rule()]);
+    await openSettings();
+
+    await userEvent.click(screen.getByLabelText(/jen upozornit/i));
+
+    expect(await screen.findByText(/přestane jít objednat/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Uložit/i })).toBeDisabled();
+  });
+
+  it('saves once it has been confirmed', async () => {
+    listRules.mockResolvedValue([rule()]);
+    await openSettings();
+
+    await userEvent.click(screen.getByLabelText(/jen upozornit/i));
+    await userEvent.click(await screen.findByLabelText(/Rozumím/));
+    await userEvent.click(screen.getByRole('button', { name: /Uložit/i }));
+
+    await waitFor(() => expect(updateRule).toHaveBeenCalled());
+    expect(updateRule.mock.calls[0][1]).toMatchObject({ blocksBooking: true });
+  });
+
+  /* Making the safer direction harder would be the wrong way round. */
+  it('does not ask to turn it off', async () => {
+    listRules.mockResolvedValue([rule({ blocksBooking: true })]);
+    await openSettings();
+
+    await userEvent.click(screen.getByLabelText(/nejde objednat/i));
+
+    expect(screen.queryByText(/přestane jít objednat/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Uložit/i })).toBeEnabled();
+  });
+
+  /*
+   * A rule already blocking is edited without being asked again about a
+   * decision already taken - otherwise changing its validity would re-open a
+   * settled question every time.
+   */
+  it('does not ask again when it was already on', async () => {
+    listRules.mockResolvedValue([rule({ blocksBooking: true })]);
+    await openSettings();
+
+    await userEvent.clear(screen.getByLabelText(/Platnost/));
+    await userEvent.type(screen.getByLabelText(/Platnost/), '6');
+
+    expect(screen.queryByText(/přestane jít objednat/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Uložit/i })).toBeEnabled();
+  });
+
+  /* Flicking it on and off must not leave a yes behind. */
+  it('drops the confirmation when the switch goes back off', async () => {
+    listRules.mockResolvedValue([rule()]);
+    await openSettings();
+
+    await userEvent.click(screen.getByLabelText(/jen upozornit/i));
+    await userEvent.click(await screen.findByLabelText(/Rozumím/));
+    await userEvent.click(screen.getByLabelText(/nejde objednat/i));
+    await userEvent.click(screen.getByLabelText(/jen upozornit/i));
+
+    expect(await screen.findByText(/přestane jít objednat/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Uložit/i })).toBeDisabled();
   });
 });

@@ -16,15 +16,19 @@
  */
 import { useState } from 'react';
 import {
-  Alert, Box, Button, Card, CardContent, IconButton, MenuItem, Stack,
+  Alert, Box, Button, Card, CardContent, Dialog, DialogActions, DialogContent,
+  DialogTitle, FormControlLabel, IconButton, MenuItem, Stack, Switch,
   TextField, Tooltip, Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import BlockIcon from '@mui/icons-material/Block';
 import DescriptionIcon from '@mui/icons-material/Description';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { documentRequirementsApi } from '../../api/documentRequirements';
+import type { RequirementRule, RequirementSettings } from '../../api/documentRequirements';
 import { clinicServicesApi } from '../../api/clinicServices';
 import { documentsApi } from '../../api/documents';
 import { AsyncSection } from '../../components/booking/AsyncSection';
@@ -32,6 +36,10 @@ import { errorText } from '../../components/booking/errorText';
 import {
   RULE_HEALTH_TEXT, alreadyRequired, canAddRule, ruleHealth, summaryText,
 } from './requirementRules';
+import {
+  BLOCKING_CONFIRM_TEXT, BLOCKING_IGNORED_TEXT, SETTINGS_PROBLEM_TEXT,
+  blockingWillHappen, settingsAreValid, settingsProblems, settingsSummary,
+} from './requirementSettings';
 
 export default function DocumentRequirementsPage() {
   const { t } = useTranslation();
@@ -75,6 +83,56 @@ export default function DocumentRequirementsPage() {
     mutationFn: (ruleId: string) => documentRequirementsApi.remove(ruleId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['document-requirements'] }),
   });
+
+  /*
+   * The four settings, changed on the rule that already exists.
+   *
+   * Until the server grew them, everything a rule did was fixed in the source
+   * - which is what the owner objected to: "nastavit ci vsetky veci ktore su
+   * teraz v kode natvrdo". `PUT` takes all four and all four are required, so
+   * the dialog always sends the whole block rather than the field that moved.
+   */
+  const [editing, setEditing] = useState<RequirementRule | null>(null);
+  const [draft, setDraft] = useState<RequirementSettings | null>(null);
+  /* Asked once, before the switch goes on. Not asked again to turn it off -
+     making the safer direction harder would be the wrong way round. */
+  const [confirmBlocking, setConfirmBlocking] = useState(false);
+
+  const save = useMutation({
+    mutationFn: ({ ruleId, settings }: { ruleId: string; settings: RequirementSettings }) =>
+      documentRequirementsApi.update(ruleId, settings),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['document-requirements'] });
+      setEditing(null);
+      setDraft(null);
+    },
+  });
+
+  const openEdit = (rule: RequirementRule) => {
+    setEditing(rule);
+    setDraft({
+      validityMonths: rule.validityMonths,
+      warnDaysBefore: rule.warnDaysBefore,
+      firstVisitOnly: rule.firstVisitOnly,
+      blocksBooking: rule.blocksBooking,
+    });
+    setConfirmBlocking(false);
+    save.reset();
+  };
+
+  const templateTypeOf = (templateId: string) =>
+    (templatesQuery.data ?? []).find((tpl) => tpl.id === templateId)?.type;
+
+  const problems = draft === null ? [] : settingsProblems(draft);
+  /*
+   * Turning it on needs the confirmation; turning it off never does. A rule
+   * already blocking stays saveable without re-confirming, or every edit to
+   * its validity would ask again about a decision already taken.
+   */
+  const blockingIsNew = draft?.blocksBooking === true && editing?.blocksBooking === false;
+  const canSave =
+    draft !== null && settingsAreValid(draft) && !save.isPending
+    && (!blockingIsNew || confirmBlocking);
 
   /*
    * Said before the click, not after. The server answers a repeat by handing
@@ -195,7 +253,21 @@ export default function DocumentRequirementsPage() {
                           ? 'u smazané služby'
                           : `u služby ${rule.serviceName}`}
                       </Typography>
+                      {/* What the rule does, on the row. Four settings behind
+                          a pencil are four settings nobody reads; the sentence
+                          is what makes the list worth opening. */}
+                      <Typography variant="caption" color="text.secondary">
+                        {settingsSummary(rule)}
+                      </Typography>
                     </Box>
+                    <Tooltip title="Nastavení pravidla">
+                      <IconButton
+                        aria-label={`Upravit pravidlo ${rule.templateName} u služby ${rule.serviceName}`}
+                        onClick={() => openEdit(rule)}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="Smazat pravidlo">
                       <IconButton
                         aria-label={`Smazat pravidlo ${rule.templateName} u služby ${rule.serviceName}`}
@@ -212,12 +284,151 @@ export default function DocumentRequirementsPage() {
                       {RULE_HEALTH_TEXT[health]}
                     </Alert>
                   )}
+
+                  {/* A rule that says "bez něj nejde objednat" on a document
+                      booking never looks at is a setting that looks obeyed and
+                      is not. Said on the row, where the promise is made. */}
+                  {rule.blocksBooking && !blockingWillHappen(templateTypeOf(rule.templateId)) && (
+                    <Alert severity="warning" sx={{ mt: 1.5 }} icon={<BlockIcon />}>
+                      {BLOCKING_IGNORED_TEXT}
+                    </Alert>
+                  )}
                 </CardContent>
               </Card>
             );
           })}
         </Stack>
       </AsyncSection>
+
+      <Dialog
+        open={draft !== null}
+        onClose={() => { setEditing(null); setDraft(null); }}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          Nastavení pravidla
+        </DialogTitle>
+        <DialogContent>
+          {draft !== null && editing !== null && (
+            <Stack spacing={2.5} sx={{ mt: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                {`${editing.templateName} u služby ${editing.serviceName}`}
+              </Typography>
+
+              <TextField
+                label="Platnost (měsíců)"
+                type="number"
+                value={draft.validityMonths}
+                onChange={(e) => setDraft({ ...draft, validityMonths: Number(e.target.value) })}
+                error={problems.some((x) => x.startsWith('validity'))}
+                /* From the issue date, not from the upload. A výpis written in
+                   March and handed in in June has three months already spent,
+                   and somebody setting this has to know which date counts. */
+                helperText={
+                  problems.find((x) => x.startsWith('validity')) !== undefined
+                    ? SETTINGS_PROBLEM_TEXT[problems.find((x) => x.startsWith('validity'))!]
+                    : 'Počítá se od data vystavení dokladu, ne od nahrání. 0 = nikdy nevyprší.'
+                }
+                sx={{ maxWidth: 320 }}
+              />
+
+              <TextField
+                label="Upozornit předem (dní)"
+                type="number"
+                value={draft.warnDaysBefore}
+                onChange={(e) => setDraft({ ...draft, warnDaysBefore: Number(e.target.value) })}
+                error={problems.some((x) => x.startsWith('warn'))}
+                helperText={
+                  problems.find((x) => x.startsWith('warn')) !== undefined
+                    ? SETTINGS_PROBLEM_TEXT[problems.find((x) => x.startsWith('warn'))!]
+                    : 'Kolik dní před koncem platnosti karta pacienta zoranžoví. 0 = neupozorňovat.'
+                }
+                sx={{ maxWidth: 320 }}
+              />
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={draft.firstVisitOnly}
+                    onChange={(e) => setDraft({ ...draft, firstVisitOnly: e.target.checked })}
+                  />
+                }
+                label={draft.firstVisitOnly
+                  ? 'Jen při první návštěvě'
+                  : 'Při každé návštěvě'}
+              />
+
+              <Box>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={draft.blocksBooking}
+                      onChange={(e) => {
+                        setDraft({ ...draft, blocksBooking: e.target.checked });
+                        /* Off again drops the confirmation with it, so
+                           flicking it on and off does not leave a yes behind. */
+                        if (!e.target.checked) setConfirmBlocking(false);
+                      }}
+                    />
+                  }
+                  label={draft.blocksBooking
+                    ? 'Bez dokladu nejde objednat'
+                    : 'Bez dokladu jen upozornit'}
+                />
+
+                {/*
+                  * Not another switch in a row. This reverses the owner's own
+                  * rule from plan 2.4 - paperwork always warns, because the
+                  * patient is on the telephone and needs a slot now - so
+                  * turning it on is asked about, and turning it off is not.
+                  */}
+                {blockingIsNew && (
+                  <Alert severity="warning" sx={{ mt: 1 }} icon={<BlockIcon />}>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      {BLOCKING_CONFIRM_TEXT}
+                    </Typography>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={confirmBlocking}
+                          onChange={(e) => setConfirmBlocking(e.target.checked)}
+                        />
+                      }
+                      label="Rozumím, chci to tak"
+                    />
+                  </Alert>
+                )}
+
+                {draft.blocksBooking
+                  && !blockingWillHappen(templateTypeOf(editing.templateId)) && (
+                  <Alert severity="info" sx={{ mt: 1 }}>{BLOCKING_IGNORED_TEXT}</Alert>
+                )}
+              </Box>
+
+              <Alert severity="info" icon={false}>
+                {settingsSummary(draft)}
+              </Alert>
+
+              {save.error ? <Alert severity="error">{errorText(save.error, t)}</Alert> : null}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => { setEditing(null); setDraft(null); }}>Zrušit</Button>
+          <Button
+            variant="contained"
+            disabled={!canSave}
+            onClick={() => {
+              if (editing !== null && draft !== null) {
+                save.mutate({ ruleId: editing.id, settings: draft });
+              }
+            }}
+          >
+            Uložit
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
