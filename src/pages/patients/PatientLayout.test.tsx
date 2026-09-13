@@ -30,7 +30,7 @@ vi.mock('../../api/documents', async () => {
 });
 vi.mock('../../api/client', () => ({ default: { get: getConsents } }));
 
-const { default: PatientLayout, missingRequired, activeSection } =
+const { default: PatientLayout, paperworkGaps, activeSection } =
   await import('./PatientLayout');
 const { PATIENT_SECTIONS, patientInPath, sectionPath } = await import('./sections');
 
@@ -77,11 +77,30 @@ const renderLayout = (path = '/patients/p1') =>
     </MemoryRouter>,
   );
 
+/*
+ * The split arrived after the rule was measured against the server and found
+ * flatly wrong: it ignored `firstVisitOnly`, and the only required template
+ * there is carries it. For a patient with no documents,
+ * `check?isFirstVisit=false` says nothing is missing, while this card said
+ * "Chybí: Výpis" - and would have gone on saying it forever.
+ */
 describe('what is still missing', () => {
   it('names a required document that is not on file', () => {
-    expect(missingRequired([template()], []).map((t) => t.name)).toEqual([
+    expect(paperworkGaps([template()], []).firstVisitOnly.map((t) => t.name)).toEqual([
       'Výpis ze zdravotní dokumentace',
     ]);
+  });
+
+  /* The half that matters: a first-visit document is not claimed to be
+     missing outright, because this screen cannot know whether this is one. */
+  it('does not call a first-visit document missing outright', () => {
+    expect(paperworkGaps([template()], []).always).toEqual([]);
+  });
+
+  it('does call an every-visit document missing outright', () => {
+    const gaps = paperworkGaps([template({ firstVisitOnly: false })], []);
+    expect(gaps.always.map((t) => t.name)).toEqual(['Výpis ze zdravotní dokumentace']);
+    expect(gaps.firstVisitOnly).toEqual([]);
   });
 
   /*
@@ -93,36 +112,45 @@ describe('what is still missing', () => {
    * same bug, and the half nobody notices.
    */
   it('is satisfied by a document that is signed off, and only then', () => {
-    expect(missingRequired([template()], [])).toHaveLength(1);
-    expect(missingRequired([template()], [doc('SignedOff')])).toHaveLength(0);
+    expect(paperworkGaps([template()], []).firstVisitOnly).toHaveLength(1);
+    expect(paperworkGaps([template()], [doc('SignedOff')]).firstVisitOnly).toHaveLength(0);
   });
 
   it.each<DocumentStatus>(['Pending', 'Expired', 'Superseded', 'Rejected'])(
     'is not satisfied by a document that is %s',
     (status) => {
-      expect(missingRequired([template()], [doc(status)])).toHaveLength(1);
+      expect(paperworkGaps([template()], [doc(status)]).firstVisitOnly).toHaveLength(1);
     },
   );
 
   /* A cardiology report carries no template, so it can satisfy nothing. */
   it('is not satisfied by a document belonging to no template', () => {
-    expect(missingRequired([template()], [doc('SignedOff', null)])).toHaveLength(1);
+    expect(paperworkGaps([template()], [doc('SignedOff', null)]).firstVisitOnly).toHaveLength(1);
   });
 
   it('is not satisfied by a signed document of some other kind', () => {
-    expect(missingRequired([template()], [doc('SignedOff', 'other-template')])).toHaveLength(1);
+    expect(paperworkGaps([template()], [doc('SignedOff', 'other-template')]).firstVisitOnly)
+      .toHaveLength(1);
   });
 
   it('ignores templates that are not required, and inactive ones', () => {
-    expect(missingRequired([template({ requiredForVisit: false })], [])).toHaveLength(0);
-    expect(missingRequired([template({ isActive: false })], [])).toHaveLength(0);
+    /* Anchored: the same template without those flags does appear, so this is
+       not "true of nothing". */
+    expect(paperworkGaps([template()], []).firstVisitOnly).toHaveLength(1);
+    const off = paperworkGaps([template({ requiredForVisit: false })], []);
+    expect([...off.always, ...off.firstVisitOnly]).toHaveLength(0);
+    const dead = paperworkGaps([template({ isActive: false })], []);
+    expect([...dead.always, ...dead.firstVisitOnly]).toHaveLength(0);
   });
 });
 
 describe('the banner on screen', () => {
-  it('warns when the výpis is missing', async () => {
+  /* Not "Chybí" any more: the výpis is wanted at a first visit, and this
+     screen does not know whether this is one. */
+  it('names the výpis as what a first visit needs', async () => {
     renderLayout();
-    expect(await screen.findByText(/Chybí: Výpis/)).toBeInTheDocument();
+    expect(await screen.findByText(/Při první návštěvě je potřeba/)).toBeInTheDocument();
+    expect(screen.queryByText(/Chybí:/)).not.toBeInTheDocument();
   });
 
   it('goes out once it is signed off', async () => {
@@ -132,13 +160,14 @@ describe('the banner on screen', () => {
     await screen.findByText('Cesta Jedna');
 
     expect(screen.queryByText(/Chybí:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Při první návštěvě/)).not.toBeInTheDocument();
   });
 
   /* It has to follow you into the section, or walking away hides it. */
   it('stays on screen inside the documents section', async () => {
     renderLayout('/patients/p1/dokumenty');
 
-    expect(await screen.findByText(/Chybí: Výpis/)).toBeInTheDocument();
+    expect(await screen.findByText(/Při první návštěvě je potřeba/)).toBeInTheDocument();
     expect(screen.getByText('DOKUMENTY')).toBeInTheDocument();
   });
 });

@@ -41,12 +41,46 @@ export function activeSection(pathname: string, patientId: string): string {
   return match?.id ?? 'prehled';
 }
 
-/** Required documents still missing, for the banner that stays on every section. */
-export function missingRequired(
+export interface PaperworkGaps {
+  /** Wanted on any visit. Missing means missing, full stop. */
+  always: DocumentTemplate[];
+  /** Wanted only the first time. Whether that is now, this screen cannot know. */
+  firstVisitOnly: DocumentTemplate[];
+}
+
+/**
+ * Required documents still missing, split by whether the requirement applies
+ * today or only to a first visit.
+ *
+ * The split exists because this rule was flatly wrong and said so on screen.
+ * It ignored `firstVisitOnly`, and the only required template there is -
+ * "Výpis ze zdravotní dokumentace" - carries it. Measured against the server
+ * on 13. 9. 2026, for a patient with no documents at all:
+ *
+ *     GET …/check?isFirstVisit=true   ->  missing: Výpis
+ *     GET …/check?isFirstVisit=false  ->  allRequiredPresent: true
+ *
+ * So on a returning patient this card said "Chybí: Výpis" while the server
+ * said nothing was missing, and it would have said it forever - a returning
+ * patient is never asked for one.
+ *
+ * `isFirstVisit` is not guessed at here, because it cannot be: the patient
+ * record carries nothing about visits - no count, no first date - and
+ * `GET /api/scheduling/appointments` has no patient filter to count them with.
+ * So the card states the condition instead of asserting the conclusion.
+ *
+ * What is still not honoured: `ageGated` and `minimumAge`. Every template has
+ * `ageGated: false` today, so nothing is wrong on screen, and the meaning of
+ * the gate was not measured - implementing a guess at it would be the same
+ * fault as the one above with a different field. The real answer to both is
+ * `GET /api/documents/patient/{id}/check`, once somebody can tell this screen
+ * whether it is a first visit.
+ */
+export function paperworkGaps(
   templates: DocumentTemplate[],
   documents: PatientDocument[],
-): DocumentTemplate[] {
-  return templates
+): PaperworkGaps {
+  const missing = templates
     .filter((t) => t.isActive && t.requiredForVisit)
     .filter(
       (t) =>
@@ -54,6 +88,11 @@ export function missingRequired(
           (d) => d.templateId === t.id && d.status === DOCUMENT_SATISFIES_REQUIREMENT,
         ),
     );
+
+  return {
+    always: missing.filter((t) => !t.firstVisitOnly),
+    firstVisitOnly: missing.filter((t) => t.firstVisitOnly),
+  };
 }
 
 export default function PatientLayout() {
@@ -99,7 +138,7 @@ export default function PatientLayout() {
     );
   }
 
-  const missing = missingRequired(templates, documents);
+  const gaps = paperworkGaps(templates, documents);
   const initials = `${patient.firstName?.[0] ?? ''}${patient.lastName?.[0] ?? ''}`;
 
   const context: PatientContext = { patient, documents, templates, reloadDocuments };
@@ -108,9 +147,19 @@ export default function PatientLayout() {
     <Box>
       {/* Stays on screen whichever section is open: somebody who walked away
           from the overview should not lose sight of what is missing. */}
-      {missing.length > 0 && (
+      {gaps.always.length > 0 && (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          Chybí: {missing.map((t) => t.name).join(', ')}
+          Chybí: {gaps.always.map((t) => t.name).join(', ')}
+        </Alert>
+      )}
+
+      {/* Stated as the condition it is. "Chybí" would be a claim this screen
+          cannot make - it does not know whether this is a first visit, and on
+          a returning patient the server says nothing is missing at all. */}
+      {gaps.firstVisitOnly.length > 0 && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Při první návštěvě je potřeba:{' '}
+          {gaps.firstVisitOnly.map((t) => t.name).join(', ')}
         </Alert>
       )}
 
