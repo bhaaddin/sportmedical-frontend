@@ -77,9 +77,16 @@ describe('splitting at now', () => {
     expect(past).toHaveLength(1);
   });
 
-  it('treats a no-show the same way', () => {
-    const { upcoming } = splitAppointments([appointment({ status: 'NoShow' })], NOW);
+  /*
+   * The `past` half matters as much as the `upcoming` half. Asserting only
+   * that it is missing from the top would pass just as well if the
+   * appointment were dropped entirely - and a no-show that vanishes takes
+   * the fact that somebody did not turn up with it.
+   */
+  it('treats a no-show the same way, and keeps it in the history', () => {
+    const { upcoming, past } = splitAppointments([appointment({ status: 'NoShow' })], NOW);
     expect(upcoming).toHaveLength(0);
+    expect(past.map((a) => a.status)).toEqual(['NoShow']);
   });
 
   /* Soonest first among what is coming - the next one is the one being asked

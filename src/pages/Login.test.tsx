@@ -35,8 +35,20 @@ const renderLogin = () =>
   );
 
 describe('the login screen', () => {
+  /*
+   * Anchored to something that must be on screen, because the claim on its own
+   * could never fail. Measured: this page renders no `<a>` at all - the two
+   * `href="#"` links it once had were deleted - so "no link goes nowhere" was
+   * true of nothing and had been since they went. It passes whether the page
+   * works or renders a blank div.
+   *
+   * With the button asserted first it can fail in both directions: a page that
+   * draws nothing fails the first line, a placeholder link that creeps back
+   * fails the second.
+   */
   it('has no link that goes nowhere', () => {
     const { container } = renderLogin();
+    expect(screen.getByRole('button', { name: /Přihlásit/i })).toBeInTheDocument();
     expect(container.querySelectorAll('a[href="#"]')).toHaveLength(0);
   });
 

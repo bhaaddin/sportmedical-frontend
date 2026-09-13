@@ -189,8 +189,14 @@ describe('what the row says', () => {
     expect(screen.getByText('Nahrál pacient')).toBeInTheDocument();
   });
 
+  /*
+   * The document is looked for first. "No patient badge" is equally true of a
+   * screen that drew nothing at all, and a staff report quietly missing from
+   * the list is a worse fault than a wrong badge on it.
+   */
   it('says nothing of the sort about one the staff uploaded', () => {
-    renderList([doc({ source: 'Staff' })]);
+    renderList([doc({ source: 'Staff', specialtyOther: 'Kardiologie' })]);
+    expect(screen.getByText('Kardiologie')).toBeInTheDocument();
     expect(screen.queryByText('Nahrál pacient')).not.toBeInTheDocument();
   });
 });
