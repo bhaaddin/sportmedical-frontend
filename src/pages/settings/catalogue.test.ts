@@ -184,6 +184,18 @@ describe('the payments section', () => {
     expect(hers?.items.map((i) => i.id).sort()).toEqual(['cenik', 'platci']);
   });
 
+  /*
+   * One name for the price list too. It has been "Ceník služeb", then "Ceník
+   * činností", and the screen's own heading is "Ceník" - three names for one
+   * thing, and "činností" was wrong besides: the list holds položky, and a
+   * činnost is the other half of the pair.
+   */
+  it('calls the price list what its own screen calls itself', () => {
+    const row = platby()?.items.find((i) => i.id === 'cenik');
+    expect(row?.label).toBe('Ceník');
+    expect(row?.label).not.toMatch(/činnost|služ/i);
+  });
+
   /* One name for this screen: the page heading and this row. It has been
      called both "Kluby" and "Plátci" in the same application. */
   it('calls the payers what the screen calls itself', () => {

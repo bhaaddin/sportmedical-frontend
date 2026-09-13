@@ -9,7 +9,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  categoriesInUse, draftFrom, hasErrors, parseCzechNumber, toRequest, validateService,
+  DEFAULT_DURATION_MINUTES, categoriesInUse, draftFrom, hasErrors, parseCzechNumber,
+  toRequest, validateService,
 } from './serviceForm';
 import type { ServiceItem } from '../../api/services';
 
@@ -104,26 +105,30 @@ describe('what may be saved', () => {
   });
 
   /*
-   * The one that reaches the screen. The card prints price ÷ duration, so a
-   * duration of 0 draws "Infinity Kč/min". The server saves it happily.
+   * The duration rules were here and are gone with the field that fed them.
+   *
+   * Length is a fact about the činnost - the time it takes in a calendar -
+   * and booking measured that the price-list copy was read in one place in
+   * the whole system, a comparison against the činnost's own. That comparison
+   * and its `price.duration_drift` warning were deleted, so the dialog
+   * stopped asking. Rules guarding a field nobody can type are the same dead
+   * weight as a check that cannot fail.
    */
-  it('refuses a duration of zero', () => {
+  it('no longer complains about a duration, since nobody types one', () => {
     expect(validateService(draft({ durationMinutes: '0' }), [], null).durationMinutes)
-      .toBeDefined();
-  });
-
-  it('refuses a negative or fractional duration', () => {
-    expect(validateService(draft({ durationMinutes: '-15' }), [], null).durationMinutes)
-      .toBeDefined();
-    expect(validateService(draft({ durationMinutes: '15,5' }), [], null).durationMinutes)
-      .toBeDefined();
-  });
-
-  it('refuses a missing or unreadable duration', () => {
+      .toBeUndefined();
     expect(validateService(draft({ durationMinutes: '' }), [], null).durationMinutes)
-      .toBeDefined();
-    expect(validateService(draft({ durationMinutes: 'chvilku' }), [], null).durationMinutes)
-      .toBeDefined();
+      .toBeUndefined();
+  });
+
+  /* The column is still there, so a new row must not send a blank. */
+  it('falls back to a default duration rather than sending nothing', () => {
+    expect(toRequest(draft({ durationMinutes: '' })).durationMinutes)
+      .toBe(DEFAULT_DURATION_MINUTES);
+  });
+
+  it('keeps an existing duration untouched', () => {
+    expect(toRequest(draft({ durationMinutes: '90' })).durationMinutes).toBe(90);
   });
 
   it('refuses a negative price but allows a free service', () => {
@@ -137,11 +142,11 @@ describe('what may be saved', () => {
 
   it('reports every broken field at once, not just the first', () => {
     const found = validateService(
-      draft({ code: '', name: '', durationMinutes: '0', priceCzk: 'nic' }),
+      draft({ code: '', name: '', category: '', priceCzk: 'nic' }),
       [],
       null,
     );
-    expect(Object.keys(found).sort()).toEqual(['code', 'durationMinutes', 'name', 'priceCzk']);
+    expect(Object.keys(found).sort()).toEqual(['category', 'code', 'name', 'priceCzk']);
   });
 
   it('knows when there is nothing wrong', () => {

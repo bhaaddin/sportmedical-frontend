@@ -128,8 +128,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     items: [
       {
         id: 'cenik',
-        label: 'Ceník činností',
-        description: 'Ceny a délky výkonů — odsud si činnost bere svou cenu',
+        label: 'Ceník',
+        description: 'Co ordinace účtuje — odsud si činnost bere svou cenu',
         to: '/cenik',
       },
       {

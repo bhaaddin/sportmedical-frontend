@@ -114,7 +114,6 @@ describe('the editor', () => {
     await fill(/Kód/, 'KP');
     await fill(/Název/, 'Něco jiného');
     await fill(/Kategorie/, 'Měření');
-    await fill(/Trvání/, '30');
     await fill(/Cena/, '900');
     await userEvent.click(screen.getByRole('button', { name: 'Uložit' }));
 
@@ -128,13 +127,12 @@ describe('the editor', () => {
     await fill(/Kód/, 'IB');
     await fill(/Název/, 'InBody 770');
     await fill(/Kategorie/, 'Měření');
-    await fill(/Trvání/, '15');
     await fill(/Cena/, '800');
     await userEvent.click(screen.getByRole('button', { name: 'Uložit' }));
 
     await waitFor(() => expect(create).toHaveBeenCalled());
     expect(create.mock.calls[0][0]).toMatchObject({
-      code: 'IB', name: 'InBody 770', durationMinutes: 15, priceCzk: 800,
+      code: 'IB', name: 'InBody 770', priceCzk: 800,
     });
     expect(update).not.toHaveBeenCalled();
     expect(onSaved).toHaveBeenCalled();
@@ -161,12 +159,27 @@ describe('the editor', () => {
     await fill(/Kód/, 'IB');
     await fill(/Název/, 'InBody 770');
     await fill(/Kategorie/, 'Měření');
-    await fill(/Trvání/, '15');
     await fill(/Cena/, '800');
     await userEvent.click(screen.getByRole('button', { name: 'Uložit' }));
 
     expect(await screen.findByText(/Uložení se nepodařilo/)).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  /*
+   * "Ještě se prodává", not "nabízí se pacientům".
+   *
+   * This is the price list and no patient ever sees it. Whether a patient can
+   * pick something when booking is `isPubliclyBookable`, and that lives on the
+   * činnost - the same one word meaning two things that misled the owner three
+   * times in a day.
+   */
+  it('says the switch is about selling, not about what a patient sees', () => {
+    render(withQueries(
+      <ServiceDialog open service={service()} existing={[service()]} onClose={vi.fn()} onSaved={vi.fn()} />,
+    ));
+    expect(screen.getByLabelText(/ještě se prodává/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/nabízí se pacientům/i)).not.toBeInTheDocument();
   });
 
   /* A new service is active by definition and the create route has no such
@@ -194,22 +207,32 @@ describe('the price list screen', () => {
   });
 
   /*
-   * The server accepted a duration of 0, and the card divides price by
-   * duration. Without the guard this row reads "Infinity Kč/min".
+   * The "Infinity Kč/min" case, kept as a case even though the arithmetic is
+   * gone: a row saved with a duration of 0 is still in the data, and what it
+   * must never do is print anything about it.
    */
-  it('does not print Infinity for a service of no length', async () => {
+  it('says nothing at all about a row with no length', async () => {
     getAll.mockResolvedValue([service({ durationMinutes: 0 })]);
 
     render(withQueries(<Cenik />));
     await screen.findAllByText('Komplexní prohlídka');
 
     expect(screen.queryByText(/Infinity/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Kč\/min/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/min/)).not.toBeInTheDocument();
   });
 
-  it('shows the price per minute when there is a length', async () => {
+  /*
+   * Neither a length nor a Kč/min. The dialog stopped offering the field -
+   * booking measured that the price-list duration was read nowhere but in a
+   * comparison against the činnost's own, and removed that - so a number
+   * somebody can see but no longer change would be worse than either.
+   */
+  it('shows no length and no price per minute', async () => {
     render(withQueries(<Cenik />));
-    expect(await screen.findByText('50 Kč/min')).toBeInTheDocument();
+    await screen.findAllByText('Komplexní prohlídka');
+
+    expect(screen.queryByText(/Kč\/min/)).not.toBeInTheDocument();
+    expect(screen.queryByText('60 min')).not.toBeInTheDocument();
   });
 
   /*

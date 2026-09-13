@@ -410,9 +410,11 @@ export default function ActivitiesPage() {
                 read through that. Choosing "no link" is allowed - it is what
                 `price.unlinked` warns about, not what it forbids.
 
-                The duration is deliberately not kept in step with the item's:
-                the owner sets it, and a difference is reported by
-                `price.duration_drift` rather than corrected behind their back.
+                The duration lives here and nowhere else. The price list used
+                to carry one too and a `price.duration_drift` warning reported
+                any difference - it was removed on 13. 9. 2026 because the
+                number it compared against was read nowhere, so it sent people
+                to correct the one that did not matter.
               */}
               <TextField
                 select

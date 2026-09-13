@@ -27,7 +27,7 @@ import {
   IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogContentText,
   DialogActions, Alert,
 } from '@mui/material';
-import { Search, AttachMoney, Timer, Add, Edit, Archive } from '@mui/icons-material';
+import { Search, AttachMoney, Add, Edit, Archive } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { servicesApi } from '../api/services';
 import type { ServiceItem } from '../api/services';
@@ -39,13 +39,6 @@ const categoryColors: Record<string, { bg: string; text: string }> = {
   'Měření': { bg: '#FFF3E0', text: '#E65100' },
   'Terapie': { bg: '#F3E5F5', text: '#7B1FA2' },
 };
-
-/* Guarded because the server allowed a duration of 0 to be saved, and the
-   division printed "Infinity Kč/min" on the card. Old rows may still have it. */
-export function pricePerMinute(service: ServiceItem): string | null {
-  if (service.durationMinutes <= 0) return null;
-  return `${(service.priceCzk / service.durationMinutes).toFixed(0)} Kč/min`;
-}
 
 export default function Cenik() {
   const [services, setServices] = useState<ServiceItem[]>([]);
@@ -95,7 +88,7 @@ export default function Cenik() {
             <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
               <AttachMoney color="primary" /> Ceník
             </Typography>
-            <Typography variant="body2" color="text.secondary">Co ordinace účtuje — položky, ceny a délky</Typography>
+            <Typography variant="body2" color="text.secondary">Co ordinace účtuje — položky a ceny</Typography>
           </Box>
           <Button
             variant="contained"
@@ -159,7 +152,6 @@ export default function Cenik() {
         <Grid container spacing={3}>
           {filtered.map((service, i) => {
             const colors = categoryColors[service.category] || { bg: '#F5F5F5', text: '#666' };
-            const perMinute = pricePerMinute(service);
             return (
               <Grid key={service.id} size={{ xs: 12, sm: 6, md: 4 }}>
                 <motion.div
@@ -185,11 +177,18 @@ export default function Cenik() {
                         {service.description}
                       </Typography>
 
+                      {/*
+                        * No length and no Kč/min.
+                        *
+                        * Length belongs to the činnost; booking measured that
+                        * the price-list copy was read nowhere but in a
+                        * comparison against it, and removed both the
+                        * comparison and its warning. So the dialog stopped
+                        * offering the field - and a number somebody can see
+                        * but no longer change, and nobody maintains, is worse
+                        * than either. Kč/min was arithmetic on it.
+                        */}
                       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-                        <Chip icon={<Timer sx={{ fontSize: 16 }} />} label={`${service.durationMinutes} min`} size="small" variant="outlined" />
-                        {perMinute !== null && (
-                          <Chip icon={<AttachMoney sx={{ fontSize: 16 }} />} label={perMinute} size="small" variant="outlined" />
-                        )}
                         <Box sx={{ flex: 1 }} />
                         {/* Named, not just drawn: an icon alone tells a screen
                             reader nothing, and a tooltip is not a name. */}
@@ -238,7 +237,6 @@ export default function Cenik() {
                   <TableCell sx={{ fontWeight: 700 }}>Kód</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Název</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Kategorie</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Trvání</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Cena (Kč)</TableCell>
                 </TableRow>
               </TableHead>
@@ -250,7 +248,6 @@ export default function Cenik() {
                     </TableCell>
                     <TableCell sx={{ fontWeight: 500 }}>{service.name}</TableCell>
                     <TableCell>{service.category}</TableCell>
-                    <TableCell align="right">{service.durationMinutes} min</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700, color: '#0D7377' }}>
                       {service.priceCzk.toLocaleString('cs-CZ')} Kč
                     </TableCell>

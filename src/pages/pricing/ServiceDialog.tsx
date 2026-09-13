@@ -180,30 +180,31 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
             helperText="Co pacient dostane. Ukazuje se na kartě v ceníku."
           />
 
-          <Stack direction="row" spacing={2}>
-            <TextField
-              label="Trvání"
-              value={draft.durationMinutes}
-              onChange={(e) => set('durationMinutes', e.target.value)}
-              error={errors.durationMinutes !== undefined}
-              helperText={errors.durationMinutes}
-              slotProps={{ input: {
-                endAdornment: <InputAdornment position="end">min</InputAdornment>,
-              } }}
-              fullWidth
-            />
-            <TextField
-              label="Cena"
-              value={draft.priceCzk}
-              onChange={(e) => set('priceCzk', e.target.value)}
-              error={errors.priceCzk !== undefined}
-              helperText={errors.priceCzk}
-              slotProps={{ input: {
-                endAdornment: <InputAdornment position="end">Kč</InputAdornment>,
-              } }}
-              fullWidth
-            />
-          </Stack>
+          {/*
+            * No "Trvání" here.
+            *
+            * How long something takes is a fact about the činnost - it is the
+            * time it occupies in a calendar - and a doklad or a faktura has no
+            * use for it. Booking measured it: the price-list duration was read
+            * in exactly one place in the whole system, a comparison against the
+            * činnost's own, and that comparison is gone along with the
+            * `price.duration_drift` warning it raised. It sent people to
+            * correct the number that did not matter.
+            *
+            * The value is still sent, untouched on an edit and a default on a
+            * new row, because the column is still there and nobody reads it.
+            */}
+          <TextField
+            label="Cena"
+            value={draft.priceCzk}
+            onChange={(e) => set('priceCzk', e.target.value)}
+            error={errors.priceCzk !== undefined}
+            helperText={errors.priceCzk}
+            slotProps={{ input: {
+              endAdornment: <InputAdornment position="end">Kč</InputAdornment>,
+            } }}
+            fullWidth
+          />
 
           {/* Only when changing an existing one: a new service is active by
               definition, and the create route has no such field. */}
@@ -216,8 +217,12 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
                     onChange={(e) => set('isActive', e.target.checked)}
                   />
                 }
-                label="Aktivní — nabízí se pacientům"
+                label="Aktivní — ještě se prodává"
               />
+              {/* Not "nabízí se pacientům": this is the price list and no
+                  patient sees it. Whether a patient can pick something when
+                  booking is `isPubliclyBookable`, and that lives on the
+                  činnost. */}
             </Box>
           )}
         </Stack>

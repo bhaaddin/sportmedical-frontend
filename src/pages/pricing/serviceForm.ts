@@ -16,6 +16,18 @@
  */
 import type { ServiceItem } from '../../api/services';
 
+/*
+ * What goes in the column nobody reads any more.
+ *
+ * Length is a fact about the činnost - the time it takes in a calendar - and
+ * a doklad has no use for it. Booking measured that the price-list duration
+ * was read in one place in the whole system, a comparison against the
+ * činnost's own, and deleted it along with the `price.duration_drift` warning
+ * it raised. The column stays, so a new row needs something in it; existing
+ * rows keep whatever they have.
+ */
+export const DEFAULT_DURATION_MINUTES = 30;
+
 export interface ServiceDraft {
   code: string;
   name: string;
@@ -23,8 +35,9 @@ export interface ServiceDraft {
   category: string;
   /* Text, not numbers: these come out of text fields, and an empty field is
      not 0. Parsing at the edge is what lets "" be told apart from "0". */
-  durationMinutes: string;
   priceCzk: string;
+  /* No longer typed anywhere - carried through so the save does not blank it. */
+  durationMinutes: string;
   isActive: boolean;
 }
 
@@ -56,7 +69,7 @@ export function draftFrom(service: ServiceItem | null): ServiceDraft {
   if (service === null) {
     return {
       code: '', name: '', description: '', category: '',
-      durationMinutes: '', priceCzk: '', isActive: true,
+      durationMinutes: String(DEFAULT_DURATION_MINUTES), priceCzk: '', isActive: true,
     };
   }
   return {
@@ -99,14 +112,6 @@ export function validateService(
   if (name === '') errors.name = 'Název je povinný.';
   if (draft.category.trim() === '') errors.category = 'Zvolte kategorii.';
 
-  const duration = parseCzechNumber(draft.durationMinutes);
-  if (duration === null) {
-    errors.durationMinutes = 'Zadejte trvání v minutách.';
-  } else if (!Number.isInteger(duration) || duration <= 0) {
-    /* Zero is the one that matters: the card divides by it. */
-    errors.durationMinutes = 'Trvání musí být celý počet minut, alespoň 1.';
-  }
-
   const price = parseCzechNumber(draft.priceCzk);
   if (price === null) {
     errors.priceCzk = 'Zadejte cenu v Kč.';
@@ -128,7 +133,7 @@ export function toRequest(draft: ServiceDraft) {
     name: draft.name.trim(),
     description: draft.description.trim(),
     category: draft.category.trim(),
-    durationMinutes: parseCzechNumber(draft.durationMinutes) ?? 0,
+    durationMinutes: parseCzechNumber(draft.durationMinutes) ?? DEFAULT_DURATION_MINUTES,
     priceCzk: parseCzechNumber(draft.priceCzk) ?? 0,
     isActive: draft.isActive,
   };
