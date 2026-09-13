@@ -33,7 +33,7 @@ import MenuItem from "@mui/material/MenuItem";
 import { calendarsApi } from "../../api/calendars";
 import { clinicServicesApi } from "../../api/clinicServices";
 import { useLocation, useNavigate } from "react-router-dom";
-import { handoffFrom, handoffIsOfferable } from "./serviceHandoff";
+import { assignableCount, handoffAction, handoffFrom } from "./serviceHandoff";
 import { hiddenCount, offerDeactivateInstead, visibleCalendars } from "./calendarLifecycle";
 import type { Calendar, CalendarInput } from "../../api/bookingContracts";
 import { AsyncSection } from "../../components/booking/AsyncSection";
@@ -196,34 +196,46 @@ export default function CalendarsPage() {
   };
 
   /*
-   * Arriving from a služba that is missing this.
+   * Arriving from a služba that no calendar runs.
    *
-   * The Služby screen can name that gap and cannot close it - the server takes
-   * the link from this side only - so it sends the service here and the form
-   * opens ready for it. Without this the button would land somebody on a list
-   * and leave them to find the same service again in a dropdown, which is the
-   * errand the button was added to save.
+   * The Služby screen can see the gap and cannot close it - the server takes
+   * the link from this side only - so it sends the service here.
    *
-   * Decided while rendering rather than in an effect, and the handoff is spent
-   * when the dialog closes rather than when it opens. The first version did
-   * the opposite and was green in every test and dead in the browser:
-   * StrictMode mounts twice, the first mount cleared the history entry, and
-   * the second found nothing to act on. `render` in the tests does not double
-   * mount, so nothing saw it. There is a StrictMode test below now.
+   * What happens then depends on whether a calendar already exists. The first
+   * version always opened the create form, and the owner met it on a clinic
+   * with three calendars already made: it asked him to build a fourth and
+   * never showed him the three. `PUT /api/calendars/{id}` takes
+   * `clinicServiceId`, so pointing an existing calendar at this service is an
+   * ordinary edit - the screen was the only thing insisting on a new one.
+   *
+   * Counted off `allCalendars` rather than the visible list: a calendar
+   * hidden behind the "show retired" toggle is still one that exists, and
+   * `assignableCount` drops the retired ones itself.
    */
   const handedOver = handoffFrom(location.state);
-  const handoffUsable =
-    handedOver !== null
-    && handoffIsOfferable(handedOver, servicesQuery.data) === true;
+  const assignable = handedOver === null
+    ? undefined
+    : calendarsQuery.isSuccess ? assignableCount(allCalendars, handedOver) : undefined;
+  const handoffAsks = handoffAction(handedOver, servicesQuery.data, assignable);
+  const handoffServiceName = handedOver === null
+    ? null
+    : (servicesQuery.data ?? []).find((svc) => svc.id === handedOver)?.name ?? null;
 
-  /* Which handoff has already opened a form. Without it, closing the dialog
+  /* Which handoff has already been acted on. Without it, closing the dialog
      while the state is still on the history entry would reopen it forever. */
   const [handoffTaken, setHandoffTaken] = useState<string | null>(null);
-  if (handoffUsable && handedOver !== handoffTaken) {
+  /* The null check is for the compiler: `handoffAction` already refuses a
+     null id, but that is not something it can see from here. */
+  if (handoffAsks === 'new' && handedOver !== null && handedOver !== handoffTaken) {
     setHandoffTaken(handedOver);
     setEditing(null);
     setDraft({ ...emptyDraft(calendars.length), clinicServiceId: handedOver });
   }
+
+  /* Shown instead, when there are calendars to assign. Which one should run
+     the service is his decision, and a form opened over the list would be
+     this screen making it for him. */
+  const showHandoffNotice = handoffAsks === 'assign' && handedOver !== handoffTaken;
 
   const nameIsValid = (draft?.name ?? "").trim().length > 0;
 
@@ -271,6 +283,26 @@ export default function CalendarsPage() {
           </Button>
         </Stack>
       </Box>
+
+      {/* Says which service is waiting, and leaves the choice where it
+          belongs. Which calendar should run it is his decision - a form
+          opened over the list would be this screen making it for him, and
+          that is the version he met and sent back. */}
+      {showHandoffNotice && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          onClose={() => setHandoffTaken(handedOver)}
+          action={
+            <Button color="inherit" size="small" onClick={openCreate}>
+              {t("booking.calendars.new")}
+            </Button>
+          }
+        >
+          {`Přišli jste ze služby „${handoffServiceName ?? ''}“. Vyberte kalendář, `
+            + 'který ji má provozovat, a nastavte mu ji přes Upravit — nebo založte nový.'}
+        </Alert>
+      )}
 
       <AsyncSection
         isLoading={calendarsQuery.isLoading}

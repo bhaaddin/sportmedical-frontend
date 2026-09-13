@@ -53,3 +53,53 @@ export function handoffIsOfferable(
   if (services === undefined) return null;
   return services.some((s) => s.id === clinicServiceId && s.isActive);
 }
+
+/**
+ * What arriving with a handoff should actually do.
+ *
+ * `new` is only right when there is nothing to assign. The first version
+ * always opened the create form, and the owner met it on a clinic with three
+ * calendars already made: it asked him to build a fourth and never showed him
+ * the three. The server never wanted that - `PUT /api/calendars/{id}` takes
+ * `clinicServiceId` and `PUT /api/activities/{id}` the same, so assigning one
+ * that exists is a normal edit. The screen was the only thing insisting.
+ *
+ * `none` while anything it needs is still loading. Deciding on a list that
+ * has not arrived is deciding that there is nothing to assign, which is the
+ * same wrong answer arriving a moment earlier.
+ */
+export type HandoffAction =
+  | 'none'
+  /** Nothing exists to carry this service. Open the form, ready for it. */
+  | 'new'
+  /** Something exists. Show it, and say which service is waiting. */
+  | 'assign';
+
+export function handoffAction(
+  clinicServiceId: string | null,
+  services: readonly { id: string; isActive: boolean }[] | undefined,
+  assignable: number | undefined,
+): HandoffAction {
+  if (clinicServiceId === null) return 'none';
+
+  const offerable = handoffIsOfferable(clinicServiceId, services);
+  if (offerable !== true) return 'none';
+
+  if (assignable === undefined) return 'none';
+  return assignable === 0 ? 'new' : 'assign';
+}
+
+/**
+ * How many existing things could take this service instead.
+ *
+ * Retired ones are not counted: they are not offered for anything else here
+ * either, and counting one would land somebody on a list that does not show
+ * it. Ones already on this service are not counted either - they are not what
+ * is missing.
+ */
+export function assignableCount(
+  items: readonly { clinicServiceId: string | null; isActive: boolean }[],
+  clinicServiceId: string,
+): number {
+  return items.filter((i) => i.isActive && i.clinicServiceId !== clinicServiceId).length;
+}

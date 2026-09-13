@@ -235,3 +235,56 @@ describe('being sent here from a service nothing runs', () => {
     expect(screen.queryByLabelText(/Název/)).not.toBeInTheDocument();
   });
 });
+
+/*
+ * The version he sent back, in his words:
+ *
+ *   "ked stlacim priradit kalendar .. tak ma to hodi na kalendar niekde ale
+ *    tam chce odomna vytvorit novy vobec nerespektuje to ze kalendar uz
+ *    vytvoreny mam neukazuje mi zoznam ... vytvorit kalendar ma byt len vtedy
+ *    ked nie je vytvoreny ziadny"
+ *
+ * He was right and it was mine, not the server's. `PUT /api/calendars/{id}`
+ * takes `clinicServiceId`, so pointing an existing calendar at a service is
+ * an ordinary edit. His clinic had three calendars and the screen showed him
+ * none of them.
+ */
+describe('being sent here when calendars already exist', () => {
+  it('does not demand a new one', async () => {
+    listCalendars.mockResolvedValue([calendar({ clinicServiceId: null })]);
+    render(withQueries(<CalendarsPage />, { clinicServiceId: 's2' }));
+
+    await servicesHaveArrived();
+    await screen.findByText('Ordinace');
+    expect(screen.queryByLabelText(/Název/)).not.toBeInTheDocument();
+  });
+
+  it('says which service is waiting, so the list is not a riddle', async () => {
+    listCalendars.mockResolvedValue([calendar({ clinicServiceId: null })]);
+    render(withQueries(<CalendarsPage />, { clinicServiceId: 's2' }));
+
+    expect(await screen.findByText(/Sportovní diagnostika/)).toBeInTheDocument();
+    expect(screen.getByText(/přes Upravit/)).toBeInTheDocument();
+  });
+
+  /*
+   * A calendar hidden behind the "show retired" toggle is still one that
+   * exists - but a retired one is not offered for anything else here either,
+   * so it does not count and a blank form is right.
+   */
+  it('opens the form when the only calendar is retired', async () => {
+    listCalendars.mockResolvedValue([calendar({ isActive: false, clinicServiceId: null })]);
+    render(withQueries(<CalendarsPage />, { clinicServiceId: 's2' }));
+
+    await screen.findByLabelText(/Název/);
+    expect(screen.getByLabelText(/Služba/)).toHaveTextContent('Sportovní diagnostika');
+  });
+
+  it('opens the form when the only calendar already runs that service', async () => {
+    listCalendars.mockResolvedValue([calendar({ clinicServiceId: 's2' })]);
+    render(withQueries(<CalendarsPage />, { clinicServiceId: 's2' }));
+
+    await screen.findByLabelText(/Název/);
+    expect(screen.getByLabelText(/Služba/)).toHaveTextContent('Sportovní diagnostika');
+  });
+});

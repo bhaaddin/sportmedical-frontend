@@ -31,7 +31,7 @@ import { activitiesApi } from "../../api/activities";
 import { servicesApi } from "../../api/services";
 import { clinicServicesApi } from "../../api/clinicServices";
 import { useLocation, useNavigate } from "react-router-dom";
-import { handoffFrom, handoffIsOfferable } from "./serviceHandoff";
+import { assignableCount, handoffAction, handoffFrom } from "./serviceHandoff";
 import RestoreIcon from "@mui/icons-material/Restore";
 import MenuItem from "@mui/material/MenuItem";
 import { warningKey } from "../../api/bookingContracts";
@@ -197,34 +197,47 @@ export default function ActivitiesPage() {
   };
 
   /*
-   * Arriving from a služba that is missing this.
+   * Arriving from a služba that has no činnost.
    *
    * The Služby screen can name that gap and cannot close it - the server takes
-   * the link from this side only - so it sends the service here and the form
-   * opens ready for it. Without this the button would land somebody on a list
-   * and leave them to find the same service again in a dropdown, which is the
-   * errand the button was added to save.
+   * the link from this side only - so it sends the service here.
    *
-   * Decided while rendering rather than in an effect, and the handoff is spent
-   * when the dialog closes rather than when it opens. The first version did
-   * the opposite and was green in every test and dead in the browser:
-   * StrictMode mounts twice, the first mount cleared the history entry, and
-   * the second found nothing to act on. `render` in the tests does not double
-   * mount, so nothing saw it. There is a StrictMode test below now.
+   * What happens then depends on whether anything already exists to carry it.
+   * The first version always opened the create form, and the owner met it on a
+   * clinic that already had činnosti: it asked him to invent another one and
+   * never showed him the one he had. `PUT /api/activities/{id}` takes
+   * `clinicServiceId`, so assigning an existing činnost is an ordinary edit -
+   * the screen was the only thing insisting on a new one.
+   *
+   * Decided while rendering rather than in an effect, and spent when the
+   * dialog closes rather than when it opens: the effect version cleared the
+   * history entry before the form was drawn and was dead in the browser while
+   * green in every test here.
    */
   const handedOver = handoffFrom(location.state);
-  const handoffUsable =
-    handedOver !== null
-    && handoffIsOfferable(handedOver, clinicServicesQuery.data) === true;
+  const assignable = handedOver === null
+    ? undefined
+    : activitiesQuery.isSuccess ? assignableCount(activities, handedOver) : undefined;
+  const handoffAsks = handoffAction(handedOver, clinicServicesQuery.data, assignable);
+  const handoffServiceName = handedOver === null
+    ? null
+    : (clinicServicesQuery.data ?? []).find((svc) => svc.id === handedOver)?.name ?? null;
 
-  /* Which handoff has already opened a form. Without it, closing the dialog
+  /* Which handoff has already been acted on. Without it, closing the dialog
      while the state is still on the history entry would reopen it forever. */
   const [handoffTaken, setHandoffTaken] = useState<string | null>(null);
-  if (handoffUsable && handedOver !== handoffTaken) {
+  /* The null check is for the compiler: `handoffAction` already refuses a
+     null id, but that is not something it can see from here. */
+  if (handoffAsks === 'new' && handedOver !== null && handedOver !== handoffTaken) {
     setHandoffTaken(handedOver);
     setEditing(null);
     setDraft({ ...emptyDraft(activities.length), clinicServiceId: handedOver });
   }
+
+  /* Shown instead, when there are činnosti to assign. Not a dialog: which
+     činnost should move under this service is his decision, and a form opened
+     over the list would be this screen making it for him. */
+  const showHandoffNotice = handoffAsks === 'assign' && handedOver !== handoffTaken;
 
   const nameIsValid = (draft?.name ?? "").trim().length > 0;
 
@@ -263,6 +276,26 @@ export default function ActivitiesPage() {
           {t("booking.activities.new")}
         </Button>
       </Box>
+
+      {/* Says which service is waiting, and leaves the choice where it
+          belongs. Which činnost should move under it is his decision - a form
+          opened over the list would be this screen making it for him, and
+          that is the version he met and sent back. */}
+      {showHandoffNotice && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          onClose={() => setHandoffTaken(handedOver)}
+          action={
+            <Button color="inherit" size="small" onClick={openCreate}>
+              Nová činnost
+            </Button>
+          }
+        >
+          {`Přišli jste ze služby „${handoffServiceName ?? ''}“. Vyberte činnost, `
+            + 'která pod ni má patřit, a nastavte jí ji přes Upravit — nebo založte novou.'}
+        </Alert>
+      )}
 
       {warnings.map((warning) => (
         <Alert

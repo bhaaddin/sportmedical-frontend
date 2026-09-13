@@ -10,7 +10,7 @@
  * dropped rather than pre-selected into a save that can never go.
  */
 import { describe, it, expect } from 'vitest';
-import { handoffFrom, handoffIsOfferable } from './serviceHandoff';
+import { assignableCount, handoffAction, handoffFrom, handoffIsOfferable } from './serviceHandoff';
 
 describe('reading the handoff out of router state', () => {
   it('finds the service that was handed over', () => {
@@ -83,5 +83,75 @@ describe('whether the handed-over service can still be chosen', () => {
 
   it('says no once they have arrived and there are none', () => {
     expect(handoffIsOfferable('s1', [])).toBe(false);
+  });
+});
+
+describe('what arriving with a handoff should do', () => {
+  const services = [{ id: 's1', isActive: true }, { id: 's9', isActive: false }];
+
+  /*
+   * The bug the owner sent back. He clicked "Přiřadit kalendář" on a clinic
+   * that already had three calendars and was asked to build a fourth - the
+   * three were never shown. The server never wanted that: `PUT` on a calendar
+   * takes `clinicServiceId`, so pointing an existing one at the service is an
+   * ordinary edit. Only the screen was insisting.
+   */
+  it('offers what exists rather than a blank form', () => {
+    expect(handoffAction('s1', services, 3)).toBe('assign');
+  });
+
+  it('opens a blank form only when there is nothing to assign', () => {
+    expect(handoffAction('s1', services, 0)).toBe('new');
+  });
+
+  it('does nothing without a handoff', () => {
+    expect(handoffAction(null, services, 0)).toBe('none');
+  });
+
+  it('does nothing for a service that is no longer offered', () => {
+    expect(handoffAction('s9', services, 0)).toBe('none');
+    expect(handoffAction('gone', services, 3)).toBe('none');
+  });
+
+  /*
+   * Deciding on a list that has not arrived is deciding there is nothing to
+   * assign - the same wrong answer, one moment earlier. Both halves have to
+   * be in before anything happens.
+   */
+  it('does nothing while the list is still on its way', () => {
+    expect(handoffAction('s1', services, undefined)).toBe('none');
+  });
+
+  it('does nothing while the services are still on their way', () => {
+    expect(handoffAction('s1', undefined, 0)).toBe('none');
+  });
+});
+
+describe('counting what could take the service instead', () => {
+  const item = (over: Record<string, unknown> = {}) =>
+    ({ clinicServiceId: null, isActive: true, ...over }) as
+      { clinicServiceId: string | null; isActive: boolean };
+
+  it('counts the ones going spare', () => {
+    expect(assignableCount([item(), item()], 's1')).toBe(2);
+  });
+
+  /* Already on this service is not what is missing. */
+  it('does not count one already on this service', () => {
+    expect(assignableCount([item({ clinicServiceId: 's1' }), item()], 's1')).toBe(1);
+  });
+
+  /* A retired one is not offered for anything else here either, and counting
+     it would land somebody on a list that does not show it. */
+  it('does not count a retired one', () => {
+    expect(assignableCount([item({ isActive: false })], 's1')).toBe(0);
+  });
+
+  it('counts one that belongs to another service', () => {
+    expect(assignableCount([item({ clinicServiceId: 's2' })], 's1')).toBe(1);
+  });
+
+  it('counts nothing in an empty list', () => {
+    expect(assignableCount([], 's1')).toBe(0);
   });
 });

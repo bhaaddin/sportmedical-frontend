@@ -277,3 +277,64 @@ describe('the way the application actually mounts', () => {
     expect(screen.getByLabelText(/Služba/)).toHaveTextContent('Sportovní diagnostika');
   });
 });
+
+/*
+ * The version he sent back.
+ *
+ * "ked stlacim priradit kalendar .. tak ma to hodi na kalendar niekde ale tam
+ * chce odomna vytvorit novy vobec nerespektuje to ze kalendar uz vytvoreny
+ * mam neukazuje mi zoznam". The same was true here for činnosti.
+ *
+ * He was right and it was mine, not the server's: `PUT /api/activities/{id}`
+ * takes `clinicServiceId`, so moving an existing činnost under a service is
+ * an ordinary edit. The screen was the only thing demanding a new one.
+ */
+describe('being sent here when činnosti already exist', () => {
+  const existing = (over: Record<string, unknown> = {}) => ({
+    id: 'a1', name: 'Spiroergometrie', slug: 'spiro', durationMinutes: 90,
+    color: '#0D7377', publicNote: '', isPubliclyBookable: true, sortOrder: 0,
+    isActive: true, serviceItemId: null, priceCzk: null, clinicServiceId: null,
+    ...over,
+  });
+
+  it('does not demand a new one', async () => {
+    listActivities.mockResolvedValue({ activities: [existing()], warnings: [] });
+    render(withQueries(<ActivitiesPage />, { clinicServiceId: 's2' }));
+
+    await servicesHaveArrived();
+    await screen.findByText('Spiroergometrie');
+    expect(screen.queryByLabelText(/Název/)).not.toBeInTheDocument();
+  });
+
+  it('says which service is waiting, so the list is not a riddle', async () => {
+    listActivities.mockResolvedValue({ activities: [existing()], warnings: [] });
+    render(withQueries(<ActivitiesPage />, { clinicServiceId: 's2' }));
+
+    expect(await screen.findByText(/Sportovní diagnostika/)).toBeInTheDocument();
+    expect(screen.getByText(/přes Upravit/)).toBeInTheDocument();
+  });
+
+  /* Still offered, because a new one may be what he wanted after all. */
+  it('still offers making a new one', async () => {
+    listActivities.mockResolvedValue({ activities: [existing()], warnings: [] });
+    render(withQueries(<ActivitiesPage />, { clinicServiceId: 's2' }));
+
+    await screen.findByText(/přes Upravit/);
+    expect(screen.getAllByRole('button', { name: /Nová činnost/i }).length).toBeGreaterThan(1);
+  });
+
+  /*
+   * A činnost already under this service is not one that is missing, so it
+   * does not count as something to assign - and with nothing else in the
+   * list, a blank form is the right answer after all.
+   */
+  it('opens the form when the only činnost is already under that service', async () => {
+    listActivities.mockResolvedValue({
+      activities: [existing({ clinicServiceId: 's2' })], warnings: [],
+    });
+    render(withQueries(<ActivitiesPage />, { clinicServiceId: 's2' }));
+
+    await screen.findByLabelText(/Název/);
+    expect(screen.getByLabelText(/Služba/)).toHaveTextContent('Sportovní diagnostika');
+  });
+});
