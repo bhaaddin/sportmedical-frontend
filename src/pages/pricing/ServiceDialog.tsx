@@ -13,11 +13,8 @@ import {
   Alert, Autocomplete, Box, Button, Dialog, DialogActions, DialogContent,
   DialogTitle, FormControlLabel, InputAdornment, Stack, Switch, TextField,
 } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
-import { Shield } from '@mui/icons-material';
 import { servicesApi } from '../../api/services';
-import { documentsApi } from '../../api/documents';
-import { categoryMeaning, nearMiss } from './categoryMeaning';
+import { nearMiss } from './categoryMeaning';
 import type { ServiceItem } from '../../api/services';
 import {
   categoriesInUse, draftFrom, hasErrors, toRequest, validateService,
@@ -41,22 +38,22 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
   const [failed, setFailed] = useState<string | null>(null);
 
   /*
-   * What the category actually decides. It stopped being a label on
-   * 13. 9. 2026: a required document hangs off it, so a služba filed under
-   * `Prohlídka` makes the patient bring a výpis and one under `Měření` does
-   * not. The field is free text and the server matches it exactly, so the
-   * screen has to say which of those is happening.
+   * The category is a label again, and only a label.
+   *
+   * It briefly decided something: a required document hung off it, so a row
+   * filed under `Prohlídka` made the patient bring a výpis. That was built on
+   * categories which turned out to be seed data the owner never wrote, and on
+   * 13. 9. 2026 the requirement moved onto a clinic service instead. The chain
+   * is now `termín -> činnost -> služba -> pravidlo`, and the price list is
+   * not in it - what a visit is billed as has no say in what the patient must
+   * bring.
+   *
+   * So the sentence that explained the link went with the link, rather than
+   * being repointed at a new field. It described a relationship this project
+   * decided was wrong.
    */
-  const rules = useQuery({
-    queryKey: ['document-requirement-rules'],
-    queryFn: documentsApi.requirementRules,
-    staleTime: 5 * 60 * 1000,
-  });
   const known = categoriesInUse(existing);
-  /* `undefined` while loading or after a failure - and that is not the same
-     as "no rule", which is why it is passed through rather than defaulted. */
-  const meaning = categoryMeaning(draft.category, rules.isSuccess ? rules.data : undefined, known);
-  const slip = meaning.kind === 'new' ? nearMiss(draft.category, known) : null;
+  const slip = nearMiss(draft.category, known);
 
   const set = (field: keyof ServiceDraft, value: string | boolean) => {
     setDraft((d) => ({ ...d, [field]: value }));
@@ -126,58 +123,26 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
                 label="Kategorie"
                 error={errors.category !== undefined}
                 helperText={
-                  errors.category ??
-                  'Podle kategorie systém pozná, co musí pacient doložit'
+                  errors.category ?? 'Jen pro přehled — položky se podle ní řadí a barví'
                 }
               />
             )}
           />
 
-          {/* Said where it is chosen, not in a manual. */}
-          {meaning.kind === 'requires' && (
-            <Alert severity="info" icon={<Shield fontSize="small" />}>
-              Pacient objednaný na položku v kategorii „{draft.category.trim()}“ musí
-              doložit: <strong>{meaning.documents.join(', ')}</strong>.
-            </Alert>
-          )}
-
-          {/* Says nothing rather than reassuring. A screen that cannot tell
-              must not sound like one that checked. */}
-          {meaning.kind === 'unknown' && (
+          {/* Kept, with a smaller claim. A near-duplicate category no longer
+              turns off a required document - nothing hangs off it now - but
+              "Prohlídka" and "Prohlídky" side by side in one price list is
+              still two names for one thing. */}
+          {slip !== null && (
             <Alert severity="info" variant="outlined">
-              Nepodařilo se zjistit, co se ke kategorii „{draft.category.trim()}“ pojí.
-              Zkontrolujte to prosím v nastavení dokumentů.
-            </Alert>
-          )}
-
-          {meaning.kind === 'known-no-rule' && (
-            <Alert severity="info" variant="outlined">
-              Ke kategorii „{draft.category.trim()}“ se nepojí žádný povinný dokument —
-              pacient nemusí nic dokládat.
-            </Alert>
-          )}
-
-          {/*
-            * A new category is allowed. It is worth saying anyway, because on
-            * screen it looks exactly like a mistyped existing one - and the
-            * two differ by whether a required medical document is asked for.
-            */}
-          {meaning.kind === 'new' && (
-            <Alert severity="warning">
-              „{draft.category.trim()}“ je nová kategorie — zatím ji nemá žádná jiná
-              položka a nepojí se k ní žádný povinný dokument.
-              {slip !== null && (
-                <>
-                  {' '}Nemysleli jste <strong>{slip}</strong>?{' '}
-                  <Button
-                    size="small"
-                    onClick={() => set('category', slip)}
-                    sx={{ textTransform: 'none', p: 0, minWidth: 0, verticalAlign: 'baseline' }}
-                  >
-                    Použít
-                  </Button>
-                </>
-              )}
+              Nemysleli jste <strong>{slip}</strong>?{' '}
+              <Button
+                size="small"
+                onClick={() => set('category', slip)}
+                sx={{ textTransform: 'none', p: 0, minWidth: 0, verticalAlign: 'baseline' }}
+              >
+                Použít
+              </Button>
             </Alert>
           )}
 

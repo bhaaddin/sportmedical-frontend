@@ -30,13 +30,6 @@ vi.mock('../../api/services', () => ({
   servicesApi: { getAll, create, update, archive, getById: vi.fn() },
 }));
 
-/* The dialog asks which categories require which documents, so it can say out
-   loud what the chosen category means. */
-const requirementRules = vi.fn();
-vi.mock('../../api/documents', async () => {
-  const actual = await vi.importActual<typeof import('../../api/documents')>('../../api/documents');
-  return { ...actual, documentsApi: { requirementRules } };
-});
 
 /* Retries off: a failing query would otherwise hold a test open for seconds
    and report a timeout instead of the failure. */
@@ -67,10 +60,6 @@ beforeEach(() => {
   create.mockReset().mockResolvedValue(service());
   update.mockReset().mockResolvedValue(service());
   archive.mockReset().mockResolvedValue(undefined);
-  requirementRules.mockReset().mockResolvedValue([
-    { id: 'r1', templateId: 't1', templateName: 'Výpis ze zdravotní dokumentace',
-      serviceCategory: 'Prohlídka' },
-  ]);
 });
 
 const renderDialog = (props: Partial<React.ComponentProps<typeof ServiceDialog>> = {}) => {
@@ -300,77 +289,6 @@ describe('the price list screen', () => {
   });
 });
 
-/*
- * What the category decides, said where it is chosen.
- *
- * The category stopped being a label: a required document hangs off it, so a
- * služba filed under `Prohlídka` makes the patient bring a výpis. The box is
- * free text and the server matches it exactly, so a plural typed in passing
- * turns the requirement off for every service in that category - and until
- * now no screen said the category decided anything at all.
- *
- * The owner asked, looking straight at this field: "so there's no category
- * here?? but that's where you say what it belongs to?? I don't understand."
- */
-describe('what the category tells the patient to bring', () => {
-  /*
-   * Two services, two categories, so "known" means something. The first
-   * version of this passed only `Prohlídka` and then asked about `Měření` -
-   * which was correctly reported as a brand new category, and the test was
-   * wrong rather than the code.
-   */
-  const openNew = async () => {
-    renderDialog({
-      existing: [service(), service({ id: 's2', code: 'IB', name: 'InBody', category: 'Měření' })],
-    });
-    await screen.findByLabelText(/Kategorie/);
-  };
-
-  it('names the document a category requires', async () => {
-    await openNew();
-    await userEvent.type(screen.getByLabelText(/Kategorie/), 'Prohlídka');
-
-    expect(await screen.findByText(/musí\s+doložit/)).toBeInTheDocument();
-    expect(screen.getByText('Výpis ze zdravotní dokumentace')).toBeInTheDocument();
-  });
-
-  it('says plainly when a category requires nothing', async () => {
-    await openNew();
-    await userEvent.type(screen.getByLabelText(/Kategorie/), 'Měření');
-
-    expect(await screen.findByText(/nemusí nic dokládat/)).toBeInTheDocument();
-  });
-
-  /*
-   * The case worth the whole thing. One letter, the výpis stops being asked
-   * for, and on screen it is indistinguishable from deliberately inventing a
-   * category - which the owner is allowed to do.
-   */
-  it('warns that a mistyped category is a new one, and offers the near miss', async () => {
-    await openNew();
-    await userEvent.type(screen.getByLabelText(/Kategorie/), 'Prohlídky');
-
-    expect(await screen.findByText(/je nová kategorie/)).toBeInTheDocument();
-    expect(screen.getByText('Prohlídka')).toBeInTheDocument();
-  });
-
-  it('puts the suggested category in the box when it is taken up', async () => {
-    await openNew();
-    const box = screen.getByLabelText(/Kategorie/);
-    await userEvent.type(box, 'Prohlídky');
-    await userEvent.click(await screen.findByRole('button', { name: 'Použít' }));
-
-    expect(box).toHaveValue('Prohlídka');
-    expect(await screen.findByText(/musí\s+doložit/)).toBeInTheDocument();
-  });
-
-  /* Nothing claimed before anything is typed. */
-  it('says nothing about an empty box', async () => {
-    await openNew();
-    expect(screen.queryByText(/je nová kategorie/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/musí\s+doložit/)).not.toBeInTheDocument();
-  });
-});
 
 /*
  * An empty price list is the normal state now.

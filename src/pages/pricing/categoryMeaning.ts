@@ -1,95 +1,24 @@
 /*
- * What a price-list category means, beyond being a label.
+ * Two categories one slip apart.
  *
- * It used to be decoration - a colour on a card and a word in a table. Since
- * 13. 9. 2026 it decides something: `DocumentRequirementRule` hangs a required
- * document off a category, so a service filed under `Prohlídka` makes the
- * patient bring a výpis and one filed under `Měření` does not.
+ * A price-list category is a label: it groups the list and colours it. It was
+ * briefly more than that - a required document hung off it - and this file
+ * carried the machinery for saying so. That machinery is gone with the link:
+ * on 13. 9. 2026 the requirement moved onto a clinic service, and the chain is
+ * `termín -> činnost -> služba -> pravidlo` with the price list outside it.
  *
- * The chain runs `termín → činnost → serviceItemId → služba → kategorie`, and
- * the last link is this word. The field that holds it is free text.
+ * What is worth keeping is smaller and still true. "Prohlídka" and "Prohlídky"
+ * side by side in one price list are two names for one thing, and nobody meant
+ * to create the second.
  *
- * That is the hazard this file exists for. The server matches the rule's
- * category against the service's own text with `OrdinalIgnoreCase` and nothing
- * else - so `Prohlídky` is not `Prohlídka`, and a trailing space is not
- * nothing. A plural typed in passing turns off a required medical document for
- * every service in that category, and no screen says a word about it. The
- * owner asked, looking at that very field, "so there's no category here?? but
- * that's where you say what it belongs to?? I don't understand" - and he was
- * right not to understand, because the screen was not saying.
+ * The claim is deliberately smaller than it was. This used to warn that a
+ * mistyped category turned off a required medical document, and that warning
+ * was correct, well built, and guarding a list of categories nobody had asked
+ * for - they were seed data. The better the guard looked, the more convincing
+ * the invented list looked with it.
  */
 
-export interface RequirementRuleLike {
-  templateName: string;
-  serviceCategory: string;
-}
 
-export type CategoryMeaning =
-  /** Nothing typed yet. */
-  | { kind: 'empty' }
-  /**
-   * The rules could not be read, so nothing is claimed either way.
-   *
-   * Distinct from `known-no-rule` on purpose, and the distinction is the point
-   * of this type. "No document is required here" and "I could not find out" are
-   * the same sentence to anybody who cannot tell them apart, and the first is a
-   * reassurance while the second is an absence of one.
-   *
-   * It became reachable when the rule's own shape started changing under this
-   * screen: on 13. 9. 2026 the requirement moved off the price-list category
-   * and onto a clinic service (`serviceCategory` -> `clinicServiceId`). Once
-   * that deploys, every rule read here stops carrying a category - and without
-   * this state the dialog would have gone on saying "nepojí se žádný povinný
-   * dokument" about every category, confidently and wrongly.
-   */
-  | { kind: 'unknown' }
-  /** Matches a rule: services here make the patient bring these documents. */
-  | { kind: 'requires'; documents: string[] }
-  /** A category already in use, with no document rule on it. */
-  | { kind: 'known-no-rule' }
-  /** Not in use anywhere yet - so nothing is required of it, quietly. */
-  | { kind: 'new' };
-
-/** The server's comparison, mirrored: case-insensitive, otherwise exact. */
-function sameCategory(a: string, b: string): boolean {
-  return a.trim().toLocaleLowerCase('cs') === b.trim().toLocaleLowerCase('cs');
-}
-
-/**
- * What the category in the box means right now.
- *
- * `known` is the categories already used by other services - the list the
- * picker offers. Being outside it is not an error; the owner is allowed to
- * invent a category. It is worth saying out loud, because inventing one is
- * indistinguishable on screen from mistyping an existing one, and the two have
- * very different consequences.
- */
-export function categoryMeaning(
-  category: string,
-  rules: readonly RequirementRuleLike[] | null | undefined,
-  known: readonly string[],
-): CategoryMeaning {
-  if (category.trim() === '') return { kind: 'empty' };
-  /* Not loaded, failed, or in a shape this screen no longer understands. */
-  if (rules === null || rules === undefined) return { kind: 'unknown' };
-
-  /*
-   * A rule with no category is a rule this screen cannot read - it hangs off
-   * something else now. One such is enough to stop claiming anything, because
-   * the one that cannot be read may be the one that matters.
-   */
-  if (rules.some((r) => typeof r.serviceCategory !== 'string' || r.serviceCategory === '')) {
-    return { kind: 'unknown' };
-  }
-
-  const documents = rules
-    .filter((r) => sameCategory(r.serviceCategory, category))
-    .map((r) => r.templateName);
-  if (documents.length > 0) return { kind: 'requires', documents };
-
-  if (known.some((k) => sameCategory(k, category))) return { kind: 'known-no-rule' };
-  return { kind: 'new' };
-}
 
 /**
  * A category already in use that the typed one is one slip away from.

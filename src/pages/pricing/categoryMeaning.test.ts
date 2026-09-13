@@ -1,120 +1,23 @@
 /*
- * The word that stopped being a label.
+ * Two categories one slip apart.
  *
- * A price-list category used to be a colour on a card. Since 13. 9. 2026 a
- * required document hangs off it: a služba filed under `Prohlídka` makes the
- * patient bring a výpis, one under `Měření` does not. The chain is
- * `termín → činnost → služba → kategorie`, and the last link is a free-text
- * box the owner types into.
+ * "Prohlídka" and "Prohlídky" side by side in one price list are two names for
+ * one thing, and nobody meant to create the second.
  *
- * The server compares it with `OrdinalIgnoreCase` and nothing else. So
- * `Prohlídky` is not `Prohlídka`, and one letter turns off a required medical
- * document for every service in that category - silently, because nothing on
- * screen mentioned that the category decided anything at all.
+ * This used to be more. A required document hung off the category, so a
+ * mistyped one turned that requirement off silently, and this file guarded it.
+ * On 13. 9. 2026 the requirement moved onto a clinic service - the chain is
+ * `termín -> činnost -> služba -> pravidlo` and the price list is outside it -
+ * so the guard went with the link and what is left is tidiness.
  *
- * The owner asked, looking straight at that field: "so there's no category
- * here?? but that's where you say what it belongs to?? I don't understand."
+ * Worth recording: the guard was correct and well built, and it was guarding a
+ * list of categories nobody had asked for. They were seed data. The better it
+ * looked, the more convincing the invented list looked with it.
  */
 import { describe, it, expect } from 'vitest';
-import { categoryMeaning, nearMiss } from './categoryMeaning';
+import { nearMiss } from './categoryMeaning';
 
-const RULES = [
-  { templateName: 'Výpis ze zdravotní dokumentace', serviceCategory: 'Prohlídka' },
-];
 const KNOWN = ['Diagnostika', 'Měření', 'Prohlídka', 'Terapie'];
-
-describe('what a category means', () => {
-  it('says which documents a category requires', () => {
-    expect(categoryMeaning('Prohlídka', RULES, KNOWN)).toEqual({
-      kind: 'requires',
-      documents: ['Výpis ze zdravotní dokumentace'],
-    });
-  });
-
-  /* The server's own comparison is case-insensitive, so this screen must not
-     be stricter than the rule it is describing. */
-  it('matches the way the server matches — case makes no difference', () => {
-    expect(categoryMeaning('prohlídka', RULES, KNOWN).kind).toBe('requires');
-    expect(categoryMeaning('  Prohlídka  ', RULES, KNOWN).kind).toBe('requires');
-  });
-
-  it('says plainly when a known category requires nothing', () => {
-    expect(categoryMeaning('Měření', RULES, KNOWN)).toEqual({ kind: 'known-no-rule' });
-  });
-
-  /*
-   * The case the whole file is for. One letter, and the výpis is no longer
-   * asked for - and on screen it looks exactly like deliberately inventing a
-   * category, which is a thing the owner is allowed to do.
-   */
-  it('calls a mistyped category new, because that is what the server will call it', () => {
-    expect(categoryMeaning('Prohlídky', RULES, KNOWN)).toEqual({ kind: 'new' });
-  });
-
-  it('says nothing about an empty box', () => {
-    expect(categoryMeaning('', RULES, KNOWN)).toEqual({ kind: 'empty' });
-    expect(categoryMeaning('   ', RULES, KNOWN)).toEqual({ kind: 'empty' });
-  });
-
-  it('lists every document when a category carries more than one', () => {
-    const two = [...RULES, { templateName: 'Informovaný souhlas', serviceCategory: 'Prohlídka' }];
-    expect(categoryMeaning('Prohlídka', two, KNOWN)).toMatchObject({
-      documents: ['Výpis ze zdravotní dokumentace', 'Informovaný souhlas'],
-    });
-  });
-
-  /* An empty list is a real answer: no rule exists. That is the state of the
-     clinic today - the rules were wiped with the seed. */
-  it('treats an empty rule list as a real "nothing required"', () => {
-    expect(categoryMeaning('Prohlídka', [], KNOWN)).toEqual({ kind: 'known-no-rule' });
-  });
-});
-
-/*
- * "Nothing is required here" and "I could not find out" are the same sentence
- * to anybody who cannot tell them apart - and the first is a reassurance while
- * the second is the absence of one.
- *
- * It stopped being hypothetical on 13. 9. 2026: the requirement moved off the
- * price-list category and onto a clinic service, so every rule this screen
- * reads will stop carrying a category. Without this state the dialog would
- * have gone on saying "nepojí se žádný povinný dokument" about everything,
- * confidently.
- */
-describe('when the rules cannot be read', () => {
-  it('says nothing while they are still loading', () => {
-    expect(categoryMeaning('Prohlídka', undefined, KNOWN)).toEqual({ kind: 'unknown' });
-  });
-
-  it('says nothing when the request failed', () => {
-    expect(categoryMeaning('Prohlídka', null, KNOWN)).toEqual({ kind: 'unknown' });
-  });
-
-  /* The shape the coming change produces: a rule that hangs off something
-     this screen does not know about. */
-  it('says nothing when a rule carries no category at all', () => {
-    const moved = [{ templateName: 'Výpis', serviceCategory: undefined as unknown as string }];
-    expect(categoryMeaning('Prohlídka', moved, KNOWN)).toEqual({ kind: 'unknown' });
-  });
-
-  /*
-   * One unreadable rule is enough. The one that cannot be read may be the one
-   * that matters, so a list half of which makes sense is not a list to answer
-   * from.
-   */
-  it('says nothing when only one rule of several is unreadable', () => {
-    const half = [
-      { templateName: 'Výpis', serviceCategory: 'Prohlídka' },
-      { templateName: 'Souhlas', serviceCategory: '' },
-    ];
-    expect(categoryMeaning('Prohlídka', half, KNOWN)).toEqual({ kind: 'unknown' });
-  });
-
-  /* And an empty box is still an empty box, whatever the rules are doing. */
-  it('still says nothing about an empty box', () => {
-    expect(categoryMeaning('', undefined, KNOWN)).toEqual({ kind: 'empty' });
-  });
-});
 
 describe('the category one slip away', () => {
   it('spots the plural of an existing one', () => {
