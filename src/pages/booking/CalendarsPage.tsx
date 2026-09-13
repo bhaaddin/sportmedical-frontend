@@ -29,7 +29,9 @@ import EditIcon from "@mui/icons-material/Edit";
 import GroupIcon from "@mui/icons-material/Group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import MenuItem from "@mui/material/MenuItem";
 import { calendarsApi } from "../../api/calendars";
+import { clinicServicesApi } from "../../api/clinicServices";
 import { hiddenCount, offerDeactivateInstead, visibleCalendars } from "./calendarLifecycle";
 import type { Calendar, CalendarInput } from "../../api/bookingContracts";
 import { AsyncSection } from "../../components/booking/AsyncSection";
@@ -53,6 +55,9 @@ function emptyDraft(sortOrder: number): CalendarInput {
     displayStepMinutes: 15,
     isActive: true,
     sortOrder,
+    /* Empty until one is picked: a calendar that runs no service offers
+       nothing, so the save waits rather than making a silent one. */
+    clinicServiceId: null,
     /* 4.1: unset means "no limit", which is the right default for a new one. */
     publicMinimumNoticeMinutes: null,
     publicHorizonDays: null,
@@ -73,6 +78,24 @@ export default function CalendarsPage() {
    * delete it - deleting takes the appointments with it. Contract v37, 4.1.
    */
   const [showInactive, setShowInactive] = useState(false);
+
+  /*
+   * Which služba each calendar runs. Only the ones still offered: a retired
+   * service is not something to point a calendar at.
+   */
+  const servicesQuery = useQuery({
+    queryKey: ["clinic-services"],
+    queryFn: clinicServicesApi.list,
+    staleTime: CODEBOOK_STALE_MS,
+    select: (all) => all.filter((s) => s.isActive),
+  });
+  const clinicServices = servicesQuery.data ?? [];
+  const serviceName = (id: string | null) =>
+    clinicServices.find((s) => s.id === id)?.name ?? null;
+  const noServicesYet = servicesQuery.isSuccess && clinicServices.length === 0;
+  /* The save waits: a calendar saved without a service is a calendar that
+     silently offers nothing, which is worse than a button that will not move. */
+  const serviceIsChosen = (draft?.clinicServiceId ?? null) !== null;
 
   const calendarsQuery = useQuery({
     queryKey: ["calendars"],
@@ -145,6 +168,9 @@ export default function CalendarsPage() {
       displayStepMinutes: calendar.displayStepMinutes,
       isActive: calendar.isActive,
       sortOrder: calendar.sortOrder,
+      /* Sent back as it came - `PUT` is the whole calendar, so leaving it out
+         would clear it and the calendar would go quiet. */
+      clinicServiceId: calendar.clinicServiceId,
       /*
        * Carried through untouched. This screen does not offer them - they are
        * public-booking limits and public booking is phase 2 - but v27 makes a
@@ -242,9 +268,28 @@ export default function CalendarsPage() {
                           flexShrink: 0,
                         }}
                       />
-                      <Typography sx={{ fontWeight: 600 }}>
-                        {calendar.name}
-                      </Typography>
+                      <Box>
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {calendar.name}
+                        </Typography>
+                        {/*
+                          * Which služba it runs, and a warning when it runs
+                          * none - because then it offers nothing on any day,
+                          * and nothing else on any screen says why. This was
+                          * the state every calendar was in until booking's
+                          * fix: a filter with no way to set what it filtered
+                          * on.
+                          */}
+                        {calendar.clinicServiceId === null ? (
+                          <Typography variant="caption" sx={{ color: "warning.main" }}>
+                            Neprovozuje žádnou službu — nenabídne nic
+                          </Typography>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">
+                            {serviceName(calendar.clinicServiceId) ?? "Služba už neexistuje"}
+                          </Typography>
+                        )}
+                      </Box>
                     </Box>
                   </TableCell>
                   <TableCell>{calendar.location || "-"}</TableCell>
@@ -368,6 +413,39 @@ export default function CalendarsPage() {
                   setDraft({ ...draft, location: e.target.value })
                 }
               />
+              {/*
+                * Which služba this calendar runs. Required in practice though
+                * the server allows none: a calendar without one offers nothing
+                * on any day, and no screen anywhere would say why.
+                */}
+              <TextField
+                select
+                required
+                fullWidth
+                label="Služba"
+                value={draft.clinicServiceId ?? ""}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    clinicServiceId: e.target.value === "" ? null : e.target.value,
+                  })
+                }
+                error={servicesQuery.isError || noServicesYet}
+                helperText={
+                  servicesQuery.isError
+                    ? "Služby se nepodařilo načíst — bez nich kalendář nic nenabídne."
+                    : noServicesYet
+                      ? "Zatím není žádná služba. Nejdřív ji založte v Nastavení → Služby."
+                      : "Co se v tomhle kalendáři dělá. Bez ní nenabídne žádnou činnost."
+                }
+              >
+                {clinicServices.map((service) => (
+                  <MenuItem key={service.id} value={service.id}>
+                    {service.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+
               <TextField
                 fullWidth
                 type="number"
@@ -408,7 +486,7 @@ export default function CalendarsPage() {
           <Button onClick={closeDialog}>{t("booking.common.cancel")}</Button>
           <Button
             variant="contained"
-            disabled={!nameIsValid || save.isPending}
+            disabled={!nameIsValid || !serviceIsChosen || save.isPending}
             onClick={() => draft && save.mutate(draft)}
           >
             {t("booking.common.save")}

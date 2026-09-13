@@ -59,6 +59,19 @@ export const calendarSchema = z.object({
   isActive: z.boolean(),
   sortOrder: z.number().int(),
   /**
+   * Which služba this calendar runs - and a calendar that runs none offers
+   * nothing on any day.
+   *
+   * Not a warning, a silence: `OfferedActivityIdsAsync` returns `[]` for a
+   * calendar with no service, so the grid is empty, availability is empty, and
+   * the day says nothing about why. Booking added the field after finding the
+   * filter shipped without any way to set what it filtered on.
+   *
+   * Nullable, because a calendar made before the field existed has none - and
+   * that is exactly the state a screen has to point at rather than hide.
+   */
+  clinicServiceId: z.string().nullish().transform((v) => v ?? null),
+  /**
    * 4.1: both are optional and unset means "no limit". They only bite on public
    * booking (4.4), which is phase 2 - which is exactly why they are read and
    * carried here. Under the v27 rule a `PUT` that leaves them out **deletes**
@@ -80,6 +93,12 @@ export const calendarInputSchema = z.object({
   displayStepMinutes: z.number().int().positive(),
   isActive: z.boolean(),
   sortOrder: z.number().int(),
+  /**
+   * `PUT` is the whole calendar, so leaving this out clears it - and a
+   * calendar whose service has been cleared stops offering anything at all,
+   * quietly. Every screen that edits one sends back what it was given.
+   */
+  clinicServiceId: z.string().nullable(),
   /** Carried, not edited - see the note on `calendarSchema`. */
   publicMinimumNoticeMinutes: z.number().int().nullable(),
   publicHorizonDays: z.number().int().nullable(),
