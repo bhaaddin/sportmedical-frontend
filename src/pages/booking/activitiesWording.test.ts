@@ -17,7 +17,11 @@ import { describe, it, expect } from 'vitest';
 import cs from '../../i18n/locales/cs.json';
 import pageSource from './ActivitiesPage.tsx?raw';
 
-const wording = (cs as { booking: { activities: Record<string, string> } })
+/* Through `unknown`: the file's real type is far wider than the slice this
+   test reads, and a direct cast between two types that barely overlap is one
+   TypeScript refuses - rightly, since it is the sort of cast that hides a
+   renamed key rather than catching it. */
+const wording = (cs as unknown as { booking: { activities: Record<string, string> } })
   .booking.activities;
 
 describe('what the retire button says', () => {

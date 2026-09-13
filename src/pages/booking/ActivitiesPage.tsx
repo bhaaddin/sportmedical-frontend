@@ -29,6 +29,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { activitiesApi } from "../../api/activities";
 import { servicesApi } from "../../api/services";
+import { clinicServicesApi } from "../../api/clinicServices";
 import RestoreIcon from "@mui/icons-material/Restore";
 import MenuItem from "@mui/material/MenuItem";
 import { warningKey } from "../../api/bookingContracts";
@@ -64,6 +65,9 @@ function emptyDraft(sortOrder: number): ActivityInput {
     isPubliclyBookable: false,
     sortOrder,
     serviceItemId: null,
+    /* Empty until one is picked. The server refuses a činnost without a
+       service, so the form holds the save shut rather than letting it fail. */
+    clinicServiceId: '',
   };
 }
 
@@ -76,6 +80,15 @@ export default function ActivitiesPage() {
   const [confirmDelete, setConfirmDelete] = useState<Activity | null>(null);
   /** Warnings the owner has clicked away this session. */
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+  /* Only the ones still offered: a retired service is not something to file a
+     new činnost under. */
+  const clinicServicesQuery = useQuery({
+    queryKey: ["clinic-services"],
+    queryFn: clinicServicesApi.list,
+    staleTime: 5 * 60 * 1000,
+    select: (all) => all.filter((s) => s.isActive),
+  });
 
   const activitiesQuery = useQuery({
     queryKey: ["activities"],
@@ -156,6 +169,12 @@ export default function ActivitiesPage() {
       isPubliclyBookable: activity.isPubliclyBookable,
       sortOrder: activity.sortOrder,
       /*
+       * Sent back as it came. `PUT` is the whole činnost, so leaving this out
+       * would mean clearing it - and a činnost under no service is a state
+       * the server does not accept and this screen must not try to create.
+       */
+      clinicServiceId: activity.clinicServiceId ?? '',
+      /*
        * 4.3 (v25): `PUT` is the whole activity, and a missing `serviceItemId`
        * clears the link. Carrying it here is the difference between renaming an
        * activity and quietly taking its price away.
@@ -166,6 +185,12 @@ export default function ActivitiesPage() {
   };
 
   const nameIsValid = (draft?.name ?? "").trim().length > 0;
+
+  /* A činnost belongs to exactly one služba and the server refuses it without
+     one, so the save waits rather than failing after the fact. */
+  const clinicServices = clinicServicesQuery.data ?? [];
+  const noServicesYet = clinicServicesQuery.isSuccess && clinicServices.length === 0;
+  const serviceIsValid = (draft?.clinicServiceId ?? "").trim().length > 0;
   const durationIsValid = (draft?.durationMinutes ?? 0) > 0;
 
   return (
@@ -416,6 +441,40 @@ export default function ActivitiesPage() {
                 number it compared against was read nowhere, so it sent people
                 to correct the one that did not matter.
               */}
+              {/*
+                * Which služba this činnost belongs to - required, and the one
+                * that decides what it IS. The price-list picker below decides
+                * what it costs. Two fields, two questions, and they were one
+                * word until today.
+                *
+                * Refused outright by the server without it rather than warned
+                * about, and the owner asked for that: a činnost under no
+                * service inherits no document rule, so it asks the patient for
+                * nothing and looks exactly like one where all is well.
+                */}
+              <TextField
+                select
+                required
+                fullWidth
+                label="Služba"
+                value={draft.clinicServiceId}
+                onChange={(e) => setDraft({ ...draft, clinicServiceId: e.target.value })}
+                error={clinicServicesQuery.isError || noServicesYet}
+                helperText={
+                  clinicServicesQuery.isError
+                    ? "Služby se nepodařilo načíst — bez nich nejde činnost uložit."
+                    : noServicesYet
+                      ? "Zatím není žádná služba. Nejdřív ji založte v Nastavení → Služby."
+                      : "Co to je. Odsud činnost dědí, co musí pacient doložit."
+                }
+              >
+                {clinicServices.map((service) => (
+                  <MenuItem key={service.id} value={service.id}>
+                    {service.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+
               <TextField
                 select
                 fullWidth
@@ -502,7 +561,7 @@ export default function ActivitiesPage() {
           <Button onClick={closeDialog}>{t("booking.common.cancel")}</Button>
           <Button
             variant="contained"
-            disabled={!nameIsValid || !durationIsValid || save.isPending}
+            disabled={!nameIsValid || !durationIsValid || !serviceIsValid || save.isPending}
             onClick={() => draft && save.mutate(draft)}
           >
             {t("booking.common.save")}

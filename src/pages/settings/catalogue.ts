@@ -52,6 +52,19 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     description: 'Kdy se pracuje, co se dělá a kdo co vidí',
     items: [
       {
+        /*
+         * First, because nothing works without it. A činnost must belong to a
+         * service and a calendar that runs none offers nothing on any day - so
+         * this is where a new clinic starts, not an afterthought below the
+         * things that depend on it.
+         */
+        id: 'sluzby',
+        label: 'Služby',
+        description: 'Co ordinace dělá — činnosti patří pod službu',
+        to: '/sluzby',
+        adminOnly: true,
+      },
+      {
         id: 'kalendare',
         label: 'Kalendáře',
         description: 'Seznam kalendářů, kdo do kterého vidí, období a pracovní doba',

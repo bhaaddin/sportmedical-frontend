@@ -128,6 +128,19 @@ export const activitySchema = z.object({
    */
   serviceItemId: z.string().nullish().transform((v) => v ?? null),
   priceCzk: z.number().nullish().transform((v) => v ?? null),
+  /**
+   * Which služba this činnost belongs to - and it belongs to exactly one.
+   *
+   * Not the price list. `serviceItemId` above points at a row of the ceník and
+   * decides what a visit costs; this points at a `ClinicService` and decides
+   * what it is - which required documents it inherits, and which calendar can
+   * offer it. Two fields, two questions, and the pair is why the screens stop
+   * calling anything "služba" except this one.
+   *
+   * Nullish on the way in: a činnost created before the field existed has
+   * none, and that is exactly the state the screen has to point at.
+   */
+  clinicServiceId: z.string().nullish().transform((v) => v ?? null),
 });
 export type Activity = z.infer<typeof activitySchema>;
 
@@ -147,6 +160,16 @@ export const activityInputSchema = z.object({
    * activity would quietly take its price away.
    */
   serviceItemId: z.string().nullable(),
+  /**
+   * Required by the server, and refused outright without it - not warned
+   * about. The owner asked for it that way and the reason holds: a činnost
+   * under no service inherits no document rule, so it asks the patient for
+   * nothing and looks exactly like one where everything is in order.
+   *
+   * `PUT` is the whole činnost here as everywhere, so leaving it out means
+   * clearing it, and there is no such state to clear to.
+   */
+  clinicServiceId: z.string().min(1),
 });
 export type ActivityInput = z.infer<typeof activityInputSchema>;
 

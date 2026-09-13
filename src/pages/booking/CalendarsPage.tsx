@@ -452,7 +452,11 @@ export default function CalendarsPage() {
           {/* The way the server's own message points. Offered only once it
               has refused, so it is an answer to what just happened rather
               than a second button to weigh up front. */}
-          {offerDeactivateInstead(confirmDelete, remove.error !== null) ? (
+          {/* `confirmDelete !== null` is repeated for the compiler: the helper
+              guarantees it, and a type guard would tie the helper's shape to
+              this call site for no gain. */}
+          {confirmDelete !== null
+            && offerDeactivateInstead(confirmDelete, remove.error !== null) ? (
             <Button
               variant="outlined"
               disabled={setActive.isPending}
