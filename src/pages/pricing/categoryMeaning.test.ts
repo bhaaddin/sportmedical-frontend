@@ -63,10 +63,56 @@ describe('what a category means', () => {
     });
   });
 
-  /* Before the rules have loaded, nothing is claimed about requirements - but
-     a known category is still known. */
-  it('does not invent a requirement while the rules are still loading', () => {
+  /* An empty list is a real answer: no rule exists. That is the state of the
+     clinic today - the rules were wiped with the seed. */
+  it('treats an empty rule list as a real "nothing required"', () => {
     expect(categoryMeaning('Prohlídka', [], KNOWN)).toEqual({ kind: 'known-no-rule' });
+  });
+});
+
+/*
+ * "Nothing is required here" and "I could not find out" are the same sentence
+ * to anybody who cannot tell them apart - and the first is a reassurance while
+ * the second is the absence of one.
+ *
+ * It stopped being hypothetical on 13. 9. 2026: the requirement moved off the
+ * price-list category and onto a clinic service, so every rule this screen
+ * reads will stop carrying a category. Without this state the dialog would
+ * have gone on saying "nepojí se žádný povinný dokument" about everything,
+ * confidently.
+ */
+describe('when the rules cannot be read', () => {
+  it('says nothing while they are still loading', () => {
+    expect(categoryMeaning('Prohlídka', undefined, KNOWN)).toEqual({ kind: 'unknown' });
+  });
+
+  it('says nothing when the request failed', () => {
+    expect(categoryMeaning('Prohlídka', null, KNOWN)).toEqual({ kind: 'unknown' });
+  });
+
+  /* The shape the coming change produces: a rule that hangs off something
+     this screen does not know about. */
+  it('says nothing when a rule carries no category at all', () => {
+    const moved = [{ templateName: 'Výpis', serviceCategory: undefined as unknown as string }];
+    expect(categoryMeaning('Prohlídka', moved, KNOWN)).toEqual({ kind: 'unknown' });
+  });
+
+  /*
+   * One unreadable rule is enough. The one that cannot be read may be the one
+   * that matters, so a list half of which makes sense is not a list to answer
+   * from.
+   */
+  it('says nothing when only one rule of several is unreadable', () => {
+    const half = [
+      { templateName: 'Výpis', serviceCategory: 'Prohlídka' },
+      { templateName: 'Souhlas', serviceCategory: '' },
+    ];
+    expect(categoryMeaning('Prohlídka', half, KNOWN)).toEqual({ kind: 'unknown' });
+  });
+
+  /* And an empty box is still an empty box, whatever the rules are doing. */
+  it('still says nothing about an empty box', () => {
+    expect(categoryMeaning('', undefined, KNOWN)).toEqual({ kind: 'empty' });
   });
 });
 

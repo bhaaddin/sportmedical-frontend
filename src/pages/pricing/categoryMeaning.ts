@@ -27,6 +27,22 @@ export interface RequirementRuleLike {
 export type CategoryMeaning =
   /** Nothing typed yet. */
   | { kind: 'empty' }
+  /**
+   * The rules could not be read, so nothing is claimed either way.
+   *
+   * Distinct from `known-no-rule` on purpose, and the distinction is the point
+   * of this type. "No document is required here" and "I could not find out" are
+   * the same sentence to anybody who cannot tell them apart, and the first is a
+   * reassurance while the second is an absence of one.
+   *
+   * It became reachable when the rule's own shape started changing under this
+   * screen: on 13. 9. 2026 the requirement moved off the price-list category
+   * and onto a clinic service (`serviceCategory` -> `clinicServiceId`). Once
+   * that deploys, every rule read here stops carrying a category - and without
+   * this state the dialog would have gone on saying "nepojí se žádný povinný
+   * dokument" about every category, confidently and wrongly.
+   */
+  | { kind: 'unknown' }
   /** Matches a rule: services here make the patient bring these documents. */
   | { kind: 'requires'; documents: string[] }
   /** A category already in use, with no document rule on it. */
@@ -50,10 +66,21 @@ function sameCategory(a: string, b: string): boolean {
  */
 export function categoryMeaning(
   category: string,
-  rules: readonly RequirementRuleLike[],
+  rules: readonly RequirementRuleLike[] | null | undefined,
   known: readonly string[],
 ): CategoryMeaning {
   if (category.trim() === '') return { kind: 'empty' };
+  /* Not loaded, failed, or in a shape this screen no longer understands. */
+  if (rules === null || rules === undefined) return { kind: 'unknown' };
+
+  /*
+   * A rule with no category is a rule this screen cannot read - it hangs off
+   * something else now. One such is enough to stop claiming anything, because
+   * the one that cannot be read may be the one that matters.
+   */
+  if (rules.some((r) => typeof r.serviceCategory !== 'string' || r.serviceCategory === '')) {
+    return { kind: 'unknown' };
+  }
 
   const documents = rules
     .filter((r) => sameCategory(r.serviceCategory, category))

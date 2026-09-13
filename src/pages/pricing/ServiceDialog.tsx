@@ -53,7 +53,9 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
     staleTime: 5 * 60 * 1000,
   });
   const known = categoriesInUse(existing);
-  const meaning = categoryMeaning(draft.category, rules.data ?? [], known);
+  /* `undefined` while loading or after a failure - and that is not the same
+     as "no rule", which is why it is passed through rather than defaulted. */
+  const meaning = categoryMeaning(draft.category, rules.isSuccess ? rules.data : undefined, known);
   const slip = meaning.kind === 'new' ? nearMiss(draft.category, known) : null;
 
   const set = (field: keyof ServiceDraft, value: string | boolean) => {
@@ -136,6 +138,15 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
             <Alert severity="info" icon={<Shield fontSize="small" />}>
               Pacient objednaný na položku v kategorii „{draft.category.trim()}“ musí
               doložit: <strong>{meaning.documents.join(', ')}</strong>.
+            </Alert>
+          )}
+
+          {/* Says nothing rather than reassuring. A screen that cannot tell
+              must not sound like one that checked. */}
+          {meaning.kind === 'unknown' && (
+            <Alert severity="info" variant="outlined">
+              Nepodařilo se zjistit, co se ke kategorii „{draft.category.trim()}“ pojí.
+              Zkontrolujte to prosím v nastavení dokumentů.
             </Alert>
           )}
 
