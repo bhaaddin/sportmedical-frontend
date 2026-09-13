@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react
 import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Avatar, IconButton, Menu, MenuItem, Badge, CircularProgress, Button } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import i18n from './i18n';
-import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Group, Search, AttachMoney, Schedule, EventBusy, Today, Description, ArrowBack } from '@mui/icons-material';
+import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Search, AttachMoney, Schedule, EventBusy, Today, Description, ArrowBack } from '@mui/icons-material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { isAdminRole, currentUserRole } from './auth/roles';
 import { PATIENT_SECTIONS, patientInPath, sectionPath } from './pages/patients/sections';
@@ -145,10 +145,17 @@ const menuGroups: MenuItemGroup[] = [
     ],
   },
   {
+    /*
+     * Plátci and Můj rozvrh used to sit here as well as in Nastavení. Both are
+     * configuration, so Nastavení is where they live and the sidebar is for
+     * the work of the day. Two entries for one screen is the shape this
+     * project keeps finding, and this time I put it there myself: adding
+     * Plátci to Nastavení without taking it out of here.
+     *
+     * `settingsDoesNotDuplicateTheSidebar` in catalogue.test.ts holds the line.
+     */
     label: '',
     items: [
-      { text: 'Plátci', icon: <Group />, path: '/clubs' },
-      { text: 'Můj rozvrh', icon: <CalendarMonth />, path: '/worker-schedule' },
       { text: 'Nastavení', icon: <Settings />, path: '/settings' },
     ],
   },

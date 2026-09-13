@@ -184,11 +184,47 @@ describe('the payments section', () => {
     expect(hers?.items.map((i) => i.id).sort()).toEqual(['cenik', 'platci']);
   });
 
-  /* One name for the payers, in the menu and here - this screen has been
+  /* One name for this screen: the page heading and this row. It has been
      called both "Kluby" and "Plátci" in the same application. */
-  it('calls the payers what the sidebar calls them', () => {
+  it('calls the payers what the screen calls itself', () => {
     const row = platby()?.items.find((i) => i.id === 'platci');
     expect(row?.label).toBe('Plátci');
-    expect(appSource).toContain("text: 'Plátci'");
+  });
+});
+
+/*
+ * One place per screen.
+ *
+ * The sidebar is the work of the day; Nastavení is configuration. A screen in
+ * both is the shape this project keeps turning up, and this time I put it
+ * there myself - "Plátci" went into Nastavení and stayed in the sidebar too,
+ * so the owner saw it twice on one screenshot. "Můj rozvrh" had been doubled
+ * the same way for longer.
+ *
+ * The rule is checked against App.tsx's own text rather than a list kept
+ * beside it, because a list kept beside it is a third place to forget.
+ */
+describe('the sidebar and the settings do not overlap', () => {
+  /* Every `{ text: …, icon: …, path: '/…' }` in the sidebar's menu groups. */
+  const sidebarPaths = [...appSource.matchAll(/\{ text: '[^']+', icon: <\w+ \/>, path: '([^']+)'/g)]
+    .map((m) => m[1]);
+
+  it('finds the sidebar in App.tsx at all', () => {
+    /* Guards the regex: if it silently matched nothing, the test below would
+       pass for the wrong reason and go on passing forever. */
+    expect(sidebarPaths.length).toBeGreaterThan(5);
+    expect(sidebarPaths).toContain('/patients');
+  });
+
+  it('offers no settings screen from the sidebar as well', () => {
+    const both = allDestinations().filter((to) => sidebarPaths.includes(to));
+    expect(both, `v liště i v nastavení: ${both.join(', ')}`).toEqual([]);
+  });
+
+  /* Nastavení itself is the one entry that belongs in the sidebar and is not
+     a row inside Nastavení. */
+  it('keeps the way into the settings in the sidebar', () => {
+    expect(sidebarPaths).toContain('/settings');
+    expect(allDestinations()).not.toContain('/settings');
   });
 });
