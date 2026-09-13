@@ -88,7 +88,7 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
   return (
     <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ fontWeight: 700 }}>
-        {service === null ? 'Nová služba' : 'Upravit službu'}
+        {service === null ? 'Nová položka ceníku' : 'Upravit položku ceníku'}
       </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
@@ -134,7 +134,7 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
           {/* Said where it is chosen, not in a manual. */}
           {meaning.kind === 'requires' && (
             <Alert severity="info" icon={<Shield fontSize="small" />}>
-              Pacient objednaný na službu v kategorii „{draft.category.trim()}“ musí
+              Pacient objednaný na položku v kategorii „{draft.category.trim()}“ musí
               doložit: <strong>{meaning.documents.join(', ')}</strong>.
             </Alert>
           )}
@@ -154,7 +154,7 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
           {meaning.kind === 'new' && (
             <Alert severity="warning">
               „{draft.category.trim()}“ je nová kategorie — zatím ji nemá žádná jiná
-              služba a nepojí se k ní žádný povinný dokument.
+              položka a nepojí se k ní žádný povinný dokument.
               {slip !== null && (
                 <>
                   {' '}Nemysleli jste <strong>{slip}</strong>?{' '}
@@ -177,7 +177,7 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
             multiline
             minRows={2}
             fullWidth
-            helperText="Co pacient dostane. Ukazuje se na kartě služby."
+            helperText="Co pacient dostane. Ukazuje se na kartě v ceníku."
           />
 
           <Stack direction="row" spacing={2}>

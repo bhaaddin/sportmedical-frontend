@@ -2,6 +2,12 @@
  * The price list on screen: the dialog that edits it, and the door that does
  * not swing back.
  *
+ * The rows are "položky ceníku" and not "služby". That one word meant two
+ * things in this application - a row here, and a calendar on the booking
+ * screen, which literally said "Kalendář je služba" - and it misled the owner
+ * three times in a day. A činnost is what you schedule; a položka is what you
+ * bill.
+ *
  * The rules themselves are tested in `serviceForm.test.ts`. What is left for
  * here is whether the screen *uses* them - a form that validates perfectly and
  * sends anyway is the same bug with more code - and the two things only the
@@ -112,7 +118,7 @@ describe('the editor', () => {
     await fill(/Cena/, '900');
     await userEvent.click(screen.getByRole('button', { name: 'Uložit' }));
 
-    expect(await screen.findByText('Tenhle kód už jedna služba má.')).toBeInTheDocument();
+    expect(await screen.findByText('Tenhle kód už jedna položka má.')).toBeInTheDocument();
     expect(create).not.toHaveBeenCalled();
   });
 
@@ -216,7 +222,7 @@ describe('the price list screen', () => {
     await screen.findAllByText('Komplexní prohlídka');
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Vyřadit službu Komplexní prohlídka' }),
+      screen.getByRole('button', { name: 'Vyřadit položku Komplexní prohlídka' }),
     );
 
     expect(await screen.findByText(/vrátit nedá/)).toBeInTheDocument();
@@ -231,7 +237,7 @@ describe('the price list screen', () => {
     await screen.findAllByText('Komplexní prohlídka');
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Vyřadit službu Komplexní prohlídka' }),
+      screen.getByRole('button', { name: 'Vyřadit položku Komplexní prohlídka' }),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Zrušit' }));
 
@@ -244,21 +250,21 @@ describe('the price list screen', () => {
     await screen.findAllByText('Komplexní prohlídka');
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Upravit službu Komplexní prohlídka' }),
+      screen.getByRole('button', { name: 'Upravit položku Komplexní prohlídka' }),
     );
 
-    expect(await screen.findByText('Upravit službu')).toBeInTheDocument();
+    expect(await screen.findByText('Upravit položku ceníku')).toBeInTheDocument();
   });
 
   it('opens an empty editor for a new service', async () => {
     render(withQueries(<Cenik />));
     await screen.findAllByText('Komplexní prohlídka');
 
-    await userEvent.click(screen.getByRole('button', { name: /Nová služba/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Nová položka/ }));
 
     /* Scoped to the dialog: the button that opened it carries the same words. */
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('Nová služba')).toBeInTheDocument();
+    expect(within(dialog).getByText('Nová položka ceníku')).toBeInTheDocument();
     expect(within(dialog).getByLabelText(/Kód/)).toHaveValue('');
   });
 

@@ -137,11 +137,11 @@
     },
     "calendars": {
       "title": "Kalendáře",
-      "subtitle": "Služby, do kterých se objednává. Každý má vlastní barvu, místo a krok zobrazení.",
+      "subtitle": "Kam se objednává. Každý má vlastní barvu, místo a krok zobrazení.",
       "new": "Nový kalendář",
       "newTitle": "Nový kalendář",
       "editTitle": "Úprava kalendáře",
-      "empty": "Zatím nemáte žádný kalendář. Kalendář je služba, do které se objednává — třeba Prohlídky nebo Diagnostika.",
+      "empty": "Zatím nemáte žádný kalendář. Kalendář je místo, kam se objednává — ordinace, laboratoř, konkrétní přístroj.",
       "active": "Aktivní",
       "inactive": "Neaktivní",
       "stepValue": "{{minutes}} min",

@@ -1,5 +1,14 @@
 /*
- * The price list: what the ordinace does, how long it takes and what it costs.
+ * The price list: what the ordinace charges, how long it takes and what it costs.
+ *
+ * These rows are "položky ceníku" on screen and not "služby", because that one
+ * word meant two things in this application and misled the owner three times
+ * in a day. A `činnost` is what you put in a calendar; a row here is what you
+ * bill. One visit is scheduled as one činnost and billed as one or more of
+ * these. The route and the type stay `api/services` and `ServiceItem` -
+ * renaming those would reach into booking's `Activity.ServiceItemId` and into
+ * invoicing and gain nothing, because it was the labels that misled, not the
+ * identifiers.
  *
  * It was already here, already full - eight priced services off
  * `/api/services` - and reachable only by typing the address: not in the menu,
@@ -84,9 +93,9 @@ export default function Cenik() {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <AttachMoney color="primary" /> Ceník služeb
+              <AttachMoney color="primary" /> Ceník
             </Typography>
-            <Typography variant="body2" color="text.secondary">Přehled nabízených služeb a ceník</Typography>
+            <Typography variant="body2" color="text.secondary">Co ordinace účtuje — položky, ceny a délky</Typography>
           </Box>
           <Button
             variant="contained"
@@ -94,7 +103,7 @@ export default function Cenik() {
             onClick={() => setEditing(null)}
             sx={{ borderRadius: 2, px: 3, bgcolor: '#0D7377' }}
           >
-            Nová služba
+            Nová položka
           </Button>
         </Box>
       </motion.div>
@@ -104,7 +113,7 @@ export default function Cenik() {
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         {[
-          { label: 'Celkem služeb', value: totalServices, color: '#0D7377' },
+          { label: 'Celkem položek', value: totalServices, color: '#0D7377' },
           { label: 'Průměrná cena', value: `${avgPrice.toLocaleString('cs-CZ')} Kč`, color: '#2E7D32' },
           { label: 'Kategorií', value: new Set(services.map(s => s.category)).size, color: '#ED6C02' },
         ].map((stat, i) => (
@@ -127,7 +136,7 @@ export default function Cenik() {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
         <TextField
           fullWidth
-          placeholder="Hledat službu..."
+          placeholder="Hledat v ceníku..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           slotProps={{ input: {
@@ -187,7 +196,7 @@ export default function Cenik() {
                         <Tooltip title="Upravit">
                           <IconButton
                             size="small"
-                            aria-label={`Upravit službu ${service.name}`}
+                            aria-label={`Upravit položku ${service.name}`}
                             onClick={() => setEditing(service)}
                           >
                             <Edit fontSize="small" />
@@ -196,7 +205,7 @@ export default function Cenik() {
                         <Tooltip title="Vyřadit z ceníku">
                           <IconButton
                             size="small"
-                            aria-label={`Vyřadit službu ${service.name}`}
+                            aria-label={`Vyřadit položku ${service.name}`}
                             onClick={() => setArchiving(service)}
                           >
                             <Archive fontSize="small" />
@@ -214,7 +223,7 @@ export default function Cenik() {
 
       {!loading && filtered.length === 0 && (
         <Box sx={{ textAlign: 'center', py: 8 }}>
-          <Typography variant="h6" color="text.secondary">Žádné služby nenalezeny</Typography>
+          <Typography variant="h6" color="text.secondary">V ceníku nic takového není</Typography>
         </Box>
       )}
 

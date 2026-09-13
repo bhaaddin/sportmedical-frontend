@@ -93,7 +93,7 @@ export function validateService(
       (s) => s.id !== editingId && s.code.trim().toLowerCase() === code.toLowerCase(),
     )
   ) {
-    errors.code = 'Tenhle kód už jedna služba má.';
+    errors.code = 'Tenhle kód už jedna položka má.';
   }
 
   if (name === '') errors.name = 'Název je povinný.';
