@@ -145,38 +145,50 @@ describe('finding the way back', () => {
 });
 
 /*
- * The price list and the činnosti, kept together.
+ * Money under one heading.
  *
- * The price list first went into "Ordinace", on the reasoning that what the
- * practice charges is a fact about the practice. That reasoning ignored how
- * the two are actually wired: an činnost carries a `serviceItemId` pointing at
- * a row of the price list and takes its price from it. They are two halves of
- * one thing, and the owner went looking for the price list beside the
- * činnosti - where it was not - and could not find it.
+ * The price list has moved twice, and both moves were mine guessing at a model
+ * the owner had not been asked for. First "Ordinace", on the reasoning that
+ * what a practice charges is a fact about the practice. Then beside "Činnosti",
+ * because an činnost takes its price from it - which is true, and still not
+ * how he thinks about it.
+ *
+ * His is simpler and he said it in one line: platby are their own heading, and
+ * the price list and the payers both sit under it. This test exists because I
+ * wrote the previous arrangement into a test too, and confidently.
  */
-describe('the price list and the činnosti', () => {
-  const sectionOf = (id: string) =>
-    SETTINGS_SECTIONS.find((s) => s.items.some((i) => i.id === id));
+describe('the payments section', () => {
+  const platby = () => SETTINGS_SECTIONS.find((s) => s.id === 'platby');
 
-  it('live in the same section', () => {
-    expect(sectionOf('cenik')?.id).toBe(sectionOf('cinnosti')?.id);
+  it('holds both the price list and the payers', () => {
+    const ids = platby()?.items.map((i) => i.id) ?? [];
+    expect(ids).toContain('cenik');
+    expect(ids).toContain('platci');
   });
 
-  /* Next to each other, not at opposite ends of a seven-row list. */
-  it('sit next to each other in it', () => {
-    const items = sectionOf('cinnosti')?.items ?? [];
-    const gap = Math.abs(
-      items.findIndex((i) => i.id === 'cenik') - items.findIndex((i) => i.id === 'cinnosti'),
-    );
-    expect(gap).toBe(1);
+  /* Not left behind in the section it used to be in. */
+  it('is the only section either of them is in', () => {
+    for (const id of ['cenik', 'platci']) {
+      const sections = SETTINGS_SECTIONS.filter((s) => s.items.some((i) => i.id === id));
+      expect(sections.map((s) => s.id)).toEqual(['platby']);
+    }
   });
 
-  /* A receptionist may not open Činnosti, so the price list must not be the
-     row that drags an otherwise empty section onto her screen - nor vanish
-     from his. Both are admin-visible; only the price list is open to all. */
-  it('is offered to a receptionist even though činnosti are not', () => {
-    const plain = visibleSections(false).flatMap((s) => s.items.map((i) => i.id));
-    expect(plain).toContain('cenik');
-    expect(plain).not.toContain('cinnosti');
+  /*
+   * A receptionist takes payments and needs to see what things cost and who
+   * gets the invoice, so neither row may be admin-only - which would empty the
+   * whole section off her screen.
+   */
+  it('is open to a receptionist, not just an administrator', () => {
+    const hers = visibleSections(false).find((s) => s.id === 'platby');
+    expect(hers?.items.map((i) => i.id).sort()).toEqual(['cenik', 'platci']);
+  });
+
+  /* One name for the payers, in the menu and here - this screen has been
+     called both "Kluby" and "Plátci" in the same application. */
+  it('calls the payers what the sidebar calls them', () => {
+    const row = platby()?.items.find((i) => i.id === 'platci');
+    expect(row?.label).toBe('Plátci');
+    expect(appSource).toContain("text: 'Plátci'");
   });
 });

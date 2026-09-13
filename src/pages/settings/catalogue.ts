@@ -49,7 +49,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'provoz',
     label: 'Kalendáře a provoz',
-    description: 'Kdy se pracuje, co se dělá, co to stojí a kdo co vidí',
+    description: 'Kdy se pracuje, co se dělá a kdo co vidí',
     items: [
       {
         id: 'kalendare',
@@ -64,19 +64,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         description: 'Co se v ordinaci dělá a jak dlouho to trvá',
         to: '/activities',
         adminOnly: true,
-      },
-      {
-        /*
-         * Beside Činnosti, not off in Ordinace where this first went. An
-         * činnost carries a `serviceItemId` pointing at a row of this list and
-         * takes its price from it; splitting the two across sections split one
-         * thing in half. The owner went looking for the price list next to the
-         * činnosti, which is exactly where it belongs.
-         */
-        id: 'cenik',
-        label: 'Ceník služeb',
-        description: 'Ceny a délky výkonů — odsud si činnost bere svou cenu',
-        to: '/cenik',
       },
       {
         id: 'pracovni-doba',
@@ -123,6 +110,40 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Můj rozvrh',
         description: 'Vaše vlastní směny a dny, kdy jste v ordinaci',
         to: '/worker-schedule',
+      },
+    ],
+  },
+  {
+    /*
+     * Money in one place. The price list moved twice before landing here -
+     * first into Ordinace on the reasoning that what a practice charges is a
+     * fact about the practice, then beside Činnosti because an činnost takes
+     * its price from it. Both were guesses at the owner's model. His is
+     * simpler and he said it plainly: payments are their own heading, and the
+     * price list and the payers both live under it.
+     */
+    id: 'platby',
+    label: 'Platby',
+    description: 'Co co stojí a kdo to platí',
+    items: [
+      {
+        id: 'cenik',
+        label: 'Ceník činností',
+        description: 'Ceny a délky výkonů — odsud si činnost bere svou cenu',
+        to: '/cenik',
+      },
+      {
+        /*
+         * "Definice plátců" in the owner's words: who gets the invoice and
+         * where it goes. The server has carried all of it from the start -
+         * IČO, DIČ, fakturační adresa, bankovní účet, IBAN and splatnost - and
+         * the screen collected five of the thirteen fields, none of them the
+         * ones you need to send an invoice.
+         */
+        id: 'platci',
+        label: 'Plátci',
+        description: 'Kluby a organizace, které platí za členy — fakturační údaje a splatnost',
+        to: '/clubs',
       },
     ],
   },

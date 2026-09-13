@@ -147,7 +147,7 @@ const menuGroups: MenuItemGroup[] = [
   {
     label: '',
     items: [
-      { text: 'Kluby', icon: <Group />, path: '/clubs' },
+      { text: 'Plátci', icon: <Group />, path: '/clubs' },
       { text: 'Můj rozvrh', icon: <CalendarMonth />, path: '/worker-schedule' },
       { text: 'Nastavení', icon: <Settings />, path: '/settings' },
     ],
