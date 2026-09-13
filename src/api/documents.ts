@@ -140,6 +140,14 @@ export interface PatientDocument {
   notes: string;
 }
 
+export interface DocumentRequirementRule {
+  id: string;
+  templateId: string;
+  templateName: string;
+  /** The price-list category, as text: `Prohlídka`, `Diagnostika`, … */
+  serviceCategory: string;
+}
+
 export const documentsApi = {
   getTemplates: async (): Promise<DocumentTemplate[]> => {
     const res = await client.get('/api/documents/templates');
@@ -262,6 +270,21 @@ export const documentsApi = {
    * that offers a specialty the server will not accept is worse than no
    * suggester. An empty query returns what a clinic actually uses.
    */
+  /**
+   * Which price-list category requires which document.
+   *
+   * Data the clinic keeps, not a constant: the owner makes his own služby and
+   * decides what each kind needs. The server matches the rule's category
+   * against the service's own text - `OrdinalIgnoreCase`, exact otherwise -
+   * so "Prohlídky" is not "Prohlídka" and a category typed slightly wrong
+   * requires nothing at all, silently. That is why the price-list dialog
+   * reads this and says out loud what the chosen category means.
+   */
+  requirementRules: async (): Promise<DocumentRequirementRule[]> => {
+    const res = await client.get('/api/documents/requirements');
+    return res.data?.data ?? res.data?.value ?? res.data ?? [];
+  },
+
   specialties: async (q: string, take = 10): Promise<Specialty[]> => {
     const res = await client.get('/api/documents/specialties', { params: { q, take } });
     return res.data?.value ?? res.data ?? [];

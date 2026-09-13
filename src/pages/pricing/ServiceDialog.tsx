@@ -13,7 +13,11 @@ import {
   Alert, Autocomplete, Box, Button, Dialog, DialogActions, DialogContent,
   DialogTitle, FormControlLabel, InputAdornment, Stack, Switch, TextField,
 } from '@mui/material';
+import { useQuery } from '@tanstack/react-query';
+import { Shield } from '@mui/icons-material';
 import { servicesApi } from '../../api/services';
+import { documentsApi } from '../../api/documents';
+import { categoryMeaning, nearMiss } from './categoryMeaning';
 import type { ServiceItem } from '../../api/services';
 import {
   categoriesInUse, draftFrom, hasErrors, toRequest, validateService,
@@ -35,6 +39,22 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
   const [errors, setErrors] = useState<ServiceErrors>({});
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+
+  /*
+   * What the category actually decides. It stopped being a label on
+   * 13. 9. 2026: a required document hangs off it, so a služba filed under
+   * `Prohlídka` makes the patient bring a výpis and one under `Měření` does
+   * not. The field is free text and the server matches it exactly, so the
+   * screen has to say which of those is happening.
+   */
+  const rules = useQuery({
+    queryKey: ['document-requirement-rules'],
+    queryFn: documentsApi.requirementRules,
+    staleTime: 5 * 60 * 1000,
+  });
+  const known = categoriesInUse(existing);
+  const meaning = categoryMeaning(draft.category, rules.data ?? [], known);
+  const slip = meaning.kind === 'new' ? nearMiss(draft.category, known) : null;
 
   const set = (field: keyof ServiceDraft, value: string | boolean) => {
     setDraft((d) => ({ ...d, [field]: value }));
@@ -95,7 +115,7 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
 
           <Autocomplete
             freeSolo
-            options={categoriesInUse(existing)}
+            options={known}
             value={draft.category}
             onInputChange={(_, value) => set('category', value)}
             renderInput={(params) => (
@@ -103,10 +123,52 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
                 {...params}
                 label="Kategorie"
                 error={errors.category !== undefined}
-                helperText={errors.category ?? 'Vyberte ze seznamu, nebo napište novou'}
+                helperText={
+                  errors.category ??
+                  'Podle kategorie systém pozná, co musí pacient doložit'
+                }
               />
             )}
           />
+
+          {/* Said where it is chosen, not in a manual. */}
+          {meaning.kind === 'requires' && (
+            <Alert severity="info" icon={<Shield fontSize="small" />}>
+              Pacient objednaný na službu v kategorii „{draft.category.trim()}“ musí
+              doložit: <strong>{meaning.documents.join(', ')}</strong>.
+            </Alert>
+          )}
+
+          {meaning.kind === 'known-no-rule' && (
+            <Alert severity="info" variant="outlined">
+              Ke kategorii „{draft.category.trim()}“ se nepojí žádný povinný dokument —
+              pacient nemusí nic dokládat.
+            </Alert>
+          )}
+
+          {/*
+            * A new category is allowed. It is worth saying anyway, because on
+            * screen it looks exactly like a mistyped existing one - and the
+            * two differ by whether a required medical document is asked for.
+            */}
+          {meaning.kind === 'new' && (
+            <Alert severity="warning">
+              „{draft.category.trim()}“ je nová kategorie — zatím ji nemá žádná jiná
+              služba a nepojí se k ní žádný povinný dokument.
+              {slip !== null && (
+                <>
+                  {' '}Nemysleli jste <strong>{slip}</strong>?{' '}
+                  <Button
+                    size="small"
+                    onClick={() => set('category', slip)}
+                    sx={{ textTransform: 'none', p: 0, minWidth: 0, verticalAlign: 'baseline' }}
+                  >
+                    Použít
+                  </Button>
+                </>
+              )}
+            </Alert>
+          )}
 
           <TextField
             label="Popis"
