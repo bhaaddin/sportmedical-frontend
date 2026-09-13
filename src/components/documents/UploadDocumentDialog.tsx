@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import DocumentScanner from '../scanner/DocumentScanner';
 import { documentsApi } from '../../api/documents';
+import { asksIssueDate, issueDateMissing as missingIssueDate } from './issueDate';
 import type { DocumentTemplate, PatientDocument } from '../../api/documents';
 import {
   checkFile, isHeic, isPdf, FILE_INPUT_ACCEPT, formatBytes, uploadErrorMessage,
@@ -72,6 +73,11 @@ export default function UploadDocumentDialog({
     specialtyOther: null,
   });
   const [reportDate, setReportDate] = useState('');
+
+  /* Which uploads are asked for a date, and which may not go without one -
+     see `issueDate.ts`; the výpis is the one the server insists on. */
+  const needsIssueDate = asksIssueDate(template);
+  const issueDateMissing = missingIssueDate(template, reportDate);
 
   const isReport = template === null;
   const title = isReport ? 'Lékařská zpráva od jiného lékaře' : template.name;
@@ -164,8 +170,12 @@ export default function UploadDocumentDialog({
         template?.id ?? null,
         payload,
         setProgress,
-        isReport
-          ? { ...specialty, reportDate: reportDate === '' ? null : reportDate }
+        needsIssueDate
+          ? {
+              specialtyCode: isReport ? specialty.specialtyCode : null,
+              specialtyOther: isReport ? specialty.specialtyOther : null,
+              reportDate: reportDate === '' ? null : reportDate,
+            }
           : undefined,
       );
       setUploaded(document);
@@ -253,20 +263,6 @@ export default function UploadDocumentDialog({
               {/* Only for a report: which doctor wrote it and when. Asked here
                   rather than afterwards, because afterwards means somebody has
                   to remember to come back, and nobody does. */}
-              {isReport && (
-                <Stack spacing={2} sx={{ pt: 1 }}>
-                  <Divider />
-                  <SpecialtyPicker value={specialty} onChange={setSpecialty} />
-                  <TextField
-                    type="date"
-                    label="Datum zprávy"
-                    value={reportDate}
-                    onChange={(event) => setReportDate(event.target.value)}
-                    helperText="Datum na zprávě, ne datum nahrání — podle něj se řadí."
-                    slotProps={{ inputLabel: { shrink: true } }}
-                  />
-                </Stack>
-              )}
             </Stack>
           )}
 
@@ -306,6 +302,35 @@ export default function UploadDocumentDialog({
                 )}
                 <Button onClick={reset}>Vybrat jiný</Button>
               </Stack>
+
+              {/*
+                * Asked here, with the document on screen, because the answer
+                * is written on it. It used to be asked before the file was
+                * even chosen - and for a výpis, whose date the server now
+                * insists on, that would have meant reaching the upload button
+                * with the field out of reach behind you.
+                */}
+              {needsIssueDate && (
+                <Stack spacing={2} sx={{ width: '100%', pt: 1 }}>
+                  <Divider />
+                  {isReport && <SpecialtyPicker value={specialty} onChange={setSpecialty} />}
+                  <TextField
+                    type="date"
+                    label={isReport ? 'Datum zprávy' : 'Datum vydání výpisu'}
+                    value={reportDate}
+                    onChange={(event) => setReportDate(event.target.value)}
+                    required={!isReport}
+                    error={issueDateMissing}
+                    helperText={
+                      isReport
+                        ? 'Datum na zprávě, ne datum nahrání — podle něj se řadí.'
+                        : 'Datum na výpisu, ne datum nahrání. Výpis platí rok od tohohle dne.'
+                    }
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    fullWidth
+                  />
+                </Stack>
+              )}
             </Stack>
           )}
 
@@ -338,10 +363,24 @@ export default function UploadDocumentDialog({
         </DialogContent>
 
         <DialogActions>
+          {phase === 'preview' && issueDateMissing && (
+            <Typography variant="caption" color="error" sx={{ mr: 'auto', ml: 1 }}>
+              Doplňte datum vydání výpisu.
+            </Typography>
+          )}
           {phase === 'preview' && (
             <>
               <Button onClick={close}>Zrušit</Button>
-              <Button variant="contained" startIcon={<CloudUpload />} onClick={() => void send()}>
+              {/* Held shut rather than let fail at the server. Without the
+                  issue date the upload answers 400, and a 400 arriving after
+                  the file has gone up is a failure nobody can act on from
+                  here. */}
+              <Button
+                variant="contained"
+                startIcon={<CloudUpload />}
+                disabled={issueDateMissing}
+                onClick={() => void send()}
+              >
                 Nahrát
               </Button>
             </>
