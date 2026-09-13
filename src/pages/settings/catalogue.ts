@@ -180,6 +180,20 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     description: 'Co musí pacient doložit a co podepisuje',
     items: [
       {
+        /*
+         * First in the section, and the only row in it that does anything
+         * today. The rules it edits decided whether a patient was told to
+         * bring a medical record, and until this screen existed they lived
+         * only in the database - seeded, never written by anybody here, and
+         * hanging off a price-list category nobody had chosen.
+         */
+        id: 'pravidla-dokumentu',
+        label: 'Pravidla dokumentů',
+        description: 'Co musí pacient doložit a ke které službě — činnosti pod ní to dědí',
+        to: '/pravidla-dokumentu',
+        adminOnly: true,
+      },
+      {
         id: 'emaily',
         label: 'E-mailové šablony',
         description: 'Text a vzhled e-mailů, které chodí pacientům',

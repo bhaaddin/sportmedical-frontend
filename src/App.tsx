@@ -73,6 +73,7 @@ const WorkerSchedulePage = lazy(() => import('./pages/admin/WorkerScheduleSettin
 /* Booking phase 1, stage 1: calendars, access and activities */
 const BookingCalendarsPage = lazy(() => import('./pages/booking/CalendarsPage'));
 const ClinicServicesPage = lazy(() => import('./pages/booking/ClinicServicesPage'));
+const DocumentRequirementsPage = lazy(() => import('./pages/settings/DocumentRequirementsPage'));
 const BookingActivitiesPage = lazy(() => import('./pages/booking/ActivitiesPage'));
 /* Booking phase 1, stage 2: working hours, periods, cycle and exceptions */
 const BookingWorkingHoursPage = lazy(() => import('./pages/booking/WorkingHoursPage'));
@@ -504,6 +505,7 @@ export default function App() {
                       element={<AppointmentLinkPage />}
                     />
                     <Route path="/sluzby" element={<RequireAdmin><ClinicServicesPage /></RequireAdmin>} />
+                    <Route path="/pravidla-dokumentu" element={<RequireAdmin><DocumentRequirementsPage /></RequireAdmin>} />
                     <Route path="/calendars" element={<RequireAdmin><BookingCalendarsPage /></RequireAdmin>} />
                     <Route path="/activities" element={<RequireAdmin><BookingActivitiesPage /></RequireAdmin>} />
                     <Route path="/working-hours" element={<RequireAdmin><BookingWorkingHoursPage /></RequireAdmin>} />
