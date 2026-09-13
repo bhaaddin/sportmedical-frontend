@@ -26,7 +26,7 @@ import {
   PhotoCamera, RotateRight, Check,
 } from '@mui/icons-material';
 import DocumentScanner from '../scanner/DocumentScanner';
-import { documentsApi } from '../../api/documents';
+import { documentsApi, DOCUMENT_SATISFIES_REQUIREMENT } from '../../api/documents';
 import { asksIssueDate, issueDateMissing as missingIssueDate } from './issueDate';
 import type { DocumentTemplate, PatientDocument } from '../../api/documents';
 import {
@@ -67,6 +67,9 @@ export default function UploadDocumentDialog({
   const [progress, setProgress] = useState(0);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [uploaded, setUploaded] = useState<PatientDocument | null>(null);
+  /* The server signs off a staff upload as it lands, so there is usually
+     nothing to ask for. See `DOCUMENT_SATISFIES_REQUIREMENT`. */
+  const alreadySigned = uploaded?.status === DOCUMENT_SATISFIES_REQUIREMENT;
   const [signing, setSigning] = useState(false);
   const [specialty, setSpecialty] = useState<SpecialtyValue>({
     specialtyCode: null,
@@ -354,9 +357,19 @@ export default function UploadDocumentDialog({
           {phase === 'uploaded' && (
             <Stack spacing={2} sx={{ py: 2 }}>
               <Alert severity="success">Dokument je nahraný.</Alert>
+              {/*
+                * Two different things, and the screen used to say only the
+                * second. Measured on 13. 9. 2026: an upload by a member of
+                * staff comes back `SignedOff` with `signedAt` already set -
+                * the server signs it off there and then. Telling somebody it
+                * "counts as not delivered until signed" while it is already
+                * signed is a warning about nothing, and warnings about
+                * nothing are how a screen teaches people to ignore it.
+                */}
               <Typography variant="body2" color="text.secondary">
-                Dokud není podepsaný, bere se jako nedodaný a u pacienta svítí
-                upozornění, že chybí. Podepsat se dá i později.
+                {alreadySigned
+                  ? 'Počítá se jako doložený. Podepsaný je automaticky, protože ho nahrál někdo z ordinace.'
+                  : 'Dokud není podepsaný, bere se jako nedodaný a u pacienta svítí upozornění, že chybí. Podepsat se dá i později.'}
               </Typography>
             </Stack>
           )}
@@ -386,17 +399,23 @@ export default function UploadDocumentDialog({
             </>
           )}
           {phase === 'uploaded' && (
-            <>
-              <Button onClick={close}>Podepsat později</Button>
-              <Button
-                variant="contained"
-                startIcon={<Check />}
-                disabled={signing}
-                onClick={() => void sign()}
-              >
-                {signing ? 'Podepisuji…' : 'Podepsat teď'}
-              </Button>
-            </>
+            alreadySigned ? (
+              /* Nothing left to do. A "Podepsat teď" button on a document that
+                 is signed would either do nothing or undo something. */
+              <Button variant="contained" onClick={close}>Hotovo</Button>
+            ) : (
+              <>
+                <Button onClick={close}>Podepsat později</Button>
+                <Button
+                  variant="contained"
+                  startIcon={<Check />}
+                  disabled={signing}
+                  onClick={() => void sign()}
+                >
+                  {signing ? 'Podepisuji…' : 'Podepsat teď'}
+                </Button>
+              </>
+            )
           )}
           {phase === 'choose' && <Button onClick={close}>Zrušit</Button>}
         </DialogActions>
