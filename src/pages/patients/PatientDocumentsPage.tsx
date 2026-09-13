@@ -17,12 +17,13 @@ import { useOutletContext } from 'react-router-dom';
 import {
   Box, Button, Card, CardContent, Chip, Divider, Stack, Typography,
 } from '@mui/material';
-import { CheckCircle, Error as ErrorIcon, CloudUpload, Shield } from '@mui/icons-material';
+import { Error as ErrorIcon, CloudUpload, Shield } from '@mui/icons-material';
 import MedicalReports from '../../components/documents/MedicalReports';
 import DocumentActions from '../../components/documents/DocumentActions';
 import UploadDocumentDialog from '../../components/documents/UploadDocumentDialog';
 import { DOCUMENT_SATISFIES_REQUIREMENT } from '../../api/documents';
 import type { DocumentTemplate } from '../../api/documents';
+import { requiredRowState } from './requiredDocumentRow';
 import type { PatientContext } from './PatientLayout';
 
 export default function PatientDocumentsPage() {
@@ -61,6 +62,8 @@ export default function PatientDocumentsPage() {
                 d.templateId === template.id && d.status === DOCUMENT_SATISFIES_REQUIREMENT,
             );
 
+            const row = requiredRowState(template, filed);
+
             return (
               <Stack
                 key={template.id}
@@ -85,22 +88,20 @@ export default function PatientDocumentsPage() {
                 </Box>
 
                 {/*
-                  * Three states, not two. A first-visit document that is not
-                  * on file is not "Chybí" - measured against the server, a
-                  * returning patient with no výpis has nothing missing at all
-                  * (`check?isFirstVisit=false` -> allRequiredPresent). Red
-                  * here while the banner above says "Při první návštěvě je
-                  * potřeba" would be the same screen saying two things about
-                  * one document, and the red one would be the wrong one.
+                  * The date, not a verdict, and no green tick. See
+                  * `requiredDocumentRow.ts` for both reasons - in short, a
+                  * card full of green teaches its reader to stop looking, and
+                  * "Hotovo" answers a question nobody has.
                   */}
-                {filed !== undefined ? (
-                  <Chip icon={<CheckCircle />} label="Hotovo" size="small"
-                    sx={{ bgcolor: '#2E7D3214', color: '#2E7D32', fontWeight: 500 }} />
-                ) : template.firstVisitOnly ? (
-                  <Chip label="Při 1. návštěvě" size="small"
+                {row.tone === 'on-file' ? (
+                  <Typography variant="body2" color="text.secondary">
+                    {row.text}
+                  </Typography>
+                ) : row.tone === 'first-visit' ? (
+                  <Chip label={row.text} size="small"
                     sx={{ bgcolor: '#0288D114', color: '#0288D1', fontWeight: 500 }} />
                 ) : (
-                  <Chip icon={<ErrorIcon />} label="Chybí" size="small"
+                  <Chip icon={<ErrorIcon />} label={row.text} size="small"
                     sx={{ bgcolor: '#D32F2F14', color: '#D32F2F', fontWeight: 500 }} />
                 )}
 
