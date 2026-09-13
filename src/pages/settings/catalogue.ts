@@ -133,12 +133,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     description: 'Co musí pacient doložit a co podepisuje',
     items: [
       {
-        id: 'sablony',
-        label: 'Šablony dokumentů',
-        description: 'Které dokumenty jsou povinné a kdy',
-        to: '/documents',
-      },
-      {
         id: 'emaily',
         label: 'E-mailové šablony',
         description: 'Text a vzhled e-mailů, které chodí pacientům',

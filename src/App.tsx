@@ -32,7 +32,6 @@ const CalendarMovedPage = lazy(() => import('./pages/CalendarMoved'));
 const BillingPage = lazy(() => import('./pages/Billing'));
 const StaffPage = lazy(() => import('./pages/Staff'));
 const InventoryPage = lazy(() => import('./pages/Inventory'));
-const DocumentsPage = lazy(() => import('./pages/Documents'));
 const MeasurementsPage = lazy(() => import('./pages/Measurements'));
 const AdminPage = lazy(() => import('./pages/Admin'));
 const CenikPage = lazy(() => import('./pages/Cenik'));
@@ -129,7 +128,6 @@ const menuGroups: MenuItemGroup[] = [
       { text: 'Dnešní přehled', icon: <Today />, path: '/dnes' },
       { text: 'Plánování', icon: <CalendarMonth />, path: '/planovani' },
       { text: 'Pacienti', icon: <People />, path: '/patients' },
-      { text: 'Dokumenty', icon: <Description />, path: '/documents' },
       { text: 'Diagnostika', icon: <Science />, path: '/diagnostics/new' },
     ],
   },
@@ -359,7 +357,6 @@ export default function App() {
                     <Route path="/patients/:id" element={<PatientDetails />} />
                     <Route path="/measurements" element={<MeasurementsPage />} />
                     <Route path="/diagnostics/new" element={<DiagnosticForm />} />
-                    <Route path="/documents" element={<DocumentsPage />} />
                     <Route path="/billing" element={<BillingPage />} />
                     <Route path="/cenik" element={<CenikPage />} />
                     <Route path="/injuries" element={<InjuriesPage />} />

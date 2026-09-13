@@ -218,6 +218,11 @@ export default function PatientDetails() {
       id: t.id,
       label: t.name,
       firstVisitOnly: t.firstVisitOnly,
+      /* Carried over from the Documents screen, which was deleted as a
+         duplicate. It is the one thing that screen said and nothing else did,
+         and it is the sentence that tells somebody at the desk what to ask the
+         patient for. */
+      description: t.description,
     }));
 
   const missingDocs = requiredDocs.filter((rd) => !hasRequiredDoc(rd.id));
@@ -288,11 +293,6 @@ export default function PatientDetails() {
                   onClick={() => navigate(`/patients/${patient.id}/edit`)}
                   sx={{ borderColor: '#0D7377', color: '#0D7377', borderRadius: 2 }}>
                   Upravit
-                </Button>
-                <Button variant="outlined" startIcon={<Description />}
-                  onClick={() => navigate('/documents')}
-                  sx={{ borderColor: '#0D7377', color: '#0D7377', borderRadius: 2 }}>
-                  Dokumenty
                 </Button>
                 <Button variant="contained" startIcon={<Science />}
                   onClick={() => navigate(`/diagnostics/new?patientId=${patient.id}`)}
@@ -462,6 +462,11 @@ export default function PatientDetails() {
                     <Box key={rd.id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, borderBottom: '1px solid #f5f5f5' }}>
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 500 }}>{rd.label}</Typography>
+                        {rd.description !== '' && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            {rd.description}
+                          </Typography>
+                        )}
                         {rd.firstVisitOnly && (
                           <Typography variant="caption" color="text.secondary">Pouze 1. návštěva</Typography>
                         )}
