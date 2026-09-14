@@ -181,8 +181,21 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     items: [
       {
         /*
-         * First in the section, and the only row in it that does anything
-         * today. The rules it edits decided whether a patient was told to
+         * Above the rules, because a rule points at one of these and the
+         * owner met them in the wrong order: he opened the rule screen, saw
+         * four documents he thought he had deleted, and had nowhere to go.
+         * Nothing had deleted them - the API has no DELETE for a template at
+         * all - and until 14. 9. 2026 nothing could even switch one off.
+         */
+        id: 'dokumenty-sablony',
+        label: 'Dokumenty',
+        description: 'Druhy dokumentů, které ordinace vede — název, popis a co se používá',
+        to: '/dokumenty-sablony',
+        adminOnly: true,
+      },
+      {
+        /*
+         * The rules it edits decided whether a patient was told to
          * bring a medical record, and until this screen existed they lived
          * only in the database - seeded, never written by anybody here, and
          * hanging off a price-list category nobody had chosen.
