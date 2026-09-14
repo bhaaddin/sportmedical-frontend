@@ -207,6 +207,21 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         adminOnly: true,
       },
       {
+        /*
+         * He was promised these and then nobody built the screen - "bavili
+         * sme sa s backendom ze budem moct nastavit i farby alertov ...
+         * nevidim to nikde". Once for the whole application: a colour is the
+         * word for a state, and the same state must not be green here and
+         * amber there. When it lights up is on the rule; what it looks like
+         * is here.
+         */
+        id: 'barvy-upozorneni',
+        label: 'Barvy upozornění',
+        description: 'Jak se barevně odlišuje, jak na tom doklad pacienta je',
+        to: '/barvy-upozorneni',
+        adminOnly: true,
+      },
+      {
         id: 'emaily',
         label: 'E-mailové šablony',
         description: 'Text a vzhled e-mailů, které chodí pacientům',

@@ -197,22 +197,29 @@ export const WHEN_OPTIONS: WhenOption[] = [
 ];
 
 /*
- * The third answer the owner asked for - "vůbec se nevyžaduje" - is not here,
- * and deliberately not faked.
+ * The third answer, and where it actually goes.
  *
- * A rule in the table IS the requirement; `firstVisitOnly` only says when. So
- * "not required at all" has nowhere to sit on the server and would mean
- * deleting the rule, taking its validity, its warning days and its blocking
- * setting with it. Offering that as the third button in a row of three would
- * be a quiet destruction dressed as a preference.
+ * The owner asked for three: not at all, every visit, first visit only. A rule
+ * in the table IS the requirement - `firstVisitOnly` only says when - so the
+ * first of those has nowhere to sit on the server and means deleting the row.
  *
- * So the screen says where it lives instead, next to the choice, and the
- * delete it points at is the one already on the row.
+ * I first left it off the list and pointed at the delete button instead,
+ * worried that a third radio would quietly destroy the validity and the
+ * warning days. App pushed back and was right: those are settings OF the
+ * requirement, so when there is no requirement they mean nothing and there is
+ * nothing to lose. A rule that exists and requires nothing is the shape this
+ * project has spent three days removing.
+ *
+ * So it is the third choice after all - and it asks first, because deleting is
+ * not the same kind of act as the other two.
  */
-export const NOT_REQUIRED_TEXT =
-  'Nemá se vyžadovat vůbec? Pak tu pravidlo nemá co dělat — smažte ho křížkem '
-  + 'na jeho řádku. Zmizí s ním i platnost a upozornění, proto se to nedá '
-  + 'přepnout jedním kliknutím.';
+export const NOT_REQUIRED_LABEL = 'Nevyžaduje se vůbec';
+export const NOT_REQUIRED_DETAIL =
+  'Po pacientech se tenhle doklad chtít nebude.';
+
+export const NOT_REQUIRED_CONFIRM_TEXT =
+  'Pravidlo se smaže i s nastavením platnosti a upozornění. Znovu se dá '
+  + 'vytvořit, ale jako nové — nastavení se nevrátí.';
 
 export interface BlockingOption {
   value: boolean;

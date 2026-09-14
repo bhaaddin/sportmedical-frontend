@@ -38,8 +38,9 @@ import {
 } from './requirementRules';
 import {
   BLOCKING_CONFIRM_TEXT, BLOCKING_IGNORED_TEXT, BLOCKING_OPTIONS,
-  NOT_REQUIRED_TEXT, SETTINGS_PROBLEM_TEXT, WHEN_OPTIONS, blockingWillHappen,
-  settingsAreValid, settingsProblems, settingsSummary,
+  NOT_REQUIRED_CONFIRM_TEXT, NOT_REQUIRED_DETAIL, NOT_REQUIRED_LABEL,
+  SETTINGS_PROBLEM_TEXT, WHEN_OPTIONS, blockingWillHappen, settingsAreValid,
+  settingsProblems, settingsSummary,
 } from './requirementSettings';
 
 export default function DocumentRequirementsPage() {
@@ -84,7 +85,15 @@ export default function DocumentRequirementsPage() {
 
   const remove = useMutation({
     mutationFn: (ruleId: string) => documentRequirementsApi.remove(ruleId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['document-requirements'] }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['document-requirements'] });
+      /* Closes the dialog too, when the delete came from inside it. A dialog
+         left open over a rule that no longer exists would offer to save
+         settings onto nothing. */
+      setEditing(null);
+      setDraft(null);
+      setDroppingRule(false);
+    },
   });
 
   /*
@@ -100,6 +109,12 @@ export default function DocumentRequirementsPage() {
   /* Asked once, before the switch goes on. Not asked again to turn it off -
      making the safer direction harder would be the wrong way round. */
   const [confirmBlocking, setConfirmBlocking] = useState(false);
+  /*
+   * "Nevyžaduje se" chosen in the dialog. Kept apart from the draft because
+   * it is not a value to save - it is the rule ceasing to exist, and the save
+   * button has nothing to do while it is picked.
+   */
+  const [droppingRule, setDroppingRule] = useState(false);
 
   const save = useMutation({
     mutationFn: ({ ruleId, settings }: { ruleId: string; settings: RequirementSettings }) =>
@@ -120,7 +135,9 @@ export default function DocumentRequirementsPage() {
       blocksBooking: rule.blocksBooking,
     });
     setConfirmBlocking(false);
+    setDroppingRule(false);
     save.reset();
+    remove.reset();
   };
 
   const templateTypeOf = (templateId: string) =>
@@ -135,7 +152,8 @@ export default function DocumentRequirementsPage() {
   const blockingIsNew = draft?.blocksBooking === true && editing?.blocksBooking === false;
   const canSave =
     draft !== null && settingsAreValid(draft) && !save.isPending
-    && (!blockingIsNew || confirmBlocking);
+    && (!blockingIsNew || confirmBlocking)
+    && !droppingRule;
 
   /*
    * Said before the click, not after. The server answers a repeat by handing
@@ -360,8 +378,13 @@ export default function DocumentRequirementsPage() {
               <FormControl>
                 <FormLabel sx={{ fontWeight: 700, mb: 0.5 }}>Kdy se doklad žádá</FormLabel>
                 <RadioGroup
-                  value={draft.firstVisitOnly ? 'first' : 'every'}
-                  onChange={(e) => setDraft({ ...draft, firstVisitOnly: e.target.value === 'first' })}
+                  value={droppingRule ? 'none' : draft.firstVisitOnly ? 'first' : 'every'}
+                  onChange={(e) => {
+                    setDroppingRule(e.target.value === 'none');
+                    if (e.target.value !== 'none') {
+                      setDraft({ ...draft, firstVisitOnly: e.target.value === 'first' });
+                    }
+                  }}
                 >
                   {WHEN_OPTIONS.map((option) => (
                     <FormControlLabel
@@ -379,14 +402,47 @@ export default function DocumentRequirementsPage() {
                       sx={{ alignItems: 'flex-start', mb: 0.5 }}
                     />
                   ))}
+                  {/*
+                    * The third answer, and it deletes rather than saves.
+                    *
+                    * I first left it off and pointed at the delete on the row,
+                    * worried it would quietly take the validity and warning
+                    * days with it. App was right that those are settings OF
+                    * the requirement: with no requirement they mean nothing.
+                    * What it does keep is the asking, because deleting is not
+                    * the same kind of act as the other two.
+                    */}
+                  <FormControlLabel
+                    value="none"
+                    control={<Radio />}
+                    label={
+                      <Box>
+                        <Typography variant="body2">{NOT_REQUIRED_LABEL}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {NOT_REQUIRED_DETAIL}
+                        </Typography>
+                      </Box>
+                    }
+                    sx={{ alignItems: 'flex-start', mb: 0.5 }}
+                  />
                 </RadioGroup>
-                {/* The third answer he asked for. Not a third button: it means
-                    deleting the rule, and the validity and warning days would
-                    go with it. Said, and pointed at the delete already on the
-                    row, rather than dressed up as a preference. */}
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                  {NOT_REQUIRED_TEXT}
-                </Typography>
+
+                {droppingRule && (
+                  <Alert severity="warning" sx={{ mt: 1 }}>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      {NOT_REQUIRED_CONFIRM_TEXT}
+                    </Typography>
+                    <Button
+                      size="small"
+                      color="inherit"
+                      variant="outlined"
+                      disabled={remove.isPending}
+                      onClick={() => remove.mutate(editing.id)}
+                    >
+                      Smazat pravidlo
+                    </Button>
+                  </Alert>
+                )}
               </FormControl>
 
               <Box>

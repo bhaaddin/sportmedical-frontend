@@ -476,16 +476,61 @@ describe('seeing the choices rather than flipping through them', () => {
   });
 
   /*
-   * The third answer he asked for - "vůbec se nevyžaduje" - is not a third
-   * button. It means deleting the rule, and the validity and warning days
-   * would go with it; a row of three where one quietly destroys the other
-   * settings is a preference dressed over a deletion.
+   * The third answer he asked for, and it is a third button after all.
+   *
+   * I first left it off and pointed at the delete on the row, worried that a
+   * radio would quietly take the validity and warning days with it. App
+   * pushed back and was right: those are settings OF the requirement, so with
+   * no requirement they mean nothing. What stays is the asking.
    */
-  it('says where "not required at all" lives, instead of faking it', async () => {
+  it('offers "not required at all" as one of the three', async () => {
     listRules.mockResolvedValue([rule()]);
     await openSettings();
 
-    expect(screen.getByText(/Nemá se vyžadovat vůbec/)).toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: /^Nevyžaduje/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Nevyžaduje se vůbec/ })).toBeInTheDocument();
+  });
+
+  it('asks before it deletes, and says what goes with it', async () => {
+    listRules.mockResolvedValue([rule()]);
+    await openSettings();
+
+    await userEvent.click(screen.getByRole('radio', { name: /Nevyžaduje se vůbec/ }));
+
+    expect(await screen.findByText(/i s nastavením platnosti/)).toBeInTheDocument();
+    expect(removeRule).not.toHaveBeenCalled();
+  });
+
+  /* Nothing to save while the rule is on its way out. */
+  it('has nothing to save while that one is chosen', async () => {
+    listRules.mockResolvedValue([rule()]);
+    await openSettings();
+
+    await userEvent.click(screen.getByRole('radio', { name: /Nevyžaduje se vůbec/ }));
+
+    expect(screen.getByRole('button', { name: /^Uložit$/i })).toBeDisabled();
+  });
+
+  it('deletes the rule once that is confirmed', async () => {
+    listRules.mockResolvedValue([rule()]);
+    await openSettings();
+
+    await userEvent.click(screen.getByRole('radio', { name: /Nevyžaduje se vůbec/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /Smazat pravidlo$/i }));
+
+    await waitFor(() => expect(removeRule).toHaveBeenCalledWith('r1'));
+  });
+
+  /* Choosing it and changing your mind must not leave the rule doomed. */
+  it('puts the confirmation away when another answer is chosen', async () => {
+    listRules.mockResolvedValue([rule()]);
+    await openSettings();
+
+    await userEvent.click(screen.getByRole('radio', { name: /Nevyžaduje se vůbec/ }));
+    await screen.findByText(/i s nastavením platnosti/);
+    await userEvent.click(screen.getByRole('radio', { name: /Jen při první návštěvě/ }));
+
+    expect(screen.queryByText(/i s nastavením platnosti/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Uložit$/i })).toBeEnabled();
+    expect(removeRule).not.toHaveBeenCalled();
   });
 });
