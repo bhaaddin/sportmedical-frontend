@@ -157,3 +157,78 @@ export const BLOCKING_CONFIRM_TEXT =
   'Zapnutím tohohle pravidla přestane jít objednat pacienta, kterému doklad chybí. '
   + 'Recepce ho nebude moci objednat ani po telefonu — dozví se jen, že doklad chybí. '
   + 'Zatím je to všude vypnuté a podklady se jen připomínají.';
+
+/*
+ * WHY THESE ARE CHOICES AND NOT SWITCHES
+ *
+ * Both settings were toggles whose label described the state they were in, so
+ * flipping one changed the words as well as the value. The owner took that
+ * apart and he was right:
+ *
+ *   "Při každé návštěvě - ked je vypnute tak co ?? ... tie switchre nedavaju
+ *    logiku ako su postavene ... jedna alebo druha oni sa len ukazu ked ten
+ *    switcher zapnem alebo vypnem"
+ *
+ * A toggle shows you where you are and hides where else you could be. For a
+ * question with real alternatives - and "every visit" against "the first one
+ * only" are two decisions about patients, not an on and an off - the choices
+ * have to be on screen at the same time.
+ */
+
+export interface WhenOption {
+  value: boolean;
+  label: string;
+  /** What it means at the desk, not what the field is called. */
+  detail: string;
+}
+
+/** The two the server can hold. `firstVisitOnly` is the whole of it. */
+export const WHEN_OPTIONS: WhenOption[] = [
+  {
+    value: false,
+    label: 'Při každé návštěvě',
+    detail: 'Pacient ho musí mít platný pokaždé, když přijde.',
+  },
+  {
+    value: true,
+    label: 'Jen při první návštěvě',
+    detail: 'Doloží ho jednou; při dalších návštěvách se po něm už nechce.',
+  },
+];
+
+/*
+ * The third answer the owner asked for - "vůbec se nevyžaduje" - is not here,
+ * and deliberately not faked.
+ *
+ * A rule in the table IS the requirement; `firstVisitOnly` only says when. So
+ * "not required at all" has nowhere to sit on the server and would mean
+ * deleting the rule, taking its validity, its warning days and its blocking
+ * setting with it. Offering that as the third button in a row of three would
+ * be a quiet destruction dressed as a preference.
+ *
+ * So the screen says where it lives instead, next to the choice, and the
+ * delete it points at is the one already on the row.
+ */
+export const NOT_REQUIRED_TEXT =
+  'Nemá se vyžadovat vůbec? Pak tu pravidlo nemá co dělat — smažte ho křížkem '
+  + 'na jeho řádku. Zmizí s ním i platnost a upozornění, proto se to nedá '
+  + 'přepnout jedním kliknutím.';
+
+export interface BlockingOption {
+  value: boolean;
+  label: string;
+  detail: string;
+}
+
+export const BLOCKING_OPTIONS: BlockingOption[] = [
+  {
+    value: false,
+    label: 'Jen upozornit',
+    detail: 'Recepce uvidí, co chybí, a objednat může. Takhle to funguje všude.',
+  },
+  {
+    value: true,
+    label: 'Bez dokladu neobjednat',
+    detail: 'Objednání se odmítne, dokud pacient doklad nedoloží.',
+  },
+];

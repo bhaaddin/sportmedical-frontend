@@ -335,7 +335,7 @@ describe('changing the settings', () => {
   });
 });
 
-describe('the switch that turns people away', () => {
+describe('the choice that turns people away', () => {
   /*
    * Not another switch in a row. It reverses the owner's own rule from plan
    * 2.4 - paperwork always warns, because the patient is on the telephone and
@@ -345,7 +345,7 @@ describe('the switch that turns people away', () => {
     listRules.mockResolvedValue([rule()]);
     await openSettings();
 
-    await userEvent.click(screen.getByLabelText(/jen upozornit/i));
+    await userEvent.click(screen.getByRole('radio', { name: /Bez dokladu neobjednat/i }));
 
     expect(await screen.findByText(/přestane jít objednat/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Uložit/i })).toBeDisabled();
@@ -355,7 +355,7 @@ describe('the switch that turns people away', () => {
     listRules.mockResolvedValue([rule()]);
     await openSettings();
 
-    await userEvent.click(screen.getByLabelText(/jen upozornit/i));
+    await userEvent.click(screen.getByRole('radio', { name: /Bez dokladu neobjednat/i }));
     await userEvent.click(await screen.findByLabelText(/Rozumím/));
     await userEvent.click(screen.getByRole('button', { name: /Uložit/i }));
 
@@ -368,7 +368,7 @@ describe('the switch that turns people away', () => {
     listRules.mockResolvedValue([rule({ blocksBooking: true })]);
     await openSettings();
 
-    await userEvent.click(screen.getByLabelText(/nejde objednat/i));
+    await userEvent.click(screen.getByRole('radio', { name: /Jen upozornit/i }));
 
     expect(screen.queryByText(/přestane jít objednat/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Uložit/i })).toBeEnabled();
@@ -395,12 +395,97 @@ describe('the switch that turns people away', () => {
     listRules.mockResolvedValue([rule()]);
     await openSettings();
 
-    await userEvent.click(screen.getByLabelText(/jen upozornit/i));
+    await userEvent.click(screen.getByRole('radio', { name: /Bez dokladu neobjednat/i }));
     await userEvent.click(await screen.findByLabelText(/Rozumím/));
-    await userEvent.click(screen.getByLabelText(/nejde objednat/i));
-    await userEvent.click(screen.getByLabelText(/jen upozornit/i));
+    await userEvent.click(screen.getByRole('radio', { name: /Jen upozornit/i }));
+    await userEvent.click(screen.getByRole('radio', { name: /Bez dokladu neobjednat/i }));
 
     expect(await screen.findByText(/přestane jít objednat/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Uložit/i })).toBeDisabled();
+  });
+});
+
+/*
+ * The options have to be visible, not discovered by flipping.
+ *
+ * Both settings were switches whose label described the state they were in,
+ * so changing one changed the words too. The owner took that apart: "tie
+ * switchre nedavaju logiku ako su postavene ... jedna alebo druha oni sa len
+ * ukazu ked ten switcher zapnem alebo vypnem". He was right - a toggle shows
+ * where you are and hides where else you could be.
+ */
+describe('seeing the choices rather than flipping through them', () => {
+  it('shows both answers to when the document is wanted', async () => {
+    listRules.mockResolvedValue([rule()]);
+    await openSettings();
+
+    expect(screen.getByRole('radio', { name: /Při každé návštěvě/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Jen při první návštěvě/ })).toBeInTheDocument();
+  });
+
+  it('shows both answers to what happens when it is missing', async () => {
+    listRules.mockResolvedValue([rule()]);
+    await openSettings();
+
+    expect(screen.getByRole('radio', { name: /Jen upozornit/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Bez dokladu neobjednat/ })).toBeInTheDocument();
+  });
+
+  it('marks the one the rule is actually on', async () => {
+    listRules.mockResolvedValue([rule({ firstVisitOnly: true })]);
+    await openSettings();
+
+    expect(screen.getByRole('radio', { name: /Jen při první návštěvě/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /Při každé návštěvě/ })).not.toBeChecked();
+  });
+
+  /*
+   * Choosing one and saving it, in both directions. Every other case here only
+   * reads the options or changes a number, so the handler could have been
+   * wired to one constant and nothing would have noticed - which is exactly
+   * what the mutation found.
+   */
+  it('saves the answer that was chosen', async () => {
+    listRules.mockResolvedValue([rule({ firstVisitOnly: false })]);
+    await openSettings();
+
+    await userEvent.click(screen.getByRole('radio', { name: /Jen při první návštěvě/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Uložit/i }));
+
+    await waitFor(() => expect(updateRule).toHaveBeenCalled());
+    expect(updateRule.mock.calls[0][1]).toMatchObject({ firstVisitOnly: true });
+  });
+
+  it('saves the way back too', async () => {
+    listRules.mockResolvedValue([rule({ firstVisitOnly: true })]);
+    await openSettings();
+
+    await userEvent.click(screen.getByRole('radio', { name: /Při každé návštěvě/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Uložit/i }));
+
+    await waitFor(() => expect(updateRule).toHaveBeenCalled());
+    expect(updateRule.mock.calls[0][1]).toMatchObject({ firstVisitOnly: false });
+  });
+
+  it('says what each one means at the desk, not what the field is called', async () => {
+    listRules.mockResolvedValue([rule()]);
+    await openSettings();
+
+    expect(screen.getByText(/musí mít platný pokaždé/)).toBeInTheDocument();
+    expect(screen.getByText(/Doloží ho jednou/)).toBeInTheDocument();
+  });
+
+  /*
+   * The third answer he asked for - "vůbec se nevyžaduje" - is not a third
+   * button. It means deleting the rule, and the validity and warning days
+   * would go with it; a row of three where one quietly destroys the other
+   * settings is a preference dressed over a deletion.
+   */
+  it('says where "not required at all" lives, instead of faking it', async () => {
+    listRules.mockResolvedValue([rule()]);
+    await openSettings();
+
+    expect(screen.getByText(/Nemá se vyžadovat vůbec/)).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /^Nevyžaduje/ })).not.toBeInTheDocument();
   });
 });

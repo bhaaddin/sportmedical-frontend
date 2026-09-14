@@ -17,8 +17,8 @@
 import { useState } from 'react';
 import {
   Alert, Box, Button, Card, CardContent, Dialog, DialogActions, DialogContent,
-  DialogTitle, FormControlLabel, IconButton, MenuItem, Stack, Switch,
-  TextField, Tooltip, Typography,
+  DialogTitle, FormControl, FormControlLabel, FormLabel, IconButton, MenuItem,
+  Radio, RadioGroup, Stack, Switch, TextField, Tooltip, Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -37,8 +37,9 @@ import {
   RULE_HEALTH_TEXT, alreadyRequired, canAddRule, ruleHealth, summaryText,
 } from './requirementRules';
 import {
-  BLOCKING_CONFIRM_TEXT, BLOCKING_IGNORED_TEXT, SETTINGS_PROBLEM_TEXT,
-  blockingWillHappen, settingsAreValid, settingsProblems, settingsSummary,
+  BLOCKING_CONFIRM_TEXT, BLOCKING_IGNORED_TEXT, BLOCKING_OPTIONS,
+  NOT_REQUIRED_TEXT, SETTINGS_PROBLEM_TEXT, WHEN_OPTIONS, blockingWillHappen,
+  settingsAreValid, settingsProblems, settingsSummary,
 } from './requirementSettings';
 
 export default function DocumentRequirementsPage() {
@@ -349,35 +350,78 @@ export default function DocumentRequirementsPage() {
                 sx={{ maxWidth: 320 }}
               />
 
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={draft.firstVisitOnly}
-                    onChange={(e) => setDraft({ ...draft, firstVisitOnly: e.target.checked })}
-                  />
-                }
-                label={draft.firstVisitOnly
-                  ? 'Jen při první návštěvě'
-                  : 'Při každé návštěvě'}
-              />
+              {/*
+                * Both choices on screen at once, because they are two
+                * decisions about patients rather than an on and an off. As a
+                * switch the label changed with the state, so it showed where
+                * you were and hid where else you could be - the owner took
+                * that apart and was right.
+                */}
+              <FormControl>
+                <FormLabel sx={{ fontWeight: 700, mb: 0.5 }}>Kdy se doklad žádá</FormLabel>
+                <RadioGroup
+                  value={draft.firstVisitOnly ? 'first' : 'every'}
+                  onChange={(e) => setDraft({ ...draft, firstVisitOnly: e.target.value === 'first' })}
+                >
+                  {WHEN_OPTIONS.map((option) => (
+                    <FormControlLabel
+                      key={option.label}
+                      value={option.value ? 'first' : 'every'}
+                      control={<Radio />}
+                      label={
+                        <Box>
+                          <Typography variant="body2">{option.label}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {option.detail}
+                          </Typography>
+                        </Box>
+                      }
+                      sx={{ alignItems: 'flex-start', mb: 0.5 }}
+                    />
+                  ))}
+                </RadioGroup>
+                {/* The third answer he asked for. Not a third button: it means
+                    deleting the rule, and the validity and warning days would
+                    go with it. Said, and pointed at the delete already on the
+                    row, rather than dressed up as a preference. */}
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                  {NOT_REQUIRED_TEXT}
+                </Typography>
+              </FormControl>
 
               <Box>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={draft.blocksBooking}
-                      onChange={(e) => {
-                        setDraft({ ...draft, blocksBooking: e.target.checked });
-                        /* Off again drops the confirmation with it, so
-                           flicking it on and off does not leave a yes behind. */
-                        if (!e.target.checked) setConfirmBlocking(false);
-                      }}
-                    />
-                  }
-                  label={draft.blocksBooking
-                    ? 'Bez dokladu nejde objednat'
-                    : 'Bez dokladu jen upozornit'}
-                />
+                <FormControl>
+                  <FormLabel sx={{ fontWeight: 700, mb: 0.5 }}>
+                    Když doklad chybí
+                  </FormLabel>
+                  <RadioGroup
+                    value={draft.blocksBooking ? 'block' : 'warn'}
+                    onChange={(e) => {
+                      const blocks = e.target.value === 'block';
+                      setDraft({ ...draft, blocksBooking: blocks });
+                      /* Back to warning drops the confirmation with it, so
+                         going there and back does not leave a yes behind. */
+                      if (!blocks) setConfirmBlocking(false);
+                    }}
+                  >
+                    {BLOCKING_OPTIONS.map((option) => (
+                      <FormControlLabel
+                        key={option.label}
+                        value={option.value ? 'block' : 'warn'}
+                        control={<Radio />}
+                        label={
+                          <Box>
+                            <Typography variant="body2">{option.label}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {option.detail}
+                            </Typography>
+                          </Box>
+                        }
+                        sx={{ alignItems: 'flex-start', mb: 0.5 }}
+                      />
+                    ))}
+                  </RadioGroup>
+                </FormControl>
 
                 {/*
                   * Not another switch in a row. This reverses the owner's own
