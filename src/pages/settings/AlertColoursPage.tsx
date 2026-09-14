@@ -110,7 +110,7 @@ export default function AlertColoursPage() {
                         onChange={(e) => setDraft({ ...current, [slot.key]: e.target.value })}
                         error={isBad}
                         helperText={isBad ? COLOUR_PROBLEM_TEXT : ' '}
-                        sx={{ width: 180 }}
+                        sx={{ width: { xs: '100%', sm: 180 } }}
                         slotProps={{ htmlInput: { 'aria-label': `Barva — ${slot.label}` } }}
                       />
 
@@ -120,7 +120,7 @@ export default function AlertColoursPage() {
                       <Box
                         sx={{
                           flex: 1,
-                          minWidth: 220,
+                          minWidth: 0,
                           borderLeft: '4px solid',
                           borderColor: colourIsValid(value) ? value : 'divider',
                           borderRadius: 1,

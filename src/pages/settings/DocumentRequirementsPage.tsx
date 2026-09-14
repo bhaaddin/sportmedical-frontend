@@ -188,13 +188,17 @@ export default function DocumentRequirementsPage() {
               Nejdřív ji založte v Nastavení → Služby.
             </Alert>
           ) : (
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: 'flex-start' }}>
+            <Stack
+              direction={{ xs: 'column', md: 'row' }}
+              spacing={2}
+              sx={{ alignItems: 'flex-start', width: '100%' }}
+            >
               <TextField
                 select
                 label="Dokument"
                 value={templateId}
                 onChange={(e) => { setTemplateId(e.target.value); add.reset(); }}
-                sx={{ minWidth: 260, flex: 1 }}
+                sx={{ minWidth: { xs: 0, sm: 260 }, flex: 1, width: '100%' }}
                 helperText={
                   offerableTemplates.length === 0 && templatesQuery.isSuccess
                     ? 'Žádná šablona dokumentu — bez ní se nedá po pacientovi nic chtít.'
@@ -211,7 +215,7 @@ export default function DocumentRequirementsPage() {
                 label="Služba"
                 value={serviceId}
                 onChange={(e) => { setServiceId(e.target.value); add.reset(); }}
-                sx={{ minWidth: 260, flex: 1 }}
+                sx={{ minWidth: { xs: 0, sm: 260 }, flex: 1, width: '100%' }}
                 helperText={duplicate ? 'Tohle pravidlo už v seznamu je.' : ' '}
                 error={duplicate}
               >
@@ -261,11 +265,20 @@ export default function DocumentRequirementsPage() {
             return (
               <Card key={rule.id} sx={{ borderRadius: 3 }}>
                 <CardContent sx={{ py: 2 }}>
-                  <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
+                  {/* Wraps rather than squeezes. On a phone the icon and the
+                      two buttons leave the title about a hundred pixels, and
+                      MUI will happily break "Výpis" one letter to a line
+                      rather than admit it does not fit - so the text keeps a
+                      floor and the buttons go underneath. */}
+                  <Stack
+                    direction="row"
+                    spacing={2}
+                    sx={{ alignItems: 'flex-start', flexWrap: 'wrap', rowGap: 1 }}
+                  >
                     <DescriptionIcon
                       sx={{ color: health === 'ok' ? '#0D7377' : 'warning.main', mt: 0.5 }}
                     />
-                    <Box sx={{ flex: 1, minWidth: 200 }}>
+                    <Box sx={{ flex: 1, minWidth: 160 }}>
                       <Typography sx={{ fontWeight: 700 }}>
                         {rule.templateName === '' ? 'Neznámý dokument' : rule.templateName}
                       </Typography>

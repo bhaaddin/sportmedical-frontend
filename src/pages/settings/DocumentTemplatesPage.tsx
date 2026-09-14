@@ -143,11 +143,15 @@ export default function DocumentTemplatesPage() {
           {templates.map((template) => (
             <Card key={template.id} sx={{ borderRadius: 3 }}>
               <CardContent sx={{ py: 2 }}>
-                <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
+                <Stack
+                  direction="row"
+                  spacing={2}
+                  sx={{ alignItems: 'flex-start', flexWrap: 'wrap', rowGap: 1 }}
+                >
                   <DescriptionIcon
                     sx={{ color: template.isActive ? '#0D7377' : 'text.disabled', mt: 0.5 }}
                   />
-                  <Box sx={{ flex: 1, minWidth: 200 }}>
+                  <Box sx={{ flex: 1, minWidth: 160 }}>
                     <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
                       <Typography sx={{ fontWeight: 700 }}>{template.name}</Typography>
                       {!template.isActive && <Chip size="small" label="Vypnuto" />}

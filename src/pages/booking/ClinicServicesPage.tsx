@@ -267,7 +267,7 @@ export default function ClinicServicesPage() {
                 <CardContent>
                   <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
                     <MedicalServicesIcon sx={{ color: service.isActive ? '#0D7377' : 'text.disabled', mt: 0.5 }} />
-                    <Box sx={{ minWidth: 220, flex: 1 }}>
+                    <Box sx={{ minWidth: 160, flex: 1 }}>
                       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
                         <Typography variant="h6" sx={{ fontWeight: 700 }}>{service.name}</Typography>
                         {!service.isActive && (
