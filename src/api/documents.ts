@@ -209,8 +209,25 @@ export interface PatientDocument {
 }
 
 export const documentsApi = {
-  getTemplates: async (): Promise<DocumentTemplate[]> => {
-    const res = await client.get('/api/documents/templates');
+  /*
+   * The kinds of document the clinic keeps.
+   *
+   * Active only, unless asked otherwise. `includeInactive` exists for the
+   * administration screen and for nothing else - every other caller of this is
+   * a picker, and a picker holding a document the owner deliberately put away
+   * is a picker offering a mistake. App made it opt-in for exactly that
+   * reason: a switched-off kind should have to be asked for, not remembered
+   * to be filtered out.
+   *
+   * Switched-off ones come last, so a screen that does not sort still reads
+   * naturally: what the clinic uses, then what it has put away.
+   */
+  getTemplates: async (includeInactive = false): Promise<DocumentTemplate[]> => {
+    const res = await client.get(
+      includeInactive
+        ? '/api/documents/templates?includeInactive=true'
+        : '/api/documents/templates',
+    );
     return res.data?.value ?? res.data ?? [];
   },
 

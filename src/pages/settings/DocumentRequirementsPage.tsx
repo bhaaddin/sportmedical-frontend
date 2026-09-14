@@ -59,7 +59,9 @@ export default function DocumentRequirementsPage() {
   });
   const templatesQuery = useQuery({
     queryKey: ['document-templates'],
-    queryFn: documentsApi.getTemplates,
+    /* Active only, deliberately. This is a picker: offering a document the
+       owner has put away would be offering a rule that asks for nothing. */
+    queryFn: () => documentsApi.getTemplates(),
     staleTime: 5 * 60 * 1000,
   });
 

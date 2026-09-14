@@ -187,10 +187,10 @@ describe('switching one off', () => {
 
     await userEvent.click(screen.getByLabelText(/Používá se/));
 
-    /* The dialog's own sentence, not the page banner above the list - both
-       say "zmizí ze všech nabídek", and matching that would pass on the
-       banner alone whether the dialog warned or not. */
-    expect(await screen.findByText(/nepůjde ho nahrát/)).toBeInTheDocument();
+    /* The dialog's own sentence. The page banner above the list says much the
+       same thing, so the match has to be on wording only the warning uses -
+       otherwise it passes on the banner alone, warning or no warning. */
+    expect(await screen.findByText(/v tomhle seznamu ho uvidíte dál/)).toBeInTheDocument();
   });
 
   /*
@@ -221,7 +221,7 @@ describe('switching one off', () => {
 
     await userEvent.type(screen.getByLabelText(/Název/), ' II');
 
-    expect(screen.queryByText(/nepůjde ho nahrát/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/v tomhle seznamu ho uvidíte dál/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Uložit/i })).toBeEnabled();
   });
 
@@ -232,7 +232,7 @@ describe('switching one off', () => {
 
     await userEvent.click(screen.getByLabelText(/Vypnuto/));
 
-    expect(screen.queryByText(/nepůjde ho nahrát/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/v tomhle seznamu ho uvidíte dál/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Uložit/i })).toBeEnabled();
   });
 });

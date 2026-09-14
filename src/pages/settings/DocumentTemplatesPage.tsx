@@ -44,9 +44,14 @@ export default function DocumentTemplatesPage() {
   const [editing, setEditing] = useState<DocumentTemplate | null>(null);
   const [draft, setDraft] = useState<TemplateDraft | null>(null);
 
+  /*
+   * The only caller that asks for the switched-off ones. Its own query key, so
+   * it cannot hand a picker somewhere else a cache holding documents the owner
+   * has put away.
+   */
   const templatesQuery = useQuery({
-    queryKey: ['document-templates'],
-    queryFn: documentsApi.getTemplates,
+    queryKey: ['document-templates', 'all'],
+    queryFn: () => documentsApi.getTemplates(true),
   });
   /* Only to say how many rules would be left with nothing to ask for. Not a
      reason to refuse the switch - that is his call, not this screen's. */
@@ -64,6 +69,8 @@ export default function DocumentTemplatesPage() {
       documentsApi.updateTemplate(id, input),
     onSuccess: async () => {
       await Promise.all([
+        /* Both: this screen's list, and the pickers' active-only one - a
+           switch here changes what they may offer. */
         queryClient.invalidateQueries({ queryKey: ['document-templates'] }),
         /* The rule screen names its template, so a rename has to reach it. */
         queryClient.invalidateQueries({ queryKey: ['document-requirements'] }),
@@ -113,10 +120,10 @@ export default function DocumentTemplatesPage() {
         * `GET /{id}` both still reach it - but nothing here can list it. A way
         * to has been asked for; until then this says what really happens.
         */}
-      <Alert severity="warning" sx={{ mb: 2 }}>
-        Dokument se nemaže, jen vypíná — dřív nahrané dokumenty si podrží jméno.
-        Vypnutý ale zatím zmizí i z tohohle seznamu a zpátky ho zapne jen správce.
-        Rozmyslete si to, než ho vypnete.
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Dokument se nemaže, jen vypíná. Vypnutý zmizí ze všech nabídek a nepůjde
+        ho nahrát, ale dřív nahrané dokumenty si podrží jméno — a tady zůstane
+        vidět, takže ho lze kdykoli zapnout zpátky.
       </Alert>
 
       {save.error ? (

@@ -97,15 +97,19 @@ describe('the sentence that outlived its rule', () => {
 describe('what switching one off will do', () => {
   /* Off, never deleted: a filed document keeps its `templateId` forever, so
      deleting the kind would leave years of paperwork nameless. */
-  it('says what really happens, including the part that is not reversible yet', () => {
+  /*
+   * This sentence said both things in one day. It promised "kdykoli zpátky",
+   * which was false while the list endpoint answered with the active ones
+   * only; it was corrected to the unpleasant truth the same hour; and it is
+   * true again now that `?includeInactive=true` exists for this screen. The
+   * difference the third time is that it was measured before it was written.
+   */
+  it('says it is reversible, and that filed documents keep their name', () => {
     const text = switchingOffText(0);
     expect(text).toMatch(/zmizí ze všech nabídek/);
     expect(text).toMatch(/zůstanou/);
-    /* Not "kdykoli zpátky". That was shipped for an hour and was false:
-       `GET /api/documents/templates` answers with the active ones only, so a
-       template switched off leaves this screen and takes its row with it. */
-    expect(text).toMatch(/nepůjde zapnout zpátky/);
-    expect(text).not.toMatch(/kdykoli/);
+    expect(text).toMatch(/v tomhle seznamu/);
+    expect(text).toMatch(/zapnout zpátky/);
   });
 
   /*

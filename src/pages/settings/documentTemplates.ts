@@ -91,20 +91,23 @@ export const STALE_FIRST_VISIT_TEXT =
  */
 export function switchingOffText(rulesPointingAtIt: number): string {
   /*
-   * "Nepůjde zapnout zpátky" is the truth today, and saying otherwise was my
-   * mistake for an hour: `GET /api/documents/templates` answers with the
-   * ACTIVE ones only, so a template switched off disappears from this screen
-   * and there is no row left to switch back. Measured after shipping the
-   * opposite promise - the list came back holding one template out of four.
+   * Reversible again, and this sentence has now said both things in one day.
    *
-   * `PUT` on it still works and `GET /{id}` still finds it, so nothing is
-   * lost; what is missing is a way to list them. Asked for. Until it lands
-   * this sentence says what actually happens.
+   * It first promised "kdykoli zpátky", which was false: the list endpoint
+   * answered with the ACTIVE templates only, so one switched off left the
+   * screen and took its row with it. Measured after shipping it - the list
+   * came back holding one template out of four - and corrected to the
+   * unpleasant truth the same hour rather than waiting for the endpoint.
+   *
+   * `?includeInactive=true` landed shortly after, on this screen only: every
+   * other caller of that list is a picker, and a picker holding a document
+   * the owner put away is a picker offering a mistake. So the promise is true
+   * again, and this time it was measured before it was written.
    */
   const base =
     'Vypnutý dokument zmizí ze všech nabídek a nepůjde ho nahrát. '
-    + 'Už nahrané dokumenty zůstanou i se jménem — ale zmizí i z tohohle seznamu, '
-    + 'takže ho zatím nepůjde zapnout zpátky bez zásahu správce.';
+    + 'Už nahrané dokumenty zůstanou i se jménem a v tomhle seznamu ho '
+    + 'uvidíte dál, takže ho lze kdykoli zapnout zpátky.';
 
   if (rulesPointingAtIt === 0) return base;
 
