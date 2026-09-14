@@ -212,12 +212,24 @@ export default function PatientDetails() {
       (d) => d.templateId === templateId && d.status === DOCUMENT_SATISFIES_REQUIREMENT,
     );
 
+  /*
+   * Every kind of document the clinic keeps, not "the required ones".
+   *
+   * `requiredForVisit` and `firstVisitOnly` were columns on the template until
+   * 14. 9. 2026 and are gone: what a patient must bring is a property of the
+   * rule (šablona x sluzba), and which rule applies depends on the service
+   * their appointment is for. A template cannot answer that on its own, and
+   * this filter answered it wrongly for as long as it existed - it asked
+   * somebody booked for a blood draw for their medical record.
+   *
+   * Who is actually missing what is on the patient card, off
+   * `GET /api/documents/patient/{id}/check`, per appointment.
+   */
   const requiredDocs = templates
-    .filter((t) => t.isActive && t.requiredForVisit)
+    .filter((t) => t.isActive)
     .map((t) => ({
       id: t.id,
       label: t.name,
-      firstVisitOnly: t.firstVisitOnly,
       /* Carried over from the Documents screen, which was deleted as a
          duplicate. It is the one thing that screen said and nothing else did,
          and it is the sentence that tells somebody at the desk what to ask the

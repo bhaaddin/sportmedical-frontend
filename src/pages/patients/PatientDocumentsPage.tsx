@@ -33,7 +33,15 @@ export default function PatientDocumentsPage() {
      it out of the required-document rules. */
   const [uploading, setUploading] = useState<DocumentTemplate | null | 'report'>(null);
 
-  const required = templates.filter((t) => t.isActive && t.requiredForVisit);
+  /*
+   * Every kind of document still in use, not "the required ones".
+   *
+   * This screen files documents; which of them a given patient owes is a
+   * question about their appointments and is answered on the card above.
+   * `requiredForVisit` lived on the template until 14. 9. 2026 and is gone,
+   * because required-ness belongs to the rule and the service it points at.
+   */
+  const required = templates.filter((t) => t.isActive);
 
   return (
     <Stack spacing={2}>
@@ -113,9 +121,6 @@ export default function PatientDocumentsPage() {
                       {row.detail}
                     </Typography>
                   </Box>
-                ) : row.tone === 'first-visit' ? (
-                  <Chip label={row.text} size="small"
-                    sx={{ bgcolor: '#0288D114', color: '#0288D1', fontWeight: 500 }} />
                 ) : (
                   <Box sx={{ textAlign: 'right' }}>
                     <Chip icon={<ErrorIcon />} label={row.text} size="small"

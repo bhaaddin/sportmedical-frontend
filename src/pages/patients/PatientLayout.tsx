@@ -22,11 +22,16 @@ import { ArrowBack, Edit, Science } from '@mui/icons-material';
 import { PATIENT_SECTIONS } from './sections';
 import { patientsApi } from '../../api/patients';
 import type { Patient } from '../../api/patients';
-import { documentsApi, DOCUMENT_SATISFIES_REQUIREMENT } from '../../api/documents';
-import type { DocumentTemplate, PatientDocument } from '../../api/documents';
+import { documentsApi } from '../../api/documents';
+import type {
+  AppointmentRequirementDto, DocumentTemplate, PatientDocument,
+} from '../../api/documents';
 import ConsentLine from '../../components/patients/ConsentLine';
 import { formatDateOnly } from '../../utils/time';
-import { reportStandsOn, validUntilFromIssued } from '../../services/reportValidity';
+import {
+  NOTHING_REQUIRED_TEXT, anyBlocks, expiringSoon, requirementLine, stillMissing,
+  validityText,
+} from './paperworkStanding';
 
 export interface PatientContext {
   patient: Patient;
@@ -42,76 +47,27 @@ export function activeSection(pathname: string, patientId: string): string {
   return match?.id ?? 'prehled';
 }
 
-/**
- * Whether one document settles one requirement.
+/*
+ * What this patient has to bring is no longer decided here.
  *
- * Signed off, and still in date. A výpis that has run out is not a výpis the
- * patient has - the owner said so plainly: "keď platnosť uplynie, hláška je
- * jedna a jednoduchá, treba doplniť výpis, rovnaká ako keď výpis nikdy nebol".
+ * Until 14. 9. 2026 this file filtered templates on `requiredForVisit` and
+ * split them on `firstVisitOnly`, and it carried its own copy of "a výpis
+ * lasts a year" to decide whether one still stood. All three are gone:
  *
- * Without the second half the banner and the row said different things about
- * the same document: the row read "Chybí — platnost skončila 3. 5. 2025" while
- * the banner above it said nothing at all.
+ *   the two flags   moved onto the rule, where they belong - the server
+ *                   stopped sending them and this filter silently matched
+ *                   nothing, so the paperwork section vanished on every
+ *                   patient without an error
+ *   the year        the rule says how many months and the server counts,
+ *                   which ends three answers to one question: this copy,
+ *                   booking’s `PaperworkRule`, and a column nobody wrote
+ *
+ * The requirement comes from `GET /api/documents/patient/{id}/check` now, per
+ * appointment. NOT unioned across every rule: a rule hangs on a service, and
+ * which service applies is a fact about the booking. Unioning them is the bug
+ * the owner had removed two days earlier, when this told somebody booked for
+ * a blood draw that their medical record was missing.
  */
-function satisfies(template: DocumentTemplate, document: PatientDocument): boolean {
-  if (document.templateId !== template.id) return false;
-  if (document.status !== DOCUMENT_SATISFIES_REQUIREMENT) return false;
-
-  if (template.type !== 'Vypis') return true;
-  const until = validUntilFromIssued(document.reportDate);
-  /* No issue date means no year to count. Calling that expired would turn a
-     blank field into a missing document. */
-  return until === null || reportStandsOn(until);
-}
-
-export interface PaperworkGaps {
-  /** Wanted on any visit. Missing means missing, full stop. */
-  always: DocumentTemplate[];
-  /** Wanted only the first time. Whether that is now, this screen cannot know. */
-  firstVisitOnly: DocumentTemplate[];
-}
-
-/**
- * Required documents still missing, split by whether the requirement applies
- * today or only to a first visit.
- *
- * The split exists because this rule was flatly wrong and said so on screen.
- * It ignored `firstVisitOnly`, and the only required template there is -
- * "Výpis ze zdravotní dokumentace" - carries it. Measured against the server
- * on 13. 9. 2026, for a patient with no documents at all:
- *
- *     GET …/check?isFirstVisit=true   ->  missing: Výpis
- *     GET …/check?isFirstVisit=false  ->  allRequiredPresent: true
- *
- * So on a returning patient this card said "Chybí: Výpis" while the server
- * said nothing was missing, and it would have said it forever - a returning
- * patient is never asked for one.
- *
- * `isFirstVisit` is not guessed at here, because it cannot be: the patient
- * record carries nothing about visits - no count, no first date - and
- * `GET /api/scheduling/appointments` has no patient filter to count them with.
- * So the card states the condition instead of asserting the conclusion.
- *
- * What is still not honoured: `ageGated` and `minimumAge`. Every template has
- * `ageGated: false` today, so nothing is wrong on screen, and the meaning of
- * the gate was not measured - implementing a guess at it would be the same
- * fault as the one above with a different field. The real answer to both is
- * `GET /api/documents/patient/{id}/check`, once somebody can tell this screen
- * whether it is a first visit.
- */
-export function paperworkGaps(
-  templates: DocumentTemplate[],
-  documents: PatientDocument[],
-): PaperworkGaps {
-  const missing = templates
-    .filter((t) => t.isActive && t.requiredForVisit)
-    .filter((t) => !documents.some((d) => satisfies(t, d)));
-
-  return {
-    always: missing.filter((t) => !t.firstVisitOnly),
-    firstVisitOnly: missing.filter((t) => t.firstVisitOnly),
-  };
-}
 
 export default function PatientLayout() {
   const { id } = useParams<{ id: string }>();
@@ -121,6 +77,13 @@ export default function PatientLayout() {
   const [documents, setDocuments] = useState<PatientDocument[]>([]);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [notFound, setNotFound] = useState(false);
+  /*
+   * `null` until the answer arrives. An empty array is a real answer - "no
+   * appointment asks for anything" - and drawing that sentence before the
+   * request has come back would state it of every patient for a moment,
+   * including the ones who are missing something.
+   */
+  const [requirements, setRequirements] = useState<AppointmentRequirementDto[] | null>(null);
 
   const reloadDocuments = useCallback(() => {
     if (id === undefined) return;
@@ -132,6 +95,11 @@ export default function PatientLayout() {
     setNotFound(false);
     patientsApi.getById(id).then(setPatient).catch(() => setNotFound(true));
     documentsApi.getTemplates().then(setTemplates).catch(() => setTemplates([]));
+    /* Left null on failure, not emptied: a request that did not come back is
+       not an answer, and "nothing is required" is a claim. */
+    documentsApi.checkRequired(id)
+      .then((r) => setRequirements(r.requirements))
+      .catch(() => setRequirements(null));
     reloadDocuments();
   }, [id, reloadDocuments]);
 
@@ -156,28 +124,91 @@ export default function PatientLayout() {
     );
   }
 
-  const gaps = paperworkGaps(templates, documents);
+  /* The server's verdict, read rather than recomputed. `ExpiringSoon` is not
+     in `missing`: the document still covers that appointment, so it is a
+     reminder, not an alarm. */
+  const missing = requirements === null ? [] : stillMissing(requirements);
+  const expiring = requirements === null ? [] : expiringSoon(requirements);
   const initials = `${patient.firstName?.[0] ?? ''}${patient.lastName?.[0] ?? ''}`;
 
   const context: PatientContext = { patient, documents, templates, reloadDocuments };
 
   return (
     <Box>
-      {/* Stays on screen whichever section is open: somebody who walked away
-          from the overview should not lose sight of what is missing. */}
-      {gaps.always.length > 0 && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          Chybí: {gaps.always.map((t) => t.name).join(', ')}
+      {/*
+        * Stays on screen whichever section is open: somebody who walked away
+        * from the overview should not lose sight of what is missing.
+        *
+        * One row per thing one appointment asks for, saying which appointment
+        * and why - "Sportovní lékařské prohlídky 24. 9. — Výpis". The old
+        * banner said only "Chybí: Výpis", which is the sentence that sent
+        * somebody booked for a blood draw looking for their medical record.
+        */}
+      {missing.length > 0 && (
+        <Alert severity={anyBlocks(missing) ? 'error' : 'warning'} sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
+            {anyBlocks(missing)
+              ? 'Chybí doklad, bez kterého nejde objednat'
+              : 'Chybí doklady k objednaným termínům'}
+          </Typography>
+          {missing.map((r) => (
+            <Typography key={`${r.appointmentId}-${r.templateId}`} variant="body2">
+              {requirementLine(r, (iso) => formatDateOnly(iso.slice(0, 10)))}
+              {r.blocksBooking === true ? ' — bez něj nejde objednat' : ''}
+            </Typography>
+          ))}
         </Alert>
       )}
 
-      {/* Stated as the condition it is. "Chybí" would be a claim this screen
-          cannot make - it does not know whether this is a first visit, and on
-          a returning patient the server says nothing is missing at all. */}
-      {gaps.firstVisitOnly.length > 0 && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Při první návštěvě je potřeba:{' '}
-          {gaps.firstVisitOnly.map((t) => t.name).join(', ')}
+      {/*
+        * The third state, and the reason for this rewrite.
+        *
+        * No appointment that asks for anything is not "everything is in
+        * order", and for three days the two were the same silence. Said
+        * plainly rather than drawn as a warning - it is the ordinary state of
+        * most patients most of the time.
+        */}
+      {requirements !== null && requirements.length === 0 && (
+        <Alert severity="info" sx={{ mb: 2 }}>{NOTHING_REQUIRED_TEXT}</Alert>
+      )}
+
+      {/* What the appointments ask for and the patient already has. A fact
+          worth showing: it is the half that says the paperwork is done. */}
+      {/* Still good, and this is the cheap moment to renew it. Amber, because
+          the appointment is covered - `allRequiredPresent` stays true - and
+          an alarm that is not true is the one people learn to ignore. */}
+      {expiring.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
+            Brzy skončí platnost
+          </Typography>
+          {expiring.map((r) => {
+            const until = validityText(r, (iso) => formatDateOnly(iso.slice(0, 10)));
+            return (
+              <Typography key={`${r.appointmentId}-${r.templateId}`} variant="body2">
+                {requirementLine(r, (iso) => formatDateOnly(iso.slice(0, 10)))}
+                {until === null ? '' : ` — ${until}`}
+              </Typography>
+            );
+          })}
+        </Alert>
+      )}
+
+      {requirements !== null && requirements.length > 0
+        && missing.length === 0 && expiring.length === 0 && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
+            Doklady k objednaným termínům jsou v pořádku
+          </Typography>
+          {requirements.map((r) => {
+            const until = validityText(r, (iso) => formatDateOnly(iso.slice(0, 10)));
+            return (
+              <Typography key={`${r.appointmentId}-${r.templateId}`} variant="body2">
+                {requirementLine(r, (iso) => formatDateOnly(iso.slice(0, 10)))}
+                {until === null ? '' : ` — ${until}`}
+              </Typography>
+            );
+          })}
         </Alert>
       )}
 

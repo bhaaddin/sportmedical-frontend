@@ -1,15 +1,83 @@
 import client from './client';
 
+/*
+ * A kind of document, not a document. "Výpis ze zdravotní dokumentace" is a
+ * template; the scan a patient hands over is a `PatientDocument`.
+ *
+ * `requiredForVisit`, `firstVisitOnly`, `ageGated` and `minimumAge` were here
+ * until 14. 9. 2026 and are gone, because the server stopped sending them: who
+ * has to bring what is a property of the RULE (šablona × služba), never of the
+ * document kind. The columns are dropped and `DocumentTemplateDto` has seven
+ * fields.
+ *
+ * They were removed from this type deliberately rather than left as optional.
+ * Left here they compiled and read `undefined`, and the patient card's
+ * `.filter(t => t.isActive && t.requiredForVisit)` quietly produced nothing -
+ * every patient looked like a patient with their paperwork in order. Deleting
+ * them turns each of those reads into a compile error, which is how they were
+ * all found.
+ */
 export interface DocumentTemplate {
   id: string;
   name: string;
+  /** `Vypis` | `InformovanySouhlas` | `Cenik` | `Podminky` - decides, among other
+      things, whether booking looks at it at all. */
   type: string;
   version: number;
   fileUrl: string;
-  requiredForVisit: boolean;
-  firstVisitOnly: boolean;
-  ageGated: boolean;
-  minimumAge: number;
+  description: string;
+  isActive: boolean;
+}
+
+/**
+ * One thing one appointment needs.
+ *
+ * `standing` is on the wire and deliberately not typed here: the live contract
+ * gives `DocumentStandingKind` as a bare `integer` with no names, so what 0, 1
+ * or 2 mean cannot be read off it, and with no appointments in the database
+ * there is nothing to measure it against. A traffic light drawn from a guessed
+ * enum is the fault this whole rewrite exists to undo.
+ */
+/**
+ * How a document stands against one appointment, in the server's words.
+ *
+ * A string since 14. 9. 2026. It was a bare `integer` for a few hours and
+ * there was no way to learn what 0, 1 or 2 meant - not from the contract, and
+ * not by measurement either, with no appointments in the database. App changed
+ * it to names when asked rather than leaving it to be guessed at.
+ *
+ *     Missing       nothing on file for it
+ *     Expired       on file, and no longer valid on the day of the appointment
+ *     ExpiringSoon  still covers it, but runs out within the rule's warning days
+ *     Valid         covers it with room to spare
+ *
+ * `ExpiringSoon` is not a failure: the appointment is covered, which is why
+ * `allRequiredPresent` stays true. It is the one state somebody can still do
+ * something cheap about, and that is why there are more than two.
+ */
+export type DocumentStanding = 'Missing' | 'Expired' | 'ExpiringSoon' | 'Valid';
+
+export interface AppointmentRequirementDto {
+  templateId: string;
+  templateName: string;
+  /** Renamed from `serviceCategory` when the rule moved off the price list. */
+  serviceName: string;
+  appointmentId: string;
+  startUtc: string;
+  standing: string;
+  validUntil?: string | null;
+  daysLeft?: number | null;
+  blocksBooking?: boolean;
+}
+
+export interface DocumentCheckResult {
+  allRequiredPresent: boolean;
+  requirements: AppointmentRequirementDto[];
+}
+
+/** What `PUT /api/documents/templates/{id}` takes - all three are required. */
+export interface DocumentTemplateInput {
+  name: string;
   description: string;
   isActive: boolean;
 }
@@ -151,8 +219,49 @@ export const documentsApi = {
     return res.data?.value ?? res.data ?? [];
   },
 
-  checkRequired: async (patientId: string, isFirstVisit: boolean, patientAge: number) => {
-    const res = await client.get(`/api/documents/patient/${patientId}/check?isFirstVisit=${isFirstVisit}&patientAge=${patientAge}`);
+  /*
+   * What this patient's appointments ask them to bring.
+   *
+   * Per appointment, never per person: a rule hangs on a service, and which
+   * service applies is a fact about the booking. Unioning every rule and
+   * calling it "what we want from patients" is the bug the owner had removed -
+   * it told somebody booked for a blood draw that their medical record was
+   * missing.
+   *
+   * `isFirstVisit` and `patientAge` used to be query parameters and are gone:
+   * the server reads the rules now, and "first visit only" is a setting on the
+   * rule rather than a guess this screen had to supply. Measured against the
+   * live contract on 14. 9. 2026 - the only parameter left is the id.
+   *
+   * An empty list is a real answer and the commonest one: no appointment that
+   * asks for anything. It is not the same as "everything is in order", and the
+   * card says which.
+   */
+  checkRequired: async (patientId: string): Promise<DocumentCheckResult> => {
+    const res = await client.get(`/api/documents/patient/${patientId}/check`);
+    const data = res.data?.value ?? res.data ?? {};
+    return {
+      allRequiredPresent: data.allRequiredPresent === true,
+      requirements: Array.isArray(data.requirements) ? data.requirements : [],
+    };
+  },
+
+  /**
+   * Renames a template, rewrites its description, or takes it out of use.
+   *
+   * New on 14. 9. 2026. Until then `/api/documents/templates` was `GET` only,
+   * which is why the seeded Výpis still describes itself as "(vyžaduje se při
+   * první návštěvě)" - a rule the owner cancelled on 13. 9. and nobody could
+   * correct because nothing could write to a template.
+   *
+   * All three fields are `required`, so this is the whole template as every
+   * write in this lane is: leaving `description` out empties it.
+   */
+  updateTemplate: async (
+    id: string,
+    input: DocumentTemplateInput,
+  ): Promise<DocumentTemplate> => {
+    const res = await client.put(`/api/documents/templates/${id}`, input);
     return res.data?.value ?? res.data;
   },
 

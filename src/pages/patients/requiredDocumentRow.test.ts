@@ -51,40 +51,41 @@ describe('a document that is on file', () => {
 
   /* Grey, not green. This is the rule, not a preference. */
   it('is never the alarming tone while it is in date', () => {
-    for (const t of [template(), template({ firstVisitOnly: false })]) {
-      expect(requiredRowState(t, doc(), TODAY).tone).toBe('on-file');
-    }
+    expect(requiredRowState(template(), doc(), TODAY).tone).toBe('on-file');
   });
 });
 
 describe('a document that is not on file', () => {
   /*
-   * Red only when something must be done. Measured against the server: a
-   * returning patient with no výpis has nothing missing at all, so red on a
-   * first-visit document would be the screen raising an alarm the server
-   * does not.
+   * "Není doloženo", not "Chybí", and no first-visit tone any more.
+   *
+   * This row is on the documents screen, which lists every kind of document
+   * the clinic keeps - it is not a list of what this patient owes. Whether
+   * they owe it depends on what they are booked for, and that is answered on
+   * the card above, by the server, per appointment.
+   *
+   * The `first-visit` tone was drawn off `template.firstVisitOnly`, which the
+   * server stopped sending on 14. 9. 2026: "only the first time" moved onto
+   * the rule, where it is one service's decision rather than a property of a
+   * document kind. The read returned `undefined`, so the tone was already
+   * unreachable before it was deleted.
    */
-  it('is informational when only a first visit needs it', () => {
-    const row = requiredRowState(template({ firstVisitOnly: true }), undefined, TODAY);
-    expect(row.tone).toBe('first-visit');
-    expect(row.text).toMatch(/1\. návštěvě/);
-  });
-
-  it('is the alarm when every visit needs it', () => {
-    const row = requiredRowState(template({ firstVisitOnly: false }), undefined, TODAY);
+  it('says it is not filed, without claiming the patient owes it', () => {
+    const row = requiredRowState(template(), undefined, TODAY);
     expect(row.tone).toBe('missing');
-    expect(row.text).toBe('Chybí');
+    expect(row.text).toBe('Není doloženo');
   });
 
-  /* The three tones are distinct - collapsing any two would put the alarm
-     somewhere it does not belong, or take it from where it does. */
-  it('gives a different answer to each of the three cases', () => {
+  /* The remaining tones stay distinct - collapsing two would put the alarm
+     where it does not belong, or take it from where it does. */
+  it('still tells the three remaining cases apart', () => {
+    const soon = { reportDate: '2025-10-01' };
     const tones = [
       requiredRowState(template(), doc(), TODAY).tone,
-      requiredRowState(template({ firstVisitOnly: true }), undefined, TODAY).tone,
-      requiredRowState(template({ firstVisitOnly: false }), undefined, TODAY).tone,
+      requiredRowState(template(), doc(soon), TODAY).tone,
+      requiredRowState(template(), undefined, TODAY).tone,
     ];
-    expect(new Set(tones).size).toBe(3);
+    expect(new Set(tones).size).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -126,7 +127,7 @@ describe('the výpis and its year', () => {
    */
   it('is simply missing once it has run out, with the same word', () => {
     const expired = requiredRowState(template(), issued('2024-05-03'), TODAY);
-    const never = requiredRowState(template({ firstVisitOnly: false }), undefined, TODAY);
+    const never = requiredRowState(template(), undefined, TODAY);
     expect(expired.tone).toBe('missing');
     expect(expired.text).toBe(never.text);
     expect(expired.detail).toMatch(/platnost skončila/);

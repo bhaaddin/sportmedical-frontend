@@ -33,9 +33,15 @@ import { formatDateOnly } from '../../utils/time';
 import { remainingText, reportValidity, validUntilFromIssued } from '../../services/reportValidity';
 import type { DocumentTemplate, PatientDocument } from '../../api/documents';
 
+/*
+ * `first-visit` is gone. It was drawn off `template.firstVisitOnly`, which the
+ * server stopped sending on 14. 9. 2026 - "only the first time" moved onto the
+ * rule, where it is one service's decision rather than a property of the
+ * document kind. The read returned `undefined`, so the tone was unreachable
+ * before it was removed.
+ */
 export type RequiredRowTone =
   | 'missing'      // red: nothing on file, or what is on file has run out
-  | 'first-visit'  // blue: worth knowing, nothing to do today
   | 'expiring'     // amber: still good, and the cheap moment to fix it is now
   | 'on-file';     // grey: a fact, not an achievement
 
@@ -96,7 +102,15 @@ export function requiredRowState(
        * bez strašenia".
        */
       if (validity.kind !== 'valid') {
-        return { tone: 'missing', text: 'Chybí', detail: `platnost skončila ${formatDateOnly(until)}` };
+        /* The same word as never-filed, as the owner asked: "keď platnosť
+           uplynie, hláška je jedna a jednoduchá, rovnaká ako keď výpis nikdy
+           nebol". The date goes on the second line, where it explains rather
+           than competes. */
+        return {
+          tone: 'missing',
+          text: 'Není doloženo',
+          detail: `platnost skončila ${formatDateOnly(until)}`,
+        };
       }
 
       const text = `${dateOf(filed)} · platí do ${formatDateOnly(until)}`;
@@ -109,11 +123,18 @@ export function requiredRowState(
   }
 
   /*
-   * Not "Chybí" for a document only a first visit needs. Measured against the
-   * server: a returning patient with no výpis has nothing missing at all, so
-   * red here would be the screen raising an alarm the server does not.
+   * "Není doloženo", not "Chybí".
+   *
+   * This row is on the documents screen, which lists every kind of document
+   * the clinic keeps - it is not a list of what this patient owes. Whether
+   * they owe it depends on what they are booked for, and that question is
+   * answered on the card above, off the server, per appointment.
+   *
+   * There used to be a `first-visit` tone here, off `template.firstVisitOnly`.
+   * The server stopped sending that on 14. 9. 2026 - it moved onto the rule,
+   * where "only the first time" is one service's decision rather than a fact
+   * about the document kind. Reading it here returned `undefined`, so the tone
+   * was already dead before it was deleted.
    */
-  if (template.firstVisitOnly) return { tone: 'first-visit', text: 'Při 1. návštěvě' };
-
-  return { tone: 'missing', text: 'Chybí' };
+  return { tone: 'missing', text: 'Není doloženo' };
 }
