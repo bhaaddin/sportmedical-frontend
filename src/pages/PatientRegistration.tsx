@@ -1,67 +1,52 @@
-/* ══════════════════════════════════════════════════════════════
-   PATIENT REGISTRATION (staff window)
-
-   Front end for the governed registry: POST /api/v1/patients, backed by
-   Application/Patients/Registration/PatientRegistrationService.
-
-   Three things make this window different from the legacy patient form:
-
-   1. The identifiers are minted here. patientId, both contact-point ids,
-      the address id and the administrative-profile id are generated once
-      per attempt and kept stable across retries, so a re-send is a replay
-      the server recognises ("Existing") rather than a second patient.
-   2. Duplicates are the server's call. When it answers
-      CandidateReviewRequired the operator decides, and the decision is
-      sent back with the fingerprints it came with.
-   3. Insurance is a branch, not a set of optional fields. Czech public
-      insurance and "no Czech insurance number" accept mutually exclusive
-      facts — the Domain refuses a mixture, so the form never offers one.
-   ══════════════════════════════════════════════════════════════ */
-
+/*
+ * Registering a patient, on one screen.
+ *
+ * It was a five-step wizard, and the owner sent it back: "coz ja nechcem
+ * pretoze mi to zbytocne kooplikuje registraciu". He is right about who this
+ * screen is for — somebody standing at a desk with a patient in front of them,
+ * reading off a card. A wizard makes that person hold five screens in their
+ * head and click through four of them to fix a digit on the first.
+ *
+ * NOTHING WAS DROPPED IN THE MOVE. Every field, every catalogue and every live
+ * behaviour the wizard had is here: the same `RegistrationFormState`, the same
+ * `validateAll`, the same `buildRequest`, the same candidate review. The fifth
+ * step — "Shrnutí" — is the one thing that stopped being a step: it is the
+ * card on the right, which fills in as the form is typed, so the summary is
+ * never a page you arrive at and always a thing you can see.
+ *
+ * Two things the wizard could not do at all:
+ *
+ *   the identifier is INSPECTED against what was typed, so a disagreement
+ *   names both values while both are on screen, instead of arriving as one
+ *   refusal after the save that names neither
+ *
+ *   an error puts the screen at the field rather than at a step, because on
+ *   one screen there is nowhere else to put it
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Alert,
-  AlertTitle,
-  Autocomplete,
-  Box,
-  Button,
-  Checkbox,
-  Chip,
-  CircularProgress,
-  FormControlLabel,
-  Grid,
-  MenuItem,
-  Paper,
-  Radio,
-  RadioGroup,
-  Step,
-  StepLabel,
-  Stepper,
-  TextField,
-  ToggleButton,
-  ToggleButtonGroup,
-  Typography,
+  Alert, AlertTitle, Autocomplete, Box, Button, Checkbox, Chip, CircularProgress,
+  Divider, FormControlLabel, Grid, LinearProgress, MenuItem, Paper, Radio,
+  RadioGroup, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
-import { ArrowBack, ArrowForward, HowToReg, PersonAdd } from '@mui/icons-material';
+import { HowToReg, PersonAdd, Search } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import patientRegistryApi, {
-  type AddressPoint,
+  type IdentityInspection,
   type PatientRegistrationOptions,
   type PatientSearchResult,
   type RegisterPatientRequest,
   type RegistrationCandidate,
   type RegistrationConfirmation,
 } from '../api/patientRegistry';
+import type { AddressPoint } from '../api/addressLookup';
 import {
   createEmptyForm,
   digitsOnly,
-  REGISTRATION_STEPS,
   validateAll,
-  validateStep,
   type FieldErrors,
   type RegistrationFormState,
-  type RegistrationStep,
 } from '../services/patientRegistration/validation';
 import { resolveRegistrationError } from '../services/patientRegistration/registrationErrors';
 import { formatRodneCislo } from '../utils/rodneCislo';
@@ -70,6 +55,9 @@ import {
   IDENTIFIER_KIND_LABEL,
   parseBirthNumber,
 } from '../services/patientRegistration/insuranceIdentifier';
+import {
+  AGREES_TEXT, disagreementText, verdictOf, worthInspecting,
+} from '../services/patientRegistration/identityInspection';
 import RuianAddressPicker from '../components/registration/RuianAddressPicker';
 import CandidateReviewDialog from '../components/registration/CandidateReviewDialog';
 
@@ -91,6 +79,8 @@ function mintIdentifiers(): RegistrationIdentifiers {
   };
 }
 
+/* The summary shows what will be saved; the identifiers are shown masked,
+   because a card left open on a reception desk is a card anybody walks past. */
 function maskBirthNumber(value: string): string {
   const digits = digitsOnly(value);
   if (digits.length === 0) return '—';
@@ -114,49 +104,65 @@ const SEX_OPTIONS = [
   { code: 'Female', label: 'Žena' },
 ] as const;
 
+/** The order errors are walked in, so the screen jumps to the FIRST problem. */
+const FIELD_ORDER: (keyof RegistrationFormState)[] = [
+  'firstName', 'lastName', 'preferredName', 'dateOfBirth', 'sex',
+  'healthInsuranceNumber', 'healthInsuranceNumberConfirmation', 'healthInsurerCode',
+  'birthNumber', 'identityDocumentType', 'identityDocumentIssuingCountryCode',
+  'identityDocumentNumber', 'ruianAddressPointCode', 'email', 'phoneRegionCode', 'phone',
+];
+
+/** What is still missing, in the words of the field rather than its name. */
+const FIELD_LABEL: Partial<Record<keyof RegistrationFormState, string>> = {
+  firstName: 'Jméno', lastName: 'Příjmení', dateOfBirth: 'Datum narození',
+  sex: 'Pohlaví', healthInsuranceNumber: 'Číslo pojištěnce',
+  healthInsuranceNumberConfirmation: 'Druhé zadání čísla pojištěnce',
+  healthInsurerCode: 'Zdravotní pojišťovna', birthNumber: 'Rodné číslo',
+  identityDocumentType: 'Typ dokladu',
+  identityDocumentIssuingCountryCode: 'Stát vydání dokladu',
+  identityDocumentNumber: 'Číslo dokladu',
+  ruianAddressPointCode: 'Adresa z registru RÚIAN',
+  email: 'E-mail', phone: 'Telefon', phoneRegionCode: 'Předvolba',
+};
+
 export default function PatientRegistration() {
   const navigate = useNavigate();
 
-  const [options, setOptions] = useState<PatientRegistrationOptions | null>(null);
-  const [optionsError, setOptionsError] = useState('');
-  const [loadingOptions, setLoadingOptions] = useState(true);
-
   const [form, setForm] = useState<RegistrationFormState>(createEmptyForm);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [step, setStep] = useState<RegistrationStep>(0);
-  const [submitting, setSubmitting] = useState(false);
   const [banner, setBanner] = useState<{ severity: 'error' | 'warning'; text: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [addressPoint, setAddressPoint] = useState<AddressPoint | null>(null);
+  const [options, setOptions] = useState<PatientRegistrationOptions | null>(null);
+  const [loadingOptions, setLoadingOptions] = useState(true);
+  const [optionsError, setOptionsError] = useState('');
+
   const [similar, setSimilar] = useState<PatientSearchResult[]>([]);
-
+  const [addressPoint, setAddressPoint] = useState<AddressPoint | null>(null);
   const [review, setReview] = useState<{
     candidates: RegistrationCandidate[];
     confirmation: RegistrationConfirmation;
   } | null>(null);
 
+  /** What the identifier itself says, when it has been asked. */
+  const [inspection, setInspection] = useState<IdentityInspection | null>(null);
+
   /* Stable for the whole attempt: a retry must replay, not duplicate. */
   const identifiers = useRef<RegistrationIdentifiers>(mintIdentifiers());
 
-  const update = useCallback(<K extends keyof RegistrationFormState>(
-    field: K,
+  const update = <K extends keyof RegistrationFormState>(
+    key: K,
     value: RegistrationFormState[K],
   ) => {
-    setForm((previous) => ({ ...previous, [field]: value }));
-    setErrors((previous) => ({ ...previous, [field]: undefined }));
-  }, []);
+    setForm((previous) => ({ ...previous, [key]: value }));
+    setErrors((previous) => ({ ...previous, [key]: undefined }));
+  };
 
   /* ── Options ── */
   useEffect(() => {
     patientRegistryApi
       .getOptions()
-      .then((result) => {
-        setOptions(result);
-        const czechRegion = result.phoneRegions.find((region) => region.code === 'CZ');
-        if (czechRegion !== undefined) {
-          setForm((previous) => ({ ...previous, phoneRegionCode: czechRegion.code }));
-        }
-      })
+      .then(setOptions)
       .catch((error) => setOptionsError(resolveRegistrationError(error).message))
       .finally(() => setLoadingOptions(false));
   }, []);
@@ -182,6 +188,42 @@ export default function PatientRegistration() {
 
     return () => clearTimeout(timer);
   }, [form.firstName, form.lastName, form.dateOfBirth]);
+
+  /*
+   * ── What the identifier says about what was typed ──
+   *
+   * Asked, never applied. The form fills an EMPTY date or sex from an
+   * identifier it can read; a full one it only queries, because an identifier
+   * that disagrees with a hand-typed date is a question and answering it by
+   * overwriting is how somebody ends up with a birthday nobody chose.
+   */
+  const identifierDigits = digitsOnly(
+    form.healthInsuranceNumber.length > 0 ? form.healthInsuranceNumber : form.birthNumber,
+  );
+
+  useEffect(() => {
+    if (form.insuranceRegistrationKind !== 'CzechPublicHealthInsurance'
+      || !worthInspecting(identifierDigits)) {
+      setInspection(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      patientRegistryApi
+        .inspectIdentity({
+          identifier: identifierDigits,
+          dateOfBirth: form.dateOfBirth || null,
+          sex: form.sex || null,
+        })
+        .then((result) => { if (!cancelled) setInspection(result); })
+        .catch(() => { if (!cancelled) setInspection(null); });
+    }, 400);
+
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [identifierDigits, form.dateOfBirth, form.sex, form.insuranceRegistrationKind]);
+
+  const verdict = verdictOf(inspection, { dateOfBirth: form.dateOfBirth, sex: form.sex });
 
   /* ── Birth number drives date of birth and sex ── */
   const handleBirthNumber = (raw: string) => {
@@ -230,15 +272,6 @@ export default function PatientRegistration() {
     }));
     setErrors((previous) => ({ ...previous, ruianAddressPointCode: undefined }));
   };
-
-  const goNext = () => {
-    const stepErrors = validateStep(step, form);
-    setErrors(stepErrors);
-    if (Object.keys(stepErrors).length > 0) return;
-    setStep((previous) => Math.min(previous + 1, REGISTRATION_STEPS.length - 1) as RegistrationStep);
-  };
-
-  const goBack = () => setStep((previous) => Math.max(previous - 1, 0) as RegistrationStep);
 
   /* ── Command ── */
   const buildRequest = useCallback(
@@ -296,6 +329,14 @@ export default function PatientRegistration() {
     [form],
   );
 
+  /** Puts the screen at the first thing that is wrong. There is no step to go to. */
+  const focusFirstError = (found: FieldErrors) => {
+    const first = FIELD_ORDER.find((field) => found[field] !== undefined);
+    if (first === undefined) return;
+    const node = document.querySelector(`[data-field="${first}"]`);
+    node?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
   const send = useCallback(
     async (confirmation: RegistrationConfirmation | null) => {
       setSubmitting(true);
@@ -310,6 +351,9 @@ export default function PatientRegistration() {
             confirmation: {
               registrationFingerprint: result.registrationFingerprint,
               authorizationScopeFingerprint: result.authorizationScopeFingerprint ?? '',
+              /* Sent back as it came: the registry refuses a confirmation of a
+                 candidate list that has changed since — `candidate_review_stale`
+                 — which is the guard against confirming a list nobody saw. */
               candidateSetFingerprint: result.candidateSetFingerprint ?? '',
               candidates: result.candidates,
             },
@@ -334,10 +378,9 @@ export default function PatientRegistration() {
         });
 
         if (resolved.field !== null) {
-          setErrors((previous) => ({ ...previous, [resolved.field as string]: resolved.message }));
-        }
-        if (resolved.step !== null) {
-          setStep(resolved.step as RegistrationStep);
+          const field = resolved.field as keyof RegistrationFormState;
+          setErrors((previous) => ({ ...previous, [field]: resolved.message }));
+          focusFirstError({ [field]: resolved.message } as FieldErrors);
         }
         if (resolved.requiresRestart) {
           // The identifiers are burnt: the registry already knows them with
@@ -357,6 +400,7 @@ export default function PatientRegistration() {
 
     if (Object.keys(allErrors).length > 0) {
       setBanner({ severity: 'warning', text: 'Formulář obsahuje chyby. Zkontrolujte zvýrazněná pole.' });
+      focusFirstError(allErrors);
       return;
     }
 
@@ -373,6 +417,17 @@ export default function PatientRegistration() {
     }),
     [options],
   );
+
+  /* What the card on the right counts down. The former "Shrnutí" step. */
+  const outstanding = useMemo(() => {
+    const found = validateAll(form);
+    return FIELD_ORDER
+      .filter((field) => found[field] !== undefined)
+      .map((field) => FIELD_LABEL[field] ?? field);
+  }, [form]);
+
+  const requiredCount = czechBranch ? 11 : 12;
+  const doneCount = Math.max(0, requiredCount - outstanding.length);
 
   if (loadingOptions) {
     return (
@@ -393,273 +448,261 @@ export default function PatientRegistration() {
     );
   }
 
-  return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1080, mx: 'auto' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-        <HowToReg color="primary" />
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            Registrace pacienta
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Řízená registrace do registru pacientů — údaje ověřuje server.
-          </Typography>
-        </Box>
+  const section = (num: number, title: string, note?: string) => (
+    <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 2.5 }}>
+      <Box
+        sx={{
+          width: 24, height: 24, borderRadius: 1.5, bgcolor: 'primary.main',
+          color: 'primary.contrastText', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0,
+        }}
+      >
+        {num}
       </Box>
+      <Typography variant="h6" sx={{ fontWeight: 700 }}>{title}</Typography>
+      {note !== undefined && (
+        <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+          {note}
+        </Typography>
+      )}
+    </Stack>
+  );
 
-      <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-        <Stepper activeStep={step} sx={{ mb: 4 }}>
-          {REGISTRATION_STEPS.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
+  return (
+    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
+      {/* ── Header ── */}
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={2}
+        sx={{ alignItems: { md: 'flex-end' }, mb: 3 }}
+      >
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexGrow: 1 }}>
+          <HowToReg color="primary" />
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 800 }}>Registrace pacienta</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Všechno na jedné obrazovce. Vpravo se průběžně skládá to, co se uloží.
+            </Typography>
+          </Box>
+        </Stack>
 
-        {banner !== null && (
-          <Alert severity={banner.severity} sx={{ mb: 3 }} onClose={() => setBanner(null)}>
-            {banner.text}
-          </Alert>
-        )}
+        <Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+            Režim zápisu
+          </Typography>
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={form.mode}
+            onChange={(_, value) => value !== null && update('mode', value)}
+          >
+            <ToggleButton value="Standard">Standardní</ToggleButton>
+            <ToggleButton value="Quick">Rychlá registrace</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+      </Stack>
 
-        {/* ── 0 — Identity ── */}
-        {step === 0 && (
-          <Grid container spacing={2}>
-            <Grid size={12}>
-              <ToggleButtonGroup
-                exclusive
-                size="small"
-                value={form.mode}
-                onChange={(_, value) => value !== null && update('mode', value)}
-              >
-                <ToggleButton value="Standard">Standardní registrace</ToggleButton>
-                <ToggleButton value="Quick">Rychlá registrace</ToggleButton>
-              </ToggleButtonGroup>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                Režim se zaznamenává do auditu registrace. Povinné údaje jsou v obou režimech stejné.
-              </Typography>
-            </Grid>
+      {banner !== null && (
+        <Alert severity={banner.severity} sx={{ mb: 2 }} onClose={() => setBanner(null)}>
+          {banner.text}
+        </Alert>
+      )}
 
-            <Grid size={{ xs: 12, md: 3 }}>
-              <Autocomplete
-                multiple
-                options={titleOptions.before}
-                getOptionLabel={(option) => option.displayValue}
-                isOptionEqualToValue={(a, b) => a.code === b.code}
-                value={titleOptions.before.filter((option) =>
-                  form.titlesBeforeName.includes(option.code),
-                )}
-                onChange={(_, value) =>
-                  update('titlesBeforeName', value.map((option) => option.code))
-                }
-                renderInput={(params) => <TextField {...params} label="Tituly před jménem" />}
-              />
-            </Grid>
+      <Stack direction={{ xs: 'column', lg: 'row' }} spacing={3} sx={{ alignItems: 'flex-start' }}>
+        {/* ═══ The form ═══ */}
+        <Stack spacing={2} sx={{ flexGrow: 1, width: '100%', minWidth: 0 }}>
 
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                required
-                label="Jméno"
-                value={form.firstName}
-                onChange={(event) => update('firstName', event.target.value)}
-                error={errors.firstName !== undefined}
-                helperText={errors.firstName ?? ' '}
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 5 }}>
-              <TextField
-                fullWidth
-                required
-                label="Příjmení"
-                value={form.lastName}
-                onChange={(event) => update('lastName', event.target.value)}
-                error={errors.lastName !== undefined}
-                helperText={errors.lastName ?? ' '}
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 3 }}>
-              <Autocomplete
-                multiple
-                options={titleOptions.after}
-                getOptionLabel={(option) => option.displayValue}
-                isOptionEqualToValue={(a, b) => a.code === b.code}
-                value={titleOptions.after.filter((option) =>
-                  form.titlesAfterName.includes(option.code),
-                )}
-                onChange={(_, value) => update('titlesAfterName', value.map((option) => option.code))}
-                renderInput={(params) => <TextField {...params} label="Tituly za jménem" />}
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Oslovení"
-                value={form.preferredName}
-                onChange={(event) => update('preferredName', event.target.value)}
-                error={errors.preferredName !== undefined}
-                helperText={errors.preferredName ?? ' '}
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 2.5 }}>
-              <TextField
-                fullWidth
-                required
-                type="date"
-                label="Datum narození"
-                value={form.dateOfBirth}
-                onChange={(event) => update('dateOfBirth', event.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
-                error={errors.dateOfBirth !== undefined}
-                helperText={errors.dateOfBirth ?? ' '}
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 2.5 }}>
-              <TextField
-                fullWidth
-                select
-                required
-                label="Pohlaví"
-                value={form.sex}
-                onChange={(event) => update('sex', event.target.value as RegistrationFormState['sex'])}
-                error={errors.sex !== undefined}
-                helperText={errors.sex ?? ' '}
-              >
-                {SEX_OPTIONS.map((option) => (
-                  <MenuItem key={option.code} value={option.code}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-
-            {similar.length > 0 && (
-              <Grid size={12}>
-                <Alert severity="info">
-                  <AlertTitle>Podobní pacienti už v registru jsou</AlertTitle>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-                    {similar.map((patient) => (
-                      <Chip
-                        key={patient.patientId}
-                        label={`${patient.fullName} · ${new Date(
-                          patient.dateOfBirth,
-                        ).toLocaleDateString('cs-CZ')}`}
-                        onClick={() => navigate(`/patients/${patient.patientId}`)}
-                        variant="outlined"
-                      />
-                    ))}
-                  </Box>
-                </Alert>
+          {/* 1 · Totožnost */}
+          <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+            {section(1, 'Totožnost')}
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, md: 2 }}>
+                <Autocomplete
+                  multiple
+                  size="small"
+                  options={titleOptions.before.map((o) => o.code)}
+                  value={form.titlesBeforeName}
+                  onChange={(_, value) => update('titlesBeforeName', value)}
+                  getOptionLabel={(code) =>
+                    titleOptions.before.find((o) => o.code === code)?.displayValue ?? code}
+                  renderInput={(params) => <TextField {...params} label="Tituly před" />}
+                />
               </Grid>
-            )}
-          </Grid>
-        )}
+              <Grid size={{ xs: 12, md: 4 }} data-field="firstName">
+                <TextField
+                  fullWidth size="small" label="Jméno *"
+                  value={form.firstName}
+                  onChange={(e) => update('firstName', e.target.value)}
+                  error={errors.firstName !== undefined}
+                  helperText={errors.firstName}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }} data-field="lastName">
+                <TextField
+                  fullWidth size="small" label="Příjmení *"
+                  value={form.lastName}
+                  onChange={(e) => update('lastName', e.target.value)}
+                  error={errors.lastName !== undefined}
+                  helperText={errors.lastName}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 2 }}>
+                <Autocomplete
+                  multiple
+                  size="small"
+                  options={titleOptions.after.map((o) => o.code)}
+                  value={form.titlesAfterName}
+                  onChange={(_, value) => update('titlesAfterName', value)}
+                  getOptionLabel={(code) =>
+                    titleOptions.after.find((o) => o.code === code)?.displayValue ?? code}
+                  renderInput={(params) => <TextField {...params} label="Tituly za" />}
+                />
+              </Grid>
 
-        {/* ── 1 — Insurance ── */}
-        {step === 1 && (
-          <Grid container spacing={2}>
-            <Grid size={12}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Způsob evidence pojištění
-              </Typography>
-              <RadioGroup
-                value={form.insuranceRegistrationKind}
-                onChange={(event) =>
-                  update(
-                    'insuranceRegistrationKind',
-                    event.target.value as RegistrationFormState['insuranceRegistrationKind'],
-                  )
-                }
-              >
-                {options.insuranceRegistrationKinds.map((option) => (
-                  <FormControlLabel
-                    key={option.code}
-                    value={option.code}
-                    control={<Radio />}
-                    label={option.displayValue}
-                  />
-                ))}
-              </RadioGroup>
+              <Grid size={{ xs: 12, md: 4 }} data-field="preferredName">
+                <TextField
+                  fullWidth size="small" label="Oslovení"
+                  value={form.preferredName}
+                  onChange={(e) => update('preferredName', e.target.value)}
+                  error={errors.preferredName !== undefined}
+                  helperText={errors.preferredName ?? 'Nepovinné.'}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }} data-field="dateOfBirth">
+                <TextField
+                  fullWidth size="small" type="date" label="Datum narození *"
+                  value={form.dateOfBirth}
+                  onChange={(e) => update('dateOfBirth', e.target.value)}
+                  error={errors.dateOfBirth !== undefined}
+                  helperText={errors.dateOfBirth}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }} data-field="sex">
+                <Typography variant="caption" color="text.secondary">Pohlaví *</Typography>
+                <RadioGroup
+                  row
+                  value={form.sex}
+                  onChange={(e) => update('sex', e.target.value as RegistrationFormState['sex'])}
+                >
+                  {SEX_OPTIONS.map((option) => (
+                    <FormControlLabel
+                      key={option.code}
+                      value={option.code}
+                      control={<Radio size="small" />}
+                      label={option.label}
+                    />
+                  ))}
+                </RadioGroup>
+                {errors.sex !== undefined && (
+                  <Typography variant="caption" color="error">{errors.sex}</Typography>
+                )}
+              </Grid>
             </Grid>
+
+            {/* Live duplicate check — said where it applies, not after the save. */}
+            {similar.length > 0 && (
+              <Alert severity="warning" icon={<Search fontSize="small" />} sx={{ mt: 2 }}>
+                <AlertTitle sx={{ fontSize: 14 }}>
+                  {similar.length === 1
+                    ? 'V registru je někdo podobný'
+                    : `V registru je ${similar.length} podobných záznamů`}
+                </AlertTitle>
+                <Stack spacing={0.5}>
+                  {similar.slice(0, 4).map((candidate) => (
+                    <Typography key={candidate.patientId} variant="body2">
+                      {candidate.fullName} · {candidate.dateOfBirth} · {candidate.status}
+                    </Typography>
+                  ))}
+                </Stack>
+                <Typography variant="caption" sx={{ display: 'block', mt: 1 }}>
+                  Ověřte, než založíte druhý záznam — rozdělil by historii vyšetření.
+                </Typography>
+              </Alert>
+            )}
+          </Paper>
+
+          {/* 2 · Pojištění */}
+          <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+            {section(2, 'Pojištění a identifikace')}
+
+            <RadioGroup
+              value={form.insuranceRegistrationKind}
+              onChange={(e) =>
+                update('insuranceRegistrationKind',
+                  e.target.value as RegistrationFormState['insuranceRegistrationKind'])}
+              sx={{ mb: 2 }}
+            >
+              {options.insuranceRegistrationKinds.map((kind) => (
+                <FormControlLabel
+                  key={kind.code}
+                  value={kind.code}
+                  control={<Radio size="small" />}
+                  label={kind.displayValue}
+                />
+              ))}
+            </RadioGroup>
+
+            <Divider sx={{ mb: 2 }} />
 
             {czechBranch ? (
-              <>
-                <Grid size={{ xs: 12, md: 4 }}>
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, md: 4 }} data-field="healthInsuranceNumber">
                   <TextField
-                    fullWidth
-                    required
-                    label="Číslo pojištěnce"
+                    fullWidth size="small" label="Číslo pojištěnce *"
                     value={form.healthInsuranceNumber}
-                    onChange={(event) => handleInsuranceNumber(event.target.value)}
+                    onChange={(e) => handleInsuranceNumber(e.target.value)}
                     error={errors.healthInsuranceNumber !== undefined}
                     helperText={
-                      errors.healthInsuranceNumber ??
-                      (IDENTIFIER_KIND_LABEL[identifier.kind] || 'Devět nebo deset číslic z průkazu')
+                      errors.healthInsuranceNumber
+                      ?? (form.healthInsuranceNumber.length > 0
+                        ? IDENTIFIER_KIND_LABEL[identifier.kind]
+                        : 'Devět nebo deset číslic z kartičky.')
                     }
-                    slotProps={{ htmlInput: { inputMode: 'numeric', maxLength: 10 } }}
                   />
                 </Grid>
 
-                {/* Only an insurer-assigned number is typed twice — the other
-                    two kinds are checked against their own structure. */}
+                {/* Only an insurer-assigned number is typed twice — nothing
+                    else can be checked against anything but itself. */}
                 {identifier.requiresConfirmation && (
-                  <Grid size={{ xs: 12, md: 4 }}>
+                  <Grid size={{ xs: 12, md: 4 }} data-field="healthInsuranceNumberConfirmation">
                     <TextField
-                      fullWidth
-                      required
-                      label="Číslo pojištěnce znovu"
+                      fullWidth size="small" label="Číslo pojištěnce ještě jednou *"
                       value={form.healthInsuranceNumberConfirmation}
-                      onChange={(event) =>
-                        update('healthInsuranceNumberConfirmation', digitsOnly(event.target.value).slice(0, 10))
-                      }
-                      onPaste={(event) => event.preventDefault()}
+                      onChange={(e) =>
+                        update('healthInsuranceNumberConfirmation', digitsOnly(e.target.value))}
                       error={errors.healthInsuranceNumberConfirmation !== undefined}
                       helperText={
-                        errors.healthInsuranceNumberConfirmation ?? 'Kontrolní opis, vkládání je vypnuté'
+                        errors.healthInsuranceNumberConfirmation
+                        ?? 'Tohle číslo se nedá ověřit proti ničemu jinému.'
                       }
-                      slotProps={{ htmlInput: { inputMode: 'numeric', maxLength: 10 } }}
                     />
                   </Grid>
                 )}
 
-                <Grid size={{ xs: 12, md: 4 }}>
+                <Grid size={{ xs: 12, md: 4 }} data-field="healthInsurerCode">
                   <TextField
-                    fullWidth
-                    select
-                    required
-                    label="Zdravotní pojišťovna"
+                    select fullWidth size="small" label="Zdravotní pojišťovna *"
                     value={form.healthInsurerCode}
-                    onChange={(event) => update('healthInsurerCode', event.target.value)}
+                    onChange={(e) => update('healthInsurerCode', e.target.value)}
                     error={errors.healthInsurerCode !== undefined}
-                    helperText={errors.healthInsurerCode ?? ' '}
+                    helperText={errors.healthInsurerCode}
                   >
-                    {options.czechHealthInsurers.map((option) => (
-                      <MenuItem key={option.code} value={option.code}>
-                        {option.displayValue}
+                    {options.czechHealthInsurers.map((insurer) => (
+                      <MenuItem key={insurer.code} value={insurer.code}>
+                        {insurer.code} — {insurer.displayValue}
                       </MenuItem>
                     ))}
                   </TextField>
                 </Grid>
 
-                <Grid size={{ xs: 12, md: 4 }}>
+                <Grid size={{ xs: 12, md: 4 }} data-field="birthNumber">
                   <TextField
-                    fullWidth
-                    label="Rodné číslo"
+                    fullWidth size="small" label="Rodné číslo"
                     value={form.birthNumber}
-                    onChange={(event) => handleBirthNumber(event.target.value)}
+                    onChange={(e) => handleBirthNumber(e.target.value)}
                     error={errors.birthNumber !== undefined}
-                    helperText={
-                      errors.birthNumber ??
-                      (identifier.kind === 'CzechBirthNumber'
-                        ? 'Doplněno z čísla pojištěnce'
-                        : 'Nepovinné; doplní datum narození a pohlaví')
-                    }
-                    slotProps={{ htmlInput: { inputMode: 'numeric', maxLength: 11 } }}
+                    helperText={errors.birthNumber ?? 'Nepovinné — registr ho nevyžaduje.'}
                   />
                 </Grid>
 
@@ -667,303 +710,266 @@ export default function PatientRegistration() {
                   <FormControlLabel
                     control={
                       <Checkbox
+                        size="small"
                         checked={form.insuranceCardInspected}
-                        onChange={(event) => update('insuranceCardInspected', event.target.checked)}
+                        onChange={(e) => update('insuranceCardInspected', e.target.checked)}
                       />
                     }
-                    label="Průkaz pojištěnce byl fyzicky zkontrolován"
+                    label="Kartička pojištěnce ověřena"
                   />
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    Zaškrtněte, když jste průkaz viděli. Zapíše se jako zdroj evidence.
+                  </Typography>
                 </Grid>
-              </>
+
+                {/* What the identifier itself says — with both values in it. */}
+                {verdict === 'disagrees' && inspection !== null && (
+                  <Grid size={12}>
+                    <Alert severity="warning">
+                      {disagreementText(inspection, {
+                        dateOfBirth: form.dateOfBirth, sex: form.sex,
+                      })}
+                    </Alert>
+                  </Grid>
+                )}
+                {verdict === 'agrees' && (
+                  <Grid size={12}>
+                    <Typography variant="caption" sx={{ color: 'success.main' }}>
+                      {AGREES_TEXT}
+                    </Typography>
+                  </Grid>
+                )}
+              </Grid>
             ) : (
-              <>
-                <Grid size={{ xs: 12, md: 4 }}>
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, md: 4 }} data-field="identityDocumentType">
                   <TextField
-                    fullWidth
-                    select
-                    required
-                    label="Typ dokladu"
+                    select fullWidth size="small" label="Typ dokladu *"
                     value={form.identityDocumentType}
-                    onChange={(event) => update('identityDocumentType', event.target.value)}
+                    onChange={(e) => update('identityDocumentType', e.target.value)}
                     error={errors.identityDocumentType !== undefined}
-                    helperText={errors.identityDocumentType ?? ' '}
+                    helperText={errors.identityDocumentType}
                   >
-                    {options.identityDocumentTypes.map((option) => (
-                      <MenuItem key={option.code} value={option.code}>
-                        {option.displayValue}
-                      </MenuItem>
+                    {options.identityDocumentTypes.map((type) => (
+                      <MenuItem key={type.code} value={type.code}>{type.displayValue}</MenuItem>
                     ))}
                   </TextField>
                 </Grid>
-
-                <Grid size={{ xs: 12, md: 3 }}>
+                <Grid size={{ xs: 12, md: 3 }} data-field="identityDocumentIssuingCountryCode">
                   <TextField
-                    fullWidth
-                    required
-                    label="Stát vydání"
-                    placeholder="SK"
+                    fullWidth size="small" label="Stát vydání *"
                     value={form.identityDocumentIssuingCountryCode}
-                    onChange={(event) =>
-                      update(
-                        'identityDocumentIssuingCountryCode',
-                        event.target.value.toUpperCase().slice(0, 2),
-                      )
-                    }
+                    onChange={(e) =>
+                      update('identityDocumentIssuingCountryCode', e.target.value.toUpperCase())}
                     error={errors.identityDocumentIssuingCountryCode !== undefined}
-                    helperText={errors.identityDocumentIssuingCountryCode ?? 'ISO 3166-1, dvě písmena'}
+                    helperText={
+                      errors.identityDocumentIssuingCountryCode ?? 'Dvě písmena, ISO 3166-1.'
+                    }
                   />
                 </Grid>
-
-                <Grid size={{ xs: 12, md: 5 }}>
+                <Grid size={{ xs: 12, md: 5 }} data-field="identityDocumentNumber">
                   <TextField
-                    fullWidth
-                    required
-                    label="Číslo dokladu"
+                    fullWidth size="small" label="Číslo dokladu *"
                     value={form.identityDocumentNumber}
-                    onChange={(event) => update('identityDocumentNumber', event.target.value)}
+                    onChange={(e) => update('identityDocumentNumber', e.target.value)}
                     error={errors.identityDocumentNumber !== undefined}
-                    helperText={errors.identityDocumentNumber ?? ' '}
+                    helperText={errors.identityDocumentNumber}
                   />
                 </Grid>
-
                 <Grid size={12}>
-                  <Alert severity="info">
-                    Bez českého čísla pojištěnce se rodné číslo ani číslo pojištěnce neevidují.
-                  </Alert>
+                  <Typography variant="caption" color="text.secondary">
+                    Datum narození a pohlaví vyplňte v prvním oddílu ručně — ze zahraničního
+                    dokladu se odvodit nedají.
+                  </Typography>
                 </Grid>
-              </>
+              </Grid>
             )}
-          </Grid>
-        )}
+          </Paper>
 
-        {/* ── 2 — Residence ── */}
-        {step === 2 && (
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 5 }}>
-              <TextField
-                fullWidth
-                select
-                required
-                label="Typ pobytu"
-                value={form.residenceType}
-                onChange={(event) =>
-                  update('residenceType', event.target.value as RegistrationFormState['residenceType'])
-                }
-              >
-                {RESIDENCE_TYPES.map((option) => (
-                  <MenuItem key={option.code} value={option.code}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </TextField>
+          {/* 3 · Bydliště */}
+          <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }} data-field="ruianAddressPointCode">
+            {section(3, 'Bydliště')}
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <TextField
+                  select fullWidth size="small" label="Typ pobytu *"
+                  value={form.residenceType}
+                  onChange={(e) =>
+                    update('residenceType', e.target.value as RegistrationFormState['residenceType'])}
+                >
+                  {RESIDENCE_TYPES.map((type) => (
+                    <MenuItem key={type.code} value={type.code}>{type.label}</MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid size={12}>
+                <RuianAddressPicker
+                  selectedPoint={addressPoint}
+                  onSelect={handleAddressPoint}
+                  error={errors.ruianAddressPointCode}
+                  disabled={submitting}
+                />
+              </Grid>
             </Grid>
+          </Paper>
 
-            <Grid size={12}>
-              <RuianAddressPicker
-                selectedPoint={addressPoint}
-                onSelect={handleAddressPoint}
-                error={errors.ruianAddressPointCode}
-                disabled={submitting}
-              />
+          {/* 4 · Kontakt */}
+          <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+            {section(4, 'Kontakt')}
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, md: 6 }} data-field="email">
+                <TextField
+                  fullWidth size="small" label="E-mail *"
+                  value={form.email}
+                  onChange={(e) => update('email', e.target.value)}
+                  error={errors.email !== undefined}
+                  helperText={errors.email}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 2 }} data-field="phoneRegionCode">
+                <TextField
+                  select fullWidth size="small" label="Předvolba *"
+                  value={form.phoneRegionCode}
+                  onChange={(e) => update('phoneRegionCode', e.target.value)}
+                  error={errors.phoneRegionCode !== undefined}
+                  helperText={errors.phoneRegionCode}
+                >
+                  {options.phoneRegions.map((region) => (
+                    <MenuItem key={region.code} value={region.code}>{region.displayValue}</MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }} data-field="phone">
+                <TextField
+                  fullWidth size="small" label="Telefon *"
+                  value={form.phone}
+                  onChange={(e) => update('phone', e.target.value)}
+                  error={errors.phone !== undefined}
+                  helperText={errors.phone}
+                />
+              </Grid>
             </Grid>
-          </Grid>
-        )}
+          </Paper>
+        </Stack>
 
-        {/* ── 3 — Contact ── */}
-        {step === 3 && (
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField
-                fullWidth
-                required
-                type="email"
-                label="E-mail"
-                value={form.email}
-                onChange={(event) => update('email', event.target.value)}
-                error={errors.email !== undefined}
-                helperText={errors.email ?? ' '}
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 2 }}>
-              <TextField
-                fullWidth
-                select
-                required
-                label="Země"
-                value={form.phoneRegionCode}
-                onChange={(event) => update('phoneRegionCode', event.target.value)}
-                error={errors.phoneRegionCode !== undefined}
-                helperText={errors.phoneRegionCode ?? ' '}
-              >
-                {options.phoneRegions.map((option) => (
-                  <MenuItem key={option.code} value={option.code}>
-                    {option.displayValue}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                required
-                label="Telefon"
-                value={form.phone}
-                onChange={(event) => update('phone', event.target.value)}
-                error={errors.phone !== undefined}
-                helperText={errors.phone ?? ' '}
-              />
-            </Grid>
-          </Grid>
-        )}
-
-        {/* ── 4 — Summary ── */}
-        {step === 4 && (
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <SummaryBlock
-                title="Totožnost"
-                rows={[
-                  ['Jméno', `${form.firstName} ${form.lastName}`.trim()],
-                  ['Oslovení', form.preferredName || '—'],
-                  [
-                    'Tituly',
-                    [...form.titlesBeforeName, ...form.titlesAfterName].join(', ') || '—',
-                  ],
-                  ['Datum narození', form.dateOfBirth || '—'],
-                  [
-                    'Pohlaví',
-                    SEX_OPTIONS.find((option) => option.code === form.sex)?.label ?? '—',
-                  ],
-                  ['Režim', form.mode === 'Standard' ? 'Standardní' : 'Rychlá'],
-                ]}
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 6 }}>
-              <SummaryBlock
-                title="Pojištění"
-                rows={
-                  czechBranch
-                    ? [
-                        ['Evidence', 'České veřejné zdravotní pojištění'],
-                        ['Číslo pojištěnce', maskInsuranceNumber(form.healthInsuranceNumber)],
-                        [
-                          'Pojišťovna',
-                          options.czechHealthInsurers.find(
-                            (option) => option.code === form.healthInsurerCode,
-                          )?.displayValue ?? '—',
-                        ],
-                        ['Rodné číslo', maskBirthNumber(form.birthNumber)],
-                        ['Průkaz zkontrolován', form.insuranceCardInspected ? 'ano' : 'ne'],
-                      ]
-                    : [
-                        ['Evidence', 'Bez českého čísla pojištěnce'],
-                        [
-                          'Doklad',
-                          options.identityDocumentTypes.find(
-                            (option) => option.code === form.identityDocumentType,
-                          )?.displayValue ?? '—',
-                        ],
-                        ['Stát vydání', form.identityDocumentIssuingCountryCode || '—'],
-                        ['Číslo dokladu', form.identityDocumentNumber || '—'],
-                      ]
-                }
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 6 }}>
-              <SummaryBlock
-                title="Bydliště"
-                rows={[
-                  [
-                    'Typ pobytu',
-                    RESIDENCE_TYPES.find((option) => option.code === form.residenceType)?.label ?? '—',
-                  ],
-                  ['Adresa', form.addressDisplay || '—'],
-                  ['Kód RÚIAN', form.ruianAddressPointCode?.toString() ?? '—'],
-                ]}
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 6 }}>
-              <SummaryBlock
-                title="Kontakt"
-                rows={[
-                  ['E-mail', form.email || '—'],
-                  ['Telefon', `${form.phone || '—'} (${form.phoneRegionCode})`],
-                ]}
-              />
-            </Grid>
-
-            <Grid size={12}>
-              <Typography variant="caption" color="text.secondary">
-                Identifikátory jsou generovány pro tento pokus. Opakované odeslání stejných údajů
-                registr rozpozná jako opakování, nezaloží druhého pacienta.
+        {/* ═══ The card — the former "Shrnutí" step ═══ */}
+        <Stack
+          spacing={2}
+          sx={{
+            width: { xs: '100%', lg: 380 }, flexShrink: 0,
+            position: { lg: 'sticky' }, top: { lg: 16 },
+          }}
+        >
+          <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
+            <Box sx={{ bgcolor: 'primary.main', color: 'primary.contrastText', p: 2.5 }}>
+              <Typography variant="caption" sx={{ opacity: 0.75, letterSpacing: '.08em' }}>
+                ULOŽÍ SE TAKTO
               </Typography>
-            </Grid>
-          </Grid>
-        )}
+              <Typography variant="h5" sx={{ fontWeight: 700, mt: 0.5 }}>
+                {`${form.firstName} ${form.lastName}`.trim() || 'Nový pacient'}
+              </Typography>
+              <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                {form.dateOfBirth !== '' && (
+                  <Chip size="small" label={form.dateOfBirth}
+                    sx={{ bgcolor: 'rgba(255,255,255,.18)', color: 'inherit' }} />
+                )}
+                {form.sex !== '' && (
+                  <Chip size="small"
+                    label={SEX_OPTIONS.find((s) => s.code === form.sex)?.label ?? form.sex}
+                    sx={{ bgcolor: 'rgba(255,255,255,.18)', color: 'inherit' }} />
+                )}
+                <Chip size="small"
+                  label={form.mode === 'Standard' ? 'Standardní' : 'Rychlá'}
+                  sx={{ bgcolor: 'rgba(255,255,255,.18)', color: 'inherit' }} />
+              </Stack>
+            </Box>
 
-        {/* ── Navigation ── */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
+            <Stack sx={{ px: 2.5, py: 1 }} divider={<Divider />}>
+              <SummaryRow label="Pojištění" value={
+                czechBranch
+                  ? (options.czechHealthInsurers.find((i) => i.code === form.healthInsurerCode)
+                    ?.displayValue ?? '—')
+                  : (options.identityDocumentTypes.find((t) => t.code === form.identityDocumentType)
+                    ?.displayValue ?? 'Doklad ze zahraničí')
+              } />
+              <SummaryRow
+                label={czechBranch ? 'Číslo pojištěnce' : 'Číslo dokladu'}
+                value={czechBranch
+                  ? maskInsuranceNumber(form.healthInsuranceNumber)
+                  : (form.identityDocumentNumber || '—')}
+              />
+              {czechBranch && (
+                <SummaryRow label="Rodné číslo" value={maskBirthNumber(form.birthNumber)} />
+              )}
+              <SummaryRow label="Bydliště" value={form.addressDisplay || '—'} />
+              <SummaryRow label="E-mail" value={form.email || '—'} />
+              <SummaryRow label="Telefon" value={form.phone || '—'} />
+            </Stack>
+          </Paper>
+
+          <Paper sx={{ borderRadius: 3, p: 2.5 }}>
+            <Stack direction="row" sx={{ alignItems: 'baseline', mb: 1.5 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Zbývá vyplnit</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                {doneCount} z {requiredCount} hotovo
+              </Typography>
+            </Stack>
+            <LinearProgress
+              variant="determinate"
+              value={(doneCount / requiredCount) * 100}
+              sx={{ height: 6, borderRadius: 3, mb: 1.5 }}
+            />
+            {outstanding.length === 0 ? (
+              <Typography variant="body2" sx={{ color: 'success.main' }}>
+                Všechno povinné je vyplněné.
+              </Typography>
+            ) : (
+              <Stack spacing={0.5}>
+                {outstanding.map((label) => (
+                  <Typography key={label} variant="body2" color="text.secondary">
+                    · {label}
+                  </Typography>
+                ))}
+              </Stack>
+            )}
+          </Paper>
+
           <Button
-            startIcon={<ArrowBack />}
-            onClick={step === 0 ? () => navigate('/patients') : goBack}
+            variant="contained"
+            size="large"
+            startIcon={<PersonAdd />}
             disabled={submitting}
+            onClick={submit}
           >
-            {step === 0 ? 'Zpět na seznam' : 'Zpět'}
+            {submitting ? 'Registruji…' : 'Zaregistrovat pacienta'}
           </Button>
-
-          {step < REGISTRATION_STEPS.length - 1 ? (
-            <Button variant="contained" endIcon={<ArrowForward />} onClick={goNext}>
-              Pokračovat
-            </Button>
-          ) : (
-            <Button
-              variant="contained"
-              startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <PersonAdd />}
-              onClick={submit}
-              disabled={submitting}
-            >
-              Zaregistrovat pacienta
-            </Button>
-          )}
-        </Box>
-      </Paper>
+          <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
+            Rodné číslo i číslo pojištěnce se do protokolu zapisují zamaskované.
+          </Typography>
+        </Stack>
+      </Stack>
 
       <CandidateReviewDialog
         open={review !== null}
         candidates={review?.candidates ?? []}
         submitting={submitting}
-        onConfirmDistinct={() => review !== null && void send(review.confirmation)}
-        onUseExisting={(candidate) => {
-          setReview(null);
-          navigate(`/patients/${candidate.patientId}`);
-        }}
         onCancel={() => setReview(null)}
+        onConfirmDistinct={() => { if (review !== null) void send(review.confirmation); }}
+        onUseExisting={(patientId) => { setReview(null); navigate(`/patients/${patientId}`); }}
       />
     </Box>
   );
 }
 
-function SummaryBlock({ title, rows }: { title: string; rows: [string, string][] }) {
+function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, height: '100%' }}>
-      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-        {title}
+    <Stack direction="row" spacing={2} sx={{ py: 1.25, alignItems: 'baseline' }}>
+      <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
+        {label}
       </Typography>
-      {rows.map(([label, value]) => (
-        <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, py: 0.4 }}>
-          <Typography variant="body2" color="text.secondary">
-            {label}
-          </Typography>
-          <Typography variant="body2" sx={{ fontWeight: 500, textAlign: 'right' }}>
-            {value}
-          </Typography>
-        </Box>
-      ))}
-    </Paper>
+      <Typography variant="body2" sx={{ ml: 'auto', textAlign: 'right', wordBreak: 'break-word' }}>
+        {value}
+      </Typography>
+    </Stack>
   );
 }
