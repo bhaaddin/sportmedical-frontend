@@ -262,7 +262,7 @@ export default function PatientRegistration() {
   }, [form.phone, form.phoneRegionCode]);
 
   const phoneState = phoneDisplayState(phoneLook, form.phone);
-  const phoneGrouped = groupedDisplay(phoneLook);
+  const phoneGrouped = groupedDisplay(phoneLook, form.phoneRegionCode);
   const phoneSays = phoneComplaint(phoneState, form.phoneRegionCode);
 
   /* ── Birth number drives date of birth and sex ── */

@@ -82,28 +82,54 @@ describe('what the field is showing', () => {
   });
 });
 
-describe('the grouping shown under the field', () => {
-  it('is the server’s, for the country chosen', () => {
-    expect(groupedDisplay(czechComplete())).toBe('777 777 777');
+/* Measured: a Slovak number, as the endpoint answers it. */
+const slovak = (): PhoneInspection => ({
+  parses: true, isValidForRegion: true,
+  e164: '+421908123456', international: '+421 908 123 456', national: '0908 123 456',
+  regionCode: 'SK',
+});
+
+describe('the grouping shown', () => {
+  /* A local number is written without its dialling code — everybody reading it
+     knows where they are. */
+  it('writes a home number without its dialling code', () => {
+    expect(groupedDisplay(czechComplete(), 'CZ')).toBe('777 777 777');
+  });
+
+  /*
+   * The one the owner caught: `0908 123 456` on a Czech patient card is a
+   * Slovak number written the Slovak way — unreadable at the desk and
+   * impossible to dial. Anything foreign carries its code.
+   */
+  it('keeps the dialling code on anything foreign', () => {
+    expect(groupedDisplay(slovak(), 'SK')).toBe('+421 908 123 456');
+    expect(groupedDisplay(slovak(), 'SK')).not.toBe('0908 123 456');
   });
 
   /* A half-typed number still gets grouped — that is the whole feature. */
   it('shows even while it is still being typed', () => {
-    expect(groupedDisplay(czechHalfTyped())).toBe('777777');
+    expect(groupedDisplay(czechHalfTyped(), 'CZ')).toBe('777777');
   });
 
   it('shows nothing for something unreadable', () => {
-    expect(groupedDisplay(unreadable())).toBe('');
-    expect(groupedDisplay(null)).toBe('');
+    expect(groupedDisplay(unreadable(), 'CZ')).toBe('');
+    expect(groupedDisplay(null, 'CZ')).toBe('');
   });
 
-  /* Some regions answer with no national form; the international one is still
-     grouped and still better than the raw digits. */
+  /* A home number with no national form still has to show something. */
   it('falls back to the international form when there is no national one', () => {
     const noNational: PhoneInspection = {
-      ...czechComplete(), national: '', international: '+41 44 668 18 00',
+      ...czechComplete(), national: '', international: '+420 777 777 777',
     };
-    expect(groupedDisplay(noNational)).toBe('+41 44 668 18 00');
+    expect(groupedDisplay(noNational, 'CZ')).toBe('+420 777 777 777');
+  });
+
+  /* And a foreign one with no international form falls the other way. */
+  it('falls back to the national form when there is no international one', () => {
+    const noInternational: PhoneInspection = {
+      ...slovak(), international: '',
+    };
+    expect(groupedDisplay(noInternational, 'SK')).toBe('0908 123 456');
   });
 });
 

@@ -62,10 +62,37 @@ export function phoneDisplayState(
   return digits.length < SHORTEST_NATIONAL_NUMBER ? 'typing' : 'wrong-region';
 }
 
-/** The grouping to show under the field — the server's, never invented here. */
-export function groupedDisplay(inspection: PhoneInspection | null): string {
+/**
+ * The country this clinic is in.
+ *
+ * It decides which numbers may be written without a dialling code, and that is
+ * a fact about where the reception desk stands rather than about any number.
+ * A Prague clinic writes `777 777 777` and `+421 908 123 456`; the same two
+ * numbers at a Bratislava desk would be written the other way round.
+ */
+export const HOME_REGION = 'CZ';
+
+/**
+ * The grouping to show — the server's, never invented here.
+ *
+ * A LOCAL number is written without its dialling code, because everybody
+ * reading it knows where they are. Anything else carries its code, because
+ * `0908 123 456` on a Czech patient card is a Slovak number written the Slovak
+ * way: unreadable at the desk and impossible to dial. The owner caught exactly
+ * that — "v karte pacienta to je zle nemas vobec predvolbu".
+ */
+export function groupedDisplay(
+  inspection: PhoneInspection | null,
+  regionCode: string,
+): string {
   if (inspection === null || !inspection.parses) return '';
-  return inspection.national !== '' ? inspection.national : inspection.international;
+
+  if (regionCode === HOME_REGION && inspection.national !== '') {
+    return inspection.national;
+  }
+  /* International first for anything foreign; `national` only as a fallback
+     when the server had no international form to give. */
+  return inspection.international !== '' ? inspection.international : inspection.national;
 }
 
 /** Only a finished number that belongs somewhere else is worth a complaint. */
