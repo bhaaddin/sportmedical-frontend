@@ -33,6 +33,7 @@ import {
 import { HowToReg, PersonAdd, Search } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import patientRegistryApi, {
+  type EmailInspection,
   type IdentityInspection,
   type PhoneInspection,
   type PatientRegistrationOptions,
@@ -50,6 +51,9 @@ import {
   type FieldErrors,
   type RegistrationFormState,
 } from '../services/patientRegistration/validation';
+import {
+  emailComplaint, emailDisplayState, storedAs, worthInspectingEmail,
+} from '../services/patientRegistration/emailInspection';
 import { resolveRegistrationError } from '../services/patientRegistration/registrationErrors';
 import { formatRodneCislo } from '../utils/rodneCislo';
 import {
@@ -277,6 +281,50 @@ export default function PatientRegistration() {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [form.phone, form.phoneRegionCode]);
 
+  /* ── The e-mail, decided by the code that stores it ── */
+
+  /*
+   * Asked when somebody LEAVES the field rather than as they type it.
+   *
+   * The telephone is asked on every keystroke because a half-typed number
+   * still comes back grouped and useful. A half-typed address does not: `j`,
+   * `ja` and `jan@` are each `parses: false`, so asking as they type would
+   * mean a red border for the whole first word — and a border that is red
+   * most of the time is one nobody reads by the time it means something.
+   *
+   * `emailAskedFor` is the value the answer belongs to. Without it a verdict
+   * about an address somebody has since edited would keep the box red, or
+   * worse, green.
+   */
+  const [emailLook, setEmailLook] = useState<EmailInspection | null>(null);
+  const [emailAskedFor, setEmailAskedFor] = useState<string>('');
+
+  const askAboutEmail = useCallback(async (value: string): Promise<EmailInspection | null> => {
+    if (!worthInspectingEmail(value)) {
+      setEmailLook(null);
+      setEmailAskedFor('');
+      return null;
+    }
+    try {
+      const result = await patientRegistryApi.inspectEmail({ value });
+      setEmailLook(result);
+      setEmailAskedFor(value);
+      return result;
+    } catch {
+      /* The save goes to the same server. If it cannot be reached to ask, it
+         cannot be reached to save either, and the POST will say so — guessing
+         here is what this whole change removed. */
+      setEmailLook(null);
+      setEmailAskedFor('');
+      return null;
+    }
+  }, []);
+
+  /* A verdict only counts for the value it was given. */
+  const emailAnswer = form.email === emailAskedFor ? emailLook : null;
+  const emailState = emailDisplayState(emailAnswer, form.email);
+  const emailSays = emailComplaint(emailAnswer);
+
   const phoneState = phoneDisplayState(phoneLook, form.phone);
   const phoneGrouped = groupedDisplay(phoneLook, form.phoneRegionCode);
   const phoneSays = phoneComplaint(phoneState, form.phoneRegionCode);
@@ -450,8 +498,30 @@ export default function PatientRegistration() {
     [buildRequest, navigate],
   );
 
-  const submit = () => {
+  /*
+   * The gate in front of the POST.
+   *
+   * "nikdy to nesmie ulozit ked je zly musi to okno zcervenat a napisat ze zly
+   * tvar". The local rules run first and cost nothing; the address is then put
+   * to the server before anything is written, because nothing on this screen
+   * knows what an address is any more.
+   *
+   * It is asked again here rather than trusted from the field: somebody can
+   * paste into the box and hit the button without ever leaving it, and that is
+   * exactly the path that must not save.
+   */
+  const submit = async () => {
     const allErrors = validateAll(form);
+
+    if (Object.keys(allErrors).length === 0) {
+      const verdict = await askAboutEmail(form.email);
+      /* `null` is unreachable, not invalid — the POST goes to the same server
+         and will refuse it there rather than this screen inventing a reason. */
+      if (verdict !== null && !verdict.parses) {
+        allErrors.email = emailComplaint(verdict);
+      }
+    }
+
     setErrors(allErrors);
 
     if (Object.keys(allErrors).length > 0) {
@@ -904,9 +974,14 @@ export default function PatientRegistration() {
                   fullWidth size="small" label="E-mail *"
                   value={form.email}
                   onChange={(e) => update('email', e.target.value)}
-                  onBlur={checkOnLeave('email')}
-                  error={errors.email !== undefined}
-                  helperText={errors.email}
+                  /* Two questions on the way out: is there one (ours), and is
+                     it an address (the server's). */
+                  onBlur={() => {
+                    checkOnLeave('email')();
+                    void askAboutEmail(form.email);
+                  }}
+                  error={errors.email !== undefined || emailState === 'invalid'}
+                  helperText={errors.email ?? (emailSays !== '' ? emailSays : undefined)}
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 2 }} data-field="phoneRegionCode">
@@ -1006,7 +1081,7 @@ export default function PatientRegistration() {
                 <SummaryRow label="Rodné číslo" value={maskBirthNumber(form.birthNumber)} />
               )}
               <SummaryRow label="Bydliště" value={form.addressDisplay || '—'} />
-              <SummaryRow label="E-mail" value={form.email || '—'} />
+              <SummaryRow label="E-mail" value={storedAs(emailAnswer, form.email) || '—'} />
               {/* The card shows the grouped form — what will actually be
                   stored and shown everywhere after the save. */}
               <SummaryRow label="Telefon" value={phoneGrouped || form.phone || '—'} />
@@ -1045,7 +1120,7 @@ export default function PatientRegistration() {
             size="large"
             startIcon={<PersonAdd />}
             disabled={submitting}
-            onClick={submit}
+            onClick={() => { void submit(); }}
           >
             {submitting ? 'Registruji…' : 'Zaregistrovat pacienta'}
           </Button>

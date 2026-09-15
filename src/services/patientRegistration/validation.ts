@@ -75,10 +75,6 @@ export function requiresInsuranceConfirmation(insuranceNumber: string): boolean 
   return classifyInsuranceNumber(insuranceNumber).requiresConfirmation;
 }
 
-function isEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim());
-}
-
 function isPhone(value: string): boolean {
   const compact = value.replace(/[\s()-]/g, '');
   return /^\+?[0-9]{6,15}$/.test(compact);
@@ -208,10 +204,18 @@ function validateResidence(form: RegistrationFormState, errors: FieldErrors): vo
 }
 
 function validateContact(form: RegistrationFormState, errors: FieldErrors): void {
+  /*
+   * Only whether there is one. WHETHER IT IS AN ADDRESS IS NOT DECIDED HERE
+   * any more — `POST /api/v1/patients/email/inspect` decides it, on the same
+   * canonicaliser that stores it.
+   *
+   * There was a regular expression on this line until 15. 9. 2026 and it was
+   * wrong in both directions against that server: it refused `jan@localhost`,
+   * which is stored, and passed `jan@example..cz`, which is refused. The
+   * screen holds the server's answer now and this file holds none.
+   */
   if (form.email.trim().length === 0) {
     errors.email = 'E-mail je povinný.';
-  } else if (!isEmail(form.email)) {
-    errors.email = 'E-mail není ve správném tvaru.';
   }
 
   if (form.phone.trim().length === 0) {

@@ -195,6 +195,29 @@ export interface InspectPhoneRequest {
  * gets the grouping and not a red border — a red border on every second
  * keystroke teaches people to ignore red borders.
  */
+/**
+ * What the server makes of an e-mail address — measured, never guessed here.
+ *
+ * `canonical` is the key it matches on (`jan@xn--hkov-5nad81a.cz`);
+ * `displayValue` is the address as a person reads it back. They differ for an
+ * accented domain and for a domain typed in capitals, and the difference is
+ * the server's to decide.
+ *
+ * An empty box comes back `parses: false` rather than a 400 — a field nobody
+ * has typed into yet is not an error.
+ */
+export interface EmailInspection {
+  parses: boolean;
+  canonical: string;
+  displayValue: string;
+  /** `patients.contact_address.…`, or `null` when it is fine. */
+  rejectionCode: string | null;
+}
+
+export interface InspectEmailRequest {
+  value: string;
+}
+
 export interface PhoneInspection {
   parses: boolean;
   isValidForRegion: boolean;
@@ -383,6 +406,33 @@ export const patientRegistryApi = {
    * happens at the save, and the field somebody is typing into has not been
    * saved. This is the same rule, reachable while they type.
    */
+  /**
+   * Whether an e-mail address is one, decided by the code that stores it.
+   *
+   * `POST /api/v1/patients/email/inspect` — writes nothing, gated on
+   * `patients.register` like the other two inspections.
+   *
+   * This screen used to hold its own regular expression, and it was wrong in
+   * BOTH directions against the server measured on 15. 9. 2026:
+   *
+   *   jan@localhost         the regex refused it; the server stores it
+   *   jan@example..cz       the regex passed it; the server refuses it
+   *
+   * Sent exactly as typed. Trimming or lower-casing it here would make two
+   * places decide what an address is, which is how those two rows happened.
+   */
+  async inspectEmail(request: InspectEmailRequest): Promise<EmailInspection> {
+    try {
+      const response = await client.post<EmailInspection>(
+        '/api/v1/patients/email/inspect',
+        request,
+      );
+      return response.data;
+    } catch (error) {
+      throw toRegistryError(error);
+    }
+  },
+
   async inspectPhone(request: InspectPhoneRequest): Promise<PhoneInspection> {
     try {
       const response = await client.post<PhoneInspection>(

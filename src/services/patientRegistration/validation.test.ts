@@ -114,10 +114,22 @@ describe('asking about a single field', () => {
     ...createEmptyForm(), email,
   });
 
-  /* The exact value the owner typed. */
-  it('catches an address with no @ in it', () => {
-    expect(validateField('email', withEmail('napriklad.gmail.com')))
-      .toMatch(/tvaru/);
+  /*
+   * The shape of an address is NOT decided here any more.
+   *
+   * It was, by a regular expression on this form, and it was wrong in both
+   * directions against the server measured on 15. 9. 2026 — it refused
+   * `jan@localhost`, which the server stores, and passed `jan@example..cz`,
+   * which the server refuses. `POST /api/v1/patients/email/inspect` decides it
+   * now, on the same canonicaliser that writes it, and what to do with that
+   * answer is guarded in `emailInspection.test.ts`.
+   *
+   * So this asserts the SILENCE. If a shape rule ever creeps back onto the
+   * form, the value below is the one that starts failing.
+   */
+  it('leaves the shape of an address to the server', () => {
+    expect(validateField('email', withEmail('napriklad.gmail.com'))).toBeUndefined();
+    expect(validateField('email', withEmail('jan@localhost'))).toBeUndefined();
   });
 
   it('says nothing about an address that is fine', () => {
