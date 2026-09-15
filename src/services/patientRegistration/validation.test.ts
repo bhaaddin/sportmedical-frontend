@@ -18,7 +18,9 @@
  * it might not have is worse than not pointing at all.
  */
 import { describe, it, expect } from 'vitest';
-import { createEmptyForm, validateStep, type RegistrationFormState } from './validation';
+import {
+  createEmptyForm, validateField, validateStep, type RegistrationFormState,
+} from './validation';
 
 const VALID = '9005150011';
 const EXCEPTION_FORM = '9005150100';
@@ -88,5 +90,67 @@ describe('insurance number on the registration form', () => {
     expect(
       insuranceStep({ healthInsuranceNumber: VALID, birthNumber: VALID }).healthInsuranceNumber,
     ).toBeUndefined();
+  });
+});
+
+/*
+ * One field at a time, so a box can complain when it is left.
+ *
+ * The owner's complaint was concrete: "email nemam pocit ze funguje to chybna
+ * zadanie .. tam som napriklad naprikladvgmail.com a nenapisalo ze je to zly
+ * tvar". It was true. Every rule below already existed and every one of them
+ * ran only inside submit, so the whole form stayed silent until the last
+ * button — and on a screen this long the offending field is usually scrolled
+ * off by then.
+ *
+ * `validateField` is the same rules asked about ONE field. It has to answer
+ * about the field it was asked about and no other: the form is only ever
+ * half-filled when somebody leaves the first box, so an answer that carried
+ * the other twelve fields' complaints would light the whole screen red on the
+ * first Tab.
+ */
+describe('asking about a single field', () => {
+  const withEmail = (email: string): RegistrationFormState => ({
+    ...createEmptyForm(), email,
+  });
+
+  /* The exact value the owner typed. */
+  it('catches an address with no @ in it', () => {
+    expect(validateField('email', withEmail('napriklad.gmail.com')))
+      .toMatch(/tvaru/);
+  });
+
+  it('says nothing about an address that is fine', () => {
+    expect(validateField('email', withEmail('pacient@example.cz'))).toBeUndefined();
+  });
+
+  it('asks for one that is missing', () => {
+    expect(validateField('email', withEmail(''))).toMatch(/povinný/);
+  });
+
+  /*
+   * The one that matters for the screen. An empty form fails nearly every
+   * rule; asking about the e-mail must bring back the e-mail's answer only.
+   */
+  it('answers about the field asked about, not the rest of the form', () => {
+    const empty = createEmptyForm();
+    expect(validateField('firstName', empty)).toMatch(/povinné|povinný/);
+    expect(validateField('email', { ...empty, email: 'pacient@example.cz' }))
+      .toBeUndefined();
+  });
+
+  /* An optional field left empty is not a complaint. */
+  it('stays quiet about an optional field nobody filled', () => {
+    expect(validateField('preferredName', createEmptyForm())).toBeUndefined();
+    expect(validateField('birthNumber', createEmptyForm())).toBeUndefined();
+  });
+
+  /* It is the whole form's rules, not the step's: the coupling between the
+     insurance number and the birth number is one of them. */
+  it('sees rules that need more than the one field', () => {
+    const coupled = {
+      ...createEmptyForm(), healthInsuranceNumber: VALID, birthNumber: TYPO,
+    };
+    expect(validateField('birthNumber', coupled)).toBeDefined();
   });
 });

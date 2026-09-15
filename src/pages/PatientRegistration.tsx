@@ -46,6 +46,7 @@ import {
   createEmptyForm,
   digitsOnly,
   validateAll,
+  validateField,
   type FieldErrors,
   type RegistrationFormState,
 } from '../services/patientRegistration/validation';
@@ -163,6 +164,21 @@ export default function PatientRegistration() {
   ) => {
     setForm((previous) => ({ ...previous, [key]: value }));
     setErrors((previous) => ({ ...previous, [key]: undefined }));
+  };
+
+  /*
+   * Checked when somebody leaves the field, not only when they press the
+   * button. The owner typed an address with no `@` in it, nothing said
+   * anything, and he found out by submitting: "nikdy to nesmie ulozit ked je
+   * zly musi to okno zcervenat".
+   *
+   * On leaving rather than on every keystroke, because a box that turns red
+   * halfway through the first word is a box people learn to ignore — the same
+   * reason the telephone says nothing while it is being typed.
+   */
+  const checkOnLeave = (field: keyof RegistrationFormState) => () => {
+    const problem = validateField(field, form);
+    setErrors((previous) => ({ ...previous, [field]: problem }));
   };
 
   /* ── Options ── */
@@ -585,6 +601,7 @@ export default function PatientRegistration() {
                   fullWidth size="small" label="Jméno *"
                   value={form.firstName}
                   onChange={(e) => update('firstName', e.target.value)}
+                  onBlur={checkOnLeave('firstName')}
                   error={errors.firstName !== undefined}
                   helperText={errors.firstName}
                 />
@@ -594,6 +611,7 @@ export default function PatientRegistration() {
                   fullWidth size="small" label="Příjmení *"
                   value={form.lastName}
                   onChange={(e) => update('lastName', e.target.value)}
+                  onBlur={checkOnLeave('lastName')}
                   error={errors.lastName !== undefined}
                   helperText={errors.lastName}
                 />
@@ -616,6 +634,7 @@ export default function PatientRegistration() {
                   fullWidth size="small" label="Oslovení"
                   value={form.preferredName}
                   onChange={(e) => update('preferredName', e.target.value)}
+                  onBlur={checkOnLeave('preferredName')}
                   error={errors.preferredName !== undefined}
                   helperText={errors.preferredName ?? 'Nepovinné.'}
                 />
@@ -625,6 +644,7 @@ export default function PatientRegistration() {
                   fullWidth size="small" type="date" label="Datum narození *"
                   value={form.dateOfBirth}
                   onChange={(e) => update('dateOfBirth', e.target.value)}
+                  onBlur={checkOnLeave('dateOfBirth')}
                   error={errors.dateOfBirth !== undefined}
                   helperText={errors.dateOfBirth}
                   slotProps={{ inputLabel: { shrink: true } }}
@@ -704,6 +724,7 @@ export default function PatientRegistration() {
                     fullWidth size="small" label="Číslo pojištěnce *"
                     value={form.healthInsuranceNumber}
                     onChange={(e) => handleInsuranceNumber(e.target.value)}
+                    onBlur={checkOnLeave('healthInsuranceNumber')}
                     error={errors.healthInsuranceNumber !== undefined}
                     helperText={
                       errors.healthInsuranceNumber
@@ -723,6 +744,7 @@ export default function PatientRegistration() {
                       value={form.healthInsuranceNumberConfirmation}
                       onChange={(e) =>
                         update('healthInsuranceNumberConfirmation', digitsOnly(e.target.value))}
+                      onBlur={checkOnLeave('healthInsuranceNumberConfirmation')}
                       error={errors.healthInsuranceNumberConfirmation !== undefined}
                       helperText={
                         errors.healthInsuranceNumberConfirmation
@@ -737,6 +759,7 @@ export default function PatientRegistration() {
                     select fullWidth size="small" label="Zdravotní pojišťovna *"
                     value={form.healthInsurerCode}
                     onChange={(e) => update('healthInsurerCode', e.target.value)}
+                    onBlur={checkOnLeave('healthInsurerCode')}
                     error={errors.healthInsurerCode !== undefined}
                     helperText={errors.healthInsurerCode}
                   >
@@ -756,6 +779,7 @@ export default function PatientRegistration() {
                     fullWidth size="small" label="Rodné číslo"
                     value={form.birthNumber}
                     onChange={(e) => handleBirthNumber(e.target.value)}
+                    onBlur={checkOnLeave('birthNumber')}
                     error={errors.birthNumber !== undefined}
                     helperText={errors.birthNumber ?? 'Nepovinné — registr ho nevyžaduje.'}
                   />
@@ -802,6 +826,7 @@ export default function PatientRegistration() {
                     select fullWidth size="small" label="Typ dokladu *"
                     value={form.identityDocumentType}
                     onChange={(e) => update('identityDocumentType', e.target.value)}
+                    onBlur={checkOnLeave('identityDocumentType')}
                     error={errors.identityDocumentType !== undefined}
                     helperText={errors.identityDocumentType}
                   >
@@ -816,6 +841,7 @@ export default function PatientRegistration() {
                     value={form.identityDocumentIssuingCountryCode}
                     onChange={(e) =>
                       update('identityDocumentIssuingCountryCode', e.target.value.toUpperCase())}
+                    onBlur={checkOnLeave('identityDocumentIssuingCountryCode')}
                     error={errors.identityDocumentIssuingCountryCode !== undefined}
                     helperText={
                       errors.identityDocumentIssuingCountryCode ?? 'Dvě písmena, ISO 3166-1.'
@@ -827,6 +853,7 @@ export default function PatientRegistration() {
                     fullWidth size="small" label="Číslo dokladu *"
                     value={form.identityDocumentNumber}
                     onChange={(e) => update('identityDocumentNumber', e.target.value)}
+                    onBlur={checkOnLeave('identityDocumentNumber')}
                     error={errors.identityDocumentNumber !== undefined}
                     helperText={errors.identityDocumentNumber}
                   />
@@ -877,6 +904,7 @@ export default function PatientRegistration() {
                   fullWidth size="small" label="E-mail *"
                   value={form.email}
                   onChange={(e) => update('email', e.target.value)}
+                  onBlur={checkOnLeave('email')}
                   error={errors.email !== undefined}
                   helperText={errors.email}
                 />
@@ -886,6 +914,7 @@ export default function PatientRegistration() {
                   select fullWidth size="small" label="Předvolba *"
                   value={form.phoneRegionCode}
                   onChange={(e) => update('phoneRegionCode', e.target.value)}
+                  onBlur={checkOnLeave('phoneRegionCode')}
                   error={errors.phoneRegionCode !== undefined}
                   helperText={errors.phoneRegionCode}
                 >
@@ -905,6 +934,7 @@ export default function PatientRegistration() {
                   fullWidth size="small" label="Telefon *"
                   value={form.phone}
                   onChange={(e) => update('phone', e.target.value)}
+                  onBlur={checkOnLeave('phone')}
                   error={errors.phone !== undefined || phoneState === 'unreadable'}
                   /* Grouped while it is being typed, and complained about only
                      when it is finished and still does not fit the country. A

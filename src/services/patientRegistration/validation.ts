@@ -237,6 +237,25 @@ export function validateStep(step: RegistrationStep, form: RegistrationFormState
   return errors;
 }
 
+/**
+ * One field, checked the moment somebody leaves it.
+ *
+ * Runs the same rules `validateAll` runs and reports only what it found about
+ * that one field — so a form cannot complain about an empty box nobody has
+ * reached yet, and cannot stay silent about the one they just left.
+ *
+ * It existed only as `validateAll` at the save until 15. 9. 2026, and the
+ * owner found what that costs: he typed an address with no `@` in it, nothing
+ * said anything, and he only learned about it by pressing the button. "nikdy
+ * to nesmie ulozit ked je zly musi to okno zcervenat."
+ */
+export function validateField(
+  field: keyof RegistrationFormState,
+  form: RegistrationFormState,
+): string | undefined {
+  return validateAll(form)[field];
+}
+
 /** Validates everything — the gate in front of the POST. */
 export function validateAll(form: RegistrationFormState): FieldErrors {
   const errors: FieldErrors = {};
