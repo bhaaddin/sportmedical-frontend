@@ -688,9 +688,12 @@ export default function PatientRegistration() {
                     error={errors.healthInsurerCode !== undefined}
                     helperText={errors.healthInsurerCode}
                   >
+                    {/* `displayValue` already reads "111 — Všeobecná zdravotní
+                        pojišťovna"; prefixing the code as well printed the enum
+                        name in front of it. */}
                     {options.czechHealthInsurers.map((insurer) => (
                       <MenuItem key={insurer.code} value={insurer.code}>
-                        {insurer.code} — {insurer.displayValue}
+                        {insurer.displayValue}
                       </MenuItem>
                     ))}
                   </TextField>
