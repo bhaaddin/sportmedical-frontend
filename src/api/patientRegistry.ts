@@ -220,12 +220,25 @@ export interface InspectEmailRequest {
 
 export interface PhoneInspection {
   parses: boolean;
+  /** Valid anywhere, regardless of the region asked about. */
+  isValid: boolean;
   isValidForRegion: boolean;
   e164: string;
   international: string;
   /** `777 777 777` — the country's own grouping, without its dialling code. */
   national: string;
+  /** The region ASKED about — whatever was sent in the request. */
   regionCode: string;
+  /**
+   * The region the number itself belongs to.
+   *
+   * Measured: `+421 908 123 456` asked about as `CZ` comes back
+   * `regionCode: 'CZ'`, `detectedRegionCode: 'SK'`, `isValidForRegion: false`.
+   * For a stored number — which always carries its `+` — this is the country,
+   * and it is the one a card must go by: `regionCode` there says only what the
+   * screen happened to ask.
+   */
+  detectedRegionCode: string;
 }
 
 /* ── Result ── */

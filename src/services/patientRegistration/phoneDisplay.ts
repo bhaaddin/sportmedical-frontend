@@ -116,3 +116,31 @@ export function phoneComplaint(
 export function worthInspectingPhone(typed: string): boolean {
   return typed.replace(/[^0-9]/g, '').length >= 3;
 }
+
+/**
+ * A STORED number, shown wherever a patient's record is read back.
+ *
+ * The registration field knows which country was picked, so it goes by that.
+ * A patient's card does not: it has a number out of the database and nothing
+ * else, and `regionCode` on the answer says only what the screen happened to
+ * ask about. The number's own country is `detectedRegionCode`.
+ *
+ * The rule is the same one as in the field, and it is the owner's: a local
+ * number drops its dialling code because everybody at that desk knows where
+ * they are, and anything foreign keeps it because `0908 123 456` on a Czech
+ * card cannot be dialled and cannot be placed.
+ *
+ * `raw` is what the profile already had. It is returned whenever there is no
+ * answer to go on, so a card never loses a telephone number it was showing.
+ */
+export function storedNumberDisplay(
+  inspection: PhoneInspection | null,
+  raw: string,
+): string {
+  if (inspection === null || !inspection.parses) return raw;
+
+  if (inspection.detectedRegionCode === HOME_REGION && inspection.national !== '') {
+    return inspection.national;
+  }
+  return inspection.international !== '' ? inspection.international : raw;
+}

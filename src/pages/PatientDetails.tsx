@@ -13,6 +13,12 @@ import {
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { patientsApi } from '../api/patients';
+import { contactOfKind, profileContacts } from './patients/cardContacts';
+import patientRegistryApi from '../api/patientRegistry';
+import type { PhoneInspection } from '../api/patientRegistry';
+import {
+  HOME_REGION, storedNumberDisplay,
+} from '../services/patientRegistration/phoneDisplay';
 import type { Patient } from '../api/patients';
 import { diagnosticsApi } from '../api/diagnostics';
 import type { DiagnosticSession } from '../api/diagnostics';
@@ -139,6 +145,38 @@ export default function PatientDetails() {
     }
   }, [id, reloadDocuments]);
 
+
+  /*
+   * These two must run on EVERY render, so they live above the early return
+   * that shows the spinner — not beside the value they feed further down,
+   * where they were first written. React counts hooks by order, and putting
+   * them after a `return` made the count change the moment a patient loaded:
+   * "Rendered more hooks than during the previous render", and the whole card
+   * fell into the error boundary.
+   *
+   * `patient` may still be null up here, so its own contact is read with `?.`
+   * — it is empty for every patient today anyway, and the profile is what
+   * actually carries the number.
+   */
+  const contacts = profileContacts(profile?.contactsJson);
+  const storedPhone = contactOfKind('phone', patient?.phone, contacts);
+  const [phoneLook, setPhoneLook] = useState<PhoneInspection | null>(null);
+
+  useEffect(() => {
+    if (storedPhone === '') {
+      setPhoneLook(null);
+      return;
+    }
+
+    let cancelled = false;
+    patientRegistryApi
+      .inspectPhone({ value: storedPhone, regionCode: HOME_REGION })
+      .then((result) => { if (!cancelled) setPhoneLook(result); })
+      .catch(() => { if (!cancelled) setPhoneLook(null); });
+
+    return () => { cancelled = true; };
+  }, [storedPhone]);
+
   if (!patient) {
     return (
       <Box>
@@ -169,14 +207,39 @@ export default function PatientDetails() {
     const months = Math.floor(days / 30);
     return { next, days, isToday, months, isMinor: age < 18 };
   })();
-  const profileContacts: { channel: string; value: string; note: string }[] = (() => {
-    try {
-      const list = JSON.parse(profile?.contactsJson ?? '[]');
-      return Array.isArray(list) ? list : [];
-    } catch { return []; }
-  })();
-  const displayEmail = patient.email || profileContacts.find(c => c.channel === 'email')?.value || '';
-  const displayPhone = patient.phone || profileContacts.find(c => c.channel === 'phone')?.value || '';
+  /*
+   * The card read `—` for e-mail and telephone on every patient in the
+   * registry, and three faults had to be undone to show either:
+   *
+   *   the rows read `patient.email` / `patient.phone`, which
+   *   `GET /api/v1/patients/{id}` does not carry;
+   *
+   *   this fallback was computed and never used — the two "declared but never
+   *   used" lint warnings on these lines were the bug reporting itself;
+   *
+   *   and it looked for `c.channel`, while the server sends `type`.
+   *
+   * The data was at `GET /api/patients/{id}/profile` the whole time.
+   */
+  const displayEmail = contactOfKind('email', patient.email, contacts);
+
+  /*
+   * A stored number is written the way the desk reads it.
+   *
+   * The profile hands over `+420 777 777 779` — a Czech number carrying its own
+   * dialling code on a Czech card, which is the fault the owner reported in
+   * reverse: "iba ceske cisla pis bez kedze sme v cechach". The grouping is not
+   * worked out here; `phone/inspect` gives it, on the same libphonenumber that
+   * stored the number.
+   *
+   * `HOME_REGION` is sent only because the request wants a region. The answer's
+   * `detectedRegionCode` is what decides, and for a stored number — which always
+   * carries its `+` — that is its real country whatever was asked.
+   *
+   * Any failure leaves `phoneLook` null and the card keeps showing the stored
+   * string, so a card can never lose a number it was already showing.
+   */
+  const displayPhone = storedNumberDisplay(phoneLook, storedPhone);
   const latest = sessions[0];
   const previous = sessions[1];
   /*
@@ -373,8 +436,8 @@ export default function PatientDetails() {
                   ['ID', patient.id.slice(0, 8) + '…'],
                   ['Datum narození', new Date(patient.dateOfBirth).toLocaleDateString('cs-CZ')],
                   ['Pohlaví', patient.sex === 'Male' ? 'Muž' : 'Žena'],
-                  ['Email', patient.email || '—'],
-                  ['Telefon', patient.phone || '—'],
+                  ['Email', displayEmail || '—'],
+                  ['Telefon', displayPhone || '—'],
                   ['Registrace', new Date(patient.createdAtUtc).toLocaleDateString('cs-CZ')],
                 ].map(([label, value]) => (
                   <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: '1px solid #f5f5f5' }}>

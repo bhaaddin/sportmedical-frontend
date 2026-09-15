@@ -15,26 +15,27 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  groupedDisplay, phoneComplaint, phoneDisplayState, worthInspectingPhone,
+  groupedDisplay, phoneComplaint, phoneDisplayState, storedNumberDisplay,
+  worthInspectingPhone,
 } from './phoneDisplay';
 import type { PhoneInspection } from '../../api/patientRegistry';
 
 /* Measured against the running endpoint on 15. 9. 2026. */
 const czechComplete = (): PhoneInspection => ({
-  parses: true, isValidForRegion: true,
+  parses: true, isValid: true, isValidForRegion: true,
   e164: '+420777777777', international: '+420 777 777 777', national: '777 777 777',
-  regionCode: 'CZ',
+  regionCode: 'CZ', detectedRegionCode: 'CZ',
 });
 
 const czechHalfTyped = (): PhoneInspection => ({
-  parses: true, isValidForRegion: false,
+  parses: true, isValid: false, isValidForRegion: false,
   e164: '+420777777', international: '+420 777777', national: '777777',
-  regionCode: 'CZ',
+  regionCode: 'CZ', detectedRegionCode: 'CZ',
 });
 
 const unreadable = (): PhoneInspection => ({
-  parses: false, isValidForRegion: false,
-  e164: '', international: '', national: '', regionCode: 'CZ',
+  parses: false, isValid: false, isValidForRegion: false,
+  e164: '', international: '', national: '', regionCode: 'CZ', detectedRegionCode: '',
 });
 
 describe('what the field is showing', () => {
@@ -84,9 +85,9 @@ describe('what the field is showing', () => {
 
 /* Measured: a Slovak number, as the endpoint answers it. */
 const slovak = (): PhoneInspection => ({
-  parses: true, isValidForRegion: true,
+  parses: true, isValid: true, isValidForRegion: true,
   e164: '+421908123456', international: '+421 908 123 456', national: '0908 123 456',
-  regionCode: 'SK',
+  regionCode: 'SK', detectedRegionCode: 'SK',
 });
 
 describe('the grouping shown', () => {
@@ -163,5 +164,67 @@ describe('when to ask the server', () => {
   it('counts digits, not punctuation', () => {
     expect(worthInspectingPhone('+ () -')).toBe(false);
     expect(worthInspectingPhone('+420 7')).toBe(true);
+  });
+});
+
+/*
+ * A number read back out of the database, on a patient's card.
+ *
+ * This is a different question from the registration field's. The field knows
+ * which country the receptionist picked; a card has a number and nothing else,
+ * and the `regionCode` on the answer says only what the screen asked about.
+ *
+ * MEASURED on 15. 9. 2026: `+421 908 123 456` asked about as `CZ` comes back
+ * `regionCode: 'CZ'`, `detectedRegionCode: 'SK'`. Going by `regionCode` there
+ * would call a Slovak number Czech and strip its dialling code — the exact
+ * fault the owner reported, arrived at from the other direction.
+ */
+describe('a number on a patient card', () => {
+  /* Measured: the stored `+420 777 777 779` asked about as CZ. */
+  const storedCzech = (): PhoneInspection => ({
+    parses: true, isValid: true, isValidForRegion: true,
+    e164: '+420777777779', international: '+420 777 777 779', national: '777 777 779',
+    regionCode: 'CZ', detectedRegionCode: 'CZ',
+  });
+
+  /* Measured: the stored `+421 908 123 456` asked about as CZ. */
+  const storedSlovak = (): PhoneInspection => ({
+    parses: true, isValid: true, isValidForRegion: false,
+    e164: '+421908123456', international: '+421 908 123 456', national: '0908 123 456',
+    regionCode: 'CZ', detectedRegionCode: 'SK',
+  });
+
+  it('drops the dialling code from a home number', () => {
+    expect(storedNumberDisplay(storedCzech(), '+420 777 777 779')).toBe('777 777 779');
+  });
+
+  /*
+   * The one that separates this from `groupedDisplay`: the region ASKED about
+   * is CZ and the number is Slovak. Going by the asked-about region would
+   * print `0908 123 456` on a Czech card.
+   */
+  it('keeps the dialling code on a foreign number asked about as a home one', () => {
+    expect(storedNumberDisplay(storedSlovak(), '+421 908 123 456'))
+      .toBe('+421 908 123 456');
+    expect(storedNumberDisplay(storedSlovak(), '+421 908 123 456'))
+      .not.toBe('0908 123 456');
+  });
+
+  /* A card must never lose a number it was already showing. */
+  it('keeps showing what it had when there is no answer', () => {
+    expect(storedNumberDisplay(null, '+420 777 777 779')).toBe('+420 777 777 779');
+    expect(storedNumberDisplay(unreadable(), '+420 777 777 779'))
+      .toBe('+420 777 777 779');
+  });
+
+  it('falls back to what it had when the answer carries no forms', () => {
+    const empty: PhoneInspection = {
+      ...storedSlovak(), international: '', national: '',
+    };
+    expect(storedNumberDisplay(empty, '+421 908 123 456')).toBe('+421 908 123 456');
+  });
+
+  it('says nothing about nothing', () => {
+    expect(storedNumberDisplay(null, '')).toBe('');
   });
 });
