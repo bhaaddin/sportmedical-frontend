@@ -146,6 +146,34 @@ export interface RegisterPatientRequest {
   confirmation?: RegistrationConfirmation | null;
 }
 
+/* ── Identity inspection ── */
+
+export interface InspectIdentityRequest {
+  /** A birth number or an insurance number, digits or formatted. */
+  identifier: string;
+  /** What the operator has typed, so the server can say whether it agrees. */
+  dateOfBirth?: string | null;
+  sex?: string | null;
+}
+
+/**
+ * What the identifier decodes to, and whether it matches what was typed.
+ *
+ * `dateOfBirthMatchesStated` and `sexMatchesStated` are null when nothing was
+ * stated to compare against - which is not the same as "they agree", and the
+ * screen must not read it that way.
+ */
+export interface IdentityInspection {
+  parses: boolean;
+  insuranceNumber: string | null;
+  kind: string | null;
+  dateOfBirth: string | null;
+  sex: string | null;
+  rejectionCode: string | null;
+  dateOfBirthMatchesStated: boolean | null;
+  sexMatchesStated: boolean | null;
+}
+
 /* ── Result ── */
 
 export type RegistrationOutcome = 'Created' | 'Existing' | 'CandidateReviewRequired';
@@ -282,6 +310,30 @@ export const patientRegistryApi = {
         },
       });
       return response.data ?? [];
+    } catch (error) {
+      throw toRegistryError(error);
+    }
+  },
+
+  /**
+   * What an identifier says about the person, without writing anything.
+   *
+   * `POST /api/v1/patients/identity/inspect` takes a birth number or an
+   * insurance number plus whatever the operator has typed, and answers with
+   * what the identifier itself decodes to and whether it agrees. Nothing is
+   * stored; it is gated on `patients.register` like the registration itself.
+   *
+   * It exists so a disagreement can be shown while somebody is still looking
+   * at the two fields - "the number says 1987, you have 1978" - instead of
+   * arriving as one refusal after the save, naming neither value.
+   */
+  async inspectIdentity(request: InspectIdentityRequest): Promise<IdentityInspection> {
+    try {
+      const response = await client.post<IdentityInspection>(
+        '/api/v1/patients/identity/inspect',
+        request,
+      );
+      return response.data;
     } catch (error) {
       throw toRegistryError(error);
     }
