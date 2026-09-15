@@ -174,6 +174,37 @@ export interface IdentityInspection {
   sexMatchesStated: boolean | null;
 }
 
+/* ── Telephone inspection ── */
+
+export interface InspectPhoneRequest {
+  /** Exactly what was typed. The server cleans it; doing that here too would
+      make two places decide what a telephone number is. */
+  value: string;
+  regionCode: string;
+}
+
+/**
+ * `parses` and `isValidForRegion` are different questions and the screen must
+ * not merge them:
+ *
+ *   parses: false             this cannot be read as a number at all
+ *   isValidForRegion: false   it can, but it is half-typed or belongs to
+ *                             another country
+ *
+ * A half-typed number comes back GROUPED with `isValidForRegion: false`, so it
+ * gets the grouping and not a red border — a red border on every second
+ * keystroke teaches people to ignore red borders.
+ */
+export interface PhoneInspection {
+  parses: boolean;
+  isValidForRegion: boolean;
+  e164: string;
+  international: string;
+  /** `777 777 777` — the country's own grouping, without its dialling code. */
+  national: string;
+  regionCode: string;
+}
+
 /* ── Result ── */
 
 export type RegistrationOutcome = 'Created' | 'Existing' | 'CandidateReviewRequired';
@@ -331,6 +362,31 @@ export const patientRegistryApi = {
     try {
       const response = await client.post<IdentityInspection>(
         '/api/v1/patients/identity/inspect',
+        request,
+      );
+      return response.data;
+    } catch (error) {
+      throw toRegistryError(error);
+    }
+  },
+
+  /**
+   * What a telephone number looks like, grouped the way its country groups it.
+   *
+   * `POST /api/v1/patients/phone/inspect` — nothing is written, gated on
+   * `patients.register` like the identity inspection. Send the raw input:
+   * spaces, dashes, brackets and a `+420` are all fine, and cleaning it here
+   * would make two places decide what a telephone number is.
+   *
+   * The grouping already existed on the server, for all 245 regions, on the
+   * same libphonenumber that canonicalises a contact on save — but that only
+   * happens at the save, and the field somebody is typing into has not been
+   * saved. This is the same rule, reachable while they type.
+   */
+  async inspectPhone(request: InspectPhoneRequest): Promise<PhoneInspection> {
+    try {
+      const response = await client.post<PhoneInspection>(
+        '/api/v1/patients/phone/inspect',
         request,
       );
       return response.data;

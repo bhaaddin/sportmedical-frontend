@@ -34,6 +34,7 @@ import { HowToReg, PersonAdd, Search } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import patientRegistryApi, {
   type IdentityInspection,
+  type PhoneInspection,
   type PatientRegistrationOptions,
   type PatientSearchResult,
   type RegisterPatientRequest,
@@ -59,6 +60,9 @@ import {
   AGREES_TEXT, disagreementText, verdictOf, worthInspecting,
 } from '../services/patientRegistration/identityInspection';
 import { preferredCount, withPreferredFirst } from '../services/patientRegistration/phoneRegions';
+import {
+  groupedDisplay, phoneComplaint, phoneDisplayState, worthInspectingPhone,
+} from '../services/patientRegistration/phoneDisplay';
 import RuianAddressPicker from '../components/registration/RuianAddressPicker';
 import CandidateReviewDialog from '../components/registration/CandidateReviewDialog';
 
@@ -147,6 +151,8 @@ export default function PatientRegistration() {
 
   /** What the identifier itself says, when it has been asked. */
   const [inspection, setInspection] = useState<IdentityInspection | null>(null);
+  /** What the telephone number looks like, grouped by its own country. */
+  const [phoneLook, setPhoneLook] = useState<PhoneInspection | null>(null);
 
   /* Stable for the whole attempt: a retry must replay, not duplicate. */
   const identifiers = useRef<RegistrationIdentifiers>(mintIdentifiers());
@@ -225,6 +231,39 @@ export default function PatientRegistration() {
   }, [identifierDigits, form.dateOfBirth, form.sex, form.insuranceRegistrationKind]);
 
   const verdict = verdictOf(inspection, { dateOfBirth: form.dateOfBirth, sex: form.sex });
+
+  /*
+   * ── How the telephone number is grouped ──
+   *
+   * The server groups it, for all 245 regions it offers, on the same
+   * libphonenumber that canonicalises a contact when it is saved — and
+   * nothing here knows how any country groups anything. That division is the
+   * point: app wrote a test for this and got the German grouping wrong, which
+   * is what anybody grouping by hand does.
+   *
+   * Sent exactly as typed, spaces and all: the server cleans it, and cleaning
+   * it here too would make two places decide what a telephone number is.
+   */
+  useEffect(() => {
+    if (!worthInspectingPhone(form.phone) || form.phoneRegionCode === '') {
+      setPhoneLook(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      patientRegistryApi
+        .inspectPhone({ value: form.phone, regionCode: form.phoneRegionCode })
+        .then((result) => { if (!cancelled) setPhoneLook(result); })
+        .catch(() => { if (!cancelled) setPhoneLook(null); });
+    }, 350);
+
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [form.phone, form.phoneRegionCode]);
+
+  const phoneState = phoneDisplayState(phoneLook, form.phone);
+  const phoneGrouped = groupedDisplay(phoneLook);
+  const phoneSays = phoneComplaint(phoneState, form.phoneRegionCode);
 
   /* ── Birth number drives date of birth and sex ── */
   const handleBirthNumber = (raw: string) => {
@@ -866,8 +905,21 @@ export default function PatientRegistration() {
                   fullWidth size="small" label="Telefon *"
                   value={form.phone}
                   onChange={(e) => update('phone', e.target.value)}
-                  error={errors.phone !== undefined}
-                  helperText={errors.phone}
+                  error={errors.phone !== undefined || phoneState === 'unreadable'}
+                  /* Grouped while it is being typed, and complained about only
+                     when it is finished and still does not fit the country. A
+                     red border on every second keystroke is a red border people
+                     stop reading. */
+                  helperText={
+                    errors.phone
+                    ?? (phoneSays !== '' ? phoneSays : undefined)
+                    ?? (phoneGrouped !== '' ? phoneGrouped : ' ')
+                  }
+                  slotProps={{
+                    formHelperText: phoneState === 'valid'
+                      ? { sx: { color: 'success.main', fontWeight: 500 } }
+                      : undefined,
+                  }}
                 />
               </Grid>
             </Grid>
@@ -925,7 +977,9 @@ export default function PatientRegistration() {
               )}
               <SummaryRow label="Bydliště" value={form.addressDisplay || '—'} />
               <SummaryRow label="E-mail" value={form.email || '—'} />
-              <SummaryRow label="Telefon" value={form.phone || '—'} />
+              {/* The card shows the grouped form — what will actually be
+                  stored and shown everywhere after the save. */}
+              <SummaryRow label="Telefon" value={phoneGrouped || form.phone || '—'} />
             </Stack>
           </Paper>
 

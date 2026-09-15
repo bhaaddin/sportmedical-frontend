@@ -1,0 +1,91 @@
+/*
+ * Showing a telephone number grouped the way its own country groups it.
+ *
+ * "ze si kod backendu pre seba napise napriklad 777777777 ale frontend proste
+ * mi ukaze toto 777 777 777 ... a takto pre kazdy stat sveta". The owner is
+ * right that it should work everywhere, and the reason it can is that NOTHING
+ * HERE KNOWS HOW ANY COUNTRY GROUPS ITS NUMBERS. The server does, on
+ * libphonenumber, for all 245 regions it offers; this module only decides what
+ * to do with the answer.
+ *
+ * That division is the whole point. App wrote a test for this and got the
+ * German grouping wrong — expected `0151 47110815`, the numbering plan says
+ * `01514 7110815` — and left the mistake in with a note, because it is the
+ * argument: anybody grouping by hand writes that same wrong thing. A screen
+ * that carried its own rules would carry its own version of that error, 245
+ * times over.
+ *
+ * THE DISTINCTION THAT MATTERS
+ *
+ *   parses: false             cannot be read as a number at all
+ *   isValidForRegion: false   readable, but half-typed or another country's
+ *
+ * A half-typed number arrives GROUPED and invalid. It gets the grouping and no
+ * complaint: a red border on every second keystroke is a red border people
+ * learn to ignore, and by the time it means something they have stopped
+ * looking.
+ */
+import type { PhoneInspection } from '../../api/patientRegistry';
+
+export type PhoneDisplayState =
+  /** Nothing typed, or nothing asked yet. Say nothing. */
+  | 'idle'
+  /** Being typed. Show the grouping, complain about nothing. */
+  | 'typing'
+  /** A complete, valid number for the chosen country. */
+  | 'valid'
+  /** Readable, complete-looking, and not valid for the country chosen. */
+  | 'wrong-region'
+  /** Not a telephone number at all. */
+  | 'unreadable';
+
+/**
+ * `typing` versus `wrong-region` is decided on length, not on the server's
+ * verdict — it answers the same `isValidForRegion: false` for both, and the
+ * difference is whether somebody is still going.
+ *
+ * Six digits is the shortest national number in use anywhere, so below it
+ * nobody can be finished yet.
+ */
+const SHORTEST_NATIONAL_NUMBER = 6;
+
+export function phoneDisplayState(
+  inspection: PhoneInspection | null,
+  typed: string,
+): PhoneDisplayState {
+  if (typed.trim() === '') return 'idle';
+  if (inspection === null) return 'idle';
+  if (!inspection.parses) return 'unreadable';
+  if (inspection.isValidForRegion) return 'valid';
+
+  const digits = typed.replace(/[^0-9]/g, '');
+  return digits.length < SHORTEST_NATIONAL_NUMBER ? 'typing' : 'wrong-region';
+}
+
+/** The grouping to show under the field — the server's, never invented here. */
+export function groupedDisplay(inspection: PhoneInspection | null): string {
+  if (inspection === null || !inspection.parses) return '';
+  return inspection.national !== '' ? inspection.national : inspection.international;
+}
+
+/** Only a finished number that belongs somewhere else is worth a complaint. */
+export function phoneComplaint(
+  state: PhoneDisplayState,
+  regionCode: string,
+): string {
+  if (state === 'unreadable') return 'Tohle nevypadá jako telefonní číslo.';
+  if (state === 'wrong-region') {
+    return `Tohle číslo neplatí pro zvolenou zemi (${regionCode}). Zkontrolujte předvolbu.`;
+  }
+  return '';
+}
+
+/**
+ * Whether the number is far enough along to be worth asking about.
+ *
+ * Asking on the first keystroke is a request per character for an answer
+ * nobody can use yet.
+ */
+export function worthInspectingPhone(typed: string): boolean {
+  return typed.replace(/[^0-9]/g, '').length >= 3;
+}
