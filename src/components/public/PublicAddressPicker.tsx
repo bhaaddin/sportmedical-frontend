@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Autocomplete,
   Box,
@@ -12,6 +12,14 @@ import {
   type AddressLocality,
   type AddressPoint,
 } from '../../api/addressLookup';
+import {
+  NO_STREET_HINT,
+  ambiguousDisplayValues,
+  formatPostalCode,
+  hasNoStreet,
+  houseNumberLabel,
+  isAmbiguous,
+} from '../../services/patientRegistration/addressPicking';
 
 /**
  * Street first, then house number - the two steps the API itself is built in.
@@ -24,6 +32,20 @@ import {
  * Nothing here validates an address. The register decides what exists, this
  * only shows what it answered - the same rule as never computing availability
  * on the client, for the same reason.
+ *
+ * TWO ROWS THAT LOOK THE SAME ARE NOT THE SAME PLACE
+ *
+ * Five different villages called Bohuslavice answer to that one word, and the
+ * locality endpoint gives every one of them the identical `displayValue`. A
+ * patient filling this in at home has nothing to choose by, so they guess -
+ * and four guesses out of five put them in the wrong village, quietly, on
+ * their own medical record.
+ *
+ * Their postal codes differ and the locality answer does not carry one, so a
+ * sample building is fetched for each row that cannot be told apart. Three
+ * extra calls in a rare case. Reception's screen does exactly the same thing,
+ * off the same module, because the owner asked for them to behave identically
+ * - and because a patient deserves the better of the two, not the worse.
  */
 
 interface Props {
@@ -47,6 +69,39 @@ export default function PublicAddressPicker({ value, onChange, error }: Props) {
      earlier reply arriving late would replace a newer list with a staler one. */
   const localitySeq = useRef(0);
   const pointSeq = useRef(0);
+
+  /** A postal code per ambiguous locality, so identical rows can be told apart. */
+  const [postalByPart, setPostalByPart] = useState<Record<number, string>>({});
+  const ambiguous = useMemo(() => ambiguousDisplayValues(localities), [localities]);
+
+  useEffect(() => {
+    if (ambiguous.length === 0) return;
+
+    const needed = localities.filter(
+      (row) => isAmbiguous(row, ambiguous)
+        && postalByPart[row.municipalityPartCode] === undefined,
+    );
+    if (needed.length === 0) return;
+
+    let cancelled = false;
+    Promise.all(
+      needed.map((row) =>
+        /* One building is enough - the postal code is the same for the part. */
+        searchPoints(row.streetCode, row.municipalityPartCode, '1', 1)
+          .then((found) => ({ part: row.municipalityPartCode, postal: found[0]?.postalCode ?? '' }))
+          .catch(() => ({ part: row.municipalityPartCode, postal: '' })),
+      ),
+    ).then((results) => {
+      if (cancelled) return;
+      setPostalByPart((previous) => {
+        const next = { ...previous };
+        for (const r of results) next[r.part] = r.postal;
+        return next;
+      });
+    });
+
+    return () => { cancelled = true; };
+  }, [ambiguous, localities, postalByPart]);
 
   useEffect(() => {
     const seq = (localitySeq.current += 1);
@@ -112,6 +167,28 @@ export default function PublicAddressPicker({ value, onChange, error }: Props) {
           a.municipalityPartCode === b.municipalityPartCode
         }
         filterOptions={(options) => options} /* the server already filtered */
+        renderOption={(props, option) => {
+          const { key, ...rest } = props as { key: string } & Record<string, unknown>;
+          const postal = postalByPart[option.municipalityPartCode];
+          return (
+            <Box component="li" key={key} {...rest} sx={{ display: 'block !important', py: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                {option.displayValue}
+              </Typography>
+              {(isAmbiguous(option, ambiguous) || hasNoStreet(option)) && (
+                <Typography variant="caption" color="text.secondary">
+                  {isAmbiguous(option, ambiguous)
+                    ? (postal === undefined || postal === ''
+                      ? 'rozlišuje se…'
+                      : `PSČ ${formatPostalCode(postal)}`)
+                    : ''}
+                  {isAmbiguous(option, ambiguous) && hasNoStreet(option) ? ' · ' : ''}
+                  {hasNoStreet(option) ? NO_STREET_HINT : ''}
+                </Typography>
+              )}
+            </Box>
+          );
+        }}
         onInputChange={(_, next) => setLocalityInput(next)}
         onChange={(_, next) => {
           setLocality(next);
@@ -164,7 +241,7 @@ export default function PublicAddressPicker({ value, onChange, error }: Props) {
         renderInput={(params) => (
           <TextField
             {...params}
-            label="Číslo domu"
+            label={houseNumberLabel(locality)}
             placeholder="118"
             error={error !== undefined}
             helperText={

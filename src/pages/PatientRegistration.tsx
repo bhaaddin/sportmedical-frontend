@@ -58,6 +58,7 @@ import {
 import {
   AGREES_TEXT, disagreementText, verdictOf, worthInspecting,
 } from '../services/patientRegistration/identityInspection';
+import { preferredCount, withPreferredFirst } from '../services/patientRegistration/phoneRegions';
 import RuianAddressPicker from '../components/registration/RuianAddressPicker';
 import CandidateReviewDialog from '../components/registration/CandidateReviewDialog';
 
@@ -409,6 +410,18 @@ export default function PatientRegistration() {
 
   const czechBranch = form.insuranceRegistrationKind === 'CzechPublicHealthInsurance';
   const identifier = classifyInsuranceNumber(form.healthInsuranceNumber);
+
+  /*
+   * Czech and Slovak first. The server sends 245 regions in ISO order — AC,
+   * AD, AE — so `CZ` sits two hundred rows down, and a Czech clinic reaches
+   * for it all day. Lifted here rather than asked of the server: which two are
+   * common is a fact about this reception desk, not about the catalogue.
+   */
+  const phoneRegions = useMemo(
+    () => withPreferredFirst(options?.phoneRegions ?? []),
+    [options],
+  );
+  const preferredRegions = preferredCount(options?.phoneRegions ?? []);
 
   const titleOptions = useMemo(
     () => ({
@@ -837,9 +850,15 @@ export default function PatientRegistration() {
                   error={errors.phoneRegionCode !== undefined}
                   helperText={errors.phoneRegionCode}
                 >
-                  {options.phoneRegions.map((region) => (
-                    <MenuItem key={region.code} value={region.code}>{region.displayValue}</MenuItem>
-                  ))}
+                  {phoneRegions.map((region, index) => [
+                    /* A line under the common ones, never above the first row. */
+                    index === preferredRegions && preferredRegions > 0
+                      ? <Divider key="preferred-divider" />
+                      : null,
+                    <MenuItem key={region.code} value={region.code}>
+                      {region.displayValue}
+                    </MenuItem>,
+                  ])}
                 </TextField>
               </Grid>
               <Grid size={{ xs: 12, md: 4 }} data-field="phone">
