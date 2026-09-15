@@ -28,10 +28,20 @@ const publicClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-/** A street within a municipality part - what the first box searches. */
+/**
+ * A street within a municipality part - what the first box searches.
+ *
+ * `streetCode` and `streetName` are NULL for a village that has no streets at
+ * all: `Bohuslavice — Bohuslavice` comes back with both null and its buildings
+ * are numbered off the municipality part alone. They were typed non-nullable
+ * here until 15. 9. 2026, and `searchPoints` took the code as a required
+ * argument, so no address outside a town could be found through this module -
+ * not in registration and not in the public questionnaire. Measured against the
+ * live catalogue, not inferred.
+ */
 export interface AddressLocality {
-  streetCode: number;
-  streetName: string;
+  streetCode: number | null;
+  streetName: string | null;
   municipalityPartCode: number;
   municipalityPartName: string;
   municipalityCode: number;
@@ -43,7 +53,8 @@ export interface AddressLocality {
 /** One numbered building. `addressPointCode` is the only part the API wants back. */
 export interface AddressPoint {
   addressPointCode: number;
-  streetName: string;
+  /** Null in a village - the building is numbered off the municipality part. */
+  streetName: string | null;
   buildingNumber: number;
   orientationNumber: number | null;
   municipalityPartName: string;
@@ -81,15 +92,45 @@ export async function searchLocalities(
  * wrongly.
  */
 export async function searchPoints(
-  streetCode: number,
+  streetCode: number | null,
   partCode: number,
   q: string,
-  limit = 10,
+  limit = 25,
 ): Promise<AddressPoint[]> {
   if (q.trim().length === 0) return [];
   const res = await publicClient.get<AddressPoint[]>(
     '/api/address-lookup/points',
-    { params: { streetCode, partCode, q: q.trim(), limit } },
+    {
+      /* `partCode` is required and `streetCode` is not - omitted, the server
+         answers with the buildings of the whole municipality part, which is
+         the only way a village address can be found. Sending `null` would be
+         sent as the string "null" by axios, so it is dropped instead. */
+      params: {
+        partCode,
+        q: q.trim(),
+        limit,
+        ...(streetCode === null ? {} : { streetCode }),
+      },
+    },
   );
   return res.data ?? [];
+}
+
+/**
+ * Whether the catalogue is there at all, and how old it is.
+ *
+ * Registration cannot be completed without it: the request carries a RÚIAN
+ * point code and the Domain refuses anything but a positive one, so a screen
+ * that lets somebody fill in thirty fields and then fails at the save is a
+ * screen that wasted their time. This is what lets it say so first.
+ */
+export interface AddressCatalogueStatus {
+  loaded: boolean;
+  addressPointCount: number;
+  datasetDate?: string | null;
+}
+
+export async function catalogueStatus(): Promise<AddressCatalogueStatus> {
+  const res = await publicClient.get<AddressCatalogueStatus>('/api/address-lookup/status');
+  return res.data;
 }
