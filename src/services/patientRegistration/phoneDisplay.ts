@@ -58,6 +58,34 @@ export function phoneDisplayState(
   if (!inspection.parses) return 'unreadable';
   if (inspection.isValidForRegion) return 'valid';
 
+  /*
+   * A number that says which country it is from CARRIES ITS OWN COUNTRY, and
+   * the picker beside it is then beside the point.
+   *
+   * `isValid: true` with `isValidForRegion: false` is the server saying "this
+   * is a real number, just not of the country you picked" — which is true of a
+   * Hungarian number and is nobody's mistake. Without this the questionnaire
+   * told a Hungarian to check a dialling code he had written correctly, and
+   * pointed him at a list of five countries that has no Hungary in it.
+   *
+   * This line first read `typed.startsWith('+') && inspection.isValid`, and a
+   * mutation that deleted the `+` half survived every test. It survived
+   * because it was RIGHT: measured on the public endpoint, no token —
+   *
+   *   00421908123456  asked as CZ  →  parses ✓ isValid ✓ forRegion ✗
+   *                                   detected SK, e164 +421908123456
+   *
+   * `00` is how half of Europe writes a dialling code, and the narrower guard
+   * would have refused it while accepting the identical `+421…`. Nothing
+   * reaches this line without a written country code anyway: a number with no
+   * prefix is parsed as national for the region picked, so it cannot come back
+   * valid somewhere else.
+   *
+   * Nothing is lost at the desk either. The picker exists to say where a
+   * number without a dialling code comes from; a number with one has said.
+   */
+  if (inspection.isValid) return 'valid';
+
   const digits = typed.replace(/[^0-9]/g, '');
   return digits.length < SHORTEST_NATIONAL_NUMBER ? 'typing' : 'wrong-region';
 }
@@ -81,13 +109,23 @@ export const HOME_REGION = 'CZ';
  * way: unreadable at the desk and impossible to dial. The owner caught exactly
  * that — "v karte pacienta to je zle nemas vobec predvolbu".
  */
-export function groupedDisplay(
-  inspection: PhoneInspection | null,
-  regionCode: string,
-): string {
+export function groupedDisplay(inspection: PhoneInspection | null): string {
   if (inspection === null || !inspection.parses) return '';
 
-  if (regionCode === HOME_REGION && inspection.national !== '') {
+  /*
+   * By the number's OWN country, never by the one picked beside it.
+   *
+   * This took the picked region until a Hungarian number went through the
+   * questionnaire with CZ selected and came out `06 30 123 4567` — the
+   * Hungarian national form, printed on a Czech form with no dialling code on
+   * it. That is the owner's original complaint word for word, "nemas vobec
+   * predvolbu", arrived at from a third direction.
+   *
+   * Nothing is lost while somebody is still typing: a number with no dialling
+   * code in it is parsed as national for the region picked, so the server
+   * reports that same region back as the detected one.
+   */
+  if (inspection.detectedRegionCode === HOME_REGION && inspection.national !== '') {
     return inspection.national;
   }
   /* International first for anything foreign; `national` only as a fallback

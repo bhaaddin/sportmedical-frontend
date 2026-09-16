@@ -17,7 +17,9 @@
  * second and third person.
  */
 import { describe, it, expect } from 'vitest';
-import { parseBirthNumber, validateEmail, validateInsuranceNumber } from './validation';
+import {
+  parseBirthNumber, validateEmail, validateInsuranceNumber, validatePhone,
+} from './validation';
 
 /* Computed, not invented: 900515001 leaves 1 modulo 11, so 1 is its check
    digit and 9005150011 divides by eleven exactly. */
@@ -154,5 +156,78 @@ describe('the e-mail on the questionnaire', () => {
    */
   it('leaves the length to the server as well', () => {
     expect(validateEmail('a'.repeat(300) + '@example.cz').ok).toBe(true);
+  });
+});
+
+/*
+ * The telephone on the public questionnaire.
+ *
+ * This held five dial prefixes written out by hand — CZ, SK, PL, DE, AT — and
+ * an E.164 shape check, and it did not only judge a number: it BUILT the one
+ * that was submitted, turning `777777777` + CZ into `+420777777777` by
+ * concatenation. A Hungarian could not be described at all, and the value that
+ * reached the registry was assembled by a rule that had drifted from the one
+ * that stores it.
+ *
+ * `POST /api/public/contact-check/phone` answers both now, on the same
+ * libphonenumber the desk uses. The owner's instruction was the reason:
+ * "nechcem mat dva system i u mojej rezervacie a v dotazniku iny … rovnaka
+ * logika a premakanost u oboch uplne rovnako."
+ *
+ * These guard the SILENCE, like the e-mail ones: the values below start
+ * failing the day a prefix table or a shape rule creeps back onto the form.
+ */
+describe('the telephone on the questionnaire', () => {
+  const phone = (number: string, regionCode = 'CZ') =>
+    validatePhone({ regionCode, number });
+
+  it('asks for one that is missing', () => {
+    const result = phone('');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('phone.required');
+  });
+
+  it('treats a box of spaces as empty', () => {
+    expect(phone('   ').ok).toBe(false);
+  });
+
+  /*
+   * The person the old list shut out. `+36` was not among the five prefixes,
+   * so a Hungarian number could not be described however it was typed.
+   * Measured: the server reads it, `detectedRegionCode: HU`.
+   */
+  it('does not refuse a country the old list had never heard of', () => {
+    expect(phone('+36301234567').ok).toBe(true);
+    expect(phone('+385911234567').ok).toBe(true);
+  });
+
+  /*
+   * And it no longer BUILDS anything. The value handed back is what somebody
+   * typed — the `+420…` form comes from the server's `e164`, so a number is
+   * assembled in one place instead of two.
+   */
+  it('hands back what was typed, without inventing a dialling code', () => {
+    const result = phone('777777777');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toBe('777777777');
+      expect(result.value).not.toContain('+420');
+    }
+  });
+
+  it('keeps the spacing out of the way but leaves the number alone', () => {
+    const result = phone('  777 777 777  ');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe('777 777 777');
+  });
+
+  /* Whether it is plausible for the chosen country is the server's call, so
+     nothing here may pass judgement on it either way. */
+  it('does not judge a number that is too short', () => {
+    expect(phone('7').ok).toBe(true);
+  });
+
+  it('does not judge letters either — the server says what it is', () => {
+    expect(phone('nevím').ok).toBe(true);
   });
 });

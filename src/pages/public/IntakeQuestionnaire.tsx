@@ -9,7 +9,7 @@
    mirrors the backend domain rules 1:1.
    ══════════════════════════════════════════════════════════════ */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -52,11 +52,20 @@ import {
   submitIntake,
 } from '../../api/publicIntake';
 import type { IntakeInsurance, IntakeResponse } from '../../api/publicIntake';
-import { checkPublicEmail } from '../../api/publicContactCheck';
-import type { EmailInspection } from '../../api/patientRegistry';
+import {
+  checkPublicEmail, checkPublicPhone, publicPhoneRegions,
+} from '../../api/publicContactCheck';
+import type { PublicPhoneRegion } from '../../api/publicContactCheck';
+import {
+  preferredCount, withPreferredFirst,
+} from '../../services/patientRegistration/phoneRegions';
+import type { EmailInspection, PhoneInspection } from '../../api/patientRegistry';
 import {
   emailComplaint, worthInspectingEmail,
 } from '../../services/patientRegistration/emailInspection';
+import {
+  groupedDisplay, phoneComplaint, phoneDisplayState, worthInspectingPhone,
+} from '../../services/patientRegistration/phoneDisplay';
 import PublicAddressPicker from '../../components/public/PublicAddressPicker';
 import type { AddressPoint } from '../../api/addressLookup';
 
@@ -111,12 +120,25 @@ type Errors = Partial<Record<keyof FormState | 'address', string>>;
 
 const STEPS = ['Kdo jste', 'Kontakt', 'Pojištění', 'Souhlasy', 'Rekapitulace'];
 
-const PHONE_REGIONS = [
-  { code: 'CZ', label: 'Česko (+420)' },
-  { code: 'SK', label: 'Slovensko (+421)' },
-  { code: 'PL', label: 'Polsko (+48)' },
-  { code: 'DE', label: 'Německo (+49)' },
-  { code: 'AT', label: 'Rakousko (+43)' },
+/*
+ * The five countries this form used to offer, kept ONLY as what to fall back
+ * on when the list cannot be fetched.
+ *
+ * They were the whole list until 16. 9. 2026, and a Hungarian could not
+ * describe his number at all — he gave up and the clinic never heard about it.
+ * The list now comes from `GET /api/public/contact-check/phone-regions`: 245
+ * entries, the same source the desk uses, with the dialling code generated
+ * from the numbering plan rather than typed here.
+ *
+ * These five stay because a form that cannot reach that endpoint must still be
+ * fillable by the people who fill it most. They are a fallback, not the offer.
+ */
+const FALLBACK_PHONE_REGIONS: PublicPhoneRegion[] = [
+  { code: 'CZ', displayValue: 'CZ (+420)' },
+  { code: 'SK', displayValue: 'SK (+421)' },
+  { code: 'PL', displayValue: 'PL (+48)' },
+  { code: 'DE', displayValue: 'DE (+49)' },
+  { code: 'AT', displayValue: 'AT (+43)' },
 ];
 
 const collect = (errors: Errors, field: keyof FormState, result: { ok: boolean; error?: FieldError }): void => {
@@ -177,6 +199,72 @@ export default function IntakeQuestionnaire() {
 
   const emailAnswer = form.email === emailAskedFor ? emailLook : null;
   const emailSays = emailComplaint(emailAnswer);
+
+  /*
+   * The telephone, on the same libphonenumber the desk uses.
+   *
+   * Asked WHILE it is typed, unlike the e-mail: a half-typed number still
+   * comes back grouped and useful, so the patient sees `777 777 777` forming
+   * as they go. The complaint waits until it is long enough to be finished —
+   * a red border on every second keystroke is one nobody reads by the time it
+   * means something.
+   */
+  /* CZ and SK first with a line under them, then the server's own order —
+     the same arrangement as the desk, which is what the owner asked for. */
+  const [regions, setRegions] = useState<PublicPhoneRegion[]>(FALLBACK_PHONE_REGIONS);
+
+  useEffect(() => {
+    let cancelled = false;
+    publicPhoneRegions()
+      .then((list) => { if (!cancelled && list.length > 0) setRegions(list); })
+      .catch(() => { /* the five stay */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  const phoneRegions = useMemo(() => withPreferredFirst(regions), [regions]);
+  const preferredRegions = useMemo(() => preferredCount(regions), [regions]);
+
+  const [phoneLook, setPhoneLook] = useState<PhoneInspection | null>(null);
+
+  useEffect(() => {
+    if (!worthInspectingPhone(form.phone) || form.phoneRegion === '') {
+      setPhoneLook(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      checkPublicPhone(form.phone, form.phoneRegion)
+        .then((result) => { if (!cancelled) setPhoneLook(result); })
+        .catch(() => { if (!cancelled) setPhoneLook(null); });
+    }, 350);
+
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [form.phone, form.phoneRegion]);
+
+  const phoneState = phoneDisplayState(phoneLook, form.phone);
+  const phoneGrouped = groupedDisplay(phoneLook);
+  const phoneSays = phoneComplaint(phoneState, form.phoneRegion);
+
+  /* The number as the registry will store it — the server's `e164`, never one
+     assembled here. Asked again at the moment of sending. */
+  const askAboutPhone = async (): Promise<PhoneInspection | null> => {
+    /*
+     * Always asked, unlike the version beside the keystrokes.
+     *
+     * This used to return `null` without asking when the box held fewer than
+     * three digits, and `null` also means "could not reach the server" — so
+     * `nevím` in the telephone box walked straight through the step. The
+     * server reads that as `parses: false`; it only had to be asked.
+     */
+    try {
+      const verdict = await checkPublicPhone(form.phone, form.phoneRegion);
+      setPhoneLook(verdict);
+      return verdict;
+    } catch {
+      return null;
+    }
+  };
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]): void => {
     setForm((previous) => ({ ...previous, [key]: value }));
@@ -243,6 +331,22 @@ export default function IntakeQuestionnaire() {
   };
 
   /*
+   * Why a number was refused, and never an empty sentence.
+   *
+   * `phoneComplaint` deliberately says nothing while somebody is mid-number —
+   * that is its job beside the keystrokes. Here it is the reason a step will
+   * not advance, and a step that refuses to advance while saying nothing is
+   * worse than one that complains: the patient has no idea what to change.
+   */
+  const phoneRefusal = (state: string, regionCode: string): string => {
+    const said = phoneComplaint(
+      state === 'typing' || state === 'idle' ? 'wrong-region' : (state as 'unreadable' | 'wrong-region'),
+      regionCode,
+    );
+    return said !== '' ? said : 'Telefonní číslo nevypadá správně. Například 601 234 567.';
+  };
+
+  /*
    * Moving on from the contact step puts the address to the server first.
    *
    * It is asked again here rather than trusted from the field, because
@@ -251,6 +355,16 @@ export default function IntakeQuestionnaire() {
    */
   const goNext = async (): Promise<void> => {
     const found = validateStep(step);
+
+    if (step === 1 && found.phone === undefined) {
+      const verdict = await askAboutPhone();
+      /* `null` is unreachable, not invalid: the submission goes to the same
+         server and will refuse it there rather than this form guessing. */
+      if (verdict !== null) {
+        const state = phoneDisplayState(verdict, form.phone);
+        if (state !== 'valid') found.phone = phoneRefusal(state, form.phoneRegion);
+      }
+    }
 
     if (step === 1 && found.email === undefined) {
       const verdict = await askAboutEmail(form.email);
@@ -299,8 +413,26 @@ export default function IntakeQuestionnaire() {
       return;
     }
 
-    const phone = validatePhone({ regionCode: form.phoneRegion, number: form.phone });
-    if (!phone.ok) return;
+    /*
+     * The number that is SENT is the server's `e164`, never one assembled
+     * here. The old code built it by string concatenation — `777777777` + CZ
+     * became `+420777777777` — which is a fourth definition of a telephone
+     * number in a codebase that spent today deleting three.
+     */
+    const inspected = await askAboutPhone();
+    const phoneVerdict = inspected === null
+      ? 'unreadable'
+      : phoneDisplayState(inspected, form.phone);
+
+    if (inspected === null || phoneVerdict !== 'valid' || inspected.e164 === '') {
+      setErrors((previous) => ({
+        ...previous,
+        phone: phoneRefusal(phoneVerdict, form.phoneRegion),
+      }));
+      setSubmitError('Některé údaje je potřeba opravit. Vraťte se prosím zpět a zkontrolujte je.');
+      return;
+    }
+    const phone = { value: inspected.e164 };
 
     setSubmitting(true);
     setSubmitError(null);
@@ -555,11 +687,15 @@ export default function IntakeQuestionnaire() {
               value={form.phoneRegion}
               onChange={(event) => set('phoneRegion', event.target.value)}
             >
-              {PHONE_REGIONS.map((region) => (
+              {phoneRegions.map((region, index) => [
+                /* A line under the common ones, never above the first row. */
+                index === preferredRegions && preferredRegions > 0
+                  ? <Divider key="preferred-divider" />
+                  : null,
                 <MenuItem key={region.code} value={region.code}>
-                  {region.label}
-                </MenuItem>
-              ))}
+                  {region.displayValue}
+                </MenuItem>,
+              ])}
             </TextField>
             <TextField
               fullWidth
@@ -567,8 +703,14 @@ export default function IntakeQuestionnaire() {
               placeholder="601 234 567"
               value={form.phone}
               onChange={(event) => set('phone', event.target.value)}
-              error={errors.phone !== undefined}
-              helperText={errors.phone ?? 'Například 601 234 567'}
+              error={errors.phone !== undefined || phoneState === 'unreadable'}
+              /* Grouped as it is typed, complained about only once it is long
+                 enough to be finished and still does not fit the country. */
+              helperText={
+                errors.phone
+                ?? (phoneSays !== '' ? phoneSays : undefined)
+                ?? (phoneGrouped !== '' ? phoneGrouped : 'Například 601 234 567')
+              }
             />
             <Box>
               <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
@@ -721,7 +863,7 @@ export default function IntakeQuestionnaire() {
               <SummaryRow label="Rodné číslo" value={form.birthNumber} />
             )}
             <SummaryRow label="E-mail" value={form.email} />
-            <SummaryRow label="Telefon" value={form.phone} />
+            <SummaryRow label="Telefon" value={phoneGrouped !== '' ? phoneGrouped : form.phone} />
             {/* The one value the patient picked from a list rather than typed,
                 so the recap is the only place they can check it was the right
                 building before it becomes their registered address. */}

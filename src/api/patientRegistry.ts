@@ -237,8 +237,13 @@ export interface PhoneInspection {
    * For a stored number — which always carries its `+` — this is the country,
    * and it is the one a card must go by: `regionCode` there says only what the
    * screen happened to ask.
+   *
+   * NULL when there is no country to name — measured: `nevím` answers
+   * `parses: false` with `detectedRegionCode: null`. The OpenAPI document
+   * types it as a plain string and the running server disagrees; this follows
+   * the server.
    */
-  detectedRegionCode: string;
+  detectedRegionCode: string | null;
 }
 
 /* ── Result ── */

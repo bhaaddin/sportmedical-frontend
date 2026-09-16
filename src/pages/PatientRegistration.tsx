@@ -326,7 +326,7 @@ export default function PatientRegistration() {
   const emailSays = emailComplaint(emailAnswer);
 
   const phoneState = phoneDisplayState(phoneLook, form.phone);
-  const phoneGrouped = groupedDisplay(phoneLook, form.phoneRegionCode);
+  const phoneGrouped = groupedDisplay(phoneLook);
   const phoneSays = phoneComplaint(phoneState, form.phoneRegionCode);
 
   /* ── Birth number drives date of birth and sex ── */

@@ -238,13 +238,21 @@ export function validateEmail(input: string): ValidationResult<string> {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Phone — structural E.164 pre-check
+   Phone — asked of the server, not decided here
 
-   The backend canonicalizes with libphonenumber
-   (PhoneContactAddressCanonicalizer, "phone.libphonenumber_e164").
-   We deliberately do NOT ship libphonenumber to the public bundle for
-   one field; this is a structural gate only and the server stays
-   authoritative for per-country plausibility.
+   This block used to hold five dial prefixes written out by hand
+   (CZ, SK, PL, DE, AT) and an E.164 shape check, and it did not only
+   judge a number — it BUILT the one that was submitted, turning
+   `777777777` + CZ into `+420777777777` by concatenation.
+
+   Two things were wrong with that. A Hungarian could not be described
+   at all, because `+36` was not in the list; and the value that reached
+   the registry was assembled by a rule that had drifted from the one
+   that stores it. `POST /api/public/contact-check/phone` answers both
+   on the same libphonenumber the desk uses — the owner asked for
+   exactly that: "rovnaka logika a premakanost u oboch uplne rovnako".
+
+   What stays here is whether there is a number at all.
    ══════════════════════════════════════════════════════════════ */
 
 export interface PhoneInput {
@@ -254,50 +262,14 @@ export interface PhoneInput {
   number: string;
 }
 
-const E164 = /^\+[1-9]\d{7,14}$/;
+export function validatePhone({ number }: PhoneInput): ValidationResult<string> {
+  const trimmed = number.trim();
 
-/** Dial prefixes for regions we offer by default; extend with the picker. */
-const DIAL_PREFIXES: Readonly<Record<string, string>> = {
-  CZ: '+420',
-  SK: '+421',
-  PL: '+48',
-  DE: '+49',
-  AT: '+43',
-};
-
-export function validatePhone({ regionCode, number }: PhoneInput): ValidationResult<string> {
-  const stripped = number.replace(/[\s\-()/.]/g, '');
-
-  if (stripped.length === 0) {
+  if (trimmed.length === 0) {
     return fail('phone.required', 'Telefon je povinný — ozveme se na něj, pokud bude potřeba.');
   }
-  if (!/^\+?\d+$/.test(stripped)) {
-    return fail(
-      'phone.format_invalid',
-      'Telefon smí obsahovat pouze číslice, mezery a případně předvolbu se znakem +.',
-    );
-  }
 
-  const prefix = DIAL_PREFIXES[regionCode] ?? null;
-  let candidate: string;
-
-  if (stripped.startsWith('+')) {
-    candidate = stripped;
-  } else if (prefix !== null) {
-    // National format: drop a single leading 0 before prefixing.
-    candidate = prefix + stripped.replace(/^0/, '');
-  } else {
-    return fail('phone.region_required', 'Vyberte prosím zemi telefonního čísla.');
-  }
-
-  if (!E164.test(candidate)) {
-    return fail(
-      'phone.format_invalid',
-      'Telefonní číslo nevypadá správně. Například 601 234 567 nebo +420 601 234 567.',
-    );
-  }
-
-  return pass(candidate);
+  return pass(trimmed);
 }
 
 /* ══════════════════════════════════════════════════════════════

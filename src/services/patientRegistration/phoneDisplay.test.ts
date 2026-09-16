@@ -90,11 +90,93 @@ const slovak = (): PhoneInspection => ({
   regionCode: 'SK', detectedRegionCode: 'SK',
 });
 
+/*
+ * A number written with its own dialling code.
+ *
+ * The owner asked for one behaviour on both forms — "rovnaka logika a
+ * premakanost u oboch uplne rovnako" — and the questionnaire is where it
+ * showed: its picker offers five countries, so `+36 30 123 4567` was told to
+ * "check the dialling code" and pointed at a list with no Hungary in it. The
+ * dialling code was right. The list was the problem.
+ *
+ * MEASURED on the public endpoint with no token:
+ *   +36301234567 asked as CZ → parses ✓ isValid ✓ isValidForRegion ✗
+ *                              detectedRegionCode HU
+ *
+ * `isValidForRegion: false` there does not mean "wrong". It means "not
+ * Czech", which is true of a Hungarian number and is nobody's mistake.
+ */
+describe('a number that carries its own dialling code', () => {
+  const foreignButValid = (): PhoneInspection => ({
+    parses: true, isValid: true, isValidForRegion: false,
+    e164: '+36301234567', international: '+36 30 123 4567',
+    national: '06 30 123 4567', regionCode: 'CZ', detectedRegionCode: 'HU',
+  });
+
+  it('accepts it whatever the picker says', () => {
+    expect(phoneDisplayState(foreignButValid(), '+36301234567')).toBe('valid');
+    expect(phoneDisplayState(foreignButValid(), '+36 30 123 4567')).toBe('valid');
+  });
+
+  it('says nothing about it', () => {
+    const state = phoneDisplayState(foreignButValid(), '+36301234567');
+    expect(phoneComplaint(state, 'CZ')).toBe('');
+  });
+
+  /*
+   * The `+` is what makes the country explicit. The same digits typed WITHOUT
+   * one are a national number for the country that was picked, and being wrong
+   * for it is a real complaint — this is the line between the two.
+   */
+  /*
+   * The case that corrected this rule. `00` is how a great many people write a
+   * dialling code, and an earlier version keyed on a literal `+` — it would
+   * have refused this while accepting the identical `+421…`. A mutation that
+   * removed the `+` half survived, and it survived because it was right.
+   *
+   * MEASURED, no token: 00421908123456 asked as CZ → isValid ✓, forRegion ✗,
+   * detected SK, e164 +421908123456.
+   */
+  it('accepts a dialling code written as 00, not only as +', () => {
+    const doubleZero: PhoneInspection = {
+      parses: true, isValid: true, isValidForRegion: false,
+      e164: '+421908123456', international: '+421 908 123 456',
+      national: '0908 123 456', regionCode: 'CZ', detectedRegionCode: 'SK',
+    };
+    expect(phoneDisplayState(doubleZero, '00421908123456')).toBe('valid');
+    expect(phoneComplaint(phoneDisplayState(doubleZero, '00421908123456'), 'CZ')).toBe('');
+  });
+
+  it('still complains about a national number that does not fit', () => {
+    const nationalMisfit: PhoneInspection = {
+      ...foreignButValid(), isValid: false, e164: '', international: '',
+    };
+    expect(phoneDisplayState(nationalMisfit, '36301234567')).toBe('wrong-region');
+  });
+
+  /* And a `+` in front of something unreadable is still unreadable. */
+  it('does not rescue something that is not a number', () => {
+    const rubbish: PhoneInspection = {
+      parses: false, isValid: false, isValidForRegion: false,
+      e164: '', international: '', national: '', regionCode: 'CZ',
+      detectedRegionCode: '',
+    };
+    expect(phoneDisplayState(rubbish, '+abc')).toBe('unreadable');
+  });
+
+  /* A leading `+` on a number the server does not consider valid anywhere is
+     not a way past the check. */
+  it('does not accept a plus in front of an invalid number', () => {
+    const half: PhoneInspection = { ...foreignButValid(), isValid: false };
+    expect(phoneDisplayState(half, '+3630123')).not.toBe('valid');
+  });
+});
+
 describe('the grouping shown', () => {
   /* A local number is written without its dialling code — everybody reading it
      knows where they are. */
   it('writes a home number without its dialling code', () => {
-    expect(groupedDisplay(czechComplete(), 'CZ')).toBe('777 777 777');
+    expect(groupedDisplay(czechComplete())).toBe('777 777 777');
   });
 
   /*
@@ -103,18 +185,34 @@ describe('the grouping shown', () => {
    * impossible to dial. Anything foreign carries its code.
    */
   it('keeps the dialling code on anything foreign', () => {
-    expect(groupedDisplay(slovak(), 'SK')).toBe('+421 908 123 456');
-    expect(groupedDisplay(slovak(), 'SK')).not.toBe('0908 123 456');
+    expect(groupedDisplay(slovak())).toBe('+421 908 123 456');
+    expect(groupedDisplay(slovak())).not.toBe('0908 123 456');
   });
 
   /* A half-typed number still gets grouped — that is the whole feature. */
   it('shows even while it is still being typed', () => {
-    expect(groupedDisplay(czechHalfTyped(), 'CZ')).toBe('777777');
+    expect(groupedDisplay(czechHalfTyped())).toBe('777777');
+  });
+
+  /*
+   * The row that moved this off the picked region. A Hungarian number on a
+   * form with CZ selected came out `06 30 123 4567` — the Hungarian national
+   * form with no dialling code, on a Czech screen. The owner's original
+   * complaint, reached from a third direction.
+   */
+  it('keeps the dialling code on a number from somewhere else entirely', () => {
+    const hungarian: PhoneInspection = {
+      parses: true, isValid: true, isValidForRegion: false,
+      e164: '+36301234567', international: '+36 30 123 4567',
+      national: '06 30 123 4567', regionCode: 'CZ', detectedRegionCode: 'HU',
+    };
+    expect(groupedDisplay(hungarian)).toBe('+36 30 123 4567');
+    expect(groupedDisplay(hungarian)).not.toBe('06 30 123 4567');
   });
 
   it('shows nothing for something unreadable', () => {
-    expect(groupedDisplay(unreadable(), 'CZ')).toBe('');
-    expect(groupedDisplay(null, 'CZ')).toBe('');
+    expect(groupedDisplay(unreadable())).toBe('');
+    expect(groupedDisplay(null)).toBe('');
   });
 
   /* A home number with no national form still has to show something. */
@@ -122,7 +220,7 @@ describe('the grouping shown', () => {
     const noNational: PhoneInspection = {
       ...czechComplete(), national: '', international: '+420 777 777 777',
     };
-    expect(groupedDisplay(noNational, 'CZ')).toBe('+420 777 777 777');
+    expect(groupedDisplay(noNational)).toBe('+420 777 777 777');
   });
 
   /* And a foreign one with no international form falls the other way. */
@@ -130,7 +228,7 @@ describe('the grouping shown', () => {
     const noInternational: PhoneInspection = {
       ...slovak(), international: '',
     };
-    expect(groupedDisplay(noInternational, 'SK')).toBe('0908 123 456');
+    expect(groupedDisplay(noInternational)).toBe('0908 123 456');
   });
 });
 
