@@ -52,6 +52,11 @@ import {
   submitIntake,
 } from '../../api/publicIntake';
 import type { IntakeInsurance, IntakeResponse } from '../../api/publicIntake';
+import { checkPublicEmail } from '../../api/publicContactCheck';
+import type { EmailInspection } from '../../api/patientRegistry';
+import {
+  emailComplaint, worthInspectingEmail,
+} from '../../services/patientRegistration/emailInspection';
 import PublicAddressPicker from '../../components/public/PublicAddressPicker';
 import type { AddressPoint } from '../../api/addressLookup';
 
@@ -135,6 +140,44 @@ export default function IntakeQuestionnaire() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [result, setResult] = useState<IntakeResponse | null>(null);
 
+  /*
+   * The e-mail, decided by the code that stores it.
+   *
+   * Asked when the field is LEFT, not while it is typed: `j`, `ja` and `jan@`
+   * are each `parses: false`, and a box that is red through the whole first
+   * word is one nobody reads by the time it means something.
+   *
+   * `emailAskedFor` is the value the answer belongs to — without it a verdict
+   * about an address somebody has since corrected would keep the box red, or
+   * worse, let a bad one through.
+   */
+  const [emailLook, setEmailLook] = useState<EmailInspection | null>(null);
+  const [emailAskedFor, setEmailAskedFor] = useState('');
+
+  const askAboutEmail = async (value: string): Promise<EmailInspection | null> => {
+    if (!worthInspectingEmail(value)) {
+      setEmailLook(null);
+      setEmailAskedFor('');
+      return null;
+    }
+    try {
+      const verdict = await checkPublicEmail(value);
+      setEmailLook(verdict);
+      setEmailAskedFor(value);
+      return verdict;
+    } catch {
+      /* The submission goes to the same server. If it cannot be reached to
+         ask, it cannot be reached to book either, and it will say so — a
+         guess here is what this change removed. */
+      setEmailLook(null);
+      setEmailAskedFor('');
+      return null;
+    }
+  };
+
+  const emailAnswer = form.email === emailAskedFor ? emailLook : null;
+  const emailSays = emailComplaint(emailAnswer);
+
   const set = <K extends keyof FormState>(key: K, value: FormState[K]): void => {
     setForm((previous) => ({ ...previous, [key]: value }));
     setErrors((previous) => ({ ...previous, [key]: undefined }));
@@ -199,8 +242,26 @@ export default function IntakeQuestionnaire() {
     return next;
   };
 
-  const goNext = (): void => {
+  /*
+   * Moving on from the contact step puts the address to the server first.
+   *
+   * It is asked again here rather than trusted from the field, because
+   * somebody can paste into the box and press the button without ever leaving
+   * it — and that is the path that must not go through.
+   */
+  const goNext = async (): Promise<void> => {
     const found = validateStep(step);
+
+    if (step === 1 && found.email === undefined) {
+      const verdict = await askAboutEmail(form.email);
+      /* `null` means unreachable, not invalid: the booking goes to the same
+         server and will refuse it there rather than this form inventing a
+         reason. */
+      if (verdict !== null && !verdict.parses) {
+        found.email = emailComplaint(verdict);
+      }
+    }
+
     setErrors(found);
     if (Object.keys(found).length === 0) setStep((current) => current + 1);
   };
@@ -480,8 +541,12 @@ export default function IntakeQuestionnaire() {
               placeholder="jan.novak@email.cz"
               value={form.email}
               onChange={(event) => set('email', event.target.value)}
-              error={errors.email !== undefined}
-              helperText={errors.email ?? 'Pošleme na něj potvrzení rezervace.'}
+              onBlur={() => { void askAboutEmail(form.email); }}
+              error={errors.email !== undefined || emailSays !== ''}
+              helperText={
+                errors.email
+                ?? (emailSays !== '' ? emailSays : 'Pošleme na něj potvrzení rezervace.')
+              }
             />
             <TextField
               select
@@ -694,7 +759,7 @@ export default function IntakeQuestionnaire() {
             </Button>
           )}
           {step < STEPS.length - 1 ? (
-            <Button fullWidth variant="contained" onClick={goNext}>
+            <Button fullWidth variant="contained" onClick={() => { void goNext(); }}>
               Pokračovat
             </Button>
           ) : (

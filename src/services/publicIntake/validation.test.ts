@@ -17,7 +17,7 @@
  * second and third person.
  */
 import { describe, it, expect } from 'vitest';
-import { parseBirthNumber, validateInsuranceNumber } from './validation';
+import { parseBirthNumber, validateEmail, validateInsuranceNumber } from './validation';
 
 /* Computed, not invented: 900515001 leaves 1 modulo 11, so 1 is its check
    digit and 9005150011 divides by eleven exactly. */
@@ -87,5 +87,72 @@ describe('the insurance number', () => {
   it('still accepts a nine- and a ten-digit number', () => {
     expect(validateInsuranceNumber('123456789').ok).toBe(true);
     expect(validateInsuranceNumber('1234567890').ok).toBe(true);
+  });
+});
+
+/*
+ * The e-mail on the public questionnaire.
+ *
+ * This file had NO test for `validateEmail` while it held sixty lines of
+ * hand-written rules mirroring `EmailContactAddressCanonicalizer` — one `@`,
+ * a local part of 1–64, a domain with a dot in it, no whitespace, 254 overall.
+ * Careful, well meant, untested, and wrong: measured against the running
+ * server, it refused `jan@localhost`, which the server stores.
+ *
+ * That was the THIRD hand-written definition of an e-mail address in this
+ * repository. It is now the server's, through
+ * `POST /api/public/contact-check/email` — anonymous, and the same
+ * canonicaliser as the staff screen rather than another copy.
+ *
+ * What is left here is whether there is an address at all, which needs no
+ * round trip and is true whoever is asked. These tests exist to guard the
+ * SILENCE: the values below are the ones that start failing if a shape rule
+ * ever creeps back onto the form.
+ */
+describe('the e-mail on the questionnaire', () => {
+  it('asks for one that is missing', () => {
+    const result = validateEmail('');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('email.required');
+      expect(result.error.message).toMatch(/povinný/);
+    }
+  });
+
+  it('treats a box of spaces as empty', () => {
+    expect(validateEmail('   ').ok).toBe(false);
+  });
+
+  /* Measured: the server stores this one. The old rule refused it for want of
+     a dot in the domain. */
+  it('does not refuse an address the server accepts', () => {
+    const result = validateEmail('jan@localhost');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe('jan@localhost');
+  });
+
+  /* Measured: the server refuses this one. The form must not pass judgement
+     either way — saying "fine" here would be a second opinion, and the step
+     cannot be left without the server's. */
+  it('does not pass judgement on an address the server refuses', () => {
+    expect(validateEmail('jan@example..cz').ok).toBe(true);
+    expect(validateEmail('napriklad.gmail.com').ok).toBe(true);
+  });
+
+  /* It trims, because what is stored is the trimmed value and the caller
+     passes this on. */
+  it('hands back the address without the spaces around it', () => {
+    const result = validateEmail('  jan@example.cz  ');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe('jan@example.cz');
+  });
+
+  /*
+   * A long address is the server's call too. The old rule cut it off at 254
+   * with its own sentence; the server answers `display_value.too_long`, and
+   * one place saying it is the whole point.
+   */
+  it('leaves the length to the server as well', () => {
+    expect(validateEmail('a'.repeat(300) + '@example.cz').ok).toBe(true);
   });
 });

@@ -206,47 +206,32 @@ export function validateInsuranceNumber(input: string): ValidationResult<string>
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Email — mirrors EmailContactAddressCanonicalizer
-   ══════════════════════════════════════════════════════════════ */
+   Email — asked of the server, not decided here
 
-const EMAIL_MAX_TOTAL = 254;
-const EMAIL_MAX_LOCAL = 64;
+   This block used to MIRROR `EmailContactAddressCanonicalizer`: one `@`,
+   a local part of 1–64, a domain containing a dot and not starting or
+   ending with one, no whitespace, 254 overall. Careful, well meant, and
+   wrong — the same way the staff screen's regular expression was wrong,
+   measured against the running server on 15. 9. 2026:
+
+     jan@localhost     the form refused it (no dot); the server stores it
+     jan@háčková.cz    both accept it; the server stores
+                       jan@xn--hkov-5nad81a.cz
+
+   A mirror is a copy that agrees until the original changes. App built
+   `POST /api/public/contact-check/email` — anonymous, no token, the SAME
+   canonicaliser rather than another copy — so the shape is decided in one
+   place for the desk and the public form alike.
+
+   What stays here is whether there is an address at all. That needs no
+   round trip and it is true whoever is asked.
+   ══════════════════════════════════════════════════════════════ */
 
 export function validateEmail(input: string): ValidationResult<string> {
   const trimmed = input.trim();
 
   if (trimmed.length === 0) {
     return fail('email.required', 'E-mail je povinný — pošleme na něj potvrzení rezervace.');
-  }
-  if (trimmed.length > EMAIL_MAX_TOTAL) {
-    return fail('email.too_long', `E-mail je příliš dlouhý (maximálně ${EMAIL_MAX_TOTAL} znaků).`);
-  }
-
-  const separatorIndex = trimmed.indexOf('@');
-  if (separatorIndex < 0 || separatorIndex !== trimmed.lastIndexOf('@')) {
-    return fail(
-      'email.format_invalid',
-      'E-mail musí obsahovat právě jeden znak @. Například jan.novak@email.cz.',
-    );
-  }
-
-  const localPart = trimmed.slice(0, separatorIndex);
-  const domainPart = trimmed.slice(separatorIndex + 1);
-
-  if (localPart.length === 0 || localPart.length > EMAIL_MAX_LOCAL) {
-    return fail(
-      'email.format_invalid',
-      `Část před @ musí mít 1 až ${EMAIL_MAX_LOCAL} znaků. Například jan.novak@email.cz.`,
-    );
-  }
-  if (domainPart.length === 0 || !domainPart.includes('.') || domainPart.startsWith('.') || domainPart.endsWith('.')) {
-    return fail(
-      'email.format_invalid',
-      'Část za @ nevypadá jako platná doména. Například jan.novak@email.cz.',
-    );
-  }
-  if (/\s/.test(trimmed)) {
-    return fail('email.format_invalid', 'E-mail nesmí obsahovat mezery.');
   }
 
   return pass(trimmed);
