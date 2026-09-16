@@ -139,6 +139,28 @@ const MESSAGE_BY_CODE: Record<string, string> = {
     'Potvrzení shod už není platné. Odešlete registraci znovu.',
   'patients.registration.concurrency_conflict':
     'Údaje se souběžně změnily. Zkuste registraci odeslat znovu.',
+  /*
+   * The live duplicate check above the form cannot see this one: it looks by
+   * name, date of birth and sex, and this is a match on the IDENTIFIER alone —
+   * the same person entered under a different name, or somebody else's number
+   * typed by mistake. It surfaces at the unique index and nowhere earlier.
+   *
+   * Until 15. 9. 2026 the server answered this with `concurrency_conflict` and
+   * the words "Skontrolujte formulár", which sent a receptionist to check a
+   * form that was correct. App shipped the real code the same afternoon; the
+   * `field` it names is one of `birthNumber`, `healthInsuranceNumber` or
+   * `identityDocumentNumber`, all three of which `FIELD_BY_DOMAIN_NAME`
+   * already knows, so the box marks itself.
+   *
+   * Deliberately NOT in `RESTART_CODES`: that mints fresh identifiers because
+   * "the registry already knows them with other facts", and here the burnt
+   * value is the number somebody typed, not the generated ids. A new GUID
+   * changes nothing about it, and the way out is to correct the number or to
+   * go and find the patient who already has it.
+   */
+  'patients.registration.identifier_already_registered':
+    'Pacient s tímto identifikátorem už je v registru zapsán. '
+    + 'Najděte ho v seznamu pacientů — druhý záznam by rozdělil historii vyšetření.',
 
   /* Transport */
   // The registry answers a malformed command from the model binder, before its
