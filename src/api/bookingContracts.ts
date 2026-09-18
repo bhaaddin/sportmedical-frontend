@@ -81,6 +81,14 @@ export const calendarSchema = z.object({
    */
   publicMinimumNoticeMinutes: z.number().int().nullish().transform((v) => v ?? null),
   publicHorizonDays: z.number().int().nullish().transform((v) => v ?? null),
+  /**
+   * How long a held slot is kept while the patient registers, and how late they
+   * may cancel online. Unset means the system's own answer - fifteen minutes
+   * and twenty-four hours - not zero, which would hold nothing and allow no
+   * cancellation at all.
+   */
+  publicHoldMinutes: z.number().int().nullish().transform((v) => v ?? null),
+  publicCancellationHours: z.number().int().nullish().transform((v) => v ?? null),
 });
 export type Calendar = z.infer<typeof calendarSchema>;
 
@@ -99,9 +107,15 @@ export const calendarInputSchema = z.object({
    * quietly. Every screen that edits one sends back what it was given.
    */
   clinicServiceId: z.string().nullable(),
-  /** Carried, not edited - see the note on `calendarSchema`. */
+  /*
+   * All four are edited on the Kalendare screen now. They used to be carried
+   * and never shown, with a note saying public booking was phase 2; phase 2
+   * arrived on 18. 9. 2026, and a limit nobody can set is not a limit.
+   */
   publicMinimumNoticeMinutes: z.number().int().nullable(),
   publicHorizonDays: z.number().int().nullable(),
+  publicHoldMinutes: z.number().int().nullable(),
+  publicCancellationHours: z.number().int().nullable(),
 });
 export type CalendarInput = z.infer<typeof calendarInputSchema>;
 

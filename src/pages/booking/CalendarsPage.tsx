@@ -49,6 +49,21 @@ import {
 
 const CODEBOOK_STALE_MS = 5 * 60 * 1000; // 7.3: minutes for codebooks, not seconds.
 
+/**
+ * What an emptied number field means: unset, not zero.
+ *
+ * Zero would be a real answer to all four of these and a wrong one - a horizon
+ * of no days, a hold of no minutes. Empty has to survive the trip to the server
+ * as null.
+ */
+function numberOrNull(raw: string): number | null {
+  const text = raw.trim();
+  if (text === "") return null;
+
+  const value = Number(text);
+  return Number.isFinite(value) ? value : null;
+}
+
 function emptyDraft(sortOrder: number): CalendarInput {
   return {
     name: "",
@@ -60,9 +75,13 @@ function emptyDraft(sortOrder: number): CalendarInput {
     /* Empty until one is picked: a calendar that runs no service offers
        nothing, so the save waits rather than making a silent one. */
     clinicServiceId: null,
-    /* 4.1: unset means "no limit", which is the right default for a new one. */
+    /* 4.1: unset means "no limit", which is the right default for a new one.
+       The last two mean "use the system's answer" - fifteen minutes and
+       twenty-four hours - rather than no hold and no cancellation at all. */
     publicMinimumNoticeMinutes: null,
     publicHorizonDays: null,
+    publicHoldMinutes: null,
+    publicCancellationHours: null,
   };
 }
 
@@ -184,13 +203,15 @@ export default function CalendarsPage() {
          would clear it and the calendar would go quiet. */
       clinicServiceId: calendar.clinicServiceId,
       /*
-       * Carried through untouched. This screen does not offer them - they are
-       * public-booking limits and public booking is phase 2 - but v27 makes a
-       * `PUT` the whole entity, so leaving them out of the body would delete
-       * them. Renaming a calendar must not quietly drop its limits.
+       * Edited below, under "Objednavani online". They were carried and never
+       * shown while public booking was still phase 2; it is live now, and v27
+       * makes a `PUT` the whole entity, so every one of them has to be in the
+       * body whether the owner touched it or not.
        */
       publicMinimumNoticeMinutes: calendar.publicMinimumNoticeMinutes,
       publicHorizonDays: calendar.publicHorizonDays,
+      publicHoldMinutes: calendar.publicHoldMinutes,
+      publicCancellationHours: calendar.publicCancellationHours,
     });
     save.reset();
   };
@@ -542,6 +563,91 @@ export default function CalendarsPage() {
                   setDraft({ ...draft, sortOrder: Number(e.target.value) || 0 })
                 }
               />
+              {/*
+                * Objednavani online.
+                *
+                * Four numbers that decide what a stranger on the website may do
+                * with this calendar. They are together, and apart from the rest,
+                * because they are one subject: nothing above them affects public
+                * booking, and nothing here affects the desk.
+                *
+                * Empty is a real answer for all four and means two different
+                * things by design: no limit for the first two, the system's own
+                * number for the last two. The helper text says which, because
+                * "leave it empty" is useless advice when the reader cannot tell
+                * what empty does.
+                */}
+              <Box
+                sx={{
+                  border: 1,
+                  borderColor: "divider",
+                  borderRadius: 1,
+                  p: 2,
+                  display: "grid",
+                  gap: 2,
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  Objednávání online
+                </Typography>
+
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Nejdřív za (minut)"
+                  value={draft.publicMinimumNoticeMinutes ?? ""}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      publicMinimumNoticeMinutes: numberOrNull(e.target.value),
+                    })
+                  }
+                  helperText="Kolik času musí zbývat, aby si pacient termín ještě objednal. Prázdné = bez omezení."
+                />
+
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Nejpozději za (dnů)"
+                  value={draft.publicHorizonDays ?? ""}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      publicHorizonDays: numberOrNull(e.target.value),
+                    })
+                  }
+                  helperText="Jak daleko dopředu se lze objednat. Prázdné = bez omezení."
+                />
+
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Držení termínu (minut)"
+                  value={draft.publicHoldMinutes ?? ""}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      publicHoldMinutes: numberOrNull(e.target.value),
+                    })
+                  }
+                  helperText="Jak dlouho termín držíme, než pacient dovyplní registraci. Prázdné = 15 minut."
+                />
+
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Zrušení nejpozději (hodin předem)"
+                  value={draft.publicCancellationHours ?? ""}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      publicCancellationHours: numberOrNull(e.target.value),
+                    })
+                  }
+                  helperText="Do kdy může pacient termín zrušit sám. Později už jen telefonicky. Prázdné = 24 hodin."
+                />
+              </Box>
+
               {/*
                 * The active switch used to live here, saving through `PUT`.
                 * Activating and deactivating have their own routes now

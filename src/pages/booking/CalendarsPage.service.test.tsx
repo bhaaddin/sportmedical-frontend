@@ -48,6 +48,7 @@ const calendar = (over: Record<string, unknown> = {}) => ({
   id: 'c1', name: 'Ordinace', color: '#0D7377', location: '', displayStepMinutes: 15,
   isActive: true, sortOrder: 0, clinicServiceId: 's1',
   publicMinimumNoticeMinutes: null, publicHorizonDays: null,
+  publicHoldMinutes: null, publicCancellationHours: null,
   ...over,
 });
 
@@ -58,6 +59,70 @@ beforeEach(() => {
     svc('s1', 'Sportovní lékařské prohlídky'),
     svc('s2', 'Sportovní diagnostika'),
   ]);
+});
+
+/*
+ * The four numbers that decide what a stranger on the website may do with a
+ * calendar: how much warning a booking needs, how far ahead it may go, how long
+ * a slot is held while somebody registers, and how late they may cancel.
+ *
+ * They lived on the entity for a week with no field to set them in. The screen
+ * carried them so that renaming a calendar would not delete them - a `PUT` is
+ * the whole entity - and the note said public booking was phase 2. It is live
+ * now, so they are edited here.
+ */
+describe('the online-booking settings', () => {
+  it('are sent as typed', async () => {
+    await openNew();
+    await userEvent.type(screen.getByLabelText(/N\u00e1zev/), 'Ordinace');
+    await userEvent.click(screen.getByLabelText(/Slu\u017eba/));
+    await userEvent.click(await screen.findByRole('option', { name: /Sportovn\u00ed l\u00e9ka\u0159sk\u00e9/ }));
+
+    await userEvent.type(screen.getByLabelText(/Dr\u017een\u00ed term\u00ednu/), '20');
+    await userEvent.type(screen.getByLabelText(/Zru\u0161en\u00ed nejpozd\u011bji/), '48');
+
+    await userEvent.click(screen.getByRole('button', { name: /Ulo\u017eit/i }));
+
+    await waitFor(() => expect(saveCalendar).toHaveBeenCalled());
+    expect(saveCalendar.mock.calls[0].at(-1)).toMatchObject({
+      publicHoldMinutes: 20,
+      publicCancellationHours: 48,
+    });
+  });
+
+  it('survive an edit that was about something else', async () => {
+    listCalendars.mockResolvedValue([
+      calendar({ publicHoldMinutes: 25, publicCancellationHours: 12, publicHorizonDays: 45 }),
+    ]);
+
+    render(withQueries(<CalendarsPage />));
+    await userEvent.click(await screen.findByRole('button', { name: /Upravit/i }));
+    await screen.findByLabelText(/N\u00e1zev/);
+
+    await userEvent.type(screen.getByLabelText(/N\u00e1zev/), ' II');
+    await userEvent.click(screen.getByRole('button', { name: /Ulo\u017eit/i }));
+
+    await waitFor(() => expect(saveCalendar).toHaveBeenCalled());
+    expect(saveCalendar.mock.calls[0].at(-1)).toMatchObject({
+      publicHoldMinutes: 25,
+      publicCancellationHours: 12,
+      publicHorizonDays: 45,
+    });
+  });
+
+  it('go back to the default when the field is emptied, not to zero', async () => {
+    listCalendars.mockResolvedValue([calendar({ publicHoldMinutes: 25 })]);
+
+    render(withQueries(<CalendarsPage />));
+    await userEvent.click(await screen.findByRole('button', { name: /Upravit/i }));
+    await screen.findByLabelText(/N\u00e1zev/);
+
+    await userEvent.clear(screen.getByLabelText(/Dr\u017een\u00ed term\u00ednu/));
+    await userEvent.click(screen.getByRole('button', { name: /Ulo\u017eit/i }));
+
+    await waitFor(() => expect(saveCalendar).toHaveBeenCalled());
+    expect(saveCalendar.mock.calls[0].at(-1)).toMatchObject({ publicHoldMinutes: null });
+  });
 });
 
 /*
