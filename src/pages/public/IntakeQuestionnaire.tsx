@@ -48,15 +48,12 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { Collapse } from '@mui/material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import {
   AutoAwesomeOutlined,
   CheckCircleOutlined,
-  ExpandLessOutlined,
-  ExpandMoreOutlined,
   GavelOutlined,
-  OpenInNewOutlined,
+  OpenInFullOutlined,
   LockOutlined,
   ScheduleOutlined,
   VerifiedUserOutlined,
@@ -266,6 +263,22 @@ export default function IntakeQuestionnaire() {
      optional today; opening it by default would turn a one-minute
      registration into a page nobody scrolls to the bottom of. */
   const [questionnaireOpen, setQuestionnaireOpen] = useState(false);
+  /* Only so the button can say "pokračovat" to somebody who already started.
+     Read once on mount: the dialog owns the draft while it is open, and two
+     copies of the same answers kept in step would be a bug waiting to happen. */
+  const [questionnaireProgress, setQuestionnaireProgress] = useState(0);
+
+  useEffect(() => {
+    if (questionnaireOpen) return;
+    try {
+      const raw = window.localStorage.getItem('smd.health-questionnaire.draft.v1');
+      setQuestionnaireProgress(raw === null ? 0 : Object.keys(JSON.parse(raw) as object).length);
+    } catch {
+      /* No storage, or nothing readable in it. Zero is the honest answer and
+         the button simply says "vyplnit". */
+      setQuestionnaireProgress(0);
+    }
+  }, [questionnaireOpen]);
   /*
    * Kept whole rather than as a bare code: the submission needs only
    * `addressPointCode`, but the screen has to show the patient which address
@@ -791,6 +804,26 @@ export default function IntakeQuestionnaire() {
           />
         </Box>
 
+        {/* Full screen, so it is mounted at the page root rather than inside
+            a column that would constrain it. `female` comes from the
+            registration form — from the birth number, usually — so the
+            gynaecological section appears or does not without anybody being
+            asked a second time. */}
+        <HealthQuestionnaire
+          open={questionnaireOpen}
+          onClose={() => setQuestionnaireOpen(false)}
+          female={form.sex === Sex.Female}
+          palette={{
+            ink: BRAND.ink,
+            accent: BRAND.accent,
+            accentDark: BRAND.accentDark,
+            accentWash: BRAND.accentWash,
+            accentEdge: BRAND.accentEdge,
+            line: BRAND.line,
+            muted: BRAND.muted,
+          }}
+        />
+
         <Container maxWidth="lg" sx={{ mt: { xs: -7, md: -8 } }}>
           <Box
             sx={{
@@ -1027,25 +1060,20 @@ export default function IntakeQuestionnaire() {
                     title="Výpis ze zdravotní dokumentace"
                     when="Přineste s sebou — pokaždé"
                     detail="Od praktického lékaře nebo pediatra. Bez něj nelze vystavit posudek o zdravotní způsobilosti. Při opakované návštěvě stačí, když lékař potvrdí, že se váš stav nezměnil."
-                    href="https://sportmedical-diagnostics.cz/pages/dokumenty-ke-stazeni"
-                    linkLabel="Podrobnosti"
                     emphasis
                   />
                   {/*
-                    The one document that is filled in HERE rather than linked.
-
-                    It opens in place, which is what the owner asked for in as
-                    many words: "on clinken na to on se mu otevre cely". Closed
-                    to begin with, because it is long and optional, and because
-                    a page that opens with 76 questions on it is a page whose
-                    first section nobody reads.
+                    The one document filled in HERE rather than carried in on
+                    paper. The button opens it over the whole screen — see the
+                    header of HealthQuestionnaire.tsx for why it stopped being
+                    an accordion inside this column.
                   */}
                   <Box
                     sx={{
-                      p: 1.75,
+                      p: 2,
                       borderRadius: 3,
-                      border: `1px solid ${questionnaireOpen ? BRAND.accentEdge : BRAND.line}`,
-                      bgcolor: questionnaireOpen ? BRAND.accentWash : 'transparent',
+                      border: `1px solid ${BRAND.accentEdge}`,
+                      bgcolor: BRAND.accentWash,
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.25 }}>
@@ -1054,78 +1082,37 @@ export default function IntakeQuestionnaire() {
                       </Typography>
                       <Chip
                         size="small"
-                        label="Vyplňte před každým vyšetřením"
+                        label="Před každým vyšetřením"
                         sx={{
                           height: 19,
                           fontSize: 11,
                           fontWeight: 700,
-                          bgcolor: 'transparent',
-                          color: BRAND.muted,
-                          border: `1px solid ${BRAND.line}`,
+                          bgcolor: BRAND.ink,
+                          color: BRAND.accent,
                         }}
                       />
                     </Box>
-                    <Typography variant="body2" sx={{ color: BRAND.muted }}>
-                      Vyplňte ho rovnou tady. Zrychlíte tím průběh vyšetření
-                      a nemusíte nic tisknout předem.
+                    <Typography variant="body2" sx={{ color: BRAND.muted, mb: 1.5 }}>
+                      Vyplňte ho rovnou tady — otevře se celý přes obrazovku.
+                      {questionnaireProgress > 0 && ` Rozepsáno: ${questionnaireProgress} odpovědí.`}
                     </Typography>
 
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
-                      <Button
-                        size="small"
-                        variant={questionnaireOpen ? 'text' : 'contained'}
-                        disableElevation
-                        onClick={() => setQuestionnaireOpen((open) => !open)}
-                        endIcon={questionnaireOpen
-                          ? <ExpandLessOutlined sx={{ fontSize: 16 }} />
-                          : <ExpandMoreOutlined sx={{ fontSize: 16 }} />}
-                        sx={{
-                          borderRadius: 999,
-                          px: 2,
-                          color: questionnaireOpen ? BRAND.accentDark : BRAND.ink,
-                        }}
-                      >
-                        {questionnaireOpen ? 'Sbalit dotazník' : 'Vyplnit dotazník'}
-                      </Button>
-                      <Button
-                        href="https://cdn.shopify.com/s/files/1/0913/0799/9614/files/zdravotni_dotaznik.pdf?v=1780561779"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        size="small"
-                        endIcon={<OpenInNewOutlined sx={{ fontSize: 14 }} />}
-                        sx={{ color: BRAND.muted }}
-                      >
-                        Radši papírově
-                      </Button>
-                    </Box>
-
-                    <Collapse in={questionnaireOpen} unmountOnExit={false} mountOnEnter>
-                      <Box sx={{ mt: 2.5, pt: 2.5, borderTop: `1px solid ${BRAND.accentEdge}` }}>
-                        {/* `female` comes from the registration form above — from
-                            the birth number, usually — so the gynaecological
-                            section appears or does not without anybody being
-                            asked a second time. */}
-                        <HealthQuestionnaire
-                          female={form.sex === Sex.Female}
-                          palette={{
-                            ink: BRAND.ink,
-                            accent: BRAND.accent,
-                            accentDark: BRAND.accentDark,
-                            accentWash: BRAND.accentWash,
-                            accentEdge: BRAND.accentEdge,
-                            line: BRAND.line,
-                            muted: BRAND.muted,
-                          }}
-                        />
-                      </Box>
-                    </Collapse>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      disableElevation
+                      onClick={() => setQuestionnaireOpen(true)}
+                      endIcon={<OpenInFullOutlined sx={{ fontSize: 16 }} />}
+                      sx={{ borderRadius: 999, py: 1.1, color: BRAND.ink }}
+                    >
+                      {questionnaireProgress > 0 ? 'Pokračovat ve vyplňování' : 'Vyplnit dotazník'}
+                    </Button>
                   </Box>
+
                   <DocumentRow
                     title="Souhlas se zpracováním údajů (GDPR)"
                     when="Jen při první návštěvě"
                     detail="Při dalších vyšetřeních už jej znovu vyplňovat nemusíte, pokud se nezmění údaje ani účel zpracování."
-                    href="https://cdn.shopify.com/s/files/1/0913/0799/9614/files/GDPR_final.pdf?v=1780561628"
-                    linkLabel="Otevřít formulář"
                   />
                   {/* Only for a minor. The age comes from the date of birth, which
                       the birth number has usually already filled in — so this row
@@ -1135,15 +1122,13 @@ export default function IntakeQuestionnaire() {
                       title="Souhlas zákonného zástupce"
                       when="Jen když nezletilý přijde bez doprovodu"
                       detail="Podle data narození je klient mladší 18 let. Pokud přijde v doprovodu zákonného zástupce, tento formulář nepotřebujete."
-                      href="https://cdn.shopify.com/s/files/1/0913/0799/9614/files/Souhlas_zakonneho_zastupce_3ff9ec9a-fe46-4e0f-8fd0-2fae5adce636.pdf?v=1780561681"
-                      linkLabel="Otevřít formulář"
                     />
                   )}
                 </Box>
 
                 <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 2 }}>
-                  Souhlasy zatím vyplňujete na papíru a nosíte s sebou.
-                  Připravujeme, aby se daly vyplnit rovnou tady.
+                  Souhlasy pro vás připravíme na recepci. Připravujeme, aby se
+                  daly vyplnit rovnou tady.
                 </Typography>
               </Card>
             </Box>
@@ -1580,15 +1565,11 @@ function DocumentRow({
   title,
   when,
   detail,
-  href,
-  linkLabel,
   emphasis = false,
 }: {
   title: string;
   when: string;
   detail: string;
-  href: string;
-  linkLabel: string;
   emphasis?: boolean;
 }) {
   return (
@@ -1618,16 +1599,6 @@ function DocumentRow({
       <Typography variant="body2" sx={{ color: BRAND.muted }}>
         {detail}
       </Typography>
-      <Button
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        size="small"
-        endIcon={<OpenInNewOutlined sx={{ fontSize: 14 }} />}
-        sx={{ mt: 0.75, ml: -1, color: BRAND.accentDark }}
-      >
-        {linkLabel}
-      </Button>
     </Box>
   );
 }
