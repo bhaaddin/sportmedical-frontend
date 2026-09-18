@@ -23,6 +23,7 @@ import NotificationCenter from './components/NotificationCenter';
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Login = lazy(() => import('./pages/Login'));
 const IntakeQuestionnaire = lazy(() => import('./pages/public/IntakeQuestionnaire'));
+const PublicBooking = lazy(() => import('./pages/public/PublicBooking'));
 const IntakeReviewQueue = lazy(() => import('./pages/IntakeReviewQueue'));
 const DashboardPage = lazy(() => import('./pages/Dashboard'));
 const DiagnosticForm = lazy(() => import('./pages/DiagnosticForm'));
@@ -456,6 +457,9 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Suspense fallback={<PageLoader />}><Login /></Suspense>} />
             <Route path="/dotaznik" element={<Suspense fallback={<PageLoader />}><IntakeQuestionnaire /></Suspense>} />
+            {/* Objednání online. Anonymous, like /dotaznik, and outside the
+                AuthGuard for the same reason: a patient has no account. */}
+            <Route path="/objednat" element={<Suspense fallback={<PageLoader />}><PublicBooking /></Suspense>} />
             <Route path="/*" element={
               <AuthGuard>
                 <Layout>

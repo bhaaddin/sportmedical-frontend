@@ -52,6 +52,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import {
   AutoAwesomeOutlined,
   CheckCircleOutlined,
+  EventAvailableOutlined,
   GavelOutlined,
   OpenInFullOutlined,
   LockOutlined,
@@ -95,6 +96,8 @@ import {
 import PublicAddressPicker from '../../components/public/PublicAddressPicker';
 import HealthQuestionnaire from '../../components/public/HealthQuestionnaire';
 import { answersForSubmission, readDraft } from '../../services/publicIntake/healthQuestionnaire';
+import { forgetHeld, readHeld } from '../../api/publicBooking';
+import type { HeldBooking } from '../../api/publicBooking';
 import type { AddressPoint } from '../../api/addressLookup';
 
 /* ── Brand, taken from sportmedical-diagnostics.cz ── */
@@ -274,6 +277,16 @@ export default function IntakeQuestionnaire() {
      Read once on mount: the dialog owns the draft while it is open, and two
      copies of the same answers kept in step would be a bug waiting to happen. */
   const [questionnaireProgress, setQuestionnaireProgress] = useState(0);
+
+  /*
+   * The slot the booking page is holding, if the patient came that way.
+   *
+   * Read once on mount and not watched: a hold lasts fifteen minutes and this
+   * form takes one, so re-reading it on every render would only add a way for
+   * the banner to vanish mid-sentence. If it has lapsed by the time they send,
+   * the server says so — see the note on `heldToken` where it is submitted.
+   */
+  const [held] = useState<HeldBooking | null>(readHeld);
 
   useEffect(() => {
     if (questionnaireOpen) return;
@@ -661,9 +674,24 @@ export default function IntakeQuestionnaire() {
          * the field is left off the request entirely rather than sent empty.
          */
         healthQuestionnaire: answersForSubmission(readDraft()),
+
+        /*
+         * The slot being claimed, when this registration is finishing a booking.
+         *
+         * Undefined for somebody who came straight to /dotaznik, and the field is
+         * then left off the request entirely. The server treats it as optional and
+         * keeps the registration either way: if the hold lapsed while the form was
+         * being filled in, the patient is still real and telling them to choose
+         * another time is better than losing everything they typed.
+         */
+        holdToken: held?.token,
       });
 
       clearIdempotencyKey();
+
+      // The slot is no longer being held -- it either became an appointment or
+      // it did not, and either way this tab must not offer it again.
+      forgetHeld();
       setResult(response);
     } catch (error) {
       if (error instanceof IntakeError) {
@@ -842,6 +870,36 @@ export default function IntakeQuestionnaire() {
         />
 
         <Container maxWidth="lg" sx={{ mt: { xs: -7, md: -9 } }}>
+          {/* What they are finishing, if they came from the booking page. It is
+              above the form rather than in the rail because it is the reason
+              they are here, and a reason belongs before the work. */}
+          {held !== null && (
+            <Box
+              sx={{
+                mb: 3,
+                p: 2.5,
+                borderRadius: 4,
+                bgcolor: BRAND.ink,
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                flexWrap: 'wrap',
+              }}
+            >
+              <EventAvailableOutlined sx={{ color: BRAND.accent }} />
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 800, fontSize: 15.5 }}>
+                  Držíme vám {heldWhen(held)}
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.68)' }}>
+                  {held.activityName} — {held.serviceName}. Dokončete prosím
+                  registraci a termín je váš.
+                </Typography>
+              </Box>
+            </Box>
+          )}
+
           {/*
             One form down the page, one rail beside it.
 
@@ -1720,4 +1778,29 @@ function DocumentRow({
       </Typography>
     </Box>
   );
+}
+
+/**
+ * The held slot in one line, in the clinic's own time zone.
+ *
+ * Named rather than left to the device: somebody booking from a phone that
+ * thinks it is in London must still read the Prague time they are expected at.
+ */
+function heldWhen(held: HeldBooking): string {
+  const when = new Date(held.startUtc);
+
+  const day = when.toLocaleDateString('cs-CZ', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'Europe/Prague',
+  });
+
+  const time = when.toLocaleTimeString('cs-CZ', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Prague',
+  });
+
+  return `${day} v ${time}`;
 }

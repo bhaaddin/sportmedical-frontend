@@ -130,6 +130,16 @@ export interface IntakeRequest {
    * from never having opened it.
    */
   healthQuestionnaire?: IntakeHealthQuestionnaire;
+
+  /**
+   * The slot being claimed, when this registration is finishing a booking.
+   *
+   * Optional, and left off entirely for somebody who came straight to the
+   * questionnaire. The server keeps the registration whether or not the claim
+   * succeeds — a hold that lapsed mid-form must not cost the patient everything
+   * they typed.
+   */
+  holdToken?: string;
   /**
    * Anti-abuse honeypot. Rendered visually hidden and never focusable;
    * a non-empty value means a bot filled the form. Always sent as ''.
