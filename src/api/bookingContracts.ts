@@ -136,6 +136,16 @@ export const activitySchema = z.object({
   color: z.string(),
   publicNote: z.string().nullish().transform((v) => v ?? ''),
   isPubliclyBookable: z.boolean(),
+  /**
+   * Which optional consents this činnost will not be booked without.
+   *
+   * Consent to the examination itself is not here and never will be: zákon
+   * č. 372/2011 Sb. requires it for every činnost. Marketing is not here
+   * either — consent that must be given to get the service is not freely
+   * given, and under GDPR that is not consent.
+   */
+  requiresReportByEmail: z.boolean().nullish().transform((v) => v ?? false),
+  requiresClubSharing: z.boolean().nullish().transform((v) => v ?? false),
   sortOrder: z.number().int(),
   /** 4.3: `DELETE` discards rather than deletes, so the row stays in the list. */
   isActive: z.boolean(),
@@ -171,6 +181,16 @@ export const activityInputSchema = z.object({
   color: z.string(),
   publicNote: z.string().trim(),
   isPubliclyBookable: z.boolean(),
+  /**
+   * Which optional consents this činnost will not be booked without.
+   *
+   * Consent to the examination itself is not here and never will be: zákon
+   * č. 372/2011 Sb. requires it for every činnost. Marketing is not here
+   * either — consent that must be given to get the service is not freely
+   * given, and under GDPR that is not consent.
+   */
+  requiresReportByEmail: z.boolean().nullish().transform((v) => v ?? false),
+  requiresClubSharing: z.boolean().nullish().transform((v) => v ?? false),
   sortOrder: z.number().int(),
   /**
    * 4.3 (v25): `PUT` is the whole activity. Left out or sent as `null`, this

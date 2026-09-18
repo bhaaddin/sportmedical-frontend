@@ -556,6 +556,24 @@ export default function IntakeQuestionnaire() {
       next.consentTreatment = 'Bez souhlasu s poskytnutím zdravotních služeb nelze dotazník odeslat.';
     }
 
+    /*
+     * The two the clinic may insist on, per činnost.
+     *
+     * Nothing here decides which: the admin ticks them in the činnost's own
+     * settings and the answer travels with the held slot. Somebody who came
+     * straight to the form without booking has no činnost, so neither applies —
+     * and that is right, because there is nothing to refuse them.
+     */
+    if (held?.requiresReportByEmail === true && !form.consentReportEmail) {
+      next.consentReportEmail =
+        'U této činnosti posíláme lékařskou zprávu e-mailem, bez tohoto souhlasu ji nelze objednat.';
+    }
+
+    if (held?.requiresClubSharing === true && !form.consentClub) {
+      next.consentClub =
+        'Tuto činnost objednáváme se sdílením výsledků s klubem, bez tohoto souhlasu ji nelze objednat.';
+    }
+
     return next;
   };
 
@@ -1279,6 +1297,13 @@ export default function IntakeQuestionnaire() {
                   its own purpose, and each can be withdrawn on its own. A row that
                   looks like a row is a row somebody can point at later and say
                   which one they gave.
+
+                  Which of them say "povinné" is the clinic's setting, not this
+                  file's: the admin ticks them on the činnost and the answer
+                  arrives with the held slot. Two are never settable — the
+                  examination is required by zákon 372/2011 whatever anybody
+                  ticks, and a marketing consent that has to be given to get an
+                  appointment is not freely given, so it stays voluntary.
                 */}
                 <Box sx={{ display: 'grid', gap: 1.25 }}>
                   <ConsentRow
@@ -1290,10 +1315,14 @@ export default function IntakeQuestionnaire() {
                     detail="Souhlasím s provedením sportovní lékařské prohlídky a se zpracováním údajů o zdravotním stavu, které si vyžádá."
                   />
                   <ConsentRow
+                    required={held?.requiresReportByEmail === true}
                     checked={form.consentReportEmail}
                     onChange={(value) => set('consentReportEmail', value)}
+                    error={errors.consentReportEmail}
                     title="Lékařská zpráva e-mailem"
-                    detail="Souhlasím, aby mi byla lékařská zpráva zaslána elektronicky na uvedený e-mail. Bez souhlasu si ji vyzvednete na recepci."
+                    detail={held?.requiresReportByEmail === true
+                      ? `Zprávu z činnosti ${held.activityName} předáváme elektronicky na uvedený e-mail. Bez tohoto souhlasu ji nelze objednat.`
+                      : 'Souhlasím, aby mi byla lékařská zpráva zaslána elektronicky na uvedený e-mail. Bez souhlasu si ji vyzvednete na recepci.'}
                   />
                   <ConsentRow
                     checked={form.consentCommunication}
@@ -1302,10 +1331,14 @@ export default function IntakeQuestionnaire() {
                     detail="Souhlasím se zasíláním novinek a nabídek. Netýká se potvrzení a připomínek k vašemu termínu — ty vám pošleme tak jako tak."
                   />
                   <ConsentRow
+                    required={held?.requiresClubSharing === true}
                     checked={form.consentClub}
                     onChange={(value) => set('consentClub', value)}
+                    error={errors.consentClub}
                     title="Sdílení výsledků s klubem"
-                    detail="Souhlasím se sdílením výsledků s mým sportovním klubem. Jde o předání údajů někomu mimo ordinaci, takže bez vašeho souhlasu je nesdílíme."
+                    detail={held?.requiresClubSharing === true
+                      ? `Činnost ${held.activityName} objednáváme se sdílením výsledků s vaším klubem. Bez tohoto souhlasu ji nelze objednat.`
+                      : 'Souhlasím se sdílením výsledků s mým sportovním klubem. Jde o předání údajů někomu mimo ordinaci, takže bez vašeho souhlasu je nesdílíme.'}
                   />
                 </Box>
               </Card>

@@ -1,0 +1,61 @@
+From 1065d60a3a3f87be66da3192e2c314f68c35821b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 5 Sep 2026 16:10:56 +0000
+Subject: [PATCH 1/5] chore(repo): add .gitattributes to normalize line endings
+ to LF
+
+The repository had no .gitattributes, so blobs are LF while a Windows
+working tree checks out CRLF. Every tracked file then shows as modified
+(315 files, 55904 insertions / 55904 deletions - identical counts, i.e.
+pure line-ending churn, zero content change). This tripped the
+uncommitted-changes check and hid real edits.
+
+Mirrors the convention already used in the backend repo (* text=auto,
+eol=lf). No file contents change - blobs are already LF, so
+'git add --renormalize' is a no-op here.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01X7MMPXSe1wrfLp4QcSDBbt
+---
+ .gitattributes | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 .gitattributes
+
+diff --git a/.gitattributes b/.gitattributes
+new file mode 100644
+index 0000000..30dc07d
+--- /dev/null
++++ b/.gitattributes
+@@ -0,0 +1,29 @@
++# Normalize all text files in the repository to LF in the index.
++# Without this, a Windows checkout produces a phantom diff on every
++# tracked file (CRLF working tree vs LF blobs).
++* text=auto eol=lf
++
++# Explicit source/config types.
++*.ts    text eol=lf
++*.tsx   text eol=lf
++*.js    text eol=lf
++*.jsx   text eol=lf
++*.json  text eol=lf
++*.css   text eol=lf
++*.html  text eol=lf
++*.md    text eol=lf
++*.yml   text eol=lf
++*.yaml  text eol=lf
++*.svg   text eol=lf
++
++# Binary — never touch.
++*.png   binary
++*.jpg   binary
++*.jpeg  binary
++*.gif   binary
++*.ico   binary
++*.woff  binary
++*.woff2 binary
++*.ttf   binary
++*.otf   binary
++*.pdf   binary
+-- 
+2.43.0
+

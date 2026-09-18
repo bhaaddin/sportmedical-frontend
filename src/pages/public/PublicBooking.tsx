@@ -198,6 +198,8 @@ export default function PublicBooking() {
         activityName: chosen.activity.name,
         activityId: chosen.activity.id,
         calendarId: chosen.activity.calendarId,
+        requiresReportByEmail: chosen.activity.requiresReportByEmail,
+        requiresClubSharing: chosen.activity.requiresClubSharing,
       });
 
       navigate('/dotaznik');

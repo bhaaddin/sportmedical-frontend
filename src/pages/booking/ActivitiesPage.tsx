@@ -65,6 +65,8 @@ function emptyDraft(sortOrder: number): ActivityInput {
     color: DEFAULT_PALETTE_ENTRY.hex,
     publicNote: "",
     isPubliclyBookable: false,
+    requiresReportByEmail: false,
+    requiresClubSharing: false,
     sortOrder,
     serviceItemId: null,
     /* Empty until one is picked. The server refuses a činnost without a
@@ -179,6 +181,8 @@ export default function ActivitiesPage() {
       color: activity.color,
       publicNote: activity.publicNote,
       isPubliclyBookable: activity.isPubliclyBookable,
+      requiresReportByEmail: activity.requiresReportByEmail,
+      requiresClubSharing: activity.requiresClubSharing,
       sortOrder: activity.sortOrder,
       /*
        * Sent back as it came. `PUT` is the whole činnost, so leaving this out
@@ -625,6 +629,50 @@ export default function ActivitiesPage() {
                 }
                 label={t("booking.activities.publicLabel")}
               />
+
+              {/*
+                Which consents this činnost will not be booked without.
+
+                Only shown when it is publicly bookable: they are questions the
+                online registration asks, and a činnost the desk books by hand
+                never reaches that form. Two, not four — the examination consent
+                is required by zákon č. 372/2011 Sb. for everything, and a
+                marketing consent that must be given to get an appointment is not
+                freely given, which under GDPR means it is not consent.
+              */}
+              {draft.isPubliclyBookable ? (
+                <Box sx={{ pl: 1.5, borderLeft: "2px solid", borderColor: "divider" }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+                    Bez kterých souhlasů nelze tuto činnost objednat
+                  </Typography>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={draft.requiresReportByEmail}
+                        onChange={(e) =>
+                          setDraft({ ...draft, requiresReportByEmail: e.target.checked })
+                        }
+                      />
+                    }
+                    label="Lékařská zpráva e-mailem"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={draft.requiresClubSharing}
+                        onChange={(e) =>
+                          setDraft({ ...draft, requiresClubSharing: e.target.checked })
+                        }
+                      />
+                    }
+                    label="Sdílení výsledků s klubem"
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                    Souhlas s provedením prohlídky vyžaduje zákon a marketingový
+                    souhlas musí zůstat dobrovolný — ty nastavit nelze.
+                  </Typography>
+                </Box>
+              ) : null}
               {/* 422 keeps the form filled in, so the message sits inside the dialog. */}
               {save.error ? (
                 <Alert severity="error">{errorText(save.error, t)}</Alert>

@@ -22,6 +22,16 @@ export interface BookableActivity {
   publicNote: string;
   /** Which calendar runs it — needed to ask for times. */
   calendarId: string;
+  /**
+   * Which optional consents this činnost will not be booked without. The
+   * clinic's setting, per činnost.
+   *
+   * Consent to the examination itself is not here: it is required by law for
+   * everything. Nor is marketing — consent that must be given to get an
+   * appointment is not freely given.
+   */
+  requiresReportByEmail: boolean;
+  requiresClubSharing: boolean;
 }
 
 export interface BookableService {
@@ -165,6 +175,9 @@ export interface HeldBooking {
   activityName: string;
   activityId: string;
   calendarId: string;
+  /** Carried to the registration so it knows which consents it must insist on. */
+  requiresReportByEmail: boolean;
+  requiresClubSharing: boolean;
 }
 
 /**
