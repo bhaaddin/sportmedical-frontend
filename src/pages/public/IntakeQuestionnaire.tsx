@@ -94,6 +94,7 @@ import {
 } from '../../services/patientRegistration/phoneDisplay';
 import PublicAddressPicker from '../../components/public/PublicAddressPicker';
 import HealthQuestionnaire from '../../components/public/HealthQuestionnaire';
+import { answersForSubmission, readDraft } from '../../services/publicIntake/healthQuestionnaire';
 import type { AddressPoint } from '../../api/addressLookup';
 
 /* ── Brand, taken from sportmedical-diagnostics.cz ── */
@@ -140,12 +141,18 @@ const publicTheme = createTheme({
         root: {
           backgroundColor: '#FFFFFF',
           borderRadius: 12,
+          fontSize: 15.5,
           '& fieldset': { borderColor: BRAND.line },
           '&:hover fieldset': { borderColor: 'rgba(17,17,17,0.28)' },
           '&.Mui-focused fieldset': { borderWidth: 2, borderColor: BRAND.accent },
         },
+        // A patient's box, not a spreadsheet cell. 15.5/56 reads at arm's
+        // length and is a target a thumb can hit; the default 14/40 is what
+        // "it looks small" was about.
+        input: { paddingTop: 15, paddingBottom: 15 },
       },
     },
+    MuiInputLabel: { styleOverrides: { root: { fontSize: 15 } } },
     MuiFormHelperText: { styleOverrides: { root: { marginLeft: 2, marginTop: 6 } } },
   },
 });
@@ -644,6 +651,16 @@ export default function IntakeQuestionnaire() {
           { policyCode: 'report_email', granted: form.consentReportEmail },
         ],
         websiteUrl: form.websiteUrl,
+
+        /*
+         * Read at the moment of sending, from the same draft the dialog writes.
+         *
+         * Not held in this component's state: the dialog owns the answers while
+         * it is open, and two copies kept in step is a bug waiting for the day
+         * somebody edits one of them. `undefined` when nothing was answered, so
+         * the field is left off the request entirely rather than sent empty.
+         */
+        healthQuestionnaire: answersForSubmission(readDraft()),
       });
 
       clearIdempotencyKey();
@@ -824,16 +841,31 @@ export default function IntakeQuestionnaire() {
           }}
         />
 
-        <Container maxWidth="lg" sx={{ mt: { xs: -7, md: -8 } }}>
+        <Container maxWidth="lg" sx={{ mt: { xs: -7, md: -9 } }}>
+          {/*
+            One form down the page, one rail beside it.
+
+            It was two columns of form cards until 18. 9. 2026, side by side and
+            of different heights, so nothing lined up with anything and the eye
+            had no order to follow -- "its not orgenized ... not combatebul".
+            A form is read top to bottom; splitting it in half sideways means
+            deciding, at every card, which side to read next.
+
+            So the form is one column now, and what sits beside it is a
+            different KIND of thing: what to bring, what is left to do, and the
+            button that sends it. That rail is sticky, which is the other half
+            of the answer -- the thing you are working towards stays on screen
+            instead of being eight sections below you.
+          */}
           <Box
             sx={{
               display: 'grid',
               gap: 3,
               alignItems: 'start',
-              gridTemplateColumns: { xs: '1fr', md: '1.05fr 0.95fr' },
+              gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) 360px' },
             }}
           >
-            {/* ── Left column ── */}
+            {/* ---- The form ---- */}
             <Box sx={{ display: 'grid', gap: 3 }}>
               <Card>
                 <Section number={1} title="Kdo jste" />
@@ -1038,105 +1070,7 @@ export default function IntakeQuestionnaire() {
                 </Box>
               </Card>
               <Card>
-                <Section number={3} title="Dokumenty před návštěvou" />
-
-                {/*
-                  What the clinic actually asks people to bring, read off its own
-                  page on 18. 9. 2026 rather than from anyone's memory of it.
-
-                  Filling them in here is not built yet — the questionnaire alone
-                  is 76 answers and the model cannot yet carry its sections,
-                  its "show only if" rules or its family table. Until it can, the
-                  honest thing is to say plainly which documents exist, when each
-                  is wanted, and to hand over the real file. A patient who reads
-                  this before they travel is better off than one who finds out at
-                  reception, which is the whole point of the page.
-
-                  Each row says WHEN it applies, because the clinic's rules differ
-                  per document and getting that wrong is what wastes the visit.
-                */}
-                <Box sx={{ display: 'grid', gap: 1.25 }}>
-                  <DocumentRow
-                    title="Výpis ze zdravotní dokumentace"
-                    when="Přineste s sebou — pokaždé"
-                    detail="Od praktického lékaře nebo pediatra. Bez něj nelze vystavit posudek o zdravotní způsobilosti. Při opakované návštěvě stačí, když lékař potvrdí, že se váš stav nezměnil."
-                    emphasis
-                  />
-                  {/*
-                    The one document filled in HERE rather than carried in on
-                    paper. The button opens it over the whole screen — see the
-                    header of HealthQuestionnaire.tsx for why it stopped being
-                    an accordion inside this column.
-                  */}
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderRadius: 3,
-                      border: `1px solid ${BRAND.accentEdge}`,
-                      bgcolor: BRAND.accentWash,
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.25 }}>
-                      <Typography sx={{ fontWeight: 700, fontSize: 14.5 }}>
-                        Zdravotní dotazník
-                      </Typography>
-                      <Chip
-                        size="small"
-                        label="Před každým vyšetřením"
-                        sx={{
-                          height: 19,
-                          fontSize: 11,
-                          fontWeight: 700,
-                          bgcolor: BRAND.ink,
-                          color: BRAND.accent,
-                        }}
-                      />
-                    </Box>
-                    <Typography variant="body2" sx={{ color: BRAND.muted, mb: 1.5 }}>
-                      Vyplňte ho rovnou tady — otevře se celý přes obrazovku.
-                      {questionnaireProgress > 0 && ` Rozepsáno: ${questionnaireProgress} odpovědí.`}
-                    </Typography>
-
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      disableElevation
-                      onClick={() => setQuestionnaireOpen(true)}
-                      endIcon={<OpenInFullOutlined sx={{ fontSize: 16 }} />}
-                      sx={{ borderRadius: 999, py: 1.1, color: BRAND.ink }}
-                    >
-                      {questionnaireProgress > 0 ? 'Pokračovat ve vyplňování' : 'Vyplnit dotazník'}
-                    </Button>
-                  </Box>
-
-                  <DocumentRow
-                    title="Souhlas se zpracováním údajů (GDPR)"
-                    when="Jen při první návštěvě"
-                    detail="Při dalších vyšetřeních už jej znovu vyplňovat nemusíte, pokud se nezmění údaje ani účel zpracování."
-                  />
-                  {/* Only for a minor. The age comes from the date of birth, which
-                      the birth number has usually already filled in — so this row
-                      appears by itself, without anybody being asked their age. */}
-                  {isMinor && (
-                    <DocumentRow
-                      title="Souhlas zákonného zástupce"
-                      when="Jen když nezletilý přijde bez doprovodu"
-                      detail="Podle data narození je klient mladší 18 let. Pokud přijde v doprovodu zákonného zástupce, tento formulář nepotřebujete."
-                    />
-                  )}
-                </Box>
-
-                <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 2 }}>
-                  Souhlasy pro vás připravíme na recepci. Připravujeme, aby se
-                  daly vyplnit rovnou tady.
-                </Typography>
-              </Card>
-            </Box>
-
-            {/* ── Right column ── */}
-            <Box sx={{ display: 'grid', gap: 3, position: { md: 'sticky' }, top: { md: 24 } }}>
-              <Card>
-                <Section number={4} title="Pojištění" />
+                <Section number={3} title="Pojištění" />
 
                 <Box sx={{ display: 'grid', gap: 2 }}>
                   <FormControl>
@@ -1223,7 +1157,7 @@ export default function IntakeQuestionnaire() {
               </Card>
 
               <Card>
-                <Section number={5} title="Souhlasy" />
+                <Section number={4} title="Souhlasy" />
 
                 {/*
                   Three consents, drawn as three separate things to agree to
@@ -1316,7 +1250,114 @@ export default function IntakeQuestionnaire() {
                     detail="Souhlasím se sdílením výsledků s mým sportovním klubem. Jde o předání údajů někomu mimo ordinaci, takže bez vašeho souhlasu je nesdílíme."
                   />
                 </Box>
+              </Card>
+            </Box>
 
+            {/* ---- The rail ---- */}
+            <Box
+              sx={{
+                display: 'grid',
+                gap: 3,
+                position: { md: 'sticky' },
+                top: { md: 24 },
+              }}
+            >
+              <Card>
+                <RailTitle>Než přijdete</RailTitle>
+
+                {/*
+                  What the clinic actually asks people to bring, read off its own
+                  page on 18. 9. 2026 rather than from anyone's memory of it.
+
+                  Filling them in here is not built yet — the questionnaire alone
+                  is 76 answers and the model cannot yet carry its sections,
+                  its "show only if" rules or its family table. Until it can, the
+                  honest thing is to say plainly which documents exist, when each
+                  is wanted, and to hand over the real file. A patient who reads
+                  this before they travel is better off than one who finds out at
+                  reception, which is the whole point of the page.
+
+                  Each row says WHEN it applies, because the clinic's rules differ
+                  per document and getting that wrong is what wastes the visit.
+                */}
+                <Box sx={{ display: 'grid', gap: 1.25 }}>
+                  <DocumentRow
+                    title="Výpis ze zdravotní dokumentace"
+                    when="Přineste s sebou — pokaždé"
+                    detail="Od praktického lékaře nebo pediatra. Bez něj nelze vystavit posudek o zdravotní způsobilosti. Při opakované návštěvě stačí, když lékař potvrdí, že se váš stav nezměnil."
+                    emphasis
+                  />
+                  {/*
+                    The one document filled in HERE rather than carried in on
+                    paper. The button opens it over the whole screen — see the
+                    header of HealthQuestionnaire.tsx for why it stopped being
+                    an accordion inside this column.
+                  */}
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 3,
+                      border: `1px solid ${BRAND.accentEdge}`,
+                      bgcolor: BRAND.accentWash,
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.25 }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: 14.5 }}>
+                        Zdravotní dotazník
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label="Před každým vyšetřením"
+                        sx={{
+                          height: 19,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          bgcolor: BRAND.ink,
+                          color: BRAND.accent,
+                        }}
+                      />
+                    </Box>
+                    <Typography variant="body2" sx={{ color: BRAND.muted, mb: 1.5 }}>
+                      Vyplňte ho rovnou tady — otevře se celý přes obrazovku.
+                      {questionnaireProgress > 0 && ` Rozepsáno: ${questionnaireProgress} odpovědí.`}
+                    </Typography>
+
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      disableElevation
+                      onClick={() => setQuestionnaireOpen(true)}
+                      endIcon={<OpenInFullOutlined sx={{ fontSize: 16 }} />}
+                      sx={{ borderRadius: 999, py: 1.1, color: BRAND.ink }}
+                    >
+                      {questionnaireProgress > 0 ? 'Pokračovat ve vyplňování' : 'Vyplnit dotazník'}
+                    </Button>
+                  </Box>
+
+                  <DocumentRow
+                    title="Souhlas se zpracováním údajů (GDPR)"
+                    when="Jen při první návštěvě"
+                    detail="Při dalších vyšetřeních už jej znovu vyplňovat nemusíte, pokud se nezmění údaje ani účel zpracování."
+                  />
+                  {/* Only for a minor. The age comes from the date of birth, which
+                      the birth number has usually already filled in — so this row
+                      appears by itself, without anybody being asked their age. */}
+                  {isMinor && (
+                    <DocumentRow
+                      title="Souhlas zákonného zástupce"
+                      when="Jen když nezletilý přijde bez doprovodu"
+                      detail="Podle data narození je klient mladší 18 let. Pokud přijde v doprovodu zákonného zástupce, tento formulář nepotřebujete."
+                    />
+                  )}
+                </Box>
+
+                <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 2 }}>
+                  Souhlasy pro vás připravíme na recepci. Připravujeme, aby se
+                  daly vyplnit rovnou tady.
+                </Typography>
+              </Card>
+
+              <Card>
                 {submitError !== null && (
                   <Alert severity="error" sx={{ mt: 3, borderRadius: 2 }}>
                     {submitError}
@@ -1381,44 +1422,110 @@ function Hero({ compact = false }: { compact?: boolean }) {
     <Box
       sx={{
         bgcolor: BRAND.ink,
-        backgroundImage: `radial-gradient(1100px 340px at 72% -30%, ${BRAND.accentWash}, transparent 70%)`,
+        backgroundImage: `radial-gradient(1200px 420px at 78% -20%, rgba(255,157,0,0.16), transparent 68%)`,
         color: '#FFFFFF',
-        pt: { xs: 4, sm: 6 },
-        pb: { xs: 10, sm: 13 },
+        pt: { xs: 3.5, md: 5 },
+        pb: { xs: 11, md: 15 },
         px: 2,
       }}
     >
       <Container maxWidth="lg" sx={{ px: { xs: '0 !important', md: 3 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: compact ? 2 : 3 }}>
-          <Typography component="span" sx={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.01em' }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.25, mb: compact ? 2 : 4 }}>
+          <Typography component="span" sx={{ fontWeight: 800, fontSize: { xs: 18, md: 22 }, letterSpacing: '-0.01em' }}>
             SportMedical
           </Typography>
           <Typography
             component="span"
-            sx={{ fontWeight: 500, fontSize: 17, letterSpacing: 2, color: BRAND.accent }}
+            sx={{ fontWeight: 500, fontSize: { xs: 18, md: 22 }, letterSpacing: 2.5, color: BRAND.accent }}
           >
             DIAGNOSTICS
           </Typography>
         </Box>
 
         {!compact && (
-          <>
-            <Typography variant="h4" sx={{ fontSize: { xs: 28, sm: 38 }, mb: 1.25, lineHeight: 1.12 }}>
-              Dotazník před návštěvou
-            </Typography>
-            <Typography sx={{ color: 'rgba(255,255,255,0.68)', mb: 3, maxWidth: 520 }}>
-              Vyplňte jednou a máte hotovo. Nemusíte se nikam registrovat ani si
-              nic pamatovat.
-            </Typography>
+          /*
+            Two columns, because one left the right half of a 1440 px banner
+            empty and the page opened on a lot of nothing. What fills it is the
+            three steps -- the shortest honest answer to "how long is this
+            going to take me", which is the question somebody about to close
+            the tab is actually asking.
+          */
+          <Box
+            sx={{
+              display: 'grid',
+              gap: { xs: 3, md: 6 },
+              alignItems: 'end',
+              gridTemplateColumns: { xs: '1fr', md: '1.35fr 1fr' },
+            }}
+          >
+            <Box>
+              <Typography
+                variant="h4"
+                sx={{ fontSize: { xs: 32, sm: 44, md: 52 }, mb: 1.5, lineHeight: 1.08 }}
+              >
+                Dotazník před návštěvou
+              </Typography>
+              <Typography
+                sx={{ color: 'rgba(255,255,255,0.68)', mb: 3, maxWidth: 520, fontSize: { xs: 15, md: 17 } }}
+              >
+                Vyplňte jednou a máte hotovo. Nemusíte se nikam registrovat ani
+                si nic pamatovat.
+              </Typography>
 
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <Trust icon={<ScheduleOutlined sx={{ fontSize: 15 }} />} label="Zhruba minuta" />
-              <Trust icon={<VerifiedUserOutlined sx={{ fontSize: 15 }} />} label="Bez registrace" />
-              <Trust icon={<LockOutlined sx={{ fontSize: 15 }} />} label="Šifrovaný přenos" />
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Trust icon={<ScheduleOutlined sx={{ fontSize: 15 }} />} label="Zhruba minuta" />
+                <Trust icon={<VerifiedUserOutlined sx={{ fontSize: 15 }} />} label="Bez registrace" />
+                <Trust icon={<LockOutlined sx={{ fontSize: 15 }} />} label="Šifrovaný přenos" />
+              </Box>
             </Box>
-          </>
+
+            <Box
+              sx={{
+                display: { xs: 'none', md: 'grid' },
+                gap: 1.75,
+                p: 3,
+                borderRadius: 4,
+                border: '1px solid rgba(255,255,255,0.14)',
+                bgcolor: 'rgba(255,255,255,0.04)',
+              }}
+            >
+              <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: 1, color: BRAND.accent }}>
+                JAK TO PROBĚHNE
+              </Typography>
+              <HeroStep n="1" text="Vyplníte tento formulář — stačí minuta." />
+              <HeroStep n="2" text="Ozveme se vám a domluvíme termín." />
+              <HeroStep n="3" text="Přijdete s výpisem od praktického lékaře." />
+            </Box>
+          </Box>
         )}
       </Container>
+    </Box>
+  );
+}
+
+function HeroStep({ n, text }: { n: string; text: string }) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+      <Box
+        sx={{
+          width: 22,
+          height: 22,
+          borderRadius: '50%',
+          flexShrink: 0,
+          mt: '1px',
+          display: 'grid',
+          placeItems: 'center',
+          fontSize: 11,
+          fontWeight: 800,
+          bgcolor: 'rgba(255,255,255,0.12)',
+          color: '#FFFFFF',
+        }}
+      >
+        {n}
+      </Box>
+      <Typography sx={{ color: 'rgba(255,255,255,0.82)', fontSize: 14.5, lineHeight: 1.4 }}>
+        {text}
+      </Typography>
     </Box>
   );
 }
@@ -1464,26 +1571,38 @@ function Card({ children, sx }: { children: ReactNode; sx?: object }) {
   );
 }
 
+/** A heading in the rail. No number: the rail is not a step of the form. */
+function RailTitle({ children }: { children: string }) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+      <Typography sx={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.01em' }}>
+        {children}
+      </Typography>
+      <Box sx={{ flex: 1, height: '1px', bgcolor: BRAND.line }} />
+    </Box>
+  );
+}
+
 function Section({ number, title }: { number: number; title: string }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
       <Box
         sx={{
-          width: 26,
-          height: 26,
-          borderRadius: 1.5,
+          width: 30,
+          height: 30,
+          borderRadius: 1.75,
           bgcolor: BRAND.ink,
           color: BRAND.accent,
           display: 'grid',
           placeItems: 'center',
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: 800,
           flexShrink: 0,
         }}
       >
         {number}
       </Box>
-      <Typography sx={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.01em' }}>
+      <Typography sx={{ fontWeight: 800, fontSize: 19, letterSpacing: '-0.01em' }}>
         {title}
       </Typography>
       <Box sx={{ flex: 1, height: '1px', bgcolor: BRAND.line }} />

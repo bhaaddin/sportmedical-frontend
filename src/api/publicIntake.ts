@@ -90,6 +90,26 @@ export interface IntakeConsent {
  * whole submission is refused with `errors.Address`, which is how it was found
  * that this form could never be submitted at all.
  */
+/**
+ * One answer, in whichever of the three shapes its question has. The server
+ * stores it verbatim and interprets none of it — the questions are defined in
+ * this repo today, so there is nothing on that side to validate against.
+ */
+export interface IntakeHealthAnswer {
+  questionId: string;
+  text?: string | null;
+  yesNo?: boolean | null;
+  choices?: string[] | null;
+}
+
+export interface IntakeHealthQuestionnaire {
+  /** Which set of questions these answers belong to. */
+  definitionKey: string;
+  /** Bumped when the questions change, so old rows stay readable. */
+  schemaVersion: number;
+  answers: IntakeHealthAnswer[];
+}
+
 export interface IntakeAddress {
   ruianAddressPointCode: number;
 }
@@ -101,6 +121,15 @@ export interface IntakeRequest {
   insurance: IntakeInsurance;
   /** Must include a granted 'treatment' consent or the server rejects. */
   consents: IntakeConsent[];
+  /**
+   * The zdravotní dotazník, when the patient filled any of it in.
+   *
+   * Optional both here and on the server, and left out entirely rather than
+   * sent empty when nothing was answered: a stored `{"answers":[]}` says
+   * somebody opened the form and answered nothing, which is a different fact
+   * from never having opened it.
+   */
+  healthQuestionnaire?: IntakeHealthQuestionnaire;
   /**
    * Anti-abuse honeypot. Rendered visually hidden and never focusable;
    * a non-empty value means a bot filled the form. Always sent as ''.

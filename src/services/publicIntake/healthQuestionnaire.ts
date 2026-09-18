@@ -366,3 +366,52 @@ export const progressOf = (
   });
   return { answered: answered.length, total: asking.length };
 };
+
+/**
+ * Which set of questions these answers belong to, and which revision of it.
+ *
+ * Stored with every submission so a row read in two years can still be matched
+ * to the questions it answered. Bump `SCHEMA_VERSION` whenever a question is
+ * added, removed or reworded — not when the layout changes.
+ */
+export const DEFINITION_KEY = 'sportmedical-cz-zdravotni-dotaznik';
+export const SCHEMA_VERSION = 1;
+
+/**
+ * The answers, in the shape the API takes.
+ *
+ * Only what was actually answered: an untouched question is absent rather than
+ * sent as null, because a form where nobody answered anything should arrive as
+ * nothing at all and not as 76 empty rows. Returns `undefined` for that case,
+ * which is what keeps the field off the request entirely.
+ */
+export const answersForSubmission = (
+  answers: Answers,
+): { definitionKey: string; schemaVersion: number; answers: {
+  questionId: string; text?: string | null; yesNo?: boolean | null; choices?: string[] | null;
+}[] } | undefined => {
+  const given = Object.entries(answers).flatMap(([questionId, value]) => {
+    if (value === null || value === undefined) return [];
+    if (typeof value === 'boolean') return [{ questionId, yesNo: value }];
+    if (Array.isArray(value)) return value.length === 0 ? [] : [{ questionId, choices: value }];
+    return value.trim().length === 0 ? [] : [{ questionId, text: value.trim() }];
+  });
+
+  return given.length === 0
+    ? undefined
+    : { definitionKey: DEFINITION_KEY, schemaVersion: SCHEMA_VERSION, answers: given };
+};
+
+/** The draft as the page last left it. Same key the form writes. */
+export const DRAFT_KEY = 'smd.health-questionnaire.draft.v1';
+
+export const readDraft = (): Answers => {
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY);
+    return raw === null ? {} : (JSON.parse(raw) as Answers);
+  } catch {
+    /* No storage, or nothing readable in it. An empty draft is a real answer:
+       the patient simply did not fill the questionnaire in. */
+    return {};
+  }
+};
