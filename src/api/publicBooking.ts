@@ -32,6 +32,14 @@ export interface BookableActivity {
    */
   requiresReportByEmail: boolean;
   requiresClubSharing: boolean;
+  /**
+   * How long the slot will be held while the patient registers, in minutes.
+   *
+   * The server's own number - the calendar's setting, or the default when it
+   * has none - so the page can promise what will actually happen instead of
+   * the fifteen it used to have written into it.
+   */
+  holdMinutes: number;
 }
 
 export interface BookableService {

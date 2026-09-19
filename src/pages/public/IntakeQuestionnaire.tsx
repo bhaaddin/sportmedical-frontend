@@ -1583,9 +1583,28 @@ function Hero({ compact = false }: { compact?: boolean }) {
               <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: 1, color: BRAND.accent }}>
                 JAK TO PROBĚHNE
               </Typography>
-              <HeroStep n="1" text="Vyplníte tento formulář — stačí minuta." />
-              <HeroStep n="2" text="Ozveme se vám a domluvíme termín." />
-              <HeroStep n="3" text="Přijdete s výpisem od praktického lékaře." />
+              {/*
+                Two different truths, and the page must not tell the wrong one.
+
+                Somebody who booked a slot already has a time; telling them "we
+                will call you and arrange one" contradicts the banner directly
+                above, which names the day and the hour we are holding for them.
+                Somebody who came straight here has no time yet, and for them
+                the original three steps are exactly right.
+              */}
+              {held !== null ? (
+                <>
+                  <HeroStep n="1" text="Vyplníte tento formulář — stačí minuta." />
+                  <HeroStep n="2" text="Termín je hned váš — potvrzení uvidíte na obrazovce." />
+                  <HeroStep n="3" text="Přijdete s výpisem od praktického lékaře." />
+                </>
+              ) : (
+                <>
+                  <HeroStep n="1" text="Vyplníte tento formulář — stačí minuta." />
+                  <HeroStep n="2" text="Ozveme se vám a domluvíme termín." />
+                  <HeroStep n="3" text="Přijdete s výpisem od praktického lékaře." />
+                </>
+              )}
             </Box>
           </Box>
         )}

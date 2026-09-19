@@ -114,6 +114,26 @@ const clinicDate = (isoDate: string): string => {
   });
 };
 
+/**
+ * Minutes, declined the way Czech declines them: 1 minutu, 2-4 minuty, 5+ minut.
+ *
+ * Worth the twelve lines. "podržíme 5 minutu" is the kind of thing that makes a
+ * clinic's own booking page look like it was written by somebody who does not
+ * speak the language - and the number is the clinic's to choose, so every case
+ * is reachable.
+ */
+function minuteWord(minutes: number): string | null {
+  // A server that does not send the number is not a reason to print
+  // "undefined minut" at somebody, and not a reason to invent fifteen either.
+  // The sentence simply does not appear; the hold still happens.
+  if (!Number.isFinite(minutes) || minutes <= 0) return null;
+
+  if (minutes === 1) return '1 minutu';
+  if (minutes >= 2 && minutes <= 4) return `${minutes} minuty`;
+
+  return `${minutes} minut`;
+}
+
 export default function PublicBooking() {
   const navigate = useNavigate();
 
@@ -400,10 +420,19 @@ export default function PublicBooking() {
                       ))}
                     </Box>
 
-                    <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 2 }}>
-                      Po výběru času vám termín podržíme 15 minut, než vyplníte
-                      registraci.
-                    </Typography>
+                    {/*
+                      The clinic's own number, not this file's. It used to say
+                      fifteen because that was the only length there was; a
+                      calendar can choose now, and a page promising fifteen to a
+                      clinic that chose five would be found out only by somebody
+                      losing a slot they had been told was theirs.
+                    */}
+                    {minuteWord(chosen.activity.holdMinutes) !== null && (
+                      <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 2 }}>
+                        Po výběru času vám termín podržíme{' '}
+                        {minuteWord(chosen.activity.holdMinutes)}, než vyplníte registraci.
+                      </Typography>
+                    )}
                   </>
                 )}
               </Card>
