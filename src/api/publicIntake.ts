@@ -168,6 +168,16 @@ export interface IntakeResponse {
    * until a member of staff resolves it.
    */
   manageToken: string | null;
+
+  /**
+   * Whether a confirmation e-mail is genuinely on its way.
+   *
+   * The server answers this, because only the server knows: a message is
+   * queued either way, but it leaves only when there is a configured sender to
+   * take it out of the queue. The screen said "we have e-mailed you"
+   * unconditionally until 19. 9. 2026, while nothing at all was being sent.
+   */
+  confirmationEmailExpected: boolean;
 }
 
 /* ── Errors ── */

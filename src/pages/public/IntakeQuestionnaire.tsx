@@ -768,9 +768,23 @@ export default function IntakeQuestionnaire() {
                   Co bude dál
                 </Typography>
                 <Typography variant="body2" sx={{ color: BRAND.muted, mb: 2 }}>
+                  {/*
+                    What is promised depends on what will really happen.
+
+                    Both sentences used to end "na uvedený e-mail" whatever the
+                    server could do, and for a fortnight the server could do
+                    nothing: no sender was configured and every confirmation sat
+                    in the queue. A patient told to watch their inbox watched it
+                    for nothing. The server now says whether a message is
+                    actually coming, and only then is one promised.
+                  */}
                   {result.outcome === IntakeOutcome.CandidateReviewRequired
-                    ? 'Vaše údaje ověří naše recepce, abychom vás nezaložili dvakrát. Ozveme se vám na uvedený e-mail.'
-                    : 'Vaše údaje máme uložené. Na uvedený e-mail vám pošleme potvrzení.'}
+                    ? (result.confirmationEmailExpected
+                      ? 'Vaše údaje ověří naše recepce, abychom vás nezaložili dvakrát. Ozveme se vám na uvedený e-mail.'
+                      : 'Vaše údaje ověří naše recepce, abychom vás nezaložili dvakrát, a pak se vám ozveme. Poznamenejte si prosím číslo žádosti.')
+                    : (result.confirmationEmailExpected
+                      ? 'Vaše údaje máme uložené a potvrzení jsme vám poslali e-mailem.'
+                      : 'Vaše údaje máme uložené. Potvrzení máte na této obrazovce — poznamenejte si prosím číslo žádosti.')}
                 </Typography>
 
                 {result.manageToken !== null && (
