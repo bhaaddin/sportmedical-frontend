@@ -24,6 +24,7 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const Login = lazy(() => import('./pages/Login'));
 const IntakeQuestionnaire = lazy(() => import('./pages/public/IntakeQuestionnaire'));
 const PublicBooking = lazy(() => import('./pages/public/PublicBooking'));
+const ManageBooking = lazy(() => import('./pages/public/ManageBooking'));
 const IntakeReviewQueue = lazy(() => import('./pages/IntakeReviewQueue'));
 const DashboardPage = lazy(() => import('./pages/Dashboard'));
 const DiagnosticForm = lazy(() => import('./pages/DiagnosticForm'));
@@ -460,6 +461,11 @@ export default function App() {
             {/* Objednání online. Anonymous, like /dotaznik, and outside the
                 AuthGuard for the same reason: a patient has no account. */}
             <Route path="/objednat" element={<Suspense fallback={<PageLoader />}><PublicBooking /></Suspense>} />
+            {/* Sprava rezervace. Anonymous like the two above: the manage token
+                IS the identity, and a patient sent to a login screen on the way
+                to their own appointment can never get there. That is exactly
+                what the confirmation's button did until this route existed. */}
+            <Route path="/rezervace/:token" element={<Suspense fallback={<PageLoader />}><ManageBooking /></Suspense>} />
             <Route path="/*" element={
               <AuthGuard>
                 <Layout>

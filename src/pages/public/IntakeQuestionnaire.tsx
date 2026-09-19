@@ -52,6 +52,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import {
   AutoAwesomeOutlined,
   CheckCircleOutlined,
+  DownloadOutlined,
   EventAvailableOutlined,
   GavelOutlined,
   OpenInFullOutlined,
@@ -97,6 +98,7 @@ import PublicAddressPicker from '../../components/public/PublicAddressPicker';
 import HealthQuestionnaire from '../../components/public/HealthQuestionnaire';
 import { answersForSubmission, readDraft } from '../../services/publicIntake/healthQuestionnaire';
 import { forgetHeld, readHeld } from '../../api/publicBooking';
+import { calendarFileUrl } from '../../api/publicManage';
 import type { HeldBooking } from '../../api/publicBooking';
 import type { AddressPoint } from '../../api/addressLookup';
 
@@ -265,6 +267,24 @@ const czechDate = (iso: string): string => {
 };
 
 /* ══════════════════════════════════════════════════════════════ */
+
+/**
+ * A moment as the clinic reads it.
+ *
+ * The server answers in UTC and the browser may be anywhere. Somebody
+ * confirming on a phone set to another zone must still be told the Prague time
+ * they are expected at.
+ */
+function clinicMoment(utc: string): string {
+  return new Date(utc).toLocaleString('cs-CZ', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Prague',
+  });
+}
 
 export default function IntakeQuestionnaire() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -737,9 +757,27 @@ export default function IntakeQuestionnaire() {
           <Container maxWidth="sm" sx={{ mt: -7, pb: 8 }}>
             <Card sx={{ textAlign: 'center' }}>
               <CheckCircleOutlined sx={{ fontSize: 64, color: 'success.main', mb: 1 }} />
+
+              {/*
+                What happened, in the words of what actually happened.
+
+                "Dotazník jsme přijali" was shown to everybody, including somebody
+                who had just booked a time — who was then given a reference
+                number and never told the time they had booked. The server has
+                returned the appointment all along; nothing read it.
+              */}
               <Typography variant="h5" sx={{ mb: 1 }}>
-                Dotazník jsme přijali
+                {result.appointmentStartUtc !== null
+                  ? 'Termín je váš'
+                  : 'Dotazník jsme přijali'}
               </Typography>
+
+              {result.appointmentStartUtc !== null && (
+                <Typography sx={{ fontWeight: 800, fontSize: 19, mb: 2 }}>
+                  {clinicMoment(result.appointmentStartUtc)}
+                </Typography>
+              )}
+
               <Typography variant="body2" sx={{ color: BRAND.muted, mb: 3 }}>
                 Číslo vaší žádosti
               </Typography>
@@ -788,14 +826,37 @@ export default function IntakeQuestionnaire() {
                 </Typography>
 
                 {result.manageToken !== null && (
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    href={`/book/manage/${result.manageToken}`}
-                    sx={{ mt: 1, borderRadius: 999, py: 1.25 }}
-                  >
-                    Správa rezervace — změna nebo zrušení termínu
-                  </Button>
+                  <>
+                    {/*
+                      The calendar file, offered here and not only one page
+                      further in. The owner asked for a confirmation the patient
+                      "can download like a calendar reminder and lock into
+                      Google or Apple" — making them follow a link first was a
+                      step between them and the thing they were promised.
+                    */}
+                    {result.appointmentStartUtc !== null && (
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        disableElevation
+                        href={calendarFileUrl(result.manageToken)}
+                        startIcon={<DownloadOutlined />}
+                        sx={{ mt: 1, borderRadius: 999, py: 1.25, color: BRAND.ink }}
+                      >
+                        Přidat do kalendáře
+                      </Button>
+                    )}
+
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      color="inherit"
+                      href={`/rezervace/${result.manageToken}`}
+                      sx={{ mt: 1.25, borderRadius: 999, py: 1.25, borderColor: BRAND.line }}
+                    >
+                      Správa rezervace — změna nebo zrušení termínu
+                    </Button>
+                  </>
                 )}
               </Box>
             </Card>
@@ -842,7 +903,7 @@ export default function IntakeQuestionnaire() {
             .smd-questionnaire { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           }
         `}</style>
-        <Hero />
+        <Hero booked={held !== null} />
 
         {/* Honeypot — visually hidden, never focusable. */}
         {/*
@@ -1522,7 +1583,16 @@ export default function IntakeQuestionnaire() {
    Presentation
    ══════════════════════════════════════════════════════════════ */
 
-function Hero({ compact = false }: { compact?: boolean }) {
+/**
+ * @param booked
+ * Whether the reader already holds a slot. It decides which three steps the
+ * hero lists, and it is a prop rather than something read here: this is a
+ * separate component, and an earlier version referenced the page's own `held`
+ * from inside it — an identifier that does not exist in this scope, which threw
+ * on render and left the whole page blank. Caught on 19. 9. 2026 by running the
+ * type check that actually checks something.
+ */
+function Hero({ compact = false, booked = false }: { compact?: boolean; booked?: boolean }) {
   return (
     <Box
       sx={{
@@ -1606,7 +1676,7 @@ function Hero({ compact = false }: { compact?: boolean }) {
                 Somebody who came straight here has no time yet, and for them
                 the original three steps are exactly right.
               */}
-              {held !== null ? (
+              {booked ? (
                 <>
                   <HeroStep n="1" text="Vyplníte tento formulář — stačí minuta." />
                   <HeroStep n="2" text="Termín je hned váš — potvrzení uvidíte na obrazovce." />

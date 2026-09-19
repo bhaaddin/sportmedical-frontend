@@ -135,6 +135,11 @@ export default function ClinicServicesPage() {
           color: a.color,
           publicNote: a.publicNote,
           isPubliclyBookable: a.isPubliclyBookable,
+          // Carried, not defaulted. A PUT is the whole entity, so moving a
+          // činnost to another služba would otherwise silently un-tick the
+          // consents the clinic set on it.
+          requiresReportByEmail: a.requiresReportByEmail,
+          requiresClubSharing: a.requiresClubSharing,
           sortOrder: a.sortOrder,
           serviceItemId: a.serviceItemId,
           clinicServiceId: serviceId,
@@ -157,6 +162,10 @@ export default function ClinicServicesPage() {
           clinicServiceId: serviceId,
           publicMinimumNoticeMinutes: c.publicMinimumNoticeMinutes,
           publicHorizonDays: c.publicHorizonDays,
+          // Same reason: a calendar moved to another služba keeps how long it
+          // holds a slot and how late a patient may cancel.
+          publicHoldMinutes: c.publicHoldMinutes,
+          publicCancellationHours: c.publicCancellationHours,
         }),
       });
     }

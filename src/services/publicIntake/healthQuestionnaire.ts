@@ -385,17 +385,34 @@ export const SCHEMA_VERSION = 1;
  * nothing at all and not as 76 empty rows. Returns `undefined` for that case,
  * which is what keeps the field off the request entirely.
  */
+/** One answer as the API takes it: whichever of the three kinds it is. */
+export interface SubmittedAnswer {
+  questionId: string;
+  text?: string | null;
+  yesNo?: boolean | null;
+  choices?: string[] | null;
+}
+
 export const answersForSubmission = (
   answers: Answers,
-): { definitionKey: string; schemaVersion: number; answers: {
-  questionId: string; text?: string | null; yesNo?: boolean | null; choices?: string[] | null;
-}[] } | undefined => {
-  const given = Object.entries(answers).flatMap(([questionId, value]) => {
-    if (value === null || value === undefined) return [];
-    if (typeof value === 'boolean') return [{ questionId, yesNo: value }];
-    if (Array.isArray(value)) return value.length === 0 ? [] : [{ questionId, choices: value }];
-    return value.trim().length === 0 ? [] : [{ questionId, text: value.trim() }];
-  });
+): { definitionKey: string; schemaVersion: number; answers: SubmittedAnswer[] } | undefined => {
+  /*
+   * One shape, not three.
+   *
+   * The branches used to return three different object literals, which left
+   * `flatMap` inferring from the first one and quietly typing the result as
+   * yes/no answers only. It compiled because nothing type-checked this project
+   * -- `tsc -p tsconfig.json` checks an empty file list here; `tsc -b` is the
+   * one that reads the source.
+   */
+  const given: SubmittedAnswer[] = Object.entries(answers).flatMap(
+    ([questionId, value]): SubmittedAnswer[] => {
+      if (value === null || value === undefined) return [];
+      if (typeof value === 'boolean') return [{ questionId, yesNo: value }];
+      if (Array.isArray(value)) return value.length === 0 ? [] : [{ questionId, choices: value }];
+
+      return value.trim().length === 0 ? [] : [{ questionId, text: value.trim() }];
+    });
 
   return given.length === 0
     ? undefined

@@ -178,6 +178,19 @@ export interface IntakeResponse {
    * unconditionally until 19. 9. 2026, while nothing at all was being sent.
    */
   confirmationEmailExpected: boolean;
+
+  /**
+   * The appointment, when this registration was finishing a booking.
+   *
+   * The server has returned these three since the booking flow was built and
+   * this contract never declared them, so the confirmation screen showed a
+   * reference number and nothing else — somebody who had just booked a time was
+   * never told what time. Null for anybody who came straight to the
+   * questionnaire without booking.
+   */
+  appointmentId: string | null;
+  appointmentStartUtc: string | null;
+  appointmentEndUtc: string | null;
 }
 
 /* ── Errors ── */

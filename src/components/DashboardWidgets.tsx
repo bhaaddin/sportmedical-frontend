@@ -81,7 +81,7 @@ export default function DashboardWidgets() {
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
               <Card>
                 <CardContent>
-                  <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <Box>
                       <Typography color="text.secondary" gutterBottom>{kpi.label}</Typography>
                       <Typography variant="h4" sx={{ fontWeight: 700 }}>{kpi.value}</Typography>
@@ -89,7 +89,7 @@ export default function DashboardWidgets() {
                     <Avatar sx={{ bgcolor: kpi.color }}>{kpi.icon}</Avatar>
                   </Box>
                   {kpi.trend !== 0 && (
-                    <Box display="flex" alignItems="center" mt={1}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
                       {kpi.trend >= 0 ? <ArrowUpIcon color="success" fontSize="small" /> : <ArrowDownIcon color="error" fontSize="small" />}
                       <Typography variant="body2" color={kpi.trend >= 0 ? 'success.main' : 'error.main'} sx={{ ml: 0.5 }}>
                         {Math.abs(kpi.trend)}%
