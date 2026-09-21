@@ -68,6 +68,8 @@ import {
   sectionsFor,
 } from '../../services/publicIntake/healthQuestionnaire';
 import type { Answer, Answers, Field, Section } from '../../services/publicIntake/healthQuestionnaire';
+import { DEFINITION_KEY } from '../../services/publicIntake/healthQuestionnaire';
+import { loadQuestionnaire } from '../../api/publicQuestionnaire';
 
 const STORE_KEY = 'smd.health-questionnaire.draft.v1';
 
@@ -118,7 +120,36 @@ export default function HealthQuestionnaire({
 
   useEffect(() => { save(answers); }, [answers]);
 
-  const sections = useMemo(() => sectionsFor(female), [female]);
+  /*
+   * The questionnaire itself, fetched.
+   *
+   * It used to be a constant in the bundle: seventy-seven questions a
+   * developer had to redeploy to change. The clinic edits them in the
+   * administration now, so the dialog asks the server what to draw.
+   *
+   * Null until it arrives, and an empty list if it cannot be fetched — the
+   * screen says so rather than drawing an empty form that looks like a
+   * questionnaire with no questions.
+   */
+  const [loaded, setLoaded] = useState<readonly Section[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    let abandoned = false;
+
+    loadQuestionnaire(DEFINITION_KEY)
+      .then((questionnaire) => { if (!abandoned) setLoaded(questionnaire.sections); })
+      .catch(() => { if (!abandoned) setLoadFailed(true); });
+
+    return () => { abandoned = true; };
+  }, [open]);
+
+  const sections = useMemo(
+    () => sectionsFor(loaded ?? [], female),
+    [loaded, female],
+  );
 
   const set = useCallback(
     (id: string, value: Answer): void =>
@@ -301,6 +332,31 @@ export default function HealthQuestionnaire({
             className="smd-questionnaire"
             sx={{ maxWidth: 860, mx: 'auto', px: { xs: 2, md: 5 }, py: { xs: 3, md: 4 } }}
           >
+            {/*
+              Three states, and the difference matters to whoever is sitting
+              here: we are fetching it, we could not, or the clinic has not
+              published one. An empty form in any of those cases looks like a
+              questionnaire with no questions, and somebody would submit it.
+            */}
+            {loaded === null && !loadFailed && (
+              <Typography sx={{ color: palette.muted, py: 4, textAlign: 'center' }}>
+                Načítáme dotazník…
+              </Typography>
+            )}
+
+            {loadFailed && (
+              <Typography sx={{ color: palette.muted, py: 4, textAlign: 'center' }}>
+                Dotazník se nepodařilo načíst. Zavřete prosím okno a zkuste to
+                za chvíli znovu — vaše dosavadní odpovědi zůstávají uložené.
+              </Typography>
+            )}
+
+            {loaded !== null && sections.length === 0 && (
+              <Typography sx={{ color: palette.muted, py: 4, textAlign: 'center' }}>
+                Ordinace zatím žádné otázky nenastavila.
+              </Typography>
+            )}
+
             {sections.map((section) => (
               <SectionBlock
                 key={section.id}

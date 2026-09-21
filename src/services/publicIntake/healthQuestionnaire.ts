@@ -1,39 +1,27 @@
-/* ══════════════════════════════════════════════════════════════
-   ZDRAVOTNÍ DOTAZNÍK — question definition
+/* ════════════════════════════════════════════════════════════
+   ZDRAVOTNÍ DOTAZNÍK — the shapes the form draws
 
-   Transcribed from the clinic's own PDF:
-   cdn.shopify.com/s/files/1/0913/0799/9614/files/zdravotni_dotaznik.pdf
-   downloaded and text-extracted on 18. 9. 2026. 9 sections, ~76 answers.
+   ── The questions are NOT here ──
 
-   ── THIS FILE IS IN THE WRONG PLACE AND EVERYONE KNOWS IT ──
+   They used to be: seventy-seven of them, transcribed from the clinic's PDF
+   into this file, which meant a clinic that wanted to add one — or fix a
+   word — needed a developer and a deploy. They are rows in the database now,
+   edited in the administration, served by `/api/public/questionnaire/{key}`
+   and fetched by `api/publicQuestionnaire.ts`.
 
-   Questions about a patient's health belong in the domain, next to the rules
-   that read them, not in a browser. `CzechQuestionnaireCatalog` is where they
-   go, and the API that serves them is `/api/questionnaires/*`.
+   That move happened on 21. 9. 2026 and it removed the second copy: there had
+   been two hardcoded questionnaires, fifty-two questions in the C# domain and
+   seventy-seven here, disagreeing with each other, and the patient only ever
+   saw these. The domain's model carries sections, conditions, notes and
+   placeholders now, so there is one questionnaire and the clinic owns it.
 
-   They are here because that model cannot yet express this form. It has no
-   sections — `CzechQuestionnaireCatalog.cs:157` smuggles them into the prompt
-   as `[01] Title: question`, which a patient would read literally. It has no
-   rule for showing a question only when another was answered "ano", which this
-   form needs thirteen times. It has no grouped or repeating answers, which the
-   family table needs. And none of it is reachable without a login.
+   ── What stays ──
 
-   The owner was told all of that and said, in as many words:
-
-     "for know creat it as it is later befor preduction we wil fix it
-      its not a big deal"
-
-   So it is built here, working, and the wording is right — which is the part
-   that is expensive to get right and cheap to move. When the domain can carry
-   the form, this file is deleted and the renderer is pointed at the API. That
-   is a real migration and it is not free, and it is worth writing down that it
-   was chosen deliberately rather than arrived at by accident.
-
-   ── While it lives here ──
-
-   Nothing in this file decides anything clinical. It is wording and shape: what
-   is asked, in what order, and what follows from a yes. No rule reads it.
-   ══════════════════════════════════════════════════════════════ */
+   Everything that is not content: the field shapes the renderer switches on,
+   the declaration the patient signs, and the helpers that decide which
+   sections and items apply and how far along somebody is. None of it decides
+   anything clinical.
+   ════════════════════════════════════════════════════════════ */
 
 export type Answer = string | boolean | string[] | null;
 export type Answers = Record<string, Answer>;
@@ -68,265 +56,7 @@ export interface Section {
 /** The four relatives the family table asks about, in the PDF's own order. */
 export const RELATIVES = ['Matka', 'Otec', 'Bratr', 'Sestra'] as const;
 
-/** Answered yes — the trigger for every "→ Pokud ano" follow-up. */
-const yes = (id: string) => (answers: Answers): boolean => answers[id] === true;
 
-/** A yes/no question and the box that opens under it when the answer is yes. */
-const asked = (id: string, label: string, followUp: string, help?: string): Item[] => [
-  { field: { kind: 'yesno', id, label, help } },
-  { field: { kind: 'longtext', id: `${id}_detail`, label: followUp }, when: yes(id) },
-];
-
-/** A plain yes/no with nothing following it. */
-const plain = (id: string, label: string): Item => ({ field: { kind: 'yesno', id, label } });
-
-export const HEALTH_QUESTIONNAIRE: readonly Section[] = [
-  {
-    id: 'lekar',
-    number: '1',
-    title: 'Váš praktický lékař',
-    note: 'Zbytek osobních údajů už máme z registrace výše — znovu je nevyplňujete.',
-    items: [
-      {
-        field: {
-          kind: 'text',
-          id: 'prakticky_lekar',
-          label: 'Jméno a adresa praktického lékaře',
-          placeholder: 'např. MUDr. Nováková, Praha 2',
-        },
-      },
-    ],
-  },
-
-  {
-    id: 'sport',
-    number: '2',
-    title: 'Sportovní anamnéza',
-    items: [
-      { field: { kind: 'text', id: 'sport_hlavni', label: 'Hlavní sport' } },
-      { field: { kind: 'text', id: 'sport_klub', label: 'Sportovní klub' } },
-      { field: { kind: 'text', id: 'sport_trener', label: 'Jméno trenéra' } },
-      {
-        field: {
-          kind: 'text',
-          id: 'sport_treninky',
-          label: 'Počet tréninků a hodin týdně',
-          placeholder: 'například 5 tréninků / 8 hodin',
-        },
-      },
-      {
-        field: {
-          kind: 'choice',
-          id: 'sport_uroven',
-          label: 'Soutěžní úroveň',
-          options: ['Rekreační', 'Amatérská', 'Profesionální'],
-        },
-      },
-    ],
-  },
-
-  {
-    id: 'rodina',
-    number: '3',
-    title: 'Rodinná anamnéza',
-    note: 'Údaje o rodinných příslušnících a o zdravotních obtížích v rodině.',
-    items: [
-      {
-        field: {
-          kind: 'notice',
-          id: 'rodina_notice',
-          text: 'U každého příbuzného uveďte věk. Pokud zemřel, uveďte prosím i příčinu úmrtí.',
-        },
-      },
-      ...RELATIVES.flatMap((relative): Item[] => [
-        {
-          field: {
-            kind: 'number',
-            id: `rodina_${relative.toLowerCase()}_vek`,
-            label: `${relative} — věk`,
-            min: 0,
-            max: 120,
-          },
-        },
-        {
-          field: {
-            kind: 'text',
-            id: `rodina_${relative.toLowerCase()}_umrti`,
-            label: `${relative} — příčina úmrtí`,
-            help: 'Nechte prázdné, pokud žije.',
-          },
-        },
-      ]),
-      {
-        field: {
-          kind: 'notice',
-          id: 'rodina_nemoci_notice',
-          text: 'U každého onemocnění označte, kterého příbuzného se týká. Můžete označit více osob, nebo žádnou.',
-        },
-      },
-      ...([
-        'Rakovina',
-        'Cukrovka (diabetes)',
-        'Chudokrevnost (anémie)',
-        'Onemocnění krve',
-        'Srdeční onemocnění',
-        'Infarkt myokardu',
-        'Vysoký krevní tlak',
-        'Onemocnění ledvin',
-        'Cévní mozková příhoda',
-      ] as const).map((nemoc, index): Item => ({
-        field: { kind: 'relatives', id: `rodina_nemoc_${index}`, label: nemoc },
-      })),
-    ],
-  },
-
-  {
-    id: 'zakladni',
-    number: '4',
-    title: 'Osobní anamnéza — základní informace',
-    items: [
-      ...asked(
-        'oa_odbornik',
-        'Navštěvujete pravidelně nějakého odborného lékaře? Jste dlouhodobě sledován?',
-        'Uveďte obor',
-      ),
-      {
-        field: {
-          kind: 'notice',
-          id: 'oa_odbornik_zprava',
-          // Verbatim from the PDF, exclamation mark and all. It is the sentence
-          // that connects this form to the výpis the clinic cannot do without.
-          text: 'Nutné přinést lékařskou zprávu!',
-        },
-        when: yes('oa_odbornik'),
-      },
-      ...asked('oa_prohlidka', 'Absolvoval/a jste někdy sportovní lékařskou prohlídku?', 'Kde a kdy'),
-      ...asked('oa_zakaz', 'Byl vám někdy zakázán sport ze zdravotních důvodů?', 'Kdy a proč'),
-      ...asked('oa_hospitalizace', 'Byl/a jste někdy hospitalizován/a (ležel/la v nemocnici)?', 'Uveďte důvod'),
-      ...asked('oa_leky', 'Užíváte v současnosti nějaké léky – ať už na předpis nebo volně prodejné?', 'Jaké'),
-      ...asked(
-        'oa_doplnky',
-        'Užíval/a jste někdy doplňky stravy, vitamíny nebo přípravky na hubnutí či zlepšení sportovního výkonu?',
-        'Jaké',
-      ),
-    ],
-  },
-
-  {
-    id: 'operace',
-    number: '5',
-    title: 'Operace a úrazy',
-    items: [
-      ...asked('ou_operace', 'Podstoupil/a jste někdy chirurgický zákrok nebo operaci?', 'Uveďte typ a rok'),
-      ...asked(
-        'ou_zlomenina',
-        'Měl/a jste někdy úraz, při kterém došlo ke zlomenině nebo vykloubení?',
-        'Uveďte podrobnosti (část těla, rok)',
-      ),
-      ...asked('ou_hlava', 'Měl/a jste úraz hlavy nebo otřes mozku?', 'Kdy a za jakých okolností'),
-    ],
-  },
-
-  {
-    id: 'alergie',
-    number: '6',
-    title: 'Alergie a kožní reakce',
-    items: [
-      ...asked('al_alergie', 'Máte diagnostikovanou alergii na léky, potraviny nebo jiné látky?', 'Specifikujte'),
-      plain('al_ekzem', 'Trpíte ekzémem, vyrážkou, svěděním, puchýři nebo jinými kožními problémy?'),
-      plain('al_zatez', 'Objevují se u vás kožní reakce po fyzické zátěži (např. zarudnutí, vyrážka)?'),
-    ],
-  },
-
-  {
-    id: 'gynekologie',
-    number: '7',
-    title: 'Gynekologická anamnéza',
-    note: 'Vyplňují pouze ženy.',
-    // Taken from the sex already given in registration — which the birth number
-    // usually filled in — so nobody is asked twice and no man sees this section.
-    when: ({ female }) => female,
-    items: [
-      { field: { kind: 'number', id: 'gyn_menarche', label: 'V kolika letech začala menstruace?', min: 6, max: 25 } },
-      plain('gyn_bolestiva', 'Míváte bolestivou menstruaci?'),
-      ...asked('gyn_potize', 'Gynekologické potíže nebo operace?', 'Upřesněte'),
-      plain('gyn_pravidelny', 'Je cyklus pravidelný?'),
-      plain('gyn_antikoncepce', 'Užíváte hormonální antikoncepci?'),
-    ],
-  },
-
-  {
-    id: 'infekcni',
-    number: '8',
-    title: 'Infekční onemocnění',
-    note: 'Prodělal/a jste některé z těchto onemocnění?',
-    items: ([
-      'Mononukleóza',
-      'Infekční žloutenka',
-      'Spála',
-      'Opakované angíny',
-      'Zarděnky',
-      'COVID-19',
-      'Zánět mozkových blan',
-      'Plané neštovice',
-    ] as const).map((nemoc, index) => plain(`inf_${index}`, nemoc)),
-  },
-
-  {
-    id: 'kardio',
-    number: '9',
-    title: 'Kardiovaskulární onemocnění',
-    // The six that stop an examination. Whatever else gets shortened, this block
-    // stays complete and stays legible.
-    items: ([
-      'Vrozená srdeční vada',
-      'Vysoký krevní tlak',
-      'Mdloby nebo závratě při námaze',
-      'Pocity bušení srdce',
-      'Pocity vynechávání rytmu',
-      'Bolesti na hrudi při zátěži',
-    ] as const).map((nemoc, index) => plain(`kv_${index}`, nemoc)),
-  },
-
-  {
-    id: 'dychani',
-    number: '10',
-    title: 'Dýchací potíže',
-    items: ([
-      'Astma',
-      'Astma – záchvat',
-      'Dušnost nebo sípot při zátěži',
-      'Kašel nebo stažené dýchání po zátěži',
-    ] as const).map((nemoc, index) => plain(`dy_${index}`, nemoc)),
-  },
-
-  {
-    id: 'neuro',
-    number: '11',
-    title: 'Neurologické stavy',
-    items: ([
-      'Epilepsie nebo křečové stavy',
-      'Omdlévání, bezvědomí',
-      'Časté nebo silné bolesti hlavy',
-    ] as const).map((stav, index) => plain(`ne_${index}`, stav)),
-  },
-
-  {
-    id: 'metabolicke',
-    number: '12',
-    title: 'Metabolické, endokrinní a jiné',
-    items: ([
-      'Cukrovka (diabetes)',
-      'Poruchy štítné žlázy',
-    ] as const).map((stav, index) => plain(`me_${index}`, stav)),
-  },
-];
-
-/**
- * The closing paragraph, verbatim from the PDF. Shown whole and never
- * summarised: it is what the patient is affirming, and a paraphrase of a
- * declaration is a different declaration.
- */
 export const DECLARATION =
   'Údaje uvedené v tomto dotazníku slouží výhradně pro účely posouzení zdravotní '
   + 'způsobilosti ke sportovní činnosti. Jsou zpracovávány v souladu s nařízením '
@@ -337,9 +67,18 @@ export const DECLARATION =
   + 'Svým podpisem uděluji souhlas se zpracováním poskytnutých údajů za výše '
   + 'uvedeným účelem.';
 
-/** Sections that apply, given what registration already knows. */
-export const sectionsFor = (female: boolean): readonly Section[] =>
-  HEALTH_QUESTIONNAIRE.filter((section) => section.when === undefined || section.when({ female }));
+/**
+ * Sections that apply, given what registration already knows.
+ *
+ * Takes the questionnaire rather than reading one from this file: the content
+ * lives in the database now and is fetched, so a helper that closed over a
+ * constant here would be the second copy the whole move was meant to remove.
+ */
+export const sectionsFor = (
+  all: readonly Section[],
+  female: boolean,
+): readonly Section[] =>
+  all.filter((section) => section.when === undefined || section.when({ female }));
 
 /** Items of a section that apply, given what has been answered so far. */
 export const itemsFor = (section: Section, answers: Answers): readonly Item[] =>
