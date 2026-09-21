@@ -234,6 +234,19 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         adminOnly: true,
       },
       {
+        /*
+         * The questions a patient actually answers. They lived in the browser
+         * bundle until 21. 9. 2026 -- seventy-seven of them, with fifty-two
+         * more unused in the domain -- so adding one meant a developer and a
+         * deploy. This is the screen that ended that.
+         */
+        id: 'zdravotni-dotaznik',
+        label: 'Zdravotní dotazník',
+        description: 'Otázky, na které pacient odpovídá — znění, sekce, pořadí a nasazení verze',
+        to: '/dotaznik-nastaveni',
+        adminOnly: true,
+      },
+      {
         id: 'emaily',
         label: 'E-mailové šablony',
         description: 'Text a vzhled e-mailů, které chodí pacientům',
