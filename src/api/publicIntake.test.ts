@@ -42,7 +42,7 @@ const request = (): IntakeRequest => ({
   },
   contact: { email: 'eva@example.invalid', phone: '+420777123995' },
   address: { ruianAddressPointCode: 25381521 },
-  insurance: { kind: 'czech', insuranceNumber: '8911099637', insurerCode: 111 },
+  insurance: { kind: 'czech', insuranceNumber: '8911099637', insuranceNumberConfirmation: null, insurerCode: 111 },
   consents: [{ policyCode: 'treatment', granted: true }],
   websiteUrl: '',
 });

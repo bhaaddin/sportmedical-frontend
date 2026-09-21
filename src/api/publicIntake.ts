@@ -60,6 +60,15 @@ export interface CzechInsurance {
   kind: 'czech';
   /** 9–10 digits. */
   insuranceNumber: string;
+  /**
+   * The same number typed a second time, or null when the form did not ask.
+   *
+   * Asked for only when the number is not shaped like a birth number: that
+   * shape checks itself, an insurer-assigned number does not. The server
+   * refuses a missing or mismatched confirmation, so this is the question, not
+   * the rule.
+   */
+  insuranceNumberConfirmation: string | null;
   /** One of 111/201/205/207/209/211/213. */
   insurerCode: number;
 }
@@ -191,6 +200,16 @@ export interface IntakeResponse {
   appointmentId: string | null;
   appointmentStartUtc: string | null;
   appointmentEndUtc: string | null;
+
+  /**
+   * True when the patient came with a held slot and leaves without an
+   * appointment.
+   *
+   * Their registration is saved either way. What this stops is the screen
+   * showing an ordinary confirmation to somebody who believes they now have a
+   * time and does not.
+   */
+  bookingFailed: boolean;
 }
 
 /* ── Errors ── */

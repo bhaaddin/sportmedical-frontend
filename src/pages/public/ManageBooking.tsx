@@ -53,6 +53,8 @@ import {
   readBooking,
 } from '../../api/publicManage';
 import type { ManagedBooking } from '../../api/publicManage';
+import { readPublicClinic } from '../../api/clinicSettings';
+import type { PublicClinic } from '../../api/clinicSettings';
 
 /* ── Brand, the same one /objednat and /dotaznik wear ── */
 
@@ -113,6 +115,17 @@ export default function ManageBooking() {
   const [cancelling, setCancelling] = useState(false);
   const [complaint, setComplaint] = useState<string | null>(null);
 
+  /** The clinic's own number, from settings. Empty when nobody has set one. */
+  const [clinic, setClinic] = useState<PublicClinic | null>(null);
+
+  useEffect(() => {
+    let abandoned = false;
+
+    void readPublicClinic().then((details) => { if (!abandoned) setClinic(details); });
+
+    return () => { abandoned = true; };
+  }, []);
+
   useEffect(() => {
     if (token === '') {
       setLoadFailed('Odkaz na rezervaci je neúplný.');
@@ -167,8 +180,9 @@ export default function ManageBooking() {
               </Typography>
               <Typography variant="body2" sx={{ color: BRAND.muted }}>
                 {loadFailed} Odkaz mohl být neúplný, nebo už byl termín zrušen.
-                Zavolejte nám prosím na +420 606 785 271 a rádi to s vámi
-                projdeme.
+                {clinic?.phone.trim()
+                  ? ` Zavolejte nám prosím na ${clinic.phone.trim()} a rádi to s vámi projdeme.`
+                  : ''}
               </Typography>
             </Card>
           )}

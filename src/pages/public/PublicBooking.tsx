@@ -53,6 +53,8 @@ import {
   rememberHeld,
 } from '../../api/publicBooking';
 import type { BookableActivity, BookableService, BookableSlot } from '../../api/publicBooking';
+import { readPublicClinic } from '../../api/clinicSettings';
+import type { PublicClinic } from '../../api/clinicSettings';
 
 /* ── Brand, the same one /dotaznik wears ── */
 
@@ -134,11 +136,37 @@ function minuteWord(minutes: number): string | null {
   return `${minutes} minut`;
 }
 
+/**
+ * ", nebo nám zavolejte na 123" — or nothing at all.
+ *
+ * The clinic may not have filled in a telephone number, and a sentence that
+ * ends "zavolejte nám na" with a blank after it is worse than one that does not
+ * mention the telephone. So the whole clause appears or none of it does.
+ */
+function ringUs(clinic: PublicClinic | null, lead: string): string {
+  const phone = clinic?.phone.trim() ?? '';
+
+  return phone === '' ? '' : `${lead}${phone}`;
+}
+
 export default function PublicBooking() {
   const navigate = useNavigate();
 
   const [services, setServices] = useState<BookableService[] | null>(null);
   const [offerFailed, setOfferFailed] = useState(false);
+
+  /*
+   * The clinic's telephone number, from the admin's own settings.
+   *
+   * It was written into this file three times. Every one of them was a value
+   * the owner may need to change and none of them was his to change: the first
+   * time the clinic changes provider, three sentences send patients to a number
+   * that no longer answers.
+   *
+   * Null while loading, empty when nobody has filled it in. Both mean the same
+   * thing here — say nothing about telephoning rather than invent a number.
+   */
+  const [clinic, setClinic] = useState<PublicClinic | null>(null);
 
   const [chosen, setChosen] =
     useState<{ service: BookableService; activity: BookableActivity } | null>(null);
@@ -154,6 +182,10 @@ export default function PublicBooking() {
     bookableOffer()
       .then((offer) => { if (!cancelled) setServices(offer); })
       .catch(() => { if (!cancelled) setOfferFailed(true); });
+
+    // Never throws -- see readPublicClinic. A missing telephone number must not
+    // cost the patient the booking screen.
+    void readPublicClinic().then((details) => { if (!cancelled) setClinic(details); });
 
     return () => { cancelled = true; };
   }, []);
@@ -256,8 +288,7 @@ export default function PublicBooking() {
             {offerFailed && (
               <Card>
                 <Alert severity="error" sx={{ borderRadius: 2 }}>
-                  Nabídku se nepodařilo načíst. Zkuste to prosím za chvíli znovu,
-                  nebo nám zavolejte na +420 606 785 271.
+                  Nabídku se nepodařilo načíst. Zkuste to prosím za chvíli znovu{ringUs(clinic, ', nebo nám zavolejte na ')}.
                 </Alert>
               </Card>
             )}
@@ -268,7 +299,9 @@ export default function PublicBooking() {
                   Online objednávání právě není otevřené
                 </Typography>
                 <Typography variant="body2" sx={{ color: BRAND.muted }}>
-                  Termín vám rádi domluvíme telefonicky na +420 606 785 271.
+                  {clinic?.phone
+                    ? `Termín vám rádi domluvíme telefonicky na ${clinic.phone}.`
+                    : 'Zkuste to prosím později.'}
                 </Typography>
               </Card>
             )}
@@ -342,8 +375,7 @@ export default function PublicBooking() {
 
                 {days !== null && days.length === 0 && (
                   <Typography variant="body2" sx={{ color: BRAND.muted }}>
-                    V nejbližších {HORIZON_DAYS} dnech nemáme volno. Zavolejte nám
-                    prosím na +420 606 785 271.
+                    V nejbližších {HORIZON_DAYS} dnech nemáme volno{ringUs(clinic, '. Zavolejte nám prosím na ')}.
                   </Typography>
                 )}
 

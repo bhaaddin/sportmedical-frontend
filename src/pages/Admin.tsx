@@ -18,6 +18,7 @@ import SystemHealth from './SystemHealth';
 import CompanySettingsCard from '../components/CompanySettingsCard';
 import { motion } from 'framer-motion';
 import client from '../api/client';
+import { PUBLIC_CLINIC_KEYS, readSettings, saveSettings } from '../api/clinicSettings';
 
 const sectionAnim = {
   hidden: { opacity: 0, y: 16 },
@@ -74,13 +75,22 @@ export default function Admin() {
   const [saved, setSaved] = useState(false);
 
   // PUBLIC SETTINGS state
+  /*
+   * Empty, not plausible.
+   *
+   * This screen used to open with "+420 XXX XXX XXX", an address of
+   * "GreenLine, 5. patro, Praha" and an e-mail nobody had chosen -- and since
+   * nothing was ever loaded or saved, those invented values were what the
+   * owner saw every time he opened it. A blank field asks to be filled in; a
+   * plausible one gets left alone.
+   */
   const [pub, setPub] = useState({
-    siteName: 'SportMedical Diagnostics',
+    siteName: '',
     siteTagline: 'Profesionální sportovní diagnostika',
     primaryColor: '#0D7377',
-    contactEmail: 'info@sportmedical-diagnostics.cz',
-    contactPhone: '+420 XXX XXX XXX',
-    contactAddress: 'GreenLine, 5. patro, Praha',
+    contactEmail: '',
+    contactPhone: '',
+    contactAddress: '',
     workingHoursStart: '08:00',
     workingHoursEnd: '17:00',
     workingDays: [1, 2, 3, 4, 5], // Mon-Fri
@@ -107,7 +117,8 @@ export default function Admin() {
     autoConfirmBookings: false,
     enableEmailTemplates: true,
     emailFromName: 'SportMedical',
-    emailFromAddress: 'noreply@sportmedical-diagnostics.cz',
+    // Not a real address until somebody types one. See the note on `pub`.
+    emailFromAddress: '',
     smtpHost: '',
     smtpPort: '587',
     smtpUser: '',
@@ -162,9 +173,64 @@ export default function Admin() {
     }
   }, [mainTab]);
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  /*
+   * What is actually stored, read on open.
+   *
+   * Until 21. 9. 2026 this screen read nothing and wrote nothing: every field
+   * came from the state above and `handleSave` set a flag that showed a green
+   * "Uloženo". The owner configured his clinic, was told it had worked, and
+   * nothing had been saved. That is worse than a screen that does not exist.
+   */
+  useEffect(() => {
+    let abandoned = false;
+
+    readSettings(Object.values(PUBLIC_CLINIC_KEYS))
+      .then((stored) => {
+        if (abandoned) return;
+
+        setPub((previous) => ({
+          ...previous,
+          siteName: stored[PUBLIC_CLINIC_KEYS.name] ?? previous.siteName,
+          contactEmail: stored[PUBLIC_CLINIC_KEYS.email] ?? previous.contactEmail,
+          contactPhone: stored[PUBLIC_CLINIC_KEYS.phone] ?? previous.contactPhone,
+          contactAddress: stored[PUBLIC_CLINIC_KEYS.address] ?? previous.contactAddress,
+          enableBooking: (stored[PUBLIC_CLINIC_KEYS.bookingEnabled] ?? 'true') !== 'false',
+        }));
+      })
+      .catch(() => {
+        // Leave the fields as they are and let the save report the failure.
+        // Wiping what the owner can see because a GET failed would look like
+        // the settings had been lost.
+      });
+
+    return () => { abandoned = true; };
+  }, []);
+
+  const [saveFailed, setSaveFailed] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveFailed(null);
+
+    try {
+      await saveSettings({
+        [PUBLIC_CLINIC_KEYS.name]: pub.siteName.trim(),
+        [PUBLIC_CLINIC_KEYS.email]: pub.contactEmail.trim(),
+        [PUBLIC_CLINIC_KEYS.phone]: pub.contactPhone.trim(),
+        [PUBLIC_CLINIC_KEYS.address]: pub.contactAddress.trim(),
+        [PUBLIC_CLINIC_KEYS.bookingEnabled]: pub.enableBooking ? 'true' : 'false',
+      });
+
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      // Said out loud. The whole fault this replaces was a success message for
+      // something that never happened.
+      setSaveFailed('Nastavení se nepodařilo uložit. Zkuste to prosím znovu.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -435,7 +501,7 @@ export default function Admin() {
 
           {/* Save button */}
           <motion.div custom={5} variants={sectionAnim} initial="hidden" animate="visible">
-            <Button variant="contained" startIcon={<Save />} onClick={handleSave}
+            <Button variant="contained" startIcon={<Save />} onClick={() => { void handleSave(); }} disabled={saving}
               sx={{ mb: 4, bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 700,
                 boxShadow: '0 4px 16px rgba(13,115,119,0.3)', '&:hover': { bgcolor: '#095456' } }}>
               Uložit nastavení veřejného webu
@@ -592,7 +658,7 @@ export default function Admin() {
 
           {/* Save button */}
           <motion.div custom={5} variants={sectionAnim} initial="hidden" animate="visible">
-            <Button variant="contained" startIcon={<Save />} onClick={handleSave}
+            <Button variant="contained" startIcon={<Save />} onClick={() => { void handleSave(); }} disabled={saving}
               sx={{ mb: 4, bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 700,
                 boxShadow: '0 4px 16px rgba(13,115,119,0.3)', '&:hover': { bgcolor: '#095456' } }}>
               Uložit nastavení zaměstnanců
@@ -720,6 +786,13 @@ export default function Admin() {
       <Snackbar open={saved} autoHideDuration={3000} onClose={() => setSaved(false)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
         <Alert severity="success" variant="filled" sx={{ borderRadius: 2 }}>Nastavení uloženo!</Alert>
+      </Snackbar>
+
+      {/* The other half of the same truth. A screen that can say "uloženo" has
+          to be able to say the opposite, or the green message means nothing. */}
+      <Snackbar open={saveFailed !== null} autoHideDuration={6000} onClose={() => setSaveFailed(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+        <Alert severity="error" variant="filled" sx={{ borderRadius: 2 }}>{saveFailed}</Alert>
       </Snackbar>
     </Box>
   );

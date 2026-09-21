@@ -175,6 +175,11 @@ interface FormState {
   phone: string;
   hasCzechInsurance: boolean;
   insuranceNumber: string;
+  /**
+   * The same number typed again — asked for ONLY when it is not shaped like a
+   * birth number. See `needsSecondTyping`.
+   */
+  insuranceNumberConfirmation: string;
   insurerCode: string;
   documentType: 'IdentityCard' | 'Passport';
   issuingCountry: string;
@@ -198,6 +203,7 @@ const EMPTY_FORM: FormState = {
   phone: '',
   hasCzechInsurance: true,
   insuranceNumber: '',
+  insuranceNumberConfirmation: '',
   insurerCode: '',
   documentType: 'IdentityCard',
   issuingCountry: 'SK',
@@ -284,6 +290,33 @@ function clinicMoment(utc: string): string {
     minute: '2-digit',
     timeZone: 'Europe/Prague',
   });
+}
+
+/**
+ * Whether this insurance number has to be typed a second time.
+ *
+ * A number shaped like a birth number checks itself: the last four digits make
+ * the whole thing divisible by eleven, so a typo is caught without asking
+ * anybody anything. An insurer-assigned number has no such check — there is
+ * nothing to compare it against, and one wrong digit becomes a patient the
+ * clinic cannot bill for.
+ *
+ * The rule belongs to the domain and is enforced there. This is the form
+ * knowing which question to ask, not a second copy of the rule: the server
+ * still refuses a mismatch, and still refuses a missing confirmation.
+ *
+ * Until 21. 9. 2026 the form never asked. Every patient with an
+ * insurer-assigned number was registered and then refused an appointment,
+ * with the reason only in a log.
+ */
+function needsSecondTyping(insuranceNumber: string): boolean {
+  const digits = insuranceNumber.trim().replace(/\s|\//g, '');
+
+  // Too short to judge yet. Asking for a confirmation of half a number would
+  // make the field appear and disappear while somebody is still typing.
+  if (digits.length < 9) return false;
+
+  return !parseBirthNumber(digits).ok;
 }
 
 export default function IntakeQuestionnaire() {
@@ -558,6 +591,24 @@ export default function IntakeQuestionnaire() {
 
     if (form.hasCzechInsurance) {
       collect(next, 'insuranceNumber', validateInsuranceNumber(form.insuranceNumber));
+
+      /*
+       * The second typing, checked here so the patient is told now rather than
+       * after their slot has been claimed.
+       *
+       * The server checks it again — this is the form asking the question, not
+       * the rule.
+       */
+      if (needsSecondTyping(form.insuranceNumber)) {
+        const typedAgain = form.insuranceNumberConfirmation.trim().replace(/\s|\//g, '');
+        const typedFirst = form.insuranceNumber.trim().replace(/\s|\//g, '');
+
+        if (typedAgain === '') {
+          next.insuranceNumberConfirmation = 'Opište prosím číslo ještě jednou.';
+        } else if (typedAgain !== typedFirst) {
+          next.insuranceNumberConfirmation = 'Čísla se neshodují. Zkontrolujte je prosím.';
+        }
+      }
       collect(
         next,
         'insurerCode',
@@ -622,6 +673,11 @@ export default function IntakeQuestionnaire() {
           insuranceNumber: validateInsuranceNumber(form.insuranceNumber).ok
             ? form.insuranceNumber.trim().replace(/\s|\//g, '')
             : form.insuranceNumber,
+          // Sent only when it was asked for. An echo of the first value would
+          // turn the server's check into a formality that always passes.
+          insuranceNumberConfirmation: needsSecondTyping(form.insuranceNumber)
+            ? form.insuranceNumberConfirmation.trim().replace(/\s|\//g, '')
+            : null,
           insurerCode: Number(form.insurerCode),
         }
       : {
@@ -769,8 +825,26 @@ export default function IntakeQuestionnaire() {
               <Typography variant="h5" sx={{ mb: 1 }}>
                 {result.appointmentStartUtc !== null
                   ? 'Termín je váš'
-                  : 'Dotazník jsme přijali'}
+                  : result.bookingFailed
+                    ? 'Registraci máme, termín zatím ne'
+                    : 'Dotazník jsme přijali'}
               </Typography>
+
+              {/*
+                Said plainly, because the alternative is somebody arriving on a
+                day nobody expects them.
+
+                The registration IS saved -- they do not fill it in again. What
+                is missing is the appointment, and for three days this screen
+                showed the ordinary confirmation to a patient who had just lost
+                one without being told.
+              */}
+              {result.bookingFailed && (
+                <Alert severity="warning" sx={{ mb: 2, textAlign: 'left', borderRadius: 2 }}>
+                  Vaše údaje máme uložené, ale vybraný termín se nám nepodařilo
+                  potvrdit. Vyberte si prosím termín znovu — už nebudete nic vyplňovat.
+                </Alert>
+              )}
 
               {result.appointmentStartUtc !== null && (
                 <Typography sx={{ fontWeight: 800, fontSize: 19, mb: 2 }}>
@@ -824,6 +898,18 @@ export default function IntakeQuestionnaire() {
                       ? 'Vaše údaje máme uložené a potvrzení jsme vám poslali e-mailem.'
                       : 'Vaše údaje máme uložené. Potvrzení máte na této obrazovce — poznamenejte si prosím číslo žádosti.')}
                 </Typography>
+
+                {result.bookingFailed && (
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    disableElevation
+                    href="/objednat"
+                    sx={{ mt: 1, borderRadius: 999, py: 1.25, color: BRAND.ink }}
+                  >
+                    Vybrat termín znovu
+                  </Button>
+                )}
 
                 {result.manageToken !== null && (
                   <>
@@ -1255,6 +1341,28 @@ export default function IntakeQuestionnaire() {
                             : '9 nebo 10 číslic z kartičky.')
                         }
                       />
+                      {/*
+                        Appears only for a number that cannot check itself, and
+                        spans both columns so it reads as a follow-up question
+                        rather than a field somebody missed.
+                      */}
+                      {needsSecondTyping(form.insuranceNumber) && (
+                        <TextField
+                          label="Číslo pojištěnce znovu"
+                          placeholder="Opište stejné číslo"
+                          autoComplete="off"
+                          inputMode="numeric"
+                          value={form.insuranceNumberConfirmation}
+                          onChange={(event) => set('insuranceNumberConfirmation', event.target.value)}
+                          error={errors.insuranceNumberConfirmation !== undefined}
+                          helperText={
+                            errors.insuranceNumberConfirmation
+                            ?? 'Toto číslo nejde ověřit výpočtem, takže ho prosím opište dvakrát.'
+                          }
+                          sx={{ gridColumn: { sm: '1 / -1' } }}
+                        />
+                      )}
+
                       <TextField
                         select
                         label="Zdravotní pojišťovna"
