@@ -160,6 +160,18 @@ export const activitySchema = z.object({
    */
   requiresReportByEmail: z.boolean().nullish().transform((v) => v ?? false),
   requiresClubSharing: z.boolean().nullish().transform((v) => v ?? false),
+  /**
+   * Whether the health questionnaire is asked for, and whether it must be
+   * filled in.
+   *
+   * The owner's own example — prohlídka povinný, diagnostika nepovinný —
+   * changed here rather than in the source. Absent means NotAsked, which is
+   * what every činnost meant before the setting existed.
+   */
+  questionnaireRequirement: z
+    .enum(['NotAsked', 'Optional', 'Required'])
+    .nullish()
+    .transform((v) => v ?? 'NotAsked'),
   sortOrder: z.number().int(),
   /** 4.3: `DELETE` discards rather than deletes, so the row stays in the list. */
   isActive: z.boolean(),
@@ -205,6 +217,18 @@ export const activityInputSchema = z.object({
    */
   requiresReportByEmail: z.boolean().nullish().transform((v) => v ?? false),
   requiresClubSharing: z.boolean().nullish().transform((v) => v ?? false),
+  /**
+   * Whether the health questionnaire is asked for, and whether it must be
+   * filled in.
+   *
+   * The owner's own example — prohlídka povinný, diagnostika nepovinný —
+   * changed here rather than in the source. Absent means NotAsked, which is
+   * what every činnost meant before the setting existed.
+   */
+  questionnaireRequirement: z
+    .enum(['NotAsked', 'Optional', 'Required'])
+    .nullish()
+    .transform((v) => v ?? 'NotAsked'),
   sortOrder: z.number().int(),
   /**
    * 4.3 (v25): `PUT` is the whole activity. Left out or sent as `null`, this

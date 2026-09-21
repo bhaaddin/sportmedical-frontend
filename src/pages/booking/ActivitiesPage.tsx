@@ -67,6 +67,7 @@ function emptyDraft(sortOrder: number): ActivityInput {
     isPubliclyBookable: false,
     requiresReportByEmail: false,
     requiresClubSharing: false,
+    questionnaireRequirement: 'NotAsked' as const,
     sortOrder,
     serviceItemId: null,
     /* Empty until one is picked. The server refuses a činnost without a
@@ -183,6 +184,7 @@ export default function ActivitiesPage() {
       isPubliclyBookable: activity.isPubliclyBookable,
       requiresReportByEmail: activity.requiresReportByEmail,
       requiresClubSharing: activity.requiresClubSharing,
+      questionnaireRequirement: activity.questionnaireRequirement,
       sortOrder: activity.sortOrder,
       /*
        * Sent back as it came. `PUT` is the whole činnost, so leaving this out
@@ -671,6 +673,35 @@ export default function ActivitiesPage() {
                     Souhlas s provedením prohlídky vyžaduje zákon a marketingový
                     souhlas musí zůstat dobrovolný — ty nastavit nelze.
                   </Typography>
+
+                  {/*
+                    The health questionnaire, per činnost.
+
+                    Three answers rather than a switch, because "neptáme se" and
+                    "ptáme se, ale nemusí" are different offers to a patient: a
+                    ten-minute re-examination of somebody seen in March does not
+                    need seventy-six answers, a first spiroergometrie does.
+                  */}
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    sx={{ mt: 2 }}
+                    label="Zdravotní dotazník"
+                    value={draft.questionnaireRequirement}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        questionnaireRequirement: e.target
+                          .value as typeof draft.questionnaireRequirement,
+                      })
+                    }
+                    helperText="Co se zeptáme pacienta při objednání této činnosti."
+                  >
+                    <MenuItem value="NotAsked">Neptáme se</MenuItem>
+                    <MenuItem value="Optional">Nepovinný</MenuItem>
+                    <MenuItem value="Required">Povinný</MenuItem>
+                  </TextField>
                 </Box>
               ) : null}
               {/* 422 keeps the form filled in, so the message sits inside the dialog. */}

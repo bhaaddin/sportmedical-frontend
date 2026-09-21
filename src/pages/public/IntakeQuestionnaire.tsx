@@ -238,7 +238,7 @@ const NOTHING_DERIVED: Derived = {
 
 /* `address` is not in FormState - the picker holds the whole chosen point in
    its own state, not a string - but it still needs somewhere to report. */
-type Errors = Partial<Record<keyof FormState | 'address', string>>;
+type Errors = Partial<Record<keyof FormState | 'address' | 'healthQuestionnaire', string>>;
 
 /*
  * The five countries this form used to offer, kept ONLY as what to fall back
@@ -340,6 +340,16 @@ export default function IntakeQuestionnaire() {
    * the server says so — see the note on `heldToken` where it is submitted.
    */
   const [held] = useState<HeldBooking | null>(readHeld);
+
+  /*
+   * What this činnost asks of the questionnaire.
+   *
+   * Somebody who came straight to the form has no činnost and is offered it as
+   * before: optional. Nothing here decides the rule — the clinic set it per
+   * činnost and the server checks it again.
+   */
+  const questionnaireAsked = held?.questionnaireRequirement ?? 'Optional';
+  const questionnaireRequired = questionnaireAsked === 'Required';
 
   useEffect(() => {
     if (questionnaireOpen) return;
@@ -621,6 +631,18 @@ export default function IntakeQuestionnaire() {
       if (form.documentNumber.trim().length < 4) {
         next.documentNumber = 'Zadejte prosím číslo dokladu.';
       }
+    }
+
+    /*
+     * The questionnaire, when this činnost insists on it.
+     *
+     * Told here rather than after the slot has been claimed. The server checks
+     * the same thing off the held token, because a rule only the form knows is
+     * one that anything which is not the form can skip.
+     */
+    if (questionnaireRequired && questionnaireProgress === 0) {
+      next.healthQuestionnaire =
+        'U této činnosti je zdravotní dotazník povinný. Vyplňte ho prosím.';
     }
 
     if (!form.consentTreatment) {
@@ -1567,11 +1589,19 @@ export default function IntakeQuestionnaire() {
                     header of HealthQuestionnaire.tsx for why it stopped being
                     an accordion inside this column.
                   */}
+                  {/*
+                    Not shown at all when the činnost does not ask for it.
+                    Offering seventy-six questions to somebody booking a
+                    ten-minute re-examination is how a form gets abandoned.
+                  */}
+                  {questionnaireAsked !== 'NotAsked' && (
                   <Box
                     sx={{
                       p: 2,
                       borderRadius: 3,
-                      border: `1px solid ${BRAND.accentEdge}`,
+                      border: `1px solid ${questionnaireRequired && questionnaireProgress === 0
+                        ? '#D32F2F'
+                        : BRAND.accentEdge}`,
                       bgcolor: BRAND.accentWash,
                     }}
                   >
@@ -1581,7 +1611,7 @@ export default function IntakeQuestionnaire() {
                       </Typography>
                       <Chip
                         size="small"
-                        label="Před každým vyšetřením"
+                        label={questionnaireRequired ? 'Povinný' : 'Nepovinný'}
                         sx={{
                           height: 19,
                           fontSize: 11,
@@ -1606,7 +1636,14 @@ export default function IntakeQuestionnaire() {
                     >
                       {questionnaireProgress > 0 ? 'Pokračovat ve vyplňování' : 'Vyplnit dotazník'}
                     </Button>
+
+                    {questionnaireRequired && questionnaireProgress === 0 && (
+                      <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
+                        Bez vyplněného dotazníku nelze objednávku dokončit.
+                      </Typography>
+                    )}
                   </Box>
+                  )}
 
                   <DocumentRow
                     title="Souhlas se zpracováním údajů (GDPR)"

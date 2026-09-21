@@ -140,6 +140,10 @@ export default function ClinicServicesPage() {
           // consents the clinic set on it.
           requiresReportByEmail: a.requiresReportByEmail,
           requiresClubSharing: a.requiresClubSharing,
+          // Carried too, for the same reason as the consents above: a PUT is
+          // the whole činnost, so moving one to another služba would otherwise
+          // silently stop it asking for the questionnaire.
+          questionnaireRequirement: a.questionnaireRequirement,
           sortOrder: a.sortOrder,
           serviceItemId: a.serviceItemId,
           clinicServiceId: serviceId,

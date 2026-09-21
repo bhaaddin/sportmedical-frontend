@@ -33,6 +33,11 @@ export interface BookableActivity {
   requiresReportByEmail: boolean;
   requiresClubSharing: boolean;
   /**
+   * Whether the health questionnaire is asked for, and whether it must be
+   * filled in. The clinic's setting, per činnost.
+   */
+  questionnaireRequirement: 'NotAsked' | 'Optional' | 'Required';
+  /**
    * How long the slot will be held while the patient registers, in minutes.
    *
    * The server's own number - the calendar's setting, or the default when it
@@ -186,6 +191,8 @@ export interface HeldBooking {
   /** Carried to the registration so it knows which consents it must insist on. */
   requiresReportByEmail: boolean;
   requiresClubSharing: boolean;
+  /** And whether the questionnaire is offered, insisted on, or not asked at all. */
+  questionnaireRequirement: 'NotAsked' | 'Optional' | 'Required';
 }
 
 /**
