@@ -86,6 +86,18 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         adminOnly: true,
       },
       {
+        /*
+         * Above the exceptions on purpose. A statutory holiday closes every
+         * calendar by itself; an exception is what one calendar does about one
+         * day. Somebody looking for "why is that Monday shut" wants this first.
+         */
+        id: 'svatky',
+        label: 'Svátky a volno',
+        description: 'Státní svátky, dny kdy pracujeme, a vlastní volno',
+        to: '/svatky',
+        adminOnly: true,
+      },
+      {
         id: 'vyjimky',
         label: 'Výjimky',
         description: 'Svátky, dovolená a dny, kdy se nepracuje',

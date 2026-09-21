@@ -78,6 +78,7 @@ const ClinicServicesPage = lazy(() => import('./pages/booking/ClinicServicesPage
 const DocumentRequirementsPage = lazy(() => import('./pages/settings/DocumentRequirementsPage'));
 const DocumentTemplatesPage = lazy(() => import('./pages/settings/DocumentTemplatesPage'));
 const AlertColoursPage = lazy(() => import('./pages/settings/AlertColoursPage'));
+const HolidaysPage = lazy(() => import('./pages/settings/HolidaysPage'));
 const BookingActivitiesPage = lazy(() => import('./pages/booking/ActivitiesPage'));
 /* Booking phase 1, stage 2: working hours, periods, cycle and exceptions */
 const BookingWorkingHoursPage = lazy(() => import('./pages/booking/WorkingHoursPage'));
@@ -493,6 +494,7 @@ export default function App() {
                     <Route path="/ppe" element={<PreParticipationPage />} />
                     <Route path="/concussion" element={<ConcussionPage />} />
                     <Route path="/availability" element={<AvailabilityPage />} />
+                    <Route path="/svatky" element={<HolidaysPage />} />
                     <Route path="/training-load" element={<TrainingLoadPage />} />
                     <Route path="/wellness" element={<WellnessPage />} />
                     <Route path="/ai-risk" element={<AiRiskPage />} />
