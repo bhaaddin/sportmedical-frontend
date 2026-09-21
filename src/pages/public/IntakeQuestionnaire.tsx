@@ -98,6 +98,7 @@ import PublicAddressPicker from '../../components/public/PublicAddressPicker';
 import HealthQuestionnaire from '../../components/public/HealthQuestionnaire';
 import { answersForSubmission, readDraft } from '../../services/publicIntake/healthQuestionnaire';
 import { forgetHeld, readHeld } from '../../api/publicBooking';
+import { questionnaireStance } from '../../services/publicIntake/questionnaireRequirement';
 import { calendarFileUrl } from '../../api/publicManage';
 import type { HeldBooking } from '../../api/publicBooking';
 import type { AddressPoint } from '../../api/addressLookup';
@@ -348,8 +349,8 @@ export default function IntakeQuestionnaire() {
    * before: optional. Nothing here decides the rule — the clinic set it per
    * činnost and the server checks it again.
    */
-  const questionnaireAsked = held?.questionnaireRequirement ?? 'Optional';
-  const questionnaireRequired = questionnaireAsked === 'Required';
+  const { asked: questionnaireAskedFor, required: questionnaireRequired } =
+    questionnaireStance(held?.questionnaireRequirement);
 
   useEffect(() => {
     if (questionnaireOpen) return;
@@ -1594,7 +1595,7 @@ export default function IntakeQuestionnaire() {
                     Offering seventy-six questions to somebody booking a
                     ten-minute re-examination is how a form gets abandoned.
                   */}
-                  {questionnaireAsked !== 'NotAsked' && (
+                  {questionnaireAskedFor && (
                   <Box
                     sx={{
                       p: 2,
