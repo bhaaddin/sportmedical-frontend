@@ -91,7 +91,16 @@ export function NewAppointmentDialog({
 }: NewAppointmentDialogProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const mayOverride = usePermission("calendar:force_override");
+  /*
+   * Booking over a warning.
+   *
+   * This asked for "calendar:force_override", a name from the client's own
+   * permission table that the server has never defined — so it was decided
+   * locally by role and checked by nobody. bookings.edit is the real one: the
+   * person who may change an appointment is the person who may book one past a
+   * warning.
+   */
+  const mayOverride = usePermission("bookings.edit");
 
   /*
    * ── Step 1: the patient, and nothing else until there is one ──

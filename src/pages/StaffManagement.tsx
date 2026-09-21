@@ -17,6 +17,8 @@ import {
   Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon,
   Person as PersonIcon, Refresh as RefreshIcon, LockReset as LockResetIcon
 } from '@mui/icons-material';
+import KeyIcon from '@mui/icons-material/VpnKey';
+import { UserPermissionsDialog } from '../components/admin/UserPermissionsDialog';
 import { motion } from 'framer-motion';
 import client from '../api/client';
 
@@ -62,6 +64,17 @@ const ROLE_COLORS: Record<string, string> = {
 
 /* ══════════════════════════════════════════════════════════════ */
 export default function StaffManagement() {
+  /*
+   * Which account's permissions are open.
+   *
+   * The owner's rule asks for this per employee: "co může vidět, co může
+   * upravovat, zda může rušit rezervace". Until now the only thing anybody
+   * could change was the role, and a role was all three answers at once.
+   */
+  const [permissionsFor, setPermissionsFor] = useState<
+    { userId: string; name: string; isOwner: boolean } | null
+  >(null);
+
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
@@ -400,6 +413,18 @@ export default function StaffManagement() {
                     />
                   </TableCell>
                   <TableCell align="right">
+                    <Tooltip title="Co sm\u00ed">
+                      <IconButton
+                        aria-label={`Co sm\u00ed ${acc.displayName || acc.email}`}
+                        onClick={() => setPermissionsFor({
+                          userId: acc.userId,
+                          name: acc.displayName || acc.email,
+                          isOwner: acc.role === 'Owner',
+                        })}
+                      >
+                        <KeyIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="Resetovat heslo">
                       <IconButton
                         aria-label={`Resetovat heslo pro ${acc.email}`}
@@ -415,6 +440,13 @@ export default function StaffManagement() {
           </Table>
         </TableContainer>
       </motion.div>
+
+      <UserPermissionsDialog
+        userId={permissionsFor?.userId ?? null}
+        userName={permissionsFor?.name ?? ''}
+        isOwner={permissionsFor?.isOwner ?? false}
+        onClose={() => setPermissionsFor(null)}
+      />
 
       {/* Add/Edit Dialog */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>

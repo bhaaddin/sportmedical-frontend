@@ -33,6 +33,20 @@ export default function Login() {
     };
     localStorage.setItem('token', res.accessToken);
     localStorage.setItem('user', JSON.stringify(user));
+
+    /*
+     * What this person may actually do, as the SERVER works it out.
+     *
+     * The client used to answer that question itself, from a table of 28
+     * permission names and 5 role names in src/auth/rbac.ts — names the server
+     * has never heard of, next to roles it does not have. Two models of who may
+     * do what, disagreeing, with the screen hiding by one and the API refusing
+     * by the other.
+     *
+     * The server has been sending this list on every login all along. Nothing
+     * read it.
+     */
+    localStorage.setItem('permissions', JSON.stringify(res.permissions ?? []));
     navigate('/');
   };
 
