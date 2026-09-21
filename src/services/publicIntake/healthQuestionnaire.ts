@@ -92,7 +92,7 @@ export const HEALTH_QUESTIONNAIRE: readonly Section[] = [
           kind: 'text',
           id: 'prakticky_lekar',
           label: 'Jméno a adresa praktického lékaře',
-          placeholder: 'MUDr. Jan Novák, Vinohradská 12, Praha 2',
+          placeholder: 'např. MUDr. Nováková, Praha 2',
         },
       },
     ],
