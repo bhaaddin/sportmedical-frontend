@@ -26,9 +26,9 @@ interface ApiResult<T> {
 export const holidaysApi = {
   /** Every day off in one year, statutory and amended, merged into one list. */
   year: async (year: number): Promise<ClinicHoliday[]> => {
-    const { data } = await client.get<ApiResult<ClinicHoliday[]>>(`/api/holidays/${year}`);
+    const { data } = await client.get<ClinicHoliday[]>(`/api/holidays/${year}`);
 
-    return data.data ?? [];
+    return data ?? [];
   },
 
   /**
@@ -39,12 +39,12 @@ export const holidaysApi = {
    * sends somebody to the source to find out why a Tuesday in June is shut.
    */
   save: async (date: string, isHoliday: boolean, name: string): Promise<ClinicHoliday> => {
-    const { data } = await client.put<ApiResult<ClinicHoliday>>(`/api/holidays/${date}`, {
+    const { data } = await client.put<ClinicHoliday>(`/api/holidays/${date}`, {
       isHoliday,
       name,
     });
 
-    return data.data;
+    return data;
   },
 
   /** Drops the amendment, putting the date back on the statutory calendar. */

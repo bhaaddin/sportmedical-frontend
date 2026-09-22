@@ -86,11 +86,11 @@ export const PERMISSION_LABELS: Record<string, { label: string; detail: string }
 
 export const userPermissionsApi = {
   list: async (userId: string): Promise<UserPermissionState[]> => {
-    const { data } = await client.get<ApiResult<UserPermissionState[]>>(
+    const { data } = await client.get<UserPermissionState[]>(
       `/api/v1/users/${userId}/permissions`,
     );
 
-    return data.data ?? [];
+    return data ?? [];
   },
 
   /**
@@ -103,11 +103,11 @@ export const userPermissionsApi = {
     permission: string,
     granted: boolean | null,
   ): Promise<UserPermissionState[]> => {
-    const { data } = await client.put<ApiResult<UserPermissionState[]>>(
+    const { data } = await client.put<UserPermissionState[]>(
       `/api/v1/users/${userId}/permissions/${encodeURIComponent(permission)}`,
       { granted },
     );
 
-    return data.data ?? [];
+    return data ?? [];
   },
 };
