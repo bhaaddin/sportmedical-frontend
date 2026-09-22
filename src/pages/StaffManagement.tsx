@@ -19,6 +19,8 @@ import {
 } from '@mui/icons-material';
 import KeyIcon from '@mui/icons-material/VpnKey';
 import { UserPermissionsDialog } from '../components/admin/UserPermissionsDialog';
+import { WhereSomebodyWorksDialog } from '../components/admin/WhereSomebodyWorksDialog';
+import EventNoteIcon from '@mui/icons-material/EventNote';
 import { motion } from 'framer-motion';
 import client from '../api/client';
 
@@ -71,6 +73,15 @@ export default function StaffManagement() {
    * upravovat, zda může rušit rezervace". Until now the only thing anybody
    * could change was the role, and a role was all three answers at once.
    */
+  /*
+   * Which account's rota is open.
+   *
+   * "Přiřadit služby" is answered by the rota — a worker on a day of a
+   * calendar, and the calendar belongs to a service — so this shows what
+   * somebody works rather than offering a second place to set it.
+   */
+  const [scheduleFor, setScheduleFor] = useState<{ userId: string; name: string } | null>(null);
+
   const [permissionsFor, setPermissionsFor] = useState<
     { userId: string; name: string; isOwner: boolean } | null
   >(null);
@@ -425,6 +436,17 @@ export default function StaffManagement() {
                         <KeyIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
+                    <Tooltip title="Kde pracuje">
+                      <IconButton
+                        aria-label={`Kde pracuje ${acc.displayName || acc.email}`}
+                        onClick={() => setScheduleFor({
+                          userId: acc.userId,
+                          name: acc.displayName || acc.email,
+                        })}
+                      >
+                        <EventNoteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="Resetovat heslo">
                       <IconButton
                         aria-label={`Resetovat heslo pro ${acc.email}`}
@@ -440,6 +462,12 @@ export default function StaffManagement() {
           </Table>
         </TableContainer>
       </motion.div>
+
+      <WhereSomebodyWorksDialog
+        userId={scheduleFor?.userId ?? null}
+        userName={scheduleFor?.name ?? ''}
+        onClose={() => setScheduleFor(null)}
+      />
 
       <UserPermissionsDialog
         userId={permissionsFor?.userId ?? null}
