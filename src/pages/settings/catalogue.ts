@@ -1,3 +1,5 @@
+import type { Permission } from '../../auth/usePermission';
+
 /*
  * What sits in Nastavení, as data rather than as markup.
  *
@@ -28,7 +30,26 @@ export interface SettingsItem {
   /** One line saying what is actually inside. Not decoration: it is what saves the click. */
   description: string;
   to: string;
-  adminOnly?: boolean;
+  /**
+   * What the server asks for before it will serve this screen.
+   *
+   * ── Why a permission and not a role ──
+   *
+   * It was a boolean filtered through `isAdminRole(currentUserRole())`, and
+   * the owner's rule is per EMPLOYEE: "Administrátor musí mít možnost pro
+   * každého zaměstnance nastavit, co může vidět." The administration already
+   * offers every permission in three states — granted, by role, revoked — and
+   * writes them; the menu could see none of it. An administrator who had
+   * `settings.clinic.manage` taken away still saw every screen, and a member
+   * of staff who was GRANTED `questionnaires.manage` saw none.
+   *
+   * The name is the one the controller behind the screen checks, so the menu
+   * and the API agree about one list rather than disagreeing about two.
+   *
+   * Undefined means everybody signed in — their own schedule, the price list
+   * the desk quotes from.
+   */
+  requires?: Permission;
   /**
    * Shown but not offered, with the reason. A screen that exists and cannot
    * work is worse hidden than labelled: hidden, somebody rebuilds it; labelled,
@@ -62,28 +83,28 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Služby',
         description: 'Co ordinace dělá — činnosti patří pod službu',
         to: '/sluzby',
-        adminOnly: true,
+        requires: 'settings.clinic.manage',
       },
       {
         id: 'kalendare',
         label: 'Kalendáře',
         description: 'Seznam kalendářů, kdo do kterého vidí, období a pracovní doba',
         to: '/calendars',
-        adminOnly: true,
+        requires: 'settings.clinic.manage',
       },
       {
         id: 'cinnosti',
         label: 'Činnosti',
         description: 'Co se v ordinaci dělá a jak dlouho to trvá',
         to: '/activities',
-        adminOnly: true,
+        requires: 'settings.clinic.manage',
       },
       {
         id: 'pracovni-doba',
         label: 'Pracovní doba',
         description: 'Hodiny podle dnů, obědová pauza, kdo slouží a co se který den dělá',
         to: '/working-hours',
-        adminOnly: true,
+        requires: 'settings.clinic.manage',
       },
       {
         /*
@@ -95,14 +116,14 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Svátky a volno',
         description: 'Státní svátky, dny kdy pracujeme, a vlastní volno',
         to: '/svatky',
-        adminOnly: true,
+        requires: 'settings.clinic.manage',
       },
       {
         id: 'vyjimky',
         label: 'Výjimky',
         description: 'Svátky, dovolená a dny, kdy se nepracuje',
         to: '/exceptions',
-        adminOnly: true,
+        requires: 'settings.clinic.manage',
       },
       {
         id: 'vyhrazeni',
@@ -128,7 +149,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Tým a účty',
         description: 'Zaměstnanci, role a resetování hesla',
         to: '/staff-management',
-        adminOnly: true,
+        requires: 'users.manage',
       },
       {
         id: 'muj-rozvrh',
@@ -182,7 +203,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Veřejný web a kontakty',
         description: 'Název, adresa, telefon a co se ukazuje pacientům',
         to: '/admin',
-        adminOnly: true,
+        requires: 'settings.clinic.manage',
       },
     ],
   },
@@ -203,7 +224,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Dokumenty',
         description: 'Druhy dokumentů, které ordinace vede — název, popis a co se používá',
         to: '/dokumenty-sablony',
-        adminOnly: true,
+        requires: 'settings.clinic.manage',
       },
       {
         /*
@@ -216,7 +237,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Pravidla dokumentů',
         description: 'Co musí pacient doložit a ke které službě — činnosti pod ní to dědí',
         to: '/pravidla-dokumentu',
-        adminOnly: true,
+        requires: 'settings.clinic.manage',
       },
       {
         /*
@@ -231,7 +252,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Barvy upozornění',
         description: 'Jak se barevně odlišuje, jak na tom doklad pacienta je',
         to: '/barvy-upozorneni',
-        adminOnly: true,
+        requires: 'settings.appearance.manage',
       },
       {
         /*
@@ -244,14 +265,14 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Zdravotní dotazník',
         description: 'Otázky, na které pacient odpovídá — znění, sekce, pořadí a nasazení verze',
         to: '/dotaznik-nastaveni',
-        adminOnly: true,
+        requires: 'questionnaires.manage',
       },
       {
         id: 'emaily',
         label: 'E-mailové šablony',
         description: 'Text a vzhled e-mailů, které chodí pacientům',
         to: '/email-templates',
-        adminOnly: true,
+        requires: 'settings.clinic.manage',
         unavailable: 'Chystá se ve fázi 2 — server pro ně zatím nemá rozhraní.',
       },
     ],
@@ -266,21 +287,21 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Auditní log',
         description: 'Kdo co změnil a kdy — včetně přístupů k citlivým údajům',
         to: '/audit-log',
-        adminOnly: true,
+        requires: 'settings.clinic.manage',
       },
       {
         id: 'zdravi',
         label: 'Zdraví systému',
         description: 'Chyby, přihlášená zařízení a stav služeb',
         to: '/system-health',
-        adminOnly: true,
+        requires: 'settings.clinic.manage',
       },
       {
         id: 'export',
         label: 'Export dat',
         description: 'Stažení dat pacienta pro předání nebo archiv',
         to: '/data-export',
-        adminOnly: true,
+        requires: 'settings.clinic.manage',
       },
     ],
   },
@@ -294,10 +315,28 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
  * - is not something a receptionist can act on, so it is only noise on a
  * screen she opens to change her own font size.
  */
-export function visibleSections(isAdmin: boolean): SettingsSection[] {
+/**
+ * The settings this person may actually open.
+ *
+ * Takes the effective permissions the SERVER sent at sign-in: the role's
+ * defaults with that person's own grants and revocations already applied.
+ *
+ * A section left with nothing in it disappears rather than standing empty — a
+ * heading over no rows reads like a screen that failed to load.
+ *
+ * It hides; it does not protect. `localStorage` is the viewer's to edit, and
+ * the server refuses these screens on its own account.
+ */
+export function visibleSections(
+  held: ReadonlySet<string> | readonly string[],
+): SettingsSection[] {
+  const permissions = held instanceof Set ? held : new Set(held);
+
   return SETTINGS_SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => isAdmin || item.adminOnly !== true),
+    items: section.items.filter(
+      (item) => item.requires === undefined || permissions.has(item.requires),
+    ),
   })).filter((section) => section.items.length > 0);
 }
 

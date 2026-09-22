@@ -21,7 +21,8 @@
 import { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
-  Accordion, AccordionDetails, AccordionSummary, Alert, Avatar, Box, Button,
+  Accordion,
+  AccordionDetails, AccordionSummary, Alert, Avatar, Box, Button,
   Card, CardContent, Chip, Divider, List, ListItemButton, ListItemText,
   Stack, ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
@@ -30,7 +31,7 @@ import {
   Tune, Lock,
 } from '@mui/icons-material';
 import { visibleSections, type SettingsItem } from './settings/catalogue';
-import { currentUserRole, isAdminRole } from '../auth/roles';
+import { hasStoredPermissions, storedPermissions } from '../auth/usePermission';
 
 /** Remembered per browser, so re-opening settings lands where you left it. */
 const OPEN_KEY = 'settings.openSection';
@@ -69,8 +70,23 @@ export default function Settings() {
     }
   });
 
-  const isAdmin = isAdminRole(currentUserRole());
-  const sections = visibleSections(isAdmin);
+  /*
+   * What this person may open, from the list the server sent at sign-in.
+   *
+   * Not their ROLE any more. The owner sets permissions per employee, in
+   * three states, and a role check could not see any of it: an administrator
+   * whose `settings.clinic.manage` was revoked still saw every screen.
+   */
+  const sections = visibleSections(storedPermissions());
+
+  /*
+   * A session from before the server started sending the list.
+   *
+   * Every guarded row would be hidden, which on this screen reads as the
+   * settings having disappeared rather than as a stale sign-in. Saying so is
+   * the difference between a bug report and a thirty-second fix.
+   */
+  const staleSession = !hasStoredPermissions();
   const user = readUser();
   const name = [user.firstName, user.lastName].filter(Boolean).join(' ');
   const initials =
@@ -122,9 +138,6 @@ export default function Settings() {
           primary={
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
               <Typography sx={{ fontWeight: 600 }}>{item.label}</Typography>
-              {item.adminOnly === true && (
-                <Chip size="small" variant="outlined" label="Jen správce" />
-              )}
               {blocked && <Chip size="small" color="warning" label="Zatím nedostupné" />}
             </Stack>
           }
@@ -143,6 +156,13 @@ export default function Settings() {
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Klikněte na okruh a rozbalí se jen ten.
       </Typography>
+
+      {staleSession && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Přihlášení je starší než nastavení oprávnění, takže se tu teď ukazuje jen část.
+          Odhlaste se a přihlaste znovu a uvidíte všechno, na co máte právo.
+        </Alert>
+      )}
 
       {sections.map((section) => (
         <Accordion

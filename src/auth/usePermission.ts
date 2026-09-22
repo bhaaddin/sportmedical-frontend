@@ -60,6 +60,28 @@ export function storedPermissions(): string[] {
   }
 }
 
+/**
+ * Whether the server has told this browser anything at all.
+ *
+ * ── Why "empty" and "never told" have to be told apart ──
+ *
+ * `storedPermissions()` answers `[]` for both, and for hiding a single button
+ * that is the right answer either way. For a whole menu it is not: a session
+ * created before the list was stored would draw a settings screen with almost
+ * nothing on it, and the owner would read that as features having vanished
+ * rather than as a sign-in that predates them.
+ *
+ * So the screen that hides a lot asks this first and says "sign in again"
+ * instead of showing a gutted menu.
+ */
+export function hasStoredPermissions(): boolean {
+  try {
+    return window.localStorage.getItem('permissions') !== null;
+  } catch {
+    return false;
+  }
+}
+
 /** Whether the signed-in user has one permission. */
 export function usePermission(permission: Permission): boolean {
   return storedPermissions().includes(permission);

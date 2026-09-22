@@ -65,16 +65,52 @@ describe('every settings destination', () => {
   });
 });
 
+/*
+ * ── What changed on 22. 9. 2026 ──
+ *
+ * These read `visibleSections(true)` and `visibleSections(false)` — a ROLE.
+ * The owner sets permissions per employee, in three states, and a role check
+ * could see none of it: an administrator whose `settings.clinic.manage` was
+ * revoked still saw every screen, and a member of staff who was granted
+ * `questionnaires.manage` saw none. The menu now takes the effective list the
+ * server sends, so these say what somebody HOLDS.
+ */
+const EVERYTHING = [
+  'patients.view',
+  'patients.register',
+  'patients.edit',
+  'patients.sensitive_identity.view',
+  'reports.view',
+  'settings.appearance.manage',
+  'settings.clinic.manage',
+  'users.manage',
+  'roles.manage',
+  'bookings.create',
+  'bookings.edit',
+  'bookings.cancel',
+  'questionnaires.manage',
+];
+
+/** What a receptionist gets by default from the server's Staff role. */
+const RECEPTIONIST = [
+  'patients.view',
+  'patients.register',
+  'patients.edit',
+  'reports.view',
+  'bookings.create',
+  'bookings.edit',
+  'bookings.cancel',
+];
+
 describe('what each person sees', () => {
-  it('shows an administrator everything', () => {
-    const admin = visibleSections(true);
+  it('shows somebody who holds everything every row', () => {
+    const admin = visibleSections(EVERYTHING);
     const count = admin.reduce((n, s) => n + s.items.length, 0);
     expect(count).toBe(allDestinations().length);
   });
 
-  it('hides the administrator-only rows from everybody else', () => {
-    const plain = visibleSections(false);
-    const ids = plain.flatMap((s) => s.items.map((i) => i.id));
+  it('hides the rows a receptionist has no permission for', () => {
+    const ids = visibleSections(RECEPTIONIST).flatMap((s) => s.items.map((i) => i.id));
     expect(ids).not.toContain('tym');
     expect(ids).not.toContain('audit');
     expect(ids).not.toContain('kalendare');
@@ -83,7 +119,7 @@ describe('what each person sees', () => {
   /* A receptionist still has something to open - an empty settings screen
      would be worse than the sidebar she had before. */
   it('leaves a receptionist rows she can actually use', () => {
-    const plain = visibleSections(false);
+    const plain = visibleSections(RECEPTIONIST);
     const ids = plain.flatMap((s) => s.items.map((i) => i.id));
     expect(ids).toContain('blokovany-cas');
     expect(ids).toContain('muj-rozvrh');
@@ -91,8 +127,58 @@ describe('what each person sees', () => {
   });
 
   it('drops a section entirely once nothing in it is hers', () => {
-    const plain = visibleSections(false);
-    expect(plain.map((s) => s.id)).not.toContain('system');
+    expect(visibleSections(RECEPTIONIST).map((s) => s.id)).not.toContain('system');
+  });
+
+  /*
+   * The point of the whole change: ONE permission, granted to one person,
+   * and the row appears. A role check could not express this, and the
+   * administration has been writing it to the database all along.
+   */
+  it('shows one extra row to somebody granted one extra permission', () => {
+    const before = visibleSections(RECEPTIONIST).flatMap((s) => s.items.map((i) => i.id));
+    const after = visibleSections([...RECEPTIONIST, 'questionnaires.manage'])
+      .flatMap((s) => s.items.map((i) => i.id));
+
+    expect(before).not.toContain('zdravotni-dotaznik');
+    expect(after).toContain('zdravotni-dotaznik');
+    expect(after.length).toBe(before.length + 1);
+  });
+
+  /* And the reverse: taking one away from an administrator takes the row. */
+  it('hides a row from somebody who had the permission revoked', () => {
+    const without = EVERYTHING.filter((p) => p !== 'settings.clinic.manage');
+    const ids = visibleSections(without).flatMap((s) => s.items.map((i) => i.id));
+
+    expect(ids).not.toContain('kalendare');
+    expect(ids).not.toContain('sluzby');
+
+    // Their other permissions are untouched.
+    expect(ids).toContain('tym');
+    expect(ids).toContain('barvy-upozorneni');
+  });
+
+  it('shows nothing but the open rows to somebody with no permissions at all', () => {
+    const ids = visibleSections([]).flatMap((s) => s.items.map((i) => i.id));
+
+    // Empty is the safe direction to be wrong in: a session that predates
+    // this, or one that never stored a list, hides everything guarded.
+    expect(ids).toContain('muj-rozvrh');
+    expect(ids).not.toContain('tym');
+  });
+
+  /*
+   * Every guarded row names a permission the SERVER defines. A name that is
+   * not on the server's list is a row nobody can ever see.
+   */
+  it('names only permissions the server has', () => {
+    for (const section of visibleSections(EVERYTHING)) {
+      for (const item of section.items) {
+        if (item.requires !== undefined) {
+          expect(EVERYTHING).toContain(item.requires);
+        }
+      }
+    }
   });
 });
 
@@ -180,7 +266,7 @@ describe('the payments section', () => {
    * whole section off her screen.
    */
   it('is open to a receptionist, not just an administrator', () => {
-    const hers = visibleSections(false).find((s) => s.id === 'platby');
+    const hers = visibleSections(RECEPTIONIST).find((s) => s.id === 'platby');
     expect(hers?.items.map((i) => i.id).sort()).toEqual(['cenik', 'platci']);
   });
 

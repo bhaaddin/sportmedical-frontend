@@ -17,13 +17,53 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import Settings from './Settings';
 
-const asRole = (role: string) => {
-  localStorage.setItem('user', JSON.stringify({ firstName: 'Jana', lastName: 'Nová', email: 'j@n.cz', role }));
+/*
+ * ── Signed in AS somebody, not IN A ROLE ──
+ *
+ * This screen decided what to draw from `user.role` until 22. 9. 2026. The
+ * owner sets permissions per employee, in three states, so the role could
+ * not answer the question: an administrator whose `settings.clinic.manage`
+ * was revoked still saw every screen. It reads the effective list the server
+ * sends at sign-in, and so do these.
+ */
+const EVERYTHING = [
+  'patients.view',
+  'patients.register',
+  'patients.edit',
+  'patients.sensitive_identity.view',
+  'reports.view',
+  'settings.appearance.manage',
+  'settings.clinic.manage',
+  'users.manage',
+  'roles.manage',
+  'bookings.create',
+  'bookings.edit',
+  'bookings.cancel',
+  'questionnaires.manage',
+];
+
+/** The server's own defaults for the Staff role. */
+const RECEPTIONIST = [
+  'patients.view',
+  'patients.register',
+  'patients.edit',
+  'reports.view',
+  'bookings.create',
+  'bookings.edit',
+  'bookings.cancel',
+];
+
+const holding = (permissions: readonly string[]) => {
+  localStorage.setItem(
+    'user',
+    JSON.stringify({ firstName: 'Jana', lastName: 'Nová', email: 'j@n.cz', role: 'Owner' }),
+  );
+  localStorage.setItem('permissions', JSON.stringify(permissions));
 };
 
 beforeEach(() => {
   localStorage.clear();
-  asRole('Owner');
+  holding(EVERYTHING);
 });
 
 const renderSettings = () =>
@@ -87,7 +127,7 @@ describe('the settings screen', () => {
 });
 
 describe('what a receptionist sees', () => {
-  beforeEach(() => asRole('Receptionist'));
+  beforeEach(() => holding(RECEPTIONIST));
 
   it('is not offered the administrator rows', async () => {
     const user = userEvent.setup();
@@ -150,5 +190,43 @@ describe('a screen that cannot work yet', () => {
 
     expect(await screen.findByText('E-mailové šablony')).toBeVisible();
     expect(screen.getByText(/Chystá se ve fázi 2/)).toBeVisible();
+  });
+});
+
+describe('a sign-in from before permissions were sent', () => {
+  /*
+   * The transition hazard, and why it is worth a test.
+   *
+   * A browser holding a session created before the server started sending the
+   * permission list has no list at all. Every guarded row is hidden, and on
+   * this screen that reads as the settings having disappeared — the owner
+   * would report features missing rather than sign in again.
+   */
+  it('says the sign-in is stale instead of drawing a gutted menu', () => {
+    localStorage.clear();
+    localStorage.setItem(
+      'user',
+      JSON.stringify({ firstName: 'Jana', lastName: 'Nová', email: 'j@n.cz', role: 'Owner' }),
+    );
+
+    renderSettings();
+
+    expect(screen.getByText(/Odhlaste se a přihlaste znovu/)).toBeInTheDocument();
+  });
+
+  it('says nothing when the server really did send an empty list', () => {
+    holding([]);
+
+    renderSettings();
+
+    // Empty is a real answer — somebody with no permissions — and telling
+    // them to sign in again would send them round in a circle.
+    expect(screen.queryByText(/Odhlaste se a přihlaste znovu/)).not.toBeInTheDocument();
+  });
+
+  it('says nothing to somebody signed in normally', () => {
+    renderSettings();
+
+    expect(screen.queryByText(/Odhlaste se a přihlaste znovu/)).not.toBeInTheDocument();
   });
 });
