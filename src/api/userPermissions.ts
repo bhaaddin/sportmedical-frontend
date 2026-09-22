@@ -62,6 +62,26 @@ export const PERMISSION_LABELS: Record<string, { label: string; detail: string }
     label: 'Rušit rezervace',
     detail: 'Zrušit už objednaný termín.',
   },
+  'billing.manage': {
+    label: 'Pracovat s pokladnou a fakturami',
+    detail: 'Přijímat platby, vystavovat a stornovat faktury, vracet peníze, vést číselné řady.',
+  },
+  'documents.view': {
+    label: 'Vidět dokumenty pacienta',
+    detail: 'Prohlížet a stahovat, co pacient doložil.',
+  },
+  'documents.manage': {
+    label: 'Měnit dokumenty pacienta',
+    detail: 'Nahrávat, podepisovat, zneplatňovat a přeřazovat. Jiná práce než jen se na ně podívat.',
+  },
+  'patients.export': {
+    label: 'Exportovat zdravotní dokumentaci',
+    detail: 'Stáhnout celou kartu pacienta jedním požadavkem. Nikdo to nemá automaticky.',
+  },
+  'communication.manage': {
+    label: 'Psát a odesílat za ordinaci',
+    detail: 'Šablony e-mailů a SMS, odesílání, fronta zpráv a webhooky — tedy mluvit jménem ordinace.',
+  },
   'questionnaires.manage': {
     label: 'Pracovat s dotazníky',
     detail: 'Číst odpovědi pacientů a nastavovat dotazníky.',

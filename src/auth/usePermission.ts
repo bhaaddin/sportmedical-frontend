@@ -38,7 +38,12 @@ export type Permission =
   | 'bookings.create'
   | 'bookings.edit'
   | 'bookings.cancel'
-  | 'questionnaires.manage';
+  | 'questionnaires.manage'
+  | 'billing.manage'
+  | 'documents.view'
+  | 'documents.manage'
+  | 'patients.export'
+  | 'communication.manage';
 
 /**
  * What the server said this person may do.
