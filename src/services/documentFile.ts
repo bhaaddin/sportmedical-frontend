@@ -108,8 +108,8 @@ export function checkFile(file: { name: string; type: string; size: number }): F
       reason: 'too-large',
       message:
         `Soubor má ${formatBytes(file.size)}, což je víc než povolených ` +
-        `${formatBytes(MAX_FILE_BYTES)}. U fotografie pomůže vyfotit dokument ` +
-        'znovu přes sken — výsledek bývá několikrát menší.',
+        `${formatBytes(MAX_FILE_BYTES)}. Pomůže vyfotit dokument znovu ` +
+        'tlačítkem Vyfotit — fotka z telefonu bývá několikrát menší.',
     };
   }
 
@@ -156,7 +156,7 @@ export function uploadErrorMessage(status: number | null): string {
     case 404:
       return 'Pacient nebo šablona dokumentu už neexistuje. Načtěte prosím stránku znovu.';
     case 413:
-      return 'Soubor je pro server příliš velký. Zkuste ho vyfotit přes sken, výsledek bývá menší.';
+      return 'Soubor je pro server příliš velký. Zkuste dokument vyfotit tlačítkem Vyfotit, fotka z telefonu bývá menší.';
     case 415:
       return 'Server tenhle typ souboru nepřijímá. Pošlete PDF nebo fotografii.';
     case 429:

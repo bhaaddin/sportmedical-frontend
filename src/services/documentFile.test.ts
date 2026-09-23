@@ -126,7 +126,7 @@ describe('the size limit', () => {
     if (result.ok) return;
     expect(result.message).toContain('30,0 MB');
     expect(result.message).toContain('25,0 MB');
-    expect(result.message).toMatch(/sken/);
+    expect(result.message).toMatch(/Vyfotit/);
   });
 
   it('writes sizes the way Czech does', () => {
@@ -143,7 +143,7 @@ describe('what we say when the upload fails', () => {
   });
 
   it('tells a too-large file what to do instead', () => {
-    expect(uploadErrorMessage(413)).toMatch(/sken/);
+    expect(uploadErrorMessage(413)).toMatch(/Vyfotit/);
   });
 
   it('says the file did not arrive when the connection dropped', () => {
