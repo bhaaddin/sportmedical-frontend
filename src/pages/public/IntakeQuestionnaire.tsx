@@ -102,6 +102,7 @@ import { questionnaireStance } from '../../services/publicIntake/questionnaireRe
 import { calendarFileUrl } from '../../api/publicManage';
 import type { HeldBooking } from '../../api/publicBooking';
 import type { AddressPoint } from '../../api/addressLookup';
+import { readPublicClinic } from '../../api/clinicSettings';
 
 /* ── Brand, taken from sportmedical-diagnostics.cz ── */
 
@@ -431,6 +432,18 @@ export default function IntakeQuestionnaire() {
     publicPhoneRegions()
       .then((list) => { if (!cancelled && list.length > 0) setRegions(list); })
       .catch(() => { /* the five stay */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  /* Where consent is withdrawn: the address the clinic set under Veřejný web
+     a kontakty. Left out of the sentence while it is blank rather than
+     replaced by one the clinic never chose. */
+  const [clinicEmail, setClinicEmail] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    // Never throws -- see readPublicClinic.
+    void readPublicClinic().then((details) => { if (!cancelled) setClinicEmail(details.email.trim()); });
     return () => { cancelled = true; };
   }, []);
 
@@ -1491,8 +1504,8 @@ export default function IntakeQuestionnaire() {
                   </Typography>
                   <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 1 }}>
                     Máte právo na přístup, opravu i výmaz svých údajů a na stížnost
-                    u ÚOOÚ. Souhlasy níže můžete kdykoli odvolat na
-                    recepce@sportmedical-diagnostics.cz.
+                    u ÚOOÚ. Souhlasy níže můžete kdykoli odvolat
+                    {clinicEmail !== '' ? ` na ${clinicEmail}` : ''}.
                   </Typography>
                 </Box>
 
@@ -1664,8 +1677,7 @@ export default function IntakeQuestionnaire() {
                 </Box>
 
                 <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 2 }}>
-                  Souhlasy pro vás připravíme na recepci. Připravujeme, aby se
-                  daly vyplnit rovnou tady.
+                  Souhlasy pro vás připravíme na recepci.
                 </Typography>
               </Card>
 
