@@ -43,6 +43,36 @@ export interface ExportCommand {
   dateTo: string;
 }
 
+/**
+ * The export form as the screen holds it: the enum members by name.
+ */
+export interface ExportForm {
+  format: keyof typeof ExportFormat;
+  type: keyof typeof ExportType;
+  from: string;
+  to: string;
+}
+
+/**
+ * The request body POST /api/accounting/export binds. The API reads
+ * `format` and `type` as the numbers of its ExportFormat and ExportType
+ * enums; the names the form shows are turned into those numbers here, so the
+ * body is one the server can bind whether or not it also accepts names.
+ */
+export function exportCommandFrom(form: ExportForm): ExportCommand {
+  return {
+    format: ExportFormat[form.format],
+    type: ExportType[form.type],
+    dateFrom: form.from,
+    dateTo: form.to,
+  };
+}
+
+/** A format name the API may list that this screen knows how to send. */
+export function isExportFormatName(name: unknown): name is keyof typeof ExportFormat {
+  return typeof name === 'string' && Object.prototype.hasOwnProperty.call(ExportFormat, name);
+}
+
 export interface ExportFormatInfo {
   format: ExportFormat;
   name: string;

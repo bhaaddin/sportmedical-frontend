@@ -8,8 +8,13 @@ import { Download, Delete, ReceiptLong } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import {
   useExportHistory, useExportAccounting, useDeleteExport, useExportFormats,
-  accountingExportApi,
+  accountingExportApi, exportCommandFrom, isExportFormatName, ExportType,
 } from '../services/accountingExportApi';
+import type { ExportForm } from '../services/accountingExportApi';
+
+/* The three formats the API has an exporter for, used until it lists its own. */
+const FALLBACK_FORMATS: ExportForm['format'][] = ['CSV', 'PohodaXml', 'MoneyS3Xml'];
+const EXPORT_TYPES = Object.keys(ExportType) as ExportForm['type'][];
 
 export default function AccountingExportPage() {
   const today = new Date().toISOString().split('T')[0];
@@ -18,16 +23,13 @@ export default function AccountingExportPage() {
   const { data: formats = [] } = useExportFormats();
   const doExport = useExportAccounting();
   const doDelete = useDeleteExport();
-  const [form, setForm] = useState({ format: 'CSV', type: 'Invoices', from: firstDay, to: today });
+  const [form, setForm] = useState<ExportForm>({ format: 'CSV', type: 'Invoices', from: firstDay, to: today });
+  const listed = formats.map((f) => f.name).filter(isExportFormatName);
+  const formatOptions = listed.length > 0 ? listed : FALLBACK_FORMATS;
 
   const runExport = async () => {
     try {
-      const result = await doExport.mutateAsync({
-        format: form.format,
-        type: form.type,
-        dateFrom: form.from,
-        dateTo: form.to,
-      } as any);
+      const result = await doExport.mutateAsync(exportCommandFrom(form));
       toast.success(`Export hotový (${result.recordCount} záznamů)`);
       const blob = await accountingExportApi.download(result.id);
       const url = URL.createObjectURL(blob);
@@ -79,16 +81,16 @@ export default function AccountingExportPage() {
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 3 }}>
               <TextField select fullWidth label="Formát" value={form.format}
-                onChange={e => setForm(f => ({ ...f, format: e.target.value }))}>
-                {(formats.length > 0 ? formats.map((f: any) => (typeof f === 'string' ? f : f.name ?? f.format)) : ['CSV', 'PohodaXml', 'MoneyS3Xml']).map((f: string) => (
+                onChange={e => setForm(f => ({ ...f, format: e.target.value as ExportForm['format'] }))}>
+                {formatOptions.map((f) => (
                   <MenuItem key={f} value={f}>{f}</MenuItem>
                 ))}
               </TextField>
             </Grid>
             <Grid size={{ xs: 12, sm: 3 }}>
               <TextField select fullWidth label="Typ" value={form.type}
-                onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
-                {['Invoices', 'CreditNotes', 'Payments', 'All'].map(t => (
+                onChange={e => setForm(f => ({ ...f, type: e.target.value as ExportForm['type'] }))}>
+                {EXPORT_TYPES.map(t => (
                   <MenuItem key={t} value={t}>{t}</MenuItem>
                 ))}
               </TextField>
