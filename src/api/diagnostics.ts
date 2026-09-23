@@ -14,7 +14,6 @@ export interface DiagnosticSession {
   bodyFatPercentage: number;
   muscleMassKg: number;
   rawPractitionerNotes?: string;
-  agentGeneratedSummary?: string;
   detectedAnomaliesJson?: string;
   requiresDoctorReview: boolean;
   createdAtUtc: string;
@@ -23,7 +22,6 @@ export interface DiagnosticSession {
 export interface CreateSessionRequest {
   patientId: string;
   practitionerName: string;
-  dateOfBirth?: string;
   restingHeartRateBpm: number;
   maxHeartRateBpm: number;
   vo2MaxMlMinKg: number;
@@ -49,11 +47,6 @@ export const diagnosticsApi = {
   getByPatient: async (patientId: string): Promise<DiagnosticSession[]> => {
     const res = await client.get(`/api/v1/diagnostics/patients/${patientId}/sessions`);
     return res.data?.value ?? res.data ?? [];
-  },
-
-  regenerate: async (id: string): Promise<DiagnosticSession> => {
-    const res = await client.post(`/api/v1/diagnostics/sessions/${id}/regenerate-analysis`);
-    return res.data?.value ?? res.data;
   },
 
   downloadPdf: async (sessionId: string): Promise<void> => {

@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   Box, Paper, Typography, TextField, Button, Grid, Chip,
   Alert, CircularProgress, Divider, Card, CardContent, LinearProgress,
-  Slider, Stepper, Step, StepLabel, StepConnector, stepConnectorClasses,
-  Avatar,
+  Stepper, Step, StepLabel, StepConnector, stepConnectorClasses,
+  Avatar, InputAdornment,
 } from '@mui/material';
 import type { StepIconProps } from '@mui/material/StepIcon';
 import { Science, Send, Warning, ArrowBack, ArrowForward, Check, Person, Favorite, FitnessCenter, Notes } from '@mui/icons-material';
@@ -14,19 +14,77 @@ import type { CreateSessionRequest, DiagnosticSession } from '../api/diagnostics
 import { DiagnosticFormSkeleton } from '../components/SkeletonLoader';
 import toast from 'react-hot-toast';
 
-const defaultValues: CreateSessionRequest = {
+type VitalKey =
+  | 'restingHeartRateBpm'
+  | 'maxHeartRateBpm'
+  | 'vo2MaxMlMinKg'
+  | 'anaerobicThresholdBpm'
+  | 'systolicBloodPressure'
+  | 'diastolicBloodPressure'
+  | 'bodyFatPercentage'
+  | 'muscleMassKg';
+
+/**
+ * Every measured value starts empty and has to be typed in. The form used to
+ * open with plausible numbers already set (65 bpm, 120/78 mmHg, ...), and an
+ * untouched step saved them as if they had been measured.
+ */
+interface SessionDraft {
+  patientId: string;
+  practitionerName: string;
+  vitals: Record<VitalKey, number | null>;
+  rawPractitionerNotes: string;
+}
+
+const CARDIO_VITALS: VitalKey[] = ['restingHeartRateBpm', 'maxHeartRateBpm', 'anaerobicThresholdBpm', 'vo2MaxMlMinKg'];
+const BODY_VITALS: VitalKey[] = ['systolicBloodPressure', 'diastolicBloodPressure', 'bodyFatPercentage', 'muscleMassKg'];
+
+const emptyDraft = (): SessionDraft => ({
   patientId: '',
   practitionerName: '',
-  restingHeartRateBpm: 65,
-  maxHeartRateBpm: 185,
-  vo2MaxMlMinKg: 45,
-  anaerobicThresholdBpm: 155,
-  systolicBloodPressure: 120,
-  diastolicBloodPressure: 78,
-  bodyFatPercentage: 15,
-  muscleMassKg: 40,
+  vitals: {
+    restingHeartRateBpm: null,
+    maxHeartRateBpm: null,
+    vo2MaxMlMinKg: null,
+    anaerobicThresholdBpm: null,
+    systolicBloodPressure: null,
+    diastolicBloodPressure: null,
+    bodyFatPercentage: null,
+    muscleMassKg: null,
+  },
   rawPractitionerNotes: '',
-};
+});
+
+const allFilled = (draft: SessionDraft, keys: VitalKey[]) =>
+  keys.every((k) => draft.vitals[k] !== null);
+
+/** The request, or null while any measured value is still missing. */
+function toRequest(draft: SessionDraft): CreateSessionRequest | null {
+  const v = draft.vitals;
+  if (
+    v.restingHeartRateBpm === null || v.maxHeartRateBpm === null ||
+    v.vo2MaxMlMinKg === null || v.anaerobicThresholdBpm === null ||
+    v.systolicBloodPressure === null || v.diastolicBloodPressure === null ||
+    v.bodyFatPercentage === null || v.muscleMassKg === null
+  ) {
+    return null;
+  }
+  return {
+    patientId: draft.patientId,
+    practitionerName: draft.practitionerName,
+    restingHeartRateBpm: v.restingHeartRateBpm,
+    maxHeartRateBpm: v.maxHeartRateBpm,
+    vo2MaxMlMinKg: v.vo2MaxMlMinKg,
+    anaerobicThresholdBpm: v.anaerobicThresholdBpm,
+    systolicBloodPressure: v.systolicBloodPressure,
+    diastolicBloodPressure: v.diastolicBloodPressure,
+    bodyFatPercentage: v.bodyFatPercentage,
+    muscleMassKg: v.muscleMassKg,
+    rawPractitionerNotes: draft.rawPractitionerNotes,
+  };
+}
+
+const shown = (value: number | null, unit: string) => (value === null ? '—' : `${value} ${unit}`);
 
 /* ── Custom Step Connector ── */
 const ColorConnector = styled(StepConnector)(({ theme }) => ({
@@ -43,44 +101,36 @@ const steps = [
   { label: 'Poznámky a odeslání', icon: <Notes /> },
 ];
 
-/* ── Metric Slider ── */
-function MetricSlider({ label, value, onChange, min, max, unit, zones }: {
-  label: string; value: number; onChange: (v: number) => void;
+/* ── Measured value: typed in, never pre-filled ── */
+function MetricField({ label, value, onChange, min, max, unit, zones }: {
+  label: string; value: number | null; onChange: (v: number | null) => void;
   min: number; max: number; unit: string;
   zones?: { from: number; to: number; color: string; label: string }[];
 }) {
-  const currentZone = zones?.find(z => value >= z.from && value <= z.to);
-
-  const getSliderColor = () => {
-    if (!currentZone) return '#0D7377';
-    return currentZone.color;
-  };
+  const currentZone = value === null ? undefined : zones?.find(z => value >= z.from && value <= z.to);
 
   return (
     <Box sx={{ mb: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 1 }}>
-        <Typography sx={{ fontWeight: 600 }}>{label}</Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: getSliderColor() }}>
-            {value}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">{unit}</Typography>
-        </Box>
-      </Box>
-      <Slider
-        value={value} onChange={(_, v) => onChange(v as number)}
-        min={min} max={max} step={0.1}
-        sx={{
-          color: getSliderColor(),
-          '& .MuiSlider-thumb': { width: 20, height: 20, '&:hover': { boxShadow: `0 0 0 8px ${getSliderColor()}20` } },
-          '& .MuiSlider-track': { border: 'none' },
+      <TextField
+        fullWidth required type="number" label={label}
+        value={value ?? ''}
+        onChange={(e) => {
+          const raw = e.target.value;
+          const n = Number(raw);
+          onChange(raw === '' || !Number.isFinite(n) ? null : n);
         }}
+        helperText={value === null ? 'Zadejte naměřenou hodnotu.' : undefined}
+        slotProps={{
+          htmlInput: { min, max, step: 0.1 },
+          input: { endAdornment: <InputAdornment position="end">{unit}</InputAdornment> },
+        }}
+        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
       />
       {currentZone && (
         <Chip label={currentZone.label} size="small"
           sx={{ bgcolor: `${currentZone.color}18`, color: currentZone.color, fontWeight: 500, mt: 0.5 }} />
       )}
-      {zones && (
+      {zones && value !== null && (
         <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
           {zones.map(z => (
             <Box key={z.label} sx={{ flex: 1, height: 3, borderRadius: 1, bgcolor: value >= z.from && value <= z.to ? z.color : `${z.color}30`, transition: 'all 0.3s' }} />
@@ -94,7 +144,7 @@ function MetricSlider({ label, value, onChange, min, max, unit, zones }: {
 /* ── Main Component ── */
 export default function DiagnosticForm() {
   const [activeStep, setActiveStep] = useState(0);
-  const [form, setForm] = useState<CreateSessionRequest>(defaultValues);
+  const [form, setForm] = useState<SessionDraft>(emptyDraft);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DiagnosticSession | null>(null);
   const [error, setError] = useState('');
@@ -105,14 +155,20 @@ export default function DiagnosticForm() {
     if (pid) setForm(prev => ({ ...prev, patientId: pid }));
   }, []);
 
-  const update = (field: keyof CreateSessionRequest, value: any) =>
+  const update = (field: 'patientId' | 'practitionerName' | 'rawPractitionerNotes', value: string) =>
     setForm(prev => ({ ...prev, [field]: value }));
 
+  const updateVital = (field: VitalKey, value: number | null) =>
+    setForm(prev => ({ ...prev, vitals: { ...prev.vitals, [field]: value } }));
+
+  const request = toRequest(form);
+
   const handleSubmit = async () => {
+    if (request === null) return;
     setLoading(true);
     setError('');
     try {
-      const session = await diagnosticsApi.create(form);
+      const session = await diagnosticsApi.create(request);
       setResult(session);
       toast.success('Diagnostická relace vytvořena!');
     } catch (err: any) {
@@ -129,7 +185,9 @@ export default function DiagnosticForm() {
   };
 
   const canNext = () => {
-    if (activeStep === 0) return form.patientId && form.practitionerName;
+    if (activeStep === 0) return Boolean(form.patientId && form.practitionerName);
+    if (activeStep === 1) return allFilled(form, CARDIO_VITALS);
+    if (activeStep === 2) return allFilled(form, BODY_VITALS);
     return true;
   };
 
@@ -146,11 +204,6 @@ export default function DiagnosticForm() {
                 ? '⚠️ Tato relace vyžaduje přezkum lékařem'
                 : '✅ Analýza dokončena — žádné kritické nálezy'}
             </Alert>
-
-            <Typography variant="h5" gutterBottom sx={{ fontWeight: 700 }}>AI Klinický souhrn</Typography>
-            <Paper variant="outlined" sx={{ p: 3, mb: 3, bgcolor: '#F8FFFE', borderRadius: 2, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
-              {result.agentGeneratedSummary}
-            </Paper>
 
             {parseAnomalies(result.detectedAnomaliesJson).length > 0 && (
               <>
@@ -196,7 +249,7 @@ export default function DiagnosticForm() {
             </Grid>
 
             <Button variant="outlined" sx={{ mt: 3, borderRadius: 2, px: 4 }}
-              onClick={() => { setResult(null); setForm(defaultValues); setActiveStep(0); }}>
+              onClick={() => { setResult(null); setForm(emptyDraft()); setActiveStep(0); }}>
               Vytvořit další relaci
             </Button>
           </Paper>
@@ -275,32 +328,32 @@ export default function DiagnosticForm() {
               <Box>
                 <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>Kardiovaskulární metriky</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  Nastavte posuvníkem jednotlivé metriky. Barevné zóny označují normální rozsahy.
+                  Zadejte naměřené hodnoty. Barevné zóny označují normální rozsahy.
                 </Typography>
-                <MetricSlider label="Klidová srdeční frekvence" value={form.restingHeartRateBpm}
-                  onChange={v => update('restingHeartRateBpm', v)} min={30} max={150} unit="bpm"
+                <MetricField label="Klidová srdeční frekvence" value={form.vitals.restingHeartRateBpm}
+                  onChange={v => updateVital('restingHeartRateBpm', v)} min={30} max={150} unit="bpm"
                   zones={[
                     { from: 30, to: 50, color: '#0288D1', label: 'Sportovec — velmi nízký klidový tep' },
                     { from: 50, to: 70, color: '#2E7D32', label: 'Normální — zdravý rozsah' },
                     { from: 70, to: 90, color: '#ED6C02', label: 'Zvýšený — zvažte vyšetření' },
                     { from: 90, to: 150, color: '#D32F2F', label: 'Vysoký — lékařská péče' },
                   ]} />
-                <MetricSlider label="Maximální srdeční frekvence" value={form.maxHeartRateBpm}
-                  onChange={v => update('maxHeartRateBpm', v)} min={100} max={250} unit="bpm"
+                <MetricField label="Maximální srdeční frekvence" value={form.vitals.maxHeartRateBpm}
+                  onChange={v => updateVital('maxHeartRateBpm', v)} min={100} max={250} unit="bpm"
                   zones={[
                     { from: 100, to: 150, color: '#ED6C02', label: 'Pod očekáváním' },
                     { from: 150, to: 200, color: '#2E7D32', label: 'Normální rozsah' },
                     { from: 200, to: 250, color: '#D32F2F', label: 'Nad očekáváním' },
                   ]} />
-                <MetricSlider label="Anaerobní práh" value={form.anaerobicThresholdBpm}
-                  onChange={v => update('anaerobicThresholdBpm', v)} min={80} max={220} unit="bpm"
+                <MetricField label="Anaerobní práh" value={form.vitals.anaerobicThresholdBpm}
+                  onChange={v => updateVital('anaerobicThresholdBpm', v)} min={80} max={220} unit="bpm"
                   zones={[
                     { from: 80, to: 130, color: '#ED6C02', label: 'Pod průměrem' },
                     { from: 130, to: 170, color: '#2E7D32', label: 'Zdravý rozsah' },
                     { from: 170, to: 220, color: '#0288D1', label: 'Sportovní úroveň' },
                   ]} />
-                <MetricSlider label="VO2 Max" value={form.vo2MaxMlMinKg}
-                  onChange={v => update('vo2MaxMlMinKg', v)} min={15} max={80} unit="ml/kg/min"
+                <MetricField label="VO2 Max" value={form.vitals.vo2MaxMlMinKg}
+                  onChange={v => updateVital('vo2MaxMlMinKg', v)} min={15} max={80} unit="ml/kg/min"
                   zones={[
                     { from: 15, to: 30, color: '#D32F2F', label: 'Špatné — je třeba zlepšit' },
                     { from: 30, to: 40, color: '#ED6C02', label: 'Pod průměrem' },
@@ -317,32 +370,32 @@ export default function DiagnosticForm() {
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                   Zadejte krevní tlak a metriky složení těla.
                 </Typography>
-                <MetricSlider label="Systolický krevní tlak" value={form.systolicBloodPressure}
-                  onChange={v => update('systolicBloodPressure', v)} min={60} max={200} unit="mmHg"
+                <MetricField label="Systolický krevní tlak" value={form.vitals.systolicBloodPressure}
+                  onChange={v => updateVital('systolicBloodPressure', v)} min={60} max={200} unit="mmHg"
                   zones={[
                     { from: 60, to: 90, color: '#0288D1', label: 'Nízký — hypotenze' },
                     { from: 90, to: 130, color: '#2E7D32', label: 'Normální' },
                     { from: 130, to: 160, color: '#ED6C02', label: 'Zvýšený — prehypertenze' },
                     { from: 160, to: 200, color: '#D32F2F', label: 'Vysoký — hypertenze' },
                   ]} />
-                <MetricSlider label="Diastolický krevní tlak" value={form.diastolicBloodPressure}
-                  onChange={v => update('diastolicBloodPressure', v)} min={30} max={130} unit="mmHg"
+                <MetricField label="Diastolický krevní tlak" value={form.vitals.diastolicBloodPressure}
+                  onChange={v => updateVital('diastolicBloodPressure', v)} min={30} max={130} unit="mmHg"
                   zones={[
                     { from: 30, to: 60, color: '#0288D1', label: 'Nízký' },
                     { from: 60, to: 85, color: '#2E7D32', label: 'Normální' },
                     { from: 85, to: 100, color: '#ED6C02', label: 'Zvýšený' },
                     { from: 100, to: 130, color: '#D32F2F', label: 'Vysoký' },
                   ]} />
-                <MetricSlider label="Podíl tělesného tuku" value={form.bodyFatPercentage}
-                  onChange={v => update('bodyFatPercentage', v)} min={3} max={50} unit="%"
+                <MetricField label="Podíl tělesného tuku" value={form.vitals.bodyFatPercentage}
+                  onChange={v => updateVital('bodyFatPercentage', v)} min={3} max={50} unit="%"
                   zones={[
                     { from: 3, to: 10, color: '#0288D1', label: 'Sportovec — velmi štíhlý' },
                     { from: 10, to: 20, color: '#2E7D32', label: 'Fitness — zdravý rozsah' },
                     { from: 20, to: 30, color: '#ED6C02', label: 'Průměrný — zvažte životní styl' },
                     { from: 30, to: 50, color: '#D32F2F', label: 'Nad průměrem — lékařská kontrola' },
                   ]} />
-                <MetricSlider label="Svalová hmota" value={form.muscleMassKg}
-                  onChange={v => update('muscleMassKg', v)} min={10} max={80} unit="kg"
+                <MetricField label="Svalová hmota" value={form.vitals.muscleMassKg}
+                  onChange={v => updateVital('muscleMassKg', v)} min={10} max={80} unit="kg"
                   zones={[
                     { from: 10, to: 25, color: '#ED6C02', label: 'Nízká — doporučen silový trénink' },
                     { from: 25, to: 50, color: '#2E7D32', label: 'Průměrná — zdravý rozsah' },
@@ -356,7 +409,7 @@ export default function DiagnosticForm() {
               <Box>
                 <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>Poznámky a kontrola</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  Přidejte klinické poznámky a odešlete k AI analýze.
+                  Přidejte klinické poznámky a relaci odešlete.
                 </Typography>
                 <TextField fullWidth multiline rows={4} label="Poznámky praktika"
                   value={form.rawPractitionerNotes}
@@ -370,10 +423,12 @@ export default function DiagnosticForm() {
                   {[
                     ['Pacient', form.patientId || '—'],
                     ['Praktik', form.practitionerName || '—'],
-                    ['Klidový tep', `${form.restingHeartRateBpm} bpm`],
-                    ['Max tep', `${form.maxHeartRateBpm} bpm`],
-                    ['VO2 Max', `${form.vo2MaxMlMinKg} ml/kg/min`],
-                    ['Krevní tlak', `${form.systolicBloodPressure}/${form.diastolicBloodPressure} mmHg`],
+                    ['Klidový tep', shown(form.vitals.restingHeartRateBpm, 'bpm')],
+                    ['Max tep', shown(form.vitals.maxHeartRateBpm, 'bpm')],
+                    ['VO2 Max', shown(form.vitals.vo2MaxMlMinKg, 'ml/kg/min')],
+                    ['Krevní tlak', form.vitals.systolicBloodPressure === null || form.vitals.diastolicBloodPressure === null
+                      ? '—'
+                      : `${form.vitals.systolicBloodPressure}/${form.vitals.diastolicBloodPressure} mmHg`],
                   ].map(([label, value]) => (
                     <Grid key={label} size={{ xs: 6, sm: 4 }}>
                       <Card variant="outlined" sx={{ borderColor: '#e0e0e0' }}>
@@ -408,11 +463,11 @@ export default function DiagnosticForm() {
           </Button>
         ) : (
           <Button variant="contained" endIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Send />}
-            onClick={handleSubmit} disabled={loading}
+            onClick={handleSubmit} disabled={loading || request === null}
             sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 600,
               boxShadow: '0 4px 16px rgba(13,115,119,0.3)',
               '&:hover': { bgcolor: '#095456' } }}>
-            {loading ? 'Analyzuji...' : 'Odeslat a spustit AI analýzu'}
+            {loading ? 'Odesílám...' : 'Odeslat relaci'}
           </Button>
         )}
       </Box>

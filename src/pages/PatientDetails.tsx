@@ -566,13 +566,6 @@ export default function PatientDetails() {
                                   </Box>
                                 )}
 
-                                {s.agentGeneratedSummary && (
-                                  <Box sx={{ mt: 2, p: 2, bgcolor: '#0D737708', borderRadius: 2, border: '1px solid #0D737720' }}>
-                                    <Typography variant="caption" sx={{ color: '#0D7377', fontWeight: 600 }}>🤖 AI Analýza</Typography>
-                                    <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: 'pre-wrap' }}>{s.agentGeneratedSummary}</Typography>
-                                  </Box>
-                                )}
-
                                 {s.detectedAnomaliesJson && (
                                   <Alert severity="warning" sx={{ mt: 2, borderRadius: 2 }}>
                                     <Typography variant="caption" sx={{ fontWeight: 600 }}>Detekované anomálie</Typography>
@@ -581,11 +574,6 @@ export default function PatientDetails() {
                                 )}
 
                                 <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-                                  <Button size="small" variant="outlined" startIcon={<Science />}
-                                    onClick={() => navigate(`/diagnostics/new?patientId=${patient.id}&sessionId=${s.id}`)}
-                                    sx={{ borderColor: '#0D7377', color: '#0D7377' }}>
-                                    Regenerovat analýzu
-                                  </Button>
                                   <Button size="small" variant="outlined" startIcon={<Download />}
                                     onClick={() => handleDownloadPdf(s.id)}
                                     sx={{ borderColor: '#0D7377', color: '#0D7377' }}>
