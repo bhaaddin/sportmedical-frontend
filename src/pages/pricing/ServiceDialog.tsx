@@ -10,14 +10,13 @@
  */
 import { useState } from 'react';
 import {
-  Alert, Autocomplete, Box, Button, Dialog, DialogActions, DialogContent,
+  Alert, Box, Button, Dialog, DialogActions, DialogContent,
   DialogTitle, FormControlLabel, InputAdornment, Stack, Switch, TextField,
 } from '@mui/material';
 import { servicesApi } from '../../api/services';
-import { nearMiss } from './categoryMeaning';
 import type { ServiceItem } from '../../api/services';
 import {
-  categoriesInUse, draftFrom, hasErrors, toRequest, validateService,
+  draftFrom, hasErrors, toRequest, validateService,
 } from './serviceForm';
 import type { ServiceDraft, ServiceErrors } from './serviceForm';
 
@@ -36,24 +35,6 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
   const [errors, setErrors] = useState<ServiceErrors>({});
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
-
-  /*
-   * The category is a label again, and only a label.
-   *
-   * It briefly decided something: a required document hung off it, so a row
-   * filed under `Prohlídka` made the patient bring a výpis. That was built on
-   * categories which turned out to be seed data the owner never wrote, and on
-   * 13. 9. 2026 the requirement moved onto a clinic service instead. The chain
-   * is now `termín -> činnost -> služba -> pravidlo`, and the price list is
-   * not in it - what a visit is billed as has no say in what the patient must
-   * bring.
-   *
-   * So the sentence that explained the link went with the link, rather than
-   * being repointed at a new field. It described a relationship this project
-   * decided was wrong.
-   */
-  const known = categoriesInUse(existing);
-  const slip = nearMiss(draft.category, known);
 
   const set = (field: keyof ServiceDraft, value: string | boolean) => {
     setDraft((d) => ({ ...d, [field]: value }));
@@ -111,40 +92,6 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
               fullWidth
             />
           </Stack>
-
-          <Autocomplete
-            freeSolo
-            options={known}
-            value={draft.category}
-            onInputChange={(_, value) => set('category', value)}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Kategorie"
-                error={errors.category !== undefined}
-                helperText={
-                  errors.category ?? 'Jen pro přehled — položky se podle ní řadí a barví'
-                }
-              />
-            )}
-          />
-
-          {/* Kept, with a smaller claim. A near-duplicate category no longer
-              turns off a required document - nothing hangs off it now - but
-              "Prohlídka" and "Prohlídky" side by side in one price list is
-              still two names for one thing. */}
-          {slip !== null && (
-            <Alert severity="info" variant="outlined">
-              Nemysleli jste <strong>{slip}</strong>?{' '}
-              <Button
-                size="small"
-                onClick={() => set('category', slip)}
-                sx={{ textTransform: 'none', p: 0, minWidth: 0, verticalAlign: 'baseline' }}
-              >
-                Použít
-              </Button>
-            </Alert>
-          )}
 
           <TextField
             label="Popis"

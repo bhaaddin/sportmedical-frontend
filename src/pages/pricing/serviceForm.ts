@@ -32,7 +32,6 @@ export interface ServiceDraft {
   code: string;
   name: string;
   description: string;
-  category: string;
   /* Text, not numbers: these come out of text fields, and an empty field is
      not 0. Parsing at the edge is what lets "" be told apart from "0". */
   priceCzk: string;
@@ -42,12 +41,6 @@ export interface ServiceDraft {
 }
 
 export type ServiceErrors = Partial<Record<keyof ServiceDraft, string>>;
-
-/** The categories already in use, so the common case is a pick and not typing. */
-export function categoriesInUse(services: ServiceItem[]): string[] {
-  const seen = new Set(services.map((s) => s.category.trim()).filter((c) => c !== ''));
-  return [...seen].sort((a, b) => a.localeCompare(b, 'cs'));
-}
 
 /**
  * A number as somebody at a desk would write it.
@@ -68,7 +61,7 @@ export function parseCzechNumber(text: string): number | null {
 export function draftFrom(service: ServiceItem | null): ServiceDraft {
   if (service === null) {
     return {
-      code: '', name: '', description: '', category: '',
+      code: '', name: '', description: '',
       durationMinutes: String(DEFAULT_DURATION_MINUTES), priceCzk: '', isActive: true,
     };
   }
@@ -76,7 +69,6 @@ export function draftFrom(service: ServiceItem | null): ServiceDraft {
     code: service.code,
     name: service.name,
     description: service.description,
-    category: service.category,
     durationMinutes: String(service.durationMinutes),
     priceCzk: String(service.priceCzk),
     isActive: service.isActive,
@@ -110,7 +102,6 @@ export function validateService(
   }
 
   if (name === '') errors.name = 'Název je povinný.';
-  if (draft.category.trim() === '') errors.category = 'Zvolte kategorii.';
 
   const price = parseCzechNumber(draft.priceCzk);
   if (price === null) {
@@ -132,7 +123,6 @@ export function toRequest(draft: ServiceDraft) {
     code: draft.code.trim(),
     name: draft.name.trim(),
     description: draft.description.trim(),
-    category: draft.category.trim(),
     durationMinutes: parseCzechNumber(draft.durationMinutes) ?? DEFAULT_DURATION_MINUTES,
     priceCzk: parseCzechNumber(draft.priceCzk) ?? 0,
     isActive: draft.isActive,

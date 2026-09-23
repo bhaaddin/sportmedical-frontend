@@ -41,14 +41,13 @@ const withQueries = (ui: ReactNode) => {
 };
 
 const { default: ServiceDialog } = await import('./ServiceDialog');
-const { default: Cenik, categoryColour } = await import('../Cenik');
+const { default: Cenik } = await import('../Cenik');
 
 const service = (over: Partial<ServiceItem> = {}): ServiceItem => ({
   id: 's1',
   code: 'KP',
   name: 'Komplexní prohlídka',
   description: 'Vše dohromady',
-  category: 'Prohlídka',
   durationMinutes: 60,
   priceCzk: 3000,
   isActive: true,
@@ -102,7 +101,6 @@ describe('the editor', () => {
 
     await fill(/Kód/, 'KP');
     await fill(/Název/, 'Něco jiného');
-    await fill(/Kategorie/, 'Měření');
     await fill(/Cena/, '900');
     await userEvent.click(screen.getByRole('button', { name: 'Uložit' }));
 
@@ -115,7 +113,6 @@ describe('the editor', () => {
 
     await fill(/Kód/, 'IB');
     await fill(/Název/, 'InBody 770');
-    await fill(/Kategorie/, 'Měření');
     await fill(/Cena/, '800');
     await userEvent.click(screen.getByRole('button', { name: 'Uložit' }));
 
@@ -147,7 +144,6 @@ describe('the editor', () => {
 
     await fill(/Kód/, 'IB');
     await fill(/Název/, 'InBody 770');
-    await fill(/Kategorie/, 'Měření');
     await fill(/Cena/, '800');
     await userEvent.click(screen.getByRole('button', { name: 'Uložit' }));
 
@@ -293,10 +289,9 @@ describe('the price list screen', () => {
 /*
  * An empty price list is the normal state now.
  *
- * The eight demo rows - and the four categories that came with them - were a
- * seed the owner never wrote. His words on 13. 9. 2026: "zmaz to, tie
- * kategórie som nikdy nerobil". They are gone from the database and from the
- * code, so nothing reappears, and a new installation opens on nothing.
+ * The eight demo rows were a seed the owner never wrote. They are gone from
+ * the database and from the code, so nothing reappears, and a new
+ * installation opens on nothing.
  *
  * The screen used to answer that with "V ceníku nic takového není" - the
  * search-result sentence - over three zeroes and a search box, which is a
@@ -339,25 +334,28 @@ describe('a price list with nothing in it', () => {
   });
 });
 
-describe('the colour of a category', () => {
-  /*
-   * Any category, not four of them. The fixed map named exactly the seed's
-   * own - so the owner's inventions would have been grey while the demo data
-   * kept its colours.
-   */
-  it('gives a colour to a category nobody planned for', () => {
-    const mine = categoryColour('Rehabilitace');
-    expect(mine.text).not.toBe('#666');
-    expect(mine.bg).not.toBe('#F5F5F5');
+/*
+ * The server stores no category for a price-list row and never returns one,
+ * so the screen neither asks for it nor sends it.
+ */
+describe('no category', () => {
+  it('lists a row exactly as the API sends it', async () => {
+    render(withQueries(<Cenik />));
+
+    expect((await screen.findAllByText('Komplexní prohlídka')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Kategorie')).not.toBeInTheDocument();
   });
 
-  it('gives the same category the same colour every time', () => {
-    expect(categoryColour('Prohlídka')).toEqual(categoryColour('Prohlídka'));
-    expect(categoryColour(' Prohlídka ')).toEqual(categoryColour('Prohlídka'));
-  });
+  it('neither asks for a category nor sends one', async () => {
+    renderDialog();
+    expect(screen.queryByLabelText(/Kategorie/)).not.toBeInTheDocument();
 
-  it('falls back to grey only for no category at all', () => {
-    expect(categoryColour('')).toMatchObject({ text: '#666' });
-    expect(categoryColour('   ')).toMatchObject({ text: '#666' });
+    await fill(/Kód/, 'IB');
+    await fill(/Název/, 'InBody 770');
+    await fill(/Cena/, '800');
+    await userEvent.click(screen.getByRole('button', { name: 'Uložit' }));
+
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    expect(create.mock.calls[0][0]).not.toHaveProperty('category');
   });
 });

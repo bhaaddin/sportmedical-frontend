@@ -33,35 +33,6 @@ import { servicesApi } from '../api/services';
 import type { ServiceItem } from '../api/services';
 import ServiceDialog from './pricing/ServiceDialog';
 
-/*
- * A colour for any category, rather than for four of them.
- *
- * There used to be a fixed map here: Prohlídka, Diagnostika, Měření, Terapie.
- * Those four came from a seed the owner never wrote - his words, on
- * 13. 9. 2026: "zmaz to, tie kategórie som nikdy nerobil". The seed is gone
- * from the database and from the code, and a map naming those four would have
- * given them colours and everything the owner invents himself grey.
- *
- * Derived from the name, so it is stable for a given category and there is no
- * list to keep in step with anything.
- */
-const CATEGORY_PALETTE = [
-  { bg: '#E8F5E9', text: '#2E7D32' },
-  { bg: '#E3F2FD', text: '#1565C0' },
-  { bg: '#FFF3E0', text: '#E65100' },
-  { bg: '#F3E5F5', text: '#7B1FA2' },
-  { bg: '#E0F7FA', text: '#00838F' },
-  { bg: '#FCE4EC', text: '#AD1457' },
-];
-
-export function categoryColour(category: string): { bg: string; text: string } {
-  const name = category.trim();
-  if (name === '') return { bg: '#F5F5F5', text: '#666' };
-  let hash = 0;
-  for (const ch of name) hash = (hash * 31 + ch.codePointAt(0)!) % 100_000;
-  return CATEGORY_PALETTE[hash % CATEGORY_PALETTE.length];
-}
-
 export default function Cenik() {
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,8 +66,7 @@ export default function Cenik() {
 
   const filtered = services.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.code.toLowerCase().includes(search.toLowerCase()) ||
-    s.category.toLowerCase().includes(search.toLowerCase())
+    s.code.toLowerCase().includes(search.toLowerCase())
   );
 
   const totalServices = services.length;
@@ -159,9 +129,8 @@ export default function Cenik() {
         {[
           { label: 'Celkem položek', value: totalServices, color: '#0D7377' },
           { label: 'Průměrná cena', value: `${avgPrice.toLocaleString('cs-CZ')} Kč`, color: '#2E7D32' },
-          { label: 'Kategorií', value: new Set(services.map(s => s.category)).size, color: '#ED6C02' },
         ].map((stat, i) => (
-          <Grid key={stat.label} size={{ xs: 12, sm: 4 }}>
+          <Grid key={stat.label} size={{ xs: 12, sm: 6 }}>
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.1 }}>
               <Card>
                 <CardContent sx={{ textAlign: 'center', py: 3 }}>
@@ -204,9 +173,7 @@ export default function Cenik() {
         </Grid>
       ) : (
         <Grid container spacing={3}>
-          {filtered.map((service, i) => {
-            const colors = categoryColour(service.category);
-            return (
+          {filtered.map((service, i) => (
               <Grid key={service.id} size={{ xs: 12, sm: 6, md: 4 }}>
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -215,11 +182,11 @@ export default function Cenik() {
                   whileHover={{ y: -4, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
                 >
                   <Card sx={{ height: '100%', overflow: 'hidden' }}>
-                    <Box sx={{ height: 4, bgcolor: colors.text }} />
+                    <Box sx={{ height: 4, bgcolor: '#0D7377' }} />
                     <CardContent sx={{ p: 3 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                         <Box>
-                          <Chip label={service.code} size="small" sx={{ mb: 1, fontWeight: 700, bgcolor: colors.bg, color: colors.text }} />
+                          <Chip label={service.code} size="small" sx={{ mb: 1, fontWeight: 700 }} />
                           <Typography variant="h6" sx={{ fontWeight: 700 }}>{service.name}</Typography>
                         </Box>
                         <Typography variant="h5" sx={{ fontWeight: 800, color: '#0D7377' }}>
@@ -269,8 +236,7 @@ export default function Cenik() {
                   </Card>
                 </motion.div>
               </Grid>
-            );
-          })}
+          ))}
         </Grid>
       )}
 
@@ -293,7 +259,6 @@ export default function Cenik() {
                 <TableRow sx={{ bgcolor: '#f8f9fa' }}>
                   <TableCell sx={{ fontWeight: 700 }}>Kód</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Název</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Kategorie</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Cena (Kč)</TableCell>
                 </TableRow>
               </TableHead>
@@ -304,7 +269,6 @@ export default function Cenik() {
                       <Chip label={service.code} size="small" sx={{ fontWeight: 700 }} />
                     </TableCell>
                     <TableCell sx={{ fontWeight: 500 }}>{service.name}</TableCell>
-                    <TableCell>{service.category}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700, color: '#0D7377' }}>
                       {service.priceCzk.toLocaleString('cs-CZ')} Kč
                     </TableCell>

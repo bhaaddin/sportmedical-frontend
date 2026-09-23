@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  DEFAULT_DURATION_MINUTES, categoriesInUse, draftFrom, hasErrors, parseCzechNumber,
+  DEFAULT_DURATION_MINUTES, draftFrom, hasErrors, parseCzechNumber,
   toRequest, validateService,
 } from './serviceForm';
 import type { ServiceItem } from '../../api/services';
@@ -19,7 +19,6 @@ const service = (over: Partial<ServiceItem> = {}): ServiceItem => ({
   code: 'KP',
   name: 'Komplexní prohlídka',
   description: 'Vše dohromady',
-  category: 'Prohlídka',
   durationMinutes: 60,
   priceCzk: 3000,
   isActive: true,
@@ -30,7 +29,6 @@ const draft = (over: Record<string, string | boolean> = {}) => ({
   code: 'IB',
   name: 'InBody 770',
   description: '',
-  category: 'Měření',
   durationMinutes: '15',
   priceCzk: '800',
   isActive: true,
@@ -78,10 +76,6 @@ describe('what may be saved', () => {
   it('demands a code and a name', () => {
     expect(validateService(draft({ code: '   ' }), [], null).code).toBeDefined();
     expect(validateService(draft({ name: '' }), [], null).name).toBeDefined();
-  });
-
-  it('demands a category', () => {
-    expect(validateService(draft({ category: '' }), [], null).category).toBeDefined();
   });
 
   /*
@@ -142,11 +136,11 @@ describe('what may be saved', () => {
 
   it('reports every broken field at once, not just the first', () => {
     const found = validateService(
-      draft({ code: '', name: '', category: '', priceCzk: 'nic' }),
+      draft({ code: '', name: '', priceCzk: 'nic' }),
       [],
       null,
     );
-    expect(Object.keys(found).sort()).toEqual(['category', 'code', 'name', 'priceCzk']);
+    expect(Object.keys(found).sort()).toEqual(['code', 'name', 'priceCzk']);
   });
 
   it('knows when there is nothing wrong', () => {
@@ -162,7 +156,6 @@ describe('turning the form into a request', () => {
         code: 'IB',
         name: 'InBody',
         description: '',
-        category: 'Měření',
         durationMinutes: 15,
         priceCzk: 1500.5,
         isActive: true,
@@ -184,18 +177,5 @@ describe('the form a service opens into', () => {
     const loaded = draftFrom(service());
     expect(loaded.priceCzk).toBe('3000');
     expect(validateService(loaded, [service()], 's1')).toEqual({});
-  });
-});
-
-describe('the categories already in use', () => {
-  it('lists each once, sorted, with blanks left out', () => {
-    expect(
-      categoriesInUse([
-        service({ id: 'a', category: 'Měření' }),
-        service({ id: 'b', category: 'Diagnostika' }),
-        service({ id: 'c', category: 'Měření' }),
-        service({ id: 'd', category: '' }),
-      ]),
-    ).toEqual(['Diagnostika', 'Měření']);
   });
 });

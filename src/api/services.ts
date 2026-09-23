@@ -5,7 +5,6 @@ export interface ServiceItem {
   code: string;
   name: string;
   description: string;
-  category: string;
   durationMinutes: number;
   priceCzk: number;
   isActive: boolean;
@@ -15,7 +14,6 @@ export interface ServiceItemInput {
   code: string;
   name: string;
   description: string;
-  category: string;
   durationMinutes: number;
   priceCzk: number;
   isActive: boolean;
