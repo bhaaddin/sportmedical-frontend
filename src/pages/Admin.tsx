@@ -63,6 +63,14 @@ export default function Admin() {
     setPub(p => ({ ...p, [key]: val }));
 
   /*
+   * Whether what is stored has been read. Until it has, the fields hold the
+   * blanks above, and saving them would write '' over the clinic's name and
+   * contacts - and switch online booking back on - on the public booking pages.
+   */
+  const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  /*
    * What is actually stored, read on open.
    *
    * Until 21. 9. 2026 this screen read nothing and wrote nothing: every field
@@ -85,11 +93,10 @@ export default function Admin() {
           contactAddress: stored[PUBLIC_CLINIC_KEYS.address] ?? previous.contactAddress,
           enableBooking: (stored[PUBLIC_CLINIC_KEYS.bookingEnabled] ?? 'true') !== 'false',
         }));
+        setLoaded(true);
       })
       .catch(() => {
-        // Leave the fields as they are and let the save report the failure.
-        // Wiping what the owner can see because a GET failed would look like
-        // the settings had been lost.
+        if (!abandoned) setLoadFailed(true);
       });
 
     return () => { abandoned = true; };
@@ -137,6 +144,13 @@ export default function Admin() {
       </motion.div>
 
       <CompanySettingsCard />
+
+      {loadFailed && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          Uložené kontakty se nepodařilo načíst. Obnovte stránku — dokud se nenačtou,
+          nelze je uložit, aby se uložené údaje nepřepsaly prázdnými.
+        </Alert>
+      )}
 
       {/* — Section: Contact — */}
       <motion.div custom={0} variants={sectionAnim} initial="hidden" animate="visible">
@@ -190,7 +204,7 @@ export default function Admin() {
 
       {/* Save button */}
       <motion.div custom={2} variants={sectionAnim} initial="hidden" animate="visible">
-        <Button variant="contained" startIcon={<Save />} onClick={() => { void handleSave(); }} disabled={saving}
+        <Button variant="contained" startIcon={<Save />} onClick={() => { void handleSave(); }} disabled={saving || !loaded}
           sx={{ mb: 4, bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 700,
             boxShadow: '0 4px 16px rgba(13,115,119,0.3)', '&:hover': { bgcolor: '#095456' } }}>
           Uložit kontakty a rezervace
