@@ -63,13 +63,7 @@ const EmailTemplatesPage = lazy(() => import('./pages/EmailTemplates'));
 const AuditLogPage = lazy(() => import('./pages/AuditLog'));
 const PatientImportPage = lazy(() => import('./pages/PatientImport'));
 const DataExportPage = lazy(() => import('./pages/DataExport'));
-const NotificationSettingsPage = lazy(() => import('./pages/NotificationSettings'));
 const BackupRestorePage = lazy(() => import('./pages/BackupRestore'));
-const CustomFieldsPage = lazy(() => import('./pages/CustomFields'));
-const WorkflowAutomationPage = lazy(() => import('./pages/WorkflowAutomation'));
-const ReportSchedulingPage = lazy(() => import('./pages/ReportScheduling'));
-const MultiClinicPage = lazy(() => import('./pages/MultiClinic'));
-const ApiKeysPage = lazy(() => import('./pages/ApiKeys'));
 const PatientRecordsPage = lazy(() => import('./pages/PatientRecords'));
 const WorkerSchedulePage = lazy(() => import('./pages/admin/WorkerScheduleSettings'));
 /* Booking phase 1, stage 1: calendars, access and activities */
@@ -536,13 +530,7 @@ export default function App() {
                     <Route path="/audit-log" element={<AuditLogPage />} />
                     <Route path="/patient-import" element={<PatientImportPage />} />
                     <Route path="/data-export" element={<DataExportPage />} />
-                    <Route path="/notification-settings" element={<NotificationSettingsPage />} />
                     <Route path="/backup-restore" element={<BackupRestorePage />} />
-                    <Route path="/custom-fields" element={<CustomFieldsPage />} />
-                    <Route path="/workflow-automation" element={<WorkflowAutomationPage />} />
-                    <Route path="/report-scheduling" element={<ReportSchedulingPage />} />
-                    <Route path="/multi-clinic" element={<MultiClinicPage />} />
-                    <Route path="/api-keys" element={<ApiKeysPage />} />
                     <Route path="/patient-records/:id" element={<PatientRecordsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/client-intake" element={<ClientIntakePage />} />
