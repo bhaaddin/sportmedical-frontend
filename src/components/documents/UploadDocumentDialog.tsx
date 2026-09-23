@@ -2,13 +2,11 @@
  * Getting one document onto the server, from whatever the person in front of
  * the screen actually has.
  *
- * Three ways in, because the three situations are genuinely different:
+ * Two ways in, because the two situations are genuinely different:
  *
- *   scan    a sheet of paper and a camera. The usual case at a desk, and the
- *           one this exists for: no scanner, no cable, no app.
  *   file    a PDF the patient e-mailed, or a photograph already on the device.
- *   photo   the phone's own camera app, for anyone who would rather not use
- *           the scanner - `capture` opens it directly instead of the gallery.
+ *   photo   the phone's own camera app - `capture` opens it directly instead
+ *           of the gallery.
  *
  * What it does before sending: refuses what the server would refuse, converts
  * an iPhone photo to something every browser can read, shows what is about to
@@ -22,16 +20,14 @@ import {
   Divider, IconButton, LinearProgress, Stack, TextField, Typography,
 } from '@mui/material';
 import {
-  Close, CloudUpload, DocumentScanner as ScannerIcon,
-  PhotoCamera, RotateRight, Check,
+  Close, CloudUpload, PhotoCamera, RotateRight, Check,
 } from '@mui/icons-material';
-import DocumentScanner from '../scanner/DocumentScanner';
 import { documentsApi, DOCUMENT_SATISFIES_REQUIREMENT } from '../../api/documents';
 import { asksIssueDate, issueDateMissing as missingIssueDate } from './issueDate';
 import type { DocumentTemplate, PatientDocument } from '../../api/documents';
 import {
   checkFile, isHeic, isPdf, FILE_INPUT_ACCEPT, formatBytes, uploadErrorMessage,
-  scanFileName, MAX_FILE_BYTES,
+  MAX_FILE_BYTES,
 } from '../../services/documentFile';
 import {
   heicToJpeg, loadImage, imageToCanvas, rotateCanvas, canvasToBlob,
@@ -65,7 +61,6 @@ export default function UploadDocumentDialog({
   const [rotation, setRotation] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
-  const [scannerOpen, setScannerOpen] = useState(false);
   const [uploaded, setUploaded] = useState<PatientDocument | null>(null);
   /* The server signs off a staff upload as it lands, so there is usually
      nothing to ask for. See `DOCUMENT_SATISFIES_REQUIREMENT`. */
@@ -208,247 +203,222 @@ export default function UploadDocumentDialog({
   };
 
   return (
-    <>
-      <Dialog open={open && !scannerOpen} onClose={close} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <CloudUpload sx={{ color: '#0D7377' }} />
-          {title}
-          <Box sx={{ flex: 1 }} />
-          <IconButton onClick={close} aria-label="Zavřít"><Close /></IconButton>
-        </DialogTitle>
+    <Dialog open={open} onClose={close} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <CloudUpload sx={{ color: '#0D7377' }} />
+        {title}
+        <Box sx={{ flex: 1 }} />
+        <IconButton onClick={close} aria-label="Zavřít"><Close /></IconButton>
+      </DialogTitle>
 
-        <DialogContent>
-          {error !== null && <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>}
+      <DialogContent>
+        {error !== null && <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>}
 
-          {phase === 'choose' && (
-            <Stack spacing={2}>
-              <Box
-                onDrop={onDrop}
-                onDragOver={(event) => event.preventDefault()}
-                sx={{
-                  border: '2px dashed', borderColor: 'divider', borderRadius: 2,
-                  p: 4, textAlign: 'center', cursor: 'pointer',
-                  '&:hover': { borderColor: '#0D7377', bgcolor: 'action.hover' },
-                }}
-                onClick={() => fileInput.current?.click()}
+        {phase === 'choose' && (
+          <Stack spacing={2}>
+            <Box
+              onDrop={onDrop}
+              onDragOver={(event) => event.preventDefault()}
+              sx={{
+                border: '2px dashed', borderColor: 'divider', borderRadius: 2,
+                p: 4, textAlign: 'center', cursor: 'pointer',
+                '&:hover': { borderColor: '#0D7377', bgcolor: 'action.hover' },
+              }}
+              onClick={() => fileInput.current?.click()}
+            >
+              <CloudUpload sx={{ fontSize: 40, color: 'text.disabled' }} />
+              <Typography sx={{ fontWeight: 600, mt: 1 }}>
+                Přetáhněte sem soubor nebo klikněte
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                PDF nebo fotografie (JPG, PNG, HEIC), nejvýš {formatBytes(MAX_FILE_BYTES)}
+              </Typography>
+            </Box>
+
+            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+              <Button
+                variant="outlined"
+                startIcon={<PhotoCamera />}
+                onClick={() => cameraInput.current?.click()}
               >
-                <CloudUpload sx={{ fontSize: 40, color: 'text.disabled' }} />
-                <Typography sx={{ fontWeight: 600, mt: 1 }}>
-                  Přetáhněte sem soubor nebo klikněte
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  PDF nebo fotografie (JPG, PNG, HEIC), nejvýš {formatBytes(MAX_FILE_BYTES)}
-                </Typography>
-              </Box>
-
-              <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
-                <Button
-                  variant="contained"
-                  startIcon={<ScannerIcon />}
-                  onClick={() => setScannerOpen(true)}
-                >
-                  Naskenovat
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<PhotoCamera />}
-                  onClick={() => cameraInput.current?.click()}
-                >
-                  Vyfotit
-                </Button>
-              </Stack>
-
-              <Typography variant="caption" color="text.secondary">
-                Sken najde okraje dokumentu sám, narovná ho a zmenší — z fotky
-                udělá něco, co vypadá jako ze skeneru.
-              </Typography>
-
-              {/* Only for a report: which doctor wrote it and when. Asked here
-                  rather than afterwards, because afterwards means somebody has
-                  to remember to come back, and nobody does. */}
+                Vyfotit
+              </Button>
             </Stack>
-          )}
 
-          {phase === 'preview' && file !== null && (
-            <Stack spacing={2} sx={{ alignItems: 'center' }}>
-              {previewUrl !== null ? (
-                <Box
-                  component="img"
-                  src={previewUrl}
-                  alt="Náhled dokumentu"
-                  sx={{
-                    maxWidth: '100%', maxHeight: 380, borderRadius: 1,
-                    border: '1px solid', borderColor: 'divider',
-                    transform: `rotate(${(rotation % 4) * 90}deg)`,
-                    transition: 'transform 0.2s',
-                  }}
-                />
-              ) : (
-                <Stack spacing={1} sx={{ alignItems: 'center', py: 4 }}>
-                  <CloudUpload sx={{ fontSize: 40, color: '#0D7377' }} />
-                  <Typography>PDF se odešle tak, jak je.</Typography>
-                </Stack>
-              )}
+            {/* Only for a report: which doctor wrote it and when. Asked here
+                rather than afterwards, because afterwards means somebody has
+                to remember to come back, and nobody does. */}
+          </Stack>
+        )}
 
-              <Typography variant="body2" color="text.secondary">
-                {file.name} · {formatBytes(file.size)}
-              </Typography>
-
-              <Stack direction="row" spacing={1}>
-                {previewUrl !== null && (
-                  <Button
-                    startIcon={<RotateRight />}
-                    onClick={() => setRotation((r) => r + 1)}
-                  >
-                    Otočit
-                  </Button>
-                )}
-                <Button onClick={reset}>Vybrat jiný</Button>
-              </Stack>
-
-              {/*
-                * Asked here, with the document on screen, because the answer
-                * is written on it. It used to be asked before the file was
-                * even chosen - and for a výpis, whose date the server now
-                * insists on, that would have meant reaching the upload button
-                * with the field out of reach behind you.
-                */}
-              {needsIssueDate && (
-                <Stack spacing={2} sx={{ width: '100%', pt: 1 }}>
-                  <Divider />
-                  {isReport && <SpecialtyPicker value={specialty} onChange={setSpecialty} />}
-                  <TextField
-                    type="date"
-                    label={isReport ? 'Datum zprávy' : 'Datum vydání výpisu'}
-                    value={reportDate}
-                    onChange={(event) => setReportDate(event.target.value)}
-                    required={!isReport}
-                    error={issueDateMissing}
-                    helperText={
-                      isReport
-                        ? 'Datum na zprávě, ne datum nahrání — podle něj se řadí.'
-                        : 'Datum na výpisu, ne datum nahrání. Výpis platí rok od tohohle dne.'
-                    }
-                    slotProps={{ inputLabel: { shrink: true } }}
-                    fullWidth
-                  />
-                </Stack>
-              )}
-            </Stack>
-          )}
-
-          {phase === 'uploading' && (
-            <Stack spacing={2} sx={{ py: 4 }}>
-              <Typography variant="body2" color="text.secondary">
-                {progress > 0 ? 'Nahrávám dokument…' : 'Připravuji soubor…'}
-              </Typography>
-              <LinearProgress
-                variant={progress > 0 ? 'determinate' : 'indeterminate'}
-                value={progress * 100}
+        {phase === 'preview' && file !== null && (
+          <Stack spacing={2} sx={{ alignItems: 'center' }}>
+            {previewUrl !== null ? (
+              <Box
+                component="img"
+                src={previewUrl}
+                alt="Náhled dokumentu"
+                sx={{
+                  maxWidth: '100%', maxHeight: 380, borderRadius: 1,
+                  border: '1px solid', borderColor: 'divider',
+                  transform: `rotate(${(rotation % 4) * 90}deg)`,
+                  transition: 'transform 0.2s',
+                }}
               />
-              {progress > 0 && (
-                <Typography variant="caption" color="text.secondary">
-                  {Math.round(progress * 100)} %
-                </Typography>
-              )}
-            </Stack>
-          )}
+            ) : (
+              <Stack spacing={1} sx={{ alignItems: 'center', py: 4 }}>
+                <CloudUpload sx={{ fontSize: 40, color: '#0D7377' }} />
+                <Typography>PDF se odešle tak, jak je.</Typography>
+              </Stack>
+            )}
 
-          {phase === 'uploaded' && (
-            <Stack spacing={2} sx={{ py: 2 }}>
-              <Alert severity="success">Dokument je nahraný.</Alert>
-              {/*
-                * Two different things, and the screen used to say only the
-                * second. Measured on 13. 9. 2026: an upload by a member of
-                * staff comes back `SignedOff` with `signedAt` already set -
-                * the server signs it off there and then. Telling somebody it
-                * "counts as not delivered until signed" while it is already
-                * signed is a warning about nothing, and warnings about
-                * nothing are how a screen teaches people to ignore it.
-                */}
-              <Typography variant="body2" color="text.secondary">
-                {alreadySigned
-                  ? 'Počítá se jako doložený. Podepsaný je automaticky, protože ho nahrál někdo z ordinace.'
-                  : 'Dokud není podepsaný, bere se jako nedodaný a u pacienta svítí upozornění, že chybí. Podepsat se dá i později.'}
-              </Typography>
-            </Stack>
-          )}
-        </DialogContent>
-
-        <DialogActions>
-          {phase === 'preview' && issueDateMissing && (
-            <Typography variant="caption" color="error" sx={{ mr: 'auto', ml: 1 }}>
-              Doplňte datum vydání výpisu.
+            <Typography variant="body2" color="text.secondary">
+              {file.name} · {formatBytes(file.size)}
             </Typography>
-          )}
-          {phase === 'preview' && (
+
+            <Stack direction="row" spacing={1}>
+              {previewUrl !== null && (
+                <Button
+                  startIcon={<RotateRight />}
+                  onClick={() => setRotation((r) => r + 1)}
+                >
+                  Otočit
+                </Button>
+              )}
+              <Button onClick={reset}>Vybrat jiný</Button>
+            </Stack>
+
+            {/*
+              * Asked here, with the document on screen, because the answer
+              * is written on it. It used to be asked before the file was
+              * even chosen - and for a výpis, whose date the server now
+              * insists on, that would have meant reaching the upload button
+              * with the field out of reach behind you.
+              */}
+            {needsIssueDate && (
+              <Stack spacing={2} sx={{ width: '100%', pt: 1 }}>
+                <Divider />
+                {isReport && <SpecialtyPicker value={specialty} onChange={setSpecialty} />}
+                <TextField
+                  type="date"
+                  label={isReport ? 'Datum zprávy' : 'Datum vydání výpisu'}
+                  value={reportDate}
+                  onChange={(event) => setReportDate(event.target.value)}
+                  required={!isReport}
+                  error={issueDateMissing}
+                  helperText={
+                    isReport
+                      ? 'Datum na zprávě, ne datum nahrání — podle něj se řadí.'
+                      : 'Datum na výpisu, ne datum nahrání. Výpis platí rok od tohohle dne.'
+                  }
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  fullWidth
+                />
+              </Stack>
+            )}
+          </Stack>
+        )}
+
+        {phase === 'uploading' && (
+          <Stack spacing={2} sx={{ py: 4 }}>
+            <Typography variant="body2" color="text.secondary">
+              {progress > 0 ? 'Nahrávám dokument…' : 'Připravuji soubor…'}
+            </Typography>
+            <LinearProgress
+              variant={progress > 0 ? 'determinate' : 'indeterminate'}
+              value={progress * 100}
+            />
+            {progress > 0 && (
+              <Typography variant="caption" color="text.secondary">
+                {Math.round(progress * 100)} %
+              </Typography>
+            )}
+          </Stack>
+        )}
+
+        {phase === 'uploaded' && (
+          <Stack spacing={2} sx={{ py: 2 }}>
+            <Alert severity="success">Dokument je nahraný.</Alert>
+            {/*
+              * Two different things, and the screen used to say only the
+              * second. Measured on 13. 9. 2026: an upload by a member of
+              * staff comes back `SignedOff` with `signedAt` already set -
+              * the server signs it off there and then. Telling somebody it
+              * "counts as not delivered until signed" while it is already
+              * signed is a warning about nothing, and warnings about
+              * nothing are how a screen teaches people to ignore it.
+              */}
+            <Typography variant="body2" color="text.secondary">
+              {alreadySigned
+                ? 'Počítá se jako doložený. Podepsaný je automaticky, protože ho nahrál někdo z ordinace.'
+                : 'Dokud není podepsaný, bere se jako nedodaný a u pacienta svítí upozornění, že chybí. Podepsat se dá i později.'}
+            </Typography>
+          </Stack>
+        )}
+      </DialogContent>
+
+      <DialogActions>
+        {phase === 'preview' && issueDateMissing && (
+          <Typography variant="caption" color="error" sx={{ mr: 'auto', ml: 1 }}>
+            Doplňte datum vydání výpisu.
+          </Typography>
+        )}
+        {phase === 'preview' && (
+          <>
+            <Button onClick={close}>Zrušit</Button>
+            {/* Held shut rather than let fail at the server. Without the
+                issue date the upload answers 400, and a 400 arriving after
+                the file has gone up is a failure nobody can act on from
+                here. */}
+            <Button
+              variant="contained"
+              startIcon={<CloudUpload />}
+              disabled={issueDateMissing}
+              onClick={() => void send()}
+            >
+              Nahrát
+            </Button>
+          </>
+        )}
+        {phase === 'uploaded' && (
+          alreadySigned ? (
+            /* Nothing left to do. A "Podepsat teď" button on a document that
+               is signed would either do nothing or undo something. */
+            <Button variant="contained" onClick={close}>Hotovo</Button>
+          ) : (
             <>
-              <Button onClick={close}>Zrušit</Button>
-              {/* Held shut rather than let fail at the server. Without the
-                  issue date the upload answers 400, and a 400 arriving after
-                  the file has gone up is a failure nobody can act on from
-                  here. */}
+              <Button onClick={close}>Podepsat později</Button>
               <Button
                 variant="contained"
-                startIcon={<CloudUpload />}
-                disabled={issueDateMissing}
-                onClick={() => void send()}
+                startIcon={<Check />}
+                disabled={signing}
+                onClick={() => void sign()}
               >
-                Nahrát
+                {signing ? 'Podepisuji…' : 'Podepsat teď'}
               </Button>
             </>
-          )}
-          {phase === 'uploaded' && (
-            alreadySigned ? (
-              /* Nothing left to do. A "Podepsat teď" button on a document that
-                 is signed would either do nothing or undo something. */
-              <Button variant="contained" onClick={close}>Hotovo</Button>
-            ) : (
-              <>
-                <Button onClick={close}>Podepsat později</Button>
-                <Button
-                  variant="contained"
-                  startIcon={<Check />}
-                  disabled={signing}
-                  onClick={() => void sign()}
-                >
-                  {signing ? 'Podepisuji…' : 'Podepsat teď'}
-                </Button>
-              </>
-            )
-          )}
-          {phase === 'choose' && <Button onClick={close}>Zrušit</Button>}
-        </DialogActions>
+          )
+        )}
+        {phase === 'choose' && <Button onClick={close}>Zrušit</Button>}
+      </DialogActions>
 
-        <input
-          ref={fileInput}
-          type="file"
-          accept={FILE_INPUT_ACCEPT}
-          hidden
-          onChange={onPicked}
-        />
-        {/* `capture` sends the phone straight to its camera rather than the
-            gallery - one tap fewer for the common case. */}
-        <input
-          ref={cameraInput}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          hidden
-          onChange={onPicked}
-        />
-      </Dialog>
-
-      <DocumentScanner
-        open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        fileName={scanFileName(title)}
-        title={`Naskenovat: ${title}`}
-        onScanned={(scanned) => {
-          setScannerOpen(false);
-          void accept(scanned);
-        }}
+      <input
+        ref={fileInput}
+        type="file"
+        accept={FILE_INPUT_ACCEPT}
+        hidden
+        onChange={onPicked}
       />
-    </>
+      {/* `capture` sends the phone straight to its camera rather than the
+          gallery - one tap fewer for the common case. */}
+      <input
+        ref={cameraInput}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={onPicked}
+      />
+    </Dialog>
   );
 }

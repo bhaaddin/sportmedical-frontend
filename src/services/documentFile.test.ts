@@ -14,7 +14,6 @@ import {
   isImage,
   formatBytes,
   uploadErrorMessage,
-  scanFileName,
   MAX_FILE_BYTES,
   FILE_INPUT_ACCEPT,
   ACCEPTED_MIME_TYPES,
@@ -52,7 +51,7 @@ describe('what we accept', () => {
     expect(isHeic({ name: 'foto.jpg', type: 'image/jpeg' })).toBe(false);
   });
 
-  it('tells a PDF from an image, so only images get the scanner treatment', () => {
+  it('tells a PDF from an image, so only images get a preview and rotation', () => {
     expect(isPdf(file())).toBe(true);
     expect(isImage(file())).toBe(false);
     expect(isImage(file({ name: 'f.png', type: 'image/png' }))).toBe(true);
@@ -157,21 +156,6 @@ describe('what we say when the upload fails', () => {
     const messages = [null, 401, 403, 404, 413, 415, 429, 500, 418].map(uploadErrorMessage);
     expect(new Set(messages).size).toBeGreaterThan(6);
     for (const m of messages) expect(m.length).toBeGreaterThan(20);
-  });
-});
-
-describe('the name a scan is saved under', () => {
-  it('is findable a year later', () => {
-    const name = scanFileName('Výpis ze zdravotní dokumentace', new Date(2026, 8, 12));
-    expect(name).toBe('vypis-ze-zdravotni-dokumentace-2026-09-12.pdf');
-  });
-
-  it('strips diacritics rather than leaving them in a filename', () => {
-    expect(scanFileName('Žádost', new Date(2026, 0, 5))).toBe('zadost-2026-01-05.pdf');
-  });
-
-  it('still produces a name when the template has none worth slugging', () => {
-    expect(scanFileName('———', new Date(2026, 0, 5))).toBe('dokument-2026-01-05.pdf');
   });
 });
 

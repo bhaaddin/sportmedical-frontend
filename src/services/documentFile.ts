@@ -173,17 +173,3 @@ export function uploadErrorMessage(status: number | null): string {
       return `Soubor se nepodařilo nahrát (kód ${status}). Zkuste to prosím znovu.`;
   }
 }
-
-/** `vypis-2026-09-12.pdf` — a name somebody can find later. */
-export function scanFileName(templateName: string, now: Date = new Date()): string {
-  const slug = templateName
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 40);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  return `${slug || 'dokument'}-${date}.pdf`;
-}
