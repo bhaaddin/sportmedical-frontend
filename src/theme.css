@@ -661,15 +661,6 @@ a {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   CALENDAR ROW INTERACTION STYLES
-   ══════════════════════════════════════════════════════════════ */
-.codebook-row:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: -3px;
-  z-index: 5;
-}
-
-/* ══════════════════════════════════════════════════════════════
    STATUS PILL (for patient status indicators)
    ══════════════════════════════════════════════════════════════ */
 .status-pill {

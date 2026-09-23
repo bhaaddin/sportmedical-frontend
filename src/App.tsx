@@ -12,7 +12,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useState, lazy, Suspense, useRef, useCallback } from 'react';
 import theme from './theme';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
-import PatientDrawer from './components/PatientDrawer';
 import { useAppStore } from './store/useAppStore';
 import NetworkBanner from './components/NetworkBanner';
 import { AccessibilityProvider } from './components/AccessibilityProvider';
@@ -52,7 +51,6 @@ const WearablesPage = lazy(() => import('./pages/Wearables'));
 const TeamsPage = lazy(() => import('./pages/Teams'));
 const PosudekPage = lazy(() => import('./pages/Posudek'));
 const TrainingLoadPage = lazy(() => import('./pages/TrainingLoad'));
-const CodebookPage = lazy(() => import('./pages/Codebook'));
 const SystemHealthPage = lazy(() => import('./pages/SystemHealth'));
 const StaffManagementPage = lazy(() => import('./pages/StaffManagement'));
 const EmailTemplatesPage = lazy(() => import('./pages/EmailTemplates'));
@@ -512,7 +510,6 @@ export default function App() {
                     <Route path="/working-hours" element={<RequireAdmin><BookingWorkingHoursPage /></RequireAdmin>} />
                     <Route path="/exceptions" element={<RequireAdmin><BookingExceptionsPage /></RequireAdmin>} />
                     <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
-                    <Route path="/codebook" element={<CodebookPage />} />
                     <Route path="/system-health" element={<SystemHealthPage />} />
                     <Route path="/staff-management" element={<RequireAdmin><StaffManagementPage /></RequireAdmin>} />
                     <Route path="/email-templates" element={<EmailTemplatesPage />} />
@@ -527,7 +524,6 @@ export default function App() {
               </AuthGuard>
             } />
           </Routes>
-          <PatientDrawer />
           <UniversalSearch />
           <NetworkBanner />
           <Toaster position="top-right" />

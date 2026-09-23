@@ -113,6 +113,6 @@ export const calendarApi = {
    * which is what every screen actually uses.
    *
    * Reading stays. `GET /api/scheduling/appointments` is untouched by that
-   * change and has two live callers - `PatientDrawer` and `UniversalSearch`.
+   * change and has one live caller - `UniversalSearch`.
    */
 };
