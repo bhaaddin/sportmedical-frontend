@@ -46,8 +46,8 @@ export interface SettingsItem {
    * The name is the one the controller behind the screen checks, so the menu
    * and the API agree about one list rather than disagreeing about two.
    *
-   * Undefined means everybody signed in — their own schedule, the price list
-   * the desk quotes from.
+   * Undefined means everybody signed in — the price list the desk quotes
+   * from, blocked time.
    */
   requires?: Permission;
   /**
@@ -150,12 +150,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         description: 'Zaměstnanci, role a resetování hesla',
         to: '/staff-management',
         requires: 'users.manage',
-      },
-      {
-        id: 'muj-rozvrh',
-        label: 'Můj rozvrh',
-        description: 'Vaše vlastní směny a dny, kdy jste v ordinaci',
-        to: '/worker-schedule',
       },
     ],
   },

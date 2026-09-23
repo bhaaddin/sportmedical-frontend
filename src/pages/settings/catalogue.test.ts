@@ -122,7 +122,7 @@ describe('what each person sees', () => {
     const plain = visibleSections(RECEPTIONIST);
     const ids = plain.flatMap((s) => s.items.map((i) => i.id));
     expect(ids).toContain('blokovany-cas');
-    expect(ids).toContain('muj-rozvrh');
+    expect(ids).toContain('cenik');
     expect(plain.length).toBeGreaterThan(1);
   });
 
@@ -163,7 +163,7 @@ describe('what each person sees', () => {
 
     // Empty is the safe direction to be wrong in: a session that predates
     // this, or one that never stored a list, hides everything guarded.
-    expect(ids).toContain('muj-rozvrh');
+    expect(ids).toContain('cenik');
     expect(ids).not.toContain('tym');
   });
 

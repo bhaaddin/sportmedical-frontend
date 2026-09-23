@@ -59,7 +59,6 @@ const EmailTemplatesPage = lazy(() => import('./pages/EmailTemplates'));
 const AuditLogPage = lazy(() => import('./pages/AuditLog'));
 const PatientImportPage = lazy(() => import('./pages/PatientImport'));
 const DataExportPage = lazy(() => import('./pages/DataExport'));
-const WorkerSchedulePage = lazy(() => import('./pages/admin/WorkerScheduleSettings'));
 /* Booking phase 1, stage 1: calendars, access and activities */
 const BookingCalendarsPage = lazy(() => import('./pages/booking/CalendarsPage'));
 const ClinicServicesPage = lazy(() => import('./pages/booking/ClinicServicesPage'));
@@ -142,9 +141,9 @@ const menuGroups: MenuItemGroup[] = [
   },
   {
     /*
-     * Plátci and Můj rozvrh used to sit here as well as in Nastavení. Both are
-     * configuration, so Nastavení is where they live and the sidebar is for
-     * the work of the day. Two entries for one screen is the shape this
+     * Plátci used to sit here as well as in Nastavení. It is configuration,
+     * so Nastavení is where it lives and the sidebar is for the work of the
+     * day. Two entries for one screen is the shape this
      * project keeps finding, and this time I put it there myself: adding
      * Plátci to Nastavení without taking it out of here.
      *
@@ -494,7 +493,6 @@ export default function App() {
                     <Route path="/cashier" element={<CashierPage />} />
                     <Route path="/clubs" element={<ClubsPage />} />
                     <Route path="/accounting-export" element={<RequireAdmin><AccountingExportPage /></RequireAdmin>} />
-                    <Route path="/worker-schedule" element={<WorkerSchedulePage />} />
                     <Route path="/intake-review" element={<RequireAdmin><IntakeReviewQueue /></RequireAdmin>} />
                     <Route path="/planovani" element={<BookingGridPage />} />
                     <Route path="/dnes" element={<BookingDayOverviewPage />} />
