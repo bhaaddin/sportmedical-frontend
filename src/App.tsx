@@ -55,7 +55,6 @@ const WearablesPage = lazy(() => import('./pages/Wearables'));
 const TeamsPage = lazy(() => import('./pages/Teams'));
 const PosudekPage = lazy(() => import('./pages/Posudek'));
 const TrainingLoadPage = lazy(() => import('./pages/TrainingLoad'));
-const ClientIntakePage = lazy(() => import('./pages/ClientIntake'));
 const CodebookPage = lazy(() => import('./pages/Codebook'));
 const SystemHealthPage = lazy(() => import('./pages/SystemHealth'));
 const StaffManagementPage = lazy(() => import('./pages/StaffManagement'));
@@ -533,7 +532,6 @@ export default function App() {
                     <Route path="/backup-restore" element={<BackupRestorePage />} />
                     <Route path="/patient-records/:id" element={<PatientRecordsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/client-intake" element={<ClientIntakePage />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                   </Suspense>

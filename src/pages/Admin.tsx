@@ -127,7 +127,6 @@ export default function Admin() {
     staffCanEditTimes: true,
     staffCanViewRevenue: false,
     trackPerformance: true,
-    requireClientIntake: true,
     enableNotifications: true,
     enableSmsAlerts: false,
     autoAssignRole: 'Staff',
@@ -575,8 +574,6 @@ export default function Admin() {
                     label="Zobrazit příjmy zaměstnancům" description="Vidět celkové příjmy firmy" />
                   <Toggle checked={wrk.trackPerformance} onChange={v => updateWrk('trackPerformance', v)}
                     label="Sledování výkonu" description="Počet klientů, čas na klienta, pracovní doba" />
-                  <Toggle checked={wrk.requireClientIntake} onChange={v => updateWrk('requireClientIntake', v)}
-                    label="Povinná registrace klienta" description="Před první diagnostikou" />
                 </List>
               </CardContent>
             </Card>
