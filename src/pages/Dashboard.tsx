@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import {
   People, Science, TrendingUp, Warning, PersonAdd, Assessment,
-  LocalHospital, AccessTime, CalendarMonth, Receipt, Inventory2,
+  LocalHospital, AccessTime, CalendarMonth, Receipt,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import {

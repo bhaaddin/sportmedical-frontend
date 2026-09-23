@@ -69,18 +69,4 @@ export const diagnosticsApi = {
     link.remove();
     window.URL.revokeObjectURL(url);
   },
-
-  downloadPosudekPdf: async (posudekId: string): Promise<void> => {
-    const res = await client.get(`/api/pdf/posudek/${posudekId}`, {
-      responseType: 'blob',
-    });
-    const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `posudek_${posudekId.slice(0, 8)}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  },
 };

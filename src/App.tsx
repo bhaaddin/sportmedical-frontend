@@ -32,8 +32,6 @@ const PatientDocumentsPage = lazy(() => import('./pages/patients/PatientDocument
 const PatientAppointmentsPage = lazy(() => import('./pages/patients/PatientAppointmentsPage'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
 const BillingPage = lazy(() => import('./pages/Billing'));
-const InventoryPage = lazy(() => import('./pages/Inventory'));
-const MeasurementsPage = lazy(() => import('./pages/Measurements'));
 const AdminPage = lazy(() => import('./pages/Admin'));
 const CenikPage = lazy(() => import('./pages/Cenik'));
 const PatientFormPage = lazy(() => import('./pages/PatientForm'));
@@ -41,13 +39,8 @@ const PatientRegistrationPage = lazy(() => import('./pages/PatientRegistration')
 const InjuriesPage = lazy(() => import('./pages/Injuries'));
 const WellnessPage = lazy(() => import('./pages/Wellness'));
 const RtpPage = lazy(() => import('./pages/Rtp'));
-const PreParticipationPage = lazy(() => import('./pages/PreParticipation'));
 const ConcussionPage = lazy(() => import('./pages/Concussion'));
 const AvailabilityPage = lazy(() => import('./pages/Availability'));
-const AiRiskPage = lazy(() => import('./pages/AiRisk'));
-const WearablesPage = lazy(() => import('./pages/Wearables'));
-const TeamsPage = lazy(() => import('./pages/Teams'));
-const PosudekPage = lazy(() => import('./pages/Posudek'));
 const TrainingLoadPage = lazy(() => import('./pages/TrainingLoad'));
 const SystemHealthPage = lazy(() => import('./pages/SystemHealth'));
 const StaffManagementPage = lazy(() => import('./pages/StaffManagement'));
@@ -453,24 +446,17 @@ export default function App() {
                       <Route path="dokumenty" element={<PatientDocumentsPage />} />
                       <Route path="terminy" element={<PatientAppointmentsPage />} />
                     </Route>
-                    <Route path="/measurements" element={<MeasurementsPage />} />
                     <Route path="/diagnostics/new" element={<DiagnosticForm />} />
                     <Route path="/billing" element={<BillingPage />} />
                     <Route path="/cenik" element={<CenikPage />} />
                     <Route path="/injuries" element={<InjuriesPage />} />
                     <Route path="/rtp" element={<RtpPage />} />
-                    <Route path="/ppe" element={<PreParticipationPage />} />
                     <Route path="/concussion" element={<ConcussionPage />} />
                     <Route path="/availability" element={<AvailabilityPage />} />
                     <Route path="/svatky" element={<HolidaysPage />} />
                     <Route path="/dotaznik-nastaveni" element={<QuestionnairePage />} />
                     <Route path="/training-load" element={<TrainingLoadPage />} />
                     <Route path="/wellness" element={<WellnessPage />} />
-                    <Route path="/ai-risk" element={<AiRiskPage />} />
-                    <Route path="/wearables" element={<WearablesPage />} />
-                    <Route path="/teams" element={<TeamsPage />} />
-                    <Route path="/posudek" element={<PosudekPage />} />
-                    <Route path="/inventory" element={<InventoryPage />} />
                     <Route path="/cashier" element={<CashierPage />} />
                     <Route path="/clubs" element={<ClubsPage />} />
                     <Route path="/accounting-export" element={<RequireAdmin><AccountingExportPage /></RequireAdmin>} />
