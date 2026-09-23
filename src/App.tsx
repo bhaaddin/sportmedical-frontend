@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Avatar, IconButton, Menu, MenuItem, Badge, CircularProgress, Button } from '@mui/material';
 import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Search, AttachMoney, Schedule, EventBusy, Today, Description, ArrowBack } from '@mui/icons-material';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { storedPermissions, type Permission } from './auth/usePermission';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { usePermissions, type Permission } from './auth/usePermission';
+import { useAccountRefresh } from './auth/accountRefresh';
+import { queryClient } from './api/queryClient';
 import { PATIENT_SECTIONS, patientInPath, sectionPath } from './pages/patients/sections';
 import { settingsItemAt } from './pages/settings/catalogue';
 import { Toaster } from 'react-hot-toast';
@@ -77,7 +79,6 @@ function PageLoader() {
   );
 }
 
-const queryClient = new QueryClient();
 const DRAWER_WIDTH = 240;
 
 /* ── Grouped sidebar menu ── */
@@ -146,7 +147,8 @@ const menuGroups: MenuItemGroup[] = [
  * person's own grants and revocations applied. It hides; the server refuses.
  */
 function RequirePermission({ of, children }: { of: Permission; children: React.ReactNode }) {
-  if (!storedPermissions().includes(of)) {
+  const held = usePermissions();
+  if (!held.includes(of)) {
     return <NotFound />;
   }
   return <>{children}</>;
@@ -172,7 +174,10 @@ function Layout({ children }: { children: React.ReactNode }) {
    * so nobody has to learn a second way of getting around; only its contents
    * change, and the way back out is the first thing in it.
    */
-  const held = new Set(storedPermissions());
+  /* Reloaded from GET /api/v1/account on start, on focus and after any 403,
+     so a permission the owner changed redraws this menu without a new sign-in. */
+  useAccountRefresh();
+  const held = new Set(usePermissions());
   /* Without patients.view the address is NotFound, and a patient's sidebar
      around it would offer sections that are NotFound too. */
   const patientId = held.has('patients.view') ? patientInPath(location.pathname) : null;

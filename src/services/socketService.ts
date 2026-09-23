@@ -62,10 +62,28 @@ export const SOCKET_EVENTS = {
 
 type SocketEventName = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];
 
+/*
+ * How long to wait before reconnect attempt `n` (0-based): 1 s, 2 s, 4 s, 8 s,
+ * 16 s, then every 30 s, with up to a second of jitter so a clinic's worth of
+ * screens does not come back in the same millisecond after a restart.
+ *
+ * It never gives up. The client's default stops after four tries (~42 s), and
+ * a server restart that took a minute left the bell deaf until somebody
+ * reloaded the page.
+ */
+export function reconnectDelayMs(attempt: number, jitter: number = Math.random()): number {
+  const base = Math.min(30_000, 1_000 * 2 ** Math.max(0, attempt));
+  return base + Math.floor(jitter * 1_000);
+}
+
 class SocketService {
   private connection: HubConnection | null = null;
   private listeners: Map<string, Set<EventCallback>> = new Map();
   private starting: Promise<void> | null = null;
+  /* Set by stop(): a signed-out browser must not keep knocking. */
+  private stopped = false;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private startAttempt = 0;
 
   private config: SocketConfig = { url: '' };
 
@@ -84,8 +102,12 @@ class SocketService {
 
   /* ── Connect ── */
   connect() {
+    this.stopped = false;
     if (this.connection?.state === HubConnectionState.Connected) return;
+    if (this.connection?.state === HubConnectionState.Reconnecting) return;
     if (this.starting) return;
+    /* Nobody signed in, nobody to authenticate as. */
+    if (!localStorage.getItem('token')) return;
     if (!this.config.url) this.init();
 
     const connection = new HubConnectionBuilder()
@@ -96,7 +118,9 @@ class SocketService {
       })
       /* The client's own backoff, rather than a hand-rolled one. It also falls
          back to another transport when WebSocket cannot be established. */
-      .withAutomaticReconnect()
+      .withAutomaticReconnect({
+        nextRetryDelayInMilliseconds: (context) => reconnectDelayMs(context.previousRetryCount),
+      })
       .configureLogging(LogLevel.Warning)
       .build();
 
@@ -128,13 +152,26 @@ class SocketService {
       this.emit(SOCKET_EVENTS.NOTIFICATIONS_CHANGED, null);
     });
 
+    /*
+     * Closed for good - the first start failed, or the server refused a
+     * reconnect (a token that expired meanwhile). Start again later with
+     * whatever token is current then, unless this browser signed out.
+     */
+    connection.onclose(() => {
+      if (this.connection === connection) this.connection = null;
+      this.scheduleRestart();
+    });
+
     this.connection = connection;
     this.starting = connection
       .start()
       .then(() => {
+        this.startAttempt = 0;
         this.emit(SOCKET_EVENTS.CONNECTED, { timestamp: Date.now() });
       })
       .catch((err: unknown) => {
+        if (this.connection === connection) this.connection = null;
+        this.scheduleRestart();
         /*
          * Not fatal and not silent. The bell polls when this does not come up,
          * so a failure here costs freshness, never correctness - but it is said
@@ -145,6 +182,39 @@ class SocketService {
       .finally(() => {
         this.starting = null;
       });
+  }
+
+  private scheduleRestart() {
+    if (this.stopped || this.retryTimer !== null) return;
+    const delay = reconnectDelayMs(this.startAttempt);
+    this.startAttempt += 1;
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      if (!this.stopped) this.connect();
+    }, delay);
+  }
+
+  /**
+   * Sign-out: close the hub and stop every retry. The next sign-in calls
+   * connect() again with its own token.
+   */
+  async stop(): Promise<void> {
+    this.stopped = true;
+    if (this.retryTimer !== null) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+    this.startAttempt = 0;
+    const connection = this.connection;
+    this.connection = null;
+    this.starting = null;
+    if (connection) {
+      try {
+        await connection.stop();
+      } catch {
+        /* Already down; nothing to close. */
+      }
+    }
   }
 
   /* ── Subscribe to event ── */

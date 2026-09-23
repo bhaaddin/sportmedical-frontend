@@ -12,7 +12,9 @@
    changed nothing the user could see.
 
    The server sends the effective list — the role's defaults with that person's
-   own grants and revocations applied — when they log in. This reads it.
+   own grants and revocations applied — when they log in, and again from
+   GET /api/v1/account on start, on focus and after a refusal
+   (accountRefresh.ts). This reads it, and redraws when it changes.
 
    ── It hides, it does not protect ──
 
@@ -20,6 +22,9 @@
    where pressing it would only produce a refusal. The refusal itself is the
    server's, on every request, whatever the client believes.
    ══════════════════════════════════════════════════════════════ */
+
+import { useMemo, useSyncExternalStore } from 'react';
+import { parsePermissions, permissionsSnapshot, subscribePermissions } from './localSession';
 
 /**
  * Exactly the permissions the server defines. Adding one here without adding
@@ -30,6 +35,7 @@ export type Permission =
   | 'patients.register'
   | 'patients.edit'
   | 'patients.sensitive_identity.view'
+  | 'patients.view_all'
   | 'settings.clinic.manage'
   | 'users.manage'
   | 'roles.manage'
@@ -50,16 +56,7 @@ export type Permission =
  * would be refused, which is the safe direction to be wrong in.
  */
 export function storedPermissions(): string[] {
-  try {
-    const raw = window.localStorage.getItem('permissions');
-    if (raw === null) return [];
-
-    const parsed: unknown = JSON.parse(raw);
-
-    return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === 'string') : [];
-  } catch {
-    return [];
-  }
+  return parsePermissions(permissionsSnapshot());
 }
 
 /**
@@ -84,7 +81,16 @@ export function hasStoredPermissions(): boolean {
   }
 }
 
-/** Whether the signed-in user has one permission. */
+/**
+ * Everything the signed-in user may do, redrawn whenever the list changes -
+ * a refresh from GET /api/v1/account after focus or a refusal, or another tab.
+ */
+export function usePermissions(): readonly string[] {
+  const raw = useSyncExternalStore(subscribePermissions, permissionsSnapshot, () => null);
+  return useMemo(() => parsePermissions(raw), [raw]);
+}
+
+/** Whether the signed-in user has one permission. Follows refreshes live. */
 export function usePermission(permission: Permission): boolean {
-  return storedPermissions().includes(permission);
+  return usePermissions().includes(permission);
 }
