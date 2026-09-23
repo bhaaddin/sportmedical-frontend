@@ -23,12 +23,9 @@ import { toast } from "react-hot-toast";
 import client from "../api/client";
 import { patientsApi } from "../api/patients";
 import { patientIdentityApi } from "../api/patientIdentity";
-import patientRegistryApi, {
-  type AddressLocality,
-  type AddressPoint,
-  type InsuranceRegistrationKind,
-  type ResidenceType,
-} from "../api/patientRegistry";
+import type { InsuranceRegistrationKind, ResidenceType } from "../api/patientRegistry";
+import type { AddressPoint } from "../api/addressLookup";
+import RuianAddressPicker from "../components/registration/RuianAddressPicker";
 
 /**
  * Editing a patient - the `app` lane's contract,
@@ -614,62 +611,20 @@ function AddressDialog({
   const [residenceType, setResidenceType] = useState<ResidenceType>(
     "PermanentResidenceInCzechia",
   );
-  const [query, setQuery] = useState("");
-  const [localities, setLocalities] = useState<AddressLocality[]>([]);
-  const [locality, setLocality] = useState<AddressLocality | null>(null);
-  const [houseNumber, setHouseNumber] = useState("");
-  const [points, setPoints] = useState<AddressPoint[]>([]);
-  const [pointCode, setPointCode] = useState<number | null>(null);
+  const [point, setPoint] = useState<AddressPoint | null>(null);
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const datasetQuery = useQuery({
-    queryKey: ["address-dataset-status"],
-    queryFn: () => patientRegistryApi.getAddressDatasetStatus(),
-    staleTime: 5 * 60 * 1000,
-  });
-  const datasetLoaded = datasetQuery.data?.loaded ?? null;
-
-  const searchLocalities = async (text: string) => {
-    setQuery(text);
-    if (text.trim().length < 2) return;
-    try {
-      setLocalities(await patientRegistryApi.searchLocalities(text));
-    } catch {
-      setLocalities([]);
-    }
-  };
-
-  /** A point needs the locality and the house number; the search takes both. */
-  const findPoints = async (value: AddressLocality | null, number: string) => {
-    setPointCode(null);
-    if (!value || number.trim() === "") {
-      setPoints([]);
-      return;
-    }
-    try {
-      setPoints(
-        await patientRegistryApi.searchAddressPoints({
-          streetCode: value.streetCode,
-          municipalityPartCode: value.municipalityPartCode,
-          number,
-        }),
-      );
-    } catch {
-      setPoints([]);
-    }
-  };
-
   const save = async () => {
-    if (pointCode === null) return;
+    if (point === null) return;
     setSaving(true);
     setError(null);
     try {
       const result = await patientIdentityApi.updateResidenceAddress(
         patientId,
         residenceType,
-        pointCode,
+        point.addressPointCode,
         reason,
       );
       toast.success(result.changed ? "Adresa opravena." : "Beze změny — adresa se shoduje.");
@@ -687,13 +642,6 @@ function AddressDialog({
       <DialogTitle>Oprava adresy</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          {datasetLoaded === false ? (
-            <Alert severity="error">
-              Adresní registr RÚIAN není v této instalaci nahraný. Bez adresního bodu
-              nelze adresu opravit — dataset musí nejdřív naimportovat správce.
-            </Alert>
-          ) : null}
-
           <TextField
             select
             fullWidth
@@ -705,58 +653,14 @@ function AddressDialog({
             <MenuItem value="ReportedResidenceInCzechia">Hlášený pobyt v ČR</MenuItem>
           </TextField>
 
-          <TextField
-            fullWidth
-            label="Ulice nebo obec"
-            value={query}
-            onChange={(e) => void searchLocalities(e.target.value)}
-            disabled={datasetLoaded === false}
+          <RuianAddressPicker
+            selectedPoint={point}
+            onSelect={setPoint}
+            emptyCatalogueText={
+              "Adresní registr RÚIAN není v této instalaci nahraný. Bez adresního bodu "
+              + "nelze adresu opravit — dataset musí nejdřív naimportovat správce."
+            }
           />
-          {localities.length > 0 ? (
-            <TextField
-              select
-              fullWidth
-              label="Vyberte lokalitu"
-              value={locality?.displayValue ?? ""}
-              onChange={(e) => {
-                const found = localities.find((l) => l.displayValue === e.target.value);
-                setLocality(found ?? null);
-                void findPoints(found ?? null, houseNumber);
-              }}
-            >
-              {localities.map((l) => (
-                <MenuItem key={l.displayValue} value={l.displayValue}>
-                  {l.displayValue}
-                </MenuItem>
-              ))}
-            </TextField>
-          ) : null}
-          {locality ? (
-            <TextField
-              fullWidth
-              label="Číslo popisné / orientační"
-              value={houseNumber}
-              onChange={(e) => {
-                setHouseNumber(e.target.value);
-                void findPoints(locality, e.target.value);
-              }}
-            />
-          ) : null}
-          {points.length > 0 ? (
-            <TextField
-              select
-              fullWidth
-              label="Adresní bod"
-              value={pointCode ?? ""}
-              onChange={(e) => setPointCode(Number(e.target.value))}
-            >
-              {points.map((p) => (
-                <MenuItem key={p.addressPointCode} value={p.addressPointCode}>
-                  {p.formattedAddress}
-                </MenuItem>
-              ))}
-            </TextField>
-          ) : null}
 
           <TextField
             required
@@ -775,7 +679,7 @@ function AddressDialog({
         <Button onClick={onClose}>Zrušit</Button>
         <Button
           variant="contained"
-          disabled={reason.trim() === "" || pointCode === null || saving}
+          disabled={reason.trim() === "" || point === null || saving}
           onClick={save}
         >
           Uložit opravu

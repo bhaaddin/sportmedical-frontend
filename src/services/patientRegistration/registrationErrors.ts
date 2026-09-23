@@ -121,9 +121,6 @@ const MESSAGE_BY_CODE: Record<string, string> = {
   /* Address catalogue */
   'patients.registration.residence_address_not_found':
     'Zvolená adresa už v registru RÚIAN není. Vyberte ji prosím znovu.',
-  'patients.address_catalog.query_required': 'Zadejte hledaný text.',
-  'patients.address_catalog.query_too_long': 'Hledaný text je příliš dlouhý.',
-  'patients.address_catalog.street_code_required': 'Vyberte ulici.',
 
   /* Registration pipeline */
   'patients.registration.access_denied': 'Účet nemá oprávnění registrovat pacienty.',

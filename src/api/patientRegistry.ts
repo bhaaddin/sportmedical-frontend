@@ -31,40 +31,6 @@ export interface PatientRegistrationOptions {
   phoneRegions: RegistrationOption[];
 }
 
-/* ── Address (RÚIAN) ── */
-
-export interface AddressLocality {
-  streetCode: number | null;
-  streetName: string | null;
-  municipalityPartCode: number;
-  municipalityPartName: string;
-  municipalityCode: number;
-  municipalityName: string;
-  displayValue: string;
-}
-
-export interface AddressDatasetStatus {
-  loaded: boolean;
-  addressPointCount: number;
-  datasetDate?: string;
-}
-
-export interface AddressPoint {
-  addressPointCode: number;
-  formattedAddress: string;
-  municipalityCode: number;
-  municipalityName: string;
-  municipalityPartCode: number;
-  municipalityPartName: string;
-  streetCode: number | null;
-  streetName: string | null;
-  buildingNumberType: string;
-  buildingNumber: number;
-  orientationNumber: number | null;
-  orientationNumberSuffix: string | null;
-  postalCode: string;
-}
-
 /* ── Command ── */
 
 export type RegistrationMode = 'Standard' | 'Quick';
@@ -336,52 +302,6 @@ export const patientRegistryApi = {
         '/api/v1/patient-registration/options',
       );
       return response.data;
-    } catch (error) {
-      throw toRegistryError(error);
-    }
-  },
-
-  /**
-   * Whether the RÚIAN dataset is actually imported. Registration cannot be
-   * completed without an address-point code, so an empty catalogue has to be
-   * said out loud rather than shown as "nic nenalezeno".
-   */
-  async getAddressDatasetStatus(): Promise<AddressDatasetStatus> {
-    try {
-      const response = await client.get<AddressDatasetStatus>('/api/address-lookup/status');
-      return response.data;
-    } catch (error) {
-      throw toRegistryError(error);
-    }
-  },
-
-  async searchLocalities(query: string, maximumResults = 20): Promise<AddressLocality[]> {
-    try {
-      const response = await client.get<AddressLocality[]>('/api/v1/addresses/localities', {
-        params: { query, maximumResults },
-      });
-      return response.data ?? [];
-    } catch (error) {
-      throw toRegistryError(error);
-    }
-  },
-
-  async searchAddressPoints(criteria: {
-    streetCode: number | null;
-    municipalityPartCode: number;
-    number: string;
-    maximumResults?: number;
-  }): Promise<AddressPoint[]> {
-    try {
-      const response = await client.get<AddressPoint[]>('/api/v1/addresses/points', {
-        params: {
-          streetCode: criteria.streetCode ?? undefined,
-          municipalityPartCode: criteria.municipalityPartCode,
-          number: criteria.number,
-          maximumResults: criteria.maximumResults ?? 20,
-        },
-      });
-      return response.data ?? [];
     } catch (error) {
       throw toRegistryError(error);
     }

@@ -94,7 +94,7 @@ import {
 import {
   groupedDisplay, phoneComplaint, phoneDisplayState, worthInspectingPhone,
 } from '../../services/patientRegistration/phoneDisplay';
-import PublicAddressPicker from '../../components/public/PublicAddressPicker';
+import RuianAddressPicker from '../../components/registration/RuianAddressPicker';
 import HealthQuestionnaire from '../../components/public/HealthQuestionnaire';
 import { answersForSubmission, readDraft } from '../../services/publicIntake/healthQuestionnaire';
 import { forgetHeld, readHeld } from '../../api/publicBooking';
@@ -1329,15 +1329,19 @@ export default function IntakeQuestionnaire() {
                     <Typography variant="body2" sx={{ mb: 1, fontWeight: 700 }}>
                       Adresa trvalého pobytu
                     </Typography>
-                    <PublicAddressPicker
-                      value={addressPoint}
-                      onChange={(point) => {
+                    <RuianAddressPicker
+                      selectedPoint={addressPoint}
+                      onSelect={(point) => {
                         setAddressPoint(point);
                         if (point !== null) {
                           setErrors((previous) => ({ ...previous, address: undefined }));
                         }
                       }}
                       error={errors.address}
+                      emptyCatalogueText={
+                        'Vyhledávání adres teď nefunguje, takže dotazník nejde odeslat. '
+                        + 'Dejte to prosím vědět ordinaci.'
+                      }
                     />
                   </Box>
                 </Box>

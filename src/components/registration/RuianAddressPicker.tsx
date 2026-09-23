@@ -22,10 +22,10 @@
  *                                   locality answer does not carry one, so
  *                                   this fetches a sample building for each
  *
- * It reads the anonymous `/api/address-lookup/*` pair rather than the
- * authenticated `/api/v1/addresses/*` one, so that the status it checks and
- * the catalogue it searches are the same service. They were two before, and a
- * "catalogue is loaded" from one says nothing about the other.
+ * It reads the anonymous `/api/address-lookup/*` routes, the only address
+ * lookup the server has, so registration, the address correction on the
+ * patient's edit screen and the public questionnaire all pick addresses with
+ * this one control.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -51,12 +51,14 @@ interface Props {
   onSelect: (point: AddressPoint | null) => void;
   error?: string;
   disabled?: boolean;
+  /** What to say when the catalogue is empty; registration's sentence by default. */
+  emptyCatalogueText?: string;
 }
 
 const DEBOUNCE_MS = 250;
 
 export default function RuianAddressPicker({
-  selectedPoint, onSelect, error, disabled,
+  selectedPoint, onSelect, error, disabled, emptyCatalogueText = CATALOGUE_EMPTY_TEXT,
 }: Props) {
   const [status, setStatus] = useState<AddressCatalogueStatus | null>(null);
 
@@ -229,7 +231,7 @@ export default function RuianAddressPicker({
    * not optional and no amount of filling in the rest will make the save work.
    */
   if (blocked) {
-    return <Alert severity="error">{CATALOGUE_EMPTY_TEXT}</Alert>;
+    return <Alert severity="error">{emptyCatalogueText}</Alert>;
   }
 
   return (

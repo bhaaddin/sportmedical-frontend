@@ -1,20 +1,10 @@
 /*
- * RÚIAN address lookup for the public questionnaire - the anonymous half.
+ * RÚIAN address lookup: `/api/address-lookup/*` (`q`, `limit`), anonymous.
  *
- * There are two address surfaces and they are not interchangeable:
- *
- *     /api/address-lookup/*    anonymous      q, limit          ← this file
- *     /api/v1/addresses/*      needs a token  query, maximumResults
- *
- * The patient filling the questionnaire from home has no account, so the
- * questionnaire uses this one. Reception, working under a login, uses the
- * authenticated one through `patientRegistry` - where the permission check
- * actually happens. Same catalogue, deliberately two doors.
- *
- * Both existed before either lane knew it: one message said the anonymous path
- * "returns 400", the other that the authenticated one "returns 401", and both
- * were right about their own caller and wrong about the other's. The parameter
- * names are the whole difference, which is why they are written above.
+ * The one address lookup the server has. The patient filling the
+ * questionnaire from home has no account, so it cannot need a token, and
+ * reception's registration and address correction read the same catalogue
+ * through the same routes.
  *
  * The catalogue is the real ČÚZK dataset - 3 021 203 address points as of
  * 11. 9. 2026, not the 40 samples it held the day before.
