@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Box, Typography, Grid, Card, CardContent, Button, TextField, MenuItem, Slider,
-  Skeleton, Alert, Chip, Divider, Paper,
+  Alert, Chip, Divider, Paper,
 } from '@mui/material';
 import { FitnessCenter, Add, TrendingUp, Warning, CheckCircle, Speed } from '@mui/icons-material';
 import { motion } from 'framer-motion';
@@ -10,7 +10,8 @@ import {
   BarChart, Bar, ReferenceLine, Legend,
 } from 'recharts';
 import { trainingApi, type TrainingSession, type AcwrData } from '../api/training';
-import { patientsApi, type Patient } from '../api/patients';
+import type { Patient } from '../api/patients';
+import PatientPicker from '../components/patients/PatientPicker';
 import toast from 'react-hot-toast';
 
 const sessionTypes = [
@@ -55,24 +56,16 @@ function AcwrGauge({ value }: { value: number }) {
 }
 
 export default function TrainingLoad() {
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [selectedPatient, setSelectedPatient] = useState('');
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const selectedPatient = patient?.id ?? '';
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
   const [acwr, setAcwr] = useState<AcwrData | null>(null);
   const [loadTrend, setLoadTrend] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
     type: 'Training', description: '', durationMinutes: 60, rpe: 5,
     avgHeartRate: 0, maxHeartRate: 0, coach: '', notes: '',
   });
   const update = (f: string, v: any) => setForm(p => ({ ...p, [f]: v }));
-
-  useEffect(() => {
-    patientsApi.getAll()
-      .then(setPatients)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
 
   const loadPatientData = async (patientId: string) => {
     if (!patientId) { setSessions([]); setAcwr(null); setLoadTrend([]); return; }
@@ -114,15 +107,6 @@ export default function TrainingLoad() {
 
   const weeklyLoad = sessions.reduce((sum, s) => sum + s.sessionRPE, 0);
 
-  if (loading) {
-    return (
-      <Box>
-        <Skeleton variant="rounded" width={300} height={40} sx={{ mb: 3 }} />
-        <Skeleton variant="rounded" height={400} sx={{ borderRadius: 3 }} />
-      </Box>
-    );
-  }
-
   return (
     <Box>
       <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
@@ -141,13 +125,7 @@ export default function TrainingLoad() {
         <CardContent>
           <Grid container spacing={2} sx={{ alignItems: 'center' }}>
             <Grid size={{ xs: 12, md: 6 }}>
-              <TextField fullWidth select label="Sportovec / pacient" value={selectedPatient}
-                onChange={e => setSelectedPatient(e.target.value)}>
-                <MenuItem value="">— Vyberte pacienta —</MenuItem>
-                {patients.map(p => (
-                  <MenuItem key={p.id} value={p.id}>{p.firstName} {p.lastName}</MenuItem>
-                ))}
-              </TextField>
+              <PatientPicker label="Sportovec / pacient" value={patient} onChange={setPatient} />
             </Grid>
             {selectedPatient && (
               <Grid size={{ xs: 12, md: 6 }}>

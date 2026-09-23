@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
   Box, Typography, Card, CardContent, Button, Grid, TextField, Chip, Stepper, Step, StepLabel,
-  Skeleton, MenuItem, List, ListItem, ListItemText, Divider, Alert,
+  MenuItem, List, ListItem, ListItemText, Divider, Alert,
 } from '@mui/material';
 import { Psychology, Warning, History, Add } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { concussionApi, type ConcussionRecord } from '../api/concussion';
-import { patientsApi, type Patient } from '../api/patients';
+import type { Patient } from '../api/patients';
+import PatientPicker from '../components/patients/PatientPicker';
 import toast from 'react-hot-toast';
 
 const rtpSteps = [
@@ -26,9 +27,8 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function Concussion() {
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patient, setPatient] = useState<Patient | null>(null);
   const [records, setRecords] = useState<ConcussionRecord[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeStep, setActiveStep] = useState(0);
   const [selectedRecord, setSelectedRecord] = useState<ConcussionRecord | null>(null);
   const [form, setForm] = useState({
@@ -36,13 +36,6 @@ export default function Concussion() {
     lossOfConsciousness: false, practitioner: '', severityGrade: 1,
   });
   const update = (f: string, v: any) => setForm(p => ({ ...p, [f]: v }));
-
-  useEffect(() => {
-    patientsApi.getAll()
-      .then(setPatients)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
 
   const loadHistory = async () => {
     if (!form.patientId) return;
@@ -85,15 +78,6 @@ export default function Concussion() {
     } catch { toast.error('Chyba'); }
   };
 
-  if (loading) {
-    return (
-      <Box>
-        <Skeleton variant="rounded" width={300} height={40} sx={{ mb: 3 }} />
-        <Skeleton variant="rounded" height={400} sx={{ borderRadius: 3 }} />
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ maxWidth: 900, mx: 'auto' }}>
       <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
@@ -111,12 +95,13 @@ export default function Concussion() {
           <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Nový záznam</Typography>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField fullWidth select label="Pacient" value={form.patientId} onChange={e => update('patientId', e.target.value)}>
-                <MenuItem value="">— Vyberte pacienta —</MenuItem>
-                {patients.map(p => (
-                  <MenuItem key={p.id} value={p.id}>{p.firstName} {p.lastName}</MenuItem>
-                ))}
-              </TextField>
+              <PatientPicker
+                value={patient}
+                onChange={(next) => {
+                  setPatient(next);
+                  update('patientId', next?.id ?? '');
+                }}
+              />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth label="Ošetřující" value={form.practitioner} onChange={e => update('practitioner', e.target.value)} /></Grid>
             <Grid size={{ xs: 12 }}><TextField fullWidth label="Mechanismus" value={form.mechanism} onChange={e => update('mechanism', e.target.value)}

@@ -18,13 +18,13 @@ import userEvent from '@testing-library/user-event';
 const content = vi.fn();
 const move = vi.fn();
 const invalidate = vi.fn();
-const getAll = vi.fn();
+const search = vi.fn();
 
 vi.mock('../../api/documents', async () => {
   const actual = await vi.importActual<typeof import('../../api/documents')>('../../api/documents');
   return { ...actual, documentsApi: { content, move, invalidate } };
 });
-vi.mock('../../api/patients', () => ({ patientsApi: { getAll } }));
+vi.mock('../../api/patients', () => ({ patientsApi: { search } }));
 
 import type { PatientDocument } from '../../api/documents';
 
@@ -72,7 +72,7 @@ beforeEach(() => {
   content.mockReset().mockResolvedValue('blob:fake');
   move.mockReset().mockResolvedValue({});
   invalidate.mockReset().mockResolvedValue({});
-  getAll.mockReset().mockResolvedValue([
+  search.mockReset().mockResolvedValue([
     { id: 'p1', firstName: 'Anna', lastName: 'Černá' },
     { id: 'p2', firstName: 'Jan', lastName: 'Novák' },
   ]);
@@ -158,9 +158,9 @@ describe('moving', () => {
     renderActions();
 
     await user.click(screen.getByLabelText('Přesunout dokument'));
-    await user.click(await screen.findByLabelText('Komu dokument patří'));
+    await user.type(await screen.findByLabelText('Komu dokument patří'), 'an');
 
-    expect(screen.getByRole('option', { name: /Jan Novák/ })).toBeInTheDocument();
+    expect(await screen.findByRole('option', { name: /Jan Novák/ })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /Anna Černá/ })).not.toBeInTheDocument();
   });
 
@@ -169,7 +169,7 @@ describe('moving', () => {
     const onChanged = renderActions();
 
     await user.click(screen.getByLabelText('Přesunout dokument'));
-    await user.click(await screen.findByLabelText('Komu dokument patří'));
+    await user.type(await screen.findByLabelText('Komu dokument patří'), 'No');
     await user.click(await screen.findByRole('option', { name: /Jan Novák/ }));
     await user.click(screen.getByRole('button', { name: 'Přesunout' }));
 

@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import {
   Box, Typography, Grid, Card, CardContent, Chip, Button, TextField, Dialog,
   DialogTitle, DialogContent, DialogActions, MenuItem, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Paper, IconButton, Tooltip, Autocomplete,
+  TableContainer, TableHead, TableRow, Paper, IconButton, Tooltip,
 } from '@mui/material';
 import { Add, Warning, CheckCircle, Healing, FitnessCenter } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { injuriesApi } from '../api/injuries';
-import { patientsApi, type Patient } from '../api/patients';
+import type { Patient } from '../api/patients';
+import PatientPicker from '../components/patients/PatientPicker';
 import toast from 'react-hot-toast';
 
 interface Injury {
@@ -53,10 +54,8 @@ const statusColors: Record<string, string> = {
 
 export default function Injuries() {
   const [injuries, setInjuries] = useState<Injury[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
   useEffect(() => {
     injuriesApi.getAll().then(setInjuries).catch(() => {});
-    patientsApi.getAll().then(setPatients).catch(() => {});
   }, []);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
@@ -211,19 +210,13 @@ export default function Injuries() {
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid size={{ xs: 12 }}>
-              <Autocomplete
-                options={patients}
-                getOptionLabel={(option) => `${option.firstName} ${option.lastName} (${option.id.slice(0, 8)}…)`}
-                isOptionEqualToValue={(option, value) => option.id === value.id}
+              <PatientPicker
+                required
                 value={selectedPatient}
-                onChange={(_, newValue) => {
-                  setSelectedPatient(newValue);
-                  update('patientId', newValue?.id || '');
+                onChange={(patient) => {
+                  setSelectedPatient(patient);
+                  update('patientId', patient?.id || '');
                 }}
-                renderInput={(params) => (
-                  <TextField {...params} fullWidth required label="Pacient" placeholder="Hledejte pacienta..." />
-                )}
-                fullWidth
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>

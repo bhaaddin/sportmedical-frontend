@@ -20,18 +20,25 @@
  * table here.
  *
  * What would have to break for these to fail: asking for a range other than
- * today, counting terminal statuses again, dropping the sort, or rendering a
- * patient id where a name was available.
+ * today, counting terminal statuses again, dropping the sort, rendering a
+ * patient id where a name was available, or counting the register's first
+ * page instead of asking it for its total.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const range = vi.fn();
-const getAll = vi.fn();
+const getById = vi.fn();
+const list = vi.fn();
 
 vi.mock('../api/appointments', () => ({ appointmentsApi: { range } }));
-vi.mock('../api/patients', () => ({ patientsApi: { getAll } }));
+vi.mock('../api/patients', () => ({ patientsApi: { getById, list } }));
+
+const PEOPLE: Record<string, { id: string; firstName: string; lastName: string }> = {
+  p1: { id: 'p1', firstName: 'Jana', lastName: 'Marková' },
+  p2: { id: 'p2', firstName: 'Anna', lastName: 'Černá' },
+};
 
 /* rAF never fires in a hidden document, which is exactly the case the counter
    now has to survive, so it is stubbed to do nothing at all here: the numbers
@@ -39,10 +46,10 @@ vi.mock('../api/patients', () => ({ patientsApi: { getAll } }));
 beforeEach(() => {
   vi.stubGlobal('requestAnimationFrame', () => 1);
   vi.stubGlobal('cancelAnimationFrame', () => {});
-  getAll.mockReset().mockResolvedValue([
-    { id: 'p1', firstName: 'Jana', lastName: 'Marková' },
-    { id: 'p2', firstName: 'Anna', lastName: 'Černá' },
-  ]);
+  localStorage.setItem('permissions', JSON.stringify(['patients.view']));
+  getById.mockReset().mockImplementation((id: string) =>
+    PEOPLE[id] ? Promise.resolve(PEOPLE[id]) : Promise.reject(new Error('404')));
+  list.mockReset().mockResolvedValue({ items: [], totalCount: 137, page: 1, pageSize: 1 });
   range.mockReset().mockResolvedValue([]);
 });
 
@@ -68,8 +75,8 @@ const tile = async (title: string) => {
   return within(label.closest('.MuiCard-root') as HTMLElement);
 };
 
-/* The names also appear in "Naposledy pacienti", so every assertion about the
-   timeline is scoped to the timeline card rather than to the whole page. */
+/* Every assertion about the timeline is scoped to the timeline card rather
+   than to the whole page. */
 const timeline = async () => {
   const heading = await screen.findByText('Dnešní harmonogram');
   return within(heading.closest('.MuiCard-root') as HTMLElement);
@@ -97,6 +104,39 @@ describe('the stat tiles', () => {
 
     const card = await tile('Dnes v kalendáři');
     expect(await card.findByText('3', {}, { timeout: 3000 })).toBeInTheDocument();
+  });
+});
+
+/*
+ * The register answers a page - twenty rows unless asked for more - and the
+ * tile used to count that page: "Celkem registrovaných" never passed 20.
+ */
+describe('"Pacienti"', () => {
+  it('shows the register\'s total, not the length of one page', async () => {
+    renderDashboard();
+
+    const card = await tile('Pacienti');
+    expect(await card.findByText('137', {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(list).toHaveBeenCalledWith({ pageSize: 1 });
+  });
+
+  it('no longer lists five alphabetical patients as "Naposledy pacienti"', async () => {
+    renderDashboard();
+    await screen.findByText('Dnešní harmonogram');
+
+    expect(screen.queryByText('Naposledy pacienti')).not.toBeInTheDocument();
+  });
+
+  it('is not shown, and asks nothing, without the permission to see patients', async () => {
+    localStorage.setItem('permissions', JSON.stringify([]));
+    range.mockResolvedValue([at(8, 0, 'a', 'p1')]);
+
+    renderDashboard();
+    await screen.findByText('Dnešní harmonogram');
+
+    expect(screen.queryByText('Pacienti')).not.toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
+    expect(getById).not.toHaveBeenCalled();
   });
 });
 
@@ -168,6 +208,18 @@ describe('"Dnes v kalendari"', () => {
     const card = await timeline();
     expect(await card.findByText('Jana Marková')).toBeInTheDocument();
     expect(card.queryByText(/^p1$/)).not.toBeInTheDocument();
+  });
+
+  /* The names used to come from the register's first page, so a patient past
+     the twentieth surname showed as an id. Each is now fetched by id. */
+  it('names a patient however far down the register they are', async () => {
+    range.mockResolvedValue([at(8, 0, 'a', 'p2')]);
+
+    renderDashboard();
+
+    const card = await timeline();
+    expect(await card.findByText('Anna Černá')).toBeInTheDocument();
+    expect(getById).toHaveBeenCalledWith('p2');
   });
 
   it('shows the empty state when every appointment of the day was cancelled', async () => {

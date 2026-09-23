@@ -24,7 +24,8 @@ import {
   documentsApi, INVALIDATION_REASONS, INVALIDATION_REASON_LABEL,
   type PatientDocument, type InvalidationReason,
 } from '../../api/documents';
-import { patientsApi } from '../../api/patients';
+import type { Patient } from '../../api/patients';
+import PatientPicker from '../patients/PatientPicker';
 
 export interface DocumentActionsProps {
   document: PatientDocument;
@@ -32,12 +33,6 @@ export interface DocumentActionsProps {
   patientDocuments: PatientDocument[];
   patientName: string;
   onChanged: () => void;
-}
-
-interface PatientOption {
-  id: string;
-  firstName: string;
-  lastName: string;
 }
 
 /**
@@ -70,8 +65,8 @@ export default function DocumentActions({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [patients, setPatients] = useState<PatientOption[]>([]);
-  const [target, setTarget] = useState('');
+  const [targetPatient, setTargetPatient] = useState<Patient | null>(null);
+  const target = targetPatient?.id ?? '';
   const [reason, setReason] = useState<InvalidationReason>('unreadable');
   const [note, setNote] = useState('');
 
@@ -82,14 +77,6 @@ export default function DocumentActions({
       if (viewing !== null) URL.revokeObjectURL(viewing);
     };
   }, [viewing]);
-
-  useEffect(() => {
-    if (!moving || patients.length > 0) return;
-    patientsApi
-      .getAll()
-      .then((all) => setPatients(all as PatientOption[]))
-      .catch(() => setError('Seznam pacientů se nepodařilo načíst.'));
-  }, [moving, patients.length]);
 
   const open = async () => {
     setLoadingView(true);
@@ -120,7 +107,7 @@ export default function DocumentActions({
     try {
       await documentsApi.move(doc.id, target);
       setMoving(false);
-      setTarget('');
+      setTargetPatient(null);
       onChanged();
     } catch {
       setError('Dokument se nepodařilo přesunout. Zkuste to prosím znovu.');
@@ -215,22 +202,14 @@ export default function DocumentActions({
               Po přesunu bude {patientName} chybět.
             </Alert>
           )}
-          <TextField
-            select
-            fullWidth
-            label="Komu dokument patří"
-            value={target}
-            onChange={(event) => setTarget(event.target.value)}
-            sx={{ mt: 1 }}
-          >
-            {patients
-              .filter((p) => p.id !== doc.patientId)
-              .map((p) => (
-                <MenuItem key={p.id} value={p.id}>
-                  {p.firstName} {p.lastName}
-                </MenuItem>
-              ))}
-          </TextField>
+          <Box sx={{ mt: 1 }}>
+            <PatientPicker
+              label="Komu dokument patří"
+              value={targetPatient}
+              onChange={setTargetPatient}
+              excludeId={doc.patientId}
+            />
+          </Box>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
             Z karty {patientName} zmizí úplně — patří někomu jinému.
           </Typography>

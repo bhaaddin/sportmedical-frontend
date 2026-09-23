@@ -9,8 +9,8 @@ import { billingApi } from '../api/billing';
 import type { Invoice } from '../api/billing';
 import { servicesApi } from '../api/services';
 import type { ServiceItem } from '../api/services';
-import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
+import PatientPicker from '../components/patients/PatientPicker';
 import { NumberSeriesPreview } from '../components/NumberSeriesPreview';
 import toast from 'react-hot-toast';
 
@@ -37,7 +37,6 @@ const COLUMNS = [
 export default function Billing() {
   /* ── Data ── */
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState<ServiceItem[]>([]);
 
@@ -50,17 +49,16 @@ export default function Billing() {
   /* ── Dialogs ── */
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newInvoice, setNewInvoice] = useState({ patientId: '', serviceId: '', notes: '' });
+  const [invoicePatient, setInvoicePatient] = useState<Patient | null>(null);
 
   /* ── Fetch data ── */
   useEffect(() => {
     Promise.all([
       billingApi.getInvoices().catch(() => []),
       servicesApi.getAll().catch(() => []),
-      patientsApi.getAll().catch(() => []),
-    ]).then(([inv, srv, pats]) => {
+    ]).then(([inv, srv]) => {
       setInvoices(inv);
       setServices(srv);
-      setPatients(pats);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -141,6 +139,7 @@ export default function Billing() {
       toast.success('Faktura vytvořena');
       setCreateDialogOpen(false);
       setNewInvoice({ patientId: '', serviceId: '', notes: '' });
+      setInvoicePatient(null);
       setSelectedServices([]);
       const refreshed = await billingApi.getInvoices();
       setInvoices(refreshed);
@@ -362,12 +361,13 @@ export default function Billing() {
           )}
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid size={{ xs: 12 }}>
-              <TextField fullWidth select label="Pacient" value={newInvoice.patientId}
-                onChange={(e) => setNewInvoice((p) => ({ ...p, patientId: e.target.value }))}>
-                {patients.map((p) => (
-                  <MenuItem key={p.id} value={p.id}>{p.firstName} {p.lastName}</MenuItem>
-                ))}
-              </TextField>
+              <PatientPicker
+                value={invoicePatient}
+                onChange={(patient) => {
+                  setInvoicePatient(patient);
+                  setNewInvoice((p) => ({ ...p, patientId: patient?.id ?? '' }));
+                }}
+              />
             </Grid>
             <Grid size={{ xs: 12 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Služby (vyberte více)</Typography>

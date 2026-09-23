@@ -3,12 +3,13 @@ import {
   Box, Typography, Card, CardContent, Grid, Button, Chip, TextField,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   MenuItem, IconButton, Tooltip, Skeleton, Alert, Dialog, DialogTitle,
-  DialogContent, DialogActions, Autocomplete,
+  DialogContent, DialogActions,
 } from '@mui/material';
 import { Add, Cancel, Undo, Refresh } from '@mui/icons-material';
 import { cashierApi, PaymentMethod, type CashierTransaction } from '../services/cashierApi';
 import { servicesApi } from '../api/services';
-import { patientsApi, type Patient } from '../api/patients';
+import type { Patient } from '../api/patients';
+import PatientPicker from '../components/patients/PatientPicker';
 import toast from 'react-hot-toast';
 
 /** The four the API has (4.x `PaymentMethod`); anything else falls back to cash. */
@@ -35,7 +36,7 @@ export default function CashierPage() {
   const [transactions, setTransactions] = useState<CashierTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState<any[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patient, setPatient] = useState<Patient | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({
     serviceId: '',
@@ -66,11 +67,6 @@ export default function CashierPage() {
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const searchPatients = (q: string) => {
-    if (q.trim().length < 2) return;
-    patientsApi.search(q).then(setPatients).catch(() => {});
-  };
-
   const handleCreate = async () => {
     const svc = services.find(s => s.id === form.serviceId);
     if (!svc || !form.patientId) {
@@ -89,6 +85,7 @@ export default function CashierPage() {
       toast.success('Platba zaevidována');
       setDialogOpen(false);
       setForm({ serviceId: '', patientId: '', paymentMethod: PaymentMethod.Cash, discount: 0 });
+      setPatient(null);
       load();
     } catch {
       toast.error('Uložení selhalo');
@@ -206,12 +203,12 @@ export default function CashierPage() {
                 <MenuItem key={s.id} value={s.id}>{s.name} — {czk(Number(s.priceCzk ?? 0))}</MenuItem>
               ))}
             </TextField>
-            <Autocomplete
-              options={patients}
-              getOptionLabel={o => `${o.firstName} ${o.lastName}`}
-              onInputChange={(_, v) => searchPatients(v)}
-              onChange={(_, v) => setForm(f => ({ ...f, patientId: v?.id ?? '' }))}
-              renderInput={params => <TextField {...params} label="Pacient (začněte psát)" />}
+            <PatientPicker
+              value={patient}
+              onChange={(next) => {
+                setPatient(next);
+                setForm(f => ({ ...f, patientId: next?.id ?? '' }));
+              }}
             />
             {/*
               The state used to be widened to `number`, which let any integer

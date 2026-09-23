@@ -1,19 +1,14 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Grid, Paper, Typography, Card, CardContent, Avatar,
-  List, ListItem, ListItemAvatar, ListItemText, Divider, Button, Chip, Skeleton,
+  Box, Grid, Typography, Card, CardContent, Avatar, Button, Chip,
 } from '@mui/material';
 import {
-  People, Science, TrendingUp, Warning, PersonAdd, Assessment,
-  LocalHospital, AccessTime, CalendarMonth, Receipt,
+  People, Science, Warning, PersonAdd, CalendarMonth, Receipt,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from 'recharts';
 import { patientsApi } from '../api/patients';
-import type { Patient } from '../api/patients';
+import { usePermission } from '../auth/usePermission';
 import { appointmentsApi } from '../api/appointments';
 import type { DayAppointment } from '../api/bookingContracts';
 import { statusName, statusTally } from '../api/bookingContracts';
@@ -120,7 +115,10 @@ function StatCard({ title, value, icon, color, subtitle, delay = 0 }: {
 /* ── Dashboard ── */
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const canSeePatients = usePermission('patients.view');
+  /* `totalCount` from the register, not the length of its first page. */
+  const [patientTotal, setPatientTotal] = useState<number | null>(null);
+  const [patientNames, setPatientNames] = useState<Record<string, string>>({});
   const [todayAppointments, setTodayAppointments] = useState<DayAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -139,19 +137,23 @@ export default function Dashboard() {
    * than to filter here: a client-side date filter would paper over a read that
    * cannot be trusted for anything else either.
    *
-   * It carries no patient name, only `patientId`, so the names come from the
-   * patient list this screen already loads. A patient missing from that list
-   * shows as an id rather than as an empty row - a nameless appointment is
-   * still an appointment somebody has to keep.
+   * It carries no patient name, only `patientId`, so each of today's patients
+   * is fetched by id - a handful of rows, where the register's first page
+   * held only the first twenty surnames and left everybody after them as an
+   * id. A patient that cannot be fetched still shows as an id rather than as
+   * an empty row - a nameless appointment is still an appointment somebody has
+   * to keep.
    */
   useEffect(() => {
     const today = toDateOnly(new Date());
 
     Promise.all([
-      patientsApi.getAll().catch(() => []),
+      canSeePatients
+        ? patientsApi.list({ pageSize: 1 }).then((page) => page.totalCount).catch(() => null)
+        : Promise.resolve(null),
       appointmentsApi.range(today, today).catch(() => []),
-    ]).then(([pats, appts]) => {
-      setPatients(pats);
+    ]).then(([total, appts]) => {
+      setPatientTotal(total);
       /*
        * Cancelled and no-show rows are not today's work; kept and completed
        * ones are. `statusTally` owns that mapping - the day overview counts by
@@ -163,14 +165,25 @@ export default function Dashboard() {
        * it can be undone - and would have been counted as work still to do.
        * Exactly inverted, and the tests caught it.
        */
-      setTodayAppointments(
-        appts.filter((a) => {
-          const tally = statusTally(a.status);
-          return tally === 'booked' || tally === 'arrived';
-        }),
-      );
+      const standing = appts.filter((a) => {
+        const tally = statusTally(a.status);
+        return tally === 'booked' || tally === 'arrived';
+      });
+      setTodayAppointments(standing);
+
+      if (canSeePatients) {
+        const ids = [...new Set(standing.map((a) => a.patientId))];
+        Promise.all(ids.map((id) => patientsApi.getById(id).catch(() => null)))
+          .then((found) => {
+            const names: Record<string, string> = {};
+            for (const p of found) {
+              if (p) names[p.id] = `${p.firstName} ${p.lastName}`;
+            }
+            setPatientNames(names);
+          });
+      }
     }).finally(() => setLoading(false));
-  }, []);
+  }, [canSeePatients]);
 
   /*
    * A copy, because `.sort()` reorders in place and this array is React state.
@@ -186,12 +199,10 @@ export default function Dashboard() {
     [todayAppointments],
   );
 
-  /* The day rows carry `patientId` only; the names are in the list already
-     loaded above. An unknown id is shown rather than swallowed. */
-  const patientName = (patientId: string): string => {
-    const found = patients.find((p) => p.id === patientId);
-    return found ? `${found.firstName} ${found.lastName}` : patientId.slice(0, 8);
-  };
+  /* The day rows carry `patientId` only; the names are fetched above. An
+     unknown id is shown rather than swallowed. */
+  const patientName = (patientId: string): string =>
+    patientNames[patientId] ?? patientId.slice(0, 8);
 
   const quickActions = [
     { label: 'Nová diagnostika', icon: <Science />, path: '/diagnostics/new', color: '#0D7377', gradient: 'linear-gradient(135deg, #0D7377 0%, #14A3A8 100%)' },
@@ -218,9 +229,11 @@ export default function Dashboard() {
 
       {/* Stat Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-          <StatCard title="Pacienti" value={patients.length} icon={<People />} color="#0D7377" subtitle="Celkem registrovaných" delay={0} />
-        </Grid>
+        {canSeePatients && (
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <StatCard title="Pacienti" value={patientTotal ?? '—'} icon={<People />} color="#0D7377" subtitle="Celkem registrovaných" delay={0} />
+          </Grid>
+        )}
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <StatCard title="Dnes v kalendáři" value={todayAppointments.length} icon={<CalendarMonth />} color="#2E7D32" subtitle="Schůzek dnes" delay={0.1} />
         </Grid>
@@ -231,7 +244,7 @@ export default function Dashboard() {
 
       {/* Charts Row */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid size={{ xs: 12, md: 8 }}>
+        <Grid size={{ xs: 12 }}>
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}>
             <Card sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -298,38 +311,6 @@ export default function Dashboard() {
           </motion.div>
         </Grid>
 
-        {/* Recent Patients */}
-        <Grid size={{ xs: 12, md: 4 }}>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.35 }}>
-            <Card sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Naposledy pacienti</Typography>
-              {patients.length === 0 ? (
-                <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <LocalHospital sx={{ fontSize: 48, color: '#ccc', mb: 1 }} />
-                  <Typography color="text.secondary">Zatím žádní pacienti</Typography>
-                </Box>
-              ) : (
-                <List sx={{ p: 0 }}>
-                  {patients.slice(0, 5).map((p) => (
-                    <motion.div key={p.id} whileHover={{ x: 4, backgroundColor: '#f8f9fa' }} transition={{ duration: 0.15 }}>
-                      <ListItem sx={{ px: 1, borderRadius: 2, mb: 0.5, cursor: 'pointer' }} onClick={() => navigate(`/patients/${p.id}`)}>
-                        <ListItemAvatar>
-                          <Avatar sx={{ bgcolor: '#0D7377', width: 40, height: 40, fontSize: 14 }}>
-                            {p.firstName[0]}{p.lastName[0]}
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={<Typography sx={{ fontWeight: 500, fontSize: 14 }}>{p.firstName} {p.lastName}</Typography>}
-                          secondary={new Date(p.createdAtUtc).toLocaleDateString('cs-CZ')}
-                        />
-                      </ListItem>
-                    </motion.div>
-                  ))}
-                </List>
-              )}
-            </Card>
-          </motion.div>
-        </Grid>
       </Grid>
 
       {/* Quick Actions */}
