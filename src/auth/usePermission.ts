@@ -42,7 +42,6 @@ export type Permission =
   | 'billing.manage'
   | 'documents.view'
   | 'documents.manage'
-  | 'patients.export'
   | 'communication.manage';
 
 /**

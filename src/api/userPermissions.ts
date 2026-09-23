@@ -74,10 +74,6 @@ export const PERMISSION_LABELS: Record<string, { label: string; detail: string }
     label: 'Měnit dokumenty pacienta',
     detail: 'Nahrávat, podepisovat, zneplatňovat a přeřazovat. Jiná práce než jen se na ně podívat.',
   },
-  'patients.export': {
-    label: 'Exportovat zdravotní dokumentaci',
-    detail: 'Stáhnout celou kartu pacienta jedním požadavkem. Nikdo to nemá automaticky.',
-  },
   'communication.manage': {
     label: 'Psát a odesílat za ordinaci',
     detail: 'Šablony e-mailů a SMS, odesílání, fronta zpráv a webhooky — tedy mluvit jménem ordinace.',

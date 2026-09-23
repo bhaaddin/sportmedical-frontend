@@ -290,13 +290,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         to: '/system-health',
         requires: 'settings.clinic.manage',
       },
-      {
-        id: 'export',
-        label: 'Export dat',
-        description: 'Stažení dat pacienta pro předání nebo archiv',
-        to: '/data-export',
-        requires: 'settings.clinic.manage',
-      },
     ],
   },
 ];
