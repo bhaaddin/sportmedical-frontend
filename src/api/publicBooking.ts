@@ -159,21 +159,6 @@ export const holdSlot = async (
   }
 };
 
-/**
- * Gives a held slot back.
- *
- * Never throws: the caller is abandoning the slot, and a failure to say so is
- * not worth interrupting them for — the hold lapses by itself in fifteen
- * minutes either way.
- */
-export const releaseSlot = async (token: string): Promise<void> => {
-  try {
-    await publicClient.delete(`/api/public/booking/hold/${encodeURIComponent(token)}`);
-  } catch {
-    /* Deliberately silent. See above. */
-  }
-};
-
 /* ── The slot being carried from the booking page to the registration ── */
 
 const HELD_KEY = 'smd.booking.held.v1';

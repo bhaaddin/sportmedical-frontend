@@ -39,11 +39,6 @@ export const diagnosticsApi = {
     return res.data?.value ?? res.data;
   },
 
-  getById: async (id: string): Promise<DiagnosticSession> => {
-    const res = await client.get(`/api/v1/diagnostics/sessions/${id}`);
-    return res.data?.value ?? res.data;
-  },
-
   getByPatient: async (patientId: string): Promise<DiagnosticSession[]> => {
     const res = await client.get(`/api/v1/diagnostics/patients/${patientId}/sessions`);
     return res.data?.value ?? res.data ?? [];

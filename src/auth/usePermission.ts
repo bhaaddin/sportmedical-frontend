@@ -88,17 +88,3 @@ export function hasStoredPermissions(): boolean {
 export function usePermission(permission: Permission): boolean {
   return storedPermissions().includes(permission);
 }
-
-/** Several at once, for a screen that decides more than one thing. */
-export function usePermissions<T extends readonly Permission[]>(
-  permissions: T,
-): Record<T[number], boolean> {
-  const held = new Set(storedPermissions());
-  const result = {} as Record<T[number], boolean>;
-
-  for (const permission of permissions) {
-    result[permission as T[number]] = held.has(permission);
-  }
-
-  return result;
-}

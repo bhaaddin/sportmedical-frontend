@@ -68,8 +68,4 @@ export const cashierApi = {
   cancelTransaction: async (id: string, reason?: string): Promise<void> => {
     await client.post(`/api/cashier/transactions/${id}/cancel`, { reason: reason ?? null });
   },
-
-  refundTransaction: async (id: string, reason: string): Promise<void> => {
-    await client.post(`/api/cashier/transactions/${id}/refund`, { reason });
-  },
 };

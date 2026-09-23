@@ -38,8 +38,4 @@ export const authApi = {
   activate: async (data: { email: string; temporaryPassword: string; newPassword: string; newPasswordConfirmation: string }): Promise<void> => {
     await client.post('/api/v1/accounts/activate', data);
   },
-
-  changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
-    await client.put('/api/v1/account/password', { currentPassword, newPassword, newPasswordConfirmation: newPassword });
-  },
 };

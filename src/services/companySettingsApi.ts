@@ -1,5 +1,4 @@
 import client from '../api/client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -48,23 +47,3 @@ export const companySettingsApi = {
     return response.data;
   },
 };
-
-// React Query hooks
-export const useCompanySettings = () => {
-  return useQuery({
-    queryKey: ['companySettings'],
-    queryFn: companySettingsApi.get,
-  });
-};
-
-export const useUpdateCompanySettings = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: companySettingsApi.update,
-    onSuccess: (data) => {
-      queryClient.setQueryData(['companySettings'], data);
-    },
-  });
-};
-

@@ -110,16 +110,6 @@ export const appointmentsApi = {
       return parseResponse(dayAppointmentListSchema, res.data);
     }),
 
-  /* ── The day of one calendar (4.5) ── */
-
-  day: (calendarId: string, date: DateOnly): Promise<DayAppointment[]> =>
-    request(async () => {
-      const res = await client.get(`/api/calendars/${calendarId}/day`, {
-        params: { date: requireDate(date, 'date') },
-      });
-      return parseResponse(dayAppointmentListSchema, res.data);
-    }),
-
   /**
    * One appointment, by id - 4.5 since v26.
    *
@@ -153,16 +143,6 @@ export const appointmentsApi = {
         ...input,
         startUtc: asUtcInstant(input.startUtc),
       });
-      return parseResponse(bookedAppointmentSchema, res.data);
-    }),
-
-  /** Turns a held slot into a real appointment before the hold expires. */
-  confirm: (calendarId: string, id: string): Promise<BookedAppointment> =>
-    request(async () => {
-      const res = await client.post(
-        `/api/calendars/${calendarId}/appointments/${id}/confirm`,
-        {},
-      );
       return parseResponse(bookedAppointmentSchema, res.data);
     }),
 

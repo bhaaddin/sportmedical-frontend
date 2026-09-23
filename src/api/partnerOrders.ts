@@ -62,14 +62,6 @@ export const partnerOrdersApi = {
       return parseResponse(partnerOrderListSchema, res.data);
     }),
 
-  get: (calendarId: string, id: string): Promise<PartnerOrder> =>
-    request(async () => {
-      const res = await client.get(
-        `/api/calendars/${calendarId}/partner-orders/${id}`,
-      );
-      return parseResponse(partnerOrderSchema, res.data);
-    }),
-
   create: (calendarId: string, input: PartnerOrderInput): Promise<PartnerOrder> =>
     request(async () => {
       const res = await client.post(
@@ -106,17 +98,6 @@ export const partnerOrdersApi = {
       return parseResponse(partnerOrderSchema, res.data);
     }),
 
-  removeWindow: (
-    calendarId: string,
-    id: string,
-    windowId: string,
-  ): Promise<void> =>
-    request(async () => {
-      await client.delete(
-        `/api/calendars/${calendarId}/partner-orders/${id}/windows/${windowId}`,
-      );
-    }),
-
   /** 4.7: extending a deadline is this, and `/extend` does not exist. */
   setDeadlines: (
     calendarId: string,
@@ -127,15 +108,6 @@ export const partnerOrdersApi = {
       const res = await client.put(
         `/api/calendars/${calendarId}/partner-orders/${id}/deadlines`,
         deadlines,
-      );
-      return parseResponse(partnerOrderSchema, res.data);
-    }),
-
-  sendLink: (calendarId: string, id: string): Promise<PartnerOrder> =>
-    request(async () => {
-      const res = await client.post(
-        `/api/calendars/${calendarId}/partner-orders/${id}/link`,
-        {},
       );
       return parseResponse(partnerOrderSchema, res.data);
     }),

@@ -282,11 +282,6 @@ export const documentsApi = {
     return res.data?.value ?? res.data;
   },
 
-  getSummary: async (patientId: string) => {
-    const res = await client.get(`/api/documents/patient/${patientId}/summary`);
-    return res.data?.value ?? res.data;
-  },
-
   /*
    * Sends the file itself.
    *

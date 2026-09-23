@@ -34,11 +34,6 @@ export const billingApi = {
     return res.data?.value ?? res.data ?? [];
   },
 
-  getInvoiceById: async (id: string): Promise<Invoice> => {
-    const res = await client.get(`/api/billing/invoices/${id}`);
-    return res.data?.value ?? res.data;
-  },
-
   createInvoice: async (data: { patientId: string; serviceId: string; notes?: string }): Promise<Invoice> => {
     const res = await client.post('/api/billing/invoices', data);
     return res.data?.value ?? res.data;
@@ -47,13 +42,5 @@ export const billingApi = {
   addLineItem: async (invoiceId: string, serviceId: string): Promise<Invoice> => {
     const res = await client.post(`/api/billing/invoices/${invoiceId}/items`, { serviceId });
     return res.data?.value ?? res.data;
-  },
-
-  removeLineItem: async (invoiceId: string, itemId: string): Promise<void> => {
-    await client.delete(`/api/billing/invoices/${invoiceId}/items/${itemId}`);
-  },
-
-  updateInvoiceStatus: async (id: string, status: string): Promise<void> => {
-    await client.patch(`/api/billing/invoices/${id}/status`, { status });
   },
 };

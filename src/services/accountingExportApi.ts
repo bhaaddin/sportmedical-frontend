@@ -98,13 +98,6 @@ export const accountingExportApi = {
     return response.data;
   },
 
-  getHistoryRange: async (from: string, to: string): Promise<ExportResult[]> => {
-    const response = await client.get(`${API_BASE}/accounting/export/history/range`, {
-      params: { from, to },
-    });
-    return response.data;
-  },
-
   deleteExport: async (id: string): Promise<void> => {
     await client.delete(`${API_BASE}/accounting/export/${id}`);
   },
