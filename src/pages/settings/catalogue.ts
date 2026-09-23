@@ -50,12 +50,6 @@ export interface SettingsItem {
    * from, blocked time.
    */
   requires?: Permission;
-  /**
-   * Shown but not offered, with the reason. A screen that exists and cannot
-   * work is worse hidden than labelled: hidden, somebody rebuilds it; labelled,
-   * they know when it is coming.
-   */
-  unavailable?: string;
 }
 
 export interface SettingsSection {
@@ -260,14 +254,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         description: 'Otázky, na které pacient odpovídá — znění, sekce, pořadí a nasazení verze',
         to: '/dotaznik-nastaveni',
         requires: 'questionnaires.manage',
-      },
-      {
-        id: 'emaily',
-        label: 'E-mailové šablony',
-        description: 'Text a vzhled e-mailů, které chodí pacientům',
-        to: '/email-templates',
-        requires: 'settings.clinic.manage',
-        unavailable: 'Chystá se ve fázi 2 — server pro ně zatím nemá rozhraní.',
       },
     ],
   },

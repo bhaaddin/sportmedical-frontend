@@ -51,18 +51,6 @@ describe('every settings destination', () => {
       }
     }
   });
-
-  /* Anything that cannot work says when it will. Hidden, somebody rebuilds it
-     from scratch; labelled, they know it is coming. */
-  it('gives a reason for anything it lists but cannot open', () => {
-    for (const section of SETTINGS_SECTIONS) {
-      for (const item of section.items) {
-        if (item.unavailable !== undefined) {
-          expect(item.unavailable.length).toBeGreaterThan(20);
-        }
-      }
-    }
-  });
 });
 
 /*

@@ -181,18 +181,6 @@ describe('the settings that used to lie here', () => {
   });
 });
 
-describe('a screen that cannot work yet', () => {
-  it('is named with the reason rather than quietly offered', async () => {
-    const user = userEvent.setup();
-    renderSettings();
-
-    await user.click(await screen.findByText('Dokumenty a souhlasy'));
-
-    expect(await screen.findByText('E-mailové šablony')).toBeVisible();
-    expect(screen.getByText(/Chystá se ve fázi 2/)).toBeVisible();
-  });
-});
-
 describe('a sign-in from before permissions were sent', () => {
   /*
    * The transition hazard, and why it is worth a test.

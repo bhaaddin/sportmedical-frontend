@@ -50,7 +50,6 @@ const PosudekPage = lazy(() => import('./pages/Posudek'));
 const TrainingLoadPage = lazy(() => import('./pages/TrainingLoad'));
 const SystemHealthPage = lazy(() => import('./pages/SystemHealth'));
 const StaffManagementPage = lazy(() => import('./pages/StaffManagement'));
-const EmailTemplatesPage = lazy(() => import('./pages/EmailTemplates'));
 const AuditLogPage = lazy(() => import('./pages/AuditLog'));
 /* Booking phase 1, stage 1: calendars, access and activities */
 const BookingCalendarsPage = lazy(() => import('./pages/booking/CalendarsPage'));
@@ -498,7 +497,6 @@ export default function App() {
                     <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
                     <Route path="/system-health" element={<SystemHealthPage />} />
                     <Route path="/staff-management" element={<RequireAdmin><StaffManagementPage /></RequireAdmin>} />
-                    <Route path="/email-templates" element={<EmailTemplatesPage />} />
                     <Route path="/audit-log" element={<AuditLogPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="*" element={<NotFound />} />

@@ -14,16 +14,14 @@
  * `/partner-orders`), so they are shown that way and somebody setting a
  * calendar up finds the whole of it in one place.
  *
- * Everything the sections offer leads to a screen that already works. What
- * does not work is named with the reason rather than hidden - hidden, it gets
- * rebuilt from scratch a year later.
+ * Everything the sections offer leads to a screen that already works.
  */
 import { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   Accordion,
   AccordionDetails, AccordionSummary, Alert, Avatar, Box, Button,
-  Card, CardContent, Chip, Divider, List, ListItemButton, ListItemText,
+  Card, CardContent, Divider, List, ListItemButton, ListItemText,
   Stack, Typography,
 } from '@mui/material';
 import {
@@ -105,30 +103,20 @@ export default function Settings() {
     navigate('/login');
   };
 
-  const renderItem = (item: SettingsItem) => {
-    const blocked = item.unavailable !== undefined;
-
-    return (
-      <ListItemButton
-        key={item.id}
-        component={blocked ? 'div' : RouterLink}
-        {...(blocked ? {} : { to: item.to })}
-        disabled={blocked}
-        sx={{ borderRadius: 2, py: 1.25, opacity: blocked ? 0.75 : 1 }}
-      >
-        <ListItemText
-          primary={
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <Typography sx={{ fontWeight: 600 }}>{item.label}</Typography>
-              {blocked && <Chip size="small" color="warning" label="Zatím nedostupné" />}
-            </Stack>
-          }
-          secondary={blocked ? item.unavailable : item.description}
-        />
-        {!blocked && <ChevronRight sx={{ color: 'text.disabled' }} />}
-      </ListItemButton>
-    );
-  };
+  const renderItem = (item: SettingsItem) => (
+    <ListItemButton
+      key={item.id}
+      component={RouterLink}
+      to={item.to}
+      sx={{ borderRadius: 2, py: 1.25 }}
+    >
+      <ListItemText
+        primary={<Typography sx={{ fontWeight: 600 }}>{item.label}</Typography>}
+        secondary={item.description}
+      />
+      <ChevronRight sx={{ color: 'text.disabled' }} />
+    </ListItemButton>
+  );
 
   return (
     <Box sx={{ maxWidth: 820, mx: 'auto' }}>

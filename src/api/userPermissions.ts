@@ -76,7 +76,7 @@ export const PERMISSION_LABELS: Record<string, { label: string; detail: string }
   },
   'communication.manage': {
     label: 'Psát a odesílat za ordinaci',
-    detail: 'Šablony e-mailů a SMS, odesílání, fronta zpráv a webhooky — tedy mluvit jménem ordinace.',
+    detail: 'Dnes nic neotvírá: žádná obrazovka ani rozhraní aplikace ho nevyžaduje.',
   },
   'questionnaires.manage': {
     label: 'Pracovat s dotazníky',
