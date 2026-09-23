@@ -30,6 +30,8 @@ import { useTranslation } from "react-i18next";
 import { activitiesApi } from "../../api/activities";
 import { servicesApi } from "../../api/services";
 import { clinicServicesApi } from "../../api/clinicServices";
+import { questionnaireEditorApi } from "../../api/questionnaireEditor";
+import { usePermission } from "../../auth/usePermission";
 import { useLocation, useNavigate } from "react-router-dom";
 import { assignableCount, handoffAction, handoffFrom } from "./serviceHandoff";
 import RestoreIcon from "@mui/icons-material/Restore";
@@ -73,6 +75,8 @@ function emptyDraft(sortOrder: number): ActivityInput {
     /* Empty until one is picked. The server refuses a činnost without a
        service, so the form holds the save shut rather than letting it fail. */
     clinicServiceId: '',
+    /* The clinic's default questionnaire until somebody picks another. */
+    questionnaireDefinitionId: null,
   };
 }
 
@@ -109,6 +113,19 @@ export default function ActivitiesPage() {
     queryKey: ["services"],
     queryFn: servicesApi.getAll,
     staleTime: CODEBOOK_STALE_MS,
+  });
+
+  /*
+   * Which questionnaire a činnost asks for. The list is the questionnaires
+   * screen's own, so it is only asked for by somebody who may manage
+   * questionnaires, and only while the form is open.
+   */
+  const mayPickQuestionnaire = usePermission("questionnaires.manage");
+  const questionnairesQuery = useQuery({
+    queryKey: ["questionnaire-definitions"],
+    queryFn: questionnaireEditorApi.list,
+    staleTime: CODEBOOK_STALE_MS,
+    enabled: mayPickQuestionnaire && draft !== null,
   });
 
   const activities = useMemo(
@@ -198,6 +215,8 @@ export default function ActivitiesPage() {
        * activity and quietly taking its price away.
        */
       serviceItemId: activity.serviceItemId,
+      /* Sent back as it came, for the same reason: `PUT` is the whole činnost. */
+      questionnaireDefinitionId: activity.questionnaireDefinitionId,
     });
     save.reset();
   };
@@ -702,6 +721,56 @@ export default function ActivitiesPage() {
                     <MenuItem value="Optional">Nepovinný</MenuItem>
                     <MenuItem value="Required">Povinný</MenuItem>
                   </TextField>
+
+                  {/*
+                    Which questionnaire, when one is asked for at all. Empty is
+                    the clinic's default questionnaire, not "none" - "none" is
+                    "Neptáme se" above.
+                  */}
+                  {draft.questionnaireRequirement !== "NotAsked" ? (
+                    <TextField
+                      select
+                      fullWidth
+                      size="small"
+                      sx={{ mt: 2 }}
+                      label="Který dotazník"
+                      value={draft.questionnaireDefinitionId ?? ""}
+                      disabled={!mayPickQuestionnaire || questionnairesQuery.isLoading}
+                      error={questionnairesQuery.isError}
+                      onChange={(e) =>
+                        setDraft({
+                          ...draft,
+                          questionnaireDefinitionId:
+                            e.target.value === "" ? null : e.target.value,
+                        })
+                      }
+                      helperText={
+                        !mayPickQuestionnaire
+                          ? "Dotazník může vybrat jen ten, kdo smí spravovat dotazníky."
+                          : questionnairesQuery.isError
+                            ? "Seznam dotazníků se nepodařilo načíst. Uložení ponechá dosavadní volbu."
+                            : "Prázdné = výchozí dotazník kliniky."
+                      }
+                    >
+                      <MenuItem value="">Výchozí dotazník kliniky</MenuItem>
+                      {(questionnairesQuery.data ?? []).map((definition) => (
+                        <MenuItem key={definition.id} value={definition.id}>
+                          {definition.displayName}
+                        </MenuItem>
+                      ))}
+                      {/* The stored choice stays selectable even when the list
+                          did not load or no longer names it, so opening and
+                          saving the form never changes it by accident. */}
+                      {draft.questionnaireDefinitionId &&
+                      !(questionnairesQuery.data ?? []).some(
+                        (definition) => definition.id === draft.questionnaireDefinitionId,
+                      ) ? (
+                        <MenuItem value={draft.questionnaireDefinitionId}>
+                          Dosavadní dotazník
+                        </MenuItem>
+                      ) : null}
+                    </TextField>
+                  ) : null}
                 </Box>
               ) : null}
               {/* 422 keeps the form filled in, so the message sits inside the dialog. */}

@@ -152,6 +152,28 @@
       "workersFailed": "Seznam pracovníků se nepodařilo načíst — prázdný výběr neznamená, že žádní nejsou.",
       "notSetYet": "zatím nenastaveno — časy níže jsou jen návrh"
     },
+    "absences": {
+      "title": "Nepřítomnost zaměstnanců",
+      "subtitle": "Dovolená, nemoc, školení. Dny nepřítomného pracovníka se nenabízejí online, na recepci se na ně nedá objednat a v kalendáři jsou označené.",
+      "new": "Zapsat nepřítomnost",
+      "newTitle": "Nová nepřítomnost",
+      "worker": "Zaměstnanec",
+      "everybody": "Všichni zaměstnanci",
+      "selectedWorker": "Vybraný zaměstnanec",
+      "unknownWorker": "Neznámý zaměstnanec",
+      "from": "Od",
+      "to": "Do (včetně)",
+      "reason": "Důvod",
+      "reasonPlaceholder": "např. dovolená",
+      "empty": "Žádná zapsaná nepřítomnost.",
+      "effect": "Na tyto dny se k pracovníkovi nedá objednat. Pokud má za něj někdo sloužit, zapište ve Výjimkách jiného pracovníka.",
+      "orderProblem": "Konec nemůže být před začátkem.",
+      "peopleFailed": "Seznam zaměstnanců se nepodařilo načíst — bez kalendáře ho nelze zjistit.",
+      "remove": "Smazat",
+      "removeFor": "Smazat nepřítomnost: {{name}}",
+      "removeTitle": "Smazat nepřítomnost?",
+      "removeBody": "{{name}}, {{from}} – {{to}}. Dny se znovu začnou nabízet podle pracovní doby."
+    },
     "exceptions": {
       "title": "Výjimky",
       "subtitle": "Jednotlivé dny, které se chovají jinak než pravidelná pracovní doba.",
@@ -204,8 +226,11 @@
         "notAWorkingDay": "nepracovní den",
         "override": "výjimka",
         "holiday": "svátek",
+        "workerAbsent": "nepřítomnost",
         "other": "zavřeno"
       },
+      "workerAbsentWhy": "{{name}} má na tento den zapsanou nepřítomnost. Objednat se sem nedá, dokud mu ve Výjimkách nezapíšete zástup.",
+      "workerAbsentWhyUnnamed": "Pracovník má na tento den zapsanou nepřítomnost. Objednat se sem nedá, dokud mu ve Výjimkách nezapíšete zástup.",
       "jumpTo": "Přejít na datum",
       "month": "Měsíc",
       "more": "+{{count}} další",
@@ -216,6 +241,7 @@
       "inactiveWhere": "Spravovat kalendáře"
     },
     "detail": {
+      "noActionsAllowed": "Tento účet nemá oprávnění rezervace upravovat ani rušit.",
       "patient": "Pacient",
       "patientMissing": "Pacienta se nepodařilo načíst.",
       "noPhone": "telefon neuveden",
@@ -263,6 +289,8 @@
       "unknown": "Neznámá akce ({{code}})"
     },
     "day": {
+      "absent": "Tento den nepřítomni: {{list}}. Jejich hodiny se do pracovní doby nepočítají a objednat se k nim nedá.",
+      "absentUnnamed": "pracovník",
       "title": "Dnešní přehled",
       "previous": "Předchozí den",
       "next": "Nejbližší",

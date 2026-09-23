@@ -121,8 +121,20 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       {
         id: 'vyjimky',
         label: 'Výjimky',
-        description: 'Svátky, dovolená a dny, kdy se nepracuje',
+        description: 'Jeden den jinak: zavřeno, jiné hodiny nebo zástup',
         to: '/exceptions',
+        requires: 'settings.clinic.manage',
+      },
+      {
+        /*
+         * Next to Výjimky, because the two go together: an absence takes a
+         * worker's days away, and a stand-in in Výjimky is how one of those
+         * days is still worked.
+         */
+        id: 'nepritomnosti',
+        label: 'Nepřítomnost zaměstnanců',
+        description: 'Dovolená, nemoc, školení — kdy kdo chybí',
+        to: '/nepritomnosti',
         requires: 'settings.clinic.manage',
       },
       {

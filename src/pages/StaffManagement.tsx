@@ -26,6 +26,8 @@ import {
 } from '@mui/icons-material';
 import KeyIcon from '@mui/icons-material/VpnKey';
 import EventNoteIcon from '@mui/icons-material/EventNote';
+import EventBusyIcon from '@mui/icons-material/EventBusy';
+import { Link as RouterLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { UserPermissionsDialog } from '../components/admin/UserPermissionsDialog';
 import { WhereSomebodyWorksDialog } from '../components/admin/WhereSomebodyWorksDialog';
@@ -55,6 +57,8 @@ export default function StaffManagement() {
   /* Only somebody who may manage roles can give out or take the Owner role;
      the server refuses it for everybody else, so it is not offered either. */
   const canManageOwners = usePermission('roles.manage');
+  /* Absences are settings.clinic.manage on the server, like the timetable. */
+  const canManageAbsences = usePermission('settings.clinic.manage');
   const assignableRoles = USER_ACCOUNT_ROLES.filter((r) => r !== 'Owner' || canManageOwners);
 
   const [accounts, setAccounts] = useState<UserAccount[]>([]);
@@ -338,6 +342,17 @@ export default function StaffManagement() {
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
+                        {canManageAbsences ? (
+                          <Tooltip title="Nepřítomnost">
+                            <IconButton
+                              component={RouterLink}
+                              to={`/nepritomnosti?userId=${encodeURIComponent(acc.userId)}`}
+                              aria-label={`Nepřítomnost ${name}`}
+                            >
+                              <EventBusyIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        ) : null}
                         <Tooltip title="Změnit roli">
                           <IconButton aria-label={`Změnit roli ${name}`} onClick={() => openRole(acc)}>
                             <BadgeIcon fontSize="small" />

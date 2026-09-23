@@ -147,6 +147,9 @@ export default function ClinicServicesPage() {
           sortOrder: a.sortOrder,
           serviceItemId: a.serviceItemId,
           clinicServiceId: serviceId,
+          // And which questionnaire: left out, the move would switch the
+          // činnost back to the clinic's default one.
+          questionnaireDefinitionId: a.questionnaireDefinitionId,
         }),
       });
     }

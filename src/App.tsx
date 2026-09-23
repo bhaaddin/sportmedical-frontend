@@ -67,6 +67,7 @@ const BookingDayOverviewPage = lazy(() => import('./pages/booking/DayOverviewPag
 /* Booking phase 1, stage 5: partner reservations */
 const BookingPartnerOrdersPage = lazy(() => import('./pages/booking/PartnerOrdersPage'));
 const BookingBlockedTimePage = lazy(() => import('./pages/booking/BlockedTimePage'));
+const EmployeeAbsencesPage = lazy(() => import('./pages/booking/EmployeeAbsencesPage'));
 const AppointmentLinkPage = lazy(() => import('./pages/booking/AppointmentLinkPage'));
 const CashierPage = lazy(() => import('./pages/CashierPage'));
 const ClubsPage = lazy(() => import('./pages/ClubsPage'));
@@ -492,6 +493,7 @@ export default function App() {
                     <Route path="/activities" element={<RequirePermission of="settings.clinic.manage"><BookingActivitiesPage /></RequirePermission>} />
                     <Route path="/working-hours" element={<RequirePermission of="settings.clinic.manage"><BookingWorkingHoursPage /></RequirePermission>} />
                     <Route path="/exceptions" element={<RequirePermission of="settings.clinic.manage"><BookingExceptionsPage /></RequirePermission>} />
+                    <Route path="/nepritomnosti" element={<RequirePermission of="settings.clinic.manage"><EmployeeAbsencesPage /></RequirePermission>} />
                     <Route path="/admin" element={<RequirePermission of="settings.clinic.manage"><AdminPage /></RequirePermission>} />
                     <Route path="/system-health" element={<RequirePermission of="settings.clinic.manage"><SystemHealthPage /></RequirePermission>} />
                     <Route path="/staff-management" element={<RequirePermission of="users.manage"><StaffManagementPage /></RequirePermission>} />

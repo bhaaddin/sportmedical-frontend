@@ -689,7 +689,7 @@ export default function CalendarGridPage() {
 
       {/* 5.8. The row is gone from the answer once it is cancelled, so the
           dialog closes itself rather than showing a stale copy. */}
-      {booking ? (
+      {booking && mayBook ? (
         <NewAppointmentDialog
           key={booking.key}
           open

@@ -13,7 +13,7 @@
  * from a screen: what somebody sees is either a button that waits and says
  * why, or a save that fails after the fact. This is about that button.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -39,6 +39,10 @@ vi.mock('../../api/services', () => ({
 }));
 vi.mock('../../api/clinicServices', () => ({
   clinicServicesApi: { list: listClinicServices },
+}));
+const listQuestionnaires = vi.fn();
+vi.mock('../../api/questionnaireEditor', () => ({
+  questionnaireEditorApi: { list: listQuestionnaires },
 }));
 
 const { default: ActivitiesPage } = await import('./ActivitiesPage');
@@ -336,5 +340,69 @@ describe('being sent here when činnosti already exist', () => {
 
     await screen.findByLabelText(/Název/);
     expect(screen.getByLabelText(/Služba/)).toHaveTextContent('Sportovní diagnostika');
+  });
+});
+
+/*
+ * Which questionnaire a činnost asks for.
+ *
+ * `PUT` is the whole činnost, so the picker has two jobs: offer the clinic's
+ * questionnaires, and send the stored choice back untouched when somebody
+ * edits something else - otherwise renaming a činnost would switch it back
+ * to the default questionnaire without anybody choosing that.
+ */
+describe('the questionnaire a činnost asks for', () => {
+  const spiro = {
+    id: 'a1', name: 'Spiroergometrie', slug: 'spiro', durationMinutes: 90,
+    color: '#0D7377', publicNote: '', isPubliclyBookable: true, sortOrder: 0,
+    isActive: true, serviceItemId: null, priceCzk: null, clinicServiceId: 's2',
+    questionnaireRequirement: 'Required', questionnaireDefinitionId: 'q2',
+  };
+
+  beforeEach(() => {
+    localStorage.setItem('permissions', JSON.stringify(['questionnaires.manage']));
+    listQuestionnaires.mockReset().mockResolvedValue([
+      { id: 'q1', displayName: 'Zdravotní dotazník', key: 'k1', versions: [] },
+      { id: 'q2', displayName: 'Dotazník pro diagnostiku', key: 'k2', versions: [] },
+    ]);
+    listActivities.mockResolvedValue({ activities: [spiro], warnings: [] });
+  });
+
+  afterEach(() => localStorage.removeItem('permissions'));
+
+  it('sends the stored questionnaire back when something else is edited', async () => {
+    render(withQueries(<ActivitiesPage />));
+    await userEvent.click(await screen.findByRole('button', { name: /Upravit/i }));
+    await screen.findByLabelText(/Název/);
+
+    await userEvent.type(screen.getByLabelText(/Název/), ' II');
+    await userEvent.click(screen.getByRole('button', { name: /Uložit/i }));
+
+    await waitFor(() => expect(saveActivity).toHaveBeenCalled());
+    expect(saveActivity.mock.calls[0].at(-1)).toMatchObject({ questionnaireDefinitionId: 'q2' });
+  });
+
+  it('offers the clinic questionnaires and sends the one picked', async () => {
+    render(withQueries(<ActivitiesPage />));
+    await userEvent.click(await screen.findByRole('button', { name: /Upravit/i }));
+
+    await userEvent.click(await screen.findByLabelText(/Který dotazník/));
+    await userEvent.click(await screen.findByRole('option', { name: 'Zdravotní dotazník' }));
+    await userEvent.click(screen.getByRole('button', { name: /Uložit/i }));
+
+    await waitFor(() => expect(saveActivity).toHaveBeenCalled());
+    expect(saveActivity.mock.calls[0].at(-1)).toMatchObject({ questionnaireDefinitionId: 'q1' });
+  });
+
+  it('sends null for the clinic default', async () => {
+    render(withQueries(<ActivitiesPage />));
+    await userEvent.click(await screen.findByRole('button', { name: /Upravit/i }));
+
+    await userEvent.click(await screen.findByLabelText(/Který dotazník/));
+    await userEvent.click(await screen.findByRole('option', { name: 'Výchozí dotazník kliniky' }));
+    await userEvent.click(screen.getByRole('button', { name: /Uložit/i }));
+
+    await waitFor(() => expect(saveActivity).toHaveBeenCalled());
+    expect(saveActivity.mock.calls[0].at(-1)).toMatchObject({ questionnaireDefinitionId: null });
   });
 });

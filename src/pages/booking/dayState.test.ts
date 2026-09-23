@@ -13,7 +13,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  dayState, dayStateLabelKey, isShaded, rangeOffersNothing, NO_ACTIVITIES,
+  dayState, dayStateLabelKey, isShaded, rangeOffersNothing, NO_ACTIVITIES, WORKER_ABSENT,
 } from './dayState';
 import cs from '../../i18n/locales/cs.json';
 import type { DayPreviewLike } from './dayState';
@@ -228,5 +228,29 @@ describe('the word in the corner of a day', () => {
   it('has the sentence explaining it, and the label on the way out', () => {
     expect(czech('booking.grid.noActivitiesWhy')).toMatch(/činnosti/);
     expect(czech('booking.grid.noActivitiesWhere')).toBeTruthy();
+  });
+
+  /* A day shut because its worker is out has its own word, not "zavřeno". */
+  it('names a day whose worker is recorded absent', () => {
+    expect(czech(key({ kind: 'closed', because: WORKER_ABSENT }) as string)).toBe('nepřítomnost');
+    expect(czech('booking.grid.workerAbsentWhy')).toMatch(/\{\{name\}\}/);
+  });
+});
+
+describe('a day whose worker is recorded absent', () => {
+  it('is shut, shaded, and says who is out', () => {
+    const state = dayState([
+      day({ isOpen: false, closedBecause: WORKER_ABSENT, workerDisplayName: 'MUDr. Nováková' }),
+    ]);
+
+    expect(state).toEqual({ kind: 'closed', because: WORKER_ABSENT, who: 'MUDr. Nováková' });
+    expect(isShaded(state)).toBe(true);
+  });
+
+  it('is an ordinary day when another calendar still offers something', () => {
+    expect(dayState([
+      day({ isOpen: false, closedBecause: WORKER_ABSENT, workerDisplayName: 'MUDr. Nováková' }),
+      day(),
+    ])).toEqual({ kind: 'open' });
   });
 });
