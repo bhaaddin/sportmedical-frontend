@@ -86,6 +86,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         requires: 'settings.clinic.manage',
       },
       {
+        id: 'vzhled-kalendare',
+        label: 'Vzhled kalendáře',
+        description: 'Výchozí pohled, délka řádku, od kdy do kdy se den ukazuje a barva čáry „teď“',
+        to: '/nastaveni/vzhled-kalendare',
+        requires: 'settings.clinic.manage',
+      },
+      {
         id: 'cinnosti',
         label: 'Činnosti',
         description: 'Co se v ordinaci dělá a jak dlouho to trvá',
@@ -143,6 +150,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         description: 'Zaměstnanci, jejich role, reset hesla a vypnutí přístupu',
         to: '/staff-management',
         requires: 'users.manage',
+      },
+      {
+        id: 'udaje-pacienta',
+        label: 'Údaje o pacientovi',
+        description: 'Které údaje karta a seznam pacientů ukazují a v jakém pořadí',
+        to: '/nastaveni/udaje-pacienta',
+        requires: 'settings.clinic.manage',
       },
     ],
   },
@@ -234,8 +248,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
          * deploy. This is the screen that ended that.
          */
         id: 'zdravotni-dotaznik',
-        label: 'Zdravotní dotazník',
-        description: 'Otázky, na které pacient odpovídá — znění, sekce, pořadí a nasazení verze',
+        label: 'Dotazníky',
+        description: 'Dotazníky pro pacienty — nový dotazník, otázky, zapnutí a vypnutí a který je výchozí',
         to: '/dotaznik-nastaveni',
         requires: 'questionnaires.manage',
       },

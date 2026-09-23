@@ -27,6 +27,8 @@ import MedicalReports from '../components/documents/MedicalReports';
 import UploadDocumentDialog from '../components/documents/UploadDocumentDialog';
 import DocumentActions from '../components/documents/DocumentActions';
 import type { PatientDocument, DocumentTemplate } from '../api/documents';
+import { SENSITIVE_IDENTITY, shownFields, usePatientFields } from '../api/displaySettings';
+import { usePermission } from '../auth/usePermission';
 
 /* ── Helpers ── */
 function trendIcon(current: number, previous: number, higherIsBetter: boolean) {
@@ -126,6 +128,12 @@ export default function PatientDetails() {
   /* Which document is being uploaded. `null` closed, a template for a required
      one, and `'report'` for a medical report from another doctor. */
   const [uploadTemplate, setUploadTemplate] = useState<DocumentTemplate | null | 'report'>(null);
+
+  /* Which rows the card shows, and in what order, is the clinic's setting
+     (Nastavení -> Údaje o pacientovi). The birth number and the insurance
+     number additionally need the permission, whatever the setting says. */
+  const fieldVisibility = usePatientFields();
+  const maySeeSensitive = usePermission(SENSITIVE_IDENTITY);
 
   /* Pulled out so accepting or reclassifying a report can refresh the same
      list the paperwork banner reads - otherwise the two disagree until the
@@ -240,6 +248,37 @@ export default function PatientDetails() {
    * string, so a card can never lose a number it was already showing.
    */
   const displayPhone = storedNumberDisplay(phoneLook, storedPhone);
+
+  /* How each field in the clinic's catalogue is read off this patient. */
+  const personalValue: Record<string, string> = {
+    recordId: patient.id.slice(0, 8) + '…',
+    dateOfBirth: new Date(patient.dateOfBirth).toLocaleDateString('cs-CZ'),
+    sex: patient.sex === 'Male' ? 'Muž' : 'Žena',
+    email: displayEmail || '—',
+    phone: displayPhone || '—',
+    registeredAt: new Date(patient.createdAtUtc).toLocaleDateString('cs-CZ'),
+    status: patient.status === 'Archived' ? 'Archivovaný' : 'Aktivní',
+  };
+  const registrationValue: Record<string, string | null | undefined> = {
+    birthNumber: profile?.birthNumber,
+    insuranceNumber: profile?.insuranceNumber,
+    healthInsurer: profile?.healthInsurerCode,
+    insuredFrom: profile?.insuredFrom,
+    insuranceType: profile?.insuranceType,
+    citizenship: profile?.citizenship,
+    address: profile?.address,
+    treatingDoctors: profile?.treatingDoctors,
+    occupation: profile?.occupation,
+    employer: profile?.employer,
+    employmentType: profile?.employmentType,
+    notes: profile?.notes,
+  };
+  const personalRows = (shownFields(fieldVisibility.data, 'card', maySeeSensitive, 'personal') ?? [])
+    .map((field) => [field.label, personalValue[field.key] ?? '—'] as const);
+  const registrationRows = (shownFields(fieldVisibility.data, 'card', maySeeSensitive, 'registration') ?? [])
+    .map((field) => [field.label, registrationValue[field.key]] as const)
+    .filter(([, value]) => value);
+
   const latest = sessions[0];
   const previous = sessions[1];
   /*
@@ -318,7 +357,7 @@ export default function PatientDetails() {
         itself.
       */}
       {/* ── Extended profile (registration data) ── */}
-      {profile && (profile.birthNumber || profile.healthInsurerCode || profile.address) && (
+      {profile && registrationRows.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
           <Card sx={{ mb: 3, borderRadius: 3 }}>
             <CardContent>
@@ -327,20 +366,7 @@ export default function PatientDetails() {
                 Registrační údaje
               </Typography>
               <Grid container spacing={2}>
-                {[
-                  ['Rodné číslo', profile.birthNumber],
-                  ['Číslo pojištěnce', profile.insuranceNumber],
-                  ['ZP', profile.healthInsurerCode],
-                  ['Pojištěn od', profile.insuredFrom],
-                  ['Druh pojištění', profile.insuranceType],
-                  ['Státní příslušnost', profile.citizenship],
-                  ['Adresa', profile.address],
-                  ['Lékaři', profile.treatingDoctors],
-                  ['Povolání', profile.occupation],
-                  ['Zaměstnavatel', profile.employer],
-                  ['Druh zaměstnání', profile.employmentType],
-                  ['Poznámka', profile.notes],
-                ].filter(([, v]) => v).map(([label, v]) => (
+                {registrationRows.map(([label, v]) => (
                   <Grid size={{ xs: 12, sm: 6 }} key={label}>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{label}</Typography>
                     <Typography variant="body2">{v}</Typography>
@@ -419,14 +445,12 @@ export default function PatientDetails() {
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>Osobní údaje</Typography>
                 </Box>
                 <Divider sx={{ mb: 2 }} />
-                {[
-                  ['ID', patient.id.slice(0, 8) + '…'],
-                  ['Datum narození', new Date(patient.dateOfBirth).toLocaleDateString('cs-CZ')],
-                  ['Pohlaví', patient.sex === 'Male' ? 'Muž' : 'Žena'],
-                  ['Email', displayEmail || '—'],
-                  ['Telefon', displayPhone || '—'],
-                  ['Registrace', new Date(patient.createdAtUtc).toLocaleDateString('cs-CZ')],
-                ].map(([label, value]) => (
+                {fieldVisibility.isError && (
+                  <Typography variant="caption" color="text.secondary">
+                    Nastavení zobrazených údajů se nepodařilo načíst.
+                  </Typography>
+                )}
+                {personalRows.map(([label, value]) => (
                   <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: '1px solid #f5f5f5' }}>
                     <Typography variant="body2" color="text.secondary">{label}</Typography>
                     <Typography variant="body2" sx={{ fontWeight: 500 }}>{value}</Typography>
