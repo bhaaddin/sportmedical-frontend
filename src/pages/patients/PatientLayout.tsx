@@ -62,6 +62,35 @@ export interface PatientContext {
  * a blood draw that their medical record was missing.
  */
 
+/**
+ * The server's code for a patient who exists but is outside the calendars
+ * this employee may see (no `patients.view_all`). The same code comes from
+ * the card, the profile and the registry detail.
+ */
+export const NOT_IN_YOUR_CALENDARS = 'patients.not_in_your_calendars';
+
+const NOT_IN_YOUR_CALENDARS_TEXT =
+  'Tento pacient nemá rezervaci v žádném z kalendářů, ke kterým máte přístup.';
+
+const NOT_THERE_TEXT = 'Tenhle pacient neexistuje, nebo na něj nemáte přístup.';
+
+/**
+ * Why the patient could not be opened, in the words to show.
+ *
+ * A patient outside this person's calendars is a refusal with a reason, and
+ * the reason is worth saying: "neexistuje, nebo nemáte přístup" sends the desk
+ * checking the id, when the answer is that the patient is booked with somebody
+ * else. The server's own sentence is used when it sends one.
+ */
+function whyNotOpened(error: unknown): string {
+  const problem = (error as { response?: { data?: { code?: unknown; message?: unknown } } } | null)
+    ?.response?.data;
+  if (problem?.code !== NOT_IN_YOUR_CALENDARS) return NOT_THERE_TEXT;
+  return typeof problem.message === 'string' && problem.message.trim() !== ''
+    ? problem.message
+    : NOT_IN_YOUR_CALENDARS_TEXT;
+}
+
 export default function PatientLayout() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -70,7 +99,8 @@ export default function PatientLayout() {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [documents, setDocuments] = useState<PatientDocument[]>([]);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
-  const [notFound, setNotFound] = useState(false);
+  /* The sentence to show instead of the patient; `null` while there is hope. */
+  const [notOpened, setNotOpened] = useState<string | null>(null);
   /*
    * `null` until the answer arrives. An empty array is a real answer - "no
    * appointment asks for anything" - and drawing that sentence before the
@@ -86,8 +116,10 @@ export default function PatientLayout() {
 
   useEffect(() => {
     if (id === undefined) return;
-    setNotFound(false);
-    patientsApi.getById(id).then(setPatient).catch(() => setNotFound(true));
+    setNotOpened(null);
+    patientsApi.getById(id)
+      .then(setPatient)
+      .catch((error: unknown) => setNotOpened(whyNotOpened(error)));
     documentsApi.getTemplates().then(setTemplates).catch(() => setTemplates([]));
     /* Left null on failure, not emptied: a request that did not come back is
        not an answer, and "nothing is required" is a claim. */
@@ -97,12 +129,10 @@ export default function PatientLayout() {
     reloadDocuments();
   }, [id, reloadDocuments]);
 
-  if (notFound) {
+  if (notOpened !== null) {
     return (
       <Box sx={{ maxWidth: 600, mx: 'auto', py: 6 }}>
-        <Alert severity="warning">
-          Tenhle pacient neexistuje, nebo na něj nemáte přístup.
-        </Alert>
+        <Alert severity="warning">{notOpened}</Alert>
         <Button startIcon={<ArrowBack />} onClick={() => navigate('/patients')} sx={{ mt: 2 }}>
           Zpět na pacienty
         </Button>

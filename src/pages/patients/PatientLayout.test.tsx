@@ -288,6 +288,40 @@ describe('a patient who is not there', () => {
     expect(await screen.findByText(/Tenhle pacient neexistuje/)).toBeInTheDocument();
     expect(screen.queryByRole('tab')).not.toBeInTheDocument();
   });
+
+  /*
+   * A different sentence for a different thing. Without patients.view_all an
+   * employee opens only patients booked in their own calendars, and the server
+   * says so with a code and a reason. "Neexistuje, nebo nemáte přístup" would
+   * send the desk checking the id; the reason is that the patient is booked
+   * with somebody else.
+   */
+  it('passes on the server\'s reason when the patient is booked in somebody else\'s calendar', async () => {
+    getById.mockRejectedValue({
+      response: {
+        status: 403,
+        data: {
+          code: 'patients.not_in_your_calendars',
+          message: 'Tento pacient nemá rezervaci v žádném z kalendářů, ke kterým máte přístup.',
+        },
+      },
+    });
+
+    renderLayout();
+
+    expect(await screen.findByText(/nemá rezervaci v žádném z kalendářů/)).toBeInTheDocument();
+    expect(screen.queryByText(/Tenhle pacient neexistuje/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Zpět na pacienty/ })).toBeInTheDocument();
+  });
+
+  /* Any other refusal stays the sentence it was: nothing is claimed about why. */
+  it('does not invent a reason for a refusal it does not know', async () => {
+    getById.mockRejectedValue({ response: { status: 403, data: { code: 'access.denied' } } });
+
+    renderLayout();
+
+    expect(await screen.findByText(/Tenhle pacient neexistuje/)).toBeInTheDocument();
+  });
 });
 
 
