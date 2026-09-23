@@ -14,7 +14,7 @@ import theme from './theme';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import { useAppStore } from './store/useAppStore';
 import NetworkBanner from './components/NetworkBanner';
-import { AccessibilityProvider } from './components/AccessibilityProvider';
+import { KeyboardShortcuts } from './components/KeyboardShortcuts';
 import UniversalSearch from './components/UniversalSearch';
 import NotificationCenter from './components/NotificationCenter';
 
@@ -437,7 +437,7 @@ export default function App() {
     <GlobalErrorBoundary>
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AccessibilityProvider>
+      <KeyboardShortcuts />
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <Routes>
@@ -525,7 +525,6 @@ export default function App() {
           <Toaster position="top-right" />
         </BrowserRouter>
       </QueryClientProvider>
-      </AccessibilityProvider>
     </ThemeProvider>
     </GlobalErrorBoundary>
   );

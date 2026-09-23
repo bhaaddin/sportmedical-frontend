@@ -211,21 +211,6 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
-   SCREEN READER ONLY (visually hidden, accessible)
-   ══════════════════════════════════════════════════════════════ */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
-}
-
-/* ══════════════════════════════════════════════════════════════
    IMPROVED COLOR CONTRAST (WCAG AA 4.5:1)
    ══════════════════════════════════════════════════════════════ */
 :root {
@@ -243,14 +228,6 @@
   --contrast-text-on-warning: #FFFFFF;
   --contrast-text-on-critical: #FFFFFF;
   --contrast-muted-on-bg: #94A3B8; /* 4.5:1 on #0F172A */
-}
-
-/* ══════════════════════════════════════════════════════════════
-   ARIA LIVE REGION STYLES
-   ══════════════════════════════════════════════════════════════ */
-[aria-live="polite"],
-[aria-live="assertive"] {
-  /* Ensure live regions are not visually hidden */
 }
 
 /* ══════════════════════════════════════════════════════════════
