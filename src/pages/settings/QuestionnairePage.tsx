@@ -59,6 +59,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import {
   draftOf,
+  isActive,
+  latestOf,
   possibleTriggers,
   toOptions,
   publishedOf,
@@ -149,17 +151,28 @@ export default function QuestionnairePage() {
     femaleOnly: boolean;
   } | null>(null);
 
+  /* The two small dialogs for the questionnaire as a whole. */
+  const [creating, setCreating] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+
   const list = useQuery({
     queryKey: ['questionnaire-definitions'],
     queryFn: questionnaireEditorApi.list,
   });
 
+  /* Which questionnaire a činnost without its own gets — the clinic's default. */
+  const defaultQuery = useQuery({
+    queryKey: ['questionnaire-default'],
+    queryFn: questionnaireEditorApi.readDefault,
+  });
+  const defaultId = defaultQuery.data?.effectiveDefinitionId ?? null;
+
   /*
    * Which questionnaire is open.
    *
-   * Defaults to the one the booking page actually serves rather than to the
-   * first row: a clinic that also has the older sample catalogue would
-   * otherwise land on it and edit questions nobody is ever asked.
+   * Defaults to the one patients get when their činnost names none, rather
+   * than to the first row: a clinic with several would otherwise land on one
+   * nobody is asked.
    */
   const definition: EditorDefinition | null = useMemo(() => {
     const all = list.data ?? [];
@@ -170,19 +183,24 @@ export default function QuestionnairePage() {
 
     return (
       all.find((candidate) => candidate.id === selectedId)
-      ?? all.find((candidate) => candidate.key === 'sportmedical-cz-zdravotni-dotaznik')
+      ?? all.find((candidate) => candidate.id === defaultId)
       ?? all[0]
     );
-  }, [list.data, selectedId]);
+  }, [list.data, selectedId, defaultId]);
 
   const draft = definition ? draftOf(definition) : null;
   const published = definition ? publishedOf(definition) : null;
+  const active = definition ? isActive(definition) : false;
 
-  /** What is on screen: the draft when there is one, otherwise the live one. */
-  const shown: EditorVersion | null = draft ?? published;
+  /**
+   * What is on screen: the draft when there is one, otherwise the live one,
+   * otherwise — for a questionnaire that was switched off — what it last asked.
+   */
+  const shown: EditorVersion | null = draft ?? published ?? (definition ? latestOf(definition) : null);
 
   const reload = async () => {
     await queryClient.invalidateQueries({ queryKey: ['questionnaire-definitions'] });
+    await queryClient.invalidateQueries({ queryKey: ['questionnaire-default'] });
   };
 
   /*
@@ -225,24 +243,87 @@ export default function QuestionnairePage() {
     );
   }
 
-  if (!definition || !shown) {
+  /*
+   * A new questionnaire: a name, nothing else. The server makes the key and
+   * opens the first draft, and the screen switches to it so the clinic can
+   * start adding questions straight away.
+   */
+  const createDialog = creating !== null && (
+    <Dialog open fullWidth maxWidth="sm" onClose={() => setCreating(null)}>
+      <DialogTitle>Nový dotazník</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            Začne jako prázdný koncept. Pacientům se ukáže, až do něj přidáte otázky a zveřejníte
+            ho — a jen u činností, které ho mají vybraný, nebo když ho nastavíte jako výchozí.
+          </Typography>
+          <TextField
+            autoFocus
+            label="Název dotazníku"
+            value={creating}
+            onChange={(event) => setCreating(event.target.value)}
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button color="inherit" onClick={() => setCreating(null)}>Zrušit</Button>
+        <Button
+          variant="contained"
+          disabled={act.isPending || creating.trim().length === 0}
+          onClick={() => {
+            const name = creating.trim();
+
+            setCreating(null);
+            run(async () => {
+              const created = await questionnaireEditorApi.create(name);
+              setSelectedId(created.id);
+            });
+          }}
+        >
+          Vytvořit
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+
+  if (!definition) {
     return (
-      <Alert severity="info" sx={{ m: 2 }}>
-        Ordinace zatím žádný dotazník nemá.
-      </Alert>
+      <Box sx={{ p: { xs: 2, md: 3 } }}>
+        <Alert
+          severity="info"
+          action={(
+            <Button color="inherit" size="small" onClick={() => setCreating('')}>
+              Nový dotazník
+            </Button>
+          )}
+        >
+          Ordinace zatím žádný dotazník nemá.
+        </Alert>
+        {refusal && <Alert severity="warning" sx={{ mt: 2 }}>{refusal}</Alert>}
+        {createDialog}
+      </Box>
     );
   }
 
-  const sections = sectionsOf(shown);
-  const editable = draft !== null && shown.id === draft.id;
+  const sections = shown ? sectionsOf(shown) : [];
+  const editable = draft !== null && shown !== null && shown.id === draft.id;
+  const isDefault = definition.id === defaultId;
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1100, mx: 'auto' }}>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { sm: 'center' } }}>
         <Box sx={{ flexGrow: 1 }}>
-          <Typography variant="h5">{definition.displayName}</Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+            <Typography variant="h5">{definition.displayName}</Typography>
+            <Chip
+              size="small"
+              color={active ? 'success' : 'default'}
+              label={active ? 'Zapnutý' : 'Vypnutý'}
+            />
+            {isDefault && <Chip size="small" color="primary" variant="outlined" label="Výchozí" />}
+          </Stack>
           <Typography variant="body2" color="text.secondary">
-            {shown.questions.length} otázek ve {sections.length} sekcích
+            {shown ? `${shown.questions.length} otázek ve ${sections.length} sekcích` : 'Zatím bez otázek'}
           </Typography>
         </Box>
 
@@ -258,11 +339,73 @@ export default function QuestionnairePage() {
             {(list.data ?? []).map((candidate) => (
               <MenuItem key={candidate.id} value={candidate.id}>
                 {candidate.displayName}
+                {isActive(candidate) ? '' : ' (vypnutý)'}
               </MenuItem>
             ))}
           </TextField>
         )}
+
+        <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setCreating('')}>
+          Nový dotazník
+        </Button>
       </Stack>
+
+      {/*
+        The questionnaire as a whole: its name, whether patients are asked it,
+        and whether it is what a činnost without its own gets.
+      */}
+      <Stack direction="row" spacing={1} sx={{ mt: 2, flexWrap: 'wrap', gap: 1 }}>
+        <Button
+          size="small"
+          startIcon={<EditIcon />}
+          disabled={act.isPending}
+          onClick={() => setRenaming(definition.displayName)}
+        >
+          Přejmenovat
+        </Button>
+        {active ? (
+          <Tooltip
+            title={isDefault
+              ? 'Výchozí dotazník nelze vypnout — nejdřív nastavte jako výchozí jiný.'
+              : 'Pacienti ho přestanou vyplňovat. Činnosti, které ho mají vybraný, dostanou výchozí dotazník.'}
+          >
+            <span>
+              <Button
+                size="small"
+                color="warning"
+                disabled={act.isPending || isDefault}
+                onClick={() => run(() => questionnaireEditorApi.deactivate(definition.id))}
+              >
+                Vypnout
+              </Button>
+            </span>
+          </Tooltip>
+        ) : (
+          draft === null && (definition.versions.length > 0) && (
+            <Button
+              size="small"
+              color="success"
+              disabled={act.isPending}
+              onClick={() => run(() => questionnaireEditorApi.activate(definition.id))}
+            >
+              Zapnout
+            </Button>
+          )
+        )}
+        {active && !isDefault && (
+          <Button
+            size="small"
+            disabled={act.isPending}
+            onClick={() => run(async () => { await questionnaireEditorApi.setDefault(definition.id); })}
+          >
+            Nastavit jako výchozí
+          </Button>
+        )}
+      </Stack>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+        Výchozí dotazník dostane pacient, jehož činnost žádný vlastní dotazník nemá. Dotazník pro
+        konkrétní činnost se vybírá v nastavení činnosti.
+      </Typography>
 
       {refusal && (
         <Alert severity="warning" sx={{ mt: 2 }} onClose={() => setRefusal(null)}>
@@ -281,16 +424,24 @@ export default function QuestionnairePage() {
         <CardContent>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: { md: 'center' } }}>
             <Box sx={{ flexGrow: 1 }}>
-              {editable ? (
+              {shown === null ? (
+                <>
+                  <Chip size="small" label="Bez verze" />
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    Dotazník zatím nemá žádné otázky. Otevřete koncept a přidejte je.
+                  </Typography>
+                </>
+              ) : editable ? (
                 <>
                   <Chip size="small" color="warning" label={`Koncept — verze ${shown.versionNumber}`} />
                   <Typography variant="body2" sx={{ mt: 1 }}>
-                    Úpravy se pacientům neukazují. Pacienti zatím vyplňují{' '}
-                    {published ? `verzi ${published.versionNumber}` : 'jinou verzi'}. Zveřejněním
-                    koncept nahradí to, co je nasazené.
+                    Úpravy se pacientům neukazují.{' '}
+                    {published
+                      ? `Pacienti zatím vyplňují verzi ${published.versionNumber}. Zveřejněním koncept nahradí to, co je nasazené.`
+                      : 'Dotazník je teď vypnutý — zveřejněním konceptu se zapne.'}
                   </Typography>
                 </>
-              ) : (
+              ) : active ? (
                 <>
                   <Chip size="small" color="success" label={`Nasazeno — verze ${shown.versionNumber}`} />
                   <Typography variant="body2" sx={{ mt: 1 }}>
@@ -298,11 +449,19 @@ export default function QuestionnairePage() {
                     kopie, na které se pracuje, dokud ji nezveřejníte.
                   </Typography>
                 </>
+              ) : (
+                <>
+                  <Chip size="small" label={`Vypnuto — naposledy verze ${shown.versionNumber}`} />
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    Tento dotazník teď nikdo nevyplňuje. Zapnutím se vrátí s otázkami, které měl
+                    naposledy; v konceptu je můžete nejdřív upravit.
+                  </Typography>
+                </>
               )}
             </Box>
 
             <Stack direction="row" spacing={1}>
-              {editable ? (
+              {editable && shown !== null ? (
                 <>
                   <Button
                     variant="contained"
@@ -336,6 +495,39 @@ export default function QuestionnairePage() {
           </Stack>
         </CardContent>
       </Card>
+
+      {createDialog}
+
+      {renaming !== null && (
+        <Dialog open fullWidth maxWidth="sm" onClose={() => setRenaming(null)}>
+          <DialogTitle>Přejmenovat dotazník</DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              fullWidth
+              label="Název dotazníku"
+              value={renaming}
+              onChange={(event) => setRenaming(event.target.value)}
+              sx={{ mt: 1 }}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button color="inherit" onClick={() => setRenaming(null)}>Zrušit</Button>
+            <Button
+              variant="contained"
+              disabled={act.isPending || renaming.trim().length === 0}
+              onClick={() => {
+                const name = renaming.trim();
+
+                setRenaming(null);
+                run(() => questionnaireEditorApi.rename(definition.id, name));
+              }}
+            >
+              Uložit
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
 
       <Stack spacing={2} sx={{ mt: 3 }}>
         {sections.map((section) => (
@@ -535,7 +727,7 @@ export default function QuestionnairePage() {
         </Button>
       )}
 
-      {adding && (
+      {adding && shown && (
         <QuestionDialog
           title="Nová otázka"
           version={shown}
@@ -552,7 +744,7 @@ export default function QuestionnairePage() {
         />
       )}
 
-      {editing && (
+      {editing && shown && (
         <RewordDialog
           question={editing}
           version={shown}
@@ -569,7 +761,7 @@ export default function QuestionnairePage() {
         />
       )}
 
-      {renamingSection && (
+      {renamingSection && shown && (
         <Dialog open fullWidth maxWidth="sm" onClose={() => setRenamingSection(null)}>
           <DialogTitle>Sekce {renamingSection.sectionNumber}</DialogTitle>
           <DialogContent>

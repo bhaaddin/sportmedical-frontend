@@ -34,6 +34,12 @@ const editQuestion = vi.fn();
 const removeQuestion = vi.fn();
 const moveQuestion = vi.fn();
 const renameSection = vi.fn();
+const rename = vi.fn();
+const create = vi.fn();
+const activate = vi.fn();
+const deactivate = vi.fn();
+const readDefault = vi.fn();
+const setDefault = vi.fn();
 
 vi.mock('../../api/questionnaireEditor', async () => {
   const actual = await vi.importActual<typeof import('../../api/questionnaireEditor')>(
@@ -53,7 +59,12 @@ vi.mock('../../api/questionnaireEditor', async () => {
       removeQuestion,
       moveQuestion,
       renameSection,
-      rename: vi.fn(),
+      rename,
+      create,
+      activate,
+      deactivate,
+      readDefault,
+      setDefault,
     },
   };
 });
@@ -126,6 +137,12 @@ beforeEach(() => {
     moveQuestion,
     renameSection,
   ].forEach((fn) => fn.mockResolvedValue(undefined));
+
+  [rename, create, activate, deactivate, readDefault, setDefault].forEach((fn) => fn.mockReset());
+  [rename, activate, deactivate].forEach((fn) => fn.mockResolvedValue(undefined));
+  create.mockResolvedValue({ id: 'd-9', key: 'dotaznik-pro-bezce', displayName: 'Dotazník pro běžce', isActive: false });
+  readDefault.mockResolvedValue({ configuredDefinitionId: null, effectiveDefinitionId: 'd-1' });
+  setDefault.mockResolvedValue({ configuredDefinitionId: 'd-2', effectiveDefinitionId: 'd-2' });
 });
 
 const withQueries = (ui: ReactNode) => {
@@ -301,13 +318,112 @@ describe('a refusal reaches the person in the words the server used', () => {
   });
 });
 
+/*
+ * The questionnaire as a whole — new, renamed, on, off, the default.
+ *
+ * The clinic had one questionnaire and no way to have a second, stop asking
+ * one, or say which one a činnost without its own gets. What is worth
+ * checking here is the one refusal the screen must not let anybody walk into:
+ * the default cannot be switched off, so the button is disabled rather than
+ * pressed and refused.
+ */
+describe('the questionnaire as a whole', () => {
+  it('says which one is switched on and which one is the default', async () => {
+    list.mockResolvedValue([definition([version('Published')])]);
+
+    render(withQueries(<QuestionnairePage />));
+
+    expect(await screen.findByText('Zapnutý')).toBeInTheDocument();
+    expect(screen.getByText('Výchozí')).toBeInTheDocument();
+  });
+
+  it('will not let the default be switched off — the button is disabled', async () => {
+    list.mockResolvedValue([definition([version('Published')])]);
+
+    render(withQueries(<QuestionnairePage />));
+
+    expect(await screen.findByRole('button', { name: 'Vypnout' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Nastavit jako výchozí' })).not.toBeInTheDocument();
+  });
+
+  it('switches a questionnaire that is not the default off', async () => {
+    readDefault.mockResolvedValue({ configuredDefinitionId: 'd-1', effectiveDefinitionId: 'd-1' });
+    list.mockResolvedValue([{ ...definition([version('Published')]), id: 'd-2', key: 'dotaznik-pro-plavce' }]);
+
+    render(withQueries(<QuestionnairePage />));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Vypnout' }));
+
+    await waitFor(() => expect(deactivate).toHaveBeenCalledWith('d-2'));
+  });
+
+  it('makes a switched-on questionnaire the default', async () => {
+    readDefault.mockResolvedValue({ configuredDefinitionId: 'd-1', effectiveDefinitionId: 'd-1' });
+    list.mockResolvedValue([{ ...definition([version('Published')]), id: 'd-2', key: 'dotaznik-pro-plavce' }]);
+
+    render(withQueries(<QuestionnairePage />));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Nastavit jako výchozí' }));
+
+    await waitFor(() => expect(setDefault).toHaveBeenCalledWith('d-2'));
+  });
+
+  it('shows a switched-off questionnaire with what it last asked, and switches it back on', async () => {
+    list.mockResolvedValue([definition([version('Retired')])]);
+
+    render(withQueries(<QuestionnairePage />));
+
+    expect(await screen.findByText(/Vypnuto — naposledy verze 1/)).toBeInTheDocument();
+    expect(screen.getByText('Bolest na hrudi při zátěži?')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zapnout' }));
+
+    await waitFor(() => expect(activate).toHaveBeenCalledWith('d-1'));
+  });
+
+  it('starts a new questionnaire from a name alone', async () => {
+    list.mockResolvedValue([definition([version('Published')])]);
+
+    render(withQueries(<QuestionnairePage />));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Nový dotazník' }));
+
+    const dialog = await screen.findByRole('dialog');
+
+    expect(within(dialog).getByRole('button', { name: 'Vytvořit' })).toBeDisabled();
+
+    await userEvent.type(within(dialog).getByLabelText('Název dotazníku'), 'Dotazník pro běžce');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vytvořit' }));
+
+    await waitFor(() => expect(create).toHaveBeenCalledWith('Dotazník pro běžce'));
+  });
+
+  it('renames a questionnaire — the name, never the key answers are filed under', async () => {
+    list.mockResolvedValue([definition([version('Published')])]);
+
+    render(withQueries(<QuestionnairePage />));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Přejmenovat' }));
+
+    const dialog = await screen.findByRole('dialog');
+    const name = within(dialog).getByLabelText('Název dotazníku');
+
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Vstupní dotazník');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Uložit' }));
+
+    await waitFor(() => expect(rename).toHaveBeenCalledWith('d-1', 'Vstupní dotazník'));
+  });
+});
+
 describe('before there is anything to edit', () => {
-  it('says so rather than drawing an empty questionnaire', async () => {
+  it('says so rather than drawing an empty questionnaire, and offers to start one', async () => {
     list.mockResolvedValue([]);
 
     render(withQueries(<QuestionnairePage />));
 
     expect(await screen.findByText('Ordinace zatím žádný dotazník nemá.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nový dotazník' })).toBeInTheDocument();
   });
 
   it('says the load failed rather than looking like a clinic with no questions', async () => {

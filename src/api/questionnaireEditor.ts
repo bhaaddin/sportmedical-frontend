@@ -153,6 +153,31 @@ export const sectionsOf = (version: EditorVersion): EditorSection[] => {
 export const draftOf = (definition: EditorDefinition): EditorVersion | null =>
   definition.versions.find((version) => version.status === 'Draft') ?? null;
 
+export interface QuestionnaireSummary {
+  id: string;
+  key: string;
+  displayName: string;
+  isActive: boolean;
+}
+
+export interface DefaultQuestionnaire {
+  /** What the clinic chose, or null when it never chose. */
+  configuredDefinitionId: string | null;
+  /** What patients whose činnost names none get now; null when nothing is switched on. */
+  effectiveDefinitionId: string | null;
+}
+
+/**
+ * Switched on: patients are being asked it. The server's rule — a published
+ * version exists — read off the same versions, not a flag of its own.
+ */
+export const isActive = (definition: EditorDefinition): boolean =>
+  definition.versions.some((version) => version.status === 'Published');
+
+/** The newest version of any kind — what a switched-off questionnaire last asked. */
+export const latestOf = (definition: EditorDefinition): EditorVersion | null =>
+  [...definition.versions].sort((a, b) => b.versionNumber - a.versionNumber)[0] ?? null;
+
 /** The one patients are answering, or null before anything was published. */
 export const publishedOf = (definition: EditorDefinition): EditorVersion | null =>
   definition.versions
@@ -259,6 +284,47 @@ export const questionnaireEditorApi = {
 
   discardDraft: async (definitionId: string, versionId: string): Promise<void> => {
     await client.delete(`${root(definitionId)}/versions/${versionId}`);
+  },
+
+  /* ── The questionnaire as a whole ── */
+
+  /**
+   * A new, empty questionnaire with its first draft open. The server makes the
+   * key from the name; patients are not asked it until the draft is published.
+   */
+  create: async (displayName: string): Promise<QuestionnaireSummary> => {
+    const { data } = await client.post<QuestionnaireSummary>('/api/questionnaires/definitions', {
+      displayName,
+    });
+    return data;
+  },
+
+  /** What it is called on screen. The key — what answers are filed under — never changes. */
+  rename: async (definitionId: string, displayName: string): Promise<void> => {
+    await client.put(`${root(definitionId)}/name`, { displayName });
+  },
+
+  /** Back on, with the questions it last had (a new version). */
+  activate: async (definitionId: string): Promise<void> => {
+    await client.post(`${root(definitionId)}/activate`, {});
+  },
+
+  /** Off: nobody is asked it any more. Answers already given stay readable. */
+  deactivate: async (definitionId: string): Promise<void> => {
+    await client.post(`${root(definitionId)}/deactivate`, {});
+  },
+
+  /** Which questionnaire a činnost without its own gets — chosen, and in effect. */
+  readDefault: async (): Promise<DefaultQuestionnaire> => {
+    const { data } = await client.get<DefaultQuestionnaire>('/api/questionnaires/default');
+    return data;
+  },
+
+  setDefault: async (definitionId: string): Promise<DefaultQuestionnaire> => {
+    const { data } = await client.put<DefaultQuestionnaire>('/api/questionnaires/default', {
+      definitionId,
+    });
+    return data;
   },
 };
 
