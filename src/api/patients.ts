@@ -63,8 +63,4 @@ export const patientsApi = {
     const res = await client.get(`/api/patients/${id}/profile`);
     return res.data?.value ?? res.data;
   },
-
-  saveProfile: async (id: string, profile: any): Promise<void> => {
-    await client.put(`/api/patients/${id}/profile`, profile);
-  },
 };
