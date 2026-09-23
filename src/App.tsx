@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Avatar, IconButton, Menu, MenuItem, Badge, CircularProgress, Button } from '@mui/material';
-import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Search, AttachMoney, Schedule, EventBusy, Today, Description, ArrowBack } from '@mui/icons-material';
+import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Search, AttachMoney, Schedule, EventBusy, Today, Description, ArrowBack, Assessment } from '@mui/icons-material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { storedPermissions, type Permission } from './auth/usePermission';
 import { PATIENT_SECTIONS, patientInPath, sectionPath } from './pages/patients/sections';
@@ -60,6 +60,8 @@ const BookingExceptionsPage = lazy(() => import('./pages/booking/ExceptionsPage'
 const BookingGridPage = lazy(() => import('./pages/booking/CalendarGridPage'));
 /* Booking phase 1, stage 4: the appointment detail and the day at a glance */
 const BookingDayOverviewPage = lazy(() => import('./pages/booking/DayOverviewPage'));
+/* The owner's "přehled podle služeb": bookings, when, who, free capacity - per činnost, by filters */
+const BookingServiceOverviewPage = lazy(() => import('./pages/booking/ServiceOverviewPage'));
 /* Booking phase 1, stage 5: partner reservations */
 const BookingPartnerOrdersPage = lazy(() => import('./pages/booking/PartnerOrdersPage'));
 const BookingBlockedTimePage = lazy(() => import('./pages/booking/BlockedTimePage'));
@@ -109,6 +111,15 @@ const menuGroups: MenuItemGroup[] = [
     items: [
       { text: 'Dnešní přehled', icon: <Today />, path: '/dnes' },
       { text: 'Plánování', icon: <CalendarMonth />, path: '/planovani' },
+      /*
+       * No `requires`, and that is measured, not forgotten: everything behind
+       * this screen - GET /api/day, …/preview, …/availability, /api/activities,
+       * /api/clinic-services - carries `[Authorize]` and per-calendar
+       * visibility only, no named permission. An employee who sees one
+       * calendar gets the overview of that one calendar, and the server is
+       * what narrows it (6.5).
+       */
+      { text: 'Přehled podle služeb', icon: <Assessment />, path: '/prehled-sluzeb' },
       { text: 'Pacienti', icon: <People />, path: '/patients', requires: 'patients.view' },
       { text: 'Diagnostika', icon: <Science />, path: '/diagnostics/new' },
     ],
@@ -469,6 +480,9 @@ export default function App() {
                     <Route path="/intake-review" element={<RequirePermission of="patients.register"><IntakeReviewQueue /></RequirePermission>} />
                     <Route path="/planovani" element={<BookingGridPage />} />
                     <Route path="/dnes" element={<BookingDayOverviewPage />} />
+                    {/* Unguarded for the reason given at the sidebar entry: the APIs
+                        behind it ask for sign-in and calendar visibility, nothing named. */}
+                    <Route path="/prehled-sluzeb" element={<BookingServiceOverviewPage />} />
                     <Route path="/vyhrazeni" element={<BookingPartnerOrdersPage />} />
                     <Route path="/blokovany-cas" element={<BookingBlockedTimePage />} />
                     {/* Where a booking notification's actionUrl points. */}
