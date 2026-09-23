@@ -23,6 +23,7 @@ import { toast } from "react-hot-toast";
 import client from "../api/client";
 import { patientsApi } from "../api/patients";
 import { patientIdentityApi } from "../api/patientIdentity";
+import { usePermission } from "../auth/usePermission";
 import type { InsuranceRegistrationKind, ResidenceType } from "../api/patientRegistry";
 import type { AddressPoint } from "../api/addressLookup";
 import RuianAddressPicker from "../components/registration/RuianAddressPicker";
@@ -122,6 +123,13 @@ const SEX_OPTIONS: { value: Sex; label: string }[] = [
 export default function PatientForm() {
   const { id: patientId } = useParams();
   const navigate = useNavigate();
+  /*
+   * The insurance correction rewrites the birth number and the insurance
+   * number, so the server takes it only from somebody who may see them. For
+   * anybody else the profile sends both as null: the dialog would open empty
+   * and every save would be refused.
+   */
+  const maySeeIdentity = usePermission("patients.sensitive_identity.view");
 
   /**
    * Loaded through the same machinery as the booking screens: a query, and the
@@ -377,13 +385,15 @@ export default function PatientForm() {
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ mt: 2, flexWrap: "wrap", gap: 1 }}>
-            <Button
-              startIcon={<EditIcon />}
-              variant="outlined"
-              onClick={() => setInsuranceOpen(true)}
-            >
-              Opravit pojištění
-            </Button>
+            {maySeeIdentity && (
+              <Button
+                startIcon={<EditIcon />}
+                variant="outlined"
+                onClick={() => setInsuranceOpen(true)}
+              >
+                Opravit pojištění
+              </Button>
+            )}
             <Button
               startIcon={<EditIcon />}
               variant="outlined"

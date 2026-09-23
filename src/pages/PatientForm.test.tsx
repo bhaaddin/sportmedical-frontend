@@ -98,3 +98,27 @@ describe('a correction to name, date of birth or sex', () => {
     expect(await screen.findByText('Důvod změny je příliš dlouhý.')).toBeInTheDocument();
   });
 });
+
+/*
+ * The insurance correction rewrites the birth number and the insurance number,
+ * and the server takes it only from somebody allowed to see them. Offered to
+ * anybody else it opened empty and every save came back 403.
+ */
+describe('the insurance correction', () => {
+  it('is offered to somebody who may see the birth number', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.edit', 'patients.sensitive_identity.view']));
+    renderForm();
+    await screen.findByDisplayValue('Markova');
+
+    expect(screen.getByRole('button', { name: 'Opravit pojištění' })).toBeInTheDocument();
+  });
+
+  it('is not offered to somebody who may not', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.edit']));
+    renderForm();
+    await screen.findByDisplayValue('Markova');
+
+    expect(screen.queryByRole('button', { name: 'Opravit pojištění' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Opravit adresu' })).toBeInTheDocument();
+  });
+});
