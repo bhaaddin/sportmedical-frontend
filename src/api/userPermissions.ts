@@ -88,7 +88,7 @@ export const PERMISSION_LABELS: Record<string, { label: string; detail: string }
   },
   'settings.appearance.manage': {
     label: 'Měnit vzhled',
-    detail: 'Barvy a vizuální nastavení.',
+    detail: 'Dnes nic neotvírá: žádná obrazovka ani rozhraní aplikace ho nevyžaduje.',
   },
   'users.manage': {
     label: 'Spravovat účty',

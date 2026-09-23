@@ -143,7 +143,7 @@ describe('what each person sees', () => {
 
     // Their other permissions are untouched.
     expect(ids).toContain('tym');
-    expect(ids).toContain('barvy-upozorneni');
+    expect(ids).toContain('zdravotni-dotaznik');
   });
 
   it('shows nothing but the open rows to somebody with no permissions at all', () => {

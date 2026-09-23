@@ -229,21 +229,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       },
       {
         /*
-         * He was promised these and then nobody built the screen - "bavili
-         * sme sa s backendom ze budem moct nastavit i farby alertov ...
-         * nevidim to nikde". Once for the whole application: a colour is the
-         * word for a state, and the same state must not be green here and
-         * amber there. When it lights up is on the rule; what it looks like
-         * is here.
-         */
-        id: 'barvy-upozorneni',
-        label: 'Barvy upozornění',
-        description: 'Jak se barevně odlišuje, jak na tom doklad pacienta je',
-        to: '/barvy-upozorneni',
-        requires: 'settings.appearance.manage',
-      },
-      {
-        /*
          * The questions a patient actually answers. They lived in the browser
          * bundle until 21. 9. 2026 -- seventy-seven of them, with fifty-two
          * more unused in the domain -- so adding one meant a developer and a
