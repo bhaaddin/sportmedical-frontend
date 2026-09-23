@@ -53,9 +53,15 @@ describe('every screen parses', () => {
    * one screen pulls enough behind it to take eight seconds the first time.
    * A tight limit would make this fail for a reason that is not the one it
    * is looking for, and a check that cries wolf gets deleted.
+   *
+   * It cried wolf on 23. 9. 2026: the first screen in the list (which pays
+   * for @mui/material and the icon barrel) took 13 s on its own and 31-34 s
+   * inside the full suite on a machine shared with other work, against a
+   * 30 s limit. A parse error throws at once whatever the limit is, so the
+   * limit only has to stop a hang.
    */
   it.each(paths)('%s', async (path) => {
     const loaded = await modules[path]();
     expect(loaded).toBeTypeOf('object');
-  }, 30_000);
+  }, 60_000);
 });
