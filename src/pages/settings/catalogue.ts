@@ -141,7 +141,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       {
         id: 'tym',
         label: 'Tým a účty',
-        description: 'Zaměstnanci, role a resetování hesla',
+        description: 'Zaměstnanci, jejich role, reset hesla a vypnutí přístupu',
         to: '/staff-management',
         requires: 'users.manage',
       },
