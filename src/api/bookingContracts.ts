@@ -386,7 +386,7 @@ export function isKnownPaperworkReason(code: string): code is PaperworkReason {
 /* ── 4.5 Bookings ── */
 
 /**
- * The seven statuses of 4.5. There is no "late" among them: 6.2 makes that a
+ * The six statuses of 4.5. There is no "late" among them: 6.2 makes that a
  * display, recomputed on the client from the rule in `isLate`.
  *
  * The list is closed - a new status is a change of contract - but an unknown
@@ -395,7 +395,7 @@ export function isKnownPaperworkReason(code: string): code is PaperworkReason {
  * nothing.
  */
 /**
- * 4.5 (v18): `status` travels as a number, and these are the seven the domain
+ * 4.5 (v18): `status` travels as a number, and these are the six the domain
  * has. The contract named them in prose until v11, then lost the table in a
  * rewrite; the names below come from the table the booking lane restored from
  * `AppointmentStatus`, not from a guess on this side.
@@ -412,7 +412,6 @@ export const BOOKING_STATUS_NAMES = [
   "Completed",
   "Cancelled",
   "NoShow",
-  "Waitlisted",
 ] as const;
 
 export type KnownBookingStatus = (typeof BOOKING_STATUS_NAMES)[number];
@@ -425,13 +424,12 @@ export function statusName(code: number): KnownBookingStatus | null {
   return BOOKING_STATUS_NAMES[code] ?? null;
 }
 
-/** Which day-overview tally a status belongs to (4.5). `none` counts nowhere. */
+/** Which day-overview tally a status belongs to (4.5). */
 export type StatusTally =
   | "booked"
   | "arrived"
   | "noShow"
   | "cancelled"
-  | "none"
   | "unknown";
 
 export function statusTally(code: number): StatusTally {
@@ -446,8 +444,6 @@ export function statusTally(code: number): StatusTally {
       return "cancelled";
     case 5: // NoShow
       return "noShow";
-    case 6: // Waitlisted - this API does not produce it yet
-      return "none";
     default:
       return "unknown";
   }
@@ -490,7 +486,7 @@ export function canChangeStatus(from: number, to: number): boolean {
     case 5: // NoShow
       return to === 0 || to === 2;
     default:
-      // Completed, Cancelled, Waitlisted and anything unknown: nowhere but 4.
+      // Completed, Cancelled and anything unknown: nowhere but 4.
       return false;
   }
 }

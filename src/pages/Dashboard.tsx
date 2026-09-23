@@ -82,7 +82,6 @@ const STATUS_LABELS: Record<string, string> = {
   Completed: 'Hotovo',
   Cancelled: 'Zrušeno',
   NoShow: 'Nepřišel',
-  Waitlisted: 'Náhradník',
 };
 
 /* ── Stat Card ── */
