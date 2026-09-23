@@ -172,7 +172,7 @@ export default function Settings() {
           <Box>
             <Typography sx={{ fontWeight: 700 }}>Můj účet</Typography>
             <Typography variant="body2" color="text.secondary">
-              Nastavení, která platí jen pro vás — ne pro celou ordinaci
+              Váš účet a odhlášení
             </Typography>
           </Box>
         </AccordionSummary>
