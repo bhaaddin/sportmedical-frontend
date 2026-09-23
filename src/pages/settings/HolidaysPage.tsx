@@ -3,13 +3,19 @@
 
    The clinic's year: which days are off, and which of them it works anyway.
 
+   ── The rule the owner set ──
+
+   A holiday is closed: nobody can book, the day is switched off. Only when the
+   administrator says "Pracujeme v tento den" do the calendars' own working
+   hours apply that day, and only then can anybody be booked. On a working
+   holiday the web can still be kept out ("Online objednávky vypnuty") while
+   the desk books as usual.
+
    ── Why this screen exists ──
 
    The thirteen Czech public holidays were computed inside the source and
    reachable from nowhere. A clinic could not add a company day off, could not
-   say it works on 28. října, and could not even SEE why a day was closed —
-   availability simply offered no times and gave no reason. Somebody looking at
-   an empty Monday in April had to read the code to find Velikonoční pondělí.
+   say it works on 28. října, and could not even SEE why a day was closed.
 
    ── What it does not do ──
 
@@ -31,20 +37,30 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   IconButton,
   Stack,
+  Switch,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import AddIcon from '@mui/icons-material/Add';
 import UndoIcon from '@mui/icons-material/Undo';
 import EditIcon from '@mui/icons-material/Edit';
 import { holidaysApi } from '../../api/holidays';
 import type { ClinicHoliday } from '../../api/holidays';
+import { calendarsApi } from '../../api/calendars';
+import { workingHoursApi } from '../../api/workingHours';
 import { errorText } from '../../components/booking/errorText';
 import { useTranslation } from 'react-i18next';
+import {
+  onlinePlan,
+  onlineState,
+  workingSwitchAction,
+  type CalendarExceptions,
+} from './holidayDay';
 
 /** The clinic's own time zone, so "today" is the clinic's today. */
 const thisYear = (): number =>
@@ -60,17 +76,17 @@ const czechDate = (iso: string): string => {
   });
 };
 
-/** What the row is, in one word the owner can scan. */
+/** What the row is, in words the owner can scan. */
 function StatusChip({ holiday }: { holiday: ClinicHoliday }) {
-  if (holiday.isAmended && !holiday.isHoliday) {
+  if (!holiday.isHoliday) {
     return <Chip size="small" color="success" label="Pracujeme" />;
   }
 
-  if (holiday.isAmended) {
-    return <Chip size="small" color="warning" label="Naše volno" />;
+  if (holiday.isStatutory) {
+    return <Chip size="small" variant="outlined" color="error" label="Státní svátek – zavřeno" />;
   }
 
-  return <Chip size="small" variant="outlined" label="Státní svátek" />;
+  return <Chip size="small" color="warning" label="Naše volno – zavřeno" />;
 }
 
 export default function HolidaysPage() {
@@ -79,10 +95,76 @@ export default function HolidaysPage() {
 
   const [year, setYear] = useState(thisYear);
   const [editing, setEditing] = useState<{ date: string; name: string; isHoliday: boolean } | null>(null);
+  const [blocked, setBlocked] = useState<{ date: string; calendars: string[] } | null>(null);
 
   const holidays = useQuery({
     queryKey: ['holidays', year],
     queryFn: () => holidaysApi.year(year),
+  });
+
+  const calendars = useQuery({
+    queryKey: ['calendars'],
+    queryFn: calendarsApi.list,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const yearFrom = `${year}-01-01`;
+  const yearTo = `${year}-12-31`;
+
+  /* One request per calendar for the whole year; the list endpoint needs the range. */
+  const exceptionQueries = useQueries({
+    queries: (calendars.data ?? []).map((calendar) => ({
+      queryKey: ['exceptions', calendar.id, yearFrom, yearTo],
+      queryFn: () => workingHoursApi.listExceptions(calendar.id, yearFrom, yearTo),
+    })),
+  });
+
+  const exceptionsKnown =
+    calendars.isSuccess && exceptionQueries.every((query) => query.isSuccess);
+  const perCalendar: CalendarExceptions[] = (calendars.data ?? []).map((calendar, index) => ({
+    calendar,
+    exceptions: exceptionQueries[index]?.data ?? [],
+  }));
+
+  const refreshExceptions = () => queryClient.invalidateQueries({ queryKey: ['exceptions'] });
+
+  /** Online-only exceptions off, or on, for one date across the calendars. */
+  const applyOnline = async (holiday: ClinicHoliday, closeOnline: boolean) => {
+    const plan = onlinePlan(holiday.date, holiday.name, perCalendar, closeOnline);
+
+    for (const { calendarId, id } of plan.remove) {
+      await workingHoursApi.deleteException(calendarId, id);
+    }
+    for (const { calendarId, input } of plan.create) {
+      await workingHoursApi.createException(calendarId, input);
+    }
+
+    return plan.blocked;
+  };
+
+  const setWorking = useMutation({
+    mutationFn: async ({ holiday, working }: { holiday: ClinicHoliday; working: boolean }) => {
+      const action = workingSwitchAction(holiday, working);
+
+      // Closing the day again: an online-only exception left behind would
+      // reopen it at the desk, so it goes first.
+      if (!working) await applyOnline(holiday, false);
+
+      if (action.kind === 'reset') await holidaysApi.reset(holiday.date);
+      else await holidaysApi.save(holiday.date, action.isHoliday, action.name);
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['holidays', year] });
+      await refreshExceptions();
+    },
+  });
+
+  const setOnline = useMutation({
+    mutationFn: ({ holiday, closeOnline }: { holiday: ClinicHoliday; closeOnline: boolean }) =>
+      applyOnline(holiday, closeOnline),
+    onSuccess: (names, { holiday }) =>
+      setBlocked(names.length > 0 ? { date: holiday.date, calendars: names } : null),
+    onSettled: refreshExceptions,
   });
 
   const save = useMutation({
@@ -95,20 +177,34 @@ export default function HolidaysPage() {
   });
 
   const reset = useMutation({
-    mutationFn: (date: string) => holidaysApi.reset(date),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['holidays', year] }),
+    mutationFn: async (holiday: ClinicHoliday) => {
+      // Back to the statutory calendar means closed again, so nothing may reopen it.
+      await applyOnline(holiday, false);
+      await holidaysApi.reset(holiday.date);
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['holidays', year] });
+      await refreshExceptions();
+    },
   });
 
+  const busy = setWorking.isPending || setOnline.isPending || reset.isPending;
   const rows = holidays.data ?? [];
+  const failure = setWorking.error ?? setOnline.error ?? reset.error ?? save.error;
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
       <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>
         Svátky a volno
       </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+        Ve svátek je ordinace zavřená a nikdo se nemůže objednat. Pokud v některý svátek pracujete,
+        zapněte u něj <strong>Pracujeme v tento den</strong> – pak ten den platí vaše běžná pracovní
+        doba a dá se objednat.
+      </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Státní svátky zavírají ordinaci samy. Tady můžete říct, že v některý
-        pracujete, nebo přidat vlastní volno.
+        <strong>Online objednávky vypnuty</strong> znamená: pracuje se, recepce objednává, ale přes
+        internet si ten den nikdo termín nevezme.
       </Typography>
 
       <Stack direction="row" spacing={1.5} sx={{ mb: 2.5, alignItems: 'center' }}>
@@ -127,11 +223,22 @@ export default function HolidaysPage() {
         </Button>
       </Stack>
 
-      {save.error !== null && (
-        <Alert severity="error" sx={{ mb: 2 }}>{errorText(save.error, t)}</Alert>
+      {failure !== null && (
+        <Alert severity="error" sx={{ mb: 2 }}>{errorText(failure, t)}</Alert>
       )}
-      {reset.error !== null && (
-        <Alert severity="error" sx={{ mb: 2 }}>{errorText(reset.error, t)}</Alert>
+
+      {(calendars.isError || exceptionQueries.some((query) => query.isError)) && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Nepodařilo se načíst výjimky kalendářů, takže teď nejde přepnout online objednávky ani
+          znovu zavřít svátek, ve kterém pracujete. Zkuste stránku načíst znovu.
+        </Alert>
+      )}
+
+      {blocked !== null && (
+        <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setBlocked(null)}>
+          {czechDate(blocked.date)}: v kalendáři {blocked.calendars.join(', ')} už na tento den je
+          jiná výjimka, takže tam online objednávky vypnout nešly. Upravte ten den ve Výjimkách.
+        </Alert>
       )}
 
       {holidays.isPending && (
@@ -160,83 +267,99 @@ export default function HolidaysPage() {
       )}
 
       <Stack spacing={1}>
-        {rows.map((holiday) => (
-          <Card key={holiday.date} variant="outlined">
-            <CardContent sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1.5,
-              flexWrap: 'wrap',
-              py: 1.5,
-              '&:last-child': { pb: 1.5 },
-            }}>
-              <Box sx={{ minWidth: 220 }}>
-                <Typography sx={{ fontWeight: 700, textTransform: 'capitalize' }}>
-                  {czechDate(holiday.date)}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {holiday.name}
-                </Typography>
-              </Box>
+        {rows.map((holiday) => {
+          const working = !holiday.isHoliday;
+          const online = onlineState(holiday.date, perCalendar);
 
-              <StatusChip holiday={holiday} />
+          return (
+            <Card key={holiday.date} variant="outlined">
+              <CardContent sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                flexWrap: 'wrap',
+                py: 1.5,
+                '&:last-child': { pb: 1.5 },
+              }}>
+                <Box sx={{ minWidth: 220 }}>
+                  <Typography sx={{ fontWeight: 700, textTransform: 'capitalize' }}>
+                    {czechDate(holiday.date)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {holiday.name}
+                  </Typography>
+                </Box>
 
-              <Box sx={{ flex: 1 }} />
+                <StatusChip holiday={holiday} />
 
-              {/*
-                No Tooltip. MUI gives the tooltip's text to the button as its
-                accessible name, so a screen reader announced "V tento den
-                pracujeme" for a button labelled "Pracujeme" -- and the test
-                that looks for the button by its label could not find it. The
-                label already says what the button does.
-              */}
-              <Button
-                size="small"
-                variant="outlined"
-                disabled={save.isPending}
-                onClick={() => save.mutate({
-                  date: holiday.date,
-                  isHoliday: !holiday.isHoliday,
-                  // The reason travels with the decision. Both directions get a
-                  // default the owner can overwrite, because a row with no word
-                  // beside it is a row nobody can explain later.
-                  name: holiday.isHoliday
-                    ? 'Pracujeme'
-                    : holiday.name || 'Volno',
-                })}
-              >
-                {holiday.isHoliday ? 'Pracujeme' : 'Máme volno'}
-              </Button>
+                <Box sx={{ flex: 1 }} />
 
-              <IconButton
-                size="small"
-                aria-label="Upravit"
-                onClick={() => setEditing({
-                  date: holiday.date,
-                  name: holiday.name,
-                  isHoliday: holiday.isHoliday,
-                })}
-              >
-                <EditIcon fontSize="small" />
-              </IconButton>
+                <Stack sx={{ minWidth: 250 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={working}
+                        /* Closing again has to clear online-only exceptions,
+                           so it waits until they are known. */
+                        disabled={busy || (working && !exceptionsKnown)}
+                        onChange={(event) =>
+                          setWorking.mutate({ holiday, working: event.target.checked })}
+                      />
+                    }
+                    label="Pracujeme v tento den"
+                  />
+                  {working ? (
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          size="small"
+                          checked={online !== 'open'}
+                          disabled={busy || !exceptionsKnown}
+                          onChange={(event) =>
+                            setOnline.mutate({ holiday, closeOnline: event.target.checked })}
+                        />
+                      }
+                      label={online === 'partly'
+                        ? 'Online objednávky vypnuty (jen v některých kalendářích)'
+                        : 'Online objednávky vypnuty'}
+                    />
+                  ) : (
+                    <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                      Zavřeno – nikdo se nemůže objednat.
+                    </Typography>
+                  )}
+                </Stack>
 
-              {/* Only an amended day can be put back; a statutory one is already
-                  where the law left it. */}
-              {holiday.isAmended && (
-                <Tooltip title="Zpět na státní kalendář">
-                  <IconButton
-                    size="small"
-                    aria-label="Vrátit"
-                    disabled={reset.isPending}
-                    onClick={() => reset.mutate(holiday.date)}
-                  >
-                    <UndoIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                <IconButton
+                  size="small"
+                  aria-label="Upravit"
+                  onClick={() => setEditing({
+                    date: holiday.date,
+                    name: holiday.name,
+                    isHoliday: holiday.isHoliday,
+                  })}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+
+                {/* Only an amended day can be put back; a statutory one is already
+                    where the law left it. */}
+                {holiday.isAmended && (
+                  <Tooltip title="Zpět na státní kalendář">
+                    <IconButton
+                      size="small"
+                      aria-label="Vrátit"
+                      disabled={busy || (!holiday.isHoliday && !exceptionsKnown)}
+                      onClick={() => reset.mutate(holiday)}
+                    >
+                      <UndoIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
       </Stack>
 
       <Dialog open={editing !== null} onClose={() => setEditing(null)} fullWidth maxWidth="xs">

@@ -930,11 +930,19 @@ export const scheduleExceptionSchema = z.object({
   endTime: timeOfDay.nullish().transform((v) => v ?? null),
   workerUserId: z.string().nullish().transform((v) => v ?? null),
   reason: z.string().nullish().transform((v) => v ?? ''),
+  /**
+   * v38: worked as usual at the desk, not offered online. Always true when
+   * `isClosed` is - closed for everybody includes the web.
+   */
+  isClosedToPublic: z.boolean().nullish().transform((v) => v ?? false),
 });
 export type ScheduleException = z.infer<typeof scheduleExceptionSchema>;
 export const scheduleExceptionListSchema = z.array(scheduleExceptionSchema);
 
-export const scheduleExceptionInputSchema = scheduleExceptionSchema.omit({ id: true });
+/* Optional on the way out: the server defaults it to false (4.2, v38). */
+export const scheduleExceptionInputSchema = scheduleExceptionSchema
+  .omit({ id: true })
+  .partial({ isClosedToPublic: true });
 export type ScheduleExceptionInput = z.infer<typeof scheduleExceptionInputSchema>;
 
 /* ── 4.2 Day-activity grid (screen 5.7) ── */

@@ -157,7 +157,7 @@
       "subtitle": "Jednotlivé dny, které se chovají jinak než pravidelná pracovní doba.",
       "new": "Nová výjimka",
       "newTitle": "Nová výjimka",
-      "empty": "Zatím nejsou žádné výjimky. Výjimka je jeden konkrétní den — zavřeno, jiný čas nebo jiný pracovník.",
+      "empty": "Zatím nejsou žádné výjimky. Výjimka je jeden konkrétní den — zavřeno, jiný čas, jiný pracovník nebo vypnuté online objednávky.",
       "date": "Datum",
       "kindColumn": "Typ",
       "detail": "Podrobnost",
@@ -165,8 +165,10 @@
       "kind": {
         "closed": "Zavřeno",
         "differentHours": "Jiný čas",
-        "differentWorker": "Jiný pracovník"
+        "differentWorker": "Jiný pracovník",
+        "onlineOff": "Online objednávky vypnuty"
       },
+      "onlineOffHelp": "Ten den se pracuje jako obvykle a recepce objednává, jen přes internet si termín nikdo nevezme.",
       "window": "Zobrazeno {{from}} – {{to}}."
     },
     "dayActivities": {
