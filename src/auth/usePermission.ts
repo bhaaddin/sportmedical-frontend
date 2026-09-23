@@ -30,8 +30,6 @@ export type Permission =
   | 'patients.register'
   | 'patients.edit'
   | 'patients.sensitive_identity.view'
-  | 'reports.view'
-  | 'settings.appearance.manage'
   | 'settings.clinic.manage'
   | 'users.manage'
   | 'roles.manage'

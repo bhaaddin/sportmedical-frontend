@@ -46,10 +46,6 @@ export const PERMISSION_LABELS: Record<string, { label: string; detail: string }
     label: 'Vidět rodné číslo a číslo pojištěnce',
     detail: 'Bez tohoto práva jsou tyto údaje skryté.',
   },
-  'reports.view': {
-    label: 'Vidět zprávy a výsledky',
-    detail: 'Lékařské zprávy a výstupy z měření.',
-  },
   'bookings.create': {
     label: 'Vytvářet rezervace',
     detail: 'Objednat pacienta do kalendáře.',
@@ -86,17 +82,13 @@ export const PERMISSION_LABELS: Record<string, { label: string; detail: string }
     label: 'Měnit nastavení ordinace',
     detail: 'Kontakty, kalendáře, služby, svátky.',
   },
-  'settings.appearance.manage': {
-    label: 'Měnit vzhled',
-    detail: 'Dnes nic neotvírá: žádná obrazovka ani rozhraní aplikace ho nevyžaduje.',
-  },
   'users.manage': {
     label: 'Spravovat účty',
     detail: 'Zakládat účty a měnit, co kdo smí.',
   },
   'roles.manage': {
     label: 'Spravovat role',
-    detail: 'Měnit, co dává která role.',
+    detail: 'Přidělovat účtům role a spravovat účty vlastníka.',
   },
 };
 
