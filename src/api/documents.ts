@@ -330,8 +330,9 @@ export const documentsApi = {
        * as a default. Axios would normally replace that for a FormData body
        * with `multipart/form-data` plus the boundary it generates - but an
        * explicit default wins, so the file went out labelled as JSON and the
-       * server answered 410. Measured both ways against the running API on
-       * 12. 9. 2026: without the forced header 200, with it 410.
+       * server refused it. Measured both ways against the running API on
+       * 12. 9. 2026: without the forced header 200, with it an error. The
+       * server has no JSON upload at all now, so a mislabelled body gets 415.
        *
        * Setting it to undefined lets axios compute it. Writing
        * `multipart/form-data` by hand would be worse than leaving it alone -
