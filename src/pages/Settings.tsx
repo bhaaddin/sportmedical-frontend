@@ -27,7 +27,7 @@ import {
   Stack, ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
 import {
-  ExpandMore, ChevronRight, Logout, Person, DarkMode, LightMode,
+  ExpandMore, ChevronRight, Logout, Person,
   Tune, Lock,
 } from '@mui/icons-material';
 import { visibleSections, type SettingsItem } from './settings/catalogue';
@@ -269,14 +269,6 @@ export default function Settings() {
                 <ToggleButton value="medium">Střední</ToggleButton>
                 <ToggleButton value="large">Velké</ToggleButton>
               </ToggleButtonGroup>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1.5 }}
-              >
-                <LightMode fontSize="inherit" /> / <DarkMode fontSize="inherit" />
-                Světlý a tmavý režim přepnete ikonou nahoře vpravo.
-              </Typography>
             </CardContent>
           </Card>
 

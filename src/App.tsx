@@ -12,7 +12,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useState, lazy, Suspense, useRef, useCallback } from 'react';
 import theme from './theme';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
-import { useAppStore } from './store/useAppStore';
 import NetworkBanner from './components/NetworkBanner';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
 import UniversalSearch from './components/UniversalSearch';
@@ -184,8 +183,6 @@ function Layout({ children }: { children: React.ReactNode }) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const themeMode = useAppStore((s) => s.theme);
-  const toggleTheme = useAppStore((s) => s.toggleTheme);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const COLLAPSED_WIDTH = 64;
@@ -219,9 +216,6 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Typography variant="h6" noWrap sx={{ fontWeight: 700, flexGrow: 1 }}>
             SportMedical Diagnostics
           </Typography>
-          <IconButton color="inherit" onClick={toggleTheme} sx={{ mr: 1 }} title="Toggle theme">
-            {themeMode === 'light' ? '🌙' : '☀️'}
-          </IconButton>
           <Button color="inherit" size="small" onClick={() => i18n.changeLanguage(i18n.language === 'cs' ? 'en' : i18n.language === 'en' ? 'sk' : 'cs')}
             sx={{ mr: 1, minWidth: 0, px: 1, fontSize: 12, textTransform: 'uppercase' }}>
             {i18n.language === 'cs' ? 'CZ' : i18n.language === 'en' ? 'EN' : 'SK'}

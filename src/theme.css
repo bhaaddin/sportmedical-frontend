@@ -156,30 +156,6 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
-   DARK MODE
-   ══════════════════════════════════════════════════════════════ */
-[data-theme="dark"] {
-  --color-bg: #0F172A;
-  --color-bg-paper: #1E293B;
-  --color-bg-elevated: #1E293B;
-  --color-bg-hover: #334155;
-  --color-bg-active: #475569;
-
-  --color-text-primary: #F1F5F9;
-  --color-text-secondary: #94A3B8;
-  --color-text-muted: #64748B;
-  --color-text-inverse: #0F172A;
-
-  --color-border: #334155;
-  --color-border-strong: #475569;
-
-  --shadow-resting: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-  --shadow-elevated: 0 4px 12px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.2);
-  --shadow-modal: 0 20px 60px rgba(0,0,0,0.5), 0 8px 16px rgba(0,0,0,0.3);
-  --shadow-dragged: 0 12px 36px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.3);
-}
-
-/* ══════════════════════════════════════════════════════════════
    ACCESSIBILITY: Reduced Motion
    ══════════════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
@@ -204,12 +180,6 @@
   box-shadow: 0 0 0 6px rgba(13, 115, 119, 0.15);
 }
 
-/* High-contrast focus for dark mode */
-[data-theme="dark"] *:focus-visible {
-  outline-color: #14A3A8;
-  box-shadow: 0 0 0 6px rgba(20, 163, 168, 0.25);
-}
-
 /* ══════════════════════════════════════════════════════════════
    IMPROVED COLOR CONTRAST (WCAG AA 4.5:1)
    ══════════════════════════════════════════════════════════════ */
@@ -220,14 +190,6 @@
   --contrast-text-on-warning: #FFFFFF; /* 4.6:1 on #EA580C */
   --contrast-text-on-critical: #FFFFFF; /* 4.8:1 on #DC2626 */
   --contrast-muted-on-bg: #64748B; /* 4.5:1 on #F8FAFC */
-}
-
-[data-theme="dark"] {
-  --contrast-text-on-primary: #FFFFFF;
-  --contrast-text-on-success: #FFFFFF;
-  --contrast-text-on-warning: #FFFFFF;
-  --contrast-text-on-critical: #FFFFFF;
-  --contrast-muted-on-bg: #94A3B8; /* 4.5:1 on #0F172A */
 }
 
 /* ══════════════════════════════════════════════════════════════

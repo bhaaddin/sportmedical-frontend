@@ -1,15 +1,11 @@
 import { createTheme } from '@mui/material/styles';
 
-const isDark = localStorage.getItem('theme') === 'dark';
-
 const theme = createTheme({
   palette: {
-    mode: isDark ? 'dark' : 'light',
+    mode: 'light',
     primary: { main: '#0D7377', light: '#14A3A8', dark: '#095456' },
     secondary: { main: '#1A1A2E', light: '#16213E', dark: '#0F0F1A' },
-    background: isDark
-      ? { default: '#121212', paper: '#1E1E1E' }
-      : { default: '#F0F4F8', paper: '#FFFFFF' },
+    background: { default: '#F0F4F8', paper: '#FFFFFF' },
     success: { main: '#2E7D32' },
     warning: { main: '#ED6C02' },
     error: { main: '#D32F2F' },
@@ -32,18 +28,13 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 16,
-          boxShadow: isDark ? '0 2px 12px rgba(0,0,0,0.3)' : '0 2px 12px rgba(0,0,0,0.08)',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
         },
       },
     },
     MuiPaper: {
       styleOverrides: {
         root: { borderRadius: 12 },
-      },
-    },
-    MuiDrawer: {
-      styleOverrides: {
-        paper: isDark ? { bgcolor: '#1A1A1A', borderRight: '1px solid rgba(255,255,255,0.06)' } : {},
       },
     },
   },
