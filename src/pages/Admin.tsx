@@ -12,9 +12,7 @@ import {
   Language, ContentCopy, Visibility, Save, ContactPhone, LocationOn,
   AccessTime, EventAvailable, Send, PictureAsPdf, Assessment, FamilyRestroom,
   ChildCare, RateReview, LocalHospital, Shield, Storage, DarkMode,
-  MonitorHeart,
 } from '@mui/icons-material';
-import SystemHealth from './SystemHealth';
 import CompanySettingsCard from '../components/CompanySettingsCard';
 import { motion } from 'framer-motion';
 import client from '../api/client';
@@ -65,7 +63,7 @@ function Toggle({ checked, onChange, label, description }: {
 /*  MAIN ADMIN PAGE                            */
 /* ─────────────────────────────────────────── */
 export default function Admin() {
-  const [mainTab, setMainTab] = useState(0); // 0 = Public, 1 = Worker, 2 = Audit, 3 = Security, 4 = System Health
+  const [mainTab, setMainTab] = useState(0); // 0 = Public, 1 = Worker, 2 = Audit, 3 = Security
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [auditCount, setAuditCount] = useState(0);
   const [patientCount, setPatientCount] = useState(0);
@@ -294,7 +292,6 @@ export default function Admin() {
           <Tab icon={<Work />} label="Zaměstnanci" />
           <Tab icon={<History />} label="Auditní log" />
           <Tab icon={<Security />} label="Bezpečnost" />
-          <Tab icon={<MonitorHeart />} label="Zdraví systému" />
         </Tabs>
       </Paper>
 
@@ -773,11 +770,6 @@ export default function Admin() {
           </Grid>
         </motion.div>
       )}
-
-      {/* ═══════════════════════════════════════════ */}
-      {/*  TAB 4: SYSTEM HEALTH                      */}
-      {/* ═══════════════════════════════════════════ */}
-      {mainTab === 4 && <SystemHealth />}
 
       {/* Snackbar */}
       <Snackbar open={saved} autoHideDuration={3000} onClose={() => setSaved(false)}
