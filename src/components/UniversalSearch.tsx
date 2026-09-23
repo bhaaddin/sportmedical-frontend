@@ -203,22 +203,6 @@ export default function UniversalSearch() {
     invoice: 'Faktura', page: 'Stránka',
   };
 
-  /* Smart suggestions based on partial input */
-  const sportSuggestions: Record<string, string[]> = {
-    f: ['Fotbal', 'Fyzioterapie', 'Florbal'],
-    k: ['Koleno', 'Kardiologická prohlídka', 'Kondiční test'],
-    v: ['VO2 Max', 'Vyšetření', 'Vazivová poranění'],
-    d: ['Diagnostika', 'Dolní záda', 'Doppler'],
-    s: ['Spiroergometrie', 'Sportovní prohlídka', 'Svalová hmota'],
-    t: ['Trauma', 'Tréninkové zatížení', 'Termín'],
-    p: ['Poranění', 'Pacient', 'Prohlídka'],
-    m: ['Měření', 'Max tep', 'MRI'],
-    i: ['InBody', 'Inklinace', 'Injekce'],
-    b: ['Bolest', 'Blood pressure', 'Bone density'],
-  };
-
-  const suggestions = query.length === 1 ? (sportSuggestions[query.toLowerCase()] || []) : [];
-
   return (
     <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth
       slotProps={{ paper: { sx: { borderRadius: 3, overflow: 'hidden' } } }}>
@@ -246,17 +230,6 @@ export default function UniversalSearch() {
           }}
           sx={{ '& .MuiOutlinedInput-notchedOutline': { border: 'none' }, p: 1 }}
         />
-        {suggestions.length > 0 && results.length === 0 && !loading && (
-          <Box sx={{ p: 2, borderBottom: '1px solid #f0f0f0' }}>
-            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>Nápovědy</Typography>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              {suggestions.map(s => (
-                <Chip key={s} label={s} size="small" onClick={() => setQuery(s)}
-                  sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#E0F2F1' } }} />
-              ))}
-            </Box>
-          </Box>
-        )}
         {results.length > 0 && (
           <List sx={{ maxHeight: 400, overflow: 'auto', borderTop: '1px solid #f0f0f0' }}>
             {results.map((r, i) => (
