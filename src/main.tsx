@@ -4,7 +4,6 @@ import './i18n';
 import App from './App';
 import './theme.css';
 import './styles/reset.css';
-import './styles/variables.css';
 import './styles/accessibility.css';
 import '@fontsource/inter/400.css';
 import '@fontsource/inter/500.css';

@@ -95,8 +95,7 @@ export default function PatientList() {
                       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.03, duration: 0.3 }}
                       style={{ cursor: 'pointer' }}
-                      onClick={() => navigate(`/patients/${p.id}`)}
-                      className="patient-row">
+                      onClick={() => navigate(`/patients/${p.id}`)}>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                           <Avatar sx={{ bgcolor: '#0D7377', width: 40, height: 40, fontSize: 14, fontWeight: 600 }}>
