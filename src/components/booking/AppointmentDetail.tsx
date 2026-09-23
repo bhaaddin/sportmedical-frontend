@@ -198,6 +198,16 @@ function DetailBody({
     queryKey: ["patient", appointment.patientId],
     queryFn: () => patientsApi.getById(appointment.patientId),
   });
+  /* The list entry above has no contacts; phone and e-mail live on the
+     patient's profile, which is what the booking dialog fills the card
+     from. Read the same source, or the desk sees "telefon neuveden" for a
+     patient whose number is on file. */
+  const profileQuery = useQuery({
+    queryKey: ["patient-profile", appointment.patientId],
+    queryFn: () => patientsApi.getProfile(appointment.patientId),
+  });
+  const phone: string | undefined = profileQuery.data?.phone ?? patientQuery.data?.phone;
+  const email: string | undefined = profileQuery.data?.email ?? patientQuery.data?.email;
 
   const historyQuery = useQuery({
     queryKey: ["appointment-history", calendarId, appointment.id],
@@ -364,9 +374,9 @@ function DetailBody({
                   `${patientQuery.data.firstName} ${patientQuery.data.lastName}`}
               </MuiLink>
               <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                {patientQuery.data.phone || t("booking.detail.noPhone")}
+                {phone || t("booking.detail.noPhone")}
                 {" · "}
-                {patientQuery.data.email || t("booking.detail.noEmail")}
+                {email || t("booking.detail.noEmail")}
               </Typography>
             </Stack>
           ) : null}
