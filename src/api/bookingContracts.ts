@@ -142,6 +142,13 @@ export const calendarAccessSchema = z.array(calendarAccessEntrySchema);
 
 /* ── 4.3 Activities ── */
 
+/** The server-side enum order; index = the numeric value on the wire. */
+export const QUESTIONNAIRE_REQUIREMENTS = ['NotAsked', 'Optional', 'Required'] as const;
+export type QuestionnaireRequirementName = (typeof QUESTIONNAIRE_REQUIREMENTS)[number];
+/** What to send: the API binds the enum from its number, not from its name. */
+export const questionnaireRequirementToWire = (v: QuestionnaireRequirementName): number =>
+  QUESTIONNAIRE_REQUIREMENTS.indexOf(v);
+
 export const activitySchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -169,9 +176,12 @@ export const activitySchema = z.object({
    * what every činnost meant before the setting existed.
    */
   questionnaireRequirement: z
-    .enum(['NotAsked', 'Optional', 'Required'])
+    .union([z.enum(['NotAsked', 'Optional', 'Required']), z.number().int()])
     .nullish()
-    .transform((v) => v ?? 'NotAsked'),
+    // The API serializes the enum as a number (0, 1, 2) unless a string
+    // converter is configured; both spellings are accepted so a client
+    // never fails to read an activity over a serialization detail.
+    .transform((v) => (typeof v === 'number' ? QUESTIONNAIRE_REQUIREMENTS[v] ?? 'NotAsked' : v ?? 'NotAsked')),
   sortOrder: z.number().int(),
   /** 4.3: `DELETE` discards rather than deletes, so the row stays in the list. */
   isActive: z.boolean(),

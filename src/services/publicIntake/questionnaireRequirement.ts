@@ -26,9 +26,15 @@ export interface QuestionnaireStance {
  * that does not apply to them would be refusing them for nothing.
  */
 export function questionnaireStance(
-  requirement: QuestionnaireRequirement | undefined,
+  requirement: QuestionnaireRequirement | number | undefined,
 ): QuestionnaireStance {
-  const effective: QuestionnaireRequirement = requirement ?? 'Optional';
+  // The API serializes the enum as a number (0 NotAsked, 1 Optional, 2 Required)
+  // unless a string converter is configured; both spellings are accepted.
+  const named: QuestionnaireRequirement | null | undefined =
+    typeof requirement === 'number'
+      ? (['NotAsked', 'Optional', 'Required'] as const)[requirement] ?? 'Optional'
+      : requirement;
+  const effective: QuestionnaireRequirement = named ?? 'Optional';
 
   return {
     asked: effective !== 'NotAsked',

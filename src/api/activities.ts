@@ -8,6 +8,7 @@ import {
   type ActivityListResult,
   type ActivitySaveResult,
 } from './bookingContracts';
+import { questionnaireRequirementToWire } from './bookingContracts';
 
 /** Activities - booking contract 4.3, screen 5.6. An activity has no break of its own. */
 
@@ -18,6 +19,15 @@ async function request<T>(run: () => Promise<T>): Promise<T> {
     throw toBookingError(error);
   }
 }
+
+/**
+ * The API binds `questionnaireRequirement` from its number (0, 1, 2), not from
+ * its name; the screens work with the name. Converted here, once, on the way out.
+ */
+const toWire = (input: ActivityInput) => ({
+  ...input,
+  questionnaireRequirement: questionnaireRequirementToWire(input.questionnaireRequirement),
+});
 
 export const activitiesApi = {
   /** 4.3: the read is symmetric with the write, warnings and all. */
@@ -33,13 +43,13 @@ export const activitiesApi = {
    */
   create: (input: ActivityInput): Promise<ActivitySaveResult> =>
     request(async () => {
-      const res = await client.post('/api/activities', input);
+      const res = await client.post('/api/activities', toWire(input));
       return parseResponse(activitySaveResultSchema, res.data);
     }),
 
   update: (id: string, input: ActivityInput): Promise<ActivitySaveResult> =>
     request(async () => {
-      const res = await client.put(`/api/activities/${id}`, input);
+      const res = await client.put(`/api/activities/${id}`, toWire(input));
       return parseResponse(activitySaveResultSchema, res.data);
     }),
 
