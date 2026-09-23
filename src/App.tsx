@@ -14,6 +14,7 @@ import NetworkBanner from './components/NetworkBanner';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
 import UniversalSearch from './components/UniversalSearch';
 import NotificationCenter from './components/NotificationCenter';
+import { signOut } from './auth/signOut';
 
 /* ── Lazy-loaded routes (code-split per page) ── */
 const NotFound = lazy(() => import('./pages/NotFound'));
@@ -195,10 +196,8 @@ function Layout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
+    setAnchorEl(null);
+    void signOut();
   };
 
   return (

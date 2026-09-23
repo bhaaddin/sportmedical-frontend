@@ -17,7 +17,7 @@
  * Everything the sections offer leads to a screen that already works.
  */
 import { useState } from 'react';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   Accordion,
   AccordionDetails, AccordionSummary, Alert, Avatar, Box, Button,
@@ -29,6 +29,7 @@ import {
 } from '@mui/icons-material';
 import { visibleSections, type SettingsItem } from './settings/catalogue';
 import { hasStoredPermissions, storedPermissions } from '../auth/usePermission';
+import { signOut } from '../auth/signOut';
 
 /** Remembered per browser, so re-opening settings lands where you left it. */
 const OPEN_KEY = 'settings.openSection';
@@ -57,7 +58,6 @@ function readUser(): StoredUser {
 }
 
 export default function Settings() {
-  const navigate = useNavigate();
   const [open, setOpen] = useState<string | false>(readStoredSection);
 
   /*
@@ -91,16 +91,6 @@ export default function Settings() {
     } catch {
       /* A browser that refuses storage still gets working settings. */
     }
-  };
-
-  const logout = () => {
-    try {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-    } catch {
-      /* Leaving is more important than tidying. */
-    }
-    navigate('/login');
   };
 
   const renderItem = (item: SettingsItem) => (
@@ -223,7 +213,7 @@ export default function Settings() {
           <Button
             startIcon={<Logout />}
             color="error"
-            onClick={logout}
+            onClick={() => { void signOut(); }}
             sx={{ fontWeight: 600 }}
           >
             Odhlásit se
