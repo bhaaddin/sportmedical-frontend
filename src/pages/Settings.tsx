@@ -28,7 +28,7 @@ import {
   ExpandMore, ChevronRight, Logout, Person, Lock,
 } from '@mui/icons-material';
 import { visibleSections, type SettingsItem } from './settings/catalogue';
-import { hasStoredPermissions, storedPermissions } from '../auth/usePermission';
+import { hasStoredPermissions, usePermissions } from '../auth/usePermission';
 import { signOut } from '../auth/signOut';
 
 /** Remembered per browser, so re-opening settings lands where you left it. */
@@ -61,20 +61,26 @@ export default function Settings() {
   const [open, setOpen] = useState<string | false>(readStoredSection);
 
   /*
-   * What this person may open, from the list the server sent at sign-in.
+   * What this person may open, from the list the server last sent - at
+   * sign-in, and again from GET /api/v1/account on start, on focus and after
+   * a refusal. Read through the hook, so a grant or revocation that arrives
+   * while this screen is open redraws it rather than waiting for the next
+   * visit.
    *
    * Not their ROLE any more. The owner sets permissions per employee, in
    * three states, and a role check could not see any of it: an administrator
    * whose `settings.clinic.manage` was revoked still saw every screen.
    */
-  const sections = visibleSections(storedPermissions());
+  const sections = visibleSections(usePermissions());
 
   /*
    * A session from before the server started sending the list.
    *
    * Every guarded row would be hidden, which on this screen reads as the
    * settings having disappeared rather than as a stale sign-in. Saying so is
-   * the difference between a bug report and a thirty-second fix.
+   * the difference between a bug report and a thirty-second fix. The account
+   * refresh usually fills the list in a moment, and this goes away with it;
+   * it stays only when the server could not be asked.
    */
   const staleSession = !hasStoredPermissions();
   const user = readUser();

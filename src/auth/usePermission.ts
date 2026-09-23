@@ -49,22 +49,11 @@ export type Permission =
   | 'communication.manage';
 
 /**
- * What the server said this person may do.
- *
- * An empty list when nothing is stored — a session that predates this, or one
- * that never logged in. Empty hides optional controls and shows nothing that
- * would be refused, which is the safe direction to be wrong in.
- */
-export function storedPermissions(): string[] {
-  return parsePermissions(permissionsSnapshot());
-}
-
-/**
  * Whether the server has told this browser anything at all.
  *
  * ── Why "empty" and "never told" have to be told apart ──
  *
- * `storedPermissions()` answers `[]` for both, and for hiding a single button
+ * `usePermissions()` answers `[]` for both, and for hiding a single button
  * that is the right answer either way. For a whole menu it is not: a session
  * created before the list was stored would draw a settings screen with almost
  * nothing on it, and the owner would read that as features having vanished
@@ -84,6 +73,10 @@ export function hasStoredPermissions(): boolean {
 /**
  * Everything the signed-in user may do, redrawn whenever the list changes -
  * a refresh from GET /api/v1/account after focus or a refusal, or another tab.
+ *
+ * An empty list when nothing is stored — a session that predates this, or one
+ * that never logged in. Empty hides optional controls and shows nothing that
+ * would be refused, which is the safe direction to be wrong in.
  */
 export function usePermissions(): readonly string[] {
   const raw = useSyncExternalStore(subscribePermissions, permissionsSnapshot, () => null);

@@ -12,10 +12,11 @@
  * back, these fail.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import Settings from './Settings';
+import { savePermissions } from '../auth/localSession';
 
 /*
  * ── Signed in AS somebody, not IN A ROLE ──
@@ -162,10 +163,11 @@ describe('the settings that used to lie here', () => {
   });
 
   /*
-   * The profile is read-only, and that is honest: `/api/account` does not
-   * exist, so the editable fields that were here wrote the name into this
-   * browser and nowhere else. It looked like it worked until you logged in
-   * somewhere else.
+   * The profile is read-only, and that is honest: GET /api/v1/account only
+   * reads who is signed in, and nothing lets somebody change their own name,
+   * so the editable fields that were here wrote the name into this browser
+   * and nowhere else. It looked like it worked until you logged in somewhere
+   * else. A name is changed in Tým a účty, by whoever manages accounts.
    */
   it('shows who you are without pretending the name can be changed here', async () => {
     const user = userEvent.setup();
@@ -213,5 +215,57 @@ describe('a sign-in from before permissions were sent', () => {
     renderSettings();
 
     expect(screen.queryByText(/Odhlaste se a přihlaste znovu/)).not.toBeInTheDocument();
+  });
+
+  /* The account refresh fills the list a moment after the screen opens; the
+     notice must go with it rather than wait for the next visit. */
+  it('stops saying so once the account refresh stores the list', async () => {
+    localStorage.clear();
+    localStorage.setItem(
+      'user',
+      JSON.stringify({ firstName: 'Jana', lastName: 'Nová', email: 'j@n.cz', role: 'Owner' }),
+    );
+    renderSettings();
+    expect(screen.getByText(/Odhlaste se a přihlaste znovu/)).toBeInTheDocument();
+
+    act(() => savePermissions(EVERYTHING));
+
+    await waitFor(() =>
+      expect(screen.queryByText(/Odhlaste se a přihlaste znovu/)).not.toBeInTheDocument(),
+    );
+  });
+});
+
+/*
+ * The list is read live, not once. GET /api/v1/account rewrites it on start,
+ * on focus and after a refusal, and an owner who grants a receptionist
+ * `users.manage` while she has this screen open must see Tým a účty appear -
+ * that grant used to reach her only after signing out and in again.
+ */
+describe('a permission that changes while the screen is open', () => {
+  it('draws the rows the grant opens, without a new sign-in', async () => {
+    const user = userEvent.setup();
+    holding(RECEPTIONIST);
+    renderSettings();
+    await screen.findByText('Můj účet');
+    expect(screen.queryByRole('link', { name: /Tým a účty/, hidden: true })).not.toBeInTheDocument();
+
+    act(() => savePermissions([...RECEPTIONIST, 'users.manage']));
+
+    await user.click(await screen.findByText('Lidé a přístupy'));
+    expect(await screen.findByRole('link', { name: /Tým a účty/ })).toBeVisible();
+  });
+
+  it('takes away the rows a revocation closes', async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    await user.click(await screen.findByText('Lidé a přístupy'));
+    expect(await screen.findByRole('link', { name: /Tým a účty/ })).toBeVisible();
+
+    act(() => savePermissions(RECEPTIONIST));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('link', { name: /Tým a účty/, hidden: true })).not.toBeInTheDocument(),
+    );
   });
 });
