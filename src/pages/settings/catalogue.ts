@@ -286,7 +286,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
  * Items they cannot open are removed rather than greyed out. A locked row
  * invites somebody to ask why, and the answer - "you are not an administrator"
  * - is not something a receptionist can act on, so it is only noise on a
- * screen she opens to change her own font size.
+ * screen she opens to see her own account.
  */
 /**
  * The settings this person may actually open.
