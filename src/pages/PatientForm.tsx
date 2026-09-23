@@ -49,12 +49,6 @@ import RuianAddressPicker from "../components/registration/RuianAddressPicker";
 
 type Sex = "Male" | "Female" | "NotSpecified" | "Unknown";
 
-interface Contact {
-  channel: string;
-  value: string;
-  note: string;
-}
-
 /** The four fields this screen may show but not write. */
 interface GovernedIdentity {
   birthNumber: string;
@@ -72,8 +66,6 @@ type Demographics = {
 };
 
 type ProfileFields = {
-  titlesBeforeName: string;
-  titlesAfterName: string;
   insuredFrom: string;
   insuranceType: string;
   citizenship: string;
@@ -93,8 +85,6 @@ const EMPTY_DEMOGRAPHICS: Demographics = {
 };
 
 const EMPTY_PROFILE: ProfileFields = {
-  titlesBeforeName: "",
-  titlesAfterName: "",
   insuredFrom: "",
   insuranceType: "",
   citizenship: "",
@@ -136,12 +126,6 @@ export default function PatientForm() {
         patientsApi.getProfile(patientId!),
       ]);
       const p = (prof ?? {}) as Record<string, string | null>;
-      let contacts: Contact[] = [];
-      try {
-        contacts = JSON.parse(p.contactsJson ?? "[]") as Contact[];
-      } catch {
-        contacts = [];
-      }
       return {
         demographics: {
           firstName: patient?.firstName ?? "",
@@ -151,8 +135,6 @@ export default function PatientForm() {
           sex: ((patient?.sex as Sex) ?? "Male") as Sex,
         },
         profile: {
-          titlesBeforeName: p.titlesBeforeName ?? "",
-          titlesAfterName: p.titlesAfterName ?? "",
           insuredFrom: (p.insuredFrom ?? "").slice(0, 10),
           insuranceType: p.insuranceType ?? "",
           citizenship: p.citizenship ?? "",
@@ -169,7 +151,6 @@ export default function PatientForm() {
           healthInsurerCode: p.healthInsurerCode ?? "",
           address: p.address ?? "",
         } as GovernedIdentity,
-        contacts,
       };
     },
     enabled: Boolean(patientId),
@@ -181,7 +162,6 @@ export default function PatientForm() {
   const demographics = editedDemographics ?? patientQuery.data?.demographics ?? EMPTY_DEMOGRAPHICS;
   const profile = editedProfile ?? patientQuery.data?.profile ?? EMPTY_PROFILE;
   const governed = patientQuery.data?.governed ?? EMPTY_GOVERNED;
-  const contacts = patientQuery.data?.contacts ?? [];
 
   const setDemographics = setEditedDemographics;
   const setProfile = setEditedProfile;
@@ -223,7 +203,6 @@ export default function PatientForm() {
       await client.put(`/api/patients/${patientId}/profile`, {
         ...profile,
         ...governed,
-        contactsJson: JSON.stringify(contacts.filter((c) => c.value.trim() !== "")),
       });
       toast.success("Ostatní údaje uloženy.");
       load();
@@ -383,24 +362,6 @@ export default function PatientForm() {
             Ostatní
           </Typography>
           <Stack spacing={2}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField
-                fullWidth
-                label="Titul před jménem"
-                value={profile.titlesBeforeName}
-                onChange={(e) =>
-                  setProfile({ ...profile, titlesBeforeName: e.target.value })
-                }
-              />
-              <TextField
-                fullWidth
-                label="Titul za jménem"
-                value={profile.titlesAfterName}
-                onChange={(e) =>
-                  setProfile({ ...profile, titlesAfterName: e.target.value })
-                }
-              />
-            </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <TextField
                 fullWidth
