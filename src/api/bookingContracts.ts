@@ -562,9 +562,6 @@ export function historyActionName(code: number): string | null {
   return HISTORY_ACTION_NAMES[code] ?? null;
 }
 
-/** Who is booking - 4.5. */
-export const BOOKING_SOURCE = { staff: 0, online: 1, partner: 2 } as const;
-
 export const createAppointmentInputSchema = z.object({
   patientId: z.string().min(1),
   calendarId: z.string(),

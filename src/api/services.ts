@@ -32,11 +32,6 @@ export const servicesApi = {
     return unwrap<ServiceItem[]>(res.data) ?? [];
   },
 
-  getById: async (id: string): Promise<ServiceItem> => {
-    const res = await client.get(`/api/services/${id}`);
-    return unwrap<ServiceItem>(res.data);
-  },
-
   /* `isActive` is not in the create contract - a new service is always active -
      so it is dropped here rather than sent and silently ignored. */
   create: async (input: ServiceItemInput): Promise<ServiceItem> => {

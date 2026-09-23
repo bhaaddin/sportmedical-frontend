@@ -1,14 +1,5 @@
 import client from './client';
 
-export interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  clinicId?: string;
-}
-
 export interface LoginResponse {
   accessToken: string;
   expiresAtUtc: string;

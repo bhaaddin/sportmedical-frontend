@@ -18,11 +18,6 @@ export const availabilityApi = {
     return res.data?.value ?? res.data ?? [];
   },
 
-  getByPatient: async (patientId: string): Promise<Availability[]> => {
-    const res = await client.get(`/api/availability/patient/${patientId}`);
-    return res.data?.value ?? res.data ?? [];
-  },
-
   create: async (data: Partial<Availability>): Promise<Availability> => {
     const res = await client.post('/api/availability', data);
     return res.data?.value ?? res.data;

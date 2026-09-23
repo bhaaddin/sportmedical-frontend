@@ -12,11 +12,6 @@
  * service he was looking at to the screen that can, and open it ready.
  */
 
-/** What a service row hands to the screen it sends you to. */
-export interface ServiceHandoff {
-  clinicServiceId: string;
-}
-
 /**
  * Reads the handoff back out of router state.
  *

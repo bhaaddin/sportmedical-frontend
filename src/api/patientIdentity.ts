@@ -40,13 +40,6 @@ export interface AdministrativeProfileChange {
   identityDocumentNumber?: string | null;
 }
 
-export interface ResidenceAddressChange {
-  patientAddressId: string;
-  residenceType: ResidenceType;
-  /** A RÚIAN address point, never free text - picked from the address search. */
-  ruianAddressPointCode: number;
-}
-
 function newGuid(): string {
   return crypto.randomUUID();
 }

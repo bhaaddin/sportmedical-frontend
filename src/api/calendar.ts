@@ -1,8 +1,5 @@
 import client from './client';
 
-/* ── Backend AppointmentType enum values ── */
-export type BackendAppointmentType = 'Consultation' | 'Examination' | 'FollowUp' | 'Therapy' | 'Test';
-
 /* ── Backend DTO shapes ── */
 export interface Appointment {
   id: string;
@@ -32,18 +29,6 @@ export interface AppointmentDto {
   endTime: string;
   status: string;
   notes: string;
-}
-
-/** What the backend expects to CREATE an appointment */
-export interface CreateAppointmentRequest {
-  patientId: string;
-  startUtc: string;
-  durationMinutes: number;    // Integer minutes, e.g. 60
-  serviceType: string;        // Maps to AppointmentType enum
-  clinic: string;
-  room: string;
-  practitionerName: string;
-  notes?: string;
 }
 
 /* ── Map backend DTO → frontend Appointment (for display) ── */

@@ -272,8 +272,3 @@ export default function UniversalSearch() {
     </Dialog>
   );
 }
-
-/* ── Hook to open search programmatically ── */
-let globalOpenSearch: (() => void) | null = null;
-export function openSearch() { globalOpenSearch?.(); }
-export function setSearchOpener(fn: () => void) { globalOpenSearch = fn; }
