@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nástěnka místností</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Libre+Franklin:wght@400;500;600&family=DM+Sans:wght@400;500;700&family=Chivo:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+body{margin:0;background:#E9EBEE;color:#1B2229;
+  font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;font-size:15px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) body{background:#14181D;color:#DDE3E9}}
+:root[data-theme="dark"] body{background:#14181D;color:#DDE3E9}
+.p-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:9px 18px;border-bottom:1px solid rgba(128,140,152,.35);
+  font-size:.82rem;position:sticky;top:env(safe-area-inset-top,0px);
+  background:inherit;z-index:30}
+.p-no{font-family:"IBM Plex Mono",ui-monospace,monospace;opacity:.65}
+.p-name{font-weight:600}
+.p-thesis{opacity:.75;flex:1 1 300px;min-width:0}
+.p-back{margin-left:auto;text-decoration:none;border:1px solid rgba(128,140,152,.45);
+  border-radius:6px;padding:5px 11px;color:inherit;min-height:32px;display:inline-flex;
+  align-items:center}
+.p-back:hover{border-color:currentColor}
+.dir{display:block}
+.dir > .shot{width:100%;min-height:calc(100vh - 46px);box-sizing:border-box}
+</style>
+</head>
+<body>
+<div class="p-bar">
+  <span class="p-no">02 / 20</span>
+  <span class="p-name">Nástěnka místností</span>
+  <span class="p-thesis">Pro recepci a provozní, kteří potřebují vidět, co se právě děje v každé z pěti místností a kam se ještě vejde další pacient — pět sloupců vedle sebe, jeden na místnost.</span>
+  <a class="p-back" href="index.html">Zpět na přehled</a>
+</div>
+<article class="dir" id="d02"
+         data-name="Nástěnka místností"
+         data-thesis="Pro recepci a provozní, kteří potřebují vidět, co se právě děje v každé z pěti místností a kam se ještě vejde další pacient — pět sloupců vedle sebe, jeden na místnost."
+         data-cost="Pořadí dne se čte hůř: časy jsou roztroušené do pěti sloupců, takže se nedá jedním pohledem říct, kdo přijde jako další.">
+<style>
+#d02 .shot{background:#F1F3F5;color:#1B2229;
+  font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  font-size:15px;line-height:1.5;display:flex;flex-direction:column;
+  font-variant-numeric:tabular-nums}
+
+/* ---- horní lišta ---- */
+#d02 .bar{padding:16px 22px 12px;border-bottom:1px solid #D4DAE0;background:#EAEDF0}
+#d02 .bar-top{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+#d02 .brand{font-size:15px;font-weight:600}
+#d02 .date{font-size:14px;color:#5E6A75}
+#d02 .clock{margin-left:auto;font-size:14px;font-weight:600;color:#1F6F66}
+#d02 .nav{display:flex;flex-wrap:wrap;gap:2px 4px;margin-top:10px}
+#d02 .nav a{text-decoration:none;color:#3F4A55;font-size:14px;padding:6px 10px;
+  border-radius:5px;min-height:32px;box-sizing:border-box;display:inline-flex;
+  align-items:center;transition:background 120ms ease}
+#d02 .nav a:hover{background:#E0E4E8}
+#d02 .nav a.on{background:#DDE7E5;color:#17544D;font-weight:600}
+
+/* ---- pás čísel ---- */
+#d02 .tally{display:flex;flex-wrap:wrap;gap:8px 20px;padding:11px 22px;
+  font-size:14px;color:#5E6A75;border-bottom:1px solid #D4DAE0}
+#d02 .tally b{color:#1B2229;font-weight:600}
+#d02 .tally .warn{color:#8E3232;font-weight:600}
+
+/* ---- deska: pět svislých drah ---- */
+#d02 .board-h{font-size:14px;font-weight:600;color:#5E6A75;margin:0;
+  padding:16px 22px 0}
+#d02 .board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;
+  padding:10px 22px 56px;align-items:start}
+#d02 .lane{background:#E8EBEE;border:1px solid #D4DAE0;border-radius:10px;
+  padding:12px;box-sizing:border-box;min-width:0}
+#d02 .lh{display:flex;align-items:baseline;gap:8px;padding-bottom:4px}
+#d02 .rm{font-size:15px;font-weight:600;letter-spacing:-.01em}
+#d02 .n{margin-left:auto;font-size:13px;color:#5E6A75}
+#d02 .lh2{font-size:13px;color:#5E6A75;padding-bottom:10px;
+  border-bottom:1px solid #D4DAE0;margin-bottom:12px}
+
+#d02 .card{background:#F8F9FB;border:1px solid #D9DEE3;border-radius:8px;
+  padding:12px 13px;margin-bottom:10px}
+#d02 .ct{font-size:14px;font-weight:600;color:#3F4A55}
+#d02 .cn{font-size:15px;font-weight:600;margin-top:3px;letter-spacing:-.01em}
+#d02 .ca{font-size:14px;color:#3F4A55;margin-top:2px}
+#d02 .cm{font-size:13px;color:#5E6A75;margin-top:6px}
+#d02 .cs{font-size:13px;font-weight:600;color:#5E6A75;margin-top:8px;
+  padding-top:7px;border-top:1px solid #E2E6EA}
+
+#d02 .card.done{background:#EDF0F2;border-style:dashed;padding:9px 13px}
+#d02 .card.done .cn{font-weight:400;color:#5E6A75;font-size:14px}
+#d02 .card.done .ca{font-size:13px}
+#d02 .card.run{box-shadow:inset 4px 0 0 0 #1F6F66;border-color:#B9CFCB}
+#d02 .card.run .cs{color:#17544D}
+#d02 .card.halt{box-shadow:inset 4px 0 0 0 #A33B3B;border-color:#DFC3C3;
+  background:#FAF2F1}
+#d02 .card.halt .cn{font-size:26px;line-height:1.18;margin-top:6px}
+#d02 .why{font-size:14px;font-weight:600;color:#8E3232;margin-top:8px}
+#d02 .how{font-size:13px;color:#3F4A55;margin-top:5px}
+#d02 button{font:inherit;font-size:14px;font-weight:600;color:#F1F3F5;
+  background:#1F6F66;border:1px solid #17544D;border-radius:6px;padding:8px 13px;
+  min-height:34px;margin-top:11px;width:100%;cursor:pointer;
+  transition:background 120ms ease}
+#d02 button:hover{background:#17544D}
+
+#d02 .nowbar{display:flex;align-items:center;gap:8px;margin:2px 0 12px}
+#d02 .nowbar span{font-size:13px;font-weight:600;color:#1F6F66;white-space:nowrap}
+#d02 .nowbar i{flex:1 1 auto;height:2px;background:#1F6F66;font-style:normal}
+#d02 .free{font-size:13px;color:#5E6A75;border-top:1px solid #D4DAE0;
+  padding-top:9px;margin-top:2px}
+
+@media (max-width:1180px){
+  #d02 .board{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:700px){
+  #d02 .board{grid-template-columns:minmax(0,1fr);padding:10px 16px 40px}
+  #d02 .bar{padding:14px 16px 10px}
+  #d02 .tally{padding:11px 16px}
+  #d02 .board-h{padding:16px 16px 0}
+}
+</style>
+
+<div class="shot">
+
+  <div class="bar">
+    <div class="bar-top">
+      <h1 class="brand">Ordinace Brno-Žabovřesky</h1>
+      <span class="date">úterý 23. září 2026 · Hana Veselá, recepce</span>
+      <span class="clock">Právě je 09:40</span>
+    </div>
+    <nav class="nav">
+      <a href="#d02">Přehled</a>
+      <a class="on" href="#d02">Dnes</a>
+      <a href="#d02">Plánování</a>
+      <a href="#d02">Pacienti</a>
+      <a href="#d02">Diagnostika</a>
+      <a href="#d02">Dokumenty</a>
+      <a href="#d02">Pokladna</a>
+      <a href="#d02">Fakturace</a>
+      <a href="#d02">Sklad</a>
+      <a href="#d02">Tým</a>
+      <a href="#d02">Nastavení</a>
+    </nav>
+  </div>
+
+  <div class="tally">
+    <span><b>18</b> návštěv v pěti místnostech</span>
+    <span><b>2</b> místnosti právě obsazené</span>
+    <span><b>5</b> hotovo</span>
+    <span><b>10</b> čeká na řadu</span>
+    <span class="warn">1 návštěva stojí kvůli chybějícímu papíru</span>
+  </div>
+
+  <h2 class="board-h">Místnosti a jejich den — každý sloupec je jedna místnost</h2>
+
+  <div class="board">
+
+    <section class="lane">
+      <div class="lh"><span class="rm">Ordinace 1</span><span class="n">4</span></div>
+      <div class="lh2">MUDr. Havelka</div>
+
+      <article class="card done">
+        <div class="ct">07:20</div>
+        <div class="cn">Petr Doležal</div>
+        <div class="ca">Vstupní vyšetření</div>
+        <div class="cs">hotovo</div>
+      </article>
+
+      <article class="card halt">
+        <div class="ct">09:15 · objednán</div>
+        <div class="cn">Martin Kolář</div>
+        <div class="ca">Posudek pro klub · pojišťovna 211</div>
+        <div class="why">Chybí: Souhlas se zpracováním zdravotních údajů</div>
+        <div class="how">Sedí v čekárně už 25 minut. Bez podpisu nejde posudek
+          vydat a ordinace 1 zbytečně stojí.</div>
+        <button type="button">Vytisknout souhlas</button>
+        <div class="cs">zastaveno</div>
+      </article>
+
+      <div class="nowbar"><span>09:40 teď</span><i></i></div>
+
+      <article class="card">
+        <div class="ct">11:00</div>
+        <div class="cn">Jakub Horák</div>
+        <div class="ca">Vstupní vyšetření</div>
+        <div class="cm">pojišťovna 205 · první návštěva, dotazník u recepce</div>
+        <div class="cs">čeká</div>
+      </article>
+
+      <article class="card">
+        <div class="ct">16:40</div>
+        <div class="cn">Petr Doležal</div>
+        <div class="ca">Kontrola po operaci</div>
+        <div class="cm">pojišťovna 201 · druhá návštěva dnes, poslední pacient dne</div>
+        <div class="cs">čeká</div>
+      </article>
+
+      <div class="free">Volno 11:45–16:40</div>
+    </section>
+
+    <section class="lane">
+      <div class="lh"><span class="rm">Ordinace 2</span><span class="n">3</span></div>
+      <div class="lh2">MUDr. Sýkorová · odpoledne MUDr. Havelka</div>
+
+      <article class="card done">
+        <div class="ct">08:30</div>
+        <div class="cn">Ondřej Veselý</div>
+        <div class="ca">Kontrola po úrazu</div>
+        <div class="cs">hotovo</div>
+      </article>
+
+      <div class="nowbar"><span>09:40 teď</span><i></i></div>
+
+      <article class="card">
+        <div class="ct">10:30</div>
+        <div class="cn">Kateřina Šimková</div>
+        <div class="ca">Kontrola po operaci</div>
+        <div class="cm">pojišťovna 111 · nese zprávu z traumatologie</div>
+        <div class="cs">čeká</div>
+      </article>
+
+      <article class="card">
+        <div class="ct">14:20</div>
+        <div class="cn">Radek Pospíšil</div>
+        <div class="ca">Kontrola po úrazu</div>
+        <div class="cm">pojišťovna 111 · minule hlásil bolest, zeptat se</div>
+        <div class="cs">čeká</div>
+      </article>
+
+      <div class="free">Volno 09:00–10:30 a 11:00–14:20</div>
+    </section>
+
+    <section class="lane">
+      <div class="lh"><span class="rm">Laboratoř</span><span class="n">4</span></div>
+      <div class="lh2">Bc. Dvořák · ve 13:40 MUDr. Sýkorová</div>
+
+      <article class="card done">
+        <div class="ct">07:00</div>
+        <div class="cn">Jana Kratochvílová</div>
+        <div class="ca">Odběr krve</div>
+        <div class="cs">hotovo</div>
+      </article>
+
+      <article class="card done">
+        <div class="ct">07:40</div>
+        <div class="cn">Tomáš Řehák</div>
+        <div class="ca">Spiroergometrie</div>
+        <div class="cs">hotovo</div>
+      </article>
+
+      <div class="nowbar"><span>09:40 teď</span><i></i></div>
+
+      <article class="card">
+        <div class="ct">11:30</div>
+        <div class="cn">Veronika Málková</div>
+        <div class="ca">Odběr krve</div>
+        <div class="cm">pojišťovna 111 · nalačno, přijde z tréninku</div>
+        <div class="cs">čeká</div>
+      </article>
+
+      <article class="card">
+        <div class="ct">13:40</div>
+        <div class="cn">Nikola Tichá</div>
+        <div class="ca">Spiroergometrie</div>
+        <div class="cm">pojišťovna 201 · zprávu chce poslat trenérovi ještě dnes</div>
+        <div class="cs">čeká</div>
+      </article>
+
+      <div class="free">Volno 08:40–11:30 a od 14:40 do konce dne</div>
+    </section>
+
+    <section class="lane">
+      <div class="lh"><span class="rm">Tělocvična</span><span class="n">3</span></div>
+      <div class="lh2">Bc. Dvořák · v 15:00 Mgr. Pilařová</div>
+
+      <article class="card run">
+        <div class="ct">09:00 – 10:00</div>
+        <div class="cn">Lucie Bartošová</div>
+        <div class="ca">Izokinetika kolene</div>
+        <div class="cm">pojišťovna 111 · druhé měření po operaci menisku</div>
+        <div class="cs">právě probíhá</div>
+      </article>
+
+      <div class="nowbar"><span>09:40 teď</span><i></i></div>
+
+      <article class="card">
+        <div class="ct">10:00</div>
+        <div class="cn">Filip Urban</div>
+        <div class="ca">Analýza chůze</div>
+        <div class="cm">pojišťovna 213 · nezvat dovnitř dřív než v 10:00</div>
+        <div class="cs">čeká · za 20 minut</div>
+      </article>
+
+      <article class="card">
+        <div class="ct">15:00</div>
+        <div class="cn">Simona Vrbová</div>
+        <div class="ca">Izokinetika kolene</div>
+        <div class="cm">pojišťovna 213 · protokol do reprezentace do pátku</div>
+        <div class="cs">čeká</div>
+      </article>
+
+      <div class="free">Volno 10:45–15:00 — největší díra dne</div>
+    </section>
+
+    <section class="lane">
+      <div class="lh"><span class="rm">Rehabilitace</span><span class="n">4</span></div>
+      <div class="lh2">Mgr. Pilařová</div>
+
+      <article class="card done">
+        <div class="ct">08:00</div>
+        <div class="cn">Marie Nováková</div>
+        <div class="ca">Fyzioterapie</div>
+        <div class="cs">hotovo</div>
+      </article>
+
+      <article class="card run">
+        <div class="ct">09:45 · začala v 09:30</div>
+        <div class="cn">Eva Procházková</div>
+        <div class="ca">Rázová vlna</div>
+        <div class="cm">pojišťovna 201 · vzata dovnitř dřív, místnost byla volná</div>
+        <div class="cs">právě probíhá</div>
+      </article>
+
+      <div class="nowbar"><span>09:40 teď</span><i></i></div>
+
+      <article class="card">
+        <div class="ct">13:00</div>
+        <div class="cn">Adam Beneš</div>
+        <div class="ca">Fyzioterapie</div>
+        <div class="cm">pojišťovna 207 · šestá série z deseti, doplatek u recepce</div>
+        <div class="cs">čeká</div>
+      </article>
+
+      <article class="card">
+        <div class="ct">15:40</div>
+        <div class="cn">Tomáš Řehák</div>
+        <div class="ca">Fyzioterapie</div>
+        <div class="cm">pojišťovna 205 · druhá návštěva dnes, ráno byl v laboratoři</div>
+        <div class="cs">čeká</div>
+      </article>
+
+      <div class="free">Volno 10:15–13:00 a 13:45–15:40</div>
+    </section>
+
+  </div>
+</div>
+</article>
+</body>
+</html>

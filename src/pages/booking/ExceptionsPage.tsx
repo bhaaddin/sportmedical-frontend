@@ -40,7 +40,12 @@ import { addDaysToDateOnly, formatDateOnly, toDateOnly } from "../../utils/time"
 
 const CODEBOOK_STALE_MS = 5 * 60 * 1000;
 
-type ExceptionKind = "closed" | "differentHours" | "differentWorker";
+/*
+ * "onlineOff" is 4.2 v38 `isClosedToPublic` on its own: the desk books as
+ * usual, the website does not offer the day. Before it the only way to keep
+ * the web out of a day was to close it for everybody.
+ */
+type ExceptionKind = "closed" | "differentHours" | "differentWorker" | "onlineOff";
 
 function draftFor(kind: ExceptionKind, date: string): ScheduleExceptionInput {
   return {
@@ -50,15 +55,20 @@ function draftFor(kind: ExceptionKind, date: string): ScheduleExceptionInput {
     endTime: kind === "differentHours" ? "16:00" : null,
     workerUserId: null,
     reason: "",
+    isClosedToPublic: kind === "onlineOff",
   };
 }
 
 function kindOf(exception: {
   isClosed: boolean;
+  startTime: string | null;
   workerUserId: string | null;
+  isClosedToPublic: boolean;
 }): ExceptionKind {
   if (exception.isClosed) return "closed";
-  return exception.workerUserId ? "differentWorker" : "differentHours";
+  if (exception.workerUserId) return "differentWorker";
+  if (exception.startTime) return "differentHours";
+  return exception.isClosedToPublic ? "onlineOff" : "differentHours";
 }
 
 export default function ExceptionsPage() {
@@ -135,6 +145,8 @@ export default function ExceptionsPage() {
     id: w.userId,
     name: w.displayName,
   }));
+
+  const kindLabel = (value: ExceptionKind) => t(`booking.exceptions.kind.${value}`);
 
   return (
     <Box sx={{ maxWidth: 1000, mx: "auto" }}>
@@ -226,11 +238,28 @@ export default function ExceptionsPage() {
                       {/* Text, not colour: 7.1 forbids colour as the only carrier. */}
                       <Chip
                         size="small"
-                        label={t(
-                          `booking.exceptions.kind.${kindOf(exception)}`,
-                        )}
-                        color={exception.isClosed ? "error" : "default"}
+                        label={kindLabel(kindOf(exception))}
+                        color={
+                          exception.isClosed
+                            ? "error"
+                            : exception.isClosedToPublic
+                              ? "warning"
+                              : "default"
+                        }
                       />
+                      {/* Different hours or a stand-in AND off the web: the
+                          second chip says so, because the first cannot. */}
+                      {exception.isClosedToPublic &&
+                      !exception.isClosed &&
+                      kindOf(exception) !== "onlineOff" ? (
+                        <Chip
+                          size="small"
+                          color="warning"
+                          variant="outlined"
+                          label={kindLabel("onlineOff")}
+                          sx={{ ml: 0.5 }}
+                        />
+                      ) : null}
                     </TableCell>
                     <TableCell>
                       {exception.isClosed
@@ -312,7 +341,16 @@ export default function ExceptionsPage() {
                 <MenuItem value="differentWorker">
                   {t("booking.exceptions.kind.differentWorker")}
                 </MenuItem>
+                <MenuItem value="onlineOff">
+                  {t("booking.exceptions.kind.onlineOff")}
+                </MenuItem>
               </TextField>
+
+              {kind === "onlineOff" ? (
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  {t("booking.exceptions.onlineOffHelp")}
+                </Typography>
+              ) : null}
 
               {kind === "differentHours" ? (
                 <Stack direction="row" spacing={1}>

@@ -1,0 +1,236 @@
+<article class="dir" id="d04"
+         data-name="Seznam a detail"
+         data-thesis="Pro toho, kdo se jedním pacientem opravdu zabývá — vlevo zůstane celý den jako úzký seznam, vpravo je jeden člověk otevřený na celou plochu i s tím, co u něj chybí a co ho čeká."
+         data-cost="Vpravo je vždy jen jeden pacient, takže srovnání dvou lidí nebo pohled na vytížení místností tahle obrazovka nenabízí.">
+<style>
+#d04 .shot{background:#F2F5F1;color:#1E2620;
+  font-family:"DM Sans",ui-sans-serif,system-ui,sans-serif;
+  font-size:15px;line-height:1.55;display:flex;flex-direction:column;
+  font-variant-numeric:tabular-nums}
+
+/* ---- horní pruh ---- */
+#d04 .bar{padding:14px 22px 10px;border-bottom:1px solid #D5DCD2;background:#EAEEE8}
+#d04 .bar-top{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+#d04 .brand{font-size:15px;font-weight:700;margin:0;letter-spacing:-.01em}
+#d04 .date{font-size:14px;color:#5E6A5E}
+#d04 .clock{margin-left:auto;font-size:14px;font-weight:700;color:#2F6B3F}
+#d04 .nav{display:flex;flex-wrap:wrap;gap:2px 4px;margin-top:9px}
+#d04 .nav a{text-decoration:none;color:#404C42;font-size:14px;padding:6px 10px;
+  border-radius:5px;min-height:32px;box-sizing:border-box;display:inline-flex;
+  align-items:center;transition:background 120ms ease}
+#d04 .nav a:hover{background:#E0E5DE}
+#d04 .nav a.on{background:#DCE7DD;color:#245331;font-weight:700}
+
+/* ---- dvě plochy ---- */
+#d04 .split{display:flex;align-items:stretch;flex:1 1 auto;min-height:0}
+
+/* levý seznam */
+#d04 .list{flex:0 0 336px;box-sizing:border-box;border-right:1px solid #D5DCD2;
+  background:#EDF1EC;padding:14px 0 40px}
+#d04 .lh{font-size:14px;font-weight:700;margin:0 0 2px;padding:0 16px}
+#d04 .lsub{font-size:13px;color:#5E6A5E;padding:0 16px 12px}
+#d04 .row{display:flex;gap:10px;align-items:baseline;padding:9px 16px;
+  border-top:1px solid #DFE5DE;text-decoration:none;color:inherit;min-height:34px;
+  box-sizing:border-box;transition:background 120ms ease}
+#d04 .row:hover{background:#E4EAE3}
+#d04 .row .t{flex:0 0 44px;font-size:14px;font-weight:700;color:#404C42}
+#d04 .row .n{flex:1 1 auto;min-width:0;font-size:14px}
+#d04 .row .s{flex:0 0 58px;text-align:right;font-size:13px;color:#5E6A5E}
+#d04 .row.done .t,#d04 .row.done .n{color:#77836F}
+#d04 .row.live{box-shadow:inset 4px 0 0 0 #2F6B3F;background:#E7EEE7}
+#d04 .row.live .s{color:#245331;font-weight:700}
+#d04 .row.open{box-shadow:inset 4px 0 0 0 #9E3A3A;background:#F6ECEA}
+#d04 .row.open .n{font-weight:700}
+#d04 .row.open .s{color:#8A3232;font-weight:700}
+#d04 .nowrow{display:flex;align-items:center;gap:9px;padding:7px 16px;
+  border-top:1px solid #D5DCD2}
+#d04 .nowrow span{font-size:13px;font-weight:700;color:#2F6B3F;white-space:nowrap}
+#d04 .nowrow i{flex:1 1 auto;height:2px;background:#2F6B3F;font-style:normal}
+#d04 .lgroup{font-size:13px;color:#5E6A5E;padding:14px 16px 5px;font-weight:700}
+
+/* pravý detail */
+#d04 .detail{flex:1 1 auto;min-width:0;box-sizing:border-box;padding:22px 30px 60px;
+  max-width:980px}
+#d04 .dtop{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+#d04 .dkind{font-size:13px;font-weight:700;color:#5E6A5E;letter-spacing:.04em;
+  text-transform:uppercase;flex:1 1 100%}
+#d04 .dname{font-size:26px;font-weight:700;margin:2px 0 0;letter-spacing:-.02em;
+  line-height:1.2}
+#d04 .dwhen{font-size:15px;color:#404C42}
+#d04 .dstate{margin-left:auto;font-size:13px;font-weight:700;color:#8A3232;
+  border:1px solid #D7B3AE;background:#F6ECEA;border-radius:4px;padding:4px 10px}
+
+#d04 .alert{margin-top:16px;background:#F6ECEA;border:1px solid #D7B3AE;
+  border-radius:10px;padding:16px 18px;box-shadow:inset 4px 0 0 0 #9E3A3A}
+#d04 .alert-h{font-size:17px;font-weight:700;color:#8A3232}
+#d04 .alert-p{font-size:15px;color:#404C42;margin-top:7px;max-width:76ch}
+#d04 .acts{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+#d04 button{font:inherit;font-size:14px;font-weight:700;color:#F2F5F1;
+  background:#2F6B3F;border:1px solid #245331;border-radius:6px;padding:9px 15px;
+  min-height:36px;cursor:pointer;transition:background 120ms ease}
+#d04 button:hover{background:#245331}
+#d04 button.second{background:#F8FAF7;color:#2C3630;border-color:#C9D2C7}
+#d04 button.second:hover{background:#EAEEE8}
+
+#d04 .panes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;
+  margin-top:18px}
+#d04 .pane{background:#F8FAF7;border:1px solid #DDE4DB;border-radius:10px;
+  padding:15px 17px;box-sizing:border-box;min-width:0}
+#d04 .pane.wide{grid-column:1 / -1}
+#d04 .ph{font-size:13px;font-weight:700;color:#5E6A5E;letter-spacing:.04em;
+  text-transform:uppercase;padding-bottom:9px;border-bottom:1px solid #E3E9E1;
+  margin-bottom:11px}
+#d04 .f{display:flex;gap:12px;align-items:baseline;padding:5px 0;font-size:15px}
+#d04 .f .k{flex:0 0 132px;color:#5E6A5E;font-size:14px}
+#d04 .f .v{flex:1 1 auto;min-width:0}
+#d04 .doc{display:flex;gap:12px;align-items:baseline;padding:9px 0;font-size:15px;
+  border-bottom:1px solid #E9EEE7}
+#d04 .doc:last-child{border-bottom:0}
+#d04 .doc .dn{flex:1 1 auto;min-width:0}
+#d04 .doc .dv{flex:0 0 132px;text-align:right;font-size:14px;color:#5E6A5E}
+#d04 .doc.bad .dn{font-weight:700;color:#8A3232}
+#d04 .doc.bad .dv{color:#8A3232;font-weight:700}
+#d04 .step{display:flex;gap:13px;align-items:baseline;padding:8px 0;font-size:15px}
+#d04 .step .sn{flex:0 0 26px;font-weight:700;color:#2F6B3F;font-size:14px}
+#d04 .step .st{flex:1 1 auto;min-width:0}
+#d04 .step .sm{display:block;font-size:14px;color:#5E6A5E;margin-top:1px}
+#d04 .pnote{font-size:14px;color:#404C42;margin:0;max-width:80ch}
+
+@media (max-width:1000px){
+  #d04 .split{display:block}
+  #d04 .list{width:auto;border-right:0;border-bottom:1px solid #D5DCD2;padding-bottom:16px}
+  #d04 .detail{padding:18px 16px 48px;max-width:none}
+  #d04 .panes{grid-template-columns:minmax(0,1fr)}
+  #d04 .bar{padding:14px 16px 10px}
+}
+</style>
+
+<div class="shot">
+
+  <div class="bar">
+    <div class="bar-top">
+      <h1 class="brand">Ordinace Brno-Žabovřesky</h1>
+      <span class="date">úterý 23. září 2026 · Hana Veselá, recepce</span>
+      <span class="clock">Právě je 09:40</span>
+    </div>
+    <nav class="nav">
+      <a href="#d04">Přehled</a>
+      <a class="on" href="#d04">Dnes</a>
+      <a href="#d04">Plánování</a>
+      <a href="#d04">Pacienti</a>
+      <a href="#d04">Diagnostika</a>
+      <a href="#d04">Dokumenty</a>
+      <a href="#d04">Pokladna</a>
+      <a href="#d04">Fakturace</a>
+      <a href="#d04">Sklad</a>
+      <a href="#d04">Tým</a>
+      <a href="#d04">Nastavení</a>
+    </nav>
+  </div>
+
+  <div class="split">
+
+    <div class="list">
+      <h2 class="lh">Dnešní pacienti</h2>
+      <div class="lsub">18 návštěv · klepnutím se člověk otevře vpravo</div>
+
+      <div class="lgroup">Hotovo</div>
+      <a class="row done" href="#d04"><span class="t">07:00</span><span class="n">Jana Kratochvílová</span><span class="s">hotovo</span></a>
+      <a class="row done" href="#d04"><span class="t">07:20</span><span class="n">Petr Doležal</span><span class="s">hotovo</span></a>
+      <a class="row done" href="#d04"><span class="t">07:40</span><span class="n">Tomáš Řehák</span><span class="s">hotovo</span></a>
+      <a class="row done" href="#d04"><span class="t">08:00</span><span class="n">Marie Nováková</span><span class="s">hotovo</span></a>
+      <a class="row done" href="#d04"><span class="t">08:30</span><span class="n">Ondřej Veselý</span><span class="s">hotovo</span></a>
+
+      <div class="lgroup">Běží a stojí</div>
+      <a class="row live" href="#d04"><span class="t">09:00</span><span class="n">Lucie Bartošová</span><span class="s">běží</span></a>
+      <a class="row open" href="#d04"><span class="t">09:15</span><span class="n">Martin Kolář</span><span class="s">stojí</span></a>
+      <a class="row live" href="#d04"><span class="t">09:45</span><span class="n">Eva Procházková</span><span class="s">běží</span></a>
+
+      <div class="nowrow"><span>Právě teď 09:40</span><i></i></div>
+
+      <div class="lgroup">Zbytek dne</div>
+      <a class="row" href="#d04"><span class="t">10:00</span><span class="n">Filip Urban</span><span class="s">čeká</span></a>
+      <a class="row" href="#d04"><span class="t">10:30</span><span class="n">Kateřina Šimková</span><span class="s">čeká</span></a>
+      <a class="row" href="#d04"><span class="t">11:00</span><span class="n">Jakub Horák</span><span class="s">čeká</span></a>
+      <a class="row" href="#d04"><span class="t">11:30</span><span class="n">Veronika Málková</span><span class="s">čeká</span></a>
+      <a class="row" href="#d04"><span class="t">13:00</span><span class="n">Adam Beneš</span><span class="s">čeká</span></a>
+      <a class="row" href="#d04"><span class="t">13:40</span><span class="n">Nikola Tichá</span><span class="s">čeká</span></a>
+      <a class="row" href="#d04"><span class="t">14:20</span><span class="n">Radek Pospíšil</span><span class="s">čeká</span></a>
+      <a class="row" href="#d04"><span class="t">15:00</span><span class="n">Simona Vrbová</span><span class="s">čeká</span></a>
+      <a class="row" href="#d04"><span class="t">15:40</span><span class="n">Tomáš Řehák</span><span class="s">čeká</span></a>
+      <a class="row" href="#d04"><span class="t">16:40</span><span class="n">Petr Doležal</span><span class="s">čeká</span></a>
+    </div>
+
+    <div class="detail">
+
+      <div class="dtop">
+        <span class="dkind">Otevřený pacient</span>
+        <h2 class="dname">Martin Kolář</h2>
+        <span class="dwhen">objednán na 09:15 · sedí v čekárně 25 minut</span>
+        <span class="dstate">stojí kvůli papírům</span>
+      </div>
+
+      <div class="alert">
+        <div class="alert-h">Chybí: Souhlas se zpracováním zdravotních údajů</div>
+        <p class="alert-p">Je to první návštěva, a bez podepsaného souhlasu nejde
+          posudek pro klub vůbec vydat. Souhlas se vytiskne u recepce, pacient ho
+          podepíše a Hana Veselá ho naskenuje do jeho složky. Trvá to zhruba tři
+          minuty. Do té doby stojí ordinace 1 i MUDr. Havelka.</p>
+        <div class="acts">
+          <button type="button">Vytisknout souhlas k podpisu</button>
+          <button class="second" type="button">Přesunout na 10:15</button>
+        </div>
+      </div>
+
+      <div class="panes">
+
+        <section class="pane">
+          <div class="ph">Kdo to je</div>
+          <div class="f"><span class="k">Jméno</span><span class="v">Martin Kolář</span></div>
+          <div class="f"><span class="k">Narozen</span><span class="v">14. 3. 1991 · 35 let</span></div>
+          <div class="f"><span class="k">Pojišťovna</span><span class="v">211 · ověřeno dnes v 09:14</span></div>
+          <div class="f"><span class="k">Telefon</span><span class="v">recepce má číslo v kartě</span></div>
+          <div class="f"><span class="k">U nás</span><span class="v">poprvé</span></div>
+        </section>
+
+        <section class="pane">
+          <div class="ph">Proč přišel</div>
+          <div class="f"><span class="k">Výkon</span><span class="v">Posudek pro klub</span></div>
+          <div class="f"><span class="k">Lékař</span><span class="v">MUDr. Havelka</span></div>
+          <div class="f"><span class="k">Místnost</span><span class="v">Ordinace 1</span></div>
+          <div class="f"><span class="k">Délka</span><span class="v">30 minut</span></div>
+          <div class="f"><span class="k">Doporučil</span><span class="v">atletický klub, potřebuje posudek před sezonou</span></div>
+        </section>
+
+        <section class="pane">
+          <div class="ph">Co chybí a co už je</div>
+          <div class="doc bad"><span class="dn">Souhlas se zpracováním zdravotních údajů</span><span class="dv">chybí podpis</span></div>
+          <div class="doc"><span class="dn">Ověření pojištěnce 211</span><span class="dv">hotovo 09:14</span></div>
+          <div class="doc"><span class="dn">Vstupní dotazník</span><span class="dv">vyplněn</span></div>
+          <div class="doc"><span class="dn">Žádost od klubu</span><span class="dv">přinesl s sebou</span></div>
+        </section>
+
+        <section class="pane">
+          <div class="ph">Co bude dál</div>
+          <div class="step"><span class="sn">1.</span><span class="st">Vytisknout a nechat podepsat souhlas<span class="sm">recepce, asi 3 minuty</span></span></div>
+          <div class="step"><span class="sn">2.</span><span class="st">Zavolat pacienta do ordinace 1<span class="sm">MUDr. Havelka je volný až do 11:00</span></span></div>
+          <div class="step"><span class="sn">3.</span><span class="st">Posudek pro klub, 30 minut<span class="sm">skončí zhruba v 10:15</span></span></div>
+          <div class="step"><span class="sn">4.</span><span class="st">Vydat posudek a vybrat platbu<span class="sm">pokladna, před odchodem</span></span></div>
+        </section>
+
+        <section class="pane wide">
+          <div class="ph">Co to udělá se zbytkem dne</div>
+          <p class="pnote">Ordinace 1 je pak volná až do 11:00, kdy má Jakub Horák
+            vstupní vyšetření — zdržení se tedy nikam dál nepřenese, jen stojí
+            MUDr. Havelka. V tělocvičně dokončuje Lucie Bartošová izokinetiku
+            kolene do 10:00 a hned po ní jde Filip Urban na analýzu chůze.
+            V rehabilitaci běží od 09:30 Eva Procházková, vzatá dovnitř dřív.
+            Odpoledne od 13:00 je plné, takže přesouvat Martina Koláře za oběd by
+            znamenalo posunout Adama Beneše i Nikolu Tichou.</p>
+        </section>
+
+      </div>
+    </div>
+  </div>
+</div>
+</article>

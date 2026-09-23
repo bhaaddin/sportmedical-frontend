@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pořadník</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Libre+Franklin:wght@400;500;600&family=DM+Sans:wght@400;500;700&family=Chivo:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+body{margin:0;background:#E9EBEE;color:#1B2229;
+  font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;font-size:15px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) body{background:#14181D;color:#DDE3E9}}
+:root[data-theme="dark"] body{background:#14181D;color:#DDE3E9}
+.p-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:9px 18px;border-bottom:1px solid rgba(128,140,152,.35);
+  font-size:.82rem;position:sticky;top:env(safe-area-inset-top,0px);
+  background:inherit;z-index:30}
+.p-no{font-family:"IBM Plex Mono",ui-monospace,monospace;opacity:.65}
+.p-name{font-weight:600}
+.p-thesis{opacity:.75;flex:1 1 300px;min-width:0}
+.p-back{margin-left:auto;text-decoration:none;border:1px solid rgba(128,140,152,.45);
+  border-radius:6px;padding:5px 11px;color:inherit;min-height:32px;display:inline-flex;
+  align-items:center}
+.p-back:hover{border-color:currentColor}
+.dir{display:block}
+.dir > .shot{width:100%;min-height:calc(100vh - 46px);box-sizing:border-box}
+</style>
+</head>
+<body>
+<div class="p-bar">
+  <span class="p-no">07 / 20</span>
+  <span class="p-name">Pořadník</span>
+  <span class="p-thesis">Pro recepci v nejhorší chvíli dne, kdy je čekárna plná a někdo se ptá, kdy na něj přijde řada: nahoře je vidět, kdo je právě v ordinaci, a pod tím lidé podle toho, jak dlouho už čekají.</span>
+  <a class="p-back" href="index.html">Zpět na přehled</a>
+</div>
+<article class="dir" id="d07"
+         data-name="Pořadník"
+         data-thesis="Pro recepci v nejhorší chvíli dne, kdy je čekárna plná a někdo se ptá, kdy na něj přijde řada: nahoře je vidět, kdo je právě v ordinaci, a pod tím lidé podle toho, jak dlouho už čekají."
+         data-cost="Je to obrazovka jen na tuhle chvíli — o odpoledni ani o vytížení místností neřekne skoro nic.">
+  <style>
+    /* Pořadník jako na úřadě. Nahoře dvě velké tabule: kdo je právě uvnitř.
+       Pod tím čekárna seřazená podle odčekaných minut, nejdéle čekající první.
+       Odpoledne se sem záměrně nevejde - to je jiná obrazovka. */
+    #d07 .shot{background:#171C21;color:#DCE4E9;
+      font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+      font-size:15px;line-height:1.5;padding-bottom:56px;
+      --gr:#171C21;--pn:#1E252B;--p2:#232B32;--l1:#2E3941;
+      --mu:#9AA8B2;--fa:#78868F;--ac:#4E93A8;--bd:#D0726E}
+
+    #d07 .bar{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 22px;
+      padding:13px 26px;border-bottom:1px solid var(--l1);background:var(--pn)}
+    #d07 .bar .pl{font-family:"DM Sans",ui-sans-serif,system-ui,sans-serif;font-weight:700}
+    #d07 .bar .dt{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px;
+      color:var(--mu)}
+    #d07 .bar .fi{margin-left:auto;background:var(--gr);border:1px solid var(--l1);
+      border-radius:2px;padding:6px 10px;font:inherit;font-size:13px;color:var(--mu);
+      min-height:32px;width:180px}
+    #d07 .bar .me{font-size:13px;color:var(--mu)}
+
+    #d07 .frame{display:flex;align-items:stretch}
+    #d07 .nav{flex:0 0 168px;box-sizing:border-box;padding:18px 0 40px;
+      background:var(--pn);border-right:1px solid var(--l1)}
+    #d07 .nav a{display:block;padding:8px 22px;color:var(--mu);text-decoration:none}
+    #d07 .nav a.on{color:#DCE4E9;font-weight:500;border-left:3px solid var(--ac);
+      padding-left:19px}
+    #d07 .nav a:hover{color:#DCE4E9}
+    #d07 .main{flex:1 1 auto;min-width:0;padding:22px 26px 0}
+
+    #d07 h2{font-family:"DM Sans",ui-sans-serif,system-ui,sans-serif;font-size:15px;
+      font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mu);
+      margin:0 0 12px}
+    #d07 h3{font-family:"DM Sans",ui-sans-serif,system-ui,sans-serif;font-size:13px;
+      font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--fa);
+      margin:0 0 10px}
+
+    #d07 .inside{display:flex;flex-wrap:wrap;gap:16px}
+    #d07 .box{flex:1 1 330px;background:var(--pn);border:1px solid var(--l1);
+      border-top:3px solid var(--ac);border-radius:3px;padding:18px 20px 20px}
+    #d07 .box .tk{display:block;font-family:"IBM Plex Mono",ui-monospace,monospace;
+      font-size:20px;color:var(--ac);letter-spacing:.06em}
+    #d07 .box .nm{display:block;font-family:"DM Sans",ui-sans-serif,system-ui,sans-serif;
+      font-size:26px;font-weight:700;line-height:1.15;letter-spacing:-.01em;margin-top:4px}
+    #d07 .box .wt{display:block;margin-top:8px;color:var(--mu)}
+    #d07 .box .tm{display:block;margin-top:10px;padding-top:10px;
+      border-top:1px solid var(--l1);font-family:"IBM Plex Mono",ui-monospace,monospace;
+      font-size:13px;color:var(--mu)}
+    #d07 .box .sx{display:block;margin-top:6px;font-size:13px;letter-spacing:.1em;
+      text-transform:uppercase;color:var(--ac)}
+
+    #d07 .qh{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px;
+      margin:34px 0 12px}
+    #d07 .qh h2{margin:0}
+    #d07 .qh .cn{font-size:13px;color:var(--fa)}
+
+    #d07 .q{list-style:none;margin:0;padding:0}
+    #d07 .q li{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;
+      padding:15px 18px;margin-bottom:8px;background:var(--pn);
+      border:1px solid var(--l1);border-left:3px solid var(--fa);border-radius:3px}
+    #d07 .q .mi{flex:0 0 74px;text-align:right;
+      font-family:"IBM Plex Mono",ui-monospace,monospace}
+    #d07 .q .mi .n{font-size:20px;color:#DCE4E9}
+    #d07 .q .mi .u{font-size:13px;color:var(--fa);margin-left:3px}
+    #d07 .q .tk{flex:0 0 46px;font-family:"IBM Plex Mono",ui-monospace,monospace;
+      font-size:15px;color:var(--ac)}
+    #d07 .q .wh{flex:1 1 260px;min-width:0}
+    #d07 .q .wh .n{display:block;font-weight:500}
+    #d07 .q .wh .d{display:block;font-size:13px;color:var(--mu);margin-top:1px}
+    #d07 .q .bk{flex:0 0 132px;font-family:"IBM Plex Mono",ui-monospace,monospace;
+      font-size:13px;color:var(--mu)}
+    #d07 .q .st{flex:0 0 auto;font-size:13px;letter-spacing:.08em;text-transform:uppercase;
+      color:var(--fa)}
+    #d07 .q li.nxt{border-left-color:var(--ac)}
+    #d07 .q li.nxt .st{color:var(--ac)}
+    #d07 .q li.blk{border-color:var(--bd);border-left-color:var(--bd);background:var(--p2)}
+    #d07 .q li.blk .mi .n{color:var(--bd)}
+    #d07 .q li.blk .st{color:var(--bd);font-weight:500}
+    #d07 .q li.late{border-left-color:var(--l1)}
+    #d07 .q li.late .mi .n{color:var(--fa)}
+    #d07 .q .why{flex:1 1 100%;color:var(--bd);font-size:15px}
+    #d07 .q button{background:var(--bd);color:#171C21;border:0;border-radius:2px;
+      padding:8px 16px;font:inherit;font-weight:600;min-height:36px;cursor:pointer}
+    #d07 .q button:hover{background:#B85B57}
+
+    #d07 .past{margin:34px 0 0;padding:16px 18px;border:1px solid var(--l1);
+      border-radius:3px;color:var(--fa)}
+    #d07 .past ul{list-style:none;display:flex;flex-wrap:wrap;gap:6px 22px;
+      margin:0;padding:0;font-size:13px}
+    #d07 .past li span{font-family:"IBM Plex Mono",ui-monospace,monospace;
+      margin-right:7px;color:var(--mu)}
+    #d07 .later{margin:22px 0 0;color:var(--mu);font-size:13px;
+      border-top:1px solid var(--l1);padding-top:14px}
+    #d07 .later b{color:var(--fa);letter-spacing:.1em;text-transform:uppercase;
+      font-weight:500;margin-right:10px}
+    #d07 .note{margin:14px 0 0;color:var(--mu);max-width:86ch}
+
+    @media (max-width:900px){
+      #d07 .frame{display:block}
+      #d07 .nav{display:flex;flex-wrap:wrap;gap:0 4px;padding:6px 14px;
+        border-right:0;border-bottom:1px solid var(--l1)}
+      #d07 .nav a{padding:8px 8px}
+      #d07 .nav a.on{padding-left:8px;border-left:0;border-bottom:2px solid var(--ac)}
+      #d07 .main{padding:18px 18px 0}
+      #d07 .bar{padding:12px 18px}
+      #d07 .bar .fi{margin-left:0;width:100%}
+      #d07 .q .bk{flex:1 1 auto}
+    }
+  </style>
+  <div class="shot">
+    <div class="bar">
+      <span class="pl">Pořadník · Ordinace Brno-Žabovřesky</span>
+      <span class="dt">úterý 23. září 2026 · 09:40</span>
+      <input class="fi" type="text" placeholder="Hledat pacienta">
+      <span class="me">Hana Veselá · recepce</span>
+    </div>
+
+    <div class="frame">
+      <nav class="nav">
+        <a>Přehled</a>
+        <a class="on">Dnes</a>
+        <a>Plánování</a>
+        <a>Pacienti</a>
+        <a>Diagnostika</a>
+        <a>Dokumenty</a>
+        <a>Pokladna</a>
+        <a>Fakturace</a>
+        <a>Sklad</a>
+        <a>Tým</a>
+        <a>Nastavení</a>
+      </nav>
+
+      <main class="main">
+        <h2>Právě uvnitř</h2>
+        <div class="inside">
+          <div class="box">
+            <span class="tk">A12</span>
+            <span class="nm">Lucie Bartošová</span>
+            <span class="wt">Izokinetika kolene · Tělocvična · Bc. Dvořák</span>
+            <span class="tm">začátek 09:00 · konec 09:45 · pojišťovna 111</span>
+            <span class="sx">právě probíhá · 40 minut uvnitř</span>
+          </div>
+          <div class="box">
+            <span class="tk">A13</span>
+            <span class="nm">Eva Procházková</span>
+            <span class="wt">Rázová vlna · Rehabilitace · Mgr. Pilařová</span>
+            <span class="tm">objednána 09:45 · přijata 09:30 · pojišťovna 201</span>
+            <span class="sx">právě probíhá · 10 minut uvnitř</span>
+          </div>
+        </div>
+
+        <div class="qh">
+          <h2>Čekárna — kdo čeká nejdéle</h2>
+          <span class="cn">4 lidé v čekárně · 1 ještě nedorazil · nejdelší čekání 25 minut</span>
+        </div>
+
+        <ul class="q">
+          <li class="blk">
+            <span class="mi"><span class="n">25</span><span class="u">min</span></span>
+            <span class="tk">A14</span>
+            <span class="wh"><span class="n">Martin Kolář</span>
+              <span class="d">Posudek pro klub · Ordinace 1 · MUDr. Havelka · poj. 211</span></span>
+            <span class="bk">objednán 09:15</span>
+            <span class="st">nelze zavolat</span>
+            <span class="why">Chybí: Souhlas se zpracováním zdravotních údajů.
+              Ordinace 1 stojí a MUDr. Havelka na něj čeká.</span>
+            <button type="button">Vytisknout souhlas</button>
+          </li>
+          <li class="nxt">
+            <span class="mi"><span class="n">18</span><span class="u">min</span></span>
+            <span class="tk">A15</span>
+            <span class="wh"><span class="n">Filip Urban</span>
+              <span class="d">Analýza chůze · Tělocvična · Bc. Dvořák · poj. 213</span></span>
+            <span class="bk">objednán 10:00</span>
+            <span class="st">na řadě jako další</span>
+          </li>
+          <li>
+            <span class="mi"><span class="n">9</span><span class="u">min</span></span>
+            <span class="tk">A16</span>
+            <span class="wh"><span class="n">Kateřina Šimková</span>
+              <span class="d">Kontrola po operaci · Ordinace 2 · MUDr. Sýkorová · poj. 111</span></span>
+            <span class="bk">objednána 10:30</span>
+            <span class="st">čeká</span>
+          </li>
+          <li>
+            <span class="mi"><span class="n">2</span><span class="u">min</span></span>
+            <span class="tk">A17</span>
+            <span class="wh"><span class="n">Jakub Horák</span>
+              <span class="d">Vstupní vyšetření · Ordinace 1 · MUDr. Havelka · poj. 205</span></span>
+            <span class="bk">objednán 11:00</span>
+            <span class="st">čeká</span>
+          </li>
+          <li class="late">
+            <span class="mi"><span class="n">0</span><span class="u">min</span></span>
+            <span class="tk">A18</span>
+            <span class="wh"><span class="n">Veronika Málková</span>
+              <span class="d">Odběr krve · Laboratoř · Bc. Dvořák · poj. 111</span></span>
+            <span class="bk">objednána 11:30</span>
+            <span class="st">zatím nedorazila</span>
+          </li>
+        </ul>
+
+        <div class="past">
+          <h3>Odbaveno dnes dopoledne</h3>
+          <ul>
+            <li><span>07:00</span>Jana Kratochvílová · Odběr krve</li>
+            <li><span>07:20</span>Petr Doležal · Vstupní vyšetření</li>
+            <li><span>07:40</span>Tomáš Řehák · Spiroergometrie</li>
+            <li><span>08:00</span>Marie Nováková · Fyzioterapie</li>
+            <li><span>08:30</span>Ondřej Veselý · Kontrola po úrazu</li>
+          </ul>
+        </div>
+
+        <p class="later"><b>Odpoledne</b>Pořadník se znovu otevře ve 12:50.
+          Pak jdou po sobě 13:00 Adam Beneš, 13:40 Nikola Tichá, 14:20 Radek Pospíšil,
+          15:00 Simona Vrbová, 15:40 Tomáš Řehák a 16:40 Petr Doležal.</p>
+        <p class="note">Lístky se tisknou u pultu, pořadí se řídí odčekanými minutami,
+          ne časem objednávky — kdo přijde dřív, čeká déle a jde dřív na řadu.
+          Řehák a Doležal se vracejí odpoledne podruhé, takže osmnáct objednávek
+          patří šestnácti lidem. Pacient, kterému chybí podepsaný doklad, zůstává
+          v pořadníku nahoře, ale zavolat ho nelze; recepce to vyřeší u pultu
+          a lékař mezitím nestojí.</p>
+      </main>
+    </div>
+  </div>
+</article>
+</body>
+</html>

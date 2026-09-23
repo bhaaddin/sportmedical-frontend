@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kontrolní seznam</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Libre+Franklin:wght@400;500;600&family=DM+Sans:wght@400;500;700&family=Chivo:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+body{margin:0;background:#E9EBEE;color:#1B2229;
+  font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;font-size:15px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) body{background:#14181D;color:#DDE3E9}}
+:root[data-theme="dark"] body{background:#14181D;color:#DDE3E9}
+.p-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:9px 18px;border-bottom:1px solid rgba(128,140,152,.35);
+  font-size:.82rem;position:sticky;top:env(safe-area-inset-top,0px);
+  background:inherit;z-index:30}
+.p-no{font-family:"IBM Plex Mono",ui-monospace,monospace;opacity:.65}
+.p-name{font-weight:600}
+.p-thesis{opacity:.75;flex:1 1 300px;min-width:0}
+.p-back{margin-left:auto;text-decoration:none;border:1px solid rgba(128,140,152,.45);
+  border-radius:6px;padding:5px 11px;color:inherit;min-height:32px;display:inline-flex;
+  align-items:center}
+.p-back:hover{border-color:currentColor}
+.dir{display:block}
+.dir > .shot{width:100%;min-height:calc(100vh - 46px);box-sizing:border-box}
+</style>
+</head>
+<body>
+<div class="p-bar">
+  <span class="p-no">15 / 20</span>
+  <span class="p-name">Kontrolní seznam</span>
+  <span class="p-thesis">Pro toho, kdo hlídá papíry — souhlasy, žádanky, průkazy a zprávy: jde se shora dolů, odškrtává se, co je hotové, a úplně nahoře stojí doklad, kvůli kterému se právě nedá přijmout pacient.</span>
+  <a class="p-back" href="index.html">Zpět na přehled</a>
+</div>
+<article class="dir" id="d15"
+         data-name="Kontrolní seznam"
+         data-thesis="Pro toho, kdo hlídá papíry — souhlasy, žádanky, průkazy a zprávy: jde se shora dolů, odškrtává se, co je hotové, a úplně nahoře stojí doklad, kvůli kterému se právě nedá přijmout pacient."
+         data-cost="Je to seznam dokladů, ne rozvrh: kdy přesně co běží a v které místnosti se odtud pozná jen z poznámky u řádku.">
+<style>
+/* Kontrolní seznam — šestý pokus.
+   FORMA: odškrtávátko. Čtverečky v levém okraji, doklady jako řádky,
+   čtyři oddíly pod sebou. Zaškrtnuté řádky ztichnou, nezaškrtnuté drží
+   plnou barvu, jeden blokuje a stojí nahoře přes celou šířku. Žádné
+   karty, žádné sloupce — jeden arch, po kterém jede ruka dolů. */
+
+#d15 .shot{
+  background:#F4F3F1; color:#221F20;
+  font-family:"Libre Franklin",ui-sans-serif,system-ui,sans-serif;
+  font-size:15px; line-height:1.5;
+  display:grid; grid-template-columns:184px 1fr; box-sizing:border-box;
+}
+
+/* ---- levá lišta ---- */
+#d15 .rail{background:#EDEBE8;border-right:1px solid #DFDBD6;padding:16px 0 32px}
+#d15 .brand{padding:0 18px 14px;font-weight:600}
+#d15 .brand small{display:block;font-size:13px;font-weight:400;color:#6F6864}
+#d15 .nv{padding:8px 18px;font-size:14px;color:#4A4441;min-height:32px;box-sizing:border-box}
+#d15 .nv.is{font-weight:600;color:#8A3A4A;border-left:3px solid #8A3A4A;padding-left:15px;
+  background:#F4EEEF}
+#d15 .railnote{margin:20px 18px 0;padding-top:14px;border-top:1px solid #DFDBD6;
+  font-size:13px;color:#6F6864}
+
+/* ---- hlavička archu ---- */
+#d15 .main{min-width:0;padding:0 0 40px}
+#d15 .top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:14px 26px;
+  border-bottom:1px solid #DFDBD6}
+#d15 h1{font-size:17px;font-weight:600;margin:0}
+#d15 .when{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px;color:#6F6864;
+  font-variant-numeric:tabular-nums}
+#d15 .find{border:1px solid #D7D2CC;background:#FAF9F7;border-radius:4px;padding:6px 12px;
+  font-size:13px;color:#6F6864;min-height:32px;box-sizing:border-box;display:flex;align-items:center}
+#d15 .who{margin-left:auto;font-size:13px;color:#6F6864}
+
+#d15 .meter{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 26px 16px;
+  border-bottom:1px solid #DFDBD6;background:#F0EEEB}
+#d15 .meter .score{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+#d15 .meter .bar{flex:1 1 220px;height:12px;background:#E1DDD8;border-radius:2px;overflow:hidden}
+#d15 .meter .bar i{display:block;height:12px;background:#6E6862}
+#d15 .meter .left{font-size:14px;color:#4A4441}
+#d15 .meter .left b{color:#8A3A4A}
+
+/* ---- oddíly ---- */
+#d15 .sheet{padding:0 26px}
+#d15 .sec{padding:22px 0 6px}
+#d15 h2, #d15 h3, #d15 h4{font-size:13px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:#6F6864;margin:0 0 4px;display:flex;gap:10px;align-items:baseline}
+#d15 h2{color:#8A3A4A}
+#d15 .secnote{font-size:13px;color:#6F6864;font-weight:400;letter-spacing:0;text-transform:none}
+
+/* ---- řádek ---- */
+#d15 .row{display:grid;grid-template-columns:22px minmax(0,1.15fr) minmax(0,1fr) 150px;
+  gap:14px;align-items:baseline;padding:14px 8px 14px 4px;border-bottom:1px solid #E4E0DB;
+  cursor:pointer}
+#d15 .row:hover{background:#EFEDEA;transition:background 120ms}
+#d15 .ck{appearance:none;-webkit-appearance:none;width:20px;height:20px;box-sizing:border-box;
+  border:1.5px solid #9A928C;border-radius:3px;background:#FAF9F7;margin:0;position:relative;
+  cursor:pointer;align-self:start}
+#d15 .ck:checked{background:#6E6862;border-color:#6E6862}
+#d15 .ck:checked::after{content:"";position:absolute;left:6px;top:2px;width:5px;height:10px;
+  border:solid #F4F3F1;border-width:0 2px 2px 0;transform:rotate(45deg)}
+#d15 .ck.stop{border:2px solid #8A3A4A;background:#F7EDEE}
+#d15 .doc{font-size:15px;font-weight:600}
+#d15 .pt{font-size:14px;color:#4A4441;font-variant-numeric:tabular-nums}
+#d15 .state{font-size:13px;text-align:right;color:#6F6864}
+#d15 .state.stop{color:#8A3A4A;font-weight:600}
+#d15 .row.done .doc{font-weight:400;color:#65605C}
+#d15 .row.done .pt{color:#77716C}
+
+/* ---- blokující řádek ---- */
+#d15 .row.big{grid-template-columns:22px minmax(0,1fr);gap:16px;padding:20px 8px 22px 4px;
+  border-bottom:2px solid #C79BA3;background:#F9F1F2;cursor:default}
+#d15 .row.big:hover{background:#F9F1F2}
+#d15 .row.big .doc{font-size:26px;font-weight:600;line-height:1.25;letter-spacing:-.01em;
+  display:block}
+#d15 .row.big .pt{display:block;margin-top:6px}
+#d15 .why{display:block;max-width:74ch;margin-top:10px;font-size:14px;color:#6B2C38}
+#d15 button{margin-top:14px;font:inherit;font-size:14px;font-weight:600;color:#F6F3F2;
+  background:#8A3A4A;border:0;border-radius:5px;padding:10px 18px;min-height:36px;cursor:pointer;
+  transition:background 120ms}
+#d15 button:hover{background:#9A4657}
+
+/* ---- pata ---- */
+#d15 .end{margin:26px 26px 0;padding:16px 18px;border:1px solid #E4E0DB;border-radius:6px;
+  background:#FAF9F7;font-size:14px;color:#4A4441}
+#d15 .end b{font-weight:600}
+#d15 .end p{margin:0 0 6px}
+#d15 .end p.last{margin:0}
+
+@media (max-width:900px){
+  #d15 .shot{grid-template-columns:1fr}
+  #d15 .rail{display:flex;flex-wrap:wrap;gap:6px;align-items:center;border-right:0;
+    border-bottom:1px solid #DFDBD6;padding:12px 16px}
+  #d15 .brand{padding:0 12px 0 0}
+  #d15 .nv{padding:6px 10px}
+  #d15 .nv.is{padding-left:8px}
+  #d15 .railnote{margin:0;padding-top:0;border-top:0}
+  #d15 .row{grid-template-columns:22px minmax(0,1fr);gap:10px}
+  #d15 .state{text-align:left}
+}
+</style>
+<div class="shot">
+
+  <div class="rail">
+    <div class="brand">Ordinace Brno<small>Žabovřesky</small></div>
+    <div class="nv">Přehled</div>
+    <div class="nv">Dnes</div>
+    <div class="nv">Plánování</div>
+    <div class="nv">Pacienti</div>
+    <div class="nv">Diagnostika</div>
+    <div class="nv is">Dokumenty</div>
+    <div class="nv">Pokladna</div>
+    <div class="nv">Fakturace</div>
+    <div class="nv">Sklad</div>
+    <div class="nv">Tým</div>
+    <div class="nv">Nastavení</div>
+    <div class="railnote">Seznam se odškrtává shora dolů. Co brání příjmu, drží první řádek.</div>
+  </div>
+
+  <div class="main">
+
+    <div class="top">
+      <h1>Doklady k dnešnímu dni</h1>
+      <span class="when">úterý 23. září 2026 · 09:40</span>
+      <span class="find">Hledat doklad nebo pacienta</span>
+      <span class="who">Hana Veselá · recepce</span>
+    </div>
+
+    <div class="meter">
+      <span class="score">11 z 18</span>
+      <span class="bar"><i style="width:61%"></i></span>
+      <span class="left">zkontrolováno · zbývá <b>7</b>, z toho <b>1 blokuje příjem</b></span>
+    </div>
+
+    <div class="sheet">
+
+      <div class="sec">
+        <h2>Blokuje příjem pacienta <span class="secnote">právě teď, 09:40</span></h2>
+        <div class="row big">
+          <input type="checkbox" class="ck stop">
+          <span>
+            <span class="doc">Souhlas se zpracováním zdravotních údajů</span>
+            <span class="pt">Martin Kolář · objednán 09:15 · Posudek pro klub · Ordinace 1 · MUDr. Havelka · čeká 25 minut</span>
+            <span class="why">Chybí: Souhlas se zpracováním zdravotních údajů. Bez podpisu nelze
+              posudek pro klub vystavit ani vykázat pojišťovně 211. Ordinace 1 zatím stojí.</span>
+            <button type="button">Vytisknout souhlas</button>
+          </span>
+        </div>
+      </div>
+
+      <div class="sec">
+        <h3>Před vyšetřením <span class="secnote">vyřídit, než pacient vejde</span></h3>
+        <label class="row done"><input type="checkbox" class="ck" checked><span class="doc">Žádanka 111</span><span class="pt">Bartošová L. · 09:00 · Tělocvična</span><span class="state">ověřeno, právě probíhá</span></label>
+        <label class="row done"><input type="checkbox" class="ck" checked><span class="doc">Souhlas s rázovou vlnou</span><span class="pt">Procházková E. · 09:45 · Rehabilitace</span><span class="state">podepsáno v 09:28</span></label>
+        <label class="row"><input type="checkbox" class="ck"><span class="doc">Žádanka 213</span><span class="pt">Urban F. · 10:00 · Tělocvična</span><span class="state stop">čeká na lékaře</span></label>
+        <label class="row done"><input type="checkbox" class="ck" checked><span class="doc">Průkaz pojištěnce 111</span><span class="pt">Šimková K. · 10:30 · Ordinace 2</span><span class="state">ověřeno</span></label>
+        <label class="row"><input type="checkbox" class="ck"><span class="doc">Vstupní dotazník</span><span class="pt">Horák J. · 11:00 · Ordinace 1</span><span class="state stop">vytisknout</span></label>
+        <label class="row done"><input type="checkbox" class="ck" checked><span class="doc">Žádanka 111</span><span class="pt">Málková V. · 11:30 · Laboratoř</span><span class="state">ověřeno</span></label>
+      </div>
+
+      <div class="sec">
+        <h3>Po vyšetření <span class="secnote">dopsat a odeslat</span></h3>
+        <label class="row done"><input type="checkbox" class="ck" checked><span class="doc">Zpráva z odběru</span><span class="pt">Kratochvílová J. · 07:00 · Laboratoř</span><span class="state">odesláno 111</span></label>
+        <label class="row done"><input type="checkbox" class="ck" checked><span class="doc">Vstupní zpráva</span><span class="pt">Doležal P. · 07:20 · Ordinace 1</span><span class="state">podepsáno</span></label>
+        <label class="row"><input type="checkbox" class="ck"><span class="doc">Výsledek spiroergometrie</span><span class="pt">Řehák T. · 07:40 · Laboratoř</span><span class="state">laboratoř do 12:00</span></label>
+        <label class="row"><input type="checkbox" class="ck"><span class="doc">Zpráva o fyzioterapii</span><span class="pt">Nováková M. · 08:00 · Rehabilitace</span><span class="state stop">čeká na Mgr. Pilařovou</span></label>
+        <label class="row done"><input type="checkbox" class="ck" checked><span class="doc">Kontrolní zpráva</span><span class="pt">Veselý O. · 08:30 · Ordinace 2</span><span class="state">podepsáno</span></label>
+      </div>
+
+      <div class="sec">
+        <h4>Odpoledne <span class="secnote">připravit dopředu</span></h4>
+        <label class="row"><input type="checkbox" class="ck"><span class="doc">Žádanka 207</span><span class="pt">Beneš A. · 13:00 · Rehabilitace</span><span class="state">k podpisu</span></label>
+        <label class="row done"><input type="checkbox" class="ck" checked><span class="doc">Souhlas se zátěžovým testem</span><span class="pt">Tichá N. · 13:40 · Laboratoř</span><span class="state">podepsáno</span></label>
+        <label class="row done"><input type="checkbox" class="ck" checked><span class="doc">Žádanka 111</span><span class="pt">Pospíšil R. · 14:20 · Ordinace 2</span><span class="state">ověřeno</span></label>
+        <label class="row done"><input type="checkbox" class="ck" checked><span class="doc">Průkaz pojištěnce 213</span><span class="pt">Vrbová S. · 15:00 · Tělocvična</span><span class="state">ověřeno</span></label>
+        <label class="row done"><input type="checkbox" class="ck" checked><span class="doc">Žádanka 205</span><span class="pt">Řehák T. · 15:40 · Rehabilitace</span><span class="state">ověřeno ráno</span></label>
+        <label class="row"><input type="checkbox" class="ck"><span class="doc">Zpráva pro pojišťovnu 201</span><span class="pt">Doležal P. · 16:40 · Ordinace 1</span><span class="state">připravit</span></label>
+      </div>
+
+    </div>
+
+    <div class="end">
+      <p><b>Dvakrát dnes:</b> Tomáš Řehák (07:40 a 15:40) a Petr Doležal (07:20 a 16:40)
+        mají papíry na každou návštěvu zvlášť.</p>
+      <p><b>Pojišťovny dnes:</b> 111 · 201 · 205 · 207 · 211 · 213, nic nečeká na schválení.</p>
+      <p class="last">Naposledy odškrtla Hana Veselá v 09:32. Den je plný, volný termín dnes
+        žádný není. Pauza 12:00–13:00.</p>
+    </div>
+
+  </div>
+</div>
+</article>
+</body>
+</html>

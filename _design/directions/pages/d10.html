@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Teď velké</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Libre+Franklin:wght@400;500;600&family=DM+Sans:wght@400;500;700&family=Chivo:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+body{margin:0;background:#E9EBEE;color:#1B2229;
+  font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;font-size:15px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) body{background:#14181D;color:#DDE3E9}}
+:root[data-theme="dark"] body{background:#14181D;color:#DDE3E9}
+.p-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:9px 18px;border-bottom:1px solid rgba(128,140,152,.35);
+  font-size:.82rem;position:sticky;top:env(safe-area-inset-top,0px);
+  background:inherit;z-index:30}
+.p-no{font-family:"IBM Plex Mono",ui-monospace,monospace;opacity:.65}
+.p-name{font-weight:600}
+.p-thesis{opacity:.75;flex:1 1 300px;min-width:0}
+.p-back{margin-left:auto;text-decoration:none;border:1px solid rgba(128,140,152,.45);
+  border-radius:6px;padding:5px 11px;color:inherit;min-height:32px;display:inline-flex;
+  align-items:center}
+.p-back:hover{border-color:currentColor}
+.dir{display:block}
+.dir > .shot{width:100%;min-height:calc(100vh - 46px);box-sizing:border-box}
+</style>
+</head>
+<body>
+<div class="p-bar">
+  <span class="p-no">10 / 20</span>
+  <span class="p-name">Teď velké</span>
+  <span class="p-thesis">Pro toho, kdo prochází kolem recepce a má tři vteřiny: co běží v tuhle minutu je přes půl obrazovky, zbytek dne je drobný pod tím.</span>
+  <a class="p-back" href="index.html">Zpět na přehled</a>
+</div>
+<article class="dir" id="d10"
+         data-name="Teď velké"
+         data-thesis="Pro toho, kdo prochází kolem recepce a má tři vteřiny: co běží v tuhle minutu je přes půl obrazovky, zbytek dne je drobný pod tím."
+         data-cost="Plánování dopředu je potlačené — odpolední termíny jsou jen drobné řádky a den jako celek se z toho odhadnout nedá.">
+<style>
+#d10 .shot{background:#181D24;color:#DFE5EB;
+  font-family:"DM Sans",ui-sans-serif,system-ui,sans-serif;font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased}
+#d10 .frame{display:flex;align-items:stretch;min-height:100vh}
+
+#d10 .nav{flex:0 0 172px;box-sizing:border-box;border-right:1px solid #2A323C;
+  padding:18px 12px 26px;background:#151A20}
+#d10 .mark{font-family:"Chivo",ui-sans-serif,system-ui,sans-serif;font-size:15px;
+  font-weight:700;padding:0 8px;letter-spacing:.01em}
+#d10 .markd{font-size:13px;color:#8B98A5;padding:2px 8px 0}
+#d10 .nav ul{list-style:none;margin:18px 0 0;padding:0}
+#d10 .nav li{padding:7px 8px;border-radius:6px;font-size:14px;color:#96A3B0;
+  min-height:32px;box-sizing:border-box;display:flex;align-items:center}
+#d10 .nav li.on{background:#223029;color:#E4EBE7;font-weight:700;
+  box-shadow:inset 2px 0 0 #4E8C6A}
+
+#d10 .main{flex:1 1 auto;min-width:0;box-sizing:border-box;padding:14px 22px 46px}
+#d10 .top{display:flex;gap:8px 16px;align-items:baseline;flex-wrap:wrap;
+  padding-bottom:12px;border-bottom:1px solid #242C35}
+#d10 h1{margin:0;font-family:"Chivo",ui-sans-serif,system-ui,sans-serif;font-size:17px;
+  font-weight:700}
+#d10 .date{font-size:14px;color:#96A3B0}
+#d10 .me{margin-left:auto;font-size:14px;color:#8B98A5}
+
+#d10 .now{margin:16px 0 0;box-sizing:border-box;min-height:404px;
+  background:#1F2731;border:1px solid #33404C;border-radius:14px;padding:22px 24px 26px}
+#d10 .nowhead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  padding-bottom:14px;border-bottom:1px solid #2E3A45}
+#d10 .now h2{margin:0;font-family:"Chivo",ui-sans-serif,system-ui,sans-serif;font-size:20px;
+  font-weight:700;letter-spacing:.01em}
+#d10 .clock{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;color:#7CB394}
+#d10 .nowsub{font-size:14px;color:#96A3B0;margin-left:auto}
+
+#d10 .split{display:grid;grid-template-columns:1.15fr 1fr;gap:22px;margin-top:18px}
+#d10 .col > .lbl{margin:0 0 12px;font-size:13px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:#8B98A5}
+
+#d10 .run{padding:15px 16px;border:1px solid #2E3A45;border-radius:10px;background:#1A222B;
+  box-shadow:inset 3px 0 0 #4E8C6A;margin-bottom:12px}
+#d10 .run .l1{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+#d10 .run .t{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;color:#B9C6D2}
+#d10 .run .nm{font-size:19px;font-weight:700;letter-spacing:-.01em}
+#d10 .run .what{margin:4px 0 0;font-size:15px;color:#C3CFDA}
+#d10 .run .who{margin:2px 0 0;font-size:14px;color:#8B98A5}
+#d10 .bar{margin-top:11px;height:6px;background:#26313B;border-radius:3px;overflow:hidden}
+#d10 .bar i{display:block;height:6px;background:#4E8C6A}
+#d10 .barcap{margin:6px 0 0;font-size:13px;color:#8B98A5;font-variant-numeric:tabular-nums}
+
+#d10 .stop{padding:16px 18px 18px;border:1px solid #6E3A44;border-radius:10px;
+  background:#2A1E23}
+#d10 .stoptag{margin:0;font-size:13px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:#D98494}
+#d10 .bigname{margin:6px 0 0;font-size:28px;font-weight:700;letter-spacing:-.02em;
+  line-height:1.1;font-family:"Chivo",ui-sans-serif,system-ui,sans-serif}
+#d10 .stopwhen{margin:6px 0 0;font-size:15px;color:#C3CFDA;font-variant-numeric:tabular-nums}
+#d10 .stopwhy{margin:12px 0 0;padding:10px 12px;background:#33232A;border-radius:7px;
+  font-size:15px;color:#EBD3D8}
+#d10 .stopwhy b{font-weight:700}
+#d10 button{font:inherit;font-size:15px;font-weight:700;margin-top:14px;min-height:36px;
+  padding:7px 15px;border:1px solid #6BA98A;border-radius:7px;background:#3E7A5A;color:#EAF2ED;
+  cursor:pointer;transition:background 120ms ease}
+#d10 button:hover{background:#4E8C6A}
+
+#d10 .next{margin:20px 0 0;padding-top:14px;border-top:1px solid #2E3A45;
+  font-size:15px;color:#B9C6D2}
+#d10 .next b{font-weight:700;color:#DFE5EB;font-variant-numeric:tabular-nums}
+#d10 .rest{margin:26px 0 0}
+#d10 .rest h2{margin:0;font-family:"Chivo",ui-sans-serif,system-ui,sans-serif;font-size:17px;
+  font-weight:700}
+#d10 .restcap{margin:3px 0 12px;font-size:13px;color:#8B98A5}
+#d10 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1px;
+  background:#242C35;border:1px solid #242C35;border-radius:8px;overflow:hidden}
+#d10 .tile{background:#1B222A;padding:11px 13px;min-width:0}
+#d10 .tile .t{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;color:#9FB0BD}
+#d10 .tile .nm{font-size:15px;font-weight:700;margin-top:1px}
+#d10 .tile .d{font-size:13px;color:#8B98A5;margin-top:2px}
+
+#d10 .done{margin:22px 0 0;border-top:1px solid #242C35;padding-top:14px}
+#d10 .done h2{margin:0 0 6px;font-family:"Chivo",ui-sans-serif,system-ui,sans-serif;
+  font-size:15px;font-weight:700;color:#9FB0BD}
+#d10 .doneline{margin:0;font-size:13px;color:#7E8B98;line-height:1.7}
+#d10 .doneline span{font-variant-numeric:tabular-nums}
+#d10 .foot{margin:16px 0 0;font-size:13px;color:#7E8B98}
+
+@media (max-width:1050px){#d10 .split{grid-template-columns:1fr}}
+@media (max-width:900px){
+  #d10 .frame{display:block}
+  #d10 .nav{border-right:0;border-bottom:1px solid #2A323C;padding:12px}
+  #d10 .nav ul{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px}
+  #d10 .main{padding:12px 14px 40px}
+  #d10 .now{min-height:0;padding:18px 16px 20px}
+}
+</style>
+<div class="shot">
+<div class="frame">
+
+  <nav class="nav">
+    <div class="mark">SportMedical</div>
+    <div class="markd">Brno-Žabovřesky</div>
+    <ul>
+      <li>Přehled</li>
+      <li class="on">Dnes</li>
+      <li>Plánování</li>
+      <li>Pacienti</li>
+      <li>Diagnostika</li>
+      <li>Dokumenty</li>
+      <li>Pokladna</li>
+      <li>Fakturace</li>
+      <li>Sklad</li>
+      <li>Tým</li>
+      <li>Nastavení</li>
+    </ul>
+  </nav>
+
+  <div class="main">
+    <div class="top">
+      <h1>Dnes</h1>
+      <span class="date">úterý 23. září 2026 · Ordinace Brno-Žabovřesky</span>
+      <span class="me">Hana Veselá, recepce</span>
+    </div>
+
+    <section class="now">
+      <div class="nowhead">
+        <h2>Právě teď</h2>
+        <span class="clock">09:40</span>
+        <span class="nowsub">2 vyšetření běží · 1 pacient nemůže dál · 10 termínů ještě přijde</span>
+      </div>
+
+      <div class="split">
+        <div class="col">
+          <p class="lbl">Běží v tuhle minutu</p>
+
+          <div class="run">
+            <div class="l1"><span class="t">09:00</span><span class="nm">Lucie Bartošová</span></div>
+            <p class="what">Izokinetika kolene · Tělocvična</p>
+            <p class="who">Bc. Dvořák · pojišťovna 111</p>
+            <div class="bar"><i style="width:80%"></i></div>
+            <p class="barcap">běží 40 minut z 50 · končí 09:50</p>
+          </div>
+
+          <div class="run">
+            <div class="l1"><span class="t">09:45</span><span class="nm">Eva Procházková</span></div>
+            <p class="what">Rázová vlna · Rehabilitace</p>
+            <p class="who">Mgr. Pilařová · pojišťovna 201</p>
+            <div class="bar"><i style="width:35%"></i></div>
+            <p class="barcap">vzata dovnitř už v 09:30 · končí 10:05</p>
+          </div>
+        </div>
+
+        <div class="col">
+          <p class="lbl">Čeká a nemůže dál</p>
+          <div class="stop">
+            <p class="stoptag">Blokováno · 25 minut</p>
+            <p class="bigname">Martin Kolář</p>
+            <p class="stopwhen">objednán 09:15 · Posudek pro klub · Ordinace 1 · MUDr. Havelka
+              · pojišťovna 211</p>
+            <p class="stopwhy"><b>Chybí: Souhlas se zpracováním zdravotních údajů.</b>
+              Bez podpisu nelze posudek vydat a Ordinace 1 zatím stojí prázdná.</p>
+            <button type="button">Vytisknout souhlas k podpisu</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="next">Hned po nich: <b>10:00</b> Filip Urban, Analýza chůze v Tělocvičně
+        a <b>10:30</b> Kateřina Šimková, Kontrola po operaci v Ordinaci 2. V čekárně sedí
+        jeden člověk — Martin Kolář.</p>
+    </section>
+
+    <section class="rest">
+      <h2>Zbytek dne</h2>
+      <p class="restcap">10 termínů od 10:00 do 16:40 · nic z toho teď nepotřebuje člověka</p>
+      <div class="tiles">
+        <div class="tile"><div class="t">10:00</div><div class="nm">Filip Urban</div>
+          <div class="d">Analýza chůze · Tělocvična</div></div>
+        <div class="tile"><div class="t">10:30</div><div class="nm">Kateřina Šimková</div>
+          <div class="d">Kontrola po operaci · Ordinace 2</div></div>
+        <div class="tile"><div class="t">11:00</div><div class="nm">Jakub Horák</div>
+          <div class="d">Vstupní vyšetření · Ordinace 1</div></div>
+        <div class="tile"><div class="t">11:30</div><div class="nm">Veronika Málková</div>
+          <div class="d">Odběr krve · Laboratoř</div></div>
+        <div class="tile"><div class="t">13:00</div><div class="nm">Adam Beneš</div>
+          <div class="d">Fyzioterapie · Rehabilitace</div></div>
+        <div class="tile"><div class="t">13:40</div><div class="nm">Nikola Tichá</div>
+          <div class="d">Spiroergometrie · Laboratoř</div></div>
+        <div class="tile"><div class="t">14:20</div><div class="nm">Radek Pospíšil</div>
+          <div class="d">Kontrola po úrazu · Ordinace 2</div></div>
+        <div class="tile"><div class="t">15:00</div><div class="nm">Simona Vrbová</div>
+          <div class="d">Izokinetika kolene · Tělocvična</div></div>
+        <div class="tile"><div class="t">15:40</div><div class="nm">Tomáš Řehák</div>
+          <div class="d">Fyzioterapie · Rehabilitace</div></div>
+        <div class="tile"><div class="t">16:40</div><div class="nm">Petr Doležal</div>
+          <div class="d">Kontrola po operaci · Ordinace 1</div></div>
+      </div>
+    </section>
+
+    <section class="done">
+      <h2>Hotovo do 09:40 · 5</h2>
+      <p class="doneline">
+        <span>07:00</span> Jana Kratochvílová, Odběr krve ·
+        <span>07:20</span> Petr Doležal, Vstupní vyšetření ·
+        <span>07:40</span> Tomáš Řehák, Spiroergometrie ·
+        <span>08:00</span> Marie Nováková, Fyzioterapie ·
+        <span>08:30</span> Ondřej Veselý, Kontrola po úrazu
+      </p>
+      <p class="foot">Nikdo dnes nezrušil a nikdo nedorazil pozdě. Volné termíny:
+        11:00 Tělocvična, 14:20 Rehabilitace, 16:00 Laboratoř.</p>
+      <p class="foot">Pro směnu: polední pauza je od 12:00 do 13:00 a telefon se přepíná
+        na mobil. Spiroergometr se vrátil ze servisu, před Nikolou Tichou ve 13:40 ho
+        musí někdo vyzkoušet naprázdno. Dva pacienti přichází dnes dvakrát:
+        Tomáš Řehák na spiroergometrii a pak na fyzioterapii, Petr Doležal na vstupní
+        vyšetření a pak na kontrolu po operaci. Pojišťovny dnes: 111 šestkrát,
+        201 čtyřikrát, 205 třikrát, 207 dvakrát, 213 dvakrát a 211 jednou.
+        Odběrové zkumavky ve skladu vystačí na dva dny, objednávka by měla odejít dnes.</p>
+    </section>
+  </div>
+</div>
+</div>
+</article>
+</body>
+</html>
