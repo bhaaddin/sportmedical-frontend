@@ -15,15 +15,20 @@ export interface Patient {
   updatedAtUtc: string;
 }
 
-export interface PatientRegistration {
+/**
+ * A correction to a patient's name, date of birth or sex.
+ *
+ * Those identify the patient, so the server refuses the change without a
+ * reason; the author is whoever is signed in. Both go to the audit trail with
+ * the change.
+ */
+export interface PatientIdentityCorrection {
   firstName: string;
   lastName: string;
-  preferredName?: string;
+  preferredName: string | null;
   dateOfBirth: string;
   sex: string;
-  email?: string;
-  phone?: string;
-  registrationBusinessDate: string;
+  changeReason: string;
 }
 
 /** One page of the register, and how many patients match in all. */
@@ -69,12 +74,7 @@ export const patientsApi = {
     return res.data?.value ?? res.data;
   },
 
-  create: async (data: PatientRegistration): Promise<Patient> => {
-    const res = await client.post('/api/patients', data);
-    return res.data?.value ?? res.data;
-  },
-
-  update: async (id: string, data: Partial<PatientRegistration>): Promise<Patient> => {
+  update: async (id: string, data: PatientIdentityCorrection): Promise<Patient> => {
     const res = await client.put(`/api/patients/${id}`, data);
     return res.data?.value ?? res.data;
   },

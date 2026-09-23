@@ -65,6 +65,17 @@ type Demographics = {
   sex: Sex;
 };
 
+/**
+ * What the server says when it refuses a correction. `code` names the rule;
+ * neither it nor `message` ever repeats a value that was sent.
+ */
+const CORRECTION_REFUSALS: Record<string, string> = {
+  "patients.change_reason.required": "Napište, proč se údaje mění.",
+  "patients.change_reason.too_long": "Důvod změny je příliš dlouhý.",
+  "patients.change_reason.invalid_characters": "Důvod změny obsahuje nepovolené znaky.",
+  "patients.sex.invalid": "Zvolte pohlaví.",
+};
+
 type ProfileFields = {
   insuredFrom: string;
   insuranceType: string;
@@ -166,6 +177,8 @@ export default function PatientForm() {
   const setDemographics = setEditedDemographics;
   const setProfile = setEditedProfile;
 
+  const [demographicsReason, setDemographicsReason] = useState("");
+  const [demographicsError, setDemographicsError] = useState<string | null>(null);
   const [savingDemographics, setSavingDemographics] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [insuranceOpen, setInsuranceOpen] = useState(false);
@@ -174,22 +187,38 @@ export default function PatientForm() {
   const load = () => {
     setEditedDemographics(null);
     setEditedProfile(null);
+    setDemographicsReason("");
     void patientQuery.refetch();
   };
 
+  /*
+   * Route 1: name, date of birth and sex identify the patient, so the server
+   * takes a correction only with a reason, and records it with the signed-in
+   * author. Sex is sent too - leaving it out made every save a 400.
+   */
   const saveDemographics = async () => {
-    if (!patientId) return;
+    if (!patientId || demographicsReason.trim() === "") return;
     setSavingDemographics(true);
+    setDemographicsError(null);
     try {
       await patientsApi.update(patientId, {
         firstName: demographics.firstName,
         lastName: demographics.lastName,
+        preferredName: demographics.preferredName.trim() === "" ? null : demographics.preferredName,
         dateOfBirth: demographics.dateOfBirth,
+        sex: demographics.sex,
+        changeReason: demographicsReason.trim(),
       });
       toast.success("Jméno a demografie uloženy.");
       load();
-    } catch {
-      toast.error("Uložení se nezdařilo.");
+    } catch (error) {
+      const body = (error as { response?: { data?: { code?: string; message?: string } } })
+        ?.response?.data;
+      setDemographicsError(
+        (body?.code !== undefined ? CORRECTION_REFUSALS[body.code] : undefined)
+          ?? body?.message
+          ?? "Uložení se nezdařilo.",
+      );
     } finally {
       setSavingDemographics(false);
     }
@@ -303,11 +332,22 @@ export default function PatientForm() {
                 ))}
               </TextField>
             </Stack>
+            <TextField
+              required
+              fullWidth
+              multiline
+              minRows={2}
+              label="Důvod změny"
+              value={demographicsReason}
+              onChange={(e) => setDemographicsReason(e.target.value)}
+              helperText="Jméno, datum narození a pohlaví se bez důvodu neuloží. Zapíše se s vaším jménem."
+            />
+            {demographicsError ? <Alert severity="error">{demographicsError}</Alert> : null}
             <Box>
               <Button
                 variant="contained"
                 onClick={saveDemographics}
-                disabled={savingDemographics}
+                disabled={savingDemographics || demographicsReason.trim() === ""}
               >
                 Uložit
               </Button>
