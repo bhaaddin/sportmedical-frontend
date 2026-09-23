@@ -27,13 +27,9 @@ const files = [];
  * printed a clean run that had never looked at the new file. A list that has to
  * be extended before it can catch anything catches nothing.
  *
- * These three predate this lane and belong to other work.
+ * A file that predates this lane and belongs to other work goes here.
  */
-const NOT_MINE = [
-  'src/components/booking/AddressPicker.tsx',
-  'src/components/booking/BookingDocuments.tsx',
-  'src/components/booking/WaitlistManager.tsx',
-];
+const NOT_MINE = [];
 
 const MINE = /^src\/(pages|components)\/booking\//;
 const mine = files.filter((f) => MINE.test(f) && !NOT_MINE.includes(f));

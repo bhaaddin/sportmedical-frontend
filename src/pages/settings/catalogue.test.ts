@@ -222,8 +222,8 @@ describe('finding the way back', () => {
     }
   });
 
-  /* `/calendar` is the old moved-calendar page; `/calendars` is the settings
-     one. A prefix match instead of a segment match would confuse them. */
+  /* `/calendar` is one letter short of `/calendars`, the settings one. A
+     prefix match instead of a segment match would confuse them. */
   it('does not mistake a shorter neighbouring route for a settings one', () => {
     expect(settingsItemAt('/calendar')).toBeNull();
     expect(settingsItemAt('/cenikovy-prehled')).toBeNull();

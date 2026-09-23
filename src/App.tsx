@@ -34,7 +34,6 @@ const PatientLayout = lazy(() => import('./pages/patients/PatientLayout'));
 const PatientDocumentsPage = lazy(() => import('./pages/patients/PatientDocumentsPage'));
 const PatientAppointmentsPage = lazy(() => import('./pages/patients/PatientAppointmentsPage'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
-const CalendarMovedPage = lazy(() => import('./pages/CalendarMoved'));
 const BillingPage = lazy(() => import('./pages/Billing'));
 const InventoryPage = lazy(() => import('./pages/Inventory'));
 const MeasurementsPage = lazy(() => import('./pages/Measurements'));
@@ -463,7 +462,6 @@ export default function App() {
                   <Suspense fallback={<PageLoader />}>
                   <Routes>
                     <Route path="/" element={<DashboardPage />} />
-                    <Route path="/calendar" element={<CalendarMovedPage />} />
                     <Route path="/patients" element={<PatientList />} />
                     <Route path="/patients/register" element={<PatientRegistrationPage />} />
                     <Route path="/patients/:id/edit" element={<PatientFormPage />} />
