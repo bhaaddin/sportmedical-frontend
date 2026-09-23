@@ -48,7 +48,7 @@ import {
   startOfPragueDay,
   toDateOnly,
 } from "../../utils/time";
-import { dayState, dayStateLabelKey, isShaded } from "./dayState";
+import { WORKER_ABSENT, dayState, dayStateLabelKey, isShaded } from "./dayState";
 import { inactiveAmong } from "./calendarLifecycle";
 import type { DayState } from "./dayState";
 
@@ -68,12 +68,18 @@ function DayStateLabel({ state, sx }: { state: DayState; sx?: SxProps<Theme> }) 
 
   const text = t(key, { defaultValue: t("booking.grid.closed.other") });
 
+  /* An absent worker's day says who is out, so nobody has to go and ask. */
+  const why =
+    state.kind === "nothing-to-book"
+      ? t("booking.grid.noActivitiesWhy")
+      : state.kind === "closed" && state.because === WORKER_ABSENT
+        ? state.who
+          ? t("booking.grid.workerAbsentWhy", { name: state.who })
+          : t("booking.grid.workerAbsentWhyUnnamed")
+        : "";
+
   return (
-    <Tooltip
-      title={
-        state.kind === "nothing-to-book" ? t("booking.grid.noActivitiesWhy") : ""
-      }
-    >
+    <Tooltip title={why}>
       <Typography sx={sx}>{text}</Typography>
     </Tooltip>
   );

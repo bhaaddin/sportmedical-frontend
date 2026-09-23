@@ -798,6 +798,21 @@ export const daySummarySchema = z.object({
     })
     .nullish()
     .transform((v) => v ?? null),
+  /**
+   * Calendars shut today only because their worker is recorded out. Their
+   * hours are already left out of `workingMinutes`; this says who and where.
+   */
+  absent: z
+    .array(
+      z.object({
+        calendarId: z.string(),
+        calendarName: z.string(),
+        workerUserId: z.string(),
+        workerDisplayName: z.string().nullish().transform((v) => v ?? null),
+      }),
+    )
+    .nullish()
+    .transform((v) => v ?? []),
 });
 export type DaySummary = z.infer<typeof daySummarySchema>;
 

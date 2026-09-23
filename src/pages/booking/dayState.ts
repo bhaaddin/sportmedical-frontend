@@ -33,12 +33,18 @@ export interface DayPreviewLike {
   isOpen: boolean;
   closedBecause: string | null;
   offeredActivityIds?: readonly string[];
+  /** Named by the server on a `workerAbsent` day: who is out. */
+  workerDisplayName?: string | null;
 }
 
 export type DayState =
   | { kind: 'open' }
-  | { kind: 'closed'; because: string | null }
+  /** `who` only on a `workerAbsent` day - the person the day belongs to. */
+  | { kind: 'closed'; because: string | null; who?: string | null }
   | { kind: 'nothing-to-book' };
+
+/** The server's word for a day shut because its worker is recorded out. */
+export const WORKER_ABSENT = 'workerAbsent';
 
 /** The server's word for a day that is open but has no činnosti assigned. */
 export const NO_ACTIVITIES = 'noActivities';
@@ -76,7 +82,11 @@ export function dayState(preview: readonly DayPreviewLike[]): DayState {
    * than naming none on a day nobody is in.
    */
   const shut = preview.find((p) => !p.isOpen);
-  if (shut !== undefined) return { kind: 'closed', because: shut.closedBecause };
+  if (shut !== undefined) {
+    return shut.closedBecause === WORKER_ABSENT
+      ? { kind: 'closed', because: WORKER_ABSENT, who: shut.workerDisplayName ?? null }
+      : { kind: 'closed', because: shut.closedBecause };
+  }
 
   return { kind: 'open' };
 }

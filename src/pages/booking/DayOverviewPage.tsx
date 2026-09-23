@@ -280,6 +280,19 @@ export default function DayOverviewPage() {
         >
           {summary ? (
             <Stack spacing={3}>
+              {/* Who is out today. Their hours are already left out of the
+                  working time below, so the figures and this line agree. */}
+              {summary.absent.length > 0 ? (
+                <Alert severity="warning">
+                  {t("booking.day.absent", {
+                    list: summary.absent
+                      .map((a) =>
+                        `${a.workerDisplayName ?? t("booking.day.absentUnnamed")} (${a.calendarName})`,
+                      )
+                      .join(", "),
+                  })}
+                </Alert>
+              ) : null}
               {/* ── The five tallies ── */}
               <Paper variant="outlined" sx={{ p: 2 }}>
                 <Stack direction="row" sx={{ flexWrap: "wrap", gap: 3 }}>
