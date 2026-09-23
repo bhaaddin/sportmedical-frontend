@@ -98,6 +98,8 @@ import RuianAddressPicker from '../../components/registration/RuianAddressPicker
 import HealthQuestionnaire from '../../components/public/HealthQuestionnaire';
 import { answersForSubmission, readDraft } from '../../services/publicIntake/healthQuestionnaire';
 import { forgetHeld, readHeld } from '../../api/publicBooking';
+import { loadQuestionnaire } from '../../api/publicQuestionnaire';
+import type { LoadedQuestionnaire } from '../../api/publicQuestionnaire';
 import { questionnaireSatisfied, questionnaireStance } from '../../services/publicIntake/questionnaireRequirement';
 import { calendarFileUrl } from '../../api/publicManage';
 import type { HeldBooking } from '../../api/publicBooking';
@@ -352,6 +354,42 @@ export default function IntakeQuestionnaire() {
    */
   const { asked: questionnaireAskedFor, required: questionnaireRequired } =
     questionnaireStance(held?.questionnaireRequirement);
+
+  /*
+   * The questionnaire itself: the one the booked činnost names, or the
+   * clinic's default — the server decides, off the hold token. Until
+   * 23. 9. 2026 the dialog asked for one key written into the bundle whatever
+   * had been booked.
+   *
+   * Loaded by the page and not by the dialog, because the submission has to
+   * say which questionnaire the answers belong to whether or not the dialog
+   * was opened on this visit. Not asked for at all when the činnost does not
+   * ask for it. `questionnaireAttempt` is bumped when the dialog is opened
+   * after a failed load, so "zkuste to znovu" in the dialog is true.
+   */
+  const [questionnaire, setQuestionnaire] = useState<LoadedQuestionnaire | null>(null);
+  const [questionnaireLoadFailed, setQuestionnaireLoadFailed] = useState(false);
+  const [questionnaireAttempt, setQuestionnaireAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!questionnaireAskedFor) return undefined;
+
+    let abandoned = false;
+
+    loadQuestionnaire(held?.token ?? null)
+      .then((loaded) => { if (!abandoned) setQuestionnaire(loaded); })
+      .catch(() => { if (!abandoned) setQuestionnaireLoadFailed(true); });
+
+    return () => { abandoned = true; };
+  }, [questionnaireAskedFor, held, questionnaireAttempt]);
+
+  const openQuestionnaire = (): void => {
+    if (questionnaireLoadFailed) {
+      setQuestionnaireLoadFailed(false);
+      setQuestionnaireAttempt((attempt) => attempt + 1);
+    }
+    setQuestionnaireOpen(true);
+  };
 
   useEffect(() => {
     if (questionnaireOpen) return;
@@ -806,10 +844,12 @@ export default function IntakeQuestionnaire() {
          *
          * Not held in this component's state: the dialog owns the answers while
          * it is open, and two copies kept in step is a bug waiting for the day
-         * somebody edits one of them. `undefined` when nothing was answered, so
-         * the field is left off the request entirely rather than sent empty.
+         * somebody edits one of them. `undefined` when nothing was answered, or
+         * when the questionnaire for this booking never arrived, so the field
+         * is left off the request entirely rather than sent empty or filed
+         * under a questionnaire this booking did not load.
          */
-        healthQuestionnaire: answersForSubmission(readDraft()),
+        healthQuestionnaire: answersForSubmission(readDraft(), questionnaire),
 
         /*
          * The slot being claimed, when this registration is finishing a booking.
@@ -1079,6 +1119,8 @@ export default function IntakeQuestionnaire() {
           open={questionnaireOpen}
           onClose={() => setQuestionnaireOpen(false)}
           female={form.sex === Sex.Female}
+          questionnaire={questionnaire}
+          loadFailed={questionnaireLoadFailed}
           palette={{
             ink: BRAND.ink,
             accent: BRAND.accent,
@@ -1535,13 +1577,23 @@ export default function IntakeQuestionnaire() {
                   appointment is not freely given, so it stays voluntary.
                 */}
                 <Box sx={{ display: 'grid', gap: 1.25 }}>
+                  {/*
+                    Names what was actually booked. It said "sportovní lékařské
+                    prohlídky" for everybody until 23. 9. 2026 — somebody who
+                    booked a diagnostic session was consenting, in writing, to
+                    an examination they had not asked for. Somebody who came
+                    without booking has nothing to name yet, so the consent
+                    covers the service they will book.
+                  */}
                   <ConsentRow
                     required
                     checked={form.consentTreatment}
                     onChange={(value) => set('consentTreatment', value)}
                     error={errors.consentTreatment}
-                    title="Provedení prohlídky"
-                    detail="Souhlasím s provedením sportovní lékařské prohlídky a se zpracováním údajů o zdravotním stavu, které si vyžádá."
+                    title={held !== null ? `Provedení: ${held.activityName}` : 'Poskytnutí zdravotní služby'}
+                    detail={held !== null
+                      ? `Souhlasím s provedením činnosti ${held.activityName}${held.serviceName !== '' ? ` (${held.serviceName})` : ''} a se zpracováním údajů o zdravotním stavu, které si vyžádá.`
+                      : 'Souhlasím s poskytnutím zdravotní služby, kterou si objednám, a se zpracováním údajů o zdravotním stavu, které si vyžádá.'}
                   />
                   <ConsentRow
                     required={held?.requiresReportByEmail === true}
@@ -1631,7 +1683,7 @@ export default function IntakeQuestionnaire() {
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.25 }}>
                       <Typography sx={{ fontWeight: 700, fontSize: 14.5 }}>
-                        Zdravotní dotazník
+                        {questionnaire?.name ?? 'Zdravotní dotazník'}
                       </Typography>
                       <Chip
                         size="small"
@@ -1654,7 +1706,7 @@ export default function IntakeQuestionnaire() {
                       fullWidth
                       variant="contained"
                       disableElevation
-                      onClick={() => setQuestionnaireOpen(true)}
+                      onClick={openQuestionnaire}
                       endIcon={<OpenInFullOutlined sx={{ fontSize: 16 }} />}
                       sx={{ borderRadius: 999, py: 1.1, color: BRAND.ink }}
                     >
