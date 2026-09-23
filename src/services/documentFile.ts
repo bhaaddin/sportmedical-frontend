@@ -88,11 +88,6 @@ export function isPdf(file: { name: string; type: string }): boolean {
   return file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
 }
 
-/** Everything that is not a PDF is an image we can rotate, crop and enhance. */
-export function isImage(file: { name: string; type: string }): boolean {
-  return !isPdf(file);
-}
-
 export function checkFile(file: { name: string; type: string; size: number }): FileCheck {
   if (file.size === 0) {
     return {

@@ -98,7 +98,7 @@ import RuianAddressPicker from '../../components/registration/RuianAddressPicker
 import HealthQuestionnaire from '../../components/public/HealthQuestionnaire';
 import { answersForSubmission, readDraft } from '../../services/publicIntake/healthQuestionnaire';
 import { forgetHeld, readHeld } from '../../api/publicBooking';
-import { questionnaireStance } from '../../services/publicIntake/questionnaireRequirement';
+import { questionnaireSatisfied, questionnaireStance } from '../../services/publicIntake/questionnaireRequirement';
 import { calendarFileUrl } from '../../api/publicManage';
 import type { HeldBooking } from '../../api/publicBooking';
 import type { AddressPoint } from '../../api/addressLookup';
@@ -364,6 +364,12 @@ export default function IntakeQuestionnaire() {
       setQuestionnaireProgress(0);
     }
   }, [questionnaireOpen]);
+  /* A required questionnaire with nothing answered in it; opening it and
+     closing it again does not count. */
+  const questionnaireMissing = !questionnaireSatisfied(
+    held?.questionnaireRequirement,
+    questionnaireProgress,
+  );
   /*
    * Kept whole rather than as a bare code: the submission needs only
    * `addressPointCode`, but the screen has to show the patient which address
@@ -654,7 +660,7 @@ export default function IntakeQuestionnaire() {
      * the same thing off the held token, because a rule only the form knows is
      * one that anything which is not the form can skip.
      */
-    if (questionnaireRequired && questionnaireProgress === 0) {
+    if (questionnaireMissing) {
       next.healthQuestionnaire =
         'U této činnosti je zdravotní dotazník povinný. Vyplňte ho prosím.';
     }
@@ -1617,7 +1623,7 @@ export default function IntakeQuestionnaire() {
                     sx={{
                       p: 2,
                       borderRadius: 3,
-                      border: `1px solid ${questionnaireRequired && questionnaireProgress === 0
+                      border: `1px solid ${questionnaireMissing
                         ? '#D32F2F'
                         : BRAND.accentEdge}`,
                       bgcolor: BRAND.accentWash,
@@ -1655,7 +1661,7 @@ export default function IntakeQuestionnaire() {
                       {questionnaireProgress > 0 ? 'Pokračovat ve vyplňování' : 'Vyplnit dotazník'}
                     </Button>
 
-                    {questionnaireRequired && questionnaireProgress === 0 && (
+                    {questionnaireMissing && (
                       <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
                         Bez vyplněného dotazníku nelze objednávku dokončit.
                       </Typography>

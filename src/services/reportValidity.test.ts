@@ -13,7 +13,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  LAST_DAY_IS_INCLUSIVE, remainingText, reportStandsOn, reportValidity,
+  LAST_DAY_IS_INCLUSIVE, remainingText, reportValidity,
   validUntilFromIssued,
 } from './reportValidity';
 
@@ -79,21 +79,21 @@ describe('measured against a day', () => {
    */
   it('says one thing about today and another about a day months away', () => {
     const until = '2026-10-01';
-    expect(reportStandsOn(until, '2026-09-13')).toBe(true);
-    expect(reportStandsOn(until, '2026-11-20')).toBe(false);
+    expect(reportValidity(until, '2026-09-13').kind).toBe('valid');
+    expect(reportValidity(until, '2026-11-20').kind).toBe('expired');
   });
 
   it('takes a Date as readily as a string, since a screen may hold one', () => {
-    expect(reportStandsOn('2026-10-01', new Date(2026, 8, 13))).toBe(true);
-    expect(reportStandsOn('2026-10-01', new Date(2026, 10, 20))).toBe(false);
+    expect(reportValidity('2026-10-01', new Date(2026, 8, 13)).kind).toBe('valid');
+    expect(reportValidity('2026-10-01', new Date(2026, 10, 20)).kind).toBe('expired');
   });
 
   /* Local midnights, so a time of day cannot move the answer across a day. */
   it('ignores the time of day it is asked about', () => {
     const early = new Date(2026, 9, 1, 0, 5);
     const late = new Date(2026, 9, 1, 23, 55);
-    expect(reportStandsOn('2026-10-01', early)).toBe(true);
-    expect(reportStandsOn('2026-10-01', late)).toBe(true);
+    expect(reportValidity('2026-10-01', early).kind).toBe('valid');
+    expect(reportValidity('2026-10-01', late).kind).toBe('valid');
   });
 
   it('survives the clock change without losing or gaining a day', () => {
@@ -158,7 +158,7 @@ describe('a year from the day it was issued', () => {
   /* End to end: issued, a year on, and still valid on the last day. */
   it('lines up with the validity it feeds', () => {
     const until = validUntilFromIssued('2026-05-03');
-    expect(reportStandsOn(until, '2027-05-03')).toBe(true);
-    expect(reportStandsOn(until, '2027-05-04')).toBe(false);
+    expect(reportValidity(until, '2027-05-03').kind).toBe('valid');
+    expect(reportValidity(until, '2027-05-04').kind).toBe('expired');
   });
 });

@@ -31,7 +31,7 @@ vi.mock('../../api/documents', async () => {
 });
 vi.mock('../../api/client', () => ({ default: { get: getConsents } }));
 
-const { default: PatientLayout, activeSection } =
+const { default: PatientLayout } =
   await import('./PatientLayout');
 const { PATIENT_SECTIONS, patientInPath, sectionPath } = await import('./sections');
 
@@ -270,14 +270,6 @@ describe('the sections', () => {
     expect(patientInPath('/patients')).toBeNull();
     expect(patientInPath('/patients/register')).toBeNull();
     expect(patientInPath('/dnes')).toBeNull();
-  });
-
-  it('works out which section an address is in', () => {
-    expect(activeSection('/patients/p1', 'p1')).toBe('prehled');
-    expect(activeSection('/patients/p1/dokumenty', 'p1')).toBe('dokumenty');
-    /* Anything unrecognised is the overview rather than nothing, so no address
-       can leave every tab unselected. */
-    expect(activeSection('/patients/p1/neznama', 'p1')).toBe('prehled');
   });
 
   it('has a tab for every section and no duplicates', () => {

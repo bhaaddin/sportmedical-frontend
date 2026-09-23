@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  AGREES_TEXT, disagreementText, kindText, readableDate, readableSex,
+  AGREES_TEXT, disagreementText, readableDate, readableSex,
   verdictOf, worthInspecting,
 } from './identityInspection';
 import type { IdentityInspection } from '../../api/patientRegistry';
@@ -142,12 +142,6 @@ describe('reading the values out', () => {
   it('writes the sexes in words', () => {
     expect(readableSex('Male')).toBe('muž');
     expect(readableSex('Female')).toBe('žena');
-  });
-
-  it('names what the number turned out to be', () => {
-    expect(kindText('CzechBirthNumber')).toBe('rodné číslo');
-    expect(kindText('InsuranceEvidenceNumber')).toMatch(/evidenční/);
-    expect(kindText(null)).toMatch(/pojištěnce/);
   });
 
   it('has something to say when it all agrees', () => {

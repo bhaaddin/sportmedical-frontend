@@ -99,14 +99,6 @@ export function disagreementText(
   return `Číslo říká ${parts.join(' a ')}. Opravte to, co je špatně — server to jinak odmítne.`;
 }
 
-/** What the identifier turned out to be, when it reads. */
-export function kindText(kind: string | null): string {
-  if (kind === 'CzechBirthNumber') return 'rodné číslo';
-  if (kind === 'InsuranceEvidenceNumber') return 'evidenční číslo pojišťovny';
-  if (kind === 'InsurerAssignedNumber') return 'číslo přidělené pojišťovnou';
-  return 'číslo pojištěnce';
-}
-
 export const AGREES_TEXT = 'Číslo sedí s datem narození i pohlavím.';
 
 /**

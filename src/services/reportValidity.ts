@@ -115,14 +115,6 @@ export function reportValidity(
   return { kind: 'expired', until, daysAgo: -left };
 }
 
-/** Whether the výpis stands on that day. The gate, without the wording. */
-export function reportStandsOn(
-  validUntil: DateOnlyString | null | undefined,
-  against: Date | DateOnlyString = new Date(),
-): boolean {
-  return reportValidity(validUntil, against).kind === 'valid';
-}
-
 /**
  * The phrase for the patient card: how much longer it has.
  *

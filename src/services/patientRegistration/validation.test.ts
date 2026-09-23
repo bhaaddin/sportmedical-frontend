@@ -19,7 +19,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  createEmptyForm, validateField, validateStep, type RegistrationFormState,
+  createEmptyForm, validateAll, validateField, type RegistrationFormState,
 } from './validation';
 
 const VALID = '9005150011';
@@ -42,7 +42,7 @@ const TYPO = '9005150014';
 const NOT_A_BIRTH_NUMBER = '123456789';
 
 const insuranceStep = (over: Partial<RegistrationFormState>) =>
-  validateStep(1, {
+  validateAll({
     ...createEmptyForm(),
     healthInsuranceNumber: NOT_A_BIRTH_NUMBER,
     ...over,

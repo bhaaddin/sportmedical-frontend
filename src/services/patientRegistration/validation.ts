@@ -52,10 +52,6 @@ export interface RegistrationFormState {
 
 export type FieldErrors = Partial<Record<keyof RegistrationFormState, string>>;
 
-export const REGISTRATION_STEPS = ['Totožnost', 'Pojištění', 'Bydliště', 'Kontakt', 'Shrnutí'] as const;
-
-export type RegistrationStep = 0 | 1 | 2 | 3 | 4;
-
 /** Digits only — what the Domain canonicalises to. */
 export function digitsOnly(value: string): string {
   return value.replace(/[^0-9]/g, '');
@@ -227,18 +223,6 @@ function validateContact(form: RegistrationFormState, errors: FieldErrors): void
   if (form.phoneRegionCode.length === 0) {
     errors.phoneRegionCode = 'Vyberte zemi telefonního čísla.';
   }
-}
-
-/** Validates one step of the wizard. */
-export function validateStep(step: RegistrationStep, form: RegistrationFormState): FieldErrors {
-  const errors: FieldErrors = {};
-
-  if (step === 0) validateIdentity(form, errors);
-  if (step === 1) validateInsurance(form, errors);
-  if (step === 2) validateResidence(form, errors);
-  if (step === 3) validateContact(form, errors);
-
-  return errors;
 }
 
 /**

@@ -11,7 +11,6 @@ import {
   checkFile,
   isHeic,
   isPdf,
-  isImage,
   formatBytes,
   uploadErrorMessage,
   MAX_FILE_BYTES,
@@ -53,8 +52,6 @@ describe('what we accept', () => {
 
   it('tells a PDF from an image, so only images get a preview and rotation', () => {
     expect(isPdf(file())).toBe(true);
-    expect(isImage(file())).toBe(false);
-    expect(isImage(file({ name: 'f.png', type: 'image/png' }))).toBe(true);
   });
 
   /*

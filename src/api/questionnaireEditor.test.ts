@@ -25,7 +25,6 @@ import {
   draftOf,
   possibleTriggers,
   publishedOf,
-  refusalCode,
   refusalText,
   sectionsOf,
   toOptions,
@@ -226,13 +225,11 @@ describe('what the server refused', () => {
     expect(refusalText(refused)).toBe(
       'A question can only be shown after a question this version asks.',
     );
-    expect(refusalCode(refused)).toBe('questionnaires.question.order.invalid');
   });
 
   it('falls back to something readable when there is no body at all', () => {
     expect(refusalText(new Error('Network Error'))).toBe(
       'Změnu se nepodařilo uložit. Zkuste to prosím znovu.',
     );
-    expect(refusalCode(new Error('Network Error'))).toBeNull();
   });
 });

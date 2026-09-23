@@ -191,15 +191,6 @@ export const questionnaireEditorApi = {
     return data ?? [];
   },
 
-  /** One questionnaire, reloaded after every change so nothing drifts. */
-  get: async (definitionId: string): Promise<EditorDefinition> => {
-    const { data } = await client.get<EditorDefinition>(
-      `/api/questionnaires/definitions/${definitionId}`,
-    );
-
-    return data;
-  },
-
   /** Starts the next version as a copy of the published one. */
   startDraft: async (definitionId: string, note: string | null): Promise<void> => {
     await client.post(`${root(definitionId)}/draft`, { note });
@@ -269,10 +260,6 @@ export const questionnaireEditorApi = {
   discardDraft: async (definitionId: string, versionId: string): Promise<void> => {
     await client.delete(`${root(definitionId)}/versions/${versionId}`);
   },
-
-  rename: async (definitionId: string, displayName: string): Promise<void> => {
-    await client.put(`${root(definitionId)}/name`, { displayName });
-  },
 };
 
 /**
@@ -290,10 +277,6 @@ export const refusalText = (error: unknown): string => {
 
   return body?.message ?? 'Změnu se nepodařilo uložit. Zkuste to prosím znovu.';
 };
-
-/** The refusal's code, for a screen that wants to react rather than read. */
-export const refusalCode = (error: unknown): string | null =>
-  (error as { response?: { data?: { code?: string } } })?.response?.data?.code ?? null;
 
 /**
  * One choice per line, keyed by position.

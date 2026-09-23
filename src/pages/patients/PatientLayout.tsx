@@ -40,13 +40,6 @@ export interface PatientContext {
   reloadDocuments: () => void;
 }
 
-/** Which section the current address is in. */
-export function activeSection(pathname: string, patientId: string): string {
-  const rest = pathname.replace(`/patients/${patientId}`, '').replace(/^\//, '');
-  const match = PATIENT_SECTIONS.find((s) => s.path !== '' && rest.startsWith(s.path));
-  return match?.id ?? 'prehled';
-}
-
 /*
  * What this patient has to bring is no longer decided here.
  *

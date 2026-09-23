@@ -4,7 +4,8 @@
  * Contract 5.2 rules out a free colour wheel — two near-identical colours make
  * a calendar unreadable — and 7.1 requires at least 4.5:1 contrast for the text
  * sitting on a coloured chip. Every entry below is checked, not guessed:
- * `assertPaletteContrast` recomputes the ratios from the hex values.
+ * `paletteContrastFailures` recomputes the ratios from the hex values, and
+ * calendarPalette.test.ts holds every entry to it.
  */
 
 export interface PaletteEntry {
