@@ -51,7 +51,6 @@ import {
 import { dayState, dayStateLabelKey, isShaded } from "./dayState";
 import { inactiveAmong } from "./calendarLifecycle";
 import type { DayState } from "./dayState";
-import { gridSpan, useCalendarDisplay } from "../../api/displaySettings";
 
 /**
  * The word in the corner of a day.
@@ -98,13 +97,7 @@ function DayStateLabel({ state, sx }: { state: DayState; sx?: SxProps<Theme> }) 
 
 type ViewMode = "day" | "week" | "month";
 
-/*
- * The row length, the day's span, the default view and the now-line colour
- * are the clinic's settings (Nastavení -> Vzhled kalendáře), read through
- * `useCalendarDisplay`. They were constants here, so the owner could not have
- * fifteen-minute rows or a day from six without a developer.
- */
-
+const SLOT_MINUTES = 30;
 /**
  * Pixels per slot. A booking shows two lines - time with activity, and the
  * status in words, which 7.1 requires because colour may not carry it alone -
@@ -112,6 +105,7 @@ type ViewMode = "day" | "week" | "month";
  * booking overflowed its slot by 18px and sat on top of the next one.
  */
 const ROW_HEIGHT = 46;
+const DEFAULT_OPEN = { start: 7, end: 19 };
 
 /** Shifts by whole calendar months, clamping a day the target month lacks. */
 function addMonths(date: string, months: number): string {
@@ -142,10 +136,7 @@ export default function CalendarGridPage() {
   const theme = useTheme();
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
 
-  const { settings: display } = useCalendarDisplay();
-  /* The clinic's default view until somebody picks another one here. */
-  const [chosenView, setView] = useState<ViewMode | null>(null);
-  const view: ViewMode = chosenView ?? display.defaultView;
+  const [view, setView] = useState<ViewMode>("week");
   const [anchor, setAnchor] = useState<string>(toDateOnly(new Date()));
   const [selected, setSelected] = useState<Set<string> | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -262,11 +253,7 @@ export default function CalendarGridPage() {
     placeholderData: (previous) => previous,
   });
 
-  /**
-   * The hours the grid shows: the clinic's day from the settings, widened to
-   * the opening hours of the shown calendars and to any appointment outside
-   * both, so the grid is not always 00–24 and never hides a patient.
-   */
+  /** The opening span across the shown calendars, so the grid is not always 00–24. */
   const openSpan = useMemo(() => {
     let earliest = 24;
     let latest = 0;
@@ -277,22 +264,9 @@ export default function CalendarGridPage() {
         latest = Math.max(latest, Number(preview.endTime.slice(0, 2)) + 1);
       }
     }
-    const opening =
-      earliest > latest ? null : { start: Math.max(0, earliest - 1), end: Math.min(24, latest) };
-
-    const visibleDays = new Set(days);
-    const booked = (appointmentsQuery.data ?? [])
-      .filter((appointment) => visibleDays.has(pragueDateKey(appointment.startUtc)))
-      .map((appointment) => {
-        const dayKey = pragueDateKey(appointment.startUtc);
-        return {
-          start: Math.floor(minutesIntoDay(appointment.startUtc, dayKey) / 60),
-          end: Math.ceil(minutesIntoDay(appointment.endUtc, dayKey) / 60),
-        };
-      });
-
-    return gridSpan(display, opening, booked);
-  }, [days, previewQueries.data, appointmentsQuery.data, display]);
+    if (earliest > latest) return DEFAULT_OPEN;
+    return { start: Math.max(0, earliest - 1), end: Math.min(24, latest) };
+  }, [days, previewQueries.data]);
 
   /**
    * Which appointment the detail is opened on. Only its id and calendar are
@@ -556,8 +530,6 @@ export default function CalendarGridPage() {
               byDay={byDay}
               calendarById={calendarById}
               openSpan={openSpan}
-              slotMinutes={display.slotMinutes}
-              nowLineColor={display.nowLineColor}
               previewByDate={previewQueries.data ?? new Map()}
               now={now}
               todayKey={todayKey}
@@ -774,8 +746,6 @@ function WeekGrid({
   byDay,
   calendarById,
   openSpan,
-  slotMinutes,
-  nowLineColor,
   previewByDate,
   now,
   todayKey,
@@ -783,8 +753,6 @@ function WeekGrid({
   onOpen,
 }: SharedProps & {
   openSpan: { start: number; end: number };
-  slotMinutes: number;
-  nowLineColor: string;
   previewByDate: Map<string, PreviewDay[]>;
   todayKey: string;
   gridRef: React.RefObject<HTMLDivElement | null>;
@@ -833,7 +801,7 @@ function WeekGrid({
             <Box
               key={hour}
               sx={{
-                height: ROW_HEIGHT * (60 / slotMinutes),
+                height: ROW_HEIGHT * (60 / SLOT_MINUTES),
                 fontSize: 11,
                 color: "text.secondary",
                 textAlign: "right",
@@ -852,8 +820,6 @@ function WeekGrid({
             appointments={byDay.get(dayKey) ?? []}
             calendarById={calendarById}
             openSpan={openSpan}
-            slotMinutes={slotMinutes}
-            nowLineColor={nowLineColor}
             preview={previewByDate.get(dayKey) ?? []}
             now={now}
             isToday={dayKey === todayKey}
@@ -870,8 +836,6 @@ function DayColumn({
   appointments,
   calendarById,
   openSpan,
-  slotMinutes,
-  nowLineColor,
   preview,
   now,
   isToday,
@@ -881,15 +845,13 @@ function DayColumn({
   appointments: DayAppointment[];
   calendarById: Map<string, { id: string; name: string; color: string }>;
   openSpan: { start: number; end: number };
-  slotMinutes: number;
-  nowLineColor: string;
   preview: PreviewDay[];
   now: Date;
   isToday: boolean;
   onOpen: (id: string) => void;
 }) {
   const { t } = useTranslation();
-  const pixelsPerMinute = ROW_HEIGHT / slotMinutes;
+  const pixelsPerMinute = ROW_HEIGHT / SLOT_MINUTES;
 
   /**
    * 3.3: the height comes from the real length of that Prague day, so 29 March
@@ -909,10 +871,6 @@ function DayColumn({
         borderLeft: "1px solid",
         borderColor: "divider",
         backgroundColor: isShaded(state) ? "action.hover" : "transparent",
-        /* One faint line per row, so the clinic's row length is something the
-           desk can read the grid against, not only a scale. */
-        backgroundImage: (theme) =>
-          `repeating-linear-gradient(to bottom, transparent 0, transparent ${ROW_HEIGHT - 1}px, ${theme.palette.divider} ${ROW_HEIGHT - 1}px, ${theme.palette.divider} ${ROW_HEIGHT}px)`,
       }}
     >
       {/* Outside working hours is shaded, never hidden: the owner has to see
@@ -929,13 +887,7 @@ function DayColumn({
       />
 
       {isToday ? (
-        <NowLine
-          now={now}
-          dayKey={dayKey}
-          topOffset={topOffset}
-          pixelsPerMinute={pixelsPerMinute}
-          color={nowLineColor}
-        />
+        <NowLine now={now} dayKey={dayKey} topOffset={topOffset} />
       ) : null}
 
       {appointments.map((appointment) => {
@@ -975,15 +927,10 @@ function NowLine({
   now,
   dayKey,
   topOffset,
-  pixelsPerMinute,
-  color,
 }: {
   now: Date;
   dayKey: string;
   topOffset: number;
-  pixelsPerMinute: number;
-  /** The clinic's colour for it, `#RRGGBB` (Nastavení -> Vzhled kalendáře). */
-  color: string;
 }) {
   const { t } = useTranslation();
   const minutes = minutesIntoDay(now.toISOString(), dayKey) - topOffset;
@@ -993,12 +940,12 @@ function NowLine({
       aria-label={t("booking.grid.now")}
       sx={{
         position: "absolute",
-        top: minutes * pixelsPerMinute,
+        top: minutes * (ROW_HEIGHT / SLOT_MINUTES),
         left: 0,
         right: 0,
         height: 0,
         borderTop: "2px solid",
-        borderColor: color,
+        borderColor: "error.main",
         zIndex: 2,
       }}
     />
