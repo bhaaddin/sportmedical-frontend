@@ -73,6 +73,21 @@ describe('the register', () => {
     expect(await screen.findByText('Jméno51 Příjmení51')).toBeInTheDocument();
   });
 
+  /* The search debounce ran on mount as well, and when it fired it put the
+     list back on its first page - undoing a click made in the meantime. */
+  it('stays on the next page once the search box has settled', async () => {
+    const user = userEvent.setup();
+    renderList();
+    await screen.findByText('Jméno1 Příjmení1');
+
+    await user.click(screen.getByRole('button', { name: /next page/i }));
+    expect(await screen.findByText('Jméno51 Příjmení51')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    expect(list).toHaveBeenLastCalledWith({ query: '', page: 2, pageSize: 50 });
+    expect(screen.getByText('Jméno51 Příjmení51')).toBeInTheDocument();
+  });
+
   it('searches on the server, over everybody', async () => {
     const user = userEvent.setup();
     renderList();

@@ -44,14 +44,19 @@ export default function PatientList() {
   const [pageSize, setPageSize] = useState(50);
   const [view, setView] = useState<'list' | 'grid'>('list');
 
-  /* One request per pause in typing, and a new search starts on its first page. */
+  /* One request per pause in typing, and a new search starts on its first
+     page. Only a search that changed resets the page: the timer used to run on
+     mount too, and a click on the next page in the first moments after the
+     list appeared was undone when it fired. */
   useEffect(() => {
+    const next = search.trim();
+    if (next === query) return;
     const timer = setTimeout(() => {
-      setQuery(search.trim());
+      setQuery(next);
       setPage(0);
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, query]);
 
   const patientsQuery = useQuery({
     queryKey: ['patients', 'register', query, page, pageSize],
