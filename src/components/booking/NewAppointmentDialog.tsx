@@ -35,7 +35,6 @@ import {
 import { AsyncSection } from "./AsyncSection";
 import { AvailabilityPicker } from "./AvailabilityPicker";
 import { rangeOffersNothing } from "../../pages/booking/dayState";
-import { isAdminRole, currentUserRole } from "../../auth/roles";
 import { errorText } from "./errorText";
 
 /**
@@ -101,6 +100,8 @@ export function NewAppointmentDialog({
    * warning.
    */
   const mayOverride = usePermission("bookings.edit");
+  /* The working-hours screen is where activities are assigned; it needs this. */
+  const mayAssign = usePermission("settings.clinic.manage");
 
   /*
    * ── Step 1: the patient, and nothing else until there is one ──
@@ -593,9 +594,10 @@ export function NewAppointmentDialog({
               )}
 
               {/* The way out, offered only to somebody who can take it: the
-                  assignment screen is admin-only, so pointing a receptionist
-                  at a door she cannot open would be a second dead end. */}
-              {nothingAssigned && !startUtc && isAdminRole(currentUserRole()) ? (
+                  assignment screen needs settings.clinic.manage, so pointing
+                  anyone without it at a door they cannot open would be a
+                  second dead end. */}
+              {nothingAssigned && !startUtc && mayAssign ? (
                 <Button
                   size="small"
                   component={RouterLink}

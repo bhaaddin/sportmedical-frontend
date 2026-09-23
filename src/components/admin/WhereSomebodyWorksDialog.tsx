@@ -18,6 +18,7 @@ import {
   workerScheduleApi,
 } from '../../api/workerSchedule';
 import type { WhereSomebodyWorksEntry } from '../../api/workerSchedule';
+import { usePermission } from '../../auth/usePermission';
 
 /**
  * Which services this person works, and on what days.
@@ -51,6 +52,8 @@ export function WhereSomebodyWorksDialog({
 
   const entries = schedule.data ?? [];
   const services = currentServices(entries);
+  /* The rota lives on the working-hours screen, which needs this. */
+  const mayEditRota = usePermission('settings.clinic.manage');
 
   return (
     <Dialog open={userId !== null} onClose={onClose} fullWidth maxWidth="sm">
@@ -95,9 +98,11 @@ export function WhereSomebodyWorksDialog({
         )}
       </DialogContent>
       <Stack direction="row" spacing={1} sx={{ p: 2, justifyContent: 'flex-end' }}>
-        <Button component={RouterLink} to="/working-hours" onClick={onClose}>
-          Upravit pracovní dobu
-        </Button>
+        {mayEditRota && (
+          <Button component={RouterLink} to="/working-hours" onClick={onClose}>
+            Upravit pracovní dobu
+          </Button>
+        )}
         <Button variant="contained" onClick={onClose}>
           Zavřít
         </Button>

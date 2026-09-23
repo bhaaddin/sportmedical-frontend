@@ -17,6 +17,7 @@ import { patientsApi, type Patient } from '../api/patients';
 import { injuriesApi, type Injury } from '../api/injuries';
 import { billingApi, type Invoice } from '../api/billing';
 import { calendarApi, type Appointment } from '../api/calendar';
+import { usePermission } from '../auth/usePermission';
 
 interface SearchResult {
   id: string;
@@ -36,6 +37,7 @@ export default function UniversalSearch() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const canBill = usePermission('billing.manage');
 
   /* ── Keyboard shortcut Ctrl+K ── */
   useEffect(() => {
@@ -64,11 +66,13 @@ export default function UniversalSearch() {
     { id: 'p-dashboard', title: 'Dashboard', subtitle: 'Přehled', type: 'page', icon: <Settings />, path: '/', color: '#0D7377' },
     { id: 'p-calendar', title: 'Plánování', subtitle: 'Správa termínů', type: 'page', icon: <CalendarMonth />, path: '/planovani', color: '#0D7377' },
     { id: 'p-patients', title: 'Pacienti', subtitle: 'Seznam pacientů', type: 'page', icon: <People />, path: '/patients', color: '#0288D1' },
-    { id: 'p-billing', title: 'Fakturace', subtitle: 'Správa faktur', type: 'page', icon: <Receipt />, path: '/billing', color: '#ED6C02' },
+    ...(canBill
+      ? [{ id: 'p-billing', title: 'Fakturace', subtitle: 'Správa faktur', type: 'page' as const, icon: <Receipt />, path: '/billing', color: '#ED6C02' }]
+      : []),
     { id: 'p-injuries', title: 'Poranění', subtitle: 'Evidence poranění', type: 'page', icon: <Warning />, path: '/injuries', color: '#D32F2F' },
     { id: 'p-diagnostics', title: 'Diagnostika', subtitle: 'Nová relace', type: 'page', icon: <Science />, path: '/diagnostics/new', color: '#7C3AED' },
     { id: 'p-settings', title: 'Nastavení', subtitle: 'Konfigurace', type: 'page', icon: <Settings />, path: '/settings', color: '#64748B' },
-  ], []);
+  ], [canBill]);
 
   /* ── Search across all data sources ── */
   const doSearch = useCallback(async (q: string) => {
@@ -80,7 +84,7 @@ export default function UniversalSearch() {
       const [patients, injuries, invoices, appointments] = await Promise.allSettled([
         patientsApi.search(q).catch(() => []),
         injuriesApi.getAll().catch(() => []),
-        billingApi.getInvoices().catch(() => []),
+        canBill ? billingApi.getInvoices().catch(() => []) : Promise.resolve([] as Invoice[]),
         calendarApi.getAppointments().catch(() => []),
       ]);
 
@@ -174,7 +178,7 @@ export default function UniversalSearch() {
     } finally {
       setLoading(false);
     }
-  }, [pages]);
+  }, [pages, canBill]);
 
   /* ── Debounced search ── */
   useEffect(() => {

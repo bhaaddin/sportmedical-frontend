@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react
 import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Avatar, IconButton, Menu, MenuItem, Badge, CircularProgress, Button } from '@mui/material';
 import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Search, AttachMoney, Schedule, EventBusy, Today, Description, ArrowBack } from '@mui/icons-material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { isAdminRole, currentUserRole } from './auth/roles';
+import { storedPermissions, type Permission } from './auth/usePermission';
 import { PATIENT_SECTIONS, patientInPath, sectionPath } from './pages/patients/sections';
 import { settingsItemAt } from './pages/settings/catalogue';
 import { Toaster } from 'react-hot-toast';
@@ -83,13 +83,10 @@ const DRAWER_WIDTH = 240;
 /* ── Grouped sidebar menu ── */
 interface MenuItemGroup {
   label: string;
-  adminOnly?: boolean;
-  items: { text: string; icon: React.ReactNode; path: string; adminOnly?: boolean }[];
+  /* `requires` is the permission the server checks behind that screen; an
+     entry the signed-in employee does not hold is not drawn. */
+  items: { text: string; icon: React.ReactNode; path: string; requires?: Permission }[];
 }
-
-/* Moved to `auth/roles.ts`: Settings needs them too, and importing them from
-   here would close a circle with the lazy import of Settings below. */
-export { isAdminRole, currentUserRole } from './auth/roles';
 
 const menuGroups: MenuItemGroup[] = [
   {
@@ -119,9 +116,9 @@ const menuGroups: MenuItemGroup[] = [
   {
     label: 'Peníze',
     items: [
-      { text: 'Pokladna', icon: <AttachMoney />, path: '/cashier' },
-      { text: 'Fakturace', icon: <Receipt />, path: '/billing' },
-      { text: 'Účetní export', icon: <Receipt />, path: '/accounting-export', adminOnly: true },
+      { text: 'Pokladna', icon: <AttachMoney />, path: '/cashier', requires: 'billing.manage' },
+      { text: 'Fakturace', icon: <Receipt />, path: '/billing', requires: 'billing.manage' },
+      { text: 'Účetní export', icon: <Receipt />, path: '/accounting-export', requires: 'billing.manage' },
     ],
   },
   {
@@ -141,8 +138,15 @@ const menuGroups: MenuItemGroup[] = [
   },
 ];
 
-function RequireAdmin({ children }: { children: React.ReactNode }) {
-  if (!isAdminRole(currentUserRole())) {
+/*
+ * A screen the signed-in employee has no permission for is not there for them.
+ *
+ * The permission is the one the controller behind the screen checks, read from
+ * the effective list the server sent at sign-in - the role's defaults with that
+ * person's own grants and revocations applied. It hides; the server refuses.
+ */
+function RequirePermission({ of, children }: { of: Permission; children: React.ReactNode }) {
+  if (!storedPermissions().includes(of)) {
     return <NotFound />;
   }
   return <>{children}</>;
@@ -174,6 +178,10 @@ function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const held = new Set(storedPermissions());
+  const visibleMenu = menuGroups
+    .map(group => ({ ...group, items: group.items.filter(item => item.requires === undefined || held.has(item.requires)) }))
+    .filter(group => group.items.length > 0);
 
   const COLLAPSED_WIDTH = 64;
   const EXPANDED_WIDTH = 240;
@@ -309,9 +317,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             </Box>
           )}
 
-          {patientId === null && menuGroups
-            .filter(group => !group.adminOnly || isAdminRole(currentUserRole()))
-            .map((group, gi) => (
+          {patientId === null && visibleMenu.map((group, gi) => (
             <Box key={gi}>
               {group.label && sidebarOpen && (
                 <Typography variant="caption" sx={{ px: 2, pt: gi > 0 ? 2 : 0, pb: 0.5, display: 'block', fontWeight: 700, color: '#999', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>
@@ -321,9 +327,7 @@ function Layout({ children }: { children: React.ReactNode }) {
               {group.label && !sidebarOpen && gi > 0 && (
                 <Box sx={{ mx: 1.5, my: 1, borderTop: '1px solid #e0e0e0' }} />
               )}
-              {group.items
-                .filter(item => !item.adminOnly || isAdminRole(currentUserRole()))
-                .map((item) => {
+              {group.items.map((item) => {
                 const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
                 return (
                   <motion.div key={item.text} whileHover={{ x: 4 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }}>
@@ -447,7 +451,7 @@ export default function App() {
                       <Route path="terminy" element={<PatientAppointmentsPage />} />
                     </Route>
                     <Route path="/diagnostics/new" element={<DiagnosticForm />} />
-                    <Route path="/billing" element={<BillingPage />} />
+                    <Route path="/billing" element={<RequirePermission of="billing.manage"><BillingPage /></RequirePermission>} />
                     <Route path="/cenik" element={<CenikPage />} />
                     <Route path="/injuries" element={<InjuriesPage />} />
                     <Route path="/rtp" element={<RtpPage />} />
@@ -457,10 +461,10 @@ export default function App() {
                     <Route path="/dotaznik-nastaveni" element={<QuestionnairePage />} />
                     <Route path="/training-load" element={<TrainingLoadPage />} />
                     <Route path="/wellness" element={<WellnessPage />} />
-                    <Route path="/cashier" element={<CashierPage />} />
+                    <Route path="/cashier" element={<RequirePermission of="billing.manage"><CashierPage /></RequirePermission>} />
                     <Route path="/clubs" element={<ClubsPage />} />
-                    <Route path="/accounting-export" element={<RequireAdmin><AccountingExportPage /></RequireAdmin>} />
-                    <Route path="/intake-review" element={<RequireAdmin><IntakeReviewQueue /></RequireAdmin>} />
+                    <Route path="/accounting-export" element={<RequirePermission of="billing.manage"><AccountingExportPage /></RequirePermission>} />
+                    <Route path="/intake-review" element={<RequirePermission of="patients.register"><IntakeReviewQueue /></RequirePermission>} />
                     <Route path="/planovani" element={<BookingGridPage />} />
                     <Route path="/dnes" element={<BookingDayOverviewPage />} />
                     <Route path="/vyhrazeni" element={<BookingPartnerOrdersPage />} />
@@ -470,16 +474,16 @@ export default function App() {
                       path="/kalendar/:calendarId/termin/:appointmentId"
                       element={<AppointmentLinkPage />}
                     />
-                    <Route path="/sluzby" element={<RequireAdmin><ClinicServicesPage /></RequireAdmin>} />
-                    <Route path="/pravidla-dokumentu" element={<RequireAdmin><DocumentRequirementsPage /></RequireAdmin>} />
-                    <Route path="/dokumenty-sablony" element={<RequireAdmin><DocumentTemplatesPage /></RequireAdmin>} />
-                    <Route path="/calendars" element={<RequireAdmin><BookingCalendarsPage /></RequireAdmin>} />
-                    <Route path="/activities" element={<RequireAdmin><BookingActivitiesPage /></RequireAdmin>} />
-                    <Route path="/working-hours" element={<RequireAdmin><BookingWorkingHoursPage /></RequireAdmin>} />
-                    <Route path="/exceptions" element={<RequireAdmin><BookingExceptionsPage /></RequireAdmin>} />
-                    <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
+                    <Route path="/sluzby" element={<RequirePermission of="settings.clinic.manage"><ClinicServicesPage /></RequirePermission>} />
+                    <Route path="/pravidla-dokumentu" element={<RequirePermission of="settings.clinic.manage"><DocumentRequirementsPage /></RequirePermission>} />
+                    <Route path="/dokumenty-sablony" element={<RequirePermission of="settings.clinic.manage"><DocumentTemplatesPage /></RequirePermission>} />
+                    <Route path="/calendars" element={<RequirePermission of="settings.clinic.manage"><BookingCalendarsPage /></RequirePermission>} />
+                    <Route path="/activities" element={<RequirePermission of="settings.clinic.manage"><BookingActivitiesPage /></RequirePermission>} />
+                    <Route path="/working-hours" element={<RequirePermission of="settings.clinic.manage"><BookingWorkingHoursPage /></RequirePermission>} />
+                    <Route path="/exceptions" element={<RequirePermission of="settings.clinic.manage"><BookingExceptionsPage /></RequirePermission>} />
+                    <Route path="/admin" element={<RequirePermission of="settings.clinic.manage"><AdminPage /></RequirePermission>} />
                     <Route path="/system-health" element={<SystemHealthPage />} />
-                    <Route path="/staff-management" element={<RequireAdmin><StaffManagementPage /></RequireAdmin>} />
+                    <Route path="/staff-management" element={<RequirePermission of="users.manage"><StaffManagementPage /></RequirePermission>} />
                     <Route path="/audit-log" element={<AuditLogPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="*" element={<NotFound />} />

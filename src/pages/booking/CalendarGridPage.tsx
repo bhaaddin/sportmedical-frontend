@@ -23,6 +23,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { Link as MuiLink } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material";
 import { calendarsApi } from "../../api/calendars";
+import { usePermission } from "../../auth/usePermission";
 import { appointmentsApi } from "../../api/appointments";
 import { workingHoursApi } from "../../api/workingHours";
 import {
@@ -131,6 +132,7 @@ function minutesIntoDay(instant: string, dayKey: string): number {
 
 export default function CalendarGridPage() {
   const { t } = useTranslation();
+  const mayManageCalendars = usePermission("settings.clinic.manage");
   const theme = useTheme();
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -438,10 +440,15 @@ export default function CalendarGridPage() {
             {t("booking.grid.inactiveHidden", {
               names: hiddenInactive.map((c) => c.name).join(", "),
               count: hiddenInactive.length,
-            })}{" "}
-            <MuiLink component={RouterLink} to="/calendars">
-              {t("booking.grid.inactiveWhere")}
-            </MuiLink>
+            })}
+            {mayManageCalendars ? (
+              <>
+                {" "}
+                <MuiLink component={RouterLink} to="/calendars">
+                  {t("booking.grid.inactiveWhere")}
+                </MuiLink>
+              </>
+            ) : null}
           </Alert>
         ) : null}
 

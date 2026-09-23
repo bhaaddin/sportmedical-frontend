@@ -54,6 +54,32 @@ describe('every settings destination', () => {
 });
 
 /*
+ * The router refuses a settings screen by the same permission the menu hides
+ * it by. Two lists that must agree, held against each other: a route guarded
+ * by one permission behind a row offered for another is a link to NotFound.
+ */
+describe('a guarded settings route', () => {
+  const guards = new Map(
+    [...appSource.matchAll(/path="(\/[a-z0-9/:-]*)" element=\{<RequirePermission of="([a-z._]+)">/g)]
+      .map((m) => [m[1], m[2]] as const),
+  );
+  const guardedItems = SETTINGS_SECTIONS.flatMap((s) => s.items).filter((i) => guards.has(i.to));
+
+  it('is found in App.tsx at all', () => {
+    /* Guards the regex, so the check below cannot pass by matching nothing. */
+    expect(guards.get('/staff-management')).toBe('users.manage');
+    expect(guardedItems.length).toBeGreaterThan(5);
+  });
+
+  it.each(guardedItems.map((i) => [i.to, i.requires]))(
+    '%s asks for %s, as the menu does',
+    (to, requires) => {
+      expect(guards.get(to)).toBe(requires);
+    },
+  );
+});
+
+/*
  * ── What changed on 22. 9. 2026 ──
  *
  * These read `visibleSections(true)` and `visibleSections(false)` — a ROLE.

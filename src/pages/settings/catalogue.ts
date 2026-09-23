@@ -35,13 +35,12 @@ export interface SettingsItem {
    *
    * ── Why a permission and not a role ──
    *
-   * It was a boolean filtered through `isAdminRole(currentUserRole())`, and
-   * the owner's rule is per EMPLOYEE: "Administrátor musí mít možnost pro
-   * každého zaměstnance nastavit, co může vidět." The administration already
-   * offers every permission in three states — granted, by role, revoked — and
-   * writes them; the menu could see none of it. An administrator who had
-   * `settings.clinic.manage` taken away still saw every screen, and a member
-   * of staff who was GRANTED `questionnaires.manage` saw none.
+   * Access is decided per EMPLOYEE, not per role. The owner's rule:
+   * "Administrátor musí mít možnost pro každého zaměstnance nastavit, co může
+   * vidět." The administration offers every permission in three states —
+   * granted, by role, revoked — so an administrator who had
+   * `settings.clinic.manage` taken away sees none of these screens, and a
+   * member of staff who was GRANTED `questionnaires.manage` sees that one.
    *
    * The name is the one the controller behind the screen checks, so the menu
    * and the API agree about one list rather than disagreeing about two.

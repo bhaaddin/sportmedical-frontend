@@ -6,8 +6,7 @@
  *
  * Kept out of `PatientLayout` for a second reason: `App.tsx` needs this list
  * to draw the sidebar, and importing it from the layout would pull that whole
- * page into the main bundle and undo its lazy loading. The same shape caught
- * `auth/roles` earlier today.
+ * page into the main bundle and undo its lazy loading.
  */
 import { Dashboard, Description, Event } from '@mui/icons-material';
 
