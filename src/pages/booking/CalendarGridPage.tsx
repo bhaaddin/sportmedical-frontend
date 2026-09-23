@@ -1,111 +1,104 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
   Button,
+  ButtonBase,
   Chip,
   IconButton,
+  MenuItem,
   Stack,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
-  TextField,
   Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import TodayIcon from "@mui/icons-material/Today";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 import { Link as MuiLink } from "@mui/material";
-import type { SxProps, Theme } from "@mui/material";
 import { calendarsApi } from "../../api/calendars";
+import { clinicServicesApi } from "../../api/clinicServices";
+import { holidaysApi, type ClinicHoliday } from "../../api/holidays";
+import { readPublicClinic, readSettings } from "../../api/clinicSettings";
 import { usePermission } from "../../auth/usePermission";
 import { appointmentsApi } from "../../api/appointments";
 import { workingHoursApi } from "../../api/workingHours";
-import {
-  isLateStatus,
-  statusName,
-  statusTally,
-  type DayAppointment,
-  type PreviewDay,
-} from "../../api/bookingContracts";
+import type { DayAppointment, PreviewDay, TimeBlock } from "../../api/bookingContracts";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { AppointmentDetail } from "../../components/booking/AppointmentDetail";
 import { NewAppointmentDialog } from "../../components/booking/NewAppointmentDialog";
-import { readableTextOn } from "../../utils/calendarPalette";
+import { AppointmentButton } from "../../components/booking/grid/AppointmentButton";
+import { GridSidebar, type GridView } from "../../components/booking/grid/GridSidebar";
+import { TimeGrid, type GridBookingRequest } from "../../components/booking/grid/TimeGrid";
+import {
+  closedHolidayDates,
+  dayMark,
+  holidayDates,
+  yearsBetween,
+  type DayMark,
+} from "../../components/booking/grid/dayMarks";
+import {
+  dayBelongsTo,
+  emphasis,
+  employeesIn,
+  mondayOf,
+  toggleCalendar,
+  visibleCalendars,
+  type Employee,
+} from "../../components/booking/grid/filters";
+import { GRID_TEXT } from "../../components/booking/grid/gridText";
+import { NOW_LINE_COLOR_KEY, resolveNowLineColor } from "../../components/booking/grid/nowLine";
+import {
+  parseTimeOfDay,
+  spanOnDay,
+  touchesDay,
+  visibleHours,
+  type MinuteRange,
+} from "../../components/booking/grid/timeRange";
 import {
   addDaysToDateOnly,
   dayOfWeekOf,
   formatDateOnly,
-  formatPragueTime,
-  hoursInPragueDay,
-  isLate,
   pragueDateKey,
-  startOfPragueDay,
-  toDateOnly,
 } from "../../utils/time";
-import { dayState, dayStateLabelKey, isShaded } from "./dayState";
 import { inactiveAmong } from "./calendarLifecycle";
-import type { DayState } from "./dayState";
 
 /**
- * The word in the corner of a day.
+ * The calendar - contract screen 5.1, laid out as the owner asked:
  *
- * Three states, three words, because they are three different next steps: a
- * shut day is about the timetable, a day with nothing to book is about what
- * the calendar has been told it does, and an open day says nothing at all.
- * Collapsing the middle one into "zavřeno" - which is what the old fallback
- * did - sends a receptionist to check the hours of a day whose hours are fine.
- */
-function DayStateLabel({ state, sx }: { state: DayState; sx?: SxProps<Theme> }) {
-  const { t } = useTranslation();
-  const key = dayStateLabelKey(state);
-  if (key === null) return null;
-
-  const text = t(key, { defaultValue: t("booking.grid.closed.other") });
-
-  return (
-    <Tooltip
-      title={
-        state.kind === "nothing-to-book" ? t("booking.grid.noActivitiesWhy") : ""
-      }
-    >
-      <Typography sx={sx}>{text}</Typography>
-    </Tooltip>
-  );
-}
-
-/**
- * The calendar grid - contract screen 5.1.
+ *   LEFT   mini calendar, day / week / month, the calendars, who works, services
+ *   TOP    previous / next, today, day / week / month, employee and service filters
+ *   MAIN   the grid: time axis, bookings, working hours, holidays, drag & drop
  *
- * Three rules shape it and are worth stating where they are easy to break:
+ * Rules that shape it and are easy to break:
  *
- *  - **It never asks for availability** (6.1). Free time is the server's answer
- *    to a booking question, not a gap this screen can infer. The grid draws
- *    appointments and working hours; the white space between them is just white
- *    space, and it does not mean "bookable".
- *  - **The day is not 24 hours.** Its height comes from `hoursInPragueDay`, so
- *    the two clock-change days render 23 and 25 rows instead of silently
- *    dropping or duplicating an hour (3.3).
+ *  - **It never asks for availability** (6.1). The grid draws appointments,
+ *    blocks and working hours; a drag only picks a time and the booking dialog
+ *    asks the server whether it can be booked.
+ *  - **Filters filter.** The calendar checkboxes, the service and the employee
+ *    decide what is drawn; they never just decorate a list that stays the same.
  *  - **Colour never carries meaning alone** (7.1). Every appointment shows its
- *    status as text, and every one of them is a button, not a div with onClick.
+ *    status as text, every closed day says why in words, and every one of them
+ *    is a button, not a div with onClick.
  */
 
-type ViewMode = "day" | "week" | "month";
+type ViewMode = GridView;
 
-const SLOT_MINUTES = 30;
-/**
- * Pixels per slot. A booking shows two lines - time with activity, and the
- * status in words, which 7.1 requires because colour may not carry it alone -
- * so the shortest slot has to be tall enough for both. At 26 a half-hour
- * booking overflowed its slot by 18px and sat on top of the next one.
- */
-const ROW_HEIGHT = 46;
-const DEFAULT_OPEN = { start: 7, end: 19 };
+interface BookingPrefill {
+  initialDate?: string;
+  initialCalendarId?: string;
+  /** Clinic local time, `YYYY-MM-DDTHH:mm`. Read by the dialog once it takes them. */
+  initialStart?: string;
+  initialEnd?: string;
+}
 
 /** Shifts by whole calendar months, clamping a day the target month lacks. */
 function addMonths(date: string, months: number): string {
@@ -119,36 +112,59 @@ function addMonths(date: string, months: number): string {
   return `${target.getUTCFullYear()}-${m}-${d}`;
 }
 
-/** Monday of the week a date falls in. */
-function startOfWeek(date: string): string {
-  const shift = (dayOfWeekOf(date) + 6) % 7;
-  return addDaysToDateOnly(date, -shift);
+const OPEN_MARK: DayMark = { redNumber: false, closed: false, label: null, detail: null };
+
+/*
+ * Stable `combine` functions: TanStack reruns one only when a result changed,
+ * so the lists below keep their identity between renders and the memos built
+ * on them do not rebuild every minute for nothing.
+ */
+function dataOfEach(results: { data?: TimeBlock[] }[]): (TimeBlock[] | undefined)[] {
+  return results.map((r) => r.data);
 }
 
-function minutesIntoDay(instant: string, dayKey: string): number {
-  const dayStart = startOfPragueDay(dayKey).getTime();
-  return Math.round((new Date(instant).getTime() - dayStart) / 60_000);
+function allHolidays(results: { data?: ClinicHoliday[] }[]): ClinicHoliday[] {
+  return results.flatMap((r) => r.data ?? []);
 }
 
 export default function CalendarGridPage() {
   const { t } = useTranslation();
-  const mayManageCalendars = usePermission("settings.clinic.manage");
   const theme = useTheme();
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
+  const mayManageCalendars = usePermission("settings.clinic.manage");
+  const mayBook = usePermission("bookings.create");
+  const mayBlock = usePermission("bookings.edit");
 
   const [view, setView] = useState<ViewMode>("week");
-  const [anchor, setAnchor] = useState<string>(toDateOnly(new Date()));
-  const [selected, setSelected] = useState<Set<string> | null>(null);
+  const [anchor, setAnchor] = useState<string>(() => pragueDateKey(new Date()));
+  const [ticked, setTicked] = useState<Set<string> | null>(null);
+  const [serviceId, setServiceId] = useState<string | null>(null);
+  const [employee, setEmployee] = useState<Employee | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
-  /* 5.9: the dialog is reachable from the calendar and from the overview. */
-  const [booking, setBooking] = useState(false);
+  /* 5.9: the dialog is reachable from the button and from a drag on the grid. */
+  const [booking, setBooking] = useState<{ key: number; prefill: BookingPrefill } | null>(
+    null,
+  );
   const [now, setNow] = useState(() => new Date());
-  const gridRef = useRef<HTMLDivElement | null>(null);
 
-  /* 6.2: "late" is a fact about the clock, so it is recomputed, not stored. */
+  /*
+   * 6.2 and the now-line: both are facts about the clock. The tick lands on
+   * the minute, so the line moves when the clock on the wall does.
+   */
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 60_000);
-    return () => window.clearInterval(timer);
+    let interval: number | undefined;
+    const tick = () => setNow(new Date());
+    const timeout = window.setTimeout(
+      () => {
+        tick();
+        interval = window.setInterval(tick, 60_000);
+      },
+      60_000 - (Date.now() % 60_000),
+    );
+    return () => {
+      window.clearTimeout(timeout);
+      if (interval !== undefined) window.clearInterval(interval);
+    };
   }, []);
 
   const calendarsQuery = useQuery({
@@ -161,31 +177,46 @@ export default function CalendarGridPage() {
     () => (calendarsQuery.data ?? []).filter((c) => c.isActive),
     [calendarsQuery.data],
   );
+  const allIds = useMemo(() => calendars.map((c) => c.id), [calendars]);
 
   /*
-   * Named, not silently dropped.
-   *
-   * An inactive calendar is not drawn here - its hours no longer count and
-   * nothing new can be booked into it - and until now it simply vanished from
-   * the chip row. "Kam sa podela Ordinace" is then the question, and the
-   * screen has no answer on it. Its appointments are still drawn among the
-   * rest, which makes the disappearance stranger rather than cleaner.
+   * Named, not silently dropped: an inactive calendar is not drawn here - its
+   * hours no longer count and nothing new can be booked into it - and a
+   * calendar that simply vanished would leave "where did it go" unanswered.
    */
   const hiddenInactive = useMemo(
     () => inactiveAmong(calendarsQuery.data ?? []),
     [calendarsQuery.data],
   );
 
-  /** Everything is shown until the owner narrows it down. */
+  const servicesQuery = useQuery({
+    queryKey: ["clinic-services"],
+    queryFn: clinicServicesApi.list,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  /* Only services a visible calendar runs: filtering by any other shows nothing, always. */
+  const services = useMemo(
+    () =>
+      (servicesQuery.data ?? []).filter(
+        (s) => s.isActive && calendars.some((c) => c.clinicServiceId === s.id),
+      ),
+    [servicesQuery.data, calendars],
+  );
+
+  const serviceCalendars = useMemo(
+    () => visibleCalendars(calendars, null, serviceId),
+    [calendars, serviceId],
+  );
   const shown = useMemo(
-    () => calendars.filter((c) => selected === null || selected.has(c.id)),
-    [calendars, selected],
+    () => visibleCalendars(calendars, ticked, serviceId),
+    [calendars, ticked, serviceId],
   );
 
   const days = useMemo(() => {
     if (view === "day") return [anchor];
     if (view === "week") {
-      const monday = startOfWeek(anchor);
+      const monday = mondayOf(anchor);
       return Array.from({ length: 7 }, (_, i) => addDaysToDateOnly(monday, i));
     }
     /*
@@ -195,84 +226,179 @@ export default function CalendarGridPage() {
      */
     const [year, month] = anchor.split("-").map(Number);
     const firstOfMonth = `${year}-${String(month).padStart(2, "0")}-01`;
-    const gridStart = startOfWeek(firstOfMonth);
+    const gridStart = mondayOf(firstOfMonth);
     const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
     const lastOfMonth = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-    const gridEnd = addDaysToDateOnly(startOfWeek(lastOfMonth), 6);
+    const gridEnd = addDaysToDateOnly(mondayOf(lastOfMonth), 6);
     const out: string[] = [];
     for (let d = gridStart; d <= gridEnd; d = addDaysToDateOnly(d, 1)) out.push(d);
     return out;
   }, [view, anchor]);
 
-  /** Which month the grid is showing, so days either side can be dimmed. */
   const anchorMonth = anchor.slice(0, 7);
-
   const from = days[0];
   const to = days[days.length - 1];
 
   /**
-   * One request for the whole visible window and every visible calendar (7.3).
-   * `placeholderData` keeps the previous answer on screen while the next one
-   * loads, so stepping through days does not blink.
+   * One request for the whole visible window and every calendar the user may
+   * see (7.3). The checkboxes and filters then narrow it on this side, so
+   * ticking a calendar redraws at once instead of asking again.
    */
   const appointmentsQuery = useQuery({
-    queryKey: ["day-range", from, to, shown.map((c) => c.id).join(",")],
-    queryFn: () =>
-      appointmentsApi.range(
-        from,
-        to,
-        shown.map((c) => c.id),
-      ),
-    enabled: shown.length > 0,
+    queryKey: ["day-range", from, to, allIds.join(",")],
+    queryFn: () => appointmentsApi.range(from, to, allIds),
+    enabled: allIds.length > 0,
     placeholderData: (previous) => previous,
   });
 
   /**
-   * Working hours behind the appointments. `preview` answers per calendar, so
-   * this is one call per shown calendar - the range endpoint above is the one
-   * that had to be a single call, because it is the one that grows with days.
+   * What each calendar does on each day - hours, break, worker, closed and
+   * why. `preview` answers per calendar, so this is one call per calendar.
    */
-  const previewQueries = useQuery({
-    queryKey: ["grid-preview", from, to, shown.map((c) => c.id).join(",")],
+  const previewQuery = useQuery({
+    queryKey: ["grid-preview", from, to, allIds.join(",")],
     queryFn: async () => {
       const perCalendar = await Promise.all(
-        shown.map(async (calendar) => ({
-          calendarId: calendar.id,
-          days: await workingHoursApi.preview(calendar.id, from, to),
-        })),
+        calendars.map(async (calendar) => {
+          const rows = await workingHoursApi.preview(calendar.id, from, to);
+          return [calendar.id, new Map(rows.map((row) => [row.date, row]))] as const;
+        }),
       );
-      const byDate = new Map<string, PreviewDay[]>();
-      for (const entry of perCalendar) {
-        for (const day of entry.days) {
-          byDate.set(day.date, [...(byDate.get(day.date) ?? []), day]);
-        }
-      }
-      return byDate;
+      return new Map<string, Map<string, PreviewDay>>(perCalendar);
     },
-    enabled: shown.length > 0,
+    enabled: allIds.length > 0,
     placeholderData: (previous) => previous,
   });
+  const previewByCalendar = useMemo(
+    () => previewQuery.data ?? new Map<string, Map<string, PreviewDay>>(),
+    [previewQuery.data],
+  );
 
-  /** The opening span across the shown calendars, so the grid is not always 00–24. */
-  const openSpan = useMemo(() => {
-    let earliest = 24;
-    let latest = 0;
+  const timeGridShown = !isPhone && view !== "month";
+
+  /* Blocks are drawn only where there is a time axis to draw them on. */
+  const blockLists = useQueries({
+    queries: shown.map((calendar) => ({
+      queryKey: ["blocks", calendar.id, from, to],
+      queryFn: () => appointmentsApi.blocks(calendar.id, from, to),
+      enabled: timeGridShown,
+      placeholderData: (previous: TimeBlock[] | undefined) => previous,
+    })),
+    combine: dataOfEach,
+  });
+  const blocksByCalendar = useMemo(() => {
+    const map = new Map<string, TimeBlock[]>();
+    shown.forEach((calendar, i) => map.set(calendar.id, blockLists[i] ?? []));
+    return map;
+  }, [shown, blockLists]);
+
+  /* The mini calendar may be showing the anchor's year while the grid spans New Year. */
+  const years = useMemo(
+    () => Array.from(new Set([...yearsBetween(from, to), Number(anchor.slice(0, 4))])),
+    [from, to, anchor],
+  );
+  const holidays = useQueries({
+    queries: years.map((year) => ({
+      queryKey: ["holidays", year],
+      queryFn: () => holidaysApi.year(year),
+      staleTime: 10 * 60 * 1000,
+    })),
+    combine: allHolidays,
+  });
+  const holidayByDate = useMemo(
+    () => new Map<string, ClinicHoliday>(holidays.map((h) => [h.date, h])),
+    [holidays],
+  );
+
+  /*
+   * The now-line colour is the administrator's setting. `/api/settings` is
+   * readable only with settings.clinic.manage, so everybody else - and an
+   * installation where nobody has set it - gets the theme's error colour.
+   */
+  const settingsQuery = useQuery({
+    queryKey: ["settings", NOW_LINE_COLOR_KEY],
+    queryFn: () => readSettings([NOW_LINE_COLOR_KEY]),
+    enabled: mayManageCalendars,
+    staleTime: 5 * 60 * 1000,
+  });
+  const nowLineColor = resolveNowLineColor(
+    settingsQuery.data?.[NOW_LINE_COLOR_KEY],
+    theme.palette.error.main,
+  );
+
+  /* `pub.bookingEnabled`, through the endpoint every screen may read. Never throws. */
+  const publicClinicQuery = useQuery({
+    queryKey: ["public-clinic"],
+    queryFn: readPublicClinic,
+    staleTime: 5 * 60 * 1000,
+  });
+  const onlineBookingOff = publicClinicQuery.data?.bookingEnabled === false;
+
+  const marks = useMemo(() => {
+    const map = new Map<string, DayMark>();
     for (const dayKey of days) {
-      for (const preview of previewQueries.data?.get(dayKey) ?? []) {
-        if (!preview.isOpen || !preview.startTime || !preview.endTime) continue;
-        earliest = Math.min(earliest, Number(preview.startTime.slice(0, 2)));
-        latest = Math.max(latest, Number(preview.endTime.slice(0, 2)) + 1);
+      const rows = shown
+        .map((c) => previewByCalendar.get(c.id)?.get(dayKey))
+        .filter((row): row is PreviewDay => row !== undefined);
+      map.set(dayKey, dayMark(holidayByDate.get(dayKey), rows));
+    }
+    return map;
+  }, [days, shown, previewByCalendar, holidayByDate]);
+
+  /* Everybody the rota names in the period, for the calendars the service filter leaves. */
+  const employees = useMemo(() => {
+    const rows: PreviewDay[] = [];
+    for (const calendar of serviceCalendars) {
+      rows.push(...(previewByCalendar.get(calendar.id)?.values() ?? []));
+    }
+    const found = employeesIn(rows);
+    return employee && !found.some((e) => e.id === employee.id)
+      ? [...found, employee]
+      : found;
+  }, [serviceCalendars, previewByCalendar, employee]);
+  const employeeId = employee?.id ?? null;
+  const chooseEmployee = (id: string | null) =>
+    setEmployee(id === null ? null : (employees.find((e) => e.id === id) ?? null));
+
+  const shownIds = useMemo(() => new Set(shown.map((c) => c.id)), [shown]);
+
+  const byDay = useMemo(() => {
+    const map = new Map<string, DayAppointment[]>();
+    for (const appointment of appointmentsQuery.data ?? []) {
+      if (!appointment.calendarId || !shownIds.has(appointment.calendarId)) continue;
+      const key = pragueDateKey(appointment.startUtc);
+      const row = previewByCalendar.get(appointment.calendarId)?.get(key);
+      if (!dayBelongsTo(row, employeeId)) continue;
+      map.set(key, [...(map.get(key) ?? []), appointment]);
+    }
+    return map;
+  }, [appointmentsQuery.data, shownIds, previewByCalendar, employeeId]);
+
+  /** The hours drawn: the working hours on screen, widened to anything outside them. */
+  const openSpan = useMemo(() => {
+    const working: MinuteRange[] = [];
+    const items: MinuteRange[] = [];
+    for (const dayKey of days) {
+      for (const calendar of shown) {
+        const row = previewByCalendar.get(calendar.id)?.get(dayKey);
+        if (!row) continue;
+        const start = parseTimeOfDay(row.startTime);
+        const end = parseTimeOfDay(row.endTime);
+        if (row.isOpen && start !== null && end !== null) working.push({ start, end });
+      }
+      for (const a of byDay.get(dayKey) ?? []) items.push(spanOnDay(a.startUtc, a.endUtc, dayKey));
+      for (const blocks of blocksByCalendar.values()) {
+        for (const b of blocks) {
+          if (touchesDay(b.startUtc, b.endUtc, dayKey)) items.push(spanOnDay(b.startUtc, b.endUtc, dayKey));
+        }
       }
     }
-    if (earliest > latest) return DEFAULT_OPEN;
-    return { start: Math.max(0, earliest - 1), end: Math.min(24, latest) };
-  }, [days, previewQueries.data]);
+    return visibleHours(working, items);
+  }, [days, shown, previewByCalendar, byDay, blocksByCalendar]);
 
   /**
    * Which appointment the detail is opened on. Only its id and calendar are
-   * taken from here - the detail reads the appointment itself from
-   * `GET .../appointments/{id}` (4.5, v26), so a change made elsewhere shows up
-   * instead of a stale copy of this row.
+   * taken from here - the detail reads the appointment itself (4.5, v26).
    */
   const openAppointment = useMemo(
     () =>
@@ -281,15 +407,6 @@ export default function CalendarGridPage() {
         : ((appointmentsQuery.data ?? []).find((a) => a.id === openId) ?? null),
     [openId, appointmentsQuery.data],
   );
-
-  const byDay = useMemo(() => {
-    const map = new Map<string, DayAppointment[]>();
-    for (const appointment of appointmentsQuery.data ?? []) {
-      const key = pragueDateKey(appointment.startUtc);
-      map.set(key, [...(map.get(key) ?? []), appointment]);
-    }
-    return map;
-  }, [appointmentsQuery.data]);
 
   const calendarById = useMemo(
     () => new Map(calendars.map((c) => [c.id, c])),
@@ -302,14 +419,26 @@ export default function CalendarGridPage() {
         ? addMonths(anchor, direction)
         : addDaysToDateOnly(anchor, direction * (view === "day" ? 1 : 7)),
     );
-  const todayKey = toDateOnly(now);
+  const todayKey = pragueDateKey(now);
+
+  const pickDay = (day: string) => {
+    setAnchor(day);
+    setView("day");
+  };
+
+  const openBooking = (prefill: BookingPrefill) =>
+    setBooking((current) => ({ key: (current?.key ?? 0) + 1, prefill }));
+
+  const bookFromGrid = (request: GridBookingRequest) =>
+    openBooking({
+      initialDate: request.dayKey,
+      initialCalendarId: request.calendarId,
+      initialStart: request.start,
+      initialEnd: request.end,
+    });
 
   /**
    * 7.1: the grid steps with the keyboard and is not a focus trap.
-   *
-   * The container carries `tabIndex` because a plain div receives no key events
-   * of its own - the first version of this handler never fired at all, which
-   * only showed up when the screen was actually driven from a keyboard.
    * `PageUp`/`PageDown` rather than Alt+Arrow, which the browser takes for its
    * own history navigation.
    */
@@ -328,7 +457,7 @@ export default function CalendarGridPage() {
     }
   };
 
-  const rangeLabel =
+  const rangeText =
     view === "day"
       ? formatDateOnly(anchor)
       : `${formatDateOnly(days[0])} – ${formatDateOnly(days[days.length - 1])}`;
@@ -337,7 +466,7 @@ export default function CalendarGridPage() {
     <Box
       tabIndex={0}
       aria-label={t("booking.grid.title")}
-      sx={{ maxWidth: 1400, mx: "auto", outline: "none" }}
+      sx={{ maxWidth: 1680, mx: "auto", outline: "none" }}
       onKeyDown={onGridKeyDown}
     >
       <Box
@@ -354,53 +483,22 @@ export default function CalendarGridPage() {
           <Typography variant="h4" sx={{ fontWeight: 800 }}>
             {t("booking.grid.title")}
           </Typography>
-          <Typography sx={{ color: "text.secondary" }}>{rangeLabel}</Typography>
+          <Typography sx={{ color: "text.secondary" }}>{rangeText}</Typography>
         </Box>
 
-        {/*
-          7.2. `spacing` alone put these five controls on one line and let them
-          run off the side of a phone: measured at 375px, the date field's right
-          edge sat at 457px with nothing to scroll to, so "jump to date" simply
-          could not be reached. Wrapping needs `gap` rather than `spacing`,
-          which lays out with margins and breaks across wrapped lines.
-        */}
-        <Stack
-          direction="row"
-          sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}
-        >
+        {/* 7.2: wrapping needs `gap` rather than `spacing`, which lays out with
+            margins and breaks across wrapped lines on a phone. */}
+        <Stack direction="row" sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
           <Tooltip title={t("booking.grid.previous")}>
-            <IconButton
-              aria-label={t("booking.grid.previous")}
-              onClick={() => stepBy(-1)}
-            >
+            <IconButton aria-label={t("booking.grid.previous")} onClick={() => stepBy(-1)}>
               <ChevronLeftIcon />
             </IconButton>
           </Tooltip>
-          <Button
-            startIcon={<TodayIcon />}
-            onClick={() => setAnchor(toDateOnly(new Date()))}
-          >
+          <Button startIcon={<TodayIcon />} onClick={() => setAnchor(pragueDateKey(new Date()))}>
             {t("booking.grid.today")}
           </Button>
-          <Button variant="contained" onClick={() => setBooking(true)}>
-            {t("booking.new.title")}
-          </Button>
-          {/* Without this the only way to reach a month back was to press the
-              arrow week by week - thirty-five presses to reach January. */}
-          <TextField
-            type="date"
-            size="small"
-            label={t("booking.grid.jumpTo")}
-            value={anchor}
-            onChange={(e) => e.target.value && setAnchor(e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: 170 }}
-          />
           <Tooltip title={t("booking.grid.next")}>
-            <IconButton
-              aria-label={t("booking.grid.next")}
-              onClick={() => stepBy(1)}
-            >
+            <IconButton aria-label={t("booking.grid.next")} onClick={() => stepBy(1)}>
               <ChevronRightIcon />
             </IconButton>
           </Tooltip>
@@ -408,147 +506,196 @@ export default function CalendarGridPage() {
             exclusive
             size="small"
             value={view}
-            onChange={(_, next) => next && setView(next as ViewMode)}
+            onChange={(_, next: ViewMode | null) => next && setView(next)}
           >
             <ToggleButton value="day">{t("booking.grid.day")}</ToggleButton>
             <ToggleButton value="week">{t("booking.grid.week")}</ToggleButton>
             <ToggleButton value="month">{t("booking.grid.month")}</ToggleButton>
           </ToggleButtonGroup>
+          <TextField
+            select
+            size="small"
+            label={GRID_TEXT.employee}
+            value={employeeId ?? ""}
+            onChange={(e) => chooseEmployee(e.target.value === "" ? null : e.target.value)}
+            sx={{ minWidth: 180 }}
+            slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
+          >
+            <MenuItem value="">{GRID_TEXT.allEmployees}</MenuItem>
+            {employees.map((e) => (
+              <MenuItem key={e.id} value={e.id}>
+                {e.name}
+              </MenuItem>
+            ))}
+          </TextField>
+          {services.length > 0 ? (
+            <TextField
+              select
+              size="small"
+              label={GRID_TEXT.service}
+              value={serviceId ?? ""}
+              onChange={(e) => setServiceId(e.target.value === "" ? null : e.target.value)}
+              sx={{ minWidth: 180 }}
+              slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
+            >
+              <MenuItem value="">{GRID_TEXT.allServices}</MenuItem>
+              {services.map((s) => (
+                <MenuItem key={s.id} value={s.id}>
+                  {s.name}
+                </MenuItem>
+              ))}
+            </TextField>
+          ) : null}
+          {mayBook ? (
+            <Button
+              variant="contained"
+              onClick={() =>
+                openBooking({
+                  initialDate: anchor,
+                  initialCalendarId: shown.length === 1 ? shown[0].id : undefined,
+                })
+              }
+            >
+              {t("booking.new.title")}
+            </Button>
+          ) : null}
+          {onlineBookingOff ? (
+            <Tooltip title={GRID_TEXT.onlineBookingOffWhy}>
+              <Chip color="warning" label={GRID_TEXT.onlineBookingOff} />
+            </Tooltip>
+          ) : null}
         </Stack>
       </Box>
 
-      <AsyncSection
-        isLoading={calendarsQuery.isLoading}
-        isSettled={calendarsQuery.isSuccess}
-        error={calendarsQuery.error}
-        isEmpty={calendars.length === 0}
-        emptyText={t("booking.grid.noCalendars")}
-        onRetry={() => void calendarsQuery.refetch()}
-        skeletonRows={3}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "260px minmax(0, 1fr)" },
+          gap: 3,
+          alignItems: "start",
+        }}
       >
-        {/*
-          * Two different silences, said apart.
-          *
-          * A calendar can offer nothing because it was deactivated, or because
-          * it has no činnosti assigned - and the fixes are opposite. Explaining
-          * an unassigned calendar as "deactivated" sends somebody to activate
-          * one that is already active, and it does not help. This line covers
-          * the first; `dayState`'s "bez činností" covers the second.
-          */}
-        {hiddenInactive.length > 0 ? (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            {t("booking.grid.inactiveHidden", {
-              names: hiddenInactive.map((c) => c.name).join(", "),
-              count: hiddenInactive.length,
-            })}
-            {mayManageCalendars ? (
-              <>
-                {" "}
-                <MuiLink component={RouterLink} to="/calendars">
-                  {t("booking.grid.inactiveWhere")}
-                </MuiLink>
-              </>
+        <GridSidebar
+          anchor={anchor}
+          view={view}
+          onDate={setAnchor}
+          onView={setView}
+          holidays={holidayDates(holidays)}
+          closedDays={closedHolidayDates(holidays)}
+          calendars={serviceCalendars}
+          isTicked={(id) => ticked === null || ticked.has(id)}
+          onToggle={(id) => setTicked(toggleCalendar(ticked, allIds, id))}
+          onOnly={(id) => setTicked(new Set([id]))}
+          employees={employees}
+          employeeId={employeeId}
+          onEmployee={chooseEmployee}
+          services={services}
+          serviceId={serviceId}
+          onService={setServiceId}
+        />
+
+        <Box sx={{ minWidth: 0 }}>
+          <AsyncSection
+            isLoading={calendarsQuery.isLoading}
+            isSettled={calendarsQuery.isSuccess}
+            error={calendarsQuery.error}
+            isEmpty={calendars.length === 0}
+            emptyText={t("booking.grid.noCalendars")}
+            onRetry={() => void calendarsQuery.refetch()}
+            skeletonRows={3}
+          >
+            {hiddenInactive.length > 0 ? (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                {t("booking.grid.inactiveHidden", {
+                  names: hiddenInactive.map((c) => c.name).join(", "),
+                  count: hiddenInactive.length,
+                })}
+                {mayManageCalendars ? (
+                  <>
+                    {" "}
+                    <MuiLink component={RouterLink} to="/calendars">
+                      {t("booking.grid.inactiveWhere")}
+                    </MuiLink>
+                  </>
+                ) : null}
+              </Alert>
             ) : null}
-          </Alert>
-        ) : null}
 
-        {/* Multiple calendars at once: the owner wants Prohlídky and Diagnostika
-            side by side, told apart by colour and by name. */}
-        <Stack
-          direction="row"
-          spacing={1}
-          sx={{ flexWrap: "wrap", gap: 1, mb: 2 }}
-        >
-          {calendars.map((calendar) => {
-            const on = selected === null || selected.has(calendar.id);
-            return (
-              <Chip
-                key={calendar.id}
-                label={calendar.name}
-                onClick={() => {
-                  const next = new Set(selected ?? calendars.map((c) => c.id));
-                  if (next.has(calendar.id)) next.delete(calendar.id);
-                  else next.add(calendar.id);
-                  setSelected(next);
-                }}
-                sx={
-                  on
-                    ? {
-                        backgroundColor: calendar.color,
-                        color: readableTextOn(calendar.color),
-                      }
-                    : undefined
-                }
-                variant={on ? "filled" : "outlined"}
-                aria-pressed={on}
-              />
-            );
-          })}
-        </Stack>
+            <AsyncSection
+              isLoading={appointmentsQuery.isLoading}
+              isSettled={appointmentsQuery.isSuccess && !appointmentsQuery.isPlaceholderData}
+              /* With placeholder data the query stays 'success', so a failed fetch
+                 never reaches `error` — it lands in `failureReason`. */
+              error={appointmentsQuery.error ?? appointmentsQuery.failureReason}
+              isEmpty={false}
+              emptyText=""
+              onRetry={() => void appointmentsQuery.refetch()}
+              skeletonRows={6}
+            >
+              {previewQuery.error ? (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  {t("booking.grid.previewFailed")}
+                </Alert>
+              ) : null}
 
-        <AsyncSection
-          isLoading={appointmentsQuery.isLoading}
-          isSettled={appointmentsQuery.isSuccess && !appointmentsQuery.isPlaceholderData}
-          /* With placeholder data the query stays 'success', so a failed fetch
-             never reaches `error` — it lands in `failureReason`. Reading only
-             `error` made a broken week look like an empty one. */
-          error={appointmentsQuery.error ?? appointmentsQuery.failureReason}
-          isEmpty={false}
-          emptyText=""
-          onRetry={() => void appointmentsQuery.refetch()}
-          skeletonRows={6}
-        >
-          {previewQueries.error ? (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              {t("booking.grid.previewFailed")}
-            </Alert>
-          ) : null}
-
-          {/* 7.2: on a phone the day is a list, not a shrunken grid. */}
-          {!isPhone && view === "month" ? (
-            <MonthGrid
-              days={days}
-              byDay={byDay}
-              calendarById={calendarById}
-              previewByDate={previewQueries.data ?? new Map()}
-              anchorMonth={anchorMonth}
-              now={now}
-              todayKey={todayKey}
-              onOpen={setOpenId}
-            />
-          ) : isPhone || view === "day" ? (
-            <DayList
-              days={days}
-              byDay={byDay}
-              calendarById={calendarById}
-              now={now}
-              onOpen={setOpenId}
-            />
-          ) : (
-            <WeekGrid
-              days={days}
-              byDay={byDay}
-              calendarById={calendarById}
-              openSpan={openSpan}
-              previewByDate={previewQueries.data ?? new Map()}
-              now={now}
-              todayKey={todayKey}
-              gridRef={gridRef}
-              onOpen={setOpenId}
-            />
-          )}
-        </AsyncSection>
-      </AsyncSection>
+              {/* 7.2: on a phone the day is a list, not a shrunken grid. */}
+              {!isPhone && view === "month" ? (
+                <MonthGrid
+                  days={days}
+                  byDay={byDay}
+                  calendarById={calendarById}
+                  marks={marks}
+                  anchor={anchor}
+                  anchorMonth={anchorMonth}
+                  now={now}
+                  todayKey={todayKey}
+                  onOpen={setOpenId}
+                  onPickDay={pickDay}
+                />
+              ) : isPhone ? (
+                <DayList
+                  days={days}
+                  byDay={byDay}
+                  calendarById={calendarById}
+                  marks={marks}
+                  now={now}
+                  onOpen={setOpenId}
+                />
+              ) : (
+                <TimeGrid
+                  days={days}
+                  view={view === "day" ? "day" : "week"}
+                  selectedDay={anchor}
+                  calendars={shown}
+                  appointmentsByDay={byDay}
+                  previewByCalendar={previewByCalendar}
+                  blocksByCalendar={blocksByCalendar}
+                  marks={marks}
+                  openSpan={openSpan}
+                  now={now}
+                  employeeId={employeeId}
+                  nowLineColor={nowLineColor}
+                  mayBook={mayBook}
+                  mayBlock={mayBlock}
+                  onOpen={setOpenId}
+                  onBook={bookFromGrid}
+                  onPickDay={pickDay}
+                />
+              )}
+            </AsyncSection>
+          </AsyncSection>
+        </Box>
+      </Box>
 
       {/* 5.8. The row is gone from the answer once it is cancelled, so the
           dialog closes itself rather than showing a stale copy. */}
       {booking ? (
         <NewAppointmentDialog
+          key={booking.key}
           open
-          onClose={() => setBooking(false)}
+          onClose={() => setBooking(null)}
           onBooked={() => void appointmentsQuery.refetch()}
-          initialDate={anchor}
-          initialCalendarId={shown.length === 1 ? shown[0].id : undefined}
+          {...booking.prefill}
         />
       ) : null}
 
@@ -570,29 +717,32 @@ interface SharedProps {
   days: string[];
   byDay: Map<string, DayAppointment[]>;
   calendarById: Map<string, { id: string; name: string; color: string }>;
+  marks: Map<string, DayMark>;
   now: Date;
   onOpen: (id: string) => void;
 }
 
-/** The phone view, and the day view on any screen: a list, not a grid (7.2). */
-function DayList({
-  days,
-  byDay,
-  calendarById,
-  now,
-  onOpen,
-}: SharedProps) {
+/** The phone view: a list, not a grid (7.2). */
+function DayList({ days, byDay, calendarById, marks, now, onOpen }: SharedProps) {
   const { t } = useTranslation();
 
   return (
     <Stack spacing={2}>
       {days.map((dayKey) => {
         const appointments = byDay.get(dayKey) ?? [];
+        const mark = marks.get(dayKey) ?? OPEN_MARK;
         return (
           <Box key={dayKey}>
             <Typography sx={{ fontWeight: 700, mb: 1 }}>
               {t(`booking.workingHours.weekday.${dayOfWeekOf(dayKey)}`)}{" "}
-              {formatDateOnly(dayKey)}
+              <Box component="span" sx={{ color: mark.redNumber ? "error.main" : "inherit" }}>
+                {formatDateOnly(dayKey)}
+              </Box>
+              {mark.label ? (
+                <Box component="span" sx={{ ml: 1, fontWeight: 400, color: "text.secondary" }}>
+                  {mark.label}
+                </Box>
+              ) : null}
             </Typography>
             {appointments.length === 0 ? (
               <Typography sx={{ color: "text.secondary", fontSize: 14 }}>
@@ -622,12 +772,8 @@ function DayList({
 /**
  * The month - contract 5.1.
  *
- * Deliberately not virtualised. 7.3 asks for `@tanstack/react-virtual` here,
- * and a month is six rows: virtualising six rows costs a scroll container and
- * measurement code and saves nothing. What can actually grow is a single day's
- * list, which is capped instead, with the rest named as a count. Said out loud
- * rather than skipped quietly - if the booking lane wants the library here, it
- * is a small change.
+ * Deliberately not virtualised: a month is six rows. What can actually grow is
+ * a single day's list, which is capped instead, with the rest named as a count.
  */
 const MAX_PER_DAY = 3;
 
@@ -635,17 +781,21 @@ function MonthGrid({
   days,
   byDay,
   calendarById,
-  previewByDate,
+  marks,
+  anchor,
   anchorMonth,
   now,
   todayKey,
   onOpen,
+  onPickDay,
 }: SharedProps & {
-  previewByDate: Map<string, PreviewDay[]>;
+  anchor: string;
   anchorMonth: string;
   todayKey: string;
+  onPickDay: (day: string) => void;
 }) {
   const { t } = useTranslation();
+  const theme = useTheme();
   const weekdayHeads = [1, 2, 3, 4, 5, 6, 0];
 
   return (
@@ -679,15 +829,23 @@ function MonthGrid({
 
         {days.map((dayKey) => {
           const appointments = byDay.get(dayKey) ?? [];
-          const state = dayState(previewByDate.get(dayKey) ?? []);
+          const mark = marks.get(dayKey) ?? OPEN_MARK;
           const outsideMonth = dayKey.slice(0, 7) !== anchorMonth;
           const shownHere = appointments.slice(0, MAX_PER_DAY);
           const hidden = appointments.length - shownHere.length;
+          const lit = emphasis(dayKey, anchor, "month");
           return (
             <Box
               key={dayKey}
+              data-testid={`month-day-${dayKey}`}
               sx={{
-                backgroundColor: isShaded(state) ? "action.hover" : "background.paper",
+                backgroundColor: mark.closed
+                  ? "action.hover"
+                  : lit === "week"
+                    ? alpha(theme.palette.primary.main, 0.05)
+                    : "background.paper",
+                boxShadow:
+                  lit === "day" ? `inset 0 0 0 2px ${theme.palette.primary.main}` : "none",
                 minHeight: 104,
                 p: 0.5,
                 opacity: outsideMonth ? 0.5 : 1,
@@ -699,21 +857,39 @@ function MonthGrid({
                   alignItems: "center",
                   justifyContent: "space-between",
                   mb: 0.5,
+                  gap: 0.5,
                 }}
               >
-                <Typography
+                <ButtonBase
+                  onClick={() => onPickDay(dayKey)}
+                  aria-label={formatDateOnly(dayKey)}
                   sx={{
                     fontSize: 12,
-                    fontWeight: dayKey === todayKey ? 800 : 500,
-                    color: dayKey === todayKey ? "primary.main" : "text.secondary",
+                    px: 0.5,
+                    borderRadius: 1,
+                    fontWeight: dayKey === todayKey || mark.redNumber ? 800 : 500,
+                    color: mark.redNumber
+                      ? "error.main"
+                      : dayKey === todayKey
+                        ? "primary.main"
+                        : "text.secondary",
                   }}
                 >
                   {Number(dayKey.slice(8, 10))}.
-                </Typography>
-                <DayStateLabel
-                  state={state}
-                  sx={{ fontSize: 10, color: "text.secondary" }}
-                />
+                </ButtonBase>
+                {mark.label ? (
+                  <Tooltip title={mark.detail ?? ""}>
+                    <Typography
+                      sx={{
+                        fontSize: 10,
+                        color: mark.redNumber ? "error.main" : "text.secondary",
+                        textAlign: "right",
+                      }}
+                    >
+                      {mark.label}
+                    </Typography>
+                  </Tooltip>
+                ) : null}
               </Box>
 
               <Stack spacing={0.25}>
@@ -737,320 +913,6 @@ function MonthGrid({
           );
         })}
       </Box>
-    </Box>
-  );
-}
-
-function WeekGrid({
-  days,
-  byDay,
-  calendarById,
-  openSpan,
-  previewByDate,
-  now,
-  todayKey,
-  gridRef,
-  onOpen,
-}: SharedProps & {
-  openSpan: { start: number; end: number };
-  previewByDate: Map<string, PreviewDay[]>;
-  todayKey: string;
-  gridRef: React.RefObject<HTMLDivElement | null>;
-}) {
-  const { t } = useTranslation();
-  const hours = Array.from(
-    { length: openSpan.end - openSpan.start },
-    (_, i) => openSpan.start + i,
-  );
-
-  return (
-    <Box ref={gridRef} sx={{ overflowX: "auto" }}>
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: `64px repeat(${days.length}, minmax(140px, 1fr))`,
-          minWidth: 760,
-        }}
-      >
-        <Box />
-        {days.map((dayKey) => (
-          <Box
-            key={dayKey}
-            sx={{
-              px: 1,
-              py: 0.5,
-              textAlign: "center",
-              fontWeight: 700,
-              fontSize: 13,
-              borderBottom: "2px solid",
-              borderColor: dayKey === todayKey ? "primary.main" : "divider",
-            }}
-          >
-            {t(`booking.workingHours.weekday.${dayOfWeekOf(dayKey)}`)}
-            <Box
-              component="span"
-              sx={{ ml: 0.5, fontWeight: 400, color: "text.secondary" }}
-            >
-              {formatDateOnly(dayKey).replace(/\s\d{4}$/, "")}
-            </Box>
-          </Box>
-        ))}
-
-        <Box sx={{ position: "relative" }}>
-          {hours.map((hour) => (
-            <Box
-              key={hour}
-              sx={{
-                height: ROW_HEIGHT * (60 / SLOT_MINUTES),
-                fontSize: 11,
-                color: "text.secondary",
-                textAlign: "right",
-                pr: 1,
-              }}
-            >
-              {String(hour).padStart(2, "0")}:00
-            </Box>
-          ))}
-        </Box>
-
-        {days.map((dayKey) => (
-          <DayColumn
-            key={dayKey}
-            dayKey={dayKey}
-            appointments={byDay.get(dayKey) ?? []}
-            calendarById={calendarById}
-            openSpan={openSpan}
-            preview={previewByDate.get(dayKey) ?? []}
-            now={now}
-            isToday={dayKey === todayKey}
-            onOpen={onOpen}
-          />
-        ))}
-      </Box>
-    </Box>
-  );
-}
-
-function DayColumn({
-  dayKey,
-  appointments,
-  calendarById,
-  openSpan,
-  preview,
-  now,
-  isToday,
-  onOpen,
-}: {
-  dayKey: string;
-  appointments: DayAppointment[];
-  calendarById: Map<string, { id: string; name: string; color: string }>;
-  openSpan: { start: number; end: number };
-  preview: PreviewDay[];
-  now: Date;
-  isToday: boolean;
-  onOpen: (id: string) => void;
-}) {
-  const { t } = useTranslation();
-  const pixelsPerMinute = ROW_HEIGHT / SLOT_MINUTES;
-
-  /**
-   * 3.3: the height comes from the real length of that Prague day, so 29 March
-   * is 23 hours tall and 25 October is 25 - never `24 * hourHeight`.
-   */
-  const dayHours = hoursInPragueDay(dayKey);
-  const visibleMinutes = Math.min(openSpan.end - openSpan.start, dayHours) * 60;
-  const topOffset = openSpan.start * 60;
-
-  const state = dayState(preview);
-
-  return (
-    <Box
-      sx={{
-        position: "relative",
-        height: visibleMinutes * pixelsPerMinute,
-        borderLeft: "1px solid",
-        borderColor: "divider",
-        backgroundColor: isShaded(state) ? "action.hover" : "transparent",
-      }}
-    >
-      {/* Outside working hours is shaded, never hidden: the owner has to see
-          where the day ends, and why it is closed if it is (5.1). */}
-      <DayStateLabel
-        state={state}
-        sx={{
-          position: "absolute",
-          top: 4,
-          left: 4,
-          fontSize: 11,
-          color: "text.secondary",
-        }}
-      />
-
-      {isToday ? (
-        <NowLine now={now} dayKey={dayKey} topOffset={topOffset} />
-      ) : null}
-
-      {appointments.map((appointment) => {
-        const startMinutes =
-          minutesIntoDay(appointment.startUtc, dayKey) - topOffset;
-        const endMinutes =
-          minutesIntoDay(appointment.endUtc, dayKey) - topOffset;
-        return (
-          <Box
-            key={appointment.id}
-            sx={{
-              position: "absolute",
-              top: Math.max(0, startMinutes) * pixelsPerMinute,
-              height: Math.max(
-                18,
-                (endMinutes - startMinutes) * pixelsPerMinute - 2,
-              ),
-              left: 2,
-              right: 2,
-            }}
-          >
-            <AppointmentButton
-              appointment={appointment}
-              calendar={calendarById.get(appointment.calendarId ?? "")}
-              now={now}
-              onOpen={onOpen}
-              layout="block"
-            />
-          </Box>
-        );
-      })}
-    </Box>
-  );
-}
-
-function NowLine({
-  now,
-  dayKey,
-  topOffset,
-}: {
-  now: Date;
-  dayKey: string;
-  topOffset: number;
-}) {
-  const { t } = useTranslation();
-  const minutes = minutesIntoDay(now.toISOString(), dayKey) - topOffset;
-  if (minutes < 0) return null;
-  return (
-    <Box
-      aria-label={t("booking.grid.now")}
-      sx={{
-        position: "absolute",
-        top: minutes * (ROW_HEIGHT / SLOT_MINUTES),
-        left: 0,
-        right: 0,
-        height: 0,
-        borderTop: "2px solid",
-        borderColor: "error.main",
-        zIndex: 2,
-      }}
-    />
-  );
-}
-
-/**
- * One appointment. It is a `button`, not a div with an onClick (7.1), and its
- * status is written out as well as coloured, because colour may not be the only
- * carrier of the information.
- */
-function AppointmentButton({
-  appointment,
-  calendar,
-  now,
-  onOpen,
-  layout,
-}: {
-  appointment: DayAppointment;
-  calendar?: { id: string; name: string; color: string };
-  now: Date;
-  onOpen: (id: string) => void;
-  layout: "row" | "block" | "compact";
-}) {
-  const { t } = useTranslation();
-  const color = calendar?.color ?? "#37474F";
-  const late = isLate(appointment.startUtc, isLateStatus(appointment.status), now);
-  const tally = statusTally(appointment.status);
-  const name = statusName(appointment.status);
-  const statusLabel = name
-    ? t(`booking.status.${name}`)
-    : t("booking.status.unknown");
-
-  return (
-    <Box
-      component="button"
-      type="button"
-      onClick={() => onOpen(appointment.id)}
-      aria-haspopup="dialog"
-      sx={{
-        display: "block",
-        width: "100%",
-        height: layout === "block" ? "100%" : "auto",
-        whiteSpace: layout === "compact" ? "nowrap" : "normal",
-        textOverflow: "ellipsis",
-        textAlign: "left",
-        cursor: "pointer",
-        border: "1px solid rgba(0,0,0,0.15)",
-        borderRadius: 1,
-        px: 1,
-        py: 0.5,
-        font: "inherit",
-        fontSize: 12,
-        overflow: "hidden",
-        backgroundColor: color,
-        color: readableTextOn(color),
-        opacity: tally === "cancelled" ? 0.55 : 1,
-        textDecoration: tally === "cancelled" ? "line-through" : "none",
-        "&:focus-visible": {
-          outline: "3px solid",
-          outlineColor: "primary.main",
-        },
-      }}
-    >
-      <Box component="span" sx={{ fontWeight: 700 }}>
-        {formatPragueTime(appointment.startUtc)}
-      </Box>{" "}
-      {appointment.activityName}
-      {/*
-        4.5, v29: ✓ or ⚠ for the paperwork, and nothing at all while the
-        register cannot answer. The mark carries a label of its own, because a
-        symbol is not a word and 7.1 does not accept one standing alone.
-      */}
-      {appointment.paperwork ? (
-        <Box
-          component="span"
-          aria-label={
-            appointment.paperwork.ready
-              ? t("booking.paperwork.ready")
-              : t("booking.paperwork.line")
-          }
-          sx={{ ml: 0.5 }}
-        >
-          {appointment.paperwork.ready ? "✓" : "⚠"}
-        </Box>
-      ) : null}
-      {/*
-        A month cell has one line to spare, so the status goes on the same line
-        and the calendar name is dropped - but it is still there in words, never
-        colour alone (7.1). The fuller second line is for the day and week.
-      */}
-      {layout === "compact" ? (
-        <Box component="span" sx={{ ml: 0.5, fontSize: 10, opacity: 0.9 }}>
-          {late ? t("booking.status.late") : statusLabel}
-        </Box>
-      ) : (
-        <Box
-          component="span"
-          sx={{ display: "block", fontSize: 11, opacity: 0.9 }}
-        >
-          {statusLabel}
-          {late ? ` · ${t("booking.status.late")}` : ""}
-          {calendar ? ` · ${calendar.name}` : ""}
-        </Box>
-      )}
     </Box>
   );
 }
