@@ -16,6 +16,7 @@ import {
   Info, Delete, DoneAll, Settings, ExpandMore, ExpandLess,
 } from '@mui/icons-material';
 import { AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import {
@@ -207,6 +208,7 @@ function NotificationLine({
 
 /* ══════════════════════════════════════════════════════════════ */
 export default function NotificationCenter() {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -227,13 +229,9 @@ export default function NotificationCenter() {
     try {
       const res = await client.get('/api/notifications');
       const data = res.data?.value ?? res.data;
-      setNotifications(prev => {
-        const api = Array.isArray(data) ? data : data?.items ?? [];
-        const bookingNotes = prev.filter(n => n.id.startsWith('booking:'));
-        return [...bookingNotes, ...api];
-      });
+      setNotifications(Array.isArray(data) ? data : data?.items ?? []);
     } catch {
-      // No notification API — keep booking notifications only
+      /* Keep what is on screen; the next poll asks again. */
     } finally {
       setLoading(false);
     }
@@ -291,8 +289,6 @@ export default function NotificationCenter() {
       document.removeEventListener('visibilitychange', tick);
     };
   }, [fetchNotifications]);
-
-  /* ── Real booking notifications (poll admin bookings) ── */
 
   /* ── Real-time sync ── */
   useRealtimeSync({
@@ -355,36 +351,51 @@ export default function NotificationCenter() {
       return next;
     });
 
+  /*
+   * Each of these changes the screen only once the server has agreed.
+   *
+   * They used to change it first and swallow the refusal, so "Vše označeno
+   * jako přečtené" appeared for a request the server had refused and the rows
+   * came back unread on the next poll. And a row with a link navigated with a
+   * full page load before its PATCH was even sent, which could abort it.
+   */
   const markAsRead = async (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
     const note = notifications.find(n => n.id === id);
-    if (note?.actionUrl) {
-      handleClose();
-      window.location.href = note.actionUrl;
+    if (note === undefined) return;
+
+    if (!note.read) {
+      try {
+        await client.patch(`/api/notifications/${id}/read`);
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      } catch {
+        toast.error('Oznámení se nepodařilo označit jako přečtené.');
+      }
     }
-    try {
-      await client.patch(`/api/notifications/${id}/read`);
-    } catch {
-      // Optimistic update already applied
+
+    /* Opened either way: the person asked to see what it points at, and a
+       failed mark leaves the row honestly unread rather than blocking that. */
+    if (note.actionUrl) {
+      handleClose();
+      navigate(note.actionUrl);
     }
   };
 
   const markAllAsRead = async () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     try {
       await client.patch('/api/notifications/read-all');
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      toast.success('Vše označeno jako přečtené');
     } catch {
-      // Optimistic update already applied
+      toast.error('Oznámení se nepodařilo označit jako přečtená. Zkuste to prosím znovu.');
     }
-    toast.success('Vše označeno jako přečtené');
   };
 
   const deleteNotification = async (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
     try {
       await client.delete(`/api/notifications/${id}`);
+      setNotifications(prev => prev.filter(n => n.id !== id));
     } catch {
-      // Optimistic update already applied
+      toast.error('Oznámení se nepodařilo smazat. Zkuste to prosím znovu.');
     }
   };
 

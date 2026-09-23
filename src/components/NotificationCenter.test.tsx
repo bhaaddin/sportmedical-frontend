@@ -11,8 +11,9 @@
  * must not invent groups out of rows that merely look alike.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 const getList = vi.fn();
 const getSeen = vi.fn();
@@ -30,7 +31,9 @@ vi.mock('../api/client', () => ({
   default: { get, patch, delete: del, post, put: vi.fn() },
 }));
 vi.mock('../hooks/useRealtimeSync', () => ({ useRealtimeSync: () => ({}) }));
-vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
+const toastSuccess = vi.fn();
+const toastError = vi.fn();
+vi.mock('react-hot-toast', () => ({ default: { success: toastSuccess, error: toastError } }));
 
 const { default: NotificationCenter } = await import('./NotificationCenter');
 
@@ -52,11 +55,25 @@ beforeEach(() => {
   post.mockReset().mockResolvedValue({ data: { lastSeenAtUtc: new Date().toISOString() } });
   patch.mockReset().mockResolvedValue({});
   del.mockReset().mockResolvedValue({});
+  toastSuccess.mockReset();
+  toastError.mockReset();
 });
+
+/* Where the router is, so a test can see a row's link being followed. */
+function Here() {
+  return <div data-testid="here">{useLocation().pathname}</div>;
+}
 
 const openPanel = async () => {
   const user = userEvent.setup();
-  render(<NotificationCenter />);
+  render(
+    <MemoryRouter initialEntries={['/']}>
+      <NotificationCenter />
+      <Routes>
+        <Route path="*" element={<Here />} />
+      </Routes>
+    </MemoryRouter>,
+  );
   const bell = await screen.findByRole('button', { name: /oznámení/i });
   await user.click(bell);
   return user;
@@ -255,5 +272,59 @@ describe('the notification panel', () => {
     await screen.findByText('Pacient a');
 
     expect(screen.queryByText(/Nové od vašeho posledního pohledu/)).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * The bell changes the screen only once the server has agreed.
+ *
+ * It used to mark rows read and delete them first and swallow the refusal,
+ * with "Vše označeno jako přečtené" shown either way; the rows came back on
+ * the next poll. And a row with a link reloaded the page before its PATCH was
+ * even sent.
+ */
+describe('what the bell reports', () => {
+  it('does not claim everything was read when the server refused', async () => {
+    getList.mockResolvedValue({ data: [row('a')] });
+    patch.mockRejectedValue(new Error('403'));
+
+    const user = await openPanel();
+    await user.click(await screen.findByRole('button', { name: /Přečíst vše/ }));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Přečíst vše/ })).toBeInTheDocument();
+  });
+
+  it('says so when the server did mark everything read', async () => {
+    getList.mockResolvedValue({ data: [row('a')] });
+
+    const user = await openPanel();
+    await user.click(await screen.findByRole('button', { name: /Přečíst vše/ }));
+
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+    expect(patch).toHaveBeenCalledWith('/api/notifications/read-all');
+  });
+
+  it('keeps a row the server refused to delete', async () => {
+    getList.mockResolvedValue({ data: [row('a')] });
+    del.mockRejectedValue(new Error('500'));
+
+    const user = await openPanel();
+    await screen.findByText('Pacient a');
+    await user.click(screen.getByRole('button', { name: 'Smazat oznámení' }));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(screen.getByText('Pacient a')).toBeInTheDocument();
+  });
+
+  it('marks a row read before following its link, inside the application', async () => {
+    getList.mockResolvedValue({ data: [row('a', { actionUrl: '/intake-review' })] });
+
+    const user = await openPanel();
+    await user.click(await screen.findByText('Pacient a'));
+
+    await waitFor(() => expect(screen.getByTestId('here')).toHaveTextContent('/intake-review'));
+    expect(patch).toHaveBeenCalledWith('/api/notifications/a/read');
   });
 });
