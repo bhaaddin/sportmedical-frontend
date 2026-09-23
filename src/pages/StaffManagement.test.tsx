@@ -18,12 +18,13 @@ import userEvent from '@testing-library/user-event';
 const list = vi.fn();
 const setActive = vi.fn();
 const create = vi.fn();
+const update = vi.fn();
 
 vi.mock('../api/userAccounts', async () => {
   const actual = await vi.importActual<typeof import('../api/userAccounts')>('../api/userAccounts');
   return {
     ...actual,
-    userAccountsApi: { list, setActive, create, resetPassword: vi.fn(), assignRole: vi.fn() },
+    userAccountsApi: { list, setActive, create, update, resetPassword: vi.fn(), assignRole: vi.fn() },
   };
 });
 vi.mock('../components/admin/UserPermissionsDialog', () => ({ UserPermissionsDialog: () => null }));
@@ -51,6 +52,7 @@ beforeEach(() => {
   ]);
   setActive.mockReset().mockResolvedValue(account({ isActive: false }));
   create.mockReset();
+  update.mockReset().mockResolvedValue(account({ displayName: 'Jana Horáková' }));
 });
 
 const rowOf = async (name: string) => {
@@ -98,5 +100,43 @@ describe('the team', () => {
 
     expect(screen.getByRole('option', { name: 'Personál' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Vlastník' })).not.toBeInTheDocument();
+  });
+});
+
+describe('editing an employee', () => {
+  it('changes the name and the sign-in e-mail through PUT /api/v1/users/{id}', async () => {
+    const user = userEvent.setup();
+    render(<StaffManagement />);
+
+    await user.click(await screen.findByLabelText('Upravit Jana Nová'));
+    const name = screen.getByLabelText('Jméno a příjmení');
+    await user.clear(name);
+    await user.type(name, 'Jana Horáková');
+    const email = screen.getByLabelText('E-mail');
+    await user.clear(email);
+    await user.type(email, ' jana.horakova@ordinace.cz ');
+    await user.click(screen.getByRole('button', { name: 'Uložit' }));
+
+    await waitFor(() =>
+      expect(update).toHaveBeenCalledWith('u1', {
+        displayName: 'Jana Horáková',
+        email: 'jana.horakova@ordinace.cz',
+      }),
+    );
+    expect(await screen.findByText('Údaje zaměstnance uloženy.')).toBeInTheDocument();
+  });
+
+  it('says in Czech when the e-mail belongs to somebody else', async () => {
+    update.mockRejectedValue({ response: { status: 409, data: { code: 'account.email_already_exists' } } });
+    const user = userEvent.setup();
+    render(<StaffManagement />);
+
+    await user.click(await screen.findByLabelText('Upravit Jana Nová'));
+    const email = screen.getByLabelText('E-mail');
+    await user.clear(email);
+    await user.type(email, 'petr@ordinace.cz');
+    await user.click(screen.getByRole('button', { name: 'Uložit' }));
+
+    expect(await screen.findByText('Účet s tímto e-mailem už existuje.')).toBeInTheDocument();
   });
 });
