@@ -216,6 +216,7 @@
       "inactiveWhere": "Spravovat kalendáře"
     },
     "detail": {
+      "noActionsAllowed": "Tento účet nemá oprávnění rezervace upravovat ani rušit.",
       "patient": "Pacient",
       "patientMissing": "Pacienta se nepodařilo načíst.",
       "noPhone": "telefon neuveden",

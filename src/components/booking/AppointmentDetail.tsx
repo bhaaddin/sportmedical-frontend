@@ -42,6 +42,7 @@ import {
 import { AsyncSection } from "./AsyncSection";
 import { AvailabilityPanel } from "./AvailabilityPicker";
 import { errorText } from "./errorText";
+import { usePermission } from "../../auth/usePermission";
 
 /**
  * One appointment, opened from the grid — contract 5.8.
@@ -179,6 +180,8 @@ function DetailBody({
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const mayEdit = usePermission("bookings.edit");
+  const mayCancel = usePermission("bookings.cancel");
 
   const [cancelling, setCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -396,83 +399,97 @@ function DetailBody({
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
           {t("booking.common.actions")}
         </Typography>
+        {!mayEdit && !mayCancel ? (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            {t("booking.detail.noActionsAllowed")}
+          </Typography>
+        ) : null}
         <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
-          <StatusButton
-            label={t("booking.detail.arrived")}
-            to={CHECKED_IN}
-            from={appointment.status}
-            disabled={busy}
-            onClick={() => statusMutation.mutate({ to: CHECKED_IN })}
-          />
-          <StatusButton
-            label={t("booking.detail.noShow")}
-            to={NO_SHOW}
-            from={appointment.status}
-            disabled={busy}
-            /*
-             * `2 -> 5` is allowed on purpose — it is how a mis-click gets
-             * corrected — but marking a patient who is standing at the desk as
-             * absent deserves a question first (4.5, v23).
-             */
-            confirmText={
-              appointment.status === CHECKED_IN
-                ? t("booking.detail.confirmNoShow")
-                : undefined
-            }
-            onClick={() => statusMutation.mutate({ to: NO_SHOW })}
-          />
-          <StatusButton
-            label={t("booking.detail.undo")}
-            to={SCHEDULED}
-            from={appointment.status}
-            disabled={busy}
-            onClick={() => statusMutation.mutate({ to: SCHEDULED })}
-          />
-          <StatusButton
-            label={t("booking.detail.complete")}
-            to={COMPLETED}
-            from={appointment.status}
-            disabled={busy}
-            confirmText={t("booking.detail.confirmComplete")}
-            onClick={() => statusMutation.mutate({ to: COMPLETED })}
-          />
-          {/*
-            A completed or cancelled appointment cannot be moved - the server
-            answers `409`, which is right, but offering the button and then
-            refusing it wastes somebody's click and teaches them nothing. Found
-            in the browser: the move panel opened on a finished appointment and
-            listed times it could never accept.
-          */}
-          <Tooltip
-            title={
-              isTerminalStatus(appointment.status)
-                ? t("booking.detail.notAllowed")
-                : ""
-            }
-          >
-            <Box component="span">
-              <Button
-                size="small"
-                variant="outlined"
-                disabled={busy || isTerminalStatus(appointment.status)}
-                onClick={() => {
-                  setConflict(null);
-                  setMoving((was) => !was);
-                }}
+          {/* Arrival, finishing and moving are bookings.edit on the server,
+              cancelling is bookings.cancel; what the account lacks is not
+              offered, rather than offered and then refused. */}
+          {mayEdit ? (
+            <>
+              <StatusButton
+                label={t("booking.detail.arrived")}
+                to={CHECKED_IN}
+                from={appointment.status}
+                disabled={busy}
+                onClick={() => statusMutation.mutate({ to: CHECKED_IN })}
+              />
+              <StatusButton
+                label={t("booking.detail.noShow")}
+                to={NO_SHOW}
+                from={appointment.status}
+                disabled={busy}
+                /*
+                 * `2 -> 5` is allowed on purpose — it is how a mis-click gets
+                 * corrected — but marking a patient who is standing at the desk
+                 * as absent deserves a question first (4.5, v23).
+                 */
+                confirmText={
+                  appointment.status === CHECKED_IN
+                    ? t("booking.detail.confirmNoShow")
+                    : undefined
+                }
+                onClick={() => statusMutation.mutate({ to: NO_SHOW })}
+              />
+              <StatusButton
+                label={t("booking.detail.undo")}
+                to={SCHEDULED}
+                from={appointment.status}
+                disabled={busy}
+                onClick={() => statusMutation.mutate({ to: SCHEDULED })}
+              />
+              <StatusButton
+                label={t("booking.detail.complete")}
+                to={COMPLETED}
+                from={appointment.status}
+                disabled={busy}
+                confirmText={t("booking.detail.confirmComplete")}
+                onClick={() => statusMutation.mutate({ to: COMPLETED })}
+              />
+              {/*
+                A completed or cancelled appointment cannot be moved - the server
+                answers `409`, which is right, but offering the button and then
+                refusing it wastes somebody's click and teaches them nothing.
+                Found in the browser: the move panel opened on a finished
+                appointment and listed times it could never accept.
+              */}
+              <Tooltip
+                title={
+                  isTerminalStatus(appointment.status)
+                    ? t("booking.detail.notAllowed")
+                    : ""
+                }
               >
-                {t("booking.detail.move")}
-              </Button>
-            </Box>
-          </Tooltip>
-          <Button
-            size="small"
-            color="error"
-            variant="outlined"
-            disabled={busy || !canChangeStatus(appointment.status, 4)}
-            onClick={() => setCancelling((was) => !was)}
-          >
-            {t("booking.detail.cancel")}
-          </Button>
+                <Box component="span">
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    disabled={busy || isTerminalStatus(appointment.status)}
+                    onClick={() => {
+                      setConflict(null);
+                      setMoving((was) => !was);
+                    }}
+                  >
+                    {t("booking.detail.move")}
+                  </Button>
+                </Box>
+              </Tooltip>
+            </>
+          ) : null}
+          {mayCancel ? (
+            <Button
+              size="small"
+              color="error"
+              variant="outlined"
+              disabled={busy || !canChangeStatus(appointment.status, 4)}
+              onClick={() => setCancelling((was) => !was)}
+            >
+              {t("booking.detail.cancel")}
+            </Button>
+          ) : null}
         </Stack>
       </Box>
 

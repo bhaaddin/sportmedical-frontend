@@ -133,6 +133,8 @@ function minutesIntoDay(instant: string, dayKey: string): number {
 export default function CalendarGridPage() {
   const { t } = useTranslation();
   const mayManageCalendars = usePermission("settings.clinic.manage");
+  /* The server refuses a booking without it; the button is not offered either. */
+  const mayBook = usePermission("bookings.create");
   const theme = useTheme();
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -382,9 +384,11 @@ export default function CalendarGridPage() {
           >
             {t("booking.grid.today")}
           </Button>
-          <Button variant="contained" onClick={() => setBooking(true)}>
-            {t("booking.new.title")}
-          </Button>
+          {mayBook ? (
+            <Button variant="contained" onClick={() => setBooking(true)}>
+              {t("booking.new.title")}
+            </Button>
+          ) : null}
           {/* Without this the only way to reach a month back was to press the
               arrow week by week - thirty-five presses to reach January. */}
           <TextField
@@ -542,7 +546,7 @@ export default function CalendarGridPage() {
 
       {/* 5.8. The row is gone from the answer once it is cancelled, so the
           dialog closes itself rather than showing a stale copy. */}
-      {booking ? (
+      {booking && mayBook ? (
         <NewAppointmentDialog
           open
           onClose={() => setBooking(false)}

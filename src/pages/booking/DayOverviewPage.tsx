@@ -35,6 +35,7 @@ import {
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { NewAppointmentDialog } from "../../components/booking/NewAppointmentDialog";
 import { errorText } from "../../components/booking/errorText";
+import { usePermission } from "../../auth/usePermission";
 
 /**
  * The day at a glance — contract 5.12, laid out as `booking.md` part 3.
@@ -62,6 +63,10 @@ const CHECKED_IN = 2;
 
 export default function DayOverviewPage() {
   const { t } = useTranslation();
+  /* The server refuses a booking without it; the button is not offered either.
+     Marking somebody as arrived is a status change, which is bookings.edit. */
+  const mayBook = usePermission("bookings.create");
+  const mayEdit = usePermission("bookings.edit");
   const queryClient = useQueryClient();
 
   const [date, setDate] = useState<string>(toDateOnly(new Date()));
@@ -220,13 +225,15 @@ export default function DayOverviewPage() {
           >
             <ChevronRightIcon fontSize="small" />
           </Button>
-          <Button
-            size="small"
-            variant="contained"
-            onClick={() => setBooking(true)}
-          >
-            {t("booking.new.title")}
-          </Button>
+          {mayBook ? (
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => setBooking(true)}
+            >
+              {t("booking.new.title")}
+            </Button>
+          ) : null}
         </Stack>
       </Stack>
 
@@ -378,14 +385,16 @@ export default function DayOverviewPage() {
                               : ""}
                           </Typography>
                         </Stack>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          disabled={row.calendarId === null || arrive.isPending}
-                          onClick={() => arrive.mutate(row)}
-                        >
-                          {t("booking.detail.arrived")}
-                        </Button>
+                        {mayEdit ? (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            disabled={row.calendarId === null || arrive.isPending}
+                            onClick={() => arrive.mutate(row)}
+                          >
+                            {t("booking.detail.arrived")}
+                          </Button>
+                        ) : null}
                       </Stack>
                     ))}
                   </Stack>
@@ -506,7 +515,7 @@ export default function DayOverviewPage() {
         </AsyncSection>
       </AsyncSection>
 
-      {booking ? (
+      {booking && mayBook ? (
         <NewAppointmentDialog
           open
           onClose={() => setBooking(false)}
