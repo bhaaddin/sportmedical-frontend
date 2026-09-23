@@ -1,7 +1,8 @@
 /* ══════════════════════════════════════════════════════════════
    REAL-TIME SERVICE
    Singleton over the SignalR hub at /hubs/notifications.
-   Same surface as before: init / connect / on / off / send.
+   The hub sends one message, `notificationsChanged`; this relays it
+   and says when the connection came back after a gap.
    ══════════════════════════════════════════════════════════════ */
 
 /*
@@ -47,41 +48,16 @@ type EventCallback = (data: any) => void;
 
 interface SocketConfig {
   url: string;
-  maxReconnectAttempts?: number;
-  initialReconnectDelay?: number;
-  maxReconnectDelay?: number;
-  heartbeatInterval?: number;
 }
 
-/* ── Event channel names ── */
+/*
+ * The only messages there are. The server sends `notificationsChanged` and
+ * nothing else; `connected` is this side's own, fired on start and again after
+ * a reconnect.
+ */
 export const SOCKET_EVENTS = {
-  /* Calendar */
-  CALENDAR_SLOT_CREATED: 'calendar:slot_created',
-  CALENDAR_SLOT_UPDATED: 'calendar:slot_updated',
-  CALENDAR_SLOT_DELETED: 'calendar:slot_deleted',
-  CALENDAR_LOCKOUT_CREATED: 'calendar:lockout_created',
-  CALENDAR_LOCKOUT_DELETED: 'calendar:lockout_deleted',
-
-  /* Billing */
-  BILLING_CLAIM_UPDATED: 'billing:claim_updated',
-  BILLING_CLAIM_SUBMITTED: 'billing:claim_submitted',
-  BILLING_BATCH_COMPLETE: 'billing:batch_complete',
-
-  /* Admin */
-  ADMIN_FORCE_LOGOUT: 'admin:force_logout',
-  ADMIN_MAINTENANCE_MODE: 'admin:maintenance_mode',
-
-  /* System */
-  SYSTEM_HEALTH_UPDATE: 'system:health_update',
-  SYSTEM_SESSION_UPDATE: 'system:session_update',
-
-  /* Audit */
-  AUDIT_NEW_ENTRY: 'audit:new_entry',
-
-  /* Connection */
+  NOTIFICATIONS_CHANGED: 'notificationsChanged',
   CONNECTED: 'connected',
-  DISCONNECTED: 'disconnected',
-  RECONNECTING: 'reconnecting',
 } as const;
 
 type SocketEventName = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];
@@ -89,7 +65,6 @@ type SocketEventName = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];
 class SocketService {
   private connection: HubConnection | null = null;
   private listeners: Map<string, Set<EventCallback>> = new Map();
-  private isManualClose = false;
   private starting: Promise<void> | null = null;
 
   private config: SocketConfig = { url: '' };
@@ -111,7 +86,6 @@ class SocketService {
   connect() {
     if (this.connection?.state === HubConnectionState.Connected) return;
     if (this.starting) return;
-    this.isManualClose = false;
     if (!this.config.url) this.init();
 
     const connection = new HubConnectionBuilder()
@@ -126,18 +100,10 @@ class SocketService {
       .configureLogging(LogLevel.Warning)
       .build();
 
-    connection.onreconnecting(() => {
-      this.emit(SOCKET_EVENTS.RECONNECTING, { timestamp: Date.now() });
-    });
-
     /* Rule 2: a reconnect means there is a gap, and whoever listens has to go
        and look rather than assume nothing happened inside it. */
     connection.onreconnected(() => {
       this.emit(SOCKET_EVENTS.CONNECTED, { timestamp: Date.now(), afterGap: true });
-    });
-
-    connection.onclose(() => {
-      this.emit(SOCKET_EVENTS.DISCONNECTED, { timestamp: Date.now() });
     });
 
     /*
@@ -158,14 +124,9 @@ class SocketService {
      * nothing heard it. Three days of a bell that wrote its rows, delivered
      * them to the right person and rendered them - and never moved on its own.
      */
-    connection.on('notificationsChanged', () => {
-      this.emit('notificationsChanged', null);
+    connection.on(SOCKET_EVENTS.NOTIFICATIONS_CHANGED, () => {
+      this.emit(SOCKET_EVENTS.NOTIFICATIONS_CHANGED, null);
     });
-    for (const name of Object.values(SOCKET_EVENTS)) {
-      if (name === SOCKET_EVENTS.CONNECTED || name === SOCKET_EVENTS.DISCONNECTED
-          || name === SOCKET_EVENTS.RECONNECTING) continue;
-      connection.on(name, (payload: unknown) => this.emit(name, payload));
-    }
 
     this.connection = connection;
     this.starting = connection
@@ -180,31 +141,14 @@ class SocketService {
          * out loud so nobody debugging an un-ringing bell has to guess.
          */
         console.warn('[SocketService] hub unavailable, falling back to polling:', err);
-        this.emit(SOCKET_EVENTS.DISCONNECTED, { timestamp: Date.now(), failedToStart: true });
       })
       .finally(() => {
         this.starting = null;
       });
   }
 
-  /* ── Disconnect ── */
-  disconnect() {
-    this.isManualClose = true;
-    const connection = this.connection;
-    this.connection = null;
-    void connection?.stop();
-  }
-
-  /* ── Send message ── */
-  send(event: string, data?: any) {
-    if (this.connection?.state !== HubConnectionState.Connected) return;
-    /* Unknown hub methods reject; a real-time nicety must not surface as an
-       unhandled rejection in a clinic. */
-    void this.connection.invoke(event, data).catch(() => {});
-  }
-
   /* ── Subscribe to event ── */
-  on(event: SocketEventName | string, callback: EventCallback): () => void {
+  on(event: SocketEventName, callback: EventCallback): () => void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
@@ -218,15 +162,6 @@ class SocketService {
     };
   }
 
-  /* ── Unsubscribe ── */
-  off(event: string, callback?: EventCallback) {
-    if (callback) {
-      this.listeners.get(event)?.delete(callback);
-    } else {
-      this.listeners.delete(event);
-    }
-  }
-
   /* ── Emit to local listeners ── */
   private emit(event: string, data: any) {
     this.listeners.get(event)?.forEach((cb) => {
@@ -236,26 +171,6 @@ class SocketService {
         console.error(`[SocketService] Listener error for ${event}:`, err);
       }
     });
-  }
-
-  /* ── Connection status ── */
-  get isConnected(): boolean {
-    return this.connection?.state === HubConnectionState.Connected;
-  }
-
-  get connectionState(): string {
-    switch (this.connection?.state) {
-      case HubConnectionState.Connected:
-        return 'connected';
-      case HubConnectionState.Connecting:
-        return 'connecting';
-      case HubConnectionState.Reconnecting:
-        return 'reconnecting';
-      case HubConnectionState.Disconnecting:
-        return 'closing';
-      default:
-        return this.isManualClose ? 'disconnected' : 'closed';
-    }
   }
 }
 

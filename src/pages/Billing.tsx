@@ -25,7 +25,6 @@ import type { Invoice, BatchVerifyResult } from '../api/billing';
 import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
 import { NumberSeriesPreview } from '../components/NumberSeriesPreview';
-import { useOptimisticUpdate } from '../hooks/useRealtimeSync';
 import toast from 'react-hot-toast';
 
 /* ── Status config ── */
@@ -86,9 +85,6 @@ export default function Billing() {
 
   /* ── Snack ── */
   const [snack, setSnack] = useState({ open: false, msg: '', severity: 'success' as 'success' | 'error' });
-
-  /* ── Optimistic updates ── */
-  const { executeOptimistic } = useOptimisticUpdate<Invoice>();
 
   /* ── Fetch data ── */
   useEffect(() => {

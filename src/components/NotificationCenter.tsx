@@ -292,9 +292,6 @@ export default function NotificationCenter() {
 
   /* ── Real-time sync ── */
   useRealtimeSync({
-    onSlotCreated: () => fetchNotifications(),
-    onSlotUpdated: () => fetchNotifications(),
-    onSlotDeleted: () => fetchNotifications(),
     /* After a gap in the socket, do not assume nothing happened inside it. */
     onReconnected: () => fetchNotifications(),
     /* The hub's nudge carries nothing by design - the answer is to ask. */
