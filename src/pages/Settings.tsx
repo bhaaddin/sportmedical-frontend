@@ -24,11 +24,10 @@ import {
   Accordion,
   AccordionDetails, AccordionSummary, Alert, Avatar, Box, Button,
   Card, CardContent, Chip, Divider, List, ListItemButton, ListItemText,
-  Stack, ToggleButton, ToggleButtonGroup, Typography,
+  Stack, Typography,
 } from '@mui/material';
 import {
-  ExpandMore, ChevronRight, Logout, Person,
-  Tune, Lock,
+  ExpandMore, ChevronRight, Logout, Person, Lock,
 } from '@mui/icons-material';
 import { visibleSections, type SettingsItem } from './settings/catalogue';
 import { hasStoredPermissions, storedPermissions } from '../auth/usePermission';
@@ -62,13 +61,6 @@ function readUser(): StoredUser {
 export default function Settings() {
   const navigate = useNavigate();
   const [open, setOpen] = useState<string | false>(readStoredSection);
-  const [fontScale, setFontScale] = useState<string>(() => {
-    try {
-      return localStorage.getItem('ui.fontScale') ?? 'medium';
-    } catch {
-      return 'medium';
-    }
-  });
 
   /*
    * What this person may open, from the list the server sent at sign-in.
@@ -100,16 +92,6 @@ export default function Settings() {
       else localStorage.setItem(OPEN_KEY, next);
     } catch {
       /* A browser that refuses storage still gets working settings. */
-    }
-  };
-
-  const changeFont = (value: string | null) => {
-    if (value === null) return;
-    setFontScale(value);
-    try {
-      localStorage.setItem('ui.fontScale', value);
-    } catch {
-      /* Preference only; nothing depends on it being kept. */
     }
   };
 
@@ -247,28 +229,6 @@ export default function Settings() {
                 Jméno a e-mail mění správce v sekci <strong>Tým a účty</strong>.
                 Tady je jen vidíte.
               </Alert>
-            </CardContent>
-          </Card>
-
-          <Card variant="outlined" sx={{ borderRadius: 2, mb: 2 }}>
-            <CardContent>
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
-                <Tune fontSize="small" sx={{ color: '#0D7377' }} />
-                <Typography sx={{ fontWeight: 700 }}>Vzhled</Typography>
-              </Stack>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                Velikost písma. Platí na tomhle počítači.
-              </Typography>
-              <ToggleButtonGroup
-                size="small"
-                exclusive
-                value={fontScale}
-                onChange={(_, value) => changeFont(value as string | null)}
-              >
-                <ToggleButton value="small">Malé</ToggleButton>
-                <ToggleButton value="medium">Střední</ToggleButton>
-                <ToggleButton value="large">Velké</ToggleButton>
-              </ToggleButtonGroup>
             </CardContent>
           </Card>
 
