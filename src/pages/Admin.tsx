@@ -11,7 +11,7 @@ import {
   Public, Work, Email, CalendarMonth, AttachMoney, Timer, Schedule,
   Language, ContentCopy, Visibility, Save, ContactPhone, LocationOn,
   AccessTime, EventAvailable, Send, PictureAsPdf, Assessment, FamilyRestroom,
-  ChildCare, RateReview, LocalHospital, Shield, Backup, Storage, DarkMode,
+  ChildCare, RateReview, LocalHospital, Shield, Storage, DarkMode,
   MonitorHeart,
 } from '@mui/icons-material';
 import SystemHealth from './SystemHealth';

@@ -62,7 +62,6 @@ const EmailTemplatesPage = lazy(() => import('./pages/EmailTemplates'));
 const AuditLogPage = lazy(() => import('./pages/AuditLog'));
 const PatientImportPage = lazy(() => import('./pages/PatientImport'));
 const DataExportPage = lazy(() => import('./pages/DataExport'));
-const BackupRestorePage = lazy(() => import('./pages/BackupRestore'));
 const PatientRecordsPage = lazy(() => import('./pages/PatientRecords'));
 const WorkerSchedulePage = lazy(() => import('./pages/admin/WorkerScheduleSettings'));
 /* Booking phase 1, stage 1: calendars, access and activities */
@@ -529,7 +528,6 @@ export default function App() {
                     <Route path="/audit-log" element={<AuditLogPage />} />
                     <Route path="/patient-import" element={<PatientImportPage />} />
                     <Route path="/data-export" element={<DataExportPage />} />
-                    <Route path="/backup-restore" element={<BackupRestorePage />} />
                     <Route path="/patient-records/:id" element={<PatientRecordsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="*" element={<NotFound />} />
