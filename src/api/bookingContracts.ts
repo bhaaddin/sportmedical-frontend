@@ -196,6 +196,12 @@ export const activitySchema = z.object({
    * none, and that is exactly the state the screen has to point at.
    */
   clinicServiceId: z.string().nullish().transform((v) => v ?? null),
+  /**
+   * Which questionnaire this činnost asks for. `null` is the clinic's default
+   * questionnaire - not "none"; whether one is asked at all is
+   * `questionnaireRequirement`.
+   */
+  questionnaireDefinitionId: z.string().nullish().transform((v) => v ?? null),
 });
 export type Activity = z.infer<typeof activitySchema>;
 
@@ -247,6 +253,11 @@ export const activityInputSchema = z.object({
    * clearing it, and there is no such state to clear to.
    */
   clinicServiceId: z.string().min(1),
+  /**
+   * `PUT` is the whole činnost, so this is sent back as it came - left out, it
+   * would switch the činnost back to the clinic's default questionnaire.
+   */
+  questionnaireDefinitionId: z.string().nullable(),
 });
 export type ActivityInput = z.infer<typeof activityInputSchema>;
 
