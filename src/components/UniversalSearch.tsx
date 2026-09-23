@@ -9,7 +9,7 @@ import {
   ListItemIcon, ListItemText, Chip, InputAdornment, CircularProgress,
 } from '@mui/material';
 import {
-  Search, People, CalendarMonth, Warning, Receipt, Description,
+  Search, People, CalendarMonth, Warning, Receipt,
   Person, Science, Settings,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -67,7 +67,6 @@ export default function UniversalSearch() {
     { id: 'p-billing', title: 'Fakturace', subtitle: 'Správa faktur', type: 'page', icon: <Receipt />, path: '/billing', color: '#ED6C02' },
     { id: 'p-injuries', title: 'Poranění', subtitle: 'Evidence poranění', type: 'page', icon: <Warning />, path: '/injuries', color: '#D32F2F' },
     { id: 'p-diagnostics', title: 'Diagnostika', subtitle: 'Nová relace', type: 'page', icon: <Science />, path: '/diagnostics/new', color: '#7C3AED' },
-    { id: 'p-reports', title: 'Reporty', subtitle: 'Analytika', type: 'page', icon: <Description />, path: '/reports', color: '#16A34A' },
     { id: 'p-settings', title: 'Nastavení', subtitle: 'Konfigurace', type: 'page', icon: <Settings />, path: '/settings', color: '#64748B' },
   ], []);
 

@@ -33,7 +33,6 @@ const PatientDetails = lazy(() => import('./pages/PatientDetails'));
 const PatientLayout = lazy(() => import('./pages/patients/PatientLayout'));
 const PatientDocumentsPage = lazy(() => import('./pages/patients/PatientDocumentsPage'));
 const PatientAppointmentsPage = lazy(() => import('./pages/patients/PatientAppointmentsPage'));
-const Reports = lazy(() => import('./pages/Reports'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
 const CalendarMovedPage = lazy(() => import('./pages/CalendarMoved'));
 const BillingPage = lazy(() => import('./pages/Billing'));
@@ -501,7 +500,6 @@ export default function App() {
                     <Route path="/clubs" element={<ClubsPage />} />
                     <Route path="/accounting-export" element={<RequireAdmin><AccountingExportPage /></RequireAdmin>} />
                     <Route path="/worker-schedule" element={<WorkerSchedulePage />} />
-                    <Route path="/reports" element={<Reports />} />
                     <Route path="/intake-review" element={<RequireAdmin><IntakeReviewQueue /></RequireAdmin>} />
                     <Route path="/planovani" element={<BookingGridPage />} />
                     <Route path="/dnes" element={<BookingDayOverviewPage />} />
