@@ -59,12 +59,6 @@ interface SettingRow {
   value: string;
 }
 
-interface ApiResult<T> {
-  success: boolean;
-  message: string;
-  data: T;
-}
-
 /**
  * Reads settings by key.
  *
@@ -73,12 +67,15 @@ interface ApiResult<T> {
  * does not invent a row for something nobody has touched.
  */
 export const readSettings = async (keys: string[]): Promise<Record<string, string>> => {
-  const { data } = await client.get<ApiResult<SettingRow[]>>('/api/settings');
+  // The shared client has already unwrapped the { success, data } envelope, so
+  // this is the rows themselves. Reading `.data` again found nothing, the screen
+  // opened blank, and saving it wrote the blanks over the clinic's details.
+  const { data } = await client.get<SettingRow[] | null>('/api/settings');
 
   const wanted = new Set(keys);
   const found: Record<string, string> = {};
 
-  for (const row of data.data ?? []) {
+  for (const row of data ?? []) {
     if (wanted.has(row.key)) found[row.key] = row.value ?? '';
   }
 
