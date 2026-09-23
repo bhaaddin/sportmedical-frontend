@@ -14,9 +14,9 @@ import '@testing-library/jest-dom/vitest';
  * Found on 13. 9. 2026, the first time a `t()`-using screen was given a
  * component test: every query for a real label found nothing.
  *
- * Not `src/i18n/index.ts`: that one attaches a language detector which reads
- * `localStorage` and `navigator`, so the language would depend on whatever a
- * test happened to leave behind. Czech, fixed, every time.
+ * Initialised here rather than by importing `src/i18n/index.ts`, so the
+ * language every test runs in is stated where tests are set up. Czech, fixed,
+ * every time.
  */
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';

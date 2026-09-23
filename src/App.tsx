@@ -1,7 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Avatar, IconButton, Menu, MenuItem, Badge, CircularProgress, Button } from '@mui/material';
-import { useTranslation } from 'react-i18next';
-import i18n from './i18n';
 import {   Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Search, AttachMoney, Schedule, EventBusy, Today, Description, ArrowBack } from '@mui/icons-material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { isAdminRole, currentUserRole } from './auth/roles';
@@ -216,10 +214,6 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Typography variant="h6" noWrap sx={{ fontWeight: 700, flexGrow: 1 }}>
             SportMedical Diagnostics
           </Typography>
-          <Button color="inherit" size="small" onClick={() => i18n.changeLanguage(i18n.language === 'cs' ? 'en' : i18n.language === 'en' ? 'sk' : 'cs')}
-            sx={{ mr: 1, minWidth: 0, px: 1, fontSize: 12, textTransform: 'uppercase' }}>
-            {i18n.language === 'cs' ? 'CZ' : i18n.language === 'en' ? 'EN' : 'SK'}
-          </Button>
           <IconButton color="inherit" sx={{ mr: 1 }} title="Hledat (Ctrl+K)"
             onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}>
             <Search />
