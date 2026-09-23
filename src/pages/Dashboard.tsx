@@ -7,7 +7,9 @@ import {
   People, Science, Warning, PersonAdd, CalendarMonth, Receipt,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
+import { useQueries } from '@tanstack/react-query';
 import { patientsApi } from '../api/patients';
+import type { Patient } from '../api/patients';
 import { usePermission } from '../auth/usePermission';
 import { appointmentsApi } from '../api/appointments';
 import type { DayAppointment } from '../api/bookingContracts';
@@ -112,6 +114,15 @@ function StatCard({ title, value, icon, color, subtitle, delay = 0 }: {
   );
 }
 
+/* Name by patient id, from whichever lookups have come back. */
+function namesOf(results: { data?: Patient }[]): Record<string, string> {
+  const names: Record<string, string> = {};
+  for (const r of results) {
+    if (r.data) names[r.data.id] = `${r.data.firstName} ${r.data.lastName}`;
+  }
+  return names;
+}
+
 /* ── Dashboard ── */
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -120,7 +131,6 @@ export default function Dashboard() {
   const canBill = usePermission('billing.manage');
   /* `totalCount` from the register, not the length of its first page. */
   const [patientTotal, setPatientTotal] = useState<number | null>(null);
-  const [patientNames, setPatientNames] = useState<Record<string, string>>({});
   const [todayAppointments, setTodayAppointments] = useState<DayAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -139,12 +149,8 @@ export default function Dashboard() {
    * than to filter here: a client-side date filter would paper over a read that
    * cannot be trusted for anything else either.
    *
-   * It carries no patient name, only `patientId`, so each of today's patients
-   * is fetched by id - a handful of rows, where the register's first page
-   * held only the first twenty surnames and left everybody after them as an
-   * id. A patient that cannot be fetched still shows as an id rather than as
-   * an empty row - a nameless appointment is still an appointment somebody has
-   * to keep.
+   * It carries no patient name, only `patientId`; the names are looked up
+   * below, once per patient.
    */
   useEffect(() => {
     const today = toDateOnly(new Date());
@@ -172,20 +178,30 @@ export default function Dashboard() {
         return tally === 'booked' || tally === 'arrived';
       });
       setTodayAppointments(standing);
-
-      if (canSeePatients) {
-        const ids = [...new Set(standing.map((a) => a.patientId))];
-        Promise.all(ids.map((id) => patientsApi.getById(id).catch(() => null)))
-          .then((found) => {
-            const names: Record<string, string> = {};
-            for (const p of found) {
-              if (p) names[p.id] = `${p.firstName} ${p.lastName}`;
-            }
-            setPatientNames(names);
-          });
-      }
     }).finally(() => setLoading(false));
   }, [canSeePatients]);
+
+  /*
+   * Each of today's patients by id - the register's first page held only the
+   * first twenty surnames and left everybody after them as an id. There is no
+   * "these ids" read on the server, so it is one request per patient, but
+   * through the query cache under the same key the day overview and the
+   * appointment detail use: coming back to this screen, or opening it after
+   * either of those, asks again only for what is more than five minutes old.
+   */
+  const patientIds = useMemo(
+    () => (canSeePatients ? [...new Set(todayAppointments.map((a) => a.patientId))] : []),
+    [canSeePatients, todayAppointments],
+  );
+  const patientNames = useQueries({
+    queries: patientIds.map((id) => ({
+      queryKey: ['patient', id],
+      queryFn: () => patientsApi.getById(id),
+      staleTime: 5 * 60 * 1000,
+      retry: false,
+    })),
+    combine: namesOf,
+  });
 
   /*
    * A copy, because `.sort()` reorders in place and this array is React state.
@@ -201,8 +217,9 @@ export default function Dashboard() {
     [todayAppointments],
   );
 
-  /* The day rows carry `patientId` only; the names are fetched above. An
-     unknown id is shown rather than swallowed. */
+  /* The day rows carry `patientId` only; the names are fetched above. A
+     patient that cannot be fetched still shows as an id rather than as an
+     empty row - a nameless appointment is still one somebody has to keep. */
   const patientName = (patientId: string): string =>
     patientNames[patientId] ?? patientId.slice(0, 8);
 

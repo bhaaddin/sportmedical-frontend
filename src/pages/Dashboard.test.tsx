@@ -27,6 +27,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const range = vi.fn();
 const getById = vi.fn();
@@ -82,11 +83,13 @@ const timeline = async () => {
   return within(heading.closest('.MuiCard-root') as HTMLElement);
 };
 
-const renderDashboard = () =>
+const renderDashboard = (queryClient = new QueryClient()) =>
   render(
-    <MemoryRouter>
-      <Dashboard />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 
 describe('the stat tiles', () => {
@@ -220,6 +223,22 @@ describe('"Dnes v kalendari"', () => {
     const card = await timeline();
     expect(await card.findByText('Anna Černá')).toBeInTheDocument();
     expect(getById).toHaveBeenCalledWith('p2');
+  });
+
+  /* One request per patient per visit was forty on a full day, every time the
+     screen mounted. Coming back asks again only for what has gone stale. */
+  it('does not ask for the same patients again on coming back', async () => {
+    range.mockResolvedValue([at(8, 0, 'a', 'p1'), at(9, 0, 'b', 'p2'), at(10, 0, 'c', 'p1')]);
+    const queryClient = new QueryClient();
+
+    const first = renderDashboard(queryClient);
+    expect(await (await timeline()).findByText('Anna Černá')).toBeInTheDocument();
+    first.unmount();
+
+    renderDashboard(queryClient);
+    expect(await (await timeline()).findAllByText('Jana Marková')).toHaveLength(2);
+
+    expect(getById).toHaveBeenCalledTimes(2);
   });
 
   it('shows the empty state when every appointment of the day was cancelled', async () => {
