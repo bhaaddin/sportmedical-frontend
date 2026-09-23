@@ -85,16 +85,6 @@ const STATUS_LABELS: Record<string, string> = {
   Waitlisted: 'Náhradník',
 };
 
-const SERVICE_COLORS: Record<string, string> = {
-  'Základní prohlídka': '#0D7377',
-  'Komplexní prohlídka': '#095456',
-  'Spiroergometrie': '#2E7D32',
-  'Základní diagnostika': '#0288D1',
-  'Komplexní diagnostika': '#1565C0',
-  'VO2max': '#ED6C02',
-  'InBody770': '#9C27B0',
-};
-
 /* ── Stat Card ── */
 function StatCard({ title, value, icon, color, subtitle, delay = 0 }: {
   title: string; value: string | number; icon: React.ReactNode;
@@ -229,17 +219,14 @@ export default function Dashboard() {
 
       {/* Stat Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <StatCard title="Pacienti" value={patients.length} icon={<People />} color="#0D7377" subtitle="Celkem registrovaných" delay={0} />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <StatCard title="Dnes v kalendáři" value={todayAppointments.length} icon={<CalendarMonth />} color="#2E7D32" subtitle="Schůzek dnes" delay={0.1} />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard title="Diagnostika" value={todayAppointments.filter(a => a.activityName.toLowerCase().includes('diagnost')).length} icon={<Science />} color="#0288D1" subtitle="Dnes" delay={0.2} />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard title="Čekající" value={todayAppointments.filter(a => statusName(a.status) === 'Scheduled').length} icon={<Warning />} color="#ED6C02" subtitle="Ke zpracování" delay={0.3} />
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+          <StatCard title="Čekající" value={todayAppointments.filter(a => statusName(a.status) === 'Scheduled').length} icon={<Warning />} color="#ED6C02" subtitle="Ke zpracování" delay={0.2} />
         </Grid>
       </Grid>
 
@@ -270,7 +257,7 @@ export default function Dashboard() {
                 <Box>
                   {sortedAppointments
                     .map((appt, i) => {
-                      const color = SERVICE_COLORS[appt.activityName] || '#0D7377';
+                      const color = '#0D7377';
                       return (
                         <motion.div key={appt.id}
                           initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
