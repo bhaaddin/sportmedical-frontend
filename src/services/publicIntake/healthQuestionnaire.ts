@@ -6,8 +6,10 @@
    They used to be: seventy-seven of them, transcribed from the clinic's PDF
    into this file, which meant a clinic that wanted to add one — or fix a
    word — needed a developer and a deploy. They are rows in the database now,
-   edited in the administration, served by `/api/public/questionnaire/{key}`
-   and fetched by `api/publicQuestionnaire.ts`.
+   edited in the administration, served by
+   `POST /api/public/questionnaire/for-booking` (the questionnaire of the
+   booked činnost, or the clinic's default) and fetched by
+   `api/publicQuestionnaire.ts`.
 
    That move happened on 21. 9. 2026 and it removed the second copy: there had
    been two hardcoded questionnaires, fifty-two questions in the C# domain and
@@ -107,23 +109,22 @@ export const progressOf = (
 };
 
 /**
- * Which set of questions these answers belong to, and which revision of it.
+ * Which set of questions a submission's answers belong to, and which revision
+ * of it.
  *
  * Stored with every submission so a row read in two years can still be matched
- * to the questions it answered. Bump `SCHEMA_VERSION` whenever a question is
- * added, removed or reworded — not when the layout changes.
+ * to the questions it answered. Both come from the server together with the
+ * questions (`api/publicQuestionnaire.ts`). They were constants in this file
+ * until 23. 9. 2026 — one key and "version 1" — so every submission claimed to
+ * answer the first revision of the one questionnaire, however many times the
+ * clinic had changed it since and whichever questionnaire the booked činnost
+ * actually asked.
  */
-export const DEFINITION_KEY = 'sportmedical-cz-zdravotni-dotaznik';
-export const SCHEMA_VERSION = 1;
+export interface QuestionnaireIdentity {
+  definitionKey: string;
+  schemaVersion: number;
+}
 
-/**
- * The answers, in the shape the API takes.
- *
- * Only what was actually answered: an untouched question is absent rather than
- * sent as null, because a form where nobody answered anything should arrive as
- * nothing at all and not as 76 empty rows. Returns `undefined` for that case,
- * which is what keeps the field off the request entirely.
- */
 /** One answer as the API takes it: whichever of the three kinds it is. */
 export interface SubmittedAnswer {
   questionId: string;
@@ -132,9 +133,25 @@ export interface SubmittedAnswer {
   choices?: string[] | null;
 }
 
+/**
+ * The answers, in the shape the API takes.
+ *
+ * Only what was actually answered: an untouched question is absent rather than
+ * sent as null, because a form where nobody answered anything should arrive as
+ * nothing at all and not as 76 empty rows. Returns `undefined` for that case,
+ * which is what keeps the field off the request entirely.
+ *
+ * Also `undefined` when the questionnaire never arrived: answers left in the
+ * browser by an earlier visit belong to whatever was asked then, and filing
+ * them under a questionnaire this booking did not load would be a guess
+ * dressed up as a record.
+ */
 export const answersForSubmission = (
   answers: Answers,
+  questionnaire: QuestionnaireIdentity | null,
 ): { definitionKey: string; schemaVersion: number; answers: SubmittedAnswer[] } | undefined => {
+  if (questionnaire === null) return undefined;
+
   /*
    * One shape, not three.
    *
@@ -155,7 +172,11 @@ export const answersForSubmission = (
 
   return given.length === 0
     ? undefined
-    : { definitionKey: DEFINITION_KEY, schemaVersion: SCHEMA_VERSION, answers: given };
+    : {
+        definitionKey: questionnaire.definitionKey,
+        schemaVersion: questionnaire.schemaVersion,
+        answers: given,
+      };
 };
 
 /** The draft as the page last left it. Same key the form writes. */

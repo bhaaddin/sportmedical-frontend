@@ -47,11 +47,13 @@ interface ServerQuestionnaire {
 export interface LoadedQuestionnaire {
   definitionKey: string;
   schemaVersion: number;
+  /** What the clinic calls it — the title over the form. */
+  name: string;
   sections: readonly Section[];
 }
 
 /**
- * The questionnaire the clinic currently asks.
+ * The questionnaire for this patient's booking.
  *
  * ── Why this exists ──
  *
@@ -59,6 +61,19 @@ export interface LoadedQuestionnaire {
  * one, or changing a word, meant a developer and a deploy — and the owner's
  * rule is that anything he may need to change is his to change. They are rows
  * in the database now; this fetches them.
+ *
+ * ── Which questionnaire ──
+ *
+ * The one the booked činnost names, or the clinic's default when it names
+ * none (or names one the clinic has since switched off) — and the default for
+ * somebody who came to the form without booking. The server decides, off the
+ * hold token. Until 23. 9. 2026 this asked for one key written into the
+ * bundle whatever had been booked, so a činnost could not have a
+ * questionnaire of its own however the clinic set it up.
+ *
+ * A POST although nothing changes: the token is what proves which činnost was
+ * booked, and a token in a query string ends up in every access log between
+ * the patient and the server.
  *
  * ── The shape is the one the dialog already draws ──
  *
@@ -69,15 +84,17 @@ export interface LoadedQuestionnaire {
  * content lives.
  */
 export const loadQuestionnaire = async (
-  definitionKey: string,
+  holdToken: string | null,
 ): Promise<LoadedQuestionnaire> => {
-  const { data } = await publicClient.get<ServerQuestionnaire>(
-    `/api/public/questionnaire/${encodeURIComponent(definitionKey)}`,
+  const { data } = await publicClient.post<ServerQuestionnaire>(
+    '/api/public/questionnaire/for-booking',
+    { holdToken },
   );
 
   return {
     definitionKey: data.definitionKey,
     schemaVersion: data.schemaVersion,
+    name: data.name,
     sections: data.sections.map((section, index) => toSection(section, index)),
   };
 };

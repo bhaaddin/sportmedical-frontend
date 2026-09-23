@@ -1,9 +1,11 @@
 /* ══════════════════════════════════════════════════════════════
    ZDRAVOTNÍ DOTAZNÍK — the form itself
 
-   Renders `healthQuestionnaire.ts`. Read that file's header first: the
-   questions are defined in the browser, which is the wrong place, and why they
-   are there anyway.
+   Draws the questionnaire the registration page loaded for the booking — the
+   one the booked činnost names, or the clinic's default — in the shapes
+   `healthQuestionnaire.ts` defines. The page owns the fetch, because the
+   submission has to say which questionnaire the answers belong to whether or
+   not this dialog was ever opened; this file only draws what it is given.
 
    ── Why this takes the whole screen ──
 
@@ -26,14 +28,12 @@
 
    ── Where the answers go ──
 
-   Nowhere, yet. `PublicIntakeSubmission` carries identity, contact, address,
-   insurance and consents, and there is no field for 76 medical answers. Lane
-   app has the brief.
-
-   A form that looks like it saves and does not is worse than no form, so this
-   one does not pretend: answers are kept in the browser as you type, the footer
-   says so, and the print button gives the filled-in form — which is what the
-   clinic asks for today ("Vyplněný dokument si prosím přineste s sebou").
+   Into the browser as you type, and to the clinic with the registration:
+   the page reads the same draft when it submits and sends it under the
+   questionnaire's key and revision. The footer says exactly that — it used to
+   say the answers went nowhere, which stopped being true the day the intake
+   request grew a `healthQuestionnaire` field. The print button stays for
+   whoever wants the filled-in form on paper.
 
    `localStorage` is a convenience that may simply not be there: a private
    window, blocked site data, or a thrown SecurityError all end with an empty
@@ -68,8 +68,7 @@ import {
   sectionsFor,
 } from '../../services/publicIntake/healthQuestionnaire';
 import type { Answer, Answers, Field, Section } from '../../services/publicIntake/healthQuestionnaire';
-import { DEFINITION_KEY } from '../../services/publicIntake/healthQuestionnaire';
-import { loadQuestionnaire } from '../../api/publicQuestionnaire';
+import type { LoadedQuestionnaire } from '../../api/publicQuestionnaire';
 
 const STORE_KEY = 'smd.health-questionnaire.draft.v1';
 
@@ -108,11 +107,19 @@ export default function HealthQuestionnaire({
   onClose,
   female,
   palette,
+  questionnaire,
+  loadFailed,
 }: {
   open: boolean;
   onClose: () => void;
   female: boolean;
   palette: Palette;
+  /**
+   * What to draw: the questionnaire the page loaded for the booking. Null
+   * while it is on its way — or, with `loadFailed`, when it never came.
+   */
+  questionnaire: LoadedQuestionnaire | null;
+  loadFailed: boolean;
 }) {
   const [answers, setAnswers] = useState<Answers>(load);
   const [active, setActive] = useState<string>('');
@@ -120,35 +127,9 @@ export default function HealthQuestionnaire({
 
   useEffect(() => { save(answers); }, [answers]);
 
-  /*
-   * The questionnaire itself, fetched.
-   *
-   * It used to be a constant in the bundle: seventy-seven questions a
-   * developer had to redeploy to change. The clinic edits them in the
-   * administration now, so the dialog asks the server what to draw.
-   *
-   * Null until it arrives, and an empty list if it cannot be fetched — the
-   * screen says so rather than drawing an empty form that looks like a
-   * questionnaire with no questions.
-   */
-  const [loaded, setLoaded] = useState<readonly Section[] | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
-
-  useEffect(() => {
-    if (!open) return undefined;
-
-    let abandoned = false;
-
-    loadQuestionnaire(DEFINITION_KEY)
-      .then((questionnaire) => { if (!abandoned) setLoaded(questionnaire.sections); })
-      .catch(() => { if (!abandoned) setLoadFailed(true); });
-
-    return () => { abandoned = true; };
-  }, [open]);
-
   const sections = useMemo(
-    () => sectionsFor(loaded ?? [], female),
-    [loaded, female],
+    () => sectionsFor(questionnaire?.sections ?? [], female),
+    [questionnaire, female],
   );
 
   const set = useCallback(
@@ -220,7 +201,7 @@ export default function HealthQuestionnaire({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography sx={{ fontWeight: 800, fontSize: { xs: 17, md: 21 }, letterSpacing: '-0.01em' }}>
-              Zdravotní dotazník
+              {questionnaire?.name ?? 'Zdravotní dotazník'}
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>
               Vyplněno {totals.answered} z {totals.total} — nic není povinné
@@ -338,20 +319,20 @@ export default function HealthQuestionnaire({
               published one. An empty form in any of those cases looks like a
               questionnaire with no questions, and somebody would submit it.
             */}
-            {loaded === null && !loadFailed && (
+            {questionnaire === null && !loadFailed && (
               <Typography sx={{ color: palette.muted, py: 4, textAlign: 'center' }}>
                 Načítáme dotazník…
               </Typography>
             )}
 
-            {loadFailed && (
+            {questionnaire === null && loadFailed && (
               <Typography sx={{ color: palette.muted, py: 4, textAlign: 'center' }}>
                 Dotazník se nepodařilo načíst. Zavřete prosím okno a zkuste to
                 za chvíli znovu — vaše dosavadní odpovědi zůstávají uložené.
               </Typography>
             )}
 
-            {loaded !== null && sections.length === 0 && (
+            {questionnaire !== null && sections.length === 0 && (
               <Typography sx={{ color: palette.muted, py: 4, textAlign: 'center' }}>
                 Ordinace zatím žádné otázky nenastavila.
               </Typography>
@@ -445,7 +426,7 @@ export default function HealthQuestionnaire({
         >
           <CloudDoneOutlined sx={{ fontSize: 17, color: palette.accentDark, flexShrink: 0 }} />
           <Typography variant="caption" sx={{ color: palette.muted }}>
-            Ukládá se průběžně ve vašem prohlížeči. Zatím se nikam neodesílá — vytiskněte a přineste s sebou.
+            Ukládá se průběžně ve vašem prohlížeči a odešle se spolu s registrací.
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1.5, width: { xs: '100%', sm: 'auto' } }}>

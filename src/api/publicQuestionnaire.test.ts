@@ -15,13 +15,17 @@
  * truthy check instead of an equality one (an answer of "ne" would open the
  * box), forgetting that a notice carries its sentence in the label, dropping
  * the placeholder or the note, or giving two sections the same React key.
+ *
+ * And one more, since 23. 9. 2026: that the form asks for the questionnaire
+ * of the BOOKED činnost, by its hold token, and not for a key written into
+ * the bundle — and that the token travels in the body, never in the URL.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const get = vi.fn();
+const post = vi.fn();
 vi.mock('axios', () => {
   const create = () => ({
-    get,
+    post,
     interceptors: { response: { use: vi.fn() }, request: { use: vi.fn() } },
   });
   return { default: { create, isAxiosError: () => false }, isAxiosError: () => false };
@@ -54,44 +58,53 @@ const section = (over: Record<string, unknown> = {}) => ({
 });
 
 const served = (sections: unknown[]) => {
-  get.mockResolvedValue({
+  post.mockResolvedValue({
     data: {
-      definitionKey: 'sportmedical-cz-zdravotni-dotaznik',
+      definitionKey: 'dotaznik-pro-plavce',
       schemaVersion: 3,
-      name: 'Zdravotní dotazník',
+      name: 'Dotazník pro plavce',
       sections,
     },
   });
 };
 
 beforeEach(() => {
-  get.mockReset();
+  post.mockReset();
+});
+
+describe('which questionnaire is asked for', () => {
+  it('asks for the one the booked činnost names, by the hold token, in the body and never the URL', async () => {
+    served([section()]);
+
+    await loadQuestionnaire('hold-1');
+
+    expect(post).toHaveBeenCalledWith('/api/public/questionnaire/for-booking', { holdToken: 'hold-1' });
+  });
+
+  it('asks for the clinic default for somebody who came without booking', async () => {
+    served([section()]);
+
+    await loadQuestionnaire(null);
+
+    expect(post).toHaveBeenCalledWith('/api/public/questionnaire/for-booking', { holdToken: null });
+  });
+
+  it('carries the key, the version and the name back — an answer has to name what it answered', async () => {
+    served([section()]);
+
+    const loaded = await loadQuestionnaire('hold-1');
+
+    expect(loaded.definitionKey).toBe('dotaznik-pro-plavce');
+    expect(loaded.schemaVersion).toBe(3);
+    expect(loaded.name).toBe('Dotazník pro plavce');
+  });
 });
 
 describe('what the server sends becomes what the dialog draws', () => {
-  it('asks for the questionnaire under the key it was given', async () => {
-    served([section()]);
-
-    await loadQuestionnaire('sportmedical-cz-zdravotni-dotaznik');
-
-    expect(get).toHaveBeenCalledWith(
-      '/api/public/questionnaire/sportmedical-cz-zdravotni-dotaznik',
-    );
-  });
-
-  it('carries the version back, because an answer has to name the version it answered', async () => {
-    served([section()]);
-
-    const loaded = await loadQuestionnaire('k');
-
-    expect(loaded.schemaVersion).toBe(3);
-    expect(loaded.definitionKey).toBe('sportmedical-cz-zdravotni-dotaznik');
-  });
-
   it('keeps the section note, which is the only place the clinic explains itself', async () => {
     served([section({ note: 'Zbytek osobních údajů už máme z registrace výše.' })]);
 
-    const [first] = (await loadQuestionnaire('k')).sections;
+    const [first] = (await loadQuestionnaire(null)).sections;
 
     expect(first.note).toBe('Zbytek osobních údajů už máme z registrace výše.');
   });
@@ -99,7 +112,7 @@ describe('what the server sends becomes what the dialog draws', () => {
   it('gives two sections different keys even when the clinic numbers them the same', async () => {
     served([section({ number: '4' }), section({ number: '4' })]);
 
-    const [a, b] = (await loadQuestionnaire('k')).sections;
+    const [a, b] = (await loadQuestionnaire(null)).sections;
 
     expect(a.id).not.toBe(b.id);
   });
@@ -121,7 +134,7 @@ describe('the follow-up box', () => {
   it('opens on a yes', async () => {
     served([withFollowUp()]);
 
-    const [first] = (await loadQuestionnaire('k')).sections;
+    const [first] = (await loadQuestionnaire(null)).sections;
 
     expect(first.items[1].when?.({ kardio_bolest: true })).toBe(true);
   });
@@ -129,7 +142,7 @@ describe('the follow-up box', () => {
   it('stays shut on a no, and on an answer that is merely present', async () => {
     served([withFollowUp()]);
 
-    const [first] = (await loadQuestionnaire('k')).sections;
+    const [first] = (await loadQuestionnaire(null)).sections;
     const shown = first.items[1].when;
 
     expect(shown?.({ kardio_bolest: false })).toBe(false);
@@ -140,7 +153,7 @@ describe('the follow-up box', () => {
   it('is absent on a question that is always on screen', async () => {
     served([section()]);
 
-    const [first] = (await loadQuestionnaire('k')).sections;
+    const [first] = (await loadQuestionnaire(null)).sections;
 
     expect(first.items[0].when).toBeUndefined();
   });
@@ -150,7 +163,7 @@ describe('the women-only section', () => {
   it('is put to a woman and withheld from a man', async () => {
     served([section({ number: '7', title: 'Gynekologická anamnéza', femaleOnly: true })]);
 
-    const { sections } = await loadQuestionnaire('k');
+    const { sections } = await loadQuestionnaire(null);
 
     expect(sectionsFor(sections, true)).toHaveLength(1);
     expect(sectionsFor(sections, false)).toHaveLength(0);
@@ -159,7 +172,7 @@ describe('the women-only section', () => {
   it('leaves every other section to both', async () => {
     served([section()]);
 
-    const { sections } = await loadQuestionnaire('k');
+    const { sections } = await loadQuestionnaire(null);
 
     expect(sectionsFor(sections, false)).toHaveLength(1);
   });
@@ -175,7 +188,7 @@ describe('the kinds the form draws', () => {
       }),
     ]);
 
-    const [first] = (await loadQuestionnaire('k')).sections;
+    const [first] = (await loadQuestionnaire(null)).sections;
 
     expect(first.items[0].field).toEqual({
       kind: 'notice',
@@ -191,7 +204,7 @@ describe('the kinds the form draws', () => {
       }),
     ]);
 
-    const [first] = (await loadQuestionnaire('k')).sections;
+    const [first] = (await loadQuestionnaire(null)).sections;
 
     expect(first.items[0].field).toMatchObject({ kind: 'number', min: 100, max: 250 });
   });
@@ -209,7 +222,7 @@ describe('the kinds the form draws', () => {
       }),
     ]);
 
-    const [first] = (await loadQuestionnaire('k')).sections;
+    const [first] = (await loadQuestionnaire(null)).sections;
 
     expect(first.items[0].field).toMatchObject({
       kind: 'choice',
@@ -224,7 +237,7 @@ describe('the kinds the form draws', () => {
       }),
     ]);
 
-    const [first] = (await loadQuestionnaire('k')).sections;
+    const [first] = (await loadQuestionnaire(null)).sections;
 
     expect(first.items[0].field).toMatchObject({ kind: 'text', placeholder: 'Jméno a adresa' });
   });
@@ -232,7 +245,7 @@ describe('the kinds the form draws', () => {
   it('falls back to a line of text for a kind this form has no drawing for', async () => {
     served([section({ questions: [question({ key: 'datum', kind: 'date' })] })]);
 
-    const [first] = (await loadQuestionnaire('k')).sections;
+    const [first] = (await loadQuestionnaire(null)).sections;
 
     expect(first.items[0].field.kind).toBe('text');
   });

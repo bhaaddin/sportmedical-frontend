@@ -9,6 +9,7 @@
  * which matches first and last names over every row, diacritics ignored.
  */
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
@@ -22,6 +23,7 @@ import { patientsApi, PATIENT_PAGE_SIZE_MAX } from '../api/patients';
 import type { Patient } from '../api/patients';
 import { PatientListSkeleton } from '../components/SkeletonLoader';
 import { usePermission } from '../auth/usePermission';
+import { SENSITIVE_IDENTITY, shownFields, usePatientFields } from '../api/displaySettings';
 
 const sexLabel = (s: string) => s === 'Male' ? 'Muž' : s === 'Female' ? 'Žena' : 'Jiné';
 const sexColor = (s: string) => s === 'Male' ? '#0D7377' : s === 'Female' ? '#9C27B0' : '#666';
@@ -32,12 +34,35 @@ const statusChip = (p: Patient) =>
     ? { label: 'Archivovaný', color: '#757575' }
     : { label: 'Aktivní', color: '#2E7D32' };
 
+/*
+ * How each column the clinic may choose (Nastavení -> Údaje o pacientovi) is
+ * drawn. Which of them appear, and in what order, is the setting; `recordId`
+ * is drawn under the name rather than as a column of its own.
+ */
+const COLUMN_CELLS: Record<string, (p: Patient) => ReactNode> = {
+  dateOfBirth: (p) => new Date(p.dateOfBirth).toLocaleDateString('cs-CZ'),
+  sex: (p) => (
+    <Chip label={sexLabel(p.sex)} size="small" sx={{ bgcolor: `${sexColor(p.sex)}14`, color: sexColor(p.sex), fontWeight: 500 }} />
+  ),
+  registeredAt: (p) => new Date(p.createdAtUtc).toLocaleDateString('cs-CZ'),
+  status: (p) => {
+    const status = statusChip(p);
+    return <Chip label={status.label} size="small" sx={{ bgcolor: `${status.color}14`, color: status.color, fontWeight: 500 }} />;
+  },
+};
+
 const PAGE_SIZES = [25, 50, PATIENT_PAGE_SIZE_MAX];
 const SEARCH_DEBOUNCE_MS = 300;
 
 export default function PatientList() {
   const navigate = useNavigate();
   const mayRegister = usePermission('patients.register');
+  const maySeeSensitive = usePermission(SENSITIVE_IDENTITY);
+  const fieldVisibility = usePatientFields();
+  const listFields = shownFields(fieldVisibility.data, 'list', maySeeSensitive) ?? [];
+  const showRecordId = listFields.some((field) => field.key === 'recordId');
+  const columns = listFields.filter((field) => COLUMN_CELLS[field.key] !== undefined);
+  const shows = (key: string) => listFields.some((field) => field.key === key);
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
@@ -150,16 +175,14 @@ export default function PatientList() {
               <TableHead>
                 <TableRow sx={{ bgcolor: '#f8f9fa' }}>
                   <TableCell sx={{ fontWeight: 700 }}>Pacient</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Datum narození</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Pohlaví</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Registrace</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Stav</TableCell>
+                  {columns.map((field) => (
+                    <TableCell key={field.key} sx={{ fontWeight: 700 }}>{field.label}</TableCell>
+                  ))}
                   <TableCell sx={{ fontWeight: 700 }} align="right">Akce</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {patients.map((p, i) => {
-                  const status = statusChip(p);
                   return (
                     <motion.tr key={p.id}
                       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -173,18 +196,15 @@ export default function PatientList() {
                           </Avatar>
                           <Box>
                             <Typography sx={{ fontWeight: 600 }}>{p.firstName} {p.lastName}</Typography>
-                            <Typography variant="caption" color="text.secondary">{p.id.slice(0, 8)}...</Typography>
+                            {showRecordId && (
+                              <Typography variant="caption" color="text.secondary">{p.id.slice(0, 8)}...</Typography>
+                            )}
                           </Box>
                         </Box>
                       </TableCell>
-                      <TableCell>{new Date(p.dateOfBirth).toLocaleDateString('cs-CZ')}</TableCell>
-                      <TableCell>
-                        <Chip label={sexLabel(p.sex)} size="small" sx={{ bgcolor: `${sexColor(p.sex)}14`, color: sexColor(p.sex), fontWeight: 500 }} />
-                      </TableCell>
-                      <TableCell>{new Date(p.createdAtUtc).toLocaleDateString('cs-CZ')}</TableCell>
-                      <TableCell>
-                        <Chip label={status.label} size="small" sx={{ bgcolor: `${status.color}14`, color: status.color, fontWeight: 500 }} />
-                      </TableCell>
+                      {columns.map((field) => (
+                        <TableCell key={field.key}>{COLUMN_CELLS[field.key](p)}</TableCell>
+                      ))}
                       <TableCell align="right">
                         <Tooltip title="Nová diagnostika">
                           <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`/diagnostics/new?patientId=${p.id}`); }}
@@ -198,7 +218,7 @@ export default function PatientList() {
                 })}
                 {patients.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                    <TableCell colSpan={columns.length + 2} align="center" sx={{ py: 6 }}>
                       <LocalHospital sx={{ fontSize: 48, color: '#ddd', mb: 1 }} />
                       <Typography color="text.secondary">{emptyText}</Typography>
                     </TableCell>
@@ -228,9 +248,14 @@ export default function PatientList() {
                         </Avatar>
                         <Typography sx={{ fontWeight: 600 }}>{p.firstName} {p.lastName}</Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {sexLabel(p.sex)} • {new Date(p.dateOfBirth).toLocaleDateString('cs-CZ')}
+                          {[
+                            shows('sex') ? sexLabel(p.sex) : null,
+                            shows('dateOfBirth') ? new Date(p.dateOfBirth).toLocaleDateString('cs-CZ') : null,
+                          ].filter((part) => part !== null).join(' • ')}
                         </Typography>
-                        <Chip label={status.label} size="small" sx={{ mt: 1.5, bgcolor: `${status.color}14`, color: status.color, fontWeight: 500 }} />
+                        {shows('status') && (
+                          <Chip label={status.label} size="small" sx={{ mt: 1.5, bgcolor: `${status.color}14`, color: status.color, fontWeight: 500 }} />
+                        )}
                       </CardContent>
                     </Card>
                   </motion.div>
