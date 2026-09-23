@@ -30,6 +30,7 @@ import {
 import { Search, AttachMoney, Add, Edit, Archive } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { servicesApi } from '../api/services';
+import { usePermission } from '../auth/usePermission';
 import type { ServiceItem } from '../api/services';
 import ServiceDialog from './pricing/ServiceDialog';
 
@@ -40,6 +41,9 @@ export default function Cenik() {
 
   /* `undefined` closed; `null` a new service; an item to change that one. */
   const [editing, setEditing] = useState<ServiceItem | null | undefined>(undefined);
+  /* Everybody reads the price list - the desk quotes from it. Changing it is
+     the clinic's configuration, and the server refuses it without this. */
+  const mayEdit = usePermission('settings.clinic.manage');
   const [archiving, setArchiving] = useState<ServiceItem | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -82,14 +86,16 @@ export default function Cenik() {
             </Typography>
             <Typography variant="body2" color="text.secondary">Co ordinace účtuje — položky a ceny</Typography>
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => setEditing(null)}
-            sx={{ borderRadius: 2, px: 3, bgcolor: '#0D7377' }}
-          >
-            Nová položka
-          </Button>
+          {mayEdit && (
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => setEditing(null)}
+              sx={{ borderRadius: 2, px: 3, bgcolor: '#0D7377' }}
+            >
+              Nová položka
+            </Button>
+          )}
         </Box>
       </motion.div>
 
@@ -109,16 +115,20 @@ export default function Cenik() {
               Ceník je prázdný
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 3 }}>
-              Přidejte první položku — co ordinace nabízí a kolik to stojí.
+              {mayEdit
+                ? 'Přidejte první položku — co ordinace nabízí a kolik to stojí.'
+                : 'Ceník vyplní ten, kdo smí měnit nastavení ordinace.'}
             </Typography>
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              onClick={() => setEditing(null)}
-              sx={{ borderRadius: 2, px: 3, bgcolor: '#0D7377' }}
-            >
-              Nová položka
-            </Button>
+            {mayEdit && (
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => setEditing(null)}
+                sx={{ borderRadius: 2, px: 3, bgcolor: '#0D7377' }}
+              >
+                Nová položka
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
@@ -213,24 +223,28 @@ export default function Cenik() {
                         <Box sx={{ flex: 1 }} />
                         {/* Named, not just drawn: an icon alone tells a screen
                             reader nothing, and a tooltip is not a name. */}
-                        <Tooltip title="Upravit">
-                          <IconButton
-                            size="small"
-                            aria-label={`Upravit položku ${service.name}`}
-                            onClick={() => setEditing(service)}
-                          >
-                            <Edit fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Vyřadit z ceníku">
-                          <IconButton
-                            size="small"
-                            aria-label={`Vyřadit položku ${service.name}`}
-                            onClick={() => setArchiving(service)}
-                          >
-                            <Archive fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                        {mayEdit && (
+                          <>
+                            <Tooltip title="Upravit">
+                              <IconButton
+                                size="small"
+                                aria-label={`Upravit položku ${service.name}`}
+                                onClick={() => setEditing(service)}
+                              >
+                                <Edit fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Vyřadit z ceníku">
+                              <IconButton
+                                size="small"
+                                aria-label={`Vyřadit položku ${service.name}`}
+                                onClick={() => setArchiving(service)}
+                              >
+                                <Archive fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        )}
                       </Box>
                     </CardContent>
                   </Card>

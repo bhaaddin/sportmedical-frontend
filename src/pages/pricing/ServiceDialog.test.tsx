@@ -59,6 +59,9 @@ beforeEach(() => {
   create.mockReset().mockResolvedValue(service());
   update.mockReset().mockResolvedValue(service());
   archive.mockReset().mockResolvedValue(undefined);
+  /* The screen offers its editing controls only to whoever may change the
+     clinic's settings (Cenik.test.tsx covers the other side). */
+  localStorage.setItem('permissions', JSON.stringify(['settings.clinic.manage']));
 });
 
 const renderDialog = (props: Partial<React.ComponentProps<typeof ServiceDialog>> = {}) => {

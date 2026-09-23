@@ -66,6 +66,18 @@ export const userAccountsApi = {
     return data;
   },
 
+  /**
+   * Name and sign-in e-mail. The server normalizes the e-mail the way sign-in
+   * reads it and refuses one another account already uses.
+   */
+  update: async (
+    userId: string,
+    request: { displayName: string; email: string },
+  ): Promise<UserAccount> => {
+    const { data } = await client.put<UserAccount>(`/api/v1/users/${userId}`, request);
+    return data;
+  },
+
   assignRole: async (userId: string, role: UserAccountRole): Promise<UserAccount> => {
     const { data } = await client.put<UserAccount>(`/api/v1/users/${userId}/role`, { role });
     return data;

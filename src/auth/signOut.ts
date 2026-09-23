@@ -1,7 +1,6 @@
 import { authApi } from '../api/auth';
-
-/** What a sign-in leaves in this browser. See Login.tsx. */
-const SESSION_KEYS = ['token', 'user', 'permissions'] as const;
+import { clearLocalSession } from './localSession';
+import { socketService } from '../services/socketService';
 
 /**
  * Sign out: on the server first, then in this browser, then to the login
@@ -26,13 +25,10 @@ export async function signOut(): Promise<void> {
     /* Expired already, or the server is down; the browser is cleared below. */
   }
 
-  for (const key of SESSION_KEYS) {
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      /* Leaving is more important than tidying. */
-    }
-  }
+  clearLocalSession();
+
+  /* The live connection authenticated as this person; it ends with them. */
+  await socketService.stop();
 
   window.location.href = '/login';
 }

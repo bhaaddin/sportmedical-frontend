@@ -42,6 +42,10 @@ export const PERMISSION_LABELS: Record<string, { label: string; detail: string }
     label: 'Upravovat pacienty',
     detail: 'Měnit údaje na kartě pacienta.',
   },
+  'patients.view_all': {
+    label: 'Vidět všechny pacienty',
+    detail: 'Bez tohoto práva vidí jen pacienty objednané v kalendářích, ke kterým má přístup.',
+  },
   'patients.sensitive_identity.view': {
     label: 'Vidět rodné číslo a číslo pojištěnce',
     detail: 'Bez tohoto práva jsou tyto údaje skryté.',

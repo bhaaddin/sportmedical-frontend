@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box, Paper, Typography, TextField, Button, Alert,
   InputAdornment, IconButton, CircularProgress,
@@ -7,9 +7,16 @@ import {
 import { Visibility, VisibilityOff, LocalHospital, Email, Lock } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { authApi } from '../api/auth';
+import { savePermissions, saveUser } from '../auth/localSession';
+
+/** What the sign-in says when the client ended a session nobody closed here. */
+export const SESSION_EXPIRED_MESSAGE =
+  'Vaše přihlášení vypršelo nebo bylo ukončeno. Přihlaste se prosím znovu.';
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const sessionExpired = searchParams.get('reason') === 'expired';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -23,16 +30,8 @@ export default function Login() {
   const [changing, setChanging] = useState(false);
 
   const finishLogin = (res: any) => {
-    const nameParts = (res.account.displayName || '').split(' ');
-    const user = {
-      id: res.account.userId,
-      email: res.account.email,
-      firstName: nameParts[0] || res.account.displayName,
-      lastName: nameParts.slice(1).join(' ') || '',
-      role: res.account.role,
-    };
     localStorage.setItem('token', res.accessToken);
-    localStorage.setItem('user', JSON.stringify(user));
+    saveUser(res.account);
 
     /*
      * What this person may actually do, as the SERVER works it out.
@@ -46,7 +45,7 @@ export default function Login() {
      * The server has been sending this list on every login all along. Nothing
      * read it.
      */
-    localStorage.setItem('permissions', JSON.stringify(res.permissions ?? []));
+    savePermissions(res.permissions ?? []);
     navigate('/');
   };
 
@@ -137,6 +136,10 @@ export default function Login() {
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>Diagnostics Platform</Typography>
             </Box>
           </motion.div>
+
+          {sessionExpired && !error && !mustChange && (
+            <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>{SESSION_EXPIRED_MESSAGE}</Alert>
+          )}
 
           {error && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>

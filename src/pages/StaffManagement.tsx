@@ -22,7 +22,7 @@ import {
 } from '@mui/material';
 import {
   Add as AddIcon, Person as PersonIcon, Refresh as RefreshIcon, LockReset as LockResetIcon,
-  Block as BlockIcon, CheckCircle as CheckCircleIcon, Badge as BadgeIcon,
+  Block as BlockIcon, CheckCircle as CheckCircleIcon, Badge as BadgeIcon, Edit as EditIcon,
 } from '@mui/icons-material';
 import KeyIcon from '@mui/icons-material/VpnKey';
 import EventNoteIcon from '@mui/icons-material/EventNote';
@@ -69,6 +69,8 @@ export default function StaffManagement() {
 
   const [adding, setAdding] = useState(false);
   const [newAccount, setNewAccount] = useState({ displayName: '', email: '', role: 'Staff' as UserAccountRole });
+  const [editing, setEditing] = useState<UserAccount | null>(null);
+  const [editDraft, setEditDraft] = useState({ displayName: '', email: '' });
   const [roleFor, setRoleFor] = useState<UserAccount | null>(null);
   const [roleChoice, setRoleChoice] = useState<UserAccountRole>('Staff');
   const [switchingOff, setSwitchingOff] = useState<UserAccount | null>(null);
@@ -107,6 +109,32 @@ export default function StaffManagement() {
       });
       setAdding(false);
       setCredentials({ email: issued.account.email, password: issued.temporaryPassword });
+      load();
+    } catch (error) {
+      setDialogError(accountRefusal(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /* ── Name and e-mail ── */
+  const openEdit = (account: UserAccount) => {
+    setEditDraft({ displayName: account.displayName, email: account.email });
+    setDialogError(null);
+    setEditing(account);
+  };
+
+  const saveEdit = async () => {
+    if (editing === null) return;
+    setBusy(true);
+    setDialogError(null);
+    try {
+      await userAccountsApi.update(editing.userId, {
+        displayName: editDraft.displayName.trim(),
+        email: editDraft.email.trim(),
+      });
+      setEditing(null);
+      say('Údaje zaměstnance uloženy.');
       load();
     } catch (error) {
       setDialogError(accountRefusal(error));
@@ -305,6 +333,11 @@ export default function StaffManagement() {
                             <EventNoteIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
+                        <Tooltip title="Upravit jméno a e-mail">
+                          <IconButton aria-label={`Upravit ${name}`} onClick={() => openEdit(acc)}>
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title="Změnit roli">
                           <IconButton aria-label={`Změnit roli ${name}`} onClick={() => openRole(acc)}>
                             <BadgeIcon fontSize="small" />
@@ -396,6 +429,39 @@ export default function StaffManagement() {
             disabled={busy || newAccount.displayName.trim() === '' || newAccount.email.trim() === ''}
             sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 3, fontWeight: 600 }}>
             Přidat
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Name and e-mail */}
+      <Dialog open={editing !== null} onClose={() => setEditing(null)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Upravit: {editing ? nameOf(editing) : ''}</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid size={{ xs: 12 }}>
+              <TextField fullWidth label="Jméno a příjmení" value={editDraft.displayName}
+                onChange={(e) => setEditDraft({ ...editDraft, displayName: e.target.value })} />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField fullWidth label="E-mail" type="email" value={editDraft.email}
+                helperText="Tímhle e-mailem se přihlašuje. Po změně se přihlásí novým."
+                onChange={(e) => setEditDraft({ ...editDraft, email: e.target.value })} />
+            </Grid>
+            {dialogError && (
+              <Grid size={{ xs: 12 }}><Alert severity="error">{dialogError}</Alert></Grid>
+            )}
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button onClick={() => setEditing(null)}>Zrušit</Button>
+          <Button variant="contained" onClick={() => void saveEdit()}
+            disabled={
+              busy || editing === null
+              || editDraft.displayName.trim() === '' || editDraft.email.trim() === ''
+              || (editDraft.displayName.trim() === editing.displayName && editDraft.email.trim() === editing.email)
+            }
+            sx={{ bgcolor: '#0D7377' }}>
+            Uložit
           </Button>
         </DialogActions>
       </Dialog>
