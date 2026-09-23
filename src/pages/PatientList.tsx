@@ -21,6 +21,7 @@ import { motion } from 'framer-motion';
 import { patientsApi, PATIENT_PAGE_SIZE_MAX } from '../api/patients';
 import type { Patient } from '../api/patients';
 import { PatientListSkeleton } from '../components/SkeletonLoader';
+import { usePermission } from '../auth/usePermission';
 
 const sexLabel = (s: string) => s === 'Male' ? 'Muž' : s === 'Female' ? 'Žena' : 'Jiné';
 const sexColor = (s: string) => s === 'Male' ? '#0D7377' : s === 'Female' ? '#9C27B0' : '#666';
@@ -36,6 +37,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 export default function PatientList() {
   const navigate = useNavigate();
+  const mayRegister = usePermission('patients.register');
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
@@ -112,11 +114,13 @@ export default function PatientList() {
                 endpoint and skipped the address, birth number and insurer, so
                 which button the operator pressed decided how complete the record
                 was. Editing an existing patient still uses that form. */}
-            <Button variant="contained" startIcon={<HowToReg />} onClick={() => navigate('/patients/register')}
-              sx={{ bgcolor: '#0D7377', borderRadius: 3, px: 3, py: 1.2, fontWeight: 600, boxShadow: '0 4px 16px rgba(13,115,119,0.3)',
-                '&:hover': { bgcolor: '#095456', boxShadow: '0 6px 20px rgba(13,115,119,0.4)' } }}>
-              Registrace pacienta
-            </Button>
+            {mayRegister && (
+              <Button variant="contained" startIcon={<HowToReg />} onClick={() => navigate('/patients/register')}
+                sx={{ bgcolor: '#0D7377', borderRadius: 3, px: 3, py: 1.2, fontWeight: 600, boxShadow: '0 4px 16px rgba(13,115,119,0.3)',
+                  '&:hover': { bgcolor: '#095456', boxShadow: '0 6px 20px rgba(13,115,119,0.4)' } }}>
+                Registrace pacienta
+              </Button>
+            )}
           </Box>
         </Box>
       </motion.div>

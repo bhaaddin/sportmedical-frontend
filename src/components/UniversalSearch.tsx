@@ -38,6 +38,7 @@ export default function UniversalSearch() {
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const canBill = usePermission('billing.manage');
+  const canSeePatients = usePermission('patients.view');
 
   /* ── Keyboard shortcut Ctrl+K ── */
   useEffect(() => {
@@ -65,14 +66,16 @@ export default function UniversalSearch() {
   const pages: SearchResult[] = useMemo(() => [
     { id: 'p-dashboard', title: 'Dashboard', subtitle: 'Přehled', type: 'page', icon: <Settings />, path: '/', color: '#0D7377' },
     { id: 'p-calendar', title: 'Plánování', subtitle: 'Správa termínů', type: 'page', icon: <CalendarMonth />, path: '/planovani', color: '#0D7377' },
-    { id: 'p-patients', title: 'Pacienti', subtitle: 'Seznam pacientů', type: 'page', icon: <People />, path: '/patients', color: '#0288D1' },
+    ...(canSeePatients
+      ? [{ id: 'p-patients', title: 'Pacienti', subtitle: 'Seznam pacientů', type: 'page' as const, icon: <People />, path: '/patients', color: '#0288D1' }]
+      : []),
     ...(canBill
       ? [{ id: 'p-billing', title: 'Fakturace', subtitle: 'Správa faktur', type: 'page' as const, icon: <Receipt />, path: '/billing', color: '#ED6C02' }]
       : []),
     { id: 'p-injuries', title: 'Poranění', subtitle: 'Evidence poranění', type: 'page', icon: <Warning />, path: '/injuries', color: '#D32F2F' },
     { id: 'p-diagnostics', title: 'Diagnostika', subtitle: 'Nová relace', type: 'page', icon: <Science />, path: '/diagnostics/new', color: '#7C3AED' },
     { id: 'p-settings', title: 'Nastavení', subtitle: 'Konfigurace', type: 'page', icon: <Settings />, path: '/settings', color: '#64748B' },
-  ], [canBill]);
+  ], [canBill, canSeePatients]);
 
   /* ── Search across all data sources ── */
   const doSearch = useCallback(async (q: string) => {
@@ -82,7 +85,7 @@ export default function UniversalSearch() {
 
     try {
       const [patients, injuries, invoices, appointments] = await Promise.allSettled([
-        patientsApi.search(q).catch(() => []),
+        canSeePatients ? patientsApi.search(q).catch(() => []) : Promise.resolve([] as Patient[]),
         injuriesApi.getAll().catch(() => []),
         canBill ? billingApi.getInvoices().catch(() => []) : Promise.resolve([] as Invoice[]),
         calendarApi.getAppointments().catch(() => []),
@@ -178,7 +181,7 @@ export default function UniversalSearch() {
     } finally {
       setLoading(false);
     }
-  }, [pages, canBill]);
+  }, [pages, canBill, canSeePatients]);
 
   /* ── Debounced search ── */
   useEffect(() => {

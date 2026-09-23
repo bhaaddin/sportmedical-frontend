@@ -19,8 +19,8 @@ import {
   Stack, Typography,
 } from '@mui/material';
 import { ArrowBack, Edit, Science } from '@mui/icons-material';
-import { PATIENT_SECTIONS } from './sections';
 import { patientsApi } from '../../api/patients';
+import { usePermission } from '../../auth/usePermission';
 import type { Patient } from '../../api/patients';
 import { documentsApi } from '../../api/documents';
 import type {
@@ -65,6 +65,7 @@ export interface PatientContext {
 export default function PatientLayout() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const mayEdit = usePermission('patients.edit');
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [documents, setDocuments] = useState<PatientDocument[]>([]);
@@ -221,13 +222,15 @@ export default function PatientLayout() {
               </Stack>
             </Box>
             <Box sx={{ flex: 1 }} />
-            <Button
-              variant="outlined"
-              startIcon={<Edit />}
-              onClick={() => navigate(`/patients/${id}/edit`)}
-            >
-              Upravit
-            </Button>
+            {mayEdit && (
+              <Button
+                variant="outlined"
+                startIcon={<Edit />}
+                onClick={() => navigate(`/patients/${id}/edit`)}
+              >
+                Upravit
+              </Button>
+            )}
             <Button
               variant="contained"
               startIcon={<Science />}

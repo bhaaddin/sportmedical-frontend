@@ -116,6 +116,7 @@ function StatCard({ title, value, icon, color, subtitle, delay = 0 }: {
 export default function Dashboard() {
   const navigate = useNavigate();
   const canSeePatients = usePermission('patients.view');
+  const canRegister = usePermission('patients.register');
   const canBill = usePermission('billing.manage');
   /* `totalCount` from the register, not the length of its first page. */
   const [patientTotal, setPatientTotal] = useState<number | null>(null);
@@ -208,7 +209,9 @@ export default function Dashboard() {
   const quickActions = [
     { label: 'Nová diagnostika', icon: <Science />, path: '/diagnostics/new', color: '#0D7377', gradient: 'linear-gradient(135deg, #0D7377 0%, #14A3A8 100%)' },
     { label: 'Plánování', icon: <CalendarMonth />, path: '/planovani', color: '#2E7D32', gradient: 'linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%)' },
-    { label: 'Registrace pacienta', icon: <PersonAdd />, path: '/patients/register', color: '#0288D1', gradient: 'linear-gradient(135deg, #0288D1 0%, #039BE5 100%)' },
+    ...(canRegister
+      ? [{ label: 'Registrace pacienta', icon: <PersonAdd />, path: '/patients/register', color: '#0288D1', gradient: 'linear-gradient(135deg, #0288D1 0%, #039BE5 100%)' }]
+      : []),
     ...(canBill
       ? [{ label: 'Fakturace', icon: <Receipt />, path: '/billing', color: '#ED6C02', gradient: 'linear-gradient(135deg, #ED6C02 0%, #FF9800 100%)' }]
       : []),

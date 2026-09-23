@@ -109,7 +109,7 @@ const menuGroups: MenuItemGroup[] = [
     items: [
       { text: 'Dnešní přehled', icon: <Today />, path: '/dnes' },
       { text: 'Plánování', icon: <CalendarMonth />, path: '/planovani' },
-      { text: 'Pacienti', icon: <People />, path: '/patients' },
+      { text: 'Pacienti', icon: <People />, path: '/patients', requires: 'patients.view' },
       { text: 'Diagnostika', icon: <Science />, path: '/diagnostics/new' },
     ],
   },
@@ -172,13 +172,15 @@ function Layout({ children }: { children: React.ReactNode }) {
    * so nobody has to learn a second way of getting around; only its contents
    * change, and the way back out is the first thing in it.
    */
-  const patientId = patientInPath(location.pathname);
+  const held = new Set(storedPermissions());
+  /* Without patients.view the address is NotFound, and a patient's sidebar
+     around it would offer sections that are NotFound too. */
+  const patientId = held.has('patients.view') ? patientInPath(location.pathname) : null;
   const settingsHere = settingsItemAt(location.pathname);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const held = new Set(storedPermissions());
   const visibleMenu = menuGroups
     .map(group => ({ ...group, items: group.items.filter(item => item.requires === undefined || held.has(item.requires)) }))
     .filter(group => group.items.length > 0);
@@ -439,13 +441,13 @@ export default function App() {
                   <Suspense fallback={<PageLoader />}>
                   <Routes>
                     <Route path="/" element={<DashboardPage />} />
-                    <Route path="/patients" element={<PatientList />} />
-                    <Route path="/patients/register" element={<PatientRegistrationPage />} />
-                    <Route path="/patients/:id/edit" element={<PatientFormPage />} />
+                    <Route path="/patients" element={<RequirePermission of="patients.view"><PatientList /></RequirePermission>} />
+                    <Route path="/patients/register" element={<RequirePermission of="patients.register"><PatientRegistrationPage /></RequirePermission>} />
+                    <Route path="/patients/:id/edit" element={<RequirePermission of="patients.edit"><PatientFormPage /></RequirePermission>} />
                     {/* One patient, with sections that are pages of their own -
                         each carries the patient id, so every one of them can be
                         linked to, bookmarked and reopened. */}
-                    <Route path="/patients/:id" element={<PatientLayout />}>
+                    <Route path="/patients/:id" element={<RequirePermission of="patients.view"><PatientLayout /></RequirePermission>}>
                       <Route index element={<PatientDetails />} />
                       <Route path="dokumenty" element={<PatientDocumentsPage />} />
                       <Route path="terminy" element={<PatientAppointmentsPage />} />
@@ -457,8 +459,8 @@ export default function App() {
                     <Route path="/rtp" element={<RtpPage />} />
                     <Route path="/concussion" element={<ConcussionPage />} />
                     <Route path="/availability" element={<AvailabilityPage />} />
-                    <Route path="/svatky" element={<HolidaysPage />} />
-                    <Route path="/dotaznik-nastaveni" element={<QuestionnairePage />} />
+                    <Route path="/svatky" element={<RequirePermission of="settings.clinic.manage"><HolidaysPage /></RequirePermission>} />
+                    <Route path="/dotaznik-nastaveni" element={<RequirePermission of="questionnaires.manage"><QuestionnairePage /></RequirePermission>} />
                     <Route path="/training-load" element={<TrainingLoadPage />} />
                     <Route path="/wellness" element={<WellnessPage />} />
                     <Route path="/cashier" element={<RequirePermission of="billing.manage"><CashierPage /></RequirePermission>} />
@@ -482,9 +484,9 @@ export default function App() {
                     <Route path="/working-hours" element={<RequirePermission of="settings.clinic.manage"><BookingWorkingHoursPage /></RequirePermission>} />
                     <Route path="/exceptions" element={<RequirePermission of="settings.clinic.manage"><BookingExceptionsPage /></RequirePermission>} />
                     <Route path="/admin" element={<RequirePermission of="settings.clinic.manage"><AdminPage /></RequirePermission>} />
-                    <Route path="/system-health" element={<SystemHealthPage />} />
+                    <Route path="/system-health" element={<RequirePermission of="settings.clinic.manage"><SystemHealthPage /></RequirePermission>} />
                     <Route path="/staff-management" element={<RequirePermission of="users.manage"><StaffManagementPage /></RequirePermission>} />
-                    <Route path="/audit-log" element={<AuditLogPage />} />
+                    <Route path="/audit-log" element={<RequirePermission of="settings.clinic.manage"><AuditLogPage /></RequirePermission>} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>

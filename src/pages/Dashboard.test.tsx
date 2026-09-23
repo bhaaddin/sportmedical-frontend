@@ -230,3 +230,20 @@ describe('"Dnes v kalendari"', () => {
     expect(await screen.findByText('Žádné schůzky na dnešek')).toBeInTheDocument();
   });
 });
+
+describe('the quick actions', () => {
+  it('offer registering a patient to somebody who may register one', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'patients.register']));
+
+    renderDashboard();
+
+    expect(await screen.findByRole('button', { name: 'Registrace pacienta' })).toBeInTheDocument();
+  });
+
+  it('do not offer it to somebody who may not', async () => {
+    renderDashboard();
+    await screen.findByText('Rychlé akce');
+
+    expect(screen.queryByRole('button', { name: 'Registrace pacienta' })).not.toBeInTheDocument();
+  });
+});

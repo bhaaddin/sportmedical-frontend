@@ -290,3 +290,24 @@ describe('a patient who is not there', () => {
   });
 });
 
+
+/* The edit form saves through PUT /api/patients/{id}, which the server takes
+   only with patients.edit: offered to anybody else, every save failed. */
+describe('the way into the edit form', () => {
+  it('is offered to somebody who may edit patients', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'patients.edit']));
+
+    renderLayout();
+
+    expect(await screen.findByRole('button', { name: 'Upravit' })).toBeInTheDocument();
+  });
+
+  it('is not offered to somebody who may only look', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.view']));
+
+    renderLayout();
+
+    await screen.findByText('Nová diagnostika');
+    expect(screen.queryByRole('button', { name: 'Upravit' })).not.toBeInTheDocument();
+  });
+});

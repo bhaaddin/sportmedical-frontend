@@ -102,6 +102,7 @@ export function NewAppointmentDialog({
   const mayOverride = usePermission("bookings.edit");
   /* The working-hours screen is where activities are assigned; it needs this. */
   const mayAssign = usePermission("settings.clinic.manage");
+  const mayRegister = usePermission("patients.register");
 
   /*
    * ── Step 1: the patient, and nothing else until there is one ──
@@ -447,9 +448,11 @@ export function NewAppointmentDialog({
                       </Box>
                     )}
 
-                    <MuiLink component={RouterLink} to="/patients/register">
-                      {t("booking.new.registerLink")}
-                    </MuiLink>
+                    {mayRegister && (
+                      <MuiLink component={RouterLink} to="/patients/register">
+                        {t("booking.new.registerLink")}
+                      </MuiLink>
+                    )}
                   </Stack>
                 ) : null}
               </Stack>

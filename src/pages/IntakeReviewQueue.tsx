@@ -28,6 +28,7 @@ import {
 import { CheckCircle, PersonAdd, Block, Refresh } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import { formatDateOnly } from '../utils/time';
+import { usePermission } from '../auth/usePermission';
 import {
   IntakeOutcome,
   IntakeResolution,
@@ -47,6 +48,7 @@ import type {
 } from '../api/intakeReview';
 
 export default function IntakeReviewQueue() {
+  const maySeePatients = usePermission('patients.view');
   const [entries, setEntries] = useState<IntakeQueueEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -290,14 +292,16 @@ export default function IntakeReviewQueue() {
                     {/* The server sends no name for the candidate, only which
                         fields agree. Opening the card is the deliberate act
                         that shows the record itself. */}
-                    <Button
-                      size="small"
-                      component={RouterLink}
-                      to={`/patients/${candidate.patientId}`}
-                      target="_blank"
-                    >
-                      Otevřít kartu pacienta
-                    </Button>
+                    {maySeePatients && (
+                      <Button
+                        size="small"
+                        component={RouterLink}
+                        to={`/patients/${candidate.patientId}`}
+                        target="_blank"
+                      >
+                        Otevřít kartu pacienta
+                      </Button>
+                    )}
                   </Box>
 
                   <SignalSummary signals={candidate.signals} />
