@@ -32,6 +32,7 @@ const PatientDetails = lazy(() => import('./pages/PatientDetails'));
 const PatientLayout = lazy(() => import('./pages/patients/PatientLayout'));
 const PatientDocumentsPage = lazy(() => import('./pages/patients/PatientDocumentsPage'));
 const PatientAppointmentsPage = lazy(() => import('./pages/patients/PatientAppointmentsPage'));
+const PatientPosudkyPage = lazy(() => import('./pages/patients/PatientPosudkyPage'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
 const BillingPage = lazy(() => import('./pages/Billing'));
 const AdminPage = lazy(() => import('./pages/Admin'));
@@ -471,6 +472,7 @@ export default function App() {
                       <Route index element={<PatientDetails />} />
                       <Route path="dokumenty" element={<PatientDocumentsPage />} />
                       <Route path="terminy" element={<PatientAppointmentsPage />} />
+                      <Route path="posudky" element={<PatientPosudkyPage />} />
                     </Route>
                     <Route path="/diagnostics/new" element={<DiagnosticForm />} />
                     <Route path="/billing" element={<RequirePermission of="billing.manage"><BillingPage /></RequirePermission>} />
