@@ -88,7 +88,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       {
         id: 'vzhled-kalendare',
         label: 'Vzhled kalendáře',
-        description: 'Výchozí pohled, délka řádku, od kdy do kdy se den ukazuje a barva čáry „teď“',
+        description: 'Výchozí pohled, délka řádku, od kdy do kdy se den ukazuje, barva čáry „teď“, obědová pauza a karta po najetí na termín',
         to: '/nastaveni/vzhled-kalendare',
         requires: 'settings.clinic.manage',
       },
