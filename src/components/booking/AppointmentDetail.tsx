@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -9,7 +9,11 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  FormControlLabel,
   Link as MuiLink,
+  MenuItem,
+  Radio,
+  RadioGroup,
   Stack,
   TextField,
   Tooltip,
@@ -18,7 +22,9 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
+import { activitiesApi } from "../../api/activities";
 import { appointmentsApi } from "../../api/appointments";
+import { calendarsApi } from "../../api/calendars";
 import { patientsApi } from "../../api/patients";
 import { BookingApiError } from "../../api/apiError";
 import {
@@ -186,6 +192,7 @@ function DetailBody({
   const [cancelling, setCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [moving, setMoving] = useState(false);
+  const [changingActivity, setChangingActivity] = useState(false);
   /**
    * A `409` is not an error (6.3): somebody was faster, or the appointment moved
    * on without us. It gets its own calm line rather than the red box, and it
@@ -229,6 +236,7 @@ function DetailBody({
     setCancelling(false);
     setCancelReason("");
     setMoving(false);
+    setChangingActivity(false);
     void queryClient.invalidateQueries({
       queryKey: ["appointment", calendarId, appointment.id],
     });
@@ -480,10 +488,35 @@ function DetailBody({
                     disabled={busy || isTerminalStatus(appointment.status)}
                     onClick={() => {
                       setConflict(null);
+                      setChangingActivity(false);
                       setMoving((was) => !was);
                     }}
                   >
                     {t("booking.detail.move")}
+                  </Button>
+                </Box>
+              </Tooltip>
+              {/* Wave 3: the booking was for something else. One click, not
+                  a cancellation and a second booking. */}
+              <Tooltip
+                title={
+                  isTerminalStatus(appointment.status)
+                    ? t("booking.detail.notAllowed")
+                    : ""
+                }
+              >
+                <Box component="span">
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    disabled={busy || isTerminalStatus(appointment.status)}
+                    onClick={() => {
+                      setConflict(null);
+                      setMoving(false);
+                      setChangingActivity((was) => !was);
+                    }}
+                  >
+                    {t("booking.detail.changeActivity")}
                   </Button>
                 </Box>
               </Tooltip>
@@ -557,6 +590,21 @@ function DetailBody({
         </Box>
       ) : null}
 
+      {/* ── Changing the činnost (wave 3): says what will happen, then asks ── */}
+      {changingActivity ? (
+        <ChangeActivityPanel
+          appointment={appointment}
+          calendarId={calendarId}
+          busy={busy}
+          conflict={conflict}
+          onConflict={onWriteError}
+          onDone={(moved) => {
+            afterWrite();
+            if (moved) onClose();
+          }}
+        />
+      ) : null}
+
       {/* ── Moving, which only ever offers what the server offered (6.1) ── */}
       {moving ? (
         <AvailabilityPanel
@@ -610,6 +658,176 @@ function DetailBody({
         </AsyncSection>
       </Box>
     </Stack>
+  );
+}
+
+/**
+ * "Změnit činnost": pick another činnost and see, before confirming, what the
+ * server will do - the new length, whether the booking stays in this calendar
+ * or moves to the one that runs the činnost's service, and whether the start
+ * is kept or the nearest free time that day is taken. The server decides all
+ * of it (4.5, wave 3); this only explains the choice it is about to be asked.
+ */
+function ChangeActivityPanel({
+  appointment,
+  calendarId,
+  busy,
+  conflict,
+  onConflict,
+  onDone,
+}: {
+  appointment: Appointment;
+  calendarId: string;
+  busy: boolean;
+  conflict: unknown;
+  onConflict: (error: unknown) => void;
+  /** `moved` when the appointment is now in another calendar. */
+  onDone: (moved: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const [activityId, setActivityId] = useState("");
+  const [keepTime, setKeepTime] = useState(true);
+  const [done, setDone] = useState<Appointment | null>(null);
+
+  const activitiesQuery = useQuery({
+    queryKey: ["activities"],
+    queryFn: activitiesApi.list,
+    staleTime: 5 * 60 * 1000,
+  });
+  const calendarsQuery = useQuery({
+    queryKey: ["calendars"],
+    queryFn: calendarsApi.list,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const activities = useMemo(
+    () =>
+      (activitiesQuery.data?.activities ?? []).filter(
+        (a) => a.isActive && a.id !== appointment.activityId,
+      ),
+    [activitiesQuery.data, appointment.activityId],
+  );
+  const chosen = activities.find((a) => a.id === activityId) ?? null;
+  const here = (calendarsQuery.data ?? []).find((c) => c.id === calendarId) ?? null;
+  const staysHere =
+    chosen !== null && here !== null && chosen.clinicServiceId !== null
+      ? chosen.clinicServiceId === here.clinicServiceId
+      : true;
+  const currentMinutes = Math.round(
+    (new Date(appointment.endUtc).getTime() - new Date(appointment.startUtc).getTime()) / 60_000,
+  );
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      appointmentsApi.changeActivity(calendarId, appointment.id, { activityId, keepTime }),
+    onSuccess: (changed) => {
+      setDone(changed);
+      onDone(changed.calendarId !== calendarId);
+    },
+    onError: onConflict,
+  });
+
+  if (done) {
+    return (
+      <Alert severity="success">
+        {t("booking.detail.changeActivityDone", {
+          activity: done.activityName || t("booking.detail.noActivity"),
+          when: formatPragueDateTime(done.startUtc),
+        })}
+        {done.calendarId !== calendarId ? ` ${t("booking.detail.changeActivityMovedTo")}` : ""}
+      </Alert>
+    );
+  }
+
+  return (
+    <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 2 }}>
+      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+        {t("booking.detail.changeActivityTitle")}
+      </Typography>
+      <AsyncSection
+        isLoading={activitiesQuery.isLoading}
+        error={activitiesQuery.error}
+        isSettled={activitiesQuery.isSuccess || activitiesQuery.isError}
+        isEmpty={activities.length === 0}
+        emptyText={t("booking.detail.changeActivityNoActivities")}
+        onRetry={() => void activitiesQuery.refetch()}
+        skeletonRows={2}
+      >
+        <Stack spacing={1.5}>
+          <TextField
+            select
+            size="small"
+            label={t("booking.detail.changeActivityPick")}
+            value={activityId}
+            onChange={(e) => setActivityId(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+          >
+            {activities.map((activity) => (
+              <MenuItem key={activity.id} value={activity.id}>
+                {activity.name} · {activity.durationMinutes} min
+              </MenuItem>
+            ))}
+          </TextField>
+
+          {chosen ? (
+            <Typography variant="body2">
+              {t("booking.detail.changeActivityLength", {
+                minutes: chosen.durationMinutes,
+                current: currentMinutes,
+              })}{" "}
+              {staysHere && here
+                ? t("booking.detail.changeActivityStays", { calendar: here.name })
+                : t("booking.detail.changeActivityMoves")}
+            </Typography>
+          ) : null}
+
+          <RadioGroup value={keepTime ? "keep" : "nearest"} onChange={(e) => setKeepTime(e.target.value === "keep")}>
+            <FormControlLabel
+              value="keep"
+              control={<Radio size="small" />}
+              label={
+                <Box>
+                  <Typography variant="body2">{t("booking.detail.changeActivityKeepTime")}</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    {t("booking.detail.changeActivityKeepTimeHelp", {
+                      time: formatPragueTime(appointment.startUtc),
+                      minutes: chosen?.durationMinutes ?? currentMinutes,
+                    })}
+                  </Typography>
+                </Box>
+              }
+            />
+            <FormControlLabel
+              value="nearest"
+              control={<Radio size="small" />}
+              label={
+                <Box>
+                  <Typography variant="body2">{t("booking.detail.changeActivityNearest")}</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    {t("booking.detail.changeActivityNearestHelp")}
+                  </Typography>
+                </Box>
+              }
+            />
+          </RadioGroup>
+
+          {mutation.error && !conflict ? (
+            <Alert severity="error">{errorText(mutation.error, t)}</Alert>
+          ) : null}
+
+          <Stack direction="row" spacing={1}>
+            <Button
+              size="small"
+              variant="contained"
+              disabled={busy || mutation.isPending || chosen === null}
+              onClick={() => mutation.mutate()}
+            >
+              {t("booking.detail.changeActivityConfirm")}
+            </Button>
+          </Stack>
+        </Stack>
+      </AsyncSection>
+    </Box>
   );
 }
 

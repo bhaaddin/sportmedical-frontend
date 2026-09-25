@@ -13,6 +13,7 @@ import {
   type Appointment,
   type AvailabilitySlot,
   type BookedAppointment,
+  type ChangeActivityInput,
   type CreateAppointmentInput,
   type DayAppointment,
   type DaySummary,
@@ -157,6 +158,22 @@ export const appointmentsApi = {
       await client.put(`/api/calendars/${calendarId}/appointments/${id}/time`, null, {
         params: { startUtc: asUtcInstant(startUtc), overrideReason },
       });
+    }),
+
+  /**
+   * Gives the appointment another činnost (wave 3). The length follows it, and
+   * so does the room: a činnost of another service moves the appointment to a
+   * calendar that runs it. The answer says where it is now - read `calendarId`
+   * from it, because it may no longer be the one in the path.
+   *
+   * `409` and `422` are outcomes, not faults: the time is not free for the new
+   * length, nothing is free that day, or no calendar offers the činnost then.
+   * The server's own sentence says which.
+   */
+  changeActivity: (calendarId: string, id: string, input: ChangeActivityInput): Promise<Appointment> =>
+    request(async () => {
+      const res = await client.put(`/api/calendars/${calendarId}/appointments/${id}/activity`, input);
+      return parseResponse(appointmentSchema, res.data);
     }),
 
   /** The reason is optional here and goes into the history. Nothing is deleted. */

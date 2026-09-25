@@ -276,7 +276,22 @@
       "note": "Poznámka",
       "noNote": "Bez poznámky. Zapisuje se při objednání.",
       "heldUntil": "drženo do",
-      "overridden": "Přetlačeno"
+      "overridden": "Přetlačeno",
+      "changeActivity": "Změnit činnost",
+      "changeActivityTitle": "Změnit činnost termínu",
+      "changeActivityPick": "Nová činnost",
+      "changeActivitySame": "Tuto činnost termín už má.",
+      "changeActivityKeepTime": "Ponechat čas začátku",
+      "changeActivityKeepTimeHelp": "Termín zůstane od {{time}} a jen se změní délka na {{minutes}} min. Když ten čas není volný, změna se odmítne.",
+      "changeActivityNearest": "Najít nejbližší volný čas",
+      "changeActivityNearestHelp": "Termín se přesune na nejbližší volný čas téhož dne, kde se nová činnost nabízí.",
+      "changeActivityStays": "Zůstane v kalendáři {{calendar}}.",
+      "changeActivityMoves": "Činnost patří pod jinou službu, termín se přesune do kalendáře, který ji nabízí.",
+      "changeActivityLength": "Nová délka: {{minutes}} min (dnes {{current}} min).",
+      "changeActivityConfirm": "Změnit činnost",
+      "changeActivityDone": "Činnost změněna: {{activity}}, {{when}}.",
+      "changeActivityMovedTo": "Termín je teď v jiném kalendáři — najdete ho v jeho sloupci.",
+      "changeActivityNoActivities": "Není zavedena žádná jiná činnost."
     },
     "history": {
       "booked": "Objednáno",
@@ -288,7 +303,8 @@
       "undone": "Vráceno zpět",
       "completed": "Dokončeno",
       "overridden": "Přetlačeno",
-      "unknown": "Neznámá akce ({{code}})"
+      "unknown": "Neznámá akce ({{code}})",
+      "activityChanged": "Změněna činnost"
     },
     "day": {
       "absent": "Tento den nepřítomni: {{list}}. Jejich hodiny se do pracovní doby nepočítají a objednat se k nim nedá.",
