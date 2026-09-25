@@ -1,229 +1,247 @@
 /* ══════════════════════════════════════════════════════════════
-   AUDIT LOG — PLAN-01 Feature A31-A40
-   - Virtualized table with thousands of entries
-   - Search by user, entity, action
-   - Date range filter
-   - Expandable rows for JSON diff
+   AUDITNÍ LOG - who did what, to what, and when
+
+   Filters (who, what happened, what kind of thing, from-to, free text) go to
+   the server; the page and the total come back from it. Every row opens to
+   the values before and after, as the trail recorded them - allowlisted on
+   the way in, masked on the way out. The screen used to fetch a hundred rows
+   and filter them in the browser, so the hundred-and-first change could not
+   be found from here.
    ══════════════════════════════════════════════════════════════ */
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Chip, TextField, Grid, IconButton, Tooltip,
-  Avatar, Skeleton, Collapse, Button
+  Alert, Box, Button, Chip, Collapse, Grid, IconButton, MenuItem, Paper, Skeleton, Table,
+  TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField,
+  Tooltip, Typography,
 } from '@mui/material';
 import {
-  Refresh as RefreshIcon, Search as SearchIcon, History as HistoryIcon,
-  ExpandMore as ExpandIcon, ExpandLess as CollapseIcon
+  ExpandLess as CollapseIcon, ExpandMore as ExpandIcon, History as HistoryIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
-import { motion } from 'framer-motion';
-import client from '../api/client';
+import { useQuery } from '@tanstack/react-query';
+import {
+  actionLabel, auditApi, entityLabel, parseValues, type AuditEntry, type AuditFilter,
+} from '../api/audit';
 
-/* ── Types ── */
-interface AuditEntry {
-  id: string;
-  userId?: string;
-  userName?: string;
-  userEmail?: string;
-  action: string;
-  entity: string;
-  entityId: string;
-  timestamp: string;
-  notes?: string;
-  beforeState?: any;
-  afterState?: any;
+const PAGE_SIZES = [25, 50, 100];
+
+const EMPTY: AuditFilter = { user: '', action: '', entity: '', from: '', to: '', search: '' };
+
+function ValueTable({ title, json }: { title: string; json: string | null }) {
+  const rows = parseValues(json);
+  if (rows.length === 0) return null;
+  return (
+    <Box sx={{ minWidth: 220 }}>
+      <Typography variant="caption" sx={{ fontWeight: 700 }}>{title}</Typography>
+      <Table size="small" sx={{ mt: 0.5 }}>
+        <TableBody>
+          {rows.map(([key, value]) => (
+            <TableRow key={key}>
+              <TableCell sx={{ fontFamily: 'monospace', fontSize: 12, color: 'text.secondary', border: 0, py: 0.25 }}>{key}</TableCell>
+              <TableCell sx={{ border: 0, py: 0.25, wordBreak: 'break-all' }}>{value}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Box>
+  );
 }
 
-/* ── Config ── */
-const ACTION_COLORS: Record<string, string> = {
-  Create: '#2E7D32',
-  Update: '#0288D1',
-  Delete: '#D32F2F',
-  Sign: '#9C27B0',
-  Import: '#ED6C02',
-  Override: '#FF5722',
-  Login: '#795548',
-  Logout: '#607D8B',
-};
+function Row({ entry }: { entry: AuditEntry }) {
+  const [open, setOpen] = useState(false);
+  const hasDetail = entry.oldValue !== null || entry.newValue !== null || entry.ipAddress !== null;
+  return (
+    <>
+      <TableRow hover>
+        <TableCell sx={{ width: 40, p: 0.5 }}>
+          {hasDetail ? (
+            <IconButton size="small" aria-label={open ? 'Skrýt podrobnosti' : 'Zobrazit podrobnosti'} onClick={() => setOpen(!open)}>
+              {open ? <CollapseIcon fontSize="small" /> : <ExpandIcon fontSize="small" />}
+            </IconButton>
+          ) : null}
+        </TableCell>
+        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+          <Typography variant="body2">{new Date(entry.timestamp).toLocaleString('cs-CZ')}</Typography>
+        </TableCell>
+        <TableCell>
+          <Typography variant="body2" sx={{ fontWeight: 500 }}>{entry.userEmail ?? 'systém'}</Typography>
+        </TableCell>
+        <TableCell>
+          <Typography variant="body2">{actionLabel(entry.action)}</Typography>
+          {actionLabel(entry.action) !== entry.action && (
+            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>{entry.action}</Typography>
+          )}
+        </TableCell>
+        <TableCell>
+          <Chip size="small" label={entityLabel(entry.entity)} />
+        </TableCell>
+        <TableCell>
+          <Typography variant="body2" color="text.secondary">{entry.notes ?? '—'}</Typography>
+        </TableCell>
+      </TableRow>
+      {hasDetail && (
+        <TableRow>
+          <TableCell colSpan={6} sx={{ p: 0, border: 0 }}>
+            <Collapse in={open} unmountOnExit>
+              <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap', px: 3, py: 2, bgcolor: 'action.hover' }}>
+                <ValueTable title="PŘED" json={entry.oldValue} />
+                <ValueTable title="PO" json={entry.newValue} />
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 700 }}>ZÁZNAM</Typography>
+                  <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    id objektu: {entry.entityId}
+                  </Typography>
+                  {entry.ipAddress && (
+                    <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12 }}>
+                      adresa: {entry.ipAddress}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            </Collapse>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+}
 
-/* ══════════════════════════════════════════════════════════════ */
 export default function AuditLog() {
-  const [entries, setEntries] = useState<AuditEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [draft, setDraft] = useState<AuditFilter>(EMPTY);
+  const [filter, setFilter] = useState<AuditFilter>(EMPTY);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
 
-  /* ── Load audit log ── */
-  useEffect(() => {
-    loadAuditLog();
-  }, []);
-
-  const loadAuditLog = async () => {
-    setLoading(true);
-    try {
-      const res = await client.get('/api/audit?take=100');
-      const data = res.data?.value ?? res.data;
-      setEntries(Array.isArray(data) ? data : data?.items ?? []);
-    } catch {
-      setEntries([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /* ── Filter entries ── */
-  const filteredEntries = entries.filter(entry => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      entry.userEmail?.toLowerCase().includes(q) ||
-      entry.userName?.toLowerCase().includes(q) ||
-      entry.action?.toLowerCase().includes(q) ||
-      entry.entity?.toLowerCase().includes(q) ||
-      entry.entityId?.toLowerCase().includes(q) ||
-      entry.notes?.toLowerCase().includes(q)
-    );
+  const catalogue = useQuery({ queryKey: ['audit', 'catalogue'], queryFn: auditApi.catalogue, staleTime: 60_000 });
+  const entries = useQuery({
+    queryKey: ['audit', 'search', filter, page, pageSize],
+    queryFn: () => auditApi.search(filter, page + 1, pageSize),
   });
 
-  if (loading) {
-    return (
-      <Box>
-        <Skeleton variant="rounded" width={200} height={40} sx={{ mb: 3 }} />
-        <Skeleton variant="rounded" height={400} sx={{ borderRadius: 3 }} />
-      </Box>
-    );
-  }
+  /* A filter that changed puts the reader back on the first page. */
+  useEffect(() => { setPage(0); }, [filter]);
+
+  const apply = (e: React.FormEvent) => {
+    e.preventDefault();
+    setFilter({ ...draft });
+  };
+
+  const clear = () => {
+    setDraft(EMPTY);
+    setFilter(EMPTY);
+  };
+
+  const set = (key: keyof AuditFilter) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setDraft({ ...draft, [key]: e.target.value });
 
   return (
     <Box>
-      {/* Header */}
-      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <HistoryIcon color="primary" /> Auditní log
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Historie všech akcí v systému
-            </Typography>
-          </Box>
-          <Tooltip title="Obnovit">
-            <IconButton onClick={loadAuditLog}><RefreshIcon /></IconButton>
-          </Tooltip>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <HistoryIcon color="primary" /> Auditní log
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Kdo co změnil a kdy: přihlášení, účty, pacienti, rezervace, platby, dokumenty a nastavení.
+            Rodná čísla, čísla pojištěnců, hesla ani klíče se do záznamu nikdy nezapisují.
+          </Typography>
         </Box>
-      </motion.div>
+        <Tooltip title="Obnovit">
+          <IconButton aria-label="Obnovit" onClick={() => { void entries.refetch(); void catalogue.refetch(); }}>
+            <RefreshIcon />
+          </IconButton>
+        </Tooltip>
+      </Box>
 
-      {/* Search */}
-      <Paper sx={{ p: 2, mb: 3, borderRadius: 3 }}>
-        <TextField fullWidth size="small" placeholder="Hledat v auditním logu..."
-          value={search} onChange={(e) => setSearch(e.target.value)}
-          slotProps={{ input: { startAdornment: <SearchIcon sx={{ mr: 1, color: '#999' }} fontSize="small" /> } }}
-          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
+      <Paper component="form" onSubmit={apply} sx={{ p: 2, mb: 3, borderRadius: 3 }}>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <TextField select fullWidth size="small" label="Kdo" value={draft.user ?? ''} onChange={set('user')}
+              helperText="Zaměstnanec, který změnu provedl">
+              <MenuItem value="">Kdokoli</MenuItem>
+              {(catalogue.data?.users ?? []).map((u) => <MenuItem key={u} value={u}>{u}</MenuItem>)}
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <TextField select fullWidth size="small" label="Co se stalo" value={draft.action ?? ''} onChange={set('action')}
+              helperText="Druh akce">
+              <MenuItem value="">Cokoli</MenuItem>
+              {(catalogue.data?.actions ?? []).map((a) => <MenuItem key={a} value={a}>{actionLabel(a)}</MenuItem>)}
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <TextField select fullWidth size="small" label="Čeho se to týká" value={draft.entity ?? ''} onChange={set('entity')}
+              helperText="Pacient, rezervace, účet…">
+              <MenuItem value="">Čehokoli</MenuItem>
+              {(catalogue.data?.entities ?? []).map((e) => <MenuItem key={e} value={e}>{entityLabel(e)}</MenuItem>)}
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 6, sm: 3, md: 2 }}>
+            <TextField fullWidth size="small" type="date" label="Od" value={draft.from ?? ''} onChange={set('from')}
+              slotProps={{ inputLabel: { shrink: true } }} helperText="Včetně tohoto dne" />
+          </Grid>
+          <Grid size={{ xs: 6, sm: 3, md: 2 }}>
+            <TextField fullWidth size="small" type="date" label="Do" value={draft.to ?? ''} onChange={set('to')}
+              slotProps={{ inputLabel: { shrink: true } }} helperText="Včetně tohoto dne" />
+          </Grid>
+          <Grid size={{ xs: 12, md: 8 }}>
+            <TextField fullWidth size="small" label="Hledat v záznamech" value={draft.search ?? ''} onChange={set('search')}
+              helperText="Text v důvodu změny nebo v zaznamenaných hodnotách, např. příjmení nebo klíč nastavení" />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+            <Button type="submit" variant="contained" sx={{ bgcolor: '#0D7377', borderRadius: 2 }}>Filtrovat</Button>
+            <Button onClick={clear}>Zrušit filtry</Button>
+          </Grid>
+        </Grid>
       </Paper>
 
-      {/* Stats */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        {Object.entries(ACTION_COLORS).map(([action, color]) => {
-          const count = entries.filter(e => e.action === action).length;
-          if (count === 0) return null;
-          return (
-            <Grid key={action} size={{ xs: 6, sm: 4, md: 2 }}>
-              <Paper sx={{ p: 2, textAlign: 'center' }}>
-                <Typography variant="h5" sx={{ fontWeight: 700, color }}>{count}</Typography>
-                <Typography variant="body2" color="text.secondary">{action}</Typography>
-              </Paper>
-            </Grid>
-          );
-        })}
-      </Grid>
+      {entries.isError && (
+        <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={() => void entries.refetch()}>Zkusit znovu</Button>}>
+          Auditní záznamy se nepodařilo načíst.
+        </Alert>
+      )}
 
-      {/* Table */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+      {entries.isPending ? (
+        <Skeleton variant="rounded" height={400} sx={{ borderRadius: 3 }} />
+      ) : entries.data ? (
         <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
           <Table>
             <TableHead>
               <TableRow sx={{ bgcolor: '#f8f9fa' }}>
-                <TableCell sx={{ fontWeight: 700, width: 40 }} />
-                <TableCell sx={{ fontWeight: 700 }}>Čas</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Uživatel</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Akce</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Entita</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Poznámky</TableCell>
+                <TableCell />
+                <TableCell sx={{ fontWeight: 700 }}>Kdy</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Kdo</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Co se stalo</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Čeho se to týká</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Důvod / poznámka</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredEntries.length === 0 ? (
+              {entries.data.items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
                     <HistoryIcon sx={{ fontSize: 48, color: '#ddd', mb: 1 }} />
-                    <Typography color="text.secondary">Žádné záznamy</Typography>
+                    <Typography color="text.secondary">Filtru neodpovídá žádný záznam.</Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredEntries.map((entry, i) => (
-                  <motion.tr key={entry.id}
-                    initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: Math.min(i * 0.02, 0.5) }}>
-                    <TableCell colSpan={7} sx={{ p: 0 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #f0f0f0' }}>
-                        {(entry.beforeState || entry.afterState) && (
-                          <IconButton size="small" onClick={() => setExpandedRow(expandedRow === entry.id ? null : entry.id)}>
-                            {expandedRow === entry.id ? <CollapseIcon fontSize="small" /> : <ExpandIcon fontSize="small" />}
-                          </IconButton>
-                        )}
-                        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 2, py: 1.5, px: 1 }}>
-                          <Typography variant="caption" color="text.secondary" sx={{ minWidth: 140, whiteSpace: 'nowrap' }}>
-                            {new Date(entry.timestamp).toLocaleString('cs-CZ')}
-                          </Typography>
-                          <Typography sx={{ fontWeight: 500, minWidth: 150 }}>
-                            {entry.userEmail || entry.userName || 'System'}
-                          </Typography>
-                          <Chip label={entry.action} size="small"
-                            sx={{ bgcolor: (ACTION_COLORS[entry.action] || '#666') + '18', color: ACTION_COLORS[entry.action] || '#666', fontWeight: 500, minWidth: 70 }} />
-                          <Typography sx={{ minWidth: 100 }}>{entry.entity}</Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: 11 }}>
-                            {entry.entityId?.slice(0, 8)}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
-                            {entry.notes || '—'}
-                          </Typography>
-                        </Box>
-                      </Box>
-                      {/* Expanded JSON diff */}
-                      {expandedRow === entry.id && (entry.beforeState || entry.afterState) && (
-                        <Box sx={{ p: 2, bgcolor: '#f8f9fa', borderBottom: '1px solid #e0e0e0' }}>
-                          <Grid container spacing={2}>
-                            {entry.beforeState && (
-                              <Grid size={{ xs: 6 }}>
-                                <Typography variant="caption" sx={{ fontWeight: 700, color: '#D32F2F' }}>PŘED</Typography>
-                                <Paper sx={{ p: 1, mt: 0.5, maxHeight: 200, overflow: 'auto' }}>
-                                  <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
-                                    {JSON.stringify(entry.beforeState, null, 2)}
-                                  </pre>
-                                </Paper>
-                              </Grid>
-                            )}
-                            {entry.afterState && (
-                              <Grid size={{ xs: 6 }}>
-                                <Typography variant="caption" sx={{ fontWeight: 700, color: '#2E7D32' }}>PO</Typography>
-                                <Paper sx={{ p: 1, mt: 0.5, maxHeight: 200, overflow: 'auto' }}>
-                                  <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
-                                    {JSON.stringify(entry.afterState, null, 2)}
-                                  </pre>
-                                </Paper>
-                              </Grid>
-                            )}
-                          </Grid>
-                        </Box>
-                      )}
-                    </TableCell>
-                  </motion.tr>
-                ))
+                entries.data.items.map((entry) => <Row key={entry.id} entry={entry} />)
               )}
             </TableBody>
           </Table>
+          <TablePagination
+            component="div"
+            count={entries.data.totalCount}
+            page={page}
+            onPageChange={(_, next) => setPage(next)}
+            rowsPerPage={pageSize}
+            rowsPerPageOptions={PAGE_SIZES}
+            onRowsPerPageChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
+            labelRowsPerPage="Na stránku:"
+            labelDisplayedRows={({ from, to, count }) => `${from}–${to} z ${count}`}
+          />
         </TableContainer>
-      </motion.div>
+      ) : null}
     </Box>
   );
 }
