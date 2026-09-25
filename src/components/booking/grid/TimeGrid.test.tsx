@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Calendar, PreviewDay } from '../../../api/bookingContracts';
 import { TimeGrid, type TimeGridProps } from './TimeGrid';
+import { rowHeightFor } from './timeRange';
 import { dayMark } from './dayMarks';
 
 /*
@@ -37,6 +38,7 @@ function row(date: string, overrides: Partial<PreviewDay> = {}): PreviewDay {
     date,
     isOpen: true,
     closedBecause: null,
+    closedName: null,
     startTime: '08:00:00',
     endTime: '16:00:00',
     breakStart: null,
@@ -160,6 +162,7 @@ describe('dragging on the grid', () => {
               id: 'ap1',
               calendarId: 'c1',
               patientId: 'p1',
+              patientName: null,
               activityId: 'a1',
               activityName: 'Spiroergometrie',
               startUtc: '2026-09-23T06:00:00Z',
@@ -200,6 +203,51 @@ describe('the now-line on the grid', () => {
   it('not on a shut today', () => {
     renderGrid({ view: 'week', now: NOW }, row(DAY, { isOpen: false, closedBecause: 'override', offeredActivityIds: [] }));
     expect(screen.queryByTestId('now-line')).not.toBeInTheDocument();
+  });
+});
+
+describe('the lunch on the grid', () => {
+  const withLunch = row(DAY, { breakStart: '12:00:00', breakEnd: '12:30:00' });
+
+  it('is drawn in red with its times written across the column', () => {
+    renderGrid({}, withLunch);
+    const lunch = screen.getByTestId(`lunch-${calendar.id}-${DAY}`);
+    expect(lunch).toHaveTextContent('OBĚD 12:00–12:30');
+    expect(lunch).toHaveAttribute('aria-label', 'OBĚD od 12:00 – do 12:30');
+  });
+
+  it('refuses a drag over it with the reason, offering neither booking nor blocking', () => {
+    const props = renderGrid({}, withLunch);
+    const column = drag(11 * 60 + 30, 12 * 60 + 10);
+    expect(screen.getByTestId('drag-selection')).toHaveAttribute('data-over-lunch', 'true');
+    fireEvent.pointerUp(column, { clientY: yAt(12 * 60 + 10), clientX: 100, pointerId: 1 });
+
+    const menu = screen.getByRole('menu');
+    expect(within(menu).getByTestId('drag-refused')).toHaveTextContent(
+      'Obědová pauza – v tento čas se neobjednává ani neblokuje.',
+    );
+    expect(within(menu).queryByRole('menuitem', { name: 'Objednat' })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole('menuitem', { name: 'Zablokovat' })).not.toBeInTheDocument();
+    expect(props.onBook).not.toHaveBeenCalled();
+  });
+
+  it('still offers a drag that ends exactly where the lunch begins', () => {
+    renderGrid({}, withLunch);
+    const column = drag(11 * 60, 11 * 60 + 40);
+    fireEvent.pointerUp(column, { clientY: yAt(11 * 60 + 40), clientX: 100, pointerId: 1 });
+    expect(screen.getByRole('menuitem', { name: 'Objednat' })).toBeInTheDocument();
+  });
+});
+
+describe('the row length', () => {
+  it('draws the hour as four rows when the row is 15 minutes, and as two when it is 30', () => {
+    renderGrid({ slotMinutes: 15 });
+    expect(screen.getByTestId('hour-label-8')).toHaveStyle({ height: `${rowHeightFor(15) * 4}px` });
+  });
+
+  it('falls back to 30-minute rows for a length that does not divide the hour', () => {
+    renderGrid({ slotMinutes: 25 });
+    expect(screen.getByTestId('hour-label-8')).toHaveStyle({ height: `${rowHeightFor(30) * 2}px` });
   });
 });
 

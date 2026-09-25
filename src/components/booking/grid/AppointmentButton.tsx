@@ -1,4 +1,5 @@
-import { Box } from "@mui/material";
+import { useState } from "react";
+import { Box, Tooltip } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import {
   isLateStatus,
@@ -6,8 +7,10 @@ import {
   statusTally,
   type DayAppointment,
 } from "../../../api/bookingContracts";
+import type { HoverFieldKey } from "../../../api/displaySettings";
 import { readableTextOn } from "../../../utils/calendarPalette";
 import { formatPragueTime, isLate } from "../../../utils/time";
+import { AppointmentHoverCard } from "./AppointmentHoverCard";
 
 /**
  * One appointment. It is a `button`, not a div with an onClick (7.1), and its
@@ -15,7 +18,9 @@ import { formatPragueTime, isLate } from "../../../utils/time";
  * carrier of the information.
  *
  * Moved here unchanged from `CalendarGridPage.tsx` so the time grid and the
- * page's list and month views draw an appointment the same way.
+ * page's list and month views draw an appointment the same way. Since wave 3
+ * the mouse resting on it opens a card with the facts the administrator chose
+ * (`hoverFields`); with none chosen there is no card at all.
  */
 export function AppointmentButton({
   appointment,
@@ -23,14 +28,18 @@ export function AppointmentButton({
   now,
   onOpen,
   layout,
+  hoverFields = [],
 }: {
   appointment: DayAppointment;
-  calendar?: { id: string; name: string; color: string };
+  calendar?: { id: string; name: string; color: string; serviceName?: string | null };
   now: Date;
   onOpen: (id: string) => void;
   layout: "row" | "block" | "compact";
+  /** What the hover card shows, in order; empty means no card. */
+  hoverFields?: readonly HoverFieldKey[];
 }) {
   const { t } = useTranslation();
+  const [hovered, setHovered] = useState(false);
   const color = calendar?.color ?? "#37474F";
   const late = isLate(appointment.startUtc, isLateStatus(appointment.status), now);
   const tally = statusTally(appointment.status);
@@ -38,8 +47,9 @@ export function AppointmentButton({
   const statusLabel = name
     ? t(`booking.status.${name}`)
     : t("booking.status.unknown");
+  const statusWithLate = late ? `${statusLabel} · ${t("booking.status.late")}` : statusLabel;
 
-  return (
+  const button = (
     <Box
       component="button"
       type="button"
@@ -107,11 +117,36 @@ export function AppointmentButton({
           component="span"
           sx={{ display: "block", fontSize: 11, opacity: 0.9 }}
         >
+          {appointment.patientName ? `${appointment.patientName} · ` : ""}
           {statusLabel}
           {late ? ` · ${t("booking.status.late")}` : ""}
           {calendar ? ` · ${calendar.name}` : ""}
         </Box>
       )}
     </Box>
+  );
+
+  if (hoverFields.length === 0) {
+    return button;
+  }
+
+  return (
+    <Tooltip
+      enterDelay={350}
+      enterNextDelay={350}
+      onOpen={() => setHovered(true)}
+      placement="right-start"
+      title={
+        <AppointmentHoverCard
+          appointment={appointment}
+          fields={hoverFields}
+          active={hovered}
+          statusLabel={statusWithLate}
+          serviceName={calendar?.serviceName ?? null}
+        />
+      }
+    >
+      {button}
+    </Tooltip>
   );
 }

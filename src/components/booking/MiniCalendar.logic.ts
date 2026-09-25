@@ -133,13 +133,17 @@ export function dayFlags(
   };
 }
 
-/** What a screen reader hears for one day: `čtvrtek 24. září 2026, svátek, dnes`. */
-export function dayLabel(cell: Date, flags: DayFlags): string {
+/**
+ * What a screen reader hears for one day: `čtvrtek 24. září 2026, svátek, dnes`
+ * - with the holiday's own name when it is known:
+ * `pondělí 28. září 2026, svátek Den české státnosti`.
+ */
+export function dayLabel(cell: Date, flags: DayFlags, holidayName?: string | null): string {
   const weekday = WEEKDAY_LONG[(cell.getDay() + 6) % 7];
   const parts = [
     `${weekday} ${cell.getDate()}. ${MONTH_GENITIVE[cell.getMonth()]} ${cell.getFullYear()}`,
   ];
-  if (flags.holiday) parts.push('svátek');
+  if (flags.holiday) parts.push(holidayName ? `svátek ${holidayName}` : 'svátek');
   if (flags.closed) parts.push('zavřeno');
   if (flags.today) parts.push('dnes');
   return parts.join(', ');

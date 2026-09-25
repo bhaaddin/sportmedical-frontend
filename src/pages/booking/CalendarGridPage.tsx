@@ -27,11 +27,13 @@ import { Link as MuiLink } from "@mui/material";
 import { calendarsApi } from "../../api/calendars";
 import { clinicServicesApi } from "../../api/clinicServices";
 import { holidaysApi, type ClinicHoliday } from "../../api/holidays";
-import { readPublicClinic, readSettings } from "../../api/clinicSettings";
+import { readPublicClinic } from "../../api/clinicSettings";
+import { gridSpan, hoverFieldsFor, useCalendarDisplay } from "../../api/displaySettings";
 import { usePermission } from "../../auth/usePermission";
 import { appointmentsApi } from "../../api/appointments";
 import { workingHoursApi } from "../../api/workingHours";
 import type { DayAppointment, PreviewDay, TimeBlock } from "../../api/bookingContracts";
+import type { HoverFieldKey } from "../../api/displaySettings";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { AppointmentDetail } from "../../components/booking/AppointmentDetail";
 import { NewAppointmentDialog } from "../../components/booking/NewAppointmentDialog";
@@ -42,6 +44,7 @@ import {
   closedHolidayDates,
   dayMark,
   holidayDates,
+  holidayNames,
   yearsBetween,
   type DayMark,
 } from "../../components/booking/grid/dayMarks";
@@ -55,12 +58,11 @@ import {
   type Employee,
 } from "../../components/booking/grid/filters";
 import { GRID_TEXT } from "../../components/booking/grid/gridText";
-import { NOW_LINE_COLOR_KEY, resolveNowLineColor } from "../../components/booking/grid/nowLine";
+import { resolveNowLineColor } from "../../components/booking/grid/nowLine";
 import {
   parseTimeOfDay,
   spanOnDay,
   touchesDay,
-  visibleHours,
   type MinuteRange,
 } from "../../components/booking/grid/timeRange";
 import {
@@ -134,8 +136,25 @@ export default function CalendarGridPage() {
   const mayManageCalendars = usePermission("settings.clinic.manage");
   const mayBook = usePermission("bookings.create");
   const mayBlock = usePermission("bookings.edit");
+  const maySeeSensitive = usePermission("patients.sensitive_identity.view");
 
-  const [view, setView] = useState<ViewMode>("week");
+  /*
+   * The administrator's settings for this screen: the view it opens on, the
+   * row length, the hours a day shows, the now-line colour, the hover card
+   * and the clinic's lunch. Read through the typed endpoint every signed-in
+   * account may use; until they arrive, the offline values draw the grid.
+   */
+  const display = useCalendarDisplay();
+  const [view, setViewState] = useState<ViewMode>("week");
+  /* The setting picks the first view; once the person has chosen, it stays theirs. */
+  const [viewChosen, setViewChosen] = useState(false);
+  const setView = (next: ViewMode) => {
+    setViewChosen(true);
+    setViewState(next);
+  };
+  if (display.loaded && !viewChosen && view !== display.settings.defaultView) {
+    setViewState(display.settings.defaultView);
+  }
   const [anchor, setAnchor] = useState<string>(() => pragueDateKey(new Date()));
   const [ticked, setTicked] = useState<Set<string> | null>(null);
   const [serviceId, setServiceId] = useState<string | null>(null);
@@ -311,20 +330,29 @@ export default function CalendarGridPage() {
   );
 
   /*
-   * The now-line colour is the administrator's setting. `/api/settings` is
-   * readable only with settings.clinic.manage, so everybody else - and an
-   * installation where nobody has set it - gets the theme's error colour.
+   * The now-line colour is the administrator's setting, read with the rest
+   * of the calendar display by every account that opens the calendar - it
+   * used to come through the generic settings list, which only a manager may
+   * read, so everybody else saw the theme's red whatever the owner chose.
    */
-  const settingsQuery = useQuery({
-    queryKey: ["settings", NOW_LINE_COLOR_KEY],
-    queryFn: () => readSettings([NOW_LINE_COLOR_KEY]),
-    enabled: mayManageCalendars,
-    staleTime: 5 * 60 * 1000,
-  });
   const nowLineColor = resolveNowLineColor(
-    settingsQuery.data?.[NOW_LINE_COLOR_KEY],
+    display.settings.nowLineColor,
     theme.palette.error.main,
   );
+  const hoverFields = useMemo(
+    () => hoverFieldsFor(display.settings, maySeeSensitive),
+    [display.settings, maySeeSensitive],
+  );
+  /* Which service each calendar runs, by name, for the hover card. */
+  const serviceNames = useMemo(() => {
+    const names = new Map<string, string>();
+    const byId = new Map((servicesQuery.data ?? []).map((s) => [s.id, s.name]));
+    for (const calendar of calendars) {
+      const name = calendar.clinicServiceId ? byId.get(calendar.clinicServiceId) : undefined;
+      if (name) names.set(calendar.id, name);
+    }
+    return names;
+  }, [servicesQuery.data, calendars]);
 
   /* `pub.bookingEnabled`, through the endpoint every screen may read. Never throws. */
   const publicClinicQuery = useQuery({
@@ -374,27 +402,39 @@ export default function CalendarGridPage() {
     return map;
   }, [appointmentsQuery.data, shownIds, previewByCalendar, employeeId]);
 
-  /** The hours drawn: the working hours on screen, widened to anything outside them. */
+  /**
+   * The hours drawn: the clinic's day from the settings, widened to the
+   * working hours on screen and to anything booked or blocked outside them -
+   * a setting may hide empty time, never a patient.
+   */
   const openSpan = useMemo(() => {
-    const working: MinuteRange[] = [];
-    const items: MinuteRange[] = [];
+    let opening: { start: number; end: number } | null = null;
+    const items: { start: number; end: number }[] = [];
+    const hoursOf = (range: MinuteRange) => ({
+      start: Math.floor(range.start / 60),
+      end: Math.ceil(range.end / 60),
+    });
     for (const dayKey of days) {
       for (const calendar of shown) {
         const row = previewByCalendar.get(calendar.id)?.get(dayKey);
         if (!row) continue;
         const start = parseTimeOfDay(row.startTime);
         const end = parseTimeOfDay(row.endTime);
-        if (row.isOpen && start !== null && end !== null) working.push({ start, end });
+        if (!row.isOpen || start === null || end === null) continue;
+        const hours = hoursOf({ start, end });
+        opening = opening
+          ? { start: Math.min(opening.start, hours.start), end: Math.max(opening.end, hours.end) }
+          : hours;
       }
-      for (const a of byDay.get(dayKey) ?? []) items.push(spanOnDay(a.startUtc, a.endUtc, dayKey));
+      for (const a of byDay.get(dayKey) ?? []) items.push(hoursOf(spanOnDay(a.startUtc, a.endUtc, dayKey)));
       for (const blocks of blocksByCalendar.values()) {
         for (const b of blocks) {
-          if (touchesDay(b.startUtc, b.endUtc, dayKey)) items.push(spanOnDay(b.startUtc, b.endUtc, dayKey));
+          if (touchesDay(b.startUtc, b.endUtc, dayKey)) items.push(hoursOf(spanOnDay(b.startUtc, b.endUtc, dayKey)));
         }
       }
     }
-    return visibleHours(working, items);
-  }, [days, shown, previewByCalendar, byDay, blocksByCalendar]);
+    return gridSpan(display.settings, opening, items);
+  }, [days, shown, previewByCalendar, byDay, blocksByCalendar, display.settings]);
 
   /**
    * Which appointment the detail is opened on. Only its id and calendar are
@@ -581,6 +621,7 @@ export default function CalendarGridPage() {
           onDate={setAnchor}
           onView={setView}
           holidays={holidayDates(holidays)}
+          holidayNames={holidayNames(holidays)}
           closedDays={closedHolidayDates(holidays)}
           calendars={serviceCalendars}
           isTicked={(id) => ticked === null || ticked.has(id)}
@@ -651,6 +692,7 @@ export default function CalendarGridPage() {
                   todayKey={todayKey}
                   onOpen={setOpenId}
                   onPickDay={pickDay}
+                  hoverFields={hoverFields}
                 />
               ) : isPhone ? (
                 <DayList
@@ -660,6 +702,7 @@ export default function CalendarGridPage() {
                   marks={marks}
                   now={now}
                   onOpen={setOpenId}
+                  hoverFields={hoverFields}
                 />
               ) : (
                 <TimeGrid
@@ -672,6 +715,9 @@ export default function CalendarGridPage() {
                   blocksByCalendar={blocksByCalendar}
                   marks={marks}
                   openSpan={openSpan}
+                  slotMinutes={display.settings.slotMinutes}
+                  hoverFields={hoverFields}
+                  serviceNames={serviceNames}
                   now={now}
                   employeeId={employeeId}
                   nowLineColor={nowLineColor}
@@ -720,10 +766,11 @@ interface SharedProps {
   marks: Map<string, DayMark>;
   now: Date;
   onOpen: (id: string) => void;
+  hoverFields: readonly HoverFieldKey[];
 }
 
 /** The phone view: a list, not a grid (7.2). */
-function DayList({ days, byDay, calendarById, marks, now, onOpen }: SharedProps) {
+function DayList({ days, byDay, calendarById, marks, now, onOpen, hoverFields }: SharedProps) {
   const { t } = useTranslation();
 
   return (
@@ -758,6 +805,7 @@ function DayList({ days, byDay, calendarById, marks, now, onOpen }: SharedProps)
                     now={now}
                     onOpen={onOpen}
                     layout="row"
+                    hoverFields={hoverFields}
                   />
                 ))}
               </Stack>
@@ -788,6 +836,7 @@ function MonthGrid({
   todayKey,
   onOpen,
   onPickDay,
+  hoverFields,
 }: SharedProps & {
   anchor: string;
   anchorMonth: string;
@@ -901,6 +950,7 @@ function MonthGrid({
                     now={now}
                     onOpen={onOpen}
                     layout="compact"
+                    hoverFields={hoverFields}
                   />
                 ))}
                 {hidden > 0 ? (

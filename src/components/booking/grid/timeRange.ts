@@ -36,6 +36,11 @@ export function pragueMinuteOfDay(instant: Date | string): number {
   return hour * 60 + minute;
 }
 
+/** Whether two stretches of one day share a minute; touching ones do not. */
+export function overlaps(a: MinuteRange, b: MinuteRange): boolean {
+  return a.start < b.end && b.start < a.end;
+}
+
 /** `08:30` from wall-clock minutes; the end of the day is `24:00`. */
 export function formatMinutes(minutes: number): string {
   const hours = Math.floor(minutes / 60);
@@ -148,4 +153,19 @@ export function rangeToInstants(dayKey: DateOnly, range: MinuteRange): { startUt
     startUtc: pragueWallClockToInstant(startDay, startTime),
     endUtc: pragueWallClockToInstant(endDay, endTime),
   };
+}
+
+/**
+ * Pixels per row, by row length. A booking shows two lines - time with
+ * activity, and the status in words, which 7.1 requires because colour may not
+ * carry it alone - so even the shortest row has to hold a legible block, while
+ * a whole day of 15-minute rows must still fit on a screen without a wall of
+ * scrolling.
+ */
+export function rowHeightFor(slotMinutes: number): number {
+  if (slotMinutes <= 10) return 24;
+  if (slotMinutes <= 15) return 30;
+  if (slotMinutes <= 20) return 36;
+  if (slotMinutes <= 30) return 46;
+  return 64;
 }

@@ -3,6 +3,7 @@ import {
   dragRange,
   formatMinutes,
   localDateTime,
+  overlaps,
   parseTimeOfDay,
   pragueMinuteOfDay,
   rangeLabel,
@@ -11,6 +12,15 @@ import {
   touchesDay,
   visibleHours,
 } from './timeRange';
+
+describe('overlaps', () => {
+  it('is true when two stretches share a minute and false when they only touch', () => {
+    expect(overlaps({ start: 690, end: 730 }, { start: 720, end: 750 })).toBe(true);
+    expect(overlaps({ start: 660, end: 720 }, { start: 720, end: 750 })).toBe(false);
+    expect(overlaps({ start: 750, end: 780 }, { start: 720, end: 750 })).toBe(false);
+    expect(overlaps({ start: 700, end: 760 }, { start: 720, end: 750 })).toBe(true);
+  });
+});
 
 const DAY = { start: 7 * 60, end: 19 * 60 };
 

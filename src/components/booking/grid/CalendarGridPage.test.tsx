@@ -15,6 +15,10 @@ vi.mock('../../../api/calendars', () => ({ calendarsApi: { list: vi.fn() } }));
 vi.mock('../../../api/clinicServices', () => ({ clinicServicesApi: { list: vi.fn() } }));
 vi.mock('../../../api/holidays', () => ({ holidaysApi: { year: vi.fn() } }));
 vi.mock('../../../api/clinicSettings', () => ({ readPublicClinic: vi.fn(), readSettings: vi.fn() }));
+vi.mock('../../../api/displaySettings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/displaySettings')>()),
+  useCalendarDisplay: vi.fn(),
+}));
 vi.mock('../../../api/workingHours', () => ({ workingHoursApi: { preview: vi.fn() } }));
 vi.mock('../../../api/appointments', () => ({ appointmentsApi: { range: vi.fn(), blocks: vi.fn() } }));
 
@@ -22,6 +26,7 @@ import { calendarsApi } from '../../../api/calendars';
 import { clinicServicesApi } from '../../../api/clinicServices';
 import { holidaysApi } from '../../../api/holidays';
 import { readPublicClinic, readSettings } from '../../../api/clinicSettings';
+import { CALENDAR_DISPLAY_OFFLINE, useCalendarDisplay } from '../../../api/displaySettings';
 import { workingHoursApi } from '../../../api/workingHours';
 import { appointmentsApi } from '../../../api/appointments';
 
@@ -47,6 +52,7 @@ function appointment(id: string, calendarId: string, activityName: string): DayA
     id,
     calendarId,
     patientId: 'p-' + id,
+    patientName: null,
     activityId: 'a-' + id,
     activityName,
     startUtc: '2026-09-23T07:00:00Z',
@@ -78,6 +84,11 @@ beforeEach(() => {
     name: '', email: '', phone: '', address: '', bookingEnabled: false,
   });
   vi.mocked(readSettings).mockResolvedValue({ 'calendar.nowLineColor': '#6A1B9A' });
+  /* The typed calendar-display endpoint every account reads: the owner set the now-line purple and 15-minute rows. */
+  vi.mocked(useCalendarDisplay).mockReturnValue({
+    settings: { ...CALENDAR_DISPLAY_OFFLINE, nowLineColor: '#6A1B9A', slotMinutes: 15, lunchFrom: '12:00', lunchTo: '12:30' },
+    loaded: true,
+  });
   vi.mocked(workingHoursApi.preview).mockImplementation(async (calendarId, from, to) => {
     const rows: PreviewDay[] = [];
     for (let d = from; d <= to; d = addDaysToDateOnly(d, 1)) {
@@ -85,10 +96,12 @@ beforeEach(() => {
         date: d,
         isOpen: true,
         closedBecause: null,
+        closedName: null,
         startTime: '08:00:00',
         endTime: '16:00:00',
-        breakStart: null,
-        breakEnd: null,
+        /* The clinic lunch, as the preview now carries it (row break or clinic default). */
+        breakStart: '12:00:00',
+        breakEnd: '12:30:00',
         workerUserId: WORKER[calendarId][0],
         workerDisplayName: WORKER[calendarId][1],
         isChangedByOverride: false,
@@ -180,11 +193,24 @@ describe('the calendar screen', () => {
     expect(screen.getByTestId('now-edge-left')).toBeInTheDocument();
   });
 
-  it('offers no new booking to somebody without bookings.create', async () => {
+  it('offers no new booking to somebody without bookings.create, and still reads the display settings', async () => {
     window.localStorage.setItem('permissions', JSON.stringify([]));
     renderPage();
     await screen.findByRole('button', { name: /Spiroergometrie/ });
     expect(screen.queryByRole('button', { name: 'Nové objednání' })).not.toBeInTheDocument();
+    /* The generic list needs settings.clinic.manage; the typed endpoint does not, so the now-line colour reaches everybody. */
     expect(readSettings).not.toHaveBeenCalled();
+    expect(useCalendarDisplay).toHaveBeenCalled();
+    const line = await screen.findByTestId('now-line');
+    await vi.waitFor(() => expect(line).toHaveStyle({ borderTopColor: 'rgb(106, 27, 154)' }));
+  });
+
+  it('draws the hour as four 15-minute rows and the clinic lunch in red across the column', async () => {
+    renderPage();
+    await screen.findByRole('button', { name: /Spiroergometrie/ });
+    /* An hour label spans four rows of 30 px when the row is 15 minutes. */
+    await vi.waitFor(() => expect(screen.getByTestId('hour-label-8')).toHaveStyle({ height: '120px' }));
+    const lunch = await screen.findByTestId('lunch-c1-2026-09-23');
+    expect(lunch).toHaveTextContent('OBĚD 12:00–12:30');
   });
 });

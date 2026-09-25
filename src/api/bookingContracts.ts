@@ -537,6 +537,12 @@ export const dayAppointmentSchema = z.object({
   /** Which column the row belongs to; present on the range answer and on /day. */
   calendarId: z.string().nullish().transform((v) => v ?? null),
   patientId: z.string(),
+  /**
+   * The patient's name as the register holds it, for the card that opens when
+   * the mouse rests on a block - the same fact the bell carries. `null` when
+   * the register does not know the patient, never a birth number.
+   */
+  patientName: z.string().nullish().transform((v) => v ?? null),
   activityId: z.string(),
   activityName: z.string(),
   startUtc: isoUtc,
@@ -577,7 +583,17 @@ export const HISTORY_ACTION_NAMES: Record<number, string> = {
   6: "undone",
   7: "completed",
   8: "overridden",
+  /** Given another činnost; `oldValue` and `newValue` carry the two names. */
+  9: "activityChanged",
 };
+
+/** What the desk asks for when a booking turns out to be for something else (4.5, wave 3). */
+export const changeActivityInputSchema = z.object({
+  activityId: z.string().min(1),
+  /** Keep the start and only change the length (and the room); refused when not free. */
+  keepTime: z.boolean(),
+});
+export type ChangeActivityInput = z.infer<typeof changeActivityInputSchema>;
 
 export function historyActionName(code: number): string | null {
   return HISTORY_ACTION_NAMES[code] ?? null;
@@ -897,6 +913,11 @@ export const previewDaySchema = z.object({
   date: dateOnly,
   isOpen: z.boolean(),
   closedBecause: z.string().nullish().transform((v) => v ?? null),
+  /**
+   * What the shut day is called: the holiday's name, or the exception's reason
+   * on an `override` day. `null` when there is nothing to name.
+   */
+  closedName: z.string().nullish().transform((v) => v ?? null),
   startTime: z.string().nullish().transform((v) => v ?? null),
   endTime: z.string().nullish().transform((v) => v ?? null),
   breakStart: z.string().nullish().transform((v) => v ?? null),

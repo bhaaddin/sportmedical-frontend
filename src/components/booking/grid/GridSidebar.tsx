@@ -42,6 +42,7 @@ export function GridSidebar({
   onDate,
   onView,
   holidays,
+  holidayNames,
   closedDays,
   calendars,
   isTicked,
@@ -59,6 +60,7 @@ export function GridSidebar({
   onDate: (date: DateOnly) => void;
   onView: (view: GridView) => void;
   holidays: ReadonlySet<string>;
+  holidayNames?: ReadonlyMap<string, string>;
   closedDays: ReadonlySet<string>;
   calendars: SidebarCalendar[];
   isTicked: (id: string) => boolean;
@@ -81,6 +83,7 @@ export function GridSidebar({
           view={view}
           onSelect={(date) => onDate(toDateOnly(date))}
           holidays={holidays}
+          holidayNames={holidayNames}
           closedDays={closedDays}
         />
       ) : (

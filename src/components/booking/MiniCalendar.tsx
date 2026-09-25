@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Box, IconButton, Stack, Typography } from "@mui/material";
+import { Box, IconButton, Stack, Tooltip, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import ChevronLeft from "@mui/icons-material/ChevronLeft";
 import ChevronRight from "@mui/icons-material/ChevronRight";
@@ -27,7 +27,9 @@ import type { CalendarView, Highlight, ShownMonth } from "./MiniCalendar.logic";
  * banded (strongly in week view, softly otherwise) and the day itself carries
  * the strongest mark. Today is ringed, a public holiday has a red number and a
  * closed day is hatched - the same three things the main grid shows, so the
- * two never disagree about what a day is.
+ * two never disagree about what a day is. A selected holiday stays red rather
+ * than turning the selection colour - it is still a holiday - and resting on
+ * it says which one.
  *
  * It fetches nothing. Holidays and closed days arrive as `yyyy-MM-dd` sets from
  * the page, which already asked the server for them.
@@ -38,6 +40,8 @@ export interface MiniCalendarProps {
   onSelect: (date: Date) => void;
   /** `yyyy-MM-dd` of public holidays. */
   holidays?: ReadonlySet<string>;
+  /** What each holiday is called, for the tooltip. */
+  holidayNames?: ReadonlyMap<string, string>;
   /** `yyyy-MM-dd` of days nobody can book (booking pause, closed day). */
   closedDays?: ReadonlySet<string>;
 }
@@ -52,6 +56,7 @@ export function MiniCalendar({
   view,
   onSelect,
   holidays,
+  holidayNames,
   closedDays,
 }: MiniCalendarProps) {
   const [shown, setShown] = useState<ShownMonth>(() => monthOf(value));
@@ -145,7 +150,8 @@ export function MiniCalendar({
                   view={view}
                   first={i === 0}
                   last={i === 6}
-                  label={dayLabel(cell, flags)}
+                  label={dayLabel(cell, flags, holidayNames?.get(dayKey(cell)))}
+                  holidayName={holidayNames?.get(dayKey(cell)) ?? null}
                   outside={flags.outside}
                   today={flags.today}
                   holiday={flags.holiday}
@@ -201,6 +207,7 @@ function DayCell({
   first,
   last,
   label,
+  holidayName,
   outside,
   today,
   holiday,
@@ -213,6 +220,7 @@ function DayCell({
   first: boolean;
   last: boolean;
   label: string;
+  holidayName: string | null;
   outside: boolean;
   today: boolean;
   holiday: boolean;
@@ -220,7 +228,7 @@ function DayCell({
   onSelect: () => void;
 }) {
   const banded = mark === "week" || mark === "weekSoft" || mark === "day";
-  return (
+  const cellButton = (
     <Box
       sx={(theme) => ({
         display: "flex",
@@ -259,15 +267,29 @@ function DayCell({
           borderRadius: "50%",
           border: "2px solid",
           borderColor:
-            today && mark !== "day" ? theme.palette.primary.main : "transparent",
+            today && mark !== "day"
+              ? theme.palette.primary.main
+              : holiday && mark === "day"
+                ? theme.palette.error.main
+                : "transparent",
+          /*
+           * A selected holiday keeps its red: the owner's rule is that the
+           * 28th stays red when clicked, not the selection green - it is a
+           * holiday whether or not it is selected. It is marked by a red ring
+           * and a tinted fill instead of the solid selection colour.
+           */
           backgroundColor:
-            mark === "day" ? theme.palette.primary.main : "transparent",
+            mark === "day"
+              ? holiday
+                ? alpha(theme.palette.error.main, 0.16)
+                : theme.palette.primary.main
+              : "transparent",
           backgroundImage: closed && mark !== "day" ? HATCH : "none",
           color:
-            mark === "day"
-              ? theme.palette.primary.contrastText
-              : holiday
-                ? theme.palette.error.main
+            holiday
+              ? theme.palette.error.main
+              : mark === "day"
+                ? theme.palette.primary.contrastText
                 : outside
                   ? theme.palette.text.disabled
                   : closed
@@ -276,20 +298,19 @@ function DayCell({
           font: "inherit",
           fontSize: "0.8125rem",
           fontWeight: mark === "day" || holiday || today ? 700 : 400,
-          textDecoration: holiday && mark === "day" ? "underline" : "none",
-          textDecorationColor: theme.palette.error.light,
-          textUnderlineOffset: 3,
           opacity: outside && mark === "none" ? 0.7 : 1,
           cursor: "pointer",
           p: 0,
           "&:hover": {
             backgroundColor:
               mark === "day"
-                ? theme.palette.primary.dark
-                : alpha(theme.palette.primary.main, 0.14),
+                ? holiday
+                  ? alpha(theme.palette.error.main, 0.28)
+                  : theme.palette.primary.dark
+                : alpha(holiday ? theme.palette.error.main : theme.palette.primary.main, 0.14),
           },
           "&:focus-visible": {
-            outline: `2px solid ${theme.palette.primary.main}`,
+            outline: `2px solid ${holiday ? theme.palette.error.main : theme.palette.primary.main}`,
             outlineOffset: 1,
           },
         })}
@@ -297,6 +318,14 @@ function DayCell({
         {cell.getDate()}
       </Box>
     </Box>
+  );
+
+  return holidayName ? (
+    <Tooltip title={holidayName} enterDelay={300}>
+      {cellButton}
+    </Tooltip>
+  ) : (
+    cellButton
   );
 }
 

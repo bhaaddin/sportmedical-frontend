@@ -10,6 +10,8 @@ export interface MiniCalendarProps {
   onSelect: (date: Date) => void;
   /** `YYYY-MM-DD` of public holidays - drawn with a red number. */
   holidays?: ReadonlySet<string>;
+  /** What each red day is called, for the tooltip: `2026-09-28` → `Den české státnosti`. */
+  holidayNames?: ReadonlyMap<string, string>;
   /** `YYYY-MM-DD` of days the clinic has off. */
   closedDays?: ReadonlySet<string>;
 }

@@ -17,6 +17,7 @@ import type {
   PreviewDay,
   TimeBlock,
 } from "../../../api/bookingContracts";
+import type { HoverFieldKey } from "../../../api/displaySettings";
 import { dayOfWeekOf, type DateOnly } from "../../../utils/time";
 import { AppointmentButton } from "./AppointmentButton";
 import { BlockDetailDialog, BlockReasonDialog, type BlockTarget } from "./BlockDialogs";
@@ -27,9 +28,12 @@ import { isWorkingToday, nowLinePlacement } from "./nowLine";
 import {
   dragRange,
   localDateTime,
+  formatMinutes,
   minuteAt,
+  overlaps,
   parseTimeOfDay,
   rangeLabel,
+  rowHeightFor,
   spanOnDay,
   touchesDay,
   type MinuteRange,
@@ -50,16 +54,14 @@ import {
  *     the server's answer (6.1), given in the booking dialog.
  *   - **The now-line**, per the owner's rules in `nowLine.ts`.
  *   - **Blocks**, drawn with their reason, and removable by who may block.
+ *   - **The row length** is the administrator's `calendar.slotMinutes` (15 by
+ *     default since wave 3: the hour as four quarters). Hour lines are drawn
+ *     stronger than the lines between rows, so the eye still finds the hour.
+ *   - **Lunch** is drawn in red with its times written across the column, and
+ *     a drag over it is refused with the reason rather than silently trimmed.
  */
 
-const SLOT_MINUTES = 30;
-/**
- * Pixels per slot. A booking shows two lines - time with activity, and the
- * status in words, which 7.1 requires because colour may not carry it alone -
- * so the shortest slot has to be tall enough for both.
- */
-const ROW_HEIGHT = 46;
-const PX_PER_MINUTE = ROW_HEIGHT / SLOT_MINUTES;
+const DEFAULT_SLOT_MINUTES = 30;
 
 export interface GridBookingRequest {
   calendarId: string;
@@ -75,6 +77,8 @@ interface Selection {
   range: MinuteRange;
   x: number;
   y: number;
+  /** Why nothing is offered for this drag - it crossed the lunch. */
+  refused?: string;
 }
 
 export interface TimeGridProps {
@@ -88,6 +92,12 @@ export interface TimeGridProps {
   marks: Map<string, DayMark>;
   /** Whole hours drawn, `end` exclusive. */
   openSpan: { start: number; end: number };
+  /** Length of one row in minutes - the clinic's `calendar.slotMinutes`. */
+  slotMinutes?: number;
+  /** What the card on a booked block shows; empty means no card. */
+  hoverFields?: readonly HoverFieldKey[];
+  /** The service each calendar runs, by calendar id, for the hover card. */
+  serviceNames?: ReadonlyMap<string, string>;
   now: Date;
   employeeId: string | null;
   nowLineColor: string;
@@ -114,7 +124,15 @@ export function TimeGrid(props: TimeGridProps) {
     nowLineColor,
     mayBook,
     mayBlock,
+    hoverFields = [],
+    serviceNames,
   } = props;
+  const slotMinutes =
+    props.slotMinutes && props.slotMinutes > 0 && 60 % props.slotMinutes === 0
+      ? props.slotMinutes
+      : DEFAULT_SLOT_MINUTES;
+  const rowHeight = rowHeightFor(slotMinutes);
+  const pxPerMinute = rowHeight / slotMinutes;
 
   const [pending, setPending] = useState<Selection | null>(null);
   const [blockTarget, setBlockTarget] = useState<BlockTarget | null>(null);
@@ -124,7 +142,7 @@ export function TimeGrid(props: TimeGridProps) {
 
   const topMinute = openSpan.start * 60;
   const bottomMinute = openSpan.end * 60;
-  const height = (bottomMinute - topMinute) * PX_PER_MINUTE;
+  const height = (bottomMinute - topMinute) * pxPerMinute;
   const hours = Array.from({ length: openSpan.end - openSpan.start }, (_, i) => openSpan.start + i);
   const columnMin = Math.max(140, calendars.length * 110);
   const dragEnabled = mayBook || mayBlock;
@@ -232,8 +250,9 @@ export function TimeGrid(props: TimeGridProps) {
           {hours.map((hour) => (
             <Box
               key={hour}
+              data-testid={`hour-label-${hour}`}
               sx={{
-                height: ROW_HEIGHT * (60 / SLOT_MINUTES),
+                height: rowHeight * (60 / slotMinutes),
                 fontSize: 11,
                 color: "text.secondary",
                 textAlign: "right",
@@ -281,6 +300,10 @@ export function TimeGrid(props: TimeGridProps) {
                     )}
                     topMinute={topMinute}
                     bottomMinute={bottomMinute}
+                    slotMinutes={slotMinutes}
+                    rowHeight={rowHeight}
+                    hoverFields={hoverFields}
+                    serviceName={serviceNames?.get(calendar.id) ?? null}
                     now={now}
                     pending={
                       pending?.calendarId === calendar.id && pending.dayKey === dayKey
@@ -317,7 +340,7 @@ export function TimeGrid(props: TimeGridProps) {
                       position: "absolute",
                       left: 0,
                       right: 0,
-                      top: (placement.minute - topMinute) * PX_PER_MINUTE,
+                      top: (placement.minute - topMinute) * pxPerMinute,
                       height: 0,
                       borderTop: `2px solid ${nowLineColor}`,
                       pointerEvents: "none",
@@ -334,11 +357,11 @@ export function TimeGrid(props: TimeGridProps) {
                             position: "absolute",
                             [edge]: 0,
                             width: 2,
-                            top: (Math.max(placement.span.start, topMinute) - topMinute) * PX_PER_MINUTE,
+                            top: (Math.max(placement.span.start, topMinute) - topMinute) * pxPerMinute,
                             height:
                               (Math.min(placement.span.end, bottomMinute) -
                                 Math.max(placement.span.start, topMinute)) *
-                              PX_PER_MINUTE,
+                              pxPerMinute,
                             backgroundColor: nowLineColor,
                             pointerEvents: "none",
                             zIndex: 5,
@@ -365,7 +388,18 @@ export function TimeGrid(props: TimeGridProps) {
             {rangeLabel(pending.range)}
           </ListSubheader>
         ) : null}
-        {mayBook ? (
+        {/* A drag across the lunch offers nothing and says why (the owner's
+            rule: not bookable, and the refusal carries the reason). */}
+        {pending?.refused ? (
+          <MenuItem
+            disabled
+            data-testid="drag-refused"
+            sx={{ whiteSpace: "normal", maxWidth: 320, opacity: "1 !important", color: "error.main" }}
+          >
+            {pending.refused}
+          </MenuItem>
+        ) : null}
+        {mayBook && !pending?.refused ? (
           <MenuItem
             onClick={() => {
               if (!pending) return;
@@ -381,7 +415,7 @@ export function TimeGrid(props: TimeGridProps) {
             {GRID_TEXT.book}
           </MenuItem>
         ) : null}
-        {mayBlock ? (
+        {mayBlock && !pending?.refused ? (
           <MenuItem
             onClick={() => {
               if (!pending) return;
@@ -426,6 +460,10 @@ function SubColumn({
   blocks,
   topMinute,
   bottomMinute,
+  slotMinutes,
+  rowHeight,
+  hoverFields,
+  serviceName,
   now,
   pending,
   onSelect,
@@ -441,6 +479,10 @@ function SubColumn({
   blocks: TimeBlock[];
   topMinute: number;
   bottomMinute: number;
+  slotMinutes: number;
+  rowHeight: number;
+  hoverFields: readonly HoverFieldKey[];
+  serviceName: string | null;
   now: Date;
   pending: MinuteRange | null;
   onSelect: (selection: Selection) => void;
@@ -449,8 +491,9 @@ function SubColumn({
 }) {
   const theme = useTheme();
   const [drag, setDrag] = useState<{ anchor: number; current: number } | null>(null);
+  const pxPerMinute = rowHeight / slotMinutes;
 
-  const step = calendar.displayStepMinutes > 0 ? calendar.displayStepMinutes : SLOT_MINUTES;
+  const step = calendar.displayStepMinutes > 0 ? calendar.displayStepMinutes : slotMinutes;
   const bounds = { start: topMinute, end: bottomMinute };
   const canDrag = dragEnabled && open;
   const live = drag ? dragRange(drag.anchor, drag.current, step, bounds) : pending;
@@ -459,8 +502,8 @@ function SubColumn({
     const start = Math.max(range.start, topMinute);
     const end = Math.min(range.end, bottomMinute);
     return {
-      top: (start - topMinute) * PX_PER_MINUTE,
-      height: Math.max(0, (end - start) * PX_PER_MINUTE),
+      top: (start - topMinute) * pxPerMinute,
+      height: Math.max(0, (end - start) * pxPerMinute),
     };
   };
 
@@ -468,12 +511,17 @@ function SubColumn({
   const workEnd = row?.isOpen ? parseTimeOfDay(row.endTime) : null;
   const breakStart = row?.isOpen ? parseTimeOfDay(row.breakStart) : null;
   const breakEnd = row?.isOpen ? parseTimeOfDay(row.breakEnd) : null;
+  const lunch: MinuteRange | null =
+    breakStart !== null && breakEnd !== null && breakEnd > breakStart
+      ? { start: breakStart, end: breakEnd }
+      : null;
   /* Without a preview row nothing is known about the hours, so nothing is shaded. */
   const shaded = row !== undefined || !open;
+  const liveOverLunch = live !== null && lunch !== null && overlaps(live, lunch);
 
   const minuteOf = (event: React.PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    return minuteAt(event.clientY - rect.top, PX_PER_MINUTE, topMinute);
+    return minuteAt(event.clientY - rect.top, pxPerMinute, topMinute);
   };
 
   return (
@@ -503,7 +551,16 @@ function SubColumn({
         if (!drag) return;
         const range = dragRange(drag.anchor, minuteOf(event), step, bounds);
         setDrag(null);
-        onSelect({ calendarId: calendar.id, dayKey, range, x: event.clientX, y: event.clientY });
+        onSelect({
+          calendarId: calendar.id,
+          dayKey,
+          range,
+          x: event.clientX,
+          y: event.clientY,
+          // The lunch is not bookable, and a drag over it is refused with
+          // the reason rather than trimmed to fit around it.
+          refused: lunch !== null && overlaps(range, lunch) ? GRID_TEXT.lunchRefused : undefined,
+        });
       }}
       onPointerCancel={() => setDrag(null)}
       sx={{
@@ -533,20 +590,45 @@ function SubColumn({
           }}
         />
       ) : null}
-      {breakStart !== null && breakEnd !== null && open ? (
+      {/* The lunch: red, with its times written across the column, so the
+          desk reads "OBĚD 12:00–12:30" and not a grey band it has to guess at. */}
+      {lunch !== null && open ? (
         <Box
+          data-testid={`lunch-${calendar.id}-${dayKey}`}
+          aria-label={`${GRID_TEXT.lunch} ${rangeLabel(lunch)}`}
           sx={{
             position: "absolute",
             left: 0,
             right: 0,
-            ...place({ start: breakStart, end: breakEnd }),
-            backgroundColor: "action.hover",
-            zIndex: 0,
+            ...place(lunch),
+            zIndex: 1,
+            backgroundColor: alpha(theme.palette.error.main, 0.14),
+            borderTop: `1px solid ${theme.palette.error.main}`,
+            borderBottom: `1px solid ${theme.palette.error.main}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            pointerEvents: "none",
           }}
-        />
+        >
+          <Typography
+            sx={{
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: 0.5,
+              color: "error.main",
+              whiteSpace: "nowrap",
+              px: 0.5,
+            }}
+          >
+            {GRID_TEXT.lunch} {formatMinutes(lunch.start)}–{formatMinutes(lunch.end)}
+          </Typography>
+        </Box>
       ) : null}
 
-      {/* Hour and half-hour lines, so a drag has something to aim at. */}
+      {/* Row lines, hour lines stronger, so a drag has something to aim at
+          and the eye still finds the hour among four quarters. */}
       <Box
         aria-hidden
         sx={{
@@ -554,7 +636,10 @@ function SubColumn({
           inset: 0,
           pointerEvents: "none",
           zIndex: 1,
-          backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${ROW_HEIGHT - 1}px, ${theme.palette.divider} ${ROW_HEIGHT - 1}px, ${theme.palette.divider} ${ROW_HEIGHT}px)`,
+          backgroundImage: [
+            `repeating-linear-gradient(to bottom, transparent 0, transparent ${rowHeight * (60 / slotMinutes) - 1}px, ${alpha(theme.palette.text.primary, 0.22)} ${rowHeight * (60 / slotMinutes) - 1}px, ${alpha(theme.palette.text.primary, 0.22)} ${rowHeight * (60 / slotMinutes)}px)`,
+            `repeating-linear-gradient(to bottom, transparent 0, transparent ${rowHeight - 1}px, ${theme.palette.divider} ${rowHeight - 1}px, ${theme.palette.divider} ${rowHeight}px)`,
+          ].join(", "),
         }}
       />
 
@@ -609,10 +694,11 @@ function SubColumn({
           >
             <AppointmentButton
               appointment={appointment}
-              calendar={calendar}
+              calendar={{ ...calendar, serviceName }}
               now={now}
               onOpen={onOpen}
               layout="block"
+              hoverFields={hoverFields}
             />
           </Box>
         );
@@ -621,6 +707,7 @@ function SubColumn({
       {live ? (
         <Box
           data-testid="drag-selection"
+          data-over-lunch={liveOverLunch ? "true" : undefined}
           sx={{
             position: "absolute",
             left: 2,
@@ -629,9 +716,9 @@ function SubColumn({
             zIndex: 4,
             pointerEvents: "none",
             border: "2px solid",
-            borderColor: "primary.main",
+            borderColor: liveOverLunch ? "error.main" : "primary.main",
             borderRadius: 1,
-            backgroundColor: alpha(theme.palette.primary.main, 0.18),
+            backgroundColor: alpha(liveOverLunch ? theme.palette.error.main : theme.palette.primary.main, 0.18),
             display: "flex",
             justifyContent: "center",
             alignItems: "flex-start",
@@ -644,12 +731,12 @@ function SubColumn({
               fontSize: 11,
               fontWeight: 700,
               borderRadius: 0.5,
-              backgroundColor: "primary.main",
-              color: "primary.contrastText",
+              backgroundColor: liveOverLunch ? "error.main" : "primary.main",
+              color: liveOverLunch ? "error.contrastText" : "primary.contrastText",
               whiteSpace: "nowrap",
             }}
           >
-            {rangeLabel(live)}
+            {liveOverLunch ? `${GRID_TEXT.lunch} · ` : ""}{rangeLabel(live)}
           </Typography>
         </Box>
       ) : null}

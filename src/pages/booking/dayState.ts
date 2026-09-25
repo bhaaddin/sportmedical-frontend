@@ -32,6 +32,8 @@
 export interface DayPreviewLike {
   isOpen: boolean;
   closedBecause: string | null;
+  /** What the shut day is called: the holiday's name, the exception's reason. */
+  closedName?: string | null;
   offeredActivityIds?: readonly string[];
   /** Named by the server on a `workerAbsent` day: who is out. */
   workerDisplayName?: string | null;
@@ -39,8 +41,11 @@ export interface DayPreviewLike {
 
 export type DayState =
   | { kind: 'open' }
-  /** `who` only on a `workerAbsent` day - the person the day belongs to. */
-  | { kind: 'closed'; because: string | null; who?: string | null }
+  /**
+   * `who` only on a `workerAbsent` day - the person the day belongs to;
+   * `name` when the server named the day (a holiday, a closed exception).
+   */
+  | { kind: 'closed'; because: string | null; who?: string | null; name?: string | null }
   | { kind: 'nothing-to-book' };
 
 /** The server's word for a day shut because its worker is recorded out. */
@@ -85,7 +90,9 @@ export function dayState(preview: readonly DayPreviewLike[]): DayState {
   if (shut !== undefined) {
     return shut.closedBecause === WORKER_ABSENT
       ? { kind: 'closed', because: WORKER_ABSENT, who: shut.workerDisplayName ?? null }
-      : { kind: 'closed', because: shut.closedBecause };
+      : shut.closedName
+        ? { kind: 'closed', because: shut.closedBecause, name: shut.closedName }
+        : { kind: 'closed', because: shut.closedBecause };
   }
 
   return { kind: 'open' };

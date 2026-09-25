@@ -69,6 +69,27 @@ describe('MiniCalendar', () => {
     expect(screen.getByText('zavřeno')).toBeInTheDocument();
   });
 
+  it('keeps a selected holiday red and names it', async () => {
+    render(
+      <MiniCalendar
+        value={new Date(2026, 8, 28)}
+        view="day"
+        onSelect={() => {}}
+        holidays={new Set(['2026-09-28'])}
+        holidayNames={new Map([['2026-09-28', 'Den české státnosti']])}
+      />,
+    );
+
+    const cell = cellOf('2026-09-28');
+    expect(cell.dataset.highlight).toBe('day');
+    /* Selected, and still red: the owner's rule. */
+    expect(cell).toHaveStyle({ color: 'rgb(211, 47, 47)' });
+    expect(cell).toHaveAccessibleName('pondělí 28. září 2026, svátek Den české státnosti');
+
+    await userEvent.hover(cell);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Den české státnosti');
+  });
+
   it('follows the selection into another month', () => {
     const { rerender } = render(
       <MiniCalendar value={new Date(2026, 8, 23)} view="week" onSelect={() => {}} />,

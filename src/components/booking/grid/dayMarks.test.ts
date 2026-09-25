@@ -4,6 +4,7 @@ import {
   closedHolidayDates,
   dayMark,
   holidayDates,
+  holidayNames,
   yearsBetween,
 } from './dayMarks';
 
@@ -15,6 +16,22 @@ const workedHoliday = { date: '2026-10-28', name: 'Den vzniku státu', isHoliday
 const clinicDayOff = { date: '2026-08-14', name: 'Firemní volno', isHoliday: true, isStatutory: false };
 
 describe('dayMark', () => {
+  it('names a day the preview alone shut - an exception with a reason, a holiday the list did not carry', () => {
+    expect(dayMark(undefined, [{ ...closedRow('override'), closedName: 'Inventura' }])).toEqual({
+      redNumber: false,
+      closed: true,
+      label: 'Zavřeno',
+      detail: 'Inventura',
+    });
+    expect(dayMark(undefined, [{ ...closedRow('holiday'), closedName: 'Den české státnosti' }]).detail).toBe(
+      'Den české státnosti',
+    );
+  });
+
+  it('prefers the holiday list name to the preview name for the same day', () => {
+    expect(dayMark(christmas, [{ ...closedRow('holiday'), closedName: 'Vánoce' }]).detail).toBe('Štědrý den');
+  });
+
   it('shuts a public holiday: red number, shaded, "Státní svátek"', () => {
     expect(dayMark(christmas, [closedRow('holiday')])).toEqual({
       redNumber: true,
@@ -78,6 +95,15 @@ describe('calendarDayOpen', () => {
 
   it('leaves the decision to the server when the preview is missing', () => {
     expect(calendarDayOpen(ordinary, undefined)).toBe(true);
+  });
+});
+
+describe('holidayNames', () => {
+  it('names every red day, and says when a holiday is worked', () => {
+    const names = holidayNames([christmas, workedHoliday, clinicDayOff]);
+    expect(names.get('2026-12-24')).toBe('Štědrý den');
+    expect(names.get('2026-08-14')).toBe('Firemní volno');
+    expect(names.get('2026-10-28')).toBe('Den vzniku státu – Svátek – pracuje se');
   });
 });
 

@@ -33,7 +33,11 @@ export interface DayMark {
   closed: boolean;
   /** The word in the day's header, or `null` for an ordinary day. */
   label: string | null;
-  /** The holiday's own name, when there is one. */
+  /**
+   * What the day is called, when it has a name: the holiday's ("Den české
+   * státnosti"), the clinic's own day off ("Firemní volno"), or the reason
+   * of the exception that shut it - so the header can say why, not only that.
+   */
   detail: string | null;
 }
 
@@ -65,7 +69,9 @@ export function dayMark(
       redNumber: worked || state.because === 'holiday',
       closed: true,
       label: (state.because && CLOSED_BECAUSE[state.because]) || GRID_TEXT.closed,
-      detail: holiday?.name || null,
+      /* The holiday list names the day first; a day the preview alone shut
+         (an exception, a holiday the list did not carry) is named by the server. */
+      detail: holiday?.name || state.name || null,
     };
   }
 
@@ -100,6 +106,21 @@ export function calendarDayOpen(
 /** The dates to paint red, for the mini calendar. */
 export function holidayDates(holidays: readonly HolidayLike[]): Set<DateOnly> {
   return new Set(holidays.filter((h) => h.isHoliday || h.isStatutory).map((h) => h.date));
+}
+
+/**
+ * What each red or closed day is called, for the mini calendar's tooltip: the
+ * statutory name, or the clinic's own word for a day it takes. A worked
+ * holiday says so, because it is still a holiday and still red.
+ */
+export function holidayNames(holidays: readonly HolidayLike[]): Map<DateOnly, string> {
+  const names = new Map<DateOnly, string>();
+  for (const holiday of holidays) {
+    if (!holiday.isHoliday && !holiday.isStatutory) continue;
+    const name = holiday.name || (holiday.isStatutory ? GRID_TEXT.publicHoliday : GRID_TEXT.closed);
+    names.set(holiday.date, holiday.isStatutory && !holiday.isHoliday ? `${name} – ${GRID_TEXT.holidayWorked}` : name);
+  }
+  return names;
 }
 
 /** The dates the clinic has off, for the mini calendar. */

@@ -40,4 +40,23 @@ export const GRID_TEXT = {
   service: 'Služba',
   jumpTo: 'Přejít na datum',
   otherWorker: 'jiný pracovník',
+  /* The lunch block, in capitals so it reads across a narrow column. */
+  lunch: 'OBĚD',
+  lunchRefused: 'Obědová pauza – v tento čas se neobjednává ani neblokuje.',
+  /* The card that opens when the mouse rests on a booked block. */
+  hoverPatient: 'Pacient',
+  hoverPhone: 'Telefon',
+  hoverEmail: 'E-mail',
+  hoverActivity: 'Činnost',
+  hoverService: 'Služba',
+  hoverStatus: 'Stav',
+  hoverPaperwork: 'Podklady',
+  hoverNote: 'Poznámka',
+  hoverInsurer: 'Pojišťovna',
+  hoverBirthDate: 'Narozen(a)',
+  hoverHistory: 'Poslední změna',
+  hoverLoading: 'načítá se…',
+  hoverUnknown: 'neuvedeno',
+  hoverNoHistory: 'bez změn',
+  hoverOpen: 'Kliknutím otevřete termín.',
 } as const;
