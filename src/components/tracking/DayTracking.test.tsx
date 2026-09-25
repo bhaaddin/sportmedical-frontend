@@ -8,7 +8,7 @@
  * it - never to something counted here.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import type { ReactNode } from 'react';
@@ -31,7 +31,7 @@ vi.mock('../../api/activities', () => ({
 
 vi.mock('../../hooks/useRealtimeSync', () => ({ useRealtimeSync: vi.fn() }));
 
-const { DayTracking } = await import('./DayTracking');
+const { DayTracking, TRACKING_DAY_QUERY_KEY } = await import('./DayTracking');
 
 const counts = (over: Partial<Record<string, number>> = {}) => ({
   booked: 3,
@@ -89,14 +89,33 @@ beforeEach(() => {
 
 const mount = (ui: ReactNode) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  return render(
+  const rendered = render(
     <QueryClientProvider client={client}>
       <MemoryRouter>{ui}</MemoryRouter>
     </QueryClientProvider>,
   );
+  return { ...rendered, client };
 };
 
 describe('sledování dne', () => {
+  it('asks the server again when a screen invalidates the exported key, and promises only that', async () => {
+    const { client } = mount(<DayTracking date="2026-09-24" calendarIds={['c1']} />);
+
+    await screen.findByRole('button', { name: 'Objednáno' });
+    expect(day).toHaveBeenCalledTimes(1);
+
+    /* The server rings no bell on a status change; "Přišel" on /dnes and the
+       booking detail invalidate this key instead, and the panel must react. */
+    await client.invalidateQueries({ queryKey: TRACKING_DAY_QUERY_KEY });
+    await waitFor(() => expect(day).toHaveBeenCalledTimes(2));
+
+    expect(
+      screen.getByText(
+        'Aktualizuje se každou minutu, po každé nové, přesunuté nebo zrušené rezervaci a po změně stavu provedené v tomto okně.',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('shows the nine numbers under their labels, from the server', async () => {
     mount(<DayTracking date="2026-09-24" calendarIds={['c1']} />);
 

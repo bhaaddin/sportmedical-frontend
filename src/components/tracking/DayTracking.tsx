@@ -41,8 +41,10 @@ import type { DateOnly } from '../../utils/time';
  *
  * Every figure is the server's (`GET /api/tracking/day`); this component
  * filters the server's own rows when a cell is clicked and computes nothing
- * of its own. It asks again every minute and whenever the hub says something
- * changed, so the numbers on the wall are never older than the last booking.
+ * of its own. It asks again every minute, whenever the hub says something
+ * changed (new, moved or cancelled bookings) and whenever a screen that
+ * changes a booking's status invalidates TRACKING_DAY_QUERY_KEY, because the
+ * server rings no bell on a status change.
  */
 export const TRACKING_DAY_QUERY_KEY = ['tracking', 'day'] as const;
 
@@ -90,7 +92,7 @@ export function DayTracking({ date, calendarIds }: { date: DateOnly; calendarIds
           Sledování dne
         </Typography>
         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          Aktualizuje se každou minutu a po každé změně v kalendáři.
+          Aktualizuje se každou minutu, po každé nové, přesunuté nebo zrušené rezervaci a po změně stavu provedené v tomto okně.
         </Typography>
       </Stack>
 

@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 import { appointmentsApi } from "../../api/appointments";
 import { patientsApi } from "../../api/patients";
+import { TRACKING_DAY_QUERY_KEY } from "../tracking/DayTracking";
 import { BookingApiError } from "../../api/apiError";
 import {
   canChangeStatus,
@@ -235,6 +236,9 @@ function DetailBody({
     void queryClient.invalidateQueries({
       queryKey: ["appointment-history", calendarId, appointment.id],
     });
+    /* Sledování dne counts this booking's status; the server does not
+       announce status changes over the hub, so the panel is told here. */
+    void queryClient.invalidateQueries({ queryKey: TRACKING_DAY_QUERY_KEY });
     onChanged();
   };
 

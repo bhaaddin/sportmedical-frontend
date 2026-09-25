@@ -36,7 +36,10 @@ import { AsyncSection } from "../../components/booking/AsyncSection";
 import { NewAppointmentDialog } from "../../components/booking/NewAppointmentDialog";
 import { errorText } from "../../components/booking/errorText";
 import { usePermission } from "../../auth/usePermission";
-import { DayTracking } from "../../components/tracking/DayTracking";
+import {
+  DayTracking,
+  TRACKING_DAY_QUERY_KEY,
+} from "../../components/tracking/DayTracking";
 
 /**
  * The day at a glance — contract 5.12, laid out as `booking.md` part 3.
@@ -167,9 +170,12 @@ export default function DayOverviewPage() {
         String(CHECKED_IN),
       ),
     onSuccess: () => {
-      /* "Po kliknutí prišiel sa Prišlo aj Mešká zmenia okamžite." */
+      /* "Po kliknutí prišiel sa Prišlo aj Mešká zmenia okamžite." The
+         tracking panel below counts the same rows, so it asks again too:
+         the server rings no bell on a status change (booking lane). */
       void queryClient.invalidateQueries({ queryKey: ["day-summary"] });
       void queryClient.invalidateQueries({ queryKey: ["day-range"] });
+      void queryClient.invalidateQueries({ queryKey: TRACKING_DAY_QUERY_KEY });
     },
   });
 
@@ -541,6 +547,7 @@ export default function DayOverviewPage() {
           onBooked={() => {
             void queryClient.invalidateQueries({ queryKey: ["day-summary"] });
             void queryClient.invalidateQueries({ queryKey: ["day-range"] });
+            void queryClient.invalidateQueries({ queryKey: TRACKING_DAY_QUERY_KEY });
           }}
           initialDate={date}
           initialCalendarId={shownIds.length === 1 ? shownIds[0] : undefined}
