@@ -345,3 +345,24 @@ describe('the way into the edit form', () => {
     expect(screen.queryByRole('button', { name: 'Upravit' })).not.toBeInTheDocument();
   });
 });
+
+/* The GDPR export is the one call that hands over every identifier at once,
+   so the button is there only for somebody the server would let through. */
+describe('the GDPR export button', () => {
+  it('is offered with patients.export', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'patients.export']));
+
+    renderLayout();
+
+    expect(await screen.findByRole('button', { name: 'Výpis údajů (GDPR)' })).toBeInTheDocument();
+  });
+
+  it('is absent without it', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'patients.edit']));
+
+    renderLayout();
+
+    await screen.findByText('Nová diagnostika');
+    expect(screen.queryByRole('button', { name: 'Výpis údajů (GDPR)' })).not.toBeInTheDocument();
+  });
+});

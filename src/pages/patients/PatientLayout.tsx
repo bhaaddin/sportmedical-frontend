@@ -16,9 +16,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { Outlet, useParams, useNavigate } from 'react-router-dom';
 import {
   Alert, Avatar, Box, Button, Card, CardContent, Chip, CircularProgress,
-  Stack, Typography,
+  Stack, Tooltip, Typography,
 } from '@mui/material';
-import { ArrowBack, Edit, Science } from '@mui/icons-material';
+import { ArrowBack, Edit, FileDownload, Science } from '@mui/icons-material';
+import toast from 'react-hot-toast';
 import { patientsApi } from '../../api/patients';
 import { usePermission } from '../../auth/usePermission';
 import type { Patient } from '../../api/patients';
@@ -95,6 +96,8 @@ export default function PatientLayout() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const mayEdit = usePermission('patients.edit');
+  const mayExport = usePermission('patients.export');
+  const [exporting, setExporting] = useState(false);
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [documents, setDocuments] = useState<PatientDocument[]>([]);
@@ -108,6 +111,29 @@ export default function PatientLayout() {
    * including the ones who are missing something.
    */
   const [requirements, setRequirements] = useState<AppointmentRequirementDto[] | null>(null);
+
+  /*
+   * The whole file as one JSON download. The server decides the file name
+   * and writes the audit line; this only hands the bytes to the browser.
+   */
+  const exportPatient = async () => {
+    if (id === undefined) return;
+    setExporting(true);
+    try {
+      const { blob, fileName } = await patientsApi.exportJson(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Výpis údajů stažen. Vystavení je zapsáno v auditním logu.');
+    } catch {
+      toast.error('Výpis údajů se nepodařilo vystavit.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const reloadDocuments = useCallback(() => {
     if (id === undefined) return;
@@ -252,6 +278,20 @@ export default function PatientLayout() {
               </Stack>
             </Box>
             <Box sx={{ flex: 1 }} />
+            {mayExport && (
+              <Tooltip title="Stáhne vše, co ordinace o pacientovi vede, jako jeden soubor JSON (výpis podle GDPR). Vystavení se zapíše do auditního logu.">
+                <span>
+                  <Button
+                    variant="outlined"
+                    startIcon={<FileDownload />}
+                    onClick={() => { void exportPatient(); }}
+                    disabled={exporting}
+                  >
+                    Výpis údajů (GDPR)
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
             {mayEdit && (
               <Button
                 variant="outlined"

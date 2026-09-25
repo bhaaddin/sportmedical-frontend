@@ -76,7 +76,11 @@ export const PERMISSION_LABELS: Record<string, { label: string; detail: string }
   },
   'communication.manage': {
     label: 'Psát a odesílat za ordinaci',
-    detail: 'Dnes nic neotvírá: žádná obrazovka ani rozhraní aplikace ho nevyžaduje.',
+    detail: 'Upravovat znění e-mailů, které systém posílá pacientům, a posílat testovací e-maily.',
+  },
+  'patients.export': {
+    label: 'Vystavit úplný výpis údajů pacienta',
+    detail: 'Stáhnout vše, co ordinace o pacientovi vede, jako jeden soubor (GDPR). Výchozí jen pro vlastníka; každé vystavení se zapisuje do auditu.',
   },
   'questionnaires.manage': {
     label: 'Pracovat s dotazníky',

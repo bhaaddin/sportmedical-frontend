@@ -46,7 +46,8 @@ export type Permission =
   | 'billing.manage'
   | 'documents.view'
   | 'documents.manage'
-  | 'communication.manage';
+  | 'communication.manage'
+  | 'patients.export';
 
 /**
  * Whether the server has told this browser anything at all.

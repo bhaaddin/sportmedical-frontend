@@ -89,4 +89,16 @@ export const patientsApi = {
     const res = await client.get(`/api/patients/${id}/profile`);
     return res.data?.value ?? res.data;
   },
+
+  /**
+   * Everything the clinic holds about this patient as one JSON file (GDPR).
+   * Needs patients.export; the server names the file and audits the request.
+   */
+  exportJson: async (id: string): Promise<{ blob: Blob; fileName: string }> => {
+    const res = await client.get(`/api/patients/${id}/export`, { responseType: 'blob' });
+    const disposition = String(res.headers?.['content-disposition'] ?? '');
+    const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+    const fileName = match ? decodeURIComponent(match[1]) : `pacient-${id}.json`;
+    return { blob: res.data as Blob, fileName };
+  },
 };
