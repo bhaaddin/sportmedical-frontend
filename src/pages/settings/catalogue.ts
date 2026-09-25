@@ -170,6 +170,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         to: '/nastaveni/udaje-pacienta',
         requires: 'settings.clinic.manage',
       },
+      {
+        id: 'odkaz-registrace',
+        label: 'Odkaz k dokončení registrace',
+        description: 'Kolik hodin platí odkaz z rychlé předregistrace a co stojí v e-mailu, který ho nese',
+        to: '/nastaveni/odkaz-registrace',
+        requires: 'settings.clinic.manage',
+      },
     ],
   },
   {

@@ -330,6 +330,12 @@ describe('groupLabel', () => {
     expect(groupLabel('intake.submitted', 5)).toBe('5 nových dotazníků');
   });
 
+  it("has words for the desk's completion link, so the bell never shows a machine kind", () => {
+    expect(groupLabel('intake.link_issued', 1)).toBe('1 vydaný odkaz k registraci');
+    expect(groupLabel('intake.completed', 2)).toBe('2 dokončené registrace');
+    expect(groupLabel('intake.expired', 6)).toBe('6 vypršelých odkazů k registraci');
+  });
+
   it('falls back to showing the kind rather than inventing a noun', () => {
     expect(groupLabel('something.new', 4)).toBe('4× something.new');
   });

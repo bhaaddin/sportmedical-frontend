@@ -325,5 +325,9 @@ const GROUP_NOUNS: Record<string, { one: string; few: string; many: string }> = 
   'appointment.moved': { one: 'přesunutý termín', few: 'přesunuté termíny', many: 'přesunutých termínů' },
   'appointment.cancelled': { one: 'zrušený termín', few: 'zrušené termíny', many: 'zrušených termínů' },
   'intake.submitted': { one: 'nový dotazník', few: 'nové dotazníky', many: 'nových dotazníků' },
+  /* The desk's completion link (rychlá předregistrace): issued, used, run out. */
+  'intake.link_issued': { one: 'vydaný odkaz k registraci', few: 'vydané odkazy k registraci', many: 'vydaných odkazů k registraci' },
+  'intake.completed': { one: 'dokončená registrace', few: 'dokončené registrace', many: 'dokončených registrací' },
+  'intake.expired': { one: 'vypršelý odkaz k registraci', few: 'vypršelé odkazy k registraci', many: 'vypršelých odkazů k registraci' },
   'document.vypis.received': { one: 'doručený výpis', few: 'doručené výpisy', many: 'doručených výpisů' },
 };

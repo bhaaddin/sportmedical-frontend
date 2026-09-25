@@ -24,6 +24,7 @@ const Login = lazy(() => import('./pages/Login'));
 const IntakeQuestionnaire = lazy(() => import('./pages/public/IntakeQuestionnaire'));
 const PublicBooking = lazy(() => import('./pages/public/PublicBooking'));
 const ManageBooking = lazy(() => import('./pages/public/ManageBooking'));
+const CompleteRegistration = lazy(() => import('./pages/public/CompleteRegistration'));
 const IntakeReviewQueue = lazy(() => import('./pages/IntakeReviewQueue'));
 const DashboardPage = lazy(() => import('./pages/Dashboard'));
 const DiagnosticForm = lazy(() => import('./pages/DiagnosticForm'));
@@ -56,6 +57,7 @@ const HolidaysPage = lazy(() => import('./pages/settings/HolidaysPage'));
 const QuestionnairePage = lazy(() => import('./pages/settings/QuestionnairePage'));
 const CalendarDisplayPage = lazy(() => import('./pages/settings/CalendarDisplayPage'));
 const PatientFieldsPage = lazy(() => import('./pages/settings/PatientFieldsPage'));
+const IntakeLinkSettingsPage = lazy(() => import('./pages/settings/IntakeLinkSettingsPage'));
 const BookingActivitiesPage = lazy(() => import('./pages/booking/ActivitiesPage'));
 /* Booking phase 1, stage 2: working hours, periods, cycle and exceptions */
 const BookingWorkingHoursPage = lazy(() => import('./pages/booking/WorkingHoursPage'));
@@ -454,6 +456,9 @@ export default function App() {
                 to their own appointment can never get there. That is exactly
                 what the confirmation's button did until this route existed. */}
             <Route path="/rezervace/:token" element={<Suspense fallback={<PageLoader />}><ManageBooking /></Suspense>} />
+            {/* Dokončení předregistrace. Anonymous for the same reason: the
+                desk-issued token is the identity, and the patient has no account. */}
+            <Route path="/dokonceni/:token" element={<Suspense fallback={<PageLoader />}><CompleteRegistration /></Suspense>} />
             <Route path="/*" element={
               <AuthGuard>
                 <Layout>
@@ -482,6 +487,7 @@ export default function App() {
                     <Route path="/dotaznik-nastaveni" element={<RequirePermission of="questionnaires.manage"><QuestionnairePage /></RequirePermission>} />
                     <Route path="/nastaveni/vzhled-kalendare" element={<RequirePermission of="settings.clinic.manage"><CalendarDisplayPage /></RequirePermission>} />
                     <Route path="/nastaveni/udaje-pacienta" element={<RequirePermission of="settings.clinic.manage"><PatientFieldsPage /></RequirePermission>} />
+                    <Route path="/nastaveni/odkaz-registrace" element={<RequirePermission of="settings.clinic.manage"><IntakeLinkSettingsPage /></RequirePermission>} />
                     <Route path="/training-load" element={<TrainingLoadPage />} />
                     <Route path="/wellness" element={<WellnessPage />} />
                     <Route path="/cashier" element={<RequirePermission of="billing.manage"><CashierPage /></RequirePermission>} />
