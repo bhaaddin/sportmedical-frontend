@@ -4,9 +4,9 @@ import {
   Box, Paper, Typography, TextField, Button, Alert,
   InputAdornment, IconButton, CircularProgress,
 } from '@mui/material';
-import { Visibility, VisibilityOff, LocalHospital, Email, Lock } from '@mui/icons-material';
+import { Visibility, VisibilityOff, LocalHospital, Email, Lock, PhonelinkLock } from '@mui/icons-material';
 import { motion } from 'framer-motion';
-import { authApi } from '../api/auth';
+import { authApi, needsSecondFactor, twoFactorRefusal, type LoginResponse, type SecondFactorChallenge } from '../api/auth';
 import { savePermissions, saveUser } from '../auth/localSession';
 
 /** What the sign-in says when the client ended a session nobody closed here. */
@@ -29,7 +29,12 @@ export default function Login() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changing, setChanging] = useState(false);
 
-  const finishLogin = (res: any) => {
+  /* Second factor: the password was right, the code from the phone is owed. */
+  const [challenge, setChallenge] = useState<SecondFactorChallenge | null>(null);
+  const [code, setCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
+
+  const finishLogin = (res: LoginResponse) => {
     localStorage.setItem('token', res.accessToken);
     saveUser(res.account);
 
@@ -55,6 +60,12 @@ export default function Login() {
     setError('');
     try {
       const res = await authApi.login(email, password);
+      if (needsSecondFactor(res)) {
+        setChallenge(res);
+        setCode('');
+        setLoading(false);
+        return;
+      }
       if (res.account.mustChangePassword) {
         setMustChange(true);
         setLoading(false);
@@ -104,11 +115,43 @@ export default function Login() {
         newPasswordConfirmation: confirmPassword,
       });
       const res = await authApi.login(email, newPassword);
+      if (needsSecondFactor(res)) {
+        setMustChange(false);
+        setChallenge(res);
+        setCode('');
+        return;
+      }
       finishLogin(res);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Nepodařilo se nastavit heslo');
     } finally {
       setChanging(false);
+    }
+  };
+
+  const handleSecondFactor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (challenge === null) return;
+    setVerifying(true);
+    setError('');
+    try {
+      const res = await authApi.completeSecondFactor(challenge.challengeToken, code.trim());
+      finishLogin(res);
+    } catch (err: any) {
+      const refusal = err.response?.data?.code;
+      if (refusal === 'two_factor.challenge_expired' || err.response?.status === 401) {
+        /* The challenge is gone - too many misses or five minutes passed.
+           Back to the password; the message says why. */
+        setChallenge(null);
+        setCode('');
+        setError(twoFactorRefusal(err));
+      } else if (!err.response) {
+        setError('Server neodpovídá. Zkontrolujte, že běží, a zkuste to znovu.');
+      } else {
+        setError(twoFactorRefusal(err));
+      }
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -137,7 +180,7 @@ export default function Login() {
             </Box>
           </motion.div>
 
-          {sessionExpired && !error && !mustChange && (
+          {sessionExpired && !error && !mustChange && challenge === null && (
             <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>{SESSION_EXPIRED_MESSAGE}</Alert>
           )}
 
@@ -147,7 +190,39 @@ export default function Login() {
             </motion.div>
           )}
 
-          {mustChange ? (
+          {challenge !== null ? (
+          <motion.form onSubmit={handleSecondFactor} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <Alert severity="info" icon={<PhonelinkLock fontSize="small" />} sx={{ mb: 2, borderRadius: 2 }}>
+              Heslo souhlasí. Účet {email} má zapnuté dvoufázové ověření - opište kód, který
+              právě ukazuje ověřovací aplikace v telefonu. Když telefon nemáte, použijte jeden ze
+              záložních kódů.
+            </Alert>
+            <TextField fullWidth label="Ověřovací kód" required value={code} autoFocus
+              onChange={e => setCode(e.target.value)} margin="normal"
+              helperText="Šest číslic z aplikace, nebo záložní kód ve tvaru XXXXX-XXXXX"
+              slotProps={{
+                htmlInput: { inputMode: 'numeric', autoComplete: 'one-time-code', maxLength: 12 },
+                input: { startAdornment: <InputAdornment position="start"><PhonelinkLock color="action" /></InputAdornment> },
+              }}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 }, mb: 1 }} />
+            <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
+              <Button type="submit" fullWidth variant="contained" size="large" disabled={verifying || code.trim().length < 6}
+                startIcon={verifying ? <CircularProgress size={20} color="inherit" /> : null}
+                sx={{
+                  mt: 1, py: 1.5, borderRadius: 2, fontWeight: 700, fontSize: 16,
+                  bgcolor: '#0D7377', boxShadow: '0 4px 20px rgba(13,115,119,0.4)',
+                  '&:hover': { bgcolor: '#095456' },
+                }}>
+                {verifying ? 'Ověřování...' : 'Ověřit a přihlásit'}
+              </Button>
+            </motion.div>
+            <Box sx={{ textAlign: 'center', mt: 2 }}>
+              <Button size="small" onClick={() => { setChallenge(null); setCode(''); setError(''); }}>
+                Zpět na přihlášení
+              </Button>
+            </Box>
+          </motion.form>
+          ) : mustChange ? (
           <motion.form onSubmit={handlePasswordChange} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
             <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
               První přihlášení — nastavte si vlastní heslo pro účet {email}.

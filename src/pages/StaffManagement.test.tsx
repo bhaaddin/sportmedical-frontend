@@ -19,12 +19,13 @@ const list = vi.fn();
 const setActive = vi.fn();
 const create = vi.fn();
 const update = vi.fn();
+const resetTwoFactor = vi.fn();
 
 vi.mock('../api/userAccounts', async () => {
   const actual = await vi.importActual<typeof import('../api/userAccounts')>('../api/userAccounts');
   return {
     ...actual,
-    userAccountsApi: { list, setActive, create, update, resetPassword: vi.fn(), assignRole: vi.fn() },
+    userAccountsApi: { list, setActive, create, update, resetTwoFactor, resetPassword: vi.fn(), assignRole: vi.fn() },
   };
 });
 vi.mock('../components/admin/UserPermissionsDialog', () => ({ UserPermissionsDialog: () => null }));
@@ -49,7 +50,9 @@ beforeEach(() => {
   list.mockReset().mockResolvedValue([
     account({}),
     account({ userId: 'u2', email: 'petr@ordinace.cz', displayName: 'Petr Starý', isActive: false }),
+    account({ userId: 'u3', email: 'eva@ordinace.cz', displayName: 'Eva Kódová', twoFactorEnabled: true }),
   ]);
+  resetTwoFactor.mockReset().mockResolvedValue(undefined);
   setActive.mockReset().mockResolvedValue(account({ isActive: false }));
   create.mockReset();
   update.mockReset().mockResolvedValue(account({ displayName: 'Jana Horáková' }));
@@ -138,5 +141,26 @@ describe('editing an employee', () => {
     await user.click(screen.getByRole('button', { name: 'Uložit' }));
 
     expect(await screen.findByText('Účet s tímto e-mailem už existuje.')).toBeInTheDocument();
+  });
+});
+
+/*
+ * A lost phone. The reset is offered only where there is a second factor to
+ * reset, and it goes through DELETE /api/v1/users/{id}/two-factor after a
+ * confirmation that says the password stays.
+ */
+describe('a lost phone', () => {
+  it('offers the two-factor reset only on accounts that have one, and confirms first', async () => {
+    const user = userEvent.setup();
+    render(<StaffManagement />);
+
+    expect(await screen.findByLabelText('Zrušit dvoufázové ověření Eva Kódová')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Zrušit dvoufázové ověření Jana Nová')).not.toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('Zrušit dvoufázové ověření Eva Kódová'));
+    expect(await screen.findByText(/Heslo se nemění/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Zrušit ověření' }));
+
+    await waitFor(() => expect(resetTwoFactor).toHaveBeenCalledWith('u3'));
   });
 });

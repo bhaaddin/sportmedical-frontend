@@ -18,6 +18,8 @@ export interface UserAccount {
   mustChangePassword: boolean;
   createdAtUtc: string;
   lastLoginAtUtc: string | null;
+  /** Whether this account signs in with a code from a phone as well. */
+  twoFactorEnabled?: boolean;
 }
 
 /** The three roles the server has. */
@@ -82,6 +84,14 @@ export const userAccountsApi = {
     const { data } = await client.put<UserAccount>(`/api/v1/users/${userId}/role`, { role });
     return data;
   },
+
+  /**
+   * The phone is lost: removes the employee's second factor so the password
+   * signs them in again. The server also ends their open sessions.
+   */
+  resetTwoFactor: async (userId: string): Promise<void> => {
+    await client.delete(`/api/v1/users/${userId}/two-factor`);
+  },
 };
 
 /** What the server's refusal code means, in words for the person at the screen. */
@@ -100,6 +110,8 @@ export function accountRefusal(error: unknown): string {
       return 'Tenhle účet už neexistuje. Obnovte seznam.';
     case 'access.denied':
       return 'Na tohle nemáte oprávnění.';
+    case 'two_factor.not_enabled':
+      return 'Tento účet nemá dvoufázové ověření zapnuté, není co resetovat.';
     default:
       return 'Požadavek se nepodařilo provést.';
   }

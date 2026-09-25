@@ -21,9 +21,13 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-vi.mock('../api/auth', () => ({
-  authApi: { login: vi.fn(), activate: vi.fn() },
-}));
+vi.mock('../api/auth', async () => {
+  const actual = await vi.importActual<typeof import('../api/auth')>('../api/auth');
+  return {
+    ...actual,
+    authApi: { login: vi.fn(), activate: vi.fn(), completeSecondFactor: vi.fn() },
+  };
+});
 
 const { default: Login } = await import('./Login');
 
@@ -70,5 +74,50 @@ describe('the login screen', () => {
     expect(screen.getByLabelText(/E-mail/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Heslo/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Přihlásit se/ })).toBeInTheDocument();
+  });
+});
+
+/*
+ * The second factor. When the server answers the password with a challenge
+ * instead of a session, the screen asks for the code and finishes the sign-in
+ * with it. A session is never stored from the first answer, because there is
+ * none in it.
+ */
+describe('an account with two-factor sign-in', () => {
+  it('asks for the code after the password and signs in with it', async () => {
+    const { authApi } = await import('../api/auth');
+    const login = vi.mocked(authApi.login);
+    login.mockResolvedValue({
+      secondFactorRequired: true,
+      challengeToken: 'challenge-1',
+      expiresAtUtc: '2026-09-25T10:05:00Z',
+    });
+    const complete = vi.mocked(authApi.completeSecondFactor);
+    complete.mockResolvedValue({
+      accessToken: 'session-token',
+      expiresAtUtc: '2026-09-25T18:00:00Z',
+      account: { userId: 'u1', email: 'jana@ordinace.cz', displayName: 'Jana Nová', role: 'Staff',
+        isActive: true, mustChangePassword: false, createdAtUtc: '2026-09-01T00:00:00Z', lastLoginAtUtc: null },
+      permissions: ['patients.view'],
+    });
+    localStorage.clear();
+
+    const user = (await import('@testing-library/user-event')).default.setup();
+    renderLogin();
+
+    await user.type(screen.getByLabelText(/E-mail/), 'jana@ordinace.cz');
+    await user.type(screen.getByLabelText(/^Heslo/), 'Some-Long-Password-2026!');
+    await user.click(screen.getByRole('button', { name: /Přihlásit se/ }));
+
+    const codeField = await screen.findByLabelText(/Ověřovací kód/);
+    expect(localStorage.getItem('token')).toBeNull();
+    expect(screen.getByText(/má zapnuté dvoufázové ověření/)).toBeInTheDocument();
+
+    await user.type(codeField, '123456');
+    await user.click(screen.getByRole('button', { name: /Ověřit a přihlásit/ }));
+
+    await vi.waitFor(() => expect(complete).toHaveBeenCalledWith('challenge-1', '123456'));
+    await vi.waitFor(() => expect(localStorage.getItem('token')).toBe('session-token'));
+    expect(JSON.parse(localStorage.getItem('permissions') ?? '[]')).toEqual(['patients.view']);
   });
 });

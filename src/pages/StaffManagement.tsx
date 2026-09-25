@@ -25,6 +25,7 @@ import {
   Block as BlockIcon, CheckCircle as CheckCircleIcon, Badge as BadgeIcon, Edit as EditIcon,
 } from '@mui/icons-material';
 import KeyIcon from '@mui/icons-material/VpnKey';
+import PhonelinkEraseIcon from '@mui/icons-material/PhonelinkErase';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import EventBusyIcon from '@mui/icons-material/EventBusy';
 import { Link as RouterLink } from 'react-router-dom';
@@ -78,6 +79,7 @@ export default function StaffManagement() {
   const [roleFor, setRoleFor] = useState<UserAccount | null>(null);
   const [roleChoice, setRoleChoice] = useState<UserAccountRole>('Staff');
   const [switchingOff, setSwitchingOff] = useState<UserAccount | null>(null);
+  const [resettingTwoFactor, setResettingTwoFactor] = useState<UserAccount | null>(null);
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
 
@@ -155,6 +157,23 @@ export default function StaffManagement() {
       load();
     } catch (error) {
       say(accountRefusal(error), 'error');
+    }
+  };
+
+  /* ── Lost phone ── */
+  const resetTwoFactor = async () => {
+    if (resettingTwoFactor === null) return;
+    setBusy(true);
+    setDialogError(null);
+    try {
+      await userAccountsApi.resetTwoFactor(resettingTwoFactor.userId);
+      say(`${nameOf(resettingTwoFactor)} se teď přihlásí jen heslem a jeho otevřená přihlášení skončila.`);
+      setResettingTwoFactor(null);
+      load();
+    } catch (error) {
+      setDialogError(accountRefusal(error));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -366,6 +385,16 @@ export default function StaffManagement() {
                             <LockResetIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
+                        {acc.twoFactorEnabled ? (
+                          <Tooltip title="Zrušit dvoufázové ověření (ztracený telefon)">
+                            <IconButton
+                              aria-label={`Zrušit dvoufázové ověření ${name}`}
+                              onClick={() => { setDialogError(null); setResettingTwoFactor(acc); }}
+                            >
+                              <PhonelinkEraseIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        ) : null}
                         {acc.isActive ? (
                           <Tooltip title="Vypnout přístup">
                             <IconButton
@@ -520,6 +549,25 @@ export default function StaffManagement() {
           <Button onClick={() => setSwitchingOff(null)}>Zrušit</Button>
           <Button color="error" variant="contained" disabled={busy} onClick={() => void switchOff()}>
             Vypnout přístup
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Lost phone: the second factor goes, the password stays */}
+      <Dialog open={resettingTwoFactor !== null} onClose={() => setResettingTwoFactor(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Zrušit dvoufázové ověření?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            <strong>{resettingTwoFactor ? nameOf(resettingTwoFactor) : ''}</strong> se pak přihlásí
+            jen heslem, dokud si ověření v Můj účet nezapne znovu. Jeho otevřená přihlášení skončí
+            hned. Heslo se nemění.
+          </DialogContentText>
+          {dialogError && <Alert severity="error" sx={{ mt: 2 }}>{dialogError}</Alert>}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setResettingTwoFactor(null)}>Zrušit</Button>
+          <Button color="error" variant="contained" disabled={busy} onClick={() => void resetTwoFactor()}>
+            Zrušit ověření
           </Button>
         </DialogActions>
       </Dialog>

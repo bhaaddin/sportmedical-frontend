@@ -28,6 +28,7 @@ import {
   ExpandMore, ChevronRight, Logout, Person, Lock,
 } from '@mui/icons-material';
 import { visibleSections, type SettingsItem } from './settings/catalogue';
+import { TwoFactorCard } from '../components/account/TwoFactorCard';
 import { hasStoredPermissions, usePermissions } from '../auth/usePermission';
 import { signOut } from '../auth/signOut';
 
@@ -178,7 +179,7 @@ export default function Settings() {
           <Box>
             <Typography sx={{ fontWeight: 700 }}>Můj účet</Typography>
             <Typography variant="body2" color="text.secondary">
-              Váš účet a odhlášení
+              Váš účet, dvoufázové ověření a odhlášení
             </Typography>
           </Box>
         </AccordionSummary>
@@ -215,6 +216,8 @@ export default function Settings() {
               </Alert>
             </CardContent>
           </Card>
+
+          <TwoFactorCard />
 
           <Button
             startIcon={<Logout />}
