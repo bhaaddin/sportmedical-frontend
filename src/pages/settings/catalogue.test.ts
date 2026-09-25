@@ -103,6 +103,10 @@ const EVERYTHING = [
   'bookings.edit',
   'bookings.cancel',
   'questionnaires.manage',
+  'billing.manage',
+  'documents.view',
+  'documents.manage',
+  'communication.manage',
 ];
 
 /** What a receptionist gets by default from the server's Staff role. */

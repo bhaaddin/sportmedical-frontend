@@ -55,6 +55,7 @@ const DocumentTemplatesPage = lazy(() => import('./pages/settings/DocumentTempla
 const HolidaysPage = lazy(() => import('./pages/settings/HolidaysPage'));
 const QuestionnairePage = lazy(() => import('./pages/settings/QuestionnairePage'));
 const CalendarDisplayPage = lazy(() => import('./pages/settings/CalendarDisplayPage'));
+const EmailTemplatesPage = lazy(() => import('./pages/settings/EmailTemplatesPage'));
 const PatientFieldsPage = lazy(() => import('./pages/settings/PatientFieldsPage'));
 const BookingActivitiesPage = lazy(() => import('./pages/booking/ActivitiesPage'));
 /* Booking phase 1, stage 2: working hours, periods, cycle and exceptions */
@@ -481,6 +482,7 @@ export default function App() {
                     <Route path="/svatky" element={<RequirePermission of="settings.clinic.manage"><HolidaysPage /></RequirePermission>} />
                     <Route path="/dotaznik-nastaveni" element={<RequirePermission of="questionnaires.manage"><QuestionnairePage /></RequirePermission>} />
                     <Route path="/nastaveni/vzhled-kalendare" element={<RequirePermission of="settings.clinic.manage"><CalendarDisplayPage /></RequirePermission>} />
+                    <Route path="/nastaveni/emaily" element={<RequirePermission of="communication.manage"><EmailTemplatesPage /></RequirePermission>} />
                     <Route path="/nastaveni/udaje-pacienta" element={<RequirePermission of="settings.clinic.manage"><PatientFieldsPage /></RequirePermission>} />
                     <Route path="/training-load" element={<TrainingLoadPage />} />
                     <Route path="/wellness" element={<WellnessPage />} />

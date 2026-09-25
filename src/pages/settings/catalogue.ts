@@ -268,6 +268,20 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ],
   },
   {
+    id: 'komunikace',
+    label: 'Komunikace s pacienty',
+    description: 'Co pacientům píšeme a v jakém znění',
+    items: [
+      {
+        id: 'emailove-sablony',
+        label: 'E-mailové šablony',
+        description: 'Znění potvrzení, změny a zrušení termínu a odkazu na registraci — s náhledem a testem',
+        to: '/nastaveni/emaily',
+        requires: 'communication.manage',
+      },
+    ],
+  },
+  {
     id: 'system',
     label: 'Systém',
     description: 'Co se kdy stalo a jak na tom systém je',

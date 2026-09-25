@@ -39,6 +39,10 @@ const EVERYTHING = [
   'bookings.edit',
   'bookings.cancel',
   'questionnaires.manage',
+  'billing.manage',
+  'documents.view',
+  'documents.manage',
+  'communication.manage',
 ];
 
 /** The server's own defaults for the Staff role. */
