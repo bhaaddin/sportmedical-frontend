@@ -380,7 +380,7 @@
       "questionnaire_missing": "Chybí dotazník",
       "questionnaire_expired": "Dotazník je starší než 2 roky",
       "report_missing": "Chybí výpis od předchozího lékaře",
-      "registration_incomplete": "Předregistrace — pacient ještě nedokončil registraci přes odkaz (adresa, pojištění, dotazník)",
+      "registration_incomplete": "Předregistrace — pacient ještě nemá v kartě adresu a pojištění (doplní je přes odkaz, nebo je zapíše recepce)",
       "unknown": "Neznámý požadavek ({{code}})",
       "line": "Podklady",
       "preRegistered": "Předregistrace",

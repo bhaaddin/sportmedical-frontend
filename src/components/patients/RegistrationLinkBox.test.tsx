@@ -19,6 +19,7 @@ const link = (overrides: Partial<IssuedRegistrationLink> = {}): IssuedRegistrati
   emailQueued: true,
   emailWillSend: true,
   sentTo: 'jan@example.cz',
+  emailNotQueuedReason: null,
   ...overrides,
 });
 
@@ -54,6 +55,12 @@ describe('the generated link box', () => {
   it('tells the desk to send the link itself when e-mail is queued but cannot leave', () => {
     render(<RegistrationLinkBox link={link({ emailWillSend: false })} />);
     expect(screen.getByText(/odesílání e-mailů není nastaveno — pošlete odkaz pacientovi sami/)).toBeInTheDocument();
+  });
+
+  it('names the missing site address when that is why no e-mail went out', () => {
+    render(<RegistrationLinkBox link={link({ emailQueued: false, emailWillSend: false, emailNotQueuedReason: 'site_address_missing' })} />);
+    expect(screen.getByText(/není vyplněná adresa webu/)).toBeInTheDocument();
+    expect(screen.getByText(/Pošlete odkaz pacientovi sami/)).toBeInTheDocument();
   });
 
   it('says until when the link is valid', () => {

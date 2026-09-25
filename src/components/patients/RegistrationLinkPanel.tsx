@@ -12,6 +12,9 @@ const TEXT = {
   pending: (until: string) =>
     `Pacient je předregistrovaný; odkaz k dokončení registrace platí do ${until}.`,
   expired: 'Pacient je předregistrovaný a odkaz k dokončení registrace vypršel. Vygenerujte nový.',
+  noLink:
+    'Pacient je předregistrovaný (chybí adresa a pojištění) a odkaz k dokončení registrace zatím nemá. ' +
+    'Vygenerujte ho, nebo údaje doplňte v kartě sami.',
   completed: (when: string) => `Registrace dokončena přes odkaz ${when}.`,
   issue: 'Vygenerovat odkaz',
   reissue: 'Vygenerovat odkaz znovu',
@@ -21,9 +24,12 @@ const TEXT = {
 /**
  * The state of a patient's completion link and the button to (re)issue it.
  *
- * Nothing is drawn for a patient who never had one and needs none — an
- * ordinary registered patient. The button is offered only to somebody who may
- * register patients, because that is what the server asks for.
+ * Nothing is drawn for a patient who needs none — an ordinary registered
+ * patient, or one the desk has since registered by hand. A pre-registered
+ * patient with no link yet gets the chip and the button, so the promise the
+ * booking dialog makes ("lze ho vygenerovat i později z karty pacienta")
+ * holds. The button is offered only to somebody who may register patients,
+ * because that is what the server asks for.
  */
 export function RegistrationLinkPanel({ patientId }: { patientId: string }) {
   const queryClient = useQueryClient();
@@ -40,7 +46,8 @@ export function RegistrationLinkPanel({ patientId }: { patientId: string }) {
   });
 
   const state = status.data?.state;
-  if (state === undefined || state === 'none') return null;
+  if (state === undefined) return null;
+  if (state === 'none' && !status.data?.registrationIncomplete) return null;
 
   return (
     <Stack spacing={1} sx={{ mt: 1.5 }}>
@@ -53,16 +60,20 @@ export function RegistrationLinkPanel({ patientId }: { patientId: string }) {
           <Typography variant="body2">
             {state === 'expired'
               ? TEXT.expired
-              : TEXT.pending(status.data?.expiresAtUtc ? formatPragueDateTime(status.data.expiresAtUtc) : '')}
+              : state === 'none'
+                ? TEXT.noLink
+                : TEXT.pending(status.data?.expiresAtUtc ? formatPragueDateTime(status.data.expiresAtUtc) : '')}
           </Typography>
           {mayRegister && issued === null ? (
             <Box sx={{ mt: 1 }}>
               <Button size="small" variant="outlined" disabled={issue.isPending} onClick={() => issue.mutate()}>
-                {state === 'expired' ? TEXT.issue : TEXT.reissue}
+                {state === 'pending' ? TEXT.reissue : TEXT.issue}
               </Button>
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}>
-                {TEXT.reissueHelp}
-              </Typography>
+              {state === 'pending' ? (
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}>
+                  {TEXT.reissueHelp}
+                </Typography>
+              ) : null}
             </Box>
           ) : null}
           {issue.error ? (

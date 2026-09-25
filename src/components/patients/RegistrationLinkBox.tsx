@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Alert, Box, Button, Stack, TextField, Typography } from '@mui/material';
 import ContentCopy from '@mui/icons-material/ContentCopy';
-import { shareableLink } from '../../api/preRegistration';
+import { SITE_ADDRESS_MISSING, shareableLink } from '../../api/preRegistration';
 import type { IssuedRegistrationLink } from '../../api/preRegistration';
 import { formatPragueDateTime } from '../../utils/time';
 
@@ -17,6 +17,9 @@ const TEXT = {
   queuedOnly: (to: string) =>
     `E-mail pro ${to} čeká ve frontě, ale odesílání e-mailů není nastaveno — pošlete odkaz pacientovi sami.`,
   notQueued: 'E-mail se nepodařilo zařadit do fronty — pošlete odkaz pacientovi sami.',
+  siteAddressMissing:
+    'E-mail se neposlal: v Nastavení → Odkaz k dokončení registrace není vyplněná adresa webu, ' +
+    'takže by odkaz v e-mailu nešel otevřít. Pošlete odkaz pacientovi sami.',
 };
 
 /**
@@ -67,7 +70,9 @@ export function RegistrationLinkBox({ link }: { link: IssuedRegistrationLink }) 
           ? TEXT.willSend(link.sentTo)
           : link.emailQueued
             ? TEXT.queuedOnly(link.sentTo)
-            : TEXT.notQueued}
+            : link.emailNotQueuedReason === SITE_ADDRESS_MISSING
+              ? TEXT.siteAddressMissing
+              : TEXT.notQueued}
       </Alert>
     </Box>
   );

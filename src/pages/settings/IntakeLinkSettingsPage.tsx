@@ -94,6 +94,18 @@ export default function IntakeLinkSettingsPage() {
             />
 
             <TextField
+              label="Adresa webu pro pacienty"
+              placeholder="https://klinika.cz"
+              value={draft.publicSiteBaseUrl}
+              onChange={(event) => set('publicSiteBaseUrl', event.target.value)}
+              error={errors.publicSiteBaseUrl !== undefined}
+              helperText={
+                errors.publicSiteBaseUrl
+                ?? 'Úplná adresa (https://…), ze které se skládá odkaz v e-mailu. Dokud není vyplněná, e-mail s odkazem se neposílá a recepce ho pacientovi pošle sama.'
+              }
+            />
+
+            <TextField
               label="Předmět e-mailu"
               value={draft.emailSubject}
               onChange={(event) => set('emailSubject', event.target.value)}

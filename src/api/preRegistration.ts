@@ -63,7 +63,15 @@ export interface IssuedRegistrationLink {
   /** ... and a sender is configured to take it out. When false, hand the link over yourself. */
   emailWillSend: boolean;
   sentTo: string;
+  /**
+   * Why nothing was queued, when `emailQueued` is false: `site_address_missing`
+   * (no public site address in Nastavení, so an e-mail could only carry a dead
+   * path) or `queue_failed`. Null when a message was queued.
+   */
+  emailNotQueuedReason: string | null;
 }
+
+export const SITE_ADDRESS_MISSING = 'site_address_missing';
 
 export type RegistrationLinkState = 'none' | 'pending' | 'expired' | 'completed';
 
@@ -73,6 +81,14 @@ export interface RegistrationLinkStatus {
   issuedAtUtc: string | null;
   expiresAtUtc: string | null;
   completedAtUtc: string | null;
+  /**
+   * The registry still lacks a current address or insurance for this patient —
+   * the same rule the server uses to decide whether a link may be issued.
+   * True with `none` means "pre-registered, no link yet": the card offers to
+   * generate one. A link outstanding for a patient the desk has since
+   * registered by hand is moot and reads as `none` with this false.
+   */
+  registrationIncomplete: boolean;
 }
 
 /**
@@ -91,6 +107,8 @@ export interface IntakeLinkSettings {
   completionDeadlineHours: number;
   emailSubject: string;
   emailBody: string;
+  /** The patient-facing site, `https://…`, or '' when not set. Without it no e-mail with the link goes out. */
+  publicSiteBaseUrl: string;
 }
 
 export interface IntakeLinkPlaceholder {
