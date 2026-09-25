@@ -387,7 +387,16 @@ export const PAPERWORK_REASONS = [
   'questionnaire_missing',
   'questionnaire_expired',
   'report_missing',
+  /* The desk pre-registered the patient; the completion link is not done yet. */
+  'registration_incomplete',
 ] as const;
+
+/** The one reason that is a state of the patient, not a document: it gets its own chip. */
+export const REGISTRATION_INCOMPLETE = 'registration_incomplete';
+
+export function isRegistrationIncomplete(paperwork: { missing: string[] } | null | undefined): boolean {
+  return paperwork?.missing.includes(REGISTRATION_INCOMPLETE) ?? false;
+}
 export type PaperworkReason = (typeof PAPERWORK_REASONS)[number];
 
 export const paperworkSchema = z

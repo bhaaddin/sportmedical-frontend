@@ -135,9 +135,26 @@ describe('searching the database for a patient', () => {
     await userEvent.type(screen.getByLabelText('Jméno nebo příjmení'), 'Nikdo');
 
     expect(await screen.findByText(/V databázi nikoho takového nenacházím/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Založit nového pacienta' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Úplná registrace' })).toHaveAttribute(
       'href',
       '/patients/register',
     );
+    expect(screen.getByRole('button', { name: /rychlá předregistrace/ })).toBeInTheDocument();
+  });
+
+  it('opens the quick path with the typed name already split, and comes back to the search', async () => {
+    list.mockResolvedValueOnce({ items: [], totalCount: 0 });
+    renderSearch();
+    await userEvent.type(screen.getByLabelText('Jméno nebo příjmení'), 'Jan Nikdo');
+    await userEvent.click(await screen.findByRole('button', { name: /rychlá předregistrace/ }));
+
+    expect(screen.getByLabelText('Jméno')).toHaveValue('Jan');
+    expect(screen.getByLabelText('Příjmení')).toHaveValue('Nikdo');
+    expect(screen.getByLabelText('Datum narození')).toBeInTheDocument();
+    expect(screen.getByLabelText('E-mail')).toBeInTheDocument();
+    expect(screen.getByLabelText('Telefon (nepovinný)')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zpět na hledání' }));
+    expect(screen.getByLabelText('Jméno nebo příjmení')).toHaveValue('Jan Nikdo');
   });
 });

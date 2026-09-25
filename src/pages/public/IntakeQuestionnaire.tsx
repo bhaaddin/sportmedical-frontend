@@ -77,9 +77,16 @@ import {
   IntakeError,
   IntakeOutcome,
   clearIdempotencyKey,
+  completeIntake,
   submitIntake,
 } from '../../api/publicIntake';
-import type { IntakeInsurance, IntakeResponse } from '../../api/publicIntake';
+import type {
+  CompletionPrefill,
+  CompletionResponse,
+  IntakeInsurance,
+  IntakeRequest,
+  IntakeResponse,
+} from '../../api/publicIntake';
 import {
   checkPublicEmail, checkPublicPhone, publicPhoneRegions,
 } from '../../api/publicContactCheck';
@@ -323,8 +330,45 @@ function needsSecondTyping(insuranceNumber: string): boolean {
   return !parseBirthNumber(digits).ok;
 }
 
-export default function IntakeQuestionnaire() {
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+/**
+ * The desk-issued link the patient is finishing, when this page is opened as
+ * `/dokonceni/{token}` rather than as `/dotaznik`.
+ *
+ * The same form, because the owner asked for "the normal public registration
+ * + questionnaire pre-filled with those four facts": what changes is where
+ * the answers go (onto the patient the link belongs to, not into the review
+ * queue), what the banner says, and that no slot is being held.
+ */
+export interface CompletionContext {
+  token: string;
+  prefill: CompletionPrefill;
+}
+
+/** The completion's answer in the shape the confirmation screen already reads. */
+function toCompletionResult(response: CompletionResponse, completion: CompletionContext): IntakeResponse {
+  return {
+    referenceNumber: response.referenceNumber,
+    outcome: IntakeOutcome.Created,
+    manageToken: null,
+    confirmationEmailExpected: false,
+    appointmentId: null,
+    appointmentStartUtc: completion.prefill.appointmentStartUtc,
+    appointmentEndUtc: null,
+    bookingFailed: false,
+  };
+}
+
+export default function IntakeQuestionnaire({ completion }: { completion?: CompletionContext } = {}) {
+  const [form, setForm] = useState<FormState>(() =>
+    completion === undefined
+      ? EMPTY_FORM
+      : {
+          ...EMPTY_FORM,
+          givenName: completion.prefill.givenName,
+          familyName: completion.prefill.familyName,
+          email: completion.prefill.email,
+          phone: completion.prefill.phone ?? '',
+        });
   const [derived, setDerived] = useState<Derived>(NOTHING_DERIVED);
   /* The health questionnaire starts closed. It is ~76 questions and it is
      optional today; opening it by default would turn a one-minute
@@ -343,7 +387,8 @@ export default function IntakeQuestionnaire() {
    * the banner to vanish mid-sentence. If it has lapsed by the time they send,
    * the server says so — see the note on `heldToken` where it is submitted.
    */
-  const [held] = useState<HeldBooking | null>(readHeld);
+  /* A completion link never carries a held slot: the desk already booked. */
+  const [held] = useState<HeldBooking | null>(() => (completion === undefined ? readHeld() : null));
 
   /*
    * What this činnost asks of the questionnaire.
@@ -814,7 +859,7 @@ export default function IntakeQuestionnaire() {
     setSubmitError(null);
 
     try {
-      const response = await submitIntake({
+      const request: IntakeRequest = {
         identity: {
           givenName: form.givenName.trim(),
           familyName: form.familyName.trim(),
@@ -861,7 +906,11 @@ export default function IntakeQuestionnaire() {
          * another time is better than losing everything they typed.
          */
         holdToken: held?.token,
-      });
+      };
+
+      const response: IntakeResponse = completion === undefined
+        ? await submitIntake(request)
+        : toCompletionResult(await completeIntake(completion.token, request), completion);
 
       clearIdempotencyKey();
 
@@ -905,11 +954,13 @@ export default function IntakeQuestionnaire() {
                 returned the appointment all along; nothing read it.
               */}
               <Typography variant="h5" sx={{ mb: 1 }}>
-                {result.appointmentStartUtc !== null
-                  ? 'Termín je váš'
-                  : result.bookingFailed
-                    ? 'Registraci máme, termín zatím ne'
-                    : 'Dotazník jsme přijali'}
+                {completion !== undefined
+                  ? 'Registrace je dokončená'
+                  : result.appointmentStartUtc !== null
+                    ? 'Termín je váš'
+                    : result.bookingFailed
+                      ? 'Registraci máme, termín zatím ne'
+                      : 'Dotazník jsme přijali'}
               </Typography>
 
               {/*
@@ -972,7 +1023,9 @@ export default function IntakeQuestionnaire() {
                     for nothing. The server now says whether a message is
                     actually coming, and only then is one promised.
                   */}
-                  {result.outcome === IntakeOutcome.CandidateReviewRequired
+                  {completion !== undefined
+                    ? 'Vaše údaje jsme doplnili do registrace, kterou pro vás založila recepce. Nic dalšího vyplňovat nemusíte; odkaz už není platný.'
+                    : result.outcome === IntakeOutcome.CandidateReviewRequired
                     ? (result.confirmationEmailExpected
                       ? 'Vaše údaje ověří naše recepce, abychom vás nezaložili dvakrát. Ozveme se vám na uvedený e-mail.'
                       : 'Vaše údaje ověří naše recepce, abychom vás nezaložili dvakrát, a pak se vám ozveme. Poznamenejte si prosím číslo žádosti.')
@@ -1071,7 +1124,7 @@ export default function IntakeQuestionnaire() {
             .smd-questionnaire { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           }
         `}</style>
-        <Hero booked={held !== null} />
+        <Hero booked={held !== null || completion?.prefill.appointmentStartUtc != null} />
 
         {/* Honeypot — visually hidden, never focusable. */}
         {/*
@@ -1133,6 +1186,39 @@ export default function IntakeQuestionnaire() {
         />
 
         <Container maxWidth="lg" sx={{ mt: { xs: -7, md: -9 } }}>
+          {/* The desk-issued link: who started this, for which appointment, and
+              how long the link lives. Above the form for the same reason as the
+              held slot below -- it is why they are here. */}
+          {completion !== undefined && (
+            <Box
+              sx={{
+                mb: 3,
+                p: 2.5,
+                borderRadius: 4,
+                bgcolor: BRAND.ink,
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                flexWrap: 'wrap',
+              }}
+            >
+              <EventAvailableOutlined sx={{ color: BRAND.accent }} />
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 800, fontSize: 15.5 }}>
+                  Dokončení registrace — {completion.prefill.givenName} {completion.prefill.familyName}
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.68)' }}>
+                  {completion.prefill.appointmentStartUtc !== null
+                    ? `Recepce pro vás založila registraci k termínu ${completion.prefill.activityName ?? ''} ${clinicMoment(completion.prefill.appointmentStartUtc)}. `
+                    : 'Recepce pro vás založila registraci. '}
+                  Doplňte prosím zbytek — adresu, pojištění a zdravotní dotazník. Odkaz platí do{' '}
+                  {clinicMoment(completion.prefill.expiresAtUtc)} a je určený jen vám.
+                </Typography>
+              </Box>
+            </Box>
+          )}
+
           {/* What they are finishing, if they came from the booking page. It is
               above the form rather than in the rail because it is the reason
               they are here, and a reason belongs before the work. */}

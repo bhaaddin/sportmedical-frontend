@@ -26,10 +26,12 @@ import {
   historyActionName,
   isKnownPaperworkReason,
   isLateStatus,
+  isRegistrationIncomplete,
   isTerminalStatus,
   statusName,
   statusTally,
 } from "../../api/bookingContracts";
+import { RegistrationLinkPanel } from "../patients/RegistrationLinkPanel";
 import type { Appointment, HistoryLine } from "../../api/bookingContracts";
 import {
   addDaysToDateOnly,
@@ -320,6 +322,9 @@ function DetailBody({
             )}`}
           />
         ) : null}
+        {isRegistrationIncomplete(appointment.paperwork) ? (
+          <Chip size="small" color="warning" label={t("booking.paperwork.preRegistered")} />
+        ) : null}
       </Stack>
 
       {/*
@@ -381,6 +386,12 @@ function DetailBody({
             </Stack>
           ) : null}
         </AsyncSection>
+        {/*
+          The completion link of a pre-registered patient: where it stands and
+          the button to issue it again. Drawn for nobody else — the panel says
+          nothing for an ordinary registered patient.
+        */}
+        <RegistrationLinkPanel patientId={appointment.patientId} />
       </Box>
 
       {/* ── The desk's note (5.8, v26) ── */}

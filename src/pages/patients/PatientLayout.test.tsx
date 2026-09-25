@@ -16,6 +16,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { DocumentStatus, DocumentTemplate, PatientDocument } from '../../api/documents';
 
 const getById = vi.fn();
@@ -23,6 +24,7 @@ const getTemplates = vi.fn();
 const getPatientDocuments = vi.fn();
 const checkRequired = vi.fn();
 const getConsents = vi.fn();
+const linkStatus = vi.fn();
 
 vi.mock('../../api/patients', () => ({ patientsApi: { getById, getProfile: vi.fn() } }));
 vi.mock('../../api/documents', async () => {
@@ -30,6 +32,11 @@ vi.mock('../../api/documents', async () => {
   return { ...actual, documentsApi: { getTemplates, getPatientDocuments, checkRequired } };
 });
 vi.mock('../../api/client', () => ({ default: { get: getConsents } }));
+/* An ordinary registered patient: no completion link, so no chip and no panel. */
+vi.mock('../../api/preRegistration', () => ({
+  preRegistrationApi: { linkStatus },
+  REGISTRATION_LINK_QUERY_KEY: (id: string) => ['registration-link', id],
+}));
 
 const { default: PatientLayout } =
   await import('./PatientLayout');
@@ -75,18 +82,23 @@ beforeEach(() => {
   getPatientDocuments.mockReset().mockResolvedValue([]);
   checkRequired.mockReset().mockResolvedValue({ allRequiredPresent: true, requirements: [] });
   getConsents.mockReset().mockResolvedValue({ data: [] });
+  linkStatus.mockReset().mockResolvedValue({
+    state: 'none', referenceNumber: null, issuedAtUtc: null, expiresAtUtc: null, completedAtUtc: null,
+  });
 });
 
 const renderLayout = (path = '/patients/p1') =>
   render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/patients/:id" element={<PatientLayout />}>
-          <Route index element={<div>PŘEHLED</div>} />
-          <Route path="dokumenty" element={<div>DOKUMENTY</div>} />
-        </Route>
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/patients/:id" element={<PatientLayout />}>
+            <Route index element={<div>PŘEHLED</div>} />
+            <Route path="dokumenty" element={<div>DOKUMENTY</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 
 /*

@@ -25,6 +25,11 @@ export interface PatientHit {
   fullName: string;
   /** `yyyy-MM-dd`, or null when the row carries none. */
   dateOfBirth: string | null;
+  /**
+   * Just pre-registered at the desk with four facts. The booking dialog
+   * issues the completion link once the appointment is booked.
+   */
+  provisional?: boolean;
 }
 
 /** Enough to ask the server; fewer letters would page through half the register. */

@@ -27,6 +27,8 @@ import type {
   AppointmentRequirementDto, DocumentTemplate, PatientDocument,
 } from '../../api/documents';
 import ConsentLine from '../../components/patients/ConsentLine';
+import { RegistrationLinkPanel } from '../../components/patients/RegistrationLinkPanel';
+import { registrationChip, useRegistrationLink } from '../../components/patients/registrationLink';
 import { formatDateOnly } from '../../utils/time';
 import {
   NOTHING_REQUIRED_TEXT, anyBlocks, expiringSoon, requirementLine, stillMissing,
@@ -108,6 +110,10 @@ export default function PatientLayout() {
    * including the ones who are missing something.
    */
   const [requirements, setRequirements] = useState<AppointmentRequirementDto[] | null>(null);
+
+  /* Whether this is a pre-registration still waiting on the patient's link. */
+  const registrationLink = useRegistrationLink(id);
+  const preRegistered = registrationChip(registrationLink.data);
 
   const reloadDocuments = useCallback(() => {
     if (id === undefined) return;
@@ -248,7 +254,14 @@ export default function PatientLayout() {
               </Typography>
               <Stack direction="row" spacing={1} sx={{ mt: 0.5, flexWrap: 'wrap' }}>
                 <Chip size="small" label={formatDateOnly(patient.dateOfBirth?.slice(0, 10))} />
-                <Chip size="small" label={patient.sex === 'Male' ? 'Muž' : 'Žena'} />
+                {/* A pre-registered patient has not said it yet; "Žena" for anybody who is not "Male" was a guess. */}
+                <Chip
+                  size="small"
+                  label={patient.sex === 'Male' ? 'Muž' : patient.sex === 'Female' ? 'Žena' : 'pohlaví neuvedeno'}
+                />
+                {preRegistered !== null && (
+                  <Chip size="small" color={preRegistered.color} label={preRegistered.label} />
+                )}
               </Stack>
             </Box>
             <Box sx={{ flex: 1 }} />
@@ -270,6 +283,8 @@ export default function PatientLayout() {
               Nová diagnostika
             </Button>
           </Stack>
+
+          <RegistrationLinkPanel patientId={id} />
 
           <Box sx={{ mt: 2 }}>
             <ConsentLine patientId={id} />

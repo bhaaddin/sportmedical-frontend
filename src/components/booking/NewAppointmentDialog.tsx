@@ -36,6 +36,9 @@ import { errorText } from "./errorText";
 import { PatientSearch } from "./patient/PatientSearch";
 import { PatientFilled } from "./patient/PatientFilled";
 import type { PatientHit } from "./patient/patientTypeahead";
+import { preRegistrationApi } from "../../api/preRegistration";
+import type { IssuedRegistrationLink } from "../../api/preRegistration";
+import { RegistrationLinkBox } from "../patients/RegistrationLinkBox";
 import {
   endClock,
   isCompleteMoment,
@@ -170,6 +173,12 @@ export function NewAppointmentDialog({
     startUtc: string;
     warnings: { code: string; message: string }[];
   } | null>(null);
+  /*
+   * The completion link for a pre-registered patient, issued right after the
+   * booking so its e-mail can name the appointment. Shown once: the server
+   * keeps only a hash.
+   */
+  const [link, setLink] = useState<IssuedRegistrationLink | null>(null);
 
   const calendarsQuery = useQuery({
     queryKey: ["calendars"],
@@ -255,6 +264,9 @@ export function NewAppointmentDialog({
         warnings: result.warnings ?? [],
       });
       onBooked();
+      if (patient?.provisional) {
+        issueLink.mutate(patient.id);
+      }
     },
     onError: (error) => {
       if (error instanceof BookingApiError && error.isConflict) {
@@ -270,6 +282,11 @@ export function NewAppointmentDialog({
         void queryClient.invalidateQueries({ queryKey: ["activities"] });
       }
     },
+  });
+
+  const issueLink = useMutation({
+    mutationFn: (patientId: string) => preRegistrationApi.issueLink(patientId),
+    onSuccess: (issued) => setLink(issued),
   });
 
   /* Any change to the time drops the dragged end: it no longer describes it. */
@@ -288,7 +305,9 @@ export function NewAppointmentDialog({
     setOverrideReason("");
     setConflict(null);
     setBooked(null);
+    setLink(null);
     book.reset();
+    issueLink.reset();
   };
 
   const close = () => {
@@ -327,6 +346,27 @@ export function NewAppointmentDialog({
                     : t("booking.paperwork.unknown", { code: w.code }))}
               </Alert>
             ))}
+            {/*
+              The pre-registered patient's link. Generated after the booking,
+              never before it: the e-mail names the appointment.
+            */}
+            {link ? <RegistrationLinkBox link={link} /> : null}
+            {issueLink.isPending ? (
+              <Alert severity="info">Generuji odkaz k dokončení registrace…</Alert>
+            ) : null}
+            {issueLink.error ? (
+              <Alert
+                severity="error"
+                action={
+                  <Button color="inherit" size="small" onClick={() => patient && issueLink.mutate(patient.id)}>
+                    {t("booking.common.retry")}
+                  </Button>
+                }
+              >
+                Termín je objednaný, ale odkaz k dokončení registrace se nepodařilo vygenerovat: {issueLink.error.message}{" "}
+                Lze ho vygenerovat i později z karty pacienta.
+              </Alert>
+            ) : null}
           </Stack>
         </DialogContent>
         <DialogActions>

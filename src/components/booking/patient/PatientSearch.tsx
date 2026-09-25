@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { formatDateOnly } from "../../../utils/time";
 import { errorText } from "../errorText";
 import { PatientInfoButton } from "./PatientInfoButton";
+import { QuickPreRegistration } from "./QuickPreRegistration";
 import {
   MIN_QUERY_LENGTH,
   displayName,
@@ -48,10 +49,17 @@ export function PatientSearch({
 }) {
   const { t } = useTranslation();
   const [text, setText] = useState("");
-  const search = usePatientTypeahead(text, enabled);
+  const [quick, setQuick] = useState(false);
+  const search = usePatientTypeahead(text, enabled && !quick);
   const duplicates = duplicateNameIds(search.hits);
   const shown = search.hits.slice(0, SHOWN);
   const typedEnough = text.trim().length >= MIN_QUERY_LENGTH;
+
+  /* The four-fact path replaces the search while it is open; "Zpět" brings
+     the search back with what was typed still in the box. */
+  if (quick) {
+    return <QuickPreRegistration typed={text} onPick={onPick} onCancel={() => setQuick(false)} />;
+  }
 
   return (
     <Stack spacing={1}>
@@ -156,15 +164,26 @@ export function PatientSearch({
       ) : null}
 
       {typedEnough && mayRegister ? (
-        <Typography variant="body2">
-          Pacient v databázi není?{" "}
-          <MuiLink href="/patients/register" target="_blank" rel="noopener">
-            Založit nového pacienta
-          </MuiLink>{" "}
-          <Typography component="span" variant="caption" sx={{ color: "text.secondary" }}>
-            (otevře se v nové záložce, zvolený čas zůstane zde)
+        <Stack spacing={0.5}>
+          <Box>
+            <Button size="small" variant="outlined" onClick={() => setQuick(true)}>
+              Pacient v databázi není — rychlá předregistrace
+            </Button>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
+              Jméno, příjmení, datum narození a e-mail. Adresu, pojištění a dotazník si pacient
+              doplní sám přes odkaz, který dostane po objednání.
+            </Typography>
+          </Box>
+          <Typography variant="body2">
+            Chcete zapsat všechno hned?{" "}
+            <MuiLink href="/patients/register" target="_blank" rel="noopener">
+              Úplná registrace
+            </MuiLink>{" "}
+            <Typography component="span" variant="caption" sx={{ color: "text.secondary" }}>
+              (otevře se v nové záložce, zvolený čas zůstane zde)
+            </Typography>
           </Typography>
-        </Typography>
+        </Stack>
       ) : null}
     </Stack>
   );

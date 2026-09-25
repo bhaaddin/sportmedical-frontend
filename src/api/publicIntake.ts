@@ -316,3 +316,72 @@ export async function submitIntake(request: IntakeRequest): Promise<IntakeRespon
     );
   }
 }
+
+/* ── The desk's completion link ── */
+
+/**
+ * What a link pre-fills: the four facts the desk typed and the booked
+ * appointment. No date of birth and no identifiers — the server withholds
+ * them so a forwarded link reveals nothing worth having.
+ */
+export interface CompletionPrefill {
+  referenceNumber: string;
+  givenName: string;
+  familyName: string;
+  email: string;
+  /** E.164, or null when the desk had none. */
+  phone: string | null;
+  expiresAtUtc: string;
+  activityName: string | null;
+  appointmentStartUtc: string | null;
+}
+
+export interface CompletionResponse {
+  referenceNumber: string;
+}
+
+/** 404 for an unknown, a used and an expired link alike — the server does not say which. */
+export async function openCompletion(token: string): Promise<CompletionPrefill | null> {
+  try {
+    const response = await publicClient.get<CompletionPrefill>(
+      `/api/public/intake/complete/${encodeURIComponent(token)}`,
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) return null;
+    throw new IntakeError('Nepodařilo se spojit se serverem. Zkuste to prosím znovu.', 0);
+  }
+}
+
+/**
+ * The same body as the public form, written onto the patient the link
+ * belongs to. A 404 here means the link died between opening and sending.
+ */
+export async function completeIntake(token: string, request: IntakeRequest): Promise<CompletionResponse> {
+  try {
+    const response = await publicClient.post<CompletionResponse>(
+      `/api/public/intake/complete/${encodeURIComponent(token)}`,
+      request,
+    );
+    return response.data;
+  } catch (error) {
+    if (!axios.isAxiosError(error)) {
+      throw new IntakeError('Odeslání se nezdařilo. Zkuste to prosím znovu.', 0);
+    }
+
+    const status = error.response?.status ?? 0;
+    const payload = error.response?.data as
+      | { message?: string; errors?: IntakeFieldError[] }
+      | undefined;
+
+    if (status === 0) {
+      throw new IntakeError('Nepodařilo se spojit se serverem. Zkontrolujte připojení.', status);
+    }
+
+    throw new IntakeError(
+      payload?.message ?? 'Odeslání se nezdařilo. Zkuste to prosím znovu.',
+      status,
+      payload?.errors ?? [],
+    );
+  }
+}

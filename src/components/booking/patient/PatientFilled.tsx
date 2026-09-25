@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, Stack, TextField, Typography } from "@mui/material";
 import CheckCircle from "@mui/icons-material/CheckCircle";
 import { BookingApiError } from "../../../api/apiError";
 import { formatDateOnly } from "../../../utils/time";
@@ -51,8 +51,11 @@ export function PatientFilled({
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
           <CheckCircle color="success" fontSize="small" />
           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            Pacient vybrán z databáze
+            {hit.provisional ? "Pacient předregistrován" : "Pacient vybrán z databáze"}
           </Typography>
+          {hit.provisional ? (
+            <Chip size="small" color="warning" label="Předregistrace" />
+          ) : null}
         </Stack>
         <Button size="small" onClick={onChange}>
           Změnit pacienta
@@ -76,6 +79,13 @@ export function PatientFilled({
           {field("Adresa", card.data?.address, card.isLoading)}
         </Box>
       </Box>
+
+      {hit.provisional ? (
+        <Alert severity="info" sx={{ mt: 1.5 }}>
+          Po objednání se vygeneruje osobní odkaz k dokončení registrace a pošle se e-mailem;
+          uvidíte ho i zde, aby šel poslat ručně.
+        </Alert>
+      ) : null}
 
       {card.error ? (
         <Alert severity={notInRegistry ? "info" : "warning"} sx={{ mt: 1.5 }}>

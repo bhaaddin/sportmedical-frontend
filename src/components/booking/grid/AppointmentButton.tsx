@@ -2,6 +2,7 @@ import { Box } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import {
   isLateStatus,
+  isRegistrationIncomplete,
   statusName,
   statusTally,
   type DayAppointment,
@@ -112,6 +113,28 @@ export function AppointmentButton({
           {calendar ? ` · ${calendar.name}` : ""}
         </Box>
       )}
+      {/*
+        A pre-registered patient, in words on the block itself: the desk
+        should see at a glance whose registration is still waiting on a link,
+        and the paperwork triangle alone does not say which gap it is.
+      */}
+      {layout !== "compact" && isRegistrationIncomplete(appointment.paperwork) ? (
+        <Box
+          component="span"
+          sx={{
+            display: "inline-block",
+            mt: 0.25,
+            px: 0.5,
+            borderRadius: 0.5,
+            fontSize: 10,
+            fontWeight: 700,
+            backgroundColor: "rgba(255,255,255,0.85)",
+            color: "#7A4B00",
+          }}
+        >
+          {t("booking.paperwork.preRegistered")}
+        </Box>
+      ) : null}
     </Box>
   );
 }
