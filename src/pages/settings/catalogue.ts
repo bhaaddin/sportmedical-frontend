@@ -296,7 +296,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       {
         id: 'zdravi',
         label: 'Zdraví systému',
-        description: 'Chyby, přihlášená zařízení a stav služeb',
+        description: 'Databáze, e-mailová fronta, SMTP, úložiště dokumentů, verze a přihlášení — změřené právě teď',
         to: '/system-health',
         requires: 'settings.clinic.manage',
       },
