@@ -36,6 +36,7 @@ import { AsyncSection } from "../../components/booking/AsyncSection";
 import { NewAppointmentDialog } from "../../components/booking/NewAppointmentDialog";
 import { errorText } from "../../components/booking/errorText";
 import { usePermission } from "../../auth/usePermission";
+import { DayTracking } from "../../components/tracking/DayTracking";
 
 /**
  * The day at a glance — contract 5.12, laid out as `booking.md` part 3.
@@ -319,6 +320,11 @@ export default function DayOverviewPage() {
                   />
                 </Stack>
               </Paper>
+
+              {/* ── Sledování dne: the nine tracking numbers, the day's list
+                  with its flags, filters by činnost, employee and status.
+                  Every figure is the server's (/api/tracking/day). ── */}
+              <DayTracking date={date} calendarIds={shownIds} />
 
               {/* ── By activity and by calendar ── */}
               <Stack

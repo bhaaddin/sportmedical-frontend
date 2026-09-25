@@ -26,6 +26,7 @@ const PublicBooking = lazy(() => import('./pages/public/PublicBooking'));
 const ManageBooking = lazy(() => import('./pages/public/ManageBooking'));
 const IntakeReviewQueue = lazy(() => import('./pages/IntakeReviewQueue'));
 const DashboardPage = lazy(() => import('./pages/Dashboard'));
+const StatisticsPage = lazy(() => import('./pages/StatisticsPage'));
 const DiagnosticForm = lazy(() => import('./pages/DiagnosticForm'));
 const PatientList = lazy(() => import('./pages/PatientList'));
 const PatientDetails = lazy(() => import('./pages/PatientDetails'));
@@ -99,6 +100,9 @@ const menuGroups: MenuItemGroup[] = [
     label: '',
     items: [
       { text: 'Přehled', icon: <Dashboard />, path: '/' },
+      /* The owner's statistics over a period: the till and the whole clinic's
+         throughput, which is why the server asks for settings.clinic.manage. */
+      { text: 'Statistiky', icon: <Assessment />, path: '/statistiky', requires: 'settings.clinic.manage' },
     ],
   },
   /*
@@ -460,6 +464,7 @@ export default function App() {
                   <Suspense fallback={<PageLoader />}>
                   <Routes>
                     <Route path="/" element={<DashboardPage />} />
+                    <Route path="/statistiky" element={<RequirePermission of="settings.clinic.manage"><StatisticsPage /></RequirePermission>} />
                     <Route path="/patients" element={<RequirePermission of="patients.view"><PatientList /></RequirePermission>} />
                     <Route path="/patients/register" element={<RequirePermission of="patients.register"><PatientRegistrationPage /></RequirePermission>} />
                     <Route path="/patients/:id/edit" element={<RequirePermission of="patients.edit"><PatientFormPage /></RequirePermission>} />

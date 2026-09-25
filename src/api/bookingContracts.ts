@@ -44,6 +44,9 @@ const isoUtc = z
     message: 'expected an ISO 8601 instant in UTC',
   });
 
+/** The same instant rule for contracts written outside this file (tracking). */
+export const utcInstantSchema = isoUtc;
+
 const dateOnly = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'expected yyyy-MM-dd with no zone' });
