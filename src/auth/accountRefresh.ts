@@ -17,10 +17,13 @@
 import { useEffect } from 'react';
 import { client, onForbidden } from '../api/client';
 import { savePermissions, saveUser, type AccountSummary } from './localSession';
+import { savePreferences, type AccountPreferences } from './preferences';
 
 export interface CurrentAccount {
   account: AccountSummary;
   permissions: string[];
+  /** The theme and workspace this person chose (wave 3). Absent on an older server. */
+  preferences?: AccountPreferences;
 }
 
 /** No more than one ordinary refresh in this window. */
@@ -53,6 +56,7 @@ export function refreshAccount(options: { force?: boolean } = {}): Promise<void>
       if (!data || !Array.isArray(data.permissions)) return;
       savePermissions(data.permissions);
       if (data.account) saveUser(data.account);
+      savePreferences(data.preferences);
     })
     .catch(() => {
       /* See above: the client's handlers already said what went wrong. */

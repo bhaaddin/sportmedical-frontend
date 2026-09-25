@@ -11,7 +11,7 @@
    ══════════════════════════════════════════════════════════════ */
 
 /** Everything a sign-in stores. Nothing else in localStorage is touched. */
-export const SESSION_KEYS = ['token', 'user', 'permissions'] as const;
+export const SESSION_KEYS = ['token', 'user', 'permissions', 'preferences'] as const;
 
 type Listener = () => void;
 
@@ -86,13 +86,27 @@ export interface AccountSummary {
   role: string;
 }
 
+/**
+ * "MUDr. Jana Nováková" is Jana Nováková with a title in front, not somebody
+ * whose first name is "MUDr.". The avatar used to read "MJ" for every doctor
+ * at the clinic; a title is a word that ends with a full stop, and it is
+ * skipped when there is a name behind it.
+ */
+export function splitDisplayName(displayName: string): { firstName: string; lastName: string } {
+  const parts = (displayName || '').trim().split(/\s+/).filter(Boolean);
+  const named = parts.filter((part) => !part.endsWith('.'));
+  const source = named.length > 0 ? named : parts;
+  return {
+    firstName: source[0] || displayName,
+    lastName: source.slice(1).join(' ') || '',
+  };
+}
+
 export function saveUser(account: AccountSummary): void {
-  const nameParts = (account.displayName || '').split(' ');
   const user: StoredUser = {
     id: account.userId,
     email: account.email,
-    firstName: nameParts[0] || account.displayName,
-    lastName: nameParts.slice(1).join(' ') || '',
+    ...splitDisplayName(account.displayName),
     role: account.role,
   };
   try {

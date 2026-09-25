@@ -14,6 +14,8 @@ export interface LoginResponse {
     lastLoginAtUtc: string | null;
   };
   permissions: string[];
+  /** The theme and workspace this person chose (wave 3). */
+  preferences?: { theme: string; workspace: string };
 }
 
 export const authApi = {

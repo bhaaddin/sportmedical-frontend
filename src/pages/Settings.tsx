@@ -28,6 +28,7 @@ import {
   ExpandMore, ChevronRight, Logout, Person, Lock,
 } from '@mui/icons-material';
 import { visibleSections, type SettingsItem } from './settings/catalogue';
+import { AccountPreferencesCard } from './settings/AccountPreferencesCard';
 import { hasStoredPermissions, usePermissions } from '../auth/usePermission';
 import { signOut } from '../auth/signOut';
 
@@ -188,7 +189,7 @@ export default function Settings() {
           <Card variant="outlined" sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent>
               <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: '#0D7377', width: 48, height: 48 }}>
+                <Avatar sx={{ bgcolor: 'primary.main', color: 'primary.contrastText', width: 48, height: 48 }}>
                   {initials}
                 </Avatar>
                 <Box sx={{ flex: 1 }}>
@@ -215,6 +216,10 @@ export default function Settings() {
               </Alert>
             </CardContent>
           </Card>
+
+          {/* Loaded only while this heading is open: the catalogue is one
+              request nobody needs until they come here to choose. */}
+          {open === 'ucet' ? <AccountPreferencesCard /> : null}
 
           <Button
             startIcon={<Logout />}

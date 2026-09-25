@@ -9,8 +9,9 @@ import { PATIENT_SECTIONS, patientInPath, sectionPath } from './pages/patients/s
 import { settingsItemAt } from './pages/settings/catalogue';
 import { Toaster } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useState, lazy, Suspense, useRef, useCallback } from 'react';
-import theme from './theme';
+import { useState, lazy, Suspense, useRef, useCallback, useMemo } from 'react';
+import { buildTheme } from './theme';
+import { usePreferences } from './auth/preferences';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import NetworkBanner from './components/NetworkBanner';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
@@ -25,7 +26,8 @@ const IntakeQuestionnaire = lazy(() => import('./pages/public/IntakeQuestionnair
 const PublicBooking = lazy(() => import('./pages/public/PublicBooking'));
 const ManageBooking = lazy(() => import('./pages/public/ManageBooking'));
 const IntakeReviewQueue = lazy(() => import('./pages/IntakeReviewQueue'));
-const DashboardPage = lazy(() => import('./pages/Dashboard'));
+/* `/` decides between the dashboard and the doctor's workspace (pages/Home). */
+const HomePage = lazy(() => import('./pages/Home'));
 const DiagnosticForm = lazy(() => import('./pages/DiagnosticForm'));
 const PatientList = lazy(() => import('./pages/PatientList'));
 const PatientDetails = lazy(() => import('./pages/PatientDetails'));
@@ -56,6 +58,7 @@ const HolidaysPage = lazy(() => import('./pages/settings/HolidaysPage'));
 const QuestionnairePage = lazy(() => import('./pages/settings/QuestionnairePage'));
 const CalendarDisplayPage = lazy(() => import('./pages/settings/CalendarDisplayPage'));
 const PatientFieldsPage = lazy(() => import('./pages/settings/PatientFieldsPage'));
+const AttendancePage = lazy(() => import('./pages/settings/AttendancePage'));
 const BookingActivitiesPage = lazy(() => import('./pages/booking/ActivitiesPage'));
 /* Booking phase 1, stage 2: working hours, periods, cycle and exceptions */
 const BookingWorkingHoursPage = lazy(() => import('./pages/booking/WorkingHoursPage'));
@@ -79,7 +82,7 @@ const AccountingExportPage = lazy(() => import('./pages/AccountingExportPage'));
 function PageLoader() {
   return (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-      <CircularProgress size={40} sx={{ color: '#0D7377' }} />
+      <CircularProgress size={40} sx={{ color: 'primary.main' }} />
     </Box>
   );
 }
@@ -227,7 +230,8 @@ function Layout({ children }: { children: React.ReactNode }) {
       <a href="#main-content" className="skip-link">
         Přeskočit na hlavní obsah
       </a>
-      <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1, bgcolor: '#0D7377', boxShadow: '0 2px 16px rgba(13,115,119,0.25)' }}>
+      {/* Colour comes from the theme (Můj účet → Vzhled), never from here. */}
+      <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1 }}>
         <Toolbar>
           <LocalHospital sx={{ mr: 1 }} />
           <Typography variant="h6" noWrap sx={{ fontWeight: 700, flexGrow: 1 }}>
@@ -240,7 +244,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           <NotificationCenter />
           <IconButton color="inherit" onClick={(e) => setAnchorEl(e.currentTarget)}
             sx={{ transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.1)' } }}>
-            <Avatar sx={{ bgcolor: '#14A3A8', width: 36, height: 36, transition: 'box-shadow 0.2s', '&:hover': { boxShadow: '0 0 0 3px rgba(20,163,168,0.4)' } }}>
+            <Avatar sx={{ bgcolor: 'primary.light', color: 'primary.contrastText', width: 36, height: 36, transition: 'box-shadow 0.2s', '&:hover': { boxShadow: (t) => `0 0 0 3px ${t.palette.primary.light}66` } }}>
               {user.firstName?.[0]}{user.lastName?.[0]}
             </Avatar>
           </IconButton>
@@ -303,7 +307,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                   }} />
                 )}
               </ListItemButton>
-              <Box sx={{ mx: 1.5, my: 1, borderTop: '1px solid #e0e0e0' }} />
+              <Box sx={{ mx: 1.5, my: 1, borderTop: '1px solid', borderColor: 'divider' }} />
               {PATIENT_SECTIONS.map((section) => {
                 const to = sectionPath(patientId, section);
                 const isActive = location.pathname === to;
@@ -318,12 +322,12 @@ function Layout({ children }: { children: React.ReactNode }) {
                       borderRadius: 2, mb: 0.5, py: 1.0, minHeight: 44,
                       justifyContent: sidebarOpen ? 'initial' : 'center',
                       px: sidebarOpen ? 2 : 1.5,
-                      '&.Mui-selected': { bgcolor: '#E0F2F1', color: '#0D7377', boxShadow: 'inset 3px 0 0 #0D7377' },
-                      '&:hover': { bgcolor: '#E0F2F1' },
+                      '&.Mui-selected': { bgcolor: 'action.selected', color: 'primary.main', boxShadow: (t) => `inset 3px 0 0 ${t.palette.primary.main}` },
+                      '&:hover': { bgcolor: 'action.hover' },
                     }}
                   >
                     <ListItemIcon sx={{
-                      color: isActive ? '#0D7377' : 'inherit', minWidth: 40, justifyContent: 'center',
+                      color: isActive ? 'primary.main' : 'inherit', minWidth: 40, justifyContent: 'center',
                     }}>
                       {section.icon}
                     </ListItemIcon>
@@ -346,7 +350,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                 </Typography>
               )}
               {group.label && !sidebarOpen && gi > 0 && (
-                <Box sx={{ mx: 1.5, my: 1, borderTop: '1px solid #e0e0e0' }} />
+                <Box sx={{ mx: 1.5, my: 1, borderTop: '1px solid', borderColor: 'divider' }} />
               )}
               {group.items.map((item) => {
                 const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
@@ -360,11 +364,11 @@ function Layout({ children }: { children: React.ReactNode }) {
                         justifyContent: sidebarOpen ? 'initial' : 'center',
                         px: sidebarOpen ? 2 : 1.5,
                         transition: 'all 0.2s ease',
-                        '&.Mui-selected': { bgcolor: '#E0F2F1', color: '#0D7377', boxShadow: 'inset 3px 0 0 #0D7377' },
+                        '&.Mui-selected': { bgcolor: 'action.selected', color: 'primary.main', boxShadow: (t) => `inset 3px 0 0 ${t.palette.primary.main}` },
                         '&:hover': { bgcolor: '#E0F2F1', transform: 'translateX(2px)' },
                       }}>
                       <ListItemIcon sx={{
-                        color: isActive ? '#0D7377' : 'inherit', minWidth: 40,
+                        color: isActive ? 'primary.main' : 'inherit', minWidth: 40,
                         justifyContent: 'center',
                       }}>
                         {item.icon}
@@ -436,6 +440,14 @@ function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  /*
+   * The theme is the signed-in person's own choice (Můj účet → Vzhled),
+   * stored on the account and mirrored in this browser at sign-in and on
+   * every account refresh. Rebuilt only when the key changes.
+   */
+  const { theme: themeKey } = usePreferences();
+  const theme = useMemo(() => buildTheme(themeKey), [themeKey]);
+
   return (
     <GlobalErrorBoundary>
     <ThemeProvider theme={theme}>
@@ -459,7 +471,7 @@ export default function App() {
                 <Layout>
                   <Suspense fallback={<PageLoader />}>
                   <Routes>
-                    <Route path="/" element={<DashboardPage />} />
+                    <Route path="/" element={<HomePage />} />
                     <Route path="/patients" element={<RequirePermission of="patients.view"><PatientList /></RequirePermission>} />
                     <Route path="/patients/register" element={<RequirePermission of="patients.register"><PatientRegistrationPage /></RequirePermission>} />
                     <Route path="/patients/:id/edit" element={<RequirePermission of="patients.edit"><PatientFormPage /></RequirePermission>} />
@@ -482,6 +494,7 @@ export default function App() {
                     <Route path="/dotaznik-nastaveni" element={<RequirePermission of="questionnaires.manage"><QuestionnairePage /></RequirePermission>} />
                     <Route path="/nastaveni/vzhled-kalendare" element={<RequirePermission of="settings.clinic.manage"><CalendarDisplayPage /></RequirePermission>} />
                     <Route path="/nastaveni/udaje-pacienta" element={<RequirePermission of="settings.clinic.manage"><PatientFieldsPage /></RequirePermission>} />
+                    <Route path="/nastaveni/dochazka" element={<RequirePermission of="settings.clinic.manage"><AttendancePage /></RequirePermission>} />
                     <Route path="/training-load" element={<TrainingLoadPage />} />
                     <Route path="/wellness" element={<WellnessPage />} />
                     <Route path="/cashier" element={<RequirePermission of="billing.manage"><CashierPage /></RequirePermission>} />

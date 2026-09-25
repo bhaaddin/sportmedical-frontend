@@ -8,6 +8,7 @@ import { Visibility, VisibilityOff, LocalHospital, Email, Lock } from '@mui/icon
 import { motion } from 'framer-motion';
 import { authApi } from '../api/auth';
 import { savePermissions, saveUser } from '../auth/localSession';
+import { savePreferences } from '../auth/preferences';
 
 /** What the sign-in says when the client ended a session nobody closed here. */
 export const SESSION_EXPIRED_MESSAGE =
@@ -46,6 +47,9 @@ export default function Login() {
      * read it.
      */
     savePermissions(res.permissions ?? []);
+    /* The theme and workspace this person chose, so the first screen after
+       sign-in is already theirs rather than the default for a moment. */
+    savePreferences(res.preferences);
     navigate('/');
   };
 

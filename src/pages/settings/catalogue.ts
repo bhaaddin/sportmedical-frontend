@@ -93,6 +93,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         requires: 'settings.clinic.manage',
       },
       {
+        id: 'dochazka',
+        label: 'Docházka',
+        description: 'Po kolika minutách se objednaný termín označí „asi nepřišel“',
+        to: '/nastaveni/dochazka',
+        requires: 'settings.clinic.manage',
+      },
+      {
         id: 'cinnosti',
         label: 'Činnosti',
         description: 'Co se v ordinaci dělá a jak dlouho to trvá',
