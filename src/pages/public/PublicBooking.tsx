@@ -45,6 +45,7 @@ import {
   VerifiedUserOutlined,
 } from '@mui/icons-material';
 import {
+  PUBLIC_DAY_WINDOW_DAYS,
   SlotGoneError,
   bookableOffer,
   freeDays,
@@ -86,9 +87,6 @@ const publicTheme = createTheme({
     button: { textTransform: 'none', fontWeight: 700 },
   },
 });
-
-/** How far ahead the day list asks. The calendar's own horizon still applies. */
-const HORIZON_DAYS = 60;
 
 const iso = (date: Date): string =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -202,7 +200,7 @@ export default function PublicBooking() {
 
     const from = new Date();
     const to = new Date();
-    to.setDate(to.getDate() + HORIZON_DAYS);
+    to.setDate(to.getDate() + PUBLIC_DAY_WINDOW_DAYS);
 
     freeDays(chosen.activity.calendarId, chosen.activity.id, iso(from), iso(to))
       .then((free) => { if (!cancelled) setDays(free); })
@@ -376,7 +374,7 @@ export default function PublicBooking() {
 
                 {days !== null && days.length === 0 && (
                   <Typography variant="body2" sx={{ color: BRAND.muted }}>
-                    V nejbližších {HORIZON_DAYS} dnech nemáme volno{ringUs(clinic, '. Zavolejte nám prosím na ')}.
+                    V nejbližších {PUBLIC_DAY_WINDOW_DAYS} dnech nemáme volno{ringUs(clinic, '. Zavolejte nám prosím na ')}.
                   </Typography>
                 )}
 

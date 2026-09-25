@@ -88,6 +88,15 @@ export const bookableOffer = async (): Promise<BookableService[]> => {
   return data.data ?? [];
 };
 
+/**
+ * How far ahead the public pages ask for free days -- one number for booking
+ * (/objednat) and for moving an existing booking (/rezervace/{token}), so a
+ * day one page offers the other cannot refuse. The server clamps the answer
+ * to the calendar's own public horizon setting; this is only how much of it
+ * the page asks for at once.
+ */
+export const PUBLIC_DAY_WINDOW_DAYS = 60;
+
 /** Which days between two dates have at least one free time. */
 export const freeDays = async (
   calendarId: string,

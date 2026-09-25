@@ -62,7 +62,7 @@ import {
   rescheduleBooking,
 } from '../../api/publicManage';
 import type { ManagedBooking } from '../../api/publicManage';
-import { freeDays, freeSlots } from '../../api/publicBooking';
+import { PUBLIC_DAY_WINDOW_DAYS, freeDays, freeSlots } from '../../api/publicBooking';
 import type { BookableSlot } from '../../api/publicBooking';
 import { readPublicClinic } from '../../api/clinicSettings';
 import type { PublicClinic } from '../../api/clinicSettings';
@@ -82,9 +82,6 @@ const BRAND = {
 };
 
 const INTER = '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-
-/** How far ahead the move offers days. The public page offers the same fortnight. */
-const MOVE_WINDOW_DAYS = 14;
 
 const publicTheme = createTheme({
   palette: {
@@ -198,7 +195,7 @@ export default function ManageBooking() {
     }
     const from = pragueDateKey(new Date());
     try {
-      setDays(await freeDays(current.calendarId, current.activityId, from, addDaysToDateOnly(from, MOVE_WINDOW_DAYS)));
+      setDays(await freeDays(current.calendarId, current.activityId, from, addDaysToDateOnly(from, PUBLIC_DAY_WINDOW_DAYS)));
       setDaysFailed(false);
     } catch {
       setDays(null);
@@ -420,7 +417,7 @@ export default function ManageBooking() {
                         <Typography sx={{ fontWeight: 700, mb: 0.5 }}>Vyberte nový čas</Typography>
                         <Typography variant="body2" sx={{ color: BRAND.muted, mb: 1.5 }}>
                           Nabízíme jen volné časy pro {booking.activityName || 'tuto činnost'} v příštích
-                          {' '}{MOVE_WINDOW_DAYS} dnech. Původní čas uvolníme, jakmile změnu potvrdíte.
+                          {' '}{PUBLIC_DAY_WINDOW_DAYS} dnech. Původní čas uvolníme, jakmile změnu potvrdíte.
                         </Typography>
 
                         {daysFailed && (
@@ -438,7 +435,7 @@ export default function ManageBooking() {
 
                         {days !== null && days.length === 0 && (
                           <Typography variant="body2" sx={{ color: BRAND.muted, mb: 1.5 }}>
-                            V příštích {MOVE_WINDOW_DAYS} dnech není žádný volný čas.{callUs}
+                            V příštích {PUBLIC_DAY_WINDOW_DAYS} dnech není žádný volný čas.{callUs}
                           </Typography>
                         )}
 
