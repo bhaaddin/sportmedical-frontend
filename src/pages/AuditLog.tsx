@@ -116,7 +116,7 @@ export default function AuditLog() {
       <Paper sx={{ p: 2, mb: 3, borderRadius: 3 }}>
         <TextField fullWidth size="small" placeholder="Hledat v auditním logu..."
           value={search} onChange={(e) => setSearch(e.target.value)}
-          slotProps={{ input: { startAdornment: <SearchIcon sx={{ mr: 1, color: '#999' }} fontSize="small" /> } }}
+          slotProps={{ input: { startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.disabled' }} fontSize="small" /> } }}
           sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
       </Paper>
 
@@ -141,7 +141,7 @@ export default function AuditLog() {
         <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f8f9fa' }}>
+              <TableRow sx={{ bgcolor: 'action.hover' }}>
                 <TableCell sx={{ fontWeight: 700, width: 40 }} />
                 <TableCell sx={{ fontWeight: 700 }}>Čas</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Uživatel</TableCell>
@@ -165,7 +165,7 @@ export default function AuditLog() {
                     initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: Math.min(i * 0.02, 0.5) }}>
                     <TableCell colSpan={7} sx={{ p: 0 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #f0f0f0' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid', borderBottomColor: 'divider' }}>
                         {(entry.beforeState || entry.afterState) && (
                           <IconButton size="small" onClick={() => setExpandedRow(expandedRow === entry.id ? null : entry.id)}>
                             {expandedRow === entry.id ? <CollapseIcon fontSize="small" /> : <ExpandIcon fontSize="small" />}
@@ -191,7 +191,7 @@ export default function AuditLog() {
                       </Box>
                       {/* Expanded JSON diff */}
                       {expandedRow === entry.id && (entry.beforeState || entry.afterState) && (
-                        <Box sx={{ p: 2, bgcolor: '#f8f9fa', borderBottom: '1px solid #e0e0e0' }}>
+                        <Box sx={{ p: 2, bgcolor: 'action.hover', borderBottom: '1px solid', borderBottomColor: 'divider' }}>
                           <Grid container spacing={2}>
                             {entry.beforeState && (
                               <Grid size={{ xs: 6 }}>

@@ -48,7 +48,7 @@ export default function PatientDocumentsPage() {
       <Card sx={{ borderRadius: 3 }}>
         <CardContent>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
-            <Shield sx={{ color: '#0D7377' }} />
+            <Shield sx={{ color: 'primary.main' }} />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               Povinné dokumenty
             </Typography>
@@ -138,7 +138,7 @@ export default function PatientDocumentsPage() {
                   variant={filed === undefined ? 'contained' : 'text'}
                   startIcon={<CloudUpload />}
                   onClick={() => setUploading(template)}
-                  sx={filed === undefined ? { bgcolor: '#0D7377' } : undefined}
+                  sx={filed === undefined ? { bgcolor: 'primary.main' } : undefined}
                 >
                   {filed === undefined ? 'Nahrát' : 'Nahradit'}
                 </Button>

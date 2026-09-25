@@ -119,7 +119,7 @@ export default function Concussion() {
             </Grid>
           </Grid>
           <Button variant="contained" startIcon={<Add />} onClick={handleSubmit}
-            sx={{ mt: 3, bgcolor: '#0D7377', borderRadius: 2, px: 3 }}>
+            sx={{ mt: 3, bgcolor: 'primary.main', borderRadius: 2, px: 3 }}>
             Vytvořit záznam
           </Button>
         </CardContent>
@@ -174,7 +174,7 @@ export default function Concussion() {
               <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
                 <Button variant="contained" onClick={() => handleAdvanceStep(selectedRecord)}
                   disabled={selectedRecord.status === 'Cleared'}
-                  sx={{ bgcolor: '#0D7377' }}>
+                  sx={{ bgcolor: 'primary.main' }}>
                   {selectedRecord.status === 'Cleared' ? 'Dokončeno' : 'Další krok'}
                 </Button>
                 <Button onClick={() => setSelectedRecord(null)}>Zavřít</Button>

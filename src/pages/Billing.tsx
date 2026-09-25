@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Box, Typography, Paper, Card, CardContent, Button, Chip,
   Grid, TextField, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Skeleton,
+  useTheme,
 } from '@mui/material';
 import { Receipt, Add, Payments, CheckCircle, Pending, Search } from '@mui/icons-material';
 import { motion } from 'framer-motion';
@@ -35,6 +36,8 @@ const COLUMNS = [
 ];
 
 export default function Billing() {
+  /* The raw table takes real colours, so it reads them off the theme. */
+  const theme = useTheme();
   /* ── Data ── */
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -190,7 +193,7 @@ export default function Billing() {
             </Typography>
           </Box>
           <Button variant="contained" startIcon={<Add />} onClick={() => setCreateDialogOpen(true)}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 3, fontWeight: 600 }}>
+            sx={{ bgcolor: 'primary.main', borderRadius: 2, px: 3, fontWeight: 600 }}>
             Nová faktura
           </Button>
         </Box>
@@ -227,7 +230,7 @@ export default function Billing() {
             <TextField
               fullWidth size="small" placeholder="Hledat faktury..."
               value={search} onChange={(e) => setSearch(e.target.value)}
-              slotProps={{ input: { startAdornment: <Search sx={{ mr: 1, color: '#999' }} fontSize="small" /> } }}
+              slotProps={{ input: { startAdornment: <Search sx={{ mr: 1, color: 'text.disabled' }} fontSize="small" /> } }}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
           </Grid>
@@ -256,16 +259,16 @@ export default function Billing() {
                     style={{
                       padding: '10px 12px',
                       textAlign: 'left',
-                      borderBottom: '2px solid #e0e0e0',
+                      borderBottom: `2px solid ${theme.palette.divider}`,
                       fontWeight: 700,
                       fontSize: 12,
-                      color: '#666',
+                      color: theme.palette.text.secondary,
                       width: col.width,
                       cursor: 'pointer',
                       whiteSpace: 'nowrap',
                       position: 'sticky',
                       top: 0,
-                      background: '#f8f9fa',
+                      background: theme.palette.action.hover,
                       zIndex: 2,
                     }}
                   >
@@ -290,7 +293,7 @@ export default function Billing() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: Math.min(i * 0.02, 0.5) }}
-                    style={{ background: i % 2 ? '#fafbfc' : '#fff' }}
+                    style={{ background: i % 2 ? theme.palette.action.hover : theme.palette.background.paper }}
                   >
                     {/* Patient */}
                     <td style={{ padding: '8px 12px', fontWeight: 500 }}>
@@ -308,7 +311,7 @@ export default function Billing() {
                     </td>
 
                     {/* Paid */}
-                    <td style={{ padding: '8px 12px', color: '#666' }}>
+                    <td style={{ padding: '8px 12px', color: theme.palette.text.secondary }}>
                       {inv.paidCzk.toLocaleString('cs-CZ')} Kč
                     </td>
 
@@ -341,7 +344,7 @@ export default function Billing() {
         </Box>
 
         {/* Table footer */}
-        <Box sx={{ p: 1.5, borderTop: '1px solid #e0e0e0' }}>
+        <Box sx={{ p: 1.5, borderTop: '1px solid', borderTopColor: 'divider' }}>
           <Typography variant="body2" color="text.secondary">
             Zobrazeno {filteredInvoices.length} z {invoices.length} faktur
           </Typography>
@@ -371,7 +374,7 @@ export default function Billing() {
             </Grid>
             <Grid size={{ xs: 12 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Služby (vyberte více)</Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, maxHeight: 200, overflow: 'auto', p: 1, border: '1px solid #e0e0e0', borderRadius: 2 }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, maxHeight: 200, overflow: 'auto', p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
                 {services.filter(s => s.isActive).map((s) => (
                   <Chip
                     key={s.id}
@@ -384,7 +387,7 @@ export default function Billing() {
                 ))}
               </Box>
               {selectedServices.length > 0 && (
-                <Typography variant="body2" sx={{ mt: 1, fontWeight: 600, color: '#0D7377' }}>
+                <Typography variant="body2" sx={{ mt: 1, fontWeight: 600, color: 'primary.main' }}>
                   Celkem: {invoiceTotal.toLocaleString('cs-CZ')} Kč ({selectedServices.length} služeb)
                 </Typography>
               )}
@@ -399,7 +402,7 @@ export default function Billing() {
           <Button onClick={() => { setCreateDialogOpen(false); setSelectedServices([]); }} sx={{ borderRadius: 2 }}>Zrušit</Button>
           <Button variant="contained" onClick={handleCreateInvoice}
             disabled={!newInvoice.patientId || selectedServices.length === 0}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 3, fontWeight: 600 }}>
+            sx={{ bgcolor: 'primary.main', borderRadius: 2, px: 3, fontWeight: 600 }}>
             Vytvořit fakturu
           </Button>
         </DialogActions>

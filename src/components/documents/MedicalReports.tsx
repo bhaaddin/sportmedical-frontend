@@ -135,7 +135,7 @@ export default function MedicalReports({
     <Card sx={{ borderRadius: 3 }}>
       <CardContent>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
-          <MedicalInformation sx={{ color: '#0D7377' }} />
+          <MedicalInformation sx={{ color: 'primary.main' }} />
           <Typography variant="h6" sx={{ fontWeight: 700 }}>
             Lékařské zprávy
           </Typography>

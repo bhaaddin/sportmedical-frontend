@@ -180,7 +180,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function Layout({ children }: { children: React.ReactNode }) {
+export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   /*
@@ -347,7 +347,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           {patientId === null && visibleMenu.map((group, gi) => (
             <Box key={gi}>
               {group.label && sidebarOpen && (
-                <Typography variant="caption" sx={{ px: 2, pt: gi > 0 ? 2 : 0, pb: 0.5, display: 'block', fontWeight: 700, color: '#999', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>
+                <Typography variant="caption" sx={{ px: 2, pt: gi > 0 ? 2 : 0, pb: 0.5, display: 'block', fontWeight: 700, color: 'text.disabled', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>
                   {group.label}
                 </Typography>
               )}
@@ -367,7 +367,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                         px: sidebarOpen ? 2 : 1.5,
                         transition: 'all 0.2s ease',
                         '&.Mui-selected': { bgcolor: 'action.selected', color: 'primary.main', boxShadow: (t) => `inset 3px 0 0 ${t.palette.primary.main}` },
-                        '&:hover': { bgcolor: '#E0F2F1', transform: 'translateX(2px)' },
+                        '&:hover': { bgcolor: 'action.hover', transform: 'translateX(2px)' },
                       }}>
                       <ListItemIcon sx={{
                         color: isActive ? 'primary.main' : 'inherit', minWidth: 40,
@@ -393,7 +393,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         sx={{
           flexGrow: 1, p: 3, mt: '64px', ml: `${currentWidth}px`,
           transition: 'margin-left 0.25s ease',
-          bgcolor: '#F5F7FA', minHeight: '100vh', overflow: 'auto',
+          bgcolor: 'background.default', minHeight: '100vh', overflow: 'auto',
         }}
       >
         {/*

@@ -107,7 +107,7 @@ function MetricCard({ icon, label, value, unit, color, prevValue, higherIsBetter
             {typeof value === 'number' ? value.toFixed(1) : value}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{unit}</Typography>
-          <Typography variant="caption" sx={{ color: '#999', mt: 1, display: 'block' }}>{label}</Typography>
+          <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1, display: 'block' }}>{label}</Typography>
         </CardContent>
       </Card>
     </motion.div>
@@ -441,7 +441,7 @@ export default function PatientDetails() {
             <Card sx={{ mb: 3 }}>
               <CardContent sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Person sx={{ color: '#0D7377', fontSize: 20 }} />
+                  <Person sx={{ color: 'primary.main', fontSize: 20 }} />
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>Osobní údaje</Typography>
                 </Box>
                 <Divider sx={{ mb: 2 }} />
@@ -468,7 +468,7 @@ export default function PatientDetails() {
             variant="outlined"
             startIcon={<Description />}
             onClick={() => navigate(`/patients/${patient.id}/dokumenty`)}
-            sx={{ mt: 2, borderColor: '#0D7377', color: '#0D7377' }}
+            sx={{ mt: 2, borderColor: 'primary.main', color: 'primary.main' }}
           >
             Dokumenty pacienta
           </Button>
@@ -481,11 +481,11 @@ export default function PatientDetails() {
               <CardContent sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <TrendingUp sx={{ color: '#0D7377', fontSize: 20 }} />
+                    <TrendingUp sx={{ color: 'primary.main', fontSize: 20 }} />
                     <Typography variant="h6" sx={{ fontWeight: 700 }}>Diagnostická sezení</Typography>
                   </Box>
                   <Button size="small" startIcon={<Add />} onClick={() => navigate(`/diagnostics/new?patientId=${patient.id}`)}
-                    sx={{ color: '#0D7377' }}>
+                    sx={{ color: 'primary.main' }}>
                     Nové
                   </Button>
                 </Box>
@@ -510,7 +510,7 @@ export default function PatientDetails() {
                           transition={{ delay: 0.3 + i * 0.04 }}>
                           <Paper variant="outlined" sx={{ mb: 1.5, borderRadius: 2, overflow: 'hidden' }}>
                             {/* Session header */}
-                            <Box sx={{ p: 2, cursor: 'pointer', '&:hover': { bgcolor: '#f8f9fa' } }}
+                            <Box sx={{ p: 2, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
                               onClick={() => setExpandedSession(isExpanded ? null : s.id)}>
                               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -584,7 +584,7 @@ export default function PatientDetails() {
                                 </Grid>
 
                                 {s.rawPractitionerNotes && (
-                                  <Box sx={{ mt: 2, p: 2, bgcolor: 'white', borderRadius: 2, border: '1px solid #e0e0e0' }}>
+                                  <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
                                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Poznámky</Typography>
                                     <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: 'pre-wrap' }}>{s.rawPractitionerNotes}</Typography>
                                   </Box>
@@ -600,7 +600,7 @@ export default function PatientDetails() {
                                 <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
                                   <Button size="small" variant="outlined" startIcon={<Download />}
                                     onClick={() => handleDownloadPdf(s.id)}
-                                    sx={{ borderColor: '#0D7377', color: '#0D7377' }}>
+                                    sx={{ borderColor: 'primary.main', color: 'primary.main' }}>
                                     PDF Report
                                   </Button>
                                 </Box>

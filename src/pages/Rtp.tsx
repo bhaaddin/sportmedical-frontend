@@ -93,7 +93,7 @@ export default function Rtp() {
             <Typography variant="body2" color="text.secondary">Protokoly návratu do sportovního výkonu</Typography>
           </Box>
           <Button variant="contained" startIcon={<Add />} onClick={() => setOpen(true)}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 3 }}>
+            sx={{ bgcolor: 'primary.main', borderRadius: 2, px: 3 }}>
             Nový protokol
           </Button>
         </Box>
@@ -109,7 +109,7 @@ export default function Rtp() {
             </Grid>
             <Grid size={{ xs: 4 }}>
               <Button fullWidth variant="contained" onClick={handlePatientLoad}
-                sx={{ bgcolor: '#0D7377', py: 1.5 }}>
+                sx={{ bgcolor: 'primary.main', py: 1.5 }}>
                 Načíst protokoly
               </Button>
             </Grid>
@@ -128,7 +128,7 @@ export default function Rtp() {
       ) : (
         protocols.map((proto, i) => (
           <motion.div key={proto.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
-            <Card sx={{ mb: 2, cursor: 'pointer', border: selected?.id === proto.id ? '2px solid #0D7377' : 'none' }}
+            <Card sx={{ mb: 2, cursor: 'pointer', border: '2px solid', borderColor: selected?.id === proto.id ? 'primary.main' : 'transparent' }}
               onClick={() => setSelected(proto)}>
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -150,7 +150,7 @@ export default function Rtp() {
           <Card sx={{ mt: 3 }}>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <Healing sx={{ color: '#0D7377' }} />
+                <Healing sx={{ color: 'primary.main' }} />
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>{selected.name} — Protokol</Typography>
               </Box>
               <Stepper activeStep={getActiveStep(selected)} alternativeLabel sx={{ mb: 3 }}>
@@ -180,7 +180,7 @@ export default function Rtp() {
                         >
                           {milestone.isCompleted
                             ? <CheckCircle sx={{ color: '#2E7D32', fontSize: 20 }} />
-                            : <RadioButtonUnchecked sx={{ color: '#999', fontSize: 20 }} />
+                            : <RadioButtonUnchecked sx={{ color: 'text.disabled', fontSize: 20 }} />
                           }
                         </Button>
                         <Box>
@@ -214,7 +214,7 @@ export default function Rtp() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpen(false)}>Zrušit</Button>
-          <Button variant="contained" onClick={handleCreate} sx={{ bgcolor: '#0D7377' }}>Vytvořit</Button>
+          <Button variant="contained" onClick={handleCreate} sx={{ bgcolor: 'primary.main' }}>Vytvořit</Button>
         </DialogActions>
       </Dialog>
     </Box>

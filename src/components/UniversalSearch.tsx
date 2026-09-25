@@ -238,7 +238,7 @@ export default function UniversalSearch() {
           sx={{ '& .MuiOutlinedInput-notchedOutline': { border: 'none' }, p: 1 }}
         />
         {results.length > 0 && (
-          <List sx={{ maxHeight: 400, overflow: 'auto', borderTop: '1px solid #f0f0f0' }}>
+          <List sx={{ maxHeight: 400, overflow: 'auto', borderTop: '1px solid', borderTopColor: 'divider' }}>
             {results.map((r, i) => (
               <ListItem key={r.id} onClick={() => { navigate(r.path); setOpen(false); }}
                 sx={{

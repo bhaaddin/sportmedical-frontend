@@ -146,8 +146,8 @@ export default function PatientList() {
                 was. Editing an existing patient still uses that form. */}
             {mayRegister && (
               <Button variant="contained" startIcon={<HowToReg />} onClick={() => navigate('/patients/register')}
-                sx={{ bgcolor: '#0D7377', borderRadius: 3, px: 3, py: 1.2, fontWeight: 600, boxShadow: '0 4px 16px rgba(13,115,119,0.3)',
-                  '&:hover': { bgcolor: '#095456', boxShadow: '0 6px 20px rgba(13,115,119,0.4)' } }}>
+                sx={{ bgcolor: 'primary.main', borderRadius: 3, px: 3, py: 1.2, fontWeight: 600, boxShadow: '0 4px 16px rgba(13,115,119,0.3)',
+                  '&:hover': { bgcolor: 'primary.dark', boxShadow: '0 6px 20px rgba(13,115,119,0.4)' } }}>
                 Registrace pacienta
               </Button>
             )}
@@ -173,7 +173,7 @@ export default function PatientList() {
           <TableContainer component={Paper} sx={{ borderRadius: 3, overflow: 'hidden' }}>
             <Table>
               <TableHead>
-                <TableRow sx={{ bgcolor: '#f8f9fa' }}>
+                <TableRow sx={{ bgcolor: 'action.hover' }}>
                   <TableCell sx={{ fontWeight: 700 }}>Pacient</TableCell>
                   {columns.map((field) => (
                     <TableCell key={field.key} sx={{ fontWeight: 700 }}>{field.label}</TableCell>
@@ -191,7 +191,7 @@ export default function PatientList() {
                       onClick={() => navigate(`/patients/${p.id}`)}>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <Avatar sx={{ bgcolor: '#0D7377', width: 40, height: 40, fontSize: 14, fontWeight: 600 }}>
+                          <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40, fontSize: 14, fontWeight: 600 }}>
                             {p.firstName[0]}{p.lastName[0]}
                           </Avatar>
                           <Box>
@@ -208,7 +208,7 @@ export default function PatientList() {
                       <TableCell align="right">
                         <Tooltip title="Nová diagnostika">
                           <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`/diagnostics/new?patientId=${p.id}`); }}
-                            sx={{ color: '#0D7377' }}>
+                            sx={{ color: 'primary.main' }}>
                             <People fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -239,10 +239,10 @@ export default function PatientList() {
                   <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: Math.min(i, 20) * 0.05, duration: 0.3 }}
                     whileHover={{ y: -4, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
-                    <Card sx={{ cursor: 'pointer', transition: 'all 0.2s', '&:hover': { borderColor: '#0D7377' } }}
+                    <Card sx={{ cursor: 'pointer', transition: 'all 0.2s', '&:hover': { borderColor: 'primary.main' } }}
                       onClick={() => navigate(`/patients/${p.id}`)}>
                       <CardContent sx={{ textAlign: 'center', py: 3 }}>
-                        <Avatar sx={{ bgcolor: '#0D7377', width: 56, height: 56, fontSize: 20, mx: 'auto', mb: 1.5, fontWeight: 600,
+                        <Avatar sx={{ bgcolor: 'primary.main', width: 56, height: 56, fontSize: 20, mx: 'auto', mb: 1.5, fontWeight: 600,
                           boxShadow: '0 4px 14px rgba(13,115,119,0.3)' }}>
                           {p.firstName[0]}{p.lastName[0]}
                         </Avatar>

@@ -41,7 +41,7 @@ function AcwrGauge({ value }: { value: number }) {
           {value > 0 ? value.toFixed(2) : '—'}
         </Typography>
         <Chip label={label} sx={{ bgcolor: `${color}18`, color, fontWeight: 600 }} />
-        <Box sx={{ mt: 2, position: 'relative', height: 12, bgcolor: '#f0f0f0', borderRadius: 6, overflow: 'hidden' }}>
+        <Box sx={{ mt: 2, position: 'relative', height: 12, bgcolor: 'action.hover', borderRadius: 6, overflow: 'hidden' }}>
           <Box sx={{ position: 'absolute', left: '40%', width: '12%', height: '100%', bgcolor: '#2E7D3240', borderRadius: 6 }} />
           <Box sx={{ position: 'absolute', left: 0, height: '100%', width: `${Math.min(value / 2 * 100, 100)}%`, bgcolor: color, borderRadius: 6, transition: 'width 0.5s' }} />
         </Box>
@@ -131,7 +131,7 @@ export default function TrainingLoad() {
               <Grid size={{ xs: 12, md: 6 }}>
                 <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                   <Typography variant="body2" color="text.secondary">Týdenní zátěž:</Typography>
-                  <Chip label={`${weeklyLoad} sRPE · ${sessions.length} tréninků`} sx={{ bgcolor: '#E0F2F1', color: '#0D7377', fontWeight: 600 }} />
+                  <Chip label={`${weeklyLoad} sRPE · ${sessions.length} tréninků`} sx={{ bgcolor: 'action.selected', color: 'primary.main', fontWeight: 600 }} />
                 </Box>
               </Grid>
             )}
@@ -162,7 +162,7 @@ export default function TrainingLoad() {
                         </Grid>
                         <Grid size={{ xs: 6 }}>
                           <Typography variant="body2" color="text.secondary">Chronická zátěž (28 dní)</Typography>
-                          <Typography variant="h6" sx={{ fontWeight: 700, color: '#0D7377' }}>{acwr.chronicLoad}</Typography>
+                          <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>{acwr.chronicLoad}</Typography>
                           <Typography variant="caption" color="text.secondary">{acwr.chronicSessions} tréninků</Typography>
                         </Grid>
                         <Grid size={{ xs: 12 }}>
@@ -224,11 +224,11 @@ export default function TrainingLoad() {
                 <Box sx={{ mt: 3, mb: 2 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                     <Typography sx={{ fontWeight: 600 }}>sRPE (Jak těžký byl trénink?)</Typography>
-                    <Chip label={`${form.rpe} — ${rpeLabels[form.rpe]}`} sx={{ bgcolor: '#E0F2F1', color: '#0D7377', fontWeight: 600 }} />
+                    <Chip label={`${form.rpe} — ${rpeLabels[form.rpe]}`} sx={{ bgcolor: 'action.selected', color: 'primary.main', fontWeight: 600 }} />
                   </Box>
                   <Slider value={form.rpe} onChange={(_, v) => update('rpe', v as number)}
                     min={1} max={10} step={1} marks
-                    sx={{ color: '#0D7377', '& .MuiSlider-markLabel': { fontSize: 10 } }} />
+                    sx={{ color: 'primary.main', '& .MuiSlider-markLabel': { fontSize: 10 } }} />
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="caption" color="text.secondary">1 — Odpočinek</Typography>
                     <Typography variant="caption" color="text.secondary">10 — Maximální</Typography>
@@ -240,7 +240,7 @@ export default function TrainingLoad() {
                     Tréninková zátěž = sRPE × Trvání = <strong>{form.rpe * form.durationMinutes}</strong>
                   </Typography>
                   <Button variant="contained" startIcon={<Add />} onClick={handleCreateSession}
-                    sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 3, fontWeight: 600 }}>
+                    sx={{ bgcolor: 'primary.main', borderRadius: 2, px: 3, fontWeight: 600 }}>
                     Zaznamenat
                   </Button>
                 </Box>
@@ -259,7 +259,7 @@ export default function TrainingLoad() {
                       <CardContent>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                           <Chip label={sessionTypes.find(t => t.value === session.type)?.label || session.type} size="small"
-                            sx={{ bgcolor: '#E0F2F1', color: '#0D7377' }} />
+                            sx={{ bgcolor: 'action.selected', color: 'primary.main' }} />
                           <Typography variant="caption" color="text.secondary">
                             {new Date(session.sessionDate).toLocaleDateString('cs-CZ')}
                           </Typography>
@@ -271,7 +271,7 @@ export default function TrainingLoad() {
                           <Chip label={`${session.durationMinutes} min`} size="small" variant="outlined" />
                           <Chip label={`sRPE: ${session.rpe}`} size="small" variant="outlined" />
                           <Chip label={`Zátěž: ${session.sessionRPE}`} size="small"
-                            sx={{ bgcolor: '#0D737718', color: '#0D7377', fontWeight: 600 }} />
+                            sx={{ bgcolor: 'action.selected', color: 'primary.main', fontWeight: 600 }} />
                         </Box>
                       </CardContent>
                     </Card>

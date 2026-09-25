@@ -149,7 +149,7 @@ export default function ClubsPage() {
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<Add />} onClick={() => openFor('new')}
-          sx={{ bgcolor: '#0D7377', borderRadius: 2, fontWeight: 600 }}>
+          sx={{ bgcolor: 'primary.main', borderRadius: 2, fontWeight: 600 }}>
           Nový plátce
         </Button>
       </Box>
@@ -163,7 +163,7 @@ export default function ClubsPage() {
           <TableContainer>
             <Table>
               <TableHead>
-                <TableRow sx={{ bgcolor: '#f8f9fa' }}>
+                <TableRow sx={{ bgcolor: 'action.hover' }}>
                   <TableCell sx={{ fontWeight: 700 }}>Název</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>IČO / DIČ</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Bankovní spojení</TableCell>
@@ -281,7 +281,7 @@ export default function ClubsPage() {
             Zrušit
           </Button>
           <Button variant="contained" onClick={save} disabled={saving}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, fontWeight: 600 }}>
+            sx={{ bgcolor: 'primary.main', borderRadius: 2, fontWeight: 600 }}>
             {saving ? 'Ukládám…' : 'Uložit'}
           </Button>
         </DialogActions>

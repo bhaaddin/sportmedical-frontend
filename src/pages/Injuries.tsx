@@ -122,7 +122,7 @@ export default function Injuries() {
             <Typography variant="body2" color="text.secondary">Evidence a sledování poranění sportovců</Typography>
           </Box>
           <Button variant="contained" startIcon={<Add />} onClick={() => setOpen(true)}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 3 }}>
+            sx={{ bgcolor: 'primary.main', borderRadius: 2, px: 3 }}>
             Nové poranění
           </Button>
         </Box>
@@ -156,7 +156,7 @@ export default function Injuries() {
         <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f8f9fa' }}>
+              <TableRow sx={{ bgcolor: 'action.hover' }}>
                 <TableCell sx={{ fontWeight: 700 }}>Datum</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Oblast</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Strana</TableCell>
@@ -285,7 +285,7 @@ export default function Injuries() {
         <DialogActions>
           <Button onClick={() => setOpen(false)}>Zrušit</Button>
           <Button variant="contained" onClick={handleSubmit}
-            sx={{ bgcolor: '#0D7377', '&:hover': { bgcolor: '#095456' } }}>
+            sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}>
             Vytvořit
           </Button>
         </DialogActions>

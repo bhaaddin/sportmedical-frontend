@@ -76,7 +76,7 @@ export default function Wellness() {
               {isFlagged ? '⚠️ Nízká připravenost — doporučeno snížit zátěž' : '✅ Dobrá připravenost — můžete trénovat'}
             </Typography>
             <LinearProgress variant="determinate" value={parseFloat(compositeScore) * 10}
-              sx={{ mt: 2, height: 8, borderRadius: 4, bgcolor: '#f0f0f0',
+              sx={{ mt: 2, height: 8, borderRadius: 4, bgcolor: 'action.hover',
                 '& .MuiLinearProgress-bar': { bgcolor: isFlagged ? '#D32F2F' : '#2E7D32' } }} />
           </CardContent>
         </Card>
@@ -169,8 +169,8 @@ export default function Wellness() {
       {/* Submit */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
         <Button variant="contained" startIcon={<Send />} onClick={handleSubmit}
-          fullWidth sx={{ mt: 3, py: 1.5, bgcolor: '#0D7377', borderRadius: 3, fontWeight: 600,
-            boxShadow: '0 4px 16px rgba(13,115,119,0.3)', '&:hover': { bgcolor: '#095456' } }}>
+          fullWidth sx={{ mt: 3, py: 1.5, bgcolor: 'primary.main', borderRadius: 3, fontWeight: 600,
+            boxShadow: '0 4px 16px rgba(13,115,119,0.3)', '&:hover': { bgcolor: 'primary.dark' } }}>
           Odeslat denní wellness
         </Button>
       </motion.div>

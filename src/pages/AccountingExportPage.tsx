@@ -111,7 +111,7 @@ export default function AccountingExportPage() {
             </Grid>
             <Grid size={{ xs: 12, sm: 2 }} sx={{ display: 'flex', alignItems: 'center' }}>
               <Button variant="contained" onClick={runExport} disabled={doExport.isPending}
-                sx={{ bgcolor: '#0D7377', borderRadius: 2, fontWeight: 600, width: '100%' }}>
+                sx={{ bgcolor: 'primary.main', borderRadius: 2, fontWeight: 600, width: '100%' }}>
                 Exportovat
               </Button>
             </Grid>
@@ -130,7 +130,7 @@ export default function AccountingExportPage() {
             <TableContainer>
               <Table size="small">
                 <TableHead>
-                  <TableRow sx={{ bgcolor: '#f8f9fa' }}>
+                  <TableRow sx={{ bgcolor: 'action.hover' }}>
                     <TableCell sx={{ fontWeight: 700 }}>Soubor</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Záznamů</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Vytvořeno</TableCell>

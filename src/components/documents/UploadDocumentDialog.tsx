@@ -205,7 +205,7 @@ export default function UploadDocumentDialog({
   return (
     <Dialog open={open} onClose={close} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <CloudUpload sx={{ color: '#0D7377' }} />
+        <CloudUpload sx={{ color: 'primary.main' }} />
         {title}
         <Box sx={{ flex: 1 }} />
         <IconButton onClick={close} aria-label="Zavřít"><Close /></IconButton>
@@ -222,7 +222,7 @@ export default function UploadDocumentDialog({
               sx={{
                 border: '2px dashed', borderColor: 'divider', borderRadius: 2,
                 p: 4, textAlign: 'center', cursor: 'pointer',
-                '&:hover': { borderColor: '#0D7377', bgcolor: 'action.hover' },
+                '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
               }}
               onClick={() => fileInput.current?.click()}
             >
@@ -267,7 +267,7 @@ export default function UploadDocumentDialog({
               />
             ) : (
               <Stack spacing={1} sx={{ alignItems: 'center', py: 4 }}>
-                <CloudUpload sx={{ fontSize: 40, color: '#0D7377' }} />
+                <CloudUpload sx={{ fontSize: 40, color: 'primary.main' }} />
                 <Typography>PDF se odešle tak, jak je.</Typography>
               </Stack>
             )}

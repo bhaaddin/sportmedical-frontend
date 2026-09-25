@@ -179,7 +179,7 @@ export default function PatientAppointmentsPage() {
       <Card sx={{ borderRadius: 3 }}>
         <CardContent>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
-            <Event sx={{ color: '#0D7377' }} />
+            <Event sx={{ color: 'primary.main' }} />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               Nadcházející termíny
             </Typography>
@@ -211,7 +211,7 @@ export default function PatientAppointmentsPage() {
       <Card sx={{ borderRadius: 3 }}>
         <CardContent>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
-            <History sx={{ color: '#0D7377' }} />
+            <History sx={{ color: 'primary.main' }} />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               Historie
             </Typography>

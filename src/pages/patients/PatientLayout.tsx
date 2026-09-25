@@ -239,7 +239,7 @@ export default function PatientLayout() {
       <Card sx={{ mb: 2, borderRadius: 3 }}>
         <CardContent>
           <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-            <Avatar sx={{ bgcolor: '#0D7377', width: 56, height: 56, fontSize: 20 }}>
+            <Avatar sx={{ bgcolor: 'primary.main', width: 56, height: 56, fontSize: 20 }}>
               {initials}
             </Avatar>
             <Box>
@@ -265,7 +265,7 @@ export default function PatientLayout() {
               variant="contained"
               startIcon={<Science />}
               onClick={() => navigate(`/diagnostics/new?patientId=${id}`)}
-              sx={{ bgcolor: '#0D7377' }}
+              sx={{ bgcolor: 'primary.main' }}
             >
               Nová diagnostika
             </Button>

@@ -69,7 +69,7 @@ export default function Availability() {
             <Typography variant="body2" color="text.secondary">Kdo může trénovat a závodit</Typography>
           </Box>
           <Button variant="contained" startIcon={<PersonAdd />} onClick={() => setOpen(true)}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2 }}>Přidat</Button>
+            sx={{ bgcolor: 'primary.main', borderRadius: 2 }}>Přidat</Button>
         </Box>
       </motion.div>
 
@@ -156,7 +156,7 @@ export default function Availability() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpen(false)}>Zrušit</Button>
-          <Button variant="contained" onClick={handleAdd} sx={{ bgcolor: '#0D7377' }}>Přidat</Button>
+          <Button variant="contained" onClick={handleAdd} sx={{ bgcolor: 'primary.main' }}>Přidat</Button>
         </DialogActions>
       </Dialog>
     </Box>

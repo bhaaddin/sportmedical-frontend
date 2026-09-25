@@ -237,7 +237,7 @@ export default function StaffManagement() {
               <IconButton aria-label="Obnovit" onClick={load}><RefreshIcon /></IconButton>
             </Tooltip>
             <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}
-              sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 3, fontWeight: 600 }}>
+              sx={{ bgcolor: 'primary.main', borderRadius: 2, px: 3, fontWeight: 600 }}>
               Přidat zaměstnance
             </Button>
           </Box>
@@ -275,7 +275,7 @@ export default function StaffManagement() {
         <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f8f9fa' }}>
+              <TableRow sx={{ bgcolor: 'action.hover' }}>
                 <TableCell sx={{ fontWeight: 700 }}>Jméno</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>E-mail</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
@@ -442,7 +442,7 @@ export default function StaffManagement() {
           <Button onClick={() => setAdding(false)} sx={{ borderRadius: 2 }}>Zrušit</Button>
           <Button onClick={() => void create()} variant="contained"
             disabled={busy || newAccount.displayName.trim() === '' || newAccount.email.trim() === ''}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 3, fontWeight: 600 }}>
+            sx={{ bgcolor: 'primary.main', borderRadius: 2, px: 3, fontWeight: 600 }}>
             Přidat
           </Button>
         </DialogActions>
@@ -475,7 +475,7 @@ export default function StaffManagement() {
               || editDraft.displayName.trim() === '' || editDraft.email.trim() === ''
               || (editDraft.displayName.trim() === editing.displayName && editDraft.email.trim() === editing.email)
             }
-            sx={{ bgcolor: '#0D7377' }}>
+            sx={{ bgcolor: 'primary.main' }}>
             Uložit
           </Button>
         </DialogActions>
@@ -499,7 +499,7 @@ export default function StaffManagement() {
           <Button onClick={() => setRoleFor(null)}>Zrušit</Button>
           <Button variant="contained" onClick={() => void saveRole()}
             disabled={busy || roleFor === null || roleChoice === roleFor.role}
-            sx={{ bgcolor: '#0D7377' }}>
+            sx={{ bgcolor: 'primary.main' }}>
             Uložit
           </Button>
         </DialogActions>
@@ -546,7 +546,7 @@ export default function StaffManagement() {
             Kopírovat
           </Button>
           <Button onClick={() => setCredentials(null)} variant="contained"
-            sx={{ bgcolor: '#0D7377', borderRadius: 2 }}>
+            sx={{ bgcolor: 'primary.main', borderRadius: 2 }}>
             Hotovo
           </Button>
         </DialogActions>

@@ -440,7 +440,7 @@ export default function NotificationCenter() {
         }}
       >
         {/* ── Header ── */}
-        <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box sx={{ p: 2, borderBottom: '1px solid', borderBottomColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h6" sx={{ fontWeight: 700 }}>
             Oznámení
           </Typography>
@@ -500,11 +500,11 @@ export default function NotificationCenter() {
                         key={`${section.key}-boundary`}
                         sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 0.5 }}
                       >
-                        <Box sx={{ flex: 1, height: '1px', bgcolor: '#0D7377' }} />
-                        <Typography variant="caption" sx={{ color: '#0D7377', fontWeight: 700 }}>
+                        <Box sx={{ flex: 1, height: '1px', bgcolor: 'primary.main' }} />
+                        <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700 }}>
                           Nové od vašeho posledního pohledu
                         </Typography>
-                        <Box sx={{ flex: 1, height: '1px', bgcolor: '#0D7377' }} />
+                        <Box sx={{ flex: 1, height: '1px', bgcolor: 'primary.main' }} />
                       </Box>
                     ) : null;
 
@@ -601,7 +601,7 @@ export default function NotificationCenter() {
 
         {/* ── Footer ── */}
         {notifications.length > 0 && (
-          <Box sx={{ p: 1.5, borderTop: '1px solid #e0e0e0', textAlign: 'center' }}>
+          <Box sx={{ p: 1.5, borderTop: '1px solid', borderTopColor: 'divider', textAlign: 'center' }}>
             <Button size="small" color="primary" onClick={handleClose}>
               Zobrazit vše
             </Button>

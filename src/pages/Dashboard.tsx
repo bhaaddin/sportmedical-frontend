@@ -275,16 +275,16 @@ export default function Dashboard() {
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>Dnešní harmonogram</Typography>
                   <Typography variant="body2" color="text.secondary">Časová osa dnešních schůzek</Typography>
                 </Box>
-                <Button size="small" onClick={() => navigate('/planovani')} sx={{ color: '#0D7377', fontWeight: 600 }}>
+                <Button size="small" onClick={() => navigate('/planovani')} sx={{ color: 'primary.main', fontWeight: 600 }}>
                   Zobrazit kalendář →
                 </Button>
               </Box>
               {todayAppointments.length === 0 ? (
-                <Box sx={{ textAlign: 'center', py: 4, bgcolor: '#f8f9fa', borderRadius: 2 }}>
+                <Box sx={{ textAlign: 'center', py: 4, bgcolor: 'action.hover', borderRadius: 2 }}>
                   <CalendarMonth sx={{ fontSize: 48, color: '#ddd', mb: 1 }} />
                   <Typography color="text.secondary">Žádné schůzky na dnešek</Typography>
                   <Button variant="contained" size="small" onClick={() => navigate('/planovani')}
-                    sx={{ mt: 1, bgcolor: '#0D7377', borderRadius: 2 }}>
+                    sx={{ mt: 1, bgcolor: 'primary.main', borderRadius: 2 }}>
                     Otevřít kalendář
                   </Button>
                 </Box>

@@ -106,7 +106,7 @@ export default function CompanySettingsCard() {
         </Grid>
         <Box sx={{ mt: 2, textAlign: 'right' }}>
           <Button variant="contained" startIcon={<Save />} onClick={save} disabled={saving}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, fontWeight: 600 }}>
+            sx={{ bgcolor: 'primary.main', borderRadius: 2, fontWeight: 600 }}>
             Uložit
           </Button>
         </Box>

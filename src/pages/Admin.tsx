@@ -28,7 +28,7 @@ function Toggle({ checked, onChange, label, description }: {
         <Switch
           checked={checked}
           onChange={e => onChange(e.target.checked)}
-          sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#0D7377' }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#0D7377' } }}
+          sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: 'primary.main' }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: 'primary.main' } }}
         />
       </ListItem>
       <Divider />
@@ -157,7 +157,7 @@ export default function Admin() {
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-              <ContactPhone sx={{ color: '#0D7377' }} />
+              <ContactPhone sx={{ color: 'primary.main' }} />
               <Typography variant="h6" sx={{ fontWeight: 700 }}>Kontaktní údaje</Typography>
             </Box>
             <Grid container spacing={3}>
@@ -169,17 +169,17 @@ export default function Admin() {
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField fullWidth label="Email" value={pub.contactEmail}
                   onChange={e => updatePub('contactEmail', e.target.value)} sx={fieldSx}
-                  slotProps={{ input: { startAdornment: <Email sx={{ mr: 1, color: '#999' }} /> } }} />
+                  slotProps={{ input: { startAdornment: <Email sx={{ mr: 1, color: 'text.disabled' }} /> } }} />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField fullWidth label="Telefon" value={pub.contactPhone}
                   onChange={e => updatePub('contactPhone', e.target.value)} sx={fieldSx}
-                  slotProps={{ input: { startAdornment: <ContactPhone sx={{ mr: 1, color: '#999' }} /> } }} />
+                  slotProps={{ input: { startAdornment: <ContactPhone sx={{ mr: 1, color: 'text.disabled' }} /> } }} />
               </Grid>
               <Grid size={{ xs: 12 }}>
                 <TextField fullWidth label="Adresa" value={pub.contactAddress}
                   onChange={e => updatePub('contactAddress', e.target.value)} sx={fieldSx}
-                  slotProps={{ input: { startAdornment: <LocationOn sx={{ mr: 1, color: '#999' }} /> } }} />
+                  slotProps={{ input: { startAdornment: <LocationOn sx={{ mr: 1, color: 'text.disabled' }} /> } }} />
               </Grid>
             </Grid>
           </CardContent>
@@ -191,7 +191,7 @@ export default function Admin() {
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-              <EventAvailable sx={{ color: '#0D7377' }} />
+              <EventAvailable sx={{ color: 'primary.main' }} />
               <Typography variant="h6" sx={{ fontWeight: 700 }}>Online rezervace</Typography>
             </Box>
             <List sx={{ p: 0 }}>
@@ -205,8 +205,8 @@ export default function Admin() {
       {/* Save button */}
       <motion.div custom={2} variants={sectionAnim} initial="hidden" animate="visible">
         <Button variant="contained" startIcon={<Save />} onClick={() => { void handleSave(); }} disabled={saving || !loaded}
-          sx={{ mb: 4, bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 700,
-            boxShadow: '0 4px 16px rgba(13,115,119,0.3)', '&:hover': { bgcolor: '#095456' } }}>
+          sx={{ mb: 4, bgcolor: 'primary.main', borderRadius: 2, px: 4, fontWeight: 700,
+            boxShadow: '0 4px 16px rgba(13,115,119,0.3)', '&:hover': { bgcolor: 'primary.dark' } }}>
           Uložit kontakty a rezervace
         </Button>
       </motion.div>

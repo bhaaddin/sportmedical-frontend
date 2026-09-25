@@ -149,7 +149,7 @@ export default function DocumentTemplatesPage() {
                   sx={{ alignItems: 'flex-start', flexWrap: 'wrap', rowGap: 1 }}
                 >
                   <DescriptionIcon
-                    sx={{ color: template.isActive ? '#0D7377' : 'text.disabled', mt: 0.5 }}
+                    sx={{ color: template.isActive ? 'primary.main' : 'text.disabled', mt: 0.5 }}
                   />
                   <Box sx={{ flex: 1, minWidth: 160 }}>
                     <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>

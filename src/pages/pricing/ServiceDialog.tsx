@@ -152,7 +152,7 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} disabled={saving}>Zrušit</Button>
-        <Button variant="contained" onClick={save} disabled={saving} sx={{ bgcolor: '#0D7377' }}>
+        <Button variant="contained" onClick={save} disabled={saving} sx={{ bgcolor: 'primary.main' }}>
           {saving ? 'Ukládám…' : 'Uložit'}
         </Button>
       </DialogActions>

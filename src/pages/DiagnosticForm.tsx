@@ -89,9 +89,9 @@ const shown = (value: number | null, unit: string) => (value === null ? '—' : 
 /* ── Custom Step Connector ── */
 const ColorConnector = styled(StepConnector)(({ theme }) => ({
   [`&.${stepConnectorClasses.alternativeLabel}`]: { top: 12 },
-  [`&.${stepConnectorClasses.active}`]: { [`& .${stepConnectorClasses.line}`]: { background: '#0D7377' } },
-  [`&.${stepConnectorClasses.completed}`]: { [`& .${stepConnectorClasses.line}`]: { background: '#0D7377' } },
-  [`& .${stepConnectorClasses.line}`]: { height: 3, border: 0, backgroundColor: '#e0e0e0', borderRadius: 1 },
+  [`&.${stepConnectorClasses.active}`]: { [`& .${stepConnectorClasses.line}`]: { background: theme.palette.primary.main } },
+  [`&.${stepConnectorClasses.completed}`]: { [`& .${stepConnectorClasses.line}`]: { background: theme.palette.primary.main } },
+  [`& .${stepConnectorClasses.line}`]: { height: 3, border: 0, backgroundColor: theme.palette.divider, borderRadius: 1 },
 }));
 
 const steps = [
@@ -280,8 +280,8 @@ export default function DiagnosticForm() {
                   <motion.div animate={{ scale: active ? 1.15 : 1 }} transition={{ type: 'spring', stiffness: 400 }}>
                     <Avatar sx={{
                       width: 32, height: 32, fontSize: 16,
-                      bgcolor: completed ? '#0D7377' : active ? '#14A3A8' : '#e0e0e0',
-                      color: completed || active ? '#fff' : '#999',
+                      bgcolor: completed ? 'primary.main' : active ? 'primary.light' : 'action.disabledBackground',
+                      color: completed || active ? 'primary.contrastText' : 'text.disabled',
                       transition: 'all 0.3s',
                     }}>
                       {completed ? <Check sx={{ fontSize: 18 }} /> : step.icon}
@@ -295,7 +295,7 @@ export default function DiagnosticForm() {
           ))}
         </Stepper>
         <LinearProgress variant="determinate" value={((activeStep + 1) / steps.length) * 100}
-          sx={{ mt: 2, borderRadius: 1, height: 4, bgcolor: '#f0f0f0', '& .MuiLinearProgress-bar': { bgcolor: '#0D7377' } }} />
+          sx={{ mt: 2, borderRadius: 1, height: 4, bgcolor: 'action.hover', '& .MuiLinearProgress-bar': { bgcolor: 'primary.main' } }} />
       </Paper>
 
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
@@ -431,7 +431,7 @@ export default function DiagnosticForm() {
                       : `${form.vitals.systolicBloodPressure}/${form.vitals.diastolicBloodPressure} mmHg`],
                   ].map(([label, value]) => (
                     <Grid key={label} size={{ xs: 6, sm: 4 }}>
-                      <Card variant="outlined" sx={{ borderColor: '#e0e0e0' }}>
+                      <Card variant="outlined" sx={{ borderColor: 'divider' }}>
                         <CardContent sx={{ py: 1.5, px: 2 }}>
                           <Typography variant="caption" color="text.secondary">{label}</Typography>
                           <Typography sx={{ fontWeight: 600 }}>{value}</Typography>
@@ -456,17 +456,17 @@ export default function DiagnosticForm() {
         {activeStep < steps.length - 1 ? (
           <Button variant="contained" endIcon={<ArrowForward />} disabled={!canNext()}
             onClick={() => setActiveStep(s => s + 1)}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 600,
+            sx={{ bgcolor: 'primary.main', borderRadius: 2, px: 4, fontWeight: 600,
               boxShadow: '0 4px 16px rgba(13,115,119,0.3)',
-              '&:hover': { bgcolor: '#095456', boxShadow: '0 6px 20px rgba(13,115,119,0.4)' } }}>
+              '&:hover': { bgcolor: 'primary.dark', boxShadow: '0 6px 20px rgba(13,115,119,0.4)' } }}>
             Další
           </Button>
         ) : (
           <Button variant="contained" endIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Send />}
             onClick={handleSubmit} disabled={loading || request === null}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 600,
+            sx={{ bgcolor: 'primary.main', borderRadius: 2, px: 4, fontWeight: 600,
               boxShadow: '0 4px 16px rgba(13,115,119,0.3)',
-              '&:hover': { bgcolor: '#095456' } }}>
+              '&:hover': { bgcolor: 'primary.dark' } }}>
             {loading ? 'Odesílám...' : 'Odeslat relaci'}
           </Button>
         )}
