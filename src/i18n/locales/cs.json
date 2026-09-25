@@ -150,7 +150,8 @@
       "previewFailed": "Data se nepodařilo načíst — nevím, na které dny cyklus padne.",
       "workerUnknown": "Pracovník — jméno se nenačetlo",
       "workersFailed": "Seznam pracovníků se nepodařilo načíst — prázdný výběr neznamená, že žádní nejsou.",
-      "notSetYet": "zatím nenastaveno — časy níže jsou jen návrh"
+      "notSetYet": "zatím nenastaveno — časy níže jsou jen návrh",
+      "lunchHelp": "Prázdné = platí obědová pauza ordinace z Nastavení → Vzhled kalendáře."
     },
     "absences": {
       "title": "Nepřítomnost zaměstnanců",

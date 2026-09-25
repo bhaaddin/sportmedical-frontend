@@ -616,6 +616,13 @@ function ShiftCells({ label, shift, workers, workersFailed, onChange }: ShiftCel
             sx={{ width: 120 }}
           />
         </Stack>
+        {/* Wave 3: an empty break is not "no lunch" any more - the clinic's own
+            lunch from Nastavení applies. Said here, where the emptiness is. */}
+        {!off && !shift.breakStart && !shift.breakEnd ? (
+          <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mt: 0.5 }}>
+            {t("booking.workingHours.lunchHelp")}
+          </Typography>
+        ) : null}
       </TableCell>
       <TableCell sx={{ verticalAlign: "top", pt: 2, minWidth: 180 }}>
         <TextField
