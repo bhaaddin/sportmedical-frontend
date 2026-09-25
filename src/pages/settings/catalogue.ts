@@ -100,6 +100,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         requires: 'settings.clinic.manage',
       },
       {
+        id: 'zmeny-rezervaci',
+        label: 'Změny rezervací pacientem',
+        description: 'Do kolika hodin před termínem si pacient může přes svůj odkaz termín sám přesunout nebo zrušit',
+        to: '/nastaveni/zmeny-rezervaci',
+        requires: 'settings.clinic.manage',
+      },
+      {
         id: 'pracovni-doba',
         label: 'Pracovní doba',
         description: 'Hodiny podle dnů, obědová pauza, kdo slouží a co se který den dělá',
@@ -284,6 +291,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Zdraví systému',
         description: 'Chyby, přihlášená zařízení a stav služeb',
         to: '/system-health',
+        requires: 'settings.clinic.manage',
+      },
+      {
+        id: 'odchozi-emaily',
+        label: 'Odchozí e-maily',
+        description: 'Co se pacientům a ordinaci vygenerovalo k odeslání, s celým textem a stavem — jen ke čtení',
+        to: '/nastaveni/odchozi-emaily',
         requires: 'settings.clinic.manage',
       },
     ],

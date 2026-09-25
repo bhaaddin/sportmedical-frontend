@@ -559,9 +559,32 @@ export const historyLineSchema = z.object({
   reason: z.string().nullish().transform((v) => v ?? null),
   oldValue: z.string().nullish().transform((v) => v ?? null),
   newValue: z.string().nullish().transform((v) => v ?? null),
+  /**
+   * `staff` or `patient`. A patient moving or cancelling through their own
+   * link is written under a fixed actor, and the screen says "Pacient
+   * přesunul" from this rather than failing to find an employee by that id.
+   * Older servers do not send it; those rows are staff rows.
+   */
+  actorKind: z.string().nullish().transform((v) => v ?? "staff"),
 });
 export type HistoryLine = z.infer<typeof historyLineSchema>;
 export const historyListSchema = z.array(historyLineSchema);
+
+/**
+ * The i18n key for one history line: the action, and — when the patient did
+ * it themselves — the patient's own wording for it. Pure, so the mapping can
+ * be held in a test without rendering.
+ *
+ * Only a move and a cancellation can come from the patient; any other action
+ * under the patient actor is rendered as the plain action.
+ */
+export function historyLineKey(line: Pick<HistoryLine, "action" | "actorKind">): string | null {
+  const action = historyActionName(line.action);
+  if (action === null) return null;
+  if (line.actorKind === "patient" && action === "rescheduled") return "booking.history.patientRescheduled";
+  if (line.actorKind === "patient" && action === "cancelled") return "booking.history.patientCancelled";
+  return `booking.history.${action}`;
+}
 
 /**
  * History actions - a **different** numbering from `status` above. Same

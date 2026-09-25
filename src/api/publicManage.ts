@@ -29,6 +29,16 @@ export interface ManagedBooking {
   startUtc: string;
   endUtc: string;
   isCancelled: boolean;
+  /** Which calendar and činnost — what the free-times request needs. */
+  calendarId?: string | null;
+  activityId?: string | null;
+  /**
+   * The last moment the patient may still move or cancel online, or null once
+   * the booking is cancelled. The clinic's own deadline, from its settings.
+   */
+  canChangeUntilUtc?: string | null;
+  /** The same deadline as a number of hours, for the sentence that explains it. */
+  changeDeadlineHours?: number;
 }
 
 interface ApiResult<T> {
@@ -37,21 +47,39 @@ interface ApiResult<T> {
   data: T;
 }
 
-/** Why a booking could not be read or cancelled, in words the patient sees. */
+/** Why a booking could not be read, moved or cancelled, in words the patient sees. */
 export class ManageError extends Error {
-  /** True when the appointment is too close to cancel online. */
+  /** True when the appointment is too close to change online. */
   readonly tooLate: boolean;
 
   /** True when there is no such booking — including one already cancelled. */
   readonly notFound: boolean;
 
-  constructor(message: string, { tooLate = false, notFound = false } = {}) {
+  /** True when the chosen time was taken by somebody else a moment ago. */
+  readonly slotGone: boolean;
+
+  constructor(message: string, { tooLate = false, notFound = false, slotGone = false } = {}) {
     super(message);
     this.name = 'ManageError';
     this.tooLate = tooLate;
     this.notFound = notFound;
+    this.slotGone = slotGone;
   }
 }
+
+/**
+ * Whether the patient may still change the booking themselves, right now.
+ *
+ * Pure so it can be tested against a fixed clock. A missing deadline means the
+ * server did not say — an older server — and then the buttons stay, because
+ * the server refuses a late change itself with a sentence of its own.
+ */
+export const canStillChange = (booking: ManagedBooking, now: Date = new Date()): boolean => {
+  if (booking.isCancelled) return false;
+  if (booking.canChangeUntilUtc === undefined || booking.canChangeUntilUtc === null) return true;
+  const until = new Date(booking.canChangeUntilUtc).getTime();
+  return Number.isNaN(until) ? true : now.getTime() <= until;
+};
 
 const complain = (error: unknown, fallback: string): ManageError => {
   if (axios.isAxiosError(error)) {
@@ -61,8 +89,17 @@ const complain = (error: unknown, fallback: string): ManageError => {
       return new ManageError(said ?? 'Tuto rezervaci se nepodařilo najít.', { notFound: true });
     }
 
+    if (error.response?.status === 409) {
+      return new ManageError(said ?? 'Tento čas byl právě obsazen. Vyberte prosím jiný.', { slotGone: true });
+    }
+
     if (error.response?.status === 422) {
-      return new ManageError(said ?? fallback, { tooLate: true });
+      /* 422 is the server saying "not this, not now": too late, a time no longer
+         offered, or a closed booking. The sentence is the server's; `tooLate`
+         is set only when it actually says so, so the page does not hide the
+         buttons for a slot that merely stopped being free. */
+      const late = (said ?? '').includes('pozdě');
+      return new ManageError(said ?? fallback, { tooLate: late, slotGone: !late });
     }
 
     if (said !== undefined && said !== '') {
@@ -102,6 +139,30 @@ export const cancelBooking = async (token: string): Promise<ManagedBooking> => {
     return data.data;
   } catch (error) {
     throw complain(error, 'Termín se nepodařilo zrušit. Zkuste to prosím znovu.');
+  }
+};
+
+/**
+ * Moves the booking to another free time the clinic offers online.
+ *
+ * Only a time the public page would show — the server asks the same
+ * availability rule — and only while the appointment is at least the clinic's
+ * deadline away. The old time is given back in the same transaction that takes
+ * the new one, and the desk is told it was the patient.
+ */
+export const rescheduleBooking = async (
+  token: string,
+  startUtc: string,
+): Promise<ManagedBooking> => {
+  try {
+    const { data } = await publicClient.post<ApiResult<ManagedBooking>>(
+      `/api/public/booking/manage/${encodeURIComponent(token)}/reschedule`,
+      { startUtc },
+    );
+
+    return data.data;
+  } catch (error) {
+    throw complain(error, 'Termín se nepodařilo přesunout. Zkuste to prosím znovu.');
   }
 };
 

@@ -326,4 +326,20 @@ const GROUP_NOUNS: Record<string, { one: string; few: string; many: string }> = 
   'appointment.cancelled': { one: 'zrušený termín', few: 'zrušené termíny', many: 'zrušených termínů' },
   'intake.submitted': { one: 'nový dotazník', few: 'nové dotazníky', many: 'nových dotazníků' },
   'document.vypis.received': { one: 'doručený výpis', few: 'doručené výpisy', many: 'doručených výpisů' },
+  /* The patient did it themselves, through the link. Not folded into the
+     desk's own moves and cancellations: the desk knows what it did, and this
+     is the one it has to be told about. */
+  'booking.patient_rescheduled': {
+    one: 'termín přesunutý pacientem',
+    few: 'termíny přesunuté pacientem',
+    many: 'termínů přesunutých pacientem',
+  },
+  'booking.patient_cancelled': {
+    one: 'termín zrušený pacientem',
+    few: 'termíny zrušené pacientem',
+    many: 'termínů zrušených pacientem',
+  },
+  'intake.link_issued': { one: 'odeslaný odkaz k registraci', few: 'odeslané odkazy k registraci', many: 'odeslaných odkazů k registraci' },
+  'intake.completed': { one: 'dokončená registrace', few: 'dokončené registrace', many: 'dokončených registrací' },
+  'intake.expired': { one: 'vypršelý odkaz k registraci', few: 'vypršelé odkazy k registraci', many: 'vypršelých odkazů k registraci' },
 };

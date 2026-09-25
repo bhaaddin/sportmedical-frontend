@@ -23,7 +23,7 @@ import { patientsApi } from "../../api/patients";
 import { BookingApiError } from "../../api/apiError";
 import {
   canChangeStatus,
-  historyActionName,
+  historyLineKey,
   isKnownPaperworkReason,
   isLateStatus,
   isTerminalStatus,
@@ -704,19 +704,19 @@ function historyValue(value: string | null): string {
  */
 function HistoryRow({ line }: { line: HistoryLine }) {
   const { t } = useTranslation();
-  const action = historyActionName(line.action);
+  const key = historyLineKey(line);
 
   return (
     <Box>
       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-        {action
-          ? t(`booking.history.${action}`)
-          : t("booking.history.unknown", { code: line.action })}
+        {key ? t(key) : t("booking.history.unknown", { code: line.action })}
       </Typography>
       <Typography variant="caption" sx={{ color: "text.secondary" }}>
         {formatPragueDateTime(line.atUtc)}
         {" · "}
-        {line.actorDisplayName ?? t("booking.detail.unknownActor")}
+        {line.actorKind === "patient"
+          ? t("booking.history.byPatient")
+          : (line.actorDisplayName ?? t("booking.detail.unknownActor"))}
       </Typography>
       {line.oldValue || line.newValue ? (
         <Typography variant="body2" sx={{ color: "text.secondary" }}>

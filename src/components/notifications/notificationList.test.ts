@@ -328,6 +328,10 @@ describe('groupLabel', () => {
     expect(groupLabel('appointment.booked', 3)).toBe('3 nové termíny');
     expect(groupLabel('appointment.booked', 8)).toBe('8 nových termínů');
     expect(groupLabel('intake.submitted', 5)).toBe('5 nových dotazníků');
+    /* The patient's own changes are their own group, apart from the desk's. */
+    expect(groupLabel('booking.patient_rescheduled', 1)).toBe('1 termín přesunutý pacientem');
+    expect(groupLabel('booking.patient_cancelled', 3)).toBe('3 termíny zrušené pacientem');
+    expect(groupLabel('intake.expired', 5)).toBe('5 vypršelých odkazů k registraci');
   });
 
   it('falls back to showing the kind rather than inventing a noun', () => {

@@ -288,6 +288,9 @@
       "undone": "Vráceno zpět",
       "completed": "Dokončeno",
       "overridden": "Přetlačeno",
+      "patientRescheduled": "Pacient přesunul",
+      "patientCancelled": "Pacient zrušil",
+      "byPatient": "pacient přes svůj odkaz",
       "unknown": "Neznámá akce ({{code}})"
     },
     "day": {
