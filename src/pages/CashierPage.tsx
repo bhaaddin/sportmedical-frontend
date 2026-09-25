@@ -11,6 +11,7 @@ import { servicesApi } from '../api/services';
 import type { Patient } from '../api/patients';
 import PatientPicker from '../components/patients/PatientPicker';
 import toast from 'react-hot-toast';
+import { toDateOnly } from '../utils/time';
 
 /** The four the API has (`PaymentMethod`); anything else falls back to cash. */
 function toPaymentMethod(value: string): PaymentMethod {
@@ -42,7 +43,8 @@ const czk = (n: number) =>
   new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK' }).format(n ?? 0);
 
 export default function CashierPage() {
-  const today = new Date().toISOString().split('T')[0];
+  /* The clinic's day, not the UTC one: at 00:30 in Prague the UTC date is still yesterday. */
+  const today = toDateOnly(new Date());
   const [stats, setStats] = useState<any>(null);
   const [transactions, setTransactions] = useState<CashierTransaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,23 +66,25 @@ export default function CashierPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const [s, t, svc] = await Promise.all([
+      const [s, t] = await Promise.all([
         cashierApi.getDashboard().catch(() => null),
         cashierApi.getTransactions(today).catch(() => []),
-        servicesApi.getAll().catch(() => []),
       ]);
       setStats(s);
       setTransactions(t);
-      /* The picker used to be fed from the public-booking event types, a table
-         with no rows: the payment dialog demands a service and could never list
-         one. It reads the real service catalogue now. */
-      setServices(svc);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    /* The picker used to be fed from the public-booking event types, a table
+       with no rows: the payment dialog demands a service and could never list
+       one. It reads the real service catalogue now - once, not on every
+       refresh of the day's list. */
+    servicesApi.getAll().then(setServices).catch(() => setServices([]));
+    load();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const discountNeedsReason = form.discount > 0 && form.discountReason.trim() === '';
 

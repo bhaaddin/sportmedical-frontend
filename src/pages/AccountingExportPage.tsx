@@ -6,6 +6,7 @@ import {
 } from '@mui/material';
 import { Download, Delete, ReceiptLong } from '@mui/icons-material';
 import toast from 'react-hot-toast';
+import { toDateOnly } from '../utils/time';
 import {
   useExportHistory, useExportAccounting, useDeleteExport, useExportFormats,
   accountingExportApi, exportCommandFrom, isExportFormatName, ExportType,
@@ -17,8 +18,11 @@ const FALLBACK_FORMATS: ExportForm['format'][] = ['CSV', 'PohodaXml', 'MoneyS3Xm
 const EXPORT_TYPES = Object.keys(ExportType) as ExportForm['type'][];
 
 export default function AccountingExportPage() {
-  const today = new Date().toISOString().split('T')[0];
-  const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+  /* The clinic's dates. `toISOString()` is UTC: local midnight on the 1st is
+     22:00 on the last day of the previous month, so the export used to start
+     one day early and, after 22:00, end one day early too. */
+  const today = toDateOnly(new Date());
+  const firstDay = `${today.slice(0, 7)}-01`;
   const { data: history = [], isLoading, refetch } = useExportHistory();
   const { data: formats = [] } = useExportFormats();
   const doExport = useExportAccounting();

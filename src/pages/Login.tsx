@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff, LocalHospital, Email, Lock } from '@mui/icons-material';
 import { motion } from 'framer-motion';
-import { authApi } from '../api/auth';
+import { authApi, type LoginResponse } from '../api/auth';
 import { savePermissions, saveUser } from '../auth/localSession';
 import { savePreferences } from '../auth/preferences';
 
@@ -30,7 +30,7 @@ export default function Login() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changing, setChanging] = useState(false);
 
-  const finishLogin = (res: any) => {
+  const finishLogin = (res: LoginResponse) => {
     localStorage.setItem('token', res.accessToken);
     saveUser(res.account);
 

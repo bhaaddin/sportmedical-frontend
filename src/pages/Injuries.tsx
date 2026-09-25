@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Box, Typography, Grid, Card, CardContent, Chip, Button, TextField, Dialog,
   DialogTitle, DialogContent, DialogActions, MenuItem, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Paper, IconButton, Tooltip,
+  TableContainer, TableHead, TableRow, Paper,
 } from '@mui/material';
 import { Add, Warning, CheckCircle, Healing, FitnessCenter } from '@mui/icons-material';
 import { motion } from 'framer-motion';
@@ -10,6 +10,7 @@ import { injuriesApi } from '../api/injuries';
 import type { Patient } from '../api/patients';
 import PatientPicker from '../components/patients/PatientPicker';
 import toast from 'react-hot-toast';
+import { toDateOnly } from '../utils/time';
 
 interface Injury {
   id: string;
@@ -61,7 +62,7 @@ export default function Injuries() {
   const [form, setForm] = useState({
     patientId: '', bodyRegion: '', specificLocation: '', side: 'Left',
     type: 'Acute', severity: 1, mechanism: '', diagnosis: '', practitioner: '',
-    injuryDate: new Date().toISOString().slice(0, 10), notes: '', isRecurrence: false,
+    injuryDate: toDateOnly(new Date()), notes: '', isRecurrence: false,
     estimatedDaysOut: '',
   });
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -96,7 +97,7 @@ export default function Injuries() {
       setSelectedPatient(null);
       setForm({ patientId: '', bodyRegion: '', specificLocation: '', side: 'Left',
         type: 'Acute', severity: 1, mechanism: '', diagnosis: '', practitioner: '',
-        injuryDate: new Date().toISOString().slice(0, 10), notes: '', isRecurrence: false,
+        injuryDate: toDateOnly(new Date()), notes: '', isRecurrence: false,
         estimatedDaysOut: '' });
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Neznámá chyba — zkontrolujte připojení k backendu';

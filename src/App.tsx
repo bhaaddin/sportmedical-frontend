@@ -1,6 +1,6 @@
-import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Avatar, IconButton, Menu, MenuItem, Badge, CircularProgress, Button } from '@mui/material';
-import { Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Search, AttachMoney, Schedule, EventBusy, Today, Description, ArrowBack, Assessment } from '@mui/icons-material';
+import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Avatar, IconButton, Menu, MenuItem, CircularProgress, Button } from '@mui/material';
+import { Science, Dashboard, People, Settings, LocalHospital, Logout, CalendarMonth, Receipt, Search, AttachMoney, Schedule, EventBusy, Today, Description, ArrowBack, Assessment } from '@mui/icons-material';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { usePermissions, type Permission } from './auth/usePermission';
 import { useAccountRefresh } from './auth/accountRefresh';
@@ -182,6 +182,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
   /*
    * Inside a patient the sidebar becomes that patient's, and the application's
    * own menu steps aside. The owner's rule: while you are in somebody's file,
@@ -249,7 +250,8 @@ function Layout({ children }: { children: React.ReactNode }) {
             </Avatar>
           </IconButton>
           <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
-            <MenuItem onClick={() => { setAnchorEl(null); window.location.href = '/settings'; }}>
+            {/* A route change, not a reload: a reload throws away every query the screens hold. */}
+            <MenuItem onClick={() => { setAnchorEl(null); navigate('/settings'); }}>
               <ListItemIcon><Settings fontSize="small" /></ListItemIcon> Nastavení
             </MenuItem>
             <MenuItem onClick={handleLogout}>
@@ -452,9 +454,9 @@ export default function App() {
     <GlobalErrorBoundary>
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <KeyboardShortcuts />
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          <KeyboardShortcuts />
           <Routes>
             <Route path="/login" element={<Suspense fallback={<PageLoader />}><Login /></Suspense>} />
             <Route path="/dotaznik" element={<Suspense fallback={<PageLoader />}><IntakeQuestionnaire /></Suspense>} />

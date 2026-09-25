@@ -93,8 +93,19 @@ export default function SystemHealth() {
 
   useEffect(() => {
     void fetchAll();
-    const iv = setInterval(() => { void fetchAll(); }, 30000);
-    return () => clearInterval(iv);
+    /* Every 30 s while the tab is on screen. A background tab used to keep
+       hitting the health routes all day, which is load with no reader. */
+    const iv = setInterval(() => {
+      if (document.visibilityState === 'visible') void fetchAll();
+    }, 30000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void fetchAll();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [fetchAll]);
 
   const handleRefresh = async () => {

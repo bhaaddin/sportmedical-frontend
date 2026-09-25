@@ -64,7 +64,7 @@ export default function UniversalSearch() {
 
   /* ── Static page results for navigation ── */
   const pages: SearchResult[] = useMemo(() => [
-    { id: 'p-dashboard', title: 'Dashboard', subtitle: 'Přehled', type: 'page', icon: <Settings />, path: '/', color: '#0D7377' },
+    { id: 'p-dashboard', title: 'Přehled', subtitle: 'Úvodní stránka', type: 'page', icon: <Settings />, path: '/', color: '#0D7377' },
     { id: 'p-calendar', title: 'Plánování', subtitle: 'Správa termínů', type: 'page', icon: <CalendarMonth />, path: '/planovani', color: '#0D7377' },
     ...(canSeePatients
       ? [{ id: 'p-patients', title: 'Pacienti', subtitle: 'Seznam pacientů', type: 'page' as const, icon: <People />, path: '/patients', color: '#0288D1' }]

@@ -11,6 +11,7 @@
    ══════════════════════════════════════════════════════════════ */
 
 import { classifyInsuranceNumber, parseBirthNumber } from './insuranceIdentifier';
+import { toDateOnly } from '../../utils/time';
 import type { InsuranceRegistrationKind, SexValue } from '../../api/patientRegistry';
 
 export const NAME_MAX_LENGTH = 100; // PatientConstraints.NameMaxLength
@@ -95,7 +96,7 @@ function validateIdentity(form: RegistrationFormState, errors: FieldErrors): voi
 
   if (form.dateOfBirth.length === 0) {
     errors.dateOfBirth = 'Datum narození je povinné.';
-  } else if (form.dateOfBirth > new Date().toISOString().slice(0, 10)) {
+  } else if (form.dateOfBirth > toDateOnly(new Date())) {
     errors.dateOfBirth = 'Datum narození nemůže být v budoucnosti.';
   }
 

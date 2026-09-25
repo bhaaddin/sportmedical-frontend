@@ -245,7 +245,7 @@ export default function Dashboard() {
             {getGreeting()}, {user.firstName || 'Doctor'} 👋
           </Typography>
           <Typography color="text.secondary" sx={{ mt: 0.5, fontSize: 16 }}>
-            Přehled ordinace — {new Date().toLocaleDateString('cs-CZ', { weekday: 'long', month: 'long', day: 'numeric' })}
+            Přehled ordinace — {new Date().toLocaleDateString('cs-CZ', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Europe/Prague' })}
           </Typography>
         </Box>
       </motion.div>
