@@ -17,8 +17,49 @@ export const PaymentMethod = {
 
 export type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod];
 
-/** The status names the server writes. Translated at the point of display. */
+/**
+ * The server's `TransactionStatus` (Domain/Billing/TransactionStatus.cs) is an
+ * enum and the API writes enums as numbers - there is no string-enum
+ * converter registered, so a transaction arrives as `"status": 1`. It is
+ * given its name once, here, and every screen works with the name.
+ *
+ * Until wave 3's review the screens compared `status` to `'Completed'`
+ * straight off the wire, which no row ever equalled: the till showed "1" in
+ * its status column, never offered "dokončit" or a refund, and the booking
+ * offered "Zaplaceno" again after the payment was recorded.
+ */
 export type TransactionStatus = 'Pending' | 'Completed' | 'Cancelled' | 'Refunded';
+
+const TRANSACTION_STATUS_NAMES: readonly TransactionStatus[] = ['Pending', 'Completed', 'Cancelled', 'Refunded'];
+
+/**
+ * The name for whatever the wire carries: the number the API writes today, or
+ * the name itself should a string converter ever be registered. Anything else
+ * is `null`, so a screen never mistakes an unknown value for an open payment.
+ */
+export function transactionStatusName(value: unknown): TransactionStatus | null {
+  if (typeof value === 'number') return TRANSACTION_STATUS_NAMES[value] ?? null;
+  if (typeof value === 'string') {
+    const named = TRANSACTION_STATUS_NAMES.find((name) => name.toLowerCase() === value.toLowerCase());
+    if (named) return named;
+    const asNumber = Number(value);
+    return value.trim() !== '' && Number.isInteger(asNumber) ? TRANSACTION_STATUS_NAMES[asNumber] ?? null : null;
+  }
+  return null;
+}
+
+/** The transaction as the API writes it: the status still a number. */
+type WireTransaction = Omit<CashierTransaction, 'status'> & { status: number | string };
+
+/**
+ * The boundary: one mapping, applied to every transaction that comes in. A
+ * value this client does not know keeps its raw text, so the till prints it
+ * as it is and no button ("dokončit", "vrátit") matches it.
+ */
+export function fromWire(raw: WireTransaction): CashierTransaction {
+  const status = transactionStatusName(raw.status) ?? String(raw.status);
+  return { ...raw, status: status as TransactionStatus, paymentMethod: Number(raw.paymentMethod) as PaymentMethod };
+}
 
 export interface CashierTransaction {
   id: string;
@@ -32,7 +73,8 @@ export interface CashierTransaction {
   finalPrice: number;
   vatRate: number;
   paymentMethod: PaymentMethod;
-  status: TransactionStatus | string;
+  /** The name, mapped from the wire's number by `fromWire`; never the raw value. */
+  status: TransactionStatus;
   createdAt: string;
   completedAt?: string | null;
 }
@@ -70,14 +112,14 @@ export const cashierApi = {
   getTransactions: async (date: string): Promise<CashierTransaction[]> => {
     const res = await client.get(`/api/cashier/transactions?date=${encodeURIComponent(date)}`);
     const d = unwrap(res);
-    return Array.isArray(d) ? d : [];
+    return Array.isArray(d) ? d.map(fromWire) : [];
   },
 
   /** Every payment recorded against one booking, newest first. */
   getByAppointment: async (appointmentId: string): Promise<CashierTransaction[]> => {
     const res = await client.get(`/api/cashier/appointments/${appointmentId}/transactions`);
     const d = unwrap(res);
-    return Array.isArray(d) ? d : [];
+    return Array.isArray(d) ? d.map(fromWire) : [];
   },
 
   /**
@@ -91,13 +133,13 @@ export const cashierApi = {
       discountAmount: 0,
       ...data,
     });
-    return unwrap(res);
+    return fromWire(unwrap(res));
   },
 
   /** An open payment (transfer, club) has arrived. */
   complete: async (id: string): Promise<CashierTransaction> => {
     const res = await client.post(`/api/cashier/transactions/${id}/complete`);
-    return unwrap(res);
+    return fromWire(unwrap(res));
   },
 
   cancelTransaction: async (id: string, reason?: string): Promise<void> => {

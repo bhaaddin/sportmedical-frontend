@@ -8,22 +8,30 @@
  * setting says so or changing a status by itself, "Zaplaceno" sending the
  * wrong service or forgetting the booking, a button offered to somebody
  * without the permission, or the sentence naming the wrong instant.
+ *
+ * The till's rows come in as the API really writes them - `status` and
+ * `paymentMethod` as numbers - through the HTTP client, so the mapping at the
+ * boundary is what these tests exercise, not a mock that already speaks names.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SmartConfirmations } from './SmartConfirmations';
 import { appointmentsApi } from '../../api/appointments';
-import { cashierApi } from '../../services/cashierApi';
+import client from '../../api/client';
 
 vi.mock('../../api/appointments', () => ({ appointmentsApi: { setStatus: vi.fn() } }));
-vi.mock('../../services/cashierApi', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../../services/cashierApi')>();
-  return {
-    ...original,
-    cashierApi: { getByAppointment: vi.fn(), createTransaction: vi.fn() },
-  };
+vi.mock('../../api/client', () => ({ default: { get: vi.fn(), post: vi.fn() } }));
+
+/* Exactly the server's enums: TransactionStatus Pending 0, Completed 1,
+   Cancelled 2, Refunded 3; PaymentMethod Cash 0, Card 1. */
+const wireTransaction = (status: number, paymentMethod: number, completedAt: string | null = '2026-09-24T07:12:00Z') => ({
+  id: 't1', serviceId: 'svc-1', patientId: 'p1', appointmentId: 'ap1', originalPrice: 1500,
+  discountAmount: 0, finalPrice: 1500, vatRate: 0, paymentMethod, status,
+  createdAt: '2026-09-24T07:12:00Z', completedAt, canComplete: status === 0, canRefund: status === 1,
 });
+const tillHolds = (...rows: ReturnType<typeof wireTransaction>[]) =>
+  vi.mocked(client.get).mockResolvedValue({ data: rows });
 vi.mock('../../api/attendanceSettings', () => ({
   useAttendanceSettings: () => ({
     settings: { noShowAfterMinutes: 30, patientChangeDeadlineHours: 24 },
@@ -56,7 +64,7 @@ function renderIt(status: number, now: Date, permissions: string[], act: Activit
 }
 
 beforeEach(() => {
-  vi.mocked(cashierApi.getByAppointment).mockResolvedValue([]);
+  tillHolds();
   vi.mocked(appointmentsApi.setStatus).mockResolvedValue(undefined);
 });
 
@@ -127,13 +135,9 @@ describe('Zaplaceno', () => {
 
   it('opens the till pre-filled and records the payment against the booking', async () => {
     const onChanged = renderIt(2, new Date('2026-09-24T07:10:00Z'), ['bookings.edit', 'billing.manage']);
-    vi.mocked(cashierApi.createTransaction).mockResolvedValue({
-      id: 't1', serviceId: 'svc-1', patientId: 'p1', appointmentId: 'ap1', originalPrice: 1500,
-      discountAmount: 0, finalPrice: 1500, vatRate: 0, paymentMethod: 0, status: 'Completed',
-      createdAt: '2026-09-24T07:12:00Z', completedAt: '2026-09-24T07:12:00Z',
-    });
+    vi.mocked(client.post).mockResolvedValue({ data: wireTransaction(1, 0) });
 
-    await waitFor(() => expect(cashierApi.getByAppointment).toHaveBeenCalledWith('ap1'));
+    await waitFor(() => expect(client.get).toHaveBeenCalledWith('/api/cashier/appointments/ap1/transactions'));
     fireEvent.click(await screen.findByRole('button', { name: 'Zaplaceno' }));
 
     const panel = screen.getByTestId('payment-panel');
@@ -142,26 +146,40 @@ describe('Zaplaceno', () => {
     fireEvent.click(within(panel).getByRole('button', { name: 'Zaevidovat platbu' }));
 
     await waitFor(() =>
-      expect(cashierApi.createTransaction).toHaveBeenCalledWith(
+      expect(client.post).toHaveBeenCalledWith(
+        '/api/cashier/transactions',
         expect.objectContaining({ serviceId: 'svc-1', patientId: 'p1', originalPrice: 1500, appointmentId: 'ap1', paymentMethod: 0 }),
       ),
     );
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
 
-  it('shows what the till already holds instead of the button', async () => {
-    vi.mocked(cashierApi.getByAppointment).mockResolvedValue([
-      {
-        id: 't1', serviceId: 'svc-1', patientId: 'p1', appointmentId: 'ap1', originalPrice: 1500,
-        discountAmount: 0, finalPrice: 1500, vatRate: 0, paymentMethod: 1, status: 'Completed',
-        createdAt: '2026-09-24T07:12:00Z', completedAt: '2026-09-24T07:12:00Z',
-      },
-    ]);
+  it('shows a Completed (1) card payment as the wire writes it, and hides the button', async () => {
+    tillHolds(wireTransaction(1, 1));
     renderIt(2, new Date('2026-09-24T07:30:00Z'), ['billing.manage']);
 
     const chip = await screen.findByTestId('payment-chip');
     expect(chip).toHaveTextContent(/Zaplaceno 1\s?500 Kč \(karta\) 09:12/);
     expect(screen.queryByRole('button', { name: 'Zaplaceno' })).toBeNull();
+  });
+
+  it('shows a Pending (0) club charge as open, and still no button', async () => {
+    tillHolds(wireTransaction(0, 3, null));
+    renderIt(2, new Date('2026-09-24T07:30:00Z'), ['billing.manage']);
+
+    const chip = await screen.findByTestId('payment-chip');
+    expect(chip).toHaveTextContent(/1\s?500 Kč/);
+    expect(chip).toHaveTextContent(/na klub/i);
+    expect(chip).not.toHaveTextContent(/^Zaplaceno/);
+    expect(screen.queryByRole('button', { name: 'Zaplaceno' })).toBeNull();
+  });
+
+  it('offers the button again when the only payment was cancelled (2) or refunded (3)', async () => {
+    tillHolds({ ...wireTransaction(2, 0, null), id: 't-cancelled' }, { ...wireTransaction(3, 1), id: 't-refunded' });
+    renderIt(2, new Date('2026-09-24T07:30:00Z'), ['billing.manage']);
+
+    expect(await screen.findByRole('button', { name: 'Zaplaceno' })).toBeInTheDocument();
+    expect(screen.queryByTestId('payment-chip')).toBeNull();
   });
 
   it('is disabled with the reason when the činnost has no price-list item', async () => {
