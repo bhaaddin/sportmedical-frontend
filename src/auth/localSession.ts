@@ -102,6 +102,18 @@ export function saveUser(account: AccountSummary): void {
   }
 }
 
+/** The id of the signed-in account, or null when nothing usable is stored. */
+export function storedUserId(): string | null {
+  try {
+    const raw = window.localStorage.getItem('user');
+    if (!raw) return null;
+    const user = JSON.parse(raw) as Partial<StoredUser>;
+    return typeof user.id === 'string' && user.id ? user.id : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Removes exactly what a sign-in stored. */
 export function clearLocalSession(): void {
   for (const key of SESSION_KEYS) {

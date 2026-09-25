@@ -37,6 +37,7 @@ import {
 } from '../api/userAccounts';
 import type { UserAccount, UserAccountRole } from '../api/userAccounts';
 import { usePermission } from '../auth/usePermission';
+import { storedUserId } from '../auth/localSession';
 
 const ROLE_COLORS: Record<UserAccountRole, string> = {
   Owner: '#7B1FA2',
@@ -61,6 +62,10 @@ export default function StaffManagement() {
   /* Absences are settings.clinic.manage on the server, like the timetable. */
   const canManageAbsences = usePermission('settings.clinic.manage');
   const assignableRoles = USER_ACCOUNT_ROLES.filter((r) => r !== 'Owner' || canManageOwners);
+  /* The lost-phone reset is for somebody else's account. The server refuses it on
+     the signed-in account (two_factor.cannot_reset_self): one's own factor comes
+     off only in Můj účet, with a code from the app. So the button is not drawn there. */
+  const signedInUserId = storedUserId();
 
   const [accounts, setAccounts] = useState<UserAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -385,7 +390,7 @@ export default function StaffManagement() {
                             <LockResetIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        {acc.twoFactorEnabled ? (
+                        {acc.twoFactorEnabled && acc.userId !== signedInUserId ? (
                           <Tooltip title="Zrušit dvoufázové ověření (ztracený telefon)">
                             <IconButton
                               aria-label={`Zrušit dvoufázové ověření ${name}`}

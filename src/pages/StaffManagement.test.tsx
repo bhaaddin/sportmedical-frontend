@@ -46,6 +46,7 @@ const account = (over: Record<string, unknown>) => ({
 });
 
 beforeEach(() => {
+  localStorage.removeItem('user');
   localStorage.setItem('permissions', JSON.stringify(['users.manage']));
   list.mockReset().mockResolvedValue([
     account({}),
@@ -162,5 +163,13 @@ describe('a lost phone', () => {
     await user.click(screen.getByRole('button', { name: 'Zrušit ověření' }));
 
     await waitFor(() => expect(resetTwoFactor).toHaveBeenCalledWith('u3'));
+  });
+
+  it('does not offer the reset on the signed-in account: that one needs a code in Můj účet', async () => {
+    localStorage.setItem('user', JSON.stringify({ id: 'u3', email: 'eva@ordinace.cz', role: 'Administrator' }));
+    render(<StaffManagement />);
+
+    expect(await screen.findByText('Eva Kódová')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Zrušit dvoufázové ověření Eva Kódová')).not.toBeInTheDocument();
   });
 });
