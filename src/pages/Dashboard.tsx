@@ -14,6 +14,7 @@ import { usePermission } from '../auth/usePermission';
 import { appointmentsApi } from '../api/appointments';
 import type { DayAppointment } from '../api/bookingContracts';
 import { statusName, statusTally } from '../api/bookingContracts';
+import DayOverviewPage from './booking/DayOverviewPage';
 import { toDateOnly, formatPragueTime } from '../utils/time';
 import { DashboardSkeleton } from '../components/SkeletonLoader';
 
@@ -123,8 +124,23 @@ function namesOf(results: { data?: Patient }[]): Record<string, string> {
   return names;
 }
 
-/* ── Dashboard ── */
+/* ── Dashboard ──
+ *
+ * A doctor (Staff) lands on their day — schedule, counts and the smart
+ * arrived/no-show/finish confirm — not the clinic-wide dashboard with its
+ * money and admin tiles. The owner and administrators keep the full one. */
 export default function Dashboard() {
+  let role = '';
+  try {
+    role = JSON.parse(localStorage.getItem('user') || '{}').role || '';
+  } catch {
+    /* private mode / cleared storage — fall through to the full dashboard */
+  }
+  if (role === 'Staff') return <DayOverviewPage />;
+  return <OwnerDashboard />;
+}
+
+function OwnerDashboard() {
   const navigate = useNavigate();
   const canSeePatients = usePermission('patients.view');
   const canRegister = usePermission('patients.register');
