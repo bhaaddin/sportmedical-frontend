@@ -31,6 +31,12 @@ export interface CalendarDisplaySettings {
   dayEndHour: number;
   /** `#RRGGBB`. */
   nowLineColor: string;
+  /**
+   * Which facts the card on a booked slot shows when the mouse rests on it,
+   * in order, by field key (`patientName`, `phone`, `activity`, `status`,
+   * `paperwork`, `birthDate`, …). The owner chooses these; the server sends them.
+   */
+  hoverFields: string[];
 }
 
 export interface CalendarDisplayResponse {
@@ -55,6 +61,7 @@ export const CALENDAR_DISPLAY_OFFLINE: CalendarDisplaySettings = {
   dayStartHour: 7,
   dayEndHour: 19,
   nowLineColor: '#D32F2F',
+  hoverFields: ['patientName', 'activity', 'status', 'phone', 'paperwork'],
 };
 
 export const readCalendarDisplay = async (): Promise<CalendarDisplayResponse> => {

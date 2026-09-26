@@ -1,4 +1,4 @@
-import { Box } from "@mui/material";
+import { Box, Tooltip } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import {
   isLateStatus,
@@ -6,8 +6,10 @@ import {
   statusTally,
   type DayAppointment,
 } from "../../../api/bookingContracts";
+import { useCalendarDisplay } from "../../../api/displaySettings";
 import { readableTextOn } from "../../../utils/calendarPalette";
 import { formatPragueTime, isLate } from "../../../utils/time";
+import { AppointmentHoverCard } from "./AppointmentHoverCard";
 
 /**
  * One appointment. It is a `button`, not a div with an onClick (7.1), and its
@@ -31,6 +33,7 @@ export function AppointmentButton({
   layout: "row" | "block" | "compact";
 }) {
   const { t } = useTranslation();
+  const { settings } = useCalendarDisplay();
   const color = calendar?.color ?? "#37474F";
   const late = isLate(appointment.startUtc, isLateStatus(appointment.status), now);
   const tally = statusTally(appointment.status);
@@ -40,6 +43,32 @@ export function AppointmentButton({
     : t("booking.status.unknown");
 
   return (
+    <Tooltip
+      arrow
+      placement="top"
+      enterDelay={350}
+      enterNextDelay={350}
+      slotProps={{
+        tooltip: {
+          sx: {
+            bgcolor: "background.paper",
+            color: "text.primary",
+            boxShadow: 3,
+            border: "1px solid",
+            borderColor: "divider",
+            p: 1,
+          },
+        },
+        arrow: { sx: { color: "background.paper" } },
+      }}
+      title={
+        <AppointmentHoverCard
+          appointment={appointment}
+          calendarName={calendar?.name}
+          fields={settings.hoverFields}
+        />
+      }
+    >
     <Box
       component="button"
       type="button"
@@ -113,5 +142,6 @@ export function AppointmentButton({
         </Box>
       )}
     </Box>
+    </Tooltip>
   );
 }
