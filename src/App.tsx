@@ -9,8 +9,16 @@ import { PATIENT_SECTIONS, patientInPath, sectionPath } from './pages/patients/s
 import { settingsItemAt } from './pages/settings/catalogue';
 import { Toaster } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useState, lazy, Suspense, useRef, useCallback } from 'react';
-import theme from './theme';
+import { useState, useMemo, lazy, Suspense, useRef, useCallback } from 'react';
+import { buildTheme, THEME_ACCENTS, type ThemeMode } from './theme';
+import {
+  ThemePrefsContext,
+  useThemePrefs,
+  readStoredAccent,
+  readStoredMode,
+  ACCENT_STORAGE_KEY,
+  MODE_STORAGE_KEY,
+} from './themePrefs';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import NetworkBanner from './components/NetworkBanner';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
@@ -198,6 +206,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   const settingsHere = settingsItemAt(location.pathname);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { accent, mode, setAccent, setMode } = useThemePrefs();
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const visibleMenu = menuGroups
@@ -248,6 +257,39 @@ function Layout({ children }: { children: React.ReactNode }) {
             <MenuItem onClick={() => { setAnchorEl(null); window.location.href = '/settings'; }}>
               <ListItemIcon><Settings fontSize="small" /></ListItemIcon> Nastavení
             </MenuItem>
+            <Box sx={{ px: 2, py: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.75 }}>
+                Vzhled
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 0.75, mb: 1 }}>
+                {THEME_ACCENTS.map((a) => (
+                  <Box
+                    key={a.key}
+                    role="button"
+                    aria-label={a.label}
+                    onClick={() => setAccent(a.color)}
+                    sx={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: '50%',
+                      cursor: 'pointer',
+                      bgcolor: a.color,
+                      outline: '2px solid',
+                      outlineColor: accent === a.color ? 'text.primary' : 'transparent',
+                      outlineOffset: 2,
+                    }}
+                  />
+                ))}
+              </Box>
+              <Button
+                size="small"
+                variant="outlined"
+                fullWidth
+                onClick={() => setMode(mode === 'light' ? 'dark' : 'light')}
+              >
+                {mode === 'light' ? 'Tmavý režim' : 'Světlý režim'}
+              </Button>
+            </Box>
             <MenuItem onClick={handleLogout}>
               <ListItemIcon><Logout fontSize="small" /></ListItemIcon> Odhlásit se
             </MenuItem>
@@ -436,9 +478,21 @@ function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const [accent, setAccentState] = useState<string>(readStoredAccent);
+  const [mode, setModeState] = useState<ThemeMode>(readStoredMode);
+  const setAccent = (color: string) => {
+    setAccentState(color);
+    try { localStorage.setItem(ACCENT_STORAGE_KEY, color); } catch { /* private mode */ }
+  };
+  const setMode = (next: ThemeMode) => {
+    setModeState(next);
+    try { localStorage.setItem(MODE_STORAGE_KEY, next); } catch { /* private mode */ }
+  };
+  const activeTheme = useMemo(() => buildTheme(accent, mode), [accent, mode]);
   return (
     <GlobalErrorBoundary>
-    <ThemeProvider theme={theme}>
+    <ThemePrefsContext.Provider value={{ accent, mode, setAccent, setMode }}>
+    <ThemeProvider theme={activeTheme}>
       <CssBaseline />
       <KeyboardShortcuts />
       <QueryClientProvider client={queryClient}>
@@ -526,6 +580,7 @@ export default function App() {
         </BrowserRouter>
       </QueryClientProvider>
     </ThemeProvider>
+    </ThemePrefsContext.Provider>
     </GlobalErrorBoundary>
   );
 }
