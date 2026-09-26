@@ -22,7 +22,7 @@ import { appointmentsApi } from "../../api/appointments";
 import { calendarsApi } from "../../api/calendars";
 import { patientsApi } from "../../api/patients";
 import { BookingApiError } from "../../api/apiError";
-import { isKnownPaperworkReason, isLateStatus } from "../../api/bookingContracts";
+import { isKnownPaperworkReason, isLateStatus, statusName } from "../../api/bookingContracts";
 import type { DayAppointment } from "../../api/bookingContracts";
 import {
   addDaysToDateOnly,
@@ -59,7 +59,11 @@ import { usePermission } from "../../auth/usePermission";
  * the list printed right underneath it, which is worse than being absent.
  */
 
+const SCHEDULED = 0;
+const CONFIRMED = 1;
 const CHECKED_IN = 2;
+const COMPLETED = 3;
+const NO_SHOW = 5;
 
 export default function DayOverviewPage() {
   const { t } = useTranslation();
@@ -170,6 +174,25 @@ export default function DayOverviewPage() {
       void queryClient.invalidateQueries({ queryKey: ["day-summary"] });
       void queryClient.invalidateQueries({ queryKey: ["day-range"] });
     },
+  });
+
+  const refreshDay = () => {
+    void queryClient.invalidateQueries({ queryKey: ["day-summary"] });
+    void queryClient.invalidateQueries({ queryKey: ["day-range"] });
+  };
+
+  /* The desk did not come, so it never arrives and never pays. */
+  const noShow = useMutation({
+    mutationFn: (appointment: DayAppointment) =>
+      appointmentsApi.setStatus(appointment.calendarId as string, appointment.id, String(NO_SHOW)),
+    onSuccess: refreshDay,
+  });
+
+  /* Arrived and paid: the visit is done. */
+  const complete = useMutation({
+    mutationFn: (appointment: DayAppointment) =>
+      appointmentsApi.setStatus(appointment.calendarId as string, appointment.id, String(COMPLETED)),
+    onSuccess: refreshDay,
   });
 
   const summary = summaryQuery.data;
@@ -399,14 +422,48 @@ export default function DayOverviewPage() {
                           </Typography>
                         </Stack>
                         {mayEdit ? (
-                          <Button
-                            size="small"
-                            variant="contained"
-                            disabled={row.calendarId === null || arrive.isPending}
-                            onClick={() => arrive.mutate(row)}
-                          >
-                            {t("booking.detail.arrived")}
-                          </Button>
+                          <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+                            {row.status === SCHEDULED || row.status === CONFIRMED ? (
+                              <>
+                                {/* Only the next real step is offered: came, or
+                                    did not. No wall of buttons to tick through. */}
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  disabled={row.calendarId === null || arrive.isPending}
+                                  onClick={() => arrive.mutate(row)}
+                                >
+                                  {t("booking.detail.arrived")}
+                                </Button>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="warning"
+                                  disabled={row.calendarId === null || noShow.isPending}
+                                  onClick={() => noShow.mutate(row)}
+                                >
+                                  {t("booking.detail.noShow")}
+                                </Button>
+                              </>
+                            ) : row.status === CHECKED_IN ? (
+                              /* Here already, so the only thing left is to finish
+                                 and take payment. */
+                              <Button
+                                size="small"
+                                variant="contained"
+                                color="success"
+                                disabled={row.calendarId === null || complete.isPending}
+                                onClick={() => complete.mutate(row)}
+                              >
+                                {t("booking.detail.complete")}
+                              </Button>
+                            ) : (
+                              <Chip
+                                size="small"
+                                label={t(`booking.status.${statusName(row.status) ?? "unknown"}`)}
+                              />
+                            )}
+                          </Stack>
                         ) : null}
                       </Stack>
                     ))}
