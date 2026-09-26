@@ -23,6 +23,7 @@ export const GRID_TEXT = {
   holidayWorked: 'Svátek – pracuje se',
   closed: 'Zavřeno',
   notAWorkingDay: 'Nepracovní den',
+  lunchBreak: 'Oběd',
   noPeriod: 'Mimo období',
   noActivities: 'Bez činností',
   onlineBookingOff: 'Online objednávky vypnuty',

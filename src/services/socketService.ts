@@ -95,8 +95,13 @@ class SocketService {
        * A path, not a ws:// URL. The SignalR client negotiates over HTTP first
        * and picks the transport itself, so handing it `ws://` would leave it
        * nothing to POST to. Relative keeps it on the dev proxy as well.
+       *
+       * When the API lives on another origin (frontend on Vercel, API on
+       * Fly/Render), the same env var the HTTP client uses points the hub at
+       * it. Empty in dev, so the relative path and the proxy still apply.
        */
-      this.config.url = '/hubs/notifications';
+      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+      this.config.url = `${apiBase}/hubs/notifications`;
     }
   }
 

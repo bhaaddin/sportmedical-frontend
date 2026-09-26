@@ -535,18 +535,38 @@ function SubColumn({
       ) : null}
       {breakStart !== null && breakEnd !== null && open ? (
         <Box
+          aria-label={GRID_TEXT.lunchBreak}
           sx={{
             position: "absolute",
             left: 0,
             right: 0,
             ...place({ start: breakStart, end: breakEnd }),
-            backgroundColor: "action.hover",
+            backgroundColor: alpha(theme.palette.error.main, 0.16),
+            borderTop: `1px solid ${theme.palette.error.main}`,
+            borderBottom: `1px solid ${theme.palette.error.main}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
             zIndex: 0,
           }}
-        />
+        >
+          <Typography
+            sx={{
+              color: "error.main",
+              fontWeight: 700,
+              fontSize: 12,
+              letterSpacing: 0.5,
+              textTransform: "uppercase",
+            }}
+          >
+            {GRID_TEXT.lunchBreak}
+          </Typography>
+        </Box>
       ) : null}
 
-      {/* Hour and half-hour lines, so a drag has something to aim at. */}
+      {/* Grid lines on the calendar's own step (15 min splits the hour into
+          four), so a drag has something to aim at and the hour reads as quarters. */}
       <Box
         aria-hidden
         sx={{
@@ -554,7 +574,7 @@ function SubColumn({
           inset: 0,
           pointerEvents: "none",
           zIndex: 1,
-          backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${ROW_HEIGHT - 1}px, ${theme.palette.divider} ${ROW_HEIGHT - 1}px, ${theme.palette.divider} ${ROW_HEIGHT}px)`,
+          backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${step * PX_PER_MINUTE - 1}px, ${theme.palette.divider} ${step * PX_PER_MINUTE - 1}px, ${theme.palette.divider} ${step * PX_PER_MINUTE}px)`,
         }}
       />
 
