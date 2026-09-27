@@ -172,15 +172,27 @@ function OwnerDashboard() {
   /* Today's appointments (the booking API honours the range; see history). */
   useEffect(() => {
     const today = toDateOnly(new Date());
+    let alive = true;
     Promise.all([
       canSeePatients
         ? patientsApi.list({ pageSize: 1 }).then((page) => page.totalCount).catch(() => null)
         : Promise.resolve(null),
       appointmentsApi.range(today, today).catch(() => []),
     ]).then(([total, appts]) => {
+      if (!alive) return;
       setPatientTotal(total);
       setTodayAppointments(appts);
-    }).finally(() => setLoading(false));
+    }).finally(() => { if (alive) setLoading(false); });
+
+    /* The plocha is a live board like the calendar: today's appointments refresh
+       on their own so an arrival or a new booking shows without reloading. */
+    const timer = window.setInterval(() => {
+      void appointmentsApi.range(today, today)
+        .then((appts) => { if (alive) setTodayAppointments(appts); })
+        .catch(() => { /* keep the last good list */ });
+    }, 60_000);
+
+    return () => { alive = false; window.clearInterval(timer); };
   }, [canSeePatients]);
 
   const patientIds = useMemo(
