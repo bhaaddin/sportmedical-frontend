@@ -23,6 +23,7 @@ import { toast } from "react-hot-toast";
 import client from "../api/client";
 import { patientsApi } from "../api/patients";
 import { patientIdentityApi } from "../api/patientIdentity";
+import { issuePortalLink } from "../api/patientPortal";
 import { usePermission } from "../auth/usePermission";
 import type { InsuranceRegistrationKind, ResidenceType } from "../api/patientRegistry";
 import { parseBirthNumber } from "../services/patientRegistration/insuranceIdentifier";
@@ -178,6 +179,23 @@ export default function PatientForm() {
 
   const [editedDemographics, setEditedDemographics] = useState<Demographics | null>(null);
   const [editedProfile, setEditedProfile] = useState<ProfileFields | null>(null);
+  /* The patient's personal portal link, shown once after the desk issues it. */
+  const [portalLink, setPortalLink] = useState<string | null>(null);
+  const [portalBusy, setPortalBusy] = useState(false);
+
+  const issuePortal = async () => {
+    if (!patientId) return;
+    setPortalBusy(true);
+    try {
+      const token = await issuePortalLink(patientId);
+      setPortalLink(`${window.location.origin}/portal/${token}`);
+      toast.success("Přístup do portálu vytvořen.");
+    } catch {
+      toast.error("Odkaz se nepodařilo vytvořit.");
+    } finally {
+      setPortalBusy(false);
+    }
+  };
 
   const demographics = editedDemographics ?? patientQuery.data?.demographics ?? EMPTY_DEMOGRAPHICS;
   const profile = editedProfile ?? patientQuery.data?.profile ?? EMPTY_PROFILE;
@@ -402,7 +420,21 @@ export default function PatientForm() {
             >
               Opravit adresu
             </Button>
+            <Button
+              variant="outlined"
+              disabled={portalBusy}
+              onClick={issuePortal}
+            >
+              {portalBusy ? "Vytvářím…" : "Přístup do portálu"}
+            </Button>
           </Stack>
+
+          {portalLink && (
+            <Alert severity="success" sx={{ mt: 2, borderRadius: 2, wordBreak: "break-all" }}>
+              Osobní odkaz pacienta do portálu (pošlete mu ho):<br />
+              <strong>{portalLink}</strong>
+            </Alert>
+          )}
         </CardContent>
       </Card>
 

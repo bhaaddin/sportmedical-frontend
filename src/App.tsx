@@ -32,6 +32,7 @@ const Login = lazy(() => import('./pages/Login'));
 const IntakeQuestionnaire = lazy(() => import('./pages/public/IntakeQuestionnaire'));
 const PublicBooking = lazy(() => import('./pages/public/PublicBooking'));
 const ManageBooking = lazy(() => import('./pages/public/ManageBooking'));
+const PatientPortal = lazy(() => import('./pages/public/PatientPortal'));
 const IntakeReviewQueue = lazy(() => import('./pages/IntakeReviewQueue'));
 const DashboardPage = lazy(() => import('./pages/Dashboard'));
 const DiagnosticForm = lazy(() => import('./pages/DiagnosticForm'));
@@ -511,6 +512,9 @@ export default function App() {
                 to their own appointment can never get there. That is exactly
                 what the confirmation's button did until this route existed. */}
             <Route path="/rezervace/:token" element={<Suspense fallback={<PageLoader />}><ManageBooking /></Suspense>} />
+            {/* Patient portal. Anonymous like the links above: the personal access
+                token IS the identity, resolving to one patient's own dashboard. */}
+            <Route path="/portal/:token" element={<Suspense fallback={<PageLoader />}><PatientPortal /></Suspense>} />
             <Route path="/*" element={
               <AuthGuard>
                 <Layout>
