@@ -278,9 +278,48 @@ export function clearIdempotencyKey(): void {
 
 /* ── Call ── */
 
-export async function submitIntake(request: IntakeRequest): Promise<IntakeResponse> {
+/** What the completion link opens with: the patient's own facts, pre-filled. */
+export interface CompletionOpen {
+  referenceNumber: string;
+  givenName: string;
+  familyName: string;
+  email: string;
+  phoneE164: string | null;
+  expiresAtUtc: string;
+  activityName?: string | null;
+  startUtc?: string | null;
+}
+
+/**
+ * Loads a desk-started registration by its link token, to pre-fill the form.
+ * Returns null when the link is unknown, used or expired (the server gives one
+ * answer for all three).
+ */
+export async function openCompletion(token: string): Promise<CompletionOpen | null> {
   try {
-    const response = await publicClient.post<IntakeResponse>('/api/public/intake', request, {
+    const res = await publicClient.get<CompletionOpen>(
+      `/api/public/intake/complete/${encodeURIComponent(token)}`,
+    );
+    return res.data;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Submits the intake. With `completionToken` it finishes a desk-started
+ * registration (writes onto that patient); without it, it is the anonymous
+ * public form.
+ */
+export async function submitIntake(
+  request: IntakeRequest,
+  completionToken?: string,
+): Promise<IntakeResponse> {
+  const url = completionToken
+    ? `/api/public/intake/complete/${encodeURIComponent(completionToken)}`
+    : '/api/public/intake';
+  try {
+    const response = await publicClient.post<IntakeResponse>(url, request, {
       headers: { 'Idempotency-Key': getIdempotencyKey() },
     });
     return response.data;

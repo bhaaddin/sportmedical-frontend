@@ -500,6 +500,9 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Suspense fallback={<PageLoader />}><Login /></Suspense>} />
             <Route path="/dotaznik" element={<Suspense fallback={<PageLoader />}><IntakeQuestionnaire /></Suspense>} />
+            {/* Dokončení registrace z odkazu, který desk poslal pacientovi.
+                Anonymní jako /dotaznik — pacient nemá účet, dokud ho tu nezaloží. */}
+            <Route path="/dokonceni/:token" element={<Suspense fallback={<PageLoader />}><IntakeQuestionnaire /></Suspense>} />
             {/* Objednání online. Anonymous, like /dotaznik, and outside the
                 AuthGuard for the same reason: a patient has no account. */}
             <Route path="/objednat" element={<Suspense fallback={<PageLoader />}><PublicBooking /></Suspense>} />

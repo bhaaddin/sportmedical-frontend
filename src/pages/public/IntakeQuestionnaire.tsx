@@ -73,10 +73,12 @@ import {
   validatePhone,
 } from '../../services/publicIntake/validation';
 import type { FieldError, ParsedBirthNumber } from '../../services/publicIntake/validation';
+import { useParams } from 'react-router-dom';
 import {
   IntakeError,
   IntakeOutcome,
   clearIdempotencyKey,
+  openCompletion,
   submitIntake,
 } from '../../api/publicIntake';
 import type { IntakeInsurance, IntakeResponse } from '../../api/publicIntake';
@@ -326,6 +328,29 @@ function needsSecondTyping(insuranceNumber: string): boolean {
 export default function IntakeQuestionnaire() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [derived, setDerived] = useState<Derived>(NOTHING_DERIVED);
+
+  /*
+   * Desk-started registration: /dokonceni/:token opens this same form, pre-filled
+   * with the patient's own facts, and submits onto that patient. Without a token
+   * it is the ordinary anonymous /dotaznik.
+   */
+  const { token: completionToken } = useParams<{ token: string }>();
+  useEffect(() => {
+    if (!completionToken) return;
+    let alive = true;
+    void openCompletion(completionToken).then((open) => {
+      if (!alive || open === null) return;
+      setForm((prev) => ({
+        ...prev,
+        givenName: prev.givenName || open.givenName || '',
+        familyName: prev.familyName || open.familyName || '',
+        email: prev.email || open.email || '',
+      }));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [completionToken]);
   /* The health questionnaire starts closed. It is ~76 questions and it is
      optional today; opening it by default would turn a one-minute
      registration into a page nobody scrolls to the bottom of. */
@@ -861,7 +886,7 @@ export default function IntakeQuestionnaire() {
          * another time is better than losing everything they typed.
          */
         holdToken: held?.token,
-      });
+      }, completionToken);
 
       clearIdempotencyKey();
 
