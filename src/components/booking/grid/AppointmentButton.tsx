@@ -1,4 +1,5 @@
 import { Box, Tooltip } from "@mui/material";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
   isLateStatus,
@@ -6,6 +7,7 @@ import {
   statusTally,
   type DayAppointment,
 } from "../../../api/bookingContracts";
+import { patientsApi } from "../../../api/patients";
 import { useCalendarDisplay } from "../../../api/displaySettings";
 import { readableTextOn } from "../../../utils/calendarPalette";
 import { formatPragueTime, isLate } from "../../../utils/time";
@@ -35,6 +37,25 @@ export function AppointmentButton({
   const { t } = useTranslation();
   const { settings } = useCalendarDisplay();
   const color = calendar?.color ?? "#37474F";
+
+  /*
+   * The patient's name on the cell itself, not only in the hover (owner: "každá
+   * objednávka bez haveru musí ukázat jméno a činnost"). Fetched through the same
+   * cached ['patient', id] query the hover uses, so a day is one request per
+   * patient however many times it is drawn. Not on the month view (compact),
+   * where a cell has one line and the činnost has to win.
+   */
+  const nameQuery = useQuery({
+    queryKey: ["patient", appointment.patientId],
+    queryFn: () => patientsApi.getById(appointment.patientId),
+    enabled: layout !== "compact",
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const patientName = nameQuery.data
+    ? (nameQuery.data.fullName
+      || `${nameQuery.data.firstName} ${nameQuery.data.lastName}`.trim())
+    : null;
   const late = isLate(appointment.startUtc, isLateStatus(appointment.status), now);
   const tally = statusTally(appointment.status);
   const name = statusName(appointment.status);
@@ -100,7 +121,14 @@ export function AppointmentButton({
         },
       }}
     >
-      <Box component="span" sx={{ fontWeight: 700 }}>
+      {/* The patient's name, first and in bold, on the day and week views. The
+          činnost follows on the line below with the time. */}
+      {patientName && layout !== "compact" ? (
+        <Box component="span" sx={{ display: "block", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {patientName}
+        </Box>
+      ) : null}
+      <Box component="span" sx={{ fontWeight: patientName && layout !== "compact" ? 500 : 700 }}>
         {formatPragueTime(appointment.startUtc)}
       </Box>{" "}
       {appointment.activityName}

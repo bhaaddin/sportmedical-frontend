@@ -6,7 +6,20 @@ import { statusName, type DayAppointment } from "../../../api/bookingContracts";
 import { formatPragueTime, formatPragueDate } from "../../../utils/time";
 
 /** What the card shows when the server sent no hover-field choice of its own. */
-const DEFAULT_HOVER_FIELDS = ["patientName", "activity", "status", "phone", "paperwork"];
+const DEFAULT_HOVER_FIELDS = [
+  "patientName", "activity", "registrationStatus", "status", "phone", "email", "paperwork",
+];
+
+/** The patient's registration standing, in words rather than the raw code. */
+const REGISTRATION_STATUS_LABELS: Record<string, string> = {
+  Active: "Registrovaný",
+  Registered: "Registrovaný",
+  Provisional: "Předběžná registrace",
+  PreRegistered: "Předběžná registrace",
+  Draft: "Rozepsaná registrace",
+  Incomplete: "Nedokončená registrace",
+  Archived: "Archivovaný",
+};
 
 /**
  * The card the calendar shows when the mouse rests on a booked slot (plan 5.2).
@@ -34,7 +47,8 @@ export function AppointmentHoverCard({
   const activeFields = fields && fields.length > 0 ? fields : DEFAULT_HOVER_FIELDS;
 
   const needsPatient = activeFields.some((f) =>
-    f === "patientName" || f === "phone" || f === "birthDate",
+    f === "patientName" || f === "phone" || f === "birthDate"
+    || f === "email" || f === "registrationStatus",
   );
 
   const patientQuery = useQuery({
@@ -58,6 +72,12 @@ export function AppointmentHoverCard({
           : null;
       case "phone":
         return patient?.phone?.trim() || null;
+      case "email":
+        return patient?.email?.trim() || null;
+      case "registrationStatus":
+        return patient?.status
+          ? (REGISTRATION_STATUS_LABELS[patient.status] ?? patient.status)
+          : null;
       case "birthDate":
         return patient?.dateOfBirth ? formatPragueDate(patient.dateOfBirth) : null;
       case "activity":
@@ -81,10 +101,12 @@ export function AppointmentHoverCard({
     switch (key) {
       case "patientName": return "Pacient";
       case "phone": return "Telefon";
+      case "email": return "E-mail";
       case "birthDate": return "Narozen(a)";
       case "activity": return "Činnost";
       case "service": return "Služba";
-      case "status": return "Stav";
+      case "registrationStatus": return "Registrace";
+      case "status": return "Stav objednávky";
       case "paperwork": return "Podklady";
       default: return key;
     }
