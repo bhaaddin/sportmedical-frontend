@@ -11,11 +11,11 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-  Alert, Box, Card, Chip, CircularProgress, Container, Divider, Stack, Typography,
+  Alert, Box, Button, Card, Chip, CircularProgress, Container, Divider, Stack, Typography,
 } from '@mui/material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import {
-  EventAvailableOutlined, DescriptionOutlined, PersonOutlined,
+  EventAvailableOutlined, DescriptionOutlined, PersonOutlined, CalendarMonthOutlined,
 } from '@mui/icons-material';
 import { openPortal } from '../../api/patientPortal';
 import type { PortalAppointment, PortalDashboard } from '../../api/patientPortal';
@@ -63,6 +63,47 @@ function clinicMoment(utc: string): string {
   });
 }
 
+/** UTC instant as an iCalendar stamp: 20260929T083000Z. */
+function icsStamp(iso: string): string {
+  return new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+}
+
+/**
+ * Builds a one-event .ics from the appointment and hands it to the browser to
+ * download — the patient adds it to Google or Apple Calendar. Client-side, so it
+ * needs nothing from the server.
+ */
+function addToCalendar(appointment: PortalAppointment): void {
+  const summary = `SportMedical — ${appointment.activityName || 'Termín'}`;
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//SportMedical//Portal//CS',
+    'BEGIN:VEVENT',
+    `UID:${icsStamp(appointment.startUtc)}-sportmedical@portal`,
+    `DTSTAMP:${icsStamp(new Date().toISOString())}`,
+    `DTSTART:${icsStamp(appointment.startUtc)}`,
+    `DTEND:${icsStamp(appointment.endUtc)}`,
+    `SUMMARY:${summary}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+
+  try {
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'termin.ics';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch {
+    /* download blocked — nothing to do; the time is on screen. */
+  }
+}
+
 function AppointmentRow({ appointment }: { appointment: PortalAppointment }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1.5 }}>
@@ -81,11 +122,21 @@ function AppointmentRow({ appointment }: { appointment: PortalAppointment }) {
           {clinicMoment(appointment.startUtc)}
         </Typography>
       </Box>
-      <Chip
-        size="small"
-        label={STATUS_LABELS[appointment.status] ?? appointment.status}
-        sx={{ fontWeight: 700, bgcolor: BRAND.accentWash, color: BRAND.accentDark }}
-      />
+      <Stack spacing={0.5} sx={{ alignItems: 'flex-end' }}>
+        <Chip
+          size="small"
+          label={STATUS_LABELS[appointment.status] ?? appointment.status}
+          sx={{ fontWeight: 700, bgcolor: BRAND.accentWash, color: BRAND.accentDark }}
+        />
+        <Button
+          size="small"
+          startIcon={<CalendarMonthOutlined sx={{ fontSize: 16 }} />}
+          onClick={() => addToCalendar(appointment)}
+          sx={{ color: BRAND.accentDark, minWidth: 0, px: 0.5, fontSize: 12 }}
+        >
+          Do kalendáře
+        </Button>
+      </Stack>
     </Box>
   );
 }
