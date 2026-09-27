@@ -2,13 +2,19 @@ import { Box, CircularProgress, Stack, Typography } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { patientsApi } from "../../../api/patients";
+import { activitiesApi } from "../../../api/activities";
 import { statusName, type DayAppointment } from "../../../api/bookingContracts";
 import { formatPragueTime, formatPragueDate } from "../../../utils/time";
 
 /** What the card shows when the server sent no hover-field choice of its own. */
 const DEFAULT_HOVER_FIELDS = [
-  "patientName", "activity", "registrationStatus", "status", "phone", "email", "paperwork",
+  "patientName", "activity", "price", "registrationStatus", "status", "phone", "email", "paperwork",
 ];
+
+/** The činnost's price in Czech koruna, from the price list it is linked to. */
+function formatPrice(czk: number): string {
+  return `${new Intl.NumberFormat("cs-CZ").format(czk)} Kč`;
+}
 
 /** The patient's registration standing, in words rather than the raw code. */
 const REGISTRATION_STATUS_LABELS: Record<string, string> = {
@@ -58,6 +64,19 @@ export function AppointmentHoverCard({
     staleTime: 5 * 60 * 1000,
   });
 
+  /* The price lives on the price list the činnost is linked to, not on the
+     appointment; one cached list answers it for every booking on screen. */
+  const needsPrice = activeFields.includes("price");
+  const activitiesQuery = useQuery({
+    queryKey: ["activities"],
+    queryFn: () => activitiesApi.list(),
+    enabled: needsPrice,
+    staleTime: 5 * 60 * 1000,
+  });
+  const activityPrice = activitiesQuery.data?.activities.find(
+    (a) => a.id === appointment.activityId,
+  )?.priceCzk ?? null;
+
   const patient = patientQuery.data;
   const statusLabel = (() => {
     const name = statusName(appointment.status);
@@ -82,6 +101,8 @@ export function AppointmentHoverCard({
         return patient?.dateOfBirth ? formatPragueDate(patient.dateOfBirth) : null;
       case "activity":
         return appointment.activityName || null;
+      case "price":
+        return activityPrice !== null ? formatPrice(activityPrice) : null;
       case "service":
         return calendarName || null;
       case "status":
@@ -104,6 +125,7 @@ export function AppointmentHoverCard({
       case "email": return "E-mail";
       case "birthDate": return "Narozen(a)";
       case "activity": return "Činnost";
+      case "price": return "Cena";
       case "service": return "Služba";
       case "registrationStatus": return "Registrace";
       case "status": return "Stav objednávky";

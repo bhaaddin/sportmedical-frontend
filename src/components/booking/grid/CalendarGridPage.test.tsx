@@ -172,7 +172,8 @@ describe('the calendar screen', () => {
   it('marks a day off, the online switch and the now-line in the set colour', async () => {
     renderPage();
     await screen.findByRole('button', { name: /Spiroergometrie/ });
-    expect(await screen.findByText('Zavřeno')).toBeInTheDocument();
+    /* "Zavřeno" is in the day header and again down the full-day closed block. */
+    expect((await screen.findAllByText('Zavřeno')).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByTestId('day-number-2026-09-25')).toHaveStyle({ color: 'rgb(211, 47, 47)' });
     expect(await screen.findByText('Online objednávky vypnuty')).toBeInTheDocument();
     const line = await screen.findByTestId('now-line');
