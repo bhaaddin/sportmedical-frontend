@@ -19,6 +19,30 @@ const publicClient = axios.create({
 });
 
 /**
+ * One Mapy.cz address suggestion: whole-republic autocomplete, proxied through
+ * our own server so the Mapy.cz key stays there. The parts are what the intake
+ * form sends back to store the address (no RÚIAN catalogue needed).
+ */
+export interface MapySuggestion {
+  label: string;
+  name: string;
+  street: string | null;
+  number: string | null;
+  municipalityPart: string | null;
+  municipality: string | null;
+  zip: string;
+}
+
+/** Whole-Czechia address autocomplete via Mapy.cz (through our proxy). */
+export async function suggestMapyAddress(q: string, limit = 6): Promise<MapySuggestion[]> {
+  if (q.trim().length < 2) return [];
+  const res = await publicClient.get<MapySuggestion[]>('/api/address-lookup/mapy', {
+    params: { q: q.trim(), limit },
+  });
+  return res.data ?? [];
+}
+
+/**
  * A street within a municipality part - what the first box searches.
  *
  * `streetCode` and `streetName` are NULL for a village that has no streets at

@@ -120,7 +120,13 @@ export interface IntakeHealthQuestionnaire {
 }
 
 export interface IntakeAddress {
+  /** 0 when the address came from Mapy.cz (whole republic); the parts carry it. */
   ruianAddressPointCode: number;
+  street?: string | null;
+  number?: string | null;
+  municipalityPart?: string | null;
+  municipality?: string | null;
+  zip?: string | null;
 }
 
 export interface IntakeRequest {

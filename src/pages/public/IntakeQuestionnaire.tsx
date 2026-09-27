@@ -97,6 +97,7 @@ import {
   groupedDisplay, phoneComplaint, phoneDisplayState, worthInspectingPhone,
 } from '../../services/patientRegistration/phoneDisplay';
 import RuianAddressPicker from '../../components/registration/RuianAddressPicker';
+import MapyAddressPicker from '../../components/registration/MapyAddressPicker';
 import HealthQuestionnaire from '../../components/public/HealthQuestionnaire';
 import { answersForSubmission, readDraft } from '../../services/publicIntake/healthQuestionnaire';
 import { forgetHeld, readHeld } from '../../api/publicBooking';
@@ -105,7 +106,7 @@ import type { LoadedQuestionnaire } from '../../api/publicQuestionnaire';
 import { questionnaireSatisfied, questionnaireStance } from '../../services/publicIntake/questionnaireRequirement';
 import { calendarFileUrl } from '../../api/publicManage';
 import type { HeldBooking } from '../../api/publicBooking';
-import type { AddressPoint } from '../../api/addressLookup';
+import type { AddressPoint, MapySuggestion } from '../../api/addressLookup';
 import { readPublicClinic } from '../../api/clinicSettings';
 
 /* ── Brand, taken from sportmedical-diagnostics.cz ── */
@@ -468,6 +469,8 @@ export default function IntakeQuestionnaire() {
    * register again for something it already said.
    */
   const [addressPoint, setAddressPoint] = useState<AddressPoint | null>(null);
+  /* The whole-republic Mapy.cz address, used on the completion link (/dokonceni). */
+  const [mapyAddress, setMapyAddress] = useState<MapySuggestion | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -706,7 +709,7 @@ export default function IntakeQuestionnaire() {
     collect(next, 'email', validateEmail(form.email));
     collect(next, 'phone', validatePhone({ regionCode: form.phoneRegion, number: form.phone }));
     /* The API refuses the whole submission without it. */
-    if (addressPoint === null) {
+    if (completionToken ? mapyAddress === null : addressPoint === null) {
       next.address = 'Vyberte prosím adresu ze seznamu.';
     }
 
@@ -879,7 +882,16 @@ export default function IntakeQuestionnaire() {
               : null,
         },
         contact: { email: form.email.trim(), phone: phone.value },
-        address: { ruianAddressPointCode: addressPoint!.addressPointCode },
+        address: completionToken && mapyAddress
+          ? {
+              ruianAddressPointCode: 0,
+              street: mapyAddress.street,
+              number: mapyAddress.number,
+              municipalityPart: mapyAddress.municipalityPart,
+              municipality: mapyAddress.municipality,
+              zip: mapyAddress.zip,
+            }
+          : { ruianAddressPointCode: addressPoint!.addressPointCode },
         insurance: buildInsurance(),
         consents: [
           { policyCode: 'treatment', granted: form.consentTreatment },
@@ -1430,20 +1442,33 @@ export default function IntakeQuestionnaire() {
                     <Typography variant="body2" sx={{ mb: 1, fontWeight: 700 }}>
                       Adresa trvalého pobytu
                     </Typography>
-                    <RuianAddressPicker
-                      selectedPoint={addressPoint}
-                      onSelect={(point) => {
-                        setAddressPoint(point);
-                        if (point !== null) {
-                          setErrors((previous) => ({ ...previous, address: undefined }));
+                    {completionToken ? (
+                      <MapyAddressPicker
+                        selected={mapyAddress}
+                        onSelect={(value) => {
+                          setMapyAddress(value);
+                          if (value !== null) {
+                            setErrors((previous) => ({ ...previous, address: undefined }));
+                          }
+                        }}
+                        error={errors.address}
+                      />
+                    ) : (
+                      <RuianAddressPicker
+                        selectedPoint={addressPoint}
+                        onSelect={(point) => {
+                          setAddressPoint(point);
+                          if (point !== null) {
+                            setErrors((previous) => ({ ...previous, address: undefined }));
+                          }
+                        }}
+                        error={errors.address}
+                        emptyCatalogueText={
+                          'Vyhledávání adres teď nefunguje, takže dotazník nejde odeslat. '
+                          + 'Dejte to prosím vědět ordinaci.'
                         }
-                      }}
-                      error={errors.address}
-                      emptyCatalogueText={
-                        'Vyhledávání adres teď nefunguje, takže dotazník nejde odeslat. '
-                        + 'Dejte to prosím vědět ordinaci.'
-                      }
-                    />
+                      />
+                    )}
                   </Box>
                 </Box>
               </Card>
