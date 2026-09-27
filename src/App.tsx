@@ -515,6 +515,7 @@ export default function App() {
             {/* Patient portal. Anonymous like the links above: the personal access
                 token IS the identity, resolving to one patient's own dashboard. */}
             <Route path="/portal/:token" element={<Suspense fallback={<PageLoader />}><PatientPortal /></Suspense>} />
+            <Route path="/portal" element={<Suspense fallback={<PageLoader />}><PatientPortal /></Suspense>} />
             <Route path="/*" element={
               <AuthGuard>
                 <Layout>

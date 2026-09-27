@@ -144,11 +144,13 @@ function AppointmentRow({ appointment }: { appointment: PortalAppointment }) {
 export default function PatientPortal() {
   const { token } = useParams<{ token: string }>();
   const [dashboard, setDashboard] = useState<PortalDashboard | null>(null);
-  const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading');
+  const [state, setState] = useState<'loading' | 'ok' | 'error' | 'no-token'>(
+    token ? 'loading' : 'no-token',
+  );
 
   useEffect(() => {
     if (!token) {
-      setState('error');
+      setState('no-token');
       return;
     }
     let alive = true;
@@ -195,6 +197,15 @@ export default function PatientPortal() {
             <Card sx={{ p: 3 }}>
               <Alert severity="warning" sx={{ borderRadius: 2 }}>
                 Tento odkaz už neplatí nebo je neúplný. Požádejte prosím ordinaci o nový.
+              </Alert>
+            </Card>
+          )}
+
+          {state === 'no-token' && (
+            <Card sx={{ p: 3 }}>
+              <Alert severity="info" sx={{ borderRadius: 2 }}>
+                Otevřete prosím svůj osobní odkaz do portálu — dostanete ho od ordinace
+                e-mailem nebo při registraci. Bez něj se do portálu nedá přihlásit.
               </Alert>
             </Card>
           )}
