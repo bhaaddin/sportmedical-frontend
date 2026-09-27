@@ -329,17 +329,26 @@ export default function PatientRegistration() {
   const phoneGrouped = groupedDisplay(phoneLook);
   const phoneSays = phoneComplaint(phoneState, form.phoneRegionCode);
 
-  /* ── Birth number drives date of birth and sex ── */
+  /* ── Birth number drives date of birth, sex and (Czech) the insurance number ── */
   const handleBirthNumber = (raw: string) => {
     const formatted = formatRodneCislo(raw);
-    const parsed = parseBirthNumber(digitsOnly(formatted));
+    const digits = digitsOnly(formatted);
+    const parsed = parseBirthNumber(digits);
 
     setForm((previous) => ({
       ...previous,
       birthNumber: formatted,
       ...(parsed !== null ? { dateOfBirth: parsed.dateOfBirth, sex: parsed.sex } : {}),
+      // For a Czech insuree the číslo pojištěnce IS the rodné číslo. Fill it only
+      // into an empty box, so a number typed by hand is never overwritten and the
+      // operator is not left with two values that fail the domain mismatch check.
+      ...(parsed !== null
+        && previous.insuranceRegistrationKind === 'CzechPublicHealthInsurance'
+        && previous.healthInsuranceNumber.trim() === ''
+        ? { healthInsuranceNumber: digits }
+        : {}),
     }));
-    setErrors((previous) => ({ ...previous, birthNumber: undefined }));
+    setErrors((previous) => ({ ...previous, birthNumber: undefined, healthInsuranceNumber: undefined }));
   };
 
   /**
