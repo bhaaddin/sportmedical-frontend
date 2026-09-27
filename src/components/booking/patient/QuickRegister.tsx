@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  MenuItem,
   Stack,
   TextField,
   Typography,
@@ -17,16 +18,32 @@ import type { PatientHit } from "./patientTypeahead";
 
 /**
  * Right under "Vyhledávání z databáze": when the caller is NOT in the register,
- * the desk makes a provisional patient from four facts and gets back the
+ * the desk makes a provisional patient from a few facts and gets back the
  * patient's own 24 h link, which the desk copies and sends by e-mail by hand.
- * The new patient is selected for the booking straight away, so the desk can
- * finish the appointment above without searching again.
+ * The new patient is selected for the booking straight away.
  */
+
+/** Country dialling codes offered for the telephone. Czech first. */
+const DIAL_CODES: { code: string; label: string }[] = [
+  { code: "+420", label: "🇨🇿 +420" },
+  { code: "+421", label: "🇸🇰 +421" },
+  { code: "+49", label: "🇩🇪 +49" },
+  { code: "+43", label: "🇦🇹 +43" },
+  { code: "+48", label: "🇵🇱 +48" },
+  { code: "+36", label: "🇭🇺 +36" },
+  { code: "+380", label: "🇺🇦 +380" },
+  { code: "+44", label: "🇬🇧 +44" },
+  { code: "+1", label: "🇺🇸 +1" },
+];
+
 export function QuickRegister({
   onRegistered,
+  onLink,
   defaultLastName = "",
 }: {
   onRegistered: (hit: PatientHit) => void;
+  /** The generated link, lifted so it can also show on the booked screen. */
+  onLink?: (link: string) => void;
   defaultLastName?: string;
 }) {
   const { t } = useTranslation();
@@ -35,18 +52,21 @@ export function QuickRegister({
   const [lastName, setLastName] = useState(defaultLastName);
   const [dob, setDob] = useState("");
   const [email, setEmail] = useState("");
+  const [dialCode, setDialCode] = useState("+420");
   const [phone, setPhone] = useState("");
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const register = useMutation({
     mutationFn: async () => {
+      const national = phone.replace(/\D/g, "").replace(/^0+/, "");
+      const fullPhone = national.length > 0 ? `${dialCode}${national}` : undefined;
       const { patientId } = await patientPreRegistrationApi.preRegister({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         dateOfBirth: dob,
         email: email.trim(),
-        phone: phone.trim() || undefined,
+        phone: fullPhone,
       });
       const issued = await patientPreRegistrationApi.issueLink(patientId);
       const full = issued.url ?? `${window.location.origin}${issued.path}`;
@@ -54,6 +74,7 @@ export function QuickRegister({
     },
     onSuccess: ({ patientId, full }) => {
       setLink(full);
+      onLink?.(full);
       onRegistered({
         id: patientId,
         firstName: firstName.trim(),
@@ -121,9 +142,6 @@ export function QuickRegister({
           Platí 24 hodin. Když pacient do té doby nedoplní údaje, rezervace se
           uvolní. Pacient je už vybraný — dokončete objednávku výše.
         </Typography>
-        <Button size="small" sx={{ mt: 1 }} onClick={() => { setLink(null); setOpen(false); register.reset(); }}>
-          Zavřít
-        </Button>
       </Alert>
     );
   }
@@ -145,7 +163,7 @@ export function QuickRegister({
     );
   }
 
-  /* ── The four (+ birth date) facts ── */
+  /* ── The facts ── */
   return (
     <Box
       sx={{
@@ -176,23 +194,37 @@ export function QuickRegister({
             onChange={(e) => setLastName(e.target.value)}
           />
         </Stack>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+        <TextField
+          size="small"
+          fullWidth
+          type="date"
+          label="Datum narození"
+          value={dob}
+          onChange={(e) => setDob(e.target.value)}
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
+        <Stack direction="row" spacing={1.5}>
           <TextField
+            select
             size="small"
-            fullWidth
-            type="date"
-            label="Datum narození"
-            value={dob}
-            onChange={(e) => setDob(e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
+            label="Předvolba"
+            value={dialCode}
+            onChange={(e) => setDialCode(e.target.value)}
+            sx={{ minWidth: 120 }}
+          >
+            {DIAL_CODES.map((c) => (
+              <MenuItem key={c.code} value={c.code}>
+                {c.label}
+              </MenuItem>
+            ))}
+          </TextField>
           <TextField
             size="small"
             fullWidth
             label="Telefon"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="+420…"
+            placeholder="např. 773 539 001"
           />
         </Stack>
         <TextField

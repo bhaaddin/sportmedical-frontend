@@ -14,6 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import CheckCircleOutline from "@mui/icons-material/CheckCircleOutlineOutlined";
+import ContentCopy from "@mui/icons-material/ContentCopy";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
@@ -160,6 +161,20 @@ export function NewAppointmentDialog({
   const [patient, setPatient] = useState<PatientHit | null>(null);
   const [activityId, setActivityId] = useState("");
   const [note, setNote] = useState("");
+  /* A quick-registration link, kept so it survives onto the booked screen. */
+  const [quickLink, setQuickLink] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const copyQuickLink = async () => {
+    if (!quickLink) return;
+    try {
+      await navigator.clipboard.writeText(quickLink);
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      /* clipboard blocked; the address is on screen to copy by hand */
+    }
+  };
 
   /* 6.4: a time outside the offer, and never without a reason. */
   const [overriding, setOverriding] = useState(false);
@@ -284,6 +299,8 @@ export function NewAppointmentDialog({
     setPatient(null);
     setActivityId("");
     setNote("");
+    setQuickLink(null);
+    setLinkCopied(false);
     setOverriding(false);
     setOverrideReason("");
     setConflict(null);
@@ -327,6 +344,46 @@ export function NewAppointmentDialog({
                     : t("booking.paperwork.unknown", { code: w.code }))}
               </Alert>
             ))}
+            {/* The quick-registration link, so the desk can send it after booking. */}
+            {quickLink ? (
+              <Alert severity="info" icon={false}>
+                <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  Odkaz pro pacienta (pošlete e-mailem):
+                </Typography>
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  sx={{ alignItems: { sm: "center" } }}
+                >
+                  <Box
+                    sx={{
+                      flex: 1,
+                      fontFamily: "monospace",
+                      fontSize: "0.85rem",
+                      wordBreak: "break-all",
+                      bgcolor: "action.hover",
+                      borderRadius: 1,
+                      px: 1,
+                      py: 0.75,
+                    }}
+                  >
+                    {quickLink}
+                  </Box>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    startIcon={<ContentCopy fontSize="small" />}
+                    onClick={copyQuickLink}
+                  >
+                    {linkCopied ? "Zkopírováno" : "Kopírovat"}
+                  </Button>
+                </Stack>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
+                  Platí 24 hodin. Když pacient do té doby registraci nedokončí,
+                  rezervace se uvolní.
+                </Typography>
+              </Alert>
+            ) : null}
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -485,6 +542,7 @@ export function NewAppointmentDialog({
                 autoFocus={fromGrid}
                 mayRegister={mayRegister}
                 onPick={setPatient}
+                onLink={setQuickLink}
               />
             )}
           </Box>

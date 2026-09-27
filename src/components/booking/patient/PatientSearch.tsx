@@ -37,11 +37,14 @@ const SHOWN = 12;
  */
 export function PatientSearch({
   onPick,
+  onLink,
   autoFocus = false,
   enabled,
   mayRegister,
 }: {
   onPick: (hit: PatientHit) => void;
+  /** A quick-registration link was generated, lifted for the booked screen. */
+  onLink?: (link: string) => void;
   autoFocus?: boolean;
   enabled: boolean;
   mayRegister: boolean;
@@ -156,7 +159,7 @@ export function PatientSearch({
       ) : null}
 
       {mayRegister ? (
-        <QuickRegister onRegistered={onPick} defaultLastName={text.trim()} />
+        <QuickRegister onRegistered={onPick} onLink={onLink} defaultLastName={text.trim()} />
       ) : null}
     </Stack>
   );
