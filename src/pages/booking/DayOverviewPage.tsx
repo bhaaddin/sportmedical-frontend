@@ -21,6 +21,7 @@ import { useTranslation } from "react-i18next";
 import { appointmentsApi } from "../../api/appointments";
 import { calendarsApi } from "../../api/calendars";
 import { patientsApi } from "../../api/patients";
+import { activitiesApi } from "../../api/activities";
 import { BookingApiError } from "../../api/apiError";
 import { isKnownPaperworkReason, isLateStatus, statusName } from "../../api/bookingContracts";
 import type { DayAppointment } from "../../api/bookingContracts";
@@ -148,6 +149,18 @@ export default function DayOverviewPage() {
       staleTime: 5 * 60 * 1000,
     })),
   });
+
+  /* The činnost prices, from one cached list, so the day list can show what each
+     appointment costs. */
+  const activitiesQuery = useQuery({
+    queryKey: ["activities"],
+    queryFn: () => activitiesApi.list(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const priceById = useMemo(
+    () => new Map((activitiesQuery.data?.activities ?? []).map((a) => [a.id, a.priceCzk])),
+    [activitiesQuery.data],
+  );
 
   const patientNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -418,6 +431,9 @@ export default function DayOverviewPage() {
                             {row.activityName}
                             {calendarById.get(row.calendarId ?? "")
                               ? ` · ${calendarById.get(row.calendarId ?? "")?.name}`
+                              : ""}
+                            {row.activityId && priceById.get(row.activityId) != null
+                              ? ` · ${new Intl.NumberFormat("cs-CZ").format(priceById.get(row.activityId)!)} Kč`
                               : ""}
                           </Typography>
                         </Stack>
