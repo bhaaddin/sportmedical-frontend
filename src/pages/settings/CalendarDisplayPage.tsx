@@ -186,6 +186,26 @@ export default function CalendarDisplayPage() {
               />
             </Stack>
 
+            <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
+              <TextField
+                label="Barva volných dnů a svátků"
+                value={draft.holidayColor}
+                onChange={(event) => set('holidayColor', event.target.value)}
+                error={errors.holidayColor !== undefined}
+                helperText={errors.holidayColor ?? 'Celý den se vykreslí touto barvou, například #9333EA.'}
+                sx={{ flexGrow: 1 }}
+              />
+              <Box
+                component="input"
+                type="color"
+                aria-label="Vybrat barvu volných dnů"
+                value={/^#[0-9a-fA-F]{6}$/.test(draft.holidayColor) ? draft.holidayColor : '#9333EA'}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  set('holidayColor', event.target.value.toUpperCase())}
+                sx={{ width: 56, height: 56, border: 'none', background: 'none', cursor: 'pointer', p: 0 }}
+              />
+            </Stack>
+
             <Divider />
 
             <Box>

@@ -56,6 +56,7 @@ import {
 } from "../../components/booking/grid/filters";
 import { GRID_TEXT } from "../../components/booking/grid/gridText";
 import { NOW_LINE_COLOR_KEY, resolveNowLineColor } from "../../components/booking/grid/nowLine";
+import { useCalendarDisplay } from "../../api/displaySettings";
 import {
   parseTimeOfDay,
   spanOnDay,
@@ -325,6 +326,10 @@ export default function CalendarGridPage() {
     settingsQuery.data?.[NOW_LINE_COLOR_KEY],
     theme.palette.error.main,
   );
+  /* The holiday/closure colour, from the calendar-display settings every signed-in
+     staff member may read (the now-line above is the admin-only /api/settings). */
+  const { settings: calendarDisplay } = useCalendarDisplay();
+  const holidayColor = calendarDisplay.holidayColor;
 
   /* `pub.bookingEnabled`, through the endpoint every screen may read. Never throws. */
   const publicClinicQuery = useQuery({
@@ -675,6 +680,7 @@ export default function CalendarGridPage() {
                   now={now}
                   employeeId={employeeId}
                   nowLineColor={nowLineColor}
+                  holidayColor={holidayColor}
                   mayBook={mayBook}
                   mayBlock={mayBlock}
                   onOpen={setOpenId}

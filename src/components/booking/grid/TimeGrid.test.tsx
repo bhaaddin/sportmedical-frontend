@@ -64,6 +64,7 @@ function renderGrid(overrides: Partial<TimeGridProps> = {}, preview: PreviewDay 
     now: new Date('2026-09-20T10:00:00Z'),
     employeeId: null,
     nowLineColor: '#D32F2F',
+    holidayColor: '#9333EA',
     mayBook: true,
     mayBlock: true,
     onOpen: vi.fn(),

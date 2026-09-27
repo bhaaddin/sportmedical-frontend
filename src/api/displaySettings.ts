@@ -31,6 +31,8 @@ export interface CalendarDisplaySettings {
   dayEndHour: number;
   /** `#RRGGBB`. */
   nowLineColor: string;
+  /** `#RRGGBB` — the colour a closed day (holiday, closure) is painted on the grid. */
+  holidayColor: string;
   /**
    * Which facts the card on a booked slot shows when the mouse rests on it,
    * in order, by field key (`patientName`, `phone`, `activity`, `status`,
@@ -61,6 +63,7 @@ export const CALENDAR_DISPLAY_OFFLINE: CalendarDisplaySettings = {
   dayStartHour: 7,
   dayEndHour: 19,
   nowLineColor: '#D32F2F',
+  holidayColor: '#9333EA',
   hoverFields: ['patientName', 'activity', 'status', 'phone', 'paperwork'],
 };
 

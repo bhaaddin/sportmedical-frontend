@@ -87,8 +87,16 @@ const AccountingExportPage = lazy(() => import('./pages/AccountingExportPage'));
 /* ── Loading spinner for Suspense ── */
 function PageLoader() {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-      <CircularProgress size={40} sx={{ color: '#0D7377' }} />
+    <Box
+      sx={{
+        display: 'flex', flexDirection: 'column', gap: 1.5,
+        justifyContent: 'center', alignItems: 'center', minHeight: '50vh',
+      }}
+    >
+      <CircularProgress size={40} color="primary" />
+      <Typography variant="caption" sx={{ color: 'text.secondary', letterSpacing: 1 }}>
+        SPORTMEDICAL
+      </Typography>
     </Box>
   );
 }

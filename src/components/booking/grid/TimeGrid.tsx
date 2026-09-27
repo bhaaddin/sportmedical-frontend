@@ -91,6 +91,7 @@ export interface TimeGridProps {
   now: Date;
   employeeId: string | null;
   nowLineColor: string;
+  holidayColor: string;
   mayBook: boolean;
   mayBlock: boolean;
   onOpen: (id: string) => void;
@@ -100,13 +101,6 @@ export interface TimeGridProps {
 
 const OPEN_MARK: DayMark = { redNumber: false, closed: false, label: null, detail: null };
 
-/**
- * The colour a closed day (a public holiday, a clinic closure) is painted with
- * on the time grid. A single default here, read once, so it is one line to move
- * into a clinic setting when the appearance settings grow a holiday colour —
- * never scattered through the grid. See the calendar epic.
- */
-const CLOSED_DAY_COLOR = "#9333EA";
 
 export function TimeGrid(props: TimeGridProps) {
   const { t } = useTranslation();
@@ -120,6 +114,7 @@ export function TimeGrid(props: TimeGridProps) {
     previewByCalendar,
     now,
     nowLineColor,
+    holidayColor,
     mayBook,
     mayBlock,
   } = props;
@@ -322,11 +317,11 @@ export function TimeGrid(props: TimeGridProps) {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: alpha(CLOSED_DAY_COLOR, 0.1),
+                    backgroundColor: alpha(holidayColor, 0.1),
                     backgroundImage: `repeating-linear-gradient(45deg, ${alpha(
-                      CLOSED_DAY_COLOR,
+                      holidayColor,
                       0.14,
-                    )} 0, ${alpha(CLOSED_DAY_COLOR, 0.14)} 10px, transparent 10px, transparent 22px)`,
+                    )} 0, ${alpha(holidayColor, 0.14)} 10px, transparent 10px, transparent 22px)`,
                   }}
                 >
                   <Typography
@@ -337,7 +332,7 @@ export function TimeGrid(props: TimeGridProps) {
                       letterSpacing: 3,
                       textTransform: "uppercase",
                       fontSize: 13,
-                      color: CLOSED_DAY_COLOR,
+                      color: holidayColor,
                       whiteSpace: "nowrap",
                     }}
                   >
