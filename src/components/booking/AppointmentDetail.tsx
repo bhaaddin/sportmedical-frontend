@@ -43,6 +43,7 @@ import { AsyncSection } from "./AsyncSection";
 import { AvailabilityPanel } from "./AvailabilityPicker";
 import { errorText } from "./errorText";
 import { CompletionLinkButton } from "./patient/CompletionLinkButton";
+import { PortalLinkButton } from "./patient/PortalLinkButton";
 import { usePermission } from "../../auth/usePermission";
 
 /**
@@ -347,6 +348,9 @@ function DetailBody({
       {appointment.paperwork && !appointment.paperwork.ready ? (
         <CompletionLinkButton patientId={appointment.patientId} />
       ) : null}
+
+      {/* The patient's personal portal link, issuable straight from the booking. */}
+      <PortalLinkButton patientId={appointment.patientId} />
 
       {/* 6.4: an override was made by a person, for a reason they typed. */}
       {appointment.overrideReason ? (
