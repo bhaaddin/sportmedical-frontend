@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 import { appointmentsApi } from "../../api/appointments";
 import { patientsApi } from "../../api/patients";
+import { activitiesApi } from "../../api/activities";
 import { BookingApiError } from "../../api/apiError";
 import {
   canChangeStatus,
@@ -106,6 +107,18 @@ export function AppointmentDetail({
     enabled: open,
   });
 
+  /* The činnost's price, from the one cached activities list, so the desk sees
+     what the appointment costs without leaving this dialog. */
+  const activitiesQuery = useQuery({
+    queryKey: ["activities"],
+    queryFn: () => activitiesApi.list(),
+    staleTime: 5 * 60 * 1000,
+    enabled: open,
+  });
+  const activityPrice =
+    activitiesQuery.data?.activities.find((a) => a.id === detailQuery.data?.activityId)?.priceCzk
+    ?? null;
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle sx={{ pb: 1 }}>
@@ -134,6 +147,9 @@ export function AppointmentDetail({
               {/* Empty when the activity is gone (4.5) - say so, do not print nothing. */}
               {detailQuery.data.activityName || t("booking.detail.noActivity")}
               {calendar ? ` · ${calendar.name}` : ""}
+              {activityPrice != null
+                ? ` · ${new Intl.NumberFormat("cs-CZ").format(activityPrice)} Kč`
+                : ""}
             </Typography>
           </>
         ) : (
