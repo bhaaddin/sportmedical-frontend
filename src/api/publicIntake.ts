@@ -216,6 +216,13 @@ export interface IntakeResponse {
    * time and does not.
    */
   bookingFailed: boolean;
+
+  /**
+   * The patient's personal portal token, when finishing a desk-started
+   * registration created one. The confirmation screen offers "Můj portál" so the
+   * patient keeps a way back to their appointments. Null otherwise.
+   */
+  portalToken?: string | null;
 }
 
 /* ── Errors ── */
@@ -341,6 +348,7 @@ export async function submitIntake(
         appointmentId?: string | null;
         appointmentStartUtc?: string | null;
         appointmentEndUtc?: string | null;
+        portalToken?: string | null;
       };
       return {
         referenceNumber: data.referenceNumber ?? '',
@@ -351,6 +359,7 @@ export async function submitIntake(
         appointmentStartUtc: data.appointmentStartUtc ?? null,
         appointmentEndUtc: data.appointmentEndUtc ?? null,
         bookingFailed: false,
+        portalToken: data.portalToken ?? null,
       };
     }
     return response.data as IntakeResponse;

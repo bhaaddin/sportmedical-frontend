@@ -1095,6 +1095,20 @@ export default function IntakeQuestionnaire() {
                     </Button>
                   </>
                 )}
+
+                {/* The patient's own portal, created with this registration: a
+                    personal link back to their appointments and documents. */}
+                {result.portalToken && (
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    disableElevation
+                    href={`/portal/${result.portalToken}`}
+                    sx={{ mt: 1.25, borderRadius: 999, py: 1.25, color: BRAND.ink }}
+                  >
+                    Můj portál — mé termíny a dokumenty
+                  </Button>
+                )}
               </Box>
             </Card>
           </Container>
