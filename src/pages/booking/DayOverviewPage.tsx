@@ -108,16 +108,20 @@ export default function DayOverviewPage() {
    * and the list of late patients out of step, and the screen would be arguing
    * with itself in front of the person reading it.
    */
+  /* The day overview is a live board — arrivals, no-shows and new bookings should
+     land on their own. A minute keeps it current without hammering the server. */
   const summaryQuery = useQuery({
     queryKey: ["day-summary", date, shownIds.join(",")],
     queryFn: () => appointmentsApi.daySummary(date, shownIds),
     enabled: shownIds.length > 0,
+    refetchInterval: 60_000,
   });
 
   const dayQuery = useQuery({
     queryKey: ["day-range", date, date, shownIds.join(",")],
     queryFn: () => appointmentsApi.range(date, date, shownIds),
     enabled: shownIds.length > 0,
+    refetchInterval: 60_000,
   });
 
   const calendarById = useMemo(

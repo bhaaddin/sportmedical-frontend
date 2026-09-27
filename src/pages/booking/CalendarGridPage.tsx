@@ -250,6 +250,10 @@ export default function CalendarGridPage() {
     queryFn: () => appointmentsApi.range(from, to, allIds),
     enabled: allIds.length > 0,
     placeholderData: (previous) => previous,
+    /* The calendar is a shared board: a booking made online, or at another desk,
+       should appear here on its own. A minute keeps it live without hammering the
+       server, and refetchOnWindowFocus already covers coming back to the tab. */
+    refetchInterval: 60_000,
   });
 
   /**
