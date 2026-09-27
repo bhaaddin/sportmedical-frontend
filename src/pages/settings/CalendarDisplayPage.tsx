@@ -17,7 +17,10 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   CircularProgress,
+  Divider,
+  FormControlLabel,
   MenuItem,
   Stack,
   TextField,
@@ -39,6 +42,23 @@ const VIEW_LABELS: Record<CalendarView, string> = {
 };
 
 const HOURS = Array.from({ length: 25 }, (_, hour) => hour);
+
+/**
+ * The facts the calendar hover can show, and what to call them. The admin ticks
+ * which appear (and the order they are ticked in is the order shown), so nothing
+ * about the hover is hard-coded — the same list the hover card reads keys from.
+ */
+const HOVER_FIELD_LABELS: { key: string; label: string }[] = [
+  { key: 'patientName', label: 'Jméno pacienta' },
+  { key: 'activity', label: 'Činnost' },
+  { key: 'price', label: 'Cena' },
+  { key: 'registrationStatus', label: 'Stav registrace' },
+  { key: 'status', label: 'Stav objednávky' },
+  { key: 'phone', label: 'Telefon' },
+  { key: 'email', label: 'E-mail' },
+  { key: 'birthDate', label: 'Datum narození' },
+  { key: 'paperwork', label: 'Podklady' },
+];
 
 export default function CalendarDisplayPage() {
   const queryClient = useQueryClient();
@@ -165,6 +185,40 @@ export default function CalendarDisplayPage() {
                 sx={{ width: 56, height: 56, border: 'none', background: 'none', cursor: 'pointer', p: 0 }}
               />
             </Stack>
+
+            <Divider />
+
+            <Box>
+              <Typography sx={{ fontWeight: 700, mb: 0.5 }}>
+                Co ukázat po najetí myší na objednávku
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Vyberte, které údaje se zobrazí v bublině nad termínem. Platí pro celou ordinaci.
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 0.5 }}>
+                {HOVER_FIELD_LABELS.map(({ key, label }) => {
+                  const on = draft.hoverFields.includes(key);
+                  return (
+                    <FormControlLabel
+                      key={key}
+                      control={
+                        <Checkbox
+                          checked={on}
+                          onChange={() =>
+                            set(
+                              'hoverFields',
+                              on
+                                ? draft.hoverFields.filter((f) => f !== key)
+                                : [...draft.hoverFields, key],
+                            )}
+                        />
+                      }
+                      label={label}
+                    />
+                  );
+                })}
+              </Box>
+            </Box>
 
             {save.isError && (
               <Alert severity="error">{problemMessageOf(save.error, 'Nastavení se nepodařilo uložit.')}</Alert>
