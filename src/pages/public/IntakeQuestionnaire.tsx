@@ -81,7 +81,7 @@ import {
   openCompletion,
   submitIntake,
 } from '../../api/publicIntake';
-import type { IntakeInsurance, IntakeResponse } from '../../api/publicIntake';
+import type { CompletionOpen, IntakeInsurance, IntakeResponse } from '../../api/publicIntake';
 import {
   checkPublicEmail, checkPublicPhone, publicPhoneRegions,
 } from '../../api/publicContactCheck';
@@ -354,11 +354,19 @@ export default function IntakeQuestionnaire() {
    * it is the ordinary anonymous /dotaznik.
    */
   const { token: completionToken } = useParams<{ token: string }>();
+  /*
+   * What the completion link is finishing: the činnost and the time the desk
+   * booked, returned by openCompletion. Kept so the page can show the patient
+   * what/when they are here for — the desk flow has no `held` slot in this tab,
+   * so without this they completed the form never seeing their own appointment.
+   */
+  const [completionInfo, setCompletionInfo] = useState<CompletionOpen | null>(null);
   useEffect(() => {
     if (!completionToken) return;
     let alive = true;
     void openCompletion(completionToken).then((open) => {
       if (!alive || open === null) return;
+      setCompletionInfo(open);
       setForm((prev) => {
         const next: FormState = {
           ...prev,
@@ -1224,6 +1232,42 @@ export default function IntakeQuestionnaire() {
                   {held.activityName} — {held.serviceName}. Dokončete prosím
                   registraci a termín je váš.
                 </Typography>
+              </Box>
+            </Box>
+          )}
+
+          {/* The desk-started flow (/dokonceni/:token) has no held slot in this
+              tab, so the patient never saw what they are finishing. The term
+              the desk booked comes back from openCompletion; show it here for
+              the same reason as above — the appointment is the reason they are
+              on this page. */}
+          {held === null && completionInfo !== null
+            && (completionInfo.activityName || completionInfo.startUtc) && (
+            <Box
+              sx={{
+                mb: 3,
+                p: 2.5,
+                borderRadius: 4,
+                bgcolor: BRAND.ink,
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                flexWrap: 'wrap',
+              }}
+            >
+              <EventAvailableOutlined sx={{ color: BRAND.accent }} />
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 800, fontSize: 15.5 }}>
+                  {completionInfo.startUtc
+                    ? `Váš termín — ${clinicMoment(completionInfo.startUtc)}`
+                    : 'Dokončení registrace'}
+                </Typography>
+                {completionInfo.activityName && (
+                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.68)' }}>
+                    {completionInfo.activityName}. Dokončete prosím registraci.
+                  </Typography>
+                )}
               </Box>
             </Box>
           )}
