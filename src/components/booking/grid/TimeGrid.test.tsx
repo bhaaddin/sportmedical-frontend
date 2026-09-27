@@ -211,7 +211,10 @@ describe('a holiday on the grid', () => {
         [DAY, dayMark({ date: DAY, name: 'Den české státnosti', isHoliday: true, isStatutory: true }, [preview])],
       ]),
     }, preview);
-    expect(screen.getByText('Státní svátek')).toBeInTheDocument();
+    /* "Státní svátek" now appears both in the day header and down the full-day
+       block that paints the closed column. */
+    expect(screen.getAllByText('Státní svátek').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId(`closed-block-${DAY}`)).toBeInTheDocument();
     expect(screen.getByTestId(`day-number-${DAY}`)).toHaveStyle({ color: 'rgb(211, 47, 47)' });
   });
 });

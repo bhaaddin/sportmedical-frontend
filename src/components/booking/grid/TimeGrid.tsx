@@ -100,6 +100,14 @@ export interface TimeGridProps {
 
 const OPEN_MARK: DayMark = { redNumber: false, closed: false, label: null, detail: null };
 
+/**
+ * The colour a closed day (a public holiday, a clinic closure) is painted with
+ * on the time grid. A single default here, read once, so it is one line to move
+ * into a clinic setting when the appearance settings grow a holiday colour —
+ * never scattered through the grid. See the calendar epic.
+ */
+const CLOSED_DAY_COLOR = "#9333EA";
+
 export function TimeGrid(props: TimeGridProps) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -293,6 +301,50 @@ export function TimeGrid(props: TimeGridProps) {
                   />
                 );
               })}
+
+              {/*
+                A closed day — a public holiday or a clinic closure — is one solid
+                block across the whole column, not the day chopped into bookable
+                fifteen-minute cells (owner: "místo 2× dvě políčka po patnácti tak
+                bude celý políčko"). Hatched so it reads as "off" at a glance, with
+                the reason written down the column. It sits over the sub-columns
+                and under the now-line, and takes no clicks.
+              */}
+              {mark.closed && mark.label ? (
+                <Box
+                  aria-hidden
+                  data-testid={`closed-block-${dayKey}`}
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: 4,
+                    pointerEvents: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: alpha(CLOSED_DAY_COLOR, 0.1),
+                    backgroundImage: `repeating-linear-gradient(45deg, ${alpha(
+                      CLOSED_DAY_COLOR,
+                      0.14,
+                    )} 0, ${alpha(CLOSED_DAY_COLOR, 0.14)} 10px, transparent 10px, transparent 22px)`,
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      writingMode: "vertical-rl",
+                      transform: "rotate(180deg)",
+                      fontWeight: 800,
+                      letterSpacing: 3,
+                      textTransform: "uppercase",
+                      fontSize: 13,
+                      color: CLOSED_DAY_COLOR,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {mark.label}
+                  </Typography>
+                </Box>
+              ) : null}
 
               {workingToday ? (
                 <Box
