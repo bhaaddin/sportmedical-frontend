@@ -11,7 +11,7 @@ export interface ThemePrefs {
 
 export const ACCENT_STORAGE_KEY = 'sm-theme-accent';
 export const MODE_STORAGE_KEY = 'sm-theme-mode';
-export const DEFAULT_ACCENT = '#0D7377';
+export const DEFAULT_ACCENT = '#0D9488';
 
 export const ThemePrefsContext = createContext<ThemePrefs | null>(null);
 

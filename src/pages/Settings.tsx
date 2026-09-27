@@ -25,11 +25,14 @@ import {
   Stack, Typography,
 } from '@mui/material';
 import {
-  ExpandMore, ChevronRight, Logout, Person, Lock,
+  ExpandMore, ChevronRight, Logout, Person, Lock, Check,
+  Palette, LightMode, DarkMode,
 } from '@mui/icons-material';
 import { visibleSections, type SettingsItem } from './settings/catalogue';
 import { hasStoredPermissions, usePermissions } from '../auth/usePermission';
 import { signOut } from '../auth/signOut';
+import { useThemePrefs } from '../themePrefs';
+import { THEME_ACCENTS } from '../theme';
 
 /** Remembered per browser, so re-opening settings lands where you left it. */
 const OPEN_KEY = 'settings.openSection';
@@ -72,6 +75,7 @@ export default function Settings() {
    * whose `settings.clinic.manage` was revoked still saw every screen.
    */
   const sections = visibleSections(usePermissions());
+  const appearance = useThemePrefs();
 
   /*
    * A session from before the server started sending the list.
@@ -159,6 +163,83 @@ export default function Settings() {
           </AccordionDetails>
         </Accordion>
       ))}
+
+      {/* Appearance — the person's own, like the account below it. Changing the
+          accent or the light/dark mode takes effect at once across the app, and
+          is remembered in this browser. This is the "admin controls the style,
+          nothing hard-coded" the owner asked for, in its first, per-user form. */}
+      <Accordion
+        expanded={open === 'vzhled'}
+        onChange={() => toggle('vzhled')}
+        disableGutters
+        sx={{
+          mb: 1.5, borderRadius: 2, border: '1px solid', borderColor: 'divider',
+          '&:before': { display: 'none' }, boxShadow: 'none',
+        }}
+      >
+        <AccordionSummary expandIcon={<ExpandMore />} sx={{ py: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+            <Palette sx={{ color: appearance.accent }} />
+            <Box>
+              <Typography sx={{ fontWeight: 700 }}>Vzhled</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Barva a světlý/tmavý režim — platí hned
+              </Typography>
+            </Box>
+          </Box>
+        </AccordionSummary>
+        <AccordionDetails sx={{ pt: 0 }}>
+          <Divider sx={{ mb: 2 }} />
+
+          <Typography variant="subtitle2" sx={{ mb: 1.25 }}>Barva aplikace</Typography>
+          <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap', gap: 1.5, mb: 3 }}>
+            {THEME_ACCENTS.map((a) => {
+              const selected = appearance.accent.toLowerCase() === a.color.toLowerCase();
+              return (
+                <Box
+                  key={a.key}
+                  component="button"
+                  type="button"
+                  aria-label={a.label}
+                  aria-pressed={selected}
+                  onClick={() => appearance.setAccent(a.color)}
+                  sx={{
+                    width: 44, height: 44, borderRadius: '50%', cursor: 'pointer',
+                    bgcolor: a.color, border: '3px solid',
+                    borderColor: selected ? 'text.primary' : 'transparent',
+                    boxShadow: selected ? `0 4px 14px ${a.color}66` : '0 2px 8px rgba(0,0,0,0.12)',
+                    display: 'grid', placeItems: 'center', color: '#fff',
+                    transition: 'transform 120ms ease, box-shadow 120ms ease',
+                    '&:hover': { transform: 'translateY(-2px)' },
+                  }}
+                >
+                  {selected ? <Check sx={{ fontSize: 20 }} /> : null}
+                </Box>
+              );
+            })}
+          </Stack>
+
+          <Typography variant="subtitle2" sx={{ mb: 1.25 }}>Režim</Typography>
+          <Stack direction="row" spacing={1.5}>
+            <Button
+              variant={appearance.mode === 'light' ? 'contained' : 'outlined'}
+              startIcon={<LightMode />}
+              onClick={() => appearance.setMode('light')}
+              sx={{ borderRadius: 2 }}
+            >
+              Světlý
+            </Button>
+            <Button
+              variant={appearance.mode === 'dark' ? 'contained' : 'outlined'}
+              startIcon={<DarkMode />}
+              onClick={() => appearance.setMode('dark')}
+              sx={{ borderRadius: 2 }}
+            >
+              Tmavý
+            </Button>
+          </Stack>
+        </AccordionDetails>
+      </Accordion>
 
       {/*
         Kept apart from the rest, and last, because it is the only thing here

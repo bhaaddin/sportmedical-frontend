@@ -16,6 +16,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import Settings from './Settings';
+import { ThemePrefsContext } from '../themePrefs';
 import { savePermissions } from '../auth/localSession';
 
 /*
@@ -64,11 +65,20 @@ beforeEach(() => {
   holding(EVERYTHING);
 });
 
+const themePrefs = {
+  accent: '#0D9488',
+  mode: 'light' as const,
+  setAccent: () => {},
+  setMode: () => {},
+};
+
 const renderSettings = () =>
   render(
-    <MemoryRouter>
-      <Settings />
-    </MemoryRouter>,
+    <ThemePrefsContext.Provider value={themePrefs}>
+      <MemoryRouter>
+        <Settings />
+      </MemoryRouter>
+    </ThemePrefsContext.Provider>,
   );
 
 describe('the settings screen', () => {
