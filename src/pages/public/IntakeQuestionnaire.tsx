@@ -96,7 +96,6 @@ import {
 import {
   groupedDisplay, phoneComplaint, phoneDisplayState, worthInspectingPhone,
 } from '../../services/patientRegistration/phoneDisplay';
-import RuianAddressPicker from '../../components/registration/RuianAddressPicker';
 import MapyAddressPicker from '../../components/registration/MapyAddressPicker';
 import HealthQuestionnaire from '../../components/public/HealthQuestionnaire';
 import { answersForSubmission, readDraft } from '../../services/publicIntake/healthQuestionnaire';
@@ -106,7 +105,7 @@ import type { LoadedQuestionnaire } from '../../api/publicQuestionnaire';
 import { questionnaireSatisfied, questionnaireStance } from '../../services/publicIntake/questionnaireRequirement';
 import { calendarFileUrl } from '../../api/publicManage';
 import type { HeldBooking } from '../../api/publicBooking';
-import type { AddressPoint, MapySuggestion } from '../../api/addressLookup';
+import type { MapySuggestion } from '../../api/addressLookup';
 import { readPublicClinic } from '../../api/clinicSettings';
 
 /* ── Brand, taken from sportmedical-diagnostics.cz ── */
@@ -471,13 +470,10 @@ export default function IntakeQuestionnaire() {
     questionnaireProgress,
   );
   /*
-   * Kept whole rather than as a bare code: the submission needs only
-   * `addressPointCode`, but the screen has to show the patient which address
-   * they picked, and re-deriving that from the number would mean asking the
-   * register again for something it already said.
+   * The whole-republic Mapy.cz address, on both the online form and the desk
+   * completion link. Kept whole rather than as a bare code: the submission sends
+   * the parts, and the screen has to show the patient which address they picked.
    */
-  const [addressPoint, setAddressPoint] = useState<AddressPoint | null>(null);
-  /* The whole-republic Mapy.cz address, used on the completion link (/dokonceni). */
   const [mapyAddress, setMapyAddress] = useState<MapySuggestion | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -717,7 +713,7 @@ export default function IntakeQuestionnaire() {
     collect(next, 'email', validateEmail(form.email));
     collect(next, 'phone', validatePhone({ regionCode: form.phoneRegion, number: form.phone }));
     /* The API refuses the whole submission without it. */
-    if (completionToken ? mapyAddress === null : addressPoint === null) {
+    if (mapyAddress === null) {
       next.address = 'Vyberte prosím adresu ze seznamu.';
     }
 
@@ -890,16 +886,16 @@ export default function IntakeQuestionnaire() {
               : null,
         },
         contact: { email: form.email.trim(), phone: phone.value },
-        address: completionToken && mapyAddress
-          ? {
-              ruianAddressPointCode: 0,
-              street: mapyAddress.street,
-              number: mapyAddress.number,
-              municipalityPart: mapyAddress.municipalityPart,
-              municipality: mapyAddress.municipality,
-              zip: mapyAddress.zip,
-            }
-          : { ruianAddressPointCode: addressPoint!.addressPointCode },
+        // Whole-republic Mapy.cz address on both flows: code 0, the parts carry
+        // it (the server builds the address point from them).
+        address: {
+          ruianAddressPointCode: 0,
+          street: mapyAddress!.street,
+          number: mapyAddress!.number,
+          municipalityPart: mapyAddress!.municipalityPart,
+          municipality: mapyAddress!.municipality,
+          zip: mapyAddress!.zip,
+        },
         insurance: buildInsurance(),
         consents: [
           { policyCode: 'treatment', granted: form.consentTreatment },
@@ -1486,33 +1482,20 @@ export default function IntakeQuestionnaire() {
                     <Typography variant="body2" sx={{ mb: 1, fontWeight: 700 }}>
                       Adresa trvalého pobytu
                     </Typography>
-                    {completionToken ? (
-                      <MapyAddressPicker
-                        selected={mapyAddress}
-                        onSelect={(value) => {
-                          setMapyAddress(value);
-                          if (value !== null) {
-                            setErrors((previous) => ({ ...previous, address: undefined }));
-                          }
-                        }}
-                        error={errors.address}
-                      />
-                    ) : (
-                      <RuianAddressPicker
-                        selectedPoint={addressPoint}
-                        onSelect={(point) => {
-                          setAddressPoint(point);
-                          if (point !== null) {
-                            setErrors((previous) => ({ ...previous, address: undefined }));
-                          }
-                        }}
-                        error={errors.address}
-                        emptyCatalogueText={
-                          'Vyhledávání adres teď nefunguje, takže dotazník nejde odeslat. '
-                          + 'Dejte to prosím vědět ordinaci.'
+                    {/* Whole-republic Mapy.cz search, on both the online form and
+                        the desk completion link. It used to be the 40-address RUIAN
+                        demo catalogue on the online form, which found almost nothing
+                        outside Prague — the same address system now serves both. */}
+                    <MapyAddressPicker
+                      selected={mapyAddress}
+                      onSelect={(value) => {
+                        setMapyAddress(value);
+                        if (value !== null) {
+                          setErrors((previous) => ({ ...previous, address: undefined }));
                         }
-                      />
-                    )}
+                      }}
+                      error={errors.address}
+                    />
                   </Box>
                 </Box>
               </Card>
