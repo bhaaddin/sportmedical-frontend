@@ -51,6 +51,8 @@ import {
   IconButton,
   LinearProgress,
   MenuItem,
+  Radio,
+  RadioGroup,
   TextField,
   Typography,
 } from '@mui/material';
@@ -102,6 +104,61 @@ export interface Palette {
   muted: string;
 }
 
+/*
+ * ── Healthy-first ──
+ *
+ * Most patients have nothing to report. The form used to make all of them read
+ * and skip every question in every section; this lets a healthy patient declare
+ * a whole section clear at once and only open the ones where they have something.
+ *
+ * "Vše v pořádku" is a real, patient-given answer, not a preselected one: it
+ * writes `ne` to the section's own yes/no questions ONLY when the patient
+ * actively chooses it, and the notice above the sections says so. That is the
+ * distinction the yes/no control was built around — a "ne" nobody chose, filed
+ * as though they had, is the thing being avoided; a "ne" the patient chose for
+ * the whole section is information.
+ *
+ * Only top-level questions (no `when`) are touched. A follow-up that appears
+ * only after its parent is answered "ano" never applies in a healthy section,
+ * so it is left absent rather than written a `ne` the API would still store.
+ */
+
+/**
+ * A section the patient has something to report in: a yes/no answered "ano", or
+ * any text / choice / family detail filled in. A section whose yes/no answers
+ * are all "ne" (or blank) is healthy and stays collapsed. Used to decide which
+ * sections open by themselves for a returning patient.
+ */
+const hasException = (section: Section, answers: Answers): boolean =>
+  section.items.some((item) => {
+    const value = answers[item.field.id];
+    if (value === undefined || value === null) return false;
+    if (typeof value === 'boolean') return value === true;
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (Array.isArray(value)) return value.length > 0;
+    return false;
+  });
+
+/**
+ * The section declared clear: "ne" on each of its top-level yes/no questions,
+ * every other top-level field cleared. Conditional follow-ups are removed too,
+ * so switching an exception section back to healthy cannot leave a stale illness
+ * or death detail behind. Answers outside this section are untouched.
+ */
+const applyHealthySection = (previous: Answers, section: Section): Answers => {
+  const next: Answers = { ...previous };
+  for (const item of section.items) {
+    if (item.field.kind === 'notice') continue;
+    if (item.when === undefined && item.field.kind === 'yesno') {
+      next[item.field.id] = false;
+    } else {
+      // Top-level non-yes/no, and every conditional follow-up: cleared.
+      delete next[item.field.id];
+    }
+  }
+  return next;
+};
+
 export default function HealthQuestionnaire({
   open,
   onClose,
@@ -137,6 +194,51 @@ export default function HealthQuestionnaire({
       setAnswers((previous) => ({ ...previous, [id]: value })),
     [],
   );
+
+  /*
+   * Which sections the patient has opened to report something. A section not in
+   * here follows hasException: it opens by itself when a saved answer needs it,
+   * and is collapsed as "vše v pořádku" otherwise.
+   */
+  const [detailOverrides, setDetailOverrides] = useState<Record<string, boolean>>({});
+
+  const detailsOpen = (section: Section): boolean =>
+    detailOverrides[section.id] ?? hasException(section, answers);
+
+  /*
+   * Healthy is the default, and it is a real answer. When the questionnaire
+   * arrives, every section the patient has not reported anything in is written
+   * clear — "ne" on its top-level yes/no questions — so a healthy patient's
+   * submission carries their answers (and a required questionnaire is satisfied)
+   * without them having to open a single section. A section with a saved
+   * exception is left exactly as it is and opens itself. Overrides reset when the
+   * questionnaire changes, so a different one does not inherit the last one's
+   * open sections.
+   */
+  useEffect(() => {
+    if (questionnaire === null) return;
+    setDetailOverrides({});
+    setAnswers((previous) => {
+      let next = previous;
+      for (const section of sections) {
+        if (hasException(section, previous)) continue;
+        next = applyHealthySection(next, section);
+      }
+      return next;
+    });
+  }, [questionnaire, female, sections]);
+
+  /*
+   * The patient's choice for one section. Choosing "vše v pořádku" writes its
+   * clear answers (and drops any detail they had typed); choosing "mám" reveals
+   * the questions and leaves the answers to them.
+   */
+  const chooseSectionMode = (section: Section, open: boolean): void => {
+    if (!open) {
+      setAnswers((previous) => applyHealthySection(previous, section));
+    }
+    setDetailOverrides((previous) => ({ ...previous, [section.id]: open }));
+  };
 
   const totals = sections.reduce(
     (running, section) => {
@@ -338,6 +440,31 @@ export default function HealthQuestionnaire({
               </Typography>
             )}
 
+            {/* What "vše v pořádku" means, said before the sections so no answer
+                is a surprise. A section left clear submits "ne" to its own
+                questions — that is a declaration, and this is where it is made
+                plain. */}
+            {questionnaire !== null && sections.length > 0 && (
+              <Box
+                className="smd-no-print"
+                sx={{
+                  mb: 3,
+                  px: 2,
+                  py: 1.5,
+                  borderRadius: 2.5,
+                  bgcolor: palette.accentWash,
+                  border: `1px solid ${palette.accentEdge}`,
+                }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  U každé části vyberte „Nemám / vše v pořádku“, nebo „Mám“ a doplňte podrobnosti.
+                </Typography>
+                <Typography variant="body2" sx={{ color: palette.muted, mt: 0.5 }}>
+                  Necháte-li část jako „vše v pořádku“, odešlou se u jejích otázek odpovědi „ne“.
+                </Typography>
+              </Box>
+            )}
+
             {sections.map((section) => (
               <SectionBlock
                 key={section.id}
@@ -345,6 +472,8 @@ export default function HealthQuestionnaire({
                 answers={answers}
                 onChange={set}
                 palette={palette}
+                detailsOpen={detailsOpen(section)}
+                onDetailsChange={(open) => chooseSectionMode(section, open)}
               />
             ))}
 
@@ -459,14 +588,19 @@ function SectionBlock({
   answers,
   onChange,
   palette,
+  detailsOpen,
+  onDetailsChange,
 }: {
   section: Section;
   answers: Answers;
   onChange: (id: string, value: Answer) => void;
   palette: Palette;
+  detailsOpen: boolean;
+  onDetailsChange: (open: boolean) => void;
 }) {
   const items = itemsFor(section, answers);
   const { answered, total } = progressOf(section, answers);
+  const isFamily = section.id === 'rodina';
 
   /*
    * Two questions abreast when they are short ones.
@@ -527,9 +661,38 @@ function SectionBlock({
           </Typography>
         )}
 
+        {/* The section's one choice: clear, or something to report. For the
+            family section it reads as the first-level "is there any family
+            history?" gate, with everything below it behind "Ano". */}
+        <Box className="smd-no-print" sx={{ mb: detailsOpen ? 2 : 0 }}>
+          {isFamily && (
+            <Typography sx={{ fontWeight: 700, fontSize: 15, mb: 0.5 }}>
+              Vyskytují se ve vaší rodině zdravotní onemocnění či úmrtí v mladém věku?
+            </Typography>
+          )}
+          <RadioGroup
+            row
+            aria-label={`${section.title}: zdravotní potíže`}
+            value={detailsOpen ? 'details' : 'healthy'}
+            onChange={(_, value) => onDetailsChange(value === 'details')}
+          >
+            <FormControlLabel
+              value="healthy"
+              control={<Radio />}
+              label={isFamily ? 'Ne — vše v pořádku' : 'Nemám / vše v pořádku'}
+            />
+            <FormControlLabel
+              value="details"
+              control={<Radio />}
+              label={isFamily ? 'Ano' : 'Mám — doplnit'}
+            />
+          </RadioGroup>
+        </Box>
+
         <Box
           sx={{
-            display: 'grid',
+            display: detailsOpen ? 'grid' : 'none',
+            '@media print': { display: 'grid' },
             gap: 1.5,
             gridTemplateColumns: twoUp ? { xs: '1fr', sm: '1fr 1fr' } : '1fr',
           }}
