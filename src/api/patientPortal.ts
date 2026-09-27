@@ -45,6 +45,7 @@ export interface PortalDashboard {
   givenName: string;
   familyName: string;
   appointments: PortalAppointment[];
+  pastAppointments: PortalAppointment[];
   documents: PortalDocument[];
 }
 

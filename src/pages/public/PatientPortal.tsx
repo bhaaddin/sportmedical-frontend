@@ -16,6 +16,7 @@ import {
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import {
   EventAvailableOutlined, DescriptionOutlined, PersonOutlined, CalendarMonthOutlined,
+  HistoryOutlined,
 } from '@mui/icons-material';
 import { openPortal } from '../../api/patientPortal';
 import type { PortalAppointment, PortalDashboard } from '../../api/patientPortal';
@@ -104,7 +105,7 @@ function addToCalendar(appointment: PortalAppointment): void {
   }
 }
 
-function AppointmentRow({ appointment }: { appointment: PortalAppointment }) {
+function AppointmentRow({ appointment, past = false }: { appointment: PortalAppointment; past?: boolean }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1.5 }}>
       <Box
@@ -128,14 +129,16 @@ function AppointmentRow({ appointment }: { appointment: PortalAppointment }) {
           label={STATUS_LABELS[appointment.status] ?? appointment.status}
           sx={{ fontWeight: 700, bgcolor: BRAND.accentWash, color: BRAND.accentDark }}
         />
-        <Button
-          size="small"
-          startIcon={<CalendarMonthOutlined sx={{ fontSize: 16 }} />}
-          onClick={() => addToCalendar(appointment)}
-          sx={{ color: BRAND.accentDark, minWidth: 0, px: 0.5, fontSize: 12 }}
-        >
-          Do kalendáře
-        </Button>
+        {!past && (
+          <Button
+            size="small"
+            startIcon={<CalendarMonthOutlined sx={{ fontSize: 16 }} />}
+            onClick={() => addToCalendar(appointment)}
+            sx={{ color: BRAND.accentDark, minWidth: 0, px: 0.5, fontSize: 12 }}
+          >
+            Do kalendáře
+          </Button>
+        )}
       </Stack>
     </Box>
   );
@@ -230,6 +233,21 @@ export default function PatientPortal() {
                   ))
                 )}
               </Card>
+
+              {dashboard.pastAppointments.length > 0 && (
+                <Card sx={{ p: { xs: 2.5, md: 3 } }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 1.5 }}>
+                    <HistoryOutlined sx={{ color: BRAND.accentDark }} />
+                    <Typography variant="h6">Vaše návštěvy</Typography>
+                  </Box>
+                  {dashboard.pastAppointments.map((a, i) => (
+                    <Box key={`past-${a.startUtc}-${i}`}>
+                      {i > 0 && <Divider />}
+                      <AppointmentRow appointment={a} past />
+                    </Box>
+                  ))}
+                </Card>
+              )}
 
               <Card sx={{ p: { xs: 2.5, md: 3 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 1.5 }}>
