@@ -6,7 +6,6 @@ import {
   CircularProgress,
   Divider,
   InputAdornment,
-  Link as MuiLink,
   Stack,
   TextField,
   Typography,
@@ -16,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import { formatDateOnly } from "../../../utils/time";
 import { errorText } from "../errorText";
 import { PatientInfoButton } from "./PatientInfoButton";
+import { QuickRegister } from "./QuickRegister";
 import {
   MIN_QUERY_LENGTH,
   displayName,
@@ -155,16 +155,8 @@ export function PatientSearch({
         </Typography>
       ) : null}
 
-      {typedEnough && mayRegister ? (
-        <Typography variant="body2">
-          Pacient v databázi není?{" "}
-          <MuiLink href="/patients/register" target="_blank" rel="noopener">
-            Založit nového pacienta
-          </MuiLink>{" "}
-          <Typography component="span" variant="caption" sx={{ color: "text.secondary" }}>
-            (otevře se v nové záložce, zvolený čas zůstane zde)
-          </Typography>
-        </Typography>
+      {mayRegister ? (
+        <QuickRegister onRegistered={onPick} defaultLastName={text.trim()} />
       ) : null}
     </Stack>
   );
