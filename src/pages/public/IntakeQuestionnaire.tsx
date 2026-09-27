@@ -325,6 +325,24 @@ function needsSecondTyping(insuranceNumber: string): boolean {
   return !parseBirthNumber(digits).ok;
 }
 
+/**
+ * Splits a stored E.164 number ("+420773539001") into the form's region code
+ * and national part. Longest dialling codes first, so "+420" wins over "+42".
+ */
+const E164_TO_REGION: readonly [string, string][] = [
+  ['+420', 'CZ'], ['+421', 'SK'], ['+380', 'UA'],
+  ['+49', 'DE'], ['+43', 'AT'], ['+48', 'PL'], ['+36', 'HU'], ['+44', 'GB'],
+  ['+1', 'US'],
+];
+function splitE164(e164: string): { region: string; national: string } | null {
+  for (const [code, region] of E164_TO_REGION) {
+    if (e164.startsWith(code)) {
+      return { region, national: e164.slice(code.length) };
+    }
+  }
+  return null;
+}
+
 export default function IntakeQuestionnaire() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [derived, setDerived] = useState<Derived>(NOTHING_DERIVED);
@@ -340,12 +358,22 @@ export default function IntakeQuestionnaire() {
     let alive = true;
     void openCompletion(completionToken).then((open) => {
       if (!alive || open === null) return;
-      setForm((prev) => ({
-        ...prev,
-        givenName: prev.givenName || open.givenName || '',
-        familyName: prev.familyName || open.familyName || '',
-        email: prev.email || open.email || '',
-      }));
+      setForm((prev) => {
+        const next: FormState = {
+          ...prev,
+          givenName: prev.givenName || open.givenName || '',
+          familyName: prev.familyName || open.familyName || '',
+          email: prev.email || open.email || '',
+        };
+        if (open.phoneE164 && prev.phone.trim() === '') {
+          const split = splitE164(open.phoneE164);
+          if (split) {
+            next.phoneRegion = split.region;
+            next.phone = split.national;
+          }
+        }
+        return next;
+      });
     });
     return () => {
       alive = false;
