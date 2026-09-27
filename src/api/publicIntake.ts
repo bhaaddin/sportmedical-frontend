@@ -325,10 +325,28 @@ export async function submitIntake(
     ? `/api/public/intake/complete/${encodeURIComponent(completionToken)}`
     : '/api/public/intake';
   try {
-    const response = await publicClient.post<IntakeResponse>(url, request, {
+    const response = await publicClient.post<IntakeResponse | { referenceNumber: string }>(url, request, {
       headers: { 'Idempotency-Key': getIdempotencyKey() },
     });
-    return response.data;
+    if (completionToken) {
+      // The completion endpoint answers with only a reference number: the desk
+      // booked the slot earlier, so there is no freshly-booked time to show and
+      // no manage token here. Return a clean confirmation without a date or a
+      // calendar link (otherwise the screen shows "Invalid Date" and a broken
+      // .ics link built from an undefined token).
+      const data = response.data as { referenceNumber?: string };
+      return {
+        referenceNumber: data.referenceNumber ?? '',
+        outcome: IntakeOutcome.Created,
+        manageToken: null,
+        confirmationEmailExpected: false,
+        appointmentId: null,
+        appointmentStartUtc: null,
+        appointmentEndUtc: null,
+        bookingFailed: false,
+      };
+    }
+    return response.data as IntakeResponse;
   } catch (error) {
     if (!axios.isAxiosError(error)) {
       throw new IntakeError('Odeslání se nezdařilo. Zkuste to prosím znovu.', 0);
