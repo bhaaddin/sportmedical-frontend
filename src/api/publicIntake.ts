@@ -329,20 +329,27 @@ export async function submitIntake(
       headers: { 'Idempotency-Key': getIdempotencyKey() },
     });
     if (completionToken) {
-      // The completion endpoint answers with only a reference number: the desk
-      // booked the slot earlier, so there is no freshly-booked time to show and
-      // no manage token here. Return a clean confirmation without a date or a
-      // calendar link (otherwise the screen shows "Invalid Date" and a broken
-      // .ics link built from an undefined token).
-      const data = response.data as { referenceNumber?: string };
+      // The completion endpoint now returns the appointment the desk booked plus
+      // a freshly-minted manage token, so the confirmation screen can show the
+      // time and offer "Přidat do kalendáře" / "Správa rezervace" -- exactly like
+      // the online booking flow. All appointment fields are null when the patient
+      // had no upcoming appointment; the screen then just shows a reference number
+      // (and never "Invalid Date", because the guards key off appointmentStartUtc).
+      const data = response.data as {
+        referenceNumber?: string;
+        manageToken?: string | null;
+        appointmentId?: string | null;
+        appointmentStartUtc?: string | null;
+        appointmentEndUtc?: string | null;
+      };
       return {
         referenceNumber: data.referenceNumber ?? '',
         outcome: IntakeOutcome.Created,
-        manageToken: null,
+        manageToken: data.manageToken ?? null,
         confirmationEmailExpected: false,
-        appointmentId: null,
-        appointmentStartUtc: null,
-        appointmentEndUtc: null,
+        appointmentId: data.appointmentId ?? null,
+        appointmentStartUtc: data.appointmentStartUtc ?? null,
+        appointmentEndUtc: data.appointmentEndUtc ?? null,
         bookingFailed: false,
       };
     }
