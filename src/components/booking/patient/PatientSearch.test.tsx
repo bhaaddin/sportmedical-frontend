@@ -135,9 +135,10 @@ describe('searching the database for a patient', () => {
     await userEvent.type(screen.getByLabelText('Jméno nebo příjmení'), 'Nikdo');
 
     expect(await screen.findByText(/V databázi nikoho takového nenacházím/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Založit nového pacienta' })).toHaveAttribute(
-      'href',
-      '/patients/register',
-    );
+    /* The old "/patients/register" link was replaced by the desk quick-registration
+       flow, which still offers a way to make a new patient right here. */
+    expect(
+      screen.getByRole('button', { name: 'Rychlá registrace + odkaz' }),
+    ).toBeInTheDocument();
   });
 });
