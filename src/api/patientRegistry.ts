@@ -58,6 +58,12 @@ export interface AddressRequest {
   patientAddressId: string;
   residenceType: ResidenceType;
   ruianAddressPointCode: number;
+  /** Whole-republic Mapy.cz address parts (code 0); the server builds the point. */
+  street?: string | null;
+  number?: string | null;
+  municipalityPart?: string | null;
+  municipality?: string | null;
+  zip?: string | null;
 }
 
 export interface AdministrativeProfileRequest {

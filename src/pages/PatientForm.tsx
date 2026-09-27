@@ -25,8 +25,9 @@ import { patientsApi } from "../api/patients";
 import { patientIdentityApi } from "../api/patientIdentity";
 import { usePermission } from "../auth/usePermission";
 import type { InsuranceRegistrationKind, ResidenceType } from "../api/patientRegistry";
-import type { AddressPoint } from "../api/addressLookup";
-import RuianAddressPicker from "../components/registration/RuianAddressPicker";
+import { parseBirthNumber } from "../services/patientRegistration/insuranceIdentifier";
+import type { MapySuggestion } from "../api/addressLookup";
+import MapyAddressPicker from "../components/registration/MapyAddressPicker";
 
 /**
  * Editing a patient - the `app` lane's contract,
@@ -512,6 +513,30 @@ function InsuranceDialog({
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /* Whether the číslo pojištěnce was filled in from the rodné číslo rather than
+     typed. A derived value stays in step with the rodné číslo; the moment staff
+     type over it, it is theirs and the rodné číslo stops touching it. */
+  const [numberDerived, setNumberDerived] = useState(false);
+
+  /*
+   * A Czech rodné číslo IS the číslo pojištěnce (the same digits) and it carries
+   * its own checksum, so typing it fills the insurance number and — because there
+   * is nothing hand-typed to mistype — its own confirmation. Only into an empty or
+   * previously-derived box, so a number staff typed by hand is never overwritten.
+   */
+  const onBirthNumberChange = (raw: string): void => {
+    setBirthNumber(raw);
+    const digits = raw.replace(/\D/g, "");
+    if (
+      kind === "CzechPublicHealthInsurance" &&
+      parseBirthNumber(digits) !== null &&
+      (number === "" || numberDerived)
+    ) {
+      setNumber(digits);
+      setConfirmation(digits);
+      setNumberDerived(true);
+    }
+  };
 
   const mismatch = confirmation !== "" && confirmation !== number;
   const canSave = reason.trim() !== "" && !mismatch && confirmation !== "" && !saving;
@@ -564,19 +589,26 @@ function InsuranceDialog({
             fullWidth
             label="Rodné číslo"
             value={birthNumber}
-            onChange={(e) => setBirthNumber(e.target.value)}
+            onChange={(e) => onBirthNumberChange(e.target.value)}
+            helperText="Doplní číslo pojištěnce."
           />
           <TextField
             fullWidth
             label="Číslo pojištěnce"
             value={number}
-            onChange={(e) => setNumber(e.target.value)}
+            onChange={(e) => {
+              setNumber(e.target.value);
+              setNumberDerived(false);
+            }}
           />
           <TextField
             fullWidth
             label="Číslo pojištěnce ještě jednou"
             value={confirmation}
-            onChange={(e) => setConfirmation(e.target.value)}
+            onChange={(e) => {
+              setConfirmation(e.target.value);
+              setNumberDerived(false);
+            }}
             error={mismatch}
             helperText={mismatch ? "Čísla se neshodují." : "Opište číslo znovu, ne kopírujte."}
           />
@@ -622,7 +654,7 @@ function AddressDialog({
   const [residenceType, setResidenceType] = useState<ResidenceType>(
     "PermanentResidenceInCzechia",
   );
-  const [point, setPoint] = useState<AddressPoint | null>(null);
+  const [point, setPoint] = useState<MapySuggestion | null>(null);
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -635,7 +667,14 @@ function AddressDialog({
       const result = await patientIdentityApi.updateResidenceAddress(
         patientId,
         residenceType,
-        point.addressPointCode,
+        {
+          ruianAddressPointCode: 0,
+          street: point.street,
+          number: point.number,
+          municipalityPart: point.municipalityPart,
+          municipality: point.municipality,
+          zip: point.zip,
+        },
         reason,
       );
       toast.success(result.changed ? "Adresa opravena." : "Beze změny — adresa se shoduje.");
@@ -664,14 +703,7 @@ function AddressDialog({
             <MenuItem value="ReportedResidenceInCzechia">Hlášený pobyt v ČR</MenuItem>
           </TextField>
 
-          <RuianAddressPicker
-            selectedPoint={point}
-            onSelect={setPoint}
-            emptyCatalogueText={
-              "Adresní registr RÚIAN není v této instalaci nahraný. Bez adresního bodu "
-              + "nelze adresu opravit — dataset musí nejdřív naimportovat správce."
-            }
-          />
+          <MapyAddressPicker selected={point} onSelect={setPoint} />
 
           <TextField
             required

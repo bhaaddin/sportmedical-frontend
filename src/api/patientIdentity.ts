@@ -76,15 +76,29 @@ export const patientIdentityApi = {
   updateResidenceAddress: async (
     patientId: string,
     residenceType: ResidenceType,
-    ruianAddressPointCode: number,
+    address: {
+      ruianAddressPointCode: number;
+      street?: string | null;
+      number?: string | null;
+      municipalityPart?: string | null;
+      municipality?: string | null;
+      zip?: string | null;
+    },
     changeReason: string,
   ): Promise<IdentityWriteResult> => {
     const reason = requireReason(changeReason);
+    // Whole-republic Mapy.cz address: code 0, the parts carry it (the server
+    // builds the address point from them). A catalogue address sends its code.
     const res = await client.put(`/api/v1/patients/${patientId}/residence-address`, {
       patientAddressId: newGuid(),
       residenceType,
-      ruianAddressPointCode,
+      ruianAddressPointCode: address.ruianAddressPointCode,
       changeReason: reason,
+      street: address.street,
+      number: address.number,
+      municipalityPart: address.municipalityPart,
+      municipality: address.municipality,
+      zip: address.zip,
     });
     return res.data as IdentityWriteResult;
   },

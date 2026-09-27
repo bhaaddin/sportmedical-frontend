@@ -42,7 +42,7 @@ import patientRegistryApi, {
   type RegistrationCandidate,
   type RegistrationConfirmation,
 } from '../api/patientRegistry';
-import type { AddressPoint } from '../api/addressLookup';
+import type { MapySuggestion } from '../api/addressLookup';
 import {
   createEmptyForm,
   digitsOnly,
@@ -68,7 +68,7 @@ import { preferredCount, withPreferredFirst } from '../services/patientRegistrat
 import {
   groupedDisplay, phoneComplaint, phoneDisplayState, worthInspectingPhone,
 } from '../services/patientRegistration/phoneDisplay';
-import RuianAddressPicker from '../components/registration/RuianAddressPicker';
+import MapyAddressPicker from '../components/registration/MapyAddressPicker';
 import CandidateReviewDialog from '../components/registration/CandidateReviewDialog';
 
 interface RegistrationIdentifiers {
@@ -148,7 +148,7 @@ export default function PatientRegistration() {
   const [optionsError, setOptionsError] = useState('');
 
   const [similar, setSimilar] = useState<PatientSearchResult[]>([]);
-  const [addressPoint, setAddressPoint] = useState<AddressPoint | null>(null);
+  const [addressPoint, setAddressPoint] = useState<MapySuggestion | null>(null);
   const [review, setReview] = useState<{
     candidates: RegistrationCandidate[];
     confirmation: RegistrationConfirmation;
@@ -367,12 +367,15 @@ export default function PatientRegistration() {
     }));
   };
 
-  const handleAddressPoint = (point: AddressPoint | null) => {
+  const handleAddressPoint = (point: MapySuggestion | null) => {
     setAddressPoint(point);
     setForm((previous) => ({
       ...previous,
-      ruianAddressPointCode: point?.addressPointCode ?? null,
-      addressDisplay: point?.formattedAddress ?? '',
+      // A whole-republic Mapy.cz address has no RÚIAN code; 1 is a sentinel that
+      // only tells the "address chosen" check the field is filled. The real
+      // address is sent as its parts in buildRequest, with the code as 0.
+      ruianAddressPointCode: point === null ? null : 1,
+      addressDisplay: point?.label ?? '',
     }));
     setErrors((previous) => ({ ...previous, ruianAddressPointCode: undefined }));
   };
@@ -407,7 +410,13 @@ export default function PatientRegistration() {
         address: {
           patientAddressId: ids.patientAddressId,
           residenceType: form.residenceType,
-          ruianAddressPointCode: form.ruianAddressPointCode ?? 0,
+          // Whole-republic Mapy.cz address: code 0, the parts carry it.
+          ruianAddressPointCode: 0,
+          street: addressPoint?.street ?? null,
+          number: addressPoint?.number ?? null,
+          municipalityPart: addressPoint?.municipalityPart ?? null,
+          municipality: addressPoint?.municipality ?? null,
+          zip: addressPoint?.zip ?? null,
         },
         administrativeProfile: {
           profileId: ids.administrativeProfileId,
@@ -955,8 +964,8 @@ export default function PatientRegistration() {
                 </TextField>
               </Grid>
               <Grid size={12}>
-                <RuianAddressPicker
-                  selectedPoint={addressPoint}
+                <MapyAddressPicker
+                  selected={addressPoint}
                   onSelect={handleAddressPoint}
                   error={errors.ruianAddressPointCode}
                   disabled={submitting}
