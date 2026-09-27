@@ -595,6 +595,9 @@ export function NewAppointmentDialog({
                     {offeredActivities.map((a) => (
                       <MenuItem key={a.id} value={a.id}>
                         {a.name} · {a.durationMinutes} min
+                        {a.priceCzk != null
+                          ? ` · ${new Intl.NumberFormat("cs-CZ").format(a.priceCzk)} Kč`
+                          : ""}
                       </MenuItem>
                     ))}
                   </TextField>
@@ -603,6 +606,9 @@ export function NewAppointmentDialog({
                     <Box>
                       <Typography sx={{ fontWeight: 600 }}>
                         {TEXT.appointment(appointmentRange, activity.durationMinutes)}
+                        {activity.priceCzk != null
+                          ? ` · ${new Intl.NumberFormat("cs-CZ").format(activity.priceCzk)} Kč`
+                          : ""}
                       </Typography>
                       {dragged !== null &&
                       dragged !== activity.durationMinutes &&
