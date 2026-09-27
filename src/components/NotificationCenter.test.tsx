@@ -10,7 +10,7 @@
  * send `kind` yet, so this is the shape the panel is actually in, and grouping
  * must not invent groups out of rows that merely look alike.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
@@ -50,6 +50,11 @@ const row = (id: string, over: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
+  /* Pin "now" to mid-day (only Date is faked, so async queries keep real
+     timers). Without this, a run just after midnight made a "5 minutes ago"
+     notice land on the previous day, so the header said "Včera" not "Dnes". */
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(2026, 8, 15, 10, 0, 0));
   getList.mockReset().mockResolvedValue({ data: [] });
   getSeen.mockReset().mockResolvedValue({ data: { lastSeenAtUtc: null } });
   post.mockReset().mockResolvedValue({ data: { lastSeenAtUtc: new Date().toISOString() } });
@@ -57,6 +62,10 @@ beforeEach(() => {
   del.mockReset().mockResolvedValue({});
   toastSuccess.mockReset();
   toastError.mockReset();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 /* Where the router is, so a test can see a row's link being followed. */

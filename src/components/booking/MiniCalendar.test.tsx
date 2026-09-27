@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MiniCalendar } from './MiniCalendar';
@@ -7,6 +7,16 @@ const day = (label: RegExp) => screen.getByRole('button', { name: label });
 const cellOf = (key: string) => document.querySelector(`[data-day="${key}"]`) as HTMLElement;
 
 describe('MiniCalendar', () => {
+  /* "Today" is the real system date unless pinned, so a cell that a test names
+     by date gains ", dnes" on the day the clock actually reaches it — which broke
+     the 2026-09-28 holiday assertion once real time got there. Only Date is
+     faked, so async queries keep their real timers. */
+  beforeAll(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 8, 15, 10, 0, 0));
+  });
+  afterAll(() => vi.useRealTimers());
+
   it('shows the month in Czech, Monday first, and moves a month at a time', async () => {
     render(<MiniCalendar value={new Date(2026, 8, 23)} view="month" onSelect={() => {}} />);
 
