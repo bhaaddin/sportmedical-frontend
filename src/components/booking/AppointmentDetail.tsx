@@ -42,6 +42,7 @@ import {
 import { AsyncSection } from "./AsyncSection";
 import { AvailabilityPanel } from "./AvailabilityPicker";
 import { errorText } from "./errorText";
+import { CompletionLinkButton } from "./patient/CompletionLinkButton";
 import { usePermission } from "../../auth/usePermission";
 
 /**
@@ -340,6 +341,11 @@ function DetailBody({
                 )
                 .join(" · ")}
         </Alert>
+      ) : null}
+
+      {/* The completion link, so the desk can (re)send it while registration is unfinished. */}
+      {appointment.paperwork && !appointment.paperwork.ready ? (
+        <CompletionLinkButton patientId={appointment.patientId} />
       ) : null}
 
       {/* 6.4: an override was made by a person, for a reason they typed. */}
