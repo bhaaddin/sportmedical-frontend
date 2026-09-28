@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Avatar, IconButton, Menu, MenuItem, Badge, CircularProgress, Button } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Search, AttachMoney, Schedule, EventBusy, Today, Description, ArrowBack, Assessment } from '@mui/icons-material';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { usePermissions, type Permission } from './auth/usePermission';
@@ -246,7 +247,7 @@ function Layout({ children }: { children: React.ReactNode }) {
       <a href="#main-content" className="skip-link">
         Přeskočit na hlavní obsah
       </a>
-      <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1, bgcolor: '#0D7377', boxShadow: '0 2px 16px rgba(13,115,119,0.25)' }}>
+      <AppBar position="fixed" sx={(t) => ({ zIndex: t.zIndex.drawer + 1, bgcolor: 'primary.main', boxShadow: `0 2px 16px ${alpha(t.palette.primary.main, 0.25)}` })}>
         <Toolbar>
           <LocalHospital sx={{ mr: 1 }} />
           <Typography variant="h6" noWrap sx={{ fontWeight: 700, flexGrow: 1 }}>
@@ -366,16 +367,16 @@ function Layout({ children }: { children: React.ReactNode }) {
                     to={to}
                     selected={isActive}
                     title={!sidebarOpen ? section.label : undefined}
-                    sx={{
+                    sx={(theme) => ({
                       borderRadius: 2, mb: 0.5, py: 1.0, minHeight: 44,
                       justifyContent: sidebarOpen ? 'initial' : 'center',
                       px: sidebarOpen ? 2 : 1.5,
-                      '&.Mui-selected': { bgcolor: '#E0F2F1', color: '#0D7377', boxShadow: 'inset 3px 0 0 #0D7377' },
-                      '&:hover': { bgcolor: '#E0F2F1' },
-                    }}
+                      '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.12), color: 'primary.main', boxShadow: `inset 3px 0 0 ${theme.palette.primary.main}` },
+                      '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) },
+                    })}
                   >
                     <ListItemIcon sx={{
-                      color: isActive ? '#0D7377' : 'inherit', minWidth: 40, justifyContent: 'center',
+                      color: isActive ? 'primary.main' : 'inherit', minWidth: 40, justifyContent: 'center',
                     }}>
                       {section.icon}
                     </ListItemIcon>
@@ -407,16 +408,16 @@ function Layout({ children }: { children: React.ReactNode }) {
                     <ListItemButton component={Link as any} to={item.path}
                       selected={isActive}
                       title={!sidebarOpen ? item.text : undefined}
-                      sx={{
+                      sx={(theme) => ({
                         borderRadius: 2, mb: 0.5, py: 1.0, minHeight: 44,
                         justifyContent: sidebarOpen ? 'initial' : 'center',
                         px: sidebarOpen ? 2 : 1.5,
                         transition: 'all 0.2s ease',
-                        '&.Mui-selected': { bgcolor: '#E0F2F1', color: '#0D7377', boxShadow: 'inset 3px 0 0 #0D7377' },
-                        '&:hover': { bgcolor: '#E0F2F1', transform: 'translateX(2px)' },
-                      }}>
+                        '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.12), color: 'primary.main', boxShadow: `inset 3px 0 0 ${theme.palette.primary.main}` },
+                        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08), transform: 'translateX(2px)' },
+                      })}>
                       <ListItemIcon sx={{
-                        color: isActive ? '#0D7377' : 'inherit', minWidth: 40,
+                        color: isActive ? 'primary.main' : 'inherit', minWidth: 40,
                         justifyContent: 'center',
                       }}>
                         {item.icon}
