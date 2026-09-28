@@ -63,7 +63,7 @@ export const CALENDAR_DISPLAY_OFFLINE: CalendarDisplaySettings = {
   dayStartHour: 7,
   dayEndHour: 19,
   nowLineColor: '#D32F2F',
-  holidayColor: '#9333EA',
+  holidayColor: '#64748B',
   hoverFields: ['patientName', 'activity', 'status', 'phone', 'paperwork'],
 };
 

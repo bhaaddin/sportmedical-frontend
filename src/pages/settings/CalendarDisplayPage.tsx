@@ -192,14 +192,14 @@ export default function CalendarDisplayPage() {
                 value={draft.holidayColor}
                 onChange={(event) => set('holidayColor', event.target.value)}
                 error={errors.holidayColor !== undefined}
-                helperText={errors.holidayColor ?? 'Celý den se vykreslí touto barvou, například #9333EA.'}
+                helperText={errors.holidayColor ?? 'Celý den se vykreslí touto barvou. Vyberte si vlastní — třeba jemnou šedou nebo červenou pro svátky.'}
                 sx={{ flexGrow: 1 }}
               />
               <Box
                 component="input"
                 type="color"
                 aria-label="Vybrat barvu volných dnů"
-                value={/^#[0-9a-fA-F]{6}$/.test(draft.holidayColor) ? draft.holidayColor : '#9333EA'}
+                value={/^#[0-9a-fA-F]{6}$/.test(draft.holidayColor) ? draft.holidayColor : '#64748B'}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   set('holidayColor', event.target.value.toUpperCase())}
                 sx={{ width: 56, height: 56, border: 'none', background: 'none', cursor: 'pointer', p: 0 }}
