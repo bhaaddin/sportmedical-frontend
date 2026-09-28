@@ -353,6 +353,18 @@ export default function PublicBooking() {
                             <Typography variant="caption" sx={{ color: BRAND.muted }}>
                               {activity.durationMinutes} minut
                             </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                mt: 0.25,
+                                fontWeight: activity.priceCzk !== null ? 700 : 400,
+                                color: activity.priceCzk !== null ? 'inherit' : BRAND.muted,
+                              }}
+                            >
+                              {activity.priceCzk !== null
+                                ? `${activity.priceCzk.toLocaleString('cs-CZ')} Kč`
+                                : 'Cena na dotaz'}
+                            </Typography>
                             {activity.publicNote !== '' && (
                               <Typography variant="body2" sx={{ color: BRAND.muted, mt: 0.5 }}>
                                 {activity.publicNote}

@@ -23,6 +23,12 @@ export interface BookableActivity {
   /** Which calendar runs it — needed to ask for times. */
   calendarId: string;
   /**
+   * What the visit costs, in Kč, from the price-list item the clinic linked to
+   * this činnost. `null` when none is linked — the card then says "cena na
+   * dotaz" instead of a made-up number. The same price the desk works from.
+   */
+  priceCzk: number | null;
+  /**
    * Which optional consents this činnost will not be booked without. The
    * clinic's setting, per činnost.
    *
