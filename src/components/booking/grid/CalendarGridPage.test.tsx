@@ -17,6 +17,22 @@ vi.mock('../../../api/holidays', () => ({ holidaysApi: { year: vi.fn() } }));
 vi.mock('../../../api/clinicSettings', () => ({ readPublicClinic: vi.fn(), readSettings: vi.fn() }));
 vi.mock('../../../api/workingHours', () => ({ workingHoursApi: { preview: vi.fn() } }));
 vi.mock('../../../api/appointments', () => ({ appointmentsApi: { range: vi.fn(), blocks: vi.fn() } }));
+/*
+ * The now-line and holiday colours are the owner's calendar-display settings,
+ * read (by everyone) from /api/v1/settings/calendar-display, not the admin-only
+ * /api/settings. Keep the real helpers; drive the hook so the chosen now-line
+ * colour is what the grid must paint.
+ */
+vi.mock('../../../api/displaySettings', async (importActual) => {
+  const actual = await importActual<typeof import('../../../api/displaySettings')>();
+  return {
+    ...actual,
+    useCalendarDisplay: vi.fn(() => ({
+      settings: { ...actual.CALENDAR_DISPLAY_OFFLINE, nowLineColor: '#6A1B9A' },
+      loaded: true,
+    })),
+  };
+});
 
 import { calendarsApi } from '../../../api/calendars';
 import { clinicServicesApi } from '../../../api/clinicServices';

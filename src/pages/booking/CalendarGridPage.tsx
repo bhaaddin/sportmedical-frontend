@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -27,7 +27,7 @@ import { Link as MuiLink } from "@mui/material";
 import { calendarsApi } from "../../api/calendars";
 import { clinicServicesApi } from "../../api/clinicServices";
 import { holidaysApi, type ClinicHoliday } from "../../api/holidays";
-import { readPublicClinic, readSettings } from "../../api/clinicSettings";
+import { readPublicClinic } from "../../api/clinicSettings";
 import { usePermission } from "../../auth/usePermission";
 import { appointmentsApi } from "../../api/appointments";
 import { workingHoursApi } from "../../api/workingHours";
@@ -55,7 +55,7 @@ import {
   type Employee,
 } from "../../components/booking/grid/filters";
 import { GRID_TEXT } from "../../components/booking/grid/gridText";
-import { NOW_LINE_COLOR_KEY, resolveNowLineColor } from "../../components/booking/grid/nowLine";
+import { resolveNowLineColor } from "../../components/booking/grid/nowLine";
 import { useCalendarDisplay } from "../../api/displaySettings";
 import {
   parseTimeOfDay,
@@ -316,24 +316,36 @@ export default function CalendarGridPage() {
   );
 
   /*
-   * The now-line colour is the administrator's setting. `/api/settings` is
-   * readable only with settings.clinic.manage, so everybody else - and an
-   * installation where nobody has set it - gets the theme's error colour.
+   * The calendar's own display settings, from the one endpoint every signed-in
+   * staff member may read. The now-line and holiday colours used to come from
+   * the admin-only `/api/settings` (settings.clinic.manage), so every
+   * receptionist saw the theme's error colour instead of the owner's choice;
+   * they are the same owner's settings, so they are read from the same place.
    */
-  const settingsQuery = useQuery({
-    queryKey: ["settings", NOW_LINE_COLOR_KEY],
-    queryFn: () => readSettings([NOW_LINE_COLOR_KEY]),
-    enabled: mayManageCalendars,
-    staleTime: 5 * 60 * 1000,
-  });
+  const { settings: calendarDisplay, loaded: calendarDisplayLoaded } = useCalendarDisplay();
+  const holidayColor = calendarDisplay.holidayColor;
   const nowLineColor = resolveNowLineColor(
-    settingsQuery.data?.[NOW_LINE_COLOR_KEY],
+    calendarDisplay.nowLineColor,
     theme.palette.error.main,
   );
-  /* The holiday/closure colour, from the calendar-display settings every signed-in
-     staff member may read (the now-line above is the admin-only /api/settings). */
-  const { settings: calendarDisplay } = useCalendarDisplay();
-  const holidayColor = calendarDisplay.holidayColor;
+
+  /*
+   * The calendar opens on the view the owner chose (calendar.defaultView),
+   * not a hardcoded "week". It is applied once, when the setting first
+   * arrives; the moment the person picks a view themselves it is theirs for
+   * the session (changeView marks it), so a late-arriving setting never
+   * yanks the grid out from under them.
+   */
+  const viewChosenByHand = useRef(false);
+  const changeView = (next: ViewMode) => {
+    viewChosenByHand.current = true;
+    setView(next);
+  };
+  useEffect(() => {
+    if (!calendarDisplayLoaded || viewChosenByHand.current) return;
+    viewChosenByHand.current = true;
+    setView(calendarDisplay.defaultView);
+  }, [calendarDisplayLoaded, calendarDisplay.defaultView]);
 
   /* `pub.bookingEnabled`, through the endpoint every screen may read. Never throws. */
   const publicClinicQuery = useQuery({
@@ -432,7 +444,7 @@ export default function CalendarGridPage() {
 
   const pickDay = (day: string) => {
     setAnchor(day);
-    setView("day");
+    changeView("day");
   };
 
   const openBooking = (prefill: BookingPrefill) =>
@@ -515,7 +527,7 @@ export default function CalendarGridPage() {
             exclusive
             size="small"
             value={view}
-            onChange={(_, next: ViewMode | null) => next && setView(next)}
+            onChange={(_, next: ViewMode | null) => next && changeView(next)}
           >
             <ToggleButton value="day">{t("booking.grid.day")}</ToggleButton>
             <ToggleButton value="week">{t("booking.grid.week")}</ToggleButton>
@@ -588,7 +600,7 @@ export default function CalendarGridPage() {
           anchor={anchor}
           view={view}
           onDate={setAnchor}
-          onView={setView}
+          onView={changeView}
           holidays={holidayDates(holidays)}
           closedDays={closedHolidayDates(holidays)}
           calendars={serviceCalendars}
