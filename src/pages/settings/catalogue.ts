@@ -265,6 +265,18 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         to: '/dotaznik-nastaveni',
         requires: 'questionnaires.manage',
       },
+      {
+        /*
+         * Only the marketing consent: it is the clinic's own to show or hide
+         * and to word. The treatment consent (zákon) and the per-činnost
+         * report/club consents are not a screen's to switch off.
+         */
+        id: 'souhlasy',
+        label: 'Souhlasy',
+        description: 'Marketingový souhlas na objednávkovém formuláři — zda se ukáže a jak zní',
+        to: '/nastaveni/souhlasy',
+        requires: 'settings.clinic.manage',
+      },
     ],
   },
   {

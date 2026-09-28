@@ -107,6 +107,7 @@ import { calendarFileUrl } from '../../api/publicManage';
 import type { HeldBooking } from '../../api/publicBooking';
 import type { MapySuggestion } from '../../api/addressLookup';
 import { readPublicClinic } from '../../api/clinicSettings';
+import { useConsentSettings } from '../../api/consentSettings';
 
 /* ── Brand, taken from sportmedical-diagnostics.cz ── */
 
@@ -405,6 +406,9 @@ export default function IntakeQuestionnaire() {
    * the server says so — see the note on `heldToken` where it is submitted.
    */
   const [held] = useState<HeldBooking | null>(readHeld);
+  /* The marketing consent's wording and whether it is shown are the clinic's,
+     set in Nastavení. The legally required consents below are not. */
+  const { settings: consentSettings } = useConsentSettings();
 
   /*
    * What this činnost asks of the questionnaire.
@@ -1724,12 +1728,14 @@ export default function IntakeQuestionnaire() {
                       ? `Zprávu z činnosti ${held.activityName} předáváme elektronicky na uvedený e-mail. Bez tohoto souhlasu ji nelze objednat.`
                       : 'Souhlasím, aby mi byla lékařská zpráva zaslána elektronicky na uvedený e-mail. Bez souhlasu si ji vyzvednete na recepci.'}
                   />
-                  <ConsentRow
-                    checked={form.consentCommunication}
-                    onChange={(value) => set('consentCommunication', value)}
-                    title="Novinky a nabídky"
-                    detail="Souhlasím se zasíláním novinek a nabídek. Netýká se potvrzení a připomínek k vašemu termínu — ty vám pošleme tak jako tak."
-                  />
+                  {consentSettings.communicationVisible && (
+                    <ConsentRow
+                      checked={form.consentCommunication}
+                      onChange={(value) => set('consentCommunication', value)}
+                      title={consentSettings.communicationTitle}
+                      detail={consentSettings.communicationDetail}
+                    />
+                  )}
                   <ConsentRow
                     required={held?.requiresClubSharing === true}
                     checked={form.consentClub}
