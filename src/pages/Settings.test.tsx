@@ -85,7 +85,7 @@ describe('the settings screen', () => {
   it('shows the headings and nothing else', async () => {
     renderSettings();
 
-    expect(await screen.findByText('Kalendáře a provoz')).toBeInTheDocument();
+    expect(await screen.findByText('Provoz a čas')).toBeInTheDocument();
     expect(screen.getByText('Lidé a přístupy')).toBeInTheDocument();
     expect(screen.getByText('Můj účet')).toBeInTheDocument();
 
@@ -99,9 +99,9 @@ describe('the settings screen', () => {
     const user = userEvent.setup();
     renderSettings();
 
-    await user.click(await screen.findByText('Kalendáře a provoz'));
+    await user.click(await screen.findByText('Provoz a čas'));
 
-    expect(await screen.findByText('Činnosti')).toBeVisible();
+    expect(await screen.findByText('Pracovní doba')).toBeVisible();
     expect(screen.getByText('Blokovaný čas')).toBeVisible();
   });
 
@@ -110,27 +110,27 @@ describe('the settings screen', () => {
     const user = userEvent.setup();
     renderSettings();
 
-    await user.click(await screen.findByText('Kalendáře a provoz'));
-    expect(await screen.findByText('Činnosti')).toBeVisible();
+    await user.click(await screen.findByText('Provoz a čas'));
+    expect(await screen.findByText('Pracovní doba')).toBeVisible();
 
     await user.click(screen.getByText('Lidé a přístupy'));
 
     /* By role, not by text: "Tým a účty" also appears in the sentence telling
        people where their name is changed, and a plain text query catches both. */
     expect(await screen.findByRole('link', { name: /Tým a účty/ })).toBeVisible();
-    expect(screen.getByText('Činnosti')).not.toBeVisible();
+    expect(screen.getByText('Pracovní doba')).not.toBeVisible();
   });
 
   it('closes a heading when it is clicked again', async () => {
     const user = userEvent.setup();
     renderSettings();
 
-    const heading = await screen.findByText('Kalendáře a provoz');
+    const heading = await screen.findByText('Provoz a čas');
     await user.click(heading);
-    expect(await screen.findByText('Činnosti')).toBeVisible();
+    expect(await screen.findByText('Pracovní doba')).toBeVisible();
 
     await user.click(heading);
-    expect(screen.getByText('Činnosti')).not.toBeVisible();
+    expect(screen.getByText('Pracovní doba')).not.toBeVisible();
   });
 });
 
@@ -141,10 +141,13 @@ describe('what a receptionist sees', () => {
     const user = userEvent.setup();
     renderSettings();
 
-    await user.click(await screen.findByText('Kalendáře a provoz'));
+    /* Provoz a čas is shown to her because it holds two rows that need no
+       permission - Vyhrazení pro kluby and Blokovaný čas - while Pracovní doba
+       and the rest of the group need settings.clinic.manage and are dropped. */
+    await user.click(await screen.findByText('Provoz a čas'));
 
     expect(screen.getByText('Blokovaný čas')).toBeVisible();
-    expect(screen.queryByText('Činnosti')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pracovní doba')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Tým a účty/ })).not.toBeInTheDocument();
   });
 
