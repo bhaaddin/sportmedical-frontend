@@ -357,11 +357,15 @@ export default function PublicBooking() {
                               variant="body2"
                               sx={{
                                 mt: 0.25,
-                                fontWeight: activity.priceCzk !== null ? 700 : 400,
-                                color: activity.priceCzk !== null ? 'inherit' : BRAND.muted,
+                                // typeof, not !== null: during a deploy the page can
+                                // reach an older API that omits the field, so the
+                                // value is undefined, not null -- and undefined must
+                                // read as "no price", never crash on .toLocaleString.
+                                fontWeight: typeof activity.priceCzk === 'number' ? 700 : 400,
+                                color: typeof activity.priceCzk === 'number' ? 'inherit' : BRAND.muted,
                               }}
                             >
-                              {activity.priceCzk !== null
+                              {typeof activity.priceCzk === 'number'
                                 ? `${activity.priceCzk.toLocaleString('cs-CZ')} Kč`
                                 : 'Cena na dotaz'}
                             </Typography>
