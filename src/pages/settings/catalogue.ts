@@ -5,22 +5,13 @@ import type { Permission } from '../../auth/usePermission';
  *
  * Kept apart from the screen so the shape can be checked without a browser:
  * that nothing is listed twice, that every destination is a route that exists,
- * and - the one that matters - that nothing dead is offered. Twenty items in a
- * sidebar was the complaint; a tidy menu full of screens that do nothing would
- * be the same complaint with better spacing.
+ * and - the one that matters - that nothing dead is offered.
  *
- * The grouping follows the API rather than the file tree, because the API is
- * where the real shape already is:
- *
- *     /api/calendars/{id}/access
- *     /api/calendars/{id}/periods/{p}/working-hours
- *     /api/calendars/{id}/exceptions
- *     /api/calendars/{id}/blocks
- *     /api/calendars/{id}/partner-orders
- *
- * Working hours, exceptions, blocked time and club reservations all hang off a
- * calendar. So they are shown hanging off a calendar, and somebody setting one
- * up finds the whole of it in one place instead of in six sidebar entries.
+ * The order is the order a clinic is set up in, not the order the API grew in:
+ * who you are, what you offer, what it costs, the calendars, when you work,
+ * who works here, what the patient signs, and last the system's own logs. Each
+ * heading holds one kind of thing, so nobody hunts for "working hours" inside a
+ * ten-item "calendar and operations" drawer again.
  */
 
 export interface SettingsItem {
@@ -61,23 +52,93 @@ export interface SettingsSection {
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
-    id: 'provoz',
-    label: 'Kalendáře a provoz',
-    description: 'Kdy se pracuje, co se dělá a kdo co vidí',
+    /*
+     * Who the clinic is, first: a new practice starts by saying its name and
+     * what the public sees, before it has a single service or calendar.
+     */
+    id: 'ordinace',
+    label: 'Ordinace',
+    description: 'Kdo jste — veřejná identita a kontakty vaší ordinace',
     items: [
       {
-        /*
-         * First, because nothing works without it. A činnost must belong to a
-         * service and a calendar that runs none offers nothing on any day - so
-         * this is where a new clinic starts, not an afterthought below the
-         * things that depend on it.
-         */
+        id: 'verejny-web',
+        label: 'Veřejný web a kontakty',
+        description: 'Název, adresa, telefon a co se ukazuje pacientům',
+        to: '/admin',
+        requires: 'settings.clinic.manage',
+      },
+    ],
+  },
+  {
+    /*
+     * What the clinic does. A činnost belongs to a service, so the two live
+     * together and a new clinic builds its offer here before hanging calendars
+     * off it.
+     */
+    id: 'nabidka',
+    label: 'Nabídka',
+    description: 'Co ordinace nabízí — služby a činnosti pod nimi',
+    items: [
+      {
         id: 'sluzby',
         label: 'Služby',
         description: 'Co ordinace dělá — činnosti patří pod službu',
         to: '/sluzby',
         requires: 'settings.clinic.manage',
       },
+      {
+        id: 'cinnosti',
+        label: 'Činnosti',
+        description: 'Co se v ordinaci dělá a jak dlouho to trvá',
+        to: '/activities',
+        requires: 'settings.clinic.manage',
+      },
+    ],
+  },
+  {
+    /*
+     * Money in one place. The price list moved twice before landing here -
+     * first into Ordinace on the reasoning that what a practice charges is a
+     * fact about the practice, then beside Činnosti because an činnost takes
+     * its price from it. Both were guesses at the owner's model. His is
+     * simpler and he said it plainly: payments are their own heading, and the
+     * price list and the payers both live under it.
+     */
+    id: 'platby',
+    label: 'Platby',
+    description: 'Co co stojí a kdo to platí',
+    items: [
+      {
+        id: 'cenik',
+        label: 'Ceník',
+        description: 'Co ordinace účtuje — odsud si činnost bere svou cenu',
+        to: '/cenik',
+      },
+      {
+        /*
+         * "Definice plátců" in the owner's words: who gets the invoice and
+         * where it goes. The server has carried all of it from the start -
+         * IČO, DIČ, fakturační adresa, bankovní účet, IBAN and splatnost - and
+         * the screen collected five of the thirteen fields, none of them the
+         * ones you need to send an invoice.
+         */
+        id: 'platci',
+        label: 'Plátci',
+        description: 'Kluby a organizace, které platí za členy — fakturační údaje a splatnost',
+        to: '/clubs',
+      },
+    ],
+  },
+  {
+    /*
+     * The calendars and how they are drawn. What HAPPENS on a calendar - hours,
+     * days off, blocks - is the next heading; this one is the calendars
+     * themselves and their look, set once and rarely touched again.
+     */
+    id: 'kalendar',
+    label: 'Kalendáře',
+    description: 'Kalendáře ordinace a jak se kreslí',
+    items: [
       {
         id: 'kalendare',
         label: 'Kalendáře',
@@ -92,13 +153,20 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         to: '/nastaveni/vzhled-kalendare',
         requires: 'settings.clinic.manage',
       },
-      {
-        id: 'cinnosti',
-        label: 'Činnosti',
-        description: 'Co se v ordinaci dělá a jak dlouho to trvá',
-        to: '/activities',
-        requires: 'settings.clinic.manage',
-      },
+    ],
+  },
+  {
+    /*
+     * Running the week: the working hours, the days off that close it, the
+     * one-off exceptions, who is away, and the time held or blocked for
+     * something other than a patient. These used to be scattered through a
+     * ten-item drawer with the services and the calendar look; they are the
+     * day-to-day of operating, and they belong together.
+     */
+    id: 'provoz',
+    label: 'Provoz a čas',
+    description: 'Kdy se pracuje, kdy ne, a jaký čas je držený nebo blokovaný',
+    items: [
       {
         id: 'pracovni-doba',
         label: 'Pracovní doba',
@@ -154,7 +222,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'lide',
     label: 'Lidé a přístupy',
-    description: 'Kdo u vás pracuje a co smí',
+    description: 'Kdo u vás pracuje a co smí, a co se ukazuje o pacientovi',
     items: [
       {
         id: 'tym',
@@ -173,57 +241,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ],
   },
   {
-    /*
-     * Money in one place. The price list moved twice before landing here -
-     * first into Ordinace on the reasoning that what a practice charges is a
-     * fact about the practice, then beside Činnosti because an činnost takes
-     * its price from it. Both were guesses at the owner's model. His is
-     * simpler and he said it plainly: payments are their own heading, and the
-     * price list and the payers both live under it.
-     */
-    id: 'platby',
-    label: 'Platby',
-    description: 'Co co stojí a kdo to platí',
-    items: [
-      {
-        id: 'cenik',
-        label: 'Ceník',
-        description: 'Co ordinace účtuje — odsud si činnost bere svou cenu',
-        to: '/cenik',
-      },
-      {
-        /*
-         * "Definice plátců" in the owner's words: who gets the invoice and
-         * where it goes. The server has carried all of it from the start -
-         * IČO, DIČ, fakturační adresa, bankovní účet, IBAN and splatnost - and
-         * the screen collected five of the thirteen fields, none of them the
-         * ones you need to send an invoice.
-         */
-        id: 'platci',
-        label: 'Plátci',
-        description: 'Kluby a organizace, které platí za členy — fakturační údaje a splatnost',
-        to: '/clubs',
-      },
-    ],
-  },
-  {
-    id: 'ordinace',
-    label: 'Ordinace',
-    description: 'Údaje o ordinaci a co z nich vidí veřejnost',
-    items: [
-      {
-        id: 'verejny-web',
-        label: 'Veřejný web a kontakty',
-        description: 'Název, adresa, telefon a co se ukazuje pacientům',
-        to: '/admin',
-        requires: 'settings.clinic.manage',
-      },
-    ],
-  },
-  {
     id: 'dokumenty',
     label: 'Dokumenty a souhlasy',
-    description: 'Co musí pacient doložit a co podepisuje',
+    description: 'Co pacient dokládá, podepisuje a vyplňuje',
     items: [
       {
         /*
@@ -302,14 +322,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   },
 ];
 
-/**
- * What this person may open.
- *
- * Items they cannot open are removed rather than greyed out. A locked row
- * invites somebody to ask why, and the answer - "you are not an administrator"
- * - is not something a receptionist can act on, so it is only noise on a
- * screen she opens to see her own account.
- */
 /**
  * The settings this person may actually open.
  *
