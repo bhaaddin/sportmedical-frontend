@@ -4,6 +4,7 @@ import {
   Box, Grid, Typography, Card, Avatar, Button, Chip, TextField,
   InputAdornment, List, ListItemButton, Divider, CircularProgress,
 } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
   Search, PersonAdd, EventAvailable, MeetingRoom, History as HistoryIcon,
   NotificationsNone, ArrowForward, CalendarMonth,
@@ -20,9 +21,6 @@ import DayOverviewPage from './booking/DayOverviewPage';
 import { toDateOnly, formatPragueTime } from '../utils/time';
 import { DashboardSkeleton } from '../components/SkeletonLoader';
 
-/* Brand — the clinic's teal, used for the plocha's one accent. */
-const TEAL = '#0D7377';
-const TEAL_DARK = '#0A5A5D';
 
 /* ── Animated counter (kept: a number that cannot animate must still show) ── */
 function AnimatedNumber({ value, duration = 1 }: { value: number; duration?: number }) {
@@ -92,7 +90,7 @@ export default function Dashboard() {
 
 /* ── One panel of the plocha ── */
 function Panel({
-  title, icon, count, accent = TEAL, action, children,
+  title, icon, count, accent, action, children,
 }: {
   title: string;
   icon: React.ReactNode;
@@ -101,16 +99,21 @@ function Panel({
   action?: { label: string; onClick: () => void };
   children: React.ReactNode;
 }) {
+  const theme = useTheme();
+  /* A panel with no accent of its own is the clinic's own colour, so the plocha
+     follows the owner's chosen theme. The tiles that pass a colour (waiting,
+     history, …) keep their own — those say what kind of panel it is. */
+  const accentColor = accent ?? theme.palette.primary.main;
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 2.5, py: 1.75, borderBottom: '1px solid #EEF1F1' }}>
-        <Avatar sx={{ bgcolor: `${accent}14`, color: accent, width: 34, height: 34 }}>{icon}</Avatar>
+        <Avatar sx={{ bgcolor: alpha(accentColor, 0.08), color: accentColor, width: 34, height: 34 }}>{icon}</Avatar>
         <Typography sx={{ fontWeight: 800, flex: 1 }}>{title}</Typography>
         {count !== undefined && (
           <Chip
             label={<AnimatedNumber value={count} />}
             size="small"
-            sx={{ fontWeight: 800, bgcolor: `${accent}14`, color: accent }}
+            sx={{ fontWeight: 800, bgcolor: alpha(accentColor, 0.08), color: accentColor }}
           />
         )}
       </Box>
@@ -119,7 +122,7 @@ function Panel({
         <Button
           onClick={action.onClick}
           endIcon={<ArrowForward sx={{ fontSize: 16 }} />}
-          sx={{ justifyContent: 'space-between', px: 2.5, py: 1.25, color: accent, fontWeight: 700, borderTop: '1px solid #EEF1F1', borderRadius: 0 }}
+          sx={{ justifyContent: 'space-between', px: 2.5, py: 1.25, color: accentColor, fontWeight: 700, borderTop: '1px solid #EEF1F1', borderRadius: 0 }}
         >
           {action.label}
         </Button>
@@ -137,6 +140,7 @@ function EmptyRow({ text }: { text: string }) {
 }
 
 function OwnerDashboard() {
+  const theme = useTheme();
   const navigate = useNavigate();
   const canSeePatients = usePermission('patients.view');
   const canRegister = usePermission('patients.register');
@@ -241,7 +245,7 @@ function OwnerDashboard() {
       onClick={() => navigate('/planovani')}
       sx={{ borderRadius: 2, mb: 0.5, gap: 1.5, alignItems: 'center' }}
     >
-      <Typography variant="caption" sx={{ fontWeight: 800, color: TEAL, minWidth: 44 }}>
+      <Typography variant="caption" sx={{ fontWeight: 800, color: theme.palette.primary.main, minWidth: 44 }}>
         {formatPragueTime(appt.startUtc)}
       </Typography>
       <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -255,7 +259,7 @@ function OwnerDashboard() {
       <Chip
         label={STATUS_LABELS[statusName(appt.status) ?? ''] ?? `stav ${appt.status}`}
         size="small"
-        sx={{ bgcolor: '#0D737714', color: TEAL, fontWeight: 600 }}
+        sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08), color: theme.palette.primary.main, fontWeight: 600 }}
       />
     </ListItemButton>
   );
@@ -281,7 +285,7 @@ function OwnerDashboard() {
             mb: 3,
             borderRadius: 4,
             color: '#fff',
-            background: `linear-gradient(135deg, ${TEAL} 0%, ${TEAL_DARK} 100%)`,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
             boxShadow: '0 12px 30px rgba(13,115,119,0.28)',
             position: 'relative',
           }}
@@ -323,7 +327,7 @@ function OwnerDashboard() {
                 startIcon={<PersonAdd />}
                 onClick={() => navigate('/patients/register')}
                 sx={{
-                  bgcolor: '#fff', color: TEAL, fontWeight: 800, borderRadius: 2.5,
+                  bgcolor: '#fff', color: theme.palette.primary.main, fontWeight: 800, borderRadius: 2.5,
                   px: 3, whiteSpace: 'nowrap', flexShrink: 0,
                   '&:hover': { bgcolor: '#F2FBFB' },
                 }}
@@ -344,7 +348,7 @@ function OwnerDashboard() {
                 <List disablePadding>
                   {(searchResults.data ?? []).map((p) => (
                     <ListItemButton key={p.id} onClick={() => navigate(`/patients/${p.id}`)} sx={{ gap: 1.5 }}>
-                      <Avatar sx={{ bgcolor: `${TEAL}14`, color: TEAL, width: 34, height: 34, fontSize: 14, fontWeight: 700 }}>
+                      <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08), color: theme.palette.primary.main, width: 34, height: 34, fontSize: 14, fontWeight: 700 }}>
                         {(p.firstName[0] ?? '') + (p.lastName[0] ?? '')}
                       </Avatar>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -447,7 +451,7 @@ function OwnerDashboard() {
                         Chybí podklady — {a.activityName}
                       </Typography>
                     </Box>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: TEAL }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: theme.palette.primary.main }}>
                       {formatPragueTime(a.startUtc)}
                     </Typography>
                   </ListItemButton>
