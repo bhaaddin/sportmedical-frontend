@@ -500,11 +500,11 @@ export default function NotificationCenter() {
                         key={`${section.key}-boundary`}
                         sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 0.5 }}
                       >
-                        <Box sx={{ flex: 1, height: '1px', bgcolor: '#0D7377' }} />
-                        <Typography variant="caption" sx={{ color: '#0D7377', fontWeight: 700 }}>
+                        <Box sx={{ flex: 1, height: '1px', bgcolor: 'primary.main' }} />
+                        <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700 }}>
                           Nové od vašeho posledního pohledu
                         </Typography>
-                        <Box sx={{ flex: 1, height: '1px', bgcolor: '#0D7377' }} />
+                        <Box sx={{ flex: 1, height: '1px', bgcolor: 'primary.main' }} />
                       </Box>
                     ) : null;
 
