@@ -16,7 +16,7 @@ import {
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import {
   EventAvailableOutlined, DescriptionOutlined, PersonOutlined, CalendarMonthOutlined,
-  HistoryOutlined,
+  HistoryOutlined, ReceiptLongOutlined,
 } from '@mui/icons-material';
 import { openPortal } from '../../api/patientPortal';
 import type { PortalAppointment, PortalDashboard } from '../../api/patientPortal';
@@ -267,6 +267,42 @@ export default function PatientPortal() {
                   ))
                 )}
               </Card>
+
+              {(dashboard.invoices?.length ?? 0) > 0 && (
+                <Card sx={{ p: { xs: 2.5, md: 3 } }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 1.5 }}>
+                    <ReceiptLongOutlined sx={{ color: BRAND.accentDark }} />
+                    <Typography variant="h6">Faktury</Typography>
+                  </Box>
+                  {dashboard.invoices!.map((inv, i) => (
+                    <Box key={inv.number || `inv-${i}`}>
+                      {i > 0 && <Divider />}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1 }}>
+                        <ReceiptLongOutlined sx={{ color: BRAND.muted }} />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 600 }}>{inv.number}</Typography>
+                          <Typography variant="caption" sx={{ color: BRAND.muted }}>
+                            Vystaveno {new Date(inv.issuedAtUtc).toLocaleDateString('cs-CZ')}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Typography sx={{ fontWeight: 700 }}>
+                            {inv.totalCzk.toLocaleString('cs-CZ')} Kč
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            sx={{ color: inv.remainingCzk > 0 ? BRAND.accentDark : BRAND.muted }}
+                          >
+                            {inv.remainingCzk > 0
+                              ? `Zbývá ${inv.remainingCzk.toLocaleString('cs-CZ')} Kč`
+                              : 'Zaplaceno'}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+                  ))}
+                </Card>
+              )}
 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: BRAND.muted, px: 1 }}>
                 <PersonOutlined sx={{ fontSize: 18 }} />

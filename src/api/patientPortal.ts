@@ -41,12 +41,24 @@ export interface PortalDocument {
   issuedAtUtc: string;
 }
 
+export interface PortalInvoice {
+  number: string;
+  issuedAtUtc: string;
+  dueAtUtc: string;
+  totalCzk: number;
+  paidCzk: number;
+  remainingCzk: number;
+  status: string;
+}
+
 export interface PortalDashboard {
   givenName: string;
   familyName: string;
   appointments: PortalAppointment[];
   pastAppointments: PortalAppointment[];
   documents: PortalDocument[];
+  /** May be absent when reached through an older API; treat undefined as none. */
+  invoices?: PortalInvoice[];
 }
 
 /** The patient's own dashboard, or null for an unknown/revoked token. */
