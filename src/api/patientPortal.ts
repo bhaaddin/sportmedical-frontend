@@ -38,6 +38,7 @@ export interface PortalAppointment {
 export interface PortalDocument {
   id: string;
   title: string;
+  /** When the clinic released it to the patient. */
   issuedAtUtc: string;
 }
 
@@ -71,6 +72,16 @@ export async function openPortal(token: string): Promise<PortalDashboard | null>
   } catch {
     return null;
   }
+}
+
+/**
+ * Where a released document opens for this token. A plain link rather than a
+ * fetch: the browser shows the PDF or image itself, and the token in the path is
+ * the identity, exactly as for the dashboard. The server answers 404 for anything
+ * the token's patient was not given.
+ */
+export function portalDocumentUrl(token: string, documentId: string): string {
+  return `${API_BASE}/api/patient-portal/${encodeURIComponent(token)}/documents/${encodeURIComponent(documentId)}`;
 }
 
 /** Issues (or re-issues) a patient's personal portal token; returns it once. */

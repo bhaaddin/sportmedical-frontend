@@ -18,11 +18,13 @@ import userEvent from '@testing-library/user-event';
 const content = vi.fn();
 const move = vi.fn();
 const invalidate = vi.fn();
+const releaseToPatient = vi.fn();
+const withdrawFromPatient = vi.fn();
 const search = vi.fn();
 
 vi.mock('../../api/documents', async () => {
   const actual = await vi.importActual<typeof import('../../api/documents')>('../../api/documents');
-  return { ...actual, documentsApi: { content, move, invalidate } };
+  return { ...actual, documentsApi: { content, move, invalidate, releaseToPatient, withdrawFromPatient } };
 });
 vi.mock('../../api/patients', () => ({ patientsApi: { search } }));
 
@@ -72,6 +74,8 @@ beforeEach(() => {
   content.mockReset().mockResolvedValue('blob:fake');
   move.mockReset().mockResolvedValue({});
   invalidate.mockReset().mockResolvedValue({});
+  releaseToPatient.mockReset().mockResolvedValue({});
+  withdrawFromPatient.mockReset().mockResolvedValue({});
   search.mockReset().mockResolvedValue([
     { id: 'p1', firstName: 'Anna', lastName: 'Černá' },
     { id: 'p2', firstName: 'Jan', lastName: 'Novák' },
@@ -236,5 +240,48 @@ describe('opening the file', () => {
     await user.click(screen.getByLabelText('Otevřít dokument'));
 
     expect(await screen.findByText(/Záznam zůstal, soubor ne/)).toBeInTheDocument();
+  });
+});
+
+/*
+ * Releasing to the patient's portal. Nothing is released by default; the button
+ * says which state the document is in, and a document the clinic has said is
+ * no good is never offered for release.
+ */
+describe('releasing a document to the patient portal', () => {
+  it('releases an unreleased document and tells the card to refresh', async () => {
+    const onChanged = renderActions();
+    await userEvent.click(screen.getByRole('button', { name: 'Zpřístupnit v portálu pacienta' }));
+    expect(releaseToPatient).toHaveBeenCalledWith('d1');
+    expect(withdrawFromPatient).not.toHaveBeenCalled();
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it('withdraws a released one', async () => {
+    const onChanged = renderActions({ releasedToPatientAtUtc: '2026-09-30T10:00:00Z' });
+    const button = screen.getByRole('button', { name: 'Odebrat z portálu pacienta' });
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(button);
+    expect(withdrawFromPatient).toHaveBeenCalledWith('d1');
+    expect(releaseToPatient).not.toHaveBeenCalled();
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it('does not offer an invalidated document for release', () => {
+    renderActions({ status: 'Invalidated', invalidatedAtUtc: '2026-09-30T10:00:00Z' });
+    expect(screen.getByRole('button', { name: 'Zpřístupnit v portálu pacienta' })).toBeDisabled();
+  });
+
+  it('does not offer a rejected document for release', () => {
+    renderActions({ status: 'Rejected' });
+    expect(screen.getByRole('button', { name: 'Zpřístupnit v portálu pacienta' })).toBeDisabled();
+  });
+
+  it('says so in words when the server refuses the release', async () => {
+    releaseToPatient.mockRejectedValue({ response: { status: 409 } });
+    const onChanged = renderActions();
+    await userEvent.click(screen.getByRole('button', { name: 'Zpřístupnit v portálu pacienta' }));
+    expect(await screen.findByText(/nelze pacientovi zpřístupnit/)).toBeInTheDocument();
+    expect(onChanged).not.toHaveBeenCalled();
   });
 });

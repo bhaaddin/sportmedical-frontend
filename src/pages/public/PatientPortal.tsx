@@ -18,7 +18,7 @@ import {
   EventAvailableOutlined, DescriptionOutlined, PersonOutlined, CalendarMonthOutlined,
   HistoryOutlined, ReceiptLongOutlined,
 } from '@mui/icons-material';
-import { openPortal } from '../../api/patientPortal';
+import { openPortal, portalDocumentUrl } from '../../api/patientPortal';
 import type { PortalAppointment, PortalDashboard } from '../../api/patientPortal';
 
 const BRAND = {
@@ -259,10 +259,29 @@ export default function PatientPortal() {
                     Zatím tu nemáte žádné dokumenty. Jakmile vám je ordinace uvolní, objeví se zde.
                   </Typography>
                 ) : (
-                  dashboard.documents.map((d) => (
-                    <Box key={d.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1 }}>
-                      <DescriptionOutlined sx={{ color: BRAND.muted }} />
-                      <Typography sx={{ flex: 1 }}>{d.title}</Typography>
+                  dashboard.documents.map((d, i) => (
+                    <Box key={d.id}>
+                      {i > 0 && <Divider />}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1 }}>
+                        <DescriptionOutlined sx={{ color: BRAND.muted }} />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{d.title}</Typography>
+                          <Typography variant="caption" sx={{ color: BRAND.muted }}>
+                            Zpřístupněno {new Date(d.issuedAtUtc).toLocaleDateString('cs-CZ')}
+                          </Typography>
+                        </Box>
+                        <Button
+                          component="a"
+                          href={portalDocumentUrl(token ?? '', d.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          variant="outlined"
+                          size="small"
+                          aria-label={`Otevřít dokument ${d.title}`}
+                        >
+                          Otevřít
+                        </Button>
+                      </Box>
                     </Box>
                   ))
                 )}

@@ -1,6 +1,7 @@
 /*
- * What can be done with a document that is already filed: open it, move it to
- * the patient it actually belongs to, or strike it out.
+ * What can be done with a document that is already filed: open it, release it
+ * to the patient's portal, move it to the patient it actually belongs to, or
+ * strike it out.
  *
  * Opening it is the one that was missing entirely. Until today there was no
  * way to read a stored file at any level - it could be uploaded, listed and
@@ -18,7 +19,7 @@ import {
   IconButton, MenuItem, Stack, TextField, Tooltip, Typography, CircularProgress,
 } from '@mui/material';
 import {
-  Visibility, DriveFileMove, Block, Close,
+  Visibility, DriveFileMove, Block, Close, Share, ShareOutlined,
 } from '@mui/icons-material';
 import {
   documentsApi, INVALIDATION_REASONS, INVALIDATION_REASON_LABEL,
@@ -116,6 +117,33 @@ export default function DocumentActions({
     }
   };
 
+  /* Released or not is one click either way: the patient's own document, and
+     nothing about releasing it is irreversible - withdrawing takes it straight
+     back out of the portal, saved links included. */
+  const toggleRelease = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (released) {
+        await documentsApi.withdrawFromPatient(doc.id);
+      } else {
+        await documentsApi.releaseToPatient(doc.id);
+      }
+      onChanged();
+    } catch (caught) {
+      const status = (caught as { response?: { status?: number } })?.response?.status;
+      setError(
+        status === 409
+          ? 'Tento dokument nelze pacientovi zpřístupnit — je zamítnutý nebo zneplatněný, nebo k němu chybí soubor.'
+          : released
+            ? 'Dokument se nepodařilo z portálu odebrat. Zkuste to prosím znovu.'
+            : 'Dokument se nepodařilo zpřístupnit. Zkuste to prosím znovu.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const doInvalidate = async () => {
     setBusy(true);
     setError(null);
@@ -133,6 +161,16 @@ export default function DocumentActions({
 
   const wouldLeaveGap = lastOfItsKind(doc, patientDocuments);
   const alreadyInvalid = doc.invalidatedAtUtc !== null;
+  const released = (doc.releasedToPatientAtUtc ?? null) !== null;
+  /* A withdrawal is always allowed - taking something out of the portal is
+     never wrong. A release is not offered for a document the clinic has said
+     is no good; the server refuses it too. */
+  const releaseBlocked = !released && (alreadyInvalid || doc.status === 'Rejected');
+  const releaseLabel = released
+    ? 'Zpřístupněno v portálu pacienta — kliknutím odebrat'
+    : releaseBlocked
+      ? 'Zneplatněný nebo zamítnutý dokument nelze zpřístupnit'
+      : 'Zpřístupnit pacientovi v portálu';
 
   return (
     <>
@@ -141,6 +179,20 @@ export default function DocumentActions({
           <span>
             <IconButton size="small" aria-label="Otevřít dokument" onClick={() => void open()} disabled={loadingView}>
               {loadingView ? <CircularProgress size={16} /> : <Visibility fontSize="small" />}
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title={releaseLabel}>
+          <span>
+            <IconButton
+              size="small"
+              aria-label={released ? 'Odebrat z portálu pacienta' : 'Zpřístupnit v portálu pacienta'}
+              aria-pressed={released}
+              color={released ? 'primary' : 'default'}
+              onClick={() => void toggleRelease()}
+              disabled={busy || releaseBlocked}
+            >
+              {released ? <Share fontSize="small" /> : <ShareOutlined fontSize="small" />}
             </IconButton>
           </span>
         </Tooltip>

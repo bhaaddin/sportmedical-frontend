@@ -121,7 +121,11 @@ export type DocumentStatus =
   | 'SignedOff'
   | 'Expired'
   | 'Superseded'
-  | 'Rejected';
+  | 'Rejected'
+  /* Sent since the invalidation (13. 9. 2026): accepted once, since found
+     unusable. Added here 30. 9. 2026 - the server's enum had it and this union
+     did not, so the one screen that needs to recognise it could not say so. */
+  | 'Invalidated';
 
 /** Signed off is the only state that satisfies a required-document rule. */
 export const DOCUMENT_SATISFIES_REQUIREMENT: DocumentStatus = 'SignedOff';
@@ -204,6 +208,21 @@ export interface PatientDocument {
   invalidationNote: string | null;
   invalidatedByUserId: string | null;
   invalidatedAtUtc: string | null;
+
+  /*
+   * Released to the patient's portal: when, and by whom. Nothing is released
+   * by default - staff decide one document at a time. Optional because an
+   * older API does not send them; absent reads as "not released".
+   */
+  releasedToPatientAtUtc?: string | null;
+  releasedToPatientByUserId?: string | null;
+  /*
+   * Whether the patient actually sees it now, computed by the server with the
+   * same rule the portal reads with - so the card and the portal cannot
+   * disagree. A released document that is later rejected is released and not
+   * visible.
+   */
+  visibleToPatient?: boolean;
   appointmentId?: string;
   notes: string;
 }
@@ -421,6 +440,21 @@ export const documentsApi = {
   },
 
   /** Strike a document out, with a reason from the fixed list. */
+  /**
+   * Release a document to the patient's portal. The server refuses (409) a
+   * rejected or invalidated document, or one with no stored file behind it.
+   */
+  releaseToPatient: async (documentId: string): Promise<PatientDocument> => {
+    const res = await client.post(`/api/documents/${documentId}/release-to-patient`);
+    return res.data?.value ?? res.data;
+  },
+
+  /** Take a document back out of the patient's portal. */
+  withdrawFromPatient: async (documentId: string): Promise<PatientDocument> => {
+    const res = await client.post(`/api/documents/${documentId}/withdraw-from-patient`);
+    return res.data?.value ?? res.data;
+  },
+
   invalidate: async (
     documentId: string,
     reasonCode: InvalidationReason,
