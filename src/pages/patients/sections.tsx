@@ -8,7 +8,7 @@
  * to draw the sidebar, and importing it from the layout would pull that whole
  * page into the main bundle and undo its lazy loading.
  */
-import { Dashboard, Description, Event } from '@mui/icons-material';
+import { Dashboard, Description, Event, History } from '@mui/icons-material';
 
 export interface PatientSection {
   id: string;
@@ -22,6 +22,7 @@ export const PATIENT_SECTIONS: PatientSection[] = [
   { id: 'prehled', label: 'Přehled', path: '', icon: <Dashboard /> },
   { id: 'dokumenty', label: 'Dokumenty', path: 'dokumenty', icon: <Description /> },
   { id: 'terminy', label: 'Termíny', path: 'terminy', icon: <Event /> },
+  { id: 'historie', label: 'Historie', path: 'historie', icon: <History /> },
 ];
 
 /** Where a section lives for a given patient. */
