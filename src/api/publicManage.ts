@@ -29,6 +29,11 @@ export interface ManagedBooking {
   startUtc: string;
   endUtc: string;
   isCancelled: boolean;
+  /** Which calendar + činnost this booking is for — needed to fetch new times. */
+  calendarId: string | null;
+  activityId: string | null;
+  /** Until when the patient may still move/cancel it online (clinic setting). */
+  canChangeUntilUtc: string | null;
 }
 
 interface ApiResult<T> {
@@ -102,6 +107,31 @@ export const cancelBooking = async (token: string): Promise<ManagedBooking> => {
     return data.data;
   } catch (error) {
     throw complain(error, 'Termín se nepodařilo zrušit. Zkuste to prosím znovu.');
+  }
+};
+
+/**
+ * Moves the booking to a new time (same činnost), and frees the old one.
+ *
+ * The server re-checks availability, the notice window and double-booking at the
+ * moment of the move — so a time that was free when it was shown but taken since
+ * is refused here, not silently overwritten. Refused too close to the
+ * appointment the same way cancel is; the server's sentence is the one shown.
+ */
+export const rescheduleBooking = async (
+  token: string,
+  startUtc: string,
+  activityId: string | null,
+): Promise<ManagedBooking> => {
+  try {
+    const { data } = await publicClient.post<ApiResult<ManagedBooking>>(
+      `/api/public/booking/manage/${encodeURIComponent(token)}/reschedule`,
+      { startUtc, activityId },
+    );
+
+    return data.data;
+  } catch (error) {
+    throw complain(error, 'Termín se nepodařilo přesunout. Vyberte prosím jiný čas.');
   }
 };
 
