@@ -8,8 +8,32 @@ import { formatPragueTime, formatPragueDate } from "../../../utils/time";
 
 /** What the card shows when the server sent no hover-field choice of its own. */
 const DEFAULT_HOVER_FIELDS = [
-  "patientName", "activity", "price", "registrationStatus", "status", "phone", "email", "paperwork",
+  "patientName", "activity", "price", "registrationStatus", "questionnaire", "status", "phone", "email", "paperwork",
 ];
+
+/** A paperwork gap code → the words the desk reads. */
+const PAPERWORK_REASON_LABEL: Record<string, string> = {
+  questionnaire_missing: "chybí dotazník",
+  questionnaire_expired: "dotazník propadlý — nový souhlas",
+  report_missing: "chybí výpis",
+  registration_incomplete: "nedokončená registrace",
+};
+const paperworkReasonLabel = (code: string): string =>
+  PAPERWORK_REASON_LABEL[code] ?? code;
+
+/**
+ * The questionnaire's own status, read from the paperwork gaps — so the desk
+ * sees "vyplněn / chybí / propadlý" distinctly, not folded into one Podklady line.
+ * `null` when the server could not judge (no paperwork answer for this patient).
+ */
+const questionnaireStatus = (
+  paperwork: { ready: boolean; missing: string[] } | null | undefined,
+): string | null => {
+  if (!paperwork) return null;
+  if (paperwork.missing.includes("questionnaire_expired")) return "propadlý — nový souhlas";
+  if (paperwork.missing.includes("questionnaire_missing")) return "chybí";
+  return "vyplněn";
+};
 
 /** The činnost's price in Czech koruna, from the price list it is linked to. */
 function formatPrice(czk: number): string {
@@ -111,8 +135,12 @@ export function AppointmentHoverCard({
         return appointment.paperwork
           ? appointment.paperwork.ready
             ? t("booking.paperwork.ready")
-            : t("booking.paperwork.line")
+            : appointment.paperwork.missing.length > 0
+              ? appointment.paperwork.missing.map(paperworkReasonLabel).join(" · ")
+              : t("booking.paperwork.line")
           : null;
+      case "questionnaire":
+        return questionnaireStatus(appointment.paperwork);
       default:
         return null;
     }
@@ -128,6 +156,7 @@ export function AppointmentHoverCard({
       case "price": return "Cena";
       case "service": return "Služba";
       case "registrationStatus": return "Registrace";
+      case "questionnaire": return "Dotazník";
       case "status": return "Stav objednávky";
       case "paperwork": return "Podklady";
       default: return key;
