@@ -84,6 +84,21 @@ export const saveCalendarDisplay = async (
 
 export const CALENDAR_DISPLAY_QUERY_KEY = ['settings', 'calendar-display'] as const;
 
+/**
+ * The server's calendar settings laid over the offline defaults, field by field.
+ *
+ * Not all-or-nothing: a server that answers 200 but omits a field — an older API
+ * that predates `holidayColor` or `hoverFields` — must not leave that field
+ * `undefined`. `alpha(undefined)` in the grid throws and takes the whole calendar
+ * down with it, and a whole-object `?? OFFLINE` only ever covered the request
+ * failing outright, never a partial payload.
+ */
+export function resolveCalendarDisplay(
+  response: CalendarDisplayResponse | undefined,
+): CalendarDisplaySettings {
+  return { ...CALENDAR_DISPLAY_OFFLINE, ...(response?.settings ?? {}) };
+}
+
 /** The calendar settings, or the offline values until (or unless) they arrive. */
 export function useCalendarDisplay(): { settings: CalendarDisplaySettings; loaded: boolean } {
   const query = useQuery({
@@ -93,7 +108,7 @@ export function useCalendarDisplay(): { settings: CalendarDisplaySettings; loade
   });
 
   return {
-    settings: query.data?.settings ?? CALENDAR_DISPLAY_OFFLINE,
+    settings: resolveCalendarDisplay(query.data),
     loaded: query.data !== undefined,
   };
 }

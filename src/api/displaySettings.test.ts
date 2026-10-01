@@ -10,8 +10,8 @@
  * setting says.
  */
 import { describe, it, expect } from 'vitest';
-import { gridSpan, shownFields } from './displaySettings';
-import type { PatientFieldVisibility } from './displaySettings';
+import { gridSpan, shownFields, resolveCalendarDisplay, CALENDAR_DISPLAY_OFFLINE } from './displaySettings';
+import type { CalendarDisplayResponse, PatientFieldVisibility } from './displaySettings';
 import { moveKey } from '../pages/settings/patientFieldOrder';
 import { fieldErrorsOf, problemMessageOf } from '../pages/settings/settingsProblem';
 
@@ -105,5 +105,26 @@ describe('settings refusals', () => {
     expect(problemMessageOf(refusal, 'x')).toContain('Konec dne');
     expect(problemMessageOf(new Error('Network Error'), 'Nepodařilo se uložit.')).toBe('Nepodařilo se uložit.');
     expect(fieldErrorsOf(new Error('Network Error'))).toEqual({});
+  });
+});
+
+describe('resolveCalendarDisplay', () => {
+  it('is the offline defaults when nothing has arrived', () => {
+    expect(resolveCalendarDisplay(undefined)).toEqual(CALENDAR_DISPLAY_OFFLINE);
+  });
+
+  it('fills a field the server omitted so the grid never draws with undefined', () => {
+    // An older API that answers 200 but predates holidayColor/hoverFields.
+    const partial = {
+      settings: { defaultView: 'day', slotMinutes: 15, dayStartHour: 7, dayEndHour: 19, nowLineColor: '#111111' },
+    } as CalendarDisplayResponse;
+
+    const resolved = resolveCalendarDisplay(partial);
+
+    // Provided fields win; omitted ones fall back rather than being undefined.
+    expect(resolved.defaultView).toBe('day');
+    expect(resolved.nowLineColor).toBe('#111111');
+    expect(resolved.holidayColor).toBe(CALENDAR_DISPLAY_OFFLINE.holidayColor);
+    expect(resolved.hoverFields).toEqual(CALENDAR_DISPLAY_OFFLINE.hoverFields);
   });
 });
