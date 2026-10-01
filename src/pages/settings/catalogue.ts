@@ -300,6 +300,28 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ],
   },
   {
+    /*
+     * What the clinic says, not what the patient signs. The e-mail templates —
+     * confirmation, reschedule, cancellation and the rest — were editable only
+     * through the API until now; the backend has carried save, preview and
+     * test-send from the start. Its own heading, under its own permission
+     * (communication.manage), because wording the clinic sends is a different
+     * job from the documents a patient brings.
+     */
+    id: 'komunikace',
+    label: 'Komunikace',
+    description: 'Zprávy, které ordinace posílá pacientům a personálu',
+    items: [
+      {
+        id: 'sablony-emailu',
+        label: 'Šablony e-mailů',
+        description: 'Předmět a text e-mailů — úprava, náhled se vzorovými hodnotami a test',
+        to: '/nastaveni/sablony-emailu',
+        requires: 'communication.manage',
+      },
+    ],
+  },
+  {
     id: 'system',
     label: 'Systém',
     description: 'Co se kdy stalo a jak na tom systém je',
