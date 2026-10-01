@@ -322,6 +322,24 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ],
   },
   {
+    /*
+     * Personal, not administrative: every signed-in user secures their own
+     * account here, so no `requires` — unlike the admin screens above. The
+     * backend TOTP flow was complete and had no screen; this is it.
+     */
+    id: 'zabezpeceni',
+    label: 'Zabezpečení',
+    description: 'Dvoufázové ověření vašeho účtu',
+    items: [
+      {
+        id: 'dvoufazove',
+        label: 'Dvoufázové ověření',
+        description: 'Chraňte svůj účet jednorázovým kódem z ověřovací aplikace',
+        to: '/nastaveni/zabezpeceni',
+      },
+    ],
+  },
+  {
     id: 'system',
     label: 'Systém',
     description: 'Co se kdy stalo a jak na tom systém je',

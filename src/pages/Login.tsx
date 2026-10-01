@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff, LocalHospital, Email, Lock } from '@mui/icons-material';
 import { motion } from 'framer-motion';
-import { authApi } from '../api/auth';
+import { authApi, isSecondFactorChallenge } from '../api/auth';
 import { savePermissions, saveUser } from '../auth/localSession';
 
 /** What the sign-in says when the client ended a session nobody closed here. */
@@ -28,6 +28,10 @@ export default function Login() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changing, setChanging] = useState(false);
+
+  /* Two-factor flow: set once the password was right but a code is also needed. */
+  const [secondFactorToken, setSecondFactorToken] = useState<string | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
 
   const finishLogin = (res: any) => {
     localStorage.setItem('token', res.accessToken);
@@ -55,6 +59,11 @@ export default function Login() {
     setError('');
     try {
       const res = await authApi.login(email, password);
+      if (isSecondFactorChallenge(res)) {
+        setSecondFactorToken(res.challengeToken);
+        setLoading(false);
+        return;
+      }
       if (res.account.mustChangePassword) {
         setMustChange(true);
         setLoading(false);
@@ -112,6 +121,31 @@ export default function Login() {
     }
   };
 
+  const handleSecondFactor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (secondFactorToken === null) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await authApi.completeSecondFactor(secondFactorToken, twoFactorCode.trim());
+      if (res.account.mustChangePassword) {
+        setSecondFactorToken(null);
+        setMustChange(true);
+        setLoading(false);
+        return;
+      }
+      finishLogin(res);
+    } catch (err: any) {
+      if (!err.response) {
+        setError('Server neodpovídá. Zkontrolujte, že běží, a zkuste to znovu.');
+      } else {
+        setError(err.response?.data?.message || 'Neplatný kód. Zkuste to znovu.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Box sx={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -147,7 +181,37 @@ export default function Login() {
             </motion.div>
           )}
 
-          {mustChange ? (
+          {secondFactorToken !== null ? (
+          <motion.form onSubmit={handleSecondFactor} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
+            <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+              Zadejte šestimístný kód z ověřovací aplikace.
+            </Alert>
+            <TextField fullWidth label="Ověřovací kód" required value={twoFactorCode} autoFocus
+              onChange={e => setTwoFactorCode(e.target.value)} margin="normal"
+              slotProps={{
+                htmlInput: { inputMode: 'numeric', maxLength: 10, style: { letterSpacing: 4, fontSize: 20, textAlign: 'center' } },
+                input: { startAdornment: <InputAdornment position="start"><Lock color="action" /></InputAdornment> },
+              }}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
+            <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
+              <Button type="submit" fullWidth variant="contained" size="large"
+                disabled={loading || twoFactorCode.trim().length < 6}
+                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
+                sx={{
+                  mt: 2, py: 1.5, borderRadius: 2, fontWeight: 700, fontSize: 16,
+                  bgcolor: '#0D7377', boxShadow: '0 4px 20px rgba(13,115,119,0.4)',
+                  '&:hover': { bgcolor: '#095456' },
+                }}>
+                {loading ? 'Ověřuji…' : 'Ověřit a přihlásit'}
+              </Button>
+            </motion.div>
+            <Box sx={{ textAlign: 'center', mt: 2 }}>
+              <Button size="small" onClick={() => { setSecondFactorToken(null); setTwoFactorCode(''); setError(''); }}>
+                Zpět na přihlášení
+              </Button>
+            </Box>
+          </motion.form>
+          ) : mustChange ? (
           <motion.form onSubmit={handlePasswordChange} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
             <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
               První přihlášení — nastavte si vlastní heslo pro účet {email}.
