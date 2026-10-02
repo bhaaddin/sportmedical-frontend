@@ -314,7 +314,7 @@ export default function Settings() {
           <Card variant="outlined" sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent>
               <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-                <Avatar sx={{ bgcolor: '#0D7377', width: 48, height: 48 }}>
+                <Avatar sx={{ bgcolor: 'primary.main', width: 48, height: 48 }}>
                   {initials}
                 </Avatar>
                 <Box sx={{ flex: 1 }}>

@@ -265,7 +265,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           <NotificationCenter />
           <IconButton color="inherit" onClick={(e) => setAnchorEl(e.currentTarget)}
             sx={{ transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.1)' } }}>
-            <Avatar sx={{ bgcolor: '#14A3A8', width: 36, height: 36, transition: 'box-shadow 0.2s', '&:hover': { boxShadow: '0 0 0 3px rgba(20,163,168,0.4)' } }}>
+            <Avatar sx={{ bgcolor: alpha('#FFFFFF', 0.22), color: '#FFFFFF', fontWeight: 700, width: 36, height: 36, transition: 'box-shadow 0.2s', '&:hover': { boxShadow: `0 0 0 3px ${alpha('#FFFFFF', 0.45)}` } }}>
               {user.firstName?.[0]}{user.lastName?.[0]}
             </Avatar>
           </IconButton>
@@ -333,7 +333,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           overflowX: 'hidden',
           '& .MuiDrawer-paper': {
             width: currentWidth, boxSizing: 'border-box', mt: '64px',
-            borderRight: '1px solid rgba(0,0,0,0.06)',
+            borderRight: '1px solid', borderColor: 'divider',
             transition: 'width 0.25s ease',
             overflowX: 'hidden',
           },
@@ -361,7 +361,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                   }} />
                 )}
               </ListItemButton>
-              <Box sx={{ mx: 1.5, my: 1, borderTop: '1px solid #e0e0e0' }} />
+              <Box sx={{ mx: 1.5, my: 1, borderTop: '1px solid', borderColor: 'divider' }} />
               {PATIENT_SECTIONS.map((section) => {
                 const to = sectionPath(patientId, section);
                 const isActive = location.pathname === to;
@@ -399,12 +399,12 @@ function Layout({ children }: { children: React.ReactNode }) {
           {patientId === null && visibleMenu.map((group, gi) => (
             <Box key={gi}>
               {group.label && sidebarOpen && (
-                <Typography variant="caption" sx={{ px: 2, pt: gi > 0 ? 2 : 0, pb: 0.5, display: 'block', fontWeight: 700, color: '#999', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>
+                <Typography variant="caption" sx={{ px: 2, pt: gi > 0 ? 2 : 0, pb: 0.5, display: 'block', fontWeight: 700, color: 'text.secondary', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>
                   {group.label}
                 </Typography>
               )}
               {group.label && !sidebarOpen && gi > 0 && (
-                <Box sx={{ mx: 1.5, my: 1, borderTop: '1px solid #e0e0e0' }} />
+                <Box sx={{ mx: 1.5, my: 1, borderTop: '1px solid', borderColor: 'divider' }} />
               )}
               {group.items.map((item) => {
                 const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
@@ -445,7 +445,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         sx={{
           flexGrow: 1, p: 3, mt: '64px', ml: `${currentWidth}px`,
           transition: 'margin-left 0.25s ease',
-          bgcolor: '#F5F7FA', minHeight: '100vh', overflow: 'auto',
+          bgcolor: 'transparent', minHeight: '100vh', overflow: 'auto',
         }}
       >
         {/*

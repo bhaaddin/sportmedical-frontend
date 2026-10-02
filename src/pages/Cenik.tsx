@@ -91,7 +91,7 @@ export default function Cenik() {
               variant="contained"
               startIcon={<Add />}
               onClick={() => setEditing(null)}
-              sx={{ borderRadius: 2, px: 3, bgcolor: '#0D7377' }}
+              sx={{ borderRadius: 2, px: 3, bgcolor: 'primary.main' }}
             >
               Nová položka
             </Button>
@@ -124,7 +124,7 @@ export default function Cenik() {
                 variant="contained"
                 startIcon={<Add />}
                 onClick={() => setEditing(null)}
-                sx={{ borderRadius: 2, px: 3, bgcolor: '#0D7377' }}
+                sx={{ borderRadius: 2, px: 3, bgcolor: 'primary.main' }}
               >
                 Nová položka
               </Button>
@@ -137,8 +137,8 @@ export default function Cenik() {
       {services.length > 0 && (
       <Grid container spacing={3} sx={{ mb: 3 }}>
         {[
-          { label: 'Celkem položek', value: totalServices, color: '#0D7377' },
-          { label: 'Průměrná cena', value: `${avgPrice.toLocaleString('cs-CZ')} Kč`, color: '#2E7D32' },
+          { label: 'Celkem položek', value: totalServices, color: 'primary.main' },
+          { label: 'Průměrná cena', value: `${avgPrice.toLocaleString('cs-CZ')} Kč`, color: 'success.main' },
         ].map((stat, i) => (
           <Grid key={stat.label} size={{ xs: 12, sm: 6 }}>
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.1 }}>
@@ -192,14 +192,14 @@ export default function Cenik() {
                   whileHover={{ y: -4, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
                 >
                   <Card sx={{ height: '100%', overflow: 'hidden' }}>
-                    <Box sx={{ height: 4, bgcolor: '#0D7377' }} />
+                    <Box sx={{ height: 4, bgcolor: 'primary.main' }} />
                     <CardContent sx={{ p: 3 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                         <Box>
                           <Chip label={service.code} size="small" sx={{ mb: 1, fontWeight: 700 }} />
                           <Typography variant="h6" sx={{ fontWeight: 700 }}>{service.name}</Typography>
                         </Box>
-                        <Typography variant="h5" sx={{ fontWeight: 800, color: '#0D7377' }}>
+                        <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main' }}>
                           {service.priceCzk.toLocaleString('cs-CZ')} Kč
                         </Typography>
                       </Box>
@@ -270,7 +270,7 @@ export default function Cenik() {
           <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
             <Table>
               <TableHead>
-                <TableRow sx={{ bgcolor: '#f8f9fa' }}>
+                <TableRow sx={{ bgcolor: 'action.hover' }}>
                   <TableCell sx={{ fontWeight: 700 }}>Kód</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Název</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Cena (Kč)</TableCell>
@@ -283,7 +283,7 @@ export default function Cenik() {
                       <Chip label={service.code} size="small" sx={{ fontWeight: 700 }} />
                     </TableCell>
                     <TableCell sx={{ fontWeight: 500 }}>{service.name}</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700, color: '#0D7377' }}>
+                    <TableCell align="right" sx={{ fontWeight: 700, color: 'primary.main' }}>
                       {service.priceCzk.toLocaleString('cs-CZ')} Kč
                     </TableCell>
                   </TableRow>
