@@ -21,6 +21,7 @@ import { formatDateOnly, formatPragueDate, toDateOnly } from "../../utils/time";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { NewPartnerOrderDialog } from "../../components/booking/NewPartnerOrderDialog";
 import { ReleaseWindowDialog } from "../../components/booking/ReleaseWindowDialog";
+import { ClubScheduleReport } from "../../components/booking/ClubScheduleReport";
 import { errorText } from "../../components/booking/errorText";
 
 /**
@@ -329,6 +330,7 @@ function OrderCard({
   const { t } = useTranslation();
   const today = toDateOnly(new Date());
   const typeKey = partnerTypeName(order.partnerType);
+  const [reportOpen, setReportOpen] = useState(false);
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
@@ -347,7 +349,16 @@ function OrderCard({
         {order.isRevoked ? (
           <Chip size="small" color="default" label={t("booking.partner.revoked")} />
         ) : null}
+        <Button
+          size="small"
+          variant="outlined"
+          sx={{ ml: "auto" }}
+          onClick={() => setReportOpen(true)}
+        >
+          Rozpis / tisk
+        </Button>
       </Stack>
+      <ClubScheduleReport order={order} open={reportOpen} onClose={() => setReportOpen(false)} />
 
       <Typography variant="body2" sx={{ color: "text.secondary", mb: 1.5 }}>
         {order.linkSentAt
