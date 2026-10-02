@@ -30,6 +30,8 @@ export interface IssuedLink {
   expiresAtUtc: string;
   emailQueued?: boolean;
   emailWillSend?: boolean;
+  /** The address the link's e-mail went to, when one was queued. */
+  sentTo?: string | null;
 }
 
 function newId(): string {

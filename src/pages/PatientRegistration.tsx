@@ -22,15 +22,21 @@
  *
  *   an error puts the screen at the field rather than at a step, because on
  *   one screen there is nowhere else to put it
+ *
+ * Dressed on 3. 10. 2026 to the design board: PageHeader with the mode switch
+ * and the live count, bordered cards with small-caps section labels, labels
+ * over the inputs, a two-column grid, and a sticky footer that keeps "Uložit
+ * a pokračovat" in reach. Rychlá registrace now also issues the patient's
+ * completion link the moment the record exists, and shows it with Kopírovat.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Alert, AlertTitle, Autocomplete, Box, Button, Checkbox, Chip, CircularProgress,
-  Divider, FormControlLabel, Grid, LinearProgress, MenuItem, Paper, Radio,
-  RadioGroup, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography,
+  Alert, AlertTitle, Autocomplete, Box, Button, Checkbox, CircularProgress,
+  Divider, FormControlLabel, Grid, LinearProgress, MenuItem, Stack, TextField,
+  ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
-import { HowToReg, PersonAdd, Search } from '@mui/icons-material';
+import { InfoOutlined, PersonAdd, Search } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import patientRegistryApi, {
   type EmailInspection,
@@ -42,6 +48,7 @@ import patientRegistryApi, {
   type RegistrationCandidate,
   type RegistrationConfirmation,
 } from '../api/patientRegistry';
+import { patientPreRegistrationApi, type IssuedLink } from '../api/patientPreRegistration';
 import type { MapySuggestion } from '../api/addressLookup';
 import {
   createEmptyForm,
@@ -68,8 +75,15 @@ import { preferredCount, withPreferredFirst } from '../services/patientRegistrat
 import {
   groupedDisplay, phoneComplaint, phoneDisplayState, worthInspectingPhone,
 } from '../services/patientRegistration/phoneDisplay';
+import {
+  MODE_LABEL, progressSubtitle, requiredFieldCount,
+} from '../services/patientRegistration/progress';
+import { PageHeader, SectionLabel, SoftCard, StatusChip } from '../components/ui';
 import MapyAddressPicker from '../components/registration/MapyAddressPicker';
 import CandidateReviewDialog from '../components/registration/CandidateReviewDialog';
+import FormField from '../components/registration/FormField';
+import IssuedLinkCard from '../components/registration/IssuedLinkCard';
+import StickyFormFooter from '../components/registration/StickyFormFooter';
 
 interface RegistrationIdentifiers {
   patientId: string;
@@ -135,6 +149,33 @@ const FIELD_LABEL: Partial<Record<keyof RegistrationFormState, string>> = {
   email: 'E-mail', phone: 'Telefon', phoneRegionCode: 'Předvolba',
 };
 
+/** The label element a select names itself after - see FormField. */
+const selectLabelledBy = (id: string) => ({ select: { labelId: `${id}-label` } });
+
+/** Brings a field into view. A test DOM has no scrolling; that is not an error. */
+function scrollToField(field: string): void {
+  const node = document.querySelector(`[data-field="${field}"]`);
+  if (node !== null && typeof node.scrollIntoView === 'function') {
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+/** What the desk sees once a quick registration has its link. */
+interface IssuedRegistration {
+  patientId: string;
+  name: string;
+  email: string;
+  link: string;
+  issued: IssuedLink;
+}
+
+function formatExpiry(iso: string): string {
+  const parsed = new Date(iso);
+  return Number.isNaN(parsed.getTime())
+    ? ''
+    : parsed.toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 export default function PatientRegistration() {
   const navigate = useNavigate();
 
@@ -153,6 +194,9 @@ export default function PatientRegistration() {
     candidates: RegistrationCandidate[];
     confirmation: RegistrationConfirmation;
   } | null>(null);
+
+  /** The completion link after a quick registration — the success state. */
+  const [issued, setIssued] = useState<IssuedRegistration | null>(null);
 
   /** What the identifier itself says, when it has been asked. */
   const [inspection, setInspection] = useState<IdentityInspection | null>(null);
@@ -457,15 +501,14 @@ export default function PatientRegistration() {
         confirmation,
       };
     },
-    [form],
+    [form, addressPoint],
   );
 
   /** Puts the screen at the first thing that is wrong. There is no step to go to. */
   const focusFirstError = (found: FieldErrors) => {
     const first = FIELD_ORDER.find((field) => found[field] !== undefined);
     if (first === undefined) return;
-    const node = document.querySelector(`[data-field="${first}"]`);
-    node?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    scrollToField(first);
   };
 
   const send = useCallback(
@@ -499,6 +542,31 @@ export default function PatientRegistration() {
             : 'Pacient s totožnými údaji už byl zaregistrován.',
         );
         identifiers.current = mintIdentifiers();
+
+        /*
+         * Rychlá registrace is a pre-registration: the record has no address
+         * yet, and the patient fills the rest in through their own link. The
+         * link is issued here, the moment the record exists, so the desk can
+         * hand it over at once — it is the same 24 h link the booking drawer
+         * makes. If the server will not issue one (the record is complete, or
+         * cannot be reached) the desk goes to the card as it always did.
+         */
+        if (form.mode === 'Quick' && result.outcome === 'Created') {
+          try {
+            const link = await patientPreRegistrationApi.issueLink(result.patientId);
+            setIssued({
+              patientId: result.patientId,
+              name: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
+              email: form.email.trim(),
+              link: link.url ?? `${window.location.origin}${link.path}`,
+              issued: link,
+            });
+            return;
+          } catch {
+            /* fall through to the card */
+          }
+        }
+
         navigate(`/patients/${result.patientId}`);
       } catch (error) {
         const resolved = resolveRegistrationError(error);
@@ -522,7 +590,7 @@ export default function PatientRegistration() {
         setSubmitting(false);
       }
     },
-    [buildRequest, navigate],
+    [buildRequest, navigate, form.mode, form.firstName, form.lastName, form.email],
   );
 
   /*
@@ -560,7 +628,23 @@ export default function PatientRegistration() {
     void send(null);
   };
 
+  /** "Další pacient" on the success state: a clean form in the same mode. */
+  const startAnother = () => {
+    setForm({ ...createEmptyForm(), mode: form.mode });
+    setErrors({});
+    setBanner(null);
+    setSimilar([]);
+    setAddressPoint(null);
+    setInspection(null);
+    setPhoneLook(null);
+    setEmailLook(null);
+    setEmailAskedFor('');
+    setIssued(null);
+    identifiers.current = mintIdentifiers();
+  };
+
   const czechBranch = form.insuranceRegistrationKind === 'CzechPublicHealthInsurance';
+  const quick = form.mode === 'Quick';
   const identifier = classifyInsuranceNumber(form.healthInsuranceNumber);
 
   /*
@@ -594,15 +678,14 @@ export default function PatientRegistration() {
   /* How many fields this mode and branch actually require — counted from the
      rules, not a fixed number, so Rychlá registrace shows its own short total
      (a pre-registration asks for far fewer than a full one). */
-  const requiredCount = useMemo(() => {
-    const probe: RegistrationFormState = {
-      ...createEmptyForm(),
+  const requiredCount = useMemo(
+    () => requiredFieldCount({
       mode: form.mode,
       insuranceRegistrationKind: form.insuranceRegistrationKind,
       residenceType: form.residenceType,
-    };
-    return Object.keys(validateAll(probe)).length;
-  }, [form.mode, form.insuranceRegistrationKind, form.residenceType]);
+    }),
+    [form.mode, form.insuranceRegistrationKind, form.residenceType],
+  );
   const doneCount = Math.max(0, requiredCount - outstanding.length);
 
   if (loadingOptions) {
@@ -624,59 +707,92 @@ export default function PatientRegistration() {
     );
   }
 
-  const section = (num: number, title: string, note?: string) => (
-    <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 2.5 }}>
-      <Box
-        sx={{
-          width: 24, height: 24, borderRadius: 1.5, bgcolor: 'primary.main',
-          color: 'primary.contrastText', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0,
-        }}
-      >
-        {num}
+  /* The optional-field note, said once per label rather than with an asterisk. */
+  const optionalInQuick = quick ? ' (nepovinné)' : '';
+
+  /* ═══ Success: a quick registration and the link that finishes it ═══ */
+  if (issued !== null) {
+    const expiry = formatExpiry(issued.issued.expiresAtUtc);
+    return (
+      <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
+        <PageHeader
+          title="Nový pacient"
+          subtitle={`${MODE_LABEL.Quick} — hotovo`}
+          actions={
+            <Button variant="outlined" onClick={() => navigate('/patients')}>
+              Zpět na seznam
+            </Button>
+          }
+        />
+        <SoftCard sx={{ maxWidth: 760 }}>
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 2.5 }}>
+            <Box
+              sx={{
+                width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
+                bgcolor: 'background.default', color: 'text.primary',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, fontSize: 16,
+              }}
+            >
+              {initials(issued.name)}
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="h6">{issued.name} je zaregistrován</Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                {issued.email}
+              </Typography>
+            </Box>
+            <StatusChip tone="beige" sx={{ ml: 'auto' }}>Registrace není dokončena</StatusChip>
+          </Stack>
+
+          <IssuedLinkCard
+            label="Registrační odkaz pro pacienta"
+            link={issued.link}
+            note={
+              <>
+                {issued.issued.emailQueued
+                  ? `E-mail s odkazem odešel na ${issued.issued.sentTo ?? issued.email}. `
+                  : 'E-mail se neodesílá automaticky — odkaz pacientovi pošlete sami. '}
+                {expiry !== '' ? `Odkaz platí do ${expiry}. ` : ''}
+                Pacient přes něj doplní adresu, rodné číslo a vstupní dotazník.
+              </>
+            }
+          />
+
+          <Divider sx={{ my: 2.5 }} />
+
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+            <Button variant="contained" onClick={() => navigate(`/patients/${issued.patientId}`)}>
+              Otevřít kartu pacienta
+            </Button>
+            <Button variant="outlined" startIcon={<PersonAdd />} onClick={startAnother}>
+              Další pacient
+            </Button>
+          </Stack>
+        </SoftCard>
       </Box>
-      <Typography variant="h6" sx={{ fontWeight: 700 }}>{title}</Typography>
-      {note !== undefined && (
-        <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-          {note}
-        </Typography>
-      )}
-    </Stack>
-  );
+    );
+  }
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
+    <Box sx={{ p: { xs: 2, md: 3 }, pb: 0, maxWidth: 1200, mx: 'auto' }}>
       {/* ── Header ── */}
-      <Stack
-        direction={{ xs: 'column', md: 'row' }}
-        spacing={2}
-        sx={{ alignItems: { md: 'flex-end' }, mb: 3 }}
-      >
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexGrow: 1 }}>
-          <HowToReg color="primary" />
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800 }}>Registrace pacienta</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Všechno na jedné obrazovce. Vpravo se průběžně skládá to, co se uloží.
-            </Typography>
-          </Box>
-        </Stack>
-
-        <Box>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-            Režim zápisu
-          </Typography>
+      <PageHeader
+        title="Nový pacient"
+        subtitle={progressSubtitle(form.mode, doneCount, requiredCount)}
+        actions={
           <ToggleButtonGroup
             exclusive
             size="small"
             value={form.mode}
+            aria-label="Režim registrace"
             onChange={(_, value) => value !== null && update('mode', value)}
           >
-            <ToggleButton value="Standard">Standardní</ToggleButton>
-            <ToggleButton value="Quick">Rychlá registrace</ToggleButton>
+            <ToggleButton value="Quick">Rychlá</ToggleButton>
+            <ToggleButton value="Standard">Úplná</ToggleButton>
           </ToggleButtonGroup>
-        </Box>
-      </Stack>
+        }
+      />
 
       {banner !== null && (
         <Alert severity={banner.severity} sx={{ mb: 2 }} onClose={() => setBanner(null)}>
@@ -688,95 +804,130 @@ export default function PatientRegistration() {
         {/* ═══ The form ═══ */}
         <Stack spacing={2} sx={{ flexGrow: 1, width: '100%', minWidth: 0 }}>
 
-          {/* 1 · Totožnost */}
-          <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-            {section(1, 'Totožnost')}
+          {quick && (
+            <SoftCard tone="muted" sx={{ p: 2, display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+              <InfoOutlined fontSize="small" sx={{ color: 'text.secondary', mt: '1px' }} />
+              <Typography variant="body2">
+                Víc teď nepotřebujeme. Adresu, rodné číslo a vstupní dotazník vyplní pacient
+                sám přes odkaz, který mu odejde hned po registraci.
+              </Typography>
+            </SoftCard>
+          )}
+
+          {/* ── Základní údaje ── */}
+          <SoftCard>
+            <SectionLabel>Základní údaje</SectionLabel>
             <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 2 }}>
-                <Autocomplete
-                  multiple
-                  size="small"
-                  options={titleOptions.before.map((o) => o.code)}
-                  value={form.titlesBeforeName}
-                  onChange={(_, value) => update('titlesBeforeName', value)}
-                  getOptionLabel={(code) =>
-                    titleOptions.before.find((o) => o.code === code)?.displayValue ?? code}
-                  renderInput={(params) => <TextField {...params} label="Tituly před" />}
-                />
+              <Grid size={{ xs: 12, md: 6 }}>
+                <FormField label="Jméno" required name="firstName">
+                  {(id) => (
+                    <TextField
+                      id={id} fullWidth placeholder="Filip"
+                      value={form.firstName}
+                      onChange={(e) => update('firstName', e.target.value)}
+                      onBlur={checkOnLeave('firstName')}
+                      error={errors.firstName !== undefined}
+                      helperText={errors.firstName}
+                    />
+                  )}
+                </FormField>
               </Grid>
-              <Grid size={{ xs: 12, md: 4 }} data-field="firstName">
-                <TextField
-                  fullWidth size="small" label="Jméno *"
-                  value={form.firstName}
-                  onChange={(e) => update('firstName', e.target.value)}
-                  onBlur={checkOnLeave('firstName')}
-                  error={errors.firstName !== undefined}
-                  helperText={errors.firstName}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 4 }} data-field="lastName">
-                <TextField
-                  fullWidth size="small" label="Příjmení *"
-                  value={form.lastName}
-                  onChange={(e) => update('lastName', e.target.value)}
-                  onBlur={checkOnLeave('lastName')}
-                  error={errors.lastName !== undefined}
-                  helperText={errors.lastName}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 2 }}>
-                <Autocomplete
-                  multiple
-                  size="small"
-                  options={titleOptions.after.map((o) => o.code)}
-                  value={form.titlesAfterName}
-                  onChange={(_, value) => update('titlesAfterName', value)}
-                  getOptionLabel={(code) =>
-                    titleOptions.after.find((o) => o.code === code)?.displayValue ?? code}
-                  renderInput={(params) => <TextField {...params} label="Tituly za" />}
-                />
+              <Grid size={{ xs: 12, md: 6 }}>
+                <FormField label="Příjmení" required name="lastName">
+                  {(id) => (
+                    <TextField
+                      id={id} fullWidth placeholder="Fehér"
+                      value={form.lastName}
+                      onChange={(e) => update('lastName', e.target.value)}
+                      onBlur={checkOnLeave('lastName')}
+                      error={errors.lastName !== undefined}
+                      helperText={errors.lastName}
+                    />
+                  )}
+                </FormField>
               </Grid>
 
-              <Grid size={{ xs: 12, md: 4 }} data-field="preferredName">
-                <TextField
-                  fullWidth size="small" label="Oslovení"
-                  value={form.preferredName}
-                  onChange={(e) => update('preferredName', e.target.value)}
-                  onBlur={checkOnLeave('preferredName')}
-                  error={errors.preferredName !== undefined}
-                  helperText={errors.preferredName ?? 'Nepovinné.'}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 4 }} data-field="dateOfBirth">
-                <TextField
-                  fullWidth size="small" type="date" label="Datum narození *"
-                  value={form.dateOfBirth}
-                  onChange={(e) => update('dateOfBirth', e.target.value)}
-                  onBlur={checkOnLeave('dateOfBirth')}
-                  error={errors.dateOfBirth !== undefined}
-                  helperText={errors.dateOfBirth}
-                  slotProps={{ inputLabel: { shrink: true } }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 4 }} data-field="sex">
-                <Typography variant="caption" color="text.secondary">Pohlaví *</Typography>
-                <RadioGroup
-                  row
-                  value={form.sex}
-                  onChange={(e) => update('sex', e.target.value as RegistrationFormState['sex'])}
-                >
-                  {SEX_OPTIONS.map((option) => (
-                    <FormControlLabel
-                      key={option.code}
-                      value={option.code}
-                      control={<Radio size="small" />}
-                      label={option.label}
+              <Grid size={{ xs: 12, md: 6 }}>
+                <FormField label="Datum narození" required name="dateOfBirth">
+                  {(id) => (
+                    <TextField
+                      id={id} fullWidth type="date"
+                      value={form.dateOfBirth}
+                      onChange={(e) => update('dateOfBirth', e.target.value)}
+                      onBlur={checkOnLeave('dateOfBirth')}
+                      error={errors.dateOfBirth !== undefined}
+                      helperText={errors.dateOfBirth}
                     />
-                  ))}
-                </RadioGroup>
-                {errors.sex !== undefined && (
-                  <Typography variant="caption" color="error">{errors.sex}</Typography>
-                )}
+                  )}
+                </FormField>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <FormField label="Pohlaví" required name="sex">
+                  {(id) => (
+                    <TextField
+                      id={id} select fullWidth
+                      value={form.sex}
+                      onChange={(e) => update('sex', e.target.value as RegistrationFormState['sex'])}
+                      onBlur={checkOnLeave('sex')}
+                      error={errors.sex !== undefined}
+                      helperText={errors.sex}
+                      slotProps={selectLabelledBy(id)}
+                    >
+                      {SEX_OPTIONS.map((option) => (
+                        <MenuItem key={option.code} value={option.code}>{option.label}</MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                </FormField>
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 6 }}>
+                <FormField label="Oslovení" name="preferredName">
+                  {(id) => (
+                    <TextField
+                      id={id} fullWidth placeholder="Nepovinné"
+                      value={form.preferredName}
+                      onChange={(e) => update('preferredName', e.target.value)}
+                      onBlur={checkOnLeave('preferredName')}
+                      error={errors.preferredName !== undefined}
+                      helperText={errors.preferredName}
+                    />
+                  )}
+                </FormField>
+              </Grid>
+              <Grid size={{ xs: 12, md: 3 }}>
+                <FormField label="Tituly před">
+                  {(id) => (
+                    <Autocomplete
+                      multiple
+                      id={id}
+                      size="small"
+                      options={titleOptions.before.map((o) => o.code)}
+                      value={form.titlesBeforeName}
+                      onChange={(_, value) => update('titlesBeforeName', value)}
+                      getOptionLabel={(code) =>
+                        titleOptions.before.find((o) => o.code === code)?.displayValue ?? code}
+                      renderInput={(params) => <TextField {...params} placeholder="MUDr." />}
+                    />
+                  )}
+                </FormField>
+              </Grid>
+              <Grid size={{ xs: 12, md: 3 }}>
+                <FormField label="Tituly za">
+                  {(id) => (
+                    <Autocomplete
+                      multiple
+                      id={id}
+                      size="small"
+                      options={titleOptions.after.map((o) => o.code)}
+                      value={form.titlesAfterName}
+                      onChange={(_, value) => update('titlesAfterName', value)}
+                      getOptionLabel={(code) =>
+                        titleOptions.after.find((o) => o.code === code)?.displayValue ?? code}
+                      renderInput={(params) => <TextField {...params} placeholder="Ph.D." />}
+                    />
+                  )}
+                </FormField>
               </Grid>
             </Grid>
 
@@ -800,100 +951,198 @@ export default function PatientRegistration() {
                 </Typography>
               </Alert>
             )}
-          </Paper>
+          </SoftCard>
 
-          {/* 2 · Pojištění */}
-          <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-            {section(2, 'Pojištění a identifikace')}
+          {/* ── Kontakt ── */}
+          <SoftCard>
+            <SectionLabel>Kontakt</SectionLabel>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <FormField label="E-mail" required name="email">
+                  {(id) => (
+                    <TextField
+                      id={id} fullWidth type="email" placeholder="filip@email.cz"
+                      value={form.email}
+                      onChange={(e) => update('email', e.target.value)}
+                      /* Two questions on the way out: is there one (ours), and is
+                         it an address (the server's). */
+                      onBlur={() => {
+                        checkOnLeave('email')();
+                        void askAboutEmail(form.email);
+                      }}
+                      error={errors.email !== undefined || emailState === 'invalid'}
+                      helperText={errors.email ?? (emailSays !== '' ? emailSays : undefined)}
+                    />
+                  )}
+                </FormField>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
+                  <FormField label="Předvolba" required={!quick} name="phoneRegionCode" sx={{ width: 150, flexShrink: 0 }}>
+                    {(id) => (
+                      <TextField
+                        id={id} select fullWidth
+                        value={form.phoneRegionCode}
+                        onChange={(e) => update('phoneRegionCode', e.target.value)}
+                        onBlur={checkOnLeave('phoneRegionCode')}
+                        error={errors.phoneRegionCode !== undefined}
+                        helperText={errors.phoneRegionCode}
+                        slotProps={selectLabelledBy(id)}
+                      >
+                        {phoneRegions.map((region, index) => [
+                          /* A line under the common ones, never above the first row. */
+                          index === preferredRegions && preferredRegions > 0
+                            ? <Divider key="preferred-divider" />
+                            : null,
+                          <MenuItem key={region.code} value={region.code}>
+                            {region.displayValue}
+                          </MenuItem>,
+                        ])}
+                      </TextField>
+                    )}
+                  </FormField>
+                  <FormField label={`Telefon${optionalInQuick}`} required={!quick} name="phone" sx={{ flexGrow: 1, minWidth: 0 }}>
+                    {(id) => (
+                      <TextField
+                        id={id} fullWidth placeholder="773 539 001"
+                        value={form.phone}
+                        onChange={(e) => update('phone', e.target.value)}
+                        onBlur={checkOnLeave('phone')}
+                        error={errors.phone !== undefined || phoneState === 'unreadable'}
+                        /* Grouped while it is being typed, and complained about only
+                           when it is finished and still does not fit the country. A
+                           red border on every second keystroke is a red border people
+                           stop reading. */
+                        helperText={
+                          errors.phone
+                          ?? (phoneSays !== '' ? phoneSays : undefined)
+                          ?? (phoneGrouped !== '' ? phoneGrouped : undefined)
+                        }
+                        slotProps={{
+                          formHelperText: phoneState === 'valid'
+                            ? { sx: { color: 'success.main', fontWeight: 500 } }
+                            : undefined,
+                        }}
+                      />
+                    )}
+                  </FormField>
+                </Stack>
+              </Grid>
+            </Grid>
+          </SoftCard>
 
-            <RadioGroup
+          {/* ── Pojištění ── */}
+          <SoftCard>
+            <SectionLabel>Pojištění</SectionLabel>
+
+            <ToggleButtonGroup
+              exclusive
+              size="small"
               value={form.insuranceRegistrationKind}
-              onChange={(e) =>
-                update('insuranceRegistrationKind',
-                  e.target.value as RegistrationFormState['insuranceRegistrationKind'])}
-              sx={{ mb: 2 }}
+              aria-label="Způsob evidence pojištění"
+              onChange={(_, value) => {
+                if (value !== null) {
+                  update('insuranceRegistrationKind',
+                    value as RegistrationFormState['insuranceRegistrationKind']);
+                }
+              }}
+              sx={{ mb: 2.5, flexWrap: 'wrap' }}
             >
               {options.insuranceRegistrationKinds.map((kind) => (
-                <FormControlLabel
-                  key={kind.code}
-                  value={kind.code}
-                  control={<Radio size="small" />}
-                  label={kind.displayValue}
-                />
+                <ToggleButton key={kind.code} value={kind.code}>
+                  {kind.displayValue}
+                </ToggleButton>
               ))}
-            </RadioGroup>
-
-            <Divider sx={{ mb: 2 }} />
+            </ToggleButtonGroup>
 
             {czechBranch ? (
               <Grid container spacing={2}>
-                <Grid size={{ xs: 12, md: 4 }} data-field="healthInsuranceNumber">
-                  <TextField
-                    fullWidth size="small" label="Číslo pojištěnce *"
-                    value={form.healthInsuranceNumber}
-                    onChange={(e) => handleInsuranceNumber(e.target.value)}
-                    onBlur={checkOnLeave('healthInsuranceNumber')}
-                    error={errors.healthInsuranceNumber !== undefined}
-                    helperText={
-                      errors.healthInsuranceNumber
-                      ?? (form.healthInsuranceNumber.length > 0
-                        ? IDENTIFIER_KIND_LABEL[identifier.kind]
-                        : 'Devět nebo deset číslic z kartičky.')
-                    }
-                  />
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <FormField label="Číslo pojištěnce" required name="healthInsuranceNumber">
+                    {(id) => (
+                      <TextField
+                        id={id} fullWidth placeholder="Devět nebo deset číslic z kartičky"
+                        inputMode="numeric"
+                        value={form.healthInsuranceNumber}
+                        onChange={(e) => handleInsuranceNumber(e.target.value)}
+                        onBlur={checkOnLeave('healthInsuranceNumber')}
+                        error={errors.healthInsuranceNumber !== undefined}
+                        helperText={
+                          errors.healthInsuranceNumber
+                          ?? (form.healthInsuranceNumber.length > 0
+                            ? IDENTIFIER_KIND_LABEL[identifier.kind]
+                            : undefined)
+                        }
+                      />
+                    )}
+                  </FormField>
                 </Grid>
 
                 {/* Only an insurer-assigned number is typed twice — nothing
                     else can be checked against anything but itself. */}
                 {identifier.requiresConfirmation && (
-                  <Grid size={{ xs: 12, md: 4 }} data-field="healthInsuranceNumberConfirmation">
-                    <TextField
-                      fullWidth size="small" label="Číslo pojištěnce ještě jednou *"
-                      value={form.healthInsuranceNumberConfirmation}
-                      onChange={(e) =>
-                        update('healthInsuranceNumberConfirmation', digitsOnly(e.target.value))}
-                      onBlur={checkOnLeave('healthInsuranceNumberConfirmation')}
-                      error={errors.healthInsuranceNumberConfirmation !== undefined}
-                      helperText={
-                        errors.healthInsuranceNumberConfirmation
-                        ?? 'Tohle číslo se nedá ověřit proti ničemu jinému.'
-                      }
-                    />
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <FormField label="Číslo pojištěnce ještě jednou" required name="healthInsuranceNumberConfirmation">
+                      {(id) => (
+                        <TextField
+                          id={id} fullWidth inputMode="numeric"
+                          value={form.healthInsuranceNumberConfirmation}
+                          onChange={(e) =>
+                            update('healthInsuranceNumberConfirmation', digitsOnly(e.target.value))}
+                          onBlur={checkOnLeave('healthInsuranceNumberConfirmation')}
+                          error={errors.healthInsuranceNumberConfirmation !== undefined}
+                          helperText={
+                            errors.healthInsuranceNumberConfirmation
+                            ?? 'Tohle číslo se nedá ověřit proti ničemu jinému.'
+                          }
+                        />
+                      )}
+                    </FormField>
                   </Grid>
                 )}
 
-                <Grid size={{ xs: 12, md: 4 }} data-field="healthInsurerCode">
-                  <TextField
-                    select fullWidth size="small" label="Zdravotní pojišťovna *"
-                    value={form.healthInsurerCode}
-                    onChange={(e) => update('healthInsurerCode', e.target.value)}
-                    onBlur={checkOnLeave('healthInsurerCode')}
-                    error={errors.healthInsurerCode !== undefined}
-                    helperText={errors.healthInsurerCode}
-                  >
-                    {/* `displayValue` already reads "111 — Všeobecná zdravotní
-                        pojišťovna"; prefixing the code as well printed the enum
-                        name in front of it. */}
-                    {options.czechHealthInsurers.map((insurer) => (
-                      <MenuItem key={insurer.code} value={insurer.code}>
-                        {insurer.displayValue}
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <FormField label="Zdravotní pojišťovna" required name="healthInsurerCode">
+                    {(id) => (
+                      <TextField
+                        id={id} select fullWidth
+                        value={form.healthInsurerCode}
+                        onChange={(e) => update('healthInsurerCode', e.target.value)}
+                        onBlur={checkOnLeave('healthInsurerCode')}
+                        error={errors.healthInsurerCode !== undefined}
+                        helperText={errors.healthInsurerCode}
+                        slotProps={selectLabelledBy(id)}
+                      >
+                        {/* `displayValue` already reads "111 — Všeobecná zdravotní
+                            pojišťovna"; prefixing the code as well printed the enum
+                            name in front of it. */}
+                        {options.czechHealthInsurers.map((insurer) => (
+                          <MenuItem key={insurer.code} value={insurer.code}>
+                            {insurer.displayValue}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    )}
+                  </FormField>
                 </Grid>
 
-                <Grid size={{ xs: 12, md: 4 }} data-field="birthNumber">
-                  <TextField
-                    fullWidth size="small" label="Rodné číslo"
-                    value={form.birthNumber}
-                    onChange={(e) => handleBirthNumber(e.target.value)}
-                    onBlur={checkOnLeave('birthNumber')}
-                    error={errors.birthNumber !== undefined}
-                    helperText={errors.birthNumber ?? 'Nepovinné — registr ho nevyžaduje.'}
-                  />
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <FormField label="Rodné číslo (nepovinné)" name="birthNumber">
+                    {(id) => (
+                      <TextField
+                        id={id} fullWidth placeholder="Doplní datum narození a pohlaví"
+                        inputMode="numeric"
+                        value={form.birthNumber}
+                        onChange={(e) => handleBirthNumber(e.target.value)}
+                        onBlur={checkOnLeave('birthNumber')}
+                        error={errors.birthNumber !== undefined}
+                        helperText={errors.birthNumber}
+                      />
+                    )}
+                  </FormField>
                 </Grid>
 
-                <Grid size={{ xs: 12, md: 8 }}>
+                <Grid size={12}>
                   <FormControlLabel
                     control={
                       <Checkbox
@@ -929,68 +1178,86 @@ export default function PatientRegistration() {
               </Grid>
             ) : (
               <Grid container spacing={2}>
-                <Grid size={{ xs: 12, md: 4 }} data-field="identityDocumentType">
-                  <TextField
-                    select fullWidth size="small" label="Typ dokladu *"
-                    value={form.identityDocumentType}
-                    onChange={(e) => update('identityDocumentType', e.target.value)}
-                    onBlur={checkOnLeave('identityDocumentType')}
-                    error={errors.identityDocumentType !== undefined}
-                    helperText={errors.identityDocumentType}
-                  >
-                    {options.identityDocumentTypes.map((type) => (
-                      <MenuItem key={type.code} value={type.code}>{type.displayValue}</MenuItem>
-                    ))}
-                  </TextField>
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <FormField label="Typ dokladu" required name="identityDocumentType">
+                    {(id) => (
+                      <TextField
+                        id={id} select fullWidth
+                        value={form.identityDocumentType}
+                        onChange={(e) => update('identityDocumentType', e.target.value)}
+                        onBlur={checkOnLeave('identityDocumentType')}
+                        error={errors.identityDocumentType !== undefined}
+                        helperText={errors.identityDocumentType}
+                        slotProps={selectLabelledBy(id)}
+                      >
+                        {options.identityDocumentTypes.map((type) => (
+                          <MenuItem key={type.code} value={type.code}>{type.displayValue}</MenuItem>
+                        ))}
+                      </TextField>
+                    )}
+                  </FormField>
                 </Grid>
-                <Grid size={{ xs: 12, md: 3 }} data-field="identityDocumentIssuingCountryCode">
-                  <TextField
-                    fullWidth size="small" label="Stát vydání *"
-                    value={form.identityDocumentIssuingCountryCode}
-                    onChange={(e) =>
-                      update('identityDocumentIssuingCountryCode', e.target.value.toUpperCase())}
-                    onBlur={checkOnLeave('identityDocumentIssuingCountryCode')}
-                    error={errors.identityDocumentIssuingCountryCode !== undefined}
-                    helperText={
-                      errors.identityDocumentIssuingCountryCode ?? 'Dvě písmena, ISO 3166-1.'
-                    }
-                  />
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <FormField label="Stát vydání" required name="identityDocumentIssuingCountryCode">
+                    {(id) => (
+                      <TextField
+                        id={id} fullWidth placeholder="SK"
+                        value={form.identityDocumentIssuingCountryCode}
+                        onChange={(e) =>
+                          update('identityDocumentIssuingCountryCode', e.target.value.toUpperCase())}
+                        onBlur={checkOnLeave('identityDocumentIssuingCountryCode')}
+                        error={errors.identityDocumentIssuingCountryCode !== undefined}
+                        helperText={
+                          errors.identityDocumentIssuingCountryCode ?? 'Dvě písmena, ISO 3166-1.'
+                        }
+                      />
+                    )}
+                  </FormField>
                 </Grid>
-                <Grid size={{ xs: 12, md: 5 }} data-field="identityDocumentNumber">
-                  <TextField
-                    fullWidth size="small" label="Číslo dokladu *"
-                    value={form.identityDocumentNumber}
-                    onChange={(e) => update('identityDocumentNumber', e.target.value)}
-                    onBlur={checkOnLeave('identityDocumentNumber')}
-                    error={errors.identityDocumentNumber !== undefined}
-                    helperText={errors.identityDocumentNumber}
-                  />
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <FormField label="Číslo dokladu" required name="identityDocumentNumber">
+                    {(id) => (
+                      <TextField
+                        id={id} fullWidth
+                        value={form.identityDocumentNumber}
+                        onChange={(e) => update('identityDocumentNumber', e.target.value)}
+                        onBlur={checkOnLeave('identityDocumentNumber')}
+                        error={errors.identityDocumentNumber !== undefined}
+                        helperText={errors.identityDocumentNumber}
+                      />
+                    )}
+                  </FormField>
                 </Grid>
                 <Grid size={12}>
                   <Typography variant="caption" color="text.secondary">
-                    Datum narození a pohlaví vyplňte v prvním oddílu ručně — ze zahraničního
+                    Datum narození a pohlaví vyplňte v základních údajích ručně — ze zahraničního
                     dokladu se odvodit nedají.
                   </Typography>
                 </Grid>
               </Grid>
             )}
-          </Paper>
+          </SoftCard>
 
-          {/* 3 · Bydliště */}
-          <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }} data-field="ruianAddressPointCode">
-            {section(3, 'Bydliště')}
+          {/* ── Adresa ── */}
+          <SoftCard data-field="ruianAddressPointCode">
+            <SectionLabel>{`Adresa${optionalInQuick}`}</SectionLabel>
             <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 4 }}>
-                <TextField
-                  select fullWidth size="small" label={`Typ pobytu${form.mode === 'Quick' ? '' : ' *'}`}
-                  value={form.residenceType}
-                  onChange={(e) =>
-                    update('residenceType', e.target.value as RegistrationFormState['residenceType'])}
-                >
-                  {RESIDENCE_TYPES.map((type) => (
-                    <MenuItem key={type.code} value={type.code}>{type.label}</MenuItem>
-                  ))}
-                </TextField>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <FormField label="Typ pobytu" required={!quick}>
+                  {(id) => (
+                    <TextField
+                      id={id} select fullWidth
+                      value={form.residenceType}
+                      onChange={(e) =>
+                        update('residenceType', e.target.value as RegistrationFormState['residenceType'])}
+                      slotProps={selectLabelledBy(id)}
+                    >
+                      {RESIDENCE_TYPES.map((type) => (
+                        <MenuItem key={type.code} value={type.code}>{type.label}</MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                </FormField>
               </Grid>
               <Grid size={12}>
                 <MapyAddressPicker
@@ -1001,142 +1268,68 @@ export default function PatientRegistration() {
                 />
               </Grid>
             </Grid>
-          </Paper>
-
-          {/* 4 · Kontakt */}
-          <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-            {section(4, 'Kontakt')}
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 6 }} data-field="email">
-                <TextField
-                  fullWidth size="small" label="E-mail *"
-                  value={form.email}
-                  onChange={(e) => update('email', e.target.value)}
-                  /* Two questions on the way out: is there one (ours), and is
-                     it an address (the server's). */
-                  onBlur={() => {
-                    checkOnLeave('email')();
-                    void askAboutEmail(form.email);
-                  }}
-                  error={errors.email !== undefined || emailState === 'invalid'}
-                  helperText={errors.email ?? (emailSays !== '' ? emailSays : undefined)}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 2 }} data-field="phoneRegionCode">
-                <TextField
-                  select fullWidth size="small" label={`Předvolba${form.mode === 'Quick' ? '' : ' *'}`}
-                  value={form.phoneRegionCode}
-                  onChange={(e) => update('phoneRegionCode', e.target.value)}
-                  onBlur={checkOnLeave('phoneRegionCode')}
-                  error={errors.phoneRegionCode !== undefined}
-                  helperText={errors.phoneRegionCode}
-                >
-                  {phoneRegions.map((region, index) => [
-                    /* A line under the common ones, never above the first row. */
-                    index === preferredRegions && preferredRegions > 0
-                      ? <Divider key="preferred-divider" />
-                      : null,
-                    <MenuItem key={region.code} value={region.code}>
-                      {region.displayValue}
-                    </MenuItem>,
-                  ])}
-                </TextField>
-              </Grid>
-              <Grid size={{ xs: 12, md: 4 }} data-field="phone">
-                <TextField
-                  fullWidth size="small" label={`Telefon${form.mode === 'Quick' ? '' : ' *'}`}
-                  value={form.phone}
-                  onChange={(e) => update('phone', e.target.value)}
-                  onBlur={checkOnLeave('phone')}
-                  error={errors.phone !== undefined || phoneState === 'unreadable'}
-                  /* Grouped while it is being typed, and complained about only
-                     when it is finished and still does not fit the country. A
-                     red border on every second keystroke is a red border people
-                     stop reading. */
-                  helperText={
-                    errors.phone
-                    ?? (phoneSays !== '' ? phoneSays : undefined)
-                    ?? (phoneGrouped !== '' ? phoneGrouped : ' ')
-                  }
-                  slotProps={{
-                    formHelperText: phoneState === 'valid'
-                      ? { sx: { color: 'success.main', fontWeight: 500 } }
-                      : undefined,
-                  }}
-                />
-              </Grid>
-            </Grid>
-          </Paper>
+          </SoftCard>
         </Stack>
 
         {/* ═══ The card — the former "Shrnutí" step ═══ */}
         <Stack
           spacing={2}
           sx={{
-            width: { xs: '100%', lg: 380 }, flexShrink: 0,
+            width: { xs: '100%', lg: 320 }, flexShrink: 0,
             position: { lg: 'sticky' }, top: { lg: 16 },
           }}
         >
-          <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
-            <Box sx={{ bgcolor: 'primary.main', color: 'primary.contrastText', p: 2.5 }}>
-              <Typography variant="caption" sx={{ opacity: 0.75, letterSpacing: '.08em' }}>
-                ULOŽÍ SE TAKTO
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, mt: 0.5 }}>
-                {`${form.firstName} ${form.lastName}`.trim() || 'Nový pacient'}
-              </Typography>
-              <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: 'wrap', gap: 1 }}>
-                {form.dateOfBirth !== '' && (
-                  <Chip size="small" label={form.dateOfBirth}
-                    sx={{ bgcolor: 'rgba(255,255,255,.18)', color: 'inherit' }} />
-                )}
-                {form.sex !== '' && (
-                  <Chip size="small"
-                    label={SEX_OPTIONS.find((s) => s.code === form.sex)?.label ?? form.sex}
-                    sx={{ bgcolor: 'rgba(255,255,255,.18)', color: 'inherit' }} />
-                )}
-                <Chip size="small"
-                  label={form.mode === 'Standard' ? 'Standardní' : 'Rychlá'}
-                  sx={{ bgcolor: 'rgba(255,255,255,.18)', color: 'inherit' }} />
-              </Stack>
-            </Box>
+          <SoftCard>
+            <SectionLabel>Uloží se takto</SectionLabel>
+            <Typography variant="h6" sx={{ mb: 0.5 }}>
+              {`${form.firstName} ${form.lastName}`.trim() || 'Nový pacient'}
+            </Typography>
+            <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 0.75, mb: 2 }}>
+              <StatusChip tone={quick ? 'beige' : 'green'}>
+                {quick ? 'Rychlá' : 'Úplná'}
+              </StatusChip>
+              {form.dateOfBirth !== '' && <StatusChip>{form.dateOfBirth}</StatusChip>}
+              {form.sex !== '' && (
+                <StatusChip>{SEX_OPTIONS.find((s) => s.code === form.sex)?.label ?? form.sex}</StatusChip>
+              )}
+            </Stack>
 
-            <Stack sx={{ px: 2.5, py: 1 }} divider={<Divider />}>
-              <SummaryRow label="Pojištění" value={
+            <Stack spacing={1.5}>
+              <LabelValue label="Pojištění" value={
                 czechBranch
                   ? (options.czechHealthInsurers.find((i) => i.code === form.healthInsurerCode)
                     ?.displayValue ?? '—')
                   : (options.identityDocumentTypes.find((t) => t.code === form.identityDocumentType)
                     ?.displayValue ?? 'Doklad ze zahraničí')
               } />
-              <SummaryRow
+              <LabelValue
                 label={czechBranch ? 'Číslo pojištěnce' : 'Číslo dokladu'}
                 value={czechBranch
                   ? maskInsuranceNumber(form.healthInsuranceNumber)
                   : (form.identityDocumentNumber || '—')}
               />
               {czechBranch && (
-                <SummaryRow label="Rodné číslo" value={maskBirthNumber(form.birthNumber)} />
+                <LabelValue label="Rodné číslo" value={maskBirthNumber(form.birthNumber)} />
               )}
-              <SummaryRow label="Bydliště" value={form.addressDisplay || '—'} />
-              <SummaryRow label="E-mail" value={storedAs(emailAnswer, form.email) || '—'} />
+              <LabelValue label="Adresa" value={form.addressDisplay || '—'} />
+              <LabelValue label="E-mail" value={storedAs(emailAnswer, form.email) || '—'} />
               {/* The card shows the grouped form — what will actually be
                   stored and shown everywhere after the save. */}
-              <SummaryRow label="Telefon" value={phoneGrouped || form.phone || '—'} />
+              <LabelValue label="Telefon" value={phoneGrouped || form.phone || '—'} />
             </Stack>
-          </Paper>
+          </SoftCard>
 
-          <Paper sx={{ borderRadius: 3, p: 2.5 }}>
-            <Stack direction="row" sx={{ alignItems: 'baseline', mb: 1.5 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Zbývá vyplnit</Typography>
+          <SoftCard>
+            <Stack direction="row" sx={{ alignItems: 'baseline' }}>
+              <SectionLabel>Zbývá vyplnit</SectionLabel>
               <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-                {doneCount} z {requiredCount} hotovo
+                {doneCount} z {requiredCount}
               </Typography>
             </Stack>
             <LinearProgress
               variant="determinate"
-              value={(doneCount / requiredCount) * 100}
-              sx={{ height: 6, borderRadius: 3, mb: 1.5 }}
+              value={requiredCount === 0 ? 100 : (doneCount / requiredCount) * 100}
+              sx={{ mb: 1.5 }}
             />
             {outstanding.length === 0 ? (
               <Typography variant="body2" sx={{ color: 'success.main' }}>
@@ -1151,22 +1344,32 @@ export default function PatientRegistration() {
                 ))}
               </Stack>
             )}
-          </Paper>
+          </SoftCard>
 
-          <Button
-            variant="contained"
-            size="large"
-            startIcon={<PersonAdd />}
-            disabled={submitting}
-            onClick={() => { void submit(); }}
-          >
-            {submitting ? 'Registruji…' : 'Zaregistrovat pacienta'}
-          </Button>
           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
             Rodné číslo i číslo pojištěnce se do protokolu zapisují zamaskované.
           </Typography>
         </Stack>
       </Stack>
+
+      <StickyFormFooter
+        start={
+          outstanding.length === 0
+            ? 'Všechno povinné je vyplněné.'
+            : `Zbývá ${outstanding.length} z ${requiredCount} povinných údajů`
+        }
+      >
+        <Button variant="outlined" disabled={submitting} onClick={() => navigate('/patients')}>
+          Zrušit
+        </Button>
+        <Button
+          variant="contained"
+          disabled={submitting}
+          onClick={() => { void submit(); }}
+        >
+          {submitting ? 'Ukládám…' : 'Uložit a pokračovat'}
+        </Button>
+      </StickyFormFooter>
 
       <CandidateReviewDialog
         open={review !== null}
@@ -1174,21 +1377,29 @@ export default function PatientRegistration() {
         submitting={submitting}
         onCancel={() => setReview(null)}
         onConfirmDistinct={() => { if (review !== null) void send(review.confirmation); }}
-        onUseExisting={(patientId) => { setReview(null); navigate(`/patients/${patientId}`); }}
+        onUseExisting={(candidate) => { setReview(null); navigate(`/patients/${candidate.patientId}`); }}
       />
     </Box>
   );
 }
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
+/** The board's label-over-value pair (OSOBNÍ ÚDAJE on the patient card). */
+function LabelValue({ label, value }: { label: string; value: string }) {
   return (
-    <Stack direction="row" spacing={2} sx={{ py: 1.25, alignItems: 'baseline' }}>
-      <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
-        {label}
-      </Typography>
-      <Typography variant="body2" sx={{ ml: 'auto', textAlign: 'right', wordBreak: 'break-word' }}>
+    <Box>
+      <SectionLabel sx={{ mb: 0.25 }}>{label}</SectionLabel>
+      <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
         {value}
       </Typography>
-    </Stack>
+    </Box>
   );
+}
+
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter((part) => part.length > 0)
+    .slice(0, 2)
+    .map((part) => part[0]!.toUpperCase())
+    .join('') || '?';
 }

@@ -1,622 +1,353 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+/*
+ * Přehled - the overview of one patient's card (design-15).
+ *
+ * Left: OSOBNÍ ÚDAJE as label/value pairs in the clinic's own order
+ * (Nastavení -> Údaje o pacientovi), the HISTORIE NÁVŠTĚV table, and the
+ * diagnostic results with their trend. Right: the next booking and what the
+ * desk should do before it.
+ *
+ * The name, contacts, standing chips, the paperwork banners and the tab row
+ * live in `patients/PatientLayout`, so they stay on screen whichever section
+ * is open; what the layout loaded comes in through the outlet context rather
+ * than being fetched a second time here.
+ */
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
-  Box, Typography, Grid, Card, CardContent, Button, Divider, Chip,
-  List, Skeleton, Alert, IconButton, Tooltip,
-  Paper, LinearProgress, Collapse,
+  Alert, Box, Button, Collapse, Divider, Grid, IconButton, LinearProgress, Stack, Typography,
 } from '@mui/material';
-import {
-  ArrowBack, Science, TrendingUp, TrendingDown, Description,
-  CheckCircle, Error, MonitorHeart, FitnessCenter, Bloodtype,
-  Download, Add, ExpandMore, ExpandLess, Person, Phone, Email, Cake,
-  Shield, LocalHospital, Spa, CloudUpload,
-} from '@mui/icons-material';
-import { motion, AnimatePresence } from 'framer-motion';
-import { patientsApi } from '../api/patients';
-import { contactOfKind, profileContacts } from './patients/cardContacts';
-import patientRegistryApi from '../api/patientRegistry';
-import type { PhoneInspection } from '../api/patientRegistry';
-import {
-  HOME_REGION, storedNumberDisplay,
-} from '../services/patientRegistration/phoneDisplay';
-import type { Patient } from '../api/patients';
+import { Download, ExpandLess, ExpandMore } from '@mui/icons-material';
 import { diagnosticsApi } from '../api/diagnostics';
 import type { DiagnosticSession } from '../api/diagnostics';
-import { documentsApi, DOCUMENT_SATISFIES_REQUIREMENT } from '../api/documents';
-import MedicalReports from '../components/documents/MedicalReports';
-import UploadDocumentDialog from '../components/documents/UploadDocumentDialog';
-import DocumentActions from '../components/documents/DocumentActions';
-import type { PatientDocument, DocumentTemplate } from '../api/documents';
+import { activitiesApi } from '../api/activities';
+import { billingApi } from '../api/billing';
 import { SENSITIVE_IDENTITY, shownFields, usePatientFields } from '../api/displaySettings';
 import { usePermission } from '../auth/usePermission';
+import { KpiCard, SectionLabel, SoftCard, StatusChip } from '../components/ui';
+import { LabelValue } from '../components/patients/LabelValue';
+import { NextAppointmentCard } from '../components/patients/NextAppointmentCard';
+import { AlertsCard } from '../components/patients/AlertsCard';
+import { VisitHistoryTable } from '../components/patients/VisitHistoryTable';
+import { ALL_APPOINTMENTS_KEY, fetchAllAppointments } from '../components/patients/appointmentsSource';
+import { questionnaireMissing, summariseVisits } from '../components/patients/patientActivity';
+import { formatDateOnly } from '../utils/time';
+import type { PatientContext } from './patients/PatientLayout';
 
 /* ── Helpers ── */
-function trendIcon(current: number, previous: number, higherIsBetter: boolean) {
-  if (!previous) return null;
-  const up = current > previous;
-  const good = higherIsBetter ? up : !up;
-  return up
-    ? <TrendingUp sx={{ fontSize: 18, color: good ? '#2E7D32' : '#D32F2F' }} />
-    : <TrendingDown sx={{ fontSize: 18, color: good ? '#2E7D32' : '#D32F2F' }} />;
-}
 
-function trendPct(current: number, previous: number) {
+function trendPct(current: number, previous: number | undefined): string | null {
   if (!previous) return null;
   const pct = ((current - previous) / previous) * 100;
   /* The sign used to be decided by comparing the formatted string to zero,
      which JavaScript makes work by coercion - until the value is not finite,
      and then the patient's card reads "NaN%". */
   if (!Number.isFinite(pct)) return null;
-  return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
+  return `${pct > 0 ? '+' : ''}${pct.toFixed(1)} % oproti minule`;
 }
 
-function getVo2Color(vo2: number) {
-  if (vo2 >= 50) return '#2E7D32';
-  if (vo2 >= 40) return '#0D7377';
-  if (vo2 >= 30) return '#ED6C02';
-  return '#D32F2F';
+function bpLabel(sys: number, dia: number): string {
+  if (sys < 120 && dia < 80) return 'Optimální';
+  if (sys < 130 && dia < 85) return 'Normální';
+  if (sys < 140 && dia < 90) return 'Zvýšené';
+  return 'Vysoké';
 }
 
-function getBpLabel(sys: number, dia: number) {
-  if (sys < 120 && dia < 80) return { text: 'Optimální', color: '#2E7D32' };
-  if (sys < 130 && dia < 85) return { text: 'Normální', color: '#0D7377' };
-  if (sys < 140 && dia < 90) return { text: 'Zvýšené', color: '#ED6C02' };
-  return { text: 'Vysoké', color: '#D32F2F' };
-}
-
-/*
- * Which documents a visit requires is the document service's answer, not this
- * screen's. It used to be this list, written out here:
- *
- *     Vypis · Dotaznik · GDPR
- *
- * Two things were wrong with that. The `app` lane is deleting the Dotazník and
- * GDPR templates - each described something that is really carried elsewhere,
- * and nothing was ever signed against either - and a hard-coded list would have
- * gone on demanding them forever, with nothing able to satisfy a template that
- * no longer exists. And a clinic that adds a required document would not see it
- * here at all.
- *
- * `GET /api/documents/templates` already says which are active and required.
- */
-
-/* ── Metric Card ── */
-function MetricCard({ icon, label, value, unit, color, prevValue, higherIsBetter = true, delay = 0 }: {
-  icon: React.ReactNode; label: string; value: number | string; unit: string; color: string;
-  prevValue?: number; higherIsBetter?: boolean; delay?: number;
-}) {
-  const numVal = typeof value === 'number' ? value : parseFloat(value as string);
-  const numPrev = prevValue;
-  return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, duration: 0.4 }}>
-      <Card sx={{ height: '100%', position: 'relative', overflow: 'hidden' }}>
-        <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, bgcolor: color }} />
-        <CardContent sx={{ pt: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-            <Box sx={{ color, opacity: 0.8 }}>{icon}</Box>
-            {numPrev ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {trendIcon(numVal, numPrev, higherIsBetter)}
-                <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>
-                  {trendPct(numVal, numPrev)}
-                </Typography>
-              </Box>
-            ) : null}
-          </Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, color, lineHeight: 1.2 }}>
-            {typeof value === 'number' ? value.toFixed(1) : value}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{unit}</Typography>
-          <Typography variant="caption" sx={{ color: '#999', mt: 1, display: 'block' }}>{label}</Typography>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-}
+const sessionDate = (iso: string) =>
+  new Date(iso).toLocaleDateString('cs-CZ', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' });
 
 /* ── Main Page ── */
 export default function PatientDetails() {
-  const { id } = useParams();
   const navigate = useNavigate();
-  const [patient, setPatient] = useState<Patient | null>(null);
+  const {
+    patient, profile, requirements, upcoming, displayPhone, displayEmail,
+  } = useOutletContext<PatientContext>();
   const [sessions, setSessions] = useState<DiagnosticSession[]>([]);
-  const [docs, setDocs] = useState<PatientDocument[]>([]);
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState<string | null>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
-  /* Which document is being uploaded. `null` closed, a template for a required
-     one, and `'report'` for a medical report from another doctor. */
-  const [uploadTemplate, setUploadTemplate] = useState<DocumentTemplate | null | 'report'>(null);
 
   /* Which rows the card shows, and in what order, is the clinic's setting
      (Nastavení -> Údaje o pacientovi). The birth number and the insurance
      number additionally need the permission, whatever the setting says. */
   const fieldVisibility = usePatientFields();
   const maySeeSensitive = usePermission(SENSITIVE_IDENTITY);
-
-  /* Pulled out so accepting or reclassifying a report can refresh the same
-     list the paperwork banner reads - otherwise the two disagree until the
-     page is reloaded, and the banner is the thing people trust. */
-  const reloadDocuments = useCallback(() => {
-    if (id === undefined) return;
-    documentsApi.getPatientDocuments(id).then(setDocs).catch(() => {});
-  }, [id]);
+  const mayBill = usePermission('billing.manage');
 
   useEffect(() => {
-    if (id) {
-      patientsApi.getById(id).then(setPatient).catch(() => {});
-      diagnosticsApi.getByPatient(id).then(setSessions).catch(() => {});
-      documentsApi.getTemplates().then(setTemplates).catch(() => setTemplates([]));
-      patientsApi.getProfile(id).then(setProfile).catch(() => {});
-      reloadDocuments();
-    }
-  }, [id, reloadDocuments]);
+    diagnosticsApi.getByPatient(patient.id).then(setSessions).catch(() => {});
+  }, [patient.id]);
 
+  /* The visits, the price list for their prices, and the invoices that say
+     whether they were paid. None of the three blocks the card. */
+  const appointmentsQuery = useQuery({
+    queryKey: ALL_APPOINTMENTS_KEY,
+    queryFn: fetchAllAppointments,
+    staleTime: 60_000,
+  });
+  const activitiesQuery = useQuery({
+    queryKey: ['activities', 'list'],
+    queryFn: () => activitiesApi.list(),
+    staleTime: 5 * 60_000,
+  });
+  const invoicesQuery = useQuery({
+    queryKey: ['billing', 'invoices'],
+    queryFn: () => billingApi.getInvoices(),
+    enabled: mayBill,
+    staleTime: 60_000,
+  });
 
-  /*
-   * These two must run on EVERY render, so they live above the early return
-   * that shows the spinner — not beside the value they feed further down,
-   * where they were first written. React counts hooks by order, and putting
-   * them after a `return` made the count change the moment a patient loaded:
-   * "Rendered more hooks than during the previous render", and the whole card
-   * fell into the error boundary.
-   *
-   * `patient` may still be null up here, so its own contact is read with `?.`
-   * — it is empty for every patient today anyway, and the profile is what
-   * actually carries the number.
-   */
-  const contacts = profileContacts(profile?.contactsJson);
-  const storedPhone = contactOfKind('phone', patient?.phone, contacts);
-  const [phoneLook, setPhoneLook] = useState<PhoneInspection | null>(null);
-
-  useEffect(() => {
-    if (storedPhone === '') {
-      setPhoneLook(null);
-      return;
-    }
-
-    let cancelled = false;
-    patientRegistryApi
-      .inspectPhone({ value: storedPhone, regionCode: HOME_REGION })
-      .then((result) => { if (!cancelled) setPhoneLook(result); })
-      .catch(() => { if (!cancelled) setPhoneLook(null); });
-
-    return () => { cancelled = true; };
-  }, [storedPhone]);
-
-  if (!patient) {
-    return (
-      <Box>
-        <Skeleton variant="rounded" width={120} height={36} sx={{ mb: 2, borderRadius: 2 }} />
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-          <Skeleton variant="circular" width={64} height={64} />
-          <Box><Skeleton variant="rounded" width={200} height={32} sx={{ mb: 0.5 }} /><Skeleton variant="rounded" width={150} height={20} /></Box>
-        </Box>
-        <Grid container spacing={3}>
-          {[1, 2, 3, 4].map(i => (
-            <Grid key={i} size={{ xs: 12, sm: 6, md: 3 }}><Skeleton variant="rounded" height={140} sx={{ borderRadius: 3 }} /></Grid>
-          ))}
-        </Grid>
-      </Box>
-    );
-  }
-
-  const age = Math.floor((Date.now() - new Date(patient.dateOfBirth).getTime()) / 31557600000);
-  const birthInfo = (() => {
-    const b = new Date(patient.dateOfBirth);
-    const now = new Date();
-    const thisYear = new Date(now.getFullYear(), b.getMonth(), b.getDate());
-    const next = thisYear.getTime() >= new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-      ? thisYear
-      : new Date(now.getFullYear() + 1, b.getMonth(), b.getDate());
-    const days = Math.ceil((next.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000);
-    const isToday = days === 0;
-    const months = Math.floor(days / 30);
-    return { next, days, isToday, months, isMinor: age < 18 };
-  })();
-  /*
-   * The card read `—` for e-mail and telephone on every patient in the
-   * registry, and three faults had to be undone to show either:
-   *
-   *   the rows read `patient.email` / `patient.phone`, which
-   *   `GET /api/v1/patients/{id}` does not carry;
-   *
-   *   this fallback was computed and never used — the two "declared but never
-   *   used" lint warnings on these lines were the bug reporting itself;
-   *
-   *   and it looked for `c.channel`, while the server sends `type`.
-   *
-   * The data was at `GET /api/patients/{id}/profile` the whole time.
-   */
-  const displayEmail = contactOfKind('email', patient.email, contacts);
-
-  /*
-   * A stored number is written the way the desk reads it.
-   *
-   * The profile hands over `+420 777 777 779` — a Czech number carrying its own
-   * dialling code on a Czech card, which is the fault the owner reported in
-   * reverse: "iba ceske cisla pis bez kedze sme v cechach". The grouping is not
-   * worked out here; `phone/inspect` gives it, on the same libphonenumber that
-   * stored the number.
-   *
-   * `HOME_REGION` is sent only because the request wants a region. The answer's
-   * `detectedRegionCode` is what decides, and for a stored number — which always
-   * carries its `+` — that is its real country whatever was asked.
-   *
-   * Any failure leaves `phoneLook` null and the card keeps showing the stored
-   * string, so a card can never lose a number it was already showing.
-   */
-  const displayPhone = storedNumberDisplay(phoneLook, storedPhone);
+  const summary = useMemo(
+    () => summariseVisits(patient.id, appointmentsQuery.data ?? []),
+    [patient.id, appointmentsQuery.data],
+  );
+  const activities = activitiesQuery.data?.activities ?? [];
+  const priceByName = (name: string): number | null =>
+    activities.find((a) => a.name === name)?.priceCzk ?? null;
+  const priceOf = (activityId: string | null, activityName: string): number | null =>
+    activities.find((a) => a.id === activityId)?.priceCzk ?? priceByName(activityName);
+  const questionnaireIsMissing = upcoming !== null && questionnaireMissing(patient.id, upcoming);
 
   /* How each field in the clinic's catalogue is read off this patient. */
   const personalValue: Record<string, string> = {
     recordId: patient.id.slice(0, 8) + '…',
-    dateOfBirth: new Date(patient.dateOfBirth).toLocaleDateString('cs-CZ'),
+    dateOfBirth: formatDateOnly(patient.dateOfBirth?.slice(0, 10)),
     sex: patient.sex === 'Male' ? 'Muž' : 'Žena',
     email: displayEmail || '—',
     phone: displayPhone || '—',
-    registeredAt: new Date(patient.createdAtUtc).toLocaleDateString('cs-CZ'),
+    registeredAt: formatDateOnly(patient.createdAtUtc?.slice(0, 10)),
     status: patient.status === 'Archived' ? 'Archivovaný' : 'Aktivní',
   };
-  const registrationValue: Record<string, string | null | undefined> = {
-    birthNumber: profile?.birthNumber,
-    insuranceNumber: profile?.insuranceNumber,
-    healthInsurer: profile?.healthInsurerCode,
-    insuredFrom: profile?.insuredFrom,
-    insuranceType: profile?.insuranceType,
-    citizenship: profile?.citizenship,
-    address: profile?.address,
-    treatingDoctors: profile?.treatingDoctors,
-    occupation: profile?.occupation,
-    employer: profile?.employer,
-    employmentType: profile?.employmentType,
-    notes: profile?.notes,
+  const str = (key: string): string | null => {
+    const value = profile?.[key];
+    return typeof value === 'string' && value.trim() !== '' ? value : null;
+  };
+  const registrationValue: Record<string, string | null> = {
+    birthNumber: str('birthNumber'),
+    insuranceNumber: str('insuranceNumber'),
+    healthInsurer: str('healthInsurerCode'),
+    insuredFrom: str('insuredFrom'),
+    insuranceType: str('insuranceType'),
+    citizenship: str('citizenship'),
+    address: str('address'),
+    treatingDoctors: str('treatingDoctors'),
+    occupation: str('occupation'),
+    employer: str('employer'),
+    employmentType: str('employmentType'),
+    notes: str('notes'),
   };
   const personalRows = (shownFields(fieldVisibility.data, 'card', maySeeSensitive, 'personal') ?? [])
-    .map((field) => [field.label, personalValue[field.key] ?? '—'] as const);
+    .map((field) => ({ key: field.key, label: field.label, value: personalValue[field.key] ?? '—' }));
   const registrationRows = (shownFields(fieldVisibility.data, 'card', maySeeSensitive, 'registration') ?? [])
-    .map((field) => [field.label, registrationValue[field.key]] as const)
-    .filter(([, value]) => value);
+    .map((field) => ({ key: field.key, label: field.label, value: registrationValue[field.key] }))
+    .filter((row): row is { key: string; label: string; value: string } => row.value !== null && row.value !== undefined);
+  const rows = [...registrationRows, ...personalRows];
 
   const latest = sessions[0];
   const previous = sessions[1];
-  /*
-   * This used to ignore its own argument:
-   *
-   *     const hasRequiredDoc = (docType: string) =>
-   *       docs.some(d => d.status === 'Signed' || d.status === 'Active');
-   *
-   * `docType` was never read, so one signed document of any kind marked every
-   * requirement satisfied - a patient with a single unrelated form on file
-   * looked like a patient whose paperwork was complete. It matches the
-   * template now.
-   */
-  /*
-   * `'Signed'` and `'Active'` were compared here, and the server has never
-   * sent either. Its `DocumentStatus` is
-   * `Pending | SignedOff | Expired | Superseded | Rejected`, so the test could
-   * not pass for any document, for any patient, ever - "Chybí: Výpis ze
-   * zdravotní dokumentace" stayed on a card whose výpis was uploaded and
-   * signed.
-   *
-   * Found by walking one patient end to end: registration, approval, upload,
-   * sign - and the warning did not move. The server agreed it was complete
-   * (`/documents/patient/{id}/summary` flipped `hasVypis` to true on signing);
-   * only this line disagreed.
-   *
-   * `SignedOff` alone counts. Expired and Rejected plainly do not, and
-   * Superseded means a newer document exists - that newer one is the signed
-   * one, and it is in this same list.
-   */
-  const hasRequiredDoc = (templateId: string) =>
-    docs.some(
-      (d) => d.templateId === templateId && d.status === DOCUMENT_SATISFIES_REQUIREMENT,
-    );
-
-  /*
-   * Every kind of document the clinic keeps, not "the required ones".
-   *
-   * `requiredForVisit` and `firstVisitOnly` were columns on the template until
-   * 14. 9. 2026 and are gone: what a patient must bring is a property of the
-   * rule (šablona x sluzba), and which rule applies depends on the service
-   * their appointment is for. A template cannot answer that on its own, and
-   * this filter answered it wrongly for as long as it existed - it asked
-   * somebody booked for a blood draw for their medical record.
-   *
-   * Who is actually missing what is on the patient card, off
-   * `GET /api/documents/patient/{id}/check`, per appointment.
-   */
-  const requiredDocs = templates
-    .filter((t) => t.isActive)
-    .map((t) => ({
-      id: t.id,
-      label: t.name,
-      /* Carried over from the Documents screen, which was deleted as a
-         duplicate. It is the one thing that screen said and nothing else did,
-         and it is the sentence that tells somebody at the desk what to ask the
-         patient for. */
-      description: t.description,
-    }));
-
-  const missingDocs = requiredDocs.filter((rd) => !hasRequiredDoc(rd.id));
-  const bp = latest ? getBpLabel(latest.systolicBloodPressure, latest.diastolicBloodPressure) : null;
 
   const handleDownloadPdf = async (sessionId: string) => {
     setLoadingPdf(sessionId);
-    try { await diagnosticsApi.downloadPdf(sessionId); } catch {}
+    try { await diagnosticsApi.downloadPdf(sessionId); } catch { /* the button stays; the download did not */ }
     setLoadingPdf(null);
   };
 
   return (
-    <Box>
-      {/*
-        The name, the missing-paperwork banner, the consent line and the
-        section tabs live in `patients/PatientLayout` now, so they stay on
-        screen whichever section is open. What is left here is the overview
-        itself.
-      */}
-      {/* ── Extended profile (registration data) ── */}
-      {profile && registrationRows.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <Card sx={{ mb: 3, borderRadius: 3 }}>
-            <CardContent>
-              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-                <Person sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Registrační údaje
+    <Grid container spacing={2.5}>
+      {/* ── Left column ── */}
+      <Grid size={{ xs: 12, md: 8 }}>
+        <Stack spacing={2.5}>
+          <SoftCard>
+            <SectionLabel>Osobní údaje</SectionLabel>
+            {fieldVisibility.isError && (
+              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
+                Nastavení zobrazených údajů se nepodařilo načíst.
               </Typography>
-              <Grid container spacing={2}>
-                {registrationRows.map(([label, v]) => (
-                  <Grid size={{ xs: 12, sm: 6 }} key={label}>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{label}</Typography>
-                    <Typography variant="body2">{v}</Typography>
-                  </Grid>
-                ))}
+            )}
+            {rows.length === 0 && !fieldVisibility.isPending && (
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Žádný údaj není nastaven k zobrazení.
+              </Typography>
+            )}
+            <Grid container spacing={2}>
+              {rows.map((row) => (
+                <Grid key={row.key} size={{ xs: 12, sm: 6 }}>
+                  <LabelValue
+                    label={row.label}
+                    value={row.value}
+                    mono={row.key === 'birthNumber' || row.key === 'insuranceNumber' || row.key === 'recordId'}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+          </SoftCard>
+
+          <VisitHistoryTable
+            visits={summary.visits}
+            invoices={invoicesQuery.data ?? []}
+            priceOf={priceByName}
+          />
+
+          {/* ── Výsledky: the latest session's numbers and every session ── */}
+          {latest && (
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 6, md: 3 }}>
+                <KpiCard
+                  label="VO₂ max"
+                  value={`${latest.vo2MaxMlMinKg.toFixed(1)}`}
+                  hint={trendPct(latest.vo2MaxMlMinKg, previous?.vo2MaxMlMinKg) ?? 'ml/min/kg'}
+                />
               </Grid>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+              <Grid size={{ xs: 6, md: 3 }}>
+                <KpiCard
+                  label="Klidový tep"
+                  value={`${latest.restingHeartRateBpm}`}
+                  hint={trendPct(latest.restingHeartRateBpm, previous?.restingHeartRateBpm) ?? 'úderů/min'}
+                />
+              </Grid>
+              <Grid size={{ xs: 6, md: 3 }}>
+                <KpiCard
+                  label="Krevní tlak"
+                  value={`${latest.systolicBloodPressure}/${latest.diastolicBloodPressure}`}
+                  hint={bpLabel(latest.systolicBloodPressure, latest.diastolicBloodPressure)}
+                />
+              </Grid>
+              <Grid size={{ xs: 6, md: 3 }}>
+                <KpiCard
+                  label="Tělesný tuk"
+                  value={`${latest.bodyFatPercentage.toFixed(1)} %`}
+                  hint={`Svaly ${latest.muscleMassKg} kg`}
+                />
+              </Grid>
+            </Grid>
+          )}
 
-      {/* One dialog for both: a required document carries its template, a
-          report from another doctor carries none - and that absence is what
-          keeps it out of the required-document rules. */}
-      {id !== undefined && uploadTemplate !== null && (
-        <UploadDocumentDialog
-          open
-          onClose={() => setUploadTemplate(null)}
-          patientId={id}
-          template={uploadTemplate === 'report' ? null : uploadTemplate}
-          onUploaded={reloadDocuments}
-        />
-      )}
+          <SoftCard>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
+              <SectionLabel sx={{ mb: 0 }}>Výsledky · diagnostická sezení</SectionLabel>
+              <Box sx={{ flex: 1 }} />
+              <Button size="small" variant="outlined" onClick={() => navigate(`/diagnostics/new?patientId=${patient.id}`)}>
+                Nové vyšetření
+              </Button>
+            </Stack>
 
-      {/*
-        The consent-management card stood here and is gone with its server.
-        It read a table that had never held a row, so it told the desk
-        "Neudělen" about every patient - including the ones who had consented,
-        whose consent sits in `patient_intake_consents` where the intake wrote
-        it. At GDPR that is wrong in both directions: somebody concludes the
-        data may not be processed when it may, or grants a second consent
-        beside the real one and nobody can later say which applies.
-        (`/api/patients/{id}/consents` now answers 404; measured.)
+            {sessions.length === 0 ? (
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Zatím žádné sezení. Vytvořte první diagnostické sezení pro {patient.firstName}.
+              </Typography>
+            ) : (
+              <Stack spacing={1}>
+                {sessions.map((s) => {
+                  const isExpanded = expandedSession === s.id;
+                  return (
+                    <Box
+                      key={s.id}
+                      sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}
+                    >
+                      <Box
+                        sx={{ p: 1.5, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
+                        onClick={() => setExpandedSession(isExpanded ? null : s.id)}
+                      >
+                        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography sx={{ fontWeight: 600 }}>{sessionDate(s.sessionDate)}</Typography>
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                              {s.practitionerName}
+                              {' · '}
+                              {new Date(s.createdAtUtc).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
+                            </Typography>
+                          </Box>
+                          {s.requiresDoctorReview && <StatusChip tone="beige">K posouzení</StatusChip>}
+                          <IconButton
+                            size="small"
+                            onClick={(e) => { e.stopPropagation(); void handleDownloadPdf(s.id); }}
+                            title="Stáhnout PDF"
+                          >
+                            {loadingPdf === s.id ? <LinearProgress sx={{ width: 20 }} /> : <Download sx={{ fontSize: 18 }} />}
+                          </IconButton>
+                          {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                        </Stack>
 
-        The owner drew the wider conclusion: the patient gives consent when
-        registering, so the desk has nothing to manage - only something to see.
-        A single line saying when it was given and under which policy version
-        is coming from the other lane; it is not here yet, and a line that is
-        absent is better than one that says "not given" to somebody who did.
-      */}
+                        <Stack direction="row" spacing={0.75} sx={{ mt: 1, flexWrap: 'wrap', rowGap: 0.75 }}>
+                          {[
+                            `VO₂ ${s.vo2MaxMlMinKg} ml`,
+                            `Klid ${s.restingHeartRateBpm} bpm`,
+                            `TK ${s.systolicBloodPressure}/${s.diastolicBloodPressure}`,
+                            `Tuk ${s.bodyFatPercentage} %`,
+                            `Svaly ${s.muscleMassKg} kg`,
+                          ].map((text) => (
+                            <StatusChip key={text} tone="grey" size="sm">{text}</StatusChip>
+                          ))}
+                        </Stack>
+                      </Box>
 
-      {/* ── Metrics Cards (latest session) ── */}
-      {latest && (
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid size={{ xs: 6, md: 3 }}>
-            <MetricCard icon={<MonitorHeart />} label="VO2 Max" value={latest.vo2MaxMlMinKg}
-              unit="ml/min/kg" color={getVo2Color(latest.vo2MaxMlMinKg)}
-              prevValue={previous?.vo2MaxMlMinKg} higherIsBetter={true} delay={0.05} />
-          </Grid>
-          <Grid size={{ xs: 6, md: 3 }}>
-            <MetricCard icon={<FitnessCenter />} label="Klidový tep" value={latest.restingHeartRateBpm}
-              unit="úderů/min" color="#0D7377"
-              prevValue={previous?.restingHeartRateBpm} higherIsBetter={false} delay={0.1} />
-          </Grid>
-          <Grid size={{ xs: 6, md: 3 }}>
-            <MetricCard icon={<Bloodtype />} label="Krevní tlak" value={`${latest.systolicBloodPressure}/${latest.diastolicBloodPressure}`}
-              unit={bp?.text || ''} color={bp?.color || '#666'} delay={0.15} />
-          </Grid>
-          <Grid size={{ xs: 6, md: 3 }}>
-            <MetricCard icon={<Spa />} label="Tělesný tuk" value={latest.bodyFatPercentage}
-              unit={`% · Svaly ${latest.muscleMassKg} kg`} color="#7B1FA2"
-              prevValue={previous?.bodyFatPercentage} higherIsBetter={false} delay={0.2} />
-          </Grid>
-        </Grid>
-      )}
+                      <Collapse in={isExpanded}>
+                        <Divider />
+                        <Box sx={{ p: 2, bgcolor: 'background.default' }}>
+                          <Grid container spacing={2}>
+                            <Grid size={{ xs: 6, sm: 3 }}>
+                              <LabelValue label="Max tep" value={`${s.maxHeartRateBpm} bpm`} />
+                            </Grid>
+                            <Grid size={{ xs: 6, sm: 3 }}>
+                              <LabelValue label="Anaerobní práh" value={`${s.anaerobicThresholdBpm} bpm`} />
+                            </Grid>
+                            <Grid size={{ xs: 6, sm: 3 }}>
+                              <LabelValue label="VO₂ max" value={`${s.vo2MaxMlMinKg} ml/min/kg`} />
+                            </Grid>
+                            <Grid size={{ xs: 6, sm: 3 }}>
+                              <LabelValue label="Tělesný tuk" value={`${s.bodyFatPercentage} %`} />
+                            </Grid>
+                          </Grid>
 
-      <Grid container spacing={3}>
-        {/* ── Left Column: Info + Documents ── */}
-        <Grid size={{ xs: 12, md: 4 }}>
-          {/* Patient Info */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-            <Card sx={{ mb: 3 }}>
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Person sx={{ color: '#0D7377', fontSize: 20 }} />
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>Osobní údaje</Typography>
-                </Box>
-                <Divider sx={{ mb: 2 }} />
-                {fieldVisibility.isError && (
-                  <Typography variant="caption" color="text.secondary">
-                    Nastavení zobrazených údajů se nepodařilo načíst.
-                  </Typography>
-                )}
-                {personalRows.map(([label, value]) => (
-                  <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: '1px solid #f5f5f5' }}>
-                    <Typography variant="body2" color="text.secondary">{label}</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{value}</Typography>
-                  </Box>
-                ))}
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Documents moved to their own section at
-              /patients/:id/dokumenty - one page about one patient's papers,
-              with room for the actions that had nowhere to go here. */}
-          <Button
-            fullWidth
-            variant="outlined"
-            startIcon={<Description />}
-            onClick={() => navigate(`/patients/${patient.id}/dokumenty`)}
-            sx={{ mt: 2, borderColor: '#0D7377', color: '#0D7377' }}
-          >
-            Dokumenty pacienta
-          </Button>
-        </Grid>
-
-        {/* ── Right Column: Diagnostic Sessions ── */}
-        <Grid size={{ xs: 12, md: 8 }}>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-            <Card>
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <TrendingUp sx={{ color: '#0D7377', fontSize: 20 }} />
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>Diagnostická sezení</Typography>
-                  </Box>
-                  <Button size="small" startIcon={<Add />} onClick={() => navigate(`/diagnostics/new?patientId=${patient.id}`)}
-                    sx={{ color: '#0D7377' }}>
-                    Nové
-                  </Button>
-                </Box>
-                <Divider sx={{ mb: 2 }} />
-
-                {sessions.length === 0 ? (
-                  <Box sx={{ textAlign: 'center', py: 6 }}>
-                    <Science sx={{ fontSize: 56, color: '#ddd', mb: 1 }} />
-                    <Typography color="text.secondary" sx={{ mb: 1 }}>Zatím žádná sezení</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Vytvořte první diagnostické sezení pro {patient.firstName}.
-                    </Typography>
-                  </Box>
-                ) : (
-                  <List sx={{ p: 0 }}>
-                    {sessions.map((s, i) => {
-                      const isExpanded = expandedSession === s.id;
-                      const sPrev = sessions[i + 1];
-                      return (
-                        <motion.div key={s.id}
-                          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.3 + i * 0.04 }}>
-                          <Paper variant="outlined" sx={{ mb: 1.5, borderRadius: 2, overflow: 'hidden' }}>
-                            {/* Session header */}
-                            <Box sx={{ p: 2, cursor: 'pointer', '&:hover': { bgcolor: '#f8f9fa' } }}
-                              onClick={() => setExpandedSession(isExpanded ? null : s.id)}>
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                  <Box sx={{
-                                    width: 10, height: 10, borderRadius: '50%',
-                                    bgcolor: s.requiresDoctorReview ? '#ED6C02' : '#2E7D32',
-                                  }} />
-                                  <Box>
-                                    <Typography sx={{ fontWeight: 600 }}>
-                                      {new Date(s.sessionDate).toLocaleDateString('cs-CZ', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      {s.practitionerName} · {new Date(s.createdAtUtc).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
-                                    </Typography>
-                                  </Box>
-                                </Box>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  {s.requiresDoctorReview && (
-                                    <Chip label="K posouzení" size="small" color="warning" sx={{ fontWeight: 500 }} />
-                                  )}
-                                  <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleDownloadPdf(s.id); }}
-                                    title="Stáhnout PDF">
-                                    {loadingPdf === s.id ? <LinearProgress sx={{ width: 20 }} /> : <Download sx={{ fontSize: 18 }} />}
-                                  </IconButton>
-                                  {isExpanded ? <ExpandLess /> : <ExpandMore />}
-                                </Box>
-                              </Box>
-
-                              {/* Mini metrics row */}
-                              <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
-                                {[
-                                  { label: 'VO₂', val: s.vo2MaxMlMinKg, unit: 'ml', color: getVo2Color(s.vo2MaxMlMinKg), prev: sPrev?.vo2MaxMlMinKg, hi: true },
-                                  { label: 'Klid', val: s.restingHeartRateBpm, unit: 'bpm', color: '#0D7377', prev: sPrev?.restingHeartRateBpm, hi: false },
-                                  { label: 'TK', val: `${s.systolicBloodPressure}/${s.diastolicBloodPressure}`, unit: '', color: '#666' },
-                                  { label: 'Tuk', val: s.bodyFatPercentage, unit: '%', color: '#7B1FA2', prev: sPrev?.bodyFatPercentage, hi: false },
-                                  { label: 'Svaly', val: s.muscleMassKg, unit: 'kg', color: '#2E7D32', prev: sPrev?.muscleMassKg, hi: true },
-                                ].map(m => (
-                                  <Chip key={m.label}
-                                    icon={typeof m.val === 'number' && m.prev ? trendIcon(m.val, m.prev, m.hi ?? true) as React.ReactElement : undefined}
-                                    label={`${m.label}: ${m.val}${m.unit ? ' ' + m.unit : ''}`}
-                                    size="small" variant="outlined"
-                                    sx={{ fontWeight: 500, fontSize: 11, borderColor: m.color + '40', color: m.color }}
-                                  />
-                                ))}
-                              </Box>
+                          {s.rawPractitionerNotes && (
+                            <Box sx={{ mt: 2 }}>
+                              <SectionLabel>Poznámky</SectionLabel>
+                              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{s.rawPractitionerNotes}</Typography>
                             </Box>
+                          )}
 
-                            {/* Expanded details */}
-                            <Collapse in={isExpanded}>
-                              <Divider />
-                              <Box sx={{ p: 2, bgcolor: '#fafbfc' }}>
-                                <Grid container spacing={2}>
-                                  <Grid size={{ xs: 6, sm: 3 }}>
-                                    <Typography variant="caption" color="text.secondary">Max tep</Typography>
-                                    <Typography sx={{ fontWeight: 600 }}>{s.maxHeartRateBpm} bpm</Typography>
-                                  </Grid>
-                                  <Grid size={{ xs: 6, sm: 3 }}>
-                                    <Typography variant="caption" color="text.secondary">Anaerobní práh</Typography>
-                                    <Typography sx={{ fontWeight: 600 }}>{s.anaerobicThresholdBpm} bpm</Typography>
-                                  </Grid>
-                                  <Grid size={{ xs: 6, sm: 3 }}>
-                                    <Typography variant="caption" color="text.secondary">VO₂ Max</Typography>
-                                    <Typography sx={{ fontWeight: 600, color: getVo2Color(s.vo2MaxMlMinKg) }}>
-                                      {s.vo2MaxMlMinKg} ml/min/kg
-                                    </Typography>
-                                  </Grid>
-                                  <Grid size={{ xs: 6, sm: 3 }}>
-                                    <Typography variant="caption" color="text.secondary">Tělesný tuk</Typography>
-                                    <Typography sx={{ fontWeight: 600 }}>{s.bodyFatPercentage}%</Typography>
-                                  </Grid>
-                                </Grid>
+                          {s.detectedAnomaliesJson && (
+                            <Alert severity="warning" sx={{ mt: 2 }}>
+                              <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>Detekované anomálie</Typography>
+                              <Typography variant="body2">{s.detectedAnomaliesJson}</Typography>
+                            </Alert>
+                          )}
 
-                                {s.rawPractitionerNotes && (
-                                  <Box sx={{ mt: 2, p: 2, bgcolor: 'white', borderRadius: 2, border: '1px solid #e0e0e0' }}>
-                                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Poznámky</Typography>
-                                    <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: 'pre-wrap' }}>{s.rawPractitionerNotes}</Typography>
-                                  </Box>
-                                )}
-
-                                {s.detectedAnomaliesJson && (
-                                  <Alert severity="warning" sx={{ mt: 2, borderRadius: 2 }}>
-                                    <Typography variant="caption" sx={{ fontWeight: 600 }}>Detekované anomálie</Typography>
-                                    <Typography variant="body2">{s.detectedAnomaliesJson}</Typography>
-                                  </Alert>
-                                )}
-
-                                <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-                                  <Button size="small" variant="outlined" startIcon={<Download />}
-                                    onClick={() => handleDownloadPdf(s.id)}
-                                    sx={{ borderColor: '#0D7377', color: '#0D7377' }}>
-                                    PDF Report
-                                  </Button>
-                                </Box>
-                              </Box>
-                            </Collapse>
-                          </Paper>
-                        </motion.div>
-                      );
-                    })}
-                  </List>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        </Grid>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<Download />}
+                            onClick={() => void handleDownloadPdf(s.id)}
+                            sx={{ mt: 2 }}
+                          >
+                            PDF report
+                          </Button>
+                        </Box>
+                      </Collapse>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            )}
+          </SoftCard>
+        </Stack>
       </Grid>
-    </Box>
+
+      {/* ── Right rail ── */}
+      <Grid size={{ xs: 12, md: 4 }}>
+        <Stack spacing={2.5}>
+          <NextAppointmentCard
+            patientId={patient.id}
+            window={upcoming}
+            fallback={summary.nextAppointment}
+            priceOf={priceOf}
+          />
+          <AlertsCard
+            patientId={patient.id}
+            questionnaireIsMissing={questionnaireIsMissing}
+            requirements={requirements}
+          />
+        </Stack>
+      </Grid>
+    </Grid>
   );
 }

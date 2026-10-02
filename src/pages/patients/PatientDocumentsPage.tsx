@@ -14,15 +14,14 @@
  */
 import { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import {
-  Box, Button, Card, CardContent, Chip, Divider, Stack, Typography,
-} from '@mui/material';
-import { Error as ErrorIcon, CloudUpload, Shield } from '@mui/icons-material';
+import { Box, Button, Stack, Typography } from '@mui/material';
+import { CloudUpload } from '@mui/icons-material';
 import MedicalReports from '../../components/documents/MedicalReports';
 import DocumentActions from '../../components/documents/DocumentActions';
 import UploadDocumentDialog from '../../components/documents/UploadDocumentDialog';
 import { DOCUMENT_SATISFIES_REQUIREMENT } from '../../api/documents';
 import type { DocumentTemplate } from '../../api/documents';
+import { DESIGN, SectionLabel, SoftCard, StatusChip } from '../../components/ui';
 import { requiredRowState } from './requiredDocumentRow';
 import type { PatientContext } from './PatientLayout';
 
@@ -44,118 +43,108 @@ export default function PatientDocumentsPage() {
   const required = templates.filter((t) => t.isActive);
 
   return (
-    <Stack spacing={2}>
-      <Card sx={{ borderRadius: 3 }}>
-        <CardContent>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
-            <Shield sx={{ color: '#0D7377' }} />
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Povinné dokumenty
-            </Typography>
-          </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Co musí pacient doložit, než ho můžete vyšetřit.
+    <Stack spacing={2.5}>
+      <SoftCard>
+        <SectionLabel sx={{ mb: 0.25 }}>Povinné dokumenty</SectionLabel>
+        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
+          Co musí pacient doložit, než ho můžete vyšetřit.
+        </Typography>
+
+        {required.length === 0 && (
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Žádné povinné dokumenty nejsou nastavené.
           </Typography>
-          <Divider sx={{ mb: 1 }} />
+        )}
 
-          {required.length === 0 && (
-            <Typography variant="body2" color="text.secondary">
-              Žádné povinné dokumenty nejsou nastavené.
-            </Typography>
-          )}
+        {required.map((template) => {
+          const filed = documents.find(
+            (d) =>
+              d.templateId === template.id && d.status === DOCUMENT_SATISFIES_REQUIREMENT,
+          );
 
-          {required.map((template) => {
-            const filed = documents.find(
-              (d) =>
-                d.templateId === template.id && d.status === DOCUMENT_SATISFIES_REQUIREMENT,
-            );
+          const row = requiredRowState(template, filed);
 
-            const row = requiredRowState(template, filed);
-
-            return (
-              <Stack
-                key={template.id}
-                direction="row"
-                spacing={1}
-                sx={{
-                  alignItems: 'center', py: 1.5, flexWrap: 'wrap',
-                  borderBottom: '1px solid', borderColor: 'divider',
-                }}
-              >
-                <Box sx={{ minWidth: 220, flex: 1 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {template.name}
+          return (
+            <Stack
+              key={template.id}
+              direction="row"
+              spacing={1.5}
+              sx={{
+                alignItems: 'center', py: 1.5, flexWrap: 'wrap',
+                borderTop: '1px solid', borderColor: 'divider',
+              }}
+            >
+              <Box sx={{ minWidth: 220, flex: 1 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {template.name}
+                </Typography>
+                {/* The sentence that tells somebody at the desk what to ask
+                    the patient for. */}
+                {template.description !== '' && (
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    {template.description}
                   </Typography>
-                  {/* The sentence that tells somebody at the desk what to ask
-                      the patient for. */}
-                  {template.description !== '' && (
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                      {template.description}
+                )}
+              </Box>
+
+              {/*
+                * The date, not a verdict, and no green tick. See
+                * `requiredDocumentRow.ts` for both reasons - in short, a
+                * card full of green teaches its reader to stop looking, and
+                * "Hotovo" answers a question nobody has.
+                */}
+              {row.tone === 'on-file' ? (
+                <Box sx={{ textAlign: 'right' }}>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>{row.text}</Typography>
+                  {row.detail !== undefined && (
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      {row.detail}
                     </Typography>
                   )}
                 </Box>
-
-                {/*
-                  * The date, not a verdict, and no green tick. See
-                  * `requiredDocumentRow.ts` for both reasons - in short, a
-                  * card full of green teaches its reader to stop looking, and
-                  * "Hotovo" answers a question nobody has.
-                  */}
-                {row.tone === 'on-file' ? (
-                  <Box sx={{ textAlign: 'right' }}>
-                    <Typography variant="body2" color="text.secondary">{row.text}</Typography>
-                    {row.detail !== undefined && (
-                      <Typography variant="caption" color="text.secondary">
-                        {row.detail}
-                      </Typography>
-                    )}
-                  </Box>
-                ) : row.tone === 'expiring' ? (
-                  /* Amber, and only here: still valid, and this is the cheap
-                     moment to replace it - while the patient is in the room. */
-                  <Box sx={{ textAlign: 'right' }}>
-                    <Typography variant="body2" sx={{ color: '#ED6C02', fontWeight: 500 }}>
-                      {row.text}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#ED6C02' }}>
+              ) : row.tone === 'expiring' ? (
+                /* Amber, and only here: still valid, and this is the cheap
+                   moment to replace it - while the patient is in the room. */
+                <Box sx={{ textAlign: 'right' }}>
+                  <Typography variant="body2" sx={{ color: DESIGN.tone.beige.fg, fontWeight: 600 }}>
+                    {row.text}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: DESIGN.tone.beige.fg }}>
+                    {row.detail}
+                  </Typography>
+                </Box>
+              ) : (
+                <Box sx={{ textAlign: 'right' }}>
+                  <StatusChip tone="red">{row.text}</StatusChip>
+                  {row.detail !== undefined && (
+                    <Typography variant="caption" sx={{ display: 'block', color: DESIGN.tone.red.fg }}>
                       {row.detail}
                     </Typography>
-                  </Box>
-                ) : (
-                  <Box sx={{ textAlign: 'right' }}>
-                    <Chip icon={<ErrorIcon />} label={row.text} size="small"
-                      sx={{ bgcolor: '#D32F2F14', color: '#D32F2F', fontWeight: 500 }} />
-                    {row.detail !== undefined && (
-                      <Typography variant="caption" sx={{ display: 'block', color: '#D32F2F' }}>
-                        {row.detail}
-                      </Typography>
-                    )}
-                  </Box>
-                )}
+                  )}
+                </Box>
+              )}
 
-                <Button
-                  size="small"
-                  variant={filed === undefined ? 'contained' : 'text'}
-                  startIcon={<CloudUpload />}
-                  onClick={() => setUploading(template)}
-                  sx={filed === undefined ? { bgcolor: '#0D7377' } : undefined}
-                >
-                  {filed === undefined ? 'Nahrát' : 'Nahradit'}
-                </Button>
+              <Button
+                size="small"
+                variant={filed === undefined ? 'contained' : 'outlined'}
+                startIcon={<CloudUpload />}
+                onClick={() => setUploading(template)}
+              >
+                {filed === undefined ? 'Nahrát' : 'Nahradit'}
+              </Button>
 
-                {filed !== undefined && (
-                  <DocumentActions
-                    document={filed}
-                    patientDocuments={documents}
-                    patientName={patient.firstName}
-                    onChanged={reloadDocuments}
-                  />
-                )}
-              </Stack>
-            );
-          })}
-        </CardContent>
-      </Card>
+              {filed !== undefined && (
+                <DocumentActions
+                  document={filed}
+                  patientDocuments={documents}
+                  patientName={patient.firstName}
+                  onChanged={reloadDocuments}
+                />
+              )}
+            </Stack>
+          );
+        })}
+      </SoftCard>
 
       <MedicalReports
         documents={documents}

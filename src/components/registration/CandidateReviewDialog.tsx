@@ -14,7 +14,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -26,6 +25,7 @@ import {
 } from '@mui/material';
 import { PersonSearch } from '@mui/icons-material';
 import type { RegistrationCandidate } from '../../api/patientRegistry';
+import { StatusChip } from '../ui/StatusChip';
 
 interface Props {
   open: boolean;
@@ -83,11 +83,9 @@ export default function CandidateReviewDialog({
                     <Typography variant="body1" sx={{ fontWeight: 600 }}>
                       {candidate.fullName ?? `${candidate.firstName} ${candidate.lastName}`}
                     </Typography>
-                    <Chip
-                      size="small"
-                      label={candidate.status === 'Active' ? 'aktivní' : 'archivovaný'}
-                      color={candidate.status === 'Active' ? 'success' : 'default'}
-                    />
+                    <StatusChip size="sm" tone={candidate.status === 'Active' ? 'green' : 'grey'}>
+                      {candidate.status === 'Active' ? 'Aktivní' : 'Archivovaný'}
+                    </StatusChip>
                   </Box>
                 }
                 secondary={`nar. ${formatDate(candidate.dateOfBirth)} · ${
@@ -103,8 +101,8 @@ export default function CandidateReviewDialog({
         </Typography>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button onClick={onCancel} disabled={submitting}>
+      <DialogActions>
+        <Button variant="outlined" onClick={onCancel} disabled={submitting}>
           Zpět do formuláře
         </Button>
         <Button variant="contained" onClick={onConfirmDistinct} disabled={submitting}>

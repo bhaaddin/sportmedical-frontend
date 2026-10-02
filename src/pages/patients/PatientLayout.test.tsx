@@ -15,7 +15,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import type { DocumentStatus, DocumentTemplate, PatientDocument } from '../../api/documents';
 
 const getById = vi.fn();
@@ -67,6 +68,7 @@ const doc = (
 ): PatientDocument => ({ id: 'd1', templateId, status, reportDate }) as PatientDocument;
 
 beforeEach(() => {
+  localStorage.setItem('permissions', JSON.stringify(['patients.view']));
   getById.mockReset().mockResolvedValue({
     id: 'p1', firstName: 'Cesta', lastName: 'Jedna',
     dateOfBirth: '1990-05-15', sex: 'Male', status: 'Active',
@@ -122,7 +124,7 @@ describe('what the appointments ask for', () => {
     getPatientDocuments.mockResolvedValue([doc('SignedOff')]);
 
     renderLayout();
-    await screen.findByText('Cesta Jedna');
+    await screen.findAllByText('Cesta Jedna');
 
     expect(screen.queryByText(/Chybí doklady/)).not.toBeInTheDocument();
     expect(screen.getByText(/jsou v pořádku/)).toBeInTheDocument();
@@ -151,7 +153,7 @@ describe('what the appointments ask for', () => {
     checkRequired.mockRejectedValue(new Error('offline'));
 
     renderLayout();
-    await screen.findByText('Cesta Jedna');
+    await screen.findAllByText('Cesta Jedna');
 
     expect(screen.queryByText(/Nemá objednaný termín/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Chybí doklady/)).not.toBeInTheDocument();
@@ -333,7 +335,7 @@ describe('the way into the edit form', () => {
 
     renderLayout();
 
-    expect(await screen.findByRole('button', { name: 'Upravit' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Upravit kartu' })).toBeInTheDocument();
   });
 
   it('is not offered to somebody who may only look', async () => {
@@ -341,7 +343,65 @@ describe('the way into the edit form', () => {
 
     renderLayout();
 
-    await screen.findByText('Nová diagnostika');
-    expect(screen.queryByRole('button', { name: 'Upravit' })).not.toBeInTheDocument();
+    await screen.findByRole('button', { name: 'Objednat termín' });
+    expect(screen.queryByRole('button', { name: 'Upravit kartu' })).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * "Objednat termín" hands the patient to the calendar: the sidebar's "Nová
+ * objednávka" opens the booking drawer on `newAppointment`, and this does the
+ * same with the patient already chosen, so the desk does not search for the
+ * person whose card is open.
+ */
+describe('booking from the card', () => {
+  it('opens the calendar with this patient handed over', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/patients/p1']}>
+        <Routes>
+          <Route path="/patients/:id" element={<PatientLayout />}>
+            <Route index element={<div>PŘEHLED</div>} />
+          </Route>
+          <Route path="/planovani" element={<HandedOver />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Objednat termín' }));
+
+    expect(await screen.findByText('KALENDÁŘ pro p1')).toBeInTheDocument();
+  });
+});
+
+function HandedOver() {
+  const { state } = useLocation() as { state: { newAppointment?: number; patientId?: string } | null };
+  return (
+    <div>
+      {typeof state?.newAppointment === 'number' && typeof state.patientId === 'string'
+        ? `KALENDÁŘ pro ${state.patientId}`
+        : 'nic nepředáno'}
+    </div>
+  );
+}
+
+/* The board's tab row, in its order, every section reachable by its address. */
+describe('the tabs', () => {
+  it('draws the board\'s tabs and marks the open section', async () => {
+    renderLayout('/patients/p1/dokumenty');
+
+    await screen.findByText('DOKUMENTY');
+    const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent);
+    expect(tabs).toEqual(['Přehled', 'Termíny', 'Výsledky', 'Dokumenty', 'Historie']);
+    expect(screen.getByRole('tab', { name: 'Dokumenty' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('offers Faktury only to somebody who may bill', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'billing.manage']));
+
+    renderLayout();
+
+    await screen.findByText('PŘEHLED');
+    expect(screen.getByRole('tab', { name: 'Faktury' })).toHaveAttribute('href', '/billing');
   });
 });

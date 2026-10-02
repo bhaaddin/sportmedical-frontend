@@ -9,6 +9,10 @@
  * What would have to break for these to fail: counting the rows on screen
  * instead of `totalCount`, filtering in the browser instead of asking the
  * server, or losing the way to the next page.
+ *
+ * The STAV column and the filter chips are joined from the appointment list
+ * (see `patientActivity`); the join is tested there, and here only that the
+ * register draws what it was handed and filters the page on it.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
@@ -17,8 +21,16 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const list = vi.fn();
+const fetchAllAppointments = vi.fn();
+const fetchUpcomingWindow = vi.fn();
 
 vi.mock('../api/patients', () => ({ patientsApi: { list }, PATIENT_PAGE_SIZE_MAX: 100 }));
+vi.mock('../components/patients/appointmentsSource', () => ({
+  ALL_APPOINTMENTS_KEY: ['scheduling', 'appointments', 'all'],
+  UPCOMING_WINDOW_KEY: ['day', 'upcoming-window'],
+  fetchAllAppointments,
+  fetchUpcomingWindow,
+}));
 
 const { default: PatientList } = await import('./PatientList');
 
@@ -43,6 +55,8 @@ beforeEach(() => {
         pageSize,
       }),
   );
+  fetchAllAppointments.mockReset().mockResolvedValue([]);
+  fetchUpcomingWindow.mockReset().mockResolvedValue([]);
 });
 
 const renderList = () =>
@@ -58,7 +72,7 @@ describe('the register', () => {
   it('counts every patient the server has, not the rows on this page', async () => {
     renderList();
 
-    expect(await screen.findByText('Registrovaných pacientů: 137')).toBeInTheDocument();
+    expect(await screen.findByText('Kartotéka kliniky · 137 záznamů')).toBeInTheDocument();
   });
 
   it('goes on to the next page', async () => {
@@ -66,7 +80,7 @@ describe('the register', () => {
     renderList();
     await screen.findByText('Jméno1 Příjmení1');
 
-    await user.click(screen.getByRole('button', { name: /next page/i }));
+    await user.click(screen.getByRole('button', { name: 'Další' }));
 
     await waitFor(() =>
       expect(list).toHaveBeenLastCalledWith({ query: '', page: 2, pageSize: 50 }));
@@ -80,7 +94,7 @@ describe('the register', () => {
     renderList();
     await screen.findByText('Jméno1 Příjmení1');
 
-    await user.click(screen.getByRole('button', { name: /next page/i }));
+    await user.click(screen.getByRole('button', { name: 'Další' }));
     expect(await screen.findByText('Jméno51 Příjmení51')).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 400));
 
@@ -93,7 +107,7 @@ describe('the register', () => {
     renderList();
     await screen.findByText('Jméno1 Příjmení1');
 
-    await user.type(screen.getByPlaceholderText(/Hledat podle jména/), 'Novák');
+    await user.type(screen.getByPlaceholderText(/Jméno, příjmení/), 'Novák');
 
     await waitFor(() =>
       expect(list).toHaveBeenLastCalledWith({ query: 'Novák', page: 1, pageSize: 50 }));
@@ -106,5 +120,45 @@ describe('the register', () => {
 
     expect(await screen.findByText('Seznam pacientů se nepodařilo načíst.')).toBeInTheDocument();
     expect(screen.queryByText('Zatím žádní pacienti.')).not.toBeInTheDocument();
+  });
+});
+
+describe('the standing column and the filters', () => {
+  it('draws where each patient stands, off the appointment list', async () => {
+    fetchAllAppointments.mockResolvedValue([
+      {
+        id: 'a1', patientId: 'p1-0000-0000', eventName: 'Prohlídka', status: 'Completed',
+        startTime: '2026-03-14T08:00:00Z', endTime: '2026-03-14T09:00:00Z', notes: '',
+      },
+      {
+        id: 'a2', patientId: 'p2-0000-0000', eventName: 'Prohlídka', status: 'NoShow',
+        startTime: '2026-03-14T08:00:00Z', endTime: '2026-03-14T09:00:00Z', notes: '',
+      },
+    ]);
+
+    renderList();
+
+    expect(await screen.findByText('Kompletní')).toBeInTheDocument();
+    expect(screen.getByText('Nepřišel 1×')).toBeInTheDocument();
+    expect(screen.getByText('Nový pacient')).toBeInTheDocument();
+  });
+
+  it('narrows the page to the patients who did not come', async () => {
+    const user = userEvent.setup();
+    fetchAllAppointments.mockResolvedValue([
+      {
+        id: 'a2', patientId: 'p2-0000-0000', eventName: 'Prohlídka', status: 'NoShow',
+        startTime: '2026-03-14T08:00:00Z', endTime: '2026-03-14T09:00:00Z', notes: '',
+      },
+    ]);
+
+    renderList();
+    await screen.findByText('Nepřišel 1×');
+
+    await user.click(screen.getByRole('button', { name: 'Nepřišli' }));
+
+    expect(screen.getByText('Jméno2 Příjmení2')).toBeInTheDocument();
+    expect(screen.queryByText('Jméno1 Příjmení1')).not.toBeInTheDocument();
+    expect(screen.getByText(/Zobrazeno 1 z 137 pacientů/)).toBeInTheDocument();
   });
 });

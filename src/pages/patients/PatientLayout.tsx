@@ -1,6 +1,6 @@
 /*
  * The frame around one patient: who they are at the top, and a row of sections
- * underneath that are pages of their own.
+ * underneath that are pages of their own (design-15, "Pacient - karta").
  *
  * Everything here is about one person and nothing else. That is the rule the
  * owner set and it is the one thing this layout has to hold on to - the
@@ -12,13 +12,14 @@
  * The header stays put while the sections change, so the name and the missing
  * paperwork are on screen wherever you are inside the patient.
  */
-import { useCallback, useEffect, useState } from 'react';
-import { Outlet, useParams, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert, Avatar, Box, Button, Card, CardContent, Chip, CircularProgress,
-  Stack, Typography,
+  Link as RouterLink, Outlet, useLocation, useNavigate, useParams,
+} from 'react-router-dom';
+import {
+  Alert, Avatar, Box, Button, CircularProgress, Stack, Tab, Tabs, Typography,
 } from '@mui/material';
-import { ArrowBack, Edit, Science } from '@mui/icons-material';
+import { ArrowBack } from '@mui/icons-material';
 import { patientsApi } from '../../api/patients';
 import { usePermission } from '../../auth/usePermission';
 import type { Patient } from '../../api/patients';
@@ -26,17 +27,35 @@ import { documentsApi } from '../../api/documents';
 import type {
   AppointmentRequirementDto, DocumentTemplate, PatientDocument,
 } from '../../api/documents';
+import type { DayAppointment } from '../../api/bookingContracts';
+import patientRegistryApi from '../../api/patientRegistry';
+import type { PhoneInspection } from '../../api/patientRegistry';
+import { HOME_REGION, storedNumberDisplay } from '../../services/patientRegistration/phoneDisplay';
 import ConsentLine from '../../components/patients/ConsentLine';
+import { PageHeader, SoftCard, StatusChip } from '../../components/ui';
+import { fetchUpcomingWindow } from '../../components/patients/appointmentsSource';
+import { birthYear, initialsOf, questionnaireMissing } from '../../components/patients/patientActivity';
 import { formatDateOnly } from '../../utils/time';
+import { contactOfKind, profileContacts } from './cardContacts';
 import {
   NOTHING_REQUIRED_TEXT, anyBlocks, expiringSoon, requirementLine, stillMissing,
   validityText,
 } from './paperworkStanding';
+import { PATIENT_SECTIONS, sectionPath } from './sections';
 
 export interface PatientContext {
   patient: Patient;
+  /** `GET /api/patients/{id}/profile` - the registration data; null until known or when absent. */
+  profile: Record<string, unknown> | null;
   documents: PatientDocument[];
   templates: DocumentTemplate[];
+  /** What the booked appointments ask for; null while unanswered. */
+  requirements: AppointmentRequirementDto[] | null;
+  /** The booking window from today (paperwork, calendar ids); null while unanswered. */
+  upcoming: DayAppointment[] | null;
+  /** The telephone and e-mail, the way the desk reads them. Empty when there are none. */
+  displayPhone: string;
+  displayEmail: string;
   reloadDocuments: () => void;
 }
 
@@ -91,12 +110,43 @@ function whyNotOpened(error: unknown): string {
     : NOT_IN_YOUR_CALENDARS_TEXT;
 }
 
+/**
+ * The tabs of the card, in the board's order: Přehled · Termíny · Výsledky ·
+ * Faktury · Dokumenty · Historie. Four are sections under the patient; two
+ * are the existing diagnostics and billing screens, opened for this patient,
+ * since neither has a section of its own yet.
+ */
+function cardTabs(patientId: string, mayBill: boolean) {
+  const section = (id: string) => {
+    const found = PATIENT_SECTIONS.find((s) => s.id === id);
+    return found === undefined ? null : { value: found.id, label: found.label, to: sectionPath(patientId, found) };
+  };
+  return [
+    section('prehled'),
+    section('terminy'),
+    { value: 'vysledky', label: 'Výsledky', to: `/diagnostics/new?patientId=${patientId}` },
+    mayBill ? { value: 'faktury', label: 'Faktury', to: '/billing' } : null,
+    section('dokumenty'),
+    section('historie'),
+  ].filter((tab): tab is { value: string; label: string; to: string } => tab !== null);
+}
+
+/** Which section the address is in: the part after `/patients/{id}/`, or the overview. */
+function sectionOf(pathname: string, patientId: string): string {
+  const rest = pathname.replace(`/patients/${patientId}`, '').replace(/^\//, '');
+  const found = PATIENT_SECTIONS.find((s) => s.path === rest);
+  return found?.id ?? 'prehled';
+}
+
 export default function PatientLayout() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const mayEdit = usePermission('patients.edit');
+  const mayBill = usePermission('billing.manage');
 
   const [patient, setPatient] = useState<Patient | null>(null);
+  const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
   const [documents, setDocuments] = useState<PatientDocument[]>([]);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   /* The sentence to show instead of the patient; `null` while there is hope. */
@@ -108,6 +158,8 @@ export default function PatientLayout() {
    * including the ones who are missing something.
    */
   const [requirements, setRequirements] = useState<AppointmentRequirementDto[] | null>(null);
+  const [upcoming, setUpcoming] = useState<DayAppointment[] | null>(null);
+  const [phoneLook, setPhoneLook] = useState<PhoneInspection | null>(null);
 
   const reloadDocuments = useCallback(() => {
     if (id === undefined) return;
@@ -117,17 +169,52 @@ export default function PatientLayout() {
   useEffect(() => {
     if (id === undefined) return;
     setNotOpened(null);
+    setProfile(null);
+    setUpcoming(null);
     patientsApi.getById(id)
       .then(setPatient)
       .catch((error: unknown) => setNotOpened(whyNotOpened(error)));
+    /* The registration data carries the telephone and the e-mail; the card
+       itself does not. Absent is drawn as absent, never as a failure. */
+    Promise.resolve(patientsApi.getProfile(id))
+      .then((data: unknown) => setProfile(data && typeof data === 'object' ? (data as Record<string, unknown>) : null))
+      .catch(() => setProfile(null));
     documentsApi.getTemplates().then(setTemplates).catch(() => setTemplates([]));
     /* Left null on failure, not emptied: a request that did not come back is
        not an answer, and "nothing is required" is a claim. */
     documentsApi.checkRequired(id)
       .then((r) => setRequirements(r.requirements))
       .catch(() => setRequirements(null));
+    /* The next booking and whether its questionnaire is in. Scoped by the
+       server to the calendars this account may see. */
+    fetchUpcomingWindow()
+      .then(setUpcoming)
+      .catch(() => setUpcoming(null));
     reloadDocuments();
   }, [id, reloadDocuments]);
+
+  /*
+   * The telephone, written the way the desk reads it: a Czech number without
+   * its dialling code, a foreign one with. `phone/inspect` works the grouping
+   * out on the same libphonenumber that stored the number; any failure leaves
+   * the stored string on screen, so a card never loses a number it had.
+   */
+  const contacts = useMemo(() => profileContacts(profile?.contactsJson), [profile]);
+  const storedPhone = contactOfKind('phone', patient?.phone, contacts);
+  const displayEmail = contactOfKind('email', patient?.email, contacts);
+
+  useEffect(() => {
+    if (storedPhone === '') {
+      setPhoneLook(null);
+      return;
+    }
+    let cancelled = false;
+    patientRegistryApi
+      .inspectPhone({ value: storedPhone, regionCode: HOME_REGION })
+      .then((result) => { if (!cancelled) setPhoneLook(result); })
+      .catch(() => { if (!cancelled) setPhoneLook(null); });
+    return () => { cancelled = true; };
+  }, [storedPhone]);
 
   if (notOpened !== null) {
     return (
@@ -153,12 +240,36 @@ export default function PatientLayout() {
      reminder, not an alarm. */
   const missing = requirements === null ? [] : stillMissing(requirements);
   const expiring = requirements === null ? [] : expiringSoon(requirements);
-  const initials = `${patient.firstName?.[0] ?? ''}${patient.lastName?.[0] ?? ''}`;
+  const displayPhone = storedNumberDisplay(phoneLook, storedPhone);
+  const questionnaireIsMissing = upcoming !== null && questionnaireMissing(id, upcoming);
+  const archived = patient.status === 'Archived';
+  const year = birthYear(patient.dateOfBirth);
+  const headline = [
+    year === '' ? null : `nar. ${year}`,
+    displayPhone === '' ? null : displayPhone,
+    displayEmail === '' ? null : displayEmail,
+  ].filter((part): part is string => part !== null).join(' · ');
 
-  const context: PatientContext = { patient, documents, templates, reloadDocuments };
+  const context: PatientContext = {
+    patient, profile, documents, templates, requirements, upcoming, displayPhone, displayEmail,
+    reloadDocuments,
+  };
+
+  const tabs = cardTabs(id, mayBill);
+  const current = sectionOf(location.pathname, id);
 
   return (
     <Box>
+      <PageHeader
+        title={`${patient.firstName} ${patient.lastName}`}
+        subtitle="Karta pacienta"
+        actions={(
+          <Button variant="outlined" component={RouterLink} to="/patients">
+            Zpět na seznam
+          </Button>
+        )}
+      />
+
       {/*
         * Stays on screen whichever section is open: somebody who walked away
         * from the overview should not lose sight of what is missing.
@@ -196,8 +307,6 @@ export default function PatientLayout() {
         <Alert severity="info" sx={{ mb: 2 }}>{NOTHING_REQUIRED_TEXT}</Alert>
       )}
 
-      {/* What the appointments ask for and the patient already has. A fact
-          worth showing: it is the half that says the paperwork is done. */}
       {/* Still good, and this is the cheap moment to renew it. Amber, because
           the appointment is covered - `allRequiredPresent` stays true - and
           an alarm that is not true is the one people learn to ignore. */}
@@ -218,6 +327,8 @@ export default function PatientLayout() {
         </Alert>
       )}
 
+      {/* What the appointments ask for and the patient already has. A fact
+          worth showing: it is the half that says the paperwork is done. */}
       {requirements !== null && requirements.length > 0
         && missing.length === 0 && expiring.length === 0 && (
         <Alert severity="success" sx={{ mb: 2 }}>
@@ -236,50 +347,66 @@ export default function PatientLayout() {
         </Alert>
       )}
 
-      <Card sx={{ mb: 2, borderRadius: 3 }}>
-        <CardContent>
-          <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-            <Avatar sx={{ bgcolor: '#0D7377', width: 56, height: 56, fontSize: 20 }}>
-              {initials}
-            </Avatar>
-            <Box>
-              <Typography variant="h5" sx={{ fontWeight: 800 }}>
+      <SoftCard sx={{ mb: 2.5 }}>
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={2}
+          sx={{ alignItems: { xs: 'flex-start', md: 'center' } }}
+        >
+          <Stack direction="row" spacing={2} sx={{ alignItems: 'center', minWidth: 0, flex: 1 }}>
+            <Avatar sx={{ width: 56, height: 56, fontSize: 18 }}>{initialsOf(patient)}</Avatar>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="h5" component="h2">
                 {patient.firstName} {patient.lastName}
               </Typography>
-              <Stack direction="row" spacing={1} sx={{ mt: 0.5, flexWrap: 'wrap' }}>
-                <Chip size="small" label={formatDateOnly(patient.dateOfBirth?.slice(0, 10))} />
-                <Chip size="small" label={patient.sex === 'Male' ? 'Muž' : 'Žena'} />
-              </Stack>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.25, overflowWrap: 'anywhere' }}>
+                {headline === '' ? (patient.sex === 'Male' ? 'Muž' : 'Žena') : headline}
+              </Typography>
             </Box>
-            <Box sx={{ flex: 1 }} />
-            {mayEdit && (
-              <Button
-                variant="outlined"
-                startIcon={<Edit />}
-                onClick={() => navigate(`/patients/${id}/edit`)}
-              >
-                Upravit
-              </Button>
-            )}
-            <Button
-              variant="contained"
-              startIcon={<Science />}
-              onClick={() => navigate(`/diagnostics/new?patientId=${id}`)}
-              sx={{ bgcolor: '#0D7377' }}
-            >
-              Nová diagnostika
-            </Button>
           </Stack>
 
-          <Box sx={{ mt: 2 }}>
-            <ConsentLine patientId={id} />
-          </Box>
-        </CardContent>
-      </Card>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+            {questionnaireIsMissing && <StatusChip tone="beige">Dotazník chybí</StatusChip>}
+            <StatusChip tone={archived ? 'grey' : 'green'}>{archived ? 'Archivovaný' : 'Aktivní'}</StatusChip>
+          </Stack>
 
-      {/* The sections are in the sidebar now, where the owner asked for them:
-          while you are inside somebody's file, the navigation on the left is
-          theirs and not the application's. */}
+          <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+            {/* The calendar opens its booking drawer on `newAppointment` and
+                takes this patient as the one being booked. */}
+            <Button
+              variant="contained"
+              onClick={() => navigate('/planovani', { state: { newAppointment: Date.now(), patientId: id } })}
+            >
+              Objednat termín
+            </Button>
+            {mayEdit && (
+              <Button variant="outlined" onClick={() => navigate(`/patients/${id}/edit`)}>
+                Upravit kartu
+              </Button>
+            )}
+          </Stack>
+        </Stack>
+
+        <Box sx={{ mt: 2 }}>
+          <ConsentLine patientId={id} />
+        </Box>
+      </SoftCard>
+
+      {/* The same sections the sidebar lists, as the board's tab row. Inside
+          somebody's file the navigation is theirs, and the two agree because
+          both read `PATIENT_SECTIONS`. */}
+      <Tabs
+        value={tabs.some((t) => t.value === current) ? current : false}
+        sx={{ mb: 2.5 }}
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
+      >
+        {tabs.map((tab) => (
+          <Tab key={tab.value} value={tab.value} label={tab.label} component={RouterLink} to={tab.to} />
+        ))}
+      </Tabs>
+
       <Outlet context={context} />
     </Box>
   );

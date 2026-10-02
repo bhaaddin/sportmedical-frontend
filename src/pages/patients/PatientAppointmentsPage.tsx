@@ -15,24 +15,24 @@
  * label that is quietly wrong. `eventName` holds the real activity.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { useOutletContext, Link as RouterLink } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import {
-  Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Divider,
-  Stack, Typography,
+  Alert, Box, Button, CircularProgress, Stack, Table, TableBody, TableCell, TableContainer, TableHead,
+  TableRow, Typography,
 } from '@mui/material';
-import { Event, EventBusy, History, Add } from '@mui/icons-material';
-import client from '../../api/client';
-import { formatPragueDateTime } from '../../utils/time';
+import { SectionLabel, SoftCard, StatusChip } from '../../components/ui';
+import type { ChipTone } from '../../components/ui';
+import { fetchAllAppointments } from '../../components/patients/appointmentsSource';
+import { isCancelled as cancelledOrNoShow, shortDay } from '../../components/patients/patientActivity';
+import type { PatientAppointment } from '../../components/patients/patientActivity';
+import { formatPragueTime, formatPragueDate } from '../../utils/time';
 import type { PatientContext } from './PatientLayout';
 
-export interface PatientAppointment {
-  id: string;
-  patientId: string;
-  eventName: string;
-  startTime: string;
-  endTime: string;
-  status: string;
-  notes: string;
+export type { PatientAppointment };
+
+/** An appointment that no longer stands. Kept visible, never counted as upcoming. */
+export function isCancelled(appointment: PatientAppointment): boolean {
+  return cancelledOrNoShow(appointment);
 }
 
 /*
@@ -50,19 +50,14 @@ export const APPOINTMENT_STATUS_LABEL: Record<string, string> = {
   NoShow: 'Nedorazil',
 };
 
-const STATUS_COLOUR: Record<string, string> = {
-  Scheduled: '#0D7377',
-  Confirmed: '#0D7377',
-  CheckedIn: '#2E7D32',
-  Completed: '#2E7D32',
-  Cancelled: '#9E9E9E',
-  NoShow: '#D32F2F',
+const STATUS_TONE: Record<string, ChipTone> = {
+  Scheduled: 'blue',
+  Confirmed: 'green',
+  CheckedIn: 'green',
+  Completed: 'green',
+  Cancelled: 'grey',
+  NoShow: 'red',
 };
-
-/** An appointment that no longer stands. Kept visible, never counted as upcoming. */
-export function isCancelled(appointment: PatientAppointment): boolean {
-  return appointment.status === 'Cancelled' || appointment.status === 'NoShow';
-}
 
 /**
  * Split into what is still coming and what has passed.
@@ -90,54 +85,67 @@ export function splitAppointments(
   return { upcoming, past };
 }
 
-function AppointmentRow({ appointment }: { appointment: PatientAppointment }) {
-  const label = APPOINTMENT_STATUS_LABEL[appointment.status] ?? appointment.status;
-  const colour = STATUS_COLOUR[appointment.status] ?? '#607D8B';
-
+function AppointmentRows({ appointments }: { appointments: PatientAppointment[] }) {
   return (
-    <Stack
-      direction="row"
-      spacing={1}
-      sx={{
-        alignItems: 'center', py: 1.5, flexWrap: 'wrap',
-        borderBottom: '1px solid', borderColor: 'divider',
-      }}
-    >
-      <Box sx={{ minWidth: 200, flex: 1 }}>
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          {appointment.eventName === '' ? 'Termín' : appointment.eventName}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {formatPragueDateTime(appointment.startTime)}
-        </Typography>
-        {appointment.notes !== '' && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-            {appointment.notes}
-          </Typography>
-        )}
-      </Box>
-      <Chip
-        size="small"
-        label={label}
-        sx={{ bgcolor: `${colour}14`, color: colour, fontWeight: 500 }}
-      />
-    </Stack>
+    <TableContainer>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Datum</TableCell>
+            <TableCell>Čas</TableCell>
+            <TableCell>Činnost</TableCell>
+            <TableCell align="right">Stav</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {appointments.map((appointment) => {
+            const label = APPOINTMENT_STATUS_LABEL[appointment.status] ?? appointment.status;
+            const tone = STATUS_TONE[appointment.status] ?? 'grey';
+            return (
+              <TableRow key={appointment.id}>
+                <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 700 }}>
+                  {shortDay(appointment.startTime)}
+                  <Typography component="span" variant="caption" sx={{ color: 'text.secondary', ml: 0.75 }}>
+                    {formatPragueDate(appointment.startTime).replace(/^.*?(\d{4})$/, '$1')}
+                  </Typography>
+                </TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                  {formatPragueTime(appointment.startTime)} – {formatPragueTime(appointment.endTime)}
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {appointment.eventName === '' ? 'Termín' : appointment.eventName}
+                  </Typography>
+                  {appointment.notes !== '' && (
+                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                      {appointment.notes}
+                    </Typography>
+                  )}
+                </TableCell>
+                <TableCell align="right">
+                  <StatusChip tone={tone}>{label}</StatusChip>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </TableContainer>
   );
 }
 
 export default function PatientAppointmentsPage() {
   const { patient } = useOutletContext<PatientContext>();
+  const navigate = useNavigate();
   const [all, setAll] = useState<PatientAppointment[] | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    client
-      .get('/api/scheduling/appointments')
-      .then((res) => {
+    fetchAllAppointments()
+      .then((rows) => {
         if (cancelled) return;
-        const data = res.data?.data ?? res.data?.value ?? res.data ?? [];
-        setAll(Array.isArray(data) ? data : []);
+        setAll(rows);
         setFailed(false);
       })
       .catch(() => {
@@ -175,61 +183,47 @@ export default function PatientAppointmentsPage() {
   }
 
   return (
-    <Stack spacing={2}>
-      <Card sx={{ borderRadius: 3 }}>
-        <CardContent>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
-            <Event sx={{ color: '#0D7377' }} />
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Nadcházející termíny
-            </Typography>
-            <Box sx={{ flex: 1 }} />
-            <Button
-              size="small"
-              startIcon={<Add />}
-              component={RouterLink}
-              to="/planovani"
-            >
-              Objednat
-            </Button>
-          </Stack>
-          <Divider sx={{ mb: 1 }} />
+    <Stack spacing={2.5}>
+      <SoftCard sx={{ p: 0, overflow: 'hidden' }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', px: 2.5, pt: 2.5, pb: 1.5 }}>
+          <SectionLabel sx={{ mb: 0 }}>Nadcházející termíny</SectionLabel>
+          <Box sx={{ flex: 1 }} />
+          {/* The calendar opens its booking drawer on `newAppointment`, for
+              this patient. */}
+          <Button
+            size="small"
+            variant="contained"
+            onClick={() => navigate('/planovani', { state: { newAppointment: Date.now(), patientId: patient.id } })}
+          >
+            Objednat
+          </Button>
+        </Stack>
 
-          {upcoming.length === 0 ? (
-            <Stack spacing={1} sx={{ alignItems: 'center', py: 3 }}>
-              <EventBusy sx={{ color: 'text.disabled' }} />
-              <Typography variant="body2" color="text.secondary">
-                {patient.firstName} nemá objednaný žádný termín.
-              </Typography>
-            </Stack>
-          ) : (
-            upcoming.map((a) => <AppointmentRow key={a.id} appointment={a} />)
-          )}
-        </CardContent>
-      </Card>
+        {upcoming.length === 0 ? (
+          <Typography variant="body2" sx={{ color: 'text.secondary', px: 2.5, pb: 2.5 }}>
+            {patient.firstName} nemá objednaný žádný termín.
+          </Typography>
+        ) : (
+          <AppointmentRows appointments={upcoming} />
+        )}
+      </SoftCard>
 
-      <Card sx={{ borderRadius: 3 }}>
-        <CardContent>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
-            <History sx={{ color: '#0D7377' }} />
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Historie
-            </Typography>
-          </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+      <SoftCard sx={{ p: 0, overflow: 'hidden' }}>
+        <Box sx={{ px: 2.5, pt: 2.5, pb: 1.5 }}>
+          <SectionLabel sx={{ mb: 0.25 }}>Historie</SectionLabel>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             Proběhlé a zrušené termíny, od nejnovějšího.
           </Typography>
-          <Divider sx={{ mb: 1 }} />
+        </Box>
 
-          {past.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              Zatím tu žádný termín není.
-            </Typography>
-          ) : (
-            past.map((a) => <AppointmentRow key={a.id} appointment={a} />)
-          )}
-        </CardContent>
-      </Card>
+        {past.length === 0 ? (
+          <Typography variant="body2" sx={{ color: 'text.secondary', px: 2.5, pb: 2.5 }}>
+            Zatím tu žádný termín není.
+          </Typography>
+        ) : (
+          <AppointmentRows appointments={past} />
+        )}
+      </SoftCard>
     </Stack>
   );
 }
