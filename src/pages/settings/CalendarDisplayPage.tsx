@@ -206,6 +206,26 @@ export default function CalendarDisplayPage() {
               />
             </Stack>
 
+            <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
+              <TextField
+                label="Barva obědové pauzy"
+                value={draft.lunchColor}
+                onChange={(event) => set('lunchColor', event.target.value)}
+                error={errors.lunchColor !== undefined}
+                helperText={errors.lunchColor ?? 'Pruh oběda v kalendáři se vykreslí touto barvou.'}
+                sx={{ flexGrow: 1 }}
+              />
+              <Box
+                component="input"
+                type="color"
+                aria-label="Vybrat barvu obědové pauzy"
+                value={/^#[0-9a-fA-F]{6}$/.test(draft.lunchColor) ? draft.lunchColor : '#E11D48'}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  set('lunchColor', event.target.value.toUpperCase())}
+                sx={{ width: 56, height: 56, border: 'none', background: 'none', cursor: 'pointer', p: 0 }}
+              />
+            </Stack>
+
             <Divider />
 
             <Box>

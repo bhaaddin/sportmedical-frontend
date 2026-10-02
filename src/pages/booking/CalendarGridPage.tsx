@@ -343,6 +343,7 @@ export default function CalendarGridPage() {
    */
   const { settings: calendarDisplay, loaded: calendarDisplayLoaded } = useCalendarDisplay();
   const holidayColor = calendarDisplay.holidayColor;
+  const lunchColor = calendarDisplay.lunchColor;
   const nowLineColor = resolveNowLineColor(
     calendarDisplay.nowLineColor,
     theme.palette.error.main,
@@ -732,6 +733,7 @@ export default function CalendarGridPage() {
                   employeeId={employeeId}
                   nowLineColor={nowLineColor}
                   holidayColor={holidayColor}
+                  lunchColor={lunchColor}
                   zoom={zoom}
                   onZoom={changeZoom}
                   mayBook={mayBook}

@@ -18,6 +18,7 @@ import type {
   TimeBlock,
 } from "../../../api/bookingContracts";
 import { dayOfWeekOf, type DateOnly } from "../../../utils/time";
+import { CALENDAR_DISPLAY_OFFLINE } from "../../../api/displaySettings";
 import { AppointmentButton } from "./AppointmentButton";
 import { BlockDetailDialog, BlockReasonDialog, type BlockTarget } from "./BlockDialogs";
 import { calendarDayOpen, type DayMark } from "./dayMarks";
@@ -91,6 +92,8 @@ export interface TimeGridProps {
   employeeId: string | null;
   nowLineColor: string;
   holidayColor: string;
+  /** `#RRGGBB` — the admin's colour for the lunch band (CalendarDisplaySettings); the offline default when absent. */
+  lunchColor?: string;
   mayBook: boolean;
   mayBlock: boolean;
   onOpen: (id: string) => void;
@@ -118,6 +121,7 @@ export function TimeGrid(props: TimeGridProps) {
     now,
     nowLineColor,
     holidayColor,
+    lunchColor = CALENDAR_DISPLAY_OFFLINE.lunchColor,
     mayBook,
     mayBlock,
     zoom = 1,
@@ -315,6 +319,7 @@ export function TimeGrid(props: TimeGridProps) {
                     topMinute={topMinute}
                     bottomMinute={bottomMinute}
                     pxPerMinute={pxPerMinute}
+                    lunchColor={lunchColor}
                     now={now}
                     pending={
                       pending?.calendarId === calendar.id && pending.dayKey === dayKey
@@ -510,6 +515,7 @@ function SubColumn({
   onSelect,
   onOpen,
   onOpenBlock,
+  lunchColor,
 }: {
   calendar: Calendar;
   dayKey: DateOnly;
@@ -517,6 +523,8 @@ function SubColumn({
   open: boolean;
   dragEnabled: boolean;
   appointments: DayAppointment[];
+  /** The admin's lunch-band colour, from CalendarDisplaySettings — not the theme's error red. */
+  lunchColor: string;
   blocks: TimeBlock[];
   topMinute: number;
   bottomMinute: number;
@@ -621,9 +629,9 @@ function SubColumn({
             left: 0,
             right: 0,
             ...place({ start: breakStart, end: breakEnd }),
-            backgroundColor: alpha(theme.palette.error.main, 0.16),
-            borderTop: `1px solid ${theme.palette.error.main}`,
-            borderBottom: `1px solid ${theme.palette.error.main}`,
+            backgroundColor: alpha(lunchColor, 0.16),
+            borderTop: `1px solid ${lunchColor}`,
+            borderBottom: `1px solid ${lunchColor}`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -633,7 +641,7 @@ function SubColumn({
         >
           <Typography
             sx={{
-              color: "error.main",
+              color: lunchColor,
               fontWeight: 700,
               fontSize: 12,
               letterSpacing: 0.5,
