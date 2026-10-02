@@ -1,14 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import {
+  clubMatches,
+  clubsWord,
+  drawerTitle,
   endClock,
+  formatCzk,
+  foundPatientsWord,
+  initials,
   isCompleteMoment,
   isStartOffered,
+  minutesWord,
+  normalizePhone,
   normalizeTime,
   parseLocalDateTime,
   pragueClock,
+  quickRegistrationPath,
   rangeLabel,
   selectionMinutes,
+  slotSubtitle,
+  slotTitle,
+  splitFullName,
+  stepSubtitle,
   toStartUtc,
+  weekdayName,
 } from './NewAppointmentDialog.logic';
 
 describe('the time the grid hands over', () => {
@@ -109,5 +123,77 @@ describe('whether the server offered the start', () => {
     expect(isStartOffered(slots, '2026-09-24T07:15:00.000Z')).toBe(false);
     expect(isStartOffered(undefined, '2026-09-24T07:00:00.000Z')).toBe(false);
     expect(isStartOffered(slots, null)).toBe(false);
+  });
+});
+
+describe('the drawer\'s words (board 2026-10-03)', () => {
+  it('writes money and minutes the way the board does', () => {
+    expect(formatCzk(2200)).toBe('2 200 Kč');
+    expect(formatCzk(500)).toBe('500 Kč');
+    expect(formatCzk(null)).toBe('—');
+    expect(minutesWord(1)).toBe('1 minuta');
+    expect(minutesWord(3)).toBe('3 minuty');
+    expect(minutesWord(60)).toBe('60 minut');
+  });
+
+  it('names the slot: weekday, date, the dragged range', () => {
+    expect(weekdayName('2026-10-26')).toBe('Pondělí');
+    expect(slotTitle('2026-10-26', '10:00', '11:00')).toBe('Pondělí 26. 10. 2026 · 10:00 — 11:00');
+    expect(slotTitle('2026-10-26', '10:00', null)).toBe('Pondělí 26. 10. 2026 · od 10:00');
+    expect(slotTitle('2026-10-26', '', null)).toBe('Pondělí 26. 10. 2026');
+    expect(slotTitle('nope', '10:00', null)).toBe('');
+    expect(slotSubtitle(60)).toBe('60 minut volno');
+    expect(slotSubtitle(null)).toBe('');
+  });
+
+  it('makes initials and splits a name typed in one box', () => {
+    expect(initials('Bohumil Komárek')).toBe('BK');
+    expect(initials('  filip  ')).toBe('F');
+    expect(initials('')).toBe('');
+    expect(splitFullName('Filip Fehér')).toEqual({ firstName: 'Filip', lastName: 'Fehér' });
+    expect(splitFullName('Jan van Dyk')).toEqual({ firstName: 'Jan', lastName: 'van Dyk' });
+    expect(splitFullName('Filip')).toBeNull();
+    expect(splitFullName('   ')).toBeNull();
+  });
+
+  it('sends a telephone with its dialling code', () => {
+    expect(normalizePhone('773 539 001')).toBe('+420773539001');
+    expect(normalizePhone('0773 539 001')).toBe('+420773539001');
+    expect(normalizePhone('+421 908 123 456')).toBe('+421908123456');
+    expect(normalizePhone('00421 908 123 456')).toBe('+421908123456');
+    expect(normalizePhone('   ')).toBeNull();
+    expect(normalizePhone('abc')).toBeNull();
+  });
+
+  it('registers a real patient only with a surname, an e-mail and a date of birth', () => {
+    const full = { name: 'Filip Fehér', email: 'f@x.cz', dateOfBirth: '1990-01-01', mayRegister: true };
+    expect(quickRegistrationPath(full)).toBe('registered');
+    expect(quickRegistrationPath({ ...full, email: '' })).toBe('walkIn');
+    expect(quickRegistrationPath({ ...full, dateOfBirth: '' })).toBe('walkIn');
+    expect(quickRegistrationPath({ ...full, name: 'Filip' })).toBe('walkIn');
+    expect(quickRegistrationPath({ ...full, mayRegister: false })).toBe('walkIn');
+    expect(quickRegistrationPath({ ...full, name: ' ' })).toBeNull();
+  });
+
+  it('heads each step the way the board words it', () => {
+    expect(stepSubtitle(1, 'database')).toBe('Krok 1 ze 2 — kdo přijde');
+    expect(stepSubtitle(1, 'quick')).toBe('Krok 1 ze 2 — nový pacient');
+    expect(stepSubtitle(1, 'club')).toBe('Krok 1 ze 2 — který klub');
+    expect(stepSubtitle(2, 'quick')).toBe('Krok 2 ze 2 — co se bude dělat');
+    expect(drawerTitle('club')).toBe('Hromadná rezervace pro klub');
+    expect(drawerTitle('database')).toBe('Objednat termín');
+  });
+
+  it('finds a club by name or contact, without diacritics, and counts in Czech', () => {
+    const club = { name: 'FK Slaný', contactPerson: 'Jan Novák' };
+    expect(clubMatches(club, 'slany')).toBe(true);
+    expect(clubMatches(club, 'novák')).toBe(true);
+    expect(clubMatches(club, '')).toBe(true);
+    expect(clubMatches(club, 'kladno')).toBe(false);
+    expect(clubsWord(1)).toBe('1 klub');
+    expect(clubsWord(4)).toBe('4 kluby');
+    expect(clubsWord(5)).toBe('5 klubů');
+    expect(foundPatientsWord(1)).toBe('1 nalezen');
+    expect(foundPatientsWord(3)).toBe('3 nalezeni');
   });
 });

@@ -97,6 +97,23 @@ export function calendarDayOpen(
   return row === undefined || row.isOpen;
 }
 
+/**
+ * The words on one calendar's column when that calendar alone is shut for the
+ * day - the others are open, so the day itself is not marked closed. A worker
+ * recorded out is drawn the board's way, "Dovolená — jméno"; any other reason
+ * gets the same word the day header would use.
+ */
+export function subColumnClosedLabel(row: {
+  closedBecause: string | null;
+  workerDisplayName?: string | null;
+}): string {
+  if (row.closedBecause === 'workerAbsent') {
+    const who = row.workerDisplayName?.trim();
+    return who ? `${GRID_TEXT.vacation} — ${who}` : GRID_TEXT.absence;
+  }
+  return (row.closedBecause && CLOSED_BECAUSE[row.closedBecause]) || GRID_TEXT.closed;
+}
+
 /** The dates to paint red, for the mini calendar. */
 export function holidayDates(holidays: readonly HolidayLike[]): Set<DateOnly> {
   return new Set(holidays.filter((h) => h.isHoliday || h.isStatutory).map((h) => h.date));

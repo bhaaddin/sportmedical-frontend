@@ -21,8 +21,10 @@ describe('MiniCalendar', () => {
     render(<MiniCalendar value={new Date(2026, 8, 23)} view="month" onSelect={() => {}} />);
 
     expect(screen.getByRole('heading', { name: 'Září 2026' })).toBeInTheDocument();
-    expect(screen.getByText('Po')).toBeInTheDocument();
-    expect(screen.getByText('Ne')).toBeInTheDocument();
+    /* One letter per weekday, Monday first: P Ú S Č P S N. */
+    expect(screen.getAllByText('P')).toHaveLength(2);
+    expect(screen.getByText('Ú')).toBeInTheDocument();
+    expect(screen.getByText('N')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Další měsíc' }));
     expect(screen.getByRole('heading', { name: 'Říjen 2026' })).toBeInTheDocument();

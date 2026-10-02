@@ -3,10 +3,14 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
-  Divider,
-  Paper,
+  IconButton,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Typography,
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
@@ -27,19 +31,22 @@ import { isKnownPaperworkReason, isLateStatus, statusName } from "../../api/book
 import type { DayAppointment } from "../../api/bookingContracts";
 import {
   addDaysToDateOnly,
-  dayOfWeekOf,
-  formatDateOnly,
   formatPragueTime,
   isLate,
+  pragueWallClockToInstant,
   toDateOnly,
 } from "../../utils/time";
+import { KpiCard, PageHeader, SectionLabel, SoftCard, StatusChip } from "../../components/ui";
 import { AsyncSection } from "../../components/booking/AsyncSection";
+import { CalendarTogglePills } from "../../components/booking/CalendarTogglePills";
 import { NewAppointmentDialog } from "../../components/booking/NewAppointmentDialog";
 import { errorText } from "../../components/booking/errorText";
+import { formatCzk, formatLongPragueDate, statusTone } from "../../components/booking/appointmentEdit";
 import { usePermission } from "../../auth/usePermission";
 
 /**
- * The day at a glance — contract 5.12, laid out as `booking.md` part 3.
+ * The day at a glance — contract 5.12, laid out as `booking.md` part 3 and
+ * drawn with the board's kit (KPI cards, bordered cards, the table head).
  *
  * Two decisions worth stating, because both look like omissions:
  *
@@ -147,7 +154,7 @@ export default function DayOverviewPage() {
    * actually late, which is a handful, not for the whole day.
    */
   const patientQueries = useQueries({
-    queries: [...new Set(lateRows.map((a) => a.patientId))].map((id) => ({
+    queries: [...new Set(lateRows.map((a) => a.patientId).filter((id) => id !== ""))].map((id) => ({
       queryKey: ["patient", id],
       queryFn: () => patientsApi.getById(id),
       staleTime: 5 * 60 * 1000,
@@ -220,62 +227,62 @@ export default function DayOverviewPage() {
 
   const stepBy = (days: number) => setDate((d) => addDaysToDateOnly(d, days));
 
+  const nameOf = (row: DayAppointment) =>
+    row.patientId === ""
+      ? (row.patientName ?? "Bez pacienta")
+      : (patientNameById.get(row.patientId) ?? t("booking.day.loadingName"));
+
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto" }}>
-      <Stack
-        direction="row"
-        sx={{
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 2,
-          mb: 2,
-        }}
-      >
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            {t("booking.day.title")}
-          </Typography>
-          <Typography sx={{ color: "text.secondary" }}>
-            {t(`booking.workingHours.weekday.${dayOfWeekOf(date)}`)}{" "}
-            {formatDateOnly(date)}
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={1}>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={() => stepBy(-1)}
-            aria-label={t("booking.day.previous")}
-          >
-            <ChevronLeftIcon fontSize="small" />
-          </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={() => setDate(toDateOnly(new Date()))}
-          >
-            {t("booking.day.today")}
-          </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={() => stepBy(1)}
-            aria-label={t("booking.day.nextDay")}
-          >
-            <ChevronRightIcon fontSize="small" />
-          </Button>
-          {mayBook ? (
-            <Button
-              size="small"
-              variant="contained"
-              onClick={() => setBooking(true)}
+      <PageHeader
+        title={t("booking.day.title")}
+        /* Noon in Prague on that date, so the weekday is that date's wherever
+           the browser happens to be. */
+        subtitle={formatLongPragueDate(pragueWallClockToInstant(date, "12:00"))}
+        actions={
+          <>
+            <Stack
+              direction="row"
+              sx={{
+                alignItems: "center",
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 2.5,
+                bgcolor: "background.paper",
+                overflow: "hidden",
+              }}
             >
-              {t("booking.new.title")}
-            </Button>
-          ) : null}
-        </Stack>
-      </Stack>
+              <IconButton
+                size="small"
+                onClick={() => stepBy(-1)}
+                aria-label={t("booking.day.previous")}
+                sx={{ borderRadius: 0, width: 40, height: 40 }}
+              >
+                <ChevronLeftIcon fontSize="small" />
+              </IconButton>
+              <Button
+                onClick={() => setDate(toDateOnly(new Date()))}
+                sx={{ borderRadius: 0, minHeight: 40, px: 1.5, borderInline: "1px solid", borderColor: "divider" }}
+              >
+                {t("booking.day.today")}
+              </Button>
+              <IconButton
+                size="small"
+                onClick={() => stepBy(1)}
+                aria-label={t("booking.day.nextDay")}
+                sx={{ borderRadius: 0, width: 40, height: 40 }}
+              >
+                <ChevronRightIcon fontSize="small" />
+              </IconButton>
+            </Stack>
+            {mayBook ? (
+              <Button variant="contained" onClick={() => setBooking(true)}>
+                {t("booking.new.title")}
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
       <AsyncSection
         isLoading={calendarsQuery.isLoading}
@@ -286,28 +293,10 @@ export default function DayOverviewPage() {
         onRetry={() => void calendarsQuery.refetch()}
         skeletonRows={3}
       >
-        <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1, mb: 2 }}>
-          {calendars.map((calendar) => {
-            const on = selected === null || selected.has(calendar.id);
-            return (
-              <Chip
-                key={calendar.id}
-                label={calendar.name}
-                variant={on ? "filled" : "outlined"}
-                onClick={() => {
-                  const next = new Set(selected ?? calendars.map((c) => c.id));
-                  if (next.has(calendar.id)) next.delete(calendar.id);
-                  else next.add(calendar.id);
-                  setSelected(next);
-                }}
-                sx={{
-                  backgroundColor: on ? calendar.color : undefined,
-                  color: on ? "#fff" : undefined,
-                }}
-              />
-            );
-          })}
-        </Stack>
+        {/* Which columns the day counts: every calendar on by default. */}
+        <Box sx={{ mb: 2.5 }}>
+          <CalendarTogglePills calendars={calendars} selected={selected} onChange={setSelected} />
+        </Box>
 
         <AsyncSection
           isLoading={summaryQuery.isLoading}
@@ -319,7 +308,7 @@ export default function DayOverviewPage() {
           skeletonRows={5}
         >
           {summary ? (
-            <Stack spacing={3}>
+            <Stack spacing={2.5}>
               {/* Who is out today. Their hours are already left out of the
                   working time below, so the figures and this line agree. */}
               {summary.absent.length > 0 ? (
@@ -333,39 +322,29 @@ export default function DayOverviewPage() {
                   })}
                 </Alert>
               ) : null}
+
               {/* ── The five tallies ── */}
-              <Paper variant="outlined" sx={{ p: 2 }}>
-                <Stack direction="row" sx={{ flexWrap: "wrap", gap: 3 }}>
-                  <Tally
-                    label={t("booking.day.booked")}
-                    value={summary.booked}
-                  />
-                  <Tally
-                    label={t("booking.day.arrived")}
-                    value={summary.arrived}
-                  />
-                  <Tally
-                    label={t("booking.status.late")}
-                    value={lateRows.length}
-                    note={t("booking.day.lateIsDisplayOnly")}
-                  />
-                  <Tally
-                    label={t("booking.day.didNotCome")}
-                    value={summary.didNotCome}
-                  />
-                  <Tally
-                    label={t("booking.day.cancelled")}
-                    value={summary.cancelled}
-                  />
-                </Stack>
-              </Paper>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)", md: "repeat(5, 1fr)" },
+                  gap: 2,
+                }}
+              >
+                <KpiCard label={t("booking.day.booked")} value={summary.booked} />
+                <KpiCard label={t("booking.day.arrived")} value={summary.arrived} tone="green" />
+                <KpiCard
+                  label={t("booking.status.late")}
+                  value={lateRows.length}
+                  hint={t("booking.day.lateIsDisplayOnly")}
+                  tone={lateRows.length > 0 ? "red" : "ink"}
+                />
+                <KpiCard label={t("booking.day.didNotCome")} value={summary.didNotCome} />
+                <KpiCard label={t("booking.day.cancelled")} value={summary.cancelled} />
+              </Box>
 
               {/* ── By activity and by calendar ── */}
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={2}
-                sx={{ alignItems: "stretch" }}
-              >
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
                 <Breakdown
                   title={t("booking.day.byActivity")}
                   rows={summary.byActivity}
@@ -377,142 +356,127 @@ export default function DayOverviewPage() {
                   emptyText={t("booking.day.nothingBooked")}
                   colorOf={(id) => calendarById.get(id)?.color}
                 />
-              </Stack>
+              </Box>
 
               {/* ── Who is late, with the one button that fixes it ── */}
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                  {t("booking.day.lateList")}
-                </Typography>
+              <SoftCard sx={{ p: 0, overflow: "hidden" }}>
+                <Box sx={{ px: 2.5, pt: 2.5, pb: 1.5 }}>
+                  <SectionLabel sx={{ mb: 0 }}>{t("booking.day.lateList")}</SectionLabel>
+                </Box>
                 {arrive.error ? (
                   <Alert
                     severity={
-                      arrive.error instanceof BookingApiError &&
-                      arrive.error.isConflict
-                        ? "info"
-                        : "error"
+                      arrive.error instanceof BookingApiError && arrive.error.isConflict ? "info" : "error"
                     }
-                    sx={{ mb: 1 }}
+                    sx={{ mx: 2.5, mb: 1.5 }}
                   >
                     {errorText(arrive.error, t)}
                   </Alert>
                 ) : null}
-                <AsyncSection
-                  isLoading={dayQuery.isLoading}
-                  isSettled={dayQuery.isSuccess || dayQuery.isError}
-                  error={dayQuery.error}
-                  isEmpty={lateRows.length === 0}
-                  emptyText={t("booking.day.nobodyLate")}
-                  onRetry={() => void dayQuery.refetch()}
-                  skeletonRows={2}
-                >
-                  <Stack divider={<Divider />}>
-                    {lateRows.map((row) => (
-                      <Stack
-                        key={row.id}
-                        direction="row"
-                        spacing={2}
-                        sx={{
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          py: 1,
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <Stack
-                          direction="row"
-                          spacing={2}
-                          sx={{ alignItems: "baseline", flexWrap: "wrap" }}
-                        >
-                          <Typography sx={{ fontWeight: 700, minWidth: 56 }}>
-                            {formatPragueTime(row.startUtc)}
-                          </Typography>
-                          <Typography>
-                            {patientNameById.get(row.patientId) ??
-                              t("booking.day.loadingName")}
-                          </Typography>
-                          <Typography sx={{ color: "text.secondary" }}>
-                            {row.activityName}
-                            {calendarById.get(row.calendarId ?? "")
-                              ? ` · ${calendarById.get(row.calendarId ?? "")?.name}`
-                              : ""}
-                            {row.activityId && priceById.get(row.activityId) != null
-                              ? ` · ${new Intl.NumberFormat("cs-CZ").format(priceById.get(row.activityId)!)} Kč`
-                              : ""}
-                          </Typography>
-                        </Stack>
-                        {mayEdit ? (
-                          <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
-                            {row.status === SCHEDULED || row.status === CONFIRMED ? (
-                              <>
-                                {/* Only the next real step is offered: came, or
-                                    did not. No wall of buttons to tick through. */}
-                                <Button
-                                  size="small"
-                                  variant="contained"
-                                  disabled={row.calendarId === null || arrive.isPending}
-                                  onClick={() => arrive.mutate(row)}
-                                >
-                                  {t("booking.detail.arrived")}
-                                </Button>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  color="warning"
-                                  disabled={row.calendarId === null || noShow.isPending}
-                                  onClick={() => noShow.mutate(row)}
-                                >
-                                  {t("booking.detail.noShow")}
-                                </Button>
-                              </>
-                            ) : row.status === CHECKED_IN ? (
-                              /* Here already, so the only thing left is to finish
-                                 and take payment. */
-                              <Button
-                                size="small"
-                                variant="contained"
-                                color="success"
-                                disabled={row.calendarId === null || complete.isPending}
-                                onClick={() => complete.mutate(row)}
-                              >
-                                {t("booking.detail.complete")}
-                              </Button>
-                            ) : (
-                              <Chip
-                                size="small"
-                                label={t(`booking.status.${statusName(row.status) ?? "unknown"}`)}
-                              />
-                            )}
-                          </Stack>
-                        ) : null}
-                      </Stack>
-                    ))}
-                  </Stack>
-                </AsyncSection>
-              </Box>
+                <Box sx={{ px: 2.5, pb: 2.5 }}>
+                  <AsyncSection
+                    isLoading={dayQuery.isLoading}
+                    isSettled={dayQuery.isSuccess || dayQuery.isError}
+                    error={dayQuery.error}
+                    isEmpty={lateRows.length === 0}
+                    emptyText={t("booking.day.nobodyLate")}
+                    onRetry={() => void dayQuery.refetch()}
+                    skeletonRows={2}
+                  >
+                    <TableContainer sx={{ border: "1px solid", borderColor: "divider" }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ width: 80 }}>Čas</TableCell>
+                            <TableCell>Pacient</TableCell>
+                            <TableCell>Činnost</TableCell>
+                            <TableCell align="right">Cena</TableCell>
+                            {mayEdit ? <TableCell align="right" sx={{ width: 220 }}>Příchod</TableCell> : null}
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {lateRows.map((row) => (
+                            <TableRow key={row.id} hover>
+                              <TableCell sx={{ fontWeight: 700 }}>{formatPragueTime(row.startUtc)}</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>{nameOf(row)}</TableCell>
+                              <TableCell>
+                                {row.activityName}
+                                {calendarById.get(row.calendarId ?? "") ? (
+                                  <Box component="span" sx={{ color: "text.secondary" }}>
+                                    {" "}
+                                    · {calendarById.get(row.calendarId ?? "")?.name}
+                                  </Box>
+                                ) : null}
+                              </TableCell>
+                              <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                                {row.activityId && priceById.get(row.activityId) != null
+                                  ? formatCzk(priceById.get(row.activityId)!)
+                                  : "—"}
+                              </TableCell>
+                              {mayEdit ? (
+                                <TableCell align="right">
+                                  <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
+                                    {row.status === SCHEDULED || row.status === CONFIRMED ? (
+                                      <>
+                                        {/* Only the next real step is offered: came, or
+                                            did not. No wall of buttons to tick through. */}
+                                        <Button
+                                          size="small"
+                                          variant="contained"
+                                          color="secondary"
+                                          disabled={row.calendarId === null || arrive.isPending}
+                                          onClick={() => arrive.mutate(row)}
+                                          sx={{ color: "#FFFFFF" }}
+                                        >
+                                          {t("booking.detail.arrived")}
+                                        </Button>
+                                        <Button
+                                          size="small"
+                                          variant="outlined"
+                                          color="error"
+                                          disabled={row.calendarId === null || noShow.isPending}
+                                          onClick={() => noShow.mutate(row)}
+                                        >
+                                          {t("booking.detail.noShow")}
+                                        </Button>
+                                      </>
+                                    ) : row.status === CHECKED_IN ? (
+                                      /* Here already, so the only thing left is to finish
+                                         and take payment. */
+                                      <Button
+                                        size="small"
+                                        variant="contained"
+                                        disabled={row.calendarId === null || complete.isPending}
+                                        onClick={() => complete.mutate(row)}
+                                      >
+                                        {t("booking.detail.complete")}
+                                      </Button>
+                                    ) : (
+                                      <StatusChip tone={statusTone(row.status)}>
+                                        {t(`booking.status.${statusName(row.status) ?? "unknown"}`)}
+                                      </StatusChip>
+                                    )}
+                                  </Stack>
+                                </TableCell>
+                              ) : null}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </AsyncSection>
+                </Box>
+              </SoftCard>
 
               {/* ── Paperwork (4.6, v29): only when there is an answer ── */}
               {summary.paperwork ? (
-                <Box>
-                  <Stack
-                    direction="row"
-                    spacing={2}
-                    sx={{ alignItems: "baseline", mb: 1, flexWrap: "wrap" }}
-                  >
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      {t("booking.paperwork.line")}
-                    </Typography>
-                    <Typography variant="body2">
-                      ✓ {summary.paperwork.ready}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontWeight: summary.paperwork.missing > 0 ? 700 : 400,
-                      }}
-                    >
+                <SoftCard>
+                  <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
+                    <SectionLabel sx={{ mb: 0 }}>{t("booking.paperwork.line")}</SectionLabel>
+                    <StatusChip tone="green">✓ {summary.paperwork.ready}</StatusChip>
+                    <StatusChip tone={summary.paperwork.missing > 0 ? "beige" : "grey"}>
                       ⚠ {summary.paperwork.missing}
-                    </Typography>
+                    </StatusChip>
                   </Stack>
                   {/*
                     `who` arrives assembled (4.6), so this never walks the day's
@@ -523,45 +487,43 @@ export default function DayOverviewPage() {
                       {t("booking.paperwork.nobodyMissing")}
                     </Typography>
                   ) : (
-                    <Stack divider={<Divider />}>
-                      {summary.paperwork.who.map((row) => (
-                        <Stack
-                          key={row.appointmentId}
-                          direction="row"
-                          spacing={2}
-                          sx={{
-                            py: 0.75,
-                            flexWrap: "wrap",
-                            alignItems: "baseline",
-                          }}
-                        >
-                          <Typography sx={{ fontWeight: 700, minWidth: 56 }}>
-                            {formatPragueTime(row.startUtc)}
-                          </Typography>
-                          <Typography variant="body2">
-                            {row.activityName}
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            sx={{ color: "warning.main" }}
-                          >
-                            {row.missing
-                              .map((code) =>
-                                isKnownPaperworkReason(code)
-                                  ? t(`booking.paperwork.${code}`)
-                                  : t("booking.paperwork.unknown", { code }),
-                              )
-                              .join(" · ")}
-                          </Typography>
-                        </Stack>
-                      ))}
-                    </Stack>
+                    <TableContainer sx={{ border: "1px solid", borderColor: "divider" }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ width: 80 }}>Čas</TableCell>
+                            <TableCell>Činnost</TableCell>
+                            <TableCell>Chybí</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {summary.paperwork.who.map((row) => (
+                            <TableRow key={row.appointmentId} hover>
+                              <TableCell sx={{ fontWeight: 700 }}>{formatPragueTime(row.startUtc)}</TableCell>
+                              <TableCell>{row.activityName}</TableCell>
+                              <TableCell>
+                                <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75 }}>
+                                  {row.missing.map((code) => (
+                                    <StatusChip key={code} tone="beige">
+                                      {isKnownPaperworkReason(code)
+                                        ? t(`booking.paperwork.${code}`)
+                                        : t("booking.paperwork.unknown", { code })}
+                                    </StatusChip>
+                                  ))}
+                                </Stack>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
                   )}
-                </Box>
+                </SoftCard>
               ) : null}
 
               {/* ── Minutes: free, next, and what stayed empty ── */}
-              <Paper variant="outlined" sx={{ p: 2 }}>
+              <SoftCard>
+                <SectionLabel>Kapacita dne</SectionLabel>
                 <Stack spacing={1}>
                   <Line
                     label={t("booking.day.freeToday")}
@@ -599,7 +561,7 @@ export default function DayOverviewPage() {
                     }
                   />
                 </Stack>
-              </Paper>
+              </SoftCard>
             </Stack>
           ) : null}
         </AsyncSection>
@@ -621,32 +583,6 @@ export default function DayOverviewPage() {
   );
 }
 
-function Tally({
-  label,
-  value,
-  note,
-}: {
-  label: string;
-  value: number;
-  note?: string;
-}) {
-  return (
-    <Box>
-      <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1.1 }}>
-        {value}
-      </Typography>
-      <Typography variant="body2" sx={{ color: "text.secondary" }}>
-        {label}
-      </Typography>
-      {note ? (
-        <Typography variant="caption" sx={{ color: "text.secondary" }}>
-          {note}
-        </Typography>
-      ) : null}
-    </Box>
-  );
-}
-
 function Breakdown({
   title,
   rows,
@@ -659,35 +595,36 @@ function Breakdown({
   colorOf?: (id: string) => string | undefined;
 }) {
   return (
-    <Paper variant="outlined" sx={{ p: 2, flex: 1 }}>
-      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-        {title}
-      </Typography>
+    <SoftCard>
+      <SectionLabel>{title}</SectionLabel>
       {rows.length === 0 ? (
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
           {emptyText}
         </Typography>
       ) : (
-        <Stack spacing={0.5}>
+        <Stack divider={<Box sx={{ borderTop: "1px solid", borderColor: "divider" }} />}>
           {rows.map((row) => (
             <Stack
               key={row.id}
               direction="row"
               spacing={1}
-              sx={{ alignItems: "center", justifyContent: "space-between" }}
+              sx={{ alignItems: "center", justifyContent: "space-between", py: 0.75 }}
             >
-              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
                 {colorOf?.(row.id) ? (
                   <Box
                     sx={{
                       width: 10,
                       height: 10,
-                      borderRadius: "50%",
+                      borderRadius: 0.5,
+                      flexShrink: 0,
                       backgroundColor: colorOf(row.id),
                     }}
                   />
                 ) : null}
-                <Typography variant="body2">{row.name}</Typography>
+                <Typography variant="body2" noWrap>
+                  {row.name}
+                </Typography>
               </Stack>
               <Typography variant="body2" sx={{ fontWeight: 700 }}>
                 {row.count}
@@ -696,7 +633,7 @@ function Breakdown({
           ))}
         </Stack>
       )}
-    </Paper>
+    </SoftCard>
   );
 }
 

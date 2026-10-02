@@ -81,6 +81,7 @@ export function QuickRegister({
         lastName: lastName.trim(),
         fullName: `${firstName.trim()} ${lastName.trim()}`.trim(),
         dateOfBirth: dob || null,
+        phone: phone.replace(/\D/g, "").length > 0 ? `${dialCode}${phone.replace(/\D/g, "").replace(/^0+/, "")}` : null,
       });
     },
   });

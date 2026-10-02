@@ -7,26 +7,25 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
   MenuItem,
   Stack,
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   TextField,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import DeleteIcon from "@mui/icons-material/Delete";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { calendarsApi } from "../../api/calendars";
 import { appointmentsApi } from "../../api/appointments";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { errorText } from "../../components/booking/errorText";
+import { PageHeader, SectionLabel, SoftCard } from "../../components/ui";
 import {
   addDaysToDateOnly,
   formatDateOnly,
@@ -184,44 +183,35 @@ export default function BlockedTimePage() {
 
   return (
     <Box sx={{ maxWidth: 1000, mx: "auto" }}>
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 2,
-          mb: 3,
-        }}
-      >
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>
-            {t("booking.blocks.title")}
-          </Typography>
-          <Typography sx={{ color: "text.secondary" }}>
+      <PageHeader
+        title={t("booking.blocks.title")}
+        subtitle={
+          <>
             {t("booking.blocks.subtitle")}{" "}
             {t("booking.blocks.window", {
               from: formatDateOnly(windowFrom),
               to: formatDateOnly(windowTo),
             })}
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={openCreate}
-          disabled={activeCalendarId === ""}
-        >
-          {t("booking.blocks.new")}
-        </Button>
-      </Box>
+          </>
+        }
+        actions={
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={openCreate}
+            disabled={activeCalendarId === ""}
+          >
+            {t("booking.blocks.new")}
+          </Button>
+        }
+      />
 
       {/*
         Said on the screen, not only in the code: on this server a block stops
         the booking (409) but does not remove the time from the offered slots.
         Whoever uses this should know before a patient tells them.
       */}
-      <Alert severity="info" sx={{ mb: 3 }}>
+      <Alert severity="info" sx={{ mb: 2.5 }}>
         {t("booking.blocks.availabilityCaveat")}
       </Alert>
 
@@ -234,19 +224,22 @@ export default function BlockedTimePage() {
         onRetry={() => void calendarsQuery.refetch()}
         skeletonRows={2}
       >
-        <TextField
-          select
-          label={t("booking.workingHours.calendar")}
-          value={activeCalendarId}
-          onChange={(e) => setCalendarId(e.target.value)}
-          sx={{ minWidth: 260, mb: 3 }}
-        >
-          {calendars.map((calendar) => (
-            <MenuItem key={calendar.id} value={calendar.id}>
-              {calendar.name}
-            </MenuItem>
-          ))}
-        </TextField>
+        <SoftCard sx={{ mb: 2.5 }}>
+          <SectionLabel>{t("booking.workingHours.calendar")}</SectionLabel>
+          <TextField
+            select
+            value={activeCalendarId}
+            onChange={(e) => setCalendarId(e.target.value)}
+            slotProps={{ htmlInput: { "aria-label": t("booking.workingHours.calendar") } }}
+            sx={{ minWidth: 280 }}
+          >
+            {calendars.map((calendar) => (
+              <MenuItem key={calendar.id} value={calendar.id}>
+                {calendar.name}
+              </MenuItem>
+            ))}
+          </TextField>
+        </SoftCard>
 
         {remove.isError && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -263,7 +256,8 @@ export default function BlockedTimePage() {
           emptyAction={{ label: t("booking.blocks.new"), onClick: openCreate }}
           onRetry={() => void blocksQuery.refetch()}
         >
-          <Box sx={{ overflowX: "auto" }}>
+          <SoftCard sx={{ p: 0, overflow: "hidden" }}>
+            <TableContainer sx={{ borderRadius: 0 }}>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -278,31 +272,32 @@ export default function BlockedTimePage() {
               <TableBody>
                 {blocks.map((block) => (
                   <TableRow key={block.id} hover>
-                    <TableCell>
+                    <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
                       {formatDateOnly(toDateOnly(new Date(block.startUtc)))}
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
                       {formatPragueTime(block.startUtc)}–
                       {formatPragueTime(block.endUtc)}
                     </TableCell>
                     {/* The reason is required on the way in, so this is never blank. */}
                     <TableCell>{block.reason}</TableCell>
                     <TableCell align="right">
-                      <Tooltip title={t("booking.blocks.release")}>
-                        <IconButton
-                          aria-label={t("booking.blocks.release")}
-                          onClick={() => remove.mutate(block.id)}
-                          disabled={remove.isPending}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      <Button
+                        size="small"
+                        color="error"
+                        aria-label={t("booking.blocks.release")}
+                        onClick={() => remove.mutate(block.id)}
+                        disabled={remove.isPending}
+                      >
+                        {t("booking.blocks.release")}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </Box>
+            </TableContainer>
+          </SoftCard>
         </AsyncSection>
       </AsyncSection>
 
@@ -315,43 +310,57 @@ export default function BlockedTimePage() {
         <DialogTitle>{t("booking.blocks.newTitle")}</DialogTitle>
         <DialogContent>
           {draft && (
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              <TextField
-                type="date"
-                label={t("booking.blocks.date")}
-                value={draft.date}
-                onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-                slotProps={{ inputLabel: { shrink: true } }}
-              />
+            <Stack spacing={2.5} sx={{ mt: 1 }}>
+              <Box>
+                <SectionLabel>{t("booking.blocks.date")}</SectionLabel>
+                <TextField
+                  fullWidth
+                  type="date"
+                  value={draft.date}
+                  onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+                  slotProps={{ htmlInput: { "aria-label": t("booking.blocks.date") } }}
+                />
+              </Box>
               <Stack direction="row" spacing={2}>
-                <TextField
-                  type="time"
-                  label={t("booking.blocks.from")}
-                  value={draft.startTime}
-                  onChange={(e) =>
-                    setDraft({ ...draft, startTime: e.target.value })
-                  }
-                  slotProps={{ inputLabel: { shrink: true } }}
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  type="time"
-                  label={t("booking.blocks.to")}
-                  value={draft.endTime}
-                  onChange={(e) =>
-                    setDraft({ ...draft, endTime: e.target.value })
-                  }
-                  slotProps={{ inputLabel: { shrink: true } }}
-                  sx={{ flex: 1 }}
-                />
+                <Box sx={{ flex: 1 }}>
+                  <SectionLabel>{t("booking.blocks.from")}</SectionLabel>
+                  <TextField
+                    fullWidth
+                    type="time"
+                    value={draft.startTime}
+                    onChange={(e) =>
+                      setDraft({ ...draft, startTime: e.target.value })
+                    }
+                    slotProps={{ htmlInput: { "aria-label": t("booking.blocks.from") } }}
+                  />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <SectionLabel>{t("booking.blocks.to")}</SectionLabel>
+                  <TextField
+                    fullWidth
+                    type="time"
+                    value={draft.endTime}
+                    onChange={(e) =>
+                      setDraft({ ...draft, endTime: e.target.value })
+                    }
+                    slotProps={{ htmlInput: { "aria-label": t("booking.blocks.to") } }}
+                  />
+                </Box>
               </Stack>
-              <TextField
-                label={t("booking.blocks.reason")}
-                value={draft.reason}
-                onChange={(e) => setDraft({ ...draft, reason: e.target.value })}
-                placeholder={t("booking.blocks.reasonPlaceholder")}
-                required
-              />
+              <Box>
+                <SectionLabel>{t("booking.blocks.reason")}</SectionLabel>
+                <TextField
+                  fullWidth
+                  value={draft.reason}
+                  onChange={(e) => setDraft({ ...draft, reason: e.target.value })}
+                  placeholder={t("booking.blocks.reasonPlaceholder")}
+                  required
+                  slotProps={{ htmlInput: { "aria-label": t("booking.blocks.reason") } }}
+                />
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
+                  Důvod se zobrazí v kalendáři místo jména pacienta.
+                </Typography>
+              </Box>
 
               {problem && <Alert severity="warning">{problem}</Alert>}
               {save.isError && (
@@ -361,7 +370,7 @@ export default function BlockedTimePage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDraft(null)}>
+          <Button variant="outlined" onClick={() => setDraft(null)}>
             {t("booking.common.cancel")}
           </Button>
           <Button

@@ -9,17 +9,19 @@ import {
 } from "../../../api/bookingContracts";
 import { patientsApi } from "../../../api/patients";
 import { useCalendarDisplay } from "../../../api/displaySettings";
-import { readableTextOn } from "../../../utils/calendarPalette";
+import { DESIGN } from "../../../theme";
 import { formatPragueTime, isLate } from "../../../utils/time";
 import { AppointmentHoverCard } from "./AppointmentHoverCard";
 
 /**
- * One appointment. It is a `button`, not a div with an onClick (7.1), and its
- * status is written out as well as coloured, because colour may not be the only
- * carrier of the information.
+ * One appointment, drawn the board's way (3. 10. 2026): a flat grey card
+ * with a 3px coloured edge on the left, the time in bold, the patient's name
+ * under it and the status in muted small print. A patient who has arrived or
+ * is being seen sits on the darker grey.
  *
- * Moved here unchanged from `CalendarGridPage.tsx` so the time grid and the
- * page's list and month views draw an appointment the same way.
+ * It is a `button`, not a div with an onClick (7.1), and its status is written
+ * out as well as shaded, because colour may not be the only carrier of the
+ * information. The month view (`compact`) has one line per booking.
  */
 export function AppointmentButton({
   appointment,
@@ -36,14 +38,14 @@ export function AppointmentButton({
 }) {
   const { t } = useTranslation();
   const { settings } = useCalendarDisplay();
-  const color = calendar?.color ?? "#37474F";
+  const edge = calendar?.color ?? DESIGN.appointment.edge;
 
   /*
    * The patient's name on the cell itself, not only in the hover (owner: "každá
    * objednávka bez haveru musí ukázat jméno a činnost"). Fetched through the same
    * cached ['patient', id] query the hover uses, so a day is one request per
    * patient however many times it is drawn. Not on the month view (compact),
-   * where a cell has one line and the činnost has to win.
+   * where the name the row already carries has to do.
    */
   /* A slot taken for nobody on the books (walk-in or event) has an empty patient
      id and carries its name on the row itself — so there is nothing to fetch, and
@@ -58,18 +60,43 @@ export function AppointmentButton({
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
+  const rowName = appointment.patientName?.trim() || null;
   const patientName = hasPatient
     ? (nameQuery.data
         ? (nameQuery.data.fullName
           || `${nameQuery.data.firstName} ${nameQuery.data.lastName}`.trim())
-        : null)
-    : (appointment.patientName ?? null);
+        : rowName)
+    : rowName;
   const late = isLate(appointment.startUtc, isLateStatus(appointment.status), now);
   const tally = statusTally(appointment.status);
   const name = statusName(appointment.status);
   const statusLabel = name
     ? t(`booking.status.${name}`)
     : t("booking.status.unknown");
+  const statusLine = late ? `${statusLabel} · ${t("booking.status.late")}` : statusLabel;
+  const cancelled = tally === "cancelled";
+  const active = tally === "arrived";
+
+  const paperworkMark = appointment.paperwork ? (
+    /*
+      4.5, v29: ✓ or ⚠ for the paperwork, and nothing at all while the
+      register cannot answer. The mark carries a label of its own, because a
+      symbol is not a word and 7.1 does not accept one standing alone.
+    */
+    <Box
+      component="span"
+      aria-label={
+        appointment.paperwork.ready
+          ? t("booking.paperwork.ready")
+          : t("booking.paperwork.line")
+      }
+      sx={{ ml: 0.5 }}
+    >
+      {appointment.paperwork.ready ? "✓" : "⚠"}
+    </Box>
+  ) : null;
+
+  const compact = layout === "compact";
 
   return (
     <Tooltip
@@ -82,7 +109,7 @@ export function AppointmentButton({
           sx: {
             bgcolor: "background.paper",
             color: "text.primary",
-            boxShadow: 3,
+            boxShadow: DESIGN.shadow.menu,
             border: "1px solid",
             borderColor: "divider",
             p: 1,
@@ -102,80 +129,95 @@ export function AppointmentButton({
       component="button"
       type="button"
       data-grid-item="appointment"
+      data-status={tally}
       onClick={() => onOpen(appointment.id)}
       aria-haspopup="dialog"
       sx={{
         display: "block",
         width: "100%",
         height: layout === "block" ? "100%" : "auto",
-        whiteSpace: layout === "compact" ? "nowrap" : "normal",
-        textOverflow: "ellipsis",
         textAlign: "left",
         cursor: "pointer",
-        border: "1px solid rgba(0,0,0,0.15)",
-        borderRadius: 1,
-        px: 1,
-        py: 0.5,
+        border: "none",
+        borderLeft: `3px solid ${edge}`,
+        borderRadius: `${DESIGN.radius.sm}px`,
+        px: compact ? 0.75 : 1,
+        py: compact ? 0.125 : 0.5,
         font: "inherit",
-        fontSize: 12,
+        lineHeight: 1.25,
         overflow: "hidden",
-        backgroundColor: color,
-        color: readableTextOn(color),
-        opacity: tally === "cancelled" ? 0.55 : 1,
-        textDecoration: tally === "cancelled" ? "line-through" : "none",
+        backgroundColor: active ? DESIGN.appointment.bgActive : DESIGN.appointment.bg,
+        color: DESIGN.ink,
+        opacity: cancelled ? 0.55 : 1,
+        textDecoration: cancelled ? "line-through" : "none",
+        whiteSpace: compact ? "nowrap" : "normal",
+        textOverflow: "ellipsis",
+        "&:hover": { backgroundColor: DESIGN.appointment.bgActive },
         "&:focus-visible": {
-          outline: "3px solid",
+          outline: "2px solid",
           outlineColor: "primary.main",
+          outlineOffset: 1,
         },
       }}
     >
-      {/* The patient's name, first and in bold, on the day and week views. The
-          činnost follows on the line below with the time. */}
-      {patientName && layout !== "compact" ? (
-        <Box component="span" sx={{ display: "block", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {patientName}
-        </Box>
-      ) : null}
-      <Box component="span" sx={{ fontWeight: patientName && layout !== "compact" ? 500 : 700 }}>
-        {formatPragueTime(appointment.startUtc)}
-      </Box>{" "}
-      {appointment.activityName}
-      {/*
-        4.5, v29: ✓ or ⚠ for the paperwork, and nothing at all while the
-        register cannot answer. The mark carries a label of its own, because a
-        symbol is not a word and 7.1 does not accept one standing alone.
-      */}
-      {appointment.paperwork ? (
-        <Box
-          component="span"
-          aria-label={
-            appointment.paperwork.ready
-              ? t("booking.paperwork.ready")
-              : t("booking.paperwork.line")
-          }
-          sx={{ ml: 0.5 }}
-        >
-          {appointment.paperwork.ready ? "✓" : "⚠"}
-        </Box>
-      ) : null}
-      {/*
-        A month cell has one line to spare, so the status goes on the same line
-        and the calendar name is dropped - but it is still there in words, never
-        colour alone (7.1). The fuller second line is for the day and week.
-      */}
-      {layout === "compact" ? (
-        <Box component="span" sx={{ ml: 0.5, fontSize: 10, opacity: 0.9 }}>
-          {late ? t("booking.status.late") : statusLabel}
-        </Box>
+      {compact ? (
+        /*
+          A month cell has one line to spare: the time, then whoever is coming
+          - or the činnost when the row carries no name. A status other than
+          "booked" is still said in words, never only by shading (7.1).
+        */
+        <>
+          <Box component="span" sx={{ fontSize: 12, fontWeight: 700 }}>
+            {formatPragueTime(appointment.startUtc)}
+          </Box>{" "}
+          <Box component="span" sx={{ fontSize: 12 }}>
+            {rowName ?? appointment.activityName}
+          </Box>
+          {tally !== "booked" || late ? (
+            <Box component="span" sx={{ ml: 0.5, fontSize: 10, color: DESIGN.muted }}>
+              {late ? t("booking.status.late") : statusLabel}
+            </Box>
+          ) : null}
+          {paperworkMark}
+        </>
       ) : (
-        <Box
-          component="span"
-          sx={{ display: "block", fontSize: 11, opacity: 0.9 }}
-        >
-          {statusLabel}
-          {late ? ` · ${t("booking.status.late")}` : ""}
-          {calendar ? ` · ${calendar.name}` : ""}
-        </Box>
+        <>
+          <Box
+            component="span"
+            sx={{ display: "block", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}
+          >
+            {formatPragueTime(appointment.startUtc)} – {formatPragueTime(appointment.endUtc)}
+          </Box>
+          {patientName ? (
+            <Box
+              component="span"
+              sx={{
+                display: "block",
+                fontSize: 13,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {patientName}
+            </Box>
+          ) : null}
+          <Box
+            component="span"
+            sx={{
+              display: "block",
+              fontSize: 11,
+              color: DESIGN.muted,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {statusLine}
+            {appointment.activityName ? ` · ${appointment.activityName}` : ""}
+            {paperworkMark}
+          </Box>
+        </>
       )}
     </Box>
     </Tooltip>

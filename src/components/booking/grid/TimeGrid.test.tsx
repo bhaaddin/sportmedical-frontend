@@ -87,36 +87,82 @@ function drag(from: number, to: number) {
   return column;
 }
 
+function release(column: HTMLElement, minute: number) {
+  fireEvent.pointerUp(column, { clientY: yAt(minute), clientX: 100, pointerId: 1 });
+}
+
 describe('dragging on the grid', () => {
-  it('shows "od – do" live while dragging', () => {
+  it('shows the time pill live while dragging', () => {
     renderGrid();
     drag(8 * 60, 9 * 60 + 40);
-    expect(screen.getByTestId('drag-selection')).toHaveTextContent('od 08:00 – do 10:00');
+    expect(screen.getByTestId('drag-selection')).toHaveTextContent('08:00 – 10:00 · 120 min');
   });
 
-  it('offers booking and blocking on release, and books with the chosen time', () => {
+  it('opens the popover on release and books with the chosen time', () => {
     const props = renderGrid();
     const column = drag(8 * 60, 9 * 60 + 10);
-    fireEvent.pointerUp(column, { clientY: yAt(9 * 60 + 10), clientX: 100, pointerId: 1 });
+    release(column, 9 * 60 + 10);
 
+    /* The board's popover: the range, the day with the free minutes, the actions. */
+    expect(screen.getByText('08:00 – 09:30')).toBeInTheDocument();
+    expect(screen.getByText('Středa 23. září · 90 minut volno')).toBeInTheDocument();
     const menu = screen.getByRole('menu');
-    expect(within(menu).getByText('Sportovní diagnostika · od 08:00 – do 09:30')).toBeInTheDocument();
-    expect(within(menu).getByRole('menuitem', { name: 'Zablokovat' })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /Zablokovat čas/ })).toBeInTheDocument();
+    expect(screen.getByText('Zrušit výběr')).toBeInTheDocument();
 
-    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Objednat' }));
-    expect(props.onBook).toHaveBeenCalledWith({
-      calendarId: 'c1',
-      dayKey: DAY,
-      start: '2026-09-23T08:00',
-      end: '2026-09-23T09:30',
-    });
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /Objednat pacienta/ }));
+    expect(props.onBook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        calendarId: 'c1',
+        dayKey: DAY,
+        start: '2026-09-23T08:00',
+        end: '2026-09-23T09:30',
+      }),
+    );
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('hands a club reservation on with the range as instants', () => {
+    const onClub = vi.fn();
+    renderGrid({ onClub });
+    const column = drag(10 * 60, 10 * 60 + 40);
+    release(column, 10 * 60 + 40);
+    fireEvent.click(screen.getByRole('menuitem', { name: /Rezervovat pro klub/ }));
+    expect(onClub).toHaveBeenCalledWith(
+      expect.objectContaining({
+        calendarId: 'c1',
+        startUtc: '2026-09-23T08:00:00.000Z',
+        endUtc: '2026-09-23T09:00:00.000Z',
+      }),
+    );
+  });
+
+  it('does not offer the club when nobody takes it', () => {
+    renderGrid();
+    const column = drag(10 * 60, 10 * 60);
+    release(column, 10 * 60);
+    expect(screen.queryByRole('menuitem', { name: /Rezervovat pro klub/ })).not.toBeInTheDocument();
+  });
+
+  it('"Zrušit výběr" and Esc drop the selection', () => {
+    renderGrid();
+    const column = drag(10 * 60, 10 * 60);
+    release(column, 10 * 60);
+    fireEvent.click(screen.getByText('Zrušit výběr'));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('drag-selection')).not.toBeInTheDocument();
+
+    release(drag(11 * 60, 11 * 60), 11 * 60);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
   it('asks for a reason before blocking', () => {
     renderGrid();
     const column = drag(10 * 60, 10 * 60);
-    fireEvent.pointerUp(column, { clientY: yAt(10 * 60), clientX: 100, pointerId: 1 });
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Zablokovat' }));
+    release(column, 10 * 60);
+    fireEvent.click(screen.getByRole('menuitem', { name: /Zablokovat čas/ }));
 
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText(/od 10:00 – do 10:30/)).toBeInTheDocument();
@@ -126,9 +172,19 @@ describe('dragging on the grid', () => {
   it('offers only what the employee may do', () => {
     renderGrid({ mayBlock: false });
     const column = drag(8 * 60, 8 * 60);
-    fireEvent.pointerUp(column, { clientY: yAt(8 * 60), clientX: 100, pointerId: 1 });
-    expect(screen.getByRole('menuitem', { name: 'Objednat' })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Zablokovat' })).not.toBeInTheDocument();
+    release(column, 8 * 60);
+    expect(screen.getByRole('menuitem', { name: /Objednat pacienta/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Zablokovat čas/ })).not.toBeInTheDocument();
+  });
+
+  it('snaps to the finer grid when the resolution is below the calendar step', () => {
+    const props = renderGrid({ resolutionStep: 10 });
+    const column = drag(8 * 60 + 5, 8 * 60 + 25);
+    release(column, 8 * 60 + 25);
+    fireEvent.click(screen.getByRole('menuitem', { name: /Objednat pacienta/ }));
+    expect(props.onBook).toHaveBeenCalledWith(
+      expect.objectContaining({ start: '2026-09-23T08:00', end: '2026-09-23T08:30' }),
+    );
   });
 
   it('does not react at all without bookings.create and bookings.edit', () => {
@@ -137,6 +193,33 @@ describe('dragging on the grid', () => {
     fireEvent.pointerUp(column, { clientY: yAt(9 * 60), clientX: 100, pointerId: 1 });
     expect(screen.queryByTestId('drag-selection')).not.toBeInTheDocument();
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('names each calendar with its bookings in the day header', () => {
+    renderGrid({
+      appointmentsByDay: new Map([
+        [
+          DAY,
+          [
+            {
+              id: 'ap1',
+              calendarId: 'c1',
+              patientId: 'p1',
+              activityId: 'a1',
+              activityName: 'Spiroergometrie',
+              startUtc: '2026-09-23T06:00:00Z',
+              endUtc: '2026-09-23T07:00:00Z',
+              status: 0,
+              isRunningLate: false,
+              checkedInUtc: null,
+              paperwork: null,
+            },
+          ],
+        ],
+      ]),
+    });
+    expect(screen.getByRole('heading', { name: 'Sportovní diagnostika' })).toBeInTheDocument();
+    expect(screen.getByText('1 rezervace')).toBeInTheDocument();
   });
 
   it('does not react on a shut day', () => {
@@ -185,11 +268,13 @@ describe('dragging on the grid', () => {
 describe('the now-line on the grid', () => {
   const NOW = new Date('2026-09-23T08:15:00Z'); // 10:15 in Prague
 
-  it('in the week: a horizontal line and both edges of today', () => {
+  it('in the week: a horizontal line, the time pill, both edges of today and the DNES pill', () => {
     renderGrid({ view: 'week', now: NOW });
     expect(screen.getByTestId('now-line')).toBeInTheDocument();
+    expect(screen.getByTestId('now-pill')).toHaveTextContent('10:15');
     expect(screen.getByTestId('now-edge-left')).toBeInTheDocument();
     expect(screen.getByTestId('now-edge-right')).toBeInTheDocument();
+    expect(screen.getByText('DNES')).toBeInTheDocument();
   });
 
   it('in the day: the horizontal line alone', () => {
@@ -212,10 +297,26 @@ describe('a holiday on the grid', () => {
         [DAY, dayMark({ date: DAY, name: 'Den české státnosti', isHoliday: true, isStatutory: true }, [preview])],
       ]),
     }, preview);
-    /* "Státní svátek" now appears both in the day header and down the full-day
-       block that paints the closed column. */
-    expect(screen.getAllByText('Státní svátek').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByTestId(`closed-block-${DAY}`)).toBeInTheDocument();
+    /* A SVÁTEK chip in the header, and one hatched block down the column that
+       says "Státní svátek — zavřeno" with the holiday's own name. */
+    expect(screen.getByText('SVÁTEK')).toBeInTheDocument();
+    const block = screen.getByTestId(`closed-block-${DAY}`);
+    expect(block).toHaveTextContent('Státní svátek — zavřeno');
+    expect(block).toHaveTextContent('Den české státnosti');
     expect(screen.getByTestId(`day-number-${DAY}`)).toHaveStyle({ color: 'rgb(211, 47, 47)' });
+  });
+
+  it('a calendar off on its own says so down its column', () => {
+    const absent = row(DAY, { isOpen: false, closedBecause: 'workerAbsent', offeredActivityIds: [] });
+    renderGrid(
+      {
+        calendars: [calendar, { ...calendar, id: 'c2', name: 'Druhá ordinace' }],
+        /* The other calendar works, so the day itself is open. */
+        marks: new Map([[DAY, dayMark(undefined, [absent, row(DAY)])]]),
+      },
+      absent,
+    );
+    expect(screen.getByTestId(`calendar-closed-c1-${DAY}`)).toHaveTextContent('Dovolená — Anna Černá');
+    expect(screen.queryByTestId(`closed-block-${DAY}`)).not.toBeInTheDocument();
   });
 });

@@ -1,16 +1,29 @@
 import { useState } from "react";
-import { Alert, Box, Button, Stack, Typography } from "@mui/material";
+import { Box, Button, Stack, Typography } from "@mui/material";
 import ContentCopy from "@mui/icons-material/ContentCopy";
 import AccountCircle from "@mui/icons-material/AccountCircle";
 import { useMutation } from "@tanstack/react-query";
 import { issuePortalLink } from "../../../api/patientPortal";
+import { SoftCard } from "../../ui";
 
 /**
  * From the appointment detail (or the patient page): issues the patient's
  * personal portal link so the desk can copy it and send it. The same personal
  * link every time it is re-issued; the previous one stops working.
+ *
+ * Drawn the board's way: an outlined button, and once issued a soft card with
+ * the address in monospace and "Kopírovat" beside it. `label` lets the card
+ * call it what fits the sentence around it.
  */
-export function PortalLinkButton({ patientId }: { patientId: string }) {
+export function PortalLinkButton({
+  patientId,
+  label = "Přístup do portálu",
+  fullWidth = false,
+}: {
+  patientId: string;
+  label?: string;
+  fullWidth?: boolean;
+}) {
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -35,8 +48,8 @@ export function PortalLinkButton({ patientId }: { patientId: string }) {
 
   if (link) {
     return (
-      <Alert severity="success" icon={false}>
-        <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
+      <SoftCard tone="soft" sx={{ p: 1.5 }}>
+        <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.75 }}>
           Osobní odkaz do portálu (pošlete pacientovi):
         </Typography>
         <Stack
@@ -47,12 +60,14 @@ export function PortalLinkButton({ patientId }: { patientId: string }) {
           <Box
             sx={{
               flex: 1,
-              fontFamily: "monospace",
-              fontSize: "0.85rem",
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+              fontSize: 12.5,
               wordBreak: "break-all",
-              bgcolor: "action.hover",
-              borderRadius: 1,
-              px: 1,
+              bgcolor: "background.paper",
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 2,
+              px: 1.25,
               py: 0.75,
             }}
           >
@@ -70,7 +85,7 @@ export function PortalLinkButton({ patientId }: { patientId: string }) {
         <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
           Jen pro tohoto pacienta. Nový odkaz ten předchozí zneplatní.
         </Typography>
-      </Alert>
+      </SoftCard>
     );
   }
 
@@ -79,11 +94,12 @@ export function PortalLinkButton({ patientId }: { patientId: string }) {
       <Button
         size="small"
         variant="outlined"
+        fullWidth={fullWidth}
         startIcon={<AccountCircle fontSize="small" />}
         disabled={issue.isPending}
         onClick={() => issue.mutate()}
       >
-        {issue.isPending ? "Generuji…" : "Přístup do portálu"}
+        {issue.isPending ? "Generuji…" : label}
       </Button>
       {issue.isError ? (
         <Typography variant="caption" sx={{ color: "error.main", display: "block", mt: 0.5 }}>

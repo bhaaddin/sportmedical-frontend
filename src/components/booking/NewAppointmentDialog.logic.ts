@@ -107,3 +107,213 @@ export function isStartOffered(
   const wanted = Date.parse(startUtc);
   return slots.some((s) => Date.parse(s.startUtc) === wanted);
 }
+
+/* ── The drawer's words and small decisions (design board 2026-10-03, screens 8–11) ── */
+
+/** The four ways to fill one slot, as the drawer's mode cards name them. */
+export type DrawerMode = 'database' | 'quick' | 'club' | 'event';
+
+/** Which of the two steps the drawer is on: who comes, then what is done. */
+export type DrawerStep = 1 | 2;
+
+/** `2 200 Kč` - money the way the board writes it; `—` when there is no price. */
+export function formatCzk(amount: number | null | undefined): string {
+  if (amount === null || amount === undefined || Number.isNaN(amount)) return '—';
+  /* Thousands are grouped with a no-break space, so "2 200" never wraps. */
+  const grouped = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 })
+    .format(amount)
+    .replace(/\s/g, ' ');
+  return `${grouped} Kč`;
+}
+
+/** `1 minuta`, `3 minuty`, `60 minut` - the Czech plural, counted. */
+export function minutesWord(minutes: number): string {
+  const abs = Math.abs(minutes);
+  const word = abs === 1 ? 'minuta' : abs >= 2 && abs <= 4 ? 'minuty' : 'minut';
+  return `${minutes} ${word}`;
+}
+
+const weekdayFormatter = new Intl.DateTimeFormat('cs-CZ', { weekday: 'long' });
+
+/** `Pondělí` - the weekday of a `yyyy-MM-dd`, capitalised as the board writes it. */
+export function weekdayName(date: DateOnly): string {
+  if (!DATE_ONLY.test(date)) return '';
+  const [year, month, day] = date.split('-').map(Number);
+  const word = weekdayFormatter.format(new Date(year, month - 1, day));
+  return word.charAt(0).toLocaleUpperCase('cs-CZ') + word.slice(1);
+}
+
+/** `26. 10. 2026` - a date-only value, no zone, no leading zeros. */
+function dateWords(date: DateOnly): string {
+  const [year, month, day] = date.split('-').map(Number);
+  return `${day}. ${month}. ${year}`;
+}
+
+/**
+ * The slot card's first line: `Pondělí 26. 10. 2026 · 10:00 — 11:00`, or
+ * `… · od 10:00` while there is no end to speak of.
+ */
+export function slotTitle(date: DateOnly, time: string, end: string | null): string {
+  if (!DATE_ONLY.test(date)) return '';
+  const when = `${weekdayName(date)} ${dateWords(date)}`;
+  const from = normalizeTime(time);
+  if (from === '') return when;
+  return end ? `${when} · ${from} — ${end}` : `${when} · od ${from}`;
+}
+
+/** The slot card's second line: `60 minut volno`, or nothing when no range was dragged. */
+export function slotSubtitle(minutes: number | null): string {
+  return minutes === null ? '' : `${minutesWord(minutes)} volno`;
+}
+
+/** `BK` for `Bohumil Komárek`; one letter for one word; empty for nothing. */
+export function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return words
+    .slice(0, 2)
+    .map((w) => w.charAt(0).toLocaleUpperCase('cs-CZ'))
+    .join('');
+}
+
+/**
+ * `Filip Fehér` typed in one box -> first name and surname. The first word is
+ * the first name and everything after it the surname, so `Jan van Dyk` keeps
+ * its particle. One word alone is not enough to register anybody: null.
+ */
+export function splitFullName(value: string): { firstName: string; lastName: string } | null {
+  const words = value.trim().split(/\s+/).filter(Boolean);
+  if (words.length < 2) return null;
+  return { firstName: words[0], lastName: words.slice(1).join(' ') };
+}
+
+/**
+ * What "Rychlá registrace" can do with what was typed.
+ *
+ * The register will not create a patient without a date of birth and an
+ * e-mail (`PatientErrorCodes.DateOfBirthRequired`; the e-mail is where the
+ * completion link goes). With both, and a first name and a surname, the desk
+ * can register a real patient who then gets the link. Without them the slot
+ * is still bookable - as a walk-in taken by name and phone, the way
+ * "Neznámý pacient" always worked - only nobody gets a link.
+ */
+export type QuickPath = 'registered' | 'walkIn';
+
+export function quickRegistrationPath(input: {
+  name: string;
+  email: string;
+  dateOfBirth: string;
+  mayRegister: boolean;
+}): QuickPath | null {
+  if (input.name.trim() === '') return null;
+  const canRegister =
+    input.mayRegister &&
+    splitFullName(input.name) !== null &&
+    input.email.trim() !== '' &&
+    DATE_ONLY.test(input.dateOfBirth);
+  return canRegister ? 'registered' : 'walkIn';
+}
+
+/**
+ * A telephone typed at the desk, made sendable: digits only, with the dialling
+ * code the register wants (`Zadejte ho s předvolbou`). `773 539 001` is a Czech
+ * number, so it gets `+420`; `00421…` and `+421…` keep their country. Empty
+ * stays null - a telephone is optional, a half-typed one is not a telephone.
+ */
+export function normalizePhone(value: string): string | null {
+  const trimmed = value.trim();
+  if (trimmed === '') return null;
+  const plus = trimmed.startsWith('+') || trimmed.startsWith('00');
+  const digits = trimmed.replace(/\D/g, '').replace(/^00/, '');
+  if (digits === '') return null;
+  if (plus) return `+${digits}`;
+  return `+420${digits.replace(/^0+/, '')}`;
+}
+
+/** What the desk types for a caller the register does not know yet ("Rychlá registrace"). */
+export interface QuickPatientDraft {
+  /** `Filip Fehér` - one box, split on the way out. */
+  name: string;
+  phone: string;
+  email: string;
+  /** `yyyy-MM-dd`; the register will not create a patient without it. */
+  dateOfBirth: string;
+  /** The činnost the caller asked for; chosen on step 1, used on step 2. */
+  activityId: string;
+}
+
+export const EMPTY_QUICK_DRAFT: QuickPatientDraft = {
+  name: '',
+  phone: '',
+  email: '',
+  dateOfBirth: '',
+  activityId: '',
+};
+
+/** A club the desk is founding from the drawer, handed on to the reservation screen. */
+export interface NewClubDraft {
+  name: string;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  /** Typed as text; parsed where it is used. */
+  athleteCount: string;
+}
+
+export const EMPTY_CLUB_DRAFT: NewClubDraft = {
+  name: '',
+  contactPerson: '',
+  phone: '',
+  email: '',
+  athleteCount: '',
+};
+
+/** The header's second line, the way the board words each step. */
+export function stepSubtitle(step: DrawerStep, mode: DrawerMode): string {
+  if (step === 2) return 'Krok 2 ze 2 — co se bude dělat';
+  switch (mode) {
+    case 'quick':
+      return 'Krok 1 ze 2 — nový pacient';
+    case 'club':
+      return 'Krok 1 ze 2 — který klub';
+    case 'event':
+      return 'Krok 1 ze 2 — bez pacienta';
+    default:
+      return 'Krok 1 ze 2 — kdo přijde';
+  }
+}
+
+/** The header's title: the club flow has its own name on the board. */
+export function drawerTitle(mode: DrawerMode): string {
+  return mode === 'club' ? 'Hromadná rezervace pro klub' : 'Objednat termín';
+}
+
+/** Lower case, no diacritics - so `Slany` finds `FK Slaný`. */
+export function foldText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Whether a club row answers the search box: by name or by contact person. */
+export function clubMatches(
+  club: { name: string; contactPerson?: string | null },
+  query: string,
+): boolean {
+  const q = foldText(query);
+  if (q === '') return true;
+  return foldText(club.name).includes(q) || foldText(club.contactPerson ?? '').includes(q);
+}
+
+/** `3 nalezeni` / `1 nalezen` / `4 kluby` - the count in the search box. */
+export function foundPatientsWord(count: number): string {
+  return count === 1 ? '1 nalezen' : `${count} nalezeni`;
+}
+
+export function clubsWord(count: number): string {
+  if (count === 1) return '1 klub';
+  if (count >= 2 && count <= 4) return `${count} kluby`;
+  return `${count} klubů`;
+}

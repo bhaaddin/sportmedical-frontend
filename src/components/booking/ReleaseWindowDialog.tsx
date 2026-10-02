@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import { partnerOrdersApi } from "../../api/partnerOrders";
 import type { PartnerOrder, PartnerWindow } from "../../api/bookingContracts";
 import { formatDateOnly } from "../../utils/time";
+import { SectionLabel } from "../ui";
 import { errorText } from "./errorText";
 
 /**
@@ -74,7 +75,7 @@ export function ReleaseWindowDialog({
       <DialogTitle>{t("booking.partner.releaseTitle")}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
-          <Typography>
+          <Typography sx={{ fontWeight: 600 }}>
             {t("booking.partner.releaseWhat", {
               partner: order.partnerName,
               day: formatDateOnly(held.date),
@@ -89,9 +90,7 @@ export function ReleaseWindowDialog({
 
           <Divider />
 
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            {t("booking.partner.audience")}
-          </Typography>
+          <SectionLabel sx={{ mb: 0 }}>{t("booking.partner.audience")}</SectionLabel>
 
           <FormControlLabel
             control={
@@ -133,7 +132,7 @@ export function ReleaseWindowDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>{t("booking.common.cancel")}</Button>
+        <Button variant="outlined" onClick={onClose}>{t("booking.common.cancel")}</Button>
         <Button
           variant="contained"
           disabled={release.isPending}

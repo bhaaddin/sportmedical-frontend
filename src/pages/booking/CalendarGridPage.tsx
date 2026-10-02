@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -17,12 +17,13 @@ import {
   useTheme,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import AddIcon from "@mui/icons-material/Add";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import TodayIcon from "@mui/icons-material/Today";
+import RemoveIcon from "@mui/icons-material/Remove";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import { Link as MuiLink } from "@mui/material";
 import { calendarsApi } from "../../api/calendars";
 import { clinicServicesApi } from "../../api/clinicServices";
@@ -31,6 +32,7 @@ import { readPublicClinic } from "../../api/clinicSettings";
 import { usePermission } from "../../auth/usePermission";
 import { appointmentsApi } from "../../api/appointments";
 import { workingHoursApi } from "../../api/workingHours";
+import { statusTally } from "../../api/bookingContracts";
 import type { DayAppointment, PreviewDay, TimeBlock } from "../../api/bookingContracts";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { AppointmentDetail } from "../../components/booking/AppointmentDetail";
@@ -55,28 +57,45 @@ import {
   type Employee,
 } from "../../components/booking/grid/filters";
 import { GRID_TEXT } from "../../components/booking/grid/gridText";
+import { nextFreeSlot } from "../../components/booking/grid/nextFreeSlot";
 import { resolveNowLineColor } from "../../components/booking/grid/nowLine";
+import {
+  WEEKDAY_ABBREVIATION,
+  periodTitle,
+  shortDate,
+  weekdayLong,
+} from "../../components/booking/grid/periodTitle";
+import {
+  RESOLUTIONS,
+  resolutionOf,
+  stepResolution,
+} from "../../components/booking/grid/resolution";
 import { useCalendarDisplay } from "../../api/displaySettings";
 import {
+  localDateTime,
   parseTimeOfDay,
+  pragueMinuteOfDay,
   spanOnDay,
   touchesDay,
   visibleHours,
   type MinuteRange,
 } from "../../components/booking/grid/timeRange";
+import { DESIGN } from "../../theme";
+import { StatusChip } from "../../components/ui/StatusChip";
+import { SectionLabel } from "../../components/ui/SectionLabel";
 import {
   addDaysToDateOnly,
-  dayOfWeekOf,
   formatDateOnly,
   pragueDateKey,
 } from "../../utils/time";
 import { inactiveAmong } from "./calendarLifecycle";
 
 /**
- * The calendar - contract screen 5.1, laid out as the owner asked:
+ * The calendar - contract screen 5.1, drawn to the board of 3. 10. 2026:
  *
- *   LEFT   mini calendar, day / week / month, the calendars, who works, services
- *   TOP    previous / next, today, day / week / month, employee and service filters
+ *   TOP    ‹ › Dnes · the period · Den | Týden | Měsíc · Nová objednávka
+ *          under it ROZLIŠENÍ − [Hodina | 30 min | 10 min] + · the filters
+ *   LEFT   mini calendar, the calendars, who works, the SLUŽBY legend
  *   MAIN   the grid: time axis, bookings, working hours, holidays, drag & drop
  *
  * Rules that shape it and are easy to break:
@@ -99,6 +118,8 @@ interface BookingPrefill {
   /** Clinic local time, `YYYY-MM-DDTHH:mm`. Read by the dialog once it takes them. */
   initialStart?: string;
   initialEnd?: string;
+  /** The patient's card said "Objednat termín": the drawer opens with them chosen. */
+  initialPatientId?: string;
 }
 
 /** Shifts by whole calendar months, clamping a day the target month lacks. */
@@ -128,9 +149,47 @@ function allHolidays(results: { data?: ClinicHoliday[] }[]): ClinicHoliday[] {
   return results.flatMap((r) => r.data ?? []);
 }
 
+/** The square ‹ › buttons of the top bar. */
+function SquareButton({
+  label,
+  onClick,
+  disabled,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip title={label}>
+      <span>
+        <IconButton
+          aria-label={label}
+          onClick={onClick}
+          disabled={disabled}
+          sx={{
+            width: 40,
+            height: 40,
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: `${DESIGN.radius.lg}px`,
+            bgcolor: "background.paper",
+            color: "text.primary",
+          }}
+        >
+          {children}
+        </IconButton>
+      </span>
+    </Tooltip>
+  );
+}
+
 export default function CalendarGridPage() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
   const mayManageCalendars = usePermission("settings.clinic.manage");
   const mayBook = usePermission("bookings.create");
@@ -146,16 +205,24 @@ export default function CalendarGridPage() {
       return 1;
     }
   });
-  const changeZoom = (delta: number) =>
-    setZoom((z) => {
-      const next = Math.min(2, Math.max(0.6, Math.round((z + delta) * 10) / 10));
-      try {
-        localStorage.setItem("calendarZoom", String(next));
-      } catch {
-        /* storage blocked; zoom still works for this view */
-      }
-      return next;
-    });
+  const changeZoom = useCallback(
+    (delta: number) =>
+      setZoom((z) => {
+        const next = Math.min(2, Math.max(0.6, Math.round((z + delta) * 10) / 10));
+        try {
+          localStorage.setItem("calendarZoom", String(next));
+        } catch {
+          /* storage blocked; zoom still works for this view */
+        }
+        return next;
+      }),
+    [],
+  );
+  const resolution = resolutionOf(zoom);
+  const setResolution = (key: string) => {
+    const level = RESOLUTIONS.find((r) => r.key === key);
+    if (level) changeZoom(level.zoom - zoom);
+  };
   const [anchor, setAnchor] = useState<string>(() => pragueDateKey(new Date()));
   const [ticked, setTicked] = useState<Set<string> | null>(null);
   const [serviceId, setServiceId] = useState<string | null>(null);
@@ -467,8 +534,11 @@ export default function CalendarGridPage() {
     changeView("day");
   };
 
-  const openBooking = (prefill: BookingPrefill) =>
-    setBooking((current) => ({ key: (current?.key ?? 0) + 1, prefill }));
+  const openBooking = useCallback(
+    (prefill: BookingPrefill) =>
+      setBooking((current) => ({ key: (current?.key ?? 0) + 1, prefill })),
+    [],
+  );
 
   const bookFromGrid = (request: GridBookingRequest) =>
     openBooking({
@@ -477,6 +547,79 @@ export default function CalendarGridPage() {
       initialStart: request.start,
       initialEnd: request.end,
     });
+
+  /* "Rezervovat pro klub": the clubs screen takes the range and the calendar. */
+  const clubFromGrid = (request: GridBookingRequest) =>
+    navigate("/vyhrazeni", {
+      state: {
+        calendarId: request.calendarId,
+        startUtc: request.startUtc,
+        endUtc: request.endUtc,
+      },
+    });
+
+  /**
+   * "Nová objednávka" - the sidebar's big button and the one in the top bar:
+   * open the booking dialog on the next free half hour from now on the first
+   * calendar on screen, exactly as if it had been dragged. What is on the
+   * calendar already, the lunch break and the working hours are stepped
+   * over; whether the time can really be booked is still the server's answer
+   * in the dialog (6.1).
+   */
+  const bookNextFree = useCallback((extra: Pick<BookingPrefill, "initialPatientId"> = {}) => {
+    const calendar = shown[0];
+    if (!calendar) return;
+    const nowDate = new Date();
+    const dayKey = pragueDateKey(nowDate);
+    const minute = pragueMinuteOfDay(nowDate);
+    const step = calendar.displayStepMinutes > 0 ? calendar.displayStepMinutes : 30;
+    const row = previewByCalendar.get(calendar.id)?.get(dayKey);
+    const busy: MinuteRange[] = [];
+    for (const a of appointmentsQuery.data ?? []) {
+      if (a.calendarId !== calendar.id || statusTally(a.status) === "cancelled") continue;
+      if (touchesDay(a.startUtc, a.endUtc, dayKey)) busy.push(spanOnDay(a.startUtc, a.endUtc, dayKey));
+    }
+    for (const b of blocksByCalendar.get(calendar.id) ?? []) {
+      if (touchesDay(b.startUtc, b.endUtc, dayKey)) busy.push(spanOnDay(b.startUtc, b.endUtc, dayKey));
+    }
+    const breakStart = parseTimeOfDay(row?.breakStart);
+    const breakEnd = parseTimeOfDay(row?.breakEnd);
+    if (breakStart !== null && breakEnd !== null) busy.push({ start: breakStart, end: breakEnd });
+    const workStart = row?.isOpen ? parseTimeOfDay(row.startTime) : null;
+    const workEnd = row?.isOpen ? parseTimeOfDay(row.endTime) : null;
+    const bounds = { start: workStart ?? 0, end: workEnd ?? 24 * 60 };
+    const slot = nextFreeSlot(minute, step, busy, 30, bounds);
+    openBooking(
+      slot
+        ? {
+            initialDate: dayKey,
+            initialCalendarId: calendar.id,
+            initialStart: localDateTime(dayKey, slot.start),
+            initialEnd: localDateTime(dayKey, slot.end),
+            ...extra,
+          }
+        : { initialDate: dayKey, initialCalendarId: calendar.id, ...extra },
+    );
+  }, [shown, previewByCalendar, appointmentsQuery.data, blocksByCalendar, openBooking]);
+
+  /*
+   * The sidebar lands here with `state.newAppointment` (a timestamp). Each new
+   * value opens the dialog once, as soon as the calendars and today's bookings
+   * are known - so the slot proposed is one that is visibly free.
+   */
+  const landing = location.state as { newAppointment?: number; patientId?: string } | null;
+  const newAppointmentKey = landing?.newAppointment;
+  /* The patient's card hands over who it is for; the sidebar hands over nobody. */
+  const landingPatientId = typeof landing?.patientId === "string" ? landing.patientId : undefined;
+  const handledNewAppointment = useRef<number | null>(null);
+  const bookingsKnown = appointmentsQuery.isSuccess || appointmentsQuery.isError;
+  useEffect(() => {
+    if (typeof newAppointmentKey !== "number") return;
+    if (handledNewAppointment.current === newAppointmentKey) return;
+    if (!mayBook || shown.length === 0 || !bookingsKnown) return;
+    handledNewAppointment.current = newAppointmentKey;
+    bookNextFree(landingPatientId ? { initialPatientId: landingPatientId } : {});
+  }, [newAppointmentKey, landingPatientId, mayBook, shown.length, bookingsKnown, bookNextFree]);
 
   /**
    * 7.1: the grid steps with the keyboard and is not a focus trap.
@@ -498,10 +641,8 @@ export default function CalendarGridPage() {
     }
   };
 
-  const rangeText =
-    view === "day"
-      ? formatDateOnly(anchor)
-      : `${formatDateOnly(days[0])} – ${formatDateOnly(days[days.length - 1])}`;
+  const title = periodTitle(view, days, anchor);
+  const outlinedSelect = { minWidth: 180, "& .MuiInputBase-root": { bgcolor: "background.paper" } };
 
   return (
     <Box
@@ -510,124 +651,154 @@ export default function CalendarGridPage() {
       sx={{ maxWidth: 1680, mx: "auto", outline: "none" }}
       onKeyDown={onGridKeyDown}
     >
+      {/* The top bar: ‹ › Dnes · the period · Den | Týden | Měsíc · Nová objednávka */}
       <Box
         sx={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
           flexWrap: "wrap",
-          gap: 2,
+          gap: 1.5,
           mb: 2,
         }}
       >
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>
-            {t("booking.grid.title")}
-          </Typography>
-          <Typography sx={{ color: "text.secondary" }}>{rangeText}</Typography>
-        </Box>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          <SquareButton label={GRID_TEXT.previous} onClick={() => stepBy(-1)}>
+            <ChevronLeftIcon fontSize="small" />
+          </SquareButton>
+          <SquareButton label={GRID_TEXT.next} onClick={() => stepBy(1)}>
+            <ChevronRightIcon fontSize="small" />
+          </SquareButton>
+          <Button variant="outlined" onClick={() => setAnchor(pragueDateKey(new Date()))}>
+            {GRID_TEXT.today}
+          </Button>
+        </Stack>
+        <Typography
+          component="h1"
+          sx={{
+            fontSize: { xs: 18, md: 20 },
+            fontWeight: 700,
+            letterSpacing: "-0.01em",
+            flex: 1,
+            minWidth: 0,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {title}
+        </Typography>
 
         {/* 7.2: wrapping needs `gap` rather than `spacing`, which lays out with
             margins and breaks across wrapped lines on a phone. */}
-        <Stack direction="row" sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
-          <Tooltip title={t("booking.grid.previous")}>
-            <IconButton aria-label={t("booking.grid.previous")} onClick={() => stepBy(-1)}>
-              <ChevronLeftIcon />
-            </IconButton>
-          </Tooltip>
-          <Button startIcon={<TodayIcon />} onClick={() => setAnchor(pragueDateKey(new Date()))}>
-            {t("booking.grid.today")}
-          </Button>
-          <Tooltip title={t("booking.grid.next")}>
-            <IconButton aria-label={t("booking.grid.next")} onClick={() => stepBy(1)}>
-              <ChevronRightIcon />
-            </IconButton>
-          </Tooltip>
+        <Stack direction="row" sx={{ alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
           <ToggleButtonGroup
             exclusive
-            size="small"
+            aria-label={GRID_TEXT.view}
             value={view}
             onChange={(_, next: ViewMode | null) => next && changeView(next)}
           >
-            <ToggleButton value="day">{t("booking.grid.day")}</ToggleButton>
-            <ToggleButton value="week">{t("booking.grid.week")}</ToggleButton>
-            <ToggleButton value="month">{t("booking.grid.month")}</ToggleButton>
+            <ToggleButton value="day">{GRID_TEXT.dayView}</ToggleButton>
+            <ToggleButton value="week">{GRID_TEXT.weekView}</ToggleButton>
+            <ToggleButton value="month">{GRID_TEXT.monthView}</ToggleButton>
           </ToggleButtonGroup>
-          {/* Vertical zoom: stretch or compress the day without changing the layout. */}
-          <ToggleButtonGroup exclusive size="small">
-            <ToggleButton value="zoom-out" onClick={() => changeZoom(-0.1)} disabled={zoom <= 0.6}>
-              −
-            </ToggleButton>
-            <ToggleButton
-              value="zoom-reset"
-              onClick={() => changeZoom(1 - zoom)}
-              title="Výchozí přiblížení"
+          {mayBook ? (
+            <Button variant="contained" onClick={() => bookNextFree()}>
+              {GRID_TEXT.newAppointment}
+            </Button>
+          ) : null}
+        </Stack>
+      </Box>
+
+      {/* The toolbar under it: ROZLIŠENÍ, the hint, the filters. */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 1.5,
+          mb: 2,
+        }}
+      >
+        {timeGridShown ? (
+          <>
+            <SectionLabel sx={{ mb: 0 }}>{GRID_TEXT.resolution}</SectionLabel>
+            <SquareButton
+              label={GRID_TEXT.coarser}
+              onClick={() => setResolution(stepResolution(zoom, -1).key)}
+              disabled={resolution.key === RESOLUTIONS[0].key}
             >
-              {Math.round(zoom * 100)}%
-            </ToggleButton>
-            <ToggleButton value="zoom-in" onClick={() => changeZoom(0.1)} disabled={zoom >= 2}>
-              +
-            </ToggleButton>
-          </ToggleButtonGroup>
+              <RemoveIcon fontSize="small" />
+            </SquareButton>
+            <ToggleButtonGroup
+              exclusive
+              aria-label={GRID_TEXT.resolution}
+              value={resolution.key}
+              onChange={(_, next: string | null) => next && setResolution(next)}
+            >
+              {RESOLUTIONS.map((level) => (
+                <ToggleButton key={level.key} value={level.key}>
+                  {level.label}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+            <SquareButton
+              label={GRID_TEXT.finer}
+              onClick={() => setResolution(stepResolution(zoom, 1).key)}
+              disabled={resolution.key === RESOLUTIONS[RESOLUTIONS.length - 1].key}
+            >
+              <AddIcon fontSize="small" />
+            </SquareButton>
+            <Typography sx={{ fontSize: 12, color: "text.secondary", display: { xs: "none", lg: "block" } }}>
+              {GRID_TEXT.gridStepHint(resolution.hint)}
+            </Typography>
+          </>
+        ) : null}
+        <Box sx={{ flex: 1 }} />
+        {onlineBookingOff ? (
+          <Tooltip title={GRID_TEXT.onlineBookingOffWhy}>
+            <Chip color="warning" label={GRID_TEXT.onlineBookingOff} />
+          </Tooltip>
+        ) : null}
+        <TextField
+          select
+          size="small"
+          label={GRID_TEXT.employee}
+          value={employeeId ?? ""}
+          onChange={(e) => chooseEmployee(e.target.value === "" ? null : e.target.value)}
+          sx={outlinedSelect}
+          slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
+        >
+          <MenuItem value="">{GRID_TEXT.allEmployees}</MenuItem>
+          {employees.map((e) => (
+            <MenuItem key={e.id} value={e.id}>
+              {e.name}
+            </MenuItem>
+          ))}
+        </TextField>
+        {services.length > 0 ? (
           <TextField
             select
             size="small"
-            label={GRID_TEXT.employee}
-            value={employeeId ?? ""}
-            onChange={(e) => chooseEmployee(e.target.value === "" ? null : e.target.value)}
-            sx={{ minWidth: 180 }}
+            label={GRID_TEXT.service}
+            value={serviceId ?? ""}
+            onChange={(e) => setServiceId(e.target.value === "" ? null : e.target.value)}
+            sx={outlinedSelect}
             slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
           >
-            <MenuItem value="">{GRID_TEXT.allEmployees}</MenuItem>
-            {employees.map((e) => (
-              <MenuItem key={e.id} value={e.id}>
-                {e.name}
+            <MenuItem value="">{GRID_TEXT.allServices}</MenuItem>
+            {services.map((s) => (
+              <MenuItem key={s.id} value={s.id}>
+                {s.name}
               </MenuItem>
             ))}
           </TextField>
-          {services.length > 0 ? (
-            <TextField
-              select
-              size="small"
-              label={GRID_TEXT.service}
-              value={serviceId ?? ""}
-              onChange={(e) => setServiceId(e.target.value === "" ? null : e.target.value)}
-              sx={{ minWidth: 180 }}
-              slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
-            >
-              <MenuItem value="">{GRID_TEXT.allServices}</MenuItem>
-              {services.map((s) => (
-                <MenuItem key={s.id} value={s.id}>
-                  {s.name}
-                </MenuItem>
-              ))}
-            </TextField>
-          ) : null}
-          {mayBook ? (
-            <Button
-              variant="contained"
-              onClick={() =>
-                openBooking({
-                  initialDate: anchor,
-                  initialCalendarId: shown.length === 1 ? shown[0].id : undefined,
-                })
-              }
-            >
-              {t("booking.new.title")}
-            </Button>
-          ) : null}
-          {onlineBookingOff ? (
-            <Tooltip title={GRID_TEXT.onlineBookingOffWhy}>
-              <Chip color="warning" label={GRID_TEXT.onlineBookingOff} />
-            </Tooltip>
-          ) : null}
-        </Stack>
+        ) : null}
       </Box>
 
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "260px minmax(0, 1fr)" },
+          gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "248px minmax(0, 1fr)" },
           gap: 3,
           alignItems: "start",
         }}
@@ -636,7 +807,6 @@ export default function CalendarGridPage() {
           anchor={anchor}
           view={view}
           onDate={setAnchor}
-          onView={changeView}
           holidays={holidayDates(holidays)}
           closedDays={closedHolidayDates(holidays)}
           calendars={serviceCalendars}
@@ -706,6 +876,7 @@ export default function CalendarGridPage() {
                   anchorMonth={anchorMonth}
                   now={now}
                   todayKey={todayKey}
+                  holidayColor={holidayColor}
                   onOpen={setOpenId}
                   onPickDay={pickDay}
                 />
@@ -736,10 +907,12 @@ export default function CalendarGridPage() {
                   lunchColor={lunchColor}
                   zoom={zoom}
                   onZoom={changeZoom}
+                  resolutionStep={resolution.step}
                   mayBook={mayBook}
                   mayBlock={mayBlock}
                   onOpen={setOpenId}
                   onBook={bookFromGrid}
+                  onClub={clubFromGrid}
                   onPickDay={pickDay}
                 />
               )}
@@ -795,7 +968,7 @@ function DayList({ days, byDay, calendarById, marks, now, onOpen }: SharedProps)
         return (
           <Box key={dayKey}>
             <Typography sx={{ fontWeight: 700, mb: 1 }}>
-              {t(`booking.workingHours.weekday.${dayOfWeekOf(dayKey)}`)}{" "}
+              {weekdayLong(dayKey)}{" "}
               <Box component="span" sx={{ color: mark.redNumber ? "error.main" : "inherit" }}>
                 {formatDateOnly(dayKey)}
               </Box>
@@ -831,7 +1004,10 @@ function DayList({ days, byDay, calendarById, marks, now, onOpen }: SharedProps)
 }
 
 /**
- * The month - contract 5.1.
+ * The month - contract 5.1, drawn to design-03: seven columns, the day
+ * number (today a filled dark circle), the count on the right, up to three
+ * rows "08:00 Jan Novák" and "+ N další"; a closed day says ZAVŘENO, a
+ * holiday is tinted in the owner's holiday colour with a SVÁTEK chip.
  *
  * Deliberately not virtualised: a month is six rows. What can actually grow is
  * a single day's list, which is capped instead, with the rest named as a count.
@@ -847,15 +1023,16 @@ function MonthGrid({
   anchorMonth,
   now,
   todayKey,
+  holidayColor,
   onOpen,
   onPickDay,
 }: SharedProps & {
   anchor: string;
   anchorMonth: string;
   todayKey: string;
+  holidayColor: string;
   onPickDay: (day: string) => void;
 }) {
-  const { t } = useTranslation();
   const theme = useTheme();
   const weekdayHeads = [1, 2, 3, 4, 5, 6, 0];
 
@@ -866,50 +1043,62 @@ function MonthGrid({
           display: "grid",
           gridTemplateColumns: "repeat(7, minmax(120px, 1fr))",
           minWidth: 840,
-          gap: "1px",
-          backgroundColor: "divider",
           border: "1px solid",
           borderColor: "divider",
+          borderRadius: `${DESIGN.radius.xl}px`,
+          overflow: "hidden",
+          bgcolor: "background.paper",
         }}
       >
-        {weekdayHeads.map((d) => (
+        {weekdayHeads.map((d, i) => (
           <Box
             key={"h" + d}
             sx={{
-              backgroundColor: "background.paper",
-              px: 1,
-              py: 0.5,
-              fontWeight: 700,
-              fontSize: 12,
-              textAlign: "center",
+              bgcolor: "action.hover",
+              px: 1.5,
+              py: 1.25,
+              fontWeight: 600,
+              fontSize: 13,
+              borderBottom: "1px solid",
+              borderLeft: i === 0 ? "none" : "1px solid",
+              borderColor: "divider",
             }}
           >
-            {t(`booking.workingHours.weekday.${d}`)}
+            {WEEKDAY_ABBREVIATION[d]}
           </Box>
         ))}
 
-        {days.map((dayKey) => {
+        {days.map((dayKey, index) => {
           const appointments = byDay.get(dayKey) ?? [];
+          const count = appointments.filter((a) => statusTally(a.status) !== "cancelled").length;
           const mark = marks.get(dayKey) ?? OPEN_MARK;
+          const holiday = mark.label === GRID_TEXT.publicHoliday;
           const outsideMonth = dayKey.slice(0, 7) !== anchorMonth;
           const shownHere = appointments.slice(0, MAX_PER_DAY);
           const hidden = appointments.length - shownHere.length;
           const lit = emphasis(dayKey, anchor, "month");
+          const today = dayKey === todayKey;
+          const firstOfMonth = dayKey.slice(8, 10) === "01";
+          const lastRow = index >= days.length - 7;
           return (
             <Box
               key={dayKey}
               data-testid={`month-day-${dayKey}`}
               sx={{
-                backgroundColor: mark.closed
-                  ? "action.hover"
-                  : lit === "week"
-                    ? alpha(theme.palette.primary.main, 0.05)
-                    : "background.paper",
+                minHeight: 104,
+                p: 1,
+                borderLeft: index % 7 === 0 ? "none" : "1px solid",
+                borderBottom: lastRow ? "none" : "1px solid",
+                borderColor: "divider",
+                bgcolor: holiday
+                  ? alpha(holidayColor, 0.1)
+                  : mark.closed
+                    ? "action.hover"
+                    : lit === "week"
+                      ? alpha(theme.palette.primary.main, 0.04)
+                      : "background.paper",
                 boxShadow:
                   lit === "day" ? `inset 0 0 0 2px ${theme.palette.primary.main}` : "none",
-                minHeight: 104,
-                p: 0.5,
-                opacity: outsideMonth ? 0.5 : 1,
               }}
             >
               <Box
@@ -917,7 +1106,7 @@ function MonthGrid({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  mb: 0.5,
+                  mb: 0.75,
                   gap: 0.5,
                 }}
               >
@@ -925,35 +1114,67 @@ function MonthGrid({
                   onClick={() => onPickDay(dayKey)}
                   aria-label={formatDateOnly(dayKey)}
                   sx={{
-                    fontSize: 12,
-                    px: 0.5,
-                    borderRadius: 1,
-                    fontWeight: dayKey === todayKey || mark.redNumber ? 800 : 500,
-                    color: mark.redNumber
-                      ? "error.main"
-                      : dayKey === todayKey
-                        ? "primary.main"
-                        : "text.secondary",
+                    minWidth: 22,
+                    height: 22,
+                    px: today ? 0 : 0.25,
+                    borderRadius: today ? "50%" : 1,
+                    fontSize: 13,
+                    fontWeight: today || mark.redNumber || lit === "day" ? 700 : 500,
+                    bgcolor: today ? "primary.main" : "transparent",
+                    color: today
+                      ? "primary.contrastText"
+                      : mark.redNumber
+                        ? "error.main"
+                        : outsideMonth
+                          ? "text.disabled"
+                          : "text.primary",
                   }}
                 >
-                  {Number(dayKey.slice(8, 10))}.
+                  {firstOfMonth && !today ? shortDate(dayKey) : Number(dayKey.slice(8, 10))}
                 </ButtonBase>
-                {mark.label ? (
+                {holiday ? (
                   <Tooltip title={mark.detail ?? ""}>
+                    <span>
+                      <StatusChip
+                        size="sm"
+                        sx={{ bgcolor: alpha(holidayColor, 0.16), color: holidayColor, letterSpacing: "0.06em" }}
+                      >
+                        {GRID_TEXT.holidayPill}
+                      </StatusChip>
+                    </span>
+                  </Tooltip>
+                ) : mark.closed ? (
+                  <Tooltip title={mark.detail ?? mark.label ?? ""}>
                     <Typography
                       sx={{
                         fontSize: 10,
-                        color: mark.redNumber ? "error.main" : "text.secondary",
-                        textAlign: "right",
+                        fontWeight: 700,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        color: "text.secondary",
                       }}
                     >
+                      {mark.label ?? GRID_TEXT.closedCaps}
+                    </Typography>
+                  </Tooltip>
+                ) : mark.label ? (
+                  <Tooltip title={mark.detail ?? ""}>
+                    <Typography sx={{ fontSize: 10, color: "text.secondary", textAlign: "right" }}>
                       {mark.label}
                     </Typography>
                   </Tooltip>
+                ) : count > 0 ? (
+                  <Typography sx={{ fontSize: 12, color: "text.secondary" }}>{count}</Typography>
                 ) : null}
               </Box>
 
-              <Stack spacing={0.25}>
+              {holiday && mark.detail ? (
+                <Typography sx={{ fontSize: 12, fontWeight: 600, color: holidayColor }}>
+                  {mark.detail}
+                </Typography>
+              ) : null}
+
+              <Stack spacing={0.375}>
                 {shownHere.map((appointment) => (
                   <AppointmentButton
                     key={appointment.id}
@@ -966,7 +1187,7 @@ function MonthGrid({
                 ))}
                 {hidden > 0 ? (
                   <Typography sx={{ fontSize: 11, color: "text.secondary", pl: 0.5 }}>
-                    {t("booking.grid.more", { count: hidden })}
+                    {GRID_TEXT.more(hidden)}
                   </Typography>
                 ) : null}
               </Stack>

@@ -25,6 +25,8 @@ export interface PatientHit {
   fullName: string;
   /** `yyyy-MM-dd`, or null when the row carries none. */
   dateOfBirth: string | null;
+  /** The telephone the register's row carries, when it carries one. */
+  phone?: string | null;
 }
 
 /** Enough to ask the server; fewer letters would page through half the register. */
@@ -107,6 +109,7 @@ export function toHit(row: unknown): PatientHit | null {
     lastName: str('lastName'),
     fullName: str('fullName'),
     dateOfBirth: str('dateOfBirth') ? str('dateOfBirth').slice(0, 10) : null,
+    phone: str('phone') || null,
   };
 }
 

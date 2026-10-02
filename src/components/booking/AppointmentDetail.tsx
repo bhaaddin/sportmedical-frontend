@@ -1,26 +1,37 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
+  Avatar,
   Box,
   Button,
-  Chip,
+  Checkbox,
   Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Divider,
+  FormControlLabel,
+  IconButton,
   Link as MuiLink,
+  MenuItem,
+  Skeleton,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from "@mui/material";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import CloseIcon from "@mui/icons-material/Close";
+import MailOutlineIcon from "@mui/icons-material/EmailOutlined";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import PhoneOutlinedIcon from "@mui/icons-material/PhoneOutlined";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 import { appointmentsApi } from "../../api/appointments";
 import { patientsApi } from "../../api/patients";
 import { activitiesApi } from "../../api/activities";
+import { patientPreRegistrationApi } from "../../api/patientPreRegistration";
 import { BookingApiError } from "../../api/apiError";
 import {
   canChangeStatus,
@@ -29,26 +40,41 @@ import {
   isLateStatus,
   isTerminalStatus,
   statusName,
-  statusTally,
 } from "../../api/bookingContracts";
-import type { Appointment, HistoryLine } from "../../api/bookingContracts";
+import type { Activity, Appointment, HistoryLine } from "../../api/bookingContracts";
 import {
   addDaysToDateOnly,
-  formatPragueDate,
   formatPragueDateTime,
   formatPragueTime,
   isLate,
   pragueDateKey,
 } from "../../utils/time";
+import { DESIGN, SectionLabel, SoftCard, StatusChip } from "../ui";
 import { AsyncSection } from "./AsyncSection";
 import { AvailabilityPanel } from "./AvailabilityPicker";
 import { errorText } from "./errorText";
-import { CompletionLinkButton } from "./patient/CompletionLinkButton";
 import { PortalLinkButton } from "./patient/PortalLinkButton";
 import { usePermission } from "../../auth/usePermission";
+import {
+  STATUS,
+  draftFrom,
+  durationMinutes,
+  formatCzk,
+  formatLongPragueDate,
+  formatShortPragueDateTime,
+  formatWallClock,
+  initials,
+  isOfferedStart,
+  planEdit,
+  reachableStatuses,
+  sourceLabel,
+  statusTone,
+  type EditDraft,
+} from "./appointmentEdit";
 
 /**
- * One appointment, opened from the grid — contract 5.8.
+ * One appointment, opened from the grid — contract 5.8, drawn as the board's
+ * screens 12 (detail) and 13 (edit).
  *
  * It reads `GET .../appointments/{id}` rather than the row the grid already
  * holds. That endpoint did not exist when this screen was first built; the
@@ -69,13 +95,12 @@ import { usePermission } from "../../auth/usePermission";
  * `canChangeStatus`, so a button the server would refuse is never offered. And
  * 4.5 gives an undo to arrival and absence and to nothing else, so cancelling
  * and completing ask before they act rather than promising a way back.
+ *
+ * The edit mode (screen 13) is the same three writes the detail always had -
+ * `/time`, `/status`, cancel - behind one form. There is no endpoint to change
+ * an appointment's činnost, its length or its note, so those fields are shown
+ * as they are and say so rather than pretending.
  */
-
-/** The status codes of 4.5, named where they are used. */
-const SCHEDULED = 0;
-const CHECKED_IN = 2;
-const COMPLETED = 3;
-const NO_SHOW = 5;
 
 /** How far ahead a move looks for free time. The API allows 62 days (4.5). */
 const RESCHEDULE_WINDOW_DAYS = 13;
@@ -99,100 +124,99 @@ export function AppointmentDetail({
   onClose,
   onChanged,
 }: AppointmentDetailProps) {
-  const { t } = useTranslation();
-
   const detailQuery = useQuery({
     queryKey: ["appointment", calendarId, appointmentId],
     queryFn: () => appointmentsApi.get(calendarId, appointmentId),
     enabled: open,
   });
 
-  /* The činnost's price, from the one cached activities list, so the desk sees
-     what the appointment costs without leaving this dialog. */
+  /* The činnost's price and length, from the one cached activities list, so
+     the desk sees what the appointment costs without leaving this dialog. */
   const activitiesQuery = useQuery({
     queryKey: ["activities"],
     queryFn: () => activitiesApi.list(),
     staleTime: 5 * 60 * 1000,
     enabled: open,
   });
-  const activityPrice =
-    activitiesQuery.data?.activities.find((a) => a.id === detailQuery.data?.activityId)?.priceCzk
-    ?? null;
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle sx={{ pb: 1 }}>
-        {detailQuery.data ? (
-          <>
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ alignItems: "center", flexWrap: "wrap" }}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="md"
+      slotProps={{ paper: { sx: { overflow: "hidden" } } }}
+    >
+      {detailQuery.data ? (
+        <DetailBody
+          appointment={detailQuery.data}
+          activities={activitiesQuery.data?.activities ?? []}
+          calendarId={calendarId}
+          calendarName={calendar?.name}
+          onChanged={onChanged}
+          onClose={onClose}
+        />
+      ) : (
+        <>
+          <Box sx={{ p: 3 }}>
+            <AsyncSection
+              isLoading={detailQuery.isLoading}
+              isSettled={detailQuery.isSuccess || detailQuery.isError}
+              error={detailQuery.error}
+              isEmpty={false}
+              emptyText=""
+              onRetry={() => void detailQuery.refetch()}
+              skeletonRows={5}
             >
-              <Box component="span" sx={{ fontWeight: 700 }}>
-                {formatPragueTime(detailQuery.data.startUtc)}–
-                {formatPragueTime(detailQuery.data.endUtc)}
-              </Box>
-              <Box
-                component="span"
-                sx={{ color: "text.secondary", fontSize: 14 }}
-              >
-                {formatPragueDate(detailQuery.data.startUtc)}
-              </Box>
-            </Stack>
-            <Typography
-              variant="body2"
-              sx={{ color: "text.secondary", mt: 0.5 }}
-            >
-              {/* Empty when the activity is gone (4.5) - say so, do not print nothing. */}
-              {detailQuery.data.activityName || t("booking.detail.noActivity")}
-              {calendar ? ` · ${calendar.name}` : ""}
-              {activityPrice != null
-                ? ` · ${new Intl.NumberFormat("cs-CZ").format(activityPrice)} Kč`
-                : ""}
-            </Typography>
-          </>
-        ) : (
-          t("booking.detail.title")
-        )}
-      </DialogTitle>
-
-      <DialogContent dividers>
-        <AsyncSection
-          isLoading={detailQuery.isLoading}
-          isSettled={detailQuery.isSuccess || detailQuery.isError}
-          error={detailQuery.error}
-          isEmpty={false}
-          emptyText=""
-          onRetry={() => void detailQuery.refetch()}
-          skeletonRows={5}
-        >
-          {detailQuery.data ? (
-            <DetailBody
-              appointment={detailQuery.data}
-              calendarId={calendarId}
-              onChanged={onChanged}
-              onClose={onClose}
-            />
-          ) : null}
-        </AsyncSection>
-      </DialogContent>
-
-      <DialogActions>
-        <Button onClick={onClose}>{t("booking.detail.close")}</Button>
-      </DialogActions>
+              {null}
+            </AsyncSection>
+          </Box>
+          <Footer>
+            <Box />
+            <Button variant="outlined" onClick={onClose}>
+              Zavřít
+            </Button>
+          </Footer>
+        </>
+      )}
     </Dialog>
+  );
+}
+
+/* ── Layout pieces shared by both modes ── */
+
+function Footer({ children }: { children: React.ReactNode }) {
+  return (
+    <Stack
+      direction="row"
+      sx={{
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 2,
+        px: 3,
+        py: 2,
+        borderTop: "1px solid",
+        borderColor: "divider",
+        bgcolor: "background.default",
+      }}
+    >
+      {children}
+    </Stack>
   );
 }
 
 function DetailBody({
   appointment,
+  activities,
   calendarId,
+  calendarName,
   onChanged,
   onClose,
 }: {
   appointment: Appointment;
+  activities: Activity[];
   calendarId: string;
+  calendarName?: string;
   onChanged: () => void;
   onClose: () => void;
 }) {
@@ -201,6 +225,7 @@ function DetailBody({
   const mayEdit = usePermission("bookings.edit");
   const mayCancel = usePermission("bookings.cancel");
 
+  const [mode, setMode] = useState<"view" | "edit">("view");
   const [cancelling, setCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [moving, setMoving] = useState(false);
@@ -212,9 +237,12 @@ function DetailBody({
    */
   const [conflict, setConflict] = useState<unknown>(null);
 
+  const hasPatient = appointment.patientId !== "";
+
   const patientQuery = useQuery({
     queryKey: ["patient", appointment.patientId],
     queryFn: () => patientsApi.getById(appointment.patientId),
+    enabled: hasPatient,
   });
   /* The list entry above has no contacts; phone and e-mail live on the
      patient's profile, which is what the booking dialog fills the card
@@ -223,24 +251,30 @@ function DetailBody({
   const profileQuery = useQuery({
     queryKey: ["patient-profile", appointment.patientId],
     queryFn: () => patientsApi.getProfile(appointment.patientId),
+    enabled: hasPatient,
   });
-  const phone: string | undefined = profileQuery.data?.phone ?? patientQuery.data?.phone;
+  const phone: string | undefined =
+    profileQuery.data?.phone ?? patientQuery.data?.phone ?? appointment.unregisteredPhone ?? undefined;
   const email: string | undefined = profileQuery.data?.email ?? patientQuery.data?.email;
+  const patientName = hasPatient
+    ? patientQuery.data
+      ? (patientQuery.data.fullName ??
+        `${patientQuery.data.firstName} ${patientQuery.data.lastName}`)
+      : null
+    : (appointment.unregisteredName ?? null);
 
   const historyQuery = useQuery({
     queryKey: ["appointment-history", calendarId, appointment.id],
     queryFn: () => appointmentsApi.history(calendarId, appointment.id),
   });
 
-  const late = isLate(
-    appointment.startUtc,
-    isLateStatus(appointment.status),
-    new Date(),
-  );
+  const activity = activities.find((a) => a.id === appointment.activityId) ?? null;
+  const price = activity?.priceCzk ?? null;
+  const minutes = durationMinutes(appointment.startUtc, appointment.endUtc);
+
+  const late = isLate(appointment.startUtc, isLateStatus(appointment.status), new Date());
   const name = statusName(appointment.status);
-  const statusLabel = name
-    ? t(`booking.status.${name}`)
-    : t("booking.status.unknown");
+  const statusLabel = name ? t(`booking.status.${name}`) : t("booking.status.unknown");
 
   const afterWrite = () => {
     setConflict(null);
@@ -278,8 +312,7 @@ function DetailBody({
   });
 
   const cancelMutation = useMutation({
-    mutationFn: (reason: string) =>
-      appointmentsApi.cancel(calendarId, appointment.id, reason),
+    mutationFn: (reason: string) => appointmentsApi.cancel(calendarId, appointment.id, reason),
     onSuccess: () => {
       afterWrite();
       onClose();
@@ -294,348 +327,682 @@ function DetailBody({
     onError: onWriteError,
   });
 
+  /**
+   * "Uložit změny": the time and the status are two calls on the server, made
+   * in that order so a move that is refused leaves the status as it was.
+   */
+  const saveMutation = useMutation({
+    mutationFn: async (plan: { startUtc: string | null; status: number | null }) => {
+      if (plan.startUtc) {
+        await appointmentsApi.reschedule(calendarId, appointment.id, plan.startUtc);
+      }
+      if (plan.status !== null) {
+        await appointmentsApi.setStatus(calendarId, appointment.id, String(plan.status));
+      }
+    },
+    onSuccess: () => {
+      afterWrite();
+      setMode("view");
+    },
+    onError: onWriteError,
+  });
+
   const busy =
     statusMutation.isPending ||
     cancelMutation.isPending ||
-    rescheduleMutation.isPending;
+    rescheduleMutation.isPending ||
+    saveMutation.isPending;
+
+  const terminal = isTerminalStatus(appointment.status);
+
+  const cancelBox =
+    cancelling && mayCancel ? (
+      <Box
+        sx={{
+          border: "1px solid",
+          borderColor: DESIGN.tone.red.line,
+          bgcolor: DESIGN.tone.red.bg,
+          borderRadius: 2.5,
+          p: 2,
+        }}
+      >
+        <Typography variant="body2" sx={{ mb: 1, color: DESIGN.tone.red.fg }}>
+          {t("booking.detail.cancelIsFinal")}
+        </Typography>
+        <TextField
+          fullWidth
+          size="small"
+          autoFocus
+          label={t("booking.detail.reason")}
+          value={cancelReason}
+          onChange={(e) => setCancelReason(e.target.value)}
+        />
+        {cancelMutation.error && !conflict ? (
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {errorText(cancelMutation.error, t)}
+          </Alert>
+        ) : null}
+        <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+          <Button
+            size="small"
+            color="error"
+            variant="contained"
+            disabled={cancelReason.trim().length === 0 || busy}
+            onClick={() => cancelMutation.mutate(cancelReason.trim())}
+          >
+            {t("booking.detail.cancelConfirm")}
+          </Button>
+          <Button size="small" variant="outlined" onClick={() => setCancelling(false)}>
+            {t("booking.detail.keep")}
+          </Button>
+        </Stack>
+      </Box>
+    ) : null;
+
+  if (mode === "edit") {
+    return (
+      <EditMode
+        appointment={appointment}
+        activities={activities}
+        activity={activity}
+        calendarId={calendarId}
+        patientName={patientName}
+        note={appointment.note}
+        busy={busy}
+        conflict={conflict}
+        error={saveMutation.error}
+        mayCancel={mayCancel}
+        onBack={() => {
+          setConflict(null);
+          setMode("view");
+        }}
+        onClose={onClose}
+        onSave={(plan) => saveMutation.mutate(plan)}
+        onCancelRequest={() => {
+          setMode("view");
+          setCancelling(true);
+        }}
+      />
+    );
+  }
 
   return (
-    <Stack spacing={2}>
-      {/* Status in words, never colour alone (7.1). */}
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
-        <Chip
-          size="small"
-          label={statusLabel}
-          color={
-            statusTally(appointment.status) === "cancelled"
-              ? "default"
-              : "primary"
-          }
-        />
-        {late ? (
-          <Chip size="small" color="warning" label={t("booking.status.late")} />
-        ) : null}
-        {/*
-          4.5, v27: completing an appointment now keeps this. Until then the
-          transition wiped it, so "přišel v 9:12" stopped being true the moment
-          the visit ended.
-        */}
-        {appointment.checkedInUtc ? (
-          <Chip
-            size="small"
-            variant="outlined"
-            label={`${t("booking.detail.checkedInAt")} ${formatPragueTime(
-              appointment.checkedInUtc,
-            )}`}
-          />
-        ) : null}
-        {appointment.heldUntilUtc ? (
-          <Chip
-            size="small"
-            color="info"
-            label={`${t("booking.detail.heldUntil")} ${formatPragueTime(
-              appointment.heldUntilUtc,
-            )}`}
-          />
-        ) : null}
+    <>
+      {/* ── Header: the 3px accent edge, the time, the day, the činnost ── */}
+      <Stack
+        direction="row"
+        sx={{
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 2,
+          px: 3,
+          pt: 2.5,
+          pb: 2,
+          borderBottom: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <Box sx={{ borderLeft: "3px solid", borderColor: "primary.main", pl: 2, minWidth: 0 }}>
+          <Typography
+            component="h2"
+            sx={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.2 }}
+          >
+            {formatPragueTime(appointment.startUtc)} — {formatPragueTime(appointment.endUtc)}
+          </Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
+            {formatLongPragueDate(appointment.startUtc)} · {minutes} minut
+          </Typography>
+          <Typography sx={{ fontWeight: 600, fontSize: 15, mt: 0.5 }}>
+            {/* Empty when the activity is gone (4.5) - say so, do not print nothing. */}
+            {appointment.activityName || t("booking.detail.noActivity")}
+            {calendarName ? (
+              <Box component="span" sx={{ color: "text.secondary", fontWeight: 400 }}>
+                {" "}
+                · {calendarName}
+              </Box>
+            ) : null}
+          </Typography>
+        </Box>
+
+        <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {/* Status in words, never colour alone (7.1). */}
+          <StatusChip tone={statusTone(appointment.status)} dot>
+            {statusLabel}
+          </StatusChip>
+          {late ? <StatusChip tone="beige">{t("booking.status.late")}</StatusChip> : null}
+          {/*
+            4.5, v27: completing an appointment now keeps this. Until then the
+            transition wiped it, so "přišel v 9:12" stopped being true the moment
+            the visit ended.
+          */}
+          {appointment.checkedInUtc ? (
+            <StatusChip tone="grey">
+              {t("booking.detail.checkedInAt")} {formatPragueTime(appointment.checkedInUtc)}
+            </StatusChip>
+          ) : null}
+          {appointment.heldUntilUtc ? (
+            <StatusChip tone="blue">
+              {t("booking.detail.heldUntil")} {formatPragueTime(appointment.heldUntilUtc)}
+            </StatusChip>
+          ) : null}
+          {appointment.paperwork?.ready ? (
+            <StatusChip tone="green">Podklady v pořádku</StatusChip>
+          ) : null}
+          <IconButton aria-label="Zavřít" onClick={onClose} size="small" sx={{ ml: 0.5 }}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Stack>
       </Stack>
 
-      {/*
-        4.5, v29; live since v32. Rendered only when there is an answer - see
-        `paperworkSchema`. When the register does not know the patient this
-        whole block is absent rather than reassuring.
-      */}
-      {appointment.paperwork ? (
-        <Alert severity={appointment.paperwork.ready ? "success" : "warning"}>
-          {appointment.paperwork.ready
-            ? t("booking.paperwork.ready")
-            : appointment.paperwork.missing
-                .map((code) =>
-                  isKnownPaperworkReason(code)
-                    ? t(`booking.paperwork.${code}`)
-                    : /* An unknown reason is shown as unknown, never dropped. */
-                      t("booking.paperwork.unknown", { code }),
-                )
-                .join(" · ")}
-        </Alert>
-      ) : null}
-
-      {/* The completion link, so the desk can (re)send it while registration is unfinished. */}
-      {appointment.paperwork && !appointment.paperwork.ready ? (
-        <CompletionLinkButton patientId={appointment.patientId} />
-      ) : null}
-
-      {/* The patient's personal portal link, issuable straight from the booking. */}
-      <PortalLinkButton patientId={appointment.patientId} />
-
-      {/* 6.4: an override was made by a person, for a reason they typed. */}
-      {appointment.overrideReason ? (
-        <Alert severity="warning">
-          {t("booking.detail.overridden")}: {appointment.overrideReason}
-        </Alert>
-      ) : null}
-
-      {/* ── Patient and contact (5.8) ── */}
-      <Box>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-          {t("booking.detail.patient")}
-        </Typography>
-        <AsyncSection
-          isLoading={patientQuery.isLoading}
-          error={patientQuery.error}
-          isSettled={patientQuery.isSuccess || patientQuery.isError}
-          isEmpty={!patientQuery.data}
-          emptyText={t("booking.detail.patientMissing")}
-          onRetry={() => void patientQuery.refetch()}
-          skeletonRows={2}
-        >
-          {patientQuery.data ? (
-            <Stack spacing={0.5}>
-              <MuiLink
-                component={RouterLink}
-                to={`/patients/${appointment.patientId}`}
-                sx={{ fontWeight: 600 }}
-              >
-                {patientQuery.data.fullName ??
-                  `${patientQuery.data.firstName} ${patientQuery.data.lastName}`}
-              </MuiLink>
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                {phone || t("booking.detail.noPhone")}
-                {" · "}
-                {email || t("booking.detail.noEmail")}
-              </Typography>
-            </Stack>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" } }}>
+        {/* ── Left column ── */}
+        <Stack spacing={2.5} sx={{ flex: 1, minWidth: 0, p: 3 }}>
+          {/*
+            4.5, v29; live since v32. Rendered only when there is an answer - see
+            `paperworkSchema`. When the register does not know the patient this
+            whole block is absent rather than reassuring.
+          */}
+          {appointment.paperwork && !appointment.paperwork.ready ? (
+            <RegistrationWarning
+              patientId={appointment.patientId}
+              email={email}
+              reasons={appointment.paperwork.missing.map((code) =>
+                isKnownPaperworkReason(code)
+                  ? t(`booking.paperwork.${code}`)
+                  : /* An unknown reason is shown as unknown, never dropped. */
+                    t("booking.paperwork.unknown", { code }),
+              )}
+            />
           ) : null}
-        </AsyncSection>
-      </Box>
 
-      {/* ── The desk's note (5.8, v26) ── */}
-      <Box>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-          {t("booking.detail.note")}
-        </Typography>
-        <Typography
-          variant="body2"
+          {/* 6.4: an override was made by a person, for a reason they typed. */}
+          {appointment.overrideReason ? (
+            <Alert severity="warning">
+              {t("booking.detail.overridden")}: {appointment.overrideReason}
+            </Alert>
+          ) : null}
+
+          {/* ── Patient and contact (5.8) ── */}
+          <SoftCard sx={{ p: 2 }}>
+            {hasPatient && patientQuery.isLoading ? (
+              <Stack direction="row" spacing={2} sx={{ alignItems: "center" }} aria-busy="true">
+                <Skeleton variant="circular" width={44} height={44} />
+                <Box sx={{ flex: 1 }}>
+                  <Skeleton width="40%" />
+                  <Skeleton width="60%" />
+                </Box>
+              </Stack>
+            ) : hasPatient && patientQuery.isError ? (
+              <Alert
+                severity="error"
+                action={
+                  <Button color="inherit" size="small" onClick={() => void patientQuery.refetch()}>
+                    {t("booking.common.retry")}
+                  </Button>
+                }
+              >
+                {t("booking.detail.patientMissing")}
+              </Alert>
+            ) : (
+              <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+                <Avatar sx={{ width: 44, height: 44, fontSize: 15 }}>{initials(patientName)}</Avatar>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  {hasPatient ? (
+                    <MuiLink
+                      component={RouterLink}
+                      to={`/patients/${appointment.patientId}`}
+                      underline="hover"
+                      sx={{ fontWeight: 700, fontSize: 16, color: "text.primary" }}
+                    >
+                      {patientName ?? t("booking.detail.patient")}
+                    </MuiLink>
+                  ) : (
+                    <Typography sx={{ fontWeight: 700, fontSize: 16 }}>
+                      {patientName ?? "Bez pacienta"}
+                    </Typography>
+                  )}
+                  <Typography variant="body2" sx={{ color: "text.secondary" }} noWrap>
+                    {phone || t("booking.detail.noPhone")}
+                    {" · "}
+                    {email || t("booking.detail.noEmail")}
+                  </Typography>
+                </Box>
+                <Stack direction="row" spacing={1}>
+                  <ContactButton label="Zavolat" href={phone ? `tel:${phone}` : undefined}>
+                    <PhoneOutlinedIcon fontSize="small" />
+                  </ContactButton>
+                  <ContactButton label="Napsat e-mail" href={email ? `mailto:${email}` : undefined}>
+                    <MailOutlineIcon fontSize="small" />
+                  </ContactButton>
+                  <ContactButton
+                    label="Otevřít kartu pacienta"
+                    to={hasPatient ? `/patients/${appointment.patientId}` : undefined}
+                  >
+                    <OpenInNewIcon fontSize="small" />
+                  </ContactButton>
+                </Stack>
+              </Stack>
+            )}
+          </SoftCard>
+
+          {/* ── CENA · PLATBA · ZDROJ ── */}
+          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 2 }}>
+            <Fact label="Cena" value={price != null ? formatCzk(price) : "—"} />
+            {/* No billing endpoint answers per appointment yet; a dash is honest. */}
+            <Fact label="Platba" value="—" muted />
+            <Fact label="Zdroj" value={sourceLabel(appointment.source)} />
+          </Box>
+
+          {/* ── The desk's note (5.8, v26) - written at booking, read here ── */}
+          <Box>
+            <SectionLabel>Poznámka</SectionLabel>
+            <TextField
+              fullWidth
+              multiline
+              minRows={2}
+              value={appointment.note ?? ""}
+              placeholder={t("booking.detail.noNote")}
+              slotProps={{ input: { readOnly: true } }}
+            />
+          </Box>
+
+          {conflict ? (
+            /* 6.3: calm, no red, and the form stays exactly as it was. */
+            <Alert severity="info" onClose={() => setConflict(null)}>
+              {errorText(conflict, t)}
+            </Alert>
+          ) : null}
+
+          {statusMutation.error && !conflict ? (
+            <Alert severity="error">{errorText(statusMutation.error, t)}</Alert>
+          ) : null}
+
+          {/* ── Moving, which only ever offers what the server offered (6.1) ── */}
+          {moving ? (
+            <AvailabilityPanel
+              title={t("booking.detail.moveTo")}
+              calendarId={calendarId}
+              activityId={appointment.activityId}
+              from={pragueDateKey(appointment.startUtc)}
+              to={addDaysToDateOnly(pragueDateKey(appointment.startUtc), RESCHEDULE_WINDOW_DAYS)}
+              excludeStartUtc={appointment.startUtc}
+              busy={busy}
+              onPick={(startUtc) => rescheduleMutation.mutate(startUtc)}
+              emptyText={t("booking.detail.noFreeTime")}
+              /*
+                A conflict already has its own calm line above (6.3); passing it
+                down as well printed the server's sentence twice. Only a real
+                failure belongs inside the panel.
+              */
+              error={conflict ? null : rescheduleMutation.error}
+            />
+          ) : null}
+
+          {/* The patient's personal portal link, issuable straight from the booking. */}
+          {hasPatient ? (
+            <Box>
+              <SectionLabel>Portál pacienta</SectionLabel>
+              <PortalLinkButton patientId={appointment.patientId} />
+            </Box>
+          ) : null}
+        </Stack>
+
+        {/* ── Right rail: arrival, the slot, cancelling ── */}
+        <Stack
+          spacing={2.5}
           sx={{
-            color: appointment.note ? "text.primary" : "text.secondary",
-            whiteSpace: "pre-wrap",
+            width: { xs: "auto", md: 300 },
+            flexShrink: 0,
+            p: 3,
+            borderLeft: { md: "1px solid" },
+            borderTop: { xs: "1px solid", md: "none" },
+            borderColor: { xs: "divider", md: "divider" },
+            bgcolor: "background.default",
           }}
         >
-          {/*
-            The note can only be written when the appointment is booked (4.5).
-            Saying so is the point: an empty line would read as "this patient
-            said nothing", not as "this screen cannot edit it".
-          */}
-          {appointment.note || t("booking.detail.noNote")}
-        </Typography>
-      </Box>
+          {!mayEdit && !mayCancel ? (
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              {t("booking.detail.noActionsAllowed")}
+            </Typography>
+          ) : null}
 
-      {/* ── Actions (5.8) ── */}
-      <Box>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-          {t("booking.common.actions")}
-        </Typography>
-        {!mayEdit && !mayCancel ? (
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            {t("booking.detail.noActionsAllowed")}
-          </Typography>
-        ) : null}
-        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
           {/* Arrival, finishing and moving are bookings.edit on the server,
               cancelling is bookings.cancel; what the account lacks is not
               offered, rather than offered and then refused. */}
           {mayEdit ? (
             <>
-              <StatusButton
-                label={t("booking.detail.arrived")}
-                to={CHECKED_IN}
-                from={appointment.status}
-                disabled={busy}
-                onClick={() => statusMutation.mutate({ to: CHECKED_IN })}
-              />
-              <StatusButton
-                label={t("booking.detail.noShow")}
-                to={NO_SHOW}
-                from={appointment.status}
-                disabled={busy}
-                /*
-                 * `2 -> 5` is allowed on purpose — it is how a mis-click gets
-                 * corrected — but marking a patient who is standing at the desk
-                 * as absent deserves a question first (4.5, v23).
-                 */
-                confirmText={
-                  appointment.status === CHECKED_IN
-                    ? t("booking.detail.confirmNoShow")
-                    : undefined
-                }
-                onClick={() => statusMutation.mutate({ to: NO_SHOW })}
-              />
-              <StatusButton
-                label={t("booking.detail.undo")}
-                to={SCHEDULED}
-                from={appointment.status}
-                disabled={busy}
-                onClick={() => statusMutation.mutate({ to: SCHEDULED })}
-              />
-              <StatusButton
-                label={t("booking.detail.complete")}
-                to={COMPLETED}
-                from={appointment.status}
-                disabled={busy}
-                confirmText={t("booking.detail.confirmComplete")}
-                onClick={() => statusMutation.mutate({ to: COMPLETED })}
-              />
-              {/*
-                A completed or cancelled appointment cannot be moved - the server
-                answers `409`, which is right, but offering the button and then
-                refusing it wastes somebody's click and teaches them nothing.
-                Found in the browser: the move panel opened on a finished
-                appointment and listed times it could never accept.
-              */}
-              <Tooltip
-                title={
-                  isTerminalStatus(appointment.status)
-                    ? t("booking.detail.notAllowed")
-                    : ""
-                }
-              >
-                <Box component="span">
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    disabled={busy || isTerminalStatus(appointment.status)}
-                    onClick={() => {
-                      setConflict(null);
-                      setMoving((was) => !was);
-                    }}
-                  >
-                    {t("booking.detail.move")}
-                  </Button>
-                </Box>
-              </Tooltip>
+              <Box>
+                <SectionLabel>Příchod</SectionLabel>
+                <Stack spacing={1}>
+                  <StatusButton
+                    label={t("booking.detail.arrived")}
+                    to={STATUS.checkedIn}
+                    from={appointment.status}
+                    disabled={busy}
+                    variant="contained"
+                    onClick={() => statusMutation.mutate({ to: STATUS.checkedIn })}
+                  />
+                  <StatusButton
+                    label={t("booking.detail.noShow")}
+                    to={STATUS.noShow}
+                    from={appointment.status}
+                    disabled={busy}
+                    /*
+                     * `2 -> 5` is allowed on purpose — it is how a mis-click gets
+                     * corrected — but marking a patient who is standing at the desk
+                     * as absent deserves a question first (4.5, v23).
+                     */
+                    confirmText={
+                      appointment.status === STATUS.checkedIn
+                        ? t("booking.detail.confirmNoShow")
+                        : undefined
+                    }
+                    onClick={() => statusMutation.mutate({ to: STATUS.noShow })}
+                  />
+                  {canChangeStatus(appointment.status, STATUS.completed) ? (
+                    <StatusButton
+                      label={t("booking.detail.complete")}
+                      to={STATUS.completed}
+                      from={appointment.status}
+                      disabled={busy}
+                      confirmText={t("booking.detail.confirmComplete")}
+                      onClick={() => statusMutation.mutate({ to: STATUS.completed })}
+                    />
+                  ) : null}
+                  {canChangeStatus(appointment.status, STATUS.scheduled) ? (
+                    <StatusButton
+                      label={t("booking.detail.undo")}
+                      to={STATUS.scheduled}
+                      from={appointment.status}
+                      disabled={busy}
+                      onClick={() => statusMutation.mutate({ to: STATUS.scheduled })}
+                    />
+                  ) : null}
+                </Stack>
+              </Box>
+
+              <Box>
+                <SectionLabel>Termín</SectionLabel>
+                <Stack spacing={1}>
+                  {/*
+                    A completed or cancelled appointment cannot be moved - the server
+                    answers `409`, which is right, but offering the button and then
+                    refusing it wastes somebody's click and teaches them nothing.
+                  */}
+                  <Tooltip title={terminal ? t("booking.detail.notAllowed") : ""}>
+                    <Box component="span" sx={{ display: "block" }}>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        disabled={busy || terminal}
+                        onClick={() => {
+                          setConflict(null);
+                          setMoving(false);
+                          setMode("edit");
+                        }}
+                      >
+                        Upravit
+                      </Button>
+                    </Box>
+                  </Tooltip>
+                  <Tooltip title={terminal ? t("booking.detail.notAllowed") : ""}>
+                    <Box component="span" sx={{ display: "block" }}>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        disabled={busy || terminal}
+                        onClick={() => {
+                          setConflict(null);
+                          setMoving((was) => !was);
+                        }}
+                      >
+                        {t("booking.detail.move")}
+                      </Button>
+                    </Box>
+                  </Tooltip>
+                </Stack>
+              </Box>
             </>
           ) : null}
+
           {mayCancel ? (
-            <Button
-              size="small"
-              color="error"
-              variant="outlined"
-              disabled={busy || !canChangeStatus(appointment.status, 4)}
-              onClick={() => setCancelling((was) => !was)}
-            >
-              {t("booking.detail.cancel")}
-            </Button>
+            <Stack spacing={1.5} sx={{ pt: mayEdit ? 1 : 0 }}>
+              <Button
+                fullWidth
+                color="error"
+                variant="outlined"
+                disabled={busy || !canChangeStatus(appointment.status, STATUS.cancelled)}
+                onClick={() => setCancelling((was) => !was)}
+              >
+                {t("booking.detail.cancel")}
+              </Button>
+              {/* ── Cancelling, which 5.8 makes conditional on a reason ── */}
+              {cancelBox}
+            </Stack>
           ) : null}
         </Stack>
       </Box>
 
-      {conflict ? (
-        /* 6.3: calm, no red, and the form stays exactly as it was. */
-        <Alert severity="info" onClose={() => setConflict(null)}>
-          {errorText(conflict, t)}
-        </Alert>
-      ) : null}
-
-      {statusMutation.error && !conflict ? (
-        <Alert severity="error">{errorText(statusMutation.error, t)}</Alert>
-      ) : null}
-
-      {/* ── Cancelling, which 5.8 makes conditional on a reason ── */}
-      {cancelling ? (
-        <Box
-          sx={{
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 2,
-            p: 2,
-          }}
-        >
-          <Typography variant="body2" sx={{ mb: 1 }}>
-            {t("booking.detail.cancelIsFinal")}
-          </Typography>
-          <TextField
-            fullWidth
-            size="small"
-            autoFocus
-            label={t("booking.detail.reason")}
-            value={cancelReason}
-            onChange={(e) => setCancelReason(e.target.value)}
-          />
-          {cancelMutation.error && !conflict ? (
-            <Alert severity="error" sx={{ mt: 1 }}>
-              {errorText(cancelMutation.error, t)}
-            </Alert>
-          ) : null}
-          <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
-            <Button
-              size="small"
-              color="error"
-              variant="contained"
-              disabled={cancelReason.trim().length === 0 || busy}
-              onClick={() => cancelMutation.mutate(cancelReason.trim())}
-            >
-              {t("booking.detail.cancelConfirm")}
-            </Button>
-            <Button size="small" onClick={() => setCancelling(false)}>
-              {t("booking.detail.keep")}
-            </Button>
-          </Stack>
+      {/* ── Footer: history on the left, the way out on the right ── */}
+      <Footer>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <SectionLabel sx={{ mb: 0.75 }}>{t("booking.detail.history")}</SectionLabel>
+          <AsyncSection
+            isLoading={historyQuery.isLoading}
+            error={historyQuery.error}
+            isSettled={historyQuery.isSuccess || historyQuery.isError}
+            isEmpty={(historyQuery.data ?? []).length === 0}
+            emptyText={t("booking.detail.historyEmpty")}
+            onRetry={() => void historyQuery.refetch()}
+            skeletonRows={2}
+          >
+            <Stack component="ul" spacing={0.5} sx={{ listStyle: "none", p: 0, m: 0 }}>
+              {[...(historyQuery.data ?? [])]
+                .sort((a, b) => new Date(b.atUtc).getTime() - new Date(a.atUtc).getTime())
+                .map((line, index) => (
+                  <HistoryRow key={`${line.atUtc}-${index}`} line={line} />
+                ))}
+            </Stack>
+          </AsyncSection>
         </Box>
-      ) : null}
+        <Button variant="outlined" onClick={onClose} sx={{ flexShrink: 0 }}>
+          {t("booking.detail.close")}
+        </Button>
+      </Footer>
+    </>
+  );
+}
 
-      {/* ── Moving, which only ever offers what the server offered (6.1) ── */}
-      {moving ? (
-        <AvailabilityPanel
-          title={t("booking.detail.moveTo")}
-          calendarId={calendarId}
-          activityId={appointment.activityId}
-          from={pragueDateKey(appointment.startUtc)}
-          to={addDaysToDateOnly(
-            pragueDateKey(appointment.startUtc),
-            RESCHEDULE_WINDOW_DAYS,
-          )}
-          excludeStartUtc={appointment.startUtc}
-          busy={busy}
-          onPick={(startUtc) => rescheduleMutation.mutate(startUtc)}
-          emptyText={t("booking.detail.noFreeTime")}
-          /*
-            A conflict already has its own calm line above (6.3); passing it
-            down as well printed the server's sentence twice. Only a real
-            failure belongs inside the panel.
-          */
-          error={conflict ? null : rescheduleMutation.error}
-        />
-      ) : null}
+/** A label in small caps over a value - CENA, PLATBA, ZDROJ. */
+function Fact({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) {
+  return (
+    <Box>
+      <SectionLabel sx={{ mb: 0.25 }}>{label}</SectionLabel>
+      <Typography sx={{ fontWeight: 600, fontSize: 15, color: muted ? "text.secondary" : "text.primary" }}>
+        {value}
+      </Typography>
+    </Box>
+  );
+}
 
-      <Divider />
+/** The square icon buttons on the patient card: phone, mail, open. */
+function ContactButton({
+  label,
+  href,
+  to,
+  children,
+}: {
+  label: string;
+  href?: string;
+  to?: string;
+  children: React.ReactNode;
+}) {
+  const sx = {
+    width: 44,
+    height: 44,
+    border: "1px solid",
+    borderColor: "divider",
+    borderRadius: 2,
+    bgcolor: "background.paper",
+    color: "text.primary",
+  } as const;
+  const disabled = !href && !to;
+  const button = to ? (
+    <IconButton aria-label={label} component={RouterLink} to={to} sx={sx}>
+      {children}
+    </IconButton>
+  ) : href ? (
+    <IconButton aria-label={label} href={href} sx={sx}>
+      {children}
+    </IconButton>
+  ) : (
+    <IconButton aria-label={label} disabled sx={sx}>
+      {children}
+    </IconButton>
+  );
+  return disabled ? (
+    button
+  ) : (
+    <Tooltip title={label}>{button}</Tooltip>
+  );
+}
 
-      {/* ── History (5.8): newest first ── */}
-      <Box>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-          {t("booking.detail.history")}
-        </Typography>
-        <AsyncSection
-          isLoading={historyQuery.isLoading}
-          error={historyQuery.error}
-          isSettled={historyQuery.isSuccess || historyQuery.isError}
-          isEmpty={(historyQuery.data ?? []).length === 0}
-          emptyText={t("booking.detail.historyEmpty")}
-          onRetry={() => void historyQuery.refetch()}
-          skeletonRows={3}
-        >
-          <Stack spacing={1.5}>
-            {[...(historyQuery.data ?? [])]
-              .sort(
-                (a, b) =>
-                  new Date(b.atUtc).getTime() - new Date(a.atUtc).getTime(),
-              )
-              .map((line, index) => (
-                <HistoryRow key={`${line.atUtc}-${index}`} line={line} />
-              ))}
-          </Stack>
-        </AsyncSection>
-      </Box>
-    </Stack>
+/**
+ * The beige card: registration is unfinished. "Zkopírovat odkaz" issues the
+ * patient's 24-hour completion link and puts it on the clipboard; "Poslat
+ * znovu" issues it and opens the desk's own mail client with it, because
+ * nothing here sends mail by itself yet.
+ */
+function RegistrationWarning({
+  patientId,
+  email,
+  reasons,
+}: {
+  patientId: string;
+  email?: string;
+  reasons: string[];
+}) {
+  const [link, setLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const issue = useMutation({
+    mutationFn: async () => {
+      const issued = await patientPreRegistrationApi.issueLink(patientId);
+      return issued.url ?? `${window.location.origin}${issued.path}`;
+    },
+    onSuccess: (full) => setLink(full),
+  });
+
+  const copyLink = async () => {
+    const full = link ?? (await issue.mutateAsync().catch(() => null));
+    if (!full) return;
+    try {
+      await navigator.clipboard.writeText(full);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard blocked; the address is on screen to copy by hand */
+    }
+  };
+
+  const sendAgain = async () => {
+    const full = link ?? (await issue.mutateAsync().catch(() => null));
+    if (!full || !email) return;
+    const subject = encodeURIComponent("Dokončení registrace");
+    const body = encodeURIComponent(
+      `Dobrý den,\n\ndokončete prosím registraci na tomto odkazu:\n${full}\n\nOdkaz platí 24 hodin.`,
+    );
+    window.open(`mailto:${email}?subject=${subject}&body=${body}`, "_self");
+  };
+
+  const canSend = Boolean(email) && patientId !== "";
+
+  return (
+    <Box
+      sx={{
+        bgcolor: DESIGN.tone.beige.bg,
+        border: "1px solid",
+        borderColor: DESIGN.tone.beige.line,
+        borderRadius: 3,
+        p: 2,
+        color: DESIGN.tone.beige.fg,
+      }}
+    >
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+        <WarningAmberIcon fontSize="small" sx={{ mt: 0.25 }} />
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Registrace není dokončena</Typography>
+          <Typography variant="body2" sx={{ mt: 0.25 }}>
+            {reasons.length === 1 && reasons[0] === "Chybí dotazník"
+              ? "Pacient zatím nevyplnil vstupní dotazník."
+              : reasons.join(" · ")}
+          </Typography>
+          {patientId !== "" ? (
+            <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: "wrap", gap: 1 }}>
+              <Button
+                variant="contained"
+                size="small"
+                disabled={issue.isPending}
+                onClick={() => void copyLink()}
+                sx={{
+                  bgcolor: DESIGN.tone.beige.fg,
+                  color: "#FFFFFF",
+                  "&:hover": { bgcolor: DESIGN.tone.beige.fg },
+                }}
+              >
+                {copied ? "Zkopírováno" : "Zkopírovat odkaz na registraci"}
+              </Button>
+              <Tooltip title={canSend ? "" : "Pacient nemá uvedený e-mail."}>
+                <Box component="span">
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={issue.isPending || !canSend}
+                    onClick={() => void sendAgain()}
+                    sx={{
+                      color: DESIGN.tone.beige.fg,
+                      borderColor: DESIGN.tone.beige.line,
+                      bgcolor: "transparent",
+                    }}
+                  >
+                    Poslat znovu
+                  </Button>
+                </Box>
+              </Tooltip>
+            </Stack>
+          ) : null}
+          {link ? (
+            <Box
+              sx={{
+                mt: 1.5,
+                fontFamily: "monospace",
+                fontSize: 12,
+                wordBreak: "break-all",
+                bgcolor: "background.paper",
+                border: "1px solid",
+                borderColor: DESIGN.tone.beige.line,
+                borderRadius: 2,
+                px: 1.25,
+                py: 0.75,
+                color: "text.primary",
+              }}
+            >
+              {link}
+            </Box>
+          ) : null}
+          {link ? (
+            <Typography variant="caption" sx={{ display: "block", mt: 0.75 }}>
+              Platí 24 hodin. Vygenerování nového odkazu ten předchozí zneplatní.
+            </Typography>
+          ) : null}
+          {issue.isError ? (
+            <Typography variant="caption" sx={{ display: "block", mt: 0.75, color: DESIGN.tone.red.fg }}>
+              Odkaz se nepodařilo vygenerovat. Zkuste to prosím znovu.
+            </Typography>
+          ) : null}
+        </Box>
+      </Stack>
+    </Box>
   );
 }
 
@@ -650,6 +1017,7 @@ function StatusButton({
   to,
   disabled,
   confirmText,
+  variant = "outlined",
   onClick,
 }: {
   label: string;
@@ -657,6 +1025,7 @@ function StatusButton({
   to: number;
   disabled: boolean;
   confirmText?: string;
+  variant?: "outlined" | "contained";
   onClick: () => void;
 }) {
   const { t } = useTranslation();
@@ -665,44 +1034,46 @@ function StatusButton({
 
   if (confirming && confirmText) {
     return (
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-        <Typography variant="body2">{confirmText}</Typography>
-        <Button
-          size="small"
-          variant="contained"
-          disabled={disabled}
-          onClick={() => {
-            setConfirming(false);
-            onClick();
-          }}
-        >
-          {t("booking.detail.yes")}
-        </Button>
-        <Button size="small" onClick={() => setConfirming(false)}>
-          {t("booking.detail.no")}
-        </Button>
-      </Stack>
+      <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2.5, p: 1.5, bgcolor: "background.paper" }}>
+        <Typography variant="body2" sx={{ mb: 1 }}>
+          {confirmText}
+        </Typography>
+        <Stack direction="row" spacing={1}>
+          <Button
+            size="small"
+            variant="contained"
+            disabled={disabled}
+            onClick={() => {
+              setConfirming(false);
+              onClick();
+            }}
+          >
+            {t("booking.detail.yes")}
+          </Button>
+          <Button size="small" variant="outlined" onClick={() => setConfirming(false)}>
+            {t("booking.detail.no")}
+          </Button>
+        </Stack>
+      </Box>
     );
   }
 
   const button = (
-    <Box component="span">
+    <Box component="span" sx={{ display: "block" }}>
       <Button
-        size="small"
-        variant="outlined"
+        fullWidth
+        variant={variant}
+        color={variant === "contained" ? "secondary" : "inherit"}
         disabled={disabled || !allowed}
         onClick={() => (confirmText ? setConfirming(true) : onClick())}
+        sx={variant === "contained" ? { color: "#FFFFFF" } : undefined}
       >
         {label}
       </Button>
     </Box>
   );
 
-  return allowed ? (
-    button
-  ) : (
-    <Tooltip title={t("booking.detail.notAllowed")}>{button}</Tooltip>
-  );
+  return allowed ? button : <Tooltip title={t("booking.detail.notAllowed")}>{button}</Tooltip>;
 }
 
 /**
@@ -733,26 +1104,368 @@ function HistoryRow({ line }: { line: HistoryLine }) {
   const action = historyActionName(line.action);
 
   return (
-    <Box>
-      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-        {action
-          ? t(`booking.history.${action}`)
-          : t("booking.history.unknown", { code: line.action })}
-      </Typography>
-      <Typography variant="caption" sx={{ color: "text.secondary" }}>
-        {formatPragueDateTime(line.atUtc)}
-        {" · "}
-        {line.actorDisplayName ?? t("booking.detail.unknownActor")}
-      </Typography>
-      {line.oldValue || line.newValue ? (
-        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-          {historyValue(line.oldValue)} → {historyValue(line.newValue)}
+    <Stack component="li" direction="row" spacing={1.25} sx={{ alignItems: "flex-start" }}>
+      <Box
+        sx={{
+          width: 6,
+          height: 6,
+          borderRadius: "50%",
+          bgcolor: "text.disabled",
+          flexShrink: 0,
+          mt: "7px",
+        }}
+      />
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="body2">
+          {action ? t(`booking.history.${action}`) : t("booking.history.unknown", { code: line.action })}
+          {" — "}
+          {formatPragueDateTime(line.atUtc)}
+          <Box component="span" sx={{ color: "text.secondary" }}>
+            {" · "}
+            {line.actorDisplayName ?? t("booking.detail.unknownActor")}
+          </Box>
         </Typography>
-      ) : null}
-      {line.reason ? (
-        <Typography variant="body2">{line.reason}</Typography>
-      ) : null}
-    </Box>
+        {line.oldValue || line.newValue ? (
+          <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+            {historyValue(line.oldValue)} → {historyValue(line.newValue)}
+          </Typography>
+        ) : null}
+        {line.reason ? (
+          <Typography variant="caption" sx={{ display: "block" }}>
+            {line.reason}
+          </Typography>
+        ) : null}
+      </Box>
+    </Stack>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Edit mode - board screen 13, "Úprava rezervace"
+   ══════════════════════════════════════════════════════════════ */
+
+function EditMode({
+  appointment,
+  activities,
+  activity,
+  calendarId,
+  patientName,
+  note,
+  busy,
+  conflict,
+  error,
+  mayCancel,
+  onBack,
+  onClose,
+  onSave,
+  onCancelRequest,
+}: {
+  appointment: Appointment;
+  activities: Activity[];
+  activity: Activity | null;
+  calendarId: string;
+  patientName: string | null;
+  note: string | null;
+  busy: boolean;
+  conflict: unknown;
+  error: unknown;
+  mayCancel: boolean;
+  onBack: () => void;
+  onClose: () => void;
+  onSave: (plan: { startUtc: string | null; status: number | null }) => void;
+  onCancelRequest: () => void;
+}) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState<EditDraft>(() => draftFrom(appointment));
+
+  /* A write elsewhere refreshed the appointment under the form: start again
+     from what it is now rather than from what it was. */
+  useEffect(() => {
+    setDraft(draftFrom(appointment));
+  }, [appointment.startUtc, appointment.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const plan = planEdit(appointment, draft);
+  const hasChanges = plan.startUtc !== null || plan.status !== null;
+  const minutes = activity?.durationMinutes ?? durationMinutes(appointment.startUtc, appointment.endUtc);
+
+  const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(draft.date);
+  const timeValid = /^\d{2}:\d{2}$/.test(draft.time);
+
+  /* 6.1: whether the typed start is free is the server's answer, never ours. */
+  const offerQuery = useQuery({
+    queryKey: ["availability", calendarId, appointment.activityId, draft.date, draft.date],
+    queryFn: () =>
+      appointmentsApi.getAvailability(calendarId, appointment.activityId, draft.date, draft.date),
+    enabled: plan.startUtc !== null && dateValid && timeValid,
+    staleTime: 60 * 1000,
+  });
+
+  const newStart = plan.startUtc ?? appointment.startUtc;
+  const newEnd = new Date(new Date(newStart).getTime() + minutes * 60_000).toISOString();
+  const span = `${formatWallClock(newStart)} — ${formatWallClock(newEnd)}`;
+
+  const slotLine = (() => {
+    if (!dateValid || !timeValid) {
+      return { tone: "beige" as const, text: "Zadejte platné datum a čas." };
+    }
+    if (plan.startUtc === null) {
+      return { tone: "grey" as const, text: `Termín zůstává ${span}.` };
+    }
+    if (offerQuery.isLoading) {
+      return { tone: "grey" as const, text: `Ověřuji, zda je ${span} volný…` };
+    }
+    if (offerQuery.isError) {
+      return {
+        tone: "beige" as const,
+        text: `Volné časy se nepodařilo načíst. Uložení rozhodne server.`,
+      };
+    }
+    if (isOfferedStart(offerQuery.data, plan.startUtc)) {
+      return {
+        tone: "green" as const,
+        text: `Nový termín ${span} je volný. Nekoliduje s žádnou rezervací.`,
+      };
+    }
+    return {
+      tone: "beige" as const,
+      text: `Nový termín ${span} není mezi nabízenými volnými časy. Server ho může odmítnout.`,
+    };
+  })();
+
+  const pills = activities.filter((a) => a.isActive || a.id === appointment.activityId);
+  if (activity === null && appointment.activityName) {
+    /* The činnost is not in the list (retired, or the list has not arrived):
+       still show the one the appointment has, so the row is never blank. */
+    pills.unshift({
+      id: appointment.activityId,
+      name: appointment.activityName,
+      durationMinutes: minutes,
+      isActive: false,
+    } as Activity);
+  }
+
+  const statusOptions = reachableStatuses(appointment.status);
+  const statusLabelOf = (code: number) => {
+    const n = statusName(code);
+    return n ? t(`booking.status.${n}`) : t("booking.status.unknown");
+  };
+
+  return (
+    <>
+      {/* ── Header: back, title, who and when ── */}
+      <Stack
+        direction="row"
+        sx={{
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 2,
+          px: 3,
+          py: 2.5,
+          borderBottom: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", minWidth: 0 }}>
+          <IconButton
+            aria-label="Zpět na detail"
+            onClick={onBack}
+            sx={{
+              width: 46,
+              height: 46,
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 2.5,
+              bgcolor: "background.paper",
+            }}
+          >
+            <ArrowBackIcon fontSize="small" />
+          </IconButton>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography component="h2" sx={{ fontSize: 20, fontWeight: 700, lineHeight: 1.3 }}>
+              Úprava rezervace
+            </Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary" }} noWrap>
+              {patientName ? `${patientName} · ` : ""}
+              {formatShortPragueDateTime(appointment.startUtc)}
+            </Typography>
+          </Box>
+        </Stack>
+        <IconButton aria-label="Zavřít" onClick={onClose} size="small">
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Stack>
+
+      <Stack spacing={2.5} sx={{ p: 3 }}>
+        {/* ── SLUŽBA ── */}
+        <Box>
+          <SectionLabel>Služba</SectionLabel>
+          <ToggleButtonGroup
+            exclusive
+            value={appointment.activityId}
+            aria-label="Služba"
+            sx={{ flexWrap: "wrap", gap: 1, bgcolor: "transparent" }}
+          >
+            {pills.map((a) => (
+              <ToggleButton
+                key={a.id}
+                value={a.id}
+                /* No endpoint changes an appointment's činnost; only the one it has is live. */
+                disabled={a.id !== appointment.activityId}
+                sx={{
+                  borderRadius: "10px !important",
+                  border: "1px solid !important",
+                  borderColor: "divider !important",
+                  ml: "0 !important",
+                  px: 2,
+                  bgcolor: "background.paper",
+                  "&.Mui-selected": {
+                    bgcolor: "secondary.main",
+                    borderColor: "secondary.main !important",
+                    color: "#FFFFFF",
+                  },
+                }}
+              >
+                {a.name}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+          <Typography variant="body2" sx={{ color: "text.secondary", mt: 1 }}>
+            Změna služby přepíše délku i cenu podle ceníku.
+            {pills.length > 1 ? " Změna služby zatím není v tomto okně dostupná." : ""}
+          </Typography>
+        </Box>
+
+        {/* ── DATUM · ZAČÁTEK · DÉLKA · STAV ── */}
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr 1fr", md: "1.4fr 1fr 1fr 1fr" },
+            gap: 2,
+          }}
+        >
+          <Box>
+            <SectionLabel>Datum</SectionLabel>
+            <TextField
+              fullWidth
+              type="date"
+              value={draft.date}
+              onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+              slotProps={{ htmlInput: { "aria-label": "Datum" } }}
+            />
+          </Box>
+          <Box>
+            <SectionLabel>Začátek</SectionLabel>
+            <TextField
+              fullWidth
+              type="time"
+              value={draft.time}
+              onChange={(e) => setDraft({ ...draft, time: e.target.value })}
+              slotProps={{ htmlInput: { "aria-label": "Začátek", step: 300 } }}
+            />
+          </Box>
+          <Box>
+            <SectionLabel>Délka</SectionLabel>
+            {/* The length is the činnost's (6.1); it is shown, not typed. */}
+            <TextField
+              fullWidth
+              value={`${minutes} minut`}
+              slotProps={{ input: { readOnly: true }, htmlInput: { "aria-label": "Délka" } }}
+            />
+          </Box>
+          <Box>
+            <SectionLabel>Stav</SectionLabel>
+            <TextField
+              fullWidth
+              select
+              value={draft.status}
+              onChange={(e) => setDraft({ ...draft, status: Number(e.target.value) })}
+              slotProps={{ htmlInput: { "aria-label": "Stav" } }}
+            >
+              {statusOptions.map((code) => (
+                <MenuItem key={code} value={code}>
+                  {statusLabelOf(code)}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Box>
+        </Box>
+
+        {/* ── Is the new slot free? ── */}
+        <Stack
+          direction="row"
+          spacing={1.25}
+          role="status"
+          sx={{
+            alignItems: "center",
+            px: 2,
+            py: 1.5,
+            borderRadius: 2.5,
+            border: "1px solid",
+            borderColor: slotLine.tone === "grey" ? "divider" : DESIGN.tone[slotLine.tone].line,
+            bgcolor: slotLine.tone === "grey" ? "background.default" : DESIGN.tone[slotLine.tone].bg,
+            color: slotLine.tone === "grey" ? "text.primary" : DESIGN.tone[slotLine.tone].fg,
+          }}
+        >
+          <AccessTimeIcon fontSize="small" sx={{ color: "inherit", opacity: 0.8 }} />
+          <Typography variant="body2" sx={{ color: "inherit" }}>
+            {slotLine.text}
+          </Typography>
+        </Stack>
+
+        {/* ── POZNÁMKA (read-only: 4.5 writes it only at booking) ── */}
+        <Box>
+          <SectionLabel>Poznámka</SectionLabel>
+          <TextField
+            fullWidth
+            multiline
+            minRows={3}
+            value={note ?? ""}
+            placeholder={t("booking.detail.noNote")}
+            slotProps={{ input: { readOnly: true } }}
+          />
+        </Box>
+
+        <Tooltip title="Odesílání potvrzení pacientovi zatím není napojené.">
+          <FormControlLabel
+            control={<Checkbox disabled />}
+            label="Poslat pacientovi potvrzení o změně"
+            sx={{ alignSelf: "flex-start", mr: 0 }}
+          />
+        </Tooltip>
+
+        {conflict ? <Alert severity="info">{errorText(conflict, t)}</Alert> : null}
+        {error && !conflict ? <Alert severity="error">{errorText(error, t)}</Alert> : null}
+      </Stack>
+
+      <Footer>
+        <Box>
+          {mayCancel ? (
+            <Button
+              color="error"
+              variant="outlined"
+              disabled={busy || !canChangeStatus(appointment.status, STATUS.cancelled)}
+              onClick={onCancelRequest}
+            >
+              {t("booking.detail.cancel")}
+            </Button>
+          ) : null}
+        </Box>
+        <Stack direction="row" spacing={1}>
+          <Button variant="outlined" onClick={onBack} disabled={busy}>
+            Zahodit změny
+          </Button>
+          <Button
+            variant="contained"
+            color="secondary"
+            disabled={busy || !hasChanges || !dateValid || !timeValid}
+            onClick={() => onSave(plan)}
+            sx={{ color: "#FFFFFF" }}
+          >
+            Uložit změny
+          </Button>
+        </Stack>
+      </Footer>
+    </>
   );
 }
 

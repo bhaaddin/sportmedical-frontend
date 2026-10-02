@@ -121,9 +121,19 @@ export function visibleHours(
   return end > start ? { start, end } : { start: 7, end: 19 };
 }
 
-/** The live label while dragging: `od 08:00 – do 09:30`. */
+/** The label of a range in a dialog: `od 08:00 – do 09:30`. */
 export function rangeLabel(range: MinuteRange): string {
   return `od ${formatMinutes(range.start)} – do ${formatMinutes(range.end)}`;
+}
+
+/** `08:00 – 09:30` - the board's spelling on cards, pills and the popover. */
+export function spanLabel(range: MinuteRange): string {
+  return `${formatMinutes(range.start)} – ${formatMinutes(range.end)}`;
+}
+
+/** The live pill while dragging: `10:00 – 11:00 · 60 min`. */
+export function selectionLabel(range: MinuteRange): string {
+  return `${spanLabel(range)} · ${range.end - range.start} min`;
 }
 
 /**

@@ -3,15 +3,14 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   Collapse,
   IconButton,
   MenuItem,
-  Paper,
   Stack,
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   TextField,
@@ -29,6 +28,9 @@ import { clinicServicesApi } from "../../api/clinicServices";
 import { workingHoursApi } from "../../api/workingHours";
 import { statusName, statusTally, type AvailabilitySlot } from "../../api/bookingContracts";
 import { AsyncSection } from "../../components/booking/AsyncSection";
+import { CalendarTogglePills } from "../../components/booking/CalendarTogglePills";
+import { statusTone } from "../../components/booking/appointmentEdit";
+import { PageHeader, SectionLabel, SoftCard, StatusChip } from "../../components/ui";
 import {
   addDaysToDateOnly,
   dayOfWeekOf,
@@ -266,20 +268,17 @@ export default function ServiceOverviewPage() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto" }}>
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          {t("booking.serviceOverview.title")}
-        </Typography>
-        <Typography sx={{ color: "text.secondary" }}>
-          {t("booking.serviceOverview.subtitle")}
-        </Typography>
-      </Box>
+      <PageHeader
+        title={t("booking.serviceOverview.title")}
+        subtitle={t("booking.serviceOverview.subtitle")}
+      />
 
       {/* ── Filters: every axis the owner named, nothing fixed ── */}
-      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+      <SoftCard sx={{ mb: 2.5 }}>
+        <SectionLabel>Filtr</SectionLabel>
         <Stack
           direction="row"
-          sx={{ flexWrap: "wrap", gap: 2, alignItems: "flex-start", mb: 1.5 }}
+          sx={{ flexWrap: "wrap", gap: 2, alignItems: "flex-start", mb: 2 }}
         >
           <TextField
             type="date"
@@ -305,7 +304,7 @@ export default function ServiceOverviewPage() {
             }
             slotProps={{ inputLabel: { shrink: true } }}
           />
-          <Stack direction="row" spacing={1} sx={{ pt: 0.5 }}>
+          <Stack direction="row" spacing={1} sx={{ pt: 0.25 }}>
             <Button size="small" variant="outlined" onClick={() => setRange(thisWeek(today))}>
               {t("booking.serviceOverview.thisWeek")}
             </Button>
@@ -347,29 +346,8 @@ export default function ServiceOverviewPage() {
           </TextField>
         </Stack>
 
-        <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
-          {calendars.map((calendar) => {
-            const on = selected === null || selected.has(calendar.id);
-            return (
-              <Chip
-                key={calendar.id}
-                label={calendar.name}
-                variant={on ? "filled" : "outlined"}
-                onClick={() => {
-                  const next = new Set(selected ?? calendars.map((c) => c.id));
-                  if (next.has(calendar.id)) next.delete(calendar.id);
-                  else next.add(calendar.id);
-                  setSelected(next);
-                }}
-                sx={{
-                  backgroundColor: on ? calendar.color : undefined,
-                  color: on ? "#fff" : undefined,
-                }}
-              />
-            );
-          })}
-        </Stack>
-      </Paper>
+        <CalendarTogglePills calendars={calendars} selected={selected} onChange={setSelected} />
+      </SoftCard>
 
       <AsyncSection
         isLoading={
@@ -409,88 +387,90 @@ export default function ServiceOverviewPage() {
             }}
             skeletonRows={5}
           >
-            <Stack
-              direction="row"
-              sx={{ flexWrap: "wrap", gap: 2, alignItems: "baseline", mb: 1 }}
-            >
-              <Typography sx={{ fontWeight: 700 }}>
-                {t("booking.serviceOverview.totals", {
-                  booked: t("booking.serviceOverview.bookedCount", { count: totals.booked }),
-                  free: freeText(totals.freeStarts, totals.freeDays),
-                })}
-              </Typography>
-              {offersPending ? (
-                <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                  {t("booking.serviceOverview.offersLoading")}
+            <SoftCard sx={{ p: 0, overflow: "hidden" }}>
+              <Stack
+                direction="row"
+                sx={{ flexWrap: "wrap", gap: 2, alignItems: "baseline", px: 2.5, py: 2 }}
+              >
+                <Typography sx={{ fontWeight: 700 }}>
+                  {t("booking.serviceOverview.totals", {
+                    booked: t("booking.serviceOverview.bookedCount", { count: totals.booked }),
+                    free: freeText(totals.freeStarts, totals.freeDays),
+                  })}
                 </Typography>
+                {offersPending ? (
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    {t("booking.serviceOverview.offersLoading")}
+                  </Typography>
+                ) : null}
+              </Stack>
+
+              {offersFailed > 0 ? (
+                <Alert severity="warning" sx={{ mx: 2.5, mb: 2 }}>
+                  {t("booking.serviceOverview.offersFailed", { count: offersFailed })}
+                </Alert>
               ) : null}
-            </Stack>
 
-            {offersFailed > 0 ? (
-              <Alert severity="warning" sx={{ mb: 1 }}>
-                {t("booking.serviceOverview.offersFailed", { count: offersFailed })}
-              </Alert>
-            ) : null}
-
-            <Box sx={{ overflowX: "auto" }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>{t("booking.serviceOverview.column.activity")}</TableCell>
-                    <TableCell align="right">{t("booking.serviceOverview.column.booked")}</TableCell>
-                    <TableCell>{t("booking.serviceOverview.column.when")}</TableCell>
-                    <TableCell>{t("booking.serviceOverview.column.who")}</TableCell>
-                    <TableCell>{t("booking.serviceOverview.column.free")}</TableCell>
-                    <TableCell padding="checkbox" />
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {groups.map((group) => (
-                    <GroupRows
-                      key={group.service?.id ?? "none"}
-                      title={group.service?.name ?? t("booking.serviceOverview.noService")}
-                      rows={group.rows}
-                      open={open}
-                      toggle={toggle}
-                      weekdayLine={weekdayLine}
-                      whoLine={whoLine}
-                      freeCell={(row) =>
-                        row.freeStarts > 0 ? (
-                          <Tooltip
-                            title={
-                              <Box>
-                                <Typography variant="caption" component="div">
-                                  {t("booking.serviceOverview.freeHelp")}
-                                </Typography>
-                                {row.freeByCalendar.map((entry) => (
-                                  <Typography key={entry.calendarId} variant="caption" component="div">
-                                    {calendarById.get(entry.calendarId)?.name ?? entry.calendarId}:{" "}
-                                    {freeText(entry.starts, entry.dates.length)}
+              <TableContainer sx={{ borderRadius: 0, borderTop: "1px solid", borderColor: "divider" }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>{t("booking.serviceOverview.column.activity")}</TableCell>
+                      <TableCell align="right">{t("booking.serviceOverview.column.booked")}</TableCell>
+                      <TableCell>{t("booking.serviceOverview.column.when")}</TableCell>
+                      <TableCell>{t("booking.serviceOverview.column.who")}</TableCell>
+                      <TableCell>{t("booking.serviceOverview.column.free")}</TableCell>
+                      <TableCell padding="checkbox" />
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {groups.map((group) => (
+                      <GroupRows
+                        key={group.service?.id ?? "none"}
+                        title={group.service?.name ?? t("booking.serviceOverview.noService")}
+                        rows={group.rows}
+                        open={open}
+                        toggle={toggle}
+                        weekdayLine={weekdayLine}
+                        whoLine={whoLine}
+                        freeCell={(row) =>
+                          row.freeStarts > 0 ? (
+                            <Tooltip
+                              title={
+                                <Box>
+                                  <Typography variant="caption" component="div">
+                                    {t("booking.serviceOverview.freeHelp")}
                                   </Typography>
-                                ))}
-                              </Box>
-                            }
-                          >
-                            <Typography variant="body2" component="span" sx={{ cursor: "help" }}>
-                              {freeText(row.freeStarts, row.freeDates.length)}
+                                  {row.freeByCalendar.map((entry) => (
+                                    <Typography key={entry.calendarId} variant="caption" component="div">
+                                      {calendarById.get(entry.calendarId)?.name ?? entry.calendarId}:{" "}
+                                      {freeText(entry.starts, entry.dates.length)}
+                                    </Typography>
+                                  ))}
+                                </Box>
+                              }
+                            >
+                              <Typography variant="body2" component="span" sx={{ cursor: "help" }}>
+                                {freeText(row.freeStarts, row.freeDates.length)}
+                              </Typography>
+                            </Tooltip>
+                          ) : (
+                            <Typography variant="body2" component="span" sx={{ color: "text.secondary" }}>
+                              {pendingActivities.has(row.activityId)
+                                ? t("booking.serviceOverview.freeLoading")
+                                : failedActivities.has(row.activityId)
+                                  ? t("booking.serviceOverview.freeFailed")
+                                  : t("booking.serviceOverview.freeNone")}
                             </Typography>
-                          </Tooltip>
-                        ) : (
-                          <Typography variant="body2" component="span" sx={{ color: "text.secondary" }}>
-                            {pendingActivities.has(row.activityId)
-                              ? t("booking.serviceOverview.freeLoading")
-                              : failedActivities.has(row.activityId)
-                                ? t("booking.serviceOverview.freeFailed")
-                                : t("booking.serviceOverview.freeNone")}
-                          </Typography>
-                        )
-                      }
-                      calendarName={(id) => (id ? (calendarById.get(id)?.name ?? "") : "")}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            </Box>
+                          )
+                        }
+                        calendarName={(id) => (id ? (calendarById.get(id)?.name ?? "") : "")}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </SoftCard>
           </AsyncSection>
         )}
       </AsyncSection>
@@ -521,8 +501,9 @@ function GroupRows({
 
   return (
     <>
+      {/* The služba heading: the board's group row, on the page tint. */}
       <TableRow>
-        <TableCell colSpan={6} sx={{ backgroundColor: "action.hover" }}>
+        <TableCell colSpan={6} sx={{ bgcolor: "background.default", py: 1 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
             {title}
           </Typography>
@@ -534,14 +515,18 @@ function GroupRows({
           <Fragment key={row.activityId}>
             <TableRow hover>
               <TableCell>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     {row.activityName}
                   </Typography>
                   {row.activity === null ? (
-                    <Chip size="small" variant="outlined" label={t("booking.serviceOverview.unlisted")} />
+                    <StatusChip tone="beige" size="sm">
+                      {t("booking.serviceOverview.unlisted")}
+                    </StatusChip>
                   ) : row.activity.isActive ? null : (
-                    <Chip size="small" variant="outlined" label={t("booking.serviceOverview.retired")} />
+                    <StatusChip tone="grey" size="sm">
+                      {t("booking.serviceOverview.retired")}
+                    </StatusChip>
                   )}
                 </Stack>
               </TableCell>
@@ -591,7 +576,7 @@ function GroupRows({
             <TableRow>
               <TableCell colSpan={6} sx={{ py: 0, borderBottom: isOpen ? undefined : "none" }}>
                 <Collapse in={isOpen} unmountOnExit>
-                  <Stack spacing={0.5} sx={{ py: 1, pl: 2 }}>
+                  <Stack spacing={0.75} sx={{ py: 1.5, pl: 2 }}>
                     {row.appointments.map((appointment) => {
                       const name = statusName(appointment.status);
                       const gone = statusTally(appointment.status) === "cancelled";
@@ -601,7 +586,7 @@ function GroupRows({
                           direction="row"
                           spacing={2}
                           sx={{
-                            alignItems: "baseline",
+                            alignItems: "center",
                             flexWrap: "wrap",
                             /* 6.6: a cancelled one is drawn differently, never dropped. */
                             color: gone ? "text.disabled" : "text.primary",
@@ -618,11 +603,9 @@ function GroupRows({
                           <Typography variant="body2" sx={{ color: "text.secondary" }}>
                             {appointment.worker?.name ?? t("booking.serviceOverview.unassigned")}
                           </Typography>
-                          <Chip
-                            size="small"
-                            variant="outlined"
-                            label={name ? t(`booking.status.${name}`) : t("booking.serviceOverview.unknownStatus")}
-                          />
+                          <StatusChip tone={gone ? "grey" : statusTone(appointment.status)} size="sm">
+                            {name ? t(`booking.status.${name}`) : t("booking.serviceOverview.unknownStatus")}
+                          </StatusChip>
                         </Stack>
                       );
                     })}

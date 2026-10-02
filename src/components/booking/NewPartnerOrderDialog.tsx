@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -7,10 +7,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   IconButton,
   MenuItem,
-  Paper,
   Stack,
   TextField,
   Typography,
@@ -22,6 +20,8 @@ import { activitiesApi } from "../../api/activities";
 import { partnerOrdersApi } from "../../api/partnerOrders";
 import { workingHoursApi } from "../../api/workingHours";
 import { PARTNER_TYPE_NAMES } from "../../api/bookingContracts";
+import { clubsApi } from "../../services/clubsApi";
+import { SectionLabel, SoftCard } from "../ui";
 import { AsyncSection } from "./AsyncSection";
 import { errorText } from "./errorText";
 
@@ -58,6 +58,12 @@ import { errorText } from "./errorText";
  * are their own routes. So a save is several calls, and a failure part-way
  * leaves an order with less in it than the form showed - which the dialog says
  * plainly rather than pretending it all landed.
+ *
+ * Since the design board (3. 10. 2026) the dialog can also be opened with a
+ * head start: the calendar's "Rezervovat pro klub" hands over the dragged
+ * slot, a club from the list, or a club typed into the drawer's "NEBO ZALOŽIT
+ * NOVÝ" form. {@link PartnerOrderPrefill} is that handover; every field in it
+ * is optional and only fills what the owner has not typed.
  */
 
 /** 4.7 takes these as numbers; the strings that match the prose are refused. */
@@ -76,25 +82,42 @@ interface ItemDraft {
   requestedCount: number;
 }
 
+/** What another screen may fill in before the owner sees the form. */
+export interface PartnerOrderPrefill {
+  partnerName?: string;
+  contactEmail?: string;
+  note?: string;
+  /** The payer on file; its name and e-mail are looked up when not given. */
+  clubId?: string | null;
+  /** How many athletes the club said - becomes the count of the first item. */
+  headcount?: number;
+  /** Held days, typically the one slot dragged on the calendar. */
+  windows?: { date: string; startTime: string; endTime: string }[];
+}
+
 export function NewPartnerOrderDialog({
   open,
   calendarId,
+  initial,
   onClose,
   onCreated,
 }: {
   open: boolean;
   calendarId: string;
+  initial?: PartnerOrderPrefill;
   onClose: () => void;
   onCreated: () => void;
 }) {
   const { t } = useTranslation();
 
-  const [partnerName, setPartnerName] = useState("");
+  const [partnerName, setPartnerName] = useState(initial?.partnerName ?? "");
   const [partnerType, setPartnerType] = useState(0);
-  const [contactEmail, setContactEmail] = useState("");
-  const [note, setNote] = useState("");
+  const [contactEmail, setContactEmail] = useState(initial?.contactEmail ?? "");
+  const [note, setNote] = useState(initial?.note ?? "");
   const [items, setItems] = useState<ItemDraft[]>([]);
-  const [windows, setWindows] = useState<WindowDraft[]>([]);
+  const [windows, setWindows] = useState<WindowDraft[]>(() =>
+    (initial?.windows ?? []).map((w, i) => ({ key: `w-init-${i}`, ...w })),
+  );
   const [partial, setPartial] = useState<string | null>(null);
 
   // Bulk multi-day reservation: a club calls with N athletes and staff hold a
@@ -124,6 +147,22 @@ export function NewPartnerOrderDialog({
     setWindows((prev) => [...prev, ...rows]);
   };
 
+  /* A club handed over by id: its name and e-mail fill the empty fields. */
+  const clubId = initial?.clubId ?? null;
+  const clubsQuery = useQuery({
+    queryKey: ["clubs"],
+    queryFn: () => clubsApi.getAll(false),
+    enabled: open && clubId !== null,
+    staleTime: 5 * 60 * 1000,
+  });
+  useEffect(() => {
+    if (clubId === null) return;
+    const club = (clubsQuery.data ?? []).find((c) => c.id === clubId);
+    if (!club) return;
+    setPartnerName((name) => (name.trim() === "" ? club.name : name));
+    setContactEmail((email) => (email.trim() === "" ? (club.contactEmail ?? "") : email));
+  }, [clubId, clubsQuery.data]);
+
   const activitiesQuery = useQuery({
     queryKey: ["activities"],
     queryFn: activitiesApi.list,
@@ -135,6 +174,17 @@ export function NewPartnerOrderDialog({
     () => (activitiesQuery.data?.activities ?? []).filter((a) => a.isActive),
     [activitiesQuery.data],
   );
+
+  /* "62 sportovců" from the drawer becomes one line to choose the činnost for. */
+  const headcount = initial?.headcount;
+  useEffect(() => {
+    if (headcount === undefined || headcount <= 0) return;
+    setItems((prev) =>
+      prev.length > 0
+        ? prev
+        : [{ key: "i-init", activityId: activities.length === 1 ? activities[0].id : "", requestedCount: headcount }],
+    );
+  }, [headcount, activities]);
 
   const durationOf = (activityId: string) =>
     activities.find((a) => a.id === activityId)?.durationMinutes ?? 0;
@@ -205,6 +255,7 @@ export function NewPartnerOrderDialog({
         partnerType,
         contactEmail: contactEmail.trim() || null,
         note: note.trim() || null,
+        clubId,
       });
 
       /*
@@ -247,6 +298,8 @@ export function NewPartnerOrderDialog({
     windows.every((w) => w.date !== "" && w.startTime !== "" && w.endTime !== "") &&
     !save.isPending;
 
+  const short = requiredMinutes > 0 && coveredMinutes < requiredMinutes;
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>{t("booking.partner.newTitle")}</DialogTitle>
@@ -254,9 +307,7 @@ export function NewPartnerOrderDialog({
         <Stack spacing={3}>
           {/* ── 1. Partner ── */}
           <Box>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-              {t("booking.partner.step1")}
-            </Typography>
+            <SectionLabel>{t("booking.partner.step1")}</SectionLabel>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <TextField
                 fullWidth
@@ -297,9 +348,7 @@ export function NewPartnerOrderDialog({
               spacing={2}
               sx={{ alignItems: "center", mb: 1, flexWrap: "wrap" }}
             >
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                {t("booking.partner.step2")}
-              </Typography>
+              <SectionLabel sx={{ mb: 0 }}>{t("booking.partner.step2")}</SectionLabel>
               <Button
                 size="small"
                 onClick={() =>
@@ -351,6 +400,7 @@ export function NewPartnerOrderDialog({
                       {activities.map((a) => (
                         <MenuItem key={a.id} value={a.id}>
                           {a.name} · {a.durationMinutes} min
+                          {a.priceCzk !== null ? ` · ${a.priceCzk.toLocaleString("cs-CZ")} Kč` : ""}
                         </MenuItem>
                       ))}
                     </TextField>
@@ -397,9 +447,7 @@ export function NewPartnerOrderDialog({
               spacing={2}
               sx={{ alignItems: "center", mb: 1, flexWrap: "wrap" }}
             >
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                {t("booking.partner.step3")}
-              </Typography>
+              <SectionLabel sx={{ mb: 0 }}>{t("booking.partner.step3")}</SectionLabel>
               <Button
                 size="small"
                 onClick={() =>
@@ -422,7 +470,7 @@ export function NewPartnerOrderDialog({
             <Stack
               direction="row"
               spacing={1}
-              sx={{ alignItems: "center", mb: 1.5, flexWrap: "wrap" }}
+              sx={{ alignItems: "center", mb: 1.5, flexWrap: "wrap", gap: 1 }}
             >
               <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 Hromadně (více dní):
@@ -536,18 +584,10 @@ export function NewPartnerOrderDialog({
             </Stack>
           </Box>
 
-          <Divider />
-
           {/* The whole reason this screen is a screen. */}
-          <Paper
-            variant="outlined"
-            sx={{
-              p: 2,
-              borderColor:
-                requiredMinutes > 0 && coveredMinutes < requiredMinutes
-                  ? "warning.main"
-                  : "divider",
-            }}
+          <SoftCard
+            tone={short ? "plain" : "soft"}
+            sx={{ p: 2, ...(short ? { borderColor: "warning.main" } : {}) }}
           >
             <Typography sx={{ fontWeight: 700 }}>
               {t("booking.partner.coverage", {
@@ -555,7 +595,7 @@ export function NewPartnerOrderDialog({
                 required: requiredMinutes,
               })}
             </Typography>
-            {requiredMinutes > 0 && coveredMinutes < requiredMinutes ? (
+            {short ? (
               <Typography variant="body2" sx={{ color: "warning.main" }}>
                 {t("booking.partner.short", {
                   minutes: requiredMinutes - coveredMinutes,
@@ -577,7 +617,7 @@ export function NewPartnerOrderDialog({
             <Typography variant="caption" sx={{ color: "text.secondary" }}>
               {t("booking.partner.coverageNote")}
             </Typography>
-          </Paper>
+          </SoftCard>
 
           <TextField
             fullWidth
@@ -596,7 +636,7 @@ export function NewPartnerOrderDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>{t("booking.common.cancel")}</Button>
+        <Button variant="outlined" onClick={onClose}>{t("booking.common.cancel")}</Button>
         <Button variant="contained" disabled={!canSave} onClick={() => save.mutate()}>
           {t("booking.common.save")}
         </Button>

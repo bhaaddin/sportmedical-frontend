@@ -5,7 +5,8 @@ import { errorText } from "./errorText";
 /**
  * The four states every booking screen owes the user (contract 5): loading,
  * empty, error, content. An empty state is never a blank white area — it says
- * what the screen is and offers the action that fills it.
+ * what the screen is and offers the action that fills it. Drawn as the board
+ * draws a card: a 1px line, no shadow, muted text.
  */
 
 interface AsyncSectionProps {
@@ -46,7 +47,7 @@ export function AsyncSection({
     return (
       <Stack spacing={1} aria-busy="true" aria-live="polite">
         {Array.from({ length: skeletonRows }, (_, i) => (
-          <Skeleton key={i} variant="rectangular" height={52} />
+          <Skeleton key={i} variant="rectangular" height={52} sx={{ borderRadius: 2.5 }} />
         ))}
       </Stack>
     );
@@ -73,14 +74,16 @@ export function AsyncSection({
     return (
       <Box
         sx={{
-          border: "1px dashed",
+          border: "1px solid",
           borderColor: "divider",
-          borderRadius: 2,
-          p: 4,
+          borderRadius: 3,
+          bgcolor: "background.paper",
+          px: 3,
+          py: 4,
           textAlign: "center",
         }}
       >
-        <Typography sx={{ mb: emptyAction ? 2 : 0, color: "text.secondary" }}>
+        <Typography variant="body2" sx={{ mb: emptyAction ? 2 : 0, color: "text.secondary" }}>
           {emptyText}
         </Typography>
         {emptyAction ? (

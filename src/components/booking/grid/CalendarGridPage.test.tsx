@@ -18,6 +18,21 @@ vi.mock('../../../api/clinicSettings', () => ({ readPublicClinic: vi.fn(), readS
 vi.mock('../../../api/workingHours', () => ({ workingHoursApi: { preview: vi.fn() } }));
 vi.mock('../../../api/appointments', () => ({ appointmentsApi: { range: vi.fn(), blocks: vi.fn() } }));
 /*
+ * The booking dialog is a screen of its own with its own tests; here only
+ * what the calendar hands it matters - which calendar, which time.
+ */
+vi.mock('../../../components/booking/NewAppointmentDialog', () => ({
+  NewAppointmentDialog: (props: { initialCalendarId?: string; initialStart?: string; initialEnd?: string }) => (
+    <div
+      role="dialog"
+      data-testid="new-appointment"
+      data-calendar={props.initialCalendarId}
+      data-start={props.initialStart}
+      data-end={props.initialEnd}
+    />
+  ),
+}));
+/*
  * The now-line and holiday colours are the owner's calendar-display settings,
  * read (by everyone) from /api/v1/settings/calendar-display, not the admin-only
  * /api/settings. Keep the real helpers; drive the hook so the chosen now-line
@@ -129,10 +144,10 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-function renderPage() {
+function renderPage(state?: Record<string, unknown>) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[{ pathname: '/planovani', state }]}>
         <CalendarGridPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -148,7 +163,33 @@ describe('the calendar screen', () => {
     expect(screen.getByRole('button', { name: /Vstupní prohlídka/ })).toBeInTheDocument();
     expect(screen.getByTestId('sub-column-c1-2026-09-23')).toBeInTheDocument();
     expect(screen.getByTestId('sub-column-c2-2026-09-23')).toBeInTheDocument();
-    expect(await screen.findByText('· Porada', { exact: false })).toBeInTheDocument();
+    expect(await screen.findByText('Porada')).toBeInTheDocument();
+  });
+
+  it('titles the week the board’s way and switches views from the top bar', async () => {
+    renderPage();
+    await screen.findByRole('button', { name: /Spiroergometrie/ });
+    expect(screen.getByRole('heading', { name: '21. — 27. září 2026' })).toBeInTheDocument();
+    expect(screen.getByText('Krok mřížky 30 min · táhněte do stran pro posun v čase')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Den' }));
+    expect(screen.getByRole('heading', { name: 'Středa 23. září 2026' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Měsíc' }));
+    /* Level 1: the mini calendar's own heading says the month too. */
+    expect(screen.getByRole('heading', { level: 1, name: 'Září 2026' })).toBeInTheDocument();
+    /* A wider range is fetched for the month, so the cells arrive with it. */
+    expect(await screen.findByTestId('month-day-2026-09-23')).toBeInTheDocument();
+  });
+
+  it('the resolution toolbar steps the grid between hour, 30 and 10 minutes', async () => {
+    renderPage();
+    await screen.findByRole('button', { name: /Spiroergometrie/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Jemnější mřížka' }));
+    expect(screen.getByRole('button', { name: '10 min' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Krok mřížky 10 min · táhněte do stran pro posun v čase')).toBeInTheDocument();
+    expect(window.localStorage.getItem('calendarZoom')).toBe('2');
+    fireEvent.click(screen.getByRole('button', { name: 'Hodina' }));
+    expect(screen.getByRole('button', { name: 'Hrubší mřížka' })).toBeDisabled();
+    expect(window.localStorage.getItem('calendarZoom')).toBe('0.6');
   });
 
   it('unticking a calendar takes its column and bookings away', async () => {
@@ -199,9 +240,33 @@ describe('the calendar screen', () => {
 
   it('offers no new booking to somebody without bookings.create', async () => {
     window.localStorage.setItem('permissions', JSON.stringify([]));
+    renderPage({ newAppointment: 1 });
+    await screen.findByRole('button', { name: /Spiroergometrie/ });
+    expect(screen.queryByRole('button', { name: 'Nová objednávka' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('new-appointment')).not.toBeInTheDocument();
+    expect(readSettings).not.toHaveBeenCalled();
+  });
+
+  it('opens the booking on the next free half hour when the sidebar sends it here', async () => {
+    renderPage({ newAppointment: 1 });
+    /* 10:15 in Prague, 30-minute step, the first calendar's 09:00–10:00 is over: 10:30. */
+    const dialog = await screen.findByTestId('new-appointment');
+    expect(dialog).toHaveAttribute('data-calendar', 'c1');
+    expect(dialog).toHaveAttribute('data-start', '2026-09-23T10:30');
+    expect(dialog).toHaveAttribute('data-end', '2026-09-23T11:00');
+  });
+
+  it('the top bar’s "Nová objednávka" does the same, stepping over what is booked', async () => {
+    vi.mocked(appointmentsApi.range).mockResolvedValue([
+      { ...appointment('ap1', 'c1', 'Spiroergometrie'), startUtc: '2026-09-23T08:30:00Z', endUtc: '2026-09-23T09:30:00Z' },
+    ]);
     renderPage();
     await screen.findByRole('button', { name: /Spiroergometrie/ });
-    expect(screen.queryByRole('button', { name: 'Nové objednání' })).not.toBeInTheDocument();
-    expect(readSettings).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('new-appointment')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Nová objednávka' }));
+    /* 10:30–11:30 is taken, so the next free half hour is 11:30. */
+    const dialog = await screen.findByTestId('new-appointment');
+    expect(dialog).toHaveAttribute('data-start', '2026-09-23T11:30');
+    expect(dialog).toHaveAttribute('data-end', '2026-09-23T12:00');
   });
 });

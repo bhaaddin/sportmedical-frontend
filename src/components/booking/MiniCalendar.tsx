@@ -18,16 +18,17 @@ import {
 import type { CalendarView, Highlight, ShownMonth } from "./MiniCalendar.logic";
 
 /**
- * The month panel on the left of the calendar - the owner's plan, "Mini
- * calendar (left)".
+ * The month panel in the calendar's left rail, drawn to the board of
+ * 3. 10. 2026: the month's name with ‹ › on the right, one letter per weekday
+ * (P Ú S Č P S N), the selected day a filled dark circle, today ringed when it
+ * is not the selection, a public holiday a red number, a closed day muted.
  *
  * Click a day to jump to it; the arrows move the panel a month at a time
  * without moving the selection, so a date three months out is two clicks
  * away. What is selected is the caller's `value`: the week it falls in is
- * banded (strongly in week view, softly otherwise) and the day itself carries
- * the strongest mark. Today is ringed, a public holiday has a red number and a
- * closed day is hatched - the same three things the main grid shows, so the
- * two never disagree about what a day is.
+ * banded (a touch stronger in week view) and the day itself carries the
+ * strongest mark - the same three things the main grid shows, so the two
+ * never disagree about what a day is.
  *
  * It fetches nothing. Holidays and closed days arrive as `yyyy-MM-dd` sets from
  * the page, which already asked the server for them.
@@ -42,10 +43,7 @@ export interface MiniCalendarProps {
   closedDays?: ReadonlySet<string>;
 }
 
-const CELL = 34;
-
-const HATCH =
-  "repeating-linear-gradient(135deg, transparent 0 4px, rgba(127,127,127,0.22) 4px 5px)";
+const CELL = 30;
 
 export function MiniCalendar({
   value,
@@ -80,50 +78,54 @@ export function MiniCalendar({
   );
 
   return (
-    <Box sx={{ width: "100%", maxWidth: CELL * 7 + 16, userSelect: "none" }}>
+    <Box sx={{ width: "100%", userSelect: "none" }}>
       <Stack
         direction="row"
-        sx={{ alignItems: "center", justifyContent: "space-between", mb: 0.5 }}
+        sx={{ alignItems: "center", justifyContent: "space-between", mb: 1, pl: 0.5 }}
       >
-        <IconButton
-          size="small"
-          aria-label="Předchozí měsíc"
-          onClick={() => setShown((m) => shiftMonth(m, -1))}
-        >
-          <ChevronLeft fontSize="small" />
-        </IconButton>
         <Typography
-          variant="subtitle2"
           component="h2"
-          sx={{ fontWeight: 700 }}
+          sx={{ fontSize: 14, fontWeight: 700 }}
           aria-live="polite"
         >
           {title}
         </Typography>
-        <IconButton
-          size="small"
-          aria-label="Další měsíc"
-          onClick={() => setShown((m) => shiftMonth(m, 1))}
-        >
-          <ChevronRight fontSize="small" />
-        </IconButton>
+        <Stack direction="row" spacing={0.5}>
+          <IconButton
+            size="small"
+            aria-label="Předchozí měsíc"
+            onClick={() => setShown((m) => shiftMonth(m, -1))}
+            sx={{ width: 28, height: 28, color: "text.secondary" }}
+          >
+            <ChevronLeft fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            aria-label="Další měsíc"
+            onClick={() => setShown((m) => shiftMonth(m, 1))}
+            sx={{ width: 28, height: 28, color: "text.secondary" }}
+          >
+            <ChevronRight fontSize="small" />
+          </IconButton>
+        </Stack>
       </Stack>
 
       <Box
         aria-hidden
-        sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", mb: 0.25 }}
+        sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", mb: 0.5 }}
       >
-        {WEEKDAY_SHORT.map((d, i) => (
+        {WEEKDAY_SHORT.map((d) => (
           <Typography
             key={d}
-            variant="caption"
             sx={{
               textAlign: "center",
-              fontWeight: 600,
-              color: i >= 5 ? "text.disabled" : "text.secondary",
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              color: "text.secondary",
             }}
           >
-            {d}
+            {d.charAt(0).toUpperCase()}
           </Typography>
         ))}
       </Box>
@@ -162,9 +164,9 @@ export function MiniCalendar({
       </Box>
 
       {showsHoliday || showsClosed ? (
-        <Stack direction="row" spacing={1.5} sx={{ mt: 0.75, px: 0.5 }}>
+        <Stack direction="row" spacing={1.5} sx={{ mt: 1, px: 0.5 }}>
           {showsHoliday ? (
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
               <Box component="span" sx={{ color: "error.main", fontWeight: 700 }}>
                 červené číslo
               </Box>{" "}
@@ -175,15 +177,13 @@ export function MiniCalendar({
             <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
               <Box
                 sx={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: 0.5,
-                  backgroundImage: HATCH,
-                  border: "1px solid",
-                  borderColor: "divider",
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  bgcolor: "text.disabled",
                 }}
               />
-              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
                 zavřeno
               </Typography>
             </Stack>
@@ -232,14 +232,14 @@ function DayCell({
          */
         backgroundColor:
           mark === "week" || (mark === "day" && view === "week")
-            ? alpha(theme.palette.primary.main, 0.2)
+            ? alpha(theme.palette.primary.main, 0.1)
             : banded
-              ? alpha(theme.palette.primary.main, 0.08)
+              ? alpha(theme.palette.primary.main, 0.05)
               : "transparent",
-        borderTopLeftRadius: banded && first ? 18 : 0,
-        borderBottomLeftRadius: banded && first ? 18 : 0,
-        borderTopRightRadius: banded && last ? 18 : 0,
-        borderBottomRightRadius: banded && last ? 18 : 0,
+        borderTopLeftRadius: banded && first ? 16 : 0,
+        borderBottomLeftRadius: banded && first ? 16 : 0,
+        borderTopRightRadius: banded && last ? 16 : 0,
+        borderBottomRightRadius: banded && last ? 16 : 0,
       })}
     >
       <Box
@@ -257,12 +257,11 @@ function DayCell({
           width: CELL,
           height: CELL,
           borderRadius: "50%",
-          border: "2px solid",
+          border: "1.5px solid",
           borderColor:
             today && mark !== "day" ? theme.palette.primary.main : "transparent",
           backgroundColor:
             mark === "day" ? theme.palette.primary.main : "transparent",
-          backgroundImage: closed && mark !== "day" ? HATCH : "none",
           color:
             mark === "day"
               ? theme.palette.primary.contrastText
@@ -271,22 +270,20 @@ function DayCell({
                 : outside
                   ? theme.palette.text.disabled
                   : closed
-                    ? theme.palette.text.secondary
+                    ? theme.palette.text.disabled
                     : theme.palette.text.primary,
           font: "inherit",
-          fontSize: "0.8125rem",
+          fontSize: 13,
           fontWeight: mark === "day" || holiday || today ? 700 : 400,
           textDecoration: holiday && mark === "day" ? "underline" : "none",
-          textDecorationColor: theme.palette.error.light,
           textUnderlineOffset: 3,
-          opacity: outside && mark === "none" ? 0.7 : 1,
           cursor: "pointer",
           p: 0,
           "&:hover": {
             backgroundColor:
               mark === "day"
                 ? theme.palette.primary.dark
-                : alpha(theme.palette.primary.main, 0.14),
+                : alpha(theme.palette.primary.main, 0.12),
           },
           "&:focus-visible": {
             outline: `2px solid ${theme.palette.primary.main}`,

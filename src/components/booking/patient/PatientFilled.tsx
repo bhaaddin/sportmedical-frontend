@@ -1,16 +1,18 @@
-import { Alert, Box, Button, Stack, TextField, Typography } from "@mui/material";
-import CheckCircle from "@mui/icons-material/CheckCircle";
+import { Alert, Avatar, Box, Button, Stack, Typography } from "@mui/material";
 import { BookingApiError } from "../../../api/apiError";
+import { SoftCard } from "../../ui";
 import { formatDateOnly } from "../../../utils/time";
+import { initials } from "../NewAppointmentDialog.logic";
 import { usePatientCard } from "./patientCard";
+import { displayName } from "./patientTypeahead";
 import type { PatientHit } from "./patientTypeahead";
 
 /**
- * The patient once picked: name, surname, date of birth, telephone, e-mail,
- * insurer and address filled in from what the clinic already holds, so nobody
- * types them again.
+ * The patient once picked - the board's summary card: initials, name, and
+ * under it the telephone and the e-mail the clinic already holds, so nobody
+ * types them again. "Změnit" hands the choice back.
  *
- * The fields are read-only on purpose. An appointment carries only the
+ * Nothing here is editable on purpose. An appointment carries only the
  * patient's id (contract 4.5); a changed telephone number belongs in the
  * registry, where a change to a patient's data is recorded with its author and
  * its reason. A box that looked editable here would accept a correction and
@@ -19,63 +21,43 @@ import type { PatientHit } from "./patientTypeahead";
 export function PatientFilled({
   hit,
   onChange,
+  changeLabel = "Změnit",
 }: {
   hit: PatientHit;
   onChange: () => void;
+  changeLabel?: string;
 }) {
   const card = usePatientCard(hit.id, true);
   const notInRegistry =
     card.error instanceof BookingApiError && card.error.kind === "notFound";
+  const name = displayName(hit);
 
-  const field = (label: string, value: string | null | undefined, loading = false) => (
-    <TextField
-      size="small"
-      fullWidth
-      label={label}
-      value={loading ? "…" : value ?? ""}
-      placeholder="neuvedeno"
-      slotProps={{ input: { readOnly: true }, inputLabel: { shrink: true } }}
-    />
-  );
+  const phone = card.data?.phone ?? hit.phone ?? null;
+  const email = card.data?.email ?? null;
+  const facts = [
+    phone ?? (card.isLoading ? "…" : null),
+    email,
+    hit.dateOfBirth ? `nar. ${formatDateOnly(hit.dateOfBirth)}` : null,
+  ].filter((f): f is string => f !== null);
 
   return (
-    <Box
-      sx={{
-        border: "1px solid",
-        borderColor: "success.light",
-        borderRadius: 2,
-        p: 1.5,
-      }}
-    >
-      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          <CheckCircle color="success" fontSize="small" />
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            Pacient vybrán z databáze
-          </Typography>
+    <Box>
+      <SoftCard tone="soft" sx={{ p: 2 }} aria-label={`Vybraný pacient ${name}`}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+          <Avatar sx={{ width: 40, height: 40, bgcolor: "primary.main", color: "primary.contrastText" }}>
+            {initials(name)}
+          </Avatar>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 700, lineHeight: 1.3 }}>{name}</Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+              {facts.length > 0 ? facts.join(" · ") : "kontaktní údaje neuvedeny"}
+            </Typography>
+          </Box>
+          <Button size="small" onClick={onChange}>
+            {changeLabel}
+          </Button>
         </Stack>
-        <Button size="small" onClick={onChange}>
-          Změnit pacienta
-        </Button>
-      </Stack>
-
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-          gap: 1.5,
-        }}
-      >
-        {field("Jméno", hit.firstName || hit.fullName)}
-        {field("Příjmení", hit.lastName)}
-        {field("Datum narození", hit.dateOfBirth ? formatDateOnly(hit.dateOfBirth) : null)}
-        {field("Telefon", card.data?.phone, card.isLoading)}
-        {field("E-mail", card.data?.email, card.isLoading)}
-        {field("Pojišťovna", card.data?.insurerCode, card.isLoading)}
-        <Box sx={{ gridColumn: { sm: "1 / -1" } }}>
-          {field("Adresa", card.data?.address, card.isLoading)}
-        </Box>
-      </Box>
+      </SoftCard>
 
       {card.error ? (
         <Alert severity={notInRegistry ? "info" : "warning"} sx={{ mt: 1.5 }}>

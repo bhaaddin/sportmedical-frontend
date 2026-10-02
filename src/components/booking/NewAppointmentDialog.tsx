@@ -1,67 +1,97 @@
-import { useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   FormControlLabel,
+  Link,
   MenuItem,
   Stack,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import CalendarMonthOutlined from "@mui/icons-material/CalendarMonthOutlined";
 import CheckCircleOutline from "@mui/icons-material/CheckCircleOutlineOutlined";
 import ContentCopy from "@mui/icons-material/ContentCopy";
+import EventBusyOutlined from "@mui/icons-material/EventBusyOutlined";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { appointmentsApi } from "../../api/appointments";
 import { activitiesApi } from "../../api/activities";
 import { workingHoursApi } from "../../api/workingHours";
 import { calendarsApi } from "../../api/calendars";
+import { patientPreRegistrationApi } from "../../api/patientPreRegistration";
 import { BookingApiError } from "../../api/apiError";
 import { isKnownPaperworkReason } from "../../api/bookingContracts";
 import { usePermission } from "../../auth/usePermission";
-import {
-  formatDateOnly,
-  formatPragueDateTime,
-  parseDateOnly,
-  toDateOnly,
-} from "../../utils/time";
+import { DESIGN, SectionLabel, SoftCard } from "../ui";
+import { formatDateOnly, formatPragueDateTime, toDateOnly } from "../../utils/time";
 import { dayState, dayStateLabelKey } from "../../pages/booking/dayState";
 import { AsyncSection } from "./AsyncSection";
 import { errorText } from "./errorText";
+import { ActivityCards } from "./drawer/ActivityCards";
+import { ClubPicker } from "./drawer/ClubPicker";
+import { DrawerFrame } from "./drawer/DrawerFrame";
+import { ModeCards } from "./drawer/ModeCards";
 import { PatientSearch } from "./patient/PatientSearch";
 import { PatientFilled } from "./patient/PatientFilled";
-import type { PatientHit } from "./patient/patientTypeahead";
+import { QuickPatientForm } from "./patient/QuickPatientForm";
+import { usePatientCard } from "./patient/patientCard";
+import { toHit, type PatientHit } from "./patient/patientTypeahead";
+import { patientsApi } from "../../api/patients";
 import {
+  EMPTY_CLUB_DRAFT,
+  EMPTY_QUICK_DRAFT,
+  drawerTitle,
   endClock,
+  formatCzk,
+  initials,
   isCompleteMoment,
   isDateOnly,
   isStartOffered,
+  normalizePhone,
   normalizeTime,
   parseLocalDateTime,
   pragueClock,
-  rangeLabel,
+  quickRegistrationPath,
   selectionMinutes,
+  slotSubtitle,
+  slotTitle,
+  splitFullName,
+  stepSubtitle,
   toStartUtc,
+  type DrawerMode,
+  type DrawerStep,
+  type NewClubDraft,
+  type QuickPatientDraft,
 } from "./NewAppointmentDialog.logic";
 
 /**
- * Booking an appointment by hand - contract 5.9, in the order the owner works
- * on the telephone: **date -> time -> patient -> činnost -> book**. Opened from
- * the calendar grid with a time already chosen (a click or a drag), it starts
- * at the patient: the date and the range "od 09:00 do 10:00" are already there,
- * one "Změnit" away if they were wrong.
+ * Booking an appointment by hand - contract 5.9, drawn as the board's
+ * right-hand drawer (design 2026-10-03, screens 8–11) in two steps: **who
+ * comes**, then **what is done**. Opened from the calendar grid with a time
+ * already chosen (a click or a drag), it starts at the patient: the slot is
+ * already there in the summary card, one "Změnit" away if it was wrong.
  *
  * This is the only screen in the application that creates an appointment.
+ *
+ * Step 1 - "kdo přijde" - has three cards and one small link:
+ *   - **Z databáze**: search the register, pick the row.
+ *   - **Rychlá registrace**: the caller is new. With a surname, an e-mail and
+ *     a date of birth the register creates a real patient (who gets the
+ *     completion link after booking); without them the slot is booked under
+ *     the name and telephone alone - the old "Neznámý pacient" - and the
+ *     registration is finished at the desk.
+ *   - **Klub**: pick or found the club, then hand the slot to the reservation
+ *     screen (`/vyhrazeni`), which books places and issues the athletes' link.
+ *   - *Jen zablokovat čas bez pacienta*: the old "Událost bez vazby" - a
+ *     slot with nobody behind it, for training or a service visit.
+ *
+ * Step 2 - "co se bude dělat" - is the činnost, the time, the note and the
+ * two checkboxes, with the price in the footer.
  *
  * Three rules hold the flow together:
  *
@@ -69,59 +99,61 @@ import {
  *     is checked against `availability` for the chosen činnost, and the only
  *     times offered instead are the ones that answer returned. The činnosti on
  *     offer are the ones the server says the day offers
- *     (`preview.offeredActivityIds`).
+ *     (`preview.offeredActivityIds`); the rest are reachable behind "Zobrazit
+ *     všechny činnosti z ceníku" and book only through the override.
  *   - **6.4** - a time outside the offer is reachable only as an override: only
  *     for `bookings.edit`, set apart, and never without a typed reason.
  *   - **6.3** - after the server confirms, nothing is drawn optimistically; the
  *     caller reloads. A `409` is somebody else having been faster: the offer
  *     reloads, the form stays, and the server's sentence is shown calmly.
  *
- * Searching comes before creating a patient - see `patient/PatientSearch.tsx`.
- *
- * The Czech wording new in this version lives in `TEXT` below rather than in
- * `cs.json`, which several teams edit at the same time; moving it there is a
- * mechanical follow-up.
+ * The Czech wording lives in `TEXT` below rather than in `cs.json`, which
+ * several teams edit at the same time; the keys that were already there are
+ * still read through `t()`.
  */
 
 /** 4.5: `source` 0 is the desk. Online is 1, a club is 2; neither books here. */
 const SOURCE_STAFF = 0;
 
-/** 4.5: the three ways to fill one slot. The server tells them apart by who. */
-type BookingMode = "patient" | "unknown" | "event";
-
 const TEXT = {
-  when: "Termín",
-  patient: "Vyhledávání z databáze",
-  mode: "Typ objednávky",
-  modePatient: "Pacient",
-  modeUnknown: "Neznámý pacient",
-  modeEvent: "Událost bez vazby",
-  contact: "Kontakt",
-  contactName: "Jméno",
-  contactNameUnknown: "Jméno (neregistrovaný pacient)",
-  contactNameEvent: "Název události (nepovinné)",
-  contactPhone: "Telefon",
-  sms: "Odeslat SMS s potvrzením",
-  smsUnavailable: "SMS zatím nejsou aktivní (připravujeme).",
-  pickNameFirst: "Nejprve zadejte jméno.",
+  who: "Kdo se objednává",
+  findPatient: "Najít pacienta",
+  newPatient: "Nový pacient — základní údaje",
+  eventLink: "Jen zablokovat čas bez pacienta",
+  eventTitle: "Čas bez pacienta",
   eventExplain: "Termín bez vazby na pacienta — např. školení nebo servis přístroje.",
+  eventName: "Název události (nepovinné)",
+  backToPatient: "Zpět na výběr pacienta",
   activity: "Činnost",
   note: "Poznámka",
+  notePlaceholder: "Nepovinné — co má lékař vědět předem",
   date: "Datum",
   time: "Čas od",
+  duration: "Trvání",
+  until: "Čas do",
   change: "Změnit",
+  continue: "Pokračovat",
+  createAndContinue: "Vytvořit a pokračovat",
+  book: "Objednat termín",
+  total: "Celkem k úhradě",
   pickWhenFirst: "Nejprve vyberte kalendář, datum a čas.",
-  pickPatientFirst: "Nejprve vyberte pacienta.",
-  offeredOnly: "Jen činnosti, které má kalendář v tento den.",
   dayOffersNothing: "V tento den kalendář nenabízí žádnou činnost",
-  selection: (range: string) => `Vybraný úsek v kalendáři: ${range}.`,
-  appointment: (range: string, minutes: number) => `Termín ${range} (${minutes} min)`,
-  free: "Čas je volný.",
+  free: "Slot je volný. Nekoliduje s žádnou rezervací ani s obědem.",
   notOffered: (time: string) =>
     `V ${time} tuto činnost nabídnout nelze — čas je obsazený nebo mimo pracovní dobu.`,
   pickOffered: "Volné začátky v tento den:",
   noneThatDay: "V tento den už pro tuto činnost není volný čas. Zkuste jiné datum.",
   overrideTimeIs: (when: string) => `Objedná se na ${when}, mimo nabídku.`,
+  sms: (phone: string | null) => `Poslat SMS s potvrzením${phone ? ` na ${phone}` : ""}`,
+  smsUnavailable: "SMS zatím nejsou aktivní (připravujeme).",
+  sendLink: "Poslat odkaz na vyplnění vstupního dotazníku",
+  sendLinkNobody: "Bez registrovaného pacienta není komu odkaz poslat.",
+  walkIn: "nový pacient — registrace se doplní na místě",
+  linkTitle: "Odkaz pro pacienta (pošlete e-mailem):",
+  linkSent: "E-mail s odkazem je ve frontě k odeslání.",
+  linkValid: "Platí 24 hodin. Když pacient do té doby registraci nedokončí, rezervace se uvolní.",
+  linkFailed: "Odkaz se nepodařilo vygenerovat.",
+  linkRetry: "Zkusit znovu",
 };
 
 interface NewAppointmentDialogProps {
@@ -137,6 +169,25 @@ interface NewAppointmentDialogProps {
   initialStart?: string;
   /** End of the dragged range, local clinic time `yyyy-MM-ddTHH:mm`. */
   initialEnd?: string;
+  /**
+   * Opened from a patient's card: the drawer starts in "Z databáze" with this
+   * patient already chosen, so the desk goes straight to the činnost.
+   */
+  initialPatientId?: string;
+}
+
+interface IssuedLinkView {
+  url: string;
+  emailQueued: boolean;
+}
+
+interface BookedView {
+  startUtc: string;
+  warnings: { code: string; message: string }[];
+  /** The completion link issued after booking, when it was asked for. */
+  link: IssuedLinkView | null;
+  linkFailed: boolean;
+  patientId: string | null;
 }
 
 export function NewAppointmentDialog({
@@ -147,9 +198,11 @@ export function NewAppointmentDialog({
   initialCalendarId,
   initialStart,
   initialEnd,
+  initialPatientId,
 }: NewAppointmentDialogProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   /*
    * Booking past the offer: the person who may change an appointment is the
    * person who may book one outside what the server offered.
@@ -177,40 +230,50 @@ export function NewAppointmentDialog({
   });
   const [editingWhen, setEditingWhen] = useState(!fromGrid);
 
-  /* ── Who, what, and a note ── */
-  /* The three booking modes. "patient" searches the register; "unknown" takes a
-     walk-in by name; "event" holds the time with nobody behind it. */
-  const [mode, setMode] = useState<BookingMode>("patient");
+  /* ── The two steps and who the slot is for ── */
+  const [step, setStep] = useState<DrawerStep>(1);
+  const [mode, setMode] = useState<DrawerMode>("database");
   const [patient, setPatient] = useState<PatientHit | null>(null);
-  const [contactName, setContactName] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
-  const [sendSms, setSendSms] = useState(false);
+  const [quick, setQuick] = useState<QuickPatientDraft>(EMPTY_QUICK_DRAFT);
+  const [eventName, setEventName] = useState("");
+  const [clubId, setClubId] = useState<string | null>(null);
+  const [clubDraft, setClubDraft] = useState<NewClubDraft>(EMPTY_CLUB_DRAFT);
+
+  /* A patient handed over by their card is looked up once and put in place. */
+  useEffect(() => {
+    if (!initialPatientId) return undefined;
+    let alive = true;
+    patientsApi
+      .getById(initialPatientId)
+      .then((row) => {
+        if (!alive) return;
+        const hit = toHit(row);
+        if (hit) {
+          setMode("database");
+          setPatient(hit);
+        }
+      })
+      .catch(() => {
+        /* Unknown id or no permission: the drawer simply starts with nobody chosen. */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [initialPatientId]);
+
+  /* ── What, a note, and the two checkboxes ── */
   const [activityId, setActivityId] = useState("");
   const [note, setNote] = useState("");
-  /* A quick-registration link, kept so it survives onto the booked screen. */
-  const [quickLink, setQuickLink] = useState<string | null>(null);
-  const [linkCopied, setLinkCopied] = useState(false);
-
-  const copyQuickLink = async () => {
-    if (!quickLink) return;
-    try {
-      await navigator.clipboard.writeText(quickLink);
-      setLinkCopied(true);
-      window.setTimeout(() => setLinkCopied(false), 2000);
-    } catch {
-      /* clipboard blocked; the address is on screen to copy by hand */
-    }
-  };
+  const [sendSms, setSendSms] = useState(false);
+  const [sendLink, setSendLink] = useState(false);
 
   /* 6.4: a time outside the offer, and never without a reason. */
   const [overriding, setOverriding] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
 
   const [conflict, setConflict] = useState<unknown>(null);
-  const [booked, setBooked] = useState<{
-    startUtc: string;
-    warnings: { code: string; message: string }[];
-  } | null>(null);
+  const [booked, setBooked] = useState<BookedView | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const calendarsQuery = useQuery({
     queryKey: ["calendars"],
@@ -262,9 +325,13 @@ export function NewAppointmentDialog({
     const ids = new Set((previewQuery.data ?? []).flatMap((p) => p.offeredActivityIds ?? []));
     return activities.filter((a) => ids.has(a.id));
   }, [previewQuery.data, activities]);
+  const otherActivities = useMemo(() => {
+    const offered = new Set(offeredActivities.map((a) => a.id));
+    return activities.filter((a) => !offered.has(a.id));
+  }, [activities, offeredActivities]);
   const day = dayState(previewQuery.data ?? []);
   const dayWordKey = dayStateLabelKey(day);
-  const activity = offeredActivities.find((a) => a.id === activityId) ?? null;
+  const activity = activities.find((a) => a.id === activityId) ?? null;
 
   /* Is the chosen start offered for this činnost? Only the server knows. */
   const availabilityQuery = useQuery({
@@ -278,18 +345,74 @@ export function NewAppointmentDialog({
     (s) => !isStartOffered([s], startUtc),
   );
 
+  /* The picked patient's contacts, for the SMS line; the same query the card reads. */
+  const patientCard = usePatientCard(patient?.id ?? null, patient !== null);
+  const quickPhone = normalizePhone(quick.phone);
+  const contactPhone =
+    patient !== null
+      ? (patientCard.data?.phone ?? patient.phone ?? null)
+      : mode === "quick"
+        ? quickPhone
+        : null;
+
+  const quickPath = quickRegistrationPath({
+    name: quick.name,
+    email: quick.email,
+    dateOfBirth: quick.dateOfBirth,
+    mayRegister,
+  });
+
+  /*
+   * "Rychlá registrace" with enough to register: a real patient first, so the
+   * booking carries an id and the patient gets the link. Done on "Vytvořit a
+   * pokračovat", before step 2, the way the inline form always did it.
+   */
+  const register = useMutation({
+    mutationFn: async (): Promise<PatientHit> => {
+      const name = splitFullName(quick.name);
+      if (!name) throw new Error("name");
+      const { patientId } = await patientPreRegistrationApi.preRegister({
+        firstName: name.firstName,
+        lastName: name.lastName,
+        dateOfBirth: quick.dateOfBirth,
+        email: quick.email.trim(),
+        phone: quickPhone ?? undefined,
+      });
+      return {
+        id: patientId,
+        firstName: name.firstName,
+        lastName: name.lastName,
+        fullName: `${name.firstName} ${name.lastName}`,
+        dateOfBirth: quick.dateOfBirth,
+        phone: quickPhone,
+      };
+    },
+    onSuccess: (hit) => {
+      setPatient(hit);
+      setSendLink(true);
+      goToStep2();
+    },
+  });
+
+  const issueLink = async (patientId: string): Promise<IssuedLinkView> => {
+    const issued = await patientPreRegistrationApi.issueLink(patientId);
+    return {
+      url: issued.url ?? `${window.location.origin}${issued.path}`,
+      emailQueued: Boolean(issued.emailQueued || issued.emailWillSend),
+    };
+  };
+
   const book = useMutation({
-    mutationFn: async (
-      input: { overrideReason?: string },
-    ): Promise<{ startUtc: string; warnings: { code: string; message: string }[] }> => {
+    mutationFn: async (input: { overrideReason?: string }): Promise<BookedView> => {
       const noteOrNull = note.trim() === "" ? null : note.trim();
 
       /* A registered patient goes through the ordinary booking, with its patient
          checks and its warnings. A walk-in or an event goes through the
          unregistered path, which carries the contact instead of a patient id. */
-      if (mode === "patient") {
+      let view: BookedView;
+      if (patient !== null) {
         const result = await appointmentsApi.create({
-          patientId: patient?.id ?? "",
+          patientId: patient.id,
           calendarId: effectiveCalendarId,
           activityId: activity?.id ?? "",
           startUtc: startUtc ?? "",
@@ -297,26 +420,42 @@ export function NewAppointmentDialog({
           note: noteOrNull,
           overrideReason: input.overrideReason,
         });
-        return { startUtc: result.appointment.startUtc, warnings: result.warnings ?? [] };
+        view = {
+          startUtc: result.appointment.startUtc,
+          warnings: result.warnings ?? [],
+          link: null,
+          linkFailed: false,
+          patientId: patient.id,
+        };
+      } else {
+        const name = mode === "event" ? eventName.trim() : quick.name.trim();
+        const appointment = await appointmentsApi.createUnregistered({
+          calendarId: effectiveCalendarId,
+          activityId: activity?.id ?? "",
+          startUtc: startUtc ?? "",
+          name: name === "" ? null : name,
+          phone: mode === "quick" ? quickPhone : null,
+          note: noteOrNull,
+          overrideReason: input.overrideReason,
+        });
+        view = { startUtc: appointment.startUtc, warnings: [], link: null, linkFailed: false, patientId: null };
       }
 
-      const appointment = await appointmentsApi.createUnregistered({
-        calendarId: effectiveCalendarId,
-        activityId: activity?.id ?? "",
-        startUtc: startUtc ?? "",
-        name: contactName.trim() === "" ? null : contactName.trim(),
-        phone: contactPhone.trim() === "" ? null : contactPhone.trim(),
-        note: noteOrNull,
-        overrideReason: input.overrideReason,
-      });
-      return { startUtc: appointment.startUtc, warnings: [] };
+      /* The link is asked for after the booking, so the e-mail can name the
+         appointment. A link that fails must not unbook anybody: it is retried
+         from the booked screen instead. */
+      if (sendLink && view.patientId) {
+        try {
+          view.link = await issueLink(view.patientId);
+        } catch {
+          view.linkFailed = true;
+        }
+      }
+      return view;
     },
     onSuccess: (result) => {
       setConflict(null);
-      setBooked({
-        startUtc: result.startUtc,
-        warnings: result.warnings,
-      });
+      setBooked(result);
       onBooked();
     },
     onError: (error) => {
@@ -335,6 +474,24 @@ export function NewAppointmentDialog({
     },
   });
 
+  /* The link, asked for again from the booked screen when the first try failed. */
+  const retryLink = useMutation({
+    mutationFn: (patientId: string) => issueLink(patientId),
+    onSuccess: (link) =>
+      setBooked((b) => (b ? { ...b, link, linkFailed: false } : b)),
+    onError: () => setBooked((b) => (b ? { ...b, linkFailed: true } : b)),
+  });
+
+  const copyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      /* clipboard blocked; the address is on screen to copy by hand */
+    }
+  };
+
   /* Any change to the time drops the dragged end: it no longer describes it. */
   const changeTime = (next: string) => {
     setTime(next);
@@ -343,33 +500,52 @@ export function NewAppointmentDialog({
     setConflict(null);
   };
 
+  const changeDate = (next: string) => {
+    if (!next) return;
+    setDate(next);
+    setSelectionEnd(null);
+    setOverriding(false);
+    setConflict(null);
+  };
+
   const resetBooking = () => {
+    setStep(1);
+    setMode("database");
     setPatient(null);
-    setContactName("");
-    setContactPhone("");
-    setSendSms(false);
+    setQuick(EMPTY_QUICK_DRAFT);
+    setEventName("");
+    setClubId(null);
+    setClubDraft(EMPTY_CLUB_DRAFT);
     setActivityId("");
     setNote("");
-    setQuickLink(null);
-    setLinkCopied(false);
+    setSendSms(false);
+    setSendLink(false);
     setOverriding(false);
     setOverrideReason("");
     setConflict(null);
     setBooked(null);
+    setLinkCopied(false);
     book.reset();
+    register.reset();
+    retryLink.reset();
   };
 
   /* Switching mode clears who the last mode named, so a walk-in's name cannot ride
      along onto a registered booking, or the other way round. */
-  const changeMode = (next: BookingMode) => {
+  const changeMode = (next: DrawerMode) => {
     if (next === mode) return;
     setMode(next);
     setPatient(null);
-    setContactName("");
-    setContactPhone("");
-    setSendSms(false);
-    setQuickLink(null);
+    setEventName("");
+    setSendLink(false);
     setConflict(null);
+    register.reset();
+  };
+
+  /* From the empty search result straight to the new-patient card, name carried over. */
+  const quickRegisterFromSearch = (typed: string) => {
+    changeMode("quick");
+    setQuick((q) => ({ ...q, name: typed }));
   };
 
   const close = () => {
@@ -377,557 +553,758 @@ export function NewAppointmentDialog({
     onClose();
   };
 
-  /* Who the slot is for is ready when: a patient is picked (patient mode); a name
-     is typed (unknown mode); or nothing is needed at all (event mode). */
-  const whoReady =
-    mode === "patient"
-      ? patient !== null
-      : mode === "unknown"
-        ? contactName.trim().length > 0
-        : true;
+  /* The time on the slot card was wrong: from the grid, close and pick again
+     there; from elsewhere, show the fields. */
+  const changeWhen = () => {
+    if (fromGrid) {
+      close();
+    } else {
+      setEditingWhen(true);
+    }
+  };
 
-  const ready =
-    whoReady && activity !== null && startUtc !== null && !book.isPending;
+  const goToStep2 = () => {
+    /* The examination the caller asked for becomes the činnost, if the day has it. */
+    if (mode === "quick" && quick.activityId !== "" && activityId === "") {
+      setActivityId(quick.activityId);
+    }
+    setStep(2);
+  };
+
+  /* Who the slot is for is ready when: a patient is picked; a name is typed
+     (quick); a club is picked or named (club); or nothing is needed (event). */
+  const whoReady =
+    patient !== null ||
+    (mode === "quick"
+      ? quick.name.trim().length > 0
+      : mode === "club"
+        ? clubId !== null || clubDraft.name.trim().length > 0
+        : mode === "event");
+
+  const canContinue = whoReady && whenComplete && !register.isPending;
+
+  const continueStep1 = () => {
+    if (!canContinue) return;
+    if (mode === "club") {
+      /* The club flow is the reservation screen's; this hands it the slot. */
+      navigate("/vyhrazeni", {
+        state: {
+          calendarId: effectiveCalendarId,
+          startUtc,
+          endUtc: selectionEnd ? toStartUtc({ date, time: selectionEnd }) : null,
+          clubId: clubId ?? undefined,
+          newClub:
+            clubId === null && clubDraft.name.trim() !== ""
+              ? {
+                  /* The shape /vyhrazeni reads: ReservationHandoff.newClub in
+                     src/pages/booking/PartnerOrdersPage.tsx. */
+                  name: clubDraft.name.trim(),
+                  contactPerson: clubDraft.contactPerson.trim() || undefined,
+                  contactPhone: normalizePhone(clubDraft.phone) || undefined,
+                  contactEmail: clubDraft.email.trim() || undefined,
+                  headcount: Number.parseInt(clubDraft.athleteCount, 10) || undefined,
+                }
+              : undefined,
+        },
+      });
+      close();
+      return;
+    }
+    if (mode === "quick" && patient === null && quickPath === "registered") {
+      register.mutate();
+      return;
+    }
+    goToStep2();
+  };
+
+  const ready = whoReady && activity !== null && startUtc !== null && !book.isPending;
   const canBook = ready && availabilityQuery.isSuccess && offered;
   const canBookOverride =
     ready && availabilityQuery.isSuccess && !offered && overrideReason.trim().length > 0;
 
-  /* ── What the dialog looks like once the booking went through ── */
+  const labelId = "new-appointment-title";
+
+  /* ── What the drawer looks like once the booking went through ── */
   if (booked) {
     return (
-      <Dialog open={open} onClose={close} fullWidth maxWidth="sm">
-        <DialogTitle>{t("booking.new.bookedTitle")}</DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={2}>
-            <Alert severity="success">
-              {t("booking.new.bookedAt", {
-                when: formatPragueDateTime(booked.startUtc),
-              })}
-            </Alert>
-            {/*
-              4.5: warnings are shown and do not block. The patient is on the
-              phone; refusing the booking over a missing questionnaire would
-              send them away over paperwork that can follow.
-            */}
-            {booked.warnings.map((w) => (
-              <Alert key={w.code} severity="warning">
-                {w.message ||
-                  (isKnownPaperworkReason(w.code.replace(/^.*\./, ""))
-                    ? t(`booking.paperwork.${w.code.replace(/^.*\./, "")}`)
-                    : t("booking.paperwork.unknown", { code: w.code }))}
-              </Alert>
-            ))}
-            {/* The quick-registration link, so the desk can send it after booking. */}
-            {quickLink ? (
-              <Alert severity="info" icon={false}>
-                <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
-                  Odkaz pro pacienta (pošlete e-mailem):
-                </Typography>
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  spacing={1}
-                  sx={{ alignItems: { sm: "center" } }}
-                >
-                  <Box
-                    sx={{
-                      flex: 1,
-                      fontFamily: "monospace",
-                      fontSize: "0.85rem",
-                      wordBreak: "break-all",
-                      bgcolor: "action.hover",
-                      borderRadius: 1,
-                      px: 1,
-                      py: 0.75,
-                    }}
-                  >
-                    {quickLink}
-                  </Box>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    startIcon={<ContentCopy fontSize="small" />}
-                    onClick={copyQuickLink}
-                  >
-                    {linkCopied ? "Zkopírováno" : "Kopírovat"}
-                  </Button>
-                </Stack>
-                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
-                  Platí 24 hodin. Když pacient do té doby registraci nedokončí,
-                  rezervace se uvolní.
-                </Typography>
-              </Alert>
-            ) : null}
+      <DrawerFrame
+        open={open}
+        onClose={close}
+        labelId={labelId}
+        title={t("booking.new.bookedTitle")}
+        subtitle={formatPragueDateTime(booked.startUtc)}
+        footer={
+          <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
+            <Button variant="outlined" onClick={resetBooking}>
+              {t("booking.new.another")}
+            </Button>
+            <Button variant="contained" onClick={close}>
+              {t("booking.detail.close")}
+            </Button>
           </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={resetBooking}>{t("booking.new.another")}</Button>
-          <Button variant="contained" onClick={close}>
-            {t("booking.detail.close")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        }
+      >
+        <Stack spacing={2}>
+          <Alert severity="success">
+            {t("booking.new.bookedAt", { when: formatPragueDateTime(booked.startUtc) })}
+          </Alert>
+          {/*
+            4.5: warnings are shown and do not block. The patient is on the
+            phone; refusing the booking over a missing questionnaire would
+            send them away over paperwork that can follow.
+          */}
+          {booked.warnings.map((w) => (
+            <Alert key={w.code} severity="warning">
+              {w.message ||
+                (isKnownPaperworkReason(w.code.replace(/^.*\./, ""))
+                  ? t(`booking.paperwork.${w.code.replace(/^.*\./, "")}`)
+                  : t("booking.paperwork.unknown", { code: w.code }))}
+            </Alert>
+          ))}
+          {/* The completion link, so the desk can send it or read it out. */}
+          {booked.link ? (
+            <SoftCard tone="soft" sx={{ p: 2 }}>
+              <Typography variant="body2" sx={{ fontWeight: 700, mb: 1 }}>
+                {TEXT.linkTitle}
+              </Typography>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { sm: "center" } }}>
+                <Box
+                  sx={{
+                    flex: 1,
+                    fontFamily: "monospace",
+                    fontSize: 13,
+                    wordBreak: "break-all",
+                    bgcolor: "background.paper",
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 2,
+                    px: 1.25,
+                    py: 1,
+                  }}
+                >
+                  {booked.link.url}
+                </Box>
+                <Button
+                  variant="contained"
+                  startIcon={<ContentCopy fontSize="small" />}
+                  onClick={() => void copyLink(booked.link?.url ?? "")}
+                >
+                  {linkCopied ? "Zkopírováno" : "Kopírovat"}
+                </Button>
+              </Stack>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
+                {booked.link.emailQueued ? `${TEXT.linkSent} ` : ""}
+                {TEXT.linkValid}
+              </Typography>
+            </SoftCard>
+          ) : booked.linkFailed && booked.patientId ? (
+            <Alert
+              severity="warning"
+              action={
+                <Button
+                  color="inherit"
+                  size="small"
+                  disabled={retryLink.isPending}
+                  onClick={() => retryLink.mutate(booked.patientId ?? "")}
+                >
+                  {TEXT.linkRetry}
+                </Button>
+              }
+            >
+              {TEXT.linkFailed}
+            </Alert>
+          ) : null}
+        </Stack>
+      </DrawerFrame>
     );
   }
 
-  const weekday = isDateOnly(date)
-    ? new Intl.DateTimeFormat("cs-CZ", { weekday: "long" }).format(parseDateOnly(date))
-    : "";
-  const selectedRange =
-    normalizeTime(time) === ""
-      ? ""
-      : selectionEnd
-        ? rangeLabel(time, selectionEnd)
-        : `od ${time}`;
-  const appointmentRange =
-    activity && whenComplete
-      ? rangeLabel(time, endClock(moment, activity.durationMinutes))
-      : null;
   const dragged =
     whenComplete && selectionEnd
       ? selectionMinutes(moment, { date, time: selectionEnd })
       : null;
+  const untilClock = activity && whenComplete ? endClock(moment, activity.durationMinutes) : "";
 
-  return (
-    <Dialog open={open} onClose={close} fullWidth maxWidth="sm">
-      <DialogTitle>{t("booking.new.title")}</DialogTitle>
-      <DialogContent dividers>
-        <Stack spacing={3}>
-          {/* ── Who the slot is for: the three booking modes ── */}
-          <Box component="section" aria-label={TEXT.mode}>
-            <SectionTitle>{TEXT.mode}</SectionTitle>
-            <ToggleButtonGroup
-              exclusive
-              fullWidth
-              size="small"
-              color="primary"
-              value={mode}
-              onChange={(_, next) => {
-                if (next !== null) changeMode(next as BookingMode);
-              }}
-              aria-label={TEXT.mode}
-            >
-              <ToggleButton value="patient">{TEXT.modePatient}</ToggleButton>
-              <ToggleButton value="unknown">{TEXT.modeUnknown}</ToggleButton>
-              <ToggleButton value="event">{TEXT.modeEvent}</ToggleButton>
-            </ToggleButtonGroup>
-          </Box>
+  /* The day's own word, when it is not an ordinary open day. Shown on both steps. */
+  const dayNotice =
+    whenComplete && previewQuery.isSuccess && dayWordKey !== null ? (
+      <Box>
+        <Alert severity="warning">
+          {TEXT.dayOffersNothing}:{" "}
+          {t(dayWordKey, { defaultValue: t("booking.grid.closed.other") })}.
+          {day.kind === "nothing-to-book" ? ` ${t("booking.grid.noActivitiesWhy")}` : ""}
+        </Alert>
+        {day.kind === "nothing-to-book" && mayAssign ? (
+          <Button size="small" component={RouterLink} to="/working-hours" sx={{ mt: 0.5 }}>
+            {t("booking.grid.noActivitiesWhere")}
+          </Button>
+        ) : null}
+      </Box>
+    ) : null;
 
-          {/* ── 1. Date and time ── */}
-          <Box component="section" aria-label={TEXT.when}>
-            <SectionTitle>{TEXT.when}</SectionTitle>
-
-            <AsyncSection
-              isLoading={calendarsQuery.isLoading}
-              isSettled={calendarsQuery.isSuccess || calendarsQuery.isError}
-              error={calendarsQuery.error}
-              isEmpty={calendars.length === 0}
-              emptyText={t("booking.new.noCalendars")}
-              onRetry={() => void calendarsQuery.refetch()}
-              skeletonRows={1}
-            >
-              {!editingWhen && whenComplete ? (
-                <Stack
-                  direction="row"
-                  sx={{
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 1,
-                    border: "1px solid",
-                    borderColor: "primary.light",
-                    borderRadius: 2,
-                    px: 1.5,
-                    py: 1,
-                  }}
-                >
-                  <Box>
-                    <Typography sx={{ fontWeight: 600 }}>
-                      {weekday} {formatDateOnly(date)} · {selectedRange}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                      {calendar?.name}
-                    </Typography>
-                  </Box>
-                  <Button size="small" onClick={() => setEditingWhen(true)}>
-                    {TEXT.change}
-                  </Button>
-                </Stack>
-              ) : (
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                  {calendars.length > 1 ? (
-                    <TextField
-                      select
-                      fullWidth
-                      size="small"
-                      label={t("booking.new.calendar")}
-                      value={effectiveCalendarId}
-                      onChange={(e) => {
-                        setCalendarId(e.target.value);
-                        setConflict(null);
-                      }}
-                    >
-                      {calendars.map((c) => (
-                        <MenuItem key={c.id} value={c.id}>
-                          {c.name}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  ) : null}
-                  <TextField
-                    type="date"
-                    size="small"
-                    label={TEXT.date}
-                    value={date}
-                    onChange={(e) => {
-                      if (!e.target.value) return;
-                      setDate(e.target.value);
-                      setSelectionEnd(null);
-                      setConflict(null);
-                    }}
-                    slotProps={{ inputLabel: { shrink: true } }}
-                    sx={{ minWidth: 160 }}
-                  />
-                  <TextField
-                    type="time"
-                    size="small"
-                    label={TEXT.time}
-                    value={time}
-                    onChange={(e) => changeTime(normalizeTime(e.target.value))}
-                    slotProps={{
-                      inputLabel: { shrink: true },
-                      htmlInput: { step: 300 },
-                    }}
-                    sx={{ minWidth: 120 }}
-                  />
-                </Stack>
-              )}
-            </AsyncSection>
-
-            {/* The day's own word, when it is not an ordinary open day. */}
-            {whenComplete && previewQuery.isSuccess && dayWordKey !== null ? (
-              <Alert severity="warning" sx={{ mt: 1 }}>
-                {TEXT.dayOffersNothing}:{" "}
-                {t(dayWordKey, { defaultValue: t("booking.grid.closed.other") })}.
-                {day.kind === "nothing-to-book"
-                  ? ` ${t("booking.grid.noActivitiesWhy")}`
-                  : ""}
-              </Alert>
-            ) : null}
-            {whenComplete && day.kind === "nothing-to-book" && mayAssign ? (
-              <Button
-                size="small"
-                component={RouterLink}
-                to="/working-hours"
-                sx={{ mt: 0.5 }}
-              >
-                {t("booking.grid.noActivitiesWhere")}
-              </Button>
-            ) : null}
-          </Box>
-
-          {/* ── 2. Who the slot is for — by mode ── */}
-          {mode === "patient" ? (
-            <Box component="section" aria-label={TEXT.patient}>
-              <SectionTitle>{TEXT.patient}</SectionTitle>
-              {patient ? (
-                <PatientFilled hit={patient} onChange={() => setPatient(null)} />
-              ) : (
-                <PatientSearch
-                  enabled={open}
-                  autoFocus={fromGrid}
-                  mayRegister={mayRegister}
-                  onPick={setPatient}
-                  onLink={setQuickLink}
-                />
-              )}
-            </Box>
-          ) : (
-            <Box component="section" aria-label={TEXT.contact}>
-              <SectionTitle>{TEXT.contact}</SectionTitle>
-              {mode === "event" ? (
-                <Typography variant="body2" sx={{ color: "text.secondary", mb: 1 }}>
-                  {TEXT.eventExplain}
-                </Typography>
-              ) : null}
-              <Stack spacing={1.5}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  autoFocus={mode === "unknown"}
-                  required={mode === "unknown"}
-                  label={mode === "unknown" ? TEXT.contactNameUnknown : TEXT.contactNameEvent}
-                  value={contactName}
-                  onChange={(e) => setContactName(e.target.value)}
-                />
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="tel"
-                  label={TEXT.contactPhone}
-                  value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
-                />
-                {/* 5.x: SMS confirmation is phase two. The control is shown so the
-                    desk knows it is coming, but it is disabled and sends nothing. */}
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      disabled
-                      checked={sendSms}
-                      onChange={(e) => setSendSms(e.target.checked)}
-                    />
-                  }
-                  label={
-                    <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                      {TEXT.sms} — {TEXT.smsUnavailable}
-                    </Typography>
-                  }
-                />
-              </Stack>
-            </Box>
-          )}
-
-          {/* ── 3. The činnost, and whether the time is free for it ── */}
-          <Box component="section" aria-label={TEXT.activity}>
-            <SectionTitle>{TEXT.activity}</SectionTitle>
-            {!whenComplete ? (
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                {TEXT.pickWhenFirst}
-              </Typography>
-            ) : !whoReady ? (
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                {mode === "patient" ? TEXT.pickPatientFirst : TEXT.pickNameFirst}
-              </Typography>
-            ) : (
-              <AsyncSection
-                isLoading={activitiesQuery.isLoading || previewQuery.isLoading}
-                isSettled={
-                  (activitiesQuery.isSuccess || activitiesQuery.isError) &&
-                  (previewQuery.isSuccess || previewQuery.isError)
-                }
-                error={activitiesQuery.error ?? previewQuery.error}
-                isEmpty={offeredActivities.length === 0}
-                emptyText={
-                  activities.length === 0
-                    ? t("booking.new.noActivities")
-                    : `${TEXT.dayOffersNothing}.`
-                }
-                onRetry={() => {
-                  void activitiesQuery.refetch();
-                  void previewQuery.refetch();
-                }}
-                skeletonRows={1}
-              >
-                <Stack spacing={1.5}>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    label={t("booking.new.activity")}
-                    value={activity?.id ?? ""}
-                    helperText={TEXT.offeredOnly}
-                    onChange={(e) => {
-                      setActivityId(e.target.value);
-                      setOverriding(false);
-                      setConflict(null);
-                    }}
-                  >
-                    {offeredActivities.map((a) => (
-                      <MenuItem key={a.id} value={a.id}>
-                        {a.name} · {a.durationMinutes} min
-                        {a.priceCzk != null
-                          ? ` · ${new Intl.NumberFormat("cs-CZ").format(a.priceCzk)} Kč`
-                          : ""}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-
-                  {activity && appointmentRange ? (
-                    <Box>
-                      <Typography sx={{ fontWeight: 600 }}>
-                        {TEXT.appointment(appointmentRange, activity.durationMinutes)}
-                        {activity.priceCzk != null
-                          ? ` · ${new Intl.NumberFormat("cs-CZ").format(activity.priceCzk)} Kč`
-                          : ""}
-                      </Typography>
-                      {dragged !== null &&
-                      dragged !== activity.durationMinutes &&
-                      selectionEnd ? (
-                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                          {TEXT.selection(rangeLabel(time, selectionEnd))}
-                        </Typography>
-                      ) : null}
-                    </Box>
-                  ) : null}
-
-                  {conflict ? (
-                    <Alert severity="info" onClose={() => setConflict(null)}>
-                      {errorText(conflict, t)}
-                    </Alert>
-                  ) : null}
-
-                  {activity ? (
-                    <AsyncSection
-                      isLoading={availabilityQuery.isLoading}
-                      isSettled={availabilityQuery.isSuccess || availabilityQuery.isError}
-                      error={availabilityQuery.error}
-                      isEmpty={false}
-                      emptyText=""
-                      onRetry={() => void availabilityQuery.refetch()}
-                      skeletonRows={1}
-                    >
-                      {offered ? (
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          sx={{ alignItems: "center", color: "success.main" }}
-                        >
-                          <CheckCircleOutline fontSize="small" />
-                          <Typography variant="body2">{TEXT.free}</Typography>
-                        </Stack>
-                      ) : (
-                        <Stack spacing={1}>
-                          <Alert severity="info">{TEXT.notOffered(time)}</Alert>
-                          {alternatives.length > 0 ? (
-                            <Box>
-                              <Typography
-                                variant="body2"
-                                sx={{ color: "text.secondary", mb: 0.5 }}
-                              >
-                                {TEXT.pickOffered}
-                              </Typography>
-                              <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5 }}>
-                                {alternatives.map((slot) => (
-                                  <Button
-                                    key={slot.startUtc}
-                                    size="small"
-                                    variant="outlined"
-                                    disabled={book.isPending}
-                                    onClick={() => changeTime(pragueClock(slot.startUtc))}
-                                  >
-                                    {pragueClock(slot.startUtc)}
-                                  </Button>
-                                ))}
-                              </Stack>
-                            </Box>
-                          ) : (
-                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                              {TEXT.noneThatDay}
-                            </Typography>
-                          )}
-
-                          {/*
-                            6.4. Not an ordinary action: only a role that may
-                            override sees it at all, it is set apart, and it
-                            will not submit without a reason somebody typed.
-                          */}
-                          {mayOverride ? (
-                            overriding ? (
-                              <Stack
-                                spacing={1}
-                                sx={{
-                                  border: "1px solid",
-                                  borderColor: "warning.main",
-                                  borderRadius: 2,
-                                  p: 2,
-                                }}
-                              >
-                                <Typography variant="body2">
-                                  {t("booking.new.overrideExplain")}
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                  {TEXT.overrideTimeIs(`${formatDateOnly(date)} ${time}`)}
-                                </Typography>
-                                <TextField
-                                  size="small"
-                                  label={t("booking.new.overrideReason")}
-                                  value={overrideReason}
-                                  onChange={(e) => setOverrideReason(e.target.value)}
-                                />
-                                <Stack direction="row" spacing={1}>
-                                  <Button
-                                    size="small"
-                                    color="warning"
-                                    variant="contained"
-                                    disabled={!canBookOverride}
-                                    onClick={() =>
-                                      book.mutate({ overrideReason: overrideReason.trim() })
-                                    }
-                                  >
-                                    {t("booking.new.overrideBook")}
-                                  </Button>
-                                  <Button size="small" onClick={() => setOverriding(false)}>
-                                    {t("booking.common.cancel")}
-                                  </Button>
-                                </Stack>
-                              </Stack>
-                            ) : (
-                              <Box>
-                                <Button
-                                  size="small"
-                                  color="warning"
-                                  onClick={() => setOverriding(true)}
-                                >
-                                  {t("booking.new.overrideOpen")}
-                                </Button>
-                              </Box>
-                            )
-                          ) : null}
-                        </Stack>
-                      )}
-                    </AsyncSection>
-                  ) : null}
-                </Stack>
-              </AsyncSection>
-            )}
-          </Box>
-
-          {/* ── 4. The note ── */}
+  /* ── Step 1: the slot, and who it is for ── */
+  const slotCard =
+    !editingWhen && whenComplete ? (
+      <SoftCard tone="soft" sx={{ p: 2 }}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
           <Box
-            component="section"
-            aria-label={TEXT.note}
-            sx={{ opacity: whoReady ? 1 : 0.5 }}
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: 2,
+              bgcolor: "primary.main",
+              color: "primary.contrastText",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
           >
-            <SectionTitle>{TEXT.note}</SectionTitle>
-            <TextField
-              fullWidth
-              multiline
-              minRows={2}
-              size="small"
-              disabled={!whoReady}
-              label={t("booking.detail.note")}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              helperText={t("booking.new.noteHelp")}
-            />
+            <CalendarMonthOutlined fontSize="small" />
           </Box>
-
-          {/* A real failure, once the calm cases above have had their turn. */}
-          {book.error && !conflict ? (
-            <Alert severity="error">{errorText(book.error, t)}</Alert>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 700, lineHeight: 1.3 }}>
+              {slotTitle(date, time, selectionEnd)}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+              {[slotSubtitle(dragged), calendar?.name].filter(Boolean).join(" · ")}
+            </Typography>
+          </Box>
+          <Button variant="outlined" size="small" onClick={changeWhen}>
+            {TEXT.change}
+          </Button>
+        </Stack>
+      </SoftCard>
+    ) : (
+      <SoftCard tone="soft" sx={{ p: 2 }}>
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            {calendars.length > 1 ? (
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label={t("booking.new.calendar")}
+                value={effectiveCalendarId}
+                onChange={(e) => {
+                  setCalendarId(e.target.value);
+                  setConflict(null);
+                }}
+              >
+                {calendars.map((c) => (
+                  <MenuItem key={c.id} value={c.id}>
+                    {c.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            ) : null}
+            <TextField
+              type="date"
+              size="small"
+              label={TEXT.date}
+              value={date}
+              onChange={(e) => changeDate(e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+              sx={{ minWidth: 160 }}
+            />
+            <TextField
+              type="time"
+              size="small"
+              label={TEXT.time}
+              value={time}
+              onChange={(e) => changeTime(normalizeTime(e.target.value))}
+              slotProps={{ inputLabel: { shrink: true }, htmlInput: { step: 300 } }}
+              sx={{ minWidth: 120 }}
+            />
+          </Stack>
+          {!whenComplete ? (
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              {TEXT.pickWhenFirst}
+            </Typography>
           ) : null}
         </Stack>
-      </DialogContent>
+      </SoftCard>
+    );
 
-      <DialogActions>
-        <Button onClick={close}>{t("booking.common.cancel")}</Button>
-        <Button
-          variant="contained"
-          disabled={!canBook}
-          onClick={() => book.mutate({})}
-        >
-          {t("booking.new.book")}
-        </Button>
-      </DialogActions>
-    </Dialog>
+  const step1 = (
+    <Stack spacing={3}>
+      <AsyncSection
+        isLoading={calendarsQuery.isLoading}
+        isSettled={calendarsQuery.isSuccess || calendarsQuery.isError}
+        error={calendarsQuery.error}
+        isEmpty={calendars.length === 0}
+        emptyText={t("booking.new.noCalendars")}
+        onRetry={() => void calendarsQuery.refetch()}
+        skeletonRows={1}
+      >
+        {slotCard}
+      </AsyncSection>
+      {dayNotice}
+
+      {mode === "event" ? (
+        <Box component="section" aria-label={TEXT.eventTitle}>
+          <SectionLabel>{TEXT.eventTitle}</SectionLabel>
+          <SoftCard sx={{ p: 2 }}>
+            <Stack spacing={1.5}>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                {TEXT.eventExplain}
+              </Typography>
+              <TextField
+                fullWidth
+                autoFocus
+                placeholder="např. Školení, Servis přístroje"
+                value={eventName}
+                onChange={(e) => setEventName(e.target.value)}
+                slotProps={{ htmlInput: { "aria-label": TEXT.eventName } }}
+              />
+              <Link
+                component="button"
+                type="button"
+                underline="hover"
+                onClick={() => changeMode("database")}
+                sx={{ alignSelf: "flex-start", fontSize: 13, fontWeight: 600 }}
+              >
+                {TEXT.backToPatient}
+              </Link>
+            </Stack>
+          </SoftCard>
+        </Box>
+      ) : (
+        <Box component="section" aria-label={TEXT.who}>
+          <SectionLabel>{TEXT.who}</SectionLabel>
+          <ModeCards value={mode} onChange={changeMode} disabled={register.isPending} />
+          <Link
+            component="button"
+            type="button"
+            underline="hover"
+            onClick={() => changeMode("event")}
+            sx={{ mt: 1, fontSize: 13, color: "text.secondary", fontWeight: 600 }}
+          >
+            {TEXT.eventLink}
+          </Link>
+        </Box>
+      )}
+
+      {mode === "database" ? (
+        <Box component="section" aria-label={TEXT.findPatient}>
+          <SectionLabel>{TEXT.findPatient}</SectionLabel>
+          {patient ? (
+            <PatientFilled hit={patient} onChange={() => setPatient(null)} />
+          ) : (
+            <PatientSearch
+              enabled={open}
+              autoFocus={fromGrid}
+              mayRegister={mayRegister}
+              onPick={setPatient}
+              onQuickRegister={quickRegisterFromSearch}
+            />
+          )}
+        </Box>
+      ) : null}
+
+      {mode === "quick" ? (
+        <Box component="section" aria-label={TEXT.newPatient}>
+          <SectionLabel>{TEXT.newPatient}</SectionLabel>
+          {patient ? (
+            <PatientFilled hit={patient} onChange={() => setPatient(null)} />
+          ) : (
+            <QuickPatientForm
+              value={quick}
+              onChange={setQuick}
+              activities={offeredActivities.length > 0 ? offeredActivities : activities}
+              path={quickPath}
+              mayRegister={mayRegister}
+              disabled={register.isPending}
+            />
+          )}
+          {register.error ? (
+            <Alert severity="error" sx={{ mt: 1.5 }}>
+              {errorText(register.error, t)}
+            </Alert>
+          ) : null}
+        </Box>
+      ) : null}
+
+      {mode === "club" ? (
+        <ClubPicker
+          selectedId={clubId}
+          onSelect={setClubId}
+          draft={clubDraft}
+          onDraft={setClubDraft}
+        />
+      ) : null}
+    </Stack>
   );
-}
 
-function SectionTitle({ children }: { children: ReactNode }) {
+  /* ── Step 2: the činnost, the time, the note ── */
+  const whoCard =
+    patient ? (
+      <PatientFilled hit={patient} onChange={() => setStep(1)} />
+    ) : (
+      <SoftCard tone="soft" sx={{ p: 2 }}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+          <Avatar sx={{ width: 40, height: 40, bgcolor: "primary.main", color: "primary.contrastText" }}>
+            {mode === "event" ? <EventBusyOutlined fontSize="small" /> : initials(quick.name) || "?"}
+          </Avatar>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 700, lineHeight: 1.3 }}>
+              {mode === "event" ? eventName.trim() || TEXT.eventTitle : quick.name.trim()}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+              {mode === "event"
+                ? TEXT.eventExplain
+                : [quickPhone, quick.email.trim() || null, TEXT.walkIn]
+                    .filter((v): v is string => Boolean(v))
+                    .join(" · ")}
+            </Typography>
+          </Box>
+          <Button size="small" onClick={() => setStep(1)}>
+            {TEXT.change}
+          </Button>
+        </Stack>
+      </SoftCard>
+    );
+
+  const readOnlyField = (label: string, value: string) => (
+    <Box>
+      <SectionLabel component="label" sx={{ mb: 0.5 }}>
+        {label}
+      </SectionLabel>
+      <TextField
+        fullWidth
+        size="small"
+        value={value}
+        placeholder="—"
+        slotProps={{
+          input: { readOnly: true, sx: { bgcolor: DESIGN.head } },
+          htmlInput: { "aria-label": label, tabIndex: -1 },
+        }}
+      />
+    </Box>
+  );
+
+  const step2 = (
+    <Stack spacing={3}>
+      {whoCard}
+
+      <Box component="section">
+        <SectionLabel>{TEXT.activity}</SectionLabel>
+        <AsyncSection
+          isLoading={activitiesQuery.isLoading || previewQuery.isLoading}
+          isSettled={
+            (activitiesQuery.isSuccess || activitiesQuery.isError) &&
+            (previewQuery.isSuccess || previewQuery.isError)
+          }
+          error={activitiesQuery.error ?? previewQuery.error}
+          isEmpty={activities.length === 0}
+          emptyText={t("booking.new.noActivities")}
+          onRetry={() => {
+            void activitiesQuery.refetch();
+            void previewQuery.refetch();
+          }}
+          skeletonRows={2}
+        >
+          {offeredActivities.length === 0 ? (
+            <Typography variant="body2" sx={{ color: "text.secondary", mb: 1 }}>
+              {TEXT.dayOffersNothing}.
+            </Typography>
+          ) : null}
+          <ActivityCards
+            offered={offeredActivities}
+            others={otherActivities}
+            value={activity?.id ?? ""}
+            onChange={(id) => {
+              setActivityId(id);
+              setOverriding(false);
+              setConflict(null);
+            }}
+            disabled={book.isPending}
+          />
+        </AsyncSection>
+      </Box>
+
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr 1fr", sm: "1.4fr 1fr 1fr 1fr" },
+          gap: 1.5,
+        }}
+      >
+        {calendars.length > 1 && !fromGrid ? (
+          <Box sx={{ gridColumn: "1 / -1" }}>
+            <SectionLabel component="label" sx={{ mb: 0.5 }}>
+              {t("booking.new.calendar")}
+            </SectionLabel>
+            <TextField
+              select
+              fullWidth
+              size="small"
+              value={effectiveCalendarId}
+              onChange={(e) => {
+                setCalendarId(e.target.value);
+                setConflict(null);
+              }}
+              slotProps={{ select: { "aria-label": t("booking.new.calendar") } }}
+            >
+              {calendars.map((c) => (
+                <MenuItem key={c.id} value={c.id}>
+                  {c.name}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Box>
+        ) : null}
+        <Box>
+          <SectionLabel component="label" sx={{ mb: 0.5 }}>
+            {TEXT.date}
+          </SectionLabel>
+          <TextField
+            type="date"
+            size="small"
+            fullWidth
+            value={date}
+            onChange={(e) => changeDate(e.target.value)}
+            slotProps={{ htmlInput: { "aria-label": TEXT.date } }}
+          />
+        </Box>
+        <Box>
+          <SectionLabel component="label" sx={{ mb: 0.5 }}>
+            {TEXT.time}
+          </SectionLabel>
+          <TextField
+            type="time"
+            size="small"
+            fullWidth
+            value={time}
+            onChange={(e) => changeTime(normalizeTime(e.target.value))}
+            slotProps={{ htmlInput: { "aria-label": TEXT.time, step: 300 } }}
+          />
+        </Box>
+        {readOnlyField(TEXT.duration, activity ? `${activity.durationMinutes} min` : "")}
+        {readOnlyField(TEXT.until, untilClock)}
+      </Box>
+
+      {dayNotice}
+
+      {conflict ? (
+        <Alert severity="info" onClose={() => setConflict(null)}>
+          {errorText(conflict, t)}
+        </Alert>
+      ) : null}
+
+      {activity && whenComplete ? (
+        <AsyncSection
+          isLoading={availabilityQuery.isLoading}
+          isSettled={availabilityQuery.isSuccess || availabilityQuery.isError}
+          error={availabilityQuery.error}
+          isEmpty={false}
+          emptyText=""
+          onRetry={() => void availabilityQuery.refetch()}
+          skeletonRows={1}
+        >
+          {offered ? (
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{
+                alignItems: "center",
+                px: 1.5,
+                py: 1.25,
+                borderRadius: 2.5,
+                bgcolor: DESIGN.tone.green.bg,
+                color: DESIGN.tone.green.fg,
+                border: "1px solid",
+                borderColor: DESIGN.tone.green.line,
+              }}
+            >
+              <CheckCircleOutline fontSize="small" />
+              <Typography variant="body2">{TEXT.free}</Typography>
+            </Stack>
+          ) : (
+            <Stack spacing={1}>
+              <Alert severity="info">{TEXT.notOffered(time)}</Alert>
+              {alternatives.length > 0 ? (
+                <Box>
+                  <Typography variant="body2" sx={{ color: "text.secondary", mb: 0.5 }}>
+                    {TEXT.pickOffered}
+                  </Typography>
+                  <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5 }}>
+                    {alternatives.map((slot) => (
+                      <Button
+                        key={slot.startUtc}
+                        size="small"
+                        variant="outlined"
+                        disabled={book.isPending}
+                        onClick={() => changeTime(pragueClock(slot.startUtc))}
+                      >
+                        {pragueClock(slot.startUtc)}
+                      </Button>
+                    ))}
+                  </Stack>
+                </Box>
+              ) : (
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  {TEXT.noneThatDay}
+                </Typography>
+              )}
+
+              {/*
+                6.4. Not an ordinary action: only a role that may override
+                sees it at all, it is set apart, and it will not submit
+                without a reason somebody typed.
+              */}
+              {mayOverride ? (
+                overriding ? (
+                  <Stack
+                    spacing={1}
+                    sx={{
+                      border: "1px solid",
+                      borderColor: DESIGN.tone.beige.line,
+                      bgcolor: DESIGN.tone.beige.bg,
+                      borderRadius: 2.5,
+                      p: 2,
+                    }}
+                  >
+                    <Typography variant="body2">{t("booking.new.overrideExplain")}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {TEXT.overrideTimeIs(`${formatDateOnly(date)} ${time}`)}
+                    </Typography>
+                    <TextField
+                      size="small"
+                      label={t("booking.new.overrideReason")}
+                      value={overrideReason}
+                      onChange={(e) => setOverrideReason(e.target.value)}
+                    />
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        size="small"
+                        color="warning"
+                        variant="contained"
+                        disabled={!canBookOverride}
+                        onClick={() => book.mutate({ overrideReason: overrideReason.trim() })}
+                      >
+                        {t("booking.new.overrideBook")}
+                      </Button>
+                      <Button size="small" onClick={() => setOverriding(false)}>
+                        {t("booking.common.cancel")}
+                      </Button>
+                    </Stack>
+                  </Stack>
+                ) : (
+                  <Box>
+                    <Button size="small" color="warning" onClick={() => setOverriding(true)}>
+                      {t("booking.new.overrideOpen")}
+                    </Button>
+                  </Box>
+                )
+              ) : null}
+            </Stack>
+          )}
+        </AsyncSection>
+      ) : null}
+
+      <Box component="section">
+        <SectionLabel>{TEXT.note}</SectionLabel>
+        <TextField
+          fullWidth
+          multiline
+          minRows={2}
+          placeholder={TEXT.notePlaceholder}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          slotProps={{ htmlInput: { "aria-label": TEXT.note } }}
+        />
+      </Box>
+
+      <Stack spacing={0.5}>
+        {/* 5.x: SMS confirmation is phase two. The control is shown so the
+            desk knows it is coming, but it is disabled and sends nothing. */}
+        <FormControlLabel
+          control={
+            <Checkbox disabled checked={sendSms} onChange={(e) => setSendSms(e.target.checked)} />
+          }
+          label={
+            <Box>
+              <Typography variant="body2">{TEXT.sms(contactPhone)}</Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                {TEXT.smsUnavailable}
+              </Typography>
+            </Box>
+          }
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              disabled={patient === null || !mayRegister}
+              checked={sendLink && patient !== null}
+              onChange={(e) => setSendLink(e.target.checked)}
+            />
+          }
+          label={
+            <Box>
+              <Typography variant="body2">{TEXT.sendLink}</Typography>
+              {patient === null ? (
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  {TEXT.sendLinkNobody}
+                </Typography>
+              ) : null}
+            </Box>
+          }
+        />
+      </Stack>
+
+      {/* A real failure, once the calm cases above have had their turn. */}
+      {book.error && !conflict ? (
+        <Alert severity="error">{errorText(book.error, t)}</Alert>
+      ) : null}
+    </Stack>
+  );
+
+  const footer =
+    step === 1 ? (
+      <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
+        <Button variant="outlined" onClick={close}>
+          {t("booking.common.cancel")}
+        </Button>
+        <Button variant="contained" disabled={!canContinue} onClick={continueStep1}>
+          {register.isPending
+            ? "Vytvářím…"
+            : mode === "quick" && patient === null && quickPath === "registered"
+              ? TEXT.createAndContinue
+              : TEXT.continue}
+        </Button>
+      </Stack>
+    ) : (
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+            {TEXT.total}
+          </Typography>
+          <Typography variant="h6" sx={{ lineHeight: 1.2 }}>
+            {formatCzk(activity?.priceCzk ?? null)}
+          </Typography>
+        </Box>
+        <Button variant="outlined" onClick={close}>
+          {t("booking.common.cancel")}
+        </Button>
+        <Button variant="contained" disabled={!canBook} onClick={() => book.mutate({})}>
+          {TEXT.book}
+        </Button>
+      </Stack>
+    );
+
   return (
-    <Typography variant="subtitle2" component="h3" sx={{ fontWeight: 700, mb: 1 }}>
-      {children}
-    </Typography>
+    <DrawerFrame
+      open={open}
+      onClose={close}
+      onBack={step === 2 ? () => setStep(1) : undefined}
+      labelId={labelId}
+      title={drawerTitle(mode)}
+      subtitle={stepSubtitle(step, mode)}
+      footer={footer}
+    >
+      {step === 1 ? step1 : step2}
+    </DrawerFrame>
   );
 }
 

@@ -7,23 +7,24 @@ import {
   ListItemText,
   Stack,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
-import { useTranslation } from "react-i18next";
 import { parseDateOnly, toDateOnly, type DateOnly } from "../../../utils/time";
+import { DESIGN } from "../../../theme";
+import { SectionLabel } from "../../ui/SectionLabel";
 import type { Employee } from "./filters";
 import { GRID_TEXT } from "./gridText";
 import { resolveMiniCalendar } from "./miniCalendarSlot";
 
 /*
- * The left side of the calendar, as the owner laid it out: the mini calendar,
- * the day / week / month switch, the calendars to show, who works in the
- * period on screen, and the services.
+ * The left rail of the calendar, as the board draws it (3. 10. 2026): the
+ * mini calendar, the calendars to show, who works in the period on screen,
+ * and the SLUŽBY legend with a colour square per service - the colour of the
+ * calendar that runs it, so the legend and the columns agree.
  *
- * Every control here drives the same state as its twin in the top bar - one
- * filter, two places to reach it - so the two can never disagree.
+ * The day / week / month switch lives in the top bar now. Every control here
+ * drives the same state as its twin up there - one filter, two places to
+ * reach it - so the two can never disagree.
  */
 
 const MiniCalendar = resolveMiniCalendar();
@@ -34,13 +35,14 @@ export interface SidebarCalendar {
   id: string;
   name: string;
   color: string;
+  /** Which služba the calendar runs; colours the legend. */
+  clinicServiceId?: string | null;
 }
 
 export function GridSidebar({
   anchor,
   view,
   onDate,
-  onView,
   holidays,
   closedDays,
   calendars,
@@ -57,7 +59,6 @@ export function GridSidebar({
   anchor: DateOnly;
   view: GridView;
   onDate: (date: DateOnly) => void;
-  onView: (view: GridView) => void;
   holidays: ReadonlySet<string>;
   closedDays: ReadonlySet<string>;
   calendars: SidebarCalendar[];
@@ -71,10 +72,11 @@ export function GridSidebar({
   serviceId: string | null;
   onService: (id: string | null) => void;
 }) {
-  const { t } = useTranslation();
+  const colourOf = (service: { id: string }) =>
+    calendars.find((c) => c.clinicServiceId === service.id)?.color ?? DESIGN.faint;
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={3}>
       {MiniCalendar ? (
         <MiniCalendar
           value={parseDateOnly(anchor)}
@@ -94,29 +96,16 @@ export function GridSidebar({
         />
       )}
 
-      <ToggleButtonGroup
-        exclusive
-        fullWidth
-        size="small"
-        aria-label={GRID_TEXT.view}
-        value={view}
-        onChange={(_, next: GridView | null) => next && onView(next)}
-      >
-        <ToggleButton value="day">{t("booking.grid.day")}</ToggleButton>
-        <ToggleButton value="week">{t("booking.grid.week")}</ToggleButton>
-        <ToggleButton value="month">{t("booking.grid.month")}</ToggleButton>
-      </ToggleButtonGroup>
-
       <Box component="section" aria-label={GRID_TEXT.calendars}>
-        <SectionTitle>{GRID_TEXT.calendars}</SectionTitle>
+        <SectionLabel component="h2">{GRID_TEXT.calendars}</SectionLabel>
         {calendars.map((calendar) => (
-          <Box key={calendar.id} sx={{ display: "flex", alignItems: "center" }}>
+          <Box key={calendar.id} sx={{ display: "flex", alignItems: "center", minHeight: 32 }}>
             <Checkbox
               size="small"
               checked={isTicked(calendar.id)}
               onChange={() => onToggle(calendar.id)}
               slotProps={{ input: { "aria-label": calendar.name } }}
-              sx={{ color: calendar.color, "&.Mui-checked": { color: calendar.color } }}
+              sx={{ p: 0.5, mr: 0.5, color: calendar.color, "&.Mui-checked": { color: calendar.color } }}
             />
             <Link
               component="button"
@@ -125,7 +114,7 @@ export function GridSidebar({
               color="inherit"
               title={GRID_TEXT.onlyThis}
               onClick={() => onOnly(calendar.id)}
-              sx={{ textAlign: "left", fontSize: 14 }}
+              sx={{ textAlign: "left", fontSize: 14, lineHeight: 1.3 }}
             >
               {calendar.name}
             </Link>
@@ -134,23 +123,28 @@ export function GridSidebar({
       </Box>
 
       <Box component="section" aria-label={GRID_TEXT.employees}>
-        <SectionTitle>{GRID_TEXT.employees}</SectionTitle>
+        <SectionLabel component="h2">{GRID_TEXT.employees}</SectionLabel>
         {employees.length === 0 ? (
           <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
             {GRID_TEXT.noEmployees}
           </Typography>
         ) : (
           <List dense disablePadding>
-            <ListItemButton selected={employeeId === null} onClick={() => onEmployee(null)}>
-              <ListItemText primary={GRID_TEXT.allEmployees} />
+            <ListItemButton
+              selected={employeeId === null}
+              onClick={() => onEmployee(null)}
+              sx={{ px: 1, minHeight: 34 }}
+            >
+              <ListItemText primary={GRID_TEXT.allEmployees} slotProps={{ primary: { sx: { fontSize: 14 } } }} />
             </ListItemButton>
             {employees.map((employee) => (
               <ListItemButton
                 key={employee.id}
                 selected={employeeId === employee.id}
                 onClick={() => onEmployee(employee.id)}
+                sx={{ px: 1, minHeight: 34 }}
               >
-                <ListItemText primary={employee.name} />
+                <ListItemText primary={employee.name} slotProps={{ primary: { sx: { fontSize: 14 } } }} />
               </ListItemButton>
             ))}
           </List>
@@ -159,34 +153,38 @@ export function GridSidebar({
 
       {services.length > 0 ? (
         <Box component="section" aria-label={GRID_TEXT.services}>
-          <SectionTitle>{GRID_TEXT.services}</SectionTitle>
+          <SectionLabel component="h2">{GRID_TEXT.services}</SectionLabel>
           <List dense disablePadding>
-            <ListItemButton selected={serviceId === null} onClick={() => onService(null)}>
-              <ListItemText primary={GRID_TEXT.allServices} />
+            <ListItemButton
+              selected={serviceId === null}
+              onClick={() => onService(null)}
+              sx={{ px: 1, minHeight: 34 }}
+            >
+              <ListItemText primary={GRID_TEXT.allServices} slotProps={{ primary: { sx: { fontSize: 14 } } }} />
             </ListItemButton>
             {services.map((service) => (
               <ListItemButton
                 key={service.id}
                 selected={serviceId === service.id}
                 onClick={() => onService(service.id)}
+                sx={{ px: 1, minHeight: 34, gap: 1.25 }}
               >
-                <ListItemText primary={service.name} />
+                <Box
+                  aria-hidden
+                  sx={{
+                    width: 14,
+                    height: 14,
+                    flexShrink: 0,
+                    borderRadius: "3px",
+                    bgcolor: colourOf(service),
+                  }}
+                />
+                <ListItemText primary={service.name} slotProps={{ primary: { sx: { fontSize: 14 } } }} />
               </ListItemButton>
             ))}
           </List>
         </Box>
       ) : null}
     </Stack>
-  );
-}
-
-function SectionTitle({ children }: { children: string }) {
-  return (
-    <Typography
-      component="h2"
-      sx={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "text.secondary", mb: 0.5 }}
-    >
-      {children}
-    </Typography>
   );
 }

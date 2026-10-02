@@ -5,17 +5,16 @@ import {
   DialogActions,
   Button,
   Typography,
-  Chip,
   Table as MuiTable,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   Stack,
 } from '@mui/material';
 import type { PartnerOrder } from '../../api/bookingContracts';
+import { StatusChip } from '../ui';
 
 /*
  * The club schedule report (plan 9.x, club booking).
@@ -204,8 +203,8 @@ export function ClubScheduleReport({
             .join(' · ') || 'Žádné činnosti'}
         </Typography>
 
-        <TableContainer component={Paper} variant="outlined">
-          <MuiTable size="small">
+        <TableContainer sx={{ border: '1px solid', borderColor: 'divider' }}>
+          <MuiTable size="small" aria-label="Rozpis vyšetření">
             <TableHead>
               <TableRow>
                 <TableCell>Den</TableCell>
@@ -229,7 +228,7 @@ export function ClubScheduleReport({
                       {w.startTime}–{w.endTime}
                     </TableCell>
                     <TableCell align="center">
-                      <Chip size="small" label={w.capacity} />
+                      <StatusChip tone="grey">{w.capacity}</StatusChip>
                     </TableCell>
                     <TableCell sx={{ fontSize: 12 }}>
                       {w.slots.map((s) => s.time).join(', ') || '—'}
@@ -241,9 +240,9 @@ export function ClubScheduleReport({
           </MuiTable>
         </TableContainer>
 
-        <Stack direction="row" spacing={1} sx={{ mt: 2, alignItems: 'center' }}>
-          <Chip label={`Kapacita: ${plan.totalCapacity} míst`} />
-          <Chip label={`Požadováno: ${plan.totalRequested} hráčů`} />
+        <Stack direction="row" spacing={1} sx={{ mt: 2, alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+          <StatusChip tone="grey">Kapacita: {plan.totalCapacity} míst</StatusChip>
+          <StatusChip tone="grey">Požadováno: {plan.totalRequested} hráčů</StatusChip>
           <Typography variant="body2" sx={{ color: fits ? 'success.main' : 'warning.main', fontWeight: 600 }}>
             {fits
               ? 'Všichni se vejdou.'
@@ -252,7 +251,7 @@ export function ClubScheduleReport({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Zavřít</Button>
+        <Button variant="outlined" onClick={onClose}>Zavřít</Button>
         <Button variant="contained" onClick={print}>
           Tisk / uložit PDF
         </Button>

@@ -1,0 +1,74 @@
+import { Box, ButtonBase, Typography } from "@mui/material";
+import PersonSearchOutlined from "@mui/icons-material/PersonSearchOutlined";
+import PersonAddAlt1Outlined from "@mui/icons-material/PersonAddAlt1Outlined";
+import GroupsOutlined from "@mui/icons-material/GroupsOutlined";
+import { DESIGN } from "../../ui";
+import type { DrawerMode } from "../NewAppointmentDialog.logic";
+
+/** The three cards under "KDO SE OBJEDNÁVÁ", in the board's order. */
+const CARDS: { mode: DrawerMode; label: string; icon: React.ReactNode }[] = [
+  { mode: "database", label: "Z databáze", icon: <PersonSearchOutlined fontSize="small" /> },
+  { mode: "quick", label: "Rychlá registrace", icon: <PersonAddAlt1Outlined fontSize="small" /> },
+  { mode: "club", label: "Klub", icon: <GroupsOutlined fontSize="small" /> },
+];
+
+/**
+ * Who the slot is for, as three cards: an icon over a word, the chosen one in
+ * the accent with a 2px border and the soft tint. The fourth way - a block of
+ * time with nobody behind it - is a small link under the cards, not a card:
+ * the board has three, and an event is the exception, not a peer.
+ */
+export function ModeCards({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: DrawerMode;
+  onChange: (mode: DrawerMode) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Box
+      role="radiogroup"
+      aria-label="Kdo se objednává"
+      sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1.5 }}
+    >
+      {CARDS.map((card) => {
+        const selected = value === card.mode;
+        return (
+          <ButtonBase
+            key={card.mode}
+            role="radio"
+            aria-checked={selected}
+            disabled={disabled}
+            onClick={() => onChange(card.mode)}
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 1,
+              py: 2,
+              px: 1,
+              borderRadius: 3,
+              border: "1px solid",
+              borderColor: selected ? "primary.main" : "divider",
+              boxShadow: selected ? (t) => `inset 0 0 0 1px ${t.palette.primary.main}` : "none",
+              bgcolor: selected ? DESIGN.softPrimary.bg : "background.paper",
+              color: selected ? "primary.main" : "text.primary",
+              fontFamily: "inherit",
+              "&:hover": { bgcolor: selected ? DESIGN.softPrimary.bg : "action.hover" },
+              "&.Mui-focusVisible": { outline: "2px solid", outlineColor: "primary.main" },
+            }}
+          >
+            {card.icon}
+            <Typography variant="body2" sx={{ fontWeight: selected ? 700 : 600 }}>
+              {card.label}
+            </Typography>
+          </ButtonBase>
+        );
+      })}
+    </Box>
+  );
+}
+
+export default ModeCards;
