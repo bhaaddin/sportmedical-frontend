@@ -326,6 +326,12 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         to: '/nastaveni/sablony-emailu',
         requires: 'communication.manage',
       },
+      {
+        id: 'hodnoceni-pacientu',
+        label: 'Hodnocení pacientů',
+        description: 'Co pacienti napsali po dokončené návštěvě — soukromé, nic se nezveřejňuje',
+        to: '/hodnoceni-pacientu',
+      },
     ],
   },
   {

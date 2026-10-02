@@ -35,6 +35,8 @@ const PublicBooking = lazy(() => import('./pages/public/PublicBooking'));
 const ManageBooking = lazy(() => import('./pages/public/ManageBooking'));
 const PatientPortal = lazy(() => import('./pages/public/PatientPortal'));
 const ClubRegistration = lazy(() => import('./pages/public/ClubRegistration'));
+const FeedbackPage = lazy(() => import('./pages/public/FeedbackPage'));
+const FeedbackReviewPage = lazy(() => import('./pages/FeedbackReviewPage'));
 const IntakeReviewQueue = lazy(() => import('./pages/IntakeReviewQueue'));
 const DashboardPage = lazy(() => import('./pages/Dashboard'));
 const DiagnosticForm = lazy(() => import('./pages/DiagnosticForm'));
@@ -528,6 +530,7 @@ export default function App() {
                 what the confirmation's button did until this route existed. */}
             <Route path="/rezervace/:token" element={<Suspense fallback={<PageLoader />}><ManageBooking /></Suspense>} />
             <Route path="/klub/:token" element={<Suspense fallback={<PageLoader />}><ClubRegistration /></Suspense>} />
+            <Route path="/hodnoceni/:token" element={<Suspense fallback={<PageLoader />}><FeedbackPage /></Suspense>} />
             {/* Patient portal. Anonymous like the links above: the personal access
                 token IS the identity, resolving to one patient's own dashboard. */}
             <Route path="/portal/:token" element={<Suspense fallback={<PageLoader />}><PatientPortal /></Suspense>} />
@@ -562,6 +565,7 @@ export default function App() {
                     <Route path="/nastaveni/vzhled-kalendare" element={<RequirePermission of="settings.clinic.manage"><CalendarDisplayPage /></RequirePermission>} />
                     <Route path="/nastaveni/udaje-pacienta" element={<RequirePermission of="settings.clinic.manage"><PatientFieldsPage /></RequirePermission>} />
                     <Route path="/nastaveni/skupinove-slevy" element={<RequirePermission of="settings.clinic.manage"><GroupDiscountsPage /></RequirePermission>} />
+                    <Route path="/hodnoceni-pacientu" element={<FeedbackReviewPage />} />
                     <Route path="/nastaveni/souhlasy" element={<RequirePermission of="settings.clinic.manage"><ConsentSettingsPage /></RequirePermission>} />
                     <Route path="/training-load" element={<TrainingLoadPage />} />
                     <Route path="/wellness" element={<WellnessPage />} />
