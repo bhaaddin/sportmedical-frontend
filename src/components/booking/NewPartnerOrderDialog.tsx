@@ -97,6 +97,33 @@ export function NewPartnerOrderDialog({
   const [windows, setWindows] = useState<WindowDraft[]>([]);
   const [partial, setPartial] = useState<string | null>(null);
 
+  // Bulk multi-day reservation: a club calls with N athletes and staff hold a
+  // whole range of days at once instead of adding them one by one.
+  const [bulkFrom, setBulkFrom] = useState("");
+  const [bulkTo, setBulkTo] = useState("");
+  const [bulkStart, setBulkStart] = useState("08:00");
+  const [bulkEnd, setBulkEnd] = useState("16:00");
+
+  const addRange = () => {
+    if (!bulkFrom || !bulkTo) return;
+    const start = new Date(`${bulkFrom}T00:00:00`);
+    const end = new Date(`${bulkTo}T00:00:00`);
+    if (Number.isNaN(+start) || Number.isNaN(+end) || start > end) return;
+    const rows: WindowDraft[] = [];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate(),
+      ).padStart(2, "0")}`;
+      rows.push({
+        key: `w${Date.now()}${iso}`,
+        date: iso,
+        startTime: bulkStart || "08:00",
+        endTime: bulkEnd || "16:00",
+      });
+    }
+    setWindows((prev) => [...prev, ...rows]);
+  };
+
   const activitiesQuery = useQuery({
     queryKey: ["activities"],
     queryFn: activitiesApi.list,
@@ -388,6 +415,61 @@ export function NewPartnerOrderDialog({
                 }
               >
                 {t("booking.partner.addWindow")}
+              </Button>
+            </Stack>
+
+            {/* Bulk multi-day: hold a whole range of days in one action. */}
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ alignItems: "center", mb: 1.5, flexWrap: "wrap" }}
+            >
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                Hromadně (více dní):
+              </Typography>
+              <TextField
+                size="small"
+                type="date"
+                label="Od"
+                value={bulkFrom}
+                onChange={(e) => setBulkFrom(e.target.value)}
+                slotProps={{ inputLabel: { shrink: true } }}
+                sx={{ width: 150 }}
+              />
+              <TextField
+                size="small"
+                type="date"
+                label="Do"
+                value={bulkTo}
+                onChange={(e) => setBulkTo(e.target.value)}
+                slotProps={{ inputLabel: { shrink: true } }}
+                sx={{ width: 150 }}
+              />
+              <TextField
+                size="small"
+                type="time"
+                label="Od"
+                value={bulkStart}
+                onChange={(e) => setBulkStart(e.target.value)}
+                slotProps={{ inputLabel: { shrink: true } }}
+                sx={{ width: 110 }}
+              />
+              <TextField
+                size="small"
+                type="time"
+                label="Do"
+                value={bulkEnd}
+                onChange={(e) => setBulkEnd(e.target.value)}
+                slotProps={{ inputLabel: { shrink: true } }}
+                sx={{ width: 110 }}
+              />
+              <Button
+                size="small"
+                variant="outlined"
+                disabled={!bulkFrom || !bulkTo}
+                onClick={addRange}
+              >
+                Přidat dny
               </Button>
             </Stack>
 
