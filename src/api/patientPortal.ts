@@ -29,10 +29,17 @@ publicClient.interceptors.response.use((res) => {
 });
 
 export interface PortalAppointment {
+  /** The appointment, for cancelling it from the portal. */
+  id: string;
   activityName: string;
   startUtc: string;
   endUtc: string;
   status: string;
+  /**
+   * Until when the patient may still cancel it themselves (the clinic's deadline,
+   * worked out by the server); null when they no longer can, or it is over.
+   */
+  cancelUntilUtc: string | null;
 }
 
 export interface PortalDocument {
@@ -82,6 +89,36 @@ export async function openPortal(token: string): Promise<PortalDashboard | null>
  */
 export function portalDocumentUrl(token: string, documentId: string): string {
   return `${API_BASE}/api/patient-portal/${encodeURIComponent(token)}/documents/${encodeURIComponent(documentId)}`;
+}
+
+/** A portal cancellation the server refused, with its own Czech message. */
+export class PortalCancelError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'PortalCancelError';
+    this.status = status;
+  }
+}
+
+/**
+ * Cancels one of the patient's own upcoming appointments from the portal (15.05).
+ * The server applies the same deadline the manage link does; a refusal arrives as
+ * PortalCancelError with the server's message (too late, not found).
+ */
+export async function cancelPortalAppointment(token: string, appointmentId: string): Promise<void> {
+  try {
+    await publicClient.post(
+      `/api/patient-portal/${encodeURIComponent(token)}/appointments/${encodeURIComponent(appointmentId)}/cancel`,
+    );
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      const data = error.response.data as { message?: string } | undefined;
+      throw new PortalCancelError(data?.message ?? 'Termín se nepodařilo zrušit.', error.response.status);
+    }
+    throw error;
+  }
 }
 
 /** Issues (or re-issues) a patient's personal portal token; returns it once. */

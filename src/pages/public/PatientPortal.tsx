@@ -18,7 +18,15 @@ import {
   EventAvailableOutlined, DescriptionOutlined, PersonOutlined, CalendarMonthOutlined,
   HistoryOutlined, ReceiptLongOutlined,
 } from '@mui/icons-material';
-import { openPortal, portalDocumentUrl } from '../../api/patientPortal';
+import { cancelPortalAppointment, openPortal, portalDocumentUrl, PortalCancelError } from '../../api/patientPortal';
+import { readPublicClinic } from '../../api/clinicSettings';
+import type { PublicClinic } from '../../api/clinicSettings';
+import {
+  EmailOutlined as EmailIcon,
+  HelpOutlineOutlined as HelpIcon,
+  PhoneOutlined as PhoneIcon,
+  PlaceOutlined as PlaceIcon,
+} from '@mui/icons-material';
 import type { PortalAppointment, PortalDashboard } from '../../api/patientPortal';
 
 const BRAND = {
@@ -105,7 +113,89 @@ function addToCalendar(appointment: PortalAppointment): void {
   }
 }
 
-function AppointmentRow({ appointment, past = false }: { appointment: PortalAppointment; past?: boolean }) {
+/**
+ * Where to turn when self-service cannot do it (plan 15.10): the clinic's own
+ * telephone, e-mail and address, read from Nastavení — nothing is written into
+ * the page, and only what the clinic has filled in is shown.
+ */
+function ClinicContactCard() {
+  const [clinic, setClinic] = useState<PublicClinic | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    readPublicClinic()
+      .then((result) => {
+        if (alive) setClinic(result);
+      })
+      .catch(() => {
+        /* no contact card rather than a broken one */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (clinic === null) return null;
+  const phone = clinic.phone.trim();
+  const email = clinic.email.trim();
+  const address = clinic.address.trim();
+  if (phone === '' && email === '' && address === '') return null;
+
+  const line = { display: 'flex', alignItems: 'center', gap: 1.25 } as const;
+  const link = { color: 'inherit', fontWeight: 600, textDecoration: 'none' } as const;
+
+  return (
+    <Card sx={{ p: { xs: 2.5, md: 3 } }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 1.5 }}>
+        <HelpIcon sx={{ color: BRAND.accentDark }} />
+        <Typography variant="h6">Potřebujete pomoc?</Typography>
+      </Box>
+      <Typography variant="body2" sx={{ color: BRAND.muted, mb: 1.5 }}>
+        Co tu nejde vyřídit — jiný termín, dotaz k vyšetření — domluvíte přímo s ordinací.
+      </Typography>
+      <Stack spacing={1}>
+        {phone !== '' && (
+          <Box sx={line}>
+            <PhoneIcon sx={{ color: BRAND.muted }} />
+            <Typography component="a" href={`tel:${phone.replace(/\s+/g, '')}`} sx={link}>
+              {phone}
+            </Typography>
+          </Box>
+        )}
+        {email !== '' && (
+          <Box sx={line}>
+            <EmailIcon sx={{ color: BRAND.muted }} />
+            <Typography component="a" href={`mailto:${email}`} sx={link}>
+              {email}
+            </Typography>
+          </Box>
+        )}
+        {address !== '' && (
+          <Box sx={line}>
+            <PlaceIcon sx={{ color: BRAND.muted }} />
+            <Typography sx={{ fontWeight: 600 }}>{address}</Typography>
+          </Box>
+        )}
+      </Stack>
+    </Card>
+  );
+}
+
+function AppointmentRow({
+  appointment,
+  past = false,
+  onCancel,
+}: {
+  appointment: PortalAppointment;
+  past?: boolean;
+  /** Offered only for an upcoming appointment the patient may still cancel. */
+  onCancel?: (appointment: PortalAppointment) => void;
+}) {
+  const canCancel =
+    !past &&
+    onCancel !== undefined &&
+    appointment.cancelUntilUtc != null &&
+    new Date(appointment.cancelUntilUtc).getTime() > Date.now();
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1.5 }}>
       <Box
@@ -139,6 +229,15 @@ function AppointmentRow({ appointment, past = false }: { appointment: PortalAppo
             Do kalendáře
           </Button>
         )}
+        {canCancel && (
+          <Button
+            size="small"
+            onClick={() => onCancel?.(appointment)}
+            sx={{ color: BRAND.muted, minWidth: 0, px: 0.5, fontSize: 12 }}
+          >
+            Zrušit termín
+          </Button>
+        )}
       </Stack>
     </Box>
   );
@@ -147,6 +246,26 @@ function AppointmentRow({ appointment, past = false }: { appointment: PortalAppo
 export default function PatientPortal() {
   const { token } = useParams<{ token: string }>();
   const [dashboard, setDashboard] = useState<PortalDashboard | null>(null);
+  const [notice, setNotice] = useState<{ severity: 'success' | 'warning'; text: string } | null>(null);
+
+  /* Cancel one of the patient's own upcoming appointments (15.05). The server
+     applies the clinic's deadline; the dashboard is re-read so what is shown is
+     what the server now holds, never a guess. */
+  const cancel = async (appointment: PortalAppointment) => {
+    if (!token) return;
+    if (!window.confirm(`Opravdu zrušit termín ${clinicMoment(appointment.startUtc)}?`)) return;
+    try {
+      await cancelPortalAppointment(token, appointment.id);
+      const fresh = await openPortal(token);
+      if (fresh !== null) setDashboard(fresh);
+      setNotice({ severity: 'success', text: 'Termín byl zrušen.' });
+    } catch (error) {
+      setNotice({
+        severity: 'warning',
+        text: error instanceof PortalCancelError ? error.message : 'Termín se nepodařilo zrušit.',
+      });
+    }
+  };
   const [state, setState] = useState<'loading' | 'ok' | 'error' | 'no-token'>(
     token ? 'loading' : 'no-token',
   );
@@ -220,6 +339,15 @@ export default function PatientPortal() {
                   <EventAvailableOutlined sx={{ color: BRAND.accentDark }} />
                   <Typography variant="h6">Vaše nadcházející termíny</Typography>
                 </Box>
+                {notice && (
+                  <Alert
+                    severity={notice.severity}
+                    onClose={() => setNotice(null)}
+                    sx={{ mb: 1.5, borderRadius: 2 }}
+                  >
+                    {notice.text}
+                  </Alert>
+                )}
                 {dashboard.appointments.length === 0 ? (
                   <Typography variant="body2" sx={{ color: BRAND.muted, py: 1 }}>
                     Nemáte žádný nadcházející termín.
@@ -228,7 +356,7 @@ export default function PatientPortal() {
                   dashboard.appointments.map((a, i) => (
                     <Box key={`${a.startUtc}-${i}`}>
                       {i > 0 && <Divider />}
-                      <AppointmentRow appointment={a} />
+                      <AppointmentRow appointment={a} onCancel={cancel} />
                     </Box>
                   ))
                 )}
@@ -322,6 +450,8 @@ export default function PatientPortal() {
                   ))}
                 </Card>
               )}
+
+              <ClinicContactCard />
 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: BRAND.muted, px: 1 }}>
                 <PersonOutlined sx={{ fontSize: 18 }} />
