@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
 import {
-  Box, Typography, Card, CardContent, Grid, Button, Chip, TextField,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  MenuItem, IconButton, Tooltip, Skeleton, Alert, Dialog, DialogTitle,
-  DialogContent, DialogActions,
+  Box, Typography, Grid, Button, TextField, Stack,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
+  MenuItem, Skeleton, Dialog, DialogTitle, DialogContent, DialogActions, InputAdornment,
 } from '@mui/material';
-import { Add, Cancel, Undo, Refresh } from '@mui/icons-material';
-import { cashierApi, PaymentMethod, type CashierTransaction } from '../services/cashierApi';
+import { Add, Refresh } from '@mui/icons-material';
+import { cashierApi, PaymentMethod, type CashierTransaction, type DashboardStats } from '../services/cashierApi';
 import { servicesApi } from '../api/services';
+import type { ServiceItem } from '../api/services';
 import type { Patient } from '../api/patients';
 import PatientPicker from '../components/patients/PatientPicker';
 import toast from 'react-hot-toast';
+import { PageHeader, KpiCard, StatusChip, SectionLabel, DESIGN } from '../components/ui';
+import type { ChipTone } from '../components/ui';
+import { czk } from './billing/money';
 
 /** The four the API has (4.x `PaymentMethod`); anything else falls back to cash. */
 function toPaymentMethod(value: string): PaymentMethod {
@@ -27,15 +30,21 @@ const METHOD_LABELS: Record<number, string> = {
   [PaymentMethod.BankTransfer]: 'Převod',
 };
 
-const czk = (n: number) =>
-  new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK' }).format(n ?? 0);
+/* The server's transaction states, in the desk's words. An unknown one is
+   shown as it came, so nothing is hidden. */
+const STATUS_VIEW: Record<string, { label: string; tone: ChipTone }> = {
+  Completed: { label: 'Zaplaceno', tone: 'green' },
+  Pending: { label: 'Čeká', tone: 'beige' },
+  Cancelled: { label: 'Zrušeno', tone: 'grey' },
+  Refunded: { label: 'Vráceno', tone: 'red' },
+};
 
 export default function CashierPage() {
   const today = new Date().toISOString().split('T')[0];
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [transactions, setTransactions] = useState<CashierTransaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [services, setServices] = useState<any[]>([]);
+  const [services, setServices] = useState<ServiceItem[]>([]);
   const [patient, setPatient] = useState<Patient | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({
@@ -70,7 +79,7 @@ export default function CashierPage() {
   const handleCreate = async () => {
     const svc = services.find(s => s.id === form.serviceId);
     if (!svc || !form.patientId) {
-      toast.error('Vyberte službu a pacienta');
+      toast.error('Vyberte položku ceníku a pacienta');
       return;
     }
     setSaving(true);
@@ -78,7 +87,7 @@ export default function CashierPage() {
       await cashierApi.createTransaction({
         serviceId: svc.id,
         patientId: form.patientId,
-        originalPrice: Number(svc.priceCzk ?? svc.price ?? 0),
+        originalPrice: Number(svc.priceCzk ?? 0),
         paymentMethod: form.paymentMethod,
         discountAmount: Number(form.discount) || 0,
       });
@@ -105,99 +114,108 @@ export default function CashierPage() {
     }
   };
 
+  const header = (
+    <PageHeader
+      title="Pokladna"
+      subtitle="Platby přijaté dnes na místě"
+      actions={
+        <>
+          <Button variant="outlined" startIcon={<Refresh />} onClick={load}>Obnovit</Button>
+          <Button variant="contained" startIcon={<Add />} onClick={() => setDialogOpen(true)}>
+            Nová platba
+          </Button>
+        </>
+      }
+    />
+  );
+
   if (loading) {
     return (
       <Box>
-        <Skeleton variant="rounded" height={120} sx={{ mb: 2, borderRadius: 3 }} />
-        <Skeleton variant="rounded" height={300} sx={{ borderRadius: 3 }} />
+        {header}
+        <Grid container spacing={2} sx={{ mb: 2.5 }}>
+          {[1, 2, 3, 4].map((i) => (
+            <Grid key={i} size={{ xs: 6, md: 3 }}><Skeleton variant="rounded" height={96} /></Grid>
+          ))}
+        </Grid>
+        <Skeleton variant="rounded" height={300} />
       </Box>
     );
   }
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>Pokladna</Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <IconButton onClick={load} title="Obnovit"><Refresh /></IconButton>
-          <Button variant="contained" startIcon={<Add />} onClick={() => setDialogOpen(true)}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, fontWeight: 600 }}>
-            Nová platba
-          </Button>
-        </Box>
-      </Box>
+      {header}
 
       {/* Stats */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        {[
-          { label: 'Dnešní tržba', value: czk(stats?.todayRevenue ?? 0) },
-          { label: 'Transakcí', value: stats?.transactionsCount ?? 0 },
-          { label: 'Hotovost', value: stats?.cashTransactions ?? 0 },
-          { label: 'Karta', value: stats?.cardTransactions ?? 0 },
-        ].map(s => (
-          <Grid size={{ xs: 6, md: 3 }} key={s.label}>
-            <Card sx={{ borderRadius: 3 }}>
-              <CardContent sx={{ textAlign: 'center' }}>
-                <Typography variant="h5" sx={{ fontWeight: 800, color: '#0D7377' }}>{s.value}</Typography>
-                <Typography variant="body2" color="text.secondary">{s.label}</Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
+      <Grid container spacing={2} sx={{ mb: 2.5 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <KpiCard label="Dnešní tržba" value={czk(stats?.todayRevenue ?? 0)} hint="všechny způsoby platby" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <KpiCard label="Transakcí" value={stats?.transactionsCount ?? 0} hint="dnes" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <KpiCard label="Hotově" value={stats?.cashTransactions ?? 0} hint="plateb v hotovosti" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <KpiCard label="Kartou" value={stats?.cardTransactions ?? 0} hint="plateb kartou" />
+        </Grid>
       </Grid>
 
       {/* Transactions */}
-      <Card sx={{ borderRadius: 3 }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Dnešní transakce</Typography>
-          {transactions.length === 0 ? (
-            <Alert severity="info">Zatím žádné platby.</Alert>
-          ) : (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow sx={{ bgcolor: '#f8f9fa' }}>
-                    <TableCell sx={{ fontWeight: 700 }}>Čas</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Částka</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Platba</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>Akce</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {transactions.map(t => (
-                    <TableRow key={t.id}>
-                      <TableCell>{new Date(t.createdAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>{czk(t.finalPrice)}</TableCell>
-                      <TableCell><Chip size="small" label={METHOD_LABELS[t.paymentMethod] ?? t.paymentMethod} variant="outlined" /></TableCell>
-                      <TableCell>
-                        <Chip size="small" label={t.status}
-                          color={t.status === 'Completed' ? 'success' : t.status === 'Cancelled' || t.status === 'Refunded' ? 'error' : 'warning'} />
-                      </TableCell>
-                      <TableCell align="right">
-                        {(t.status === 'Pending' || t.status === 'Completed') && (
-                          <Tooltip title="Zrušit / refundovat">
-                            <IconButton size="small" color="error" onClick={() => handleCancel(t.id)}>
-                              {t.status === 'Pending' ? <Cancel fontSize="small" /> : <Undo fontSize="small" />}
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </CardContent>
-      </Card>
+      <SectionLabel>Dnešní transakce</SectionLabel>
+      <TableContainer component={Paper} sx={{ overflow: 'hidden' }}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Čas</TableCell>
+              <TableCell align="right">Částka</TableCell>
+              <TableCell>Platba</TableCell>
+              <TableCell>Stav</TableCell>
+              <TableCell align="right">Akce</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {transactions.map(t => {
+              const st = STATUS_VIEW[t.status] ?? { label: t.status, tone: 'grey' as ChipTone };
+              return (
+                <TableRow key={t.id} hover>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                    {new Date(t.createdAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                    {czk(t.finalPrice)}
+                  </TableCell>
+                  <TableCell>{METHOD_LABELS[t.paymentMethod] ?? t.paymentMethod}</TableCell>
+                  <TableCell><StatusChip tone={st.tone}>{st.label}</StatusChip></TableCell>
+                  <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                    {(t.status === 'Pending' || t.status === 'Completed') && (
+                      <Button size="small" variant="text" sx={{ color: DESIGN.danger }} onClick={() => handleCancel(t.id)}>
+                        {t.status === 'Pending' ? 'Zrušit' : 'Refundovat'}
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            {transactions.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} sx={{ py: 6, textAlign: 'center' }}>
+                  <Typography sx={{ color: 'text.secondary' }}>Zatím žádné platby.</Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       {/* New payment dialog */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Nová platba</DialogTitle>
+        <DialogTitle>Nová platba</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            <TextField select fullWidth label="Služba" value={form.serviceId}
+          <Stack spacing={2} sx={{ mt: 0.5 }}>
+            <TextField select fullWidth label="Položka ceníku" value={form.serviceId}
               onChange={e => setForm(f => ({ ...f, serviceId: e.target.value }))}>
               {services.map(s => (
                 <MenuItem key={s.id} value={s.id}>{s.name} — {czk(Number(s.priceCzk ?? 0))}</MenuItem>
@@ -223,15 +241,15 @@ export default function CashierPage() {
                 <MenuItem key={v} value={Number(v)}>{l}</MenuItem>
               ))}
             </TextField>
-            <TextField fullWidth type="number" label="Sleva (CZK)" value={form.discount}
-              onChange={e => setForm(f => ({ ...f, discount: Number(e.target.value) }))} />
-          </Box>
+            <TextField fullWidth type="number" label="Sleva" value={form.discount}
+              onChange={e => setForm(f => ({ ...f, discount: Number(e.target.value) }))}
+              slotProps={{ input: { endAdornment: <InputAdornment position="end">Kč</InputAdornment> } }} />
+          </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setDialogOpen(false)} sx={{ borderRadius: 2 }}>Zrušit</Button>
-          <Button variant="contained" onClick={handleCreate} disabled={saving || !form.serviceId || !form.patientId}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, fontWeight: 600 }}>
-            {saving ? 'Ukládání...' : 'Zaevidovat platbu'}
+        <DialogActions>
+          <Button variant="outlined" onClick={() => setDialogOpen(false)}>Zrušit</Button>
+          <Button variant="contained" onClick={handleCreate} disabled={saving || !form.serviceId || !form.patientId}>
+            {saving ? 'Ukládám…' : 'Zaevidovat platbu'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,14 +1,39 @@
+import { z } from 'zod';
 import client from './client';
 import { toBookingError } from './apiError';
 import {
   parseResponse,
   partnerNoticeListSchema,
-  partnerOrderListSchema,
   partnerOrderSchema,
   type PartnerNotice,
-  type PartnerOrder,
 } from './bookingContracts';
 import type { DateOnly } from '../utils/time';
+
+/**
+ * The order as the clubs screens read it (3. 10. 2026, design-17).
+ *
+ * Two fields the shared `partnerOrderSchema` does not keep, because `z.object`
+ * drops what it was not told about:
+ *
+ *   - `clubId` - the payer (`/api/clubs`) this order belongs to. The API has
+ *     carried it since the `PartnerOrderClubLink` migration (2. 10. 2026) and
+ *     takes it on create. The clubs page matches orders to clubs by it, and
+ *     only falls back to the name when it is missing.
+ *   - `token` - the athletes' self-registration link, `/klub/{token}`. **Not
+ *     sent by the API today**: `PartnerOrderView` has no token field, so this
+ *     parses as `null` and the screen says the link is not available rather
+ *     than inventing one. The day the view carries it (or a `publicLink`),
+ *     nothing else here changes.
+ *
+ * Both are supersets of `PartnerOrder`, so every caller typed against the
+ * shared type keeps compiling.
+ */
+export const partnerOrderDetailSchema = partnerOrderSchema.extend({
+  clubId: z.string().nullish().transform((v) => v ?? null),
+  token: z.string().nullish().transform((v) => v ?? null),
+});
+export type PartnerOrderDetail = z.infer<typeof partnerOrderDetailSchema>;
+const partnerOrderDetailListSchema = z.array(partnerOrderDetailSchema);
 
 /**
  * Partner reservations - contract 4.7, screens 5.10 and 5.11.
@@ -42,6 +67,8 @@ export interface PartnerOrderInput {
   partnerType: number;
   contactEmail?: string | null;
   note?: string | null;
+  /** The payer this order is for (`/api/clubs`), when the clinic has one on file. */
+  clubId?: string | null;
 }
 
 export interface PartnerItemInput {
@@ -56,19 +83,19 @@ export interface PartnerWindowInput {
 }
 
 export const partnerOrdersApi = {
-  list: (calendarId: string): Promise<PartnerOrder[]> =>
+  list: (calendarId: string): Promise<PartnerOrderDetail[]> =>
     request(async () => {
       const res = await client.get(`/api/calendars/${calendarId}/partner-orders`);
-      return parseResponse(partnerOrderListSchema, res.data);
+      return parseResponse(partnerOrderDetailListSchema, res.data);
     }),
 
-  create: (calendarId: string, input: PartnerOrderInput): Promise<PartnerOrder> =>
+  create: (calendarId: string, input: PartnerOrderInput): Promise<PartnerOrderDetail> =>
     request(async () => {
       const res = await client.post(
         `/api/calendars/${calendarId}/partner-orders`,
         input,
       );
-      return parseResponse(partnerOrderSchema, res.data);
+      return parseResponse(partnerOrderDetailSchema, res.data);
     }),
 
   /** The whole request, replaced. A bare array - see the note at the top. */
@@ -76,26 +103,26 @@ export const partnerOrdersApi = {
     calendarId: string,
     id: string,
     items: PartnerItemInput[],
-  ): Promise<PartnerOrder> =>
+  ): Promise<PartnerOrderDetail> =>
     request(async () => {
       const res = await client.put(
         `/api/calendars/${calendarId}/partner-orders/${id}/items`,
         items,
       );
-      return parseResponse(partnerOrderSchema, res.data);
+      return parseResponse(partnerOrderDetailSchema, res.data);
     }),
 
   addWindow: (
     calendarId: string,
     id: string,
     window: PartnerWindowInput,
-  ): Promise<PartnerOrder> =>
+  ): Promise<PartnerOrderDetail> =>
     request(async () => {
       const res = await client.post(
         `/api/calendars/${calendarId}/partner-orders/${id}/windows`,
         window,
       );
-      return parseResponse(partnerOrderSchema, res.data);
+      return parseResponse(partnerOrderDetailSchema, res.data);
     }),
 
   /** 4.7: extending a deadline is this, and `/extend` does not exist. */
@@ -103,13 +130,13 @@ export const partnerOrdersApi = {
     calendarId: string,
     id: string,
     deadlines: { releaseDate?: DateOnly; warnDate?: DateOnly; partnerReminderDate?: DateOnly },
-  ): Promise<PartnerOrder> =>
+  ): Promise<PartnerOrderDetail> =>
     request(async () => {
       const res = await client.put(
         `/api/calendars/${calendarId}/partner-orders/${id}/deadlines`,
         deadlines,
       );
-      return parseResponse(partnerOrderSchema, res.data);
+      return parseResponse(partnerOrderDetailSchema, res.data);
     }),
 
   /**
@@ -122,13 +149,13 @@ export const partnerOrdersApi = {
     id: string,
     windowId: string,
     audience: { toPublic: boolean; partnerOrderIds: string[] },
-  ): Promise<PartnerOrder> =>
+  ): Promise<PartnerOrderDetail> =>
     request(async () => {
       const res = await client.post(
         `/api/calendars/${calendarId}/partner-orders/${id}/windows/${windowId}/release`,
         audience,
       );
-      return parseResponse(partnerOrderSchema, res.data);
+      return parseResponse(partnerOrderDetailSchema, res.data);
     }),
 
   /**
@@ -140,13 +167,13 @@ export const partnerOrdersApi = {
    * its windows all stay, anybody already booked keeps their appointment, and
    * the token stops opening. Revoking twice answers `200`, not an error.
    */
-  revoke: (calendarId: string, id: string): Promise<PartnerOrder> =>
+  revoke: (calendarId: string, id: string): Promise<PartnerOrderDetail> =>
     request(async () => {
       const res = await client.post(
         `/api/calendars/${calendarId}/partner-orders/${id}/revoke`,
         {},
       );
-      return parseResponse(partnerOrderSchema, res.data);
+      return parseResponse(partnerOrderDetailSchema, res.data);
     }),
 
   /** What falls due on a day. 4.7: it says what should be sent; sending is phase 2. */

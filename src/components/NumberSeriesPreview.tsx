@@ -1,14 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Typography, 
-  Chip, 
-  Box, 
-  CircularProgress,
-  Tooltip,
-  IconButton 
-} from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
+import { Typography, Box, CircularProgress, Button } from '@mui/material';
 import { numberSeriesApi } from '../services/numberSeriesApi';
+import { SectionLabel } from './ui';
 
 interface NumberSeriesPreviewProps {
   documentType: string;
@@ -17,6 +10,10 @@ interface NumberSeriesPreviewProps {
   onNumberLoaded?: (number: string) => void;
 }
 
+/**
+ * "DALŠÍ ČÍSLO DOKLADU  2026-0419" at the top of a new document - what the
+ * numbering series will hand out next, peeked, not taken.
+ */
 export const NumberSeriesPreview: React.FC<NumberSeriesPreviewProps> = ({
   documentType,
   showLabel = true,
@@ -36,7 +33,7 @@ export const NumberSeriesPreview: React.FC<NumberSeriesPreviewProps> = ({
       onNumberLoaded?.(response.number);
     } catch (error) {
       console.error('Failed to fetch next number:', error);
-      setError('Failed to load number preview');
+      setError('Číslo dokladu se nepodařilo načíst.');
     } finally {
       setLoading(false);
     }
@@ -44,13 +41,13 @@ export const NumberSeriesPreview: React.FC<NumberSeriesPreviewProps> = ({
 
   useEffect(() => {
     fetchNext();
-  }, [documentType]);
+  }, [documentType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <CircularProgress size={16} />
-        <Typography variant="caption">Načítání...</Typography>
+        <Typography variant="caption" sx={{ color: 'text.secondary' }}>Načítám číslo dokladu…</Typography>
       </Box>
     );
   }
@@ -62,34 +59,36 @@ export const NumberSeriesPreview: React.FC<NumberSeriesPreviewProps> = ({
           {error}
         </Typography>
         {showRefresh && (
-          <IconButton size="small" onClick={fetchNext}>
-            <RefreshIcon fontSize="small" />
-          </IconButton>
+          <Button size="small" variant="text" onClick={fetchNext}>Zkusit znovu</Button>
         )}
       </Box>
     );
   }
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-      {showLabel && (
-        <Typography variant="caption" color="text.secondary">
-          Další číslo:
-        </Typography>
-      )}
-      <Tooltip title={`Next number for ${documentType}`}>
-        <Chip 
-          label={nextNumber} 
-          size="small" 
-          color="primary" 
-          variant="outlined"
-          sx={{ fontFamily: 'monospace' }}
-        />
-      </Tooltip>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+      {showLabel && <SectionLabel sx={{ mb: 0 }}>Další číslo dokladu</SectionLabel>}
+      <Box
+        component="span"
+        title={`Další číslo řady ${documentType}`}
+        sx={{
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+          fontSize: 13,
+          fontWeight: 600,
+          px: 1.25,
+          py: 0.375,
+          borderRadius: 2,
+          border: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.default',
+        }}
+      >
+        {nextNumber}
+      </Box>
       {showRefresh && (
-        <IconButton size="small" onClick={fetchNext}>
-          <RefreshIcon fontSize="small" />
-        </IconButton>
+        <Button size="small" variant="text" onClick={fetchNext} aria-label="Načíst číslo znovu">
+          Obnovit
+        </Button>
       )}
     </Box>
   );

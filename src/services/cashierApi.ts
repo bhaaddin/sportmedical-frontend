@@ -1,10 +1,15 @@
 import client from '../api/client';
 
+/*
+ * The server's numbering (Domain/Billing/PaymentMethod.cs): Cash 0, Card 1,
+ * Transfer 2, ClubBilling 3. Until 3. 10. 2026 this table had the last two
+ * swapped, so a club payment was recorded as a bank transfer and vice versa.
+ */
 export const PaymentMethod = {
   Cash: 0,
   Card: 1,
-  ClubBilling: 2,
-  BankTransfer: 3,
+  BankTransfer: 2,
+  ClubBilling: 3,
 } as const;
 
 export type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod];

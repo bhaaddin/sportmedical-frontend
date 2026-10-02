@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
   Button,
-  Chip,
   Divider,
+  LinearProgress,
   MenuItem,
-  Paper,
   Stack,
   TextField,
   Typography,
@@ -17,12 +17,17 @@ import { calendarsApi } from "../../api/calendars";
 import { partnerOrdersApi } from "../../api/partnerOrders";
 import { partnerTypeName } from "../../api/bookingContracts";
 import type { PartnerOrder, PartnerWindow } from "../../api/bookingContracts";
-import { formatDateOnly, formatPragueDate, toDateOnly } from "../../utils/time";
+import { formatDateOnly, formatPragueDate, pragueDateKey, toDateOnly } from "../../utils/time";
 import { AsyncSection } from "../../components/booking/AsyncSection";
-import { NewPartnerOrderDialog } from "../../components/booking/NewPartnerOrderDialog";
+import {
+  NewPartnerOrderDialog,
+  type PartnerOrderPrefill,
+} from "../../components/booking/NewPartnerOrderDialog";
 import { ReleaseWindowDialog } from "../../components/booking/ReleaseWindowDialog";
 import { ClubScheduleReport } from "../../components/booking/ClubScheduleReport";
 import { errorText } from "../../components/booking/errorText";
+import { SectionLabel, SoftCard, StatusChip } from "../../components/ui";
+import { pragueHHMM } from "../clubs/clubOrders";
 
 /**
  * Partner reservations — contract 5.11, with 5.10 as the dialog that creates
@@ -52,14 +57,79 @@ import { errorText } from "../../components/booking/errorText";
  * The one that is missing is not left as a dead button or a silent gap: the
  * screen says what is absent and why, which is the repository rule about a
  * removed function applied to one that has not arrived yet.
+ *
+ * Since the design board (3. 10. 2026) the calendar's "Rezervovat pro klub"
+ * and the clubs page land here with a {@link ReservationHandoff} in
+ * `location.state`: the dragged slot, the chosen club or the club typed into
+ * the drawer. The page opens the new-reservation dialog with those filled in
+ * and spends the handoff on the way out, so Back does not reopen it.
  */
+
+/** What the calendar or the clubs page hands over to pre-fill a reservation. */
+export interface ReservationHandoff {
+  calendarId?: string;
+  /** The dragged slot, as UTC instants. Both or neither. */
+  startUtc?: string;
+  endUtc?: string;
+  /** A payer already on file (`/api/clubs`). */
+  clubId?: string;
+  /** A club typed into the drawer's "NEBO ZALOŽIT NOVÝ" form. */
+  newClub?: {
+    name: string;
+    contactPerson?: string;
+    contactPhone?: string;
+    contactEmail?: string;
+    headcount?: number;
+  };
+}
+
+/** True when the state carries anything worth opening the dialog for. */
+export function isReservationHandoff(state: unknown): state is ReservationHandoff {
+  if (state === null || typeof state !== "object") return false;
+  const s = state as ReservationHandoff;
+  return s.startUtc !== undefined || s.clubId !== undefined || s.newClub !== undefined;
+}
+
+/** The handoff as the dialog's prefill. Exported so the test can pin the mapping. */
+export function prefillFromHandoff(handoff: ReservationHandoff): PartnerOrderPrefill {
+  const windows =
+    handoff.startUtc && handoff.endUtc
+      ? [
+          {
+            date: pragueDateKey(handoff.startUtc),
+            startTime: pragueHHMM(handoff.startUtc),
+            endTime: pragueHHMM(handoff.endUtc),
+          },
+        ]
+      : [];
+  const note =
+    handoff.newClub && (handoff.newClub.contactPerson || handoff.newClub.contactPhone)
+      ? [handoff.newClub.contactPerson, handoff.newClub.contactPhone].filter(Boolean).join(" · ")
+      : undefined;
+  return {
+    partnerName: handoff.newClub?.name,
+    contactEmail: handoff.newClub?.contactEmail,
+    note,
+    clubId: handoff.clubId ?? null,
+    headcount: handoff.newClub?.headcount,
+    windows,
+  };
+}
 
 export default function PartnerOrdersPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const [calendarId, setCalendarId] = useState("");
-  const [creating, setCreating] = useState(false);
+  const handoff = isReservationHandoff(location.state) ? location.state : null;
+
+  const [calendarId, setCalendarId] = useState(handoff?.calendarId ?? "");
+  const [creating, setCreating] = useState(handoff !== null);
+  /* Kept in state: the location is cleared once the dialog closes. */
+  const [prefill] = useState<PartnerOrderPrefill | undefined>(
+    handoff === null ? undefined : prefillFromHandoff(handoff),
+  );
   const [releasing, setReleasing] = useState<{
     order: PartnerOrder;
     window: PartnerWindow;
@@ -98,6 +168,15 @@ export default function PartnerOrdersPage() {
     void queryClient.invalidateQueries({ queryKey: ["partner-notices"] });
   };
 
+  /* Spend the handoff on the way out, not on the way in - StrictMode mounts
+     twice, and clearing it before the dialog was drawn left nothing to open. */
+  const closeCreating = () => {
+    setCreating(false);
+    if (handoff !== null) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  };
+
   const extendDeadline = useMutation({
     mutationFn: ({ order, date }: { order: PartnerOrder; date: string }) =>
       partnerOrdersApi.setDeadlines(order.calendarId, order.id, {
@@ -121,24 +200,23 @@ export default function PartnerOrdersPage() {
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto" }}>
       <Stack
-        direction="row"
+        direction={{ xs: "column", sm: "row" }}
+        spacing={1.5}
         sx={{
-          alignItems: "center",
+          alignItems: { xs: "flex-start", sm: "center" },
           justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 2,
-          mb: 2,
+          mb: 2.5,
         }}
       >
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>
+          <Typography variant="h4" component="h1" sx={{ fontSize: { xs: 22, md: 24 } }}>
             {t("booking.partner.title")}
           </Typography>
-          <Typography sx={{ color: "text.secondary" }}>
+          <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.25 }}>
             {t("booking.partner.subtitle")}
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, alignItems: "center" }}>
           <TextField
             select
             size="small"
@@ -188,7 +266,7 @@ export default function PartnerOrdersPage() {
 
       {/* What falls due today. 4.7: this says what to send, it does not send. */}
       {(noticesQuery.data ?? []).length > 0 ? (
-        <Alert severity="info" sx={{ mb: 2 }}>
+        <Alert severity="info" sx={{ mb: 2, alignItems: "flex-start" }}>
           <Typography sx={{ fontWeight: 600, mb: 0.5 }}>
             {t("booking.partner.dueToday")}
           </Typography>
@@ -250,10 +328,7 @@ export default function PartnerOrdersPage() {
 
       {/* Extending the deadline: 4.7 puts it on the order, not on one window. */}
       {extending ? (
-        <Paper
-          variant="outlined"
-          sx={{ p: 2, mt: 2, borderColor: "warning.main" }}
-        >
+        <SoftCard tone="soft" sx={{ p: 2, mt: 2 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
             {t("booking.partner.extendTitle", { partner: extending.partnerName })}
           </Typography>
@@ -283,18 +358,19 @@ export default function PartnerOrdersPage() {
             >
               {t("booking.common.save")}
             </Button>
-            <Button onClick={() => setExtending(null)}>
+            <Button variant="outlined" onClick={() => setExtending(null)}>
               {t("booking.common.cancel")}
             </Button>
           </Stack>
-        </Paper>
+        </SoftCard>
       ) : null}
 
-      {creating ? (
+      {creating && chosen !== "" ? (
         <NewPartnerOrderDialog
           open
           calendarId={chosen}
-          onClose={() => setCreating(false)}
+          initial={prefill}
+          onClose={closeCreating}
           onCreated={reload}
         />
       ) : null}
@@ -313,7 +389,7 @@ export default function PartnerOrdersPage() {
   );
 }
 
-/** One partner order, laid out as 5.11 draws it. */
+/** One partner order, laid out as 5.11 draws it, in the board's clothes. */
 function OrderCard({
   order,
   busy,
@@ -331,15 +407,18 @@ function OrderCard({
   const today = toDateOnly(new Date());
   const typeKey = partnerTypeName(order.partnerType);
   const [reportOpen, setReportOpen] = useState(false);
+  const free = Math.max(0, order.requestedCount - order.bookedCount);
 
   return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
+    <SoftCard>
       <Stack
         direction="row"
-        spacing={1}
-        sx={{ alignItems: "baseline", flexWrap: "wrap", mb: 0.5 }}
+        spacing={1.5}
+        sx={{ alignItems: "center", flexWrap: "wrap", gap: 1, mb: 0.5 }}
       >
-        <Typography sx={{ fontWeight: 700 }}>{order.partnerName}</Typography>
+        <Typography component="h2" sx={{ fontSize: 17, fontWeight: 700 }}>
+          {order.partnerName}
+        </Typography>
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
           {/* An unknown type is shown as unknown, not guessed at. */}
           {typeKey
@@ -347,7 +426,9 @@ function OrderCard({
             : t("booking.partner.type.unknown", { code: order.partnerType })}
         </Typography>
         {order.isRevoked ? (
-          <Chip size="small" color="default" label={t("booking.partner.revoked")} />
+          <StatusChip tone="grey">{t("booking.partner.revoked")}</StatusChip>
+        ) : free === 0 && order.requestedCount > 0 ? (
+          <StatusChip tone="green">Obsazeno</StatusChip>
         ) : null}
         <Button
           size="small"
@@ -373,7 +454,27 @@ function OrderCard({
           : ""}
       </Typography>
 
+      {/* Taken places, the server's count (4.7). */}
+      {order.requestedCount > 0 ? (
+        <Box sx={{ mb: 2 }}>
+          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "baseline", mb: 0.75 }}>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Obsazeno {order.bookedCount} z {order.requestedCount} míst
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+              {free} volných
+            </Typography>
+          </Stack>
+          <LinearProgress
+            variant="determinate"
+            value={Math.min(100, (order.bookedCount / order.requestedCount) * 100)}
+            aria-label="Obsazenost míst"
+          />
+        </Box>
+      ) : null}
+
       {/* The request, activity by activity. Counts are the server's (4.7). */}
+      <SectionLabel>{t("booking.partner.step2")}</SectionLabel>
       {order.items.length === 0 ? (
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
           {t("booking.partner.noItems")}
@@ -396,8 +497,9 @@ function OrderCard({
         </Stack>
       )}
 
-      <Divider sx={{ my: 1 }} />
+      <Divider sx={{ my: 1.5 }} />
 
+      <SectionLabel>{t("booking.partner.step3")}</SectionLabel>
       {order.windows.length === 0 ? (
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
           {t("booking.partner.noWindows")}
@@ -435,7 +537,7 @@ function OrderCard({
                 <Stack
                   direction="row"
                   spacing={2}
-                  sx={{ alignItems: "baseline", flexWrap: "wrap" }}
+                  sx={{ alignItems: "center", flexWrap: "wrap" }}
                 >
                   <Typography sx={{ fontWeight: 600 }}>
                     {formatDateOnly(w.date)}
@@ -466,11 +568,7 @@ function OrderCard({
                     </Typography>
                   ) : null}
                   {w.releasedAt ? (
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      label={t("booking.partner.released")}
-                    />
+                    <StatusChip tone="grey" size="sm">{t("booking.partner.released")}</StatusChip>
                   ) : null}
                 </Stack>
                 <Button
@@ -488,7 +586,7 @@ function OrderCard({
       )}
 
       <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: "wrap", gap: 1 }}>
-        <Button size="small" onClick={onExtend}>
+        <Button size="small" variant="outlined" onClick={onExtend}>
           {t("booking.partner.extend")}
         </Button>
         {/*
@@ -498,7 +596,8 @@ function OrderCard({
         */}
         <Button
           size="small"
-          color="warning"
+          variant="outlined"
+          color="error"
           disabled={busy || order.isRevoked}
           onClick={onRevoke}
         >
@@ -511,13 +610,13 @@ function OrderCard({
         neither has a route. Saying so beats a button that does nothing and
         beats leaving the gap for somebody to rediscover.
       */}
-      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+      <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
         {t("booking.partner.reminderIsPhase2", {
           when: order.windows[0]?.partnerReminderDate
             ? formatDateOnly(order.windows[0].partnerReminderDate)
             : "—",
         })}
       </Typography>
-    </Paper>
+    </SoftCard>
   );
 }
