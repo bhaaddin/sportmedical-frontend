@@ -332,6 +332,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         description: 'Co pacienti napsali po dokončené návštěvě — soukromé, nic se nezveřejňuje',
         to: '/hodnoceni-pacientu',
       },
+      {
+        id: 'pripominky',
+        label: 'Připomínky termínů',
+        description: 'Kolik hodin před termínem odejde pacientovi připomínka e-mailem',
+        to: '/nastaveni/pripominky',
+        requires: 'settings.clinic.manage',
+      },
     ],
   },
   {
