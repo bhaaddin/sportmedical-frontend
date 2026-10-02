@@ -18,6 +18,12 @@ export interface PublicClinic {
   phone: string;
   address: string;
   bookingEnabled: boolean;
+  /**
+   * Opening hours as one line ("Po–Pá 8:00–18:00"), when the API sends them.
+   * Absent on today's endpoint; the public pages then fall back to the line in
+   * src/pages/public/content.ts. Never invented here.
+   */
+  openingHours?: string;
 }
 
 /**
@@ -46,6 +52,9 @@ export const readPublicClinic = async (): Promise<PublicClinic> => {
       phone: data.phone ?? '',
       address: data.address ?? '',
       bookingEnabled: data.bookingEnabled !== false,
+      ...(typeof data.openingHours === 'string' && data.openingHours.trim() !== ''
+        ? { openingHours: data.openingHours.trim() }
+        : {}),
     };
   } catch {
     return { name: '', email: '', phone: '', address: '', bookingEnabled: true };

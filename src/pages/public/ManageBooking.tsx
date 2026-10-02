@@ -40,7 +40,6 @@ import {
   DialogTitle,
   Typography,
 } from '@mui/material';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
 import {
   EventAvailableOutlined,
   EventBusyOutlined,
@@ -58,37 +57,10 @@ import { freeDays, freeSlots } from '../../api/publicBooking';
 import type { BookableSlot } from '../../api/publicBooking';
 import { readPublicClinic } from '../../api/clinicSettings';
 import type { PublicClinic } from '../../api/clinicSettings';
+import PublicLayout from './PublicLayout';
+import { BRAND } from '../../components/public/brand';
 
-/* ── Brand, the same one /objednat and /dotaznik wear ── */
-
-const BRAND = {
-  ink: '#0B0B0C',
-  accent: '#FF9D00',
-  accentDark: '#E08A00',
-  accentWash: 'rgba(255, 157, 0, 0.09)',
-  accentEdge: 'rgba(255, 157, 0, 0.32)',
-  page: '#F4F4F6',
-  line: '#E5E5E9',
-  muted: 'rgba(17, 17, 17, 0.58)',
-};
-
-const INTER = '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-
-const publicTheme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: { main: BRAND.accent, dark: BRAND.accentDark, contrastText: BRAND.ink },
-    background: { default: BRAND.page, paper: '#FFFFFF' },
-    text: { primary: '#111111', secondary: BRAND.muted },
-    divider: BRAND.line,
-  },
-  shape: { borderRadius: 12 },
-  typography: {
-    fontFamily: INTER,
-    h4: { fontWeight: 800, letterSpacing: '-0.02em' },
-    button: { textTransform: 'none', fontWeight: 700 },
-  },
-});
+/* Brand: the website identity every public page wears — components/public/brand.ts. */
 
 /**
  * The appointment as the clinic reads it.
@@ -244,8 +216,8 @@ export default function ManageBooking() {
   };
 
   return (
-    <ThemeProvider theme={publicTheme}>
-      <Box sx={{ minHeight: '100vh', bgcolor: BRAND.page, pb: { xs: 6, md: 10 } }}>
+    <PublicLayout clinic={clinic}>
+      <Box sx={{ pb: { xs: 6, md: 10 } }}>
         <Hero />
 
         <Container maxWidth="sm" sx={{ mt: { xs: -7, md: -9 } }}>
@@ -484,7 +456,7 @@ export default function ManageBooking() {
           </DialogActions>
         </Dialog>
       </Box>
-    </ThemeProvider>
+    </PublicLayout>
   );
 }
 
@@ -494,19 +466,15 @@ function Hero() {
       sx={{
         bgcolor: BRAND.ink,
         color: '#FFFFFF',
-        pt: { xs: 5, md: 7 },
+        pt: { xs: 4, md: 6 },
         pb: { xs: 10, md: 13 },
-        px: 2,
       }}
     >
       <Container maxWidth="sm">
-        <Typography sx={{ fontWeight: 900, letterSpacing: '-0.02em', fontSize: { xs: 22, md: 26 } }}>
-          SportMedical{' '}
-          <Box component="span" sx={{ color: BRAND.accent, letterSpacing: 2, fontWeight: 800 }}>
-            DIAGNOSTICS
-          </Box>
+        <Typography sx={{ color: BRAND.accent, fontWeight: 800, fontSize: 12.5, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+          Správa rezervace
         </Typography>
-        <Typography variant="h4" sx={{ mt: 2, fontSize: { xs: 26, md: 34 } }}>
+        <Typography component="h1" sx={{ fontWeight: 800, letterSpacing: '-0.02em', mt: 1, fontSize: { xs: 28, md: 36 }, lineHeight: 1.1 }}>
           Vaše rezervace
         </Typography>
       </Container>

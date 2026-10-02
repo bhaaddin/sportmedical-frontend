@@ -19,41 +19,16 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CheckCircleOutlined, StarOutlined } from '@mui/icons-material';
 import {
   FeedbackAlreadySubmittedError,
   FeedbackLinkDeadError,
   submitFeedback,
 } from '../../api/feedback';
+import PublicLayout from './PublicLayout';
+import { BRAND } from '../../components/public/brand';
 
-/* ── Brand, the same one /objednat and /klub wear ── */
-const BRAND = {
-  ink: '#0B0B0C',
-  accent: '#FF9D00',
-  accentDark: '#E08A00',
-  page: '#F4F4F6',
-  line: '#E5E5E9',
-  muted: 'rgba(17, 17, 17, 0.58)',
-};
-
-const INTER = '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-
-const publicTheme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: { main: BRAND.accent, dark: BRAND.accentDark, contrastText: BRAND.ink },
-    background: { default: BRAND.page, paper: '#FFFFFF' },
-    text: { primary: '#111111', secondary: BRAND.muted },
-    divider: BRAND.line,
-  },
-  shape: { borderRadius: 12 },
-  typography: {
-    fontFamily: INTER,
-    h4: { fontWeight: 800, letterSpacing: '-0.02em' },
-    button: { textTransform: 'none', fontWeight: 700 },
-  },
-});
+/* Brand: the website identity every public page wears — components/public/brand.ts. */
 
 const RATING_WORDS: Record<number, string> = {
   1: 'Špatné',
@@ -65,11 +40,15 @@ const RATING_WORDS: Record<number, string> = {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider theme={publicTheme}>
-      <Box sx={{ minHeight: '100vh', bgcolor: BRAND.page, py: { xs: 3, sm: 6 } }}>
-        <Container maxWidth="sm">{children}</Container>
+    <PublicLayout>
+      <Box sx={{ py: { xs: 3, sm: 6 } }}>
+        <Container maxWidth="sm">
+          <Box sx={{ bgcolor: BRAND.paper, border: `1px solid ${BRAND.line}`, borderRadius: 4, p: { xs: 2.5, sm: 3.5 } }}>
+            {children}
+          </Box>
+        </Container>
       </Box>
-    </ThemeProvider>
+    </PublicLayout>
   );
 }
 
@@ -153,10 +132,10 @@ export default function FeedbackPage() {
 
         <Box
           sx={{
-            border: `1px solid ${BRAND.line}`,
-            borderRadius: 2,
+            border: `1px solid ${BRAND.accentEdge}`,
+            borderRadius: 3,
             p: 3,
-            bgcolor: '#FFFFFF',
+            bgcolor: BRAND.accentWash,
             textAlign: 'center',
           }}
         >
@@ -194,6 +173,7 @@ export default function FeedbackPage() {
           disabled={rating === null || submitting}
           onClick={submit}
           startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : null}
+          sx={{ color: BRAND.ink }}
         >
           {submitting ? 'Odesílám…' : 'Odeslat hodnocení'}
         </Button>

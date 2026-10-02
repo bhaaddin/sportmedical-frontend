@@ -57,6 +57,14 @@ export interface ClubClaim {
 export class ClubLinkDeadError extends Error {}
 
 /**
+ * The link an athlete follows for one club order, as the staff screen shows and
+ * copies it: this app's own origin and the `/klub/:token` route above. One
+ * place, so the clubs page and anything that e-mails the link agree on it.
+ */
+export const clubRegistrationLink = (token: string, origin: string = window.location.origin): string =>
+  `${origin.replace(/\/+$/, '')}/klub/${encodeURIComponent(token)}`;
+
+/**
  * What the club link offers. `null` is never returned: a dead link throws
  * {@link ClubLinkDeadError} so the page can say "the link is not live" rather
  * than show an empty offer that looks like a club with nothing to book.

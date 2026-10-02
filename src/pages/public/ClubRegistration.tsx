@@ -24,7 +24,6 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
 import {
   CheckCircleOutlined,
   EventAvailableOutlined,
@@ -36,35 +35,10 @@ import {
   getClubOffer,
 } from '../../api/publicClub';
 import type { ClubOffer } from '../../api/publicClub';
+import PublicLayout from './PublicLayout';
+import { BRAND } from '../../components/public/brand';
 
-/* ── Brand, the same one /objednat wears ── */
-const BRAND = {
-  ink: '#0B0B0C',
-  accent: '#FF9D00',
-  accentDark: '#E08A00',
-  accentWash: 'rgba(255, 157, 0, 0.09)',
-  page: '#F4F4F6',
-  line: '#E5E5E9',
-  muted: 'rgba(17, 17, 17, 0.58)',
-};
-
-const INTER = '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-
-const publicTheme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: { main: BRAND.accent, dark: BRAND.accentDark, contrastText: BRAND.ink },
-    background: { default: BRAND.page, paper: '#FFFFFF' },
-    text: { primary: '#111111', secondary: BRAND.muted },
-    divider: BRAND.line,
-  },
-  shape: { borderRadius: 12 },
-  typography: {
-    fontFamily: INTER,
-    h4: { fontWeight: 800, letterSpacing: '-0.02em' },
-    button: { textTransform: 'none', fontWeight: 700 },
-  },
-});
+/* Brand: the website identity every public page wears — components/public/brand.ts. */
 
 const clinicDateTime = (utc: string): string =>
   new Date(utc).toLocaleString('cs-CZ', {
@@ -89,11 +63,15 @@ const hhmm = (time: string): string => time.slice(0, 5);
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider theme={publicTheme}>
-      <Box sx={{ minHeight: '100vh', bgcolor: BRAND.page, py: { xs: 3, sm: 6 } }}>
-        <Container maxWidth="sm">{children}</Container>
+    <PublicLayout>
+      <Box sx={{ py: { xs: 3, sm: 6 } }}>
+        <Container maxWidth="sm">
+          <Box sx={{ bgcolor: BRAND.paper, border: `1px solid ${BRAND.line}`, borderRadius: 4, p: { xs: 2.5, sm: 3.5 } }}>
+            {children}
+          </Box>
+        </Container>
       </Box>
-    </ThemeProvider>
+    </PublicLayout>
   );
 }
 
@@ -306,6 +284,7 @@ export default function ClubRegistration() {
                 disabled={!canSubmit}
                 onClick={submit}
                 startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : null}
+                sx={{ color: BRAND.ink }}
               >
                 {submitting ? 'Rezervuji…' : 'Zapsat se a rezervovat termín'}
               </Button>

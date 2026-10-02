@@ -1101,17 +1101,35 @@ export default function IntakeQuestionnaire() {
                 )}
 
                 {/* The patient's own portal, created with this registration: a
-                    personal link back to their appointments and documents. */}
+                    personal link back to their appointments and documents, and
+                    the place to set a password so the link is not the only way in. */}
                 {result.portalToken && (
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    disableElevation
-                    href={`/portal/${result.portalToken}`}
-                    sx={{ mt: 1.25, borderRadius: 999, py: 1.25, color: BRAND.ink }}
+                  <Box
+                    sx={{
+                      mt: 2.5,
+                      p: 2.25,
+                      borderRadius: 3,
+                      bgcolor: BRAND.accentWash,
+                      border: `1px solid ${BRAND.accentEdge}`,
+                    }}
                   >
-                    Můj portál — mé termíny a dokumenty
-                  </Button>
+                    <Typography sx={{ fontWeight: 800, fontSize: 17, mb: 0.5 }}>
+                      Váš portál je připraven
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: BRAND.muted, mb: 1.5 }}>
+                      Termíny, dokumenty a doklady najdete v portálu. Nastavte si tam heslo,
+                      abyste se příště přihlásili e-mailem i bez tohoto odkazu.
+                    </Typography>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      disableElevation
+                      href={`/portal/${encodeURIComponent(result.portalToken)}`}
+                      sx={{ borderRadius: 999, py: 1.25, color: BRAND.ink }}
+                    >
+                      Otevřít můj portál
+                    </Button>
+                  </Box>
                 )}
               </Box>
             </Card>

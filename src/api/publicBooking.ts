@@ -94,6 +94,56 @@ export const bookableOffer = async (): Promise<BookableService[]> => {
   return data.data ?? [];
 };
 
+/* ── The public price list ── */
+
+/** One line of the price list as the website shows it. */
+export interface PriceListItem {
+  code: string;
+  name: string;
+  description: string;
+  priceCzk: number | null;
+  durationMinutes: number | null;
+}
+
+export interface PriceListCategory {
+  category: string;
+  items: PriceListItem[];
+}
+
+/**
+ * The clinic's published price list, grouped by category.
+ *
+ * GET /api/public/price-list is newer than the rest of this file and may not
+ * exist on the server the page reaches. That is not an error the patient can
+ * do anything about, so it never throws: an empty list means "no price list
+ * to show" and the section stays hidden.
+ */
+export const readPublicPriceList = async (): Promise<PriceListCategory[]> => {
+  try {
+    const { data } = await publicClient.get<ApiResult<PriceListCategory[]> | PriceListCategory[]>(
+      '/api/public/price-list',
+    );
+    const list = Array.isArray(data) ? data : data?.data;
+    if (!Array.isArray(list)) return [];
+
+    return list
+      .filter((group) => group && typeof group.category === 'string' && Array.isArray(group.items))
+      .map((group) => ({
+        category: group.category,
+        items: group.items.map((item) => ({
+          code: item.code ?? '',
+          name: item.name ?? '',
+          description: item.description ?? '',
+          priceCzk: typeof item.priceCzk === 'number' ? item.priceCzk : null,
+          durationMinutes: typeof item.durationMinutes === 'number' ? item.durationMinutes : null,
+        })),
+      }))
+      .filter((group) => group.items.length > 0);
+  } catch {
+    return [];
+  }
+};
+
 /** Which days between two dates have at least one free time. */
 export const freeDays = async (
   calendarId: string,

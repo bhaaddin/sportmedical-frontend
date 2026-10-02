@@ -34,6 +34,7 @@ const IntakeQuestionnaire = lazy(() => import('./pages/public/IntakeQuestionnair
 const PublicBooking = lazy(() => import('./pages/public/PublicBooking'));
 const ManageBooking = lazy(() => import('./pages/public/ManageBooking'));
 const PatientPortal = lazy(() => import('./pages/public/PatientPortal'));
+const PatientSignIn = lazy(() => import('./pages/public/PatientSignIn'));
 const ClubRegistration = lazy(() => import('./pages/public/ClubRegistration'));
 const FeedbackPage = lazy(() => import('./pages/public/FeedbackPage'));
 const FeedbackReviewPage = lazy(() => import('./pages/FeedbackReviewPage'));
@@ -173,6 +174,20 @@ const menuGroups: MenuItemGroup[] = [
     ],
   },
 ];
+
+/*
+ * Settings destinations that draw the board's settings frame themselves
+ * (SettingsScreen: nav + breadcrumb), so the shell must not draw a second way
+ * back above them. Everything else in the catalogue still gets the one-line
+ * "Nastavení / Skupina" link.
+ */
+const SETTINGS_FRAMED = new Set<string>([
+  '/admin', '/audit-log', '/activities', '/calendars', '/sluzby', '/nepritomnosti', '/exceptions',
+  '/working-hours', '/nastaveni/vzhled-kalendare', '/nastaveni/souhlasy', '/pravidla-dokumentu',
+  '/dokumenty-sablony', '/nastaveni/sablony-emailu', '/nastaveni/skupinove-slevy', '/svatky',
+  '/nastaveni/udaje-pacienta', '/dotaznik-nastaveni', '/nastaveni/pripominky', '/nastaveni/zabezpeceni',
+  '/staff-management', '/system-health',
+]);
 
 /*
  * A screen the signed-in employee has no permission for is not there for them.
@@ -510,12 +525,13 @@ function Layout({ children }: { children: React.ReactNode }) {
         }}
       >
         {/*
-          * The way out of a settings screen, drawn once for all of them. Not
-          * one had one: clicking into any of them left the gear in a collapsed
-          * icon sidebar as the only route back, which is a route nobody finds
-          * by looking. It names where it goes rather than promising "back".
+          * The way out of a settings screen is drawn by the screens themselves
+          * now (SettingsScreen in src/pages/settings/SettingsFrame.tsx: the
+          * board's settings nav + "Nastavení / Skupina / Stránka" breadcrumb).
+          * A settings destination that does not wear that frame yet still gets
+          * this one line back, so no screen is ever a dead end.
           */}
-        {settingsHere !== null && (
+        {settingsHere !== null && !SETTINGS_FRAMED.has(settingsHere.item.to) && (
           <Box sx={{ mb: 2 }}>
             <Button
               component={Link as any}
@@ -587,6 +603,7 @@ export default function App() {
             <Route path="/hodnoceni/:token" element={<Suspense fallback={<PageLoader />}><FeedbackPage /></Suspense>} />
             {/* Patient portal. Anonymous like the links above: the personal access
                 token IS the identity, resolving to one patient's own dashboard. */}
+            <Route path="/portal/prihlaseni" element={<Suspense fallback={<PageLoader />}><PatientSignIn /></Suspense>} />
             <Route path="/portal/:token" element={<Suspense fallback={<PageLoader />}><PatientPortal /></Suspense>} />
             <Route path="/portal" element={<Suspense fallback={<PageLoader />}><PatientPortal /></Suspense>} />
             <Route path="/*" element={
