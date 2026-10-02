@@ -260,28 +260,33 @@ describe('finding the way back', () => {
 describe('the payments section', () => {
   const platby = () => SETTINGS_SECTIONS.find((s) => s.id === 'platby');
 
-  it('holds both the price list and the payers', () => {
+  /*
+   * The payers (Kluby) left this section on 3. 10. 2026: on the design board
+   * "Kluby a týmy" is a screen of the working day - hromadné objednávky and the
+   * athletes' registration links - so it sits in the sidebar, and the overlap
+   * test below would rightly refuse it here.
+   */
+  it('holds the price list, and not the payers', () => {
     const ids = platby()?.items.map((i) => i.id) ?? [];
     expect(ids).toContain('cenik');
-    expect(ids).toContain('platci');
+    expect(ids).not.toContain('platci');
+    expect(SETTINGS_SECTIONS.flatMap((s) => s.items).map((i) => i.to)).not.toContain('/clubs');
   });
 
   /* Not left behind in the section it used to be in. */
-  it('is the only section either of them is in', () => {
-    for (const id of ['cenik', 'platci']) {
-      const sections = SETTINGS_SECTIONS.filter((s) => s.items.some((i) => i.id === id));
-      expect(sections.map((s) => s.id)).toEqual(['platby']);
-    }
+  it('is the only section the price list is in', () => {
+    const sections = SETTINGS_SECTIONS.filter((s) => s.items.some((i) => i.id === 'cenik'));
+    expect(sections.map((s) => s.id)).toEqual(['platby']);
   });
 
   /*
-   * A receptionist takes payments and needs to see what things cost and who
-   * gets the invoice, so neither row may be admin-only - which would empty the
-   * whole section off her screen.
+   * A receptionist takes payments and needs to see what things cost, so the
+   * price list may not be admin-only - which would empty the section off her
+   * screen.
    */
   it('is open to a receptionist, not just an administrator', () => {
     const hers = visibleSections(RECEPTIONIST).find((s) => s.id === 'platby');
-    expect(hers?.items.map((i) => i.id).sort()).toEqual(['cenik', 'platci']);
+    expect(hers?.items.map((i) => i.id)).toContain('cenik');
   });
 
   /*
@@ -296,12 +301,6 @@ describe('the payments section', () => {
     expect(row?.label).not.toMatch(/činnost|služ/i);
   });
 
-  /* One name for this screen: the page heading and this row. It has been
-     called both "Kluby" and "Plátci" in the same application. */
-  it('calls the payers what the screen calls itself', () => {
-    const row = platby()?.items.find((i) => i.id === 'platci');
-    expect(row?.label).toBe('Plátci');
-  });
 });
 
 /*

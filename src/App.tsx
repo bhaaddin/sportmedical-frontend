@@ -1,7 +1,7 @@
-import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Avatar, IconButton, Menu, MenuItem, Badge, CircularProgress, Button } from '@mui/material';
-import { alpha } from '@mui/material/styles';
-import { Science, Dashboard, People, PersonAdd, Settings, LocalHospital, Logout, Notifications, CalendarMonth, Receipt, MonitorHeart, AdminPanelSettings, Warning, Flag, Psychology, EventAvailable, Search, AttachMoney, Schedule, EventBusy, Today, Description, ArrowBack, Assessment } from '@mui/icons-material';
+import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, Avatar, IconButton, Menu, MenuItem, CircularProgress, Button, ButtonBase, Collapse, Divider, Stack, useMediaQuery } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import { Science, Dashboard, People, Settings, Logout, CalendarMonth, Receipt, Search, AttachMoney, Today, ArrowBack, Assessment, Groups, ExpandLess, ExpandMore, Menu as MenuIcon, EventBusy, Lock, RateReview, FactCheck, HealthAndSafety, Psychology, MonitorHeart, Spa, EventAvailable } from '@mui/icons-material';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { usePermissions, type Permission } from './auth/usePermission';
 import { useAccountRefresh } from './auth/accountRefresh';
@@ -122,26 +122,36 @@ interface MenuItemGroup {
 }
 
 const menuGroups: MenuItemGroup[] = [
-  {
-    label: '',
-    items: [
-      { text: 'Přehled', icon: <Dashboard />, path: '/' },
-    ],
-  },
   /*
-   * Daily work only. Everything anybody sets up once - calendars, activities,
-   * working hours, exceptions, the team, the public site, the audit log - now
-   * lives behind Nastavení, grouped the way the API already groups it.
+   * The six screens of the working day, in the order the design board lists
+   * them (3. 10. 2026): the calendar, the people, the clubs, the results, the
+   * money, the settings. Nothing else sits at the top level.
    *
-   * The sidebar was twenty entries, and the four somebody opens every morning
-   * sat among sixteen they open twice a year. Documents were not there at all:
-   * the screen existed and could only be reached by typing its address.
+   * Everything anybody sets up once - calendars, activities, working hours,
+   * exceptions, the team, the public site, the audit log - lives behind
+   * Nastavení, grouped the way the API already groups it.
+   * `settingsDoesNotDuplicateTheSidebar` in catalogue.test.ts holds the line.
    */
   {
     label: '',
     items: [
+      { text: 'Kalendář', icon: <CalendarMonth />, path: '/planovani' },
+      { text: 'Pacienti', icon: <People />, path: '/patients', requires: 'patients.view' },
+      { text: 'Kluby a týmy', icon: <Groups />, path: '/clubs' },
+      { text: 'Výsledky', icon: <Science />, path: '/diagnostics/new' },
+      { text: 'Fakturace', icon: <Receipt />, path: '/billing', requires: 'billing.manage' },
+      { text: 'Nastavení', icon: <Settings />, path: '/settings' },
+    ],
+  },
+  /*
+   * The rest of the day's screens, folded away under "Další" so the sidebar
+   * stays the board's six lines but nothing that existed is lost.
+   */
+  {
+    label: 'Další',
+    items: [
+      { text: 'Přehled', icon: <Dashboard />, path: '/' },
       { text: 'Dnešní přehled', icon: <Today />, path: '/dnes' },
-      { text: 'Plánování', icon: <CalendarMonth />, path: '/planovani' },
       /*
        * No `requires`, and that is measured, not forgotten: everything behind
        * this screen - GET /api/day, …/preview, …/availability, /api/activities,
@@ -151,31 +161,15 @@ const menuGroups: MenuItemGroup[] = [
        * what narrows it (6.5).
        */
       { text: 'Přehled podle služeb', icon: <Assessment />, path: '/prehled-sluzeb' },
-      { text: 'Pacienti', icon: <People />, path: '/patients', requires: 'patients.view' },
-      { text: 'Diagnostika', icon: <Science />, path: '/diagnostics/new' },
-    ],
-  },
-  {
-    label: 'Peníze',
-    items: [
       { text: 'Pokladna', icon: <AttachMoney />, path: '/cashier', requires: 'billing.manage' },
-      { text: 'Fakturace', icon: <Receipt />, path: '/billing', requires: 'billing.manage' },
-      { text: 'Účetní export', icon: <Receipt />, path: '/accounting-export', requires: 'billing.manage' },
-    ],
-  },
-  {
-    /*
-     * Plátci used to sit here as well as in Nastavení. It is configuration,
-     * so Nastavení is where it lives and the sidebar is for the work of the
-     * day. Two entries for one screen is the shape this
-     * project keeps finding, and this time I put it there myself: adding
-     * Plátci to Nastavení without taking it out of here.
-     *
-     * `settingsDoesNotDuplicateTheSidebar` in catalogue.test.ts holds the line.
-     */
-    label: '',
-    items: [
-      { text: 'Nastavení', icon: <Settings />, path: '/settings' },
+      { text: 'Účetní export', icon: <FactCheck />, path: '/accounting-export', requires: 'billing.manage' },
+      { text: 'Kontrola registrací', icon: <RateReview />, path: '/intake-review', requires: 'patients.register' },
+      { text: 'Zranění', icon: <HealthAndSafety />, path: '/injuries' },
+      { text: 'Návrat do hry', icon: <EventAvailable />, path: '/rtp' },
+      { text: 'Otřes mozku', icon: <Psychology />, path: '/concussion' },
+      { text: 'Tréninková zátěž', icon: <MonitorHeart />, path: '/training-load' },
+      { text: 'Wellness', icon: <Spa />, path: '/wellness' },
+      { text: 'Dostupnost', icon: <EventBusy />, path: '/availability' },
     ],
   },
 ];
@@ -204,16 +198,68 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** The sidebar's width on the board: 300px of white with a hairline on the right. */
+const SIDEBAR_WIDTH = 272;
+
+/**
+ * One row of the sidebar's navigation. The board draws it as plain text with
+ * generous height; the open screen sits on a soft tinted pill in the accent.
+ */
+function NavRow({
+  to,
+  label,
+  icon,
+  active,
+  indent = false,
+  onNavigate,
+}: {
+  to: string;
+  label: string;
+  icon?: React.ReactNode;
+  active: boolean;
+  indent?: boolean;
+  onNavigate?: () => void;
+}) {
+  return (
+    <ListItemButton
+      component={Link as any}
+      to={to}
+      selected={active}
+      onClick={onNavigate}
+      sx={{
+        borderRadius: 2,
+        mb: 0.25,
+        minHeight: indent ? 38 : 44,
+        px: indent ? 2 : 1.75,
+        ml: indent ? 2 : 0,
+        gap: 1.25,
+        color: active ? 'primary.main' : 'text.primary',
+        fontWeight: active ? 600 : 500,
+        fontSize: indent ? 13.5 : 14.5,
+      }}
+    >
+      {icon !== undefined && (
+        <Box sx={{ display: 'flex', color: active ? 'primary.main' : 'text.secondary', '& svg': { fontSize: 20 } }}>
+          {icon}
+        </Box>
+      )}
+      <Box component="span" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</Box>
+    </ListItemButton>
+  );
+}
+
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const theme = useTheme();
+  const narrow = useMediaQuery(theme.breakpoints.down('md'));
   /*
    * Inside a patient the sidebar becomes that patient's, and the application's
    * own menu steps aside. The owner's rule: while you are in somebody's file,
    * everything on screen is about them.
    *
-   * It is the same navigation either way - a column of links on the left -
-   * so nobody has to learn a second way of getting around; only its contents
-   * change, and the way back out is the first thing in it.
+   * On the board that is a sub-list under "Pacienti" rather than a second
+   * sidebar: the file's sections, indented, with the way back out above them.
    */
   /* Reloaded from GET /api/v1/account on start, on focus and after any 403,
      so a permission the owner changed redraws this menu without a new sign-in. */
@@ -224,243 +270,250 @@ function Layout({ children }: { children: React.ReactNode }) {
   const patientId = held.has('patients.view') ? patientInPath(location.pathname) : null;
   const settingsHere = settingsItemAt(location.pathname);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState<boolean>(() => {
+    try { return localStorage.getItem('sm-nav-more') === '1'; } catch { return false; }
+  });
   const { accent, mode, setAccent, setMode } = useThemePrefs();
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const visibleMenu = menuGroups
     .map(group => ({ ...group, items: group.items.filter(item => item.requires === undefined || held.has(item.requires)) }))
     .filter(group => group.items.length > 0);
 
-  const COLLAPSED_WIDTH = 64;
-  const EXPANDED_WIDTH = 240;
-  const currentWidth = sidebarOpen ? EXPANDED_WIDTH : COLLAPSED_WIDTH;
+  const isActivePath = (path: string) =>
+    location.pathname === path || (path !== '/' && location.pathname.startsWith(path));
 
-  const handleSidebarEnter = useCallback(() => {
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    setSidebarOpen(true);
-  }, []);
-
-  const handleSidebarLeave = useCallback(() => {
-    hoverTimerRef.current = setTimeout(() => setSidebarOpen(false), 300);
-  }, []);
+  const toggleMore = () => {
+    setMoreOpen((open) => {
+      try { localStorage.setItem('sm-nav-more', open ? '0' : '1'); } catch { /* private mode */ }
+      return !open;
+    });
+  };
 
   const handleLogout = () => {
     setAnchorEl(null);
     void signOut();
   };
 
+  const closeMobile = () => setMobileOpen(false);
+
+  /*
+   * The big button at the top of the sidebar. It always lands on the calendar;
+   * the calendar reads `state.newAppointment` and opens the booking drawer on
+   * the next free time, so the desk never has to find a slot first.
+   */
+  const newAppointment = () => {
+    closeMobile();
+    navigate('/planovani', { state: { newAppointment: Date.now() } });
+  };
+
+  const sidebar = (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', px: 2, pt: 2.25, pb: 1.5 }}>
+      <Box
+        component={Link}
+        to="/"
+        onClick={closeMobile}
+        sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, px: 0.5, color: 'text.primary' }}
+      >
+        <Typography sx={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em' }}>SportMedical</Typography>
+      </Box>
+
+      <Button variant="contained" size="large" fullWidth onClick={newAppointment} sx={{ mb: 2.5, minHeight: 46 }}>
+        Nová objednávka
+      </Button>
+
+      <Box sx={{ flex: 1, overflowY: 'auto', mx: -0.5, px: 0.5 }}>
+        <List disablePadding>
+          {visibleMenu.map((group, gi) => {
+            const isMore = group.label === 'Další';
+            const rows = group.items.map((item) => {
+              const active = isActivePath(item.path);
+              const inPatients = item.path === '/patients' && patientId !== null;
+              return (
+                <Box key={item.text}>
+                  <NavRow to={item.path} label={item.text} icon={item.icon} active={active && !inPatients} onNavigate={closeMobile} />
+                  {inPatients && (
+                    <Box sx={{ mb: 0.75 }}>
+                      {PATIENT_SECTIONS.map((section) => {
+                        const to = sectionPath(patientId, section);
+                        return (
+                          <NavRow
+                            key={section.id}
+                            to={to}
+                            label={section.label}
+                            active={location.pathname === to}
+                            indent
+                            onNavigate={closeMobile}
+                          />
+                        );
+                      })}
+                    </Box>
+                  )}
+                </Box>
+              );
+            });
+
+            if (isMore) {
+              return (
+                <Box key={gi} sx={{ mt: 1.5 }}>
+                  <ListItemButton onClick={toggleMore} sx={{ borderRadius: 2, minHeight: 36, px: 1.75, color: 'text.secondary' }}>
+                    <Typography variant="overline" sx={{ flex: 1 }}>Další</Typography>
+                    {moreOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                  </ListItemButton>
+                  <Collapse in={moreOpen} timeout="auto" unmountOnExit>
+                    {rows}
+                  </Collapse>
+                </Box>
+              );
+            }
+
+            return (
+              <Box key={gi} sx={{ mt: gi > 0 ? 1 : 0 }}>
+                {group.label && (
+                  <Typography variant="overline" sx={{ px: 1.75, pb: 0.5, display: 'block', color: 'text.secondary' }}>
+                    {group.label}
+                  </Typography>
+                )}
+                {rows}
+              </Box>
+            );
+          })}
+        </List>
+      </Box>
+
+      <Divider sx={{ my: 1.25 }} />
+
+      <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+        <ButtonBase
+          onClick={(e) => setAnchorEl(e.currentTarget)}
+          aria-label="Účet a vzhled"
+          sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1.25, borderRadius: 2, px: 1, py: 0.75, textAlign: 'left', minWidth: 0, '&:hover': { bgcolor: 'action.hover' } }}
+        >
+          <Avatar sx={{ width: 34, height: 34, bgcolor: 'primary.main', color: '#FFF', fontSize: 13 }}>
+            {user.firstName?.[0]}{user.lastName?.[0]}
+          </Avatar>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {[user.firstName, user.lastName].filter(Boolean).join(' ') || 'Účet'}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user.role || ''}
+            </Typography>
+          </Box>
+        </ButtonBase>
+        <IconButton size="small" title="Hledat (Ctrl+K)" aria-label="Hledat"
+          onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}>
+          <Search fontSize="small" />
+        </IconButton>
+        <NotificationCenter />
+      </Stack>
+
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'left' }} transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
+        <MenuItem onClick={() => { setAnchorEl(null); navigate('/settings'); }}>
+          <ListItemIcon><Settings fontSize="small" /></ListItemIcon> Nastavení
+        </MenuItem>
+        <Box sx={{ px: 2, py: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.75 }}>
+            Vzhled
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 0.75, mb: 1 }}>
+            {THEME_ACCENTS.map((a) => (
+              <Box
+                key={a.key}
+                role="button"
+                aria-label={a.label}
+                title={a.label}
+                onClick={() => setAccent(a.color)}
+                sx={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  bgcolor: a.color,
+                  outline: '2px solid',
+                  outlineColor: accent === a.color ? 'text.primary' : 'transparent',
+                  outlineOffset: 2,
+                }}
+              />
+            ))}
+          </Box>
+          <Button
+            size="small"
+            variant="outlined"
+            fullWidth
+            onClick={() => setMode(mode === 'light' ? 'dark' : 'light')}
+          >
+            {mode === 'light' ? 'Tmavý režim' : 'Světlý režim'}
+          </Button>
+        </Box>
+        <MenuItem onClick={handleLogout}>
+          <ListItemIcon><Logout fontSize="small" /></ListItemIcon> Odhlásit se
+        </MenuItem>
+      </Menu>
+    </Box>
+  );
+
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <a href="#main-content" className="skip-link">
         Přeskočit na hlavní obsah
       </a>
-      <AppBar position="fixed" sx={(t) => ({ zIndex: t.zIndex.drawer + 1, bgcolor: 'primary.main', boxShadow: `0 2px 16px ${alpha(t.palette.primary.main, 0.25)}` })}>
-        <Toolbar>
-          <LocalHospital sx={{ mr: 1 }} />
-          <Typography variant="h6" noWrap sx={{ fontWeight: 700, flexGrow: 1 }}>
-            SportMedical Diagnostics
-          </Typography>
-          <IconButton color="inherit" sx={{ mr: 1 }} title="Hledat (Ctrl+K)"
-            onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}>
-            <Search />
-          </IconButton>
-          <NotificationCenter />
-          <IconButton color="inherit" onClick={(e) => setAnchorEl(e.currentTarget)}
-            sx={{ transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.1)' } }}>
-            <Avatar sx={{ bgcolor: alpha('#FFFFFF', 0.22), color: '#FFFFFF', fontWeight: 700, width: 36, height: 36, transition: 'box-shadow 0.2s', '&:hover': { boxShadow: `0 0 0 3px ${alpha('#FFFFFF', 0.45)}` } }}>
-              {user.firstName?.[0]}{user.lastName?.[0]}
-            </Avatar>
-          </IconButton>
-          <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
-            <MenuItem onClick={() => { setAnchorEl(null); window.location.href = '/settings'; }}>
-              <ListItemIcon><Settings fontSize="small" /></ListItemIcon> Nastavení
-            </MenuItem>
-            <Box sx={{ px: 2, py: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.75 }}>
-                Vzhled
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 0.75, mb: 1 }}>
-                {THEME_ACCENTS.map((a) => (
-                  <Box
-                    key={a.key}
-                    role="button"
-                    aria-label={a.label}
-                    onClick={() => setAccent(a.color)}
-                    sx={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: '50%',
-                      cursor: 'pointer',
-                      bgcolor: a.color,
-                      outline: '2px solid',
-                      outlineColor: accent === a.color ? 'text.primary' : 'transparent',
-                      outlineOffset: 2,
-                    }}
-                  />
-                ))}
-              </Box>
-              <Button
-                size="small"
-                variant="outlined"
-                fullWidth
-                onClick={() => setMode(mode === 'light' ? 'dark' : 'light')}
-              >
-                {mode === 'light' ? 'Tmavý režim' : 'Světlý režim'}
-              </Button>
-            </Box>
-            <MenuItem onClick={handleLogout}>
-              <ListItemIcon><Logout fontSize="small" /></ListItemIcon> Odhlásit se
-            </MenuItem>
-          </Menu>
-        </Toolbar>
-      </AppBar>
 
-      {/* Hover zone — triggers sidebar open when cursor nears left edge */}
-      <Box
-        onMouseEnter={handleSidebarEnter}
-        sx={{
-          position: 'fixed', top: 64, left: 0, width: sidebarOpen ? currentWidth : 8,
-          height: 'calc(100vh - 64px)', zIndex: 1200,
-          transition: 'width 0.25s ease',
-        }}
-      />
-
-      <Drawer
-        variant="permanent"
-        onMouseEnter={handleSidebarEnter}
-        onMouseLeave={handleSidebarLeave}
-        sx={{
-          width: currentWidth, flexShrink: 0,
-          transition: 'width 0.25s ease',
-          overflowX: 'hidden',
-          '& .MuiDrawer-paper': {
-            width: currentWidth, boxSizing: 'border-box', mt: '64px',
-            borderRight: '1px solid', borderColor: 'divider',
-            transition: 'width 0.25s ease',
-            overflowX: 'hidden',
-          },
-        }}
-      >
-        <List sx={{ px: 0.5, pt: 1 }}>
-          {patientId !== null && (
-            <Box sx={{ mb: 1 }}>
-              <ListItemButton
-                component={Link as any}
-                to="/patients"
-                title={!sidebarOpen ? 'Zpět na pacienty' : undefined}
-                sx={{
-                  borderRadius: 2, mb: 0.5, py: 1.0, minHeight: 44,
-                  justifyContent: sidebarOpen ? 'initial' : 'center',
-                  px: sidebarOpen ? 2 : 1.5,
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 40, justifyContent: 'center' }}>
-                  <ArrowBack />
-                </ListItemIcon>
-                {sidebarOpen && (
-                  <ListItemText primary="Zpět na pacienty" slotProps={{
-                    primary: { sx: { fontSize: 14, whiteSpace: 'nowrap' } },
-                  }} />
-                )}
-              </ListItemButton>
-              <Box sx={{ mx: 1.5, my: 1, borderTop: '1px solid', borderColor: 'divider' }} />
-              {PATIENT_SECTIONS.map((section) => {
-                const to = sectionPath(patientId, section);
-                const isActive = location.pathname === to;
-                return (
-                  <ListItemButton
-                    key={section.id}
-                    component={Link as any}
-                    to={to}
-                    selected={isActive}
-                    title={!sidebarOpen ? section.label : undefined}
-                    sx={(theme) => ({
-                      borderRadius: 2, mb: 0.5, py: 1.0, minHeight: 44,
-                      justifyContent: sidebarOpen ? 'initial' : 'center',
-                      px: sidebarOpen ? 2 : 1.5,
-                      '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.12), color: 'primary.main', boxShadow: `inset 3px 0 0 ${theme.palette.primary.main}` },
-                      '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) },
-                    })}
-                  >
-                    <ListItemIcon sx={{
-                      color: isActive ? 'primary.main' : 'inherit', minWidth: 40, justifyContent: 'center',
-                    }}>
-                      {section.icon}
-                    </ListItemIcon>
-                    {sidebarOpen && (
-                      <ListItemText primary={section.label} slotProps={{
-                        primary: { sx: { fontWeight: isActive ? 600 : 400, fontSize: 14, whiteSpace: 'nowrap' } },
-                      }} />
-                    )}
-                  </ListItemButton>
-                );
-              })}
-            </Box>
-          )}
-
-          {patientId === null && visibleMenu.map((group, gi) => (
-            <Box key={gi}>
-              {group.label && sidebarOpen && (
-                <Typography variant="caption" sx={{ px: 2, pt: gi > 0 ? 2 : 0, pb: 0.5, display: 'block', fontWeight: 700, color: 'text.secondary', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>
-                  {group.label}
-                </Typography>
-              )}
-              {group.label && !sidebarOpen && gi > 0 && (
-                <Box sx={{ mx: 1.5, my: 1, borderTop: '1px solid', borderColor: 'divider' }} />
-              )}
-              {group.items.map((item) => {
-                const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
-                return (
-                  <motion.div key={item.text} whileHover={{ x: 4 }} transition={{ type: 'spring', stiffness: 400, damping: 25 }}>
-                    <ListItemButton component={Link as any} to={item.path}
-                      selected={isActive}
-                      title={!sidebarOpen ? item.text : undefined}
-                      sx={(theme) => ({
-                        borderRadius: 2, mb: 0.5, py: 1.0, minHeight: 44,
-                        justifyContent: sidebarOpen ? 'initial' : 'center',
-                        px: sidebarOpen ? 2 : 1.5,
-                        transition: 'all 0.2s ease',
-                        '&.Mui-selected': { bgcolor: alpha(theme.palette.primary.main, 0.12), color: 'primary.main', boxShadow: `inset 3px 0 0 ${theme.palette.primary.main}` },
-                        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08), transform: 'translateX(2px)' },
-                      })}>
-                      <ListItemIcon sx={{
-                        color: isActive ? 'primary.main' : 'inherit', minWidth: 40,
-                        justifyContent: 'center',
-                      }}>
-                        {item.icon}
-                      </ListItemIcon>
-                      {sidebarOpen && (
-                        <ListItemText primary={item.text} slotProps={{
-                          primary: { sx: { fontWeight: isActive ? 600 : 400, fontSize: 14, whiteSpace: 'nowrap' } },
-                        }} />
-                      )}
-                    </ListItemButton>
-                  </motion.div>
-                );
-                })}
-            </Box>
-          ))}
-        </List>
-      </Drawer>
+      {narrow ? (
+        <>
+          <AppBar position="fixed">
+            <Toolbar sx={{ minHeight: 56, gap: 1 }}>
+              <IconButton edge="start" aria-label="Otevřít menu" onClick={() => setMobileOpen(true)}>
+                <MenuIcon />
+              </IconButton>
+              <Typography sx={{ fontWeight: 700, fontSize: 16, flexGrow: 1 }}>SportMedical</Typography>
+              <Button size="small" variant="contained" onClick={newAppointment}>Objednat</Button>
+            </Toolbar>
+          </AppBar>
+          <Drawer
+            variant="temporary"
+            open={mobileOpen}
+            onClose={closeMobile}
+            ModalProps={{ keepMounted: true }}
+            sx={{ '& .MuiDrawer-paper': { width: SIDEBAR_WIDTH, boxSizing: 'border-box' } }}
+          >
+            {sidebar}
+          </Drawer>
+        </>
+      ) : (
+        <Drawer
+          variant="permanent"
+          sx={{
+            width: SIDEBAR_WIDTH,
+            flexShrink: 0,
+            '& .MuiDrawer-paper': {
+              width: SIDEBAR_WIDTH,
+              boxSizing: 'border-box',
+              borderRight: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+            },
+          }}
+        >
+          {sidebar}
+        </Drawer>
+      )}
 
       <Box component="main" id="main-content" role="main" aria-label="Hlavní obsah"
         sx={{
-          flexGrow: 1, p: 3, mt: '64px', ml: `${currentWidth}px`,
-          transition: 'margin-left 0.25s ease',
-          bgcolor: 'transparent', minHeight: '100vh', overflow: 'auto',
+          flexGrow: 1,
+          minWidth: 0,
+          p: { xs: 2, md: 3 },
+          pt: { xs: '72px', md: 3 },
+          minHeight: '100vh',
         }}
       >
         {/*
-          * The way out of a settings screen, drawn once for all fourteen of
-          * them. Not one had one: clicking into any of them left the gear in a
-          * collapsed icon sidebar as the only route back, which is a route
-          * nobody finds by looking.
-          *
-          * It names where it goes rather than promising "back". `navigate(-1)`
-          * would be a guess - somebody can arrive here from the booking screen
-          * or by typing the address - and a control that lands somewhere
-          * different each time is worse than none.
+          * The way out of a settings screen, drawn once for all of them. Not
+          * one had one: clicking into any of them left the gear in a collapsed
+          * icon sidebar as the only route back, which is a route nobody finds
+          * by looking. It names where it goes rather than promising "back".
           */}
         {settingsHere !== null && (
           <Box sx={{ mb: 2 }}>
@@ -483,10 +536,10 @@ function Layout({ children }: { children: React.ReactNode }) {
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
-            initial={{ opacity: 0, y: 12 }}
+            initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
           >
             {children}
           </motion.div>

@@ -58,6 +58,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
      */
     id: 'ordinace',
     label: 'Ordinace',
+    /* (Kluby a týmy left this catalogue on 3. 10. 2026: on the design board it
+       is a screen of the working day - hromadné objednávky and the athletes'
+       registration links - and so it sits in the sidebar, not in Nastavení.) */
     description: 'Kdo jste — veřejná identita a kontakty vaší ordinace',
     items: [
       {
@@ -113,19 +116,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Ceník',
         description: 'Co ordinace účtuje — odsud si činnost bere svou cenu',
         to: '/cenik',
-      },
-      {
-        /*
-         * "Definice plátců" in the owner's words: who gets the invoice and
-         * where it goes. The server has carried all of it from the start -
-         * IČO, DIČ, fakturační adresa, bankovní účet, IBAN and splatnost - and
-         * the screen collected five of the thirteen fields, none of them the
-         * ones you need to send an invoice.
-         */
-        id: 'platci',
-        label: 'Plátci',
-        description: 'Kluby a organizace, které platí za členy — fakturační údaje a splatnost',
-        to: '/clubs',
       },
       {
         id: 'skupinove-slevy',

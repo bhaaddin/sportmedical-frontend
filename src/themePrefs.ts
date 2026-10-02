@@ -11,7 +11,9 @@ export interface ThemePrefs {
 
 export const ACCENT_STORAGE_KEY = 'sm-theme-accent';
 export const MODE_STORAGE_KEY = 'sm-theme-mode';
-export const DEFAULT_ACCENT = '#0D9488';
+/* The board's forest green (THEME_ACCENTS[0]); the old teal still works for
+   anybody who picked it, it just is not the default any more. */
+export const DEFAULT_ACCENT = '#0D5C52';
 
 export const ThemePrefsContext = createContext<ThemePrefs | null>(null);
 
