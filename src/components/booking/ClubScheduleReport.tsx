@@ -86,6 +86,12 @@ export function planSchedule(order: PartnerOrder): {
     }
   }
 
+  // One fixed unit for the "Míst" (places) estimate across every window — the
+  // order's primary činnost length. Using the NEXT queued item's length instead
+  // made the capacity shift window to window and could show fewer places than the
+  // slots actually generated for the same window when činnosti have mixed lengths.
+  const primaryUnit = order.items[0]?.durationMinutes || 30;
+
   let cursor = 0;
   const windows: WindowPlan[] = [];
 
@@ -104,15 +110,12 @@ export function planSchedule(order: PartnerOrder): {
       cursor += 1;
     }
 
-    // Capacity is what the window could hold of the next činnost's length, so the
-    // card still says "7 places" even once the queue is empty.
-    const unit = queue[cursor]?.durationMinutes ?? order.items[0]?.durationMinutes ?? 30;
     windows.push({
       date: w.date,
       startTime: w.startTime.slice(0, 5),
       endTime: w.endTime.slice(0, 5),
       coveredMinutes: w.coveredMinutes,
-      capacity: unit > 0 ? Math.floor(w.coveredMinutes / unit) : 0,
+      capacity: primaryUnit > 0 ? Math.floor(w.coveredMinutes / primaryUnit) : 0,
       slots,
     });
   }
@@ -123,6 +126,18 @@ export function planSchedule(order: PartnerOrder): {
   );
   const totalCapacity = windows.reduce((n, w) => n + w.capacity, 0);
   return { windows, totalCapacity, totalRequested, placed: cursor };
+}
+
+/**
+ * Escapes text before it goes into the printable document. reportHtml builds a
+ * string and hands it to document.write in the app's own origin, so an
+ * unescaped club or činnost name containing markup would run there — this closes
+ * that. The in-app dialog renders through React and is already safe.
+ */
+function esc(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string,
+  );
 }
 
 function reportHtml(order: PartnerOrder, plan: ReturnType<typeof planSchedule>): string {
@@ -139,7 +154,7 @@ function reportHtml(order: PartnerOrder, plan: ReturnType<typeof planSchedule>):
     .join('');
   const fits = plan.placed >= plan.totalRequested;
   return `<!doctype html><html lang="cs"><head><meta charset="utf-8">
-  <title>Rozpis – ${order.partnerName}</title>
+  <title>Rozpis – ${esc(order.partnerName)}</title>
   <style>
     body{font-family:system-ui,Arial,sans-serif;color:#1a2b2b;margin:32px;}
     h1{font-size:20px;margin:0 0 4px;} .sub{color:#667;margin:0 0 16px;}
@@ -148,8 +163,8 @@ function reportHtml(order: PartnerOrder, plan: ReturnType<typeof planSchedule>):
     th{background:#f0f6f6;} .tot{margin-top:16px;font-weight:600;}
     .ok{color:#0a7d5a;} .no{color:#b4531f;}
   </style></head><body>
-  <h1>Rozpis vyšetření – ${order.partnerName}</h1>
-  <p class="sub">${order.items.map((i) => `${i.activityName} (${i.durationMinutes} min) × ${i.requestedCount}`).join(' · ')}</p>
+  <h1>Rozpis vyšetření – ${esc(order.partnerName)}</h1>
+  <p class="sub">${order.items.map((i) => `${esc(i.activityName)} (${i.durationMinutes} min) × ${i.requestedCount}`).join(' · ')}</p>
   <table><thead><tr><th>Den</th><th>Čas</th><th>Míst</th><th>Časy</th></tr></thead>
   <tbody>${rows}</tbody></table>
   <p class="tot ${fits ? 'ok' : 'no'}">
