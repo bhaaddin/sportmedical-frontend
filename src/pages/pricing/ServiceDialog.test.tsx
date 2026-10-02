@@ -187,11 +187,15 @@ describe('the editor', () => {
 });
 
 describe('the price list screen', () => {
-  /* Twice on purpose: the cards at the top and the table underneath are two
-     views of one list, and both are part of this screen. */
-  it('lists what the server has, on the cards and in the table', async () => {
+  /* Once: the board's one table replaced the cards-plus-table pair that showed
+     every row twice. The name, the code and the price are all in that row. */
+  it('lists what the server has, once, in the table', async () => {
     render(withQueries(<Cenik />));
-    expect(await screen.findAllByText('Komplexní prohlídka')).toHaveLength(2);
+    expect(await screen.findAllByText('Komplexní prohlídka')).toHaveLength(1);
+    const row = screen.getByText('Komplexní prohlídka').closest('tr');
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getByText('KP')).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByText(/^3\s000 Kč$/)).toBeInTheDocument();
   });
 
   /*
@@ -326,13 +330,14 @@ describe('a price list with nothing in it', () => {
     expect(screen.queryByPlaceholderText(/Hledat v ceníku/)).not.toBeInTheDocument();
   });
 
-  /* And the totals come back with the first row, so this is not "hidden
-     forever" by accident. */
+  /* And the search and the table come back with the first row, so this is
+     not "hidden forever" by accident. */
   it('shows them again once there is something', async () => {
     getAll.mockResolvedValue([service()]);
     render(withQueries(<Cenik />));
 
-    expect(await screen.findByText('Celkem položek')).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText(/Hledat v ceníku/)).toBeInTheDocument();
+    expect(screen.getByRole('table')).toBeInTheDocument();
     expect(screen.queryByText('Ceník je prázdný')).not.toBeInTheDocument();
   });
 });
