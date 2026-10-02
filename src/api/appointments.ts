@@ -14,6 +14,7 @@ import {
   type AvailabilitySlot,
   type BookedAppointment,
   type CreateAppointmentInput,
+  type CreateUnregisteredInput,
   type DayAppointment,
   type DaySummary,
   type HistoryLine,
@@ -144,6 +145,21 @@ export const appointmentsApi = {
         startUtc: asUtcInstant(input.startUtc),
       });
       return parseResponse(bookedAppointmentSchema, res.data);
+    }),
+
+  /**
+   * The second and third booking modes: a walk-in taken by name, or an event with
+   * no patient at all. The činnost still has to be offered then and the time still
+   * has to be free, but no patient is sent or looked up. Answers with the
+   * appointment alone - there is no patient, so there are no patient warnings.
+   */
+  createUnregistered: (input: CreateUnregisteredInput): Promise<Appointment> =>
+    request(async () => {
+      const res = await client.post(
+        `/api/calendars/${input.calendarId}/appointments/unregistered`,
+        { ...input, startUtc: asUtcInstant(input.startUtc) },
+      );
+      return parseResponse(appointmentSchema, res.data);
     }),
 
   /** A move is its own operation, not a cancel plus a new booking (4.5). */

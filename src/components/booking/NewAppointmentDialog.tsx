@@ -4,13 +4,17 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   MenuItem,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import CheckCircleOutline from "@mui/icons-material/CheckCircleOutlineOutlined";
@@ -82,9 +86,25 @@ import {
 /** 4.5: `source` 0 is the desk. Online is 1, a club is 2; neither books here. */
 const SOURCE_STAFF = 0;
 
+/** 4.5: the three ways to fill one slot. The server tells them apart by who. */
+type BookingMode = "patient" | "unknown" | "event";
+
 const TEXT = {
   when: "Termín",
   patient: "Vyhledávání z databáze",
+  mode: "Typ objednávky",
+  modePatient: "Pacient",
+  modeUnknown: "Neznámý pacient",
+  modeEvent: "Událost bez vazby",
+  contact: "Kontakt",
+  contactName: "Jméno",
+  contactNameUnknown: "Jméno (neregistrovaný pacient)",
+  contactNameEvent: "Název události (nepovinné)",
+  contactPhone: "Telefon",
+  sms: "Odeslat SMS s potvrzením",
+  smsUnavailable: "SMS zatím nejsou aktivní (připravujeme).",
+  pickNameFirst: "Nejprve zadejte jméno.",
+  eventExplain: "Termín bez vazby na pacienta — např. školení nebo servis přístroje.",
   activity: "Činnost",
   note: "Poznámka",
   date: "Datum",
@@ -158,7 +178,13 @@ export function NewAppointmentDialog({
   const [editingWhen, setEditingWhen] = useState(!fromGrid);
 
   /* ── Who, what, and a note ── */
+  /* The three booking modes. "patient" searches the register; "unknown" takes a
+     walk-in by name; "event" holds the time with nobody behind it. */
+  const [mode, setMode] = useState<BookingMode>("patient");
   const [patient, setPatient] = useState<PatientHit | null>(null);
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [sendSms, setSendSms] = useState(false);
   const [activityId, setActivityId] = useState("");
   const [note, setNote] = useState("");
   /* A quick-registration link, kept so it survives onto the booked screen. */
@@ -253,21 +279,43 @@ export function NewAppointmentDialog({
   );
 
   const book = useMutation({
-    mutationFn: (input: { overrideReason?: string }) =>
-      appointmentsApi.create({
-        patientId: patient?.id ?? "",
+    mutationFn: async (
+      input: { overrideReason?: string },
+    ): Promise<{ startUtc: string; warnings: { code: string; message: string }[] }> => {
+      const noteOrNull = note.trim() === "" ? null : note.trim();
+
+      /* A registered patient goes through the ordinary booking, with its patient
+         checks and its warnings. A walk-in or an event goes through the
+         unregistered path, which carries the contact instead of a patient id. */
+      if (mode === "patient") {
+        const result = await appointmentsApi.create({
+          patientId: patient?.id ?? "",
+          calendarId: effectiveCalendarId,
+          activityId: activity?.id ?? "",
+          startUtc: startUtc ?? "",
+          source: SOURCE_STAFF,
+          note: noteOrNull,
+          overrideReason: input.overrideReason,
+        });
+        return { startUtc: result.appointment.startUtc, warnings: result.warnings ?? [] };
+      }
+
+      const appointment = await appointmentsApi.createUnregistered({
         calendarId: effectiveCalendarId,
         activityId: activity?.id ?? "",
         startUtc: startUtc ?? "",
-        source: SOURCE_STAFF,
-        note: note.trim() === "" ? null : note.trim(),
+        name: contactName.trim() === "" ? null : contactName.trim(),
+        phone: contactPhone.trim() === "" ? null : contactPhone.trim(),
+        note: noteOrNull,
         overrideReason: input.overrideReason,
-      }),
+      });
+      return { startUtc: appointment.startUtc, warnings: [] };
+    },
     onSuccess: (result) => {
       setConflict(null);
       setBooked({
-        startUtc: result.appointment.startUtc,
-        warnings: result.warnings ?? [],
+        startUtc: result.startUtc,
+        warnings: result.warnings,
       });
       onBooked();
     },
@@ -297,6 +345,9 @@ export function NewAppointmentDialog({
 
   const resetBooking = () => {
     setPatient(null);
+    setContactName("");
+    setContactPhone("");
+    setSendSms(false);
     setActivityId("");
     setNote("");
     setQuickLink(null);
@@ -308,13 +359,35 @@ export function NewAppointmentDialog({
     book.reset();
   };
 
+  /* Switching mode clears who the last mode named, so a walk-in's name cannot ride
+     along onto a registered booking, or the other way round. */
+  const changeMode = (next: BookingMode) => {
+    if (next === mode) return;
+    setMode(next);
+    setPatient(null);
+    setContactName("");
+    setContactPhone("");
+    setSendSms(false);
+    setQuickLink(null);
+    setConflict(null);
+  };
+
   const close = () => {
     resetBooking();
     onClose();
   };
 
+  /* Who the slot is for is ready when: a patient is picked (patient mode); a name
+     is typed (unknown mode); or nothing is needed at all (event mode). */
+  const whoReady =
+    mode === "patient"
+      ? patient !== null
+      : mode === "unknown"
+        ? contactName.trim().length > 0
+        : true;
+
   const ready =
-    patient !== null && activity !== null && startUtc !== null && !book.isPending;
+    whoReady && activity !== null && startUtc !== null && !book.isPending;
   const canBook = ready && availabilityQuery.isSuccess && offered;
   const canBookOverride =
     ready && availabilityQuery.isSuccess && !offered && overrideReason.trim().length > 0;
@@ -419,6 +492,26 @@ export function NewAppointmentDialog({
       <DialogTitle>{t("booking.new.title")}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={3}>
+          {/* ── Who the slot is for: the three booking modes ── */}
+          <Box component="section" aria-label={TEXT.mode}>
+            <SectionTitle>{TEXT.mode}</SectionTitle>
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              color="primary"
+              value={mode}
+              onChange={(_, next) => {
+                if (next !== null) changeMode(next as BookingMode);
+              }}
+              aria-label={TEXT.mode}
+            >
+              <ToggleButton value="patient">{TEXT.modePatient}</ToggleButton>
+              <ToggleButton value="unknown">{TEXT.modeUnknown}</ToggleButton>
+              <ToggleButton value="event">{TEXT.modeEvent}</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+
           {/* ── 1. Date and time ── */}
           <Box component="section" aria-label={TEXT.when}>
             <SectionTitle>{TEXT.when}</SectionTitle>
@@ -531,21 +624,68 @@ export function NewAppointmentDialog({
             ) : null}
           </Box>
 
-          {/* ── 2. The patient, from the database ── */}
-          <Box component="section" aria-label={TEXT.patient}>
-            <SectionTitle>{TEXT.patient}</SectionTitle>
-            {patient ? (
-              <PatientFilled hit={patient} onChange={() => setPatient(null)} />
-            ) : (
-              <PatientSearch
-                enabled={open}
-                autoFocus={fromGrid}
-                mayRegister={mayRegister}
-                onPick={setPatient}
-                onLink={setQuickLink}
-              />
-            )}
-          </Box>
+          {/* ── 2. Who the slot is for — by mode ── */}
+          {mode === "patient" ? (
+            <Box component="section" aria-label={TEXT.patient}>
+              <SectionTitle>{TEXT.patient}</SectionTitle>
+              {patient ? (
+                <PatientFilled hit={patient} onChange={() => setPatient(null)} />
+              ) : (
+                <PatientSearch
+                  enabled={open}
+                  autoFocus={fromGrid}
+                  mayRegister={mayRegister}
+                  onPick={setPatient}
+                  onLink={setQuickLink}
+                />
+              )}
+            </Box>
+          ) : (
+            <Box component="section" aria-label={TEXT.contact}>
+              <SectionTitle>{TEXT.contact}</SectionTitle>
+              {mode === "event" ? (
+                <Typography variant="body2" sx={{ color: "text.secondary", mb: 1 }}>
+                  {TEXT.eventExplain}
+                </Typography>
+              ) : null}
+              <Stack spacing={1.5}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  autoFocus={mode === "unknown"}
+                  required={mode === "unknown"}
+                  label={mode === "unknown" ? TEXT.contactNameUnknown : TEXT.contactNameEvent}
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                />
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="tel"
+                  label={TEXT.contactPhone}
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                />
+                {/* 5.x: SMS confirmation is phase two. The control is shown so the
+                    desk knows it is coming, but it is disabled and sends nothing. */}
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      disabled
+                      checked={sendSms}
+                      onChange={(e) => setSendSms(e.target.checked)}
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                      {TEXT.sms} — {TEXT.smsUnavailable}
+                    </Typography>
+                  }
+                />
+              </Stack>
+            </Box>
+          )}
 
           {/* ── 3. The činnost, and whether the time is free for it ── */}
           <Box component="section" aria-label={TEXT.activity}>
@@ -554,9 +694,9 @@ export function NewAppointmentDialog({
               <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 {TEXT.pickWhenFirst}
               </Typography>
-            ) : !patient ? (
+            ) : !whoReady ? (
               <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                {TEXT.pickPatientFirst}
+                {mode === "patient" ? TEXT.pickPatientFirst : TEXT.pickNameFirst}
               </Typography>
             ) : (
               <AsyncSection
@@ -746,7 +886,7 @@ export function NewAppointmentDialog({
           <Box
             component="section"
             aria-label={TEXT.note}
-            sx={{ opacity: patient ? 1 : 0.5 }}
+            sx={{ opacity: whoReady ? 1 : 0.5 }}
           >
             <SectionTitle>{TEXT.note}</SectionTitle>
             <TextField
@@ -754,7 +894,7 @@ export function NewAppointmentDialog({
               multiline
               minRows={2}
               size="small"
-              disabled={!patient}
+              disabled={!whoReady}
               label={t("booking.detail.note")}
               value={note}
               onChange={(e) => setNote(e.target.value)}

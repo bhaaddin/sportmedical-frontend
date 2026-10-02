@@ -546,6 +546,15 @@ export const dayAppointmentSchema = z.object({
   checkedInUtc: isoUtc.nullish().transform((v) => v ?? null),
   /** 4.5, v29: the same field the detail carries, so the grid can mark it. */
   paperwork: paperworkSchema,
+  /**
+   * Whose slot it is: the registered patient's name, or the name a walk-in was taken
+   * under. `null` for an event booked under no name. When `patientId` is empty the
+   * slot has no register entry and this is the only name there is. Optional so the
+   * grid's own fixtures need not carry it; absent reads the same as none.
+   */
+  patientName: z.string().nullable().optional(),
+  /** Contact phone for a slot with no registered patient; absent or `null` otherwise. */
+  unregisteredPhone: z.string().nullable().optional(),
 });
 export type DayAppointment = z.infer<typeof dayAppointmentSchema>;
 export const dayAppointmentListSchema = z.array(dayAppointmentSchema);
@@ -603,6 +612,25 @@ export const createAppointmentInputSchema = z.object({
 export type CreateAppointmentInput = z.infer<typeof createAppointmentInputSchema>;
 
 /**
+ * Booking a slot for nobody on the register: a walk-in taken by name, or an event
+ * with no patient at all (CGM's "Udalost bez vazby"). No `patientId` and no
+ * `source` - the server fixes the source to the desk. The činnost still has to be
+ * offered and the time still has to be free; only the patient checks fall away.
+ */
+export const createUnregisteredInputSchema = z.object({
+  calendarId: z.string(),
+  activityId: z.string(),
+  startUtc: isoUtc,
+  /** The walk-in's name; empty for a pure event. */
+  name: z.string().nullable().optional(),
+  /** Contact phone, optional. */
+  phone: z.string().nullable().optional(),
+  overrideReason: z.string().trim().min(1).optional(),
+  note: z.string().nullable().optional(),
+});
+export type CreateUnregisteredInput = z.infer<typeof createUnregisteredInputSchema>;
+
+/**
  * `AppointmentView` - what `POST`, `/confirm`, `/time` and, since v26,
  * `GET .../appointments/{id}` all answer with. The whole shape, from the table
  * 4.5 keeps, rather than the handful of fields the first draft guessed at.
@@ -636,6 +664,10 @@ export const appointmentSchema = z.object({
   checkedInUtc: isoUtc.nullish().transform((v) => v ?? null),
   /** 4.5, v29. `null` while the register cannot answer - see `paperworkSchema`. */
   paperwork: paperworkSchema,
+  /** The name a slot with no registered patient was taken under; `null` otherwise. */
+  unregisteredName: z.string().nullish().transform((v) => v ?? null),
+  /** Contact phone for a slot with no registered patient; `null` otherwise. */
+  unregisteredPhone: z.string().nullish().transform((v) => v ?? null),
 }).passthrough();
 export type Appointment = z.infer<typeof appointmentSchema>;
 
