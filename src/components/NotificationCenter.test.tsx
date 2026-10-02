@@ -1,0 +1,339 @@
+/*
+ * The bell's panel, rendered.
+ *
+ * The arrangement logic has its own tests next door; these cover the part that
+ * only shows up on screen - that a group draws as one line and opens into its
+ * rows, that the day heading is there, that the exact time is reachable from a
+ * row whose label is relative, and that a list with no `kind` stays as it was.
+ *
+ * That last one matters today rather than hypothetically: the server does not
+ * send `kind` yet, so this is the shape the panel is actually in, and grouping
+ * must not invent groups out of rows that merely look alike.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, within, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+
+const getList = vi.fn();
+const getSeen = vi.fn();
+const post = vi.fn();
+const patch = vi.fn();
+const del = vi.fn();
+
+/* Two paths now: the list, and the "when did I last look" marker on its own
+   route. Routed here by url so a test can move one without the other. */
+const get = vi.fn((url: string) =>
+  url === '/api/notifications/seen' ? getSeen() : getList(),
+);
+
+vi.mock('../api/client', () => ({
+  default: { get, patch, delete: del, post, put: vi.fn() },
+}));
+vi.mock('../hooks/useRealtimeSync', () => ({ useRealtimeSync: () => ({}) }));
+const toastSuccess = vi.fn();
+const toastError = vi.fn();
+vi.mock('react-hot-toast', () => ({ default: { success: toastSuccess, error: toastError } }));
+
+const { default: NotificationCenter } = await import('./NotificationCenter');
+
+const minutesAgo = (n: number) => new Date(Date.now() - n * 60_000).toISOString();
+
+const row = (id: string, over: Record<string, unknown> = {}) => ({
+  id,
+  type: 'info',
+  title: 'Nový dotazník k posouzení',
+  message: `Pacient ${id}`,
+  timestamp: minutesAgo(5),
+  read: false,
+  ...over,
+});
+
+beforeEach(() => {
+  /* Pin "now" to mid-day (only Date is faked, so async queries keep real
+     timers). Without this, a run just after midnight made a "5 minutes ago"
+     notice land on the previous day, so the header said "Včera" not "Dnes". */
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(2026, 8, 15, 10, 0, 0));
+  getList.mockReset().mockResolvedValue({ data: [] });
+  getSeen.mockReset().mockResolvedValue({ data: { lastSeenAtUtc: null } });
+  post.mockReset().mockResolvedValue({ data: { lastSeenAtUtc: new Date().toISOString() } });
+  patch.mockReset().mockResolvedValue({});
+  del.mockReset().mockResolvedValue({});
+  toastSuccess.mockReset();
+  toastError.mockReset();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/* Where the router is, so a test can see a row's link being followed. */
+function Here() {
+  return <div data-testid="here">{useLocation().pathname}</div>;
+}
+
+const openPanel = async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter initialEntries={['/']}>
+      <NotificationCenter />
+      <Routes>
+        <Route path="*" element={<Here />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  const bell = await screen.findByRole('button', { name: /oznámení/i });
+  await user.click(bell);
+  return user;
+};
+
+describe('the notification panel', () => {
+  it('heads the list with the day', async () => {
+    getList.mockResolvedValue({ data: [row('a')] });
+    await openPanel();
+    expect(await screen.findByText('Dnes')).toBeInTheDocument();
+  });
+
+  it('collapses a run of the same kind into one line, and opens it', async () => {
+    getList.mockResolvedValue({
+      data: [
+        row('a', { kind: 'intake.submitted', timestamp: minutesAgo(3) }),
+        row('b', { kind: 'intake.submitted', timestamp: minutesAgo(4) }),
+        row('c', { kind: 'intake.submitted', timestamp: minutesAgo(5) }),
+      ],
+    });
+
+    const user = await openPanel();
+
+    const summary = await screen.findByText('3 nové dotazníky');
+    expect(summary).toBeInTheDocument();
+    /* Collapsed: the individual rows are not on screen yet. */
+    expect(screen.queryByText('Pacient a')).not.toBeInTheDocument();
+
+    await user.click(summary);
+
+    expect(await screen.findByText('Pacient a')).toBeInTheDocument();
+    expect(screen.getByText('Pacient b')).toBeInTheDocument();
+    expect(screen.getByText('Pacient c')).toBeInTheDocument();
+  });
+
+  it('says how many of a group are unread', async () => {
+    getList.mockResolvedValue({
+      data: [
+        row('a', { kind: 'intake.submitted', read: false, timestamp: minutesAgo(3) }),
+        row('b', { kind: 'intake.submitted', read: true, timestamp: minutesAgo(4) }),
+      ],
+    });
+
+    await openPanel();
+    expect(await screen.findByText('1 nepřečtených')).toBeInTheDocument();
+  });
+
+  /*
+   * The state the application is actually in: no `kind` from the server. Rows
+   * that look identical must stay separate, because the thing that would group
+   * them is the title, and a title is prose.
+   */
+  it('leaves rows ungrouped when the server sends no kind', async () => {
+    getList.mockResolvedValue({
+      data: [row('a', { timestamp: minutesAgo(3) }), row('b', { timestamp: minutesAgo(4) })],
+    });
+
+    await openPanel();
+
+    expect(await screen.findByText('Pacient a')).toBeInTheDocument();
+    expect(screen.getByText('Pacient b')).toBeInTheDocument();
+    expect(screen.queryByText(/nové dotazníky/)).not.toBeInTheDocument();
+  });
+
+  it('offers the exact moment on a row whose label is relative', async () => {
+    getList.mockResolvedValue({ data: [row('a', { timestamp: minutesAgo(12) })] });
+
+    await openPanel();
+
+    /* The column is labelled, because a booking notification carries two
+       times: when it arrived, and when the patient is coming. */
+    const label = await screen.findByText(/přišlo Před 12 min/);
+    expect(label).toBeInTheDocument();
+    const holder = label.closest('[aria-label], [title]');
+    expect(holder ?? label.parentElement).toBeTruthy();
+  });
+
+  it('says which time it is showing, so it cannot be read as the appointment time', async () => {
+    getList.mockResolvedValue({
+      data: [
+        row('a', {
+          title: 'Nový termín',
+          message: 'Ordinace · Odběr · 24. 9. 2026 10:00',
+          timestamp: minutesAgo(20),
+        }),
+      ],
+    });
+
+    await openPanel();
+
+    /* Both times on one row: the arrival is labelled, the appointment time
+       stays inside the server's own sentence. */
+    expect(await screen.findByText(/přišlo Před 20 min/)).toBeInTheDocument();
+    expect(screen.getByText(/24\. 9\. 2026 10:00/)).toBeInTheDocument();
+  });
+
+  it('orders newest first and does not float unread to the top', async () => {
+    getList.mockResolvedValue({
+      data: [
+        row('older-unread', { timestamp: minutesAgo(30), read: false, message: 'starší' }),
+        row('newer-read', { timestamp: minutesAgo(2), read: true, message: 'novější' }),
+      ],
+    });
+
+    await openPanel();
+
+    const panel = (await screen.findByText('novější')).closest('ul') as HTMLElement;
+    const text = within(panel).getByText('novější').closest('ul')?.textContent ?? '';
+    expect(text.indexOf('novější')).toBeLessThan(text.indexOf('starší'));
+  });
+
+  it('draws no "new since" line while the server has not said when we last looked', async () => {
+    getList.mockResolvedValue({ data: [row('a'), row('b', { timestamp: minutesAgo(90) })] });
+
+    await openPanel();
+    await screen.findByText('Pacient a');
+
+    expect(screen.queryByText(/Nové od vašeho posledního pohledu/)).not.toBeInTheDocument();
+  });
+
+  it('draws the line once the server does say', async () => {
+    getList.mockResolvedValue({
+      data: [
+        row('new', { timestamp: minutesAgo(2), message: 'po pohledu' }),
+        row('seen', { timestamp: minutesAgo(90), message: 'před pohledem' }),
+      ],
+    });
+    getSeen.mockResolvedValue({ data: { lastSeenAtUtc: minutesAgo(30) } });
+
+    await openPanel();
+
+    expect(await screen.findByText(/Nové od vašeho posledního pohledu/)).toBeInTheDocument();
+  });
+
+  /*
+   * Stamped on closing, never on opening. On opening, the line would move out
+   * from under the person reading the list.
+   */
+  it('marks the panel seen when it closes, not when it opens', async () => {
+    getList.mockResolvedValue({ data: [row('a')] });
+
+    const user = await openPanel();
+    await screen.findByText('Pacient a');
+    expect(post).not.toHaveBeenCalled();
+
+    await user.keyboard('{Escape}');
+
+    expect(post).toHaveBeenCalledWith('/api/notifications/seen');
+  });
+
+  /*
+   * The field wins over the sentence once anything populates it. Nothing does
+   * yet, which is why the parse stays.
+   */
+  it('takes the appointment time from occursAtUtc when the server sends it', async () => {
+    getList.mockResolvedValue({
+      data: [
+        row('a', {
+          title: 'Nový termín',
+          message: 'Ordinace · Odběr · 24. 9. 2026 10:00',
+          occursAtUtc: '2026-10-01T07:30:00Z',
+        }),
+      ],
+    });
+
+    await openPanel();
+
+    /* 07:30Z is 09:30 in Prague - read through the one formatter, not from
+       the sentence, which still says 24. 9. */
+    expect(await screen.findByText(/termín 1\. 10\. 2026 09:30/)).toBeInTheDocument();
+    expect(screen.queryByText(/24\. 9\. 2026 10:00/)).not.toBeInTheDocument();
+  });
+
+  it('falls back to the sentence while occursAtUtc is null, as it is today', async () => {
+    getList.mockResolvedValue({
+      data: [
+        row('a', {
+          title: 'Nový termín',
+          message: 'Ordinace · Odběr · 24. 9. 2026 10:00',
+          occursAtUtc: null,
+        }),
+      ],
+    });
+
+    await openPanel();
+    expect(await screen.findByText(/termín 24\. 9\. 2026 10:00/)).toBeInTheDocument();
+  });
+
+  it('shows no line when this viewer has never looked', async () => {
+    getList.mockResolvedValue({
+      data: [row('a'), row('b', { timestamp: minutesAgo(90) })],
+    });
+    getSeen.mockResolvedValue({ data: { lastSeenAtUtc: null } });
+
+    await openPanel();
+    await screen.findByText('Pacient a');
+
+    expect(screen.queryByText(/Nové od vašeho posledního pohledu/)).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * The bell changes the screen only once the server has agreed.
+ *
+ * It used to mark rows read and delete them first and swallow the refusal,
+ * with "Vše označeno jako přečtené" shown either way; the rows came back on
+ * the next poll. And a row with a link reloaded the page before its PATCH was
+ * even sent.
+ */
+describe('what the bell reports', () => {
+  it('does not claim everything was read when the server refused', async () => {
+    getList.mockResolvedValue({ data: [row('a')] });
+    patch.mockRejectedValue(new Error('403'));
+
+    const user = await openPanel();
+    await user.click(await screen.findByRole('button', { name: /Přečíst vše/ }));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Přečíst vše/ })).toBeInTheDocument();
+  });
+
+  it('says so when the server did mark everything read', async () => {
+    getList.mockResolvedValue({ data: [row('a')] });
+
+    const user = await openPanel();
+    await user.click(await screen.findByRole('button', { name: /Přečíst vše/ }));
+
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+    expect(patch).toHaveBeenCalledWith('/api/notifications/read-all');
+  });
+
+  it('keeps a row the server refused to delete', async () => {
+    getList.mockResolvedValue({ data: [row('a')] });
+    del.mockRejectedValue(new Error('500'));
+
+    const user = await openPanel();
+    await screen.findByText('Pacient a');
+    await user.click(screen.getByRole('button', { name: 'Smazat oznámení' }));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(screen.getByText('Pacient a')).toBeInTheDocument();
+  });
+
+  it('marks a row read before following its link, inside the application', async () => {
+    getList.mockResolvedValue({ data: [row('a', { actionUrl: '/intake-review' })] });
+
+    const user = await openPanel();
+    await user.click(await screen.findByText('Pacient a'));
+
+    await waitFor(() => expect(screen.getByTestId('here')).toHaveTextContent('/intake-review'));
+    expect(patch).toHaveBeenCalledWith('/api/notifications/a/read');
+  });
+});

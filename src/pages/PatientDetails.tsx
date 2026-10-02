@@ -1,26 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Grid, Card, CardContent, Avatar, Button, Divider, Chip,
-  List, ListItem, ListItemText, Skeleton, Alert, IconButton, Tooltip,
+  Box, Typography, Grid, Card, CardContent, Button, Divider, Chip,
+  List, Skeleton, Alert, IconButton, Tooltip,
   Paper, LinearProgress, Collapse,
 } from '@mui/material';
 import {
-  ArrowBack, Science, TrendingUp, TrendingDown, CalendarToday, Description,
-  Warning, CheckCircle, Error, MonitorHeart, FitnessCenter, Bloodtype,
+  ArrowBack, Science, TrendingUp, TrendingDown, Description,
+  CheckCircle, Error, MonitorHeart, FitnessCenter, Bloodtype,
   Download, Add, ExpandMore, ExpandLess, Person, Phone, Email, Cake,
-  Shield, LocalHospital, Spa,
+  Shield, LocalHospital, Spa, CloudUpload,
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { patientsApi } from '../api/patients';
+import { contactOfKind, profileContacts } from './patients/cardContacts';
+import patientRegistryApi from '../api/patientRegistry';
+import type { PhoneInspection } from '../api/patientRegistry';
+import {
+  HOME_REGION, storedNumberDisplay,
+} from '../services/patientRegistration/phoneDisplay';
 import type { Patient } from '../api/patients';
 import { diagnosticsApi } from '../api/diagnostics';
 import type { DiagnosticSession } from '../api/diagnostics';
-import { documentsApi } from '../api/documents';
-import type { PatientDocument } from '../api/documents';
-import { publicBookingApi } from '../api/publicBooking';
-import { BookingDocumentView } from '../components/booking/BookingDocuments';
-import { ConsentManager } from '../components/ConsentManager';
+import { documentsApi, DOCUMENT_SATISFIES_REQUIREMENT } from '../api/documents';
+import MedicalReports from '../components/documents/MedicalReports';
+import UploadDocumentDialog from '../components/documents/UploadDocumentDialog';
+import DocumentActions from '../components/documents/DocumentActions';
+import type { PatientDocument, DocumentTemplate } from '../api/documents';
+import { SENSITIVE_IDENTITY, shownFields, usePatientFields } from '../api/displaySettings';
+import { usePermission } from '../auth/usePermission';
 
 /* ── Helpers ── */
 function trendIcon(current: number, previous: number, higherIsBetter: boolean) {
@@ -34,8 +42,12 @@ function trendIcon(current: number, previous: number, higherIsBetter: boolean) {
 
 function trendPct(current: number, previous: number) {
   if (!previous) return null;
-  const pct = ((current - previous) / previous * 100).toFixed(1);
-  return `${pct > 0 ? '+' : ''}${pct}%`;
+  const pct = ((current - previous) / previous) * 100;
+  /* The sign used to be decided by comparing the formatted string to zero,
+     which JavaScript makes work by coercion - until the value is not finite,
+     and then the patient's card reads "NaN%". */
+  if (!Number.isFinite(pct)) return null;
+  return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
 }
 
 function getVo2Color(vo2: number) {
@@ -52,11 +64,21 @@ function getBpLabel(sys: number, dia: number) {
   return { text: 'Vysoké', color: '#D32F2F' };
 }
 
-const requiredDocs = [
-  { type: 'Vypis', label: 'Výpis ze zdravotní dokumentace', firstVisitOnly: true },
-  { type: 'Dotaznik', label: 'Dotazník před prohlídkou', firstVisitOnly: false },
-  { type: 'GDPR', label: 'GDPR souhlas', firstVisitOnly: true },
-];
+/*
+ * Which documents a visit requires is the document service's answer, not this
+ * screen's. It used to be this list, written out here:
+ *
+ *     Vypis · Dotaznik · GDPR
+ *
+ * Two things were wrong with that. The `app` lane is deleting the Dotazník and
+ * GDPR templates - each described something that is really carried elsewhere,
+ * and nothing was ever signed against either - and a hard-coded list would have
+ * gone on demanding them forever, with nothing able to satisfy a template that
+ * no longer exists. And a clinic that adds a required document would not see it
+ * here at all.
+ *
+ * `GET /api/documents/templates` already says which are active and required.
+ */
 
 /* ── Metric Card ── */
 function MetricCard({ icon, label, value, unit, color, prevValue, higherIsBetter = true, delay = 0 }: {
@@ -101,31 +123,67 @@ export default function PatientDetails() {
   const [docs, setDocs] = useState<PatientDocument[]>([]);
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState<string | null>(null);
-  const [bookingDocs, setBookingDocs] = useState<any>(undefined);
   const [profile, setProfile] = useState<any>(null);
+  const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
+  /* Which document is being uploaded. `null` closed, a template for a required
+     one, and `'report'` for a medical report from another doctor. */
+  const [uploadTemplate, setUploadTemplate] = useState<DocumentTemplate | null | 'report'>(null);
+
+  /* Which rows the card shows, and in what order, is the clinic's setting
+     (Nastavení -> Údaje o pacientovi). The birth number and the insurance
+     number additionally need the permission, whatever the setting says. */
+  const fieldVisibility = usePatientFields();
+  const maySeeSensitive = usePermission(SENSITIVE_IDENTITY);
+
+  /* Pulled out so accepting or reclassifying a report can refresh the same
+     list the paperwork banner reads - otherwise the two disagree until the
+     page is reloaded, and the banner is the thing people trust. */
+  const reloadDocuments = useCallback(() => {
+    if (id === undefined) return;
+    documentsApi.getPatientDocuments(id).then(setDocs).catch(() => {});
+  }, [id]);
 
   useEffect(() => {
     if (id) {
       patientsApi.getById(id).then(setPatient).catch(() => {});
       diagnosticsApi.getByPatient(id).then(setSessions).catch(() => {});
-      documentsApi.getPatientDocuments(id).then(setDocs).catch(() => {});
+      documentsApi.getTemplates().then(setTemplates).catch(() => setTemplates([]));
       patientsApi.getProfile(id).then(setProfile).catch(() => {});
+      reloadDocuments();
     }
-  }, [id]);
+  }, [id, reloadDocuments]);
 
-  // Load booking questionnaire/GDPR/signature once patient is known
+
+  /*
+   * These two must run on EVERY render, so they live above the early return
+   * that shows the spinner — not beside the value they feed further down,
+   * where they were first written. React counts hooks by order, and putting
+   * them after a `return` made the count change the moment a patient loaded:
+   * "Rendered more hooks than during the previous render", and the whole card
+   * fell into the error boundary.
+   *
+   * `patient` may still be null up here, so its own contact is read with `?.`
+   * — it is empty for every patient today anyway, and the profile is what
+   * actually carries the number.
+   */
+  const contacts = profileContacts(profile?.contactsJson);
+  const storedPhone = contactOfKind('phone', patient?.phone, contacts);
+  const [phoneLook, setPhoneLook] = useState<PhoneInspection | null>(null);
+
   useEffect(() => {
-    if (!patient) return;
-    const dob = typeof patient.dateOfBirth === 'string'
-      ? patient.dateOfBirth.slice(0, 10)
-      : new Date(patient.dateOfBirth).toISOString().slice(0, 10);
-    publicBookingApi.adminGetPatientDocuments({
-      email: (patient as any).email ?? '',
-      firstName: patient.firstName,
-      lastName: patient.lastName,
-      birthDate: dob,
-    }).then(setBookingDocs).catch(() => setBookingDocs(null));
-  }, [patient]);
+    if (storedPhone === '') {
+      setPhoneLook(null);
+      return;
+    }
+
+    let cancelled = false;
+    patientRegistryApi
+      .inspectPhone({ value: storedPhone, regionCode: HOME_REGION })
+      .then((result) => { if (!cancelled) setPhoneLook(result); })
+      .catch(() => { if (!cancelled) setPhoneLook(null); });
+
+    return () => { cancelled = true; };
+  }, [storedPhone]);
 
   if (!patient) {
     return (
@@ -157,18 +215,131 @@ export default function PatientDetails() {
     const months = Math.floor(days / 30);
     return { next, days, isToday, months, isMinor: age < 18 };
   })();
-  const profileContacts: { channel: string; value: string; note: string }[] = (() => {
-    try {
-      const list = JSON.parse(profile?.contactsJson ?? '[]');
-      return Array.isArray(list) ? list : [];
-    } catch { return []; }
-  })();
-  const displayEmail = patient.email || profileContacts.find(c => c.channel === 'email')?.value || '';
-  const displayPhone = patient.phone || profileContacts.find(c => c.channel === 'phone')?.value || '';
+  /*
+   * The card read `—` for e-mail and telephone on every patient in the
+   * registry, and three faults had to be undone to show either:
+   *
+   *   the rows read `patient.email` / `patient.phone`, which
+   *   `GET /api/v1/patients/{id}` does not carry;
+   *
+   *   this fallback was computed and never used — the two "declared but never
+   *   used" lint warnings on these lines were the bug reporting itself;
+   *
+   *   and it looked for `c.channel`, while the server sends `type`.
+   *
+   * The data was at `GET /api/patients/{id}/profile` the whole time.
+   */
+  const displayEmail = contactOfKind('email', patient.email, contacts);
+
+  /*
+   * A stored number is written the way the desk reads it.
+   *
+   * The profile hands over `+420 777 777 779` — a Czech number carrying its own
+   * dialling code on a Czech card, which is the fault the owner reported in
+   * reverse: "iba ceske cisla pis bez kedze sme v cechach". The grouping is not
+   * worked out here; `phone/inspect` gives it, on the same libphonenumber that
+   * stored the number.
+   *
+   * `HOME_REGION` is sent only because the request wants a region. The answer's
+   * `detectedRegionCode` is what decides, and for a stored number — which always
+   * carries its `+` — that is its real country whatever was asked.
+   *
+   * Any failure leaves `phoneLook` null and the card keeps showing the stored
+   * string, so a card can never lose a number it was already showing.
+   */
+  const displayPhone = storedNumberDisplay(phoneLook, storedPhone);
+
+  /* How each field in the clinic's catalogue is read off this patient. */
+  const personalValue: Record<string, string> = {
+    recordId: patient.id.slice(0, 8) + '…',
+    dateOfBirth: new Date(patient.dateOfBirth).toLocaleDateString('cs-CZ'),
+    sex: patient.sex === 'Male' ? 'Muž' : 'Žena',
+    email: displayEmail || '—',
+    phone: displayPhone || '—',
+    registeredAt: new Date(patient.createdAtUtc).toLocaleDateString('cs-CZ'),
+    status: patient.status === 'Archived' ? 'Archivovaný' : 'Aktivní',
+  };
+  const registrationValue: Record<string, string | null | undefined> = {
+    birthNumber: profile?.birthNumber,
+    insuranceNumber: profile?.insuranceNumber,
+    healthInsurer: profile?.healthInsurerCode,
+    insuredFrom: profile?.insuredFrom,
+    insuranceType: profile?.insuranceType,
+    citizenship: profile?.citizenship,
+    address: profile?.address,
+    treatingDoctors: profile?.treatingDoctors,
+    occupation: profile?.occupation,
+    employer: profile?.employer,
+    employmentType: profile?.employmentType,
+    notes: profile?.notes,
+  };
+  const personalRows = (shownFields(fieldVisibility.data, 'card', maySeeSensitive, 'personal') ?? [])
+    .map((field) => [field.label, personalValue[field.key] ?? '—'] as const);
+  const registrationRows = (shownFields(fieldVisibility.data, 'card', maySeeSensitive, 'registration') ?? [])
+    .map((field) => [field.label, registrationValue[field.key]] as const)
+    .filter(([, value]) => value);
+
   const latest = sessions[0];
   const previous = sessions[1];
-  const hasRequiredDoc = (docType: string) => docs.some(d => d.status === 'Signed' || d.status === 'Active');
-  const missingDocs = requiredDocs.filter(rd => !hasRequiredDoc(rd.type));
+  /*
+   * This used to ignore its own argument:
+   *
+   *     const hasRequiredDoc = (docType: string) =>
+   *       docs.some(d => d.status === 'Signed' || d.status === 'Active');
+   *
+   * `docType` was never read, so one signed document of any kind marked every
+   * requirement satisfied - a patient with a single unrelated form on file
+   * looked like a patient whose paperwork was complete. It matches the
+   * template now.
+   */
+  /*
+   * `'Signed'` and `'Active'` were compared here, and the server has never
+   * sent either. Its `DocumentStatus` is
+   * `Pending | SignedOff | Expired | Superseded | Rejected`, so the test could
+   * not pass for any document, for any patient, ever - "Chybí: Výpis ze
+   * zdravotní dokumentace" stayed on a card whose výpis was uploaded and
+   * signed.
+   *
+   * Found by walking one patient end to end: registration, approval, upload,
+   * sign - and the warning did not move. The server agreed it was complete
+   * (`/documents/patient/{id}/summary` flipped `hasVypis` to true on signing);
+   * only this line disagreed.
+   *
+   * `SignedOff` alone counts. Expired and Rejected plainly do not, and
+   * Superseded means a newer document exists - that newer one is the signed
+   * one, and it is in this same list.
+   */
+  const hasRequiredDoc = (templateId: string) =>
+    docs.some(
+      (d) => d.templateId === templateId && d.status === DOCUMENT_SATISFIES_REQUIREMENT,
+    );
+
+  /*
+   * Every kind of document the clinic keeps, not "the required ones".
+   *
+   * `requiredForVisit` and `firstVisitOnly` were columns on the template until
+   * 14. 9. 2026 and are gone: what a patient must bring is a property of the
+   * rule (šablona x sluzba), and which rule applies depends on the service
+   * their appointment is for. A template cannot answer that on its own, and
+   * this filter answered it wrongly for as long as it existed - it asked
+   * somebody booked for a blood draw for their medical record.
+   *
+   * Who is actually missing what is on the patient card, off
+   * `GET /api/documents/patient/{id}/check`, per appointment.
+   */
+  const requiredDocs = templates
+    .filter((t) => t.isActive)
+    .map((t) => ({
+      id: t.id,
+      label: t.name,
+      /* Carried over from the Documents screen, which was deleted as a
+         duplicate. It is the one thing that screen said and nothing else did,
+         and it is the sentence that tells somebody at the desk what to ask the
+         patient for. */
+      description: t.description,
+    }));
+
+  const missingDocs = requiredDocs.filter((rd) => !hasRequiredDoc(rd.id));
   const bp = latest ? getBpLabel(latest.systolicBloodPressure, latest.diastolicBloodPressure) : null;
 
   const handleDownloadPdf = async (sessionId: string) => {
@@ -179,82 +350,14 @@ export default function PatientDetails() {
 
   return (
     <Box>
-      {/* Back button */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <Button startIcon={<ArrowBack />} onClick={() => navigate('/patients')}
-          sx={{ mb: 2, borderRadius: 2, fontWeight: 500 }}>
-          Zpět na pacienty
-        </Button>
-      </motion.div>
-
-      {/* Missing docs warning */}
-      {missingDocs.length > 0 && (
-        <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }} icon={<Warning />}>
-          Chybí: {missingDocs.map(d => d.label).join(', ')}
-        </Alert>
-      )}
-
-      {/* ── Patient Header ── */}
-      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4 }}>
-        <Card sx={{ mb: 3, overflow: 'hidden' }}>
-          <Box sx={{ height: 80, background: 'linear-gradient(135deg, #0D7377 0%, #14A3A8 50%, #1A1A2E 100%)' }} />
-          <CardContent sx={{ pt: 0, mt: -4 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2 }}>
-                <Avatar sx={{
-                  bgcolor: '#0D7377', width: 72, height: 72, fontSize: 28, fontWeight: 700,
-                  border: '4px solid white', boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-                }}>
-                  {patient.firstName[0]}{patient.lastName[0]}
-                </Avatar>
-                <Box sx={{ pb: 0.5 }}>
-                  <Typography variant="h4" sx={{ fontWeight: 800 }}>{patient.firstName} {patient.lastName}</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
-                    <Chip size="small" label={`Věk ${age}`} />
-                    {birthInfo.isToday ? (
-                      <Chip size="small" label="🎂 Dnes má narozeniny!" color="success" sx={{ fontWeight: 700 }} />
-                    ) : (
-                      <Chip size="small" label={`Narozeniny za ${birthInfo.days} ${birthInfo.days === 1 ? 'den' : birthInfo.days < 5 ? 'dny' : 'dní'} (${birthInfo.next.toLocaleDateString('cs-CZ')})`} variant="outlined" />
-                    )}
-                    {birthInfo.isMinor && (
-                      <Chip size="small" label="Nezletilý — nutný zákonný zástupce" color="warning" />
-                    )}
-                    <Chip size="small" label={patient.sex === 'Male' ? 'Muž' : 'Žena'}
-                      sx={{ bgcolor: '#0D737714', color: '#0D7377' }} />
-                    <Chip size="small" label={`${sessions.length} sezení`} variant="outlined" />
-                    {displayEmail && (
-                      <Chip size="small" icon={<Email sx={{ fontSize: 14 }} />} label={displayEmail} variant="outlined" />
-                    )}
-                    {displayPhone && (
-                      <Chip size="small" icon={<Phone sx={{ fontSize: 14 }} />} label={displayPhone} variant="outlined" />
-                    )}
-                  </Box>
-                </Box>
-              </Box>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button variant="outlined" startIcon={<Description />}
-                  onClick={() => navigate(`/patients/${patient.id}/edit`)}
-                  sx={{ borderColor: '#0D7377', color: '#0D7377', borderRadius: 2 }}>
-                  Upravit
-                </Button>
-                <Button variant="outlined" startIcon={<Description />}
-                  onClick={() => navigate('/documents')}
-                  sx={{ borderColor: '#0D7377', color: '#0D7377', borderRadius: 2 }}>
-                  Dokumenty
-                </Button>
-                <Button variant="contained" startIcon={<Science />}
-                  onClick={() => navigate(`/diagnostics/new?patientId=${patient.id}`)}
-                  sx={{ bgcolor: '#0D7377', borderRadius: 2, fontWeight: 600, boxShadow: '0 4px 16px rgba(13,115,119,0.3)', '&:hover': { bgcolor: '#095456' } }}>
-                  Nová diagnostika
-                </Button>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      </motion.div>
-
+      {/*
+        The name, the missing-paperwork banner, the consent line and the
+        section tabs live in `patients/PatientLayout` now, so they stay on
+        screen whichever section is open. What is left here is the overview
+        itself.
+      */}
       {/* ── Extended profile (registration data) ── */}
-      {profile && (profile.birthNumber || profile.healthInsurerCode || profile.address) && (
+      {profile && registrationRows.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
           <Card sx={{ mb: 3, borderRadius: 3 }}>
             <CardContent>
@@ -263,20 +366,7 @@ export default function PatientDetails() {
                 Registrační údaje
               </Typography>
               <Grid container spacing={2}>
-                {[
-                  ['Rodné číslo', profile.birthNumber],
-                  ['Číslo pojištěnce', profile.insuranceNumber],
-                  ['ZP', profile.healthInsurerCode],
-                  ['Pojištěn od', profile.insuredFrom],
-                  ['Druh pojištění', profile.insuranceType],
-                  ['Státní příslušnost', profile.citizenship],
-                  ['Adresa', profile.address],
-                  ['Lékaři', profile.treatingDoctors],
-                  ['Povolání', profile.occupation],
-                  ['Zaměstnavatel', profile.employer],
-                  ['Druh zaměstnání', profile.employmentType],
-                  ['Poznámka', profile.notes],
-                ].filter(([, v]) => v).map(([label, v]) => (
+                {registrationRows.map(([label, v]) => (
                   <Grid size={{ xs: 12, sm: 6 }} key={label}>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{label}</Typography>
                     <Typography variant="body2">{v}</Typography>
@@ -288,42 +378,35 @@ export default function PatientDetails() {
         </motion.div>
       )}
 
-      {/* ── Booking documents (questionnaire + GDPR + signature) ── */}
-      {bookingDocs !== undefined && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <Card sx={{ mb: 3, borderRadius: 3 }}>
-            <CardContent>
-              <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-                <Description sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Dokumenty z online rezervace
-              </Typography>
-              {bookingDocs === null ? (
-                <Typography variant="body2" color="text.secondary">
-                  K pacientovi zatím není přiřazen žádný online dotazník.
-                </Typography>
-              ) : (
-                <>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    {bookingDocs.eventName} · {new Date(bookingDocs.startAt).toLocaleDateString('cs-CZ')}
-                  </Typography>
-                  <BookingDocumentView data={bookingDocs.consents} />
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+      {/* One dialog for both: a required document carries its template, a
+          report from another doctor carries none - and that absence is what
+          keeps it out of the required-document rules. */}
+      {id !== undefined && uploadTemplate !== null && (
+        <UploadDocumentDialog
+          open
+          onClose={() => setUploadTemplate(null)}
+          patientId={id}
+          template={uploadTemplate === 'report' ? null : uploadTemplate}
+          onUploaded={reloadDocuments}
+        />
       )}
 
-      {/* ── Consent lifecycle (grant / revoke / export) ── */}
-      {id && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <Card sx={{ mb: 3, borderRadius: 3 }}>
-            <CardContent>
-              <ConsentManager patientId={id} />
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+      {/*
+        The consent-management card stood here and is gone with its server.
+        It read a table that had never held a row, so it told the desk
+        "Neudělen" about every patient - including the ones who had consented,
+        whose consent sits in `patient_intake_consents` where the intake wrote
+        it. At GDPR that is wrong in both directions: somebody concludes the
+        data may not be processed when it may, or grants a second consent
+        beside the real one and nobody can later say which applies.
+        (`/api/patients/{id}/consents` now answers 404; measured.)
+
+        The owner drew the wider conclusion: the patient gives consent when
+        registering, so the desk has nothing to manage - only something to see.
+        A single line saying when it was given and under which policy version
+        is coming from the other lane; it is not here yet, and a line that is
+        absent is better than one that says "not given" to somebody who did.
+      */}
 
       {/* ── Metrics Cards (latest session) ── */}
       {latest && (
@@ -362,14 +445,12 @@ export default function PatientDetails() {
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>Osobní údaje</Typography>
                 </Box>
                 <Divider sx={{ mb: 2 }} />
-                {[
-                  ['ID', patient.id.slice(0, 8) + '…'],
-                  ['Datum narození', new Date(patient.dateOfBirth).toLocaleDateString('cs-CZ')],
-                  ['Pohlaví', patient.sex === 'Male' ? 'Muž' : 'Žena'],
-                  ['Email', patient.email || '—'],
-                  ['Telefon', patient.phone || '—'],
-                  ['Registrace', new Date(patient.createdAtUtc).toLocaleDateString('cs-CZ')],
-                ].map(([label, value]) => (
+                {fieldVisibility.isError && (
+                  <Typography variant="caption" color="text.secondary">
+                    Nastavení zobrazených údajů se nepodařilo načíst.
+                  </Typography>
+                )}
+                {personalRows.map(([label, value]) => (
                   <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: '1px solid #f5f5f5' }}>
                     <Typography variant="body2" color="text.secondary">{label}</Typography>
                     <Typography variant="body2" sx={{ fontWeight: 500 }}>{value}</Typography>
@@ -379,38 +460,18 @@ export default function PatientDetails() {
             </Card>
           </motion.div>
 
-          {/* Document Status */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <Card>
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Shield sx={{ color: '#0D7377', fontSize: 20 }} />
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>Povinné dokumenty</Typography>
-                </Box>
-                <Divider sx={{ mb: 2 }} />
-                {requiredDocs.map(rd => {
-                  const hasDoc = hasRequiredDoc(rd.type);
-                  return (
-                    <Box key={rd.type} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, borderBottom: '1px solid #f5f5f5' }}>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>{rd.label}</Typography>
-                        {rd.firstVisitOnly && (
-                          <Typography variant="caption" color="text.secondary">Pouze 1. návštěva</Typography>
-                        )}
-                      </Box>
-                      {hasDoc ? (
-                        <Chip icon={<CheckCircle />} label="Hotovo" size="small"
-                          sx={{ bgcolor: '#2E7D3214', color: '#2E7D32', fontWeight: 500 }} />
-                      ) : (
-                        <Chip icon={<Error />} label="Chybí" size="small"
-                          sx={{ bgcolor: '#D32F2F14', color: '#D32F2F', fontWeight: 500 }} />
-                      )}
-                    </Box>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          </motion.div>
+          {/* Documents moved to their own section at
+              /patients/:id/dokumenty - one page about one patient's papers,
+              with room for the actions that had nowhere to go here. */}
+          <Button
+            fullWidth
+            variant="outlined"
+            startIcon={<Description />}
+            onClick={() => navigate(`/patients/${patient.id}/dokumenty`)}
+            sx={{ mt: 2, borderColor: '#0D7377', color: '#0D7377' }}
+          >
+            Dokumenty pacienta
+          </Button>
         </Grid>
 
         {/* ── Right Column: Diagnostic Sessions ── */}
@@ -529,13 +590,6 @@ export default function PatientDetails() {
                                   </Box>
                                 )}
 
-                                {s.agentGeneratedSummary && (
-                                  <Box sx={{ mt: 2, p: 2, bgcolor: '#0D737708', borderRadius: 2, border: '1px solid #0D737720' }}>
-                                    <Typography variant="caption" sx={{ color: '#0D7377', fontWeight: 600 }}>🤖 AI Analýza</Typography>
-                                    <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: 'pre-wrap' }}>{s.agentGeneratedSummary}</Typography>
-                                  </Box>
-                                )}
-
                                 {s.detectedAnomaliesJson && (
                                   <Alert severity="warning" sx={{ mt: 2, borderRadius: 2 }}>
                                     <Typography variant="caption" sx={{ fontWeight: 600 }}>Detekované anomálie</Typography>
@@ -544,11 +598,6 @@ export default function PatientDetails() {
                                 )}
 
                                 <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-                                  <Button size="small" variant="outlined" startIcon={<Science />}
-                                    onClick={() => navigate(`/diagnostics/new?patientId=${patient.id}&sessionId=${s.id}`)}
-                                    sx={{ borderColor: '#0D7377', color: '#0D7377' }}>
-                                    Regenerovat analýzu
-                                  </Button>
                                   <Button size="small" variant="outlined" startIcon={<Download />}
                                     onClick={() => handleDownloadPdf(s.id)}
                                     sx={{ borderColor: '#0D7377', color: '#0D7377' }}>

@@ -1,0 +1,281 @@
+<article class="dir" id="d17"
+         data-name="Úzký sloupec"
+         data-thesis="Pro recepci a lékaře, kteří chtějí den přečíst shora dolů jako stránku v knize — sedí tam, kde se objednává po jednom a nikdo nemusí hlídat pět místností najednou."
+         data-cost="Vzdává se šířky: na velkém monitoru zůstanou obě strany prázdné a vedle sloupce se už nic dalšího neotevře.">
+  <style>
+    #d17 .shot{
+      background:#F8F6F2; color:#232019;
+      font-family:"Source Serif 4",Georgia,"Times New Roman",serif;
+      font-size:16px; line-height:1.66; font-variant-numeric:tabular-nums;
+      display:block;
+    }
+
+    /* Celá obrazovka je jeden sloupec o šířce jedné stránky.
+       Po stranách nic není a nic tam nepřibude. */
+    #d17 .page{
+      max-width:632px; margin:0 auto;
+      padding:46px 28px 110px; box-sizing:border-box;
+    }
+
+    /* ---- záhlaví stránky ---- */
+    #d17 h1{
+      font-family:"Libre Franklin",ui-sans-serif,system-ui,sans-serif;
+      font-size:14px; font-weight:600; letter-spacing:.17em;
+      text-transform:uppercase; color:#4E4739;
+      margin:0 0 6px; line-height:1.5;
+    }
+    #d17 .dateline{
+      margin:0 0 14px; font-size:13.5px; color:#7C7263; font-style:italic;
+    }
+    #d17 .nav{
+      margin:0 0 30px; padding-bottom:18px;
+      border-bottom:2px solid #CFC6B6;
+      font-family:"Libre Franklin",ui-sans-serif,system-ui,sans-serif;
+      line-height:1.4;
+    }
+    #d17 .nav a{
+      display:inline-block; padding:7px 2px; font-size:14px;
+      color:#7C7263; text-decoration:none; transition:color 120ms;
+    }
+    #d17 .nav a::after{content:"\00B7"; margin:0 3px 0 9px; color:#CFC6B6}
+    #d17 .nav a:last-child::after{content:""}
+    #d17 .nav a:hover,#d17 .nav a:focus-visible{color:#232019; outline:none}
+    #d17 .nav a.on{color:#232019; font-weight:600}
+
+    /* ---- co potřebuje člověka: odstavec se svislicí, ne plakát ---- */
+    #d17 .lbl{
+      font-family:"Libre Franklin",ui-sans-serif,system-ui,sans-serif;
+      font-size:13px; font-weight:600; letter-spacing:.16em;
+      text-transform:uppercase; color:#7C7263; margin:0 0 8px;
+    }
+    #d17 .hold{
+      border-left:3px solid #8C3A24; padding-left:18px; margin:0 0 34px;
+    }
+    #d17 .hold .lbl{color:#8C3A24}
+    #d17 .hold p{margin:0 0 10px}
+    #d17 .hold .nm{font-weight:600}
+    #d17 .hold .why{font-style:italic; color:#4E4739}
+    #d17 button{
+      font-family:"Libre Franklin",ui-sans-serif,system-ui,sans-serif;
+      font-size:15px; font-weight:600;
+      background:#6B4B2F; color:#F8F6F2; border:1px solid #6B4B2F;
+      border-radius:4px; padding:8px 16px; min-height:34px; cursor:pointer;
+      transition:opacity 120ms;
+    }
+    #d17 button:hover,#d17 button:focus-visible{opacity:.87; outline:none}
+
+    /* ---- mezinadpisy uvnitř čtení ---- */
+    #d17 h2{
+      font-size:17px; font-weight:600; letter-spacing:.005em;
+      margin:0 0 4px; line-height:1.5;
+    }
+    #d17 .note{margin:0 0 20px; color:#4E4739}
+    #d17 .quiet{color:#7C7263; font-style:italic}
+
+    /* ---- den jako odstavce, čas visí vlevo ---- */
+    #d17 .e{
+      display:flex; gap:16px; align-items:baseline;
+      padding:11px 0 10px; border-bottom:1px solid #E6E0D6;
+    }
+    #d17 .e .t{flex:0 0 50px; font-size:15px; color:#7C7263}
+    #d17 .e .b{flex:1 1 auto; min-width:0}
+    #d17 .e .who{font-size:17px; line-height:1.45}
+    #d17 .e .det{font-size:15px; color:#4E4739}
+    #d17 .e .st{font-size:15px; color:#7C7263; font-style:italic}
+    #d17 .e.run .who{font-weight:600}
+    #d17 .e.run .st{color:#6B4B2F; font-style:normal; font-weight:600}
+    #d17 .e.stop .who{font-weight:600; color:#8C3A24}
+    #d17 .e.stop .st{color:#8C3A24; font-style:normal; font-weight:600}
+    #d17 .e.past{color:#7C7263}
+    #d17 .e.past .who{font-size:16px; color:#7C7263}
+    #d17 .e.past .det,#d17 .e.past .st{color:#9A9082}
+
+    /* ---- předěl uprostřed čtení: kde je den teď ---- */
+    #d17 .now{
+      margin:26px 0 24px; padding:16px 0 14px; text-align:center;
+      border-top:2px solid #6B4B2F; border-bottom:1px solid #6B4B2F;
+    }
+    #d17 .now .h{
+      font-family:"Libre Franklin",ui-sans-serif,system-ui,sans-serif;
+      font-size:28px; font-weight:600; line-height:1.2; color:#6B4B2F;
+      display:block; letter-spacing:-.01em;
+    }
+    #d17 .now .s{
+      font-family:"Libre Franklin",ui-sans-serif,system-ui,sans-serif;
+      font-size:13px; font-weight:600; letter-spacing:.2em;
+      text-transform:uppercase; color:#6B4B2F;
+    }
+
+    /* ---- odstavcový předěl uvnitř dne ---- */
+    #d17 .part{
+      margin:30px 0 12px; text-align:center;
+      font-family:"Libre Franklin",ui-sans-serif,system-ui,sans-serif;
+      font-size:13px; font-weight:600; letter-spacing:.2em;
+      text-transform:uppercase; color:#9A9082;
+    }
+    #d17 .part.first{margin-top:6px}
+
+    /* ---- konec stránky: volno a směna, čtené prózou ---- */
+    #d17 .tail{margin-top:46px; padding-top:26px; border-top:2px solid #CFC6B6}
+    #d17 .tail p{margin:0 0 14px; color:#4E4739}
+    #d17 .slots{margin:0 0 20px}
+    #d17 .slots .s1{
+      display:flex; gap:16px; align-items:baseline;
+      padding:9px 0; border-bottom:1px solid #E6E0D6; font-size:15px;
+    }
+    #d17 .slots .s1 .t{flex:0 0 50px; color:#7C7263}
+    #d17 .colophon{
+      margin:26px 0 0; font-size:13.5px; color:#7C7263; font-style:italic;
+    }
+
+    @media (max-width:720px){
+      #d17 .page{padding:30px 20px 80px}
+      #d17 .e{flex-wrap:wrap; gap:2px 16px}
+      #d17 .e .b{flex:1 1 100%}
+    }
+  </style>
+
+  <div class="shot">
+    <div class="page">
+      <h1>Ordinace Brno-Žabovřesky</h1>
+      <p class="dateline">Denní list na úterý 23. září 2026, sestaveno v 09:40,
+        u pultu Hana Veselá.</p>
+      <nav class="nav">
+        <a href="#d17">Přehled</a><a class="on" href="#d17">Dnes</a><a href="#d17">Plánování</a><a href="#d17">Pacienti</a><a href="#d17">Diagnostika</a><a href="#d17">Dokumenty</a><a href="#d17">Pokladna</a><a href="#d17">Fakturace</a><a href="#d17">Sklad</a><a href="#d17">Tým</a><a href="#d17">Nastavení</a>
+      </nav>
+
+      <div class="hold">
+        <p class="lbl">Čeká na vás</p>
+        <p><span class="nm">Martin Kolář</span> sedí v čekárně od 09:15, tedy
+          dvacet pět minut. Posudek pro klub, Ordinace 1, MUDr. Havelka,
+          pojišťovna 211.</p>
+        <p class="why">Chybí: Souhlas se zpracováním zdravotních údajů. Dokud
+          ho nepodepíše, posudek nelze vydat a Ordinace 1 stojí naprázdno.</p>
+        <button type="button">Vytisknout souhlas</button>
+      </div>
+
+      <h2>Ráno už je odbavené</h2>
+      <p class="note quiet">Od sedmi do půl deváté prošlo pět lidí a všichni
+        jsou vykázaní: 07:00 Jana Kratochvílová na odběru krve, 07:20 Petr
+        Doležal na vstupním vyšetření, 07:40 Tomáš Řehák na spiroergometrii,
+        08:00 Marie Nováková na fyzioterapii a 08:30 Ondřej Veselý na kontrole
+        po úrazu. Nikdo z nich nedorazil pozdě a nic po nich nezůstalo
+        otevřené.</p>
+
+      <h2>Jak den pokračuje</h2>
+      <p class="note">Z osmnácti dnešních termínů je pět hotových, dvě
+        vyšetření běží, jedno je blokované kvůli souhlasu a deset lidí je ještě
+        před námi. Poslední termín je v 16:40.</p>
+
+      <div class="part first">dopoledne</div>
+
+      <div class="e run">
+        <span class="t">09:00</span>
+        <span class="b"><span class="who">Lucie Bartošová</span><br>
+          <span class="det">Izokinetika kolene · Tělocvična · Bc. Dvořák · 111</span><br>
+          <span class="st">probíhá</span></span>
+      </div>
+      <div class="e stop">
+        <span class="t">09:15</span>
+        <span class="b"><span class="who">Martin Kolář</span><br>
+          <span class="det">Posudek pro klub · Ordinace 1 · MUDr. Havelka · 211</span><br>
+          <span class="st">čeká 25 minut — chybí souhlas</span></span>
+      </div>
+
+      <div class="now">
+        <span class="h">09:40</span>
+        <span class="s">právě teď</span>
+      </div>
+
+      <div class="e run">
+        <span class="t">09:45</span>
+        <span class="b"><span class="who">Eva Procházková</span><br>
+          <span class="det">Rázová vlna · Rehabilitace · Mgr. Pilařová · 201</span><br>
+          <span class="st">probíhá, vzali ji už v 09:30</span></span>
+      </div>
+      <div class="e">
+        <span class="t">10:00</span>
+        <span class="b"><span class="who">Filip Urban</span><br>
+          <span class="det">Analýza chůze · Tělocvična · Bc. Dvořák · 213</span><br>
+          <span class="st">čeká</span></span>
+      </div>
+      <div class="e">
+        <span class="t">10:30</span>
+        <span class="b"><span class="who">Kateřina Šimková</span><br>
+          <span class="det">Kontrola po operaci · Ordinace 2 · MUDr. Sýkorová · 111</span><br>
+          <span class="st">čeká</span></span>
+      </div>
+      <div class="e">
+        <span class="t">11:00</span>
+        <span class="b"><span class="who">Jakub Horák</span><br>
+          <span class="det">Vstupní vyšetření · Ordinace 1 · MUDr. Havelka · 205</span><br>
+          <span class="st">čeká</span></span>
+      </div>
+      <div class="e">
+        <span class="t">11:30</span>
+        <span class="b"><span class="who">Veronika Málková</span><br>
+          <span class="det">Odběr krve · Laboratoř · Bc. Dvořák · 111</span><br>
+          <span class="st">čeká</span></span>
+      </div>
+
+      <div class="part">odpoledne</div>
+
+      <div class="e">
+        <span class="t">13:00</span>
+        <span class="b"><span class="who">Adam Beneš</span><br>
+          <span class="det">Fyzioterapie · Rehabilitace · Mgr. Pilařová · 207</span><br>
+          <span class="st">čeká</span></span>
+      </div>
+      <div class="e">
+        <span class="t">13:40</span>
+        <span class="b"><span class="who">Nikola Tichá</span><br>
+          <span class="det">Spiroergometrie · Laboratoř · MUDr. Sýkorová · 201</span><br>
+          <span class="st">čeká</span></span>
+      </div>
+      <div class="e">
+        <span class="t">14:20</span>
+        <span class="b"><span class="who">Radek Pospíšil</span><br>
+          <span class="det">Kontrola po úrazu · Ordinace 2 · MUDr. Havelka · 111</span><br>
+          <span class="st">čeká</span></span>
+      </div>
+      <div class="e">
+        <span class="t">15:00</span>
+        <span class="b"><span class="who">Simona Vrbová</span><br>
+          <span class="det">Izokinetika kolene · Tělocvična · Mgr. Pilařová · 213</span><br>
+          <span class="st">čeká</span></span>
+      </div>
+      <div class="e">
+        <span class="t">15:40</span>
+        <span class="b"><span class="who">Tomáš Řehák</span><br>
+          <span class="det">Fyzioterapie · Rehabilitace · Mgr. Pilařová · 205</span><br>
+          <span class="st">čeká, dnes je tu podruhé</span></span>
+      </div>
+      <div class="e">
+        <span class="t">16:40</span>
+        <span class="b"><span class="who">Petr Doležal</span><br>
+          <span class="det">Kontrola po operaci · Ordinace 1 · MUDr. Havelka · 201</span><br>
+          <span class="st">čeká, poslední dnešní termín</span></span>
+      </div>
+
+      <div class="tail">
+        <h2>Kam se dnes ještě dá někoho vzít</h2>
+        <div class="slots">
+          <div class="s1"><span class="t">12:00</span>
+            <span>Ordinace 2 · MUDr. Sýkorová se vrací z oběda, vejde se kontrola</span></div>
+          <div class="s1"><span class="t">12:20</span>
+            <span>Rehabilitace · Mgr. Pilařová, volná hodina na fyzioterapii</span></div>
+          <div class="s1"><span class="t">16:00</span>
+            <span>Laboratoř · Bc. Dvořák, poslední odběr dne</span></div>
+        </div>
+        <p>Poznámky ke směně: Eva Procházková přišla dřív, a protože byla
+          rehabilitace volná, vzala ji Mgr. Pilařová už v 09:30. Filip Urban je
+          po operaci menisku o berlích, počítejte s delším přesunem do
+          tělocvičny. Tomáš Řehák a Petr Doležal jsou tu dnes každý dvakrát,
+          ráno i odpoledne. Nikdo dnes zatím nenahlásil, že nedorazí, a nic se
+          neruší.</p>
+        <p class="colophon">Denní list se přepisuje každých pět minut. Tisk pro
+          sestru na noční: Dokumenty → Denní list.</p>
+      </div>
+    </div>
+  </div>
+</article>

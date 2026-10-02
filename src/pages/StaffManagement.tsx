@@ -1,272 +1,211 @@
 /* ══════════════════════════════════════════════════════════════
-   STAFF MANAGEMENT — PLAN-01 Feature A11-A20
-   - CRUD operations for staff members
-   - Role-based access control
-   - Work hours configuration
-   - Status management
+   TÝM A ÚČTY
+
+   One row per login account, because the account is the employee: its role,
+   what it may do (per employee, "Co smí"), where it works ("Kde pracuje") and
+   whether it may sign in at all.
+
+   This screen used to keep a second record per person - a "staff member" in
+   /api/staff with a free-text role, phone and department - and paired it with
+   the account by e-mail. Nothing else read that record, the per-employee
+   permissions and rota were offered only on accounts that lacked one, and
+   "Smazat" archived the record while the login kept working. A dismissed
+   employee is now switched off here, on the account, and the server ends
+   their open sessions with it.
    ══════════════════════════════════════════════════════════════ */
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Button, IconButton, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField, FormControl, InputLabel,
-  Select, MenuItem, Chip, Avatar, Switch, FormControlLabel, Grid,
-  Alert, Snackbar, Skeleton, Tooltip
+  DialogContent, DialogContentText, DialogActions, TextField, MenuItem, Chip, Avatar, Grid,
+  Alert, Snackbar, Skeleton, Tooltip,
 } from '@mui/material';
 import {
-  Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon,
-  Person as PersonIcon, Refresh as RefreshIcon
+  Add as AddIcon, Person as PersonIcon, Refresh as RefreshIcon, LockReset as LockResetIcon,
+  Block as BlockIcon, CheckCircle as CheckCircleIcon, Badge as BadgeIcon, Edit as EditIcon,
 } from '@mui/icons-material';
+import KeyIcon from '@mui/icons-material/VpnKey';
+import EventNoteIcon from '@mui/icons-material/EventNote';
+import EventBusyIcon from '@mui/icons-material/EventBusy';
+import { Link as RouterLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import client from '../api/client';
+import { UserPermissionsDialog } from '../components/admin/UserPermissionsDialog';
+import { WhereSomebodyWorksDialog } from '../components/admin/WhereSomebodyWorksDialog';
+import {
+  userAccountsApi, accountRefusal, ROLE_LABELS, USER_ACCOUNT_ROLES,
+} from '../api/userAccounts';
+import type { UserAccount, UserAccountRole } from '../api/userAccounts';
+import { usePermission } from '../auth/usePermission';
 
-/* ── Types ── */
-interface StaffMember {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  role: 'Admin' | 'Doctor' | 'Nurse' | 'Receptionist' | 'HeadPhysician';
-  specialization: string;
-  isActive: boolean;
-  avatar?: string;
-  services: string[];
-}
-
-interface LoginAccount {
-  userId: string;
-  email: string;
-  displayName: string;
-  role: string;
-  isActive: boolean;
-  mustChangePassword: boolean;
-}
-
-interface ServiceOption {
-  id: string;
-  slug: string;
-  name: string;
-  providerName: string;
-}
-
-/* ── Role config ── */
-const ROLE_LABELS: Record<string, string> = {
-  Admin: 'Administrátor',
-  Doctor: 'Lékař',
-  Nurse: 'Sestra',
-  Receptionist: 'Recepční',
-  HeadPhysician: 'Primář',
+const ROLE_COLORS: Record<UserAccountRole, string> = {
+  Owner: '#7B1FA2',
+  Administrator: '#D32F2F',
+  Staff: '#0288D1',
 };
 
-const ROLE_COLORS: Record<string, string> = {
-  Admin: '#D32F2F',
-  Doctor: '#0288D1',
-  Nurse: '#2E7D32',
-  Receptionist: '#ED6C02',
-  HeadPhysician: '#7B1FA2',
-};
+const nameOf = (a: UserAccount) => a.displayName || a.email;
 
-/* ══════════════════════════════════════════════════════════════ */
+const initialsOf = (a: UserAccount) =>
+  nameOf(a)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('') || '?';
+
 export default function StaffManagement() {
-  const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
-  const [formData, setFormData] = useState<Partial<StaffMember>>({
-    firstName: '', lastName: '', email: '', phone: '',
-    role: 'Doctor', specialization: '', isActive: true, services: [],
-  });
-  const [services, setServices] = useState<ServiceOption[]>([]);
-  const [accounts, setAccounts] = useState<LoginAccount[]>([]);
+  /* Only somebody who may manage roles can give out or take the Owner role;
+     the server refuses it for everybody else, so it is not offered either. */
+  const canManageOwners = usePermission('roles.manage');
+  /* Absences are settings.clinic.manage on the server, like the timetable. */
+  const canManageAbsences = usePermission('settings.clinic.manage');
+  const assignableRoles = USER_ACCOUNT_ROLES.filter((r) => r !== 'Owner' || canManageOwners);
 
-  /* ── Load staff + services + login accounts ── */
-  useEffect(() => {
-    loadStaff();
-    loadServices();
-    loadAccounts();
+  const [accounts, setAccounts] = useState<UserAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+
+  const [permissionsFor, setPermissionsFor] = useState<
+    { userId: string; name: string; isOwner: boolean } | null
+  >(null);
+  const [scheduleFor, setScheduleFor] = useState<{ userId: string; name: string } | null>(null);
+
+  const [adding, setAdding] = useState(false);
+  const [newAccount, setNewAccount] = useState({ displayName: '', email: '', role: 'Staff' as UserAccountRole });
+  const [editing, setEditing] = useState<UserAccount | null>(null);
+  const [editDraft, setEditDraft] = useState({ displayName: '', email: '' });
+  const [roleFor, setRoleFor] = useState<UserAccount | null>(null);
+  const [roleChoice, setRoleChoice] = useState<UserAccountRole>('Staff');
+  const [switchingOff, setSwitchingOff] = useState<UserAccount | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [dialogError, setDialogError] = useState<string | null>(null);
+
+  const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
+
+  const say = (message: string, severity: 'success' | 'error' = 'success') =>
+    setSnackbar({ open: true, message, severity });
+
+  const load = useCallback(() => {
+    userAccountsApi.list()
+      .then((list) => { setAccounts(list); setLoadFailed(false); })
+      .catch(() => setLoadFailed(true))
+      .finally(() => setLoading(false));
   }, []);
 
-  const splitName = (full: string) => {
-    const parts = (full || '').trim().split(/\s+/);
-    return { firstName: parts[0] || '', lastName: parts.slice(1).join(' ') || '' };
+  useEffect(load, [load]);
+
+  /* ── New account ── */
+  const openAdd = () => {
+    setNewAccount({ displayName: '', email: '', role: 'Staff' });
+    setDialogError(null);
+    setAdding(true);
   };
 
-  const loadServices = async () => {
+  const create = async () => {
+    setBusy(true);
+    setDialogError(null);
     try {
-      const res = await client.get('/api/booking/event-types');
-      const data = res.data?.value ?? res.data ?? [];
-      const list = Array.isArray(data) ? data : [];
-      setServices(list.map((e: any) => ({ id: e.id, slug: e.slug, name: e.name, providerName: e.providerName ?? '' })));
-    } catch {
-      setServices([]);
-    }
-  };
-
-  const loadAccounts = async () => {
-    try {
-      const res = await client.get('/api/v1/users');
-      const data = res.data?.value ?? res.data ?? [];
-      setAccounts(Array.isArray(data) ? data : []);
-    } catch {
-      setAccounts([]);
-    }
-  };
-
-  const accountFor = (email: string) =>
-    accounts.find(a => (a.email || '').toLowerCase() === (email || '').toLowerCase());
-
-  const loadStaff = async () => {
-    setLoading(true);
-    try {
-      const res = await client.get('/api/staff');
-      const data = res.data?.value ?? res.data?.data ?? res.data;
-      const list = Array.isArray(data) ? data : data?.items ?? [];
-      const mapped: StaffMember[] = list.map((m: any) => {
-        const { firstName, lastName } = splitName(m.fullName ?? '');
-        return {
-          id: m.id, firstName, lastName,
-          email: m.email ?? '', phone: m.phone ?? '',
-          role: m.role ?? 'Doctor', specialization: m.department ?? '',
-          isActive: m.isActive ?? true, services: [],
-        };
+      const issued = await userAccountsApi.create({
+        email: newAccount.email.trim(),
+        displayName: newAccount.displayName.trim(),
+        role: newAccount.role,
       });
-      // Attach services by matching provider name
-      try {
-        const evRes = await client.get('/api/booking/event-types');
-        const evData = evRes.data?.value ?? evRes.data ?? [];
-        const evList = Array.isArray(evData) ? evData : [];
-        mapped.forEach(s => {
-          const full = `${s.firstName} ${s.lastName}`.trim();
-          s.services = evList.filter((e: any) =>
-            String(e.providerName ?? '').split(',').map((x: string) => x.trim()).includes(full)
-          ).map((e: any) => e.id);
-        });
-      } catch { /* ignore */ }
-      setStaff(mapped);
-    } catch {
-      setStaff([]);
+      setAdding(false);
+      setCredentials({ email: issued.account.email, password: issued.temporaryPassword });
+      load();
+    } catch (error) {
+      setDialogError(accountRefusal(error));
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
-  /* ── Save staff (+ login account + service assignment) ── */
-  const [newTempPassword, setNewTempPassword] = useState('');
-  const [newAccountEmail, setNewAccountEmail] = useState('');
-  const handleSave = async () => {
+  /* ── Name and e-mail ── */
+  const openEdit = (account: UserAccount) => {
+    setEditDraft({ displayName: account.displayName, email: account.email });
+    setDialogError(null);
+    setEditing(account);
+  };
+
+  const saveEdit = async () => {
+    if (editing === null) return;
+    setBusy(true);
+    setDialogError(null);
     try {
-      const fullName = `${formData.firstName ?? ''} ${formData.lastName ?? ''}`.trim();
-      const payload = {
-        fullName,
-        role: formData.role ?? 'Doctor',
-        department: formData.specialization ?? '',
-        email: formData.email ?? '',
-        schedule: null,
-        phone: formData.phone ?? '',
-      };
-      if (editingStaff) {
-        await client.put(`/api/staff/${editingStaff.id}`, { ...payload, isActive: formData.isActive ?? true });
-      } else {
-        await client.post('/api/staff', payload);
-      }
-
-      // Assign selected services to this doctor (patient bookings → his calendar)
-      try {
-        const prevServices = editingStaff?.services ?? [];
-        const nextServices = formData.services ?? [];
-        const toAssign = nextServices.filter(id => !prevServices.includes(id));
-        const toUnassign = prevServices.filter(id => !nextServices.includes(id));
-        const setProvider = async (id: string, provider: string) => {
-          const get = await client.get(`/api/booking/event-types/${id}`);
-          const full = get.data?.value ?? get.data;
-          const cur = String(full.providerName ?? '').split(',').map((s: string) => s.trim()).filter(Boolean);
-          const next = provider
-            ? (cur.includes(provider) ? cur : [...cur, provider])
-            : cur.filter((n: string) => n !== fullName);
-          await client.put(`/api/booking/event-types/${id}`, { ...full, providerName: next.join(', ') });
-        };
-        for (const id of toAssign) await setProvider(id, fullName);
-        for (const id of toUnassign) {
-          const ev = services.find(s => s.id === id);
-          if (ev && ev.providerName.split(',').map(s => s.trim()).includes(fullName)) await setProvider(id, '');
-        }
-        await loadServices();
-      } catch { /* service sync failed — staff saved */ }
-
-      // New member → also create login account (email + generated password)
-      if (!editingStaff && formData.email) {
-        try {
-          const accountRole = formData.role === 'Admin' ? 'Administrator' : 'Staff';
-          const res = await client.post('/api/v1/users', {
-            email: formData.email,
-            displayName: fullName || formData.email,
-            role: accountRole,
-          });
-          const temp = res.data?.temporaryPassword ?? res.data?.value?.temporaryPassword ?? '';
-          setNewTempPassword(temp);
-          setNewAccountEmail(formData.email);
-          setSnackbar({ open: true, message: 'Zaměstnanec uložen + přihlašovací účet vytvořen.', severity: 'success' });
-        } catch (e: any) {
-          const msg = e?.response?.status === 409
-            ? 'Zaměstnanec uložen. Přihlašovací účet s tímto emailem již existuje.'
-            : 'Zaměstnanec uložen, ale vytvoření přihlašovacího účtu selhalo.';
-          setSnackbar({ open: true, message: msg, severity: 'error' });
-        }
-        loadAccounts();
-      } else {
-        setSnackbar({ open: true, message: 'Zaměstnanec uložen', severity: 'success' });
-      }
-      setOpenDialog(false);
-      loadStaff();
-    } catch {
-      setSnackbar({ open: true, message: 'Chyba při ukládání', severity: 'error' });
+      await userAccountsApi.update(editing.userId, {
+        displayName: editDraft.displayName.trim(),
+        email: editDraft.email.trim(),
+      });
+      setEditing(null);
+      say('Údaje zaměstnance uloženy.');
+      load();
+    } catch (error) {
+      setDialogError(accountRefusal(error));
+    } finally {
+      setBusy(false);
     }
   };
 
-  /* ── Reset login password ── */
-  const handleResetPassword = async (email: string) => {
-    const acc = accountFor(email);
-    if (!acc) return;
+  /* ── Password ── */
+  const resetPassword = async (account: UserAccount) => {
     try {
-      const res = await client.post(`/api/v1/users/${acc.userId}/reset-password`);
-      const temp = res.data?.temporaryPassword ?? res.data?.value?.temporaryPassword ?? '';
-      setNewTempPassword(temp);
-      setNewAccountEmail(email);
-    } catch {
-      setSnackbar({ open: true, message: 'Reset hesla selhal', severity: 'error' });
+      const issued = await userAccountsApi.resetPassword(account.userId);
+      setCredentials({ email: account.email, password: issued.temporaryPassword });
+      load();
+    } catch (error) {
+      say(accountRefusal(error), 'error');
     }
   };
 
-  /* ── Delete staff ── */
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Opravdu chcete smazat tohoto zaměstnance?')) return;
-    
+  /* ── Role ── */
+  const openRole = (account: UserAccount) => {
+    setRoleChoice(account.role);
+    setDialogError(null);
+    setRoleFor(account);
+  };
+
+  const saveRole = async () => {
+    if (roleFor === null) return;
+    setBusy(true);
+    setDialogError(null);
     try {
-      await client.delete(`/api/staff/${id}`);
-      setSnackbar({ open: true, message: 'Zaměstnanec smazán', severity: 'success' });
-      loadStaff();
-    } catch {
-      setSnackbar({ open: true, message: 'Chyba při mazání', severity: 'error' });
+      await userAccountsApi.assignRole(roleFor.userId, roleChoice);
+      setRoleFor(null);
+      say('Role změněna.');
+      load();
+    } catch (error) {
+      setDialogError(accountRefusal(error));
+    } finally {
+      setBusy(false);
     }
   };
 
-  /* ── Open edit dialog ── */
-  const handleEdit = (member: StaffMember) => {
-    setEditingStaff(member);
-    setFormData(member);
-    setOpenDialog(true);
+  /* ── Access on / off ── */
+  const switchOff = async () => {
+    if (switchingOff === null) return;
+    setBusy(true);
+    setDialogError(null);
+    try {
+      await userAccountsApi.setActive(switchingOff.userId, false);
+      say(`${nameOf(switchingOff)} se už nepřihlásí.`);
+      setSwitchingOff(null);
+      load();
+    } catch (error) {
+      setDialogError(accountRefusal(error));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  /* ── Open add dialog ── */
-  const handleAdd = () => {
-    setEditingStaff(null);
-    setFormData({
-      firstName: '', lastName: '', email: '', phone: '',
-      role: 'Doctor', specialization: '', isActive: true, services: [],
-    });
-    setOpenDialog(true);
+  const switchOn = async (account: UserAccount) => {
+    try {
+      await userAccountsApi.setActive(account.userId, true);
+      say(`${nameOf(account)} se může znovu přihlásit.`);
+      load();
+    } catch (error) {
+      say(accountRefusal(error), 'error');
+    }
   };
 
   if (loading) {
@@ -278,24 +217,26 @@ export default function StaffManagement() {
     );
   }
 
+  const active = accounts.filter((a) => a.isActive);
+
   return (
     <Box>
       {/* Header */}
       <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <PersonIcon color="primary" /> Správa zaměstnanců
+              <PersonIcon color="primary" /> Tým a účty
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Přidávání, úprava a mazání zaměstnanců
+              Kdo se přihlašuje, s jakou rolí, co smí a kde pracuje
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Tooltip title="Obnovit">
-              <IconButton onClick={loadStaff}><RefreshIcon /></IconButton>
+              <IconButton aria-label="Obnovit" onClick={load}><RefreshIcon /></IconButton>
             </Tooltip>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={handleAdd}
+            <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}
               sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 3, fontWeight: 600 }}>
               Přidat zaměstnance
             </Button>
@@ -303,220 +244,314 @@ export default function StaffManagement() {
         </Box>
       </motion.div>
 
-      {/* Stats */}
+      {loadFailed && (
+        <Alert severity="error" sx={{ mb: 2 }}>Seznam účtů se nepodařilo načíst.</Alert>
+      )}
+
+      {/* Stats: active accounts per role */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        {Object.entries(ROLE_LABELS).map(([role, label]) => {
-          const count = staff.filter(s => s.role === role).length;
-          return (
-            <Grid key={role} size={{ xs: 6, sm: 4, md: 2.4 }}>
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                <Paper sx={{ p: 2, textAlign: 'center' }}>
-                  <Typography variant="h4" sx={{ fontWeight: 700, color: ROLE_COLORS[role] }}>{count}</Typography>
-                  <Typography variant="body2" color="text.secondary">{label}</Typography>
-                </Paper>
-              </motion.div>
-            </Grid>
-          );
-        })}
+        {USER_ACCOUNT_ROLES.map((role) => (
+          <Grid key={role} size={{ xs: 6, sm: 3 }}>
+            <Paper sx={{ p: 2, textAlign: 'center' }}>
+              <Typography variant="h4" sx={{ fontWeight: 700, color: ROLE_COLORS[role] }}>
+                {active.filter((a) => a.role === role).length}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">{ROLE_LABELS[role]}</Typography>
+            </Paper>
+          </Grid>
+        ))}
+        <Grid size={{ xs: 6, sm: 3 }}>
+          <Paper sx={{ p: 2, textAlign: 'center' }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: '#757575' }}>
+              {accounts.length - active.length}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">Vypnutý přístup</Typography>
+          </Paper>
+        </Grid>
       </Grid>
 
-      {/* Staff Table */}
+      {/* Accounts */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
         <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
           <Table>
             <TableHead>
               <TableRow sx={{ bgcolor: '#f8f9fa' }}>
                 <TableCell sx={{ fontWeight: 700 }}>Jméno</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Email</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Telefon</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>E-mail</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Služby</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Přihlášení</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Stav</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Naposledy přihlášen</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Přístup</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 700 }}>Akce</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {staff.length === 0 ? (
+              {accounts.length === 0 && !loadFailed ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
                     <PersonIcon sx={{ fontSize: 48, color: '#ddd', mb: 1 }} />
-                    <Typography color="text.secondary">Žádní zaměstnanci</Typography>
+                    <Typography color="text.secondary">Žádné účty</Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                staff.map((member, i) => (
-                  <motion.tr key={member.id}
-                    initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: Math.min(i * 0.03, 0.5) }}>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Avatar sx={{ bgcolor: ROLE_COLORS[member.role], width: 36, height: 36 }}>
-                          {member.firstName[0]}{member.lastName[0]}
-                        </Avatar>
-                        <Typography sx={{ fontWeight: 500 }}>{member.firstName} {member.lastName}</Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>{member.email}</TableCell>
-                    <TableCell>{member.phone}</TableCell>
-                    <TableCell>
-                      <Chip label={ROLE_LABELS[member.role]} size="small"
-                        sx={{ bgcolor: ROLE_COLORS[member.role] + '18', color: ROLE_COLORS[member.role], fontWeight: 500 }} />
-                    </TableCell>
-                    <TableCell>{member.specialization || (member.services ?? []).map(id => services.find(s => s.id === id)?.name).filter(Boolean).join(', ') || '—'}</TableCell>
-                    <TableCell>
-                      {(() => {
-                        const acc = accountFor(member.email);
-                        if (!acc) return <Chip label="Bez účtu" size="small" variant="outlined" />;
-                        return (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <Chip
-                              label={acc.isActive ? acc.role : 'Neaktivní'}
-                              size="small"
-                              sx={{ bgcolor: acc.isActive ? '#E8F5E9' : '#F5F5F5', color: acc.isActive ? '#2E7D32' : '#757575' }}
-                            />
-                            <Tooltip title="Vygenerovat nové heslo">
-                              <IconButton size="small" onClick={() => handleResetPassword(member.email)}>
-                                <RefreshIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </Box>
-                        );
-                      })()}
-                    </TableCell>
-                    <TableCell>
-                      <Chip label={member.isActive ? 'Aktivní' : 'Neaktivní'} size="small"
-                        sx={{ bgcolor: member.isActive ? '#E8F5E9' : '#F5F5F5', color: member.isActive ? '#2E7D32' : '#757575' }} />
-                    </TableCell>
-                    <TableCell align="right">
-                      <Tooltip title="Upravit">
-                        <IconButton size="small" onClick={() => handleEdit(member)}><EditIcon fontSize="small" /></IconButton>
-                      </Tooltip>
-                      <Tooltip title="Smazat">
-                        <IconButton size="small" onClick={() => handleDelete(member.id)} color="error"><DeleteIcon fontSize="small" /></IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </motion.tr>
-                ))
+                accounts.map((acc) => {
+                  const name = nameOf(acc);
+                  return (
+                    <TableRow key={acc.userId} sx={{ opacity: acc.isActive ? 1 : 0.6 }}>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Avatar sx={{ bgcolor: ROLE_COLORS[acc.role] ?? '#90A4AE', width: 36, height: 36, fontSize: 14 }}>
+                            {initialsOf(acc)}
+                          </Avatar>
+                          <Typography sx={{ fontWeight: 600 }}>{name}</Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>{acc.email}</TableCell>
+                      <TableCell>
+                        <Chip label={ROLE_LABELS[acc.role] ?? acc.role} size="small"
+                          sx={{ bgcolor: `${ROLE_COLORS[acc.role] ?? '#90A4AE'}18`, color: ROLE_COLORS[acc.role] ?? '#607D8B', fontWeight: 500 }} />
+                      </TableCell>
+                      <TableCell>
+                        {acc.lastLoginAtUtc ? new Date(acc.lastLoginAtUtc).toLocaleString('cs-CZ') : '—'}
+                      </TableCell>
+                      <TableCell>
+                        {acc.isActive ? (
+                          <Chip size="small" color="success" label={acc.mustChangePassword ? 'Čeká na první přihlášení' : 'Aktivní'} />
+                        ) : (
+                          <Chip size="small" label="Vypnutý" />
+                        )}
+                      </TableCell>
+                      <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                        <Tooltip title="Co smí">
+                          <IconButton
+                            aria-label={`Co smí ${name}`}
+                            onClick={() => setPermissionsFor({ userId: acc.userId, name, isOwner: acc.role === 'Owner' })}
+                          >
+                            <KeyIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Kde pracuje">
+                          <IconButton
+                            aria-label={`Kde pracuje ${name}`}
+                            onClick={() => setScheduleFor({ userId: acc.userId, name })}
+                          >
+                            <EventNoteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Upravit jméno a e-mail">
+                          <IconButton aria-label={`Upravit ${name}`} onClick={() => openEdit(acc)}>
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        {canManageAbsences ? (
+                          <Tooltip title="Nepřítomnost">
+                            <IconButton
+                              component={RouterLink}
+                              to={`/nepritomnosti?userId=${encodeURIComponent(acc.userId)}`}
+                              aria-label={`Nepřítomnost ${name}`}
+                            >
+                              <EventBusyIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        ) : null}
+                        <Tooltip title="Změnit roli">
+                          <IconButton aria-label={`Změnit roli ${name}`} onClick={() => openRole(acc)}>
+                            <BadgeIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Resetovat heslo">
+                          <IconButton
+                            aria-label={`Resetovat heslo pro ${acc.email}`}
+                            onClick={() => void resetPassword(acc)}
+                          >
+                            <LockResetIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        {acc.isActive ? (
+                          <Tooltip title="Vypnout přístup">
+                            <IconButton
+                              color="error"
+                              aria-label={`Vypnout přístup ${name}`}
+                              onClick={() => { setDialogError(null); setSwitchingOff(acc); }}
+                            >
+                              <BlockIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        ) : (
+                          <Tooltip title="Znovu zapnout přístup">
+                            <IconButton
+                              color="success"
+                              aria-label={`Zapnout přístup ${name}`}
+                              onClick={() => void switchOn(acc)}
+                            >
+                              <CheckCircleIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
         </TableContainer>
       </motion.div>
 
-      {/* Add/Edit Dialog */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>
-          {editingStaff ? 'Upravit zaměstnance' : 'Přidat zaměstnance'}
-        </DialogTitle>
+      <WhereSomebodyWorksDialog
+        userId={scheduleFor?.userId ?? null}
+        userName={scheduleFor?.name ?? ''}
+        onClose={() => setScheduleFor(null)}
+      />
+
+      <UserPermissionsDialog
+        userId={permissionsFor?.userId ?? null}
+        userName={permissionsFor?.name ?? ''}
+        isOwner={permissionsFor?.isOwner ?? false}
+        onClose={() => setPermissionsFor(null)}
+      />
+
+      {/* New account */}
+      <Dialog open={adding} onClose={() => setAdding(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Přidat zaměstnance</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid size={{ xs: 6 }}>
-              <TextField fullWidth label="Jméno" value={formData.firstName}
-                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 6 }}>
-              <TextField fullWidth label="Příjmení" value={formData.lastName}
-                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} />
+            <Grid size={{ xs: 12 }}>
+              <TextField fullWidth label="Jméno a příjmení" value={newAccount.displayName}
+                onChange={(e) => setNewAccount({ ...newAccount, displayName: e.target.value })} />
             </Grid>
             <Grid size={{ xs: 12 }}>
-              <TextField fullWidth label="Email" type="email" value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+              <TextField fullWidth label="E-mail" type="email" value={newAccount.email}
+                helperText="Tímhle e-mailem se bude přihlašovat."
+                onChange={(e) => setNewAccount({ ...newAccount, email: e.target.value })} />
             </Grid>
             <Grid size={{ xs: 12 }}>
-              <TextField fullWidth label="Telefon" value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+              <TextField select fullWidth label="Role" value={newAccount.role}
+                helperText="Co role dává, se dá u každého zaměstnance upravit tlačítkem Co smí."
+                onChange={(e) => setNewAccount({ ...newAccount, role: e.target.value as UserAccountRole })}>
+                {assignableRoles.map((role) => (
+                  <MenuItem key={role} value={role}>{ROLE_LABELS[role]}</MenuItem>
+                ))}
+              </TextField>
             </Grid>
-            <Grid size={{ xs: 12 }}>
-              <FormControl fullWidth>
-                <InputLabel>Role</InputLabel>
-                <Select value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value as any })} label="Role">
-                  {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                    <MenuItem key={value} value={value}>{label}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                Služby, které pracovník provádí
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Rezervace těchto služeb půjdou do jeho kalendáře a oznámení.
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                {services.length === 0 && (
-                  <Typography variant="body2" color="text.secondary">Žádné služby k výběru</Typography>
-                )}
-                {services.map(s => {
-                  const selected = (formData.services ?? []).includes(s.id);
-                  const takenByOther = s.providerName && s.providerName !== `${formData.firstName ?? ''} ${formData.lastName ?? ''}`.trim();
-                  return (
-                    <Chip
-                      key={s.id}
-                      label={s.providerName && !selected ? `${s.name} (${s.providerName})` : s.name}
-                      onClick={() => {
-                        const cur = formData.services ?? [];
-                        setFormData({
-                          ...formData,
-                          services: selected ? cur.filter(id => id !== s.id) : [...cur, s.id],
-                        });
-                      }}
-                      color={selected ? 'primary' : 'default'}
-                      variant={selected ? 'filled' : 'outlined'}
-                      sx={takenByOther && !selected ? { opacity: 0.7 } : undefined}
-                    />
-                  );
-                })}
-              </Box>
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <FormControlLabel control={<Switch checked={formData.isActive}
-                onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })} />} label="Aktivní" />
-            </Grid>
+            {dialogError && (
+              <Grid size={{ xs: 12 }}><Alert severity="error">{dialogError}</Alert></Grid>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions sx={{ p: 2, gap: 1 }}>
-          <Button onClick={() => setOpenDialog(false)} sx={{ borderRadius: 2 }}>Zrušit</Button>
-          <Button onClick={handleSave} variant="contained"
-            disabled={!formData.firstName || !formData.lastName || !formData.email}
+          <Button onClick={() => setAdding(false)} sx={{ borderRadius: 2 }}>Zrušit</Button>
+          <Button onClick={() => void create()} variant="contained"
+            disabled={busy || newAccount.displayName.trim() === '' || newAccount.email.trim() === ''}
             sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 3, fontWeight: 600 }}>
-            {editingStaff ? 'Uložit' : 'Přidat'}
+            Přidat
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Credentials dialog (new member login) */}
-      <Dialog open={newTempPassword !== ''} onClose={() => setNewTempPassword('')} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Přihlašovací údaje vytvořeny</DialogTitle>
+      {/* Name and e-mail */}
+      <Dialog open={editing !== null} onClose={() => setEditing(null)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Upravit: {editing ? nameOf(editing) : ''}</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid size={{ xs: 12 }}>
+              <TextField fullWidth label="Jméno a příjmení" value={editDraft.displayName}
+                onChange={(e) => setEditDraft({ ...editDraft, displayName: e.target.value })} />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField fullWidth label="E-mail" type="email" value={editDraft.email}
+                helperText="Tímhle e-mailem se přihlašuje. Po změně se přihlásí novým."
+                onChange={(e) => setEditDraft({ ...editDraft, email: e.target.value })} />
+            </Grid>
+            {dialogError && (
+              <Grid size={{ xs: 12 }}><Alert severity="error">{dialogError}</Alert></Grid>
+            )}
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button onClick={() => setEditing(null)}>Zrušit</Button>
+          <Button variant="contained" onClick={() => void saveEdit()}
+            disabled={
+              busy || editing === null
+              || editDraft.displayName.trim() === '' || editDraft.email.trim() === ''
+              || (editDraft.displayName.trim() === editing.displayName && editDraft.email.trim() === editing.email)
+            }
+            sx={{ bgcolor: '#0D7377' }}>
+            Uložit
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Role */}
+      <Dialog open={roleFor !== null} onClose={() => setRoleFor(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Role: {roleFor ? nameOf(roleFor) : ''}</DialogTitle>
+        <DialogContent>
+          <TextField select fullWidth label="Role" value={roleChoice} sx={{ mt: 1 }}
+            onChange={(e) => setRoleChoice(e.target.value as UserAccountRole)}>
+            {USER_ACCOUNT_ROLES
+              .filter((role) => assignableRoles.includes(role) || role === roleFor?.role)
+              .map((role) => (
+                <MenuItem key={role} value={role}>{ROLE_LABELS[role]}</MenuItem>
+              ))}
+          </TextField>
+          {dialogError && <Alert severity="error" sx={{ mt: 2 }}>{dialogError}</Alert>}
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button onClick={() => setRoleFor(null)}>Zrušit</Button>
+          <Button variant="contained" onClick={() => void saveRole()}
+            disabled={busy || roleFor === null || roleChoice === roleFor.role}
+            sx={{ bgcolor: '#0D7377' }}>
+            Uložit
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Switching access off */}
+      <Dialog open={switchingOff !== null} onClose={() => setSwitchingOff(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Vypnout přístup?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            <strong>{switchingOff ? nameOf(switchingOff) : ''}</strong> se už nepřihlásí a jeho
+            otevřená přihlášení skončí hned. Účet i jeho historie zůstanou; přístup jde
+            později znovu zapnout.
+          </DialogContentText>
+          {dialogError && <Alert severity="error" sx={{ mt: 2 }}>{dialogError}</Alert>}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setSwitchingOff(null)}>Zrušit</Button>
+          <Button color="error" variant="contained" disabled={busy} onClick={() => void switchOff()}>
+            Vypnout přístup
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* One-time password, for a new account or a reset one */}
+      <Dialog open={credentials !== null} onClose={() => setCredentials(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Přihlašovací údaje</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Předejte je novému členovi týmu. Po prvním přihlášení si nastaví vlastní heslo.
+            Předejte je zaměstnanci. Po prvním přihlášení si nastaví vlastní heslo.
           </Typography>
-          {newAccountEmail && (
-            <Typography variant="body2" sx={{ mb: 1 }}>
-              Email: <strong>{newAccountEmail}</strong>
-            </Typography>
-          )}
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            E-mail: <strong>{credentials?.email}</strong>
+          </Typography>
           <Alert severity="success" sx={{ wordBreak: 'break-all' }}>
-            Heslo: <strong>{newTempPassword}</strong>
+            Heslo: <strong>{credentials?.password}</strong>
           </Alert>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button
-            onClick={() => { navigator.clipboard?.writeText(newTempPassword).catch(() => {}); }}
+            onClick={() => { navigator.clipboard?.writeText(credentials?.password ?? '').catch(() => {}); }}
             variant="outlined" sx={{ borderRadius: 2 }}
           >
             Kopírovat
           </Button>
-          <Button onClick={() => setNewTempPassword('')} variant="contained"
+          <Button onClick={() => setCredentials(null)} variant="contained"
             sx={{ bgcolor: '#0D7377', borderRadius: 2 }}>
             Hotovo
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar */}
       <Snackbar open={snackbar.open} autoHideDuration={3000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>

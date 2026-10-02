@@ -3,19 +3,23 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
-export enum ExportFormat {
-  CSV = 0,
-  PohodaXml = 1,
-  MoneyS3Xml = 2,
-  IdokladXml = 3,
-}
+export const ExportFormat = {
+  CSV: 0,
+  PohodaXml: 1,
+  MoneyS3Xml: 2,
+  IdokladXml: 3,
+} as const;
 
-export enum ExportType {
-  Invoices = 0,
-  CreditNotes = 1,
-  Payments = 2,
-  All = 3,
-}
+export type ExportFormat = (typeof ExportFormat)[keyof typeof ExportFormat];
+
+export const ExportType = {
+  Invoices: 0,
+  CreditNotes: 1,
+  Payments: 2,
+  All: 3,
+} as const;
+
+export type ExportType = (typeof ExportType)[keyof typeof ExportType];
 
 export interface ExportResult {
   id: string;
@@ -37,6 +41,36 @@ export interface ExportCommand {
   type: ExportType;
   dateFrom: string;
   dateTo: string;
+}
+
+/**
+ * The export form as the screen holds it: the enum members by name.
+ */
+export interface ExportForm {
+  format: keyof typeof ExportFormat;
+  type: keyof typeof ExportType;
+  from: string;
+  to: string;
+}
+
+/**
+ * The request body POST /api/accounting/export binds. The API reads
+ * `format` and `type` as the numbers of its ExportFormat and ExportType
+ * enums; the names the form shows are turned into those numbers here, so the
+ * body is one the server can bind whether or not it also accepts names.
+ */
+export function exportCommandFrom(form: ExportForm): ExportCommand {
+  return {
+    format: ExportFormat[form.format],
+    type: ExportType[form.type],
+    dateFrom: form.from,
+    dateTo: form.to,
+  };
+}
+
+/** A format name the API may list that this screen knows how to send. */
+export function isExportFormatName(name: unknown): name is keyof typeof ExportFormat {
+  return typeof name === 'string' && Object.prototype.hasOwnProperty.call(ExportFormat, name);
 }
 
 export interface ExportFormatInfo {
@@ -61,13 +95,6 @@ export const accountingExportApi = {
 
   getHistory: async (): Promise<ExportResult[]> => {
     const response = await client.get(`${API_BASE}/accounting/export/history`);
-    return response.data;
-  },
-
-  getHistoryRange: async (from: string, to: string): Promise<ExportResult[]> => {
-    const response = await client.get(`${API_BASE}/accounting/export/history/range`, {
-      params: { from, to },
-    });
     return response.data;
   },
 

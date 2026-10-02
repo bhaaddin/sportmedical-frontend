@@ -3,3 +3,9 @@ dist
 .git
 *.md
 REPORT-*.md
+
+# Design galleries that live in working trees, not in the application. Vite
+# copies all of public/ into dist, so anything left there is served publicly.
+_design
+public/g*.html
+public/t

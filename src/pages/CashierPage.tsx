@@ -3,13 +3,22 @@ import {
   Box, Typography, Card, CardContent, Grid, Button, Chip, TextField,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   MenuItem, IconButton, Tooltip, Skeleton, Alert, Dialog, DialogTitle,
-  DialogContent, DialogActions, Autocomplete,
+  DialogContent, DialogActions,
 } from '@mui/material';
 import { Add, Cancel, Undo, Refresh } from '@mui/icons-material';
 import { cashierApi, PaymentMethod, type CashierTransaction } from '../services/cashierApi';
-import { publicBookingApi } from '../api/publicBooking';
-import { patientsApi, type Patient } from '../api/patients';
+import { servicesApi } from '../api/services';
+import type { Patient } from '../api/patients';
+import PatientPicker from '../components/patients/PatientPicker';
 import toast from 'react-hot-toast';
+
+/** The four the API has (4.x `PaymentMethod`); anything else falls back to cash. */
+function toPaymentMethod(value: string): PaymentMethod {
+  const n = Number(value);
+  return (Object.values(PaymentMethod) as number[]).includes(n)
+    ? (n as PaymentMethod)
+    : PaymentMethod.Cash;
+}
 
 const METHOD_LABELS: Record<number, string> = {
   [PaymentMethod.Cash]: 'Hotovost',
@@ -27,33 +36,36 @@ export default function CashierPage() {
   const [transactions, setTransactions] = useState<CashierTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState<any[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patient, setPatient] = useState<Patient | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({ serviceId: '', patientId: '', paymentMethod: PaymentMethod.Cash as number, discount: 0 });
+  const [form, setForm] = useState({
+    serviceId: '',
+    patientId: '',
+    paymentMethod: PaymentMethod.Cash as PaymentMethod,
+    discount: 0,
+  });
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [s, t, ev] = await Promise.all([
+      const [s, t, svc] = await Promise.all([
         cashierApi.getDashboard().catch(() => null),
         cashierApi.getTransactions(today).catch(() => []),
-        publicBookingApi.adminGetAll().catch(() => []),
+        servicesApi.getAll().catch(() => []),
       ]);
       setStats(s);
       setTransactions(t);
-      setServices(ev);
+      /* The picker used to be fed from the public-booking event types, a table
+         with no rows: the payment dialog demands a service and could never list
+         one. It reads the real service catalogue now. */
+      setServices(svc);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const searchPatients = (q: string) => {
-    if (q.trim().length < 2) return;
-    patientsApi.search(q).then(setPatients).catch(() => {});
-  };
 
   const handleCreate = async () => {
     const svc = services.find(s => s.id === form.serviceId);
@@ -73,6 +85,7 @@ export default function CashierPage() {
       toast.success('Platba zaevidována');
       setDialogOpen(false);
       setForm({ serviceId: '', patientId: '', paymentMethod: PaymentMethod.Cash, discount: 0 });
+      setPatient(null);
       load();
     } catch {
       toast.error('Uložení selhalo');
@@ -190,15 +203,22 @@ export default function CashierPage() {
                 <MenuItem key={s.id} value={s.id}>{s.name} — {czk(Number(s.priceCzk ?? 0))}</MenuItem>
               ))}
             </TextField>
-            <Autocomplete
-              options={patients}
-              getOptionLabel={o => `${o.firstName} ${o.lastName}`}
-              onInputChange={(_, v) => searchPatients(v)}
-              onChange={(_, v) => setForm(f => ({ ...f, patientId: v?.id ?? '' }))}
-              renderInput={params => <TextField {...params} label="Pacient (začněte psát)" />}
+            <PatientPicker
+              value={patient}
+              onChange={(next) => {
+                setPatient(next);
+                setForm(f => ({ ...f, patientId: next?.id ?? '' }));
+              }}
             />
+            {/*
+              The state used to be widened to `number`, which let any integer
+              through as a payment method. It is the union of the four real ones
+              now, and the select's value is checked against them rather than
+              cast - a select cannot produce anything else today, but nothing
+              stops the next person reading this value from somewhere that can.
+            */}
             <TextField select fullWidth label="Způsob platby" value={form.paymentMethod}
-              onChange={e => setForm(f => ({ ...f, paymentMethod: Number(e.target.value) }))}>
+              onChange={e => setForm(f => ({ ...f, paymentMethod: toPaymentMethod(e.target.value) }))}>
               {Object.entries(METHOD_LABELS).map(([v, l]) => (
                 <MenuItem key={v} value={Number(v)}>{l}</MenuItem>
               ))}

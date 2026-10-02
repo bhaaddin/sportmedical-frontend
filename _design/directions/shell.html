@@ -1,0 +1,201 @@
+<title>Dvacet obrazovek</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Libre+Franklin:wght@400;500;600&family=DM+Sans:wght@400;500;700&family=Chivo:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+/* ------------------------------------------------------------------
+   Gallery chrome. Everything here is prefixed `g-`: the twenty
+   templates are authored separately and reuse names like .card, .row
+   and .nav inside their own scoped stylesheets.
+   The chrome itself follows the same eye rules it is asking of them -
+   no pure black, no pure white, no ambient motion.
+   ------------------------------------------------------------------ */
+:root{
+  --g-bg:#F4F6F8; --g-panel:#FBFCFD; --g-line:#D8E0E6; --g-line-2:#E7ECF0;
+  --g-fg:#1A2028; --g-fg-2:#4C5A66; --g-fg-3:#75838F;
+  --g-accent:#2C6E63;
+  --g-ui:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --g-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --g-bg:#171D24; --g-panel:#1D242C; --g-line:#2C3640; --g-line-2:#242C35;
+    --g-fg:#DFE6EC; --g-fg-2:#A9B6C1; --g-fg-3:#7B8894;
+    --g-accent:#63B3A4;
+  }
+}
+:root[data-theme="dark"]{
+  --g-bg:#171D24; --g-panel:#1D242C; --g-line:#2C3640; --g-line-2:#242C35;
+  --g-fg:#DFE6EC; --g-fg-2:#A9B6C1; --g-fg-3:#7B8894;
+  --g-accent:#63B3A4;
+}
+
+body{
+  margin:0; background:var(--g-bg); color:var(--g-fg);
+  font-family:var(--g-ui); font-size:15px; line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---- sticky index ---- */
+.g-bar{
+  position:sticky; top:env(safe-area-inset-top,0px); z-index:50;
+  background:var(--g-panel); border-bottom:1px solid var(--g-line);
+  padding:9px 18px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+}
+.g-bar-name{font-weight:600; font-size:.92rem; white-space:nowrap}
+.g-jump{display:flex; gap:4px; flex-wrap:wrap; overflow-x:auto; flex:1 1 auto}
+.g-jump a{
+  font-family:var(--g-mono); font-size:.78rem; text-decoration:none;
+  color:var(--g-fg-3); border:1px solid transparent; border-radius:5px;
+  padding:3px 7px; min-height:26px; display:inline-flex; align-items:center;
+}
+.g-jump a:hover,.g-jump a:focus-visible{color:var(--g-fg); border-color:var(--g-line); outline:none}
+
+.g-wrap{max-width:1560px; margin:0 auto; padding-inline:18px; padding-block:30px 70px; box-sizing:border-box}
+
+.g-intro{border-bottom:1px solid var(--g-line); padding-bottom:22px; margin-bottom:30px;
+  display:flex; flex-direction:column; gap:11px}
+.g-intro h1{font-size:1.9rem; font-weight:600; margin:0; letter-spacing:-.02em}
+.g-intro p{margin:0; max-width:78ch; color:var(--g-fg-2)}
+.g-rules{display:flex; gap:7px; flex-wrap:wrap; margin-top:3px}
+.g-rules span{font-family:var(--g-mono); font-size:.74rem; color:var(--g-fg-3);
+  border:1px solid var(--g-line); border-radius:4px; padding:2px 7px}
+
+/* ---- one template ---- */
+.g-item{margin-bottom:38px; scroll-margin-top:72px}
+.g-head{display:flex; align-items:baseline; gap:11px; flex-wrap:wrap; margin-bottom:5px}
+.g-no{font-family:var(--g-mono); font-size:.86rem; color:var(--g-fg-3)}
+.g-head h2{font-size:1.14rem; font-weight:600; margin:0}
+.g-expand{
+  margin-left:auto; font-family:var(--g-ui); font-size:.8rem; font-weight:500;
+  color:var(--g-fg-2); background:var(--g-panel); border:1px solid var(--g-line);
+  border-radius:6px; padding:5px 11px; min-height:32px; cursor:pointer;
+}
+.g-expand:hover{color:var(--g-fg); border-color:var(--g-fg-3)}
+.g-lines{display:flex; flex-direction:column; gap:2px; margin-bottom:11px; max-width:92ch}
+.g-lines p{margin:0; font-size:.88rem; color:var(--g-fg-2)}
+.g-lines .g-cost{color:var(--g-fg-3)}
+.g-lines .g-cost b{color:var(--g-fg-2); font-weight:500}
+
+.g-screen{
+  border:1px solid var(--g-line); border-radius:9px; overflow:auto;
+  height:78vh; min-height:520px; background:var(--g-panel);
+  overscroll-behavior:contain;
+}
+.g-item[data-full="1"] .g-screen{height:calc(100vh - 96px)}
+
+/* the template's own canvas: full width, its own height, scrolls in .g-screen */
+.dir{display:block}
+.dir > .shot{width:100%; min-height:100%; box-sizing:border-box}
+
+.g-foot{margin-top:7px; font-family:var(--g-mono); font-size:.76rem; color:var(--g-fg-3)}
+
+@media (max-width:700px){
+  .g-screen{height:70vh; min-height:440px}
+  .g-wrap{padding-block:22px 50px}
+}
+</style>
+
+<div class="g-bar">
+  <span class="g-bar-name">Dvacet obrazovek</span>
+  <nav class="g-jump" id="g-jump" aria-label="Přejít na návrh"></nav>
+</div>
+
+<div class="g-wrap">
+  <header class="g-intro">
+    <h1>Dvacet obrazovek jednoho dne</h1>
+    <p>Každý návrh je <b>celá pracovní obrazovka</b>, ne náhled — dá se v ní
+      rolovat a prohlédnout si ji zblízka. Všechny ukazují totéž úterý: stejné
+      pacienty, stejné časy, stejný chybějící souhlas u Martina Koláře. Liší se
+      tím, jak je den uspořádaný.</p>
+    <p>První kolo bylo odmítnuto jako nevhodné pro dlouhou směnu. Tohle kolo se
+      drží pravidel, která se měří, ne doporučují:</p>
+    <div class="g-rules">
+      <span>žádná čistá černá ani bílá</span>
+      <span>sytost do 25 % na plochách</span>
+      <span>nic se nehýbe samo</span>
+      <span>žádné rozostření ani záře</span>
+      <span>nic pod 13 px</span>
+      <span>stav nikdy jen barvou</span>
+    </div>
+  </header>
+  <div id="g-list"></div>
+</div>
+
+<div id="g-src" hidden>
+<!--DIRECTIONS-->
+</div>
+
+<script>
+(function(){
+  var src = document.getElementById('g-src');
+  var list = document.getElementById('g-list');
+  var jump = document.getElementById('g-jump');
+  var dirs = Array.prototype.slice.call(src.children).filter(function(el){
+    return el.classList && el.classList.contains('dir');
+  });
+
+  dirs.forEach(function(dir, i){
+    var no = String(i + 1);
+    while (no.length < 2) no = '0' + no;
+    var name = dir.getAttribute('data-name') || ('Návrh ' + no);
+    var thesis = dir.getAttribute('data-thesis') || '';
+    var cost = dir.getAttribute('data-cost') || '';
+    var anchor = 'navrh-' + no;
+
+    var item = document.createElement('section');
+    item.className = 'g-item';
+    item.id = anchor;
+
+    var head = document.createElement('div');
+    head.className = 'g-head';
+    var noEl = document.createElement('span');
+    noEl.className = 'g-no';
+    noEl.textContent = no;
+    var h2 = document.createElement('h2');
+    h2.textContent = name;
+    var expand = document.createElement('button');
+    expand.type = 'button';
+    expand.className = 'g-expand';
+    expand.textContent = 'Zvětšit';
+    head.appendChild(noEl);
+    head.appendChild(h2);
+    head.appendChild(expand);
+
+    var lines = document.createElement('div');
+    lines.className = 'g-lines';
+    var pT = document.createElement('p');
+    pT.textContent = thesis;
+    var pC = document.createElement('p');
+    pC.className = 'g-cost';
+    var b = document.createElement('b');
+    b.textContent = 'Co za to platí: ';
+    pC.appendChild(b);
+    pC.appendChild(document.createTextNode(cost));
+    lines.appendChild(pT);
+    if (cost) lines.appendChild(pC);
+
+    var screen = document.createElement('div');
+    screen.className = 'g-screen';
+    screen.setAttribute('tabindex', '0');
+    screen.setAttribute('aria-label', 'Návrh ' + no + ' - ' + name);
+    screen.appendChild(dir);
+
+    item.appendChild(head);
+    item.appendChild(lines);
+    item.appendChild(screen);
+    list.appendChild(item);
+
+    expand.addEventListener('click', function(){
+      var on = item.getAttribute('data-full') === '1';
+      item.setAttribute('data-full', on ? '0' : '1');
+      expand.textContent = on ? 'Zvětšit' : 'Zmenšit';
+      if (!on) item.scrollIntoView({block: 'start'});
+    });
+
+    var a = document.createElement('a');
+    a.href = '#' + anchor;
+    a.textContent = no;
+    a.title = name;
+    jump.appendChild(a);
+  });
+})();
+</script>

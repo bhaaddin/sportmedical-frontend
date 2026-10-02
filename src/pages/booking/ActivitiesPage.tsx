@@ -1,0 +1,829 @@
+import { useMemo, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  IconButton,
+  Stack,
+  Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TextField,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import PublicIcon from "@mui/icons-material/Public";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { activitiesApi } from "../../api/activities";
+import { servicesApi } from "../../api/services";
+import { clinicServicesApi } from "../../api/clinicServices";
+import { questionnaireEditorApi } from "../../api/questionnaireEditor";
+import { usePermission } from "../../auth/usePermission";
+import { useLocation, useNavigate } from "react-router-dom";
+import { assignableCount, handoffAction, handoffFrom } from "./serviceHandoff";
+import RestoreIcon from "@mui/icons-material/Restore";
+import MenuItem from "@mui/material/MenuItem";
+import { warningKey } from "../../api/bookingContracts";
+import type {
+  Activity,
+  ActivityInput,
+  ActivityWarning,
+} from "../../api/bookingContracts";
+import { AsyncSection } from "../../components/booking/AsyncSection";
+import { errorText } from "../../components/booking/errorText";
+import { ColorSelect } from "../../components/booking/ColorSelect";
+import {
+  DEFAULT_PALETTE_ENTRY,
+  readableTextOn,
+} from "../../utils/calendarPalette";
+
+/**
+ * Activities - contract screen 5.6.
+ *
+ * Two rules shape this screen. The duration is free: no fixed list and no
+ * 15-minute step. And the backend's remark about an unsellable remainder is a
+ * warning the owner may walk past, never a blocking error.
+ */
+
+const CODEBOOK_STALE_MS = 5 * 60 * 1000;
+
+function emptyDraft(sortOrder: number): ActivityInput {
+  return {
+    name: "",
+    durationMinutes: 30,
+    color: DEFAULT_PALETTE_ENTRY.hex,
+    publicNote: "",
+    isPubliclyBookable: false,
+    requiresReportByEmail: false,
+    requiresClubSharing: false,
+    questionnaireRequirement: 'NotAsked' as const,
+    sortOrder,
+    serviceItemId: null,
+    /* Empty until one is picked. The server refuses a činnost without a
+       service, so the form holds the save shut rather than letting it fail. */
+    clinicServiceId: '',
+    /* The clinic's default questionnaire until somebody picks another. */
+    questionnaireDefinitionId: null,
+  };
+}
+
+export default function ActivitiesPage() {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const [editing, setEditing] = useState<Activity | null>(null);
+  const [draft, setDraft] = useState<ActivityInput | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Activity | null>(null);
+  /** Warnings the owner has clicked away this session. */
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+  /* Only the ones still offered: a retired service is not something to file a
+     new činnost under. */
+  const clinicServicesQuery = useQuery({
+    queryKey: ["clinic-services"],
+    queryFn: clinicServicesApi.list,
+    staleTime: 5 * 60 * 1000,
+    select: (all) => all.filter((s) => s.isActive),
+  });
+
+  const activitiesQuery = useQuery({
+    queryKey: ["activities"],
+    queryFn: activitiesApi.list,
+    staleTime: CODEBOOK_STALE_MS,
+  });
+
+  /* The price list itself belongs to the `app` lane; this screen only points at it. */
+  const servicesQuery = useQuery({
+    queryKey: ["services"],
+    queryFn: servicesApi.getAll,
+    staleTime: CODEBOOK_STALE_MS,
+  });
+
+  /*
+   * Which questionnaire a činnost asks for. The list is the questionnaires
+   * screen's own, so it is only asked for by somebody who may manage
+   * questionnaires, and only while the form is open.
+   */
+  const mayPickQuestionnaire = usePermission("questionnaires.manage");
+  const questionnairesQuery = useQuery({
+    queryKey: ["questionnaire-definitions"],
+    queryFn: questionnaireEditorApi.list,
+    staleTime: CODEBOOK_STALE_MS,
+    enabled: mayPickQuestionnaire && draft !== null,
+  });
+
+  const activities = useMemo(
+    () =>
+      [...(activitiesQuery.data?.activities ?? [])].sort(
+        (a, b) => a.sortOrder - b.sortOrder,
+      ),
+    [activitiesQuery.data],
+  );
+
+  /**
+   * 3.1: the read carries the same warnings as the write, so an unsellable
+   * remainder is visible on opening the screen - it is a state of the codebook,
+   * not the outcome of the last save.
+   */
+  const warnings: ActivityWarning[] = (
+    activitiesQuery.data?.warnings ?? []
+  ).filter((warning) => !dismissed.has(warningKey(warning)));
+
+  const closeDialog = () => {
+    setDraft(null);
+    setEditing(null);
+    /* Spend the handoff on the way out, not on the way in. Clearing it before
+       the dialog was drawn is what broke this in the browser: StrictMode
+       mounts twice, the first mount emptied the history entry, and the second
+       had nothing left to open. */
+    if (location.state !== null) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  };
+
+  const save = useMutation({
+    mutationFn: (input: ActivityInput) =>
+      editing
+        ? activitiesApi.update(editing.id, input)
+        : activitiesApi.create(input),
+    onSuccess: async () => {
+      // The save went through either way; the refetched list carries the warnings.
+      await queryClient.invalidateQueries({ queryKey: ["activities"] });
+      setDismissed(new Set());
+      closeDialog();
+    },
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => activitiesApi.remove(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["activities"] });
+      setConfirmDelete(null);
+    },
+  });
+
+  const restore = useMutation({
+    mutationFn: (id: string) => activitiesApi.restore(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["activities"] });
+    },
+  });
+
+  const openCreate = () => {
+    setEditing(null);
+    setDraft(emptyDraft(activities.length));
+    save.reset();
+  };
+
+  const openEdit = (activity: Activity) => {
+    setEditing(activity);
+    setDraft({
+      name: activity.name,
+      durationMinutes: activity.durationMinutes,
+      color: activity.color,
+      publicNote: activity.publicNote,
+      isPubliclyBookable: activity.isPubliclyBookable,
+      requiresReportByEmail: activity.requiresReportByEmail,
+      requiresClubSharing: activity.requiresClubSharing,
+      questionnaireRequirement: activity.questionnaireRequirement,
+      sortOrder: activity.sortOrder,
+      /*
+       * Sent back as it came. `PUT` is the whole činnost, so leaving this out
+       * would mean clearing it - and a činnost under no service is a state
+       * the server does not accept and this screen must not try to create.
+       */
+      clinicServiceId: activity.clinicServiceId ?? '',
+      /*
+       * 4.3 (v25): `PUT` is the whole activity, and a missing `serviceItemId`
+       * clears the link. Carrying it here is the difference between renaming an
+       * activity and quietly taking its price away.
+       */
+      serviceItemId: activity.serviceItemId,
+      /* Sent back as it came, for the same reason: `PUT` is the whole činnost. */
+      questionnaireDefinitionId: activity.questionnaireDefinitionId,
+    });
+    save.reset();
+  };
+
+  /*
+   * Arriving from a služba that has no činnost.
+   *
+   * The Služby screen can name that gap and cannot close it - the server takes
+   * the link from this side only - so it sends the service here.
+   *
+   * What happens then depends on whether anything already exists to carry it.
+   * The first version always opened the create form, and the owner met it on a
+   * clinic that already had činnosti: it asked him to invent another one and
+   * never showed him the one he had. `PUT /api/activities/{id}` takes
+   * `clinicServiceId`, so assigning an existing činnost is an ordinary edit -
+   * the screen was the only thing insisting on a new one.
+   *
+   * Decided while rendering rather than in an effect, and spent when the
+   * dialog closes rather than when it opens: the effect version cleared the
+   * history entry before the form was drawn and was dead in the browser while
+   * green in every test here.
+   */
+  const handedOver = handoffFrom(location.state);
+  const assignable = handedOver === null
+    ? undefined
+    : activitiesQuery.isSuccess ? assignableCount(activities, handedOver) : undefined;
+  const handoffAsks = handoffAction(handedOver, clinicServicesQuery.data, assignable);
+  const handoffServiceName = handedOver === null
+    ? null
+    : (clinicServicesQuery.data ?? []).find((svc) => svc.id === handedOver)?.name ?? null;
+
+  /* Which handoff has already been acted on. Without it, closing the dialog
+     while the state is still on the history entry would reopen it forever. */
+  const [handoffTaken, setHandoffTaken] = useState<string | null>(null);
+  /* The null check is for the compiler: `handoffAction` already refuses a
+     null id, but that is not something it can see from here. */
+  if (handoffAsks === 'new' && handedOver !== null && handedOver !== handoffTaken) {
+    setHandoffTaken(handedOver);
+    setEditing(null);
+    setDraft({ ...emptyDraft(activities.length), clinicServiceId: handedOver });
+  }
+
+  /* Shown instead, when there are činnosti to assign. Not a dialog: which
+     činnost should move under this service is his decision, and a form opened
+     over the list would be this screen making it for him. */
+  const showHandoffNotice = handoffAsks === 'assign' && handedOver !== handoffTaken;
+
+  const nameIsValid = (draft?.name ?? "").trim().length > 0;
+
+  /* A činnost belongs to exactly one služba and the server refuses it without
+     one, so the save waits rather than failing after the fact. */
+  const clinicServices = clinicServicesQuery.data ?? [];
+  const noServicesYet = clinicServicesQuery.isSuccess && clinicServices.length === 0;
+  const serviceIsValid = (draft?.clinicServiceId ?? "").trim().length > 0;
+  const durationIsValid = (draft?.durationMinutes ?? 0) > 0;
+
+  return (
+    <Box sx={{ maxWidth: 1100, mx: "auto" }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 2,
+          mb: 3,
+        }}
+      >
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 800 }}>
+            {t("booking.activities.title")}
+          </Typography>
+          <Typography sx={{ color: "text.secondary" }}>
+            {t("booking.activities.subtitle")}
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={openCreate}
+        >
+          {t("booking.activities.new")}
+        </Button>
+      </Box>
+
+      {/* Says which service is waiting, and leaves the choice where it
+          belongs. Which činnost should move under it is his decision - a form
+          opened over the list would be this screen making it for him, and
+          that is the version he met and sent back. */}
+      {showHandoffNotice && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          onClose={() => setHandoffTaken(handedOver)}
+          action={
+            <Button color="inherit" size="small" onClick={openCreate}>
+              Nová činnost
+            </Button>
+          }
+        >
+          {`Přišli jste ze služby „${handoffServiceName ?? ''}“. Vyberte činnost, `
+            + 'která pod ni má patřit, a nastavte jí ji přes Upravit — nebo založte novou.'}
+        </Alert>
+      )}
+
+      {warnings.map((warning) => (
+        <Alert
+          key={warningKey(warning)}
+          severity="warning"
+          sx={{ mb: 2 }}
+          onClose={() =>
+            setDismissed((prev) => new Set(prev).add(warningKey(warning)))
+          }
+        >
+          {warning.message}
+        </Alert>
+      ))}
+
+      <AsyncSection
+        isLoading={activitiesQuery.isLoading}
+        isSettled={activitiesQuery.isSuccess}
+        error={activitiesQuery.error}
+        isEmpty={activities.length === 0}
+        emptyText={t("booking.activities.empty")}
+        emptyAction={{
+          label: t("booking.activities.new"),
+          onClick: openCreate,
+        }}
+        onRetry={() => void activitiesQuery.refetch()}
+      >
+        <Box sx={{ overflowX: "auto" }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>{t("booking.activities.column.name")}</TableCell>
+                <TableCell>{t("booking.activities.column.duration")}</TableCell>
+                <TableCell>
+                  {t("booking.activities.column.publicNote")}
+                </TableCell>
+                <TableCell>{t("booking.activities.column.price")}</TableCell>
+                <TableCell>{t("booking.activities.column.public")}</TableCell>
+                <TableCell align="right">
+                  {t("booking.common.actions")}
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {activities.map((activity) => (
+                <TableRow
+                  key={activity.id}
+                  hover
+                  sx={{ opacity: activity.isActive ? 1 : 0.55 }}
+                >
+                  <TableCell>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Box
+                        aria-hidden
+                        sx={{
+                          width: 14,
+                          height: 14,
+                          borderRadius: "3px",
+                          backgroundColor: activity.color,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <Typography sx={{ fontWeight: 600 }}>
+                        {activity.name}
+                      </Typography>
+                      {/* 4.3: a discard keeps the row and its slug. Say so in
+                          words - the dimming alone is not the message (7.1). */}
+                      {activity.isActive ? null : (
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label={t("booking.activities.discarded")}
+                        />
+                      )}
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      label={t("booking.activities.durationValue", {
+                        minutes: activity.durationMinutes,
+                      })}
+                      sx={{
+                        backgroundColor: activity.color,
+                        color: readableTextOn(activity.color),
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ maxWidth: 320 }}>
+                    {activity.publicNote || "-"}
+                  </TableCell>
+                  {/*
+                    4.3 (v25): read through the link, never stored here. No link
+                    means no price - written as such, because "0 Kč" would read
+                    as free rather than as unpriced.
+                  */}
+                  <TableCell>
+                    {activity.priceCzk === null
+                      ? t("booking.activities.noPrice")
+                      : t("booking.activities.priceValue", {
+                          price: activity.priceCzk,
+                        })}
+                  </TableCell>
+                  <TableCell>
+                    {/* Icon plus text: colour and icon alone would not carry it (7.1). */}
+                    {activity.isPubliclyBookable ? (
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                      >
+                        <PublicIcon fontSize="small" />
+                        {t("booking.activities.publicYes")}
+                      </Box>
+                    ) : (
+                      t("booking.activities.publicNo")
+                    )}
+                  </TableCell>
+                  <TableCell align="right">
+                    <Tooltip title={t("booking.common.edit")}>
+                      <IconButton
+                        aria-label={t("booking.common.edit")}
+                        onClick={() => openEdit(activity)}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    {activity.isActive ? (
+                      /*
+                        * Not "Smazat". `DELETE /api/activities/{id}` retires:
+                        * the row stays, keeps its slug, is marked "vyřazeno",
+                        * and the button that undoes it sits two columns along
+                        * this very row. The dialog said "Tuto akci nelze
+                        * vrátit zpět" while the undo was on screen beside it.
+                        *
+                        * Wording only. Činnosti may yet get the split the
+                        * calendars got (a real DELETE, a 409 with a count, and
+                        * deactivate/activate of their own); building that now
+                        * would be work thrown away. A sentence that is false
+                        * today is false whatever the contract becomes.
+                        */
+                      <Tooltip title={t("booking.activities.retireAction")}>
+                        <IconButton
+                          aria-label={`${t("booking.activities.retireAction")} — ${activity.name}`}
+                          onClick={() => setConfirmDelete(activity)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    ) : (
+                      <Tooltip title={t("booking.activities.restore")}>
+                        <IconButton
+                          aria-label={t("booking.activities.restore")}
+                          disabled={restore.isPending}
+                          onClick={() => restore.mutate(activity.id)}
+                        >
+                          <RestoreIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Box>
+      </AsyncSection>
+
+      <Dialog
+        open={draft !== null}
+        onClose={closeDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          {editing
+            ? t("booking.activities.editTitle")
+            : t("booking.activities.newTitle")}
+        </DialogTitle>
+        <DialogContent>
+          {draft ? (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField
+                autoFocus
+                required
+                fullWidth
+                label={t("booking.activities.column.name")}
+                value={draft.name}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                error={draft.name !== "" && !nameIsValid}
+              />
+              <TextField
+                required
+                fullWidth
+                type="number"
+                label={t("booking.activities.column.duration")}
+                value={draft.durationMinutes}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    durationMinutes: Number(e.target.value) || 0,
+                  })
+                }
+                error={!durationIsValid}
+                helperText={t("booking.activities.durationHelp")}
+              />
+              <ColorSelect
+                label={t("booking.activities.column.color")}
+                value={draft.color}
+                onChange={(color) => setDraft({ ...draft, color })}
+              />
+              {/*
+                4.3 (v25). The price is not typed here and never was: the
+                activity points at an item in the price list and the price is
+                read through that. Choosing "no link" is allowed - it is what
+                `price.unlinked` warns about, not what it forbids.
+
+                The duration lives here and nowhere else. The price list used
+                to carry one too and a `price.duration_drift` warning reported
+                any difference - it was removed on 13. 9. 2026 because the
+                number it compared against was read nowhere, so it sent people
+                to correct the one that did not matter.
+              */}
+              {/*
+                * Which služba this činnost belongs to - required, and the one
+                * that decides what it IS. The price-list picker below decides
+                * what it costs. Two fields, two questions, and they were one
+                * word until today.
+                *
+                * Refused outright by the server without it rather than warned
+                * about, and the owner asked for that: a činnost under no
+                * service inherits no document rule, so it asks the patient for
+                * nothing and looks exactly like one where all is well.
+                */}
+              <TextField
+                select
+                required
+                fullWidth
+                label="Služba"
+                value={draft.clinicServiceId}
+                onChange={(e) => setDraft({ ...draft, clinicServiceId: e.target.value })}
+                error={clinicServicesQuery.isError || noServicesYet}
+                helperText={
+                  clinicServicesQuery.isError
+                    ? "Služby se nepodařilo načíst — bez nich nejde činnost uložit."
+                    : noServicesYet
+                      ? "Zatím není žádná služba. Nejdřív ji založte v Nastavení → Služby."
+                      : "Co to je. Odsud činnost dědí, co musí pacient doložit."
+                }
+              >
+                {clinicServices.map((service) => (
+                  <MenuItem key={service.id} value={service.id}>
+                    {service.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+
+              <TextField
+                select
+                fullWidth
+                label={t("booking.activities.serviceItem")}
+                value={draft.serviceItemId ?? ""}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    serviceItemId: e.target.value === "" ? null : e.target.value,
+                  })
+                }
+                helperText={
+                  servicesQuery.isError
+                    ? t("booking.activities.serviceItemUnavailable")
+                    : t("booking.activities.serviceItemHelp")
+                }
+                error={servicesQuery.isError}
+              >
+                <MenuItem value="">
+                  {t("booking.activities.noServiceItem")}
+                </MenuItem>
+                {/*
+                  A link the owner already has stays selectable even when the
+                  item is archived or gone from the list - otherwise opening the
+                  dialog would silently drop it on the next save.
+                */}
+                {(servicesQuery.data ?? []).map((item) => (
+                  <MenuItem key={item.id} value={item.id}>
+                    {item.name} · {t("booking.activities.priceValue", {
+                      price: item.priceCzk,
+                    })}
+                  </MenuItem>
+                ))}
+                {draft.serviceItemId &&
+                !(servicesQuery.data ?? []).some(
+                  (item) => item.id === draft.serviceItemId,
+                ) ? (
+                  <MenuItem value={draft.serviceItemId}>
+                    {t("booking.activities.serviceItemUnknown")}
+                  </MenuItem>
+                ) : null}
+              </TextField>
+              <TextField
+                fullWidth
+                multiline
+                minRows={2}
+                label={t("booking.activities.column.publicNote")}
+                value={draft.publicNote}
+                onChange={(e) =>
+                  setDraft({ ...draft, publicNote: e.target.value })
+                }
+              />
+              <TextField
+                fullWidth
+                type="number"
+                label={t("booking.activities.column.order")}
+                value={draft.sortOrder}
+                onChange={(e) =>
+                  setDraft({ ...draft, sortOrder: Number(e.target.value) || 0 })
+                }
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={draft.isPubliclyBookable}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        isPubliclyBookable: e.target.checked,
+                      })
+                    }
+                  />
+                }
+                label={t("booking.activities.publicLabel")}
+              />
+
+              {/*
+                Which consents this činnost will not be booked without.
+
+                Only shown when it is publicly bookable: they are questions the
+                online registration asks, and a činnost the desk books by hand
+                never reaches that form. Two, not four — the examination consent
+                is required by zákon č. 372/2011 Sb. for everything, and a
+                marketing consent that must be given to get an appointment is not
+                freely given, which under GDPR means it is not consent.
+              */}
+              {draft.isPubliclyBookable ? (
+                <Box sx={{ pl: 1.5, borderLeft: "2px solid", borderColor: "divider" }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+                    Bez kterých souhlasů nelze tuto činnost objednat
+                  </Typography>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={draft.requiresReportByEmail}
+                        onChange={(e) =>
+                          setDraft({ ...draft, requiresReportByEmail: e.target.checked })
+                        }
+                      />
+                    }
+                    label="Lékařská zpráva e-mailem"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={draft.requiresClubSharing}
+                        onChange={(e) =>
+                          setDraft({ ...draft, requiresClubSharing: e.target.checked })
+                        }
+                      />
+                    }
+                    label="Sdílení výsledků s klubem"
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                    Souhlas s provedením prohlídky vyžaduje zákon a marketingový
+                    souhlas musí zůstat dobrovolný — ty nastavit nelze.
+                  </Typography>
+
+                  {/*
+                    The health questionnaire, per činnost.
+
+                    Three answers rather than a switch, because "neptáme se" and
+                    "ptáme se, ale nemusí" are different offers to a patient: a
+                    ten-minute re-examination of somebody seen in March does not
+                    need seventy-six answers, a first spiroergometrie does.
+                  */}
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    sx={{ mt: 2 }}
+                    label="Zdravotní dotazník"
+                    value={draft.questionnaireRequirement}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        questionnaireRequirement: e.target
+                          .value as typeof draft.questionnaireRequirement,
+                      })
+                    }
+                    helperText="Co se zeptáme pacienta při objednání této činnosti."
+                  >
+                    <MenuItem value="NotAsked">Neptáme se</MenuItem>
+                    <MenuItem value="Optional">Nepovinný</MenuItem>
+                    <MenuItem value="Required">Povinný</MenuItem>
+                  </TextField>
+
+                  {/*
+                    Which questionnaire, when one is asked for at all. Empty is
+                    the clinic's default questionnaire, not "none" - "none" is
+                    "Neptáme se" above.
+                  */}
+                  {draft.questionnaireRequirement !== "NotAsked" ? (
+                    <TextField
+                      select
+                      fullWidth
+                      size="small"
+                      sx={{ mt: 2 }}
+                      label="Který dotazník"
+                      value={draft.questionnaireDefinitionId ?? ""}
+                      disabled={!mayPickQuestionnaire || questionnairesQuery.isLoading}
+                      error={questionnairesQuery.isError}
+                      onChange={(e) =>
+                        setDraft({
+                          ...draft,
+                          questionnaireDefinitionId:
+                            e.target.value === "" ? null : e.target.value,
+                        })
+                      }
+                      helperText={
+                        !mayPickQuestionnaire
+                          ? "Dotazník může vybrat jen ten, kdo smí spravovat dotazníky."
+                          : questionnairesQuery.isError
+                            ? "Seznam dotazníků se nepodařilo načíst. Uložení ponechá dosavadní volbu."
+                            : "Prázdné = výchozí dotazník kliniky."
+                      }
+                    >
+                      <MenuItem value="">Výchozí dotazník kliniky</MenuItem>
+                      {(questionnairesQuery.data ?? []).map((definition) => (
+                        <MenuItem key={definition.id} value={definition.id}>
+                          {definition.displayName}
+                        </MenuItem>
+                      ))}
+                      {/* The stored choice stays selectable even when the list
+                          did not load or no longer names it, so opening and
+                          saving the form never changes it by accident. */}
+                      {draft.questionnaireDefinitionId &&
+                      !(questionnairesQuery.data ?? []).some(
+                        (definition) => definition.id === draft.questionnaireDefinitionId,
+                      ) ? (
+                        <MenuItem value={draft.questionnaireDefinitionId}>
+                          Dosavadní dotazník
+                        </MenuItem>
+                      ) : null}
+                    </TextField>
+                  ) : null}
+                </Box>
+              ) : null}
+              {/* 422 keeps the form filled in, so the message sits inside the dialog. */}
+              {save.error ? (
+                <Alert severity="error">{errorText(save.error, t)}</Alert>
+              ) : null}
+            </Stack>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDialog}>{t("booking.common.cancel")}</Button>
+          <Button
+            variant="contained"
+            disabled={!nameIsValid || !durationIsValid || !serviceIsValid || save.isPending}
+            onClick={() => draft && save.mutate(draft)}
+          >
+            {t("booking.common.save")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+      >
+        <DialogTitle>{t("booking.activities.deleteTitle")}</DialogTitle>
+        <DialogContent>
+          <Typography>
+            {t("booking.activities.deleteBody", {
+              name: confirmDelete?.name ?? "",
+            })}
+          </Typography>
+          {remove.error ? (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {errorText(remove.error, t)}
+            </Alert>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDelete(null)}>
+            {t("booking.common.cancel")}
+          </Button>
+          {/* Not `error` either: red is the colour of the irreversible, and
+              this is undone by a button on the same row. */}
+          <Button
+            variant="contained"
+            disabled={remove.isPending}
+            onClick={() => confirmDelete && remove.mutate(confirmDelete.id)}
+          >
+            {t("booking.activities.retireAction")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}

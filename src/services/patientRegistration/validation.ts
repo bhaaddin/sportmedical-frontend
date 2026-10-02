@@ -1,0 +1,285 @@
+/* ══════════════════════════════════════════════════════════════
+   CLIENT-SIDE MIRROR OF THE REGISTRATION RULES
+
+   The Domain is the validation authority — nothing here is a second
+   copy of a rule that decides anything. These checks exist only so the
+   operator sees the problem next to the field instead of after a round
+   trip; every rule below has its counterpart in
+   Domain/Patients/PatientAdministrativeProfile.cs and
+   Domain/Patients/CzechBirthNumber.cs, and the server still refuses
+   whatever this file lets through.
+   ══════════════════════════════════════════════════════════════ */
+
+import { classifyInsuranceNumber, parseBirthNumber } from './insuranceIdentifier';
+import type { InsuranceRegistrationKind, SexValue } from '../../api/patientRegistry';
+
+export const NAME_MAX_LENGTH = 100; // PatientConstraints.NameMaxLength
+
+export interface RegistrationFormState {
+  /* Identity */
+  firstName: string;
+  lastName: string;
+  preferredName: string;
+  titlesBeforeName: string[];
+  titlesAfterName: string[];
+  dateOfBirth: string;
+  sex: SexValue | '';
+
+  /* Insurance branch */
+  insuranceRegistrationKind: InsuranceRegistrationKind;
+  birthNumber: string;
+  healthInsuranceNumber: string;
+  healthInsuranceNumberConfirmation: string;
+  healthInsurerCode: string;
+  insuranceCardInspected: boolean;
+  identityDocumentType: string;
+  identityDocumentIssuingCountryCode: string;
+  identityDocumentNumber: string;
+
+  /* Residence */
+  residenceType: 'PermanentResidenceInCzechia' | 'ReportedResidenceInCzechia';
+  ruianAddressPointCode: number | null;
+  addressDisplay: string;
+
+  /* Contact */
+  email: string;
+  phone: string;
+  phoneRegionCode: string;
+
+  /* Registration metadata */
+  mode: 'Standard' | 'Quick';
+}
+
+export type FieldErrors = Partial<Record<keyof RegistrationFormState, string>>;
+
+/** Digits only — what the Domain canonicalises to. */
+export function digitsOnly(value: string): string {
+  return value.replace(/[^0-9]/g, '');
+}
+
+/**
+ * True when a health-insurance number is itself a birth number. The Domain
+ * then demands the stored birth number be that same value
+ * (BirthNumberInsuranceNumberMismatch), so the form fills it in.
+ */
+export function isBirthNumberShaped(insuranceNumber: string): boolean {
+  return classifyInsuranceNumber(insuranceNumber).kind === 'CzechBirthNumber';
+}
+
+/** Only an insurer-assigned number nobody can decode is typed twice. */
+export function requiresInsuranceConfirmation(insuranceNumber: string): boolean {
+  return classifyInsuranceNumber(insuranceNumber).requiresConfirmation;
+}
+
+function isPhone(value: string): boolean {
+  const compact = value.replace(/[\s()-]/g, '');
+  return /^\+?[0-9]{6,15}$/.test(compact);
+}
+
+function validateIdentity(form: RegistrationFormState, errors: FieldErrors): void {
+  if (form.firstName.trim().length === 0) {
+    errors.firstName = 'Jméno je povinné.';
+  } else if (form.firstName.trim().length > NAME_MAX_LENGTH) {
+    errors.firstName = `Jméno může mít nejvýše ${NAME_MAX_LENGTH} znaků.`;
+  }
+
+  if (form.lastName.trim().length === 0) {
+    errors.lastName = 'Příjmení je povinné.';
+  } else if (form.lastName.trim().length > NAME_MAX_LENGTH) {
+    errors.lastName = `Příjmení může mít nejvýše ${NAME_MAX_LENGTH} znaků.`;
+  }
+
+  if (form.preferredName.trim().length > NAME_MAX_LENGTH) {
+    errors.preferredName = `Oslovení může mít nejvýše ${NAME_MAX_LENGTH} znaků.`;
+  }
+
+  if (form.dateOfBirth.length === 0) {
+    errors.dateOfBirth = 'Datum narození je povinné.';
+  } else if (form.dateOfBirth > new Date().toISOString().slice(0, 10)) {
+    errors.dateOfBirth = 'Datum narození nemůže být v budoucnosti.';
+  }
+
+  // Registration accepts male or female only — PatientRegistrationService
+  // refuses anything else once nothing could be derived from the identifier.
+  if (form.sex !== 'Male' && form.sex !== 'Female') {
+    errors.sex = 'Vyberte pohlaví (muž nebo žena).';
+  }
+}
+
+function validateInsurance(form: RegistrationFormState, errors: FieldErrors): void {
+  if (form.insuranceRegistrationKind === 'CzechPublicHealthInsurance') {
+    const insuranceNumber = digitsOnly(form.healthInsuranceNumber);
+
+    if (insuranceNumber.length === 0) {
+      errors.healthInsuranceNumber = 'Číslo pojištěnce je povinné.';
+    } else if (insuranceNumber.length !== 9 && insuranceNumber.length !== 10) {
+      /*
+       * The form already has a mode for people with no Czech insurance number,
+       * and somebody typing a foreign one here cannot tell it exists.
+       *
+       * The mode is described rather than quoted: its label comes from the
+       * server (`options.insuranceRegistrationKinds`), so a quotation here
+       * would point at a button by a name it might not have.
+       */
+      errors.healthInsuranceNumber =
+        'Číslo pojištěnce má devět nebo deset číslic. Pokud pacient české ' +
+        'pojištění nemá, přepněte výše způsob evidence pojištění.';
+    }
+
+    // The registry demands the second entry only for an insurer-assigned
+    // number, whose shape it cannot check against anything else.
+    if (requiresInsuranceConfirmation(insuranceNumber)) {
+      if (digitsOnly(form.healthInsuranceNumberConfirmation).length === 0) {
+        errors.healthInsuranceNumberConfirmation = 'Zadejte číslo pojištěnce ještě jednou.';
+      } else if (digitsOnly(form.healthInsuranceNumberConfirmation) !== insuranceNumber) {
+        errors.healthInsuranceNumberConfirmation = 'Obě zadání se neshodují.';
+      }
+    }
+
+    if (form.healthInsurerCode.length === 0) {
+      errors.healthInsurerCode = 'Zdravotní pojišťovna je povinná.';
+    }
+
+    const birthNumber = digitsOnly(form.birthNumber);
+
+    if (birthNumber.length > 0) {
+      const parsed = parseBirthNumber(birthNumber);
+      if (parsed === null) {
+        /*
+         * Says what to do, not only that something is wrong.
+         *
+         * "Rodné číslo není platné" left the receptionist with a patient at
+         * the desk holding an ID card and nowhere to go. The number is
+         * optional here - the registry does not need it - so the way out is to
+         * clear the field, and nothing said so.
+         *
+         * The reason for the rejection is deliberately not distinguished. A
+         * mistyped digit, a foreign number that is not a Czech birth number at
+         * all, and one of the roughly thousand numbers issued under the
+         * remainder-ten exception before 1985 all lead to the same advice.
+         * Splitting the message three ways would need a reason this function
+         * does not return, and would not change what anybody does next.
+         */
+        errors.birthNumber =
+          'Rodné číslo neprošlo kontrolou. Zkontrolujte opis — pokud je správný, ' +
+          'nechte pole prázdné a pokračujte, není povinné.';
+      } else if (form.dateOfBirth.length > 0 && parsed.dateOfBirth !== form.dateOfBirth) {
+        errors.birthNumber = 'Rodné číslo neodpovídá datu narození.';
+      } else if (form.sex !== '' && parsed.sex !== form.sex) {
+        errors.birthNumber = 'Rodné číslo neodpovídá pohlaví.';
+      }
+    }
+
+    if (isBirthNumberShaped(insuranceNumber) && birthNumber !== insuranceNumber) {
+      errors.birthNumber = 'Číslo pojištěnce má tvar rodného čísla — rodné číslo musí být stejné.';
+    }
+
+    return;
+  }
+
+  if (form.identityDocumentType.length === 0) {
+    errors.identityDocumentType = 'Typ dokladu je povinný.';
+  }
+
+  const country = form.identityDocumentIssuingCountryCode.trim().toUpperCase();
+  if (country.length === 0) {
+    errors.identityDocumentIssuingCountryCode = 'Stát vydání je povinný.';
+  } else if (!/^[A-Z]{2}$/.test(country)) {
+    errors.identityDocumentIssuingCountryCode = 'Zadejte dvoupísmenný kód státu (ISO 3166-1, např. SK).';
+  }
+
+  if (form.identityDocumentNumber.trim().length === 0) {
+    errors.identityDocumentNumber = 'Číslo dokladu je povinné.';
+  }
+}
+
+function validateResidence(form: RegistrationFormState, errors: FieldErrors): void {
+  if (form.ruianAddressPointCode === null || form.ruianAddressPointCode <= 0) {
+    errors.ruianAddressPointCode = 'Vyberte adresu z registru RÚIAN.';
+  }
+}
+
+function validateContact(form: RegistrationFormState, errors: FieldErrors): void {
+  /*
+   * Only whether there is one. WHETHER IT IS AN ADDRESS IS NOT DECIDED HERE
+   * any more — `POST /api/v1/patients/email/inspect` decides it, on the same
+   * canonicaliser that stores it.
+   *
+   * There was a regular expression on this line until 15. 9. 2026 and it was
+   * wrong in both directions against that server: it refused `jan@localhost`,
+   * which is stored, and passed `jan@example..cz`, which is refused. The
+   * screen holds the server's answer now and this file holds none.
+   */
+  if (form.email.trim().length === 0) {
+    errors.email = 'E-mail je povinný.';
+  }
+
+  if (form.phone.trim().length === 0) {
+    errors.phone = 'Telefon je povinný.';
+  } else if (!isPhone(form.phone)) {
+    errors.phone = 'Telefon není ve správném tvaru.';
+  }
+
+  if (form.phoneRegionCode.length === 0) {
+    errors.phoneRegionCode = 'Vyberte zemi telefonního čísla.';
+  }
+}
+
+/**
+ * One field, checked the moment somebody leaves it.
+ *
+ * Runs the same rules `validateAll` runs and reports only what it found about
+ * that one field — so a form cannot complain about an empty box nobody has
+ * reached yet, and cannot stay silent about the one they just left.
+ *
+ * It existed only as `validateAll` at the save until 15. 9. 2026, and the
+ * owner found what that costs: he typed an address with no `@` in it, nothing
+ * said anything, and he only learned about it by pressing the button. "nikdy
+ * to nesmie ulozit ked je zly musi to okno zcervenat."
+ */
+export function validateField(
+  field: keyof RegistrationFormState,
+  form: RegistrationFormState,
+): string | undefined {
+  return validateAll(form)[field];
+}
+
+/** Validates everything — the gate in front of the POST. */
+export function validateAll(form: RegistrationFormState): FieldErrors {
+  const errors: FieldErrors = {};
+
+  validateIdentity(form, errors);
+  validateInsurance(form, errors);
+  validateResidence(form, errors);
+  validateContact(form, errors);
+
+  return errors;
+}
+
+export function createEmptyForm(): RegistrationFormState {
+  return {
+    firstName: '',
+    lastName: '',
+    preferredName: '',
+    titlesBeforeName: [],
+    titlesAfterName: [],
+    dateOfBirth: '',
+    sex: '',
+    insuranceRegistrationKind: 'CzechPublicHealthInsurance',
+    birthNumber: '',
+    healthInsuranceNumber: '',
+    healthInsuranceNumberConfirmation: '',
+    healthInsurerCode: '',
+    insuranceCardInspected: false,
+    identityDocumentType: '',
+    identityDocumentIssuingCountryCode: '',
+    identityDocumentNumber: '',
+    residenceType: 'PermanentResidenceInCzechia',
+    ruianAddressPointCode: null,
+    addressDisplay: '',
+    email: '',
+    phone: '',
+    phoneRegionCode: 'CZ',
+    mode: 'Standard',
+  };
+}

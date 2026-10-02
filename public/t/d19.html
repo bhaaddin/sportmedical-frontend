@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Podle služeb</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Libre+Franklin:wght@400;500;600&family=DM+Sans:wght@400;500;700&family=Chivo:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+body{margin:0;background:#E9EBEE;color:#1B2229;
+  font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;font-size:15px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) body{background:#14181D;color:#DDE3E9}}
+:root[data-theme="dark"] body{background:#14181D;color:#DDE3E9}
+.p-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:9px 18px;border-bottom:1px solid rgba(128,140,152,.35);
+  font-size:.82rem;position:sticky;top:env(safe-area-inset-top,0px);
+  background:inherit;z-index:30}
+.p-no{font-family:"IBM Plex Mono",ui-monospace,monospace;opacity:.65}
+.p-name{font-weight:600}
+.p-thesis{opacity:.75;flex:1 1 300px;min-width:0}
+.p-back{margin-left:auto;text-decoration:none;border:1px solid rgba(128,140,152,.45);
+  border-radius:6px;padding:5px 11px;color:inherit;min-height:32px;display:inline-flex;
+  align-items:center}
+.p-back:hover{border-color:currentColor}
+.dir{display:block}
+.dir > .shot{width:100%;min-height:calc(100vh - 46px);box-sizing:border-box}
+</style>
+</head>
+<body>
+<div class="p-bar">
+  <span class="p-no">19 / 20</span>
+  <span class="p-name">Podle služeb</span>
+  <span class="p-thesis">Pro vedoucí provozu a sestry, které mají na starosti jednu ze čtyř služeb — každá služba má svůj vlastní blok s kapacitou, takže je na první pohled vidět, kde je plno a kde je volno.</span>
+  <a class="p-back" href="index.html">Zpět na přehled</a>
+</div>
+<article class="dir" id="d19"
+         data-name="Podle služeb"
+         data-thesis="Pro vedoucí provozu a sestry, které mají na starosti jednu ze čtyř služeb — každá služba má svůj vlastní blok s kapacitou, takže je na první pohled vidět, kde je plno a kde je volno."
+         data-cost="Souvislá časová osa celého dne se rozpadá do čtyř seznamů: co se děje napříč službami v jednu hodinu, si musí člověk složit sám.">
+  <style>
+    #d19 .shot{
+      background:#F1F4F2; color:#1A2220;
+      font-family:"DM Sans",ui-sans-serif,system-ui,sans-serif;
+      font-size:15px; line-height:1.55; font-variant-numeric:tabular-nums;
+      display:block;
+    }
+
+    /* ---- úzká lišta; celou plochu mají dostat čtyři bloky ---- */
+    #d19 .top{
+      display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 18px;
+      padding:12px 22px; border-bottom:1px solid #C7D6CE; background:#F8FAF8;
+    }
+    #d19 h1{font-size:15px; font-weight:700; margin:0}
+    #d19 .top .when{font-size:13.5px; color:#74847C}
+    #d19 .top nav{display:flex; flex-wrap:wrap; gap:0 2px; margin-left:auto}
+    #d19 .top nav a{
+      display:inline-flex; align-items:center; min-height:32px; padding:0 8px;
+      font-size:13.5px; color:#47564F; text-decoration:none; border-radius:4px;
+      transition:background-color 120ms;
+    }
+    #d19 .top nav a:hover,#d19 .top nav a:focus-visible{background:#E4EBE6; outline:none}
+    #d19 .top nav a.on{color:#1A2220; font-weight:700}
+
+    /* ---- čtyři bloky, dva a dva ---- */
+    #d19 .grid{
+      display:grid; grid-template-columns:1fr 1fr; gap:20px;
+      padding:20px 22px 56px; box-sizing:border-box;
+    }
+    #d19 .svc{
+      border:1px solid #C7D6CE; border-radius:8px; background:#F8FAF8;
+      padding:18px 20px 16px; box-sizing:border-box; min-width:0;
+      display:flex; flex-direction:column;
+    }
+    #d19 .svc h4{
+      font-size:24px; font-weight:700; line-height:1.2; letter-spacing:-.015em;
+      margin:0 0 2px;
+    }
+    #d19 .svc .staff{margin:0 0 12px; font-size:13.5px; color:#74847C}
+
+    /* ---- kapacita: číslo, slovo a proužek ---- */
+    #d19 .cap{margin:0 0 14px; padding-bottom:14px; border-bottom:1px solid #DDE6E0}
+    #d19 .cap .line{
+      display:flex; align-items:baseline; gap:8px; margin:0 0 7px; font-size:13.5px;
+      color:#47564F;
+    }
+    #d19 .cap .line .v{font-size:17px; font-weight:700; color:#1A2220}
+    #d19 .cap .line .warn{margin-left:auto; color:#9C3B2E; font-weight:700}
+    #d19 .cap .track{height:8px; background:#DDE6E0; border-radius:4px}
+    #d19 .cap .fill{height:8px; background:#226057; border-radius:4px}
+    #d19 .cap .fill.tight{background:#9C3B2E}
+
+    /* ---- řádky uvnitř bloku ---- */
+    #d19 .lbl{
+      font-size:13px; font-weight:700; letter-spacing:.14em;
+      text-transform:uppercase; color:#74847C; margin:0 0 6px;
+    }
+    #d19 .r{
+      display:flex; gap:12px; align-items:baseline; box-sizing:border-box;
+      padding:10px 2px; border-bottom:1px solid #E6EDE8; min-height:44px;
+    }
+    #d19 .r:last-of-type{border-bottom:0}
+    #d19 .r .t{flex:0 0 46px; font-size:14px; color:#74847C}
+    #d19 .r .b{flex:1 1 auto; min-width:0}
+    #d19 .r .nm{font-size:15px; line-height:1.45}
+    #d19 .r .dt{display:block; font-size:13px; color:#74847C}
+    #d19 .r .st{flex:0 0 auto; font-size:13px; color:#47564F; padding-left:8px}
+    #d19 .r.run .nm{font-weight:700}
+    #d19 .r.run .st{color:#226057; font-weight:700}
+    #d19 .r.past .nm,#d19 .r.past .t{color:#8C9A93}
+    #d19 .r.past .dt,#d19 .r.past .st{color:#9AA7A0}
+
+    /* ---- zdržený pacient sedí v tom bloku, kam patří ---- */
+    #d19 .r.stop{
+      border-left:3px solid #9C3B2E; padding-left:11px; background:#F4EEEC;
+      border-bottom:1px solid #E6EDE8;
+    }
+    #d19 .r.stop .nm{font-weight:700; color:#9C3B2E}
+    #d19 .r.stop .st{color:#9C3B2E; font-weight:700}
+    #d19 .fix{margin:10px 0 12px; font-size:13.5px; color:#47564F}
+    #d19 button{
+      font:inherit; font-size:14px; font-weight:700;
+      background:#226057; color:#F1F4F2; border:1px solid #226057;
+      border-radius:4px; padding:7px 14px; min-height:34px; cursor:pointer;
+      align-self:flex-start; margin:0 0 4px;
+      transition:opacity 120ms;
+    }
+    #d19 button:hover,#d19 button:focus-visible{opacity:.88; outline:none}
+
+    /* ---- čára teď, stejná ve všech čtyřech blocích ---- */
+    #d19 .now{
+      display:flex; align-items:center; gap:9px;
+      padding:6px 2px; border-top:2px solid #226057;
+    }
+    #d19 .now .t{font-size:14px; font-weight:700; color:#226057}
+    #d19 .now .k{
+      font-size:13px; font-weight:700; letter-spacing:.14em;
+      text-transform:uppercase; color:#226057;
+    }
+
+    #d19 .svc .foot{
+      margin-top:auto; padding-top:12px; font-size:13px; color:#74847C;
+      line-height:1.6;
+    }
+
+    @media (max-width:1000px){
+      #d19 .grid{grid-template-columns:1fr; gap:16px; padding:16px 16px 40px}
+      #d19 .top nav{margin-left:0}
+    }
+    @media (max-width:560px){
+      #d19 .r{flex-wrap:wrap; gap:2px 12px}
+      #d19 .r .b{flex:1 1 100%}
+    }
+  </style>
+
+  <div class="shot">
+    <div class="top">
+      <h1>Ordinace Brno-Žabovřesky</h1>
+      <span class="when">úterý 23. září 2026 · 09:40 · u pultu Hana Veselá ·
+        den rozdělený podle čtyř služeb</span>
+      <nav>
+        <a href="#d19">Přehled</a>
+        <a class="on" href="#d19">Dnes</a>
+        <a href="#d19">Plánování</a>
+        <a href="#d19">Pacienti</a>
+        <a href="#d19">Diagnostika</a>
+        <a href="#d19">Dokumenty</a>
+        <a href="#d19">Pokladna</a>
+        <a href="#d19">Fakturace</a>
+        <a href="#d19">Sklad</a>
+        <a href="#d19">Tým</a>
+        <a href="#d19">Nastavení</a>
+      </nav>
+    </div>
+
+    <div class="grid">
+
+      <!-- ============ 1 ============ -->
+      <section class="svc">
+        <h4>Vstupní prohlídky</h4>
+        <p class="staff">Ordinace 1 a Laboratoř · MUDr. Havelka, Bc. Dvořák</p>
+
+        <div class="cap">
+          <p class="line"><span class="v">4 ze 6</span> míst obsazeno</p>
+          <div class="track"><div class="fill" style="width:67%"></div></div>
+        </div>
+
+        <p class="lbl">Objednaní</p>
+
+        <div class="r past"><span class="t">07:00</span>
+          <span class="b"><span class="nm">Jana Kratochvílová</span>
+            <span class="dt">Odběr krve · Laboratoř · 111</span></span>
+          <span class="st">hotovo</span></div>
+        <div class="r past"><span class="t">07:20</span>
+          <span class="b"><span class="nm">Petr Doležal</span>
+            <span class="dt">Vstupní vyšetření · Ordinace 1 · 201</span></span>
+          <span class="st">hotovo</span></div>
+
+        <div class="now"><span class="t">09:40</span><span class="k">právě teď</span></div>
+
+        <div class="r"><span class="t">11:00</span>
+          <span class="b"><span class="nm">Jakub Horák</span>
+            <span class="dt">Vstupní vyšetření · Ordinace 1 · 205</span></span>
+          <span class="st">čeká</span></div>
+        <div class="r"><span class="t">11:30</span>
+          <span class="b"><span class="nm">Veronika Málková</span>
+            <span class="dt">Odběr krve · Laboratoř · 111</span></span>
+          <span class="st">čeká</span></div>
+
+        <p class="foot">Volno: 12:00 a 14:00 v Ordinaci 1. Vstupní prohlídka
+          trvá 45 minut, na dnešek se vejde ještě jedna.</p>
+      </section>
+
+      <!-- ============ 2 ============ -->
+      <section class="svc">
+        <h4>Rehabilitace</h4>
+        <p class="staff">Rehabilitace · Mgr. Pilařová</p>
+
+        <div class="cap">
+          <p class="line"><span class="v">4 z 5</span> míst obsazeno</p>
+          <div class="track"><div class="fill" style="width:80%"></div></div>
+        </div>
+
+        <p class="lbl">Objednaní</p>
+
+        <div class="r past"><span class="t">08:00</span>
+          <span class="b"><span class="nm">Marie Nováková</span>
+            <span class="dt">Fyzioterapie · Rehabilitace · 111</span></span>
+          <span class="st">hotovo</span></div>
+
+        <div class="now"><span class="t">09:40</span><span class="k">právě teď</span></div>
+
+        <div class="r run"><span class="t">09:45</span>
+          <span class="b"><span class="nm">Eva Procházková</span>
+            <span class="dt">Rázová vlna · Rehabilitace · 201</span></span>
+          <span class="st">probíhá od 09:30</span></div>
+        <div class="r"><span class="t">13:00</span>
+          <span class="b"><span class="nm">Adam Beneš</span>
+            <span class="dt">Fyzioterapie · Rehabilitace · 207</span></span>
+          <span class="st">čeká</span></div>
+        <div class="r"><span class="t">15:40</span>
+          <span class="b"><span class="nm">Tomáš Řehák</span>
+            <span class="dt">Fyzioterapie · Rehabilitace · 205</span></span>
+          <span class="st">dnes podruhé</span></div>
+
+        <p class="foot">Volno: 12:20, hodina se dá nabídnout komukoliv z čekárny.
+          Mgr. Pilařová má ve 12:00 pauzu na obědě.</p>
+      </section>
+
+      <!-- ============ 3 ============ -->
+      <section class="svc">
+        <h4>Zátěžová diagnostika</h4>
+        <p class="staff">Laboratoř a Tělocvična · Bc. Dvořák, MUDr. Sýkorová,
+          Mgr. Pilařová</p>
+
+        <div class="cap">
+          <p class="line"><span class="v">5 ze 6</span> míst obsazeno
+            <span class="warn">téměř plno</span></p>
+          <div class="track"><div class="fill tight" style="width:83%"></div></div>
+        </div>
+
+        <p class="lbl">Objednaní</p>
+
+        <div class="r past"><span class="t">07:40</span>
+          <span class="b"><span class="nm">Tomáš Řehák</span>
+            <span class="dt">Spiroergometrie · Laboratoř · 205</span></span>
+          <span class="st">hotovo</span></div>
+        <div class="r run"><span class="t">09:00</span>
+          <span class="b"><span class="nm">Lucie Bartošová</span>
+            <span class="dt">Izokinetika kolene · Tělocvična · 111</span></span>
+          <span class="st">probíhá</span></div>
+
+        <div class="now"><span class="t">09:40</span><span class="k">právě teď</span></div>
+
+        <div class="r"><span class="t">10:00</span>
+          <span class="b"><span class="nm">Filip Urban</span>
+            <span class="dt">Analýza chůze · Tělocvična · 213</span></span>
+          <span class="st">čeká</span></div>
+        <div class="r"><span class="t">13:40</span>
+          <span class="b"><span class="nm">Nikola Tichá</span>
+            <span class="dt">Spiroergometrie · Laboratoř · 201</span></span>
+          <span class="st">čeká</span></div>
+        <div class="r"><span class="t">15:00</span>
+          <span class="b"><span class="nm">Simona Vrbová</span>
+            <span class="dt">Izokinetika kolene · Tělocvična · 213</span></span>
+          <span class="st">čeká</span></div>
+
+        <p class="foot">Volno: 16:00 v Laboratoři, poslední volné místo dne.
+          Běžící zátěž se nepřerušuje, akutní posílejte do Ordinace 2.</p>
+      </section>
+
+      <!-- ============ 4 ============ -->
+      <section class="svc">
+        <h4>Posudky a kontroly</h4>
+        <p class="staff">Ordinace 1 a 2 · MUDr. Havelka, MUDr. Sýkorová</p>
+
+        <div class="cap">
+          <p class="line"><span class="v">5 ze 7</span> míst obsazeno
+            <span class="warn">1 blokováno</span></p>
+          <div class="track"><div class="fill" style="width:71%"></div></div>
+        </div>
+
+        <p class="lbl">Objednaní</p>
+
+        <div class="r past"><span class="t">08:30</span>
+          <span class="b"><span class="nm">Ondřej Veselý</span>
+            <span class="dt">Kontrola po úrazu · Ordinace 2 · 207</span></span>
+          <span class="st">hotovo</span></div>
+        <div class="r stop"><span class="t">09:15</span>
+          <span class="b"><span class="nm">Martin Kolář</span>
+            <span class="dt">Posudek pro klub · Ordinace 1 · 211</span></span>
+          <span class="st">čeká 25 min</span></div>
+        <p class="fix">Chybí: Souhlas se zpracováním zdravotních údajů. Dokud ho
+          nepodepíše, posudek nelze vydat a Ordinace 1 stojí naprázdno.</p>
+        <button type="button">Vytisknout souhlas</button>
+
+        <div class="now"><span class="t">09:40</span><span class="k">právě teď</span></div>
+
+        <div class="r"><span class="t">10:30</span>
+          <span class="b"><span class="nm">Kateřina Šimková</span>
+            <span class="dt">Kontrola po operaci · Ordinace 2 · 111</span></span>
+          <span class="st">čeká</span></div>
+        <div class="r"><span class="t">14:20</span>
+          <span class="b"><span class="nm">Radek Pospíšil</span>
+            <span class="dt">Kontrola po úrazu · Ordinace 2 · 111</span></span>
+          <span class="st">čeká</span></div>
+        <div class="r"><span class="t">16:40</span>
+          <span class="b"><span class="nm">Petr Doležal</span>
+            <span class="dt">Kontrola po operaci · Ordinace 1 · 201</span></span>
+          <span class="st">dnes podruhé</span></div>
+
+        <p class="foot">Volno: 12:00 a 15:20 v Ordinaci 2. Posudek pro klub si
+          Martin Kolář odnese na místě, tiskne ho MUDr. Havelka.</p>
+      </section>
+
+    </div>
+  </div>
+</article>
+</body>
+</html>

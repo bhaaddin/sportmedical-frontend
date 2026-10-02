@@ -1,0 +1,747 @@
+<title>Dvacet obrazovek</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Libre+Franklin:wght@400;500;600&family=DM+Sans:wght@400;500;700&family=Chivo:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+/* ------------------------------------------------------------------
+   Gallery chrome. Everything here is prefixed `g-`: the twenty
+   templates are authored separately and reuse names like .card, .row
+   and .nav inside their own scoped stylesheets.
+   The chrome itself follows the same eye rules it is asking of them -
+   no pure black, no pure white, no ambient motion.
+   ------------------------------------------------------------------ */
+:root{
+  --g-bg:#F4F6F8; --g-panel:#FBFCFD; --g-line:#D8E0E6; --g-line-2:#E7ECF0;
+  --g-fg:#1A2028; --g-fg-2:#4C5A66; --g-fg-3:#75838F;
+  --g-accent:#2C6E63;
+  --g-ui:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --g-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --g-bg:#171D24; --g-panel:#1D242C; --g-line:#2C3640; --g-line-2:#242C35;
+    --g-fg:#DFE6EC; --g-fg-2:#A9B6C1; --g-fg-3:#7B8894;
+    --g-accent:#63B3A4;
+  }
+}
+:root[data-theme="dark"]{
+  --g-bg:#171D24; --g-panel:#1D242C; --g-line:#2C3640; --g-line-2:#242C35;
+  --g-fg:#DFE6EC; --g-fg-2:#A9B6C1; --g-fg-3:#7B8894;
+  --g-accent:#63B3A4;
+}
+
+body{
+  margin:0; background:var(--g-bg); color:var(--g-fg);
+  font-family:var(--g-ui); font-size:15px; line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---- sticky index ---- */
+.g-bar{
+  position:sticky; top:env(safe-area-inset-top,0px); z-index:50;
+  background:var(--g-panel); border-bottom:1px solid var(--g-line);
+  padding:9px 18px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+}
+.g-bar-name{font-weight:600; font-size:.92rem; white-space:nowrap}
+.g-jump{display:flex; gap:4px; flex-wrap:wrap; overflow-x:auto; flex:1 1 auto}
+.g-jump a{
+  font-family:var(--g-mono); font-size:.78rem; text-decoration:none;
+  color:var(--g-fg-3); border:1px solid transparent; border-radius:5px;
+  padding:3px 7px; min-height:26px; display:inline-flex; align-items:center;
+}
+.g-jump a:hover,.g-jump a:focus-visible{color:var(--g-fg); border-color:var(--g-line); outline:none}
+
+.g-wrap{max-width:1560px; margin:0 auto; padding-inline:18px; padding-block:30px 70px; box-sizing:border-box}
+
+.g-intro{border-bottom:1px solid var(--g-line); padding-bottom:22px; margin-bottom:30px;
+  display:flex; flex-direction:column; gap:11px}
+.g-intro h1{font-size:1.9rem; font-weight:600; margin:0; letter-spacing:-.02em}
+.g-intro p{margin:0; max-width:78ch; color:var(--g-fg-2)}
+.g-rules{display:flex; gap:7px; flex-wrap:wrap; margin-top:3px}
+.g-rules span{font-family:var(--g-mono); font-size:.74rem; color:var(--g-fg-3);
+  border:1px solid var(--g-line); border-radius:4px; padding:2px 7px}
+
+/* ---- one template ---- */
+.g-item{margin-bottom:38px; scroll-margin-top:72px}
+.g-head{display:flex; align-items:baseline; gap:11px; flex-wrap:wrap; margin-bottom:5px}
+.g-no{font-family:var(--g-mono); font-size:.86rem; color:var(--g-fg-3)}
+.g-head h2{font-size:1.14rem; font-weight:600; margin:0}
+.g-expand{
+  margin-left:auto; font-family:var(--g-ui); font-size:.8rem; font-weight:500;
+  color:var(--g-fg-2); background:var(--g-panel); border:1px solid var(--g-line);
+  border-radius:6px; padding:5px 11px; min-height:32px; cursor:pointer;
+}
+.g-expand:hover{color:var(--g-fg); border-color:var(--g-fg-3)}
+.g-lines{display:flex; flex-direction:column; gap:2px; margin-bottom:11px; max-width:92ch}
+.g-lines p{margin:0; font-size:.88rem; color:var(--g-fg-2)}
+.g-lines .g-cost{color:var(--g-fg-3)}
+.g-lines .g-cost b{color:var(--g-fg-2); font-weight:500}
+
+.g-screen{
+  border:1px solid var(--g-line); border-radius:9px; overflow:auto;
+  height:78vh; min-height:520px; background:var(--g-panel);
+  overscroll-behavior:contain;
+}
+.g-item[data-full="1"] .g-screen{height:calc(100vh - 96px)}
+
+/* the template's own canvas: full width, its own height, scrolls in .g-screen */
+.dir{display:block}
+.dir > .shot{width:100%; min-height:100%; box-sizing:border-box}
+
+.g-foot{margin-top:7px; font-family:var(--g-mono); font-size:.76rem; color:var(--g-fg-3)}
+
+@media (max-width:700px){
+  .g-screen{height:70vh; min-height:440px}
+  .g-wrap{padding-block:22px 50px}
+}
+</style>
+
+<div class="g-bar">
+  <span class="g-bar-name">Dvacet obrazovek</span>
+  <nav class="g-jump" id="g-jump" aria-label="Přejít na návrh"></nav>
+</div>
+
+<div class="g-wrap">
+  <header class="g-intro">
+    <h1>Dvacet obrazovek jednoho dne</h1>
+    <p>Každý návrh je <b>celá pracovní obrazovka</b>, ne náhled — dá se v ní
+      rolovat a prohlédnout si ji zblízka. Všechny ukazují totéž úterý: stejné
+      pacienty, stejné časy, stejný chybějící souhlas u Martina Koláře. Liší se
+      tím, jak je den uspořádaný.</p>
+    <p>První kolo bylo odmítnuto jako nevhodné pro dlouhou směnu. Tohle kolo se
+      drží pravidel, která se měří, ne doporučují:</p>
+    <div class="g-rules">
+      <span>žádná čistá černá ani bílá</span>
+      <span>sytost do 25 % na plochách</span>
+      <span>nic se nehýbe samo</span>
+      <span>žádné rozostření ani záře</span>
+      <span>nic pod 13 px</span>
+      <span>stav nikdy jen barvou</span>
+    </div>
+  </header>
+  <div id="g-list"></div>
+</div>
+
+<div id="g-src" hidden>
+<article class="dir" id="d01"
+         data-name="Klidný seznam"
+         data-thesis="Den jako jeden tichý chronologický seznam: jeden sloupcový rytmus, čas vlevo, jedna vlasová linka mezi dopolednem a odpolednem."
+         data-cost="Rozvržení ordinací se z něj nepřečte jedním pohledem — místnost je tu jen další sloupec textu.">
+  <style>
+    #d01{
+      --ground:#F6F4F1;
+      --alt:#F1EEE9; --tint:#EBE7E0;
+      --rule:#D8D3CB;
+      --ink:#22201D; --ink-2:#767167; --ink-3:#8C8579;
+      --mark:#3A5E8C; --mark-soft:#E3E7EE;
+      --warn:#6A5A95; --warn-soft:#E6E3EC;
+      --stop:#8E3F5A; --stop-soft:#EEE6E9;
+      --face:"Libre Franklin",ui-sans-serif,system-ui,sans-serif;
+    }
+    #d01 .shot{
+      background:var(--ground); color:var(--ink);
+      font-family:var(--face); font-size:16px; line-height:1.5;
+      font-variant-numeric:tabular-nums; box-sizing:border-box;
+    }
+    #d01 .app{display:grid; grid-template-columns:212px minmax(0,1fr); align-items:start}
+    /* ---------------- left navigation: plain text, no panel ---------------- */
+    #d01 .nav{
+      border-right:1px solid var(--rule);
+      padding:26px 26px 34px 0; display:flex; flex-direction:column;
+      position:sticky; top:0;
+    }
+    #d01 .brand{padding:0 0 22px; display:flex; flex-direction:column; gap:2px}
+    #d01 .brand b{font-size:17px; font-weight:600; letter-spacing:-.01em}
+    #d01 .brand span{font-size:13px; color:var(--ink-3)}
+    #d01 .nvg{
+      font-size:13px; letter-spacing:.14em; text-transform:uppercase;
+      color:var(--ink-3); font-weight:600; padding:18px 0 6px;
+    }
+    #d01 .nv{
+      min-height:32px; display:flex; align-items:center; gap:10px;
+      color:var(--ink-2); font-size:16px; transition:color 120ms;
+    }
+    #d01 .nv:hover{color:var(--ink)}
+    #d01 .nv i{
+      display:inline-block; width:6px; height:6px; flex:0 0 6px;
+      background:transparent;
+    }
+    #d01 .nv-on{color:var(--ink); font-weight:600}
+    #d01 .nv-on i{background:var(--mark)}
+    #d01 .nv em{margin-left:auto; font-style:normal; font-size:13px; color:var(--ink-3)}
+    #d01 .nv-stop em{color:var(--stop); font-weight:600}
+
+    /* ---------------- top bar: quiet, it is not the point ---------------- */
+    #d01 .main{min-width:0; padding:0 34px 52px}
+    #d01 .top{padding:22px 0 0}
+    #d01 .crumb{font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3); font-weight:600}
+    #d01 .head{display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; padding:4px 0 12px}
+    #d01 .head h1{margin:0; font-size:20px; font-weight:600; letter-spacing:-.01em}
+    #d01 .head .date{font-size:15px; color:var(--ink-2)}
+    #d01 .head .who{margin-left:auto; font-size:15px; color:var(--ink-2)}
+    #d01 .head .who b{font-weight:600; color:var(--ink)}
+    #d01 .search{
+      min-height:34px; display:flex; align-items:center;
+      border-bottom:1px solid var(--rule); color:var(--ink-3); font-size:15px;
+      padding:0 0 4px; margin-bottom:0; transition:border-color 120ms;
+    }
+    #d01 .search:hover{border-bottom-color:var(--ink-3)}
+
+    /* ---------------- what stands: the first thing on the screen -------- */
+    #d01 .lead{
+      display:grid; grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);
+      column-gap:44px; margin-top:22px; padding-top:13px;
+      border-top:3px solid var(--stop);
+    }
+    #d01 .leadh{
+      font-size:13px; letter-spacing:.14em; text-transform:uppercase;
+      color:var(--stop); font-weight:600; padding-bottom:9px;
+    }
+    #d01 .leadbig{
+      margin:0; font-size:30px; font-weight:400; line-height:1.14;
+      letter-spacing:-.03em; max-width:22ch;
+    }
+    #d01 .leadwho{font-size:16px; color:var(--ink-2); padding-top:9px}
+    #d01 .leadwhy{font-size:16px; color:var(--stop); padding-top:5px; max-width:76ch}
+    #d01 .leadwhy b{font-weight:600}
+    #d01 .leadacts{display:flex; gap:12px; flex-wrap:wrap; padding:15px 0 4px}
+    #d01 .lside{border-left:1px solid var(--rule); padding-left:26px}
+    #d01 .lsh{
+      font-size:13px; letter-spacing:.12em; text-transform:uppercase;
+      color:var(--ink-3); font-weight:600; padding:0 0 3px;
+    }
+    #d01 .lsr{font-size:15px; color:var(--ink-2); padding-bottom:15px}
+    #d01 .lsr b{display:block; font-size:16px; font-weight:600; color:var(--ink)}
+    #d01 .lsr-now{border-left:3px solid var(--mark); padding-left:13px; margin-left:-13px}
+
+    /* ---------------- numbers: a thin ruled band, no longer the hero ---- */
+    #d01 .nums{
+      display:grid; grid-template-columns:repeat(5,minmax(0,1fr));
+      border-top:1px solid var(--rule); border-bottom:1px solid var(--rule);
+      margin-top:30px;
+    }
+    #d01 .num{
+      padding:11px 18px 11px 0; display:flex; align-items:baseline; gap:9px;
+      border-left:1px solid var(--rule); padding-left:18px;
+    }
+    #d01 .num:first-child{border-left:0; padding-left:0}
+    #d01 .num b{font-size:20px; font-weight:400; line-height:1.1; letter-spacing:-.02em}
+    #d01 .num span{font-size:13px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); font-weight:600}
+    #d01 .num-stop b{color:var(--stop); font-weight:600}
+
+    /* ---------------- the day: a ledger, zebra, no boxes ---------------- */
+    #d01 .sec{padding:30px 0 0}
+    #d01 .sech{display:flex; align-items:baseline; gap:14px; padding-bottom:12px; flex-wrap:wrap}
+    #d01 .sech h2{margin:0; font-size:13px; letter-spacing:.14em; text-transform:uppercase; font-weight:600}
+    #d01 .sech span{font-size:14px; color:var(--ink-3)}
+    #d01 .done{
+      display:grid; grid-template-columns:104px minmax(0,1fr) auto;
+      column-gap:16px; align-items:baseline; padding:9px 10px;
+      background:var(--alt); font-size:14px; color:var(--ink-3);
+    }
+    #d01 .done b{
+      font-size:13px; letter-spacing:.1em; text-transform:uppercase;
+      font-weight:600; color:var(--ink-3);
+    }
+    #d01 .done span{overflow-wrap:anywhere}
+    #d01 .done em{font-style:normal; font-size:13px; text-align:right}
+    #d01 .hd, #d01 .row{
+      display:grid;
+      grid-template-columns:62px minmax(150px,1.15fr) minmax(150px,1.2fr) 120px 136px 50px 112px;
+      column-gap:16px; align-items:center;
+    }
+    #d01 .hd{
+      padding:12px 10px 7px; font-size:13px; letter-spacing:.1em;
+      text-transform:uppercase; color:var(--ink-3); font-weight:600;
+      border-bottom:1px solid var(--rule);
+    }
+    #d01 .hd .rt, #d01 .row .ins{text-align:right}
+    #d01 .row{
+      min-height:38px; padding:0 10px; border-left:3px solid transparent;
+      transition:background-color 120ms;
+    }
+    #d01 .rowwrap{display:flex; flex-direction:column}
+    #d01 .rowwrap .row:nth-child(odd){background:var(--alt)}
+    #d01 .row:hover{background:var(--tint)}
+    #d01 .tm{font-size:15px; color:var(--ink-2); letter-spacing:.02em}
+    #d01 .pt{font-size:16px; font-weight:500; overflow-wrap:anywhere}
+    #d01 .ac{font-size:15px; color:var(--ink-2)}
+    #d01 .rm{font-size:15px; color:var(--ink-2)}
+    #d01 .st{font-size:15px; color:var(--ink-3)}
+    #d01 .ins{font-size:15px; color:var(--ink-3)}
+    #d01 .stt{display:flex; align-items:center; gap:8px; font-size:15px; color:var(--ink-2)}
+    #d01 .mk{display:inline-block; width:9px; height:9px; flex:0 0 9px; background:var(--ink-3)}
+    #d01 .mk-pro{background:var(--mark)}
+    #d01 .mk-cek{background:var(--ground); border:2px solid var(--ink-3)}
+    #d01 .mk-ned{background:var(--ground); border:2px solid var(--warn)}
+    #d01 .mk-zru{height:3px; background:var(--ink-3)}
+    #d01 .mk-blk{background:var(--stop)}
+    #d01 .row-zru .pt{color:var(--ink-3); text-decoration:line-through}
+    #d01 .rowwrap .row-blk, #d01 .rowwrap .row-blk:nth-child(odd){background:var(--stop-soft); border-left-color:var(--stop)}
+    #d01 .rowwrap .row-now, #d01 .rowwrap .row-now:nth-child(odd){background:var(--mark-soft); border-left-color:var(--mark)}
+    #d01 .row-now .pt{font-weight:600}
+    #d01 .note{
+      font-size:14px; color:var(--stop); padding:6px 10px 12px 89px;
+      max-width:86ch;
+    }
+    #d01 .now{
+      display:flex; align-items:baseline; gap:12px; margin:10px 10px 4px;
+      border-top:2px solid var(--mark); padding-top:6px;
+      font-size:13px; letter-spacing:.14em; text-transform:uppercase;
+      color:var(--mark); font-weight:600;
+    }
+    #d01 .now b{font-size:15px; letter-spacing:.02em; font-weight:600}
+    #d01 .now em{
+      margin-left:auto; font-style:normal; letter-spacing:0; text-transform:none;
+      font-weight:400; font-size:14px; color:var(--ink-3);
+    }
+    #d01 .mid{
+      margin:16px 10px 8px; border-top:1px solid var(--rule);
+      padding-top:10px; font-size:13px; letter-spacing:.1em; text-transform:uppercase;
+      color:var(--ink-3); font-weight:600; display:flex; gap:14px; flex-wrap:wrap;
+    }
+    #d01 .mid em{font-style:normal; letter-spacing:0; text-transform:none; font-weight:400; font-size:14px}
+
+    /* ---------------- below the fold ---------------- */
+    #d01 .below{
+      display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,1fr);
+      column-gap:44px; padding-top:38px; margin-top:38px; border-top:1px solid var(--rule);
+    }
+    #d01 .blk h3{margin:0 0 14px; font-size:13px; letter-spacing:.14em; text-transform:uppercase; font-weight:600}
+    #d01 .fr{
+      display:grid; grid-template-columns:62px 1fr auto; column-gap:14px;
+      align-items:baseline; min-height:36px; padding:6px 0; font-size:15px; color:var(--ink-2);
+      border-bottom:1px solid var(--rule);
+    }
+    #d01 .fr b{font-size:15px; font-weight:500; color:var(--ink); letter-spacing:.02em}
+    #d01 .fr em{font-style:normal; font-size:14px; color:var(--ink-3)}
+    #d01 .pap{
+      display:flex; flex-direction:column; gap:3px; padding:12px 0;
+      border-bottom:1px solid var(--rule); font-size:15px;
+    }
+    #d01 .pap b{font-weight:600; font-size:16px}
+    #d01 .pap span{color:var(--ink-2); font-size:14px}
+    #d01 .pap-stop b{color:var(--stop)}
+    #d01 .btn{
+      align-self:flex-start; min-height:32px;
+      font-family:var(--face); font-size:13px; letter-spacing:.1em; text-transform:uppercase;
+      font-weight:600; color:var(--ink); background:var(--ground);
+      border:1px solid var(--rule); border-radius:0;
+      padding:5px 14px; cursor:pointer; transition:border-color 120ms, background-color 120ms;
+    }
+    #d01 .pap .btn{margin-top:9px}
+    #d01 .btn:hover{border-color:var(--ink); background:var(--alt)}
+    #d01 .btn-main{border-left:3px solid var(--mark); color:var(--mark)}
+    #d01 .btn-main:hover{border-color:var(--mark); border-left-color:var(--mark); background:var(--mark-soft)}
+    #d01 .ld{padding:11px 0; border-bottom:1px solid var(--rule)}
+    #d01 .ldh{display:flex; align-items:baseline; gap:10px; font-size:15px; padding-bottom:7px}
+    #d01 .ldh b{font-weight:500}
+    #d01 .ldh em{margin-left:auto; font-style:normal; font-size:14px; color:var(--ink-3)}
+    #d01 .bar{height:3px; background:var(--tint)}
+    #d01 .bar i{display:block; height:3px; background:var(--mark)}
+    #d01 .bar-w i{background:var(--warn)}
+    #d01 .foot{
+      margin-top:38px; padding-top:16px; border-top:1px solid var(--rule);
+      font-size:13px; color:var(--ink-3); display:flex; gap:22px; flex-wrap:wrap;
+    }
+
+    @media (max-width:1100px){
+      #d01 .lead{grid-template-columns:minmax(0,1fr); row-gap:22px}
+      #d01 .lside{border-left:0; border-top:1px solid var(--rule); padding:16px 0 0; margin:0}
+    }
+    @media (max-width:900px){
+      #d01 .app{grid-template-columns:minmax(0,1fr)}
+      #d01 .nav{
+        position:static; flex-direction:row; flex-wrap:wrap; align-items:center;
+        border-right:0; border-bottom:1px solid var(--rule); padding:14px 16px 12px;
+      }
+      #d01 .brand{padding:0 0 10px; flex:1 1 100%}
+      #d01 .nvg{padding:4px 12px 4px 0; flex:1 1 100%}
+      #d01 .nv{padding:0 14px 0 0}
+      #d01 .nv em{margin-left:8px}
+      #d01 .main{padding:0 16px 42px}
+      #d01 .nums{grid-template-columns:repeat(2,minmax(0,1fr))}
+      #d01 .num{border-left:0; padding-left:0; padding-right:12px}
+      #d01 .done{grid-template-columns:minmax(0,1fr); row-gap:3px}
+      #d01 .done em{text-align:left}
+      #d01 .hd{display:none}
+      #d01 .row{
+        grid-template-columns:58px minmax(0,1fr) auto;
+        row-gap:2px; padding:9px 10px; align-items:baseline;
+      }
+      #d01 .row .tm{grid-area:1 / 1 / 2 / 2}
+      #d01 .row .pt{grid-area:1 / 2 / 2 / 3}
+      #d01 .row .stt{grid-area:1 / 3 / 2 / 4}
+      #d01 .row .ac{grid-area:2 / 2 / 3 / 3}
+      #d01 .row .ins{grid-area:2 / 3 / 3 / 4}
+      #d01 .row .rm{grid-area:3 / 2 / 4 / 3}
+      #d01 .row .st{grid-area:3 / 3 / 4 / 4; text-align:right}
+      #d01 .note{padding-left:10px}
+      #d01 .below{grid-template-columns:minmax(0,1fr); row-gap:32px}
+    }
+  </style>
+
+  <div class="shot">
+    <div class="app">
+
+      <nav class="nav">
+        <div class="brand"><b>SportMedical</b><span>Klinika sportovní medicíny</span></div>
+        <div class="nvg">Provoz</div>
+        <div class="nv"><i></i>Přehled</div>
+        <div class="nv nv-on"><i></i>Dnes<em>18</em></div>
+        <div class="nv"><i></i>Plánování</div>
+        <div class="nv"><i></i>Pacienti</div>
+        <div class="nvg">Péče</div>
+        <div class="nv"><i></i>Diagnostika</div>
+        <div class="nv nv-stop"><i></i>Dokumenty<em>3</em></div>
+        <div class="nvg">Provozovna</div>
+        <div class="nv"><i></i>Pokladna</div>
+        <div class="nv"><i></i>Fakturace</div>
+        <div class="nv"><i></i>Sklad</div>
+        <div class="nv"><i></i>Tým</div>
+        <div class="nv"><i></i>Nastavení</div>
+      </nav>
+
+      <div class="main">
+
+        <header class="top">
+          <div class="crumb">Provoz · Ordinace Brno-Žabovřesky</div>
+          <div class="head">
+            <h1>Dnes</h1>
+            <span class="date">úterý 23. září 2026 · 09:38</span>
+            <span class="who"><b>Hana Veselá</b> · recepce</span>
+          </div>
+          <div class="search">Hledat pacienta, rodné číslo nebo číslo objednávky</div>
+        </header>
+
+        <section class="lead">
+          <div>
+            <div class="leadh">Den stojí na jednom papíru</div>
+            <p class="leadbig">Martin Kolář čeká 31 minut</p>
+            <div class="leadwho">09:15 · Posudek pro klub · Ordinace 1 · MUDr. Havelka je volný</div>
+            <div class="leadwhy"><b>Chybí: Souhlas se zpracováním zdravotních údajů.</b>
+              Vytisknout, nechat podepsat u přepážky, naskenovat do karty — bez toho
+              posudek nelze vydat ani odeslat klubu.</div>
+            <div class="leadacts">
+              <button type="button" class="btn btn-main">Vytisknout souhlas</button>
+              <button type="button" class="btn">Přesunout na 11:00</button>
+            </div>
+          </div>
+          <div class="lside">
+            <div class="lsr lsr-now">
+              <div class="lsh">Právě probíhá</div>
+              <b>Lucie Bartošová</b>
+              09:00 · Izokinetika kolene · Tělocvična · konec v 09:40
+            </div>
+            <div class="lsr">
+              <div class="lsh">Další na řadě</div>
+              <b>Eva Procházková</b>
+              09:45 · Rázová vlna · Rehabilitace · sedí v čekárně od 09:26
+            </div>
+            <div class="lsr">
+              <div class="lsh">Čekárna</div>
+              <b>3 z 8 míst</b>
+              Kateřina Šimková přišla o hodinu dřív, lze ji vzít v 09:30
+            </div>
+          </div>
+        </section>
+
+        <section class="nums">
+          <div class="num"><b>18</b><span>objednáno dnes</span></div>
+          <div class="num"><b>5</b><span>odbaveno</span></div>
+          <div class="num"><b>3</b><span>čeká v čekárně</span></div>
+          <div class="num"><b>6</b><span>volných míst</span></div>
+          <div class="num num-stop"><b>3</b><span>blokováno papírem</span></div>
+        </section>
+
+        <section class="sec">
+          <div class="sech">
+            <h2>Den po pořádku</h2>
+            <span>07:00 až 16:40 · pět pracovišť · čtyři lidé ve službě</span>
+          </div>
+
+          <div class="done">
+            <b>Odbaveno</b>
+            <span>07:00 Jana Kratochvílová · 07:20 Petr Doležal · 07:40 Tomáš Řehák ·
+              08:00 Marie Nováková · 08:30 Ondřej Veselý</span>
+            <em>5 hotovo, vykázáno</em>
+          </div>
+
+          <div class="hd">
+            <span>Čas</span><span>Pacient</span><span>Výkon</span><span>Místnost</span>
+            <span>Personál</span><span class="rt">Poj.</span><span>Stav</span>
+          </div>
+
+          <div class="rowwrap">
+            <div class="row row-now">
+              <span class="tm">09:00</span>
+              <span class="pt">Lucie Bartošová</span>
+              <span class="ac">Izokinetika kolene</span>
+              <span class="rm">Tělocvična</span>
+              <span class="st">Mgr. Pilařová</span>
+              <span class="ins">111</span>
+              <span class="stt"><i class="mk mk-pro"></i>probíhá</span>
+            </div>
+            <div class="row row-blk">
+              <span class="tm">09:15</span>
+              <span class="pt">Martin Kolář</span>
+              <span class="ac">Posudek pro klub</span>
+              <span class="rm">Ordinace 1</span>
+              <span class="st">MUDr. Havelka</span>
+              <span class="ins">211</span>
+              <span class="stt"><i class="mk mk-blk"></i>blokováno</span>
+            </div>
+            <div class="note">Chybí: Souhlas se zpracováním zdravotních údajů — vytisknout, podepsat a naskenovat, jinak posudek nelze vydat.</div>
+          </div>
+
+          <div class="now"><b>09:38</b><span>právě teď</span><em>zbývá dvanáct objednávek do konce dne</em></div>
+
+          <div class="rowwrap">
+            <div class="row">
+              <span class="tm">09:45</span>
+              <span class="pt">Eva Procházková</span>
+              <span class="ac">Rázová vlna</span>
+              <span class="rm">Rehabilitace</span>
+              <span class="st">Mgr. Pilařová</span>
+              <span class="ins">201</span>
+              <span class="stt"><i class="mk mk-cek"></i>čeká</span>
+            </div>
+            <div class="row">
+              <span class="tm">10:00</span>
+              <span class="pt">Filip Urban</span>
+              <span class="ac">Analýza chůze</span>
+              <span class="rm">Tělocvična</span>
+              <span class="st">Bc. Dvořák</span>
+              <span class="ins">213</span>
+              <span class="stt"><i class="mk mk-cek"></i>čeká</span>
+            </div>
+            <div class="row">
+              <span class="tm">10:30</span>
+              <span class="pt">Kateřina Šimková</span>
+              <span class="ac">Kontrola po operaci</span>
+              <span class="rm">Ordinace 2</span>
+              <span class="st">MUDr. Sýkorová</span>
+              <span class="ins">111</span>
+              <span class="stt"><i class="mk mk-cek"></i>čeká</span>
+            </div>
+            <div class="row">
+              <span class="tm">11:00</span>
+              <span class="pt">Jakub Horák</span>
+              <span class="ac">Vstupní vyšetření</span>
+              <span class="rm">Ordinace 1</span>
+              <span class="st">MUDr. Havelka</span>
+              <span class="ins">205</span>
+              <span class="stt"><i class="mk mk-cek"></i>čeká</span>
+            </div>
+            <div class="row">
+              <span class="tm">11:30</span>
+              <span class="pt">Veronika Málková</span>
+              <span class="ac">Odběr krve</span>
+              <span class="rm">Laboratoř</span>
+              <span class="st">Bc. Dvořák</span>
+              <span class="ins">111</span>
+              <span class="stt"><i class="mk mk-ned"></i>nedorazil</span>
+            </div>
+          </div>
+
+          <div class="mid"><span>Polední pauza 12:00 až 13:00</span><em>ordinace uklizené, laboratoř svoz vzorků</em></div>
+
+          <div class="rowwrap">
+            <div class="row">
+              <span class="tm">13:00</span>
+              <span class="pt">Adam Beneš</span>
+              <span class="ac">Fyzioterapie</span>
+              <span class="rm">Rehabilitace</span>
+              <span class="st">Mgr. Pilařová</span>
+              <span class="ins">207</span>
+              <span class="stt"><i class="mk mk-cek"></i>čeká</span>
+            </div>
+            <div class="row">
+              <span class="tm">13:40</span>
+              <span class="pt">Nikola Tichá</span>
+              <span class="ac">Spiroergometrie</span>
+              <span class="rm">Laboratoř</span>
+              <span class="st">MUDr. Sýkorová</span>
+              <span class="ins">201</span>
+              <span class="stt"><i class="mk mk-cek"></i>čeká</span>
+            </div>
+            <div class="row">
+              <span class="tm">14:20</span>
+              <span class="pt">Radek Pospíšil</span>
+              <span class="ac">Kontrola po úrazu</span>
+              <span class="rm">Ordinace 2</span>
+              <span class="st">MUDr. Havelka</span>
+              <span class="ins">111</span>
+              <span class="stt"><i class="mk mk-cek"></i>čeká</span>
+            </div>
+            <div class="row">
+              <span class="tm">15:00</span>
+              <span class="pt">Simona Vrbová</span>
+              <span class="ac">Izokinetika kolene</span>
+              <span class="rm">Tělocvična</span>
+              <span class="st">Mgr. Pilařová</span>
+              <span class="ins">213</span>
+              <span class="stt"><i class="mk mk-cek"></i>čeká</span>
+            </div>
+            <div class="row row-zru">
+              <span class="tm">15:40</span>
+              <span class="pt">Jana Kratochvílová</span>
+              <span class="ac">Rázová vlna</span>
+              <span class="rm">Rehabilitace</span>
+              <span class="st">Mgr. Pilařová</span>
+              <span class="ins">111</span>
+              <span class="stt"><i class="mk mk-zru"></i>zrušeno</span>
+            </div>
+            <div class="row">
+              <span class="tm">16:40</span>
+              <span class="pt">Petr Doležal</span>
+              <span class="ac">Kontrola po operaci</span>
+              <span class="rm">Ordinace 1</span>
+              <span class="st">MUDr. Havelka</span>
+              <span class="ins">201</span>
+              <span class="stt"><i class="mk mk-cek"></i>čeká</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="below">
+          <div class="blk">
+            <h3>Blokované papírování</h3>
+            <div class="pap pap-stop">
+              <b>Martin Kolář · 09:15</b>
+              <span>Chybí: Souhlas se zpracováním zdravotních údajů</span>
+              <button type="button" class="btn btn-main">Vytisknout souhlas</button>
+            </div>
+            <div class="pap">
+              <b>Filip Urban · 10:00</b>
+              <span>Chybí doporučení od praktického lékaře, pojišťovna 213</span>
+              <button type="button" class="btn">Zavolat na recepci klubu</button>
+            </div>
+            <div class="pap">
+              <b>Nikola Tichá · 13:40</b>
+              <span>Nepodepsané poučení před zátěžovým testem</span>
+              <button type="button" class="btn">Připravit k podpisu</button>
+            </div>
+          </div>
+
+          <div class="blk">
+            <h3>Volné termíny k obsazení</h3>
+            <div class="fr"><b>09:30</b><span>Ordinace 2 · MUDr. Sýkorová</span><em>20 minut</em></div>
+            <div class="fr"><b>10:50</b><span>Rehabilitace · Mgr. Pilařová</span><em>30 minut</em></div>
+            <div class="fr"><b>11:50</b><span>Laboratoř · Bc. Dvořák</span><em>20 minut</em></div>
+            <div class="fr"><b>14:00</b><span>Tělocvična · volná</span><em>20 minut</em></div>
+            <div class="fr"><b>15:40</b><span>Rehabilitace · uvolněno zrušením</span><em>40 minut</em></div>
+            <div class="fr"><b>16:00</b><span>Ordinace 1 · MUDr. Havelka</span><em>40 minut</em></div>
+          </div>
+
+          <div class="blk">
+            <h3>Vytížení personálu</h3>
+            <div class="ld">
+              <div class="ldh"><b>MUDr. Havelka</b><em>5 z 8</em></div>
+              <div class="bar"><i style="width:62%"></i></div>
+            </div>
+            <div class="ld">
+              <div class="ldh"><b>MUDr. Sýkorová</b><em>4 z 8</em></div>
+              <div class="bar"><i style="width:50%"></i></div>
+            </div>
+            <div class="ld">
+              <div class="ldh"><b>Mgr. Pilařová</b><em>7 z 8</em></div>
+              <div class="bar bar-w"><i style="width:88%"></i></div>
+            </div>
+            <div class="ld">
+              <div class="ldh"><b>Bc. Dvořák</b><em>4 z 8</em></div>
+              <div class="bar"><i style="width:50%"></i></div>
+            </div>
+            <div class="ld">
+              <div class="ldh"><b>Hana Veselá · recepce</b><em>směna 06:45 až 17:15</em></div>
+              <div class="bar"><i style="width:70%"></i></div>
+            </div>
+          </div>
+        </section>
+
+        <div class="foot">
+          <span>Poslední synchronizace s pojišťovnami v 08:41</span>
+          <span>Pojišťovny dnes: 111 · 201 · 205 · 207 · 211 · 213</span>
+          <span>Zpracovala: Hana Veselá</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</article>
+
+</div>
+
+<script>
+(function(){
+  var src = document.getElementById('g-src');
+  var list = document.getElementById('g-list');
+  var jump = document.getElementById('g-jump');
+  var dirs = Array.prototype.slice.call(src.children).filter(function(el){
+    return el.classList && el.classList.contains('dir');
+  });
+
+  dirs.forEach(function(dir, i){
+    var no = String(i + 1);
+    while (no.length < 2) no = '0' + no;
+    var name = dir.getAttribute('data-name') || ('Návrh ' + no);
+    var thesis = dir.getAttribute('data-thesis') || '';
+    var cost = dir.getAttribute('data-cost') || '';
+    var anchor = 'navrh-' + no;
+
+    var item = document.createElement('section');
+    item.className = 'g-item';
+    item.id = anchor;
+
+    var head = document.createElement('div');
+    head.className = 'g-head';
+    var noEl = document.createElement('span');
+    noEl.className = 'g-no';
+    noEl.textContent = no;
+    var h2 = document.createElement('h2');
+    h2.textContent = name;
+    var expand = document.createElement('button');
+    expand.type = 'button';
+    expand.className = 'g-expand';
+    expand.textContent = 'Zvětšit';
+    head.appendChild(noEl);
+    head.appendChild(h2);
+    head.appendChild(expand);
+
+    var lines = document.createElement('div');
+    lines.className = 'g-lines';
+    var pT = document.createElement('p');
+    pT.textContent = thesis;
+    var pC = document.createElement('p');
+    pC.className = 'g-cost';
+    var b = document.createElement('b');
+    b.textContent = 'Co za to platí: ';
+    pC.appendChild(b);
+    pC.appendChild(document.createTextNode(cost));
+    lines.appendChild(pT);
+    if (cost) lines.appendChild(pC);
+
+    var screen = document.createElement('div');
+    screen.className = 'g-screen';
+    screen.setAttribute('tabindex', '0');
+    screen.setAttribute('aria-label', 'Návrh ' + no + ' - ' + name);
+    screen.appendChild(dir);
+
+    item.appendChild(head);
+    item.appendChild(lines);
+    item.appendChild(screen);
+    list.appendChild(item);
+
+    expand.addEventListener('click', function(){
+      var on = item.getAttribute('data-full') === '1';
+      item.setAttribute('data-full', on ? '0' : '1');
+      expand.textContent = on ? 'Zvětšit' : 'Zmenšit';
+      if (!on) item.scrollIntoView({block: 'start'});
+    });
+
+    var a = document.createElement('a');
+    a.href = '#' + anchor;
+    a.textContent = no;
+    a.title = name;
+    jump.appendChild(a);
+  });
+})();
+</script>

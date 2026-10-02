@@ -1,14 +1,5 @@
 import client from './client';
 
-export interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  clinicId?: string;
-}
-
 export interface LoginResponse {
   accessToken: string;
   expiresAtUtc: string;
@@ -25,9 +16,31 @@ export interface LoginResponse {
   permissions: string[];
 }
 
+/**
+ * The password was right but the account also asks for a one-time code. No
+ * session exists yet; the browser keeps `challengeToken` for the second call.
+ */
+export interface SecondFactorChallenge {
+  secondFactorRequired: true;
+  challengeToken: string;
+  expiresAtUtc: string;
+}
+
+export type LoginResult = LoginResponse | SecondFactorChallenge;
+
+export function isSecondFactorChallenge(result: LoginResult): result is SecondFactorChallenge {
+  return (result as SecondFactorChallenge).secondFactorRequired === true;
+}
+
 export const authApi = {
-  login: async (email: string, password: string): Promise<LoginResponse> => {
+  login: async (email: string, password: string): Promise<LoginResult> => {
     const res = await client.post('/api/v1/session', { email, password });
+    return res.data?.value ?? res.data;
+  },
+
+  /** Second step of a sign-in with 2FA on: the challenge token and the code. */
+  completeSecondFactor: async (challengeToken: string, code: string): Promise<LoginResponse> => {
+    const res = await client.post('/api/v1/session/second-factor', { challengeToken, code });
     return res.data?.value ?? res.data;
   },
 
@@ -37,9 +50,5 @@ export const authApi = {
 
   activate: async (data: { email: string; temporaryPassword: string; newPassword: string; newPasswordConfirmation: string }): Promise<void> => {
     await client.post('/api/v1/accounts/activate', data);
-  },
-
-  changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
-    await client.put('/api/v1/account/password', { currentPassword, newPassword, newPasswordConfirmation: newPassword });
   },
 };

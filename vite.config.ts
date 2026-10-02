@@ -1,8 +1,15 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    /* Only our own tests. Without this vitest also walks node_modules. */
+    include: ['src/**/*.test.{ts,tsx}'],
+  },
   server: {
     port: 3000,
     open: true,
@@ -16,10 +23,6 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/openapi': {
-        target: 'http://localhost:5092',
-        changeOrigin: true,
-      },
-      '/swagger': {
         target: 'http://localhost:5092',
         changeOrigin: true,
       },

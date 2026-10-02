@@ -15,16 +15,32 @@ export interface Patient {
   updatedAtUtc: string;
 }
 
-export interface PatientRegistration {
+/**
+ * A correction to a patient's name, date of birth or sex.
+ *
+ * Those identify the patient, so the server refuses the change without a
+ * reason; the author is whoever is signed in. Both go to the audit trail with
+ * the change.
+ */
+export interface PatientIdentityCorrection {
   firstName: string;
   lastName: string;
-  preferredName?: string;
+  preferredName: string | null;
   dateOfBirth: string;
   sex: string;
-  email?: string;
-  phone?: string;
-  registrationBusinessDate: string;
+  changeReason: string;
 }
+
+/** One page of the register, and how many patients match in all. */
+export interface PatientPage {
+  items: Patient[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+/** The most `GET /api/patients` answers in one page. */
+export const PATIENT_PAGE_SIZE_MAX = 100;
 
 function extractItems<T>(data: any): T[] {
   if (Array.isArray(data)) return data;
@@ -33,9 +49,24 @@ function extractItems<T>(data: any): T[] {
 }
 
 export const patientsApi = {
-  getAll: async (): Promise<Patient[]> => {
-    const res = await client.get('/api/patients');
-    return extractItems<Patient>(res.data);
+  /**
+   * One page of the register, searched on the server.
+   *
+   * The route pages - twenty rows unless asked for more, at most a hundred -
+   * so the answer is a page plus `totalCount`, never "every patient".
+   */
+  list: async (
+    params: { query?: string; page?: number; pageSize?: number } = {},
+  ): Promise<PatientPage> => {
+    const page = params.page ?? 1;
+    const pageSize = Math.min(params.pageSize ?? 20, PATIENT_PAGE_SIZE_MAX);
+    const res = await client.get('/api/patients', {
+      params: { query: params.query?.trim() || undefined, page, pageSize },
+    });
+    const items = extractItems<Patient>(res.data);
+    const totalCount =
+      typeof res.data?.totalCount === 'number' ? res.data.totalCount : items.length;
+    return { items, totalCount, page, pageSize };
   },
 
   getById: async (id: string): Promise<Patient> => {
@@ -43,12 +74,7 @@ export const patientsApi = {
     return res.data?.value ?? res.data;
   },
 
-  create: async (data: PatientRegistration): Promise<Patient> => {
-    const res = await client.post('/api/patients', data);
-    return res.data?.value ?? res.data;
-  },
-
-  update: async (id: string, data: Partial<PatientRegistration>): Promise<Patient> => {
+  update: async (id: string, data: PatientIdentityCorrection): Promise<Patient> => {
     const res = await client.put(`/api/patients/${id}`, data);
     return res.data?.value ?? res.data;
   },
@@ -62,9 +88,5 @@ export const patientsApi = {
   getProfile: async (id: string): Promise<any> => {
     const res = await client.get(`/api/patients/${id}/profile`);
     return res.data?.value ?? res.data;
-  },
-
-  saveProfile: async (id: string, profile: any): Promise<void> => {
-    await client.put(`/api/patients/${id}/profile`, profile);
   },
 };

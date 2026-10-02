@@ -21,16 +21,6 @@ export interface WellnessEntry {
 }
 
 export const wellnessApi = {
-  getByPatient: async (patientId: string, days = 30): Promise<WellnessEntry[]> => {
-    const res = await client.get(`/api/wellness/patient/${patientId}?days=${days}`);
-    return res.data?.value ?? res.data ?? [];
-  },
-
-  getSummary: async (patientId: string, days = 7): Promise<any> => {
-    const res = await client.get(`/api/wellness/patient/${patientId}/summary?days=${days}`);
-    return res.data?.value ?? res.data;
-  },
-
   create: async (data: Partial<WellnessEntry>): Promise<WellnessEntry> => {
     const res = await client.post('/api/wellness', data);
     return res.data?.value ?? res.data;

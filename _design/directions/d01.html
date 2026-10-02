@@ -1,0 +1,319 @@
+<article class="dir" id="d01"
+         data-name="Agenda"
+         data-thesis="Pro lékaře nebo sestru, kteří si chtějí den přečíst shora dolů jako papírový diář — každá návštěva dostane vlastní velké okno, kde je vidět pacient, výkon, místnost i poznámka bez rozklikávání."
+         data-cost="Na jednu obrazovku se vejde jen pár nejbližších návštěv; kdo chce porovnat místnosti nebo vidět celý den naráz, musí rolovat.">
+<style>
+#d01 .shot{background:#F6F4F1;color:#22201D;
+  font-family:"Libre Franklin",ui-sans-serif,system-ui,sans-serif;
+  font-size:15px;line-height:1.55;display:flex;align-items:stretch;
+  font-variant-numeric:tabular-nums}
+
+/* ---- levý svislý pruh s navigací ---- */
+#d01 .nav{flex:0 0 184px;box-sizing:border-box;padding:22px 16px 48px;
+  border-right:1px solid #DDD8D0;background:#F2EFEA}
+#d01 .brand{font-size:15px;font-weight:600;letter-spacing:-.01em;margin-bottom:2px}
+#d01 .brand-sub{font-size:13px;color:#6A655D;margin-bottom:22px}
+#d01 .nav a{display:block;padding:7px 9px;border-radius:5px;text-decoration:none;
+  color:#3D3934;font-size:14px;min-height:32px;box-sizing:border-box;
+  transition:background 120ms ease}
+#d01 .nav a:hover{background:#E7E2DA}
+#d01 .nav a.on{background:#E4E9F0;color:#22201D;font-weight:600;
+  box-shadow:inset 3px 0 0 0 #3A5E8C}
+
+/* ---- pravá část ---- */
+#d01 .main{flex:1 1 auto;min-width:0;box-sizing:border-box;padding:20px 30px 60px;
+  max-width:1120px}
+#d01 .top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  padding-bottom:12px;border-bottom:1px solid #DDD8D0}
+#d01 .ttl{font-size:17px;font-weight:600;margin:0;letter-spacing:-.01em}
+#d01 .where{font-size:14px;color:#6A655D}
+#d01 .clock{margin-left:auto;font-size:14px;font-weight:600;color:#3A5E8C}
+
+#d01 .tally{display:flex;flex-wrap:wrap;gap:10px 22px;padding:12px 0 22px;
+  font-size:14px;color:#6A655D}
+#d01 .tally b{color:#22201D;font-weight:600}
+
+/* ---- odbyté dopoledne: úzké proužky ---- */
+#d01 .past-h{font-size:14px;font-weight:600;margin:0 0 8px;color:#6A655D;
+  text-transform:none}
+#d01 .past{border:1px solid #E2DDD5;border-radius:8px;background:#F2EFEA;
+  padding:4px 12px;margin-bottom:30px}
+#d01 .prow{display:flex;gap:14px;align-items:baseline;padding:6px 0;font-size:13px;
+  color:#6A655D;border-bottom:1px solid #E7E2DA}
+#d01 .prow:last-child{border-bottom:0}
+#d01 .prow .pt{flex:0 0 46px;font-weight:600;color:#4A4640}
+#d01 .prow .pn{flex:0 0 172px;color:#3D3934}
+#d01 .prow .pa{flex:1 1 auto;min-width:0}
+#d01 .prow .ps{flex:0 0 66px;text-align:right}
+
+/* ---- velké bloky ---- */
+#d01 .stack{display:flex;flex-direction:column;gap:14px}
+#d01 .blk{display:flex;gap:20px;align-items:flex-start;background:#FBFAF8;
+  border:1px solid #E2DDD5;border-radius:10px;padding:16px 18px;min-height:104px;
+  box-sizing:border-box}
+#d01 .gut{flex:0 0 78px;border-right:1px solid #E7E2DA;padding-right:14px;
+  align-self:stretch}
+#d01 .tm{display:block;font-size:20px;font-weight:600;letter-spacing:-.01em}
+#d01 .dur{display:block;font-size:13px;color:#6A655D;margin-top:2px}
+#d01 .cnt{flex:1 1 auto;min-width:0}
+#d01 .who{font-size:18px;font-weight:600;letter-spacing:-.01em}
+#d01 .act{font-size:15px;margin-top:2px}
+#d01 .meta{font-size:13px;color:#6A655D;margin-top:6px}
+#d01 .note{font-size:14px;color:#4A4640;margin-top:10px;max-width:74ch;
+  padding-left:11px;box-shadow:inset 2px 0 0 0 #DDD8D0}
+#d01 .st{flex:0 0 152px;text-align:right}
+#d01 .chip{display:inline-block;font-size:13px;font-weight:600;border-radius:4px;
+  padding:3px 9px;border:1px solid #DDD8D0;color:#4A4640;background:#F2EFEA}
+#d01 .chip.run{border-color:#4A6B4F;color:#3A5A40}
+#d01 .chip.stop{border-color:#9B3B3B;color:#9B3B3B;background:#F4EAE8}
+#d01 .sub{display:block;font-size:13px;color:#6A655D;margin-top:6px}
+
+/* živý a zablokovaný blok */
+#d01 .blk.live{box-shadow:inset 4px 0 0 0 #4A6B4F}
+#d01 .blk.halt{box-shadow:inset 4px 0 0 0 #9B3B3B;background:#FAF3F1;
+  border-color:#E4CFC9;min-height:172px}
+#d01 .blk.halt .who{font-size:26px;line-height:1.22}
+#d01 .halt-why{margin-top:10px;font-size:15px;color:#7E3232;font-weight:600}
+#d01 .halt-how{margin-top:4px;font-size:14px;color:#4A4640;max-width:70ch}
+#d01 .act-row{margin-top:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+#d01 button{font:inherit;font-size:14px;font-weight:600;color:#F6F4F1;
+  background:#3A5E8C;border:1px solid #33527A;border-radius:6px;
+  padding:8px 15px;min-height:34px;cursor:pointer;transition:background 120ms ease}
+#d01 button:hover{background:#33527A}
+#d01 .act-note{font-size:13px;color:#6A655D}
+
+/* ---- čára teď ---- */
+#d01 .now{display:flex;align-items:center;gap:12px;margin:22px 0 8px}
+#d01 .now-lab{font-size:14px;font-weight:600;color:#3A5E8C;white-space:nowrap}
+#d01 .now-rule{flex:1 1 auto;height:2px;background:#3A5E8C}
+
+#d01 .later-h{font-size:14px;font-weight:600;color:#6A655D;margin:30px 0 8px}
+#d01 .foot{margin-top:34px;padding-top:14px;border-top:1px solid #DDD8D0;
+  font-size:13px;color:#6A655D;max-width:80ch}
+
+@media (max-width:900px){
+  #d01 .shot{display:block}
+  #d01 .nav{width:auto;border-right:0;border-bottom:1px solid #DDD8D0;
+    padding:14px 16px;display:flex;flex-wrap:wrap;gap:4px 6px;align-items:baseline}
+  #d01 .brand{flex:1 1 100%}
+  #d01 .brand-sub{flex:1 1 100%;margin-bottom:8px}
+  #d01 .main{padding:16px 16px 48px}
+  #d01 .blk{flex-wrap:wrap;gap:10px 16px}
+  #d01 .gut{border-right:0;flex:0 0 auto;display:flex;gap:12px;align-items:baseline}
+  #d01 .st{flex:1 1 100%;text-align:left}
+}
+</style>
+
+<div class="shot">
+
+  <nav class="nav">
+    <div class="brand">Ordinace Brno-Žabovřesky</div>
+    <div class="brand-sub">Hana Veselá, recepce</div>
+    <a href="#d01">Přehled</a>
+    <a class="on" href="#d01">Dnes</a>
+    <a href="#d01">Plánování</a>
+    <a href="#d01">Pacienti</a>
+    <a href="#d01">Diagnostika</a>
+    <a href="#d01">Dokumenty</a>
+    <a href="#d01">Pokladna</a>
+    <a href="#d01">Fakturace</a>
+    <a href="#d01">Sklad</a>
+    <a href="#d01">Tým</a>
+    <a href="#d01">Nastavení</a>
+  </nav>
+
+  <div class="main">
+
+    <div class="top">
+      <h1 class="ttl">Agenda dne</h1>
+      <span class="where">úterý 23. září 2026</span>
+      <span class="clock">Právě je 09:40</span>
+    </div>
+
+    <div class="tally">
+      <span><b>18</b> návštěv od 07:00 do 16:40</span>
+      <span><b>5</b> hotovo</span>
+      <span><b>2</b> probíhá</span>
+      <span><b>1</b> zastaveno kvůli papírům</span>
+      <span><b>10</b> čeká na řadu</span>
+    </div>
+
+    <h2 class="past-h">Co už je odbyté (do 08:30)</h2>
+    <div class="past">
+      <div class="prow"><span class="pt">07:00</span><span class="pn">Jana Kratochvílová</span><span class="pa">Odběr krve · Laboratoř · Bc. Dvořák · 111</span><span class="ps">hotovo</span></div>
+      <div class="prow"><span class="pt">07:20</span><span class="pn">Petr Doležal</span><span class="pa">Vstupní vyšetření · Ordinace 1 · MUDr. Havelka · 201</span><span class="ps">hotovo</span></div>
+      <div class="prow"><span class="pt">07:40</span><span class="pn">Tomáš Řehák</span><span class="pa">Spiroergometrie · Laboratoř · Bc. Dvořák · 205</span><span class="ps">hotovo</span></div>
+      <div class="prow"><span class="pt">08:00</span><span class="pn">Marie Nováková</span><span class="pa">Fyzioterapie · Rehabilitace · Mgr. Pilařová · 111</span><span class="ps">hotovo</span></div>
+      <div class="prow"><span class="pt">08:30</span><span class="pn">Ondřej Veselý</span><span class="pa">Kontrola po úrazu · Ordinace 2 · MUDr. Sýkorová · 207</span><span class="ps">hotovo</span></div>
+    </div>
+
+    <h2 class="past-h">Rozepsané návštěvy</h2>
+    <div class="stack">
+
+      <article class="blk halt">
+        <div class="gut"><span class="tm">09:15</span><span class="dur">30 min</span></div>
+        <div class="cnt">
+          <div class="who">Martin Kolář</div>
+          <div class="act">Posudek pro klub</div>
+          <div class="meta">Ordinace 1 · MUDr. Havelka · pojišťovna 211</div>
+          <div class="halt-why">Chybí: Souhlas se zpracováním zdravotních údajů</div>
+          <div class="halt-how">Dokud ho pacient nepodepíše, nejde posudek vydat.
+            Souhlas se vytiskne u recepce, pacient ho podepíše a Hana Veselá ho
+            naskenuje do jeho složky.</div>
+          <div class="act-row">
+            <button type="button">Vytisknout souhlas k podpisu</button>
+            <span class="act-note">Ordinace 1 je do 11:00 volná, MUDr. Havelka čeká.</span>
+          </div>
+        </div>
+        <div class="st"><span class="chip stop">zastaveno</span>
+          <span class="sub">sedí v čekárně<br>už 25 minut</span></div>
+      </article>
+
+      <article class="blk live">
+        <div class="gut"><span class="tm">09:00</span><span class="dur">60 min</span></div>
+        <div class="cnt">
+          <div class="who">Lucie Bartošová</div>
+          <div class="act">Izokinetika kolene</div>
+          <div class="meta">Tělocvična · Bc. Dvořák · pojišťovna 111</div>
+          <div class="note">Druhé měření po operaci menisku. Porovnat s protokolem
+            z června.</div>
+        </div>
+        <div class="st"><span class="chip run">probíhá</span>
+          <span class="sub">končí v 10:00</span></div>
+      </article>
+
+      <article class="blk live">
+        <div class="gut"><span class="tm">09:45</span><span class="dur">30 min</span></div>
+        <div class="cnt">
+          <div class="who">Eva Procházková</div>
+          <div class="act">Rázová vlna</div>
+          <div class="meta">Rehabilitace · Mgr. Pilařová · pojišťovna 201</div>
+          <div class="note">Vzata dovnitř dřív, v 09:30, protože rehabilitace byla
+            volná — proto běží, přestože je objednaná až na 09:45.</div>
+        </div>
+        <div class="st"><span class="chip run">probíhá</span>
+          <span class="sub">začala v 09:30</span></div>
+      </article>
+
+      <div class="now"><span class="now-lab">Právě teď 09:40</span><span class="now-rule"></span></div>
+
+      <article class="blk">
+        <div class="gut"><span class="tm">10:00</span><span class="dur">45 min</span></div>
+        <div class="cnt">
+          <div class="who">Filip Urban</div>
+          <div class="act">Analýza chůze</div>
+          <div class="meta">Tělocvična · Bc. Dvořák · pojišťovna 213</div>
+          <div class="note">Tělocvična se uvolní přesně v 10:00, dřív ho nezvat dovnitř.</div>
+        </div>
+        <div class="st"><span class="chip">čeká</span><span class="sub">za 20 minut</span></div>
+      </article>
+
+      <article class="blk">
+        <div class="gut"><span class="tm">10:30</span><span class="dur">30 min</span></div>
+        <div class="cnt">
+          <div class="who">Kateřina Šimková</div>
+          <div class="act">Kontrola po operaci</div>
+          <div class="meta">Ordinace 2 · MUDr. Sýkorová · pojišťovna 111</div>
+          <div class="note">Nosí s sebou zprávu z traumatologie.</div>
+        </div>
+        <div class="st"><span class="chip">čeká</span></div>
+      </article>
+
+      <article class="blk">
+        <div class="gut"><span class="tm">11:00</span><span class="dur">45 min</span></div>
+        <div class="cnt">
+          <div class="who">Jakub Horák</div>
+          <div class="act">Vstupní vyšetření</div>
+          <div class="meta">Ordinace 1 · MUDr. Havelka · pojišťovna 205</div>
+          <div class="note">První návštěva, vyplní dotazník u recepce před vyšetřením.</div>
+        </div>
+        <div class="st"><span class="chip">čeká</span></div>
+      </article>
+
+      <article class="blk">
+        <div class="gut"><span class="tm">11:30</span><span class="dur">20 min</span></div>
+        <div class="cnt">
+          <div class="who">Veronika Málková</div>
+          <div class="act">Odběr krve</div>
+          <div class="meta">Laboratoř · Bc. Dvořák · pojišťovna 111</div>
+          <div class="note">Nalačno, přijde rovnou z tréninku.</div>
+        </div>
+        <div class="st"><span class="chip">čeká</span></div>
+      </article>
+
+      <article class="blk">
+        <div class="gut"><span class="tm">13:00</span><span class="dur">45 min</span></div>
+        <div class="cnt">
+          <div class="who">Adam Beneš</div>
+          <div class="act">Fyzioterapie</div>
+          <div class="meta">Rehabilitace · Mgr. Pilařová · pojišťovna 207</div>
+          <div class="note">Šestá série z deseti. Doplatek se platí u recepce.</div>
+        </div>
+        <div class="st"><span class="chip">čeká</span></div>
+      </article>
+
+      <article class="blk">
+        <div class="gut"><span class="tm">13:40</span><span class="dur">60 min</span></div>
+        <div class="cnt">
+          <div class="who">Nikola Tichá</div>
+          <div class="act">Spiroergometrie</div>
+          <div class="meta">Laboratoř · MUDr. Sýkorová · pojišťovna 201</div>
+          <div class="note">Přijde nalačno. Zprávu chce poslat trenérovi ještě dnes.</div>
+        </div>
+        <div class="st"><span class="chip">čeká</span></div>
+      </article>
+
+      <article class="blk">
+        <div class="gut"><span class="tm">14:20</span><span class="dur">30 min</span></div>
+        <div class="cnt">
+          <div class="who">Radek Pospíšil</div>
+          <div class="act">Kontrola po úrazu</div>
+          <div class="meta">Ordinace 2 · MUDr. Havelka · pojišťovna 111</div>
+          <div class="note">Minule hlásil bolest v achilovce, zeptat se, jestli povolila.</div>
+        </div>
+        <div class="st"><span class="chip">čeká</span></div>
+      </article>
+
+      <article class="blk">
+        <div class="gut"><span class="tm">15:00</span><span class="dur">60 min</span></div>
+        <div class="cnt">
+          <div class="who">Simona Vrbová</div>
+          <div class="act">Izokinetika kolene</div>
+          <div class="meta">Tělocvična · Mgr. Pilařová · pojišťovna 213</div>
+          <div class="note">Potřebuje protokol do reprezentace, termín odevzdání je pátek.</div>
+        </div>
+        <div class="st"><span class="chip">čeká</span></div>
+      </article>
+
+      <article class="blk">
+        <div class="gut"><span class="tm">15:40</span><span class="dur">45 min</span></div>
+        <div class="cnt">
+          <div class="who">Tomáš Řehák</div>
+          <div class="act">Fyzioterapie</div>
+          <div class="meta">Rehabilitace · Mgr. Pilařová · pojišťovna 205</div>
+          <div class="note">Druhá návštěva dnes — ráno byl v laboratoři na spiroergometrii.</div>
+        </div>
+        <div class="st"><span class="chip">čeká</span></div>
+      </article>
+
+      <article class="blk">
+        <div class="gut"><span class="tm">16:40</span><span class="dur">30 min</span></div>
+        <div class="cnt">
+          <div class="who">Petr Doležal</div>
+          <div class="act">Kontrola po operaci</div>
+          <div class="meta">Ordinace 1 · MUDr. Havelka · pojišťovna 201</div>
+          <div class="note">Druhá návštěva dnes — ráno byl na vstupním vyšetření.
+            Poslední pacient dne.</div>
+        </div>
+        <div class="st"><span class="chip">čeká</span><span class="sub">konec dne</span></div>
+      </article>
+
+    </div>
+
+    <p class="foot">Sloupec vlevo u každého bloku drží čas a délku, takže se den dá číst
+      po minutách stejně jako v papírovém diáři. Odbyté návštěvy zůstávají nahoře,
+      ale zmenšené na jeden řádek, aby nezabíraly místo lidem, kteří teprve přijdou.</p>
+
+  </div>
+</div>
+</article>

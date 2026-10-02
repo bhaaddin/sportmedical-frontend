@@ -1,147 +1,228 @@
-import client from './client';
+import axios from 'axios';
 
-export interface PublicBookingEventType {
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
+
+/**
+ * Deliberately NOT the shared `client`: that one attaches a bearer token and
+ * sends a 401 to the staff login screen. Somebody booking an appointment has no
+ * token and must never be bounced to a login page.
+ */
+const publicClient = axios.create({
+  baseURL: API_BASE,
+  timeout: 15000,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+/** One činnost a stranger may book. */
+export interface BookableActivity {
   id: string;
-  slug: string;
   name: string;
-  category: string;
+  durationMinutes: number;
+  /** The clinic's own text about this one. Empty when they have not written any. */
+  publicNote: string;
+  /** Which calendar runs it — needed to ask for times. */
+  calendarId: string;
+  /**
+   * What the visit costs, in Kč, from the price-list item the clinic linked to
+   * this činnost. `null` when none is linked — the card then says "cena na
+   * dotaz" instead of a made-up number. The same price the desk works from.
+   */
+  priceCzk: number | null;
+  /**
+   * Which optional consents this činnost will not be booked without. The
+   * clinic's setting, per činnost.
+   *
+   * Consent to the examination itself is not here: it is required by law for
+   * everything. Nor is marketing — consent that must be given to get an
+   * appointment is not freely given.
+   */
+  requiresReportByEmail: boolean;
+  requiresClubSharing: boolean;
+  /**
+   * Whether the health questionnaire is asked for, and whether it must be
+   * filled in. The clinic's setting, per činnost.
+   */
+  questionnaireRequirement: 'NotAsked' | 'Optional' | 'Required';
+  /**
+   * How long the slot will be held while the patient registers, in minutes.
+   *
+   * The server's own number - the calendar's setting, or the default when it
+   * has none - so the page can promise what will actually happen instead of
+   * the fifteen it used to have written into it.
+   */
+  holdMinutes: number;
+}
+
+export interface BookableService {
+  id: string;
+  name: string;
   description: string;
-  durationMinutes: number;
-  priceCzk: number;
-  room: string;
-  providerName: string;
-  color: string;
-  customQuestionsJson: string;
+  activities: BookableActivity[];
 }
 
-export interface BookingSlot {
-  start: string;
-  end: string;
-  durationMinutes: number;
-  timeZone: string;
-  providerName?: string;
-}
-
-export interface PublicBooking {
-  bookingId: string;
-  status: string;
+/** A free time. Two instants and nothing else — see the controller. */
+export interface BookableSlot {
   startUtc: string;
   endUtc: string;
-  eventName: string;
-  room: string;
-  providerName: string;
-  inviteeName: string;
-  inviteeEmail: string;
 }
 
-export interface BookingAvailabilitySchedule {
-  id: string;
-  providerName: string;
-  timeZone: string;
-  intervals: {
-    id: string;
-    dayOfWeek: number;
-    startMinute: number;
-    endMinute: number;
-  }[];
+export interface HeldSlot {
+  token: string;
+  startUtc: string;
+  endUtc: string;
+  expiresAtUtc: string;
 }
 
-export const publicBookingApi = {
-  // ── Public (no auth) ──────────────────────────────────────────
-  getEventTypes: async (): Promise<PublicBookingEventType[]> => {
-    const res = await client.get('/api/public/booking/events');
-    return res.data?.value ?? res.data ?? [];
-  },
+interface ApiResult<T> {
+  success: boolean;
+  message: string;
+  data: T;
+}
 
-  getEventBySlug: async (slug: string): Promise<PublicBookingEventType> => {
-    const res = await client.get(`/api/public/booking/events/${slug}`);
-    return res.data?.value ?? res.data;
-  },
+/**
+ * What the clinic offers, read from the admin's own calendars.
+ *
+ * Empty is a real answer: nothing marked publicly bookable means the clinic is
+ * not taking online bookings, and the page says so rather than showing a
+ * spinner for ever.
+ */
+export const bookableOffer = async (): Promise<BookableService[]> => {
+  const { data } = await publicClient.get<ApiResult<BookableService[]>>(
+    '/api/public/booking/offer',
+  );
 
-  getSlots: async (slug: string, from: string, to: string, timeZone = 'Europe/Prague'): Promise<BookingSlot[]> => {
-    const params = new URLSearchParams({ slug, from, to, timeZone });
-    const res = await client.get(`/api/public/booking/slots?${params}`);
-    return res.data?.value ?? res.data ?? [];
-  },
+  return data.data ?? [];
+};
 
-  createBooking: async (data: {
-    slug: string;
-    inviteeName: string;
-    inviteeEmail: string;
-    inviteePhone?: string;
-    inviteeTimeZone?: string;
-    startAt: string;
-    notes?: string;
-    consentsJson?: string;
-    providerName?: string;
-    idempotencyKey?: string;
-  }): Promise<PublicBooking> => {
-    const res = await client.post('/api/public/booking/bookings', data);
-    return res.data?.value ?? res.data;
-  },
+/** Which days between two dates have at least one free time. */
+export const freeDays = async (
+  calendarId: string,
+  activityId: string,
+  from: string,
+  to: string,
+): Promise<string[]> => {
+  const { data } = await publicClient.get<ApiResult<string[]>>('/api/public/booking/days', {
+    params: { calendarId, activityId, from, to },
+  });
 
-  getBooking: async (id: string): Promise<PublicBooking> => {
-    const res = await client.get(`/api/public/booking/bookings/${id}`);
-    return res.data?.value ?? res.data;
-  },
+  return data.data ?? [];
+};
 
-  cancelBooking: async (id: string, reason?: string): Promise<void> => {
-    const params = reason ? `?reason=${encodeURIComponent(reason)}` : '';
-    await client.delete(`/api/public/booking/bookings/${id}${params}`);
-  },
+/** The free times on one day. */
+export const freeSlots = async (
+  calendarId: string,
+  activityId: string,
+  date: string,
+): Promise<BookableSlot[]> => {
+  const { data } = await publicClient.get<ApiResult<BookableSlot[]>>('/api/public/booking/slots', {
+    params: { calendarId, activityId, date },
+  });
 
-  checkPatient: async (email: string): Promise<{ isFirstVisit: boolean }> => {
-    const res = await client.get(`/api/public/booking/check-patient?email=${encodeURIComponent(email)}`);
-    return res.data?.value ?? res.data;
-  },
+  return data.data ?? [];
+};
 
-  // ── Admin (auth required) ────────────────────────────────────
-  adminGetAll: async (): Promise<PublicBookingEventType[]> => {
-    const res = await client.get('/api/booking/event-types');
-    return res.data?.value ?? res.data ?? [];
-  },
+/** Why a slot could not be held, in the words the patient sees. */
+export class SlotGoneError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SlotGoneError';
+  }
+}
 
-  adminGetBookings: async (params?: { from?: string; to?: string; status?: string }) => {
-    const search = new URLSearchParams();
-    if (params?.from) search.set('from', params.from);
-    if (params?.to) search.set('to', params.to);
-    if (params?.status) search.set('status', params.status);
-    const res = await client.get(`/api/booking/admin/bookings?${search}`);
-    return res.data?.value ?? res.data ?? [];
-  },
+/**
+ * Keeps a slot while the patient registers.
+ *
+ * The time is genuinely taken from this moment — the hold is a row under the
+ * same constraint that stops two appointments colliding — and it lapses by
+ * itself if the registration is abandoned.
+ *
+ * 409 and 422 both mean somebody else got there first, or the time stopped
+ * being offered while it was being chosen. They are one error here because the
+ * patient does the same thing about either: pick another time.
+ */
+export const holdSlot = async (
+  calendarId: string,
+  activityId: string,
+  startUtc: string,
+): Promise<HeldSlot> => {
+  try {
+    const { data } = await publicClient.post<ApiResult<HeldSlot>>('/api/public/booking/hold', {
+      calendarId,
+      activityId,
+      startUtc,
+    });
 
-  adminGetStats: async () => {
-    const res = await client.get('/api/booking/admin/stats');
-    return res.data?.value ?? res.data;
-  },
-
-  adminGetPatientDocuments: async (params: { email?: string; firstName?: string; lastName?: string; birthDate?: string }) => {
-    const search = new URLSearchParams();
-    if (params.email) search.set('email', params.email);
-    if (params.firstName) search.set('firstName', params.firstName);
-    if (params.lastName) search.set('lastName', params.lastName);
-    if (params.birthDate) search.set('birthDate', params.birthDate);
-    const res = await client.get(`/api/booking/admin/patient-documents?${search}`);
-    return res.data?.value ?? res.data;
-  },
-
-  adminSeed: async () => {
-    const res = await client.post('/api/booking/event-types/seed');
-    return res.data?.value ?? res.data;
-  },
-
-  // ── Availability ──────────────────────────────────────────────
-  getAvailabilitySchedules: async (): Promise<BookingAvailabilitySchedule[]> => {
-    const res = await client.get('/api/booking/availability');
-    return res.data?.value ?? res.data ?? [];
-  },
-
-  saveAvailabilitySchedule: async (schedule: Partial<BookingAvailabilitySchedule>): Promise<BookingAvailabilitySchedule> => {
-    if (schedule.id) {
-      const res = await client.put(`/api/booking/availability/${schedule.id}`, schedule);
-      return res.data?.value ?? res.data;
+    return data.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && (error.response?.status === 409 || error.response?.status === 422)) {
+      throw new SlotGoneError(
+        (error.response.data as ApiResult<unknown> | undefined)?.message
+        ?? 'Tento termín byl právě obsazen.',
+      );
     }
-    const res = await client.post('/api/booking/availability', schedule);
-    return res.data?.value ?? res.data;
-  },
+
+    throw error;
+  }
+};
+
+/* ── The slot being carried from the booking page to the registration ── */
+
+const HELD_KEY = 'smd.booking.held.v1';
+
+/** What the registration page needs to know about the slot it is finishing. */
+export interface HeldBooking {
+  token: string;
+  startUtc: string;
+  endUtc: string;
+  expiresAtUtc: string;
+  serviceName: string;
+  activityName: string;
+  activityId: string;
+  calendarId: string;
+  /** Carried to the registration so it knows which consents it must insist on. */
+  requiresReportByEmail: boolean;
+  requiresClubSharing: boolean;
+  /** And whether the questionnaire is offered, insisted on, or not asked at all. */
+  questionnaireRequirement: 'NotAsked' | 'Optional' | 'Required';
+}
+
+/**
+ * The booking page holds a slot and the registration page finishes it, and they
+ * are two screens. This is how the slot crosses between them.
+ *
+ * `sessionStorage` rather than `localStorage`: a held slot belongs to the tab
+ * that is booking it and lasts fifteen minutes. Finding yesterday's abandoned
+ * hold in a new window and being told a time is waiting would be a lie, and
+ * reading it out of a URL would let one person hand another their hold.
+ */
+export const rememberHeld = (booking: HeldBooking): void => {
+  try {
+    window.sessionStorage.setItem(HELD_KEY, JSON.stringify(booking));
+  } catch {
+    /* Private window, or storage refused. The registration still works; it
+       simply will not know a slot is waiting, which is the honest fallback. */
+  }
+};
+
+export const readHeld = (): HeldBooking | null => {
+  try {
+    const raw = window.sessionStorage.getItem(HELD_KEY);
+    if (raw === null) return null;
+
+    const held = JSON.parse(raw) as HeldBooking;
+
+    // A hold that has run out is not a hold. Saying so here keeps every screen
+    // from having to check the clock for itself.
+    return new Date(held.expiresAtUtc).getTime() > Date.now() ? held : null;
+  } catch {
+    return null;
+  }
+};
+
+export const forgetHeld = (): void => {
+  try {
+    window.sessionStorage.removeItem(HELD_KEY);
+  } catch {
+    /* Nothing to do, and nothing worth telling anybody. */
+  }
 };

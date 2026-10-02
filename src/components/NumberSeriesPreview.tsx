@@ -48,7 +48,7 @@ export const NumberSeriesPreview: React.FC<NumberSeriesPreviewProps> = ({
 
   if (loading) {
     return (
-      <Box display="flex" alignItems="center" gap={1}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <CircularProgress size={16} />
         <Typography variant="caption">Načítání...</Typography>
       </Box>
@@ -57,7 +57,7 @@ export const NumberSeriesPreview: React.FC<NumberSeriesPreviewProps> = ({
 
   if (error) {
     return (
-      <Box display="flex" alignItems="center" gap={1}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Typography variant="caption" color="error">
           {error}
         </Typography>
@@ -71,7 +71,7 @@ export const NumberSeriesPreview: React.FC<NumberSeriesPreviewProps> = ({
   }
 
   return (
-    <Box display="flex" alignItems="center" gap={1}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
       {showLabel && (
         <Typography variant="caption" color="text.secondary">
           Další číslo:

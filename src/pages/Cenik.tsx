@@ -1,36 +1,76 @@
-import { useState, useEffect } from 'react';
+/*
+ * The price list: what the ordinace charges, how long it takes and what it costs.
+ *
+ * These rows are "položky ceníku" on screen and not "služby", because that one
+ * word meant two things in this application and misled the owner three times
+ * in a day. A `činnost` is what you put in a calendar; a row here is what you
+ * bill. One visit is scheduled as one činnost and billed as one or more of
+ * these. The route and the type stay `api/services` and `ServiceItem` -
+ * renaming those would reach into booking's `Activity.ServiceItemId` and into
+ * invoicing and gain nothing, because it was the labels that misled, not the
+ * identifiers.
+ *
+ * It was already here, already full - eight priced services off
+ * `/api/services` - and reachable only by typing the address: not in the menu,
+ * not in Nastavení. The owner asked where the price list was and the honest
+ * answer was nowhere. It is in Nastavení -> Ordinace now.
+ *
+ * The button marked "Upravit ceník" was wired to nothing, while the server has
+ * had create, update and archive all along. Editing is real from here on, and
+ * every rule is checked in front, because the server checks almost none of
+ * them - see `pricing/serviceForm.ts`.
+ */
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Grid, Card, CardContent, Chip, Button, TextField, InputAdornment,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Skeleton,
+  IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogContentText,
+  DialogActions, Alert,
 } from '@mui/material';
-import { Search, AttachMoney, Timer, Devices, CheckCircle, Edit } from '@mui/icons-material';
+import { Search, AttachMoney, Add, Edit, Archive } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { servicesApi } from '../api/services';
+import { usePermission } from '../auth/usePermission';
 import type { ServiceItem } from '../api/services';
-
-const categoryColors: Record<string, { bg: string; text: string }> = {
-  'Prohlídka': { bg: '#E8F5E9', text: '#2E7D32' },
-  'Diagnostika': { bg: '#E3F2FD', text: '#1565C0' },
-  'Měření': { bg: '#FFF3E0', text: '#E65100' },
-  'Terapie': { bg: '#F3E5F5', text: '#7B1FA2' },
-};
+import ServiceDialog from './pricing/ServiceDialog';
 
 export default function Cenik() {
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
+  /* `undefined` closed; `null` a new service; an item to change that one. */
+  const [editing, setEditing] = useState<ServiceItem | null | undefined>(undefined);
+  /* Everybody reads the price list - the desk quotes from it. Changing it is
+     the clinic's configuration, and the server refuses it without this. */
+  const mayEdit = usePermission('settings.clinic.manage');
+  const [archiving, setArchiving] = useState<ServiceItem | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  const load = useCallback(() => {
     servicesApi.getAll()
-      .then(setServices)
-      .catch(() => {})
+      .then((items) => { setServices(items); setFailed(null); })
+      .catch(() => setFailed('Ceník se nepodařilo načíst.'))
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(load, [load]);
+
+  const confirmArchive = async () => {
+    if (archiving === null) return;
+    try {
+      await servicesApi.archive(archiving.id);
+      setArchiving(null);
+      load();
+    } catch {
+      setFailed('Vyřazení se nepodařilo.');
+      setArchiving(null);
+    }
+  };
+
   const filtered = services.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.code.toLowerCase().includes(search.toLowerCase()) ||
-    s.category.toLowerCase().includes(search.toLowerCase())
+    s.code.toLowerCase().includes(search.toLowerCase())
   );
 
   const totalServices = services.length;
@@ -39,27 +79,68 @@ export default function Cenik() {
   return (
     <Box>
       <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <AttachMoney color="primary" /> Ceník služeb
+              <AttachMoney color="primary" /> Ceník
             </Typography>
-            <Typography variant="body2" color="text.secondary">Přehled nabízených služeb a ceník</Typography>
+            <Typography variant="body2" color="text.secondary">Co ordinace účtuje — položky a ceny</Typography>
           </Box>
-          <Button variant="outlined" startIcon={<Edit />} sx={{ borderRadius: 2, px: 3 }}>
-            Upravit ceník
-          </Button>
+          {mayEdit && (
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => setEditing(null)}
+              sx={{ borderRadius: 2, px: 3, bgcolor: '#0D7377' }}
+            >
+              Nová položka
+            </Button>
+          )}
         </Box>
       </motion.div>
 
+      {failed !== null && <Alert severity="warning" sx={{ mb: 2 }}>{failed}</Alert>}
+
+      {/*
+        * An empty price list is the normal state of a new installation now -
+        * the eight demo rows were a seed and it has been removed from the code
+        * as well as the database, so nothing reappears. Three zeroes and a
+        * search box over nothing are furniture; this says what to do instead.
+        */}
+      {!loading && services.length === 0 && failed === null && (
+        <Card sx={{ borderRadius: 3, textAlign: 'center', py: 6 }}>
+          <CardContent>
+            <AttachMoney sx={{ fontSize: 40, color: 'text.disabled' }} />
+            <Typography variant="h6" sx={{ fontWeight: 700, mt: 1 }}>
+              Ceník je prázdný
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 3 }}>
+              {mayEdit
+                ? 'Přidejte první položku — co ordinace nabízí a kolik to stojí.'
+                : 'Ceník vyplní ten, kdo smí měnit nastavení ordinace.'}
+            </Typography>
+            {mayEdit && (
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => setEditing(null)}
+                sx={{ borderRadius: 2, px: 3, bgcolor: '#0D7377' }}
+              >
+                Nová položka
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats Cards */}
+      {services.length > 0 && (
       <Grid container spacing={3} sx={{ mb: 3 }}>
         {[
-          { label: 'Celkem služeb', value: totalServices, color: '#0D7377' },
+          { label: 'Celkem položek', value: totalServices, color: '#0D7377' },
           { label: 'Průměrná cena', value: `${avgPrice.toLocaleString('cs-CZ')} Kč`, color: '#2E7D32' },
-          { label: 'Kategorií', value: new Set(services.map(s => s.category)).size, color: '#ED6C02' },
         ].map((stat, i) => (
-          <Grid key={stat.label} size={{ xs: 12, sm: 4 }}>
+          <Grid key={stat.label} size={{ xs: 12, sm: 6 }}>
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.1 }}>
               <Card>
                 <CardContent sx={{ textAlign: 'center', py: 3 }}>
@@ -73,20 +154,23 @@ export default function Cenik() {
           </Grid>
         ))}
       </Grid>
+      )}
 
       {/* Search */}
+      {services.length > 0 && (
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
         <TextField
           fullWidth
-          placeholder="Hledat službu..."
+          placeholder="Hledat v ceníku..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          InputProps={{
+          slotProps={{ input: {
             startAdornment: <InputAdornment position="start"><Search /></InputAdornment>,
-          }}
+          } }}
           sx={{ mb: 3, '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
         />
       </motion.div>
+      )}
 
       {/* Service Cards */}
       {loading ? (
@@ -99,9 +183,7 @@ export default function Cenik() {
         </Grid>
       ) : (
         <Grid container spacing={3}>
-          {filtered.map((service, i) => {
-            const colors = categoryColors[service.category] || { bg: '#F5F5F5', text: '#666' };
-            return (
+          {filtered.map((service, i) => (
               <Grid key={service.id} size={{ xs: 12, sm: 6, md: 4 }}>
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -110,11 +192,11 @@ export default function Cenik() {
                   whileHover={{ y: -4, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
                 >
                   <Card sx={{ height: '100%', overflow: 'hidden' }}>
-                    <Box sx={{ height: 4, bgcolor: colors.text }} />
+                    <Box sx={{ height: 4, bgcolor: '#0D7377' }} />
                     <CardContent sx={{ p: 3 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                         <Box>
-                          <Chip label={service.code} size="small" sx={{ mb: 1, fontWeight: 700, bgcolor: colors.bg, color: colors.text }} />
+                          <Chip label={service.code} size="small" sx={{ mb: 1, fontWeight: 700 }} />
                           <Typography variant="h6" sx={{ fontWeight: 700 }}>{service.name}</Typography>
                         </Box>
                         <Typography variant="h5" sx={{ fontWeight: 800, color: '#0D7377' }}>
@@ -126,27 +208,58 @@ export default function Cenik() {
                         {service.description}
                       </Typography>
 
-                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                        <Chip icon={<Timer sx={{ fontSize: 16 }} />} label={`${service.durationMinutes} min`} size="small" variant="outlined" />
-                        <Chip icon={<AttachMoney sx={{ fontSize: 16 }} />} label={`${(service.priceCzk / service.durationMinutes).toFixed(0)} Kč/min`} size="small" variant="outlined" />
+                      {/*
+                        * No length and no Kč/min.
+                        *
+                        * Length belongs to the činnost; booking measured that
+                        * the price-list copy was read nowhere but in a
+                        * comparison against it, and removed both the
+                        * comparison and its warning. So the dialog stopped
+                        * offering the field - and a number somebody can see
+                        * but no longer change, and nobody maintains, is worse
+                        * than either. Kč/min was arithmetic on it.
+                        */}
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <Box sx={{ flex: 1 }} />
+                        {/* Named, not just drawn: an icon alone tells a screen
+                            reader nothing, and a tooltip is not a name. */}
+                        {mayEdit && (
+                          <>
+                            <Tooltip title="Upravit">
+                              <IconButton
+                                size="small"
+                                aria-label={`Upravit položku ${service.name}`}
+                                onClick={() => setEditing(service)}
+                              >
+                                <Edit fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Vyřadit z ceníku">
+                              <IconButton
+                                size="small"
+                                aria-label={`Vyřadit položku ${service.name}`}
+                                onClick={() => setArchiving(service)}
+                              >
+                                <Archive fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        )}
                       </Box>
-
-                      {service.isActive && (
-                        <Chip icon={<CheckCircle sx={{ fontSize: 14 }} />} label="Aktivní" size="small"
-                          sx={{ mt: 2, bgcolor: '#E8F5E9', color: '#2E7D32' }} />
-                      )}
                     </CardContent>
                   </Card>
                 </motion.div>
               </Grid>
-            );
-          })}
+          ))}
         </Grid>
       )}
 
-      {!loading && filtered.length === 0 && (
+      {/* Only about the search. An empty price list has its own words above -
+          "nic takového není" answers a question nobody asked when there is
+          nothing to search through. */}
+      {!loading && services.length > 0 && filtered.length === 0 && (
         <Box sx={{ textAlign: 'center', py: 8 }}>
-          <Typography variant="h6" color="text.secondary">Žádné služby nenalezeny</Typography>
+          <Typography variant="h6" color="text.secondary">V ceníku nic takového není</Typography>
         </Box>
       )}
 
@@ -160,8 +273,6 @@ export default function Cenik() {
                 <TableRow sx={{ bgcolor: '#f8f9fa' }}>
                   <TableCell sx={{ fontWeight: 700 }}>Kód</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Název</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Kategorie</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Trvání</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Cena (Kč)</TableCell>
                 </TableRow>
               </TableHead>
@@ -172,8 +283,6 @@ export default function Cenik() {
                       <Chip label={service.code} size="small" sx={{ fontWeight: 700 }} />
                     </TableCell>
                     <TableCell sx={{ fontWeight: 500 }}>{service.name}</TableCell>
-                    <TableCell>{service.category}</TableCell>
-                    <TableCell align="right">{service.durationMinutes} min</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700, color: '#0D7377' }}>
                       {service.priceCzk.toLocaleString('cs-CZ')} Kč
                     </TableCell>
@@ -184,6 +293,38 @@ export default function Cenik() {
           </TableContainer>
         </motion.div>
       )}
+
+      {editing !== undefined && (
+        <ServiceDialog
+          open
+          service={editing}
+          existing={services}
+          onClose={() => setEditing(undefined)}
+          onSaved={load}
+        />
+      )}
+
+      {/*
+        * A one-way door, and it says so before it is opened. The list route on
+        * the server is "active only", so a vyřazená služba is never returned
+        * again and there is no screen that can find it to bring it back.
+        */}
+      <Dialog open={archiving !== null} onClose={() => setArchiving(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Vyřadit z ceníku?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            <strong>{archiving?.name}</strong> se přestane nabízet. Zpátky už se
+            do ceníku vrátit nedá — kdybyste ji potřebovali znovu, bude se muset
+            založit nová.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setArchiving(null)}>Zrušit</Button>
+          <Button color="error" variant="contained" onClick={confirmArchive}>
+            Vyřadit
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

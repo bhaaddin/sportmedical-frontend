@@ -1,0 +1,29 @@
+# Normalize all text files in the repository to LF in the index.
+# Without this, a Windows checkout produces a phantom diff on every
+# tracked file (CRLF working tree vs LF blobs).
+* text=auto eol=lf
+
+# Explicit source/config types.
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.json  text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.svg   text eol=lf
+
+# Binary — never touch.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.pdf   binary

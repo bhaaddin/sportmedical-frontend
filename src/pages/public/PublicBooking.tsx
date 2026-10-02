@@ -1,554 +1,621 @@
-import { useState, useEffect } from 'react';
+/* ══════════════════════════════════════════════════════════════
+   OBJEDNÁNÍ ONLINE  (route: /objednat)
+
+   Pick a service, pick a činnost, pick a day, pick a time. The slot is held
+   from that moment and the patient goes on to the registration to finish it.
+
+   This file used to say the screen had not been built, and why: the old one was
+   written against `/api/public/book` and a system of public event types that
+   etapa 9 deleted, so it was pointing at nothing. The note asked for it to be
+   rewritten against the calendars that actually exist. That is what this is.
+
+   ── One page that grows, not a wizard ──
+
+   Each choice reveals the next. Nothing is hidden behind a Pokračovat, and
+   going back is scrolling up and clicking something else — the same reasoning
+   that took the five steps out of /dotaznik. A booking IS sequential, unlike
+   that form, but sequential does not have to mean one thing on screen at a
+   time.
+
+   ── Everything here comes from the admin's own calendar ──
+
+   /api/public/booking/offer lists a činnost only if the owner created it,
+   marked it publicly bookable, left it active, put it under a service, and that
+   service has a live calendar. The days are the days he said he works. There is
+   no second list of what the clinic does, and nothing on this page decides
+   anything he has not already decided.
+   ══════════════════════════════════════════════════════════════ */
+
+import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Container, Paper, Stepper, Step, StepLabel,
-  Button, Grid, Card, CardContent, TextField, Alert, CircularProgress,
-  Checkbox, FormControlLabel, FormGroup, Divider, Chip, Avatar
+  Alert,
+  Box,
+  Chip,
+  CircularProgress,
+  Container,
+  Typography,
 } from '@mui/material';
-import { motion } from 'framer-motion';
-import { format, addDays, isWeekend, getDay, startOfWeek, addWeeks } from 'date-fns';
-import { cs } from 'date-fns/locale';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import {
+  EventAvailableOutlined,
+  LockOutlined,
+  ScheduleOutlined,
+  VerifiedUserOutlined,
+} from '@mui/icons-material';
+import {
+  SlotGoneError,
+  bookableOffer,
+  freeDays,
+  freeSlots,
+  holdSlot,
+  rememberHeld,
+} from '../../api/publicBooking';
+import type { BookableActivity, BookableService, BookableSlot } from '../../api/publicBooking';
+import { readPublicClinic } from '../../api/clinicSettings';
+import type { PublicClinic } from '../../api/clinicSettings';
 
-const steps = ['Služba', 'Lékař', 'Datum & čas', 'Vaše údaje', 'Souhlasy (GDPR)', 'Potvrzení'];
+/* ── Brand, the same one /dotaznik wears ── */
 
-interface Service {
-  id: string;
-  name: string;
-  description: string;
-  duration: number;
-  price: number;
-  category: string;
-  requiresConsent: boolean;
-}
-
-interface Doctor {
-  id: string;
-  name: string;
-  specialization: string;
-  avatar: string;
-  rating: number;
-  availableDays: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
-}
-
-interface TimeSlot {
-  time: string;
-  available: boolean;
-}
-
-// Simulated data — in production this comes from API
-const mockServices: Service[] = [
-  { id: '1', name: 'Vstupní preventivní prohlídka', description: 'Komplexní vstupní prohlídka s hodnocením zdravotního stavu', duration: 30, price: 500, category: 'Preventivní', requiresConsent: true },
-  { id: '2', name: 'Sportovní prohlídka', description: 'Sportovnělékařské vyšetření pro sportovce', duration: 45, price: 800, category: 'Sportovní', requiresConsent: true },
-  { id: '3', name: 'Kontrolní prohlídka', description: 'Kontrolní vyšetření po předchozí prohlídce', duration: 15, price: 250, category: 'Preventivní', requiresConsent: false },
-  { id: '4', name: 'Rehabilitace', description: 'Rehabilitační seance s fyzioterapeutem', duration: 60, price: 1200, category: 'Rehabilitace', requiresConsent: true },
-];
-
-const mockDoctors: Doctor[] = [
-  { id: '1', name: 'MUDr. Jan Novák', specialization: 'Sportovní lékařství', avatar: '', rating: 4.8, availableDays: [1, 2, 3, 4, 5] },
-  { id: '2', name: 'MUDr. Marie Svobodová', specialization: 'Fyzioterapie', avatar: '', rating: 4.9, availableDays: [1, 3, 4, 5] },
-  { id: '3', name: 'MUDr. Pavel Dvořák', specialization: 'Preventivní medicína', avatar: '', rating: 4.7, availableDays: [1, 2, 4, 5] },
-];
-
-const generateTimeSlots = (date: string, doctorId: string): TimeSlot[] => {
-  const slots: TimeSlot[] = [];
-  for (let hour = 8; hour < 17; hour++) {
-    for (let min = 0; min < 60; min += 30) {
-      const time = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
-      // Simulate some slots being taken
-      const available = Math.random() > 0.3;
-      slots.push({ time, available });
-    }
-  }
-  return slots;
+const BRAND = {
+  ink: '#0B0B0C',
+  accent: '#FF9D00',
+  accentDark: '#E08A00',
+  accentWash: 'rgba(255, 157, 0, 0.09)',
+  accentEdge: 'rgba(255, 157, 0, 0.32)',
+  page: '#F4F4F6',
+  line: '#E5E5E9',
+  muted: 'rgba(17, 17, 17, 0.58)',
 };
 
+const INTER = '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+
+const publicTheme = createTheme({
+  palette: {
+    mode: 'light',
+    primary: { main: BRAND.accent, dark: BRAND.accentDark, contrastText: BRAND.ink },
+    background: { default: BRAND.page, paper: '#FFFFFF' },
+    text: { primary: '#111111', secondary: BRAND.muted },
+    divider: BRAND.line,
+  },
+  shape: { borderRadius: 12 },
+  typography: {
+    fontFamily: INTER,
+    h4: { fontWeight: 800, letterSpacing: '-0.02em' },
+    button: { textTransform: 'none', fontWeight: 700 },
+  },
+});
+
+/** How far ahead the day list asks. The calendar's own horizon still applies. */
+const HORIZON_DAYS = 60;
+
+const iso = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+/**
+ * A time as the clinic reads it.
+ *
+ * The server answers in UTC and the browser may be anywhere. Somebody booking
+ * from a phone that thinks it is in London must still be told the Prague time
+ * they are expected at, so the zone is named rather than left to the device.
+ */
+const clinicTime = (utc: string): string =>
+  new Date(utc).toLocaleTimeString('cs-CZ', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Prague',
+  });
+
+const clinicDate = (isoDate: string): string => {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString('cs-CZ', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+};
+
+/**
+ * Minutes, declined the way Czech declines them: 1 minutu, 2-4 minuty, 5+ minut.
+ *
+ * Worth the twelve lines. "podržíme 5 minutu" is the kind of thing that makes a
+ * clinic's own booking page look like it was written by somebody who does not
+ * speak the language - and the number is the clinic's to choose, so every case
+ * is reachable.
+ */
+function minuteWord(minutes: number): string | null {
+  // A server that does not send the number is not a reason to print
+  // "undefined minut" at somebody, and not a reason to invent fifteen either.
+  // The sentence simply does not appear; the hold still happens.
+  if (!Number.isFinite(minutes) || minutes <= 0) return null;
+
+  if (minutes === 1) return '1 minutu';
+  if (minutes >= 2 && minutes <= 4) return `${minutes} minuty`;
+
+  return `${minutes} minut`;
+}
+
+/**
+ * ", nebo nám zavolejte na 123" — or nothing at all.
+ *
+ * The clinic may not have filled in a telephone number, and a sentence that
+ * ends "zavolejte nám na" with a blank after it is worse than one that does not
+ * mention the telephone. So the whole clause appears or none of it does.
+ */
+function ringUs(clinic: PublicClinic | null, lead: string): string {
+  const phone = clinic?.phone.trim() ?? '';
+
+  return phone === '' ? '' : `${lead}${phone}`;
+}
+
 export default function PublicBooking() {
-  const [activeStep, setActiveStep] = useState(0);
-  const [selectedService, setSelectedService] = useState<string>('');
-  const [selectedDoctor, setSelectedDoctor] = useState<string>('');
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedTime, setSelectedTime] = useState<string>('');
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
-  const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(addWeeks(new Date(), 1), { weekStartsOn: 1 }));
+  const navigate = useNavigate();
 
-  // Patient data
-  const [patientData, setPatientData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    rodneCislo: '',
-    dateOfBirth: '',
-    insuranceCompany: '',
-    insuranceNumber: '',
-    address: '',
-    city: '',
-    postalCode: '',
-    notes: '',
-  });
+  const [services, setServices] = useState<BookableService[] | null>(null);
+  const [offerFailed, setOfferFailed] = useState(false);
 
-  // GDPR consents
-  const [consents, setConsents] = useState({
-    dataProcessing: false,     // ZPRACOVÁNÍ OSOBNÍCH ÚDAJŮ (GDPR čl. 6)
-    healthDataProcessing: false, // ZPRACOVÁNÍ ZDRAVOTNÍCH ÚDAJŮ (GDPR čl. 9)
-    dataRetention: false,      // SOUHLAS S UCHOVÁNÍM DAT
-    marketingConsent: false,   // MARKETING
-    thirdPartySharing: false,  // SDÍLENÍ S TŘETÍMI STRANAMI
-    cameraConsent: false,      // POŘIZOVÁNÍ ZÁZNAMŮ
-  });
+  /*
+   * The clinic's telephone number, from the admin's own settings.
+   *
+   * It was written into this file three times. Every one of them was a value
+   * the owner may need to change and none of them was his to change: the first
+   * time the clinic changes provider, three sentences send patients to a number
+   * that no longer answers.
+   *
+   * Null while loading, empty when nobody has filled it in. Both mean the same
+   * thing here — say nothing about telephoning rather than invent a number.
+   */
+  const [clinic, setClinic] = useState<PublicClinic | null>(null);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-
-  const selectedServiceData = mockServices.find(s => s.id === selectedService);
-  const selectedDoctorData = mockDoctors.find(d => d.id === selectedDoctor);
-
-  // Check if date is available for selected doctor
-  const isDateAvailable = (date: Date): boolean => {
-    if (!selectedDoctorData) return false;
-    const dayOfWeek = getDay(date);
-    return selectedDoctorData.availableDays.includes(dayOfWeek);
-  };
-
-  // Generate available dates for 3 weeks
-  const getAvailableDates = (): Date[] => {
-    const dates: Date[] = [];
-    for (let i = 0; i < 21; i++) {
-      const date = addDays(currentWeekStart, i);
-      if (!isWeekend(date) && isDateAvailable(date)) {
-        dates.push(date);
-      }
-    }
-    return dates;
-  };
+  const [chosen, setChosen] =
+    useState<{ service: BookableService; activity: BookableActivity } | null>(null);
+  const [days, setDays] = useState<string[] | null>(null);
+  const [day, setDay] = useState<string | null>(null);
+  const [slots, setSlots] = useState<BookableSlot[] | null>(null);
+  const [holding, setHolding] = useState<string | null>(null);
+  const [complaint, setComplaint] = useState<string | null>(null);
 
   useEffect(() => {
-    if (selectedDate && selectedDoctor) {
-      setTimeSlots(generateTimeSlots(selectedDate, selectedDoctor));
-    }
-  }, [selectedDate, selectedDoctor]);
+    let cancelled = false;
 
-  // GDPR required checks
-  const isGdprValid = () => {
-    if (!selectedServiceData?.requiresConsent) return true;
-    return consents.dataProcessing && consents.healthDataProcessing && consents.dataRetention;
-  };
+    bookableOffer()
+      .then((offer) => { if (!cancelled) setServices(offer); })
+      .catch(() => { if (!cancelled) setOfferFailed(true); });
 
-  const handleNext = () => {
-    if (activeStep === 3) {
-      // Validate patient data
-      if (!patientData.firstName || !patientData.lastName || !patientData.email || !patientData.phone) {
-        setError('Vyplňte prosím povinné údaje (jméno, příjmení, e-mail, telefon)');
-        return;
-      }
-      setError(null);
-    }
-    setActiveStep(prev => prev + 1);
-  };
+    // Never throws -- see readPublicClinic. A missing telephone number must not
+    // cost the patient the booking screen.
+    void readPublicClinic().then((details) => { if (!cancelled) setClinic(details); });
 
-  const handleBack = () => {
-    setError(null);
-    setActiveStep(prev => prev - 1);
-  };
+    return () => { cancelled = true; };
+  }, []);
 
-  const handleSubmit = async () => {
-    if (!isGdprValid()) {
-      setError('Musíte souhlasit se zpracováním osobních údajů');
-      return;
-    }
+  /* Days for the chosen činnost. Cleared first, so a slow answer for the
+     previous choice can never land under the new one. */
+  useEffect(() => {
+    if (chosen === null) return undefined;
 
-    setLoading(true);
-    setError(null);
+    let cancelled = false;
+    setDays(null);
+    setDay(null);
+    setSlots(null);
+
+    const from = new Date();
+    const to = new Date();
+    to.setDate(to.getDate() + HORIZON_DAYS);
+
+    freeDays(chosen.activity.calendarId, chosen.activity.id, iso(from), iso(to))
+      .then((free) => { if (!cancelled) setDays(free); })
+      .catch(() => { if (!cancelled) setDays([]); });
+
+    return () => { cancelled = true; };
+  }, [chosen]);
+
+  useEffect(() => {
+    if (chosen === null || day === null) return undefined;
+
+    let cancelled = false;
+    setSlots(null);
+
+    freeSlots(chosen.activity.calendarId, chosen.activity.id, day)
+      .then((free) => { if (!cancelled) setSlots(free); })
+      .catch(() => { if (!cancelled) setSlots([]); });
+
+    return () => { cancelled = true; };
+  }, [chosen, day]);
+
+  /**
+   * Hold the slot, then go to the registration.
+   *
+   * The hold happens BEFORE the form, which is the whole point: the patient
+   * spends a minute typing and the time is already theirs. If somebody got
+   * there first they are told here — while they have typed nothing — rather
+   * than at the end, having given us their address and their insurance number.
+   */
+  const take = async (slot: BookableSlot): Promise<void> => {
+    if (chosen === null) return;
+
+    setHolding(slot.startUtc);
+    setComplaint(null);
 
     try {
-      const response = await fetch('/api/public/book', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          serviceId: selectedService,
-          doctorId: selectedDoctor,
-          date: selectedDate,
-          time: selectedTime,
-          patient: patientData,
-          consents: {
-            ...consents,
-            consentTimestamp: new Date().toISOString(),
-            consentVersion: '2.1',
-            ipAddress: 'collected-server-side',
-          },
-        }),
+      const held = await holdSlot(chosen.activity.calendarId, chosen.activity.id, slot.startUtc);
+
+      rememberHeld({
+        token: held.token,
+        startUtc: held.startUtc,
+        endUtc: held.endUtc,
+        expiresAtUtc: held.expiresAtUtc,
+        serviceName: chosen.service.name,
+        activityName: chosen.activity.name,
+        activityId: chosen.activity.id,
+        calendarId: chosen.activity.calendarId,
+        requiresReportByEmail: chosen.activity.requiresReportByEmail,
+        requiresClubSharing: chosen.activity.requiresClubSharing,
+        questionnaireRequirement: chosen.activity.questionnaireRequirement,
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Rezervace selhala');
+      navigate('/dotaznik');
+    } catch (error) {
+      setHolding(null);
+
+      if (error instanceof SlotGoneError) {
+        setComplaint(error.message);
+
+        // Ask again rather than leaving a time on screen that is no longer
+        // there. Somebody who has just been refused must not be able to click
+        // the same dead slot a second time.
+        if (day !== null) {
+          freeSlots(chosen.activity.calendarId, chosen.activity.id, day)
+            .then(setSlots)
+            .catch(() => setSlots([]));
+        }
+        return;
       }
 
-      setSuccess(true);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
+      setComplaint('Termín se nepodařilo rezervovat. Zkuste to prosím znovu.');
     }
   };
 
-  const getMinStepValid = (step: number): boolean => {
-    switch (step) {
-      case 0: return !!selectedService;
-      case 1: return !!selectedDoctor;
-      case 2: return !!selectedDate && !!selectedTime;
-      case 3: return !!patientData.firstName && !!patientData.lastName && !!patientData.email && !!patientData.phone;
-      case 4: return isGdprValid();
-      default: return true;
-    }
-  };
-
-  if (success) {
-    return (
-      <Container maxWidth="sm" sx={{ py: 8, textAlign: 'center' }}>
-        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>
-          <Box sx={{ mb: 4 }}>
-            <Box sx={{
-              width: 80, height: 80, borderRadius: '50%', bgcolor: 'success.main',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 3,
-            }}>
-              <Typography variant="h4" color="white">✓</Typography>
-            </Box>
-            <Typography variant="h4" gutterBottom fontWeight={700}>Rezervace potvrzena!</Typography>
-            <Typography color="text.secondary" sx={{ mb: 3 }}>
-              Na Váš email {patientData.email} byla odeslána potvrzovací zpráva.
-            </Typography>
-            <Paper sx={{ p: 3, textAlign: 'left' }}>
-              <Typography variant="h6" gutterBottom>Shrnutí</Typography>
-              <Typography><strong>Služba:</strong> {selectedServiceData?.name}</Typography>
-              <Typography><strong>Lékař:</strong> {selectedDoctorData?.name}</Typography>
-              <Typography><strong>Datum:</strong> {selectedDate}</Typography>
-              <Typography><strong>Čas:</strong> {selectedTime}</Typography>
-              <Typography><strong>Cena:</strong> {selectedServiceData?.price} Kč</Typography>
-            </Paper>
-          </Box>
-        </motion.div>
-      </Container>
-    );
-  }
-
-  const renderStepContent = (step: number) => {
-    switch (step) {
-      case 0: // Services
-        return (
-          <Grid container spacing={2}>
-            {mockServices.map(service => (
-              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={service.id}>
-                <Card
-                  onClick={() => setSelectedService(service.id)}
-                  sx={{
-                    cursor: 'pointer',
-                    border: selectedService === service.id ? 2 : 1,
-                    borderColor: selectedService === service.id ? 'primary.main' : 'divider',
-                    '&:hover': { boxShadow: 4, transform: 'translateY(-2px)' },
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  <CardContent>
-                    <Chip label={service.category} size="small" sx={{ mb: 1 }} />
-                    <Typography variant="h6" gutterBottom>{service.name}</Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{service.description}</Typography>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="body2" color="text.secondary">{service.duration} min</Typography>
-                      <Typography variant="subtitle1" color="primary" fontWeight={700}>{service.price} Kč</Typography>
-                    </Box>
-                    {service.requiresConsent && (
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                        Vyžaduje lékařský posudek
-                      </Typography>
-                    )}
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        );
-
-      case 1: // Doctors
-        return (
-          <Grid container spacing={2}>
-            {mockDoctors.map(doctor => (
-              <Grid size={{ xs: 12 }} sm={6} key={doctor.id}>
-                <Card
-                  onClick={() => { setSelectedDoctor(doctor.id); setSelectedDate(''); setSelectedTime(''); }}
-                  sx={{
-                    cursor: 'pointer',
-                    border: selectedDoctor === doctor.id ? 2 : 1,
-                    borderColor: selectedDoctor === doctor.id ? 'primary.main' : 'divider',
-                    '&:hover': { boxShadow: 4 },
-                  }}
-                >
-                  <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Avatar sx={{ width: 64, height: 64, bgcolor: 'primary.main', fontSize: 24 }}>
-                      {doctor.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                    </Avatar>
-                    <Box>
-                      <Typography variant="h6">{doctor.name}</Typography>
-                      <Typography variant="body2" color="text.secondary">{doctor.specialization}</Typography>
-                      <Typography variant="body2" color="primary">★ {doctor.rating}/5</Typography>
-                      <Box sx={{ mt: 1 }}>
-                        {['Po', 'Út', 'St', 'Čt', 'Pá'].map((day, i) => (
-                          <Chip key={day} label={day} size="small"
-                            color={doctor.availableDays.includes(i + 1) ? 'success' : 'default'}
-                            variant={doctor.availableDays.includes(i + 1) ? 'filled' : 'outlined'}
-                            sx={{ mr: 0.5, mb: 0.5 }} />
-                        ))}
-                      </Box>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        );
-
-      case 2: // Date & Time
-        return (
-          <Box>
-            {selectedDoctor && (
-              <Alert severity="info" sx={{ mb: 2 }}>
-                {selectedDoctorData?.name} přijímá pacienty: {['Po', 'Út', 'St', 'Čt', 'Pá']
-                  .filter((_, i) => selectedDoctorData?.availableDays.includes(i + 1)).join(', ')}
-              </Alert>
-            )}
-            <Typography variant="h6" gutterBottom>Vyberte datum</Typography>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 3 }}>
-              {getAvailableDates().map(date => (
-                <Button
-                  key={date.toISOString()}
-                  variant={selectedDate === format(date, 'yyyy-MM-dd') ? 'contained' : 'outlined'}
-                  onClick={() => { setSelectedDate(format(date, 'yyyy-MM-dd')); setSelectedTime(''); }}
-                  sx={{ minWidth: 80 }}
-                >
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="caption">{format(date, 'EEE', { locale: cs })}</Typography>
-                    <Typography variant="body1" fontWeight={600}>{format(date, 'd')}</Typography>
-                    <Typography variant="caption">{format(date, 'MMM', { locale: cs })}</Typography>
-                  </Box>
-                </Button>
-              ))}
-            </Box>
-
-            {selectedDate && (
-              <>
-                <Typography variant="h6" gutterBottom>Vyberte čas</Typography>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  {timeSlots.map(slot => (
-                    <Button
-                      key={slot.time}
-                      variant={selectedTime === slot.time ? 'contained' : 'outlined'}
-                      disabled={!slot.available}
-                      onClick={() => setSelectedTime(slot.time)}
-                      sx={{ minWidth: 80 }}
-                    >
-                      {slot.time}
-                    </Button>
-                  ))}
-                </Box>
-              </>
-            )}
-          </Box>
-        );
-
-      case 3: // Patient data
-        return (
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12 }} sm={6}><TextField fullWidth label="Jméno *" value={patientData.firstName} onChange={(e) => setPatientData({ ...patientData, firstName: e.target.value })} required /></Grid>
-            <Grid size={{ xs: 12 }} sm={6}><TextField fullWidth label="Příjmení *" value={patientData.lastName} onChange={(e) => setPatientData({ ...patientData, lastName: e.target.value })} required /></Grid>
-            <Grid size={{ xs: 12 }} sm={6}><TextField fullWidth type="email" label="E-mail *" value={patientData.email} onChange={(e) => setPatientData({ ...patientData, email: e.target.value })} required /></Grid>
-            <Grid size={{ xs: 12 }} sm={6}><TextField fullWidth label="Telefon *" value={patientData.phone} onChange={(e) => setPatientData({ ...patientData, phone: e.target.value })} required /></Grid>
-            <Grid size={{ xs: 12 }} sm={6}><TextField fullWidth label="Rodné číslo" value={patientData.rodneCislo} onChange={(e) => setPatientData({ ...patientData, rodneCislo: e.target.value })} placeholder="RRMMDD/XXXX" /></Grid>
-            <Grid size={{ xs: 12 }} sm={6}><TextField fullWidth type="date" label="Datum narození" value={patientData.dateOfBirth} InputLabelProps={{ shrink: true }} onChange={(e) => setPatientData({ ...patientData, dateOfBirth: e.target.value })} /></Grid>
-            <Grid size={{ xs: 12 }} sm={6}><TextField fullWidth label="Pojišťovna" value={patientData.insuranceCompany} onChange={(e) => setPatientData({ ...patientData, insuranceCompany: e.target.value })} /></Grid>
-            <Grid size={{ xs: 12 }} sm={6}><TextField fullWidth label="Číslo pojištěnce" value={patientData.insuranceNumber} onChange={(e) => setPatientData({ ...patientData, insuranceNumber: e.target.value })} /></Grid>
-            <Grid size={{ xs: 12 }}><TextField fullWidth label="Adresa" value={patientData.address} onChange={(e) => setPatientData({ ...patientData, address: e.target.value })} /></Grid>
-            <Grid size={{ xs: 12 }} sm={6}><TextField fullWidth label="Město" value={patientData.city} onChange={(e) => setPatientData({ ...patientData, city: e.target.value })} /></Grid>
-            <Grid size={{ xs: 12 }} sm={6}><TextField fullWidth label="PSČ" value={patientData.postalCode} onChange={(e) => setPatientData({ ...patientData, postalCode: e.target.value })} /></Grid>
-            <Grid size={{ xs: 12 }}><TextField fullWidth multiline rows={2} label="Poznámky" value={patientData.notes} onChange={(e) => setPatientData({ ...patientData, notes: e.target.value })} /></Grid>
-          </Grid>
-        );
-
-      case 4: // GDPR consents
-        return (
-          <Box>
-            <Alert severity="info" sx={{ mb: 3 }}>
-              Vážíme si Vašeho soukromí. Níže uvedené souhlasy jsou nezbytné pro zajištění zdravotní péče.
-              Vaše údaje zpracováváme v souladu s Nařízením (EU) 2016/679 (GDPR).
-            </Alert>
-
-            <Paper variant="outlined" sx={{ p: 3, mb: 2 }}>
-              <Typography variant="subtitle1" fontWeight={700} gutterBottom>1. Zpracování osobních údajů *</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Souhlasím se zpracováním osobních údajů (jméno, příjmení, datum narození, kontaktní údaje, rodné číslo)
-                pro účely poskytování zdravotní péče, vedení zdravotnické dokumentace a komunikace související s poskytovanou péčí.
-                <br /><strong>Právní základ:</strong> GDPR čl. 6(1)(a) — souhlas subjektu údajů.
-                <br /><strong>Odvolání:</strong> Souhlas lze kdykoli odvolat na recepci nebo e-mailem.
-              </Typography>
-              <FormControlLabel
-                control={<Checkbox checked={consents.dataProcessing} onChange={(e) => setConsents({ ...consents, dataProcessing: e.target.checked })} />}
-                label="Souhlasím se zpracováním osobních údajů *"
-              />
-            </Paper>
-
-            <Paper variant="outlined" sx={{ p: 3, mb: 2 }}>
-              <Typography variant="subtitle1" fontWeight={700} gutterBottom>2. Zpracování zdravotních údajů *</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Souhlasím se zpracováním zvláštních kategorií osobních údajů (zdravotní stav, diagnózy, výsledky vyšetření,
-                léčba, alergie, léky) pro účely diagnostiky, léčby a prevence.
-                <br /><strong>Právní základ:</strong> GDPR čl. 9(2)(a) — výslovný souhlas.
-                <br /><strong>Doba zpracování:</strong> Po dobu poskytování zdravotní péče + 10 let (dle zákona č. 372/2011 Sb.).
-              </Typography>
-              <FormControlLabel
-                control={<Checkbox checked={consents.healthDataProcessing} onChange={(e) => setConsents({ ...consents, healthDataProcessing: e.target.checked })} />}
-                label="Souhlasím se zpracováním zdravotních údajů *"
-              />
-            </Paper>
-
-            <Paper variant="outlined" sx={{ p: 3, mb: 2 }}>
-              <Typography variant="subtitle1" fontWeight={700} gutterBottom>3. Uchování údajů *</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Souhlasím s uchováním mých osobních a zdravotních údajů v elektronickém i fyzickém formátu
-                po dobu stanovenou zákonem (min. 10 let od posledního ošetření).
-              </Typography>
-              <FormControlLabel
-                control={<Checkbox checked={consents.dataRetention} onChange={(e) => setConsents({ ...consents, dataRetention: e.target.checked })} />}
-                label="Souhlasím s uchováním údajů *"
-              />
-            </Paper>
-
-            <Paper variant="outlined" sx={{ p: 3, mb: 2 }}>
-              <Typography variant="subtitle1" fontWeight={700} gutterBottom>4. Marketingové sdělení</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Souhlasím s občasným zasíláním informací o nabídkách, akcích a novinkách kliniky CGM MEDISTAR.
-                Tento souhlas je dobrovolný a nemá vliv na poskytování péče.
-              </Typography>
-              <FormControlLabel
-                control={<Checkbox checked={consents.marketingConsent} onChange={(e) => setConsents({ ...consents, marketingConsent: e.target.checked })} />}
-                label="Souhlasím se zasíláním marketingových sdělení"
-              />
-            </Paper>
-
-            <Paper variant="outlined" sx={{ p: 3, mb: 2 }}>
-              <Typography variant="subtitle1" fontWeight={700} gutterBottom>5. Sdílení s třetími stranami</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Souhlasím se sdílením mých údajů s pojišťovnou, laboratořemi a dalšími zdravotnickými zařízeními
-                v rozsahu nezbytném pro poskytování zdravotní péče.
-              </Typography>
-              <FormControlLabel
-                control={<Checkbox checked={consents.thirdPartySharing} onChange={(e) => setConsents({ ...consents, thirdPartySharing: e.target.checked })} />}
-                label="Souhlasím se sdílením s třetími stranami"
-              />
-            </Paper>
-
-            <Paper variant="outlined" sx={{ p: 3 }}>
-              <Typography variant="subtitle1" fontWeight={700} gutterBottom>6. Pořizování záznamů</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Souhlasím s případným pořizováním fotografických a videozáznamů pro účely dokumentace,
-                telemedicíny a vzdělávání (v anonymizované podobě).
-              </Typography>
-              <FormControlLabel
-                control={<Checkbox checked={consents.cameraConsent} onChange={(e) => setConsents({ ...consents, cameraConsent: e.target.checked })} />}
-                label="Souhlasím s pořizováním záznamů"
-              />
-            </Paper>
-
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-              * Povinné souhlasy. Bez nich nelze rezervaci dokončit.
-              Podrobné informace o zpracování osobních údajů najdete v naší <strong>Zásadách ochrany soukromí</strong>.
-              Kontakt: privacy@medistar.cz | +420 XXX XXX XXX
-            </Typography>
-          </Box>
-        );
-
-      case 5: // Confirmation
-        return (
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>Shrnutí rezervace</Typography>
-            <Divider sx={{ mb: 2 }} />
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 6 }}><Typography color="text.secondary">Služba:</Typography><Typography fontWeight={600}>{selectedServiceData?.name}</Typography></Grid>
-              <Grid size={{ xs: 6 }}><Typography color="text.secondary">Lékař:</Typography><Typography fontWeight={600}>{selectedDoctorData?.name}</Typography></Grid>
-              <Grid size={{ xs: 6 }}><Typography color="text.secondary">Datum:</Typography><Typography fontWeight={600}>{selectedDate}</Typography></Grid>
-              <Grid size={{ xs: 6 }}><Typography color="text.secondary">Čas:</Typography><Typography fontWeight={600}>{selectedTime}</Typography></Grid>
-              <Grid size={{ xs: 12 }}><Divider /></Grid>
-              <Grid size={{ xs: 6 }}><Typography color="text.secondary">Pacient:</Typography><Typography fontWeight={600}>{patientData.firstName} {patientData.lastName}</Typography></Grid>
-              <Grid size={{ xs: 6 }}><Typography color="text.secondary">Kontakt:</Typography><Typography fontWeight={600}>{patientData.email} • {patientData.phone}</Typography></Grid>
-              <Grid size={{ xs: 12 }}><Divider /></Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography color="text.secondary">Souhlasy (GDPR):</Typography>
-                <Box sx={{ mt: 1 }}>
-                  {consents.dataProcessing && <Chip label="Zpracování údajů ✓" size="small" color="success" sx={{ mr: 0.5, mb: 0.5 }} />}
-                  {consents.healthDataProcessing && <Chip label="Zdravotní data ✓" size="small" color="success" sx={{ mr: 0.5, mb: 0.5 }} />}
-                  {consents.dataRetention && <Chip label="Uchování dat ✓" size="small" color="success" sx={{ mr: 0.5, mb: 0.5 }} />}
-                  {consents.marketingConsent && <Chip label="Marketing" size="small" color="info" sx={{ mr: 0.5, mb: 0.5 }} />}
-                  {consents.thirdPartySharing && <Chip label="Sdílení" size="small" color="info" sx={{ mr: 0.5, mb: 0.5 }} />}
-                  {consents.cameraConsent && <Chip label="Záznamy" size="small" color="info" sx={{ mr: 0.5, mb: 0.5 }} />}
-                </Box>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography color="text.secondary">Cena:</Typography>
-                <Typography variant="h5" color="primary" fontWeight={700}>{selectedServiceData?.price} Kč</Typography>
-              </Grid>
-            </Grid>
-          </Paper>
-        );
-
-      default:
-        return null;
-    }
-  };
+  const nothingOffered = services !== null && services.length === 0;
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 4, md: 8 } }}>
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <Typography variant="h3" textAlign="center" fontWeight={700} sx={{ mb: 1 }}>
-          Online rezervace
-        </Typography>
-        <Typography variant="body1" textAlign="center" color="text.secondary" sx={{ mb: 4, maxWidth: 600, mx: 'auto' }}>
-          Vyberte si službu, lékaře a termín. Rezervace zabere jen pár minut.
-        </Typography>
-      </motion.div>
+    <ThemeProvider theme={publicTheme}>
+      <Box sx={{ minHeight: '100vh', bgcolor: BRAND.page, pb: { xs: 6, md: 10 } }}>
+        <Hero />
 
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Stepper activeStep={activeStep} alternativeLabel>
-          {steps.map(label => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
-      </Paper>
+        <Container maxWidth="md" sx={{ mt: { xs: -7, md: -9 } }}>
+          <Box sx={{ display: 'grid', gap: 3 }}>
+            {offerFailed && (
+              <Card>
+                <Alert severity="error" sx={{ borderRadius: 2 }}>
+                  Nabídku se nepodařilo načíst. Zkuste to prosím za chvíli znovu{ringUs(clinic, ', nebo nám zavolejte na ')}.
+                </Alert>
+              </Card>
+            )}
 
-      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+            {nothingOffered && (
+              <Card>
+                <Typography sx={{ fontWeight: 800, fontSize: 19, mb: 1 }}>
+                  Online objednávání právě není otevřené
+                </Typography>
+                <Typography variant="body2" sx={{ color: BRAND.muted }}>
+                  {clinic?.phone
+                    ? `Termín vám rádi domluvíme telefonicky na ${clinic.phone}.`
+                    : 'Zkuste to prosím později.'}
+                </Typography>
+              </Card>
+            )}
 
-      <Paper sx={{ p: 3, mb: 3 }}>
-        {renderStepContent(activeStep)}
-      </Paper>
+            {/* ── 1. Co potřebujete ── */}
+            {services !== null && services.length > 0 && (
+              <Card>
+                <Step number={1} title="Co potřebujete" />
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-        <Button disabled={activeStep === 0} onClick={handleBack}>
-          Zpět
-        </Button>
-        {activeStep === steps.length - 1 ? (
-          <Button
-            variant="contained"
-            size="large"
-            onClick={handleSubmit}
-            disabled={loading || !isGdprValid()}
-          >
-            {loading ? <CircularProgress size={24} /> : 'Potvrdit rezervaci'}
-          </Button>
-        ) : (
-          <Button variant="contained" onClick={handleNext} disabled={!getMinStepValid(activeStep)}>
-            Další
-          </Button>
-        )}
+                {services.map((service) => (
+                  <Box key={service.id} sx={{ mb: 3, '&:last-of-type': { mb: 0 } }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: 15, mb: 1.25 }}>
+                      {service.name}
+                    </Typography>
+
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gap: 1.25,
+                        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                      }}
+                    >
+                      {service.activities.map((activity) => {
+                        const picked = chosen?.activity.id === activity.id;
+                        return (
+                          <Box
+                            key={activity.id}
+                            component="button"
+                            type="button"
+                            onClick={() => setChosen({ service, activity })}
+                            sx={{
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              fontFamily: 'inherit',
+                              p: 1.75,
+                              borderRadius: 3,
+                              bgcolor: picked ? BRAND.accentWash : '#FFFFFF',
+                              border: `1px solid ${picked ? BRAND.accentEdge : BRAND.line}`,
+                              transition: 'background-color 120ms ease, border-color 120ms ease',
+                              '&:hover': {
+                                borderColor: picked ? BRAND.accentEdge : 'rgba(17,17,17,0.24)',
+                              },
+                            }}
+                          >
+                            <Typography sx={{ fontWeight: 700, fontSize: 14.5 }}>
+                              {activity.name}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: BRAND.muted }}>
+                              {activity.durationMinutes} minut
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                mt: 0.25,
+                                // typeof, not !== null: during a deploy the page can
+                                // reach an older API that omits the field, so the
+                                // value is undefined, not null -- and undefined must
+                                // read as "no price", never crash on .toLocaleString.
+                                fontWeight: typeof activity.priceCzk === 'number' ? 700 : 400,
+                                color: typeof activity.priceCzk === 'number' ? 'inherit' : BRAND.muted,
+                              }}
+                            >
+                              {typeof activity.priceCzk === 'number'
+                                ? `${activity.priceCzk.toLocaleString('cs-CZ')} Kč`
+                                : 'Cena na dotaz'}
+                            </Typography>
+                            {activity.publicNote !== '' && (
+                              <Typography variant="body2" sx={{ color: BRAND.muted, mt: 0.5 }}>
+                                {activity.publicNote}
+                              </Typography>
+                            )}
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  </Box>
+                ))}
+              </Card>
+            )}
+
+            {/* ── 2. Kdy ── */}
+            {chosen !== null && (
+              <Card>
+                <Step number={2} title="Kdy vám to vyhovuje" />
+
+                {days === null && <Waiting />}
+
+                {days !== null && days.length === 0 && (
+                  <Typography variant="body2" sx={{ color: BRAND.muted }}>
+                    V nejbližších {HORIZON_DAYS} dnech nemáme volno{ringUs(clinic, '. Zavolejte nám prosím na ')}.
+                  </Typography>
+                )}
+
+                {days !== null && days.length > 0 && (
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {days.map((free) => (
+                      <Chip
+                        key={free}
+                        label={clinicDate(free)}
+                        onClick={() => setDay(free)}
+                        sx={{
+                          fontWeight: 700,
+                          py: 2.25,
+                          cursor: 'pointer',
+                          bgcolor: day === free ? BRAND.ink : '#FFFFFF',
+                          color: day === free ? BRAND.accent : 'inherit',
+                          border: `1px solid ${day === free ? BRAND.ink : BRAND.line}`,
+                          '&:hover': { bgcolor: day === free ? BRAND.ink : BRAND.accentWash },
+                        }}
+                      />
+                    ))}
+                  </Box>
+                )}
+              </Card>
+            )}
+
+            {/* ── 3. V kolik ── */}
+            {chosen !== null && day !== null && (
+              <Card>
+                <Step number={3} title="V kolik hodin" />
+
+                {complaint !== null && (
+                  <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
+                    {complaint}
+                  </Alert>
+                )}
+
+                {slots === null && <Waiting />}
+
+                {slots !== null && slots.length === 0 && (
+                  <Typography variant="body2" sx={{ color: BRAND.muted }}>
+                    Na tento den už volno nemáme. Zkuste prosím jiný.
+                  </Typography>
+                )}
+
+                {slots !== null && slots.length > 0 && (
+                  <>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      {slots.map((slot) => (
+                        <Box
+                          key={slot.startUtc}
+                          component="button"
+                          type="button"
+                          disabled={holding !== null}
+                          onClick={() => { void take(slot); }}
+                          sx={{
+                            minWidth: 84,
+                            py: 1.1,
+                            px: 1.5,
+                            borderRadius: 999,
+                            cursor: holding === null ? 'pointer' : 'progress',
+                            fontFamily: 'inherit',
+                            fontSize: 15,
+                            fontWeight: 700,
+                            bgcolor: holding === slot.startUtc ? BRAND.ink : '#FFFFFF',
+                            color: holding === slot.startUtc ? BRAND.accent : 'inherit',
+                            border: `1px solid ${holding === slot.startUtc ? BRAND.ink : BRAND.line}`,
+                            opacity: holding !== null && holding !== slot.startUtc ? 0.45 : 1,
+                            transition: 'background-color 120ms ease, opacity 120ms ease',
+                          }}
+                        >
+                          {clinicTime(slot.startUtc)}
+                        </Box>
+                      ))}
+                    </Box>
+
+                    {/*
+                      The clinic's own number, not this file's. It used to say
+                      fifteen because that was the only length there was; a
+                      calendar can choose now, and a page promising fifteen to a
+                      clinic that chose five would be found out only by somebody
+                      losing a slot they had been told was theirs.
+                    */}
+                    {minuteWord(chosen.activity.holdMinutes) !== null && (
+                      <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 2 }}>
+                        Po výběru času vám termín podržíme{' '}
+                        {minuteWord(chosen.activity.holdMinutes)}, než vyplníte registraci.
+                      </Typography>
+                    )}
+                  </>
+                )}
+              </Card>
+            )}
+          </Box>
+        </Container>
       </Box>
-    </Container>
+    </ThemeProvider>
+  );
+}
+
+function Waiting() {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: BRAND.muted }}>
+      <CircularProgress size={18} sx={{ color: BRAND.accent }} />
+      <Typography variant="body2">Hledám volné termíny…</Typography>
+    </Box>
+  );
+}
+
+function Card({ children }: { children: ReactNode }) {
+  return (
+    <Box
+      sx={{
+        bgcolor: '#FFFFFF',
+        borderRadius: 4,
+        border: `1px solid ${BRAND.line}`,
+        boxShadow: '0 18px 50px rgba(11, 11, 12, 0.10)',
+        p: { xs: 2.5, sm: 3.5 },
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+function Step({ number, title }: { number: number; title: string }) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+      <Box
+        sx={{
+          width: 30,
+          height: 30,
+          borderRadius: 1.75,
+          bgcolor: BRAND.ink,
+          color: BRAND.accent,
+          display: 'grid',
+          placeItems: 'center',
+          fontSize: 14,
+          fontWeight: 800,
+          flexShrink: 0,
+        }}
+      >
+        {number}
+      </Box>
+      <Typography sx={{ fontWeight: 800, fontSize: 19, letterSpacing: '-0.01em' }}>
+        {title}
+      </Typography>
+      <Box sx={{ flex: 1, height: '1px', bgcolor: BRAND.line }} />
+    </Box>
+  );
+}
+
+function Hero() {
+  return (
+    <Box
+      sx={{
+        bgcolor: BRAND.ink,
+        backgroundImage:
+          'radial-gradient(1200px 420px at 78% -20%, rgba(255,157,0,0.16), transparent 68%)',
+        color: '#FFFFFF',
+        pt: { xs: 3.5, md: 5 },
+        pb: { xs: 11, md: 15 },
+        px: 2,
+      }}
+    >
+      <Container maxWidth="md" sx={{ px: { xs: '0 !important', md: 3 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.25, mb: 4 }}>
+          <Typography component="span" sx={{ fontWeight: 800, fontSize: { xs: 18, md: 22 } }}>
+            SportMedical
+          </Typography>
+          <Typography
+            component="span"
+            sx={{
+              fontWeight: 500,
+              fontSize: { xs: 18, md: 22 },
+              letterSpacing: 2.5,
+              color: BRAND.accent,
+            }}
+          >
+            DIAGNOSTICS
+          </Typography>
+        </Box>
+
+        <Typography variant="h4" sx={{ fontSize: { xs: 32, sm: 44, md: 52 }, mb: 1.5, lineHeight: 1.08 }}>
+          Objednat se online
+        </Typography>
+        <Typography
+          sx={{ color: 'rgba(255,255,255,0.68)', mb: 3, maxWidth: 520, fontSize: { xs: 15, md: 17 } }}
+        >
+          Vyberte si vyšetření a čas. Termín je váš hned — potvrzení dostanete na
+          obrazovce a přidáte si ho do svého kalendáře.
+        </Typography>
+
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Trust icon={<EventAvailableOutlined sx={{ fontSize: 15 }} />} label="Termín ihned" />
+          <Trust icon={<ScheduleOutlined sx={{ fontSize: 15 }} />} label="Registrace do minuty" />
+          <Trust icon={<VerifiedUserOutlined sx={{ fontSize: 15 }} />} label="Zrušíte kdykoli" />
+          <Trust icon={<LockOutlined sx={{ fontSize: 15 }} />} label="Šifrovaný přenos" />
+        </Box>
+      </Container>
+    </Box>
+  );
+}
+
+function Trust({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <Box
+      sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 0.75,
+        px: 1.5,
+        py: 0.65,
+        borderRadius: 999,
+        border: '1px solid rgba(255,255,255,0.16)',
+        bgcolor: 'rgba(255,255,255,0.05)',
+        color: 'rgba(255,255,255,0.85)',
+        fontSize: 12.5,
+        fontWeight: 600,
+      }}
+    >
+      {icon}
+      {label}
+    </Box>
   );
 }

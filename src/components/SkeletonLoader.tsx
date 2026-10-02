@@ -1,13 +1,38 @@
 import { Box, Skeleton, Card, CardContent, Grid } from '@mui/material';
+import type { SxProps, Theme } from '@mui/material';
 import { motion } from 'framer-motion';
 
-function ShimmerBox({ width, height, borderRadius = 8 }: { width: string | number; height: string | number; borderRadius?: number }) {
+/*
+ * Callers have always passed `sx` for spacing - `sx={{ mt: 1 }}` and the like -
+ * and the props type never admitted it, so sixteen call sites were type errors
+ * against their own component. It takes `sx` now and merges it after its own,
+ * through MUI's array form, so a caller can space a skeleton without being able
+ * to lose the shimmer it exists for.
+ */
+function ShimmerBox({
+  width,
+  height,
+  borderRadius = 8,
+  sx,
+}: {
+  width: string | number;
+  height: string | number;
+  borderRadius?: number;
+  sx?: SxProps<Theme>;
+}) {
   return (
     <Skeleton
       variant="rounded"
       width={width}
       height={height}
-      sx={{ borderRadius, background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)' }}
+      sx={[
+        {
+          borderRadius,
+          background:
+            'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+        },
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
       animation="wave"
     />
   );

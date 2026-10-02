@@ -9,7 +9,7 @@ import {
   ListItemIcon, ListItemText, Chip, InputAdornment, CircularProgress,
 } from '@mui/material';
 import {
-  Search, People, CalendarMonth, Warning, Receipt, Description,
+  Search, People, CalendarMonth, Warning, Receipt,
   Person, Science, Settings,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -17,6 +17,7 @@ import { patientsApi, type Patient } from '../api/patients';
 import { injuriesApi, type Injury } from '../api/injuries';
 import { billingApi, type Invoice } from '../api/billing';
 import { calendarApi, type Appointment } from '../api/calendar';
+import { usePermission } from '../auth/usePermission';
 
 interface SearchResult {
   id: string;
@@ -36,6 +37,8 @@ export default function UniversalSearch() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const canBill = usePermission('billing.manage');
+  const canSeePatients = usePermission('patients.view');
 
   /* ── Keyboard shortcut Ctrl+K ── */
   useEffect(() => {
@@ -62,14 +65,17 @@ export default function UniversalSearch() {
   /* ── Static page results for navigation ── */
   const pages: SearchResult[] = useMemo(() => [
     { id: 'p-dashboard', title: 'Dashboard', subtitle: 'Přehled', type: 'page', icon: <Settings />, path: '/', color: '#0D7377' },
-    { id: 'p-calendar', title: 'Kalendář', subtitle: 'Správa termínů', type: 'page', icon: <CalendarMonth />, path: '/calendar', color: '#0D7377' },
-    { id: 'p-patients', title: 'Pacienti', subtitle: 'Seznam pacientů', type: 'page', icon: <People />, path: '/patients', color: '#0288D1' },
-    { id: 'p-billing', title: 'Fakturace', subtitle: 'Správa faktur', type: 'page', icon: <Receipt />, path: '/billing', color: '#ED6C02' },
+    { id: 'p-calendar', title: 'Plánování', subtitle: 'Správa termínů', type: 'page', icon: <CalendarMonth />, path: '/planovani', color: '#0D7377' },
+    ...(canSeePatients
+      ? [{ id: 'p-patients', title: 'Pacienti', subtitle: 'Seznam pacientů', type: 'page' as const, icon: <People />, path: '/patients', color: '#0288D1' }]
+      : []),
+    ...(canBill
+      ? [{ id: 'p-billing', title: 'Fakturace', subtitle: 'Správa faktur', type: 'page' as const, icon: <Receipt />, path: '/billing', color: '#ED6C02' }]
+      : []),
     { id: 'p-injuries', title: 'Poranění', subtitle: 'Evidence poranění', type: 'page', icon: <Warning />, path: '/injuries', color: '#D32F2F' },
     { id: 'p-diagnostics', title: 'Diagnostika', subtitle: 'Nová relace', type: 'page', icon: <Science />, path: '/diagnostics/new', color: '#7C3AED' },
-    { id: 'p-reports', title: 'Reporty', subtitle: 'Analytika', type: 'page', icon: <Description />, path: '/reports', color: '#16A34A' },
     { id: 'p-settings', title: 'Nastavení', subtitle: 'Konfigurace', type: 'page', icon: <Settings />, path: '/settings', color: '#64748B' },
-  ], []);
+  ], [canBill, canSeePatients]);
 
   /* ── Search across all data sources ── */
   const doSearch = useCallback(async (q: string) => {
@@ -79,9 +85,9 @@ export default function UniversalSearch() {
 
     try {
       const [patients, injuries, invoices, appointments] = await Promise.allSettled([
-        patientsApi.search(q).catch(() => []),
+        canSeePatients ? patientsApi.search(q).catch(() => []) : Promise.resolve([] as Patient[]),
         injuriesApi.getAll().catch(() => []),
-        billingApi.getInvoices().catch(() => []),
+        canBill ? billingApi.getInvoices().catch(() => []) : Promise.resolve([] as Invoice[]),
         calendarApi.getAppointments().catch(() => []),
       ]);
 
@@ -141,10 +147,14 @@ export default function UniversalSearch() {
 
       /* Appointments */
       if (appointments.status === 'fulfilled') {
+        /* This read returns cancelled appointments too, and search offered them
+           with no sign they were cancelled - a receptionist reading the result
+           would have told a patient a slot was still theirs. */
         for (const a of appointments.value.filter(
-          x => x.patientName?.toLowerCase().includes(lower) ||
+          x => x.status !== 'Cancelled' &&
+              (x.patientName?.toLowerCase().includes(lower) ||
                x.serviceType?.toLowerCase().includes(lower) ||
-               x.practitionerName?.toLowerCase().includes(lower)
+               x.practitionerName?.toLowerCase().includes(lower))
         ).slice(0, 3)) {
           found.push({
             id: `apt-${a.id}`,
@@ -152,7 +162,7 @@ export default function UniversalSearch() {
             subtitle: `${a.patientName || a.patientId} · ${new Date(a.startTime).toLocaleDateString('cs-CZ')}`,
             type: 'appointment',
             icon: <CalendarMonth />,
-            path: '/calendar',
+            path: '/planovani',
             color: '#0D7377',
           });
         }
@@ -171,7 +181,7 @@ export default function UniversalSearch() {
     } finally {
       setLoading(false);
     }
-  }, [pages]);
+  }, [pages, canBill, canSeePatients]);
 
   /* ── Debounced search ── */
   useEffect(() => {
@@ -200,22 +210,6 @@ export default function UniversalSearch() {
     invoice: 'Faktura', page: 'Stránka',
   };
 
-  /* Smart suggestions based on partial input */
-  const sportSuggestions: Record<string, string[]> = {
-    f: ['Fotbal', 'Fyzioterapie', 'Florbal'],
-    k: ['Koleno', 'Kardiologická prohlídka', 'Kondiční test'],
-    v: ['VO2 Max', 'Vyšetření', 'Vazivová poranění'],
-    d: ['Diagnostika', 'Dolní záda', 'Doppler'],
-    s: ['Spiroergometrie', 'Sportovní prohlídka', 'Svalová hmota'],
-    t: ['Trauma', 'Tréninkové zatížení', 'Termín'],
-    p: ['Poranění', 'Pacient', 'Prohlídka'],
-    m: ['Měření', 'Max tep', 'MRI'],
-    i: ['InBody', 'Inklinace', 'Injekce'],
-    b: ['Bolest', 'Blood pressure', 'Bone density'],
-  };
-
-  const suggestions = query.length === 1 ? (sportSuggestions[query.toLowerCase()] || []) : [];
-
   return (
     <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth
       slotProps={{ paper: { sx: { borderRadius: 3, overflow: 'hidden' } } }}>
@@ -243,17 +237,6 @@ export default function UniversalSearch() {
           }}
           sx={{ '& .MuiOutlinedInput-notchedOutline': { border: 'none' }, p: 1 }}
         />
-        {suggestions.length > 0 && results.length === 0 && !loading && (
-          <Box sx={{ p: 2, borderBottom: '1px solid #f0f0f0' }}>
-            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>Nápovědy</Typography>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              {suggestions.map(s => (
-                <Chip key={s} label={s} size="small" onClick={() => setQuery(s)}
-                  sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#E0F2F1' } }} />
-              ))}
-            </Box>
-          </Box>
-        )}
         {results.length > 0 && (
           <List sx={{ maxHeight: 400, overflow: 'auto', borderTop: '1px solid #f0f0f0' }}>
             {results.map((r, i) => (
@@ -269,8 +252,13 @@ export default function UniversalSearch() {
                 <ListItemText
                   primary={r.title}
                   secondary={r.subtitle}
-                  primaryTypographyProps={{ fontWeight: 600, fontSize: 14 }}
-                  secondaryTypographyProps={{ fontSize: 12, color: 'text.secondary' }}
+                  slotProps={{
+                    /* One `slotProps` per element - two of them and JSX keeps
+                       only the later. And these are system shorthands, so they
+                       belong in `sx` rather than on the Typography itself. */
+                    primary: { sx: { fontWeight: 600, fontSize: 14 } },
+                    secondary: { sx: { fontSize: 12, color: 'text.secondary' } },
+                  }}
                 />
                 <Chip label={typeLabel[r.type]} size="small"
                   sx={{ bgcolor: `${r.color}12`, color: r.color, fontSize: 10, height: 20 }} />
@@ -287,8 +275,3 @@ export default function UniversalSearch() {
     </Dialog>
   );
 }
-
-/* ── Hook to open search programmatically ── */
-let globalOpenSearch: (() => void) | null = null;
-export function openSearch() { globalOpenSearch?.(); }
-export function setSearchOpener(fn: () => void) { globalOpenSearch = fn; }

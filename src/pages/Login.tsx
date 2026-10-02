@@ -1,15 +1,22 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box, Paper, Typography, TextField, Button, Alert,
-  InputAdornment, IconButton, CircularProgress, Link,
+  InputAdornment, IconButton, CircularProgress,
 } from '@mui/material';
 import { Visibility, VisibilityOff, LocalHospital, Email, Lock } from '@mui/icons-material';
 import { motion } from 'framer-motion';
-import { authApi } from '../api/auth';
+import { authApi, isSecondFactorChallenge } from '../api/auth';
+import { savePermissions, saveUser } from '../auth/localSession';
+
+/** What the sign-in says when the client ended a session nobody closed here. */
+export const SESSION_EXPIRED_MESSAGE =
+  'Vaše přihlášení vypršelo nebo bylo ukončeno. Přihlaste se prosím znovu.';
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const sessionExpired = searchParams.get('reason') === 'expired';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -22,17 +29,27 @@ export default function Login() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changing, setChanging] = useState(false);
 
+  /* Two-factor flow: set once the password was right but a code is also needed. */
+  const [secondFactorToken, setSecondFactorToken] = useState<string | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+
   const finishLogin = (res: any) => {
-    const nameParts = (res.account.displayName || '').split(' ');
-    const user = {
-      id: res.account.userId,
-      email: res.account.email,
-      firstName: nameParts[0] || res.account.displayName,
-      lastName: nameParts.slice(1).join(' ') || '',
-      role: res.account.role,
-    };
     localStorage.setItem('token', res.accessToken);
-    localStorage.setItem('user', JSON.stringify(user));
+    saveUser(res.account);
+
+    /*
+     * What this person may actually do, as the SERVER works it out.
+     *
+     * The client used to answer that question itself, from a table of 28
+     * permission names and 5 role names in src/auth/rbac.ts — names the server
+     * has never heard of, next to roles it does not have. Two models of who may
+     * do what, disagreeing, with the screen hiding by one and the API refusing
+     * by the other.
+     *
+     * The server has been sending this list on every login all along. Nothing
+     * read it.
+     */
+    savePermissions(res.permissions ?? []);
     navigate('/');
   };
 
@@ -42,6 +59,11 @@ export default function Login() {
     setError('');
     try {
       const res = await authApi.login(email, password);
+      if (isSecondFactorChallenge(res)) {
+        setSecondFactorToken(res.challengeToken);
+        setLoading(false);
+        return;
+      }
       if (res.account.mustChangePassword) {
         setMustChange(true);
         setLoading(false);
@@ -53,6 +75,16 @@ export default function Login() {
       if (err.response?.data?.code === 'account.password_change_required') {
         setMustChange(true);
         setError('');
+      } else if (!err.response) {
+        /*
+         * Nothing answered - the server is down, or the network is. Saying
+         * "Neplatné přihlašovací údaje" here is a claim the screen cannot make:
+         * nobody checked the password. It sends people off to hunt for a
+         * credential that was right all along, which is exactly what it did.
+         */
+        setError('Server neodpovídá. Zkontrolujte, že běží, a zkuste to znovu.');
+      } else if (err.response.status >= 500) {
+        setError('Server odpověděl chybou. S přihlašovacími údaji to nesouvisí.');
       } else {
         setError(err.response?.data?.message || 'Neplatné přihlašovací údaje');
       }
@@ -89,6 +121,31 @@ export default function Login() {
     }
   };
 
+  const handleSecondFactor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (secondFactorToken === null) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await authApi.completeSecondFactor(secondFactorToken, twoFactorCode.trim());
+      if (res.account.mustChangePassword) {
+        setSecondFactorToken(null);
+        setMustChange(true);
+        setLoading(false);
+        return;
+      }
+      finishLogin(res);
+    } catch (err: any) {
+      if (!err.response) {
+        setError('Server neodpovídá. Zkontrolujte, že běží, a zkuste to znovu.');
+      } else {
+        setError(err.response?.data?.message || 'Neplatný kód. Zkuste to znovu.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Box sx={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -114,13 +171,47 @@ export default function Login() {
             </Box>
           </motion.div>
 
+          {sessionExpired && !error && !mustChange && (
+            <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>{SESSION_EXPIRED_MESSAGE}</Alert>
+          )}
+
           {error && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
               <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>
             </motion.div>
           )}
 
-          {mustChange ? (
+          {secondFactorToken !== null ? (
+          <motion.form onSubmit={handleSecondFactor} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
+            <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+              Zadejte šestimístný kód z ověřovací aplikace.
+            </Alert>
+            <TextField fullWidth label="Ověřovací kód" required value={twoFactorCode} autoFocus
+              onChange={e => setTwoFactorCode(e.target.value)} margin="normal"
+              slotProps={{
+                htmlInput: { inputMode: 'numeric', maxLength: 10, style: { letterSpacing: 4, fontSize: 20, textAlign: 'center' } },
+                input: { startAdornment: <InputAdornment position="start"><Lock color="action" /></InputAdornment> },
+              }}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
+            <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
+              <Button type="submit" fullWidth variant="contained" size="large"
+                disabled={loading || twoFactorCode.trim().length < 6}
+                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
+                sx={{
+                  mt: 2, py: 1.5, borderRadius: 2, fontWeight: 700, fontSize: 16,
+                  bgcolor: '#0D7377', boxShadow: '0 4px 20px rgba(13,115,119,0.4)',
+                  '&:hover': { bgcolor: '#095456' },
+                }}>
+                {loading ? 'Ověřuji…' : 'Ověřit a přihlásit'}
+              </Button>
+            </motion.div>
+            <Box sx={{ textAlign: 'center', mt: 2 }}>
+              <Button size="small" onClick={() => { setSecondFactorToken(null); setTwoFactorCode(''); setError(''); }}>
+                Zpět na přihlášení
+              </Button>
+            </Box>
+          </motion.form>
+          ) : mustChange ? (
           <motion.form onSubmit={handlePasswordChange} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
             <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
               První přihlášení — nastavte si vlastní heslo pro účet {email}.
@@ -176,8 +267,31 @@ export default function Login() {
               }}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
 
+            {/*
+              This was `<Link href="#">Zapomenuté heslo?</Link>` - a link that
+              looked like a way out and did nothing when clicked.
+
+              The person who has forgotten their password is the only person who
+              ever clicks it, so the silence lands on exactly the one who cannot
+              afford it. It happened to the owner of this system on 11. 9. 2026,
+              which is how it was found.
+
+              There is no anonymous reset to point it at, and that is measured,
+              not assumed: the API has two password routes and both require a
+              session - `/api/v1/account/password` (change your own) and
+              `/api/v1/users/{id}/reset-password` (admin, [Authorize]). Building
+              a self-service reset to fill the gap would be a security surface
+              invented on the side of another task - what proves the identity of
+              whoever asks, how long a link lives, what happens to open
+              sessions. That is its own job with its own brief.
+
+              So it says what is true instead. Less pretty, and it stops
+              promising.
+            */}
             <Box sx={{ textAlign: 'right', mt: 0.5, mb: 1 }}>
-              <Link href="#" underline="hover" sx={{ fontSize: 13, color: '#0D7377' }}>Zapomenuté heslo?</Link>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                Zapomenuté heslo? Nové vám nastaví správce v sekci Tým.
+              </Typography>
             </Box>
 
             <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
@@ -193,9 +307,14 @@ export default function Login() {
               </Button>
             </motion.div>
 
+            {/*
+              The same fault again, two lines down: "Požádat o přístup" was also
+              `href="#"`. There is no self-registration - an account is only ever
+              created by an administrator through `POST /api/v1/users` on the
+              Tým screen - so the invitation to ask for one led nowhere.
+            */}
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 3 }}>
-              Nemáte účet?{' '}
-              <Link href="#" underline="hover" sx={{ color: '#0D7377', fontWeight: 600 }}>Požádat o přístup</Link>
+              Nemáte účet? Přístup zakládá správce ordinace.
             </Typography>
           </motion.form>
           )}

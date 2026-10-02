@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Agent scratch notes (zadanie.local.md, status.local.md)
+*.local.md
