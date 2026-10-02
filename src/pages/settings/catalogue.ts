@@ -127,6 +127,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         description: 'Kluby a organizace, které platí za členy — fakturační údaje a splatnost',
         to: '/clubs',
       },
+      {
+        id: 'skupinove-slevy',
+        label: 'Skupinové slevy',
+        description: 'Čím víc lidí přijde společně, tím větší sleva — pásma podle počtu osob',
+        to: '/nastaveni/skupinove-slevy',
+        requires: 'settings.clinic.manage',
+      },
     ],
   },
   {
