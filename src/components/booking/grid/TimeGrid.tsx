@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Box,
   ButtonBase,
@@ -98,6 +98,8 @@ export interface TimeGridProps {
   onPickDay: (day: DateOnly) => void;
   /** Vertical zoom multiplier for row height; 1 is the default density. */
   zoom?: number;
+  /** Zoom by a step (±0.1), from ctrl/⌘+wheel over the grid. */
+  onZoom?: (delta: number) => void;
 }
 
 const OPEN_MARK: DayMark = { redNumber: false, closed: false, label: null, detail: null };
@@ -119,7 +121,28 @@ export function TimeGrid(props: TimeGridProps) {
     mayBook,
     mayBlock,
     zoom = 1,
+    onZoom,
   } = props;
+
+  /* Zoom with the mouse: ctrl/⌘ + wheel over the grid, the way maps and editors
+     do it. A native non-passive listener so preventDefault actually stops the
+     page from zooming the browser; a plain wheel still scrolls the day. */
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (node === null || onZoom === undefined) {
+      return;
+    }
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) {
+        return;
+      }
+      event.preventDefault();
+      onZoom(event.deltaY < 0 ? 0.1 : -0.1);
+    };
+    node.addEventListener("wheel", onWheel, { passive: false });
+    return () => node.removeEventListener("wheel", onWheel);
+  }, [onZoom]);
 
   /* Zoom scales the whole vertical scale: the row height and, with it, every
      minute→pixel placement below. Horizontal layout is untouched. */
@@ -148,7 +171,7 @@ export function TimeGrid(props: TimeGridProps) {
       .filter((row): row is PreviewDay => row !== undefined);
 
   return (
-    <Box sx={{ overflowX: "auto" }}>
+    <Box ref={scrollRef} sx={{ overflowX: "auto" }}>
       <Box
         sx={{
           display: "grid",

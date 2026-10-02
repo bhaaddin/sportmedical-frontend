@@ -733,6 +733,7 @@ export default function CalendarGridPage() {
                   nowLineColor={nowLineColor}
                   holidayColor={holidayColor}
                   zoom={zoom}
+                  onZoom={changeZoom}
                   mayBook={mayBook}
                   mayBlock={mayBlock}
                   onOpen={setOpenId}

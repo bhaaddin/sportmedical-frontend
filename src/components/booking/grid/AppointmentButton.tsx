@@ -45,17 +45,25 @@ export function AppointmentButton({
    * patient however many times it is drawn. Not on the month view (compact),
    * where a cell has one line and the činnost has to win.
    */
+  /* A slot taken for nobody on the books (walk-in or event) has an empty patient
+     id and carries its name on the row itself — so there is nothing to fetch, and
+     fetching the empty id would 404. Only a real patient is looked up. */
+  const hasPatient =
+    appointment.patientId !== "" &&
+    appointment.patientId !== "00000000-0000-0000-0000-000000000000";
   const nameQuery = useQuery({
     queryKey: ["patient", appointment.patientId],
     queryFn: () => patientsApi.getById(appointment.patientId),
-    enabled: layout !== "compact",
+    enabled: layout !== "compact" && hasPatient,
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
-  const patientName = nameQuery.data
-    ? (nameQuery.data.fullName
-      || `${nameQuery.data.firstName} ${nameQuery.data.lastName}`.trim())
-    : null;
+  const patientName = hasPatient
+    ? (nameQuery.data
+        ? (nameQuery.data.fullName
+          || `${nameQuery.data.firstName} ${nameQuery.data.lastName}`.trim())
+        : null)
+    : (appointment.patientName ?? null);
   const late = isLate(appointment.startUtc, isLateStatus(appointment.status), now);
   const tally = statusTally(appointment.status);
   const name = statusName(appointment.status);

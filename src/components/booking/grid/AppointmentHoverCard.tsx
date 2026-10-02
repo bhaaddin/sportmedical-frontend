@@ -76,7 +76,13 @@ export function AppointmentHoverCard({
 
   const activeFields = fields && fields.length > 0 ? fields : DEFAULT_HOVER_FIELDS;
 
-  const needsPatient = activeFields.some((f) =>
+  /* A walk-in or event has no patient on the books — its name and phone ride on
+     the row, so there is nothing to fetch and the empty id must not be queried. */
+  const hasPatient =
+    appointment.patientId !== "" &&
+    appointment.patientId !== "00000000-0000-0000-0000-000000000000";
+
+  const needsPatient = hasPatient && activeFields.some((f) =>
     f === "patientName" || f === "phone" || f === "birthDate"
     || f === "email" || f === "registrationStatus",
   );
@@ -110,14 +116,23 @@ export function AppointmentHoverCard({
   const value = (key: string): string | null => {
     switch (key) {
       case "patientName":
+        if (!hasPatient) {
+          return appointment.patientName?.trim() || null;
+        }
         return patient
           ? (patient.fullName || `${patient.firstName} ${patient.lastName}`.trim())
           : null;
       case "phone":
+        if (!hasPatient) {
+          return appointment.unregisteredPhone?.trim() || null;
+        }
         return patient?.phone?.trim() || null;
       case "email":
-        return patient?.email?.trim() || null;
+        return hasPatient ? (patient?.email?.trim() || null) : null;
       case "registrationStatus":
+        if (!hasPatient) {
+          return "Neregistrovaný";
+        }
         return patient?.status
           ? (REGISTRATION_STATUS_LABELS[patient.status] ?? patient.status)
           : null;
