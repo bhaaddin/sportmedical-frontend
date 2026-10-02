@@ -137,6 +137,25 @@ export default function CalendarGridPage() {
   const mayBlock = usePermission("bookings.edit");
 
   const [view, setView] = useState<ViewMode>("week");
+  /* Vertical zoom for the grid — a per-viewer convenience, remembered locally. */
+  const [zoom, setZoom] = useState<number>(() => {
+    try {
+      const v = Number(localStorage.getItem("calendarZoom"));
+      return v >= 0.6 && v <= 2 ? v : 1;
+    } catch {
+      return 1;
+    }
+  });
+  const changeZoom = (delta: number) =>
+    setZoom((z) => {
+      const next = Math.min(2, Math.max(0.6, Math.round((z + delta) * 10) / 10));
+      try {
+        localStorage.setItem("calendarZoom", String(next));
+      } catch {
+        /* storage blocked; zoom still works for this view */
+      }
+      return next;
+    });
   const [anchor, setAnchor] = useState<string>(() => pragueDateKey(new Date()));
   const [ticked, setTicked] = useState<Set<string> | null>(null);
   const [serviceId, setServiceId] = useState<string | null>(null);
@@ -533,6 +552,22 @@ export default function CalendarGridPage() {
             <ToggleButton value="week">{t("booking.grid.week")}</ToggleButton>
             <ToggleButton value="month">{t("booking.grid.month")}</ToggleButton>
           </ToggleButtonGroup>
+          {/* Vertical zoom: stretch or compress the day without changing the layout. */}
+          <ToggleButtonGroup exclusive size="small">
+            <ToggleButton value="zoom-out" onClick={() => changeZoom(-0.1)} disabled={zoom <= 0.6}>
+              −
+            </ToggleButton>
+            <ToggleButton
+              value="zoom-reset"
+              onClick={() => changeZoom(1 - zoom)}
+              title="Výchozí přiblížení"
+            >
+              {Math.round(zoom * 100)}%
+            </ToggleButton>
+            <ToggleButton value="zoom-in" onClick={() => changeZoom(0.1)} disabled={zoom >= 2}>
+              +
+            </ToggleButton>
+          </ToggleButtonGroup>
           <TextField
             select
             size="small"
@@ -697,6 +732,7 @@ export default function CalendarGridPage() {
                   employeeId={employeeId}
                   nowLineColor={nowLineColor}
                   holidayColor={holidayColor}
+                  zoom={zoom}
                   mayBook={mayBook}
                   mayBlock={mayBlock}
                   onOpen={setOpenId}

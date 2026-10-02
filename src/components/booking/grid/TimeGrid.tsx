@@ -59,7 +59,6 @@ const SLOT_MINUTES = 30;
  * so the shortest slot has to be tall enough for both.
  */
 const ROW_HEIGHT = 46;
-const PX_PER_MINUTE = ROW_HEIGHT / SLOT_MINUTES;
 
 export interface GridBookingRequest {
   calendarId: string;
@@ -97,6 +96,8 @@ export interface TimeGridProps {
   onOpen: (id: string) => void;
   onBook: (request: GridBookingRequest) => void;
   onPickDay: (day: DateOnly) => void;
+  /** Vertical zoom multiplier for row height; 1 is the default density. */
+  zoom?: number;
 }
 
 const OPEN_MARK: DayMark = { redNumber: false, closed: false, label: null, detail: null };
@@ -117,7 +118,13 @@ export function TimeGrid(props: TimeGridProps) {
     holidayColor,
     mayBook,
     mayBlock,
+    zoom = 1,
   } = props;
+
+  /* Zoom scales the whole vertical scale: the row height and, with it, every
+     minute→pixel placement below. Horizontal layout is untouched. */
+  const pxPerMinute = (ROW_HEIGHT * zoom) / SLOT_MINUTES;
+  const rowHeight = ROW_HEIGHT * zoom;
 
   const [pending, setPending] = useState<Selection | null>(null);
   const [blockTarget, setBlockTarget] = useState<BlockTarget | null>(null);
@@ -127,7 +134,7 @@ export function TimeGrid(props: TimeGridProps) {
 
   const topMinute = openSpan.start * 60;
   const bottomMinute = openSpan.end * 60;
-  const height = (bottomMinute - topMinute) * PX_PER_MINUTE;
+  const height = (bottomMinute - topMinute) * pxPerMinute;
   const hours = Array.from({ length: openSpan.end - openSpan.start }, (_, i) => openSpan.start + i);
   const columnMin = Math.max(140, calendars.length * 110);
   const dragEnabled = mayBook || mayBlock;
@@ -236,7 +243,7 @@ export function TimeGrid(props: TimeGridProps) {
             <Box
               key={hour}
               sx={{
-                height: ROW_HEIGHT * (60 / SLOT_MINUTES),
+                height: rowHeight * (60 / SLOT_MINUTES),
                 fontSize: 11,
                 color: "text.secondary",
                 textAlign: "right",
@@ -284,6 +291,7 @@ export function TimeGrid(props: TimeGridProps) {
                     )}
                     topMinute={topMinute}
                     bottomMinute={bottomMinute}
+                    pxPerMinute={pxPerMinute}
                     now={now}
                     pending={
                       pending?.calendarId === calendar.id && pending.dayKey === dayKey
@@ -364,7 +372,7 @@ export function TimeGrid(props: TimeGridProps) {
                       position: "absolute",
                       left: 0,
                       right: 0,
-                      top: (placement.minute - topMinute) * PX_PER_MINUTE,
+                      top: (placement.minute - topMinute) * pxPerMinute,
                       height: 0,
                       borderTop: `2px solid ${nowLineColor}`,
                       pointerEvents: "none",
@@ -381,11 +389,11 @@ export function TimeGrid(props: TimeGridProps) {
                             position: "absolute",
                             [edge]: 0,
                             width: 2,
-                            top: (Math.max(placement.span.start, topMinute) - topMinute) * PX_PER_MINUTE,
+                            top: (Math.max(placement.span.start, topMinute) - topMinute) * pxPerMinute,
                             height:
                               (Math.min(placement.span.end, bottomMinute) -
                                 Math.max(placement.span.start, topMinute)) *
-                              PX_PER_MINUTE,
+                              pxPerMinute,
                             backgroundColor: nowLineColor,
                             pointerEvents: "none",
                             zIndex: 5,
@@ -473,6 +481,7 @@ function SubColumn({
   blocks,
   topMinute,
   bottomMinute,
+  pxPerMinute,
   now,
   pending,
   onSelect,
@@ -488,6 +497,7 @@ function SubColumn({
   blocks: TimeBlock[];
   topMinute: number;
   bottomMinute: number;
+  pxPerMinute: number;
   now: Date;
   pending: MinuteRange | null;
   onSelect: (selection: Selection) => void;
@@ -506,8 +516,8 @@ function SubColumn({
     const start = Math.max(range.start, topMinute);
     const end = Math.min(range.end, bottomMinute);
     return {
-      top: (start - topMinute) * PX_PER_MINUTE,
-      height: Math.max(0, (end - start) * PX_PER_MINUTE),
+      top: (start - topMinute) * pxPerMinute,
+      height: Math.max(0, (end - start) * pxPerMinute),
     };
   };
 
@@ -520,7 +530,7 @@ function SubColumn({
 
   const minuteOf = (event: React.PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    return minuteAt(event.clientY - rect.top, PX_PER_MINUTE, topMinute);
+    return minuteAt(event.clientY - rect.top, pxPerMinute, topMinute);
   };
 
   return (
@@ -621,7 +631,7 @@ function SubColumn({
           inset: 0,
           pointerEvents: "none",
           zIndex: 1,
-          backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${step * PX_PER_MINUTE - 1}px, ${theme.palette.divider} ${step * PX_PER_MINUTE - 1}px, ${theme.palette.divider} ${step * PX_PER_MINUTE}px)`,
+          backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${step * pxPerMinute - 1}px, ${theme.palette.divider} ${step * pxPerMinute - 1}px, ${theme.palette.divider} ${step * pxPerMinute}px)`,
         }}
       />
 
