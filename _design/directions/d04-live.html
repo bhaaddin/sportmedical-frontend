@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Seznam a detail — živě</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+html,body{height:100%}
+body{margin:0;background:#E9EBEE;color:#1B2229;
+  font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;font-size:15px}
+
+/* ============ d04, verbatim from the template ============ */
+#d04 .shot{background:#F2F5F1;color:#1E2620;
+  font-family:"DM Sans",ui-sans-serif,system-ui,sans-serif;
+  font-size:15px;line-height:1.55;display:flex;flex-direction:column;min-height:100vh;
+  font-variant-numeric:tabular-nums}
+
+#d04 .bar{padding:14px 22px 10px;border-bottom:1px solid #D5DCD2;background:#EAEEE8}
+#d04 .bar-top{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+#d04 .brand{font-size:15px;font-weight:700;margin:0;letter-spacing:-.01em}
+#d04 .date{font-size:14px;color:#5E6A5E}
+#d04 .clock{margin-left:auto;font-size:14px;font-weight:700;color:#2F6B3F}
+#d04 .nav{display:flex;flex-wrap:wrap;gap:2px 4px;margin-top:9px}
+#d04 .nav a{text-decoration:none;color:#404C42;font-size:14px;padding:6px 10px;
+  border-radius:5px;min-height:32px;box-sizing:border-box;display:inline-flex;
+  align-items:center;transition:background 120ms ease}
+#d04 .nav a:hover{background:#E0E5DE}
+#d04 .nav a.on{background:#DCE7DD;color:#245331;font-weight:700}
+
+#d04 .split{display:flex;align-items:stretch;flex:1 1 auto;min-height:0}
+
+#d04 .list{flex:0 0 336px;box-sizing:border-box;border-right:1px solid #D5DCD2;
+  background:#EDF1EC;padding:14px 0 40px}
+#d04 .lh{font-size:14px;font-weight:700;margin:0 0 2px;padding:0 16px}
+#d04 .lsub{font-size:13px;color:#5E6A5E;padding:0 16px 12px}
+#d04 .row{display:flex;gap:10px;align-items:baseline;padding:9px 16px;
+  border-top:1px solid #DFE5DE;text-decoration:none;color:inherit;min-height:34px;
+  box-sizing:border-box;cursor:pointer}
+#d04 .row:hover{background:#E4EAE3}
+#d04 .row .t{flex:0 0 44px;font-size:14px;font-weight:700;color:#404C42}
+#d04 .row .n{flex:1 1 auto;min-width:0;font-size:14px}
+#d04 .row .s{flex:0 0 58px;text-align:right;font-size:13px;color:#5E6A5E}
+#d04 .row.done .t,#d04 .row.done .n{color:#77836F}
+#d04 .row.live{box-shadow:inset 4px 0 0 0 #2F6B3F;background:#E7EEE7}
+#d04 .row.live .s{color:#245331;font-weight:700}
+#d04 .row.open{box-shadow:inset 4px 0 0 0 #9E3A3A;background:#F6ECEA}
+#d04 .row.open .n{font-weight:700}
+#d04 .row.open .s{color:#8A3232;font-weight:700}
+#d04 .row.sel{outline:2px solid #B9C7B6;outline-offset:-2px}
+#d04 .nowrow{display:flex;align-items:center;gap:9px;padding:7px 16px;
+  border-top:1px solid #D5DCD2}
+#d04 .nowrow span{font-size:13px;font-weight:700;color:#2F6B3F;white-space:nowrap}
+#d04 .nowrow i{flex:1 1 auto;height:2px;background:#2F6B3F;font-style:normal}
+#d04 .lgroup{font-size:13px;color:#5E6A5E;padding:14px 16px 5px;font-weight:700}
+
+#d04 .detail{flex:1 1 auto;min-width:0;box-sizing:border-box;padding:22px 30px 60px;
+  max-width:980px}
+#d04 .dtop{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+#d04 .dkind{font-size:13px;font-weight:700;color:#5E6A5E;letter-spacing:.04em;
+  text-transform:uppercase;flex:1 1 100%}
+#d04 .dname{font-size:26px;font-weight:700;margin:2px 0 0;letter-spacing:-.02em;line-height:1.2}
+#d04 .dwhen{font-size:15px;color:#404C42}
+#d04 .dstate{margin-left:auto;font-size:13px;font-weight:700;color:#8A3232;
+  border:1px solid #D7B3AE;background:#F6ECEA;border-radius:4px;padding:4px 10px}
+#d04 .dstate.ok{color:#245331;border-color:#B5CDB7;background:#E7EEE7}
+
+#d04 .alert{margin-top:16px;background:#F6ECEA;border:1px solid #D7B3AE;
+  border-radius:10px;padding:16px 18px;box-shadow:inset 4px 0 0 0 #9E3A3A}
+#d04 .alert-h{font-size:17px;font-weight:700;color:#8A3232}
+#d04 .alert-p{font-size:15px;color:#404C42;margin-top:7px;max-width:76ch}
+#d04 .acts{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+#d04 button{font:inherit;font-size:14px;font-weight:700;color:#F2F5F1;
+  background:#2F6B3F;border:1px solid #245331;border-radius:6px;padding:9px 15px;
+  min-height:36px;cursor:pointer;transition:background 120ms ease}
+#d04 button:hover{background:#245331}
+#d04 button.second{background:#F8FAF7;color:#2C3630;border-color:#C9D2C7}
+#d04 button.second:hover{background:#EAEEE8}
+
+#d04 .panes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
+#d04 .pane{background:#F8FAF7;border:1px solid #DDE4DB;border-radius:10px;
+  padding:15px 17px;box-sizing:border-box;min-width:0}
+#d04 .pane.wide{grid-column:1 / -1}
+#d04 .ph{font-size:13px;font-weight:700;color:#5E6A5E;letter-spacing:.04em;
+  text-transform:uppercase;padding-bottom:9px;border-bottom:1px solid #E3E9E1;margin-bottom:11px}
+#d04 .f{display:flex;gap:12px;align-items:baseline;padding:5px 0;font-size:15px}
+#d04 .f .k{flex:0 0 132px;color:#5E6A5E;font-size:14px}
+#d04 .f .v{flex:1 1 auto;min-width:0}
+#d04 .doc{display:flex;gap:12px;align-items:baseline;padding:9px 0;font-size:15px;border-bottom:1px solid #E9EEE7}
+#d04 .doc:last-child{border-bottom:0}
+#d04 .doc .dn{flex:1 1 auto;min-width:0}
+#d04 .doc .dv{flex:0 0 132px;text-align:right;font-size:14px;color:#5E6A5E}
+#d04 .doc.bad .dn{font-weight:700;color:#8A3232}
+#d04 .doc.bad .dv{color:#8A3232;font-weight:700}
+#d04 .step{display:flex;gap:13px;align-items:baseline;padding:8px 0;font-size:15px}
+#d04 .step .sn{flex:0 0 26px;font-weight:700;color:#2F6B3F;font-size:14px}
+#d04 .step .st{flex:1 1 auto;min-width:0}
+#d04 .step .sm{display:block;font-size:14px;color:#5E6A5E;margin-top:1px}
+#d04 .pnote{font-size:14px;color:#404C42;margin:0;max-width:80ch}
+
+@media (max-width:1000px){
+  #d04 .split{display:block}
+  #d04 .list{width:auto;border-right:0;border-bottom:1px solid #D5DCD2;padding-bottom:16px}
+  #d04 .detail{padding:18px 16px 48px;max-width:none}
+  #d04 .panes{grid-template-columns:minmax(0,1fr)}
+  #d04 .bar{padding:14px 16px 10px}
+}
+
+/* ============ motion only — nothing above changes at rest ============ */
+#d04 .shot{--dur:250ms;--durf:150ms;--durs:350ms;--ease:cubic-bezier(.4,0,.2,1)}
+@media (prefers-reduced-motion:reduce){#d04 .shot{--dur:1ms;--durf:1ms;--durs:1ms}}
+#d04 .shot.calm{--dur:1ms;--durf:1ms;--durs:1ms}
+#d04 .row{transition:background 120ms ease,box-shadow var(--dur) ease,transform var(--dur) var(--ease)}
+#d04 .row.flip{transition:none}
+#d04 .row.announce{animation:d04announce var(--durs) var(--ease)}
+@keyframes d04announce{0%{background:#F6ECEA;box-shadow:inset 4px 0 0 0 #9E3A3A}
+  35%{background:#F0DBD7;box-shadow:inset 4px 0 0 0 #9E3A3A}100%{}}
+#d04 .dwrap{transition:opacity var(--durs) ease,transform var(--durs) var(--ease)}
+#d04 .dwrap.swap{opacity:0;transform:translateX(10px)}
+#d04 .nowrow i{transition:background var(--durs) ease}
+#d04 .demo{display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  padding:9px 22px;border-top:1px solid #D5DCD2;background:#EAEEE8}
+#d04 .demo .lbl{font-size:12.5px;font-weight:700;color:#5E6A5E;letter-spacing:.03em;text-transform:uppercase}
+#d04 .demo button{min-height:32px;padding:6px 12px;font-size:13px}
+#d04 .demo button[aria-pressed="true"]{background:#2F6B3F;color:#F2F5F1;border-color:#245331}
+@media (max-width:1000px){#d04 .demo{padding:9px 16px}}
+</style>
+</head>
+<body>
+<article class="dir" id="d04">
+<div class="shot">
+
+  <div class="bar">
+    <div class="bar-top">
+      <h1 class="brand">Ordinace Brno-Žabovřesky</h1>
+      <span class="date">úterý 23. září 2026 · Hana Veselá, recepce</span>
+      <span class="clock" id="clock">Právě je 09:40</span>
+    </div>
+    <nav class="nav">
+      <a href="#d04">Přehled</a><a class="on" href="#d04">Dnes</a><a href="#d04">Plánování</a>
+      <a href="#d04">Pacienti</a><a href="#d04">Diagnostika</a><a href="#d04">Dokumenty</a>
+      <a href="#d04">Pokladna</a><a href="#d04">Fakturace</a><a href="#d04">Sklad</a>
+      <a href="#d04">Tým</a><a href="#d04">Nastavení</a>
+    </nav>
+  </div>
+
+  <div class="split">
+    <div class="list">
+      <h2 class="lh">Dnešní pacienti</h2>
+      <div class="lsub" id="lsub">18 návštěv · klepnutím se člověk otevře vpravo</div>
+      <div id="rows"></div>
+    </div>
+    <div class="detail"><div class="dwrap" id="dwrap"></div></div>
+  </div>
+
+  <div class="demo">
+    <span class="lbl">Ukázka pohybu</span>
+    <button class="second" id="bNext" type="button">Zavolat dalšího</button>
+    <button class="second" id="bProblem" type="button">Nahlásit problém</button>
+    <button class="second" id="bGroup" type="button" aria-pressed="false">Podle stavu</button>
+    <button class="second" id="bCalm" type="button" aria-pressed="false">Klidný režim</button>
+  </div>
+
+</div>
+</article>
+
+<script>
+(function(){
+  var W={done:"hotovo",live:"běží",open:"stojí",wait:"čeká"};
+  var appts=[
+    {id:1,time:"07:00",name:"Jana Kratochvílová",proc:"Odběr krve",room:"Laboratoř",staff:"Bc. Dvořák",ins:"111",born:"",st:"done"},
+    {id:2,time:"07:20",name:"Petr Doležal",proc:"Vstupní vyšetření",room:"Ordinace 1",staff:"MUDr. Havelka",ins:"201",st:"done"},
+    {id:3,time:"07:40",name:"Tomáš Řehák",proc:"Spiroergometrie",room:"Laboratoř",staff:"Bc. Dvořák",ins:"205",st:"done"},
+    {id:4,time:"08:00",name:"Marie Nováková",proc:"Fyzioterapie",room:"Rehabilitace",staff:"Mgr. Pilařová",ins:"111",st:"done"},
+    {id:5,time:"08:30",name:"Ondřej Veselý",proc:"Kontrola po úrazu",room:"Ordinace 2",staff:"MUDr. Sýkorová",ins:"207",st:"done"},
+    {id:6,time:"09:00",name:"Lucie Bartošová",proc:"Izokinetika kolene",room:"Tělocvična",staff:"Bc. Dvořák",ins:"111",st:"live"},
+    {id:7,time:"09:15",name:"Martin Kolář",proc:"Posudek pro klub",room:"Ordinace 1",staff:"MUDr. Havelka",ins:"211",born:"14. 3. 1991 · 35 let",st:"open"},
+    {id:8,time:"09:45",name:"Eva Procházková",proc:"Rázová vlna",room:"Rehabilitace",staff:"Mgr. Pilařová",ins:"201",st:"live"},
+    {id:9,time:"10:00",name:"Filip Urban",proc:"Analýza chůze",room:"Tělocvična",staff:"Bc. Dvořák",ins:"213",st:"wait"},
+    {id:10,time:"10:30",name:"Kateřina Šimková",proc:"Kontrola po operaci",room:"Ordinace 2",staff:"MUDr. Sýkorová",ins:"111",st:"wait"},
+    {id:11,time:"11:00",name:"Jakub Horák",proc:"Vstupní vyšetření",room:"Ordinace 1",staff:"MUDr. Havelka",ins:"205",st:"wait"},
+    {id:12,time:"11:30",name:"Veronika Málková",proc:"Odběr krve",room:"Laboratoř",staff:"Bc. Dvořák",ins:"111",st:"wait"},
+    {id:13,time:"13:00",name:"Adam Beneš",proc:"Fyzioterapie",room:"Rehabilitace",staff:"Mgr. Pilařová",ins:"207",st:"wait"},
+    {id:14,time:"13:40",name:"Nikola Tichá",proc:"Spiroergometrie",room:"Laboratoř",staff:"MUDr. Sýkorová",ins:"201",st:"wait"},
+    {id:15,time:"14:20",name:"Radek Pospíšil",proc:"Kontrola po úrazu",room:"Ordinace 2",staff:"MUDr. Havelka",ins:"111",st:"wait"},
+    {id:16,time:"15:00",name:"Simona Vrbová",proc:"Izokinetika kolene",room:"Tělocvična",staff:"Mgr. Pilařová",ins:"213",st:"wait"},
+    {id:17,time:"15:40",name:"Tomáš Řehák",proc:"Fyzioterapie",room:"Rehabilitace",staff:"Mgr. Pilařová",ins:"205",st:"wait"},
+    {id:18,time:"16:40",name:"Petr Doležal",proc:"Kontrola po operaci",room:"Ordinace 1",staff:"MUDr. Havelka",ins:"201",st:"wait"}
+  ];
+  var sel=7, byStatus=false, justBlocked=null, clock=580;
+  var $=function(s){return document.querySelector(s)};
+  var rowsBox=$("#rows");
+  function esc(s){return String(s==null?"":s).replace(/[&<>]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;"}[c]})}
+  function cls(a){return a.st==="done"?"done":a.st==="live"?"live":a.st==="open"?"open":""}
+  function rowHTML(a){
+    return '<a class="row '+cls(a)+(a.id===sel?' sel':'')+(a.id===justBlocked?' announce':'')+'" '
+      +'data-id="'+a.id+'" href="#d04" role="option"><span class="t">'+a.time+'</span>'
+      +'<span class="n">'+esc(a.name)+'</span><span class="s">'+W[a.st]+'</span></a>';
+  }
+  function grp(title,arr){return arr.length?'<div class="lgroup">'+title+'</div>'+arr.map(rowHTML).join(""):""}
+  function clockStr(){var h=Math.floor(clock/60),m=clock%60;return (h<10?"0":"")+h+":"+(m<10?"0":"")+m}
+  function listHTML(){
+    var f=function(s){return appts.filter(function(a){return a.st===s})};
+    if(byStatus){
+      return grp("Stojí – potřebuje člověka",f("open"))+grp("Běží",f("live"))
+        +grp("Čeká",f("wait"))+grp("Hotovo",f("done"));
+    }
+    var now='<div class="nowrow"><span>Právě teď '+clockStr()+'</span><i></i></div>';
+    return grp("Hotovo",f("done"))
+      +grp("Běží a stojí",appts.filter(function(a){return a.st==="live"||a.st==="open"}))
+      +now+grp("Zbytek dne",f("wait"));
+  }
+
+  // FLIP: animate rows from their old positions to the new ones
+  function render(){
+    var firsts={};
+    rowsBox.querySelectorAll(".row").forEach(function(r){firsts[r.getAttribute("data-id")]=r.getBoundingClientRect().top});
+    rowsBox.innerHTML=listHTML();
+    justBlocked=null;
+    var rows=rowsBox.querySelectorAll(".row");
+    rows.forEach(function(r){
+      var id=r.getAttribute("data-id"),f=firsts[id];
+      if(f==null) return;
+      var dy=f-r.getBoundingClientRect().top;
+      if(!dy) return;
+      r.classList.add("flip");r.style.transform="translateY("+dy+"px)";
+    });
+    requestAnimationFrame(function(){
+      rows.forEach(function(r){r.classList.remove("flip");r.style.transform=""});
+    });
+  }
+
+  function detailHTML(a){
+    var head='<div class="dtop"><span class="dkind">Otevřený pacient</span>'
+      +'<h2 class="dname">'+esc(a.name)+'</h2>';
+    if(a.st==="open"){
+      return head+'<span class="dwhen">objednán na '+a.time+' · sedí v čekárně 25 minut</span>'
+        +'<span class="dstate">stojí kvůli papírům</span></div>'
+        +'<div class="alert"><div class="alert-h">Chybí: Souhlas se zpracováním zdravotních údajů</div>'
+        +'<p class="alert-p">Je to první návštěva, a bez podepsaného souhlasu nejde posudek pro klub vůbec vydat. '
+        +'Souhlas se vytiskne u recepce, pacient ho podepíše a Hana Veselá ho naskenuje do jeho složky. '
+        +'Trvá to zhruba tři minuty. Do té doby stojí ordinace 1 i MUDr. Havelka.</p>'
+        +'<div class="acts"><button type="button">Vytisknout souhlas k podpisu</button>'
+        +'<button class="second" type="button">Přesunout na 10:15</button></div></div>'
+        +'<div class="panes">'
+        +pane("Kdo to je",[["Jméno",a.name],["Narozen",a.born||"—"],["Pojišťovna",a.ins+" · ověřeno dnes v 09:14"],["U nás","poprvé"]])
+        +pane("Proč přišel",[["Výkon",a.proc],["Lékař",a.staff],["Místnost",a.room],["Délka","30 minut"]])
+        +'<section class="pane"><div class="ph">Co chybí a co už je</div>'
+        +'<div class="doc bad"><span class="dn">Souhlas se zpracováním zdravotních údajů</span><span class="dv">chybí podpis</span></div>'
+        +'<div class="doc"><span class="dn">Ověření pojištěnce 211</span><span class="dv">hotovo 09:14</span></div>'
+        +'<div class="doc"><span class="dn">Vstupní dotazník</span><span class="dv">vyplněn</span></div>'
+        +'<div class="doc"><span class="dn">Žádost od klubu</span><span class="dv">přinesl s sebou</span></div></section>'
+        +'<section class="pane"><div class="ph">Co bude dál</div>'
+        +step("1.","Vytisknout a nechat podepsat souhlas","recepce, asi 3 minuty")
+        +step("2.","Zavolat pacienta do ordinace 1","MUDr. Havelka je volný až do 11:00")
+        +step("3.","Posudek pro klub, 30 minut","skončí zhruba v 10:15")
+        +step("4.","Vydat posudek a vybrat platbu","pokladna, před odchodem")+'</section>'
+        +'<section class="pane wide"><div class="ph">Co to udělá se zbytkem dne</div>'
+        +'<p class="pnote">Ordinace 1 je pak volná až do 11:00, kdy má Jakub Horák vstupní vyšetření — '
+        +'zdržení se tedy nikam dál nepřenese, jen stojí MUDr. Havelka. V tělocvičně dokončuje Lucie '
+        +'Bartošová izokinetiku kolene do 10:00 a hned po ní jde Filip Urban na analýzu chůze. V rehabilitaci '
+        +'běží od 09:30 Eva Procházková, vzatá dovnitř dřív.</p></section></div>';
+    }
+    var when=a.st==="done"?"dokončeno":a.st==="live"?"právě běží":"objednán na "+a.time;
+    var note=a.st==="done"?"Výkon je hotový, pacient může odejít / pokračovat dál podle plánu."
+      :a.st==="live"?"Výkon právě běží v místnosti "+a.room+"."
+      :"Papírově v pořádku, čeká na řadu. Nic kolem něj teď nepotřebuje člověka.";
+    return head+'<span class="dwhen">'+when+'</span>'
+      +'<span class="dstate ok">'+W[a.st]+'</span></div>'
+      +'<div class="panes">'
+      +pane("Kdo to je",[["Jméno",a.name],["Pojišťovna",a.ins],["Stav",W[a.st]]])
+      +pane("Proč přišel",[["Výkon",a.proc],["Lékař",a.staff],["Místnost",a.room]])
+      +'<section class="pane wide"><div class="ph">Poznámka</div><p class="pnote">'+note+'</p></section></div>';
+  }
+  function pane(title,rows){
+    return '<section class="pane"><div class="ph">'+title+'</div>'
+      +rows.map(function(r){return '<div class="f"><span class="k">'+esc(r[0])+'</span><span class="v">'+esc(r[1])+'</span></div>'}).join("")
+      +'</section>';
+  }
+  function step(n,t,m){return '<div class="step"><span class="sn">'+n+'</span><span class="st">'+esc(t)+'<span class="sm">'+esc(m)+'</span></span></div>'}
+
+  function showDetail(){
+    var a=appts.find(function(x){return x.id===sel})||appts[0];
+    var w=$("#dwrap");w.classList.add("swap");
+    var ms=Math.max(1,parseFloat(getComputedStyle($("#d04 .shot")).getPropertyValue("--durs")));
+    setTimeout(function(){w.innerHTML=detailHTML(a);w.classList.remove("swap")},ms);
+  }
+
+  rowsBox.addEventListener("click",function(e){
+    var r=e.target.closest(".row");if(!r)return;e.preventDefault();
+    sel=parseInt(r.getAttribute("data-id"),10);
+    rowsBox.querySelectorAll(".row").forEach(function(x){x.classList.toggle("sel",x===r)});
+    showDetail();
+  });
+
+  $("#bNext").addEventListener("click",function(){
+    var n=appts.find(function(a){return a.st==="wait"});if(!n)return;
+    n.st="live";clock+=5;$("#clock").textContent="Právě je "+clockStr();render();
+  });
+  $("#bProblem").addEventListener("click",function(){
+    var n=appts.find(function(a){return a.st==="wait"});if(!n)return;
+    n.st="open";justBlocked=n.id;sel=n.id;render();showDetail();
+  });
+  $("#bGroup").addEventListener("click",function(){
+    byStatus=!byStatus;this.setAttribute("aria-pressed",String(byStatus));
+    this.textContent=byStatus?"Podle času":"Podle stavu";render();
+  });
+  $("#bCalm").addEventListener("click",function(){
+    var on=$("#d04 .shot").classList.toggle("calm");this.setAttribute("aria-pressed",String(on));
+  });
+
+  rowsBox.innerHTML=listHTML();showDetail();
+})();
+</script>
+</body>
+</html>

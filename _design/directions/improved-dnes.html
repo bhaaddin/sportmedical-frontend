@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dnešní přehled — lepší</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+:root{
+  --accent:#0D9488; --accent-d:#00665A;
+  --ground:#EEF3F9; --paper:#FFFFFF;
+  --text:#14202B; --muted:#5B6B7B; --divider:#E3EAF2; --secondary:#1E293B;
+  --success:#16A34A; --warning:#F59E0B; --error:#E11D48; --info:#0EA5E9;
+  --cal1:#00695C; --cal2:#1565C0; --cal3:#2E7D32; --cal4:#6A1B9A; --cal5:#BF360C;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:"Inter","Roboto","Helvetica","Arial",sans-serif;color:var(--text);
+  background:radial-gradient(1200px 600px at 100% -5%, rgba(13,148,136,.10) 0%, rgba(0,0,0,0) 55%), var(--ground);
+  background-attachment:fixed;font-size:15px;line-height:1.5}
+.tnum{font-variant-numeric:tabular-nums}
+
+.appbar{position:sticky;top:0;z-index:20;height:56px;display:flex;align-items:center;gap:14px;padding:0 18px;color:#fff;
+  background:linear-gradient(100deg,var(--accent) 0%,var(--accent-d) 100%);box-shadow:0 8px 24px -10px rgba(13,148,136,.55)}
+.appbar .logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.01em;font-size:17px}
+.appbar .mk{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:16px}
+.appbar .spacer{flex:1}
+.appbar .user{display:flex;align-items:center;gap:9px;font-size:13px}
+.appbar .ava{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.22);display:grid;place-items:center;font-weight:700;font-size:13px}
+
+.frame{display:grid;grid-template-columns:240px 1fr;min-height:calc(100% - 56px)}
+.side{background:var(--paper);border-right:1px solid var(--divider);padding:12px 10px}
+.side .glabel{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:12px 12px 4px}
+.side a{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;text-decoration:none;color:var(--secondary);font-size:14px;font-weight:600}
+.side a:hover{background:rgba(13,148,136,.07)}
+.side a.on{background:rgba(13,148,136,.12);color:var(--accent-d)}
+.side a svg{width:19px;height:19px;flex:0 0 19px;stroke:currentColor;fill:none;stroke-width:1.8;opacity:.9}
+
+.content{padding:22px 26px 48px;min-width:0}
+.phead{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.phead h1{font-size:28px;font-weight:800;letter-spacing:-.02em;margin:0}
+.phead .date{color:var(--muted);font-size:14px;margin-top:2px}
+.phead .nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.obtn{border:1px solid var(--divider);background:var(--paper);color:var(--text);border-radius:10px;padding:7px 13px;font:inherit;font-weight:600;font-size:14px;cursor:pointer}
+.pbtn{border:0;border-radius:10px;padding:8px 16px;font:inherit;font-weight:700;color:#fff;background:var(--accent);box-shadow:0 6px 16px rgba(13,148,136,.28);cursor:pointer}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 18px}
+.chip{border-radius:8px;font-weight:700;font-size:13px;padding:5px 12px;color:#fff}
+.chip.off{background:transparent;color:var(--muted);border:1px solid var(--divider)}
+
+.pp{background:var(--paper);border:1px solid var(--divider);border-radius:14px;padding:16px 18px}
+/* the richer MuiCard look (18px + layered soft shadow) — used only for the hero, to make it lead */
+.card{background:var(--paper);border:1px solid #E7EDF4;border-radius:18px;
+  box-shadow:0 1px 2px rgba(16,32,48,.04),0 12px 28px -12px rgba(16,32,48,.18);padding:18px 20px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+
+/* ===== HERO: now + needs-a-person, promoted to the top ===== */
+.hero{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;margin-bottom:16px}
+.runrow{display:flex;flex-direction:column;gap:10px}
+.run{display:flex;align-items:center;gap:12px;border-left:3px solid var(--success);background:rgba(22,163,74,.08);
+  border-radius:10px;padding:11px 13px}
+.run .t{font-weight:800;font-size:15px;min-width:52px}
+.run .b{min-width:0}
+.run .nm{font-weight:700}
+.run .mt{color:var(--muted);font-size:13px}
+.run .rb{margin-left:auto;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--success)}
+.nextline{margin-top:12px;color:var(--muted);font-size:13.5px}
+.nextline b{color:var(--text)}
+
+.needs{border-left:4px solid var(--error);background:rgba(225,29,72,.05);border-color:#F2C6CF}
+.needs .eyebrow{color:var(--error)}
+.need{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 0;border-top:1px solid rgba(225,29,72,.14)}
+.need:first-of-type{border-top:0}
+.need .who{min-width:0}
+.need .nm{font-weight:700}
+.need .why{color:var(--error);font-size:13px}
+.need .acts{display:flex;gap:7px;flex-shrink:0}
+.mini{border-radius:9px;padding:6px 12px;font:inherit;font-weight:700;font-size:12.5px;cursor:pointer;border:1px solid transparent}
+.mini.pri{background:var(--accent);color:#fff}
+.mini.warn{background:transparent;color:var(--warning);border-color:#F6D58A}
+
+/* ===== KPI band ===== */
+.tallies{display:flex;flex-wrap:wrap;gap:30px;margin-bottom:16px}
+.tal .num{font-size:33px;font-weight:800;line-height:1.1}
+.tal .lab{font-size:13px;color:var(--muted)}
+.tal .note{font-size:11px;color:var(--muted)}
+
+/* breakdowns + minutes */
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.pp h3{margin:0 0 11px;font-size:13px;font-weight:700}
+.brow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:3px 0;font-size:14px}
+.brow .l{display:flex;align-items:center;gap:8px;min-width:0}
+.brow .dot{width:10px;height:10px;border-radius:50%;flex:0 0 10px}
+.brow .c{font-weight:700}
+.lineR{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:4px 0}
+.lineR .k{color:var(--muted);font-size:14px}
+.lineR .v{font-weight:600;font-size:14px}
+
+@media (max-width:980px){.frame{grid-template-columns:1fr}.side{display:none}.hero{grid-template-columns:1fr}.grid3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="appbar">
+  <div class="logo"><span class="mk">✚</span> SportMedical</div>
+  <div class="spacer"></div>
+  <div class="user"><span>Hana Veselá · recepce</span><span class="ava">HV</span></div>
+</div>
+<div class="frame">
+  <nav class="side">
+    <a href="#"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Přehled</a>
+    <div style="height:8px"></div>
+    <a href="#" class="on"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Dnešní přehled</a>
+    <a href="#"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M8 13h3M14 13h3"/></svg>Plánování</a>
+    <a href="#"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Přehled podle služeb</a>
+    <a href="#"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 11a3 3 0 0 0 0-6"/></svg>Pacienti</a>
+    <a href="#"><svg viewBox="0 0 24 24"><path d="M9 3v6l-5 9a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-5-9V3M8 3h8"/></svg>Diagnostika</a>
+    <div class="glabel">Peníze</div>
+    <a href="#"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5a2.5 2 0 0 1 5 0c0 3-5 1-5 4a2.5 2 0 0 0 5 0"/></svg>Pokladna</a>
+    <a href="#"><svg viewBox="0 0 24 24"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2zM9 7h6M9 11h6"/></svg>Fakturace</a>
+  </nav>
+
+  <main class="content">
+    <div class="phead">
+      <div><h1>Dnešní přehled</h1><div class="date">úterý 23. září 2026 · 09:40</div></div>
+      <div class="nav"><button class="obtn">‹</button><button class="obtn">Dnes</button><button class="obtn">›</button><button class="pbtn">Nová rezervace</button></div>
+    </div>
+
+    <div class="chips">
+      <span class="chip" style="background:var(--cal1)">Ordinace 1</span>
+      <span class="chip" style="background:var(--cal2)">Ordinace 2</span>
+      <span class="chip" style="background:var(--cal3)">Laboratoř</span>
+      <span class="chip" style="background:var(--cal4)">Rehabilitace</span>
+      <span class="chip" style="background:var(--cal5)">Tělocvična</span>
+    </div>
+
+    <!-- HERO: what's happening now + who needs a person (the real win from template 10 + 03) -->
+    <div class="hero">
+      <div class="card">
+        <div class="eyebrow">Právě teď · 09:40</div>
+        <div class="runrow">
+          <div class="run"><span class="t tnum">09:00</span><span class="b"><span class="nm">Lucie Bartošová</span><span class="mt"> · Izokinetika kolene · Tělocvična</span></span><span class="rb">běží</span></div>
+          <div class="run"><span class="t tnum">09:30</span><span class="b"><span class="nm">Eva Procházková</span><span class="mt"> · Rázová vlna · Rehabilitace</span></span><span class="rb">běží</span></div>
+        </div>
+        <div class="nextline">Další na řadě: <b>10:00 · Analýza chůze · Tělocvična</b> · volno dnes <b>180 min</b></div>
+      </div>
+
+      <div class="card needs">
+        <div class="eyebrow">Potřebuje člověka · 2</div>
+        <div class="need">
+          <div class="who"><div class="nm">09:15 · Martin Kolář</div><div class="why">Chybí souhlas se zpracováním údajů · Ordinace 1</div></div>
+          <div class="acts"><button class="mini pri">Přišel</button><button class="mini warn">Nepřišel</button></div>
+        </div>
+        <div class="need">
+          <div class="who"><div class="nm">10:00 · Filip Urban</div><div class="why">Mešká · Analýza chůze · Tělocvična</div></div>
+          <div class="acts"><button class="mini pri">Přišel</button><button class="mini warn">Nepřišel</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI band -->
+    <div class="pp" style="margin-bottom:16px">
+      <div class="tallies">
+        <div class="tal"><div class="num tnum">18</div><div class="lab">objednáno</div></div>
+        <div class="tal"><div class="num tnum">6</div><div class="lab">přišlo</div></div>
+        <div class="tal"><div class="num tnum" style="color:var(--warning)">2</div><div class="lab">mešká</div><div class="note">jen zobrazení</div></div>
+        <div class="tal"><div class="num tnum">1</div><div class="lab">nepřišlo</div></div>
+        <div class="tal"><div class="num tnum">0</div><div class="lab">zrušeno</div></div>
+      </div>
+    </div>
+
+    <!-- numbers below the fold of attention -->
+    <div class="grid3">
+      <div class="pp">
+        <h3>Podle činnosti</h3>
+        <div class="brow"><div class="l">Odběr krve</div><div class="c tnum">3</div></div>
+        <div class="brow"><div class="l">Fyzioterapie</div><div class="c tnum">3</div></div>
+        <div class="brow"><div class="l">Kontrola</div><div class="c tnum">3</div></div>
+        <div class="brow"><div class="l">Vstupní vyšetření</div><div class="c tnum">2</div></div>
+        <div class="brow"><div class="l">Spiroergometrie</div><div class="c tnum">2</div></div>
+        <div class="brow"><div class="l">Izokinetika kolene</div><div class="c tnum">2</div></div>
+      </div>
+      <div class="pp">
+        <h3>Podle kalendáře</h3>
+        <div class="brow"><div class="l"><span class="dot" style="background:var(--cal1)"></span>Ordinace 1</div><div class="c tnum">4</div></div>
+        <div class="brow"><div class="l"><span class="dot" style="background:var(--cal2)"></span>Ordinace 2</div><div class="c tnum">3</div></div>
+        <div class="brow"><div class="l"><span class="dot" style="background:var(--cal3)"></span>Laboratoř</div><div class="c tnum">4</div></div>
+        <div class="brow"><div class="l"><span class="dot" style="background:var(--cal4)"></span>Rehabilitace</div><div class="c tnum">4</div></div>
+        <div class="brow"><div class="l"><span class="dot" style="background:var(--cal5)"></span>Tělocvična</div><div class="c tnum">3</div></div>
+      </div>
+      <div class="pp">
+        <h3>Podklady · kapacita</h3>
+        <div class="lineR"><span class="k">Podklady</span><span class="v">✓ 14 &nbsp; <span style="color:var(--warning)">⚠ 2</span></span></div>
+        <div class="lineR"><span class="k">Volno dnes</span><span class="v tnum">180 minut</span></div>
+        <div class="lineR"><span class="k">Nevyužito</span><span class="v tnum">120 z 480 (25 %)</span></div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

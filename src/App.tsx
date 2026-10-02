@@ -88,10 +88,6 @@ const AppointmentLinkPage = lazy(() => import('./pages/booking/AppointmentLinkPa
 const CashierPage = lazy(() => import('./pages/CashierPage'));
 const ClubsPage = lazy(() => import('./pages/ClubsPage'));
 const AccountingExportPage = lazy(() => import('./pages/AccountingExportPage'));
-const ProvozPage = lazy(() => import('./pages/admin/Provoz'));
-const OznameniPage = lazy(() => import('./pages/admin/Oznameni'));
-const ZabezpeceniPage = lazy(() => import('./pages/admin/Zabezpeceni'));
-const DohledPage = lazy(() => import('./pages/admin/Dohled'));
 
 /* ── Loading spinner for Suspense ── */
 function PageLoader() {
@@ -592,12 +588,6 @@ export default function App() {
                     <Route path="/exceptions" element={<RequirePermission of="settings.clinic.manage"><BookingExceptionsPage /></RequirePermission>} />
                     <Route path="/nepritomnosti" element={<RequirePermission of="settings.clinic.manage"><EmployeeAbsencesPage /></RequirePermission>} />
                     <Route path="/admin" element={<RequirePermission of="settings.clinic.manage"><AdminPage /></RequirePermission>} />
-                    {/* Admin-ops pages adopted from the old main branch (2026-10-02),
-                        re-guarded by permission to match this branch's scheme. */}
-                    <Route path="/admin/provoz" element={<RequirePermission of="settings.clinic.manage"><ProvozPage /></RequirePermission>} />
-                    <Route path="/admin/oznameni" element={<RequirePermission of="settings.clinic.manage"><OznameniPage /></RequirePermission>} />
-                    <Route path="/admin/zabezpeceni" element={<RequirePermission of="settings.clinic.manage"><ZabezpeceniPage /></RequirePermission>} />
-                    <Route path="/admin/dohled" element={<RequirePermission of="settings.clinic.manage"><DohledPage /></RequirePermission>} />
                     <Route path="/system-health" element={<RequirePermission of="settings.clinic.manage"><SystemHealthPage /></RequirePermission>} />
                     <Route path="/staff-management" element={<RequirePermission of="users.manage"><StaffManagementPage /></RequirePermission>} />
                     <Route path="/audit-log" element={<RequirePermission of="settings.clinic.manage"><AuditLogPage /></RequirePermission>} />
