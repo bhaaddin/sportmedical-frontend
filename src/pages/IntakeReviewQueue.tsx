@@ -14,21 +14,21 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
-  Paper,
+  Stack,
   TextField,
   Typography,
 } from '@mui/material';
-import { CheckCircle, PersonAdd, Block, Refresh } from '@mui/icons-material';
+import { PersonAdd, Block, Refresh } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import { formatDateOnly } from '../utils/time';
 import { usePermission } from '../auth/usePermission';
+import { PageHeader, SoftCard, StatusChip } from '../components/ui';
 import {
   IntakeOutcome,
   IntakeResolution,
@@ -149,21 +149,19 @@ export default function IntakeReviewQueue() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>
-            Fronta ke kontrole
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {entries.length === 0
-              ? 'Nic nečeká na kontrolu.'
-              : `${entries.length} ${entries.length === 1 ? 'záznam čeká' : 'záznamů čeká'} na rozhodnutí.`}
-          </Typography>
-        </Box>
-        <Button startIcon={<Refresh />} onClick={() => void load()}>
-          Načíst znovu
-        </Button>
-      </Box>
+      <PageHeader
+        title="Fronta ke kontrole"
+        subtitle={
+          entries.length === 0
+            ? 'Nic nečeká na kontrolu.'
+            : `${entries.length} ${entries.length === 1 ? 'záznam čeká' : 'záznamů čeká'} na rozhodnutí.`
+        }
+        actions={
+          <Button variant="outlined" startIcon={<Refresh />} onClick={() => void load()}>
+            Načíst znovu
+          </Button>
+        }
+      />
 
       {error !== null && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -172,33 +170,31 @@ export default function IntakeReviewQueue() {
       )}
 
       {entries.length === 0 ? (
-        <Paper sx={{ p: 6, borderRadius: 3, textAlign: 'center' }}>
-          <CheckCircle sx={{ fontSize: 56, color: 'success.main', mb: 1 }} />
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+        <SoftCard sx={{ p: 6, textAlign: 'center' }}>
+          <StatusChip tone="green" dot sx={{ mb: 1.5 }}>Vše vyřízeno</StatusChip>
+          <Typography sx={{ fontSize: 17, fontWeight: 700 }}>
             Fronta je prázdná
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             Všechny dotazníky jsou vyřízené.
           </Typography>
-        </Paper>
+        </SoftCard>
       ) : (
         entries.map((entry) => (
-          <Paper key={entry.intakeId} sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3, mb: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+          <SoftCard key={entry.intakeId} sx={{ p: { xs: 2, sm: 2.5 }, mb: 2 }}>
+            <Stack direction="row" sx={{ alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
+              <Typography sx={{ fontSize: 17, fontWeight: 700 }}>
                 {entry.givenName} {entry.familyName}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                 {/* A birth date is a date, not an instant: formatted with no
                     zone conversion, and in Czech like everything around it.
                     It rendered as `1989-11-09` next to a Czech timestamp. */}
                 nar. {formatDateOnly(entry.dateOfBirth)}
               </Typography>
-              <Chip
-                size="small"
-                label={entry.referenceNumber}
-                sx={{ fontFamily: 'monospace', fontSize: 11 }}
-              />
+              <StatusChip tone="grey" size="sm" sx={{ fontFamily: 'monospace', fontWeight: 500 }}>
+                {entry.referenceNumber}
+              </StatusChip>
               {/*
                 What the matcher concluded, in words. It arrives as a number -
                 0, 1, 2 - and an unrecognised one is shown as unknown rather
@@ -210,32 +206,32 @@ export default function IntakeReviewQueue() {
                 const outcome = outcomeOf(entry.outcome);
                 if (outcome === null) {
                   return (
-                    <Chip
-                      size="small"
-                      color="warning"
-                      label={`neznámý výsledek (${entry.outcome})`}
-                    />
+                    <StatusChip tone="beige">{`neznámý výsledek (${entry.outcome})`}</StatusChip>
                   );
                 }
                 return (
-                  <Chip
-                    size="small"
-                    color={outcome === IntakeOutcome.ReviewRequired ? 'warning' : 'default'}
-                    label={
+                  <StatusChip
+                    tone={
                       outcome === IntakeOutcome.ReviewRequired
-                        ? 'Ke kontrole'
+                        ? 'beige'
                         : outcome === IntakeOutcome.AutoAssignToExisting
-                          ? 'Shoda s pacientem'
-                          : 'Nový pacient'
+                          ? 'green'
+                          : 'primary'
                     }
-                  />
+                  >
+                    {outcome === IntakeOutcome.ReviewRequired
+                      ? 'Ke kontrole'
+                      : outcome === IntakeOutcome.AutoAssignToExisting
+                        ? 'Shoda s pacientem'
+                        : 'Nový pacient'}
+                  </StatusChip>
                 );
               })()}
               <Box sx={{ flexGrow: 1 }} />
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                 {new Date(entry.submittedAtUtc).toLocaleString('cs-CZ')}
               </Typography>
-            </Box>
+            </Stack>
 
             {/*
               The summary row carries `topScore` but never the candidates, so
@@ -279,16 +275,14 @@ export default function IntakeReviewQueue() {
                 ? (details[entry.intakeId]?.candidates ?? [])
                 : []
               ).map((candidate: IntakeCandidate) => (
-                <Box key={candidate.patientId} sx={{ mb: 2 }}>
+                <SoftCard key={candidate.patientId} tone="muted" sx={{ mb: 2, p: 2 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                       Možná shoda
                     </Typography>
-                    <Chip
-                      size="small"
-                      color={candidate.score >= 80 ? 'warning' : 'default'}
-                      label={`skóre ${candidate.score}`}
-                    />
+                    <StatusChip tone={candidate.score >= 80 ? 'beige' : 'grey'} size="sm">
+                      {`skóre ${candidate.score}`}
+                    </StatusChip>
                     {/* The server sends no name for the candidate, only which
                         fields agree. Opening the card is the deliberate act
                         that shows the record itself. */}
@@ -319,12 +313,11 @@ export default function IntakeReviewQueue() {
                       Sloučit s tímto pacientem
                     </Button>
                   </Box>
-
-                  <Divider sx={{ mt: 2 }} />
-                </Box>
+                </SoftCard>
               ))
             )}
 
+            <Divider sx={{ mb: 2 }} />
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
               <Button
                 size="small"
@@ -337,6 +330,7 @@ export default function IntakeReviewQueue() {
               </Button>
               <Button
                 size="small"
+                variant="outlined"
                 color="error"
                 startIcon={<Block />}
                 disabled={busyId === entry.intakeId}
@@ -348,7 +342,7 @@ export default function IntakeReviewQueue() {
                 Zamítnout
               </Button>
             </Box>
-          </Paper>
+          </SoftCard>
         ))
       )}
 
@@ -467,12 +461,12 @@ function SignalSummary({ signals }: { signals: IntakeMatchSignals }) {
   return (
     <Box sx={{ fontSize: 14 }}>
       {signals.anchorMatches && (
-        <Typography variant="body2" sx={{ fontWeight: 700, color: 'warning.dark', mb: 0.5 }}>
+        <Typography variant="body2" sx={{ fontWeight: 700, color: 'warning.main', mb: 0.5 }}>
           Shoduje se rodné číslo nebo číslo pojištěnce — jde téměř jistě o stejnou osobu.
         </Typography>
       )}
       {signals.nameAndDateOfBirthMatch && !signals.anchorMatches && (
-        <Typography variant="body2" sx={{ fontWeight: 700, color: 'warning.dark', mb: 0.5 }}>
+        <Typography variant="body2" sx={{ fontWeight: 700, color: 'warning.main', mb: 0.5 }}>
           Shoduje se jméno i datum narození.
         </Typography>
       )}

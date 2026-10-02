@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { twoFactorApi } from '../../api/twoFactor';
 import type { TwoFactorSetup } from '../../api/twoFactor';
 import { errorText } from '../../components/booking/errorText';
+import { SettingsScreen } from './SettingsFrame';
 
 export default function TwoFactorPage() {
   const { t } = useTranslation();
@@ -49,17 +50,11 @@ export default function TwoFactorPage() {
   });
 
   return (
-    <Box sx={{ maxWidth: 640 }}>
-      <Box sx={{ mb: 3 }}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <ShieldIcon color="primary" />
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>Dvoufázové ověření</Typography>
-        </Stack>
-        <Typography sx={{ color: 'text.secondary', mt: 0.5 }}>
-          Přidá k heslu jednorázový kód z ověřovací aplikace (Google Authenticator,
-          Authy a podobné). Platí jen pro váš účet.
-        </Typography>
-      </Box>
+    <SettingsScreen
+      title="Zabezpečení"
+      subtitle="Dvoufázové ověření — k heslu přidá jednorázový kód z ověřovací aplikace. Platí jen pro váš účet."
+      width={640}
+    >
 
       {/* Recovery codes — shown once, right after enabling. */}
       {recoveryCodes !== null ? (
@@ -176,6 +171,6 @@ export default function TwoFactorPage() {
           )}
         </CardContent>
       </Card>
-    </Box>
+    </SettingsScreen>
   );
 }

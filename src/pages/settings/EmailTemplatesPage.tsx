@@ -25,6 +25,7 @@ import { emailTemplatesApi } from '../../api/emailTemplates';
 import type { EmailPlaceholder, EmailTemplate, RenderedEmail } from '../../api/emailTemplates';
 import { AsyncSection } from '../../components/booking/AsyncSection';
 import { errorText } from '../../components/booking/errorText';
+import { SettingsScreen } from './SettingsFrame';
 
 /** The delimiter the body already uses, so an inserted placeholder matches it. */
 function wrap(key: string, body: string): string {
@@ -105,15 +106,10 @@ export default function EmailTemplatesPage() {
   };
 
   return (
-    <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>Šablony e-mailů</Typography>
-        <Typography sx={{ color: 'text.secondary' }}>
-          Co se posílá pacientům a personálu — předmět a text každého e-mailu. Vložte
-          povolené zástupné údaje, podívejte se na náhled se vzorovými hodnotami a
-          pošlete si testovací e-mail, než uložíte.
-        </Typography>
-      </Box>
+    <SettingsScreen
+      title="SMS a e-maily"
+      subtitle="Předmět a text každé zprávy — vložte zástupné údaje, prohlédněte náhled se vzorovými hodnotami a pošlete si test, než uložíte"
+    >
 
       <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {/* Left: the templates */}
@@ -287,6 +283,6 @@ export default function EmailTemplatesPage() {
         message={toast ?? ''}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
-    </Box>
+    </SettingsScreen>
   );
 }

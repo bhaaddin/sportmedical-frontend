@@ -45,6 +45,7 @@ import type {
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { errorText } from "../../components/booking/errorText";
 import { ColorSelect } from "../../components/booking/ColorSelect";
+import { SettingsScreen } from "../settings/SettingsFrame";
 import {
   DEFAULT_PALETTE_ENTRY,
   readableTextOn,
@@ -274,25 +275,11 @@ export default function ActivitiesPage() {
   const durationIsValid = (draft?.durationMinutes ?? 0) > 0;
 
   return (
-    <Box sx={{ maxWidth: 1100, mx: "auto" }}>
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 2,
-          mb: 3,
-        }}
-      >
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>
-            {t("booking.activities.title")}
-          </Typography>
-          <Typography sx={{ color: "text.secondary" }}>
-            {t("booking.activities.subtitle")}
-          </Typography>
-        </Box>
+    <SettingsScreen
+      title={t("booking.activities.title")}
+      subtitle={t("booking.activities.subtitle")}
+      width={1100}
+      actions={
         <Button
           variant="contained"
           startIcon={<AddIcon />}
@@ -300,7 +287,8 @@ export default function ActivitiesPage() {
         >
           {t("booking.activities.new")}
         </Button>
-      </Box>
+      }
+    >
 
       {/* Says which service is waiting, and leaves the choice where it
           belongs. Which činnost should move under it is his decision - a form
@@ -824,6 +812,6 @@ export default function ActivitiesPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </SettingsScreen>
   );
 }

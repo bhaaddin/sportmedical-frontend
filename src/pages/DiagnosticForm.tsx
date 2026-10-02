@@ -1,17 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
-  Box, Paper, Typography, TextField, Button, Grid, Chip,
-  Alert, CircularProgress, Divider, Card, CardContent, LinearProgress,
-  Stepper, Step, StepLabel, StepConnector, stepConnectorClasses,
-  Avatar, InputAdornment,
+  Box, Typography, TextField, Button, Grid, Alert, CircularProgress, Divider,
+  InputAdornment, Stack,
 } from '@mui/material';
-import type { StepIconProps } from '@mui/material/StepIcon';
-import { Science, Send, Warning, ArrowBack, ArrowForward, Check, Person, Favorite, FitnessCenter, Notes } from '@mui/icons-material';
-import { styled } from '@mui/material/styles';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Send, ArrowBack, ArrowForward, Check } from '@mui/icons-material';
 import { diagnosticsApi } from '../api/diagnostics';
 import type { CreateSessionRequest, DiagnosticSession } from '../api/diagnostics';
 import { DiagnosticFormSkeleton } from '../components/SkeletonLoader';
+import { DESIGN, PageHeader, SectionLabel, SoftCard, StatusChip, type ChipTone } from '../components/ui';
 import toast from 'react-hot-toast';
 
 type VitalKey =
@@ -86,31 +82,26 @@ function toRequest(draft: SessionDraft): CreateSessionRequest | null {
 
 const shown = (value: number | null, unit: string) => (value === null ? '—' : `${value} ${unit}`);
 
-/* ── Custom Step Connector ── */
-const ColorConnector = styled(StepConnector)(({ theme }) => ({
-  [`&.${stepConnectorClasses.alternativeLabel}`]: { top: 12 },
-  [`&.${stepConnectorClasses.active}`]: { [`& .${stepConnectorClasses.line}`]: { background: '#0D7377' } },
-  [`&.${stepConnectorClasses.completed}`]: { [`& .${stepConnectorClasses.line}`]: { background: '#0D7377' } },
-  [`& .${stepConnectorClasses.line}`]: { height: 3, border: 0, backgroundColor: '#e0e0e0', borderRadius: 1 },
-}));
-
 const steps = [
-  { label: 'Informace o pacientovi', icon: <Person /> },
-  { label: 'Kardiovaskulární', icon: <Favorite /> },
-  { label: 'Složení těla', icon: <FitnessCenter /> },
-  { label: 'Poznámky a odeslání', icon: <Notes /> },
+  { label: 'Pacient a lékař' },
+  { label: 'Kardiovaskulární' },
+  { label: 'Složení těla' },
+  { label: 'Poznámky a odeslání' },
 ];
+
+/* A reference range: which tone its chip takes, drawn from the board's tones. */
+type Zone = { from: number; to: number; tone: ChipTone; label: string };
 
 /* ── Measured value: typed in, never pre-filled ── */
 function MetricField({ label, value, onChange, min, max, unit, zones }: {
   label: string; value: number | null; onChange: (v: number | null) => void;
   min: number; max: number; unit: string;
-  zones?: { from: number; to: number; color: string; label: string }[];
+  zones?: Zone[];
 }) {
   const currentZone = value === null ? undefined : zones?.find(z => value >= z.from && value <= z.to);
 
   return (
-    <Box sx={{ mb: 3 }}>
+    <Box sx={{ mb: 2.5 }}>
       <TextField
         fullWidth required type="number" label={label}
         value={value ?? ''}
@@ -124,20 +115,66 @@ function MetricField({ label, value, onChange, min, max, unit, zones }: {
           htmlInput: { min, max, step: 0.1 },
           input: { endAdornment: <InputAdornment position="end">{unit}</InputAdornment> },
         }}
-        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
       />
       {currentZone && (
-        <Chip label={currentZone.label} size="small"
-          sx={{ bgcolor: `${currentZone.color}18`, color: currentZone.color, fontWeight: 500, mt: 0.5 }} />
+        <Box sx={{ mt: 0.75 }}>
+          <StatusChip tone={currentZone.tone} size="sm">{currentZone.label}</StatusChip>
+        </Box>
       )}
       {zones && value !== null && (
-        <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
-          {zones.map(z => (
-            <Box key={z.label} sx={{ flex: 1, height: 3, borderRadius: 1, bgcolor: value >= z.from && value <= z.to ? z.color : `${z.color}30`, transition: 'all 0.3s' }} />
-          ))}
+        <Box sx={{ display: 'flex', gap: 0.5, mt: 0.75 }}>
+          {zones.map(z => {
+            const active = value >= z.from && value <= z.to;
+            const tone = z.tone === 'primary' ? DESIGN.tone.grey : DESIGN.tone[z.tone];
+            return (
+              <Box key={z.label} sx={{ flex: 1, height: 3, borderRadius: 1, bgcolor: active ? tone.fg : tone.bg }} />
+            );
+          })}
         </Box>
       )}
     </Box>
+  );
+}
+
+/* ── The step strip: numbered circles joined by a line, the board's calm version of a stepper ── */
+function StepStrip({ active }: { active: number }) {
+  return (
+    <Stack direction="row" sx={{ alignItems: 'center' }}>
+      {steps.map((step, i) => {
+        const done = i < active;
+        const current = i === active;
+        return (
+          <Box key={step.label} sx={{ display: 'flex', alignItems: 'center', flex: i < steps.length - 1 ? 1 : 'none', minWidth: 0 }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+              <Box
+                aria-current={current ? 'step' : undefined}
+                sx={{
+                  width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, fontWeight: 700, flexShrink: 0,
+                  bgcolor: done || current ? 'primary.main' : 'background.paper',
+                  color: done || current ? 'primary.contrastText' : 'text.secondary',
+                  border: '1px solid', borderColor: done || current ? 'primary.main' : 'divider',
+                }}
+              >
+                {done ? <Check sx={{ fontSize: 16 }} /> : i + 1}
+              </Box>
+              <Typography
+                sx={{
+                  fontSize: 13, fontWeight: current ? 700 : 500, whiteSpace: 'nowrap',
+                  color: current ? 'text.primary' : 'text.secondary',
+                  display: { xs: current ? 'block' : 'none', sm: 'block' },
+                }}
+              >
+                {step.label}
+              </Typography>
+            </Stack>
+            {i < steps.length - 1 && (
+              <Box sx={{ flex: 1, height: 1, mx: 1.5, bgcolor: done ? 'primary.main' : 'divider' }} />
+            )}
+          </Box>
+        );
+      })}
+    </Stack>
   );
 }
 
@@ -195,65 +232,64 @@ export default function DiagnosticForm() {
 
   /* ── Results View ── */
   if (result) {
+    const anomalies = parseAnomalies(result.detectedAnomaliesJson);
+    const metrics: Array<[string, string]> = [
+      ['Klidový tep', `${result.restingHeartRateBpm} bpm`],
+      ['Max tep', `${result.maxHeartRateBpm} bpm`],
+      ['VO2 Max', `${result.vo2MaxMlMinKg} ml/kg/min`],
+      ['Anaerobní práh', `${result.anaerobicThresholdBpm} bpm`],
+      ['Krevní tlak', `${result.systolicBloodPressure}/${result.diastolicBloodPressure} mmHg`],
+      ['Tělesný tuk', `${result.bodyFatPercentage} %`],
+      ['Svalová hmota', `${result.muscleMassKg} kg`],
+    ];
     return (
       <Box sx={{ maxWidth: 1000, mx: 'auto' }}>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <Paper sx={{ p: 4 }}>
-            <Alert severity={result.requiresDoctorReview ? 'warning' : 'success'} sx={{ mb: 3, borderRadius: 2 }}>
-              {result.requiresDoctorReview
-                ? '⚠️ Tato relace vyžaduje přezkum lékařem'
-                : '✅ Analýza dokončena — žádné kritické nálezy'}
-            </Alert>
-
-            {parseAnomalies(result.detectedAnomaliesJson).length > 0 && (
-              <>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700, mb: 2 }}>Zjištěné anomálie</Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
-                  {parseAnomalies(result.detectedAnomaliesJson).map((a: any, i: number) => (
-                    <motion.div key={i} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.1 }}>
-                      <Chip
-                        icon={a.isCritical ? <Warning /> : undefined}
-                        label={`${a.metric}: ${a.description}`}
-                        color={a.severity === 'Critical' ? 'error' : a.severity === 'Warning' ? 'warning' : 'info'}
-                        variant="outlined" sx={{ fontWeight: 500 }}
-                      />
-                    </motion.div>
-                  ))}
-                </Box>
-              </>
-            )}
-
-            <Divider sx={{ my: 3 }} />
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 700, mb: 2 }}>Metriky relace</Typography>
-            <Grid container spacing={2}>
-              {[
-                ['Klidový tep', `${result.restingHeartRateBpm} bpm`, '#0D7377'],
-                ['Max tep', `${result.maxHeartRateBpm} bpm`, '#D32F2F'],
-                ['VO2 Max', `${result.vo2MaxMlMinKg} ml/kg/min`, '#2E7D32'],
-                ['Anaerobní práh', `${result.anaerobicThresholdBpm} bpm`, '#ED6C02'],
-                ['Krevní tlak', `${result.systolicBloodPressure}/${result.diastolicBloodPressure} mmHg`, '#0288D1'],
-                ['Tělesný tuk', `${result.bodyFatPercentage}%`, '#9C27B0'],
-                ['Svalová hmota', `${result.muscleMassKg} kg`, '#FF5722'],
-              ].map(([label, value, color], i) => (
-                <Grid key={label} size={{ xs: 6, sm: 4 }}>
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + i * 0.05 }}>
-                    <Card variant="outlined" sx={{ borderColor: `${color}30` }}>
-                      <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                        <Typography variant="caption" color="text.secondary">{label}</Typography>
-                        <Typography variant="h6" sx={{ fontWeight: 700, color }}>{value}</Typography>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                </Grid>
-              ))}
-            </Grid>
-
-            <Button variant="outlined" sx={{ mt: 3, borderRadius: 2, px: 4 }}
-              onClick={() => { setResult(null); setForm(emptyDraft()); setActiveStep(0); }}>
+        <PageHeader
+          title="Výsledky"
+          subtitle="Diagnostika a měření · uložená relace"
+          actions={
+            <Button variant="outlined" onClick={() => { setResult(null); setForm(emptyDraft()); setActiveStep(0); }}>
               Vytvořit další relaci
             </Button>
-          </Paper>
-        </motion.div>
+          }
+        />
+        <SoftCard>
+          <Alert severity={result.requiresDoctorReview ? 'warning' : 'success'} sx={{ mb: 3 }}>
+            {result.requiresDoctorReview
+              ? 'Tato relace vyžaduje přezkum lékařem'
+              : 'Analýza dokončena — žádné kritické nálezy'}
+          </Alert>
+
+          {anomalies.length > 0 && (
+            <>
+              <SectionLabel>Zjištěné anomálie</SectionLabel>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+                {anomalies.map((a: any, i: number) => (
+                  <StatusChip
+                    key={i}
+                    tone={a.severity === 'Critical' ? 'red' : a.severity === 'Warning' ? 'beige' : 'blue'}
+                    dot={Boolean(a.isCritical)}
+                  >
+                    {a.metric}: {a.description}
+                  </StatusChip>
+                ))}
+              </Box>
+              <Divider sx={{ my: 3 }} />
+            </>
+          )}
+
+          <SectionLabel>Metriky relace</SectionLabel>
+          <Grid container spacing={2}>
+            {metrics.map(([label, value]) => (
+              <Grid key={label} size={{ xs: 6, sm: 4 }}>
+                <SoftCard tone="muted" sx={{ p: 2 }}>
+                  <SectionLabel sx={{ mb: 0.5 }}>{label}</SectionLabel>
+                  <Typography sx={{ fontSize: 18, fontWeight: 700 }}>{value}</Typography>
+                </SoftCard>
+              </Grid>
+            ))}
+          </Grid>
+        </SoftCard>
       </Box>
     );
   }
@@ -261,212 +297,169 @@ export default function DiagnosticForm() {
   /* ── Wizard View ── */
   return (
     <Box sx={{ maxWidth: 900, mx: 'auto' }}>
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <Typography variant="h4" gutterBottom sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Science color="primary" /> Nová diagnostická relace
-        </Typography>
-        <Typography color="text.secondary" sx={{ mb: 3 }}>
-          Krok {activeStep + 1} z {steps.length} — {steps[activeStep].label}
-        </Typography>
-      </motion.div>
+      <PageHeader
+        title="Výsledky"
+        subtitle={`Diagnostika a měření · krok ${activeStep + 1} ze ${steps.length} — ${steps[activeStep].label}`}
+      />
 
-      {/* ── Stepper ── */}
-      <Paper sx={{ p: 3, mb: 3, borderRadius: 3 }}>
-        <Stepper activeStep={activeStep} alternativeLabel connector={<ColorConnector />}>
-          {steps.map((step) => (
-            <Step key={step.label}>
-              <StepLabel
-                slots={{ stepIcon: ({ active, completed }: StepIconProps) => (
-                  <motion.div animate={{ scale: active ? 1.15 : 1 }} transition={{ type: 'spring', stiffness: 400 }}>
-                    <Avatar sx={{
-                      width: 32, height: 32, fontSize: 16,
-                      bgcolor: completed ? '#0D7377' : active ? '#14A3A8' : '#e0e0e0',
-                      color: completed || active ? '#fff' : '#999',
-                      transition: 'all 0.3s',
-                    }}>
-                      {completed ? <Check sx={{ fontSize: 18 }} /> : step.icon}
-                    </Avatar>
-                  </motion.div>
-                ) }}
-              >
-                {step.label}
-              </StepLabel>
-            </Step>
-          ))}
-        </Stepper>
-        <LinearProgress variant="determinate" value={((activeStep + 1) / steps.length) * 100}
-          sx={{ mt: 2, borderRadius: 1, height: 4, bgcolor: '#f0f0f0', '& .MuiLinearProgress-bar': { bgcolor: '#0D7377' } }} />
-      </Paper>
+      <SoftCard sx={{ mb: 2, py: 2 }}>
+        <StepStrip active={activeStep} />
+      </SoftCard>
 
-      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {/* ── Step Content ── */}
-      <AnimatePresence mode="wait">
-        <motion.div key={activeStep} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
-          <Paper sx={{ p: 4, borderRadius: 3 }}>
-            {/* Step 0: Patient Info */}
-            {activeStep === 0 && (
-              <Box>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>Informace o pacientovi</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>Zadejte údaje pacienta a praktika</Typography>
-                <Grid container spacing={3}>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <TextField fullWidth required label="ID pacienta" value={form.patientId}
-                      onChange={e => update('patientId', e.target.value)} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <TextField fullWidth required label="Jméno praktika" value={form.practitionerName}
-                      onChange={e => update('practitionerName', e.target.value)} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
-                  </Grid>
+      <SoftCard>
+        {/* Step 0: Patient Info */}
+        {activeStep === 0 && (
+          <Box>
+            <SectionLabel>Pacient a lékař</SectionLabel>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2.5 }}>Zadejte údaje pacienta a vyšetřujícího.</Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth required label="ID pacienta" value={form.patientId}
+                  onChange={e => update('patientId', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth required label="Jméno praktika" value={form.practitionerName}
+                  onChange={e => update('practitionerName', e.target.value)} />
+              </Grid>
+            </Grid>
+          </Box>
+        )}
+
+        {/* Step 1: Cardiovascular */}
+        {activeStep === 1 && (
+          <Box>
+            <SectionLabel>Kardiovaskulární metriky</SectionLabel>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2.5 }}>
+              Zadejte naměřené hodnoty. Štítek pod polem říká, do jakého rozsahu hodnota spadá.
+            </Typography>
+            <MetricField label="Klidová srdeční frekvence" value={form.vitals.restingHeartRateBpm}
+              onChange={v => updateVital('restingHeartRateBpm', v)} min={30} max={150} unit="bpm"
+              zones={[
+                { from: 30, to: 50, tone: 'blue', label: 'Sportovec — velmi nízký klidový tep' },
+                { from: 50, to: 70, tone: 'green', label: 'Normální — zdravý rozsah' },
+                { from: 70, to: 90, tone: 'beige', label: 'Zvýšený — zvažte vyšetření' },
+                { from: 90, to: 150, tone: 'red', label: 'Vysoký — lékařská péče' },
+              ]} />
+            <MetricField label="Maximální srdeční frekvence" value={form.vitals.maxHeartRateBpm}
+              onChange={v => updateVital('maxHeartRateBpm', v)} min={100} max={250} unit="bpm"
+              zones={[
+                { from: 100, to: 150, tone: 'beige', label: 'Pod očekáváním' },
+                { from: 150, to: 200, tone: 'green', label: 'Normální rozsah' },
+                { from: 200, to: 250, tone: 'red', label: 'Nad očekáváním' },
+              ]} />
+            <MetricField label="Anaerobní práh" value={form.vitals.anaerobicThresholdBpm}
+              onChange={v => updateVital('anaerobicThresholdBpm', v)} min={80} max={220} unit="bpm"
+              zones={[
+                { from: 80, to: 130, tone: 'beige', label: 'Pod průměrem' },
+                { from: 130, to: 170, tone: 'green', label: 'Zdravý rozsah' },
+                { from: 170, to: 220, tone: 'blue', label: 'Sportovní úroveň' },
+              ]} />
+            <MetricField label="VO2 Max" value={form.vitals.vo2MaxMlMinKg}
+              onChange={v => updateVital('vo2MaxMlMinKg', v)} min={15} max={80} unit="ml/kg/min"
+              zones={[
+                { from: 15, to: 30, tone: 'red', label: 'Špatné — je třeba zlepšit' },
+                { from: 30, to: 40, tone: 'beige', label: 'Pod průměrem' },
+                { from: 40, to: 55, tone: 'green', label: 'Dobré — zdravá kondice' },
+                { from: 55, to: 80, tone: 'blue', label: 'Výborné — sportovní úroveň' },
+              ]} />
+          </Box>
+        )}
+
+        {/* Step 2: Body Composition */}
+        {activeStep === 2 && (
+          <Box>
+            <SectionLabel>Složení těla</SectionLabel>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2.5 }}>
+              Zadejte krevní tlak a metriky složení těla.
+            </Typography>
+            <MetricField label="Systolický krevní tlak" value={form.vitals.systolicBloodPressure}
+              onChange={v => updateVital('systolicBloodPressure', v)} min={60} max={200} unit="mmHg"
+              zones={[
+                { from: 60, to: 90, tone: 'blue', label: 'Nízký — hypotenze' },
+                { from: 90, to: 130, tone: 'green', label: 'Normální' },
+                { from: 130, to: 160, tone: 'beige', label: 'Zvýšený — prehypertenze' },
+                { from: 160, to: 200, tone: 'red', label: 'Vysoký — hypertenze' },
+              ]} />
+            <MetricField label="Diastolický krevní tlak" value={form.vitals.diastolicBloodPressure}
+              onChange={v => updateVital('diastolicBloodPressure', v)} min={30} max={130} unit="mmHg"
+              zones={[
+                { from: 30, to: 60, tone: 'blue', label: 'Nízký' },
+                { from: 60, to: 85, tone: 'green', label: 'Normální' },
+                { from: 85, to: 100, tone: 'beige', label: 'Zvýšený' },
+                { from: 100, to: 130, tone: 'red', label: 'Vysoký' },
+              ]} />
+            <MetricField label="Podíl tělesného tuku" value={form.vitals.bodyFatPercentage}
+              onChange={v => updateVital('bodyFatPercentage', v)} min={3} max={50} unit="%"
+              zones={[
+                { from: 3, to: 10, tone: 'blue', label: 'Sportovec — velmi štíhlý' },
+                { from: 10, to: 20, tone: 'green', label: 'Fitness — zdravý rozsah' },
+                { from: 20, to: 30, tone: 'beige', label: 'Průměrný — zvažte životní styl' },
+                { from: 30, to: 50, tone: 'red', label: 'Nad průměrem — lékařská kontrola' },
+              ]} />
+            <MetricField label="Svalová hmota" value={form.vitals.muscleMassKg}
+              onChange={v => updateVital('muscleMassKg', v)} min={10} max={80} unit="kg"
+              zones={[
+                { from: 10, to: 25, tone: 'beige', label: 'Nízká — doporučen silový trénink' },
+                { from: 25, to: 50, tone: 'green', label: 'Průměrná — zdravý rozsah' },
+                { from: 50, to: 80, tone: 'blue', label: 'Nad průměrem — sportovní postava' },
+              ]} />
+          </Box>
+        )}
+
+        {/* Step 3: Notes & Submit */}
+        {activeStep === 3 && (
+          <Box>
+            <SectionLabel>Poznámky a kontrola</SectionLabel>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2.5 }}>
+              Přidejte klinické poznámky a relaci odešlete.
+            </Typography>
+            <TextField fullWidth multiline rows={4} label="Poznámky praktika"
+              value={form.rawPractitionerNotes}
+              onChange={e => update('rawPractitionerNotes', e.target.value)}
+              placeholder="např. Pacient hlásí bolest na hrudi při cvičení, rodinná anamnéza srdečních chorob..."
+              sx={{ mb: 3 }} />
+
+            <Divider sx={{ my: 3 }} />
+            <SectionLabel>Shrnutí</SectionLabel>
+            <Grid container spacing={2}>
+              {[
+                ['Pacient', form.patientId || '—'],
+                ['Praktik', form.practitionerName || '—'],
+                ['Klidový tep', shown(form.vitals.restingHeartRateBpm, 'bpm')],
+                ['Max tep', shown(form.vitals.maxHeartRateBpm, 'bpm')],
+                ['VO2 Max', shown(form.vitals.vo2MaxMlMinKg, 'ml/kg/min')],
+                ['Krevní tlak', form.vitals.systolicBloodPressure === null || form.vitals.diastolicBloodPressure === null
+                  ? '—'
+                  : `${form.vitals.systolicBloodPressure}/${form.vitals.diastolicBloodPressure} mmHg`],
+              ].map(([label, value]) => (
+                <Grid key={label} size={{ xs: 6, sm: 4 }}>
+                  <SoftCard tone="muted" sx={{ p: 2 }}>
+                    <SectionLabel sx={{ mb: 0.5 }}>{label}</SectionLabel>
+                    <Typography sx={{ fontWeight: 600 }}>{value}</Typography>
+                  </SoftCard>
                 </Grid>
-              </Box>
-            )}
-
-            {/* Step 1: Cardiovascular */}
-            {activeStep === 1 && (
-              <Box>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>Kardiovaskulární metriky</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  Zadejte naměřené hodnoty. Barevné zóny označují normální rozsahy.
-                </Typography>
-                <MetricField label="Klidová srdeční frekvence" value={form.vitals.restingHeartRateBpm}
-                  onChange={v => updateVital('restingHeartRateBpm', v)} min={30} max={150} unit="bpm"
-                  zones={[
-                    { from: 30, to: 50, color: '#0288D1', label: 'Sportovec — velmi nízký klidový tep' },
-                    { from: 50, to: 70, color: '#2E7D32', label: 'Normální — zdravý rozsah' },
-                    { from: 70, to: 90, color: '#ED6C02', label: 'Zvýšený — zvažte vyšetření' },
-                    { from: 90, to: 150, color: '#D32F2F', label: 'Vysoký — lékařská péče' },
-                  ]} />
-                <MetricField label="Maximální srdeční frekvence" value={form.vitals.maxHeartRateBpm}
-                  onChange={v => updateVital('maxHeartRateBpm', v)} min={100} max={250} unit="bpm"
-                  zones={[
-                    { from: 100, to: 150, color: '#ED6C02', label: 'Pod očekáváním' },
-                    { from: 150, to: 200, color: '#2E7D32', label: 'Normální rozsah' },
-                    { from: 200, to: 250, color: '#D32F2F', label: 'Nad očekáváním' },
-                  ]} />
-                <MetricField label="Anaerobní práh" value={form.vitals.anaerobicThresholdBpm}
-                  onChange={v => updateVital('anaerobicThresholdBpm', v)} min={80} max={220} unit="bpm"
-                  zones={[
-                    { from: 80, to: 130, color: '#ED6C02', label: 'Pod průměrem' },
-                    { from: 130, to: 170, color: '#2E7D32', label: 'Zdravý rozsah' },
-                    { from: 170, to: 220, color: '#0288D1', label: 'Sportovní úroveň' },
-                  ]} />
-                <MetricField label="VO2 Max" value={form.vitals.vo2MaxMlMinKg}
-                  onChange={v => updateVital('vo2MaxMlMinKg', v)} min={15} max={80} unit="ml/kg/min"
-                  zones={[
-                    { from: 15, to: 30, color: '#D32F2F', label: 'Špatné — je třeba zlepšit' },
-                    { from: 30, to: 40, color: '#ED6C02', label: 'Pod průměrem' },
-                    { from: 40, to: 55, color: '#2E7D32', label: 'Dobré — zdravá kondice' },
-                    { from: 55, to: 80, color: '#0288D1', label: 'Výborné — sportovní úroveň' },
-                  ]} />
-              </Box>
-            )}
-
-            {/* Step 2: Body Composition */}
-            {activeStep === 2 && (
-              <Box>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>Složení těla</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  Zadejte krevní tlak a metriky složení těla.
-                </Typography>
-                <MetricField label="Systolický krevní tlak" value={form.vitals.systolicBloodPressure}
-                  onChange={v => updateVital('systolicBloodPressure', v)} min={60} max={200} unit="mmHg"
-                  zones={[
-                    { from: 60, to: 90, color: '#0288D1', label: 'Nízký — hypotenze' },
-                    { from: 90, to: 130, color: '#2E7D32', label: 'Normální' },
-                    { from: 130, to: 160, color: '#ED6C02', label: 'Zvýšený — prehypertenze' },
-                    { from: 160, to: 200, color: '#D32F2F', label: 'Vysoký — hypertenze' },
-                  ]} />
-                <MetricField label="Diastolický krevní tlak" value={form.vitals.diastolicBloodPressure}
-                  onChange={v => updateVital('diastolicBloodPressure', v)} min={30} max={130} unit="mmHg"
-                  zones={[
-                    { from: 30, to: 60, color: '#0288D1', label: 'Nízký' },
-                    { from: 60, to: 85, color: '#2E7D32', label: 'Normální' },
-                    { from: 85, to: 100, color: '#ED6C02', label: 'Zvýšený' },
-                    { from: 100, to: 130, color: '#D32F2F', label: 'Vysoký' },
-                  ]} />
-                <MetricField label="Podíl tělesného tuku" value={form.vitals.bodyFatPercentage}
-                  onChange={v => updateVital('bodyFatPercentage', v)} min={3} max={50} unit="%"
-                  zones={[
-                    { from: 3, to: 10, color: '#0288D1', label: 'Sportovec — velmi štíhlý' },
-                    { from: 10, to: 20, color: '#2E7D32', label: 'Fitness — zdravý rozsah' },
-                    { from: 20, to: 30, color: '#ED6C02', label: 'Průměrný — zvažte životní styl' },
-                    { from: 30, to: 50, color: '#D32F2F', label: 'Nad průměrem — lékařská kontrola' },
-                  ]} />
-                <MetricField label="Svalová hmota" value={form.vitals.muscleMassKg}
-                  onChange={v => updateVital('muscleMassKg', v)} min={10} max={80} unit="kg"
-                  zones={[
-                    { from: 10, to: 25, color: '#ED6C02', label: 'Nízká — doporučen silový trénink' },
-                    { from: 25, to: 50, color: '#2E7D32', label: 'Průměrná — zdravý rozsah' },
-                    { from: 50, to: 80, color: '#0288D1', label: 'Nad průměrem — sportovní postava' },
-                  ]} />
-              </Box>
-            )}
-
-            {/* Step 3: Notes & Submit */}
-            {activeStep === 3 && (
-              <Box>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>Poznámky a kontrola</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  Přidejte klinické poznámky a relaci odešlete.
-                </Typography>
-                <TextField fullWidth multiline rows={4} label="Poznámky praktika"
-                  value={form.rawPractitionerNotes}
-                  onChange={e => update('rawPractitionerNotes', e.target.value)}
-                  placeholder="např. Pacient hlásí bolest na hrudi při cvičení, rodinná anamnéza srdečních chorob..."
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 }, mb: 3 }} />
-
-                <Divider sx={{ my: 3 }} />
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>Shrnutí</Typography>
-                <Grid container spacing={2}>
-                  {[
-                    ['Pacient', form.patientId || '—'],
-                    ['Praktik', form.practitionerName || '—'],
-                    ['Klidový tep', shown(form.vitals.restingHeartRateBpm, 'bpm')],
-                    ['Max tep', shown(form.vitals.maxHeartRateBpm, 'bpm')],
-                    ['VO2 Max', shown(form.vitals.vo2MaxMlMinKg, 'ml/kg/min')],
-                    ['Krevní tlak', form.vitals.systolicBloodPressure === null || form.vitals.diastolicBloodPressure === null
-                      ? '—'
-                      : `${form.vitals.systolicBloodPressure}/${form.vitals.diastolicBloodPressure} mmHg`],
-                  ].map(([label, value]) => (
-                    <Grid key={label} size={{ xs: 6, sm: 4 }}>
-                      <Card variant="outlined" sx={{ borderColor: '#e0e0e0' }}>
-                        <CardContent sx={{ py: 1.5, px: 2 }}>
-                          <Typography variant="caption" color="text.secondary">{label}</Typography>
-                          <Typography sx={{ fontWeight: 600 }}>{value}</Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-              </Box>
-            )}
-          </Paper>
-        </motion.div>
-      </AnimatePresence>
+              ))}
+            </Grid>
+          </Box>
+        )}
+      </SoftCard>
 
       {/* ── Navigation Buttons ── */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
-        <Button startIcon={<ArrowBack />} disabled={activeStep === 0}
-          onClick={() => setActiveStep(s => s - 1)}
-          sx={{ borderRadius: 2, px: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+        <Button variant="outlined" startIcon={<ArrowBack />} disabled={activeStep === 0}
+          onClick={() => setActiveStep(s => s - 1)}>
           Zpět
         </Button>
         {activeStep < steps.length - 1 ? (
           <Button variant="contained" endIcon={<ArrowForward />} disabled={!canNext()}
-            onClick={() => setActiveStep(s => s + 1)}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 600,
-              boxShadow: '0 4px 16px rgba(13,115,119,0.3)',
-              '&:hover': { bgcolor: '#095456', boxShadow: '0 6px 20px rgba(13,115,119,0.4)' } }}>
+            onClick={() => setActiveStep(s => s + 1)}>
             Další
           </Button>
         ) : (
           <Button variant="contained" endIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Send />}
-            onClick={handleSubmit} disabled={loading || request === null}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 4, fontWeight: 600,
-              boxShadow: '0 4px 16px rgba(13,115,119,0.3)',
-              '&:hover': { bgcolor: '#095456' } }}>
+            onClick={handleSubmit} disabled={loading || request === null}>
             {loading ? 'Odesílám...' : 'Odeslat relaci'}
           </Button>
         )}

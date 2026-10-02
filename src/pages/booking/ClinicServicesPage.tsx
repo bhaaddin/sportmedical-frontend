@@ -35,6 +35,7 @@ import { calendarsApi } from '../../api/calendars';
 import type { Activity, Calendar } from '../../api/bookingContracts';
 import { AsyncSection } from '../../components/booking/AsyncSection';
 import { errorText } from '../../components/booking/errorText';
+import { SettingsScreen } from '../settings/SettingsFrame';
 import {
   SERVICE_GAP_TEXT, countsText, deletionWillBeRefused, serviceGap,
 } from './clinicServiceState';
@@ -253,18 +254,16 @@ export default function ClinicServicesPage() {
 
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>Služby</Typography>
-          <Typography sx={{ color: 'text.secondary' }}>
-            Co ordinace dělá. Každá činnost patří pod jednu službu a kalendář jednu službu provozuje.
-          </Typography>
-        </Box>
+    <SettingsScreen
+      title="Služby"
+      subtitle="Co ordinace dělá — každá činnost patří pod jednu službu a kalendář jednu službu provozuje"
+      width={1100}
+      actions={
         <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
           Nová služba
         </Button>
-      </Box>
+      }
+    >
 
       <AsyncSection
         isLoading={servicesQuery.isLoading}
@@ -579,6 +578,6 @@ export default function ClinicServicesPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </SettingsScreen>
   );
 }

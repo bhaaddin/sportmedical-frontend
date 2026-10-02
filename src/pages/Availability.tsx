@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
 import {
-  Box, Typography, Grid, Card, CardContent, Chip, Button, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField, MenuItem, Skeleton,
+  Box, Typography, Grid, Button, Dialog, DialogTitle,
+  DialogContent, DialogActions, TextField, MenuItem, Skeleton, Stack,
 } from '@mui/material';
-import { PersonAdd, CheckCircle, Cancel, Pause, EventBusy } from '@mui/icons-material';
-import { motion } from 'framer-motion';
+import { PersonAdd } from '@mui/icons-material';
 import { availabilityApi, type Availability } from '../api/availability';
+import { KpiCard, PageHeader, SoftCard, StatusChip, type ChipTone } from '../components/ui';
 import toast from 'react-hot-toast';
 
-const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
-  Available: { label: 'K dispozici', color: '#2E7D32', icon: <CheckCircle /> },
-  Modified: { label: 'Omezený', color: '#ED6C02', icon: <Pause /> },
-  Unavailable: { label: 'Nedostupný', color: '#D32F2F', icon: <Cancel /> },
-  Suspended: { label: 'Vyloučen', color: '#9C27B0', icon: <EventBusy /> },
+const statusConfig: Record<string, { label: string; tone: ChipTone }> = {
+  Available: { label: 'K dispozici', tone: 'green' },
+  Modified: { label: 'Omezený', tone: 'beige' },
+  Unavailable: { label: 'Nedostupný', tone: 'red' },
+  Suspended: { label: 'Vyloučen', tone: 'grey' },
 };
 
 export default function Availability() {
@@ -41,13 +41,14 @@ export default function Availability() {
       });
       setAthletes(p => [newAvail, ...p]);
       setOpen(false);
-      toast.success('Sportovce přidán');
+      toast.success('Sportovec přidán');
       setForm({ patientId: '', status: 'Available', reason: '', expectedReturnDate: '' });
     } catch { toast.error('Chyba při přidávání'); }
   };
 
   const available = athletes.filter(a => a.status === 'Available').length;
   const unavailable = athletes.filter(a => a.status === 'Unavailable').length;
+  const modified = athletes.filter(a => a.status === 'Modified').length;
 
   if (loading) {
     return (
@@ -60,79 +61,62 @@ export default function Availability() {
 
   return (
     <Box>
-      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <PersonAdd color="primary" /> Dostupnost sportovců
-            </Typography>
-            <Typography variant="body2" color="text.secondary">Kdo může trénovat a závodit</Typography>
-          </Box>
-          <Button variant="contained" startIcon={<PersonAdd />} onClick={() => setOpen(true)}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2 }}>Přidat</Button>
-        </Box>
-      </motion.div>
+      <PageHeader
+        title="Dostupnost sportovců"
+        subtitle="Kdo může trénovat a závodit"
+        actions={
+          <Button variant="contained" startIcon={<PersonAdd />} onClick={() => setOpen(true)}>
+            Přidat
+          </Button>
+        }
+      />
 
-      <Grid container spacing={3} sx={{ mb: 3 }}>
+      <Grid container spacing={2} sx={{ mb: 2.5 }}>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <Card><CardContent sx={{ textAlign: 'center' }}>
-            <Typography variant="h3" sx={{ fontWeight: 800, color: '#2E7D32' }}>{available}</Typography>
-            <Typography variant="body2" color="text.secondary">K dispozici</Typography>
-          </CardContent></Card>
+          <KpiCard label="K dispozici" value={available} tone="green" />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <Card><CardContent sx={{ textAlign: 'center' }}>
-            <Typography variant="h3" sx={{ fontWeight: 800, color: '#D32F2F' }}>{unavailable}</Typography>
-            <Typography variant="body2" color="text.secondary">Nedostupní</Typography>
-          </CardContent></Card>
+          <KpiCard label="Nedostupní" value={unavailable} tone={unavailable > 0 ? 'red' : 'ink'} />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <Card><CardContent sx={{ textAlign: 'center' }}>
-            <Typography variant="h3" sx={{ fontWeight: 800, color: '#ED6C02' }}>{athletes.filter(a => a.status === 'Modified').length}</Typography>
-            <Typography variant="body2" color="text.secondary">Omezení</Typography>
-          </CardContent></Card>
+          <KpiCard label="Omezení" value={modified} />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <Card><CardContent sx={{ textAlign: 'center' }}>
-            <Typography variant="h3" sx={{ fontWeight: 800 }}>{athletes.length}</Typography>
-            <Typography variant="body2" color="text.secondary">Celkem</Typography>
-          </CardContent></Card>
+          <KpiCard label="Celkem" value={athletes.length} hint="záznamů o dostupnosti" />
         </Grid>
       </Grid>
 
       <Grid container spacing={2}>
-        {athletes.map((a, i) => {
+        {athletes.map((a) => {
           const cfg = statusConfig[a.status] || statusConfig.Available;
           return (
             <Grid key={a.id} size={{ xs: 12, sm: 6, md: 4 }}>
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                      <Typography variant="h6" sx={{ fontWeight: 700 }}>{a.patientName || a.patientId.slice(0, 8)}</Typography>
-                      <Chip icon={cfg.icon} label={cfg.label} size="small" sx={{ bgcolor: `${cfg.color}18`, color: cfg.color }} />
-                    </Box>
-                    {a.reason && <Typography variant="body2" color="text.secondary">{a.reason}</Typography>}
-                    {a.expectedReturnDate && (
-                      <Typography variant="caption" color="text.secondary">
-                        Návrat: {new Date(a.expectedReturnDate).toLocaleDateString('cs-CZ')}
-                      </Typography>
-                    )}
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                      {new Date(a.date).toLocaleDateString('cs-CZ')} • {a.updatedBy}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </motion.div>
+              <SoftCard sx={{ height: '100%' }}>
+                <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography sx={{ fontSize: 15, fontWeight: 700, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {a.patientName || a.patientId.slice(0, 8)}
+                  </Typography>
+                  <StatusChip tone={cfg.tone}>{cfg.label}</StatusChip>
+                </Stack>
+                {a.reason && <Typography variant="body2" sx={{ color: 'text.secondary' }}>{a.reason}</Typography>}
+                {a.expectedReturnDate && (
+                  <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    Návrat: <Box component="strong">{new Date(a.expectedReturnDate).toLocaleDateString('cs-CZ')}</Box>
+                  </Typography>
+                )}
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1 }}>
+                  {new Date(a.date).toLocaleDateString('cs-CZ')} · {a.updatedBy}
+                </Typography>
+              </SoftCard>
             </Grid>
           );
         })}
         {athletes.length === 0 && (
           <Grid size={{ xs: 12 }}>
-            <Card sx={{ textAlign: 'center', py: 6 }}>
-              <PersonAdd sx={{ fontSize: 48, color: '#ccc', mb: 1 }} />
-              <Typography color="text.secondary">Žádné záznamy o dostupnosti</Typography>
-            </Card>
+            <SoftCard sx={{ textAlign: 'center', py: 6 }}>
+              <Typography sx={{ fontWeight: 600 }}>Žádné záznamy o dostupnosti</Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>Přidejte prvního sportovce tlačítkem vpravo nahoře.</Typography>
+            </SoftCard>
           </Grid>
         )}
       </Grid>
@@ -155,8 +139,8 @@ export default function Availability() {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>Zrušit</Button>
-          <Button variant="contained" onClick={handleAdd} sx={{ bgcolor: '#0D7377' }}>Přidat</Button>
+          <Button variant="outlined" onClick={() => setOpen(false)}>Zrušit</Button>
+          <Button variant="contained" onClick={handleAdd}>Přidat</Button>
         </DialogActions>
       </Dialog>
     </Box>

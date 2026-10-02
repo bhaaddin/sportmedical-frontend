@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react';
 import {
-  Box, Typography, Grid, Card, CardContent, Button, TextField, MenuItem, Slider,
-  Alert, Chip, Divider, Paper,
+  Box, Typography, Grid, Button, TextField, MenuItem, Slider, Alert, Stack,
 } from '@mui/material';
-import { FitnessCenter, Add, TrendingUp, Warning, CheckCircle, Speed } from '@mui/icons-material';
-import { motion } from 'framer-motion';
+import { useTheme } from '@mui/material/styles';
+import { Add } from '@mui/icons-material';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, ReferenceLine, Legend,
 } from 'recharts';
 import { trainingApi, type TrainingSession, type AcwrData } from '../api/training';
 import type { Patient } from '../api/patients';
 import PatientPicker from '../components/patients/PatientPicker';
+import { DESIGN, KpiCard, PageHeader, SectionLabel, SoftCard, StatusChip, type ChipTone } from '../components/ui';
 import toast from 'react-hot-toast';
 
 const sessionTypes = [
@@ -30,32 +30,41 @@ const rpeLabels: Record<number, string> = {
   8: 'Maximální', 9: 'Maximální', 10: 'Maximální',
 };
 
+/* What the ACWR number means, in the board's tones. */
+function acwrBand(value: number): { tone: ChipTone; label: string } {
+  if (value < 0.8) return { tone: 'beige', label: 'Nízká' };
+  if (value <= 1.3) return { tone: 'green', label: 'Optimální' };
+  if (value <= 1.5) return { tone: 'beige', label: 'Zvýšená' };
+  return { tone: 'red', label: 'Nebezpečná' };
+}
+
 function AcwrGauge({ value }: { value: number }) {
-  const color = value < 0.8 ? '#ED6C02' : value <= 1.3 ? '#2E7D32' : value <= 1.5 ? '#ED6C02' : '#D32F2F';
-  const label = value < 0.8 ? 'Nízká' : value <= 1.3 ? 'Optimální' : value <= 1.5 ? 'Zvýšená' : 'Nebezpečná';
+  const band = acwrBand(value);
+  const bandTone = DESIGN.tone[band.tone === 'primary' ? 'grey' : band.tone];
   return (
-    <Card>
-      <CardContent sx={{ textAlign: 'center' }}>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>ACWR Poměr</Typography>
-        <Typography variant="h1" sx={{ fontWeight: 800, color, mb: 1 }}>
+    <SoftCard sx={{ height: '100%' }}>
+      <SectionLabel>Poměr ACWR</SectionLabel>
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'baseline' }}>
+        <Typography sx={{ fontSize: 36, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, color: bandTone.fg }}>
           {value > 0 ? value.toFixed(2) : '—'}
         </Typography>
-        <Chip label={label} sx={{ bgcolor: `${color}18`, color, fontWeight: 600 }} />
-        <Box sx={{ mt: 2, position: 'relative', height: 12, bgcolor: '#f0f0f0', borderRadius: 6, overflow: 'hidden' }}>
-          <Box sx={{ position: 'absolute', left: '40%', width: '12%', height: '100%', bgcolor: '#2E7D3240', borderRadius: 6 }} />
-          <Box sx={{ position: 'absolute', left: 0, height: '100%', width: `${Math.min(value / 2 * 100, 100)}%`, bgcolor: color, borderRadius: 6, transition: 'width 0.5s' }} />
-        </Box>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-          <Typography variant="caption" color="text.secondary">0.0</Typography>
-          <Typography variant="caption" sx={{ color: '#2E7D32', fontWeight: 600 }}>0.8 — 1.3</Typography>
-          <Typography variant="caption" color="text.secondary">2.0</Typography>
-        </Box>
-      </CardContent>
-    </Card>
+        <StatusChip tone={band.tone}>{band.label}</StatusChip>
+      </Stack>
+      <Box sx={{ mt: 2, position: 'relative', height: 8, bgcolor: 'divider', borderRadius: 999, overflow: 'hidden' }}>
+        <Box sx={{ position: 'absolute', left: '40%', width: '25%', height: '100%', bgcolor: DESIGN.tone.green.bg }} />
+        <Box sx={{ position: 'absolute', left: 0, height: '100%', width: `${Math.min(value / 2 * 100, 100)}%`, bgcolor: bandTone.fg, borderRadius: 999 }} />
+      </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+        <Typography variant="caption" sx={{ color: 'text.secondary' }}>0,0</Typography>
+        <Typography variant="caption" sx={{ color: DESIGN.tone.green.fg, fontWeight: 600 }}>0,8 — 1,3</Typography>
+        <Typography variant="caption" sx={{ color: 'text.secondary' }}>2,0</Typography>
+      </Box>
+    </SoftCard>
   );
 }
 
 export default function TrainingLoad() {
+  const theme = useTheme();
   const [patient, setPatient] = useState<Patient | null>(null);
   const selectedPatient = patient?.id ?? '';
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
@@ -109,176 +118,155 @@ export default function TrainingLoad() {
 
   return (
     <Box>
-      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <FitnessCenter color="primary" /> Tréninkové zatížení
-            </Typography>
-            <Typography variant="body2" color="text.secondary">sRPE, ACWR a trendové analytiky</Typography>
-          </Box>
-        </Box>
-      </motion.div>
+      <PageHeader
+        title="Tréninkové zatížení"
+        subtitle="sRPE, ACWR a trend zátěže"
+      />
 
       {/* Patient Selection */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={2} sx={{ alignItems: 'center' }}>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <PatientPicker label="Sportovec / pacient" value={patient} onChange={setPatient} />
-            </Grid>
-            {selectedPatient && (
-              <Grid size={{ xs: 12, md: 6 }}>
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">Týdenní zátěž:</Typography>
-                  <Chip label={`${weeklyLoad} sRPE · ${sessions.length} tréninků`} sx={{ bgcolor: '#E0F2F1', color: '#0D7377', fontWeight: 600 }} />
-                </Box>
-              </Grid>
-            )}
+      <SoftCard sx={{ mb: 2.5 }}>
+        <SectionLabel>Sportovec</SectionLabel>
+        <Grid container spacing={2} sx={{ alignItems: 'center' }}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <PatientPicker label="Sportovec / pacient" value={patient} onChange={setPatient} />
           </Grid>
-        </CardContent>
-      </Card>
+          {selectedPatient && (
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>Zátěž za 30 dní:</Typography>
+                <StatusChip tone="green">{weeklyLoad} sRPE · {sessions.length} tréninků</StatusChip>
+              </Stack>
+            </Grid>
+          )}
+        </Grid>
+      </SoftCard>
 
       {selectedPatient && (
         <>
           {/* ACWR & Stats Row */}
-          <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid container spacing={2} sx={{ mb: 2.5 }}>
             <Grid size={{ xs: 12, md: 4 }}>
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                <AcwrGauge value={acwr?.acwrValue ?? 0} />
-              </motion.div>
+              <AcwrGauge value={acwr?.acwrValue ?? 0} />
             </Grid>
             <Grid size={{ xs: 12, md: 8 }}>
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-                <Card sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>ACWR Podrobnosti</Typography>
-                    {acwr ? (
-                      <Grid container spacing={2}>
-                        <Grid size={{ xs: 6 }}>
-                          <Typography variant="body2" color="text.secondary">Akutní zátěž (7 dní)</Typography>
-                          <Typography variant="h6" sx={{ fontWeight: 700, color: '#0288D1' }}>{acwr.acuteLoad}</Typography>
-                          <Typography variant="caption" color="text.secondary">{acwr.acuteSessions} tréninků</Typography>
-                        </Grid>
-                        <Grid size={{ xs: 6 }}>
-                          <Typography variant="body2" color="text.secondary">Chronická zátěž (28 dní)</Typography>
-                          <Typography variant="h6" sx={{ fontWeight: 700, color: '#0D7377' }}>{acwr.chronicLoad}</Typography>
-                          <Typography variant="caption" color="text.secondary">{acwr.chronicSessions} tréninků</Typography>
-                        </Grid>
-                        <Grid size={{ xs: 12 }}>
-                          <Alert severity={acwr.riskLevel === 'optimal' ? 'success' : acwr.riskLevel === 'danger' ? 'error' : 'warning'} sx={{ borderRadius: 2 }}>
-                            {acwr.riskDescription}
-                          </Alert>
-                        </Grid>
-                      </Grid>
-                    ) : (
-                      <Typography color="text.secondary">Zatím žádná data pro výpočet ACWR</Typography>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
+              <SoftCard sx={{ height: '100%' }}>
+                <SectionLabel>Podrobnosti ACWR</SectionLabel>
+                {acwr ? (
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 6 }}>
+                      <KpiCard label="Akutní zátěž (7 dní)" value={acwr.acuteLoad} hint={`${acwr.acuteSessions} tréninků`} />
+                    </Grid>
+                    <Grid size={{ xs: 6 }}>
+                      <KpiCard label="Chronická zátěž (28 dní)" value={acwr.chronicLoad} hint={`${acwr.chronicSessions} tréninků`} />
+                    </Grid>
+                    <Grid size={{ xs: 12 }}>
+                      <Alert severity={acwr.riskLevel === 'optimal' ? 'success' : acwr.riskLevel === 'danger' ? 'error' : 'warning'}>
+                        {acwr.riskDescription}
+                      </Alert>
+                    </Grid>
+                  </Grid>
+                ) : (
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>Zatím žádná data pro výpočet ACWR</Typography>
+                )}
+              </SoftCard>
             </Grid>
           </Grid>
 
           {/* Load Trend Chart */}
           {loadTrend.length > 0 && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-              <Card sx={{ mb: 3 }}>
-                <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>Trend zátěže</Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Celková týdenní zátěž (sRPE)</Typography>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={loadTrend}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="week" tick={{ fontSize: 12 }} stroke="#999" />
-                      <YAxis tick={{ fontSize: 12 }} stroke="#999" />
-                      <Tooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
-                      <Legend />
-                      <ReferenceLine y={acwr?.chronicLoad ?? 0} stroke="#0D7377" strokeDasharray="5 5" label={{ value: 'Chronický průměr', position: 'right' }} />
-                      <Bar dataKey="totalLoad" name="Celková zátěž" fill="#0D7377" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </motion.div>
+            <SoftCard sx={{ mb: 2.5 }}>
+              <SectionLabel>Trend zátěže</SectionLabel>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>Celková týdenní zátěž (sRPE)</Typography>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={loadTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} vertical={false} />
+                  <XAxis dataKey="week" tick={{ fontSize: 12, fill: theme.palette.text.secondary }} stroke={theme.palette.divider} />
+                  <YAxis tick={{ fontSize: 12, fill: theme.palette.text.secondary }} stroke={theme.palette.divider} />
+                  <Tooltip contentStyle={{ borderRadius: 10, border: `1px solid ${theme.palette.divider}`, boxShadow: DESIGN.shadow.menu, fontFamily: DESIGN.font }} />
+                  <Legend />
+                  <ReferenceLine y={acwr?.chronicLoad ?? 0} stroke={theme.palette.text.secondary} strokeDasharray="5 5" label={{ value: 'Chronický průměr', position: 'right', fontSize: 11, fill: theme.palette.text.secondary }} />
+                  <Bar dataKey="totalLoad" name="Celková zátěž" fill={theme.palette.primary.main} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </SoftCard>
           )}
 
           {/* Create Session Form */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-            <Card sx={{ mb: 3 }}>
-              <CardContent>
-                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Zaznamenat trénink</Typography>
-                <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 4 }}>
-                    <TextField fullWidth select label="Typ" value={form.type} onChange={e => update('type', e.target.value)}>
-                      {sessionTypes.map(t => <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>)}
-                    </TextField>
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Popis" value={form.description} onChange={e => update('description', e.target.value)}
-                    placeholder="např. Intervaly 4×4 min, posilovna horní polovina" /></Grid>
-                  <Grid size={{ xs: 6, sm: 2 }}><TextField fullWidth type="number" label="Trvání (min)" value={form.durationMinutes} onChange={e => update('durationMinutes', parseInt(e.target.value) || 0)} /></Grid>
-                  <Grid size={{ xs: 6, sm: 2 }}><TextField fullWidth label="Trenér" value={form.coach} onChange={e => update('coach', e.target.value)} /></Grid>
-                </Grid>
+          <SoftCard sx={{ mb: 2.5 }}>
+            <SectionLabel>Zaznamenat trénink</SectionLabel>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <TextField fullWidth select label="Typ" value={form.type} onChange={e => update('type', e.target.value)}>
+                  {sessionTypes.map(t => <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>)}
+                </TextField>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Popis" value={form.description} onChange={e => update('description', e.target.value)}
+                placeholder="např. Intervaly 4×4 min, posilovna horní polovina" /></Grid>
+              <Grid size={{ xs: 6, sm: 2 }}><TextField fullWidth type="number" label="Trvání (min)" value={form.durationMinutes} onChange={e => update('durationMinutes', parseInt(e.target.value) || 0)} /></Grid>
+              <Grid size={{ xs: 6, sm: 2 }}><TextField fullWidth label="Trenér" value={form.coach} onChange={e => update('coach', e.target.value)} /></Grid>
+            </Grid>
 
-                {/* RPE Slider */}
-                <Box sx={{ mt: 3, mb: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography sx={{ fontWeight: 600 }}>sRPE (Jak těžký byl trénink?)</Typography>
-                    <Chip label={`${form.rpe} — ${rpeLabels[form.rpe]}`} sx={{ bgcolor: '#E0F2F1', color: '#0D7377', fontWeight: 600 }} />
-                  </Box>
-                  <Slider value={form.rpe} onChange={(_, v) => update('rpe', v as number)}
-                    min={1} max={10} step={1} marks
-                    sx={{ color: '#0D7377', '& .MuiSlider-markLabel': { fontSize: 10 } }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">1 — Odpočinek</Typography>
-                    <Typography variant="caption" color="text.secondary">10 — Maximální</Typography>
-                  </Box>
-                </Box>
+            {/* RPE Slider */}
+            <Box sx={{ mt: 3, mb: 2 }}>
+              <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography sx={{ fontWeight: 600, fontSize: 14 }}>sRPE — jak těžký byl trénink?</Typography>
+                <StatusChip tone="primary">{form.rpe} — {rpeLabels[form.rpe]}</StatusChip>
+              </Stack>
+              <Slider value={form.rpe} onChange={(_, v) => update('rpe', v as number)}
+                min={1} max={10} step={1} marks
+                sx={{ '& .MuiSlider-markLabel': { fontSize: 10 } }} />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>1 — Odpočinek</Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>10 — Maximální</Typography>
+              </Box>
+            </Box>
 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Tréninková zátěž = sRPE × Trvání = <strong>{form.rpe * form.durationMinutes}</strong>
-                  </Typography>
-                  <Button variant="contained" startIcon={<Add />} onClick={handleCreateSession}
-                    sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 3, fontWeight: 600 }}>
-                    Zaznamenat
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
-          </motion.div>
+            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Tréninková zátěž = sRPE × trvání = <Box component="strong" sx={{ color: 'text.primary' }}>{form.rpe * form.durationMinutes}</Box>
+              </Typography>
+              <Button variant="contained" startIcon={<Add />} onClick={handleCreateSession}>
+                Zaznamenat
+              </Button>
+            </Stack>
+          </SoftCard>
 
           {/* Recent Sessions */}
           {sessions.length > 0 && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Poslední tréninky</Typography>
+            <>
+              <SectionLabel>Poslední tréninky</SectionLabel>
               <Grid container spacing={2}>
-                {sessions.slice(0, 10).map((session, i) => (
+                {sessions.slice(0, 10).map((session) => (
                   <Grid key={session.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                    <Card>
-                      <CardContent>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                          <Chip label={sessionTypes.find(t => t.value === session.type)?.label || session.type} size="small"
-                            sx={{ bgcolor: '#E0F2F1', color: '#0D7377' }} />
-                          <Typography variant="caption" color="text.secondary">
-                            {new Date(session.sessionDate).toLocaleDateString('cs-CZ')}
-                          </Typography>
+                    <SoftCard sx={{ height: '100%' }}>
+                      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                        <StatusChip tone="grey" size="sm">{sessionTypes.find(t => t.value === session.type)?.label || session.type}</StatusChip>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          {new Date(session.sessionDate).toLocaleDateString('cs-CZ')}
+                        </Typography>
+                      </Stack>
+                      {session.description && (
+                        <Typography variant="body2" sx={{ mb: 1 }}>{session.description}</Typography>
+                      )}
+                      <Stack direction="row" spacing={2}>
+                        <Box>
+                          <SectionLabel sx={{ mb: 0 }}>Trvání</SectionLabel>
+                          <Typography sx={{ fontSize: 14, fontWeight: 600 }}>{session.durationMinutes} min</Typography>
                         </Box>
-                        {session.description && (
-                          <Typography variant="body2" sx={{ mb: 1 }}>{session.description}</Typography>
-                        )}
-                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                          <Chip label={`${session.durationMinutes} min`} size="small" variant="outlined" />
-                          <Chip label={`sRPE: ${session.rpe}`} size="small" variant="outlined" />
-                          <Chip label={`Zátěž: ${session.sessionRPE}`} size="small"
-                            sx={{ bgcolor: '#0D737718', color: '#0D7377', fontWeight: 600 }} />
+                        <Box>
+                          <SectionLabel sx={{ mb: 0 }}>sRPE</SectionLabel>
+                          <Typography sx={{ fontSize: 14, fontWeight: 600 }}>{session.rpe}</Typography>
                         </Box>
-                      </CardContent>
-                    </Card>
+                        <Box>
+                          <SectionLabel sx={{ mb: 0 }}>Zátěž</SectionLabel>
+                          <Typography sx={{ fontSize: 14, fontWeight: 700, color: 'primary.main' }}>{session.sessionRPE}</Typography>
+                        </Box>
+                      </Stack>
+                    </SoftCard>
                   </Grid>
                 ))}
               </Grid>
-            </motion.div>
+            </>
           )}
         </>
       )}

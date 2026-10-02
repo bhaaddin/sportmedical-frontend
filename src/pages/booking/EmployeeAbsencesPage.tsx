@@ -34,6 +34,7 @@ import {
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { errorText } from "../../components/booking/errorText";
 import { formatDateOnly, toDateOnly } from "../../utils/time";
+import { SettingsScreen } from "../settings/SettingsFrame";
 
 /*
  * Nepřítomnost zaměstnanců - who is out, and when.
@@ -145,29 +146,16 @@ export default function EmployeeAbsencesPage() {
   const problem = draft ? absenceDraftProblem(draft) : null;
 
   return (
-    <Box sx={{ maxWidth: 1000, mx: "auto" }}>
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 2,
-          mb: 3,
-        }}
-      >
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>
-            {t("booking.absences.title")}
-          </Typography>
-          <Typography sx={{ color: "text.secondary" }}>
-            {t("booking.absences.subtitle")}
-          </Typography>
-        </Box>
+    <SettingsScreen
+      title={t("booking.absences.title")}
+      subtitle={t("booking.absences.subtitle")}
+      width={1000}
+      actions={
         <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
           {t("booking.absences.new")}
         </Button>
-      </Box>
+      }
+    >
 
       <TextField
         select
@@ -350,6 +338,6 @@ export default function EmployeeAbsencesPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </SettingsScreen>
   );
 }

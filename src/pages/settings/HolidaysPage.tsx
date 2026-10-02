@@ -48,6 +48,7 @@ import {
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import AddIcon from '@mui/icons-material/Add';
 import UndoIcon from '@mui/icons-material/Undo';
+import { SettingsScreen } from './SettingsFrame';
 import EditIcon from '@mui/icons-material/Edit';
 import { holidaysApi } from '../../api/holidays';
 import type { ClinicHoliday } from '../../api/holidays';
@@ -193,27 +194,11 @@ export default function HolidaysPage() {
   const failure = setWorking.error ?? setOnline.error ?? reset.error ?? save.error;
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
-      <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>
-        Svátky a volno
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Ve svátek je ordinace zavřená a nikdo se nemůže objednat. Pokud v některý svátek pracujete,
-        zapněte u něj <strong>Pracujeme v tento den</strong> – pak ten den platí vaše běžná pracovní
-        doba a dá se objednat.
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        <strong>Online objednávky vypnuty</strong> znamená: pracuje se, recepce objednává, ale přes
-        internet si ten den nikdo termín nevezme.
-      </Typography>
-
-      <Stack direction="row" spacing={1.5} sx={{ mb: 2.5, alignItems: 'center' }}>
-        <Button onClick={() => setYear((y) => y - 1)}>{year - 1}</Button>
-        <Typography sx={{ fontWeight: 800, fontSize: 20 }}>{year}</Typography>
-        <Button onClick={() => setYear((y) => y + 1)}>{year + 1}</Button>
-
-        <Box sx={{ flex: 1 }} />
-
+    <SettingsScreen
+      title="Svátky a dovolené"
+      subtitle="Ve svátek je ordinace zavřená a nikdo se nemůže objednat; vlastní volno ordinace přidáte sem"
+      width={960}
+      actions={
         <Button
           variant="contained"
           startIcon={<AddIcon />}
@@ -221,6 +206,19 @@ export default function HolidaysPage() {
         >
           Přidat vlastní volno
         </Button>
+      }
+    >
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+        Pokud v některý svátek pracujete, zapněte u něj <strong>Pracujeme v tento den</strong> – pak
+        ten den platí vaše běžná pracovní doba a dá se objednat.
+        {' '}<strong>Online objednávky vypnuty</strong> znamená: pracuje se, recepce objednává, ale přes
+        internet si ten den nikdo termín nevezme.
+      </Typography>
+
+      <Stack direction="row" spacing={1} sx={{ my: 2.5, alignItems: 'center' }}>
+        <Button variant="outlined" size="small" onClick={() => setYear((y) => y - 1)}>{year - 1}</Button>
+        <Typography sx={{ fontWeight: 700, fontSize: 20, px: 1 }}>{year}</Typography>
+        <Button variant="outlined" size="small" onClick={() => setYear((y) => y + 1)}>{year + 1}</Button>
       </Stack>
 
       {failure !== null && (
@@ -401,6 +399,6 @@ export default function HolidaysPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </SettingsScreen>
   );
 }

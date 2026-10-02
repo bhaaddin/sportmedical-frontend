@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
-  Box, Typography, Card, CardContent, Button, Grid, TextField, Chip, Stepper, Step, StepLabel,
-  MenuItem, List, ListItem, ListItemText, Divider, Alert,
+  Box, Typography, Button, Grid, TextField, MenuItem, Stack, Alert,
 } from '@mui/material';
-import { Psychology, Warning, History, Add } from '@mui/icons-material';
-import { motion } from 'framer-motion';
+import { Add, CheckCircle, RadioButtonUnchecked } from '@mui/icons-material';
 import { concussionApi, type ConcussionRecord } from '../api/concussion';
 import type { Patient } from '../api/patients';
 import PatientPicker from '../components/patients/PatientPicker';
+import { PageHeader, SectionLabel, SoftCard, StatusChip } from '../components/ui';
 import toast from 'react-hot-toast';
 
 const rtpSteps = [
@@ -29,7 +28,6 @@ const statusLabels: Record<string, string> = {
 export default function Concussion() {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [records, setRecords] = useState<ConcussionRecord[]>([]);
-  const [activeStep, setActiveStep] = useState(0);
   const [selectedRecord, setSelectedRecord] = useState<ConcussionRecord | null>(null);
   const [form, setForm] = useState({
     patientId: '', mechanism: '', symptomScore: 0,
@@ -78,112 +76,116 @@ export default function Concussion() {
     } catch { toast.error('Chyba'); }
   };
 
+  const activeStepOf = (record: ConcussionRecord) => rtpSteps.indexOf(statusLabels[record.status] || '');
+
   return (
     <Box sx={{ maxWidth: 900, mx: 'auto' }}>
-      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-          <Psychology color="primary" /> Protokol otřesu mozku
-        </Typography>
-        <Typography color="text.secondary" sx={{ mb: 3 }}>
-          Sledování návratu po otřesu mozku dle konsenzu 5. konsenzu (Zurich 2016)
-        </Typography>
-      </motion.div>
+      <PageHeader
+        title="Protokol otřesu mozku"
+        subtitle="Sledování návratu po otřesu mozku dle 5. konsenzu (Zurich 2016)"
+      />
 
       {/* New Record Form */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Nový záznam</Typography>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <PatientPicker
-                value={patient}
-                onChange={(next) => {
-                  setPatient(next);
-                  update('patientId', next?.id ?? '');
-                }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth label="Ošetřující" value={form.practitioner} onChange={e => update('practitioner', e.target.value)} /></Grid>
-            <Grid size={{ xs: 12 }}><TextField fullWidth label="Mechanismus" value={form.mechanism} onChange={e => update('mechanism', e.target.value)}
-              placeholder="např. přímý kontakt hlavou při fotbale" /></Grid>
-            <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth type="number" label="Symptom Score (SCAT 0-132)" value={form.symptomScore} onChange={e => update('symptomScore', parseInt(e.target.value) || 0)} /></Grid>
-            <Grid size={{ xs: 12, sm: 4 }}>
-              <TextField fullWidth select label="Závažnost" value={form.severityGrade} onChange={e => update('severityGrade', parseInt(e.target.value))}>
-                <MenuItem value={1}>1 — Mírný</MenuItem>
-                <MenuItem value={2}>2 — Střední</MenuItem>
-                <MenuItem value={3}>3 — Těžký</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 4 }}>
-              {form.lossOfConsciousness && <Chip icon={<Warning />} label="Ztráta vědomí" color="error" sx={{ mt: 1 }} />}
-            </Grid>
+      <SoftCard sx={{ mb: 2.5 }}>
+        <SectionLabel>Nový záznam</SectionLabel>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <PatientPicker
+              value={patient}
+              onChange={(next) => {
+                setPatient(next);
+                update('patientId', next?.id ?? '');
+              }}
+            />
           </Grid>
-          <Button variant="contained" startIcon={<Add />} onClick={handleSubmit}
-            sx={{ mt: 3, bgcolor: '#0D7377', borderRadius: 2, px: 3 }}>
-            Vytvořit záznam
-          </Button>
-        </CardContent>
-      </Card>
+          <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth label="Ošetřující" value={form.practitioner} onChange={e => update('practitioner', e.target.value)} /></Grid>
+          <Grid size={{ xs: 12 }}><TextField fullWidth label="Mechanismus" value={form.mechanism} onChange={e => update('mechanism', e.target.value)}
+            placeholder="např. přímý kontakt hlavou při fotbale" /></Grid>
+          <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth type="number" label="Symptom Score (SCAT 0–132)" value={form.symptomScore} onChange={e => update('symptomScore', parseInt(e.target.value) || 0)} /></Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <TextField fullWidth select label="Závažnost" value={form.severityGrade} onChange={e => update('severityGrade', parseInt(e.target.value))}>
+              <MenuItem value={1}>1 — Mírný</MenuItem>
+              <MenuItem value={2}>2 — Střední</MenuItem>
+              <MenuItem value={3}>3 — Těžký</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }} sx={{ display: 'flex', alignItems: 'center' }}>
+            {form.lossOfConsciousness && <StatusChip tone="red" dot>Ztráta vědomí</StatusChip>}
+          </Grid>
+        </Grid>
+        <Button variant="contained" startIcon={<Add />} onClick={handleSubmit} sx={{ mt: 2.5 }}>
+          Vytvořit záznam
+        </Button>
+      </SoftCard>
 
       {/* History */}
       {records.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <History /> Historie otřesů
-          </Typography>
-          <List>
-            {records.map((record, i) => (
-              <div key={record.id}>
-                <ListItem sx={{ cursor: 'pointer', borderRadius: 2, '&:hover': { bgcolor: '#f5f5f5' } }}
-                  onClick={() => setSelectedRecord(record)}>
-                  <ListItemText
-                    primary={`${new Date(record.injuryDate).toLocaleDateString('cs-CZ')} — ${record.practitioner}`}
-                    secondary={
-                      <Box component="span">
-                        Mechanismus: {record.mechanism} • Score: {record.symptomScore}/132 • Závažnost: {record.severityGrade}
-                        {record.lossOfConsciousness && ' • ⚠️ Ztráta vědomí'}
-                      </Box>
-                    }
-                  />
-                  <Chip label={statusLabels[record.status] || record.status} size="small"
-                    sx={{ bgcolor: record.status === 'Cleared' ? '#E8F5E9' : '#FFF3E0', color: record.status === 'Cleared' ? '#2E7D32' : '#ED6C02' }} />
-                </ListItem>
-                {i < records.length - 1 && <Divider />}
-              </div>
-            ))}
-          </List>
-        </motion.div>
+        <SoftCard sx={{ mb: 2.5, p: 0, overflow: 'hidden' }}>
+          <Box sx={{ px: 2.5, pt: 2, pb: 1 }}>
+            <SectionLabel sx={{ mb: 0 }}>Historie otřesů</SectionLabel>
+          </Box>
+          {records.map((record) => (
+            <Box
+              key={record.id}
+              onClick={() => setSelectedRecord(record)}
+              sx={{
+                display: 'flex', alignItems: 'center', gap: 2, px: 2.5, py: 1.5, cursor: 'pointer',
+                borderTop: '1px solid', borderColor: 'divider',
+                bgcolor: selectedRecord?.id === record.id ? 'action.selected' : 'transparent',
+                '&:hover': { bgcolor: 'action.hover' },
+              }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
+                  {new Date(record.injuryDate).toLocaleDateString('cs-CZ')} — {record.practitioner}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                  Mechanismus: {record.mechanism} · Score: {record.symptomScore}/132 · Závažnost: {record.severityGrade}
+                  {record.lossOfConsciousness && ' · Ztráta vědomí'}
+                </Typography>
+              </Box>
+              <StatusChip tone={record.status === 'Cleared' ? 'green' : 'beige'}>
+                {statusLabels[record.status] || record.status}
+              </StatusChip>
+            </Box>
+          ))}
+        </SoftCard>
       )}
 
       {/* RTP Protocol Detail */}
       {selectedRecord && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <Card sx={{ mt: 3 }}>
-            <CardContent>
-              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Protokol návratu do hry</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Každý krok vyžaduje minimálně 24 hodin bez příznaků
-              </Typography>
-              <Stepper activeStep={rtpSteps.indexOf(statusLabels[selectedRecord.status] || '')} orientation="vertical">
-                {rtpSteps.map((step, i) => (
-                  <Step key={i} completed={i < rtpSteps.indexOf(statusLabels[selectedRecord.status] || '')}>
-                    <StepLabel>{step}</StepLabel>
-                  </Step>
-                ))}
-              </Stepper>
-              <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-                <Button variant="contained" onClick={() => handleAdvanceStep(selectedRecord)}
-                  disabled={selectedRecord.status === 'Cleared'}
-                  sx={{ bgcolor: '#0D7377' }}>
-                  {selectedRecord.status === 'Cleared' ? 'Dokončeno' : 'Další krok'}
-                </Button>
-                <Button onClick={() => setSelectedRecord(null)}>Zavřít</Button>
-              </Box>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <SoftCard>
+          <SectionLabel>Protokol návratu do hry</SectionLabel>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Každý krok vyžaduje minimálně 24 hodin bez příznaků.
+          </Alert>
+          <Stack spacing={0}>
+            {rtpSteps.map((step, i) => {
+              const active = activeStepOf(selectedRecord);
+              const done = i < active;
+              const current = i === active;
+              return (
+                <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1, borderBottom: '1px solid', borderColor: 'divider', '&:last-of-type': { borderBottom: 0 } }}>
+                  {done
+                    ? <CheckCircle sx={{ fontSize: 20, color: 'primary.main' }} />
+                    : <RadioButtonUnchecked sx={{ fontSize: 20, color: current ? 'primary.main' : 'text.disabled' }} />}
+                  <Typography variant="body2" sx={{ fontWeight: current ? 700 : 500, color: done ? 'text.secondary' : 'text.primary' }}>
+                    {step}
+                  </Typography>
+                  {current && <StatusChip tone="primary" size="sm" sx={{ ml: 'auto' }}>Aktuální krok</StatusChip>}
+                </Box>
+              );
+            })}
+          </Stack>
+          <Stack direction="row" spacing={1} sx={{ mt: 3 }}>
+            <Button variant="contained" onClick={() => handleAdvanceStep(selectedRecord)}
+              disabled={selectedRecord.status === 'Cleared'}>
+              {selectedRecord.status === 'Cleared' ? 'Dokončeno' : 'Další krok'}
+            </Button>
+            <Button variant="outlined" onClick={() => setSelectedRecord(null)}>Zavřít</Button>
+          </Stack>
+        </SoftCard>
       )}
     </Box>
   );
 }
-

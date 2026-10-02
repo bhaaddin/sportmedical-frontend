@@ -32,6 +32,7 @@ import { AsyncSection } from "../../components/booking/AsyncSection";
 import { DayActivityGrid } from "../../components/booking/DayActivityGrid";
 import { errorText } from "../../components/booking/errorText";
 import { addDaysToDateOnly, formatDateOnly, pragueDateKey } from "../../utils/time";
+import { SettingsScreen } from "../settings/SettingsFrame";
 import {
   DEFAULT_PERIOD_NAME,
   defaultPeriodStart,
@@ -144,22 +145,24 @@ export default function WorkingHoursPage() {
   const rowsReady = main === null || hoursQuery.isSuccess;
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto" }}>
-      <Typography variant="h4" sx={{ fontWeight: 800 }}>
-        {t("booking.workingHours.title")}
-      </Typography>
-      <Typography sx={{ color: "text.secondary", mb: 3 }}>
-        Kdy se v kalendáři pracuje, po dnech v týdnu. Jednotlivé dny jinak (dovolená, jiný čas)
-        nastavíte ve{" "}
-        <Link component={RouterLink} to="/exceptions">
-          výjimkách
-        </Link>
-        , státní svátky ve{" "}
-        <Link component={RouterLink} to="/svatky">
-          svátcích a volnu
-        </Link>
-        .
-      </Typography>
+    <SettingsScreen
+      title="Otevírací doba"
+      subtitle={
+        <>
+          Kdy se v kalendáři pracuje, po dnech v týdnu, včetně obědové pauzy. Jednotlivé dny jinak
+          (dovolená, jiný čas) nastavíte ve{" "}
+          <Link component={RouterLink} to="/exceptions">
+            výjimkách
+          </Link>
+          , státní svátky ve{" "}
+          <Link component={RouterLink} to="/svatky">
+            svátcích a dovolených
+          </Link>
+          .
+        </>
+      }
+      width={1200}
+    >
 
       <AsyncSection
         isLoading={calendarsQuery.isLoading}
@@ -311,7 +314,7 @@ export default function WorkingHoursPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </SettingsScreen>
   );
 }
 

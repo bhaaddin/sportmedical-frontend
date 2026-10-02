@@ -1,15 +1,11 @@
 /*
- * Nastavení: six headings, nothing open until asked.
+ * Nastavení: the board's three-pane screen.
  *
- * The complaint was twenty sidebar entries, and the obvious way to answer it
- * badly is a single screen a kilometre long. So the thing worth testing is not
- * that the rows exist - it is that they are *not shown* until somebody asks,
- * and that opening one does not open the rest.
- *
- * Also covered: the fake settings that used to sit on this screen. A default
- * appointment length, a buffer and working hours, all hardcoded, saving
- * nowhere, contradicting the real working-hours screen. If any of them come
- * back, these fail.
+ * What is worth testing is not that the rows exist - it is that both the nav
+ * and the cards come from one catalogue, that the search narrows them, that
+ * a person is offered only what the server lets them open, and that the fake
+ * settings that used to sit on this screen (a default appointment length, a
+ * buffer, working hours - all hardcoded, saving nowhere) stay gone.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
@@ -22,11 +18,10 @@ import { savePermissions } from '../auth/localSession';
 /*
  * ── Signed in AS somebody, not IN A ROLE ──
  *
- * This screen decided what to draw from `user.role` until 22. 9. 2026. The
- * owner sets permissions per employee, in three states, so the role could
+ * The owner sets permissions per employee, in three states, so a role could
  * not answer the question: an administrator whose `settings.clinic.manage`
- * was revoked still saw every screen. It reads the effective list the server
- * sends at sign-in, and so do these.
+ * was revoked still saw every screen. The screen reads the effective list the
+ * server sends at sign-in, and so do these.
  */
 const EVERYTHING = [
   'patients.view',
@@ -40,6 +35,7 @@ const EVERYTHING = [
   'bookings.edit',
   'bookings.cancel',
   'questionnaires.manage',
+  'communication.manage',
 ];
 
 /** The server's own defaults for the Staff role. */
@@ -75,62 +71,57 @@ const themePrefs = {
 const renderSettings = () =>
   render(
     <ThemePrefsContext.Provider value={themePrefs}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/settings']}>
         <Settings />
       </MemoryRouter>
     </ThemePrefsContext.Provider>,
   );
 
+/* A row is drawn twice on a wide screen - in the nav and as a card - and both
+   are links to the same place. "At least one, all pointing there" is the claim. */
+const linksTo = (name: string | RegExp) =>
+  screen.getAllByRole('link', { name }).map((a) => a.getAttribute('href'));
+
 describe('the settings screen', () => {
-  it('shows the headings and nothing else', async () => {
+  it('shows the board\'s groups, in its order, with the screens as links', async () => {
     renderSettings();
 
-    expect(await screen.findByText('Provoz a čas')).toBeInTheDocument();
-    expect(screen.getByText('Lidé a přístupy')).toBeInTheDocument();
-    expect(screen.getByText('Můj účet')).toBeInTheDocument();
+    const headings = (await screen.findAllByRole('heading', { level: 2 })).map((h) => h.textContent);
+    expect(headings.slice(0, 4)).toEqual(['Provoz', 'Služby a ceny', 'Kluby', 'Komunikace']);
+    expect(headings).toContain('Systém');
+    expect(headings[headings.length - 1]).toBe('Osobní');
 
-    /* The rows inside are in the DOM but not shown - that is what collapsed
-       means for an accordion, and what the eye sees is visibility. */
-    expect(screen.getByText('Činnosti')).not.toBeVisible();
-    expect(screen.getByText('Pracovní doba')).not.toBeVisible();
+    expect(new Set(linksTo('Otevírací doba'))).toEqual(new Set(['/working-hours']));
+    expect(new Set(linksTo('Slevy a cenové hladiny'))).toEqual(new Set(['/nastaveni/skupinove-slevy']));
+    expect(new Set(linksTo('Hromadné objednávky'))).toEqual(new Set(['/vyhrazeni']));
+    expect(new Set(linksTo('SMS a e-maily'))).toEqual(new Set(['/nastaveni/sablony-emailu']));
   });
 
-  it('opens one heading when it is clicked', async () => {
+  it('says what each screen holds, next to its name', async () => {
+    renderSettings();
+    expect(await screen.findByText(/Čím víc lidí přijde společně/)).toBeInTheDocument();
+  });
+
+  it('narrows the nav and the cards together when searched', async () => {
     const user = userEvent.setup();
     renderSettings();
 
-    await user.click(await screen.findByText('Provoz a čas'));
+    await user.type(screen.getAllByLabelText('Hledat v nastavení')[0], 'sleva');
 
-    expect(await screen.findByText('Pracovní doba')).toBeVisible();
-    expect(screen.getByText('Blokovaný čas')).toBeVisible();
+    expect(screen.getAllByRole('link', { name: 'Slevy a cenové hladiny' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('link', { name: 'Otevírací doba' })).not.toBeInTheDocument();
+    /* The personal cards are not a search hit for "sleva". */
+    expect(screen.queryByText('Můj účet')).not.toBeInTheDocument();
   });
 
-  /* One at a time. Opening everything is how the kilometre comes back. */
-  it('closes the previous one when another is opened', async () => {
+  it('says so when nothing matches', async () => {
     const user = userEvent.setup();
     renderSettings();
 
-    await user.click(await screen.findByText('Provoz a čas'));
-    expect(await screen.findByText('Pracovní doba')).toBeVisible();
+    await user.type(screen.getAllByLabelText('Hledat v nastavení')[0], 'xyzzy');
 
-    await user.click(screen.getByText('Lidé a přístupy'));
-
-    /* By role, not by text: "Tým a účty" also appears in the sentence telling
-       people where their name is changed, and a plain text query catches both. */
-    expect(await screen.findByRole('link', { name: /Tým a účty/ })).toBeVisible();
-    expect(screen.getByText('Pracovní doba')).not.toBeVisible();
-  });
-
-  it('closes a heading when it is clicked again', async () => {
-    const user = userEvent.setup();
-    renderSettings();
-
-    const heading = await screen.findByText('Provoz a čas');
-    await user.click(heading);
-    expect(await screen.findByText('Pracovní doba')).toBeVisible();
-
-    await user.click(heading);
-    expect(screen.getByText('Pracovní doba')).not.toBeVisible();
+    expect(screen.getByText(/Nic odpovídajícího „xyzzy“\. Zkuste jiné slovo/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Otevírací doba' })).not.toBeInTheDocument();
   });
 });
 
@@ -138,36 +129,34 @@ describe('what a receptionist sees', () => {
   beforeEach(() => holding(RECEPTIONIST));
 
   it('is not offered the administrator rows', async () => {
-    const user = userEvent.setup();
     renderSettings();
 
-    /* Provoz a čas is shown to her because it holds two rows that need no
-       permission - Vyhrazení pro kluby and Blokovaný čas - while Pracovní doba
-       and the rest of the group need settings.clinic.manage and are dropped. */
-    await user.click(await screen.findByText('Provoz a čas'));
-
-    expect(screen.getByText('Blokovaný čas')).toBeVisible();
-    expect(screen.queryByText('Pracovní doba')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Tým a účty/ })).not.toBeInTheDocument();
+    /* Provoz is shown to her because Pauzy a přestávky needs no permission,
+       while Otevírací doba and the rest of the group need
+       settings.clinic.manage and are dropped. */
+    expect((await screen.findAllByRole('link', { name: 'Pauzy a přestávky' })).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: 'Ceník' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('link', { name: 'Otevírací doba' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Zaměstnanci' })).not.toBeInTheDocument();
   });
 
   it('still has her own settings', async () => {
     renderSettings();
     expect(await screen.findByText('Můj účet')).toBeInTheDocument();
+    expect(screen.getByText('Vzhled')).toBeInTheDocument();
   });
 
   it('is not shown a whole section that holds nothing of hers', async () => {
     renderSettings();
     await screen.findByText('Můj účet');
-    expect(screen.queryByText('Systém')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Systém' })).not.toBeInTheDocument();
   });
 });
 
 describe('the settings that used to lie here', () => {
   it('no longer offers a working day this screen cannot save', async () => {
-    const user = userEvent.setup();
     renderSettings();
-    await user.click(await screen.findByText('Můj účet'));
+    await screen.findByText('Můj účet');
 
     expect(screen.queryByText(/Začátek pracovní doby/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Konec pracovní doby/)).not.toBeInTheDocument();
@@ -179,24 +168,20 @@ describe('the settings that used to lie here', () => {
    * The profile is read-only, and that is honest: GET /api/v1/account only
    * reads who is signed in, and nothing lets somebody change their own name,
    * so the editable fields that were here wrote the name into this browser
-   * and nowhere else. It looked like it worked until you logged in somewhere
-   * else. A name is changed in Tým a účty, by whoever manages accounts.
+   * and nowhere else. A name is changed under Tým, by whoever manages accounts.
    */
   it('shows who you are without pretending the name can be changed here', async () => {
-    const user = userEvent.setup();
     renderSettings();
-    await user.click(await screen.findByText('Můj účet'));
 
     expect(await screen.findByText('Jana Nová')).toBeVisible();
     expect(screen.getByText(/mění správce v sekci/)).toBeVisible();
     expect(screen.queryByRole('button', { name: /Uložit změny/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Odhlásit se/ })).toBeInTheDocument();
   });
 });
 
 describe('a sign-in from before permissions were sent', () => {
   /*
-   * The transition hazard, and why it is worth a test.
-   *
    * A browser holding a session created before the server started sending the
    * permission list has no list at all. Every guarded row is hidden, and on
    * this screen that reads as the settings having disappeared — the owner
@@ -252,33 +237,29 @@ describe('a sign-in from before permissions were sent', () => {
 /*
  * The list is read live, not once. GET /api/v1/account rewrites it on start,
  * on focus and after a refusal, and an owner who grants a receptionist
- * `users.manage` while she has this screen open must see Tým a účty appear -
+ * `users.manage` while she has this screen open must see Zaměstnanci appear -
  * that grant used to reach her only after signing out and in again.
  */
 describe('a permission that changes while the screen is open', () => {
   it('draws the rows the grant opens, without a new sign-in', async () => {
-    const user = userEvent.setup();
     holding(RECEPTIONIST);
     renderSettings();
     await screen.findByText('Můj účet');
-    expect(screen.queryByRole('link', { name: /Tým a účty/, hidden: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Zaměstnanci' })).not.toBeInTheDocument();
 
     act(() => savePermissions([...RECEPTIONIST, 'users.manage']));
 
-    await user.click(await screen.findByText('Lidé a přístupy'));
-    expect(await screen.findByRole('link', { name: /Tým a účty/ })).toBeVisible();
+    expect((await screen.findAllByRole('link', { name: 'Zaměstnanci' })).length).toBeGreaterThan(0);
   });
 
   it('takes away the rows a revocation closes', async () => {
-    const user = userEvent.setup();
     renderSettings();
-    await user.click(await screen.findByText('Lidé a přístupy'));
-    expect(await screen.findByRole('link', { name: /Tým a účty/ })).toBeVisible();
+    expect((await screen.findAllByRole('link', { name: 'Zaměstnanci' })).length).toBeGreaterThan(0);
 
     act(() => savePermissions(RECEPTIONIST));
 
     await waitFor(() =>
-      expect(screen.queryByRole('link', { name: /Tým a účty/, hidden: true })).not.toBeInTheDocument(),
+      expect(screen.queryByRole('link', { name: 'Zaměstnanci' })).not.toBeInTheDocument(),
     );
   });
 });

@@ -17,7 +17,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Button, IconButton, Dialog, DialogTitle,
-  DialogContent, DialogContentText, DialogActions, TextField, MenuItem, Chip, Avatar, Grid,
+  DialogContent, DialogContentText, DialogActions, TextField, MenuItem, Avatar, Grid,
   Alert, Snackbar, Skeleton, Tooltip,
 } from '@mui/material';
 import {
@@ -36,6 +36,15 @@ import {
 } from '../api/userAccounts';
 import type { UserAccount, UserAccountRole } from '../api/userAccounts';
 import { usePermission } from '../auth/usePermission';
+import { KpiCard, StatusChip, type ChipTone } from '../components/ui';
+import { SettingsScreen } from './settings/SettingsFrame';
+
+/** The board's soft tones, one per role, for the chip in the table. */
+const ROLE_TONES: Record<UserAccountRole, ChipTone> = {
+  Owner: 'beige',
+  Administrator: 'blue',
+  Staff: 'grey',
+};
 
 const ROLE_COLORS: Record<UserAccountRole, string> = {
   Owner: '#7B1FA2',
@@ -220,30 +229,20 @@ export default function StaffManagement() {
   const active = accounts.filter((a) => a.isActive);
 
   return (
-    <Box>
-      {/* Header */}
-      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <PersonIcon color="primary" /> Tým a účty
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Kdo se přihlašuje, s jakou rolí, co smí a kde pracuje
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Tooltip title="Obnovit">
-              <IconButton aria-label="Obnovit" onClick={load}><RefreshIcon /></IconButton>
-            </Tooltip>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}
-              sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 3, fontWeight: 600 }}>
-              Přidat zaměstnance
-            </Button>
-          </Box>
-        </Box>
-      </motion.div>
-
+    <SettingsScreen
+      title="Zaměstnanci"
+      subtitle="Kdo se přihlašuje, s jakou rolí, co smí a kde pracuje"
+      actions={
+        <>
+          <Tooltip title="Obnovit">
+            <IconButton aria-label="Obnovit" onClick={load}><RefreshIcon /></IconButton>
+          </Tooltip>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openAdd}>
+            Přidat zaměstnance
+          </Button>
+        </>
+      }
+    >
       {loadFailed && (
         <Alert severity="error" sx={{ mb: 2 }}>Seznam účtů se nepodařilo načíst.</Alert>
       )}
@@ -252,36 +251,26 @@ export default function StaffManagement() {
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {USER_ACCOUNT_ROLES.map((role) => (
           <Grid key={role} size={{ xs: 6, sm: 3 }}>
-            <Paper sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="h4" sx={{ fontWeight: 700, color: ROLE_COLORS[role] }}>
-                {active.filter((a) => a.role === role).length}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">{ROLE_LABELS[role]}</Typography>
-            </Paper>
+            <KpiCard label={ROLE_LABELS[role]} value={active.filter((a) => a.role === role).length} />
           </Grid>
         ))}
         <Grid size={{ xs: 6, sm: 3 }}>
-          <Paper sx={{ p: 2, textAlign: 'center' }}>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: '#757575' }}>
-              {accounts.length - active.length}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">Vypnutý přístup</Typography>
-          </Paper>
+          <KpiCard label="Vypnutý přístup" value={accounts.length - active.length} />
         </Grid>
       </Grid>
 
       {/* Accounts */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-        <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
+        <TableContainer component={Paper}>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f8f9fa' }}>
-                <TableCell sx={{ fontWeight: 700 }}>Jméno</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>E-mail</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Naposledy přihlášen</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Přístup</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700 }}>Akce</TableCell>
+              <TableRow>
+                <TableCell>Jméno</TableCell>
+                <TableCell>E-mail</TableCell>
+                <TableCell>Role</TableCell>
+                <TableCell>Naposledy přihlášen</TableCell>
+                <TableCell>Přístup</TableCell>
+                <TableCell align="right">Akce</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -307,17 +296,20 @@ export default function StaffManagement() {
                       </TableCell>
                       <TableCell>{acc.email}</TableCell>
                       <TableCell>
-                        <Chip label={ROLE_LABELS[acc.role] ?? acc.role} size="small"
-                          sx={{ bgcolor: `${ROLE_COLORS[acc.role] ?? '#90A4AE'}18`, color: ROLE_COLORS[acc.role] ?? '#607D8B', fontWeight: 500 }} />
+                        <StatusChip tone={ROLE_TONES[acc.role] ?? 'grey'}>
+                          {ROLE_LABELS[acc.role] ?? acc.role}
+                        </StatusChip>
                       </TableCell>
                       <TableCell>
                         {acc.lastLoginAtUtc ? new Date(acc.lastLoginAtUtc).toLocaleString('cs-CZ') : '—'}
                       </TableCell>
                       <TableCell>
                         {acc.isActive ? (
-                          <Chip size="small" color="success" label={acc.mustChangePassword ? 'Čeká na první přihlášení' : 'Aktivní'} />
+                          <StatusChip tone={acc.mustChangePassword ? 'beige' : 'green'}>
+                            {acc.mustChangePassword ? 'Čeká na první přihlášení' : 'Aktivní'}
+                          </StatusChip>
                         ) : (
-                          <Chip size="small" label="Vypnutý" />
+                          <StatusChip tone="grey">Vypnutý</StatusChip>
                         )}
                       </TableCell>
                       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
@@ -441,8 +433,7 @@ export default function StaffManagement() {
         <DialogActions sx={{ p: 2, gap: 1 }}>
           <Button onClick={() => setAdding(false)} sx={{ borderRadius: 2 }}>Zrušit</Button>
           <Button onClick={() => void create()} variant="contained"
-            disabled={busy || newAccount.displayName.trim() === '' || newAccount.email.trim() === ''}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 3, fontWeight: 600 }}>
+            disabled={busy || newAccount.displayName.trim() === '' || newAccount.email.trim() === ''}>
             Přidat
           </Button>
         </DialogActions>
@@ -474,8 +465,7 @@ export default function StaffManagement() {
               busy || editing === null
               || editDraft.displayName.trim() === '' || editDraft.email.trim() === ''
               || (editDraft.displayName.trim() === editing.displayName && editDraft.email.trim() === editing.email)
-            }
-            sx={{ bgcolor: '#0D7377' }}>
+            }>
             Uložit
           </Button>
         </DialogActions>
@@ -498,8 +488,7 @@ export default function StaffManagement() {
         <DialogActions sx={{ p: 2, gap: 1 }}>
           <Button onClick={() => setRoleFor(null)}>Zrušit</Button>
           <Button variant="contained" onClick={() => void saveRole()}
-            disabled={busy || roleFor === null || roleChoice === roleFor.role}
-            sx={{ bgcolor: '#0D7377' }}>
+            disabled={busy || roleFor === null || roleChoice === roleFor.role}>
             Uložit
           </Button>
         </DialogActions>
@@ -545,8 +534,7 @@ export default function StaffManagement() {
           >
             Kopírovat
           </Button>
-          <Button onClick={() => setCredentials(null)} variant="contained"
-            sx={{ bgcolor: '#0D7377', borderRadius: 2 }}>
+          <Button onClick={() => setCredentials(null)} variant="contained">
             Hotovo
           </Button>
         </DialogActions>
@@ -555,8 +543,8 @@ export default function StaffManagement() {
       <Snackbar open={snackbar.open} autoHideDuration={3000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
-        <Alert severity={snackbar.severity} sx={{ borderRadius: 2 }}>{snackbar.message}</Alert>
+        <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
       </Snackbar>
-    </Box>
+    </SettingsScreen>
   );
 }

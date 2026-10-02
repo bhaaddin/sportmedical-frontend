@@ -9,10 +9,8 @@
 import {
   Alert,
   Box,
-  Card,
-  CardContent,
-  Chip,
   CircularProgress,
+  Grid,
   Rating,
   Stack,
   Typography,
@@ -20,6 +18,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { Link as RouterLink } from 'react-router-dom';
 import { FEEDBACK_QUERY_KEY, listFeedback } from '../api/feedback';
+import { KpiCard, PageHeader, SoftCard } from '../components/ui';
 
 const when = (utc: string): string =>
   new Date(utc).toLocaleString('cs-CZ', {
@@ -54,50 +53,53 @@ export default function FeedbackReviewPage() {
 
   return (
     <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>Hodnocení pacientů</Typography>
-        <Typography sx={{ color: 'text.secondary' }}>
-          Co pacienti napsali po dokončené návštěvě. Soukromé — nic se nikde nezveřejňuje.
-        </Typography>
-      </Box>
+      <PageHeader
+        title="Hodnocení pacientů"
+        subtitle="Co pacienti napsali po dokončené návštěvě · soukromé, nic se nikde nezveřejňuje"
+      />
 
       {entries.length === 0 ? (
         <Alert severity="info">Zatím žádné hodnocení. Pozvánka se posílá po dokončení návštěvy.</Alert>
       ) : (
         <Stack spacing={2}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <Chip label={`${entries.length} hodnocení`} />
-            {average !== null ? (
-              <Chip color="primary" label={`průměr ${average.toFixed(1)} / 5`} />
-            ) : null}
-          </Stack>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <KpiCard label="Hodnocení" value={entries.length} hint="odpovědí celkem" />
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <KpiCard
+                label="Průměr"
+                value={average !== null ? `${average.toFixed(1)} / 5` : '—'}
+                hint="hvězdiček"
+                tone="primary"
+              />
+            </Grid>
+          </Grid>
 
           {entries.map((entry) => (
-            <Card key={entry.id} variant="outlined">
-              <CardContent>
-                <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                  <Rating value={entry.rating ?? 0} readOnly />
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    {entry.submittedAtUtc ? when(entry.submittedAtUtc) : '—'}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    component={RouterLink}
-                    to={`/patients/${entry.patientId}`}
-                    sx={{ color: 'primary.main', fontWeight: 600, textDecoration: 'none' }}
-                  >
-                    Karta pacienta
-                  </Typography>
-                </Stack>
-                {entry.comment ? (
-                  <Typography sx={{ mt: 1.5, whiteSpace: 'pre-wrap' }}>{entry.comment}</Typography>
-                ) : (
-                  <Typography sx={{ mt: 1.5, color: 'text.secondary', fontStyle: 'italic' }}>
-                    Bez komentáře.
-                  </Typography>
-                )}
-              </CardContent>
-            </Card>
+            <SoftCard key={entry.id}>
+              <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                <Rating value={entry.rating ?? 0} readOnly />
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  {entry.submittedAtUtc ? when(entry.submittedAtUtc) : '—'}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  component={RouterLink}
+                  to={`/patients/${entry.patientId}`}
+                  sx={{ color: 'primary.main', fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                >
+                  Karta pacienta
+                </Typography>
+              </Stack>
+              {entry.comment ? (
+                <Typography sx={{ mt: 1.5, whiteSpace: 'pre-wrap' }}>{entry.comment}</Typography>
+              ) : (
+                <Typography sx={{ mt: 1.5, color: 'text.secondary', fontStyle: 'italic' }}>
+                  Bez komentáře.
+                </Typography>
+              )}
+            </SoftCard>
           ))}
         </Stack>
       )}

@@ -6,11 +6,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Dialog, DialogContent, TextField, Box, Typography, List, ListItem,
-  ListItemIcon, ListItemText, Chip, InputAdornment, CircularProgress,
+  ListItemIcon, ListItemText, InputAdornment, CircularProgress,
 } from '@mui/material';
 import {
   Search, People, CalendarMonth, Warning, Receipt,
-  Person, Science, Settings,
+  Person, Science, Settings, Home,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { patientsApi, type Patient } from '../api/patients';
@@ -18,6 +18,7 @@ import { injuriesApi, type Injury } from '../api/injuries';
 import { billingApi, type Invoice } from '../api/billing';
 import { calendarApi, type Appointment } from '../api/calendar';
 import { usePermission } from '../auth/usePermission';
+import { DESIGN, StatusChip, type ChipTone } from './ui';
 
 interface SearchResult {
   id: string;
@@ -26,8 +27,17 @@ interface SearchResult {
   type: 'patient' | 'appointment' | 'injury' | 'invoice' | 'staff' | 'page';
   icon: React.ReactNode;
   path: string;
-  color: string;
 }
+
+/* What kind of thing a row is, said with the board's tones rather than a colour per type. */
+const TYPE_LABEL: Record<SearchResult['type'], string> = {
+  patient: 'Pacient', appointment: 'Termín', injury: 'Poranění',
+  invoice: 'Faktura', staff: 'Tým', page: 'Stránka',
+};
+const TYPE_TONE: Record<SearchResult['type'], ChipTone> = {
+  patient: 'green', appointment: 'blue', injury: 'red',
+  invoice: 'beige', staff: 'grey', page: 'grey',
+};
 
 export default function UniversalSearch() {
   const [open, setOpen] = useState(false);
@@ -64,17 +74,17 @@ export default function UniversalSearch() {
 
   /* ── Static page results for navigation ── */
   const pages: SearchResult[] = useMemo(() => [
-    { id: 'p-dashboard', title: 'Dashboard', subtitle: 'Přehled', type: 'page', icon: <Settings />, path: '/', color: '#0D7377' },
-    { id: 'p-calendar', title: 'Plánování', subtitle: 'Správa termínů', type: 'page', icon: <CalendarMonth />, path: '/planovani', color: '#0D7377' },
+    { id: 'p-dashboard', title: 'Přehled', subtitle: 'Úvodní plocha', type: 'page', icon: <Home />, path: '/' },
+    { id: 'p-calendar', title: 'Kalendář', subtitle: 'Správa termínů', type: 'page', icon: <CalendarMonth />, path: '/planovani' },
     ...(canSeePatients
-      ? [{ id: 'p-patients', title: 'Pacienti', subtitle: 'Seznam pacientů', type: 'page' as const, icon: <People />, path: '/patients', color: '#0288D1' }]
+      ? [{ id: 'p-patients', title: 'Pacienti', subtitle: 'Kartotéka kliniky', type: 'page' as const, icon: <People />, path: '/patients' }]
       : []),
     ...(canBill
-      ? [{ id: 'p-billing', title: 'Fakturace', subtitle: 'Správa faktur', type: 'page' as const, icon: <Receipt />, path: '/billing', color: '#ED6C02' }]
+      ? [{ id: 'p-billing', title: 'Fakturace', subtitle: 'Doklady a platby', type: 'page' as const, icon: <Receipt />, path: '/billing' }]
       : []),
-    { id: 'p-injuries', title: 'Poranění', subtitle: 'Evidence poranění', type: 'page', icon: <Warning />, path: '/injuries', color: '#D32F2F' },
-    { id: 'p-diagnostics', title: 'Diagnostika', subtitle: 'Nová relace', type: 'page', icon: <Science />, path: '/diagnostics/new', color: '#7C3AED' },
-    { id: 'p-settings', title: 'Nastavení', subtitle: 'Konfigurace', type: 'page', icon: <Settings />, path: '/settings', color: '#64748B' },
+    { id: 'p-injuries', title: 'Poranění', subtitle: 'Evidence poranění', type: 'page', icon: <Warning />, path: '/injuries' },
+    { id: 'p-diagnostics', title: 'Výsledky', subtitle: 'Diagnostika a měření', type: 'page', icon: <Science />, path: '/diagnostics/new' },
+    { id: 'p-settings', title: 'Nastavení', subtitle: 'Konfigurace', type: 'page', icon: <Settings />, path: '/settings' },
   ], [canBill, canSeePatients]);
 
   /* ── Search across all data sources ── */
@@ -103,14 +113,13 @@ export default function UniversalSearch() {
             type: 'patient',
             icon: <Person />,
             path: `/patients/${p.id}`,
-            color: '#0288D1',
           });
         }
       }
 
       /* Injuries */
       if (injuries.status === 'fulfilled') {
-        for (const i of injuries.value.filter(
+        for (const i of (injuries.value as Injury[]).filter(
           x => x.bodyRegion?.toLowerCase().includes(lower) ||
                x.diagnosis?.toLowerCase().includes(lower) ||
                x.patientId?.toLowerCase().includes(lower)
@@ -122,7 +131,6 @@ export default function UniversalSearch() {
             type: 'injury',
             icon: <Warning />,
             path: '/injuries',
-            color: '#D32F2F',
           });
         }
       }
@@ -140,7 +148,6 @@ export default function UniversalSearch() {
             type: 'invoice',
             icon: <Receipt />,
             path: '/billing',
-            color: '#ED6C02',
           });
         }
       }
@@ -150,7 +157,7 @@ export default function UniversalSearch() {
         /* This read returns cancelled appointments too, and search offered them
            with no sign they were cancelled - a receptionist reading the result
            would have told a patient a slot was still theirs. */
-        for (const a of appointments.value.filter(
+        for (const a of (appointments.value as Appointment[]).filter(
           x => x.status !== 'Cancelled' &&
               (x.patientName?.toLowerCase().includes(lower) ||
                x.serviceType?.toLowerCase().includes(lower) ||
@@ -163,7 +170,6 @@ export default function UniversalSearch() {
             type: 'appointment',
             icon: <CalendarMonth />,
             path: '/planovani',
-            color: '#0D7377',
           });
         }
       }
@@ -205,19 +211,26 @@ export default function UniversalSearch() {
     }
   };
 
-  const typeLabel: Record<string, string> = {
-    patient: 'Pacient', appointment: 'Termín', injury: 'Poranění',
-    invoice: 'Faktura', page: 'Stránka',
-  };
-
   return (
-    <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth
-      slotProps={{ paper: { sx: { borderRadius: 3, overflow: 'hidden' } } }}>
+    <Dialog
+      open={open}
+      onClose={() => setOpen(false)}
+      maxWidth="sm"
+      fullWidth
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: 3, overflow: 'hidden', border: '1px solid', borderColor: 'divider',
+            boxShadow: DESIGN.shadow.menu,
+          },
+        },
+      }}
+    >
       <DialogContent sx={{ p: 0 }}>
         <TextField
           inputRef={inputRef}
           fullWidth
-          placeholder="Hledat pacienty, faktury, poranění, stránky..."
+          placeholder="Hledat pacienty, termíny, faktury, poranění nebo stránky…"
           value={query}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -225,28 +238,42 @@ export default function UniversalSearch() {
             input: {
               startAdornment: (
                 <InputAdornment position="start">
-                  {loading ? <CircularProgress size={20} /> : <Search />}
+                  {loading ? <CircularProgress size={18} /> : <Search sx={{ color: 'text.secondary', fontSize: 20 }} />}
                 </InputAdornment>
               ),
               endAdornment: (
                 <InputAdornment position="end">
-                  <Chip label="Ctrl+K" size="small" sx={{ fontSize: 10, height: 20 }} />
+                  <Box
+                    component="kbd"
+                    sx={{
+                      fontFamily: 'inherit', fontSize: 11, fontWeight: 600, color: 'text.secondary',
+                      border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 0.75, py: 0.125,
+                      bgcolor: 'background.default',
+                    }}
+                  >
+                    Ctrl+K
+                  </Box>
                 </InputAdornment>
               ),
+              sx: { fontSize: 15, '& input': { py: 1.75 } },
             },
           }}
-          sx={{ '& .MuiOutlinedInput-notchedOutline': { border: 'none' }, p: 1 }}
+          sx={{ '& .MuiOutlinedInput-notchedOutline': { border: 'none' }, px: 1 }}
         />
         {results.length > 0 && (
-          <List sx={{ maxHeight: 400, overflow: 'auto', borderTop: '1px solid #f0f0f0' }}>
+          <List sx={{ maxHeight: 400, overflow: 'auto', borderTop: '1px solid', borderColor: 'divider', py: 0.75 }}>
             {results.map((r, i) => (
-              <ListItem key={r.id} onClick={() => { navigate(r.path); setOpen(false); }}
+              <ListItem
+                key={r.id}
+                onClick={() => { navigate(r.path); setOpen(false); }}
+                aria-selected={i === selectedIndex}
                 sx={{
-                  cursor: 'pointer', mx: 1, borderRadius: 2, mb: 0.5,
-                  bgcolor: i === selectedIndex ? `${r.color}12` : 'transparent',
-                  '&:hover': { bgcolor: `${r.color}08` },
-                }}>
-                <ListItemIcon sx={{ color: r.color, minWidth: 40 }}>
+                  cursor: 'pointer', mx: 1, width: 'auto', borderRadius: 2, mb: 0.25, py: 1,
+                  bgcolor: i === selectedIndex ? 'action.selected' : 'transparent',
+                  '&:hover': { bgcolor: 'action.hover' },
+                }}
+              >
+                <ListItemIcon sx={{ color: i === selectedIndex ? 'primary.main' : 'text.secondary', minWidth: 36, '& svg': { fontSize: 20 } }}>
                   {r.icon}
                 </ListItemIcon>
                 <ListItemText
@@ -260,15 +287,14 @@ export default function UniversalSearch() {
                     secondary: { sx: { fontSize: 12, color: 'text.secondary' } },
                   }}
                 />
-                <Chip label={typeLabel[r.type]} size="small"
-                  sx={{ bgcolor: `${r.color}12`, color: r.color, fontSize: 10, height: 20 }} />
+                <StatusChip tone={TYPE_TONE[r.type]} size="sm">{TYPE_LABEL[r.type]}</StatusChip>
               </ListItem>
             ))}
           </List>
         )}
         {query.length >= 2 && !loading && results.length === 0 && (
-          <Box sx={{ p: 3, textAlign: 'center' }}>
-            <Typography color="text.secondary">Žádné výsledky pro "{query}"</Typography>
+          <Box sx={{ p: 3, textAlign: 'center', borderTop: '1px solid', borderColor: 'divider' }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>Žádné výsledky pro „{query}"</Typography>
           </Box>
         )}
       </DialogContent>

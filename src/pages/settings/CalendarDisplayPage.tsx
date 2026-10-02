@@ -15,8 +15,6 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   Checkbox,
   CircularProgress,
   Divider,
@@ -27,6 +25,8 @@ import {
   Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { SectionLabel, SoftCard } from '../../components/ui';
+import { SettingsScreen } from './SettingsFrame';
 import {
   CALENDAR_DISPLAY_QUERY_KEY,
   readCalendarDisplay,
@@ -99,18 +99,32 @@ export default function CalendarDisplayPage() {
   };
 
   return (
-    <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>Vzhled kalendáře</Typography>
-        <Typography sx={{ color: 'text.secondary' }}>
-          Jak se kalendář rezervací kreslí všem v ordinaci. Den se vždy roztáhne tak, aby byla vidět
-          pracovní doba i každá rezervace mimo nastavené hodiny.
-        </Typography>
-      </Box>
-
-      <Card variant="outlined" sx={{ maxWidth: 640 }}>
-        <CardContent>
+    <SettingsScreen
+      title="Kalendář a mřížka"
+      subtitle="Jak se kalendář kreslí všem v ordinaci — den se roztáhne tak, aby byla vidět pracovní doba i každá rezervace mimo ni"
+      width={720}
+      actions={
+        <>
+          <Button
+            variant="outlined"
+            disabled={edited === null || save.isPending}
+            onClick={() => { setSaved(false); setDraft(null); }}
+          >
+            Zahodit
+          </Button>
+          <Button
+            variant="contained"
+            disabled={edited === null || save.isPending}
+            onClick={() => save.mutate(draft)}
+          >
+            {save.isPending ? 'Ukládám…' : 'Uložit'}
+          </Button>
+        </>
+      }
+    >
+      <SoftCard>
           <Stack spacing={2.5}>
+            <SectionLabel sx={{ mb: 0 }}>Pohled a mřížka</SectionLabel>
             <TextField
               select
               label="Výchozí pohled"
@@ -165,6 +179,9 @@ export default function CalendarDisplayPage() {
                 ))}
               </TextField>
             </Stack>
+
+            <Divider />
+            <SectionLabel sx={{ mb: 0 }}>Barvy</SectionLabel>
 
             <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
               <TextField
@@ -229,6 +246,7 @@ export default function CalendarDisplayPage() {
             <Divider />
 
             <Box>
+              <SectionLabel sx={{ mb: 0.5 }}>Bublina nad objednávkou</SectionLabel>
               <Typography sx={{ fontWeight: 700, mb: 0.5 }}>
                 Co ukázat po najetí myší na objednávku
               </Typography>
@@ -265,21 +283,18 @@ export default function CalendarDisplayPage() {
             )}
             {saved && !save.isPending && <Alert severity="success">Uloženo. Kalendář se tak kreslí všem.</Alert>}
 
-            <Stack direction="row" spacing={1}>
-              <Button variant="contained" disabled={save.isPending} onClick={() => save.mutate(draft)}>
-                Uložit
-              </Button>
+            <Box>
               <Button
-                color="inherit"
+                size="small"
+                sx={{ color: 'text.secondary' }}
                 disabled={save.isPending}
                 onClick={() => { setSaved(false); setDraft(defaults); }}
               >
                 Vrátit výchozí hodnoty
               </Button>
-            </Stack>
+            </Box>
           </Stack>
-        </CardContent>
-      </Card>
-    </Box>
+      </SoftCard>
+    </SettingsScreen>
   );
 }

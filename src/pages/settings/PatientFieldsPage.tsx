@@ -17,8 +17,6 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
   Divider,
@@ -27,6 +25,8 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { SectionLabel, SoftCard } from '../../components/ui';
+import { SettingsScreen } from './SettingsFrame';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -99,22 +99,36 @@ export default function PatientFieldsPage() {
   };
 
   return (
-    <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>Údaje o pacientovi</Typography>
-        <Typography sx={{ color: 'text.secondary' }}>
-          Které údaje karta pacienta a seznam pacientů ukazují a v jakém pořadí. Jméno je vidět vždy.
-        </Typography>
-      </Box>
-
-      <Alert severity="info" sx={{ mb: 2, maxWidth: 760 }}>
+    <SettingsScreen
+      title="Údaje pacienta"
+      subtitle="Které údaje karta pacienta a seznam pacientů ukazují a v jakém pořadí — jméno je vidět vždy"
+      width={760}
+      actions={
+        <>
+          <Button
+            variant="outlined"
+            disabled={edited === null || save.isPending}
+            onClick={() => { setSaved(false); setVisible(null); }}
+          >
+            Zahodit
+          </Button>
+          <Button
+            variant="contained"
+            disabled={edited === null || save.isPending}
+            onClick={() => save.mutate(visible)}
+          >
+            {save.isPending ? 'Ukládám…' : 'Uložit'}
+          </Button>
+        </>
+      }
+    >
+      <Alert severity="info" sx={{ mb: 2 }}>
         Rodné číslo a číslo pojištěnce uvidí jen ten, kdo má oprávnění k citlivým identifikátorům —
         i když jsou tady zapnuté.
       </Alert>
 
-      <Card variant="outlined" sx={{ maxWidth: 760 }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 1 }}>Zobrazené ({shown.length})</Typography>
+      <SoftCard>
+          <SectionLabel>Zobrazené ({shown.length})</SectionLabel>
           {shown.length === 0 && (
             <Typography color="text.secondary" sx={{ py: 1 }}>
               Nic — karta ukáže jen jméno pacienta.
@@ -167,7 +181,7 @@ export default function PatientFieldsPage() {
 
           {hidden.length > 0 && (
             <>
-              <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>Skryté ({hidden.length})</Typography>
+              <SectionLabel sx={{ mt: 3 }}>Skryté ({hidden.length})</SectionLabel>
               <Stack divider={<Divider flexItem />}>
                 {hidden.map((field) => (
                   <Stack key={field.key} direction="row" spacing={1} sx={{ py: 1, alignItems: 'center' }}>
@@ -197,20 +211,17 @@ export default function PatientFieldsPage() {
             <Alert severity="success" sx={{ mt: 2 }}>Uloženo. Karta a seznam pacientů to ukazují všem.</Alert>
           )}
 
-          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-            <Button variant="contained" disabled={save.isPending} onClick={() => save.mutate(visible)}>
-              Uložit
-            </Button>
+          <Box sx={{ mt: 2 }}>
             <Button
-              color="inherit"
+              size="small"
+              sx={{ color: 'text.secondary' }}
               disabled={save.isPending}
               onClick={() => change(query.data.fields.map((field) => field.key))}
             >
               Zobrazit vše v původním pořadí
             </Button>
-          </Stack>
-        </CardContent>
-      </Card>
-    </Box>
+          </Box>
+      </SoftCard>
+    </SettingsScreen>
   );
 }

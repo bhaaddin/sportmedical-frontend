@@ -59,10 +59,10 @@ const at = (hourUtc: number, status: number, id: string, patientId = 'p1', paper
   paperwork: { ready: paperworkReady, missing: [] },
 });
 
-/** The card a panel's title sits in. */
+/** The bordered card a panel's title sits in (the board's SoftCard is a Paper). */
 const panel = async (title: string) => {
   const heading = await screen.findByText(title);
-  return within(heading.closest('.MuiCard-root') as HTMLElement);
+  return within(heading.closest('.MuiPaper-root') as HTMLElement);
 };
 
 const renderDashboard = (queryClient = new QueryClient()) =>
@@ -167,6 +167,32 @@ describe('"today" in the panels', () => {
 
     const card = await panel('Objednaní');
     expect(await card.findByText('Na dnešek nikdo objednaný.')).toBeInTheDocument();
+  });
+});
+
+/*
+ * The day's facts at the top (board restyle, 3. 10. 2026): the KPI cards count
+ * the same lists the panels show, so the number and the list can never
+ * disagree. Cancelled and no-show rows are not "objednáno"; a missing
+ * questionnaire is counted once per appointment that still stands.
+ */
+describe('the KPI cards', () => {
+  it('count standing appointments, the waiting room and missing paperwork', async () => {
+    range.mockResolvedValue([
+      at(8, 0, 'a', 'p1', false), // Scheduled, paperwork missing
+      at(9, 1, 'b', 'p2', true),  // Confirmed
+      at(10, 2, 'c', 'p1', false), // CheckedIn -> waiting, paperwork missing
+      at(11, 4, 'd', 'p2', false), // Cancelled -> counts nowhere
+    ]);
+
+    renderDashboard();
+
+    const kpi = async (label: string) =>
+      within((await screen.findByText(label)).closest('.MuiPaper-root') as HTMLElement);
+
+    expect((await kpi('Dnes objednáno')).getByText('2')).toBeInTheDocument();
+    expect((await kpi('V čekárně')).getByText('1')).toBeInTheDocument();
+    expect((await kpi('Chybí podklady')).getByText('2')).toBeInTheDocument();
   });
 });
 

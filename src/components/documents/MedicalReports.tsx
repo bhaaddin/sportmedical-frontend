@@ -19,17 +19,18 @@
  */
 import { useMemo, useState } from 'react';
 import {
-  Alert, Box, Button, Card, CardContent, Chip, Dialog, DialogActions,
-  DialogContent, DialogTitle, Divider, IconButton, Stack, Tooltip, Typography,
+  Alert, Box, Button, Chip, Dialog, DialogActions,
+  DialogContent, DialogTitle, IconButton, Stack, Tooltip, Typography,
 } from '@mui/material';
 import {
-  Add, Edit, MedicalInformation, PersonOutlined, Check, Close, Badge as BadgeIcon,
+  Add, Edit, PersonOutlined, Check, Close, Badge as BadgeIcon,
 } from '@mui/icons-material';
 import SpecialtyPicker, { type SpecialtyValue } from './SpecialtyPicker';
 import { documentsApi, INVALIDATION_REASON_LABEL } from '../../api/documents';
 import type { PatientDocument } from '../../api/documents';
 import DocumentActions from './DocumentActions';
 import { formatDateOnly } from '../../utils/time';
+import { DESIGN, SectionLabel, SoftCard } from '../ui';
 
 export interface MedicalReportsProps {
   documents: PatientDocument[];
@@ -132,22 +133,19 @@ export default function MedicalReports({
   };
 
   return (
-    <Card sx={{ borderRadius: 3 }}>
-      <CardContent>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
-          <MedicalInformation sx={{ color: '#0D7377' }} />
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            Lékařské zprávy
-          </Typography>
-          <Box sx={{ flex: 1 }} />
-          <Button size="small" startIcon={<Add />} onClick={onAdd}>
+    <SoftCard>
+      <Box>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', mb: 2 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <SectionLabel sx={{ mb: 0.25 }}>Lékařské zprávy</SectionLabel>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Zprávy od jiných lékařů. Nepočítají se mezi povinné dokumenty.
+            </Typography>
+          </Box>
+          <Button size="small" variant="outlined" startIcon={<Add />} onClick={onAdd} sx={{ flexShrink: 0 }}>
             Přidat zprávu
           </Button>
         </Stack>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Zprávy od jiných lékařů. Nepočítají se mezi povinné dokumenty.
-        </Typography>
-        <Divider sx={{ mb: 2 }} />
 
         {error !== null && <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -166,8 +164,8 @@ export default function MedicalReports({
                   key={doc.id}
                   sx={{
                     border: '1px solid',
-                    borderColor: waiting ? 'warning.light' : 'divider',
-                    bgcolor: waiting ? 'warning.light' : 'transparent',
+                    borderColor: waiting ? DESIGN.tone.beige.line : 'divider',
+                    bgcolor: waiting ? DESIGN.tone.beige.bg : 'transparent',
                     borderRadius: 2,
                     p: 1.5,
                   }}
@@ -260,7 +258,7 @@ export default function MedicalReports({
             })}
           </Stack>
         )}
-      </CardContent>
+      </Box>
 
       <Dialog open={editing !== null} onClose={() => setEditing(null)} fullWidth maxWidth="sm">
         <DialogTitle>Změnit obor</DialogTitle>
@@ -280,6 +278,6 @@ export default function MedicalReports({
           </Button>
         </DialogActions>
       </Dialog>
-    </Card>
+    </SoftCard>
   );
 }

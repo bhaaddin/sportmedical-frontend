@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
-  Box, Typography, Card, CardContent, Button, LinearProgress, Chip, Step, StepLabel,
-  Stepper, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Grid, Skeleton,
+  Box, Typography, Button, LinearProgress, Dialog, DialogTitle, DialogContent,
+  DialogActions, TextField, Grid, Skeleton, Stack, IconButton,
 } from '@mui/material';
-import { Add, CheckCircle, RadioButtonUnchecked, Flag, Healing } from '@mui/icons-material';
-import { motion } from 'framer-motion';
-import { rtpApi, type RtpProtocol, type RtpMilestone } from '../api/rtp';
+import { Add, CheckCircle, RadioButtonUnchecked } from '@mui/icons-material';
+import { rtpApi, type RtpProtocol } from '../api/rtp';
+import { PageHeader, SectionLabel, SoftCard, StatusChip, type ChipTone } from '../components/ui';
 import toast from 'react-hot-toast';
 
 const phaseLabels: Record<string, string> = {
@@ -13,12 +13,40 @@ const phaseLabels: Record<string, string> = {
   ReturnToTraining: 'Návrat do tréninku', ReturnToPlay: 'Návrat do hry',
 };
 
-const phaseColors: Record<string, string> = {
-  Acute: '#D32F2F', Subacute: '#ED6C02', SportSpecific: '#0288D1',
-  ReturnToTraining: '#7B1FA2', ReturnToPlay: '#2E7D32',
+const phaseTones: Record<string, ChipTone> = {
+  Acute: 'red', Subacute: 'beige', SportSpecific: 'blue',
+  ReturnToTraining: 'grey', ReturnToPlay: 'green',
 };
 
 const phases = ['Acute', 'Subacute', 'SportSpecific', 'ReturnToTraining', 'ReturnToPlay'];
+
+/* The five phases as a strip of pills; the current one is filled with the accent. */
+function PhaseStrip({ active }: { active: number }) {
+  return (
+    <Stack direction="row" sx={{ alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+      {phases.map((p, i) => {
+        const done = i < active;
+        const current = i === active;
+        return (
+          <Box
+            key={p}
+            sx={{
+              display: 'inline-flex', alignItems: 'center', gap: 0.75,
+              borderRadius: 999, px: 1.5, py: 0.5, fontSize: 13, fontWeight: 600,
+              border: '1px solid',
+              borderColor: current ? 'primary.main' : 'divider',
+              bgcolor: current ? 'primary.main' : 'background.paper',
+              color: current ? 'primary.contrastText' : done ? 'text.primary' : 'text.secondary',
+            }}
+          >
+            {done && <CheckCircle sx={{ fontSize: 14, color: 'primary.main' }} />}
+            {phaseLabels[p]}
+          </Box>
+        );
+      })}
+    </Stack>
+  );
+}
 
 export default function Rtp() {
   const [protocols, setProtocols] = useState<RtpProtocol[]>([]);
@@ -64,8 +92,8 @@ export default function Rtp() {
       const updated = await rtpApi.getById(protocolId);
       setSelected(updated);
       setProtocols(p => p.map(proto => proto.id === protocolId ? updated : proto));
-      toast.success('Milestone dokončen!');
-    } catch { toast.error('Chyba při dokončování milestone'); }
+      toast.success('Milník dokončen');
+    } catch { toast.error('Chyba při dokončování milníku'); }
   };
 
   const getActiveStep = (protocol: RtpProtocol) => {
@@ -84,122 +112,114 @@ export default function Rtp() {
 
   return (
     <Box>
-      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Flag color="primary" /> Návrat do hry (RTP)
-            </Typography>
-            <Typography variant="body2" color="text.secondary">Protokoly návratu do sportovního výkonu</Typography>
-          </Box>
-          <Button variant="contained" startIcon={<Add />} onClick={() => setOpen(true)}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 3 }}>
+      <PageHeader
+        title="Návrat do hry"
+        subtitle="Protokoly návratu do sportovního výkonu (RTP)"
+        actions={
+          <Button variant="contained" startIcon={<Add />} onClick={() => setOpen(true)}>
             Nový protokol
           </Button>
-        </Box>
-      </motion.div>
+        }
+      />
 
       {/* Patient ID input for loading protocols */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={2} sx={{ alignItems: 'center' }}>
-            <Grid size={{ xs: 8 }}>
-              <TextField fullWidth label="ID pacienta" value={form.patientId}
-                onChange={e => update('patientId', e.target.value)} />
-            </Grid>
-            <Grid size={{ xs: 4 }}>
-              <Button fullWidth variant="contained" onClick={handlePatientLoad}
-                sx={{ bgcolor: '#0D7377', py: 1.5 }}>
-                Načíst protokoly
-              </Button>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
+      <SoftCard sx={{ mb: 2.5 }}>
+        <SectionLabel>Pacient</SectionLabel>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+          <TextField fullWidth label="ID pacienta" value={form.patientId}
+            onChange={e => update('patientId', e.target.value)} />
+          <Button variant="contained" onClick={handlePatientLoad} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+            Načíst protokoly
+          </Button>
+        </Stack>
+      </SoftCard>
 
       {protocols.length === 0 ? (
-        <Card sx={{ textAlign: 'center', py: 8 }}>
-          <CardContent>
-            <Flag sx={{ fontSize: 64, color: '#ccc', mb: 2 }} />
-            <Typography variant="h6" color="text.secondary">Žádné protokoly</Typography>
-            <Typography variant="body2" color="text.secondary">Vytvořte nový protokol návratu do hry</Typography>
-          </CardContent>
-        </Card>
+        <SoftCard sx={{ textAlign: 'center', py: 6 }}>
+          <Typography sx={{ fontWeight: 600 }}>Žádné protokoly</Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+            Načtěte pacienta nebo vytvořte nový protokol návratu do hry.
+          </Typography>
+        </SoftCard>
       ) : (
-        protocols.map((proto, i) => (
-          <motion.div key={proto.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
-            <Card sx={{ mb: 2, cursor: 'pointer', border: selected?.id === proto.id ? '2px solid #0D7377' : 'none' }}
-              onClick={() => setSelected(proto)}>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>{proto.name}</Typography>
-                  <Chip label={phaseLabels[proto.currentPhase] || proto.currentPhase} size="small"
-                    sx={{ bgcolor: `${phaseColors[proto.currentPhase] || '#666'}18`, color: phaseColors[proto.currentPhase] || '#666' }} />
-                </Box>
-                <LinearProgress variant="determinate" value={proto.progressPercent}
-                  sx={{ height: 8, borderRadius: 4, mb: 1 }} />
-                <Typography variant="body2" color="text.secondary">{proto.progressPercent}% dokončeno</Typography>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))
+        <Stack spacing={1.5}>
+          {protocols.map((proto) => {
+            const isSelected = selected?.id === proto.id;
+            return (
+              <SoftCard
+                key={proto.id}
+                onClick={() => setSelected(proto)}
+                tone={isSelected ? 'soft' : 'plain'}
+                sx={{
+                  cursor: 'pointer',
+                  borderColor: isSelected ? 'primary.main' : undefined,
+                  '&:hover': { borderColor: 'primary.main' },
+                }}
+              >
+                <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 1.25 }}>
+                  <Typography sx={{ fontSize: 15, fontWeight: 700, flex: 1, minWidth: 0 }}>{proto.name}</Typography>
+                  <StatusChip tone={phaseTones[proto.currentPhase] ?? 'grey'}>
+                    {phaseLabels[proto.currentPhase] || proto.currentPhase}
+                  </StatusChip>
+                </Stack>
+                <LinearProgress variant="determinate" value={proto.progressPercent} sx={{ mb: 0.75 }} />
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>{proto.progressPercent} % dokončeno</Typography>
+              </SoftCard>
+            );
+          })}
+        </Stack>
       )}
 
       {selected && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <Card sx={{ mt: 3 }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <Healing sx={{ color: '#0D7377' }} />
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>{selected.name} — Protokol</Typography>
-              </Box>
-              <Stepper activeStep={getActiveStep(selected)} alternativeLabel sx={{ mb: 3 }}>
-                {phases.map(p => (
-                  <Step key={p}><StepLabel>{phaseLabels[p]}</StepLabel></Step>
-                ))}
-              </Stepper>
-              {phases.map(phase => {
-                const phaseMilestones = selected.milestones.filter(m => m.phase === phase);
-                if (phaseMilestones.length === 0) return null;
-                return (
-                  <Box key={phase} sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" sx={{ color: phaseColors[phase], fontWeight: 600, mb: 1 }}>
-                      {phaseLabels[phase]}
-                    </Typography>
-                    {phaseMilestones.map(milestone => (
-                      <Box key={milestone.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5, pl: 2 }}>
-                        <Button
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!milestone.isCompleted) {
-                              handleCompleteMilestone(selected.id, milestone.id);
-                            }
-                          }}
-                          sx={{ minWidth: 'auto', p: 0 }}
-                        >
-                          {milestone.isCompleted
-                            ? <CheckCircle sx={{ color: '#2E7D32', fontSize: 20 }} />
-                            : <RadioButtonUnchecked sx={{ color: '#999', fontSize: 20 }} />
-                          }
-                        </Button>
-                        <Box>
-                          <Typography variant="body2" sx={{ textDecoration: milestone.isCompleted ? 'line-through' : 'none', opacity: milestone.isCompleted ? 0.6 : 1 }}>
-                            {milestone.title}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">{milestone.passCriteria}</Typography>
-                        </Box>
-                        {milestone.isCompleted && milestone.completedAt && (
-                          <Chip label="Hotovo" size="small" sx={{ bgcolor: '#E8F5E9', color: '#2E7D32', ml: 'auto' }} />
-                        )}
-                      </Box>
-                    ))}
+        <SoftCard sx={{ mt: 2.5 }}>
+          <SectionLabel>Protokol</SectionLabel>
+          <Typography sx={{ fontSize: 17, fontWeight: 700, mb: 2 }}>{selected.name}</Typography>
+          <PhaseStrip active={getActiveStep(selected)} />
+          {phases.map(phase => {
+            const phaseMilestones = selected.milestones.filter(m => m.phase === phase);
+            if (phaseMilestones.length === 0) return null;
+            return (
+              <Box key={phase} sx={{ mb: 2.5 }}>
+                <SectionLabel>{phaseLabels[phase]}</SectionLabel>
+                {phaseMilestones.map(milestone => (
+                  <Box
+                    key={milestone.id}
+                    sx={{
+                      display: 'flex', alignItems: 'center', gap: 1, py: 1,
+                      borderBottom: '1px solid', borderColor: 'divider',
+                      '&:last-of-type': { borderBottom: 0 },
+                    }}
+                  >
+                    <IconButton
+                      size="small"
+                      aria-label={milestone.isCompleted ? 'Milník dokončen' : 'Dokončit milník'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!milestone.isCompleted) {
+                          handleCompleteMilestone(selected.id, milestone.id);
+                        }
+                      }}
+                    >
+                      {milestone.isCompleted
+                        ? <CheckCircle sx={{ color: 'primary.main', fontSize: 20 }} />
+                        : <RadioButtonUnchecked sx={{ color: 'text.disabled', fontSize: 20 }} />
+                      }
+                    </IconButton>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, textDecoration: milestone.isCompleted ? 'line-through' : 'none', color: milestone.isCompleted ? 'text.secondary' : 'text.primary' }}>
+                        {milestone.title}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>{milestone.passCriteria}</Typography>
+                    </Box>
+                    {milestone.isCompleted && milestone.completedAt && (
+                      <StatusChip tone="green" size="sm">Hotovo</StatusChip>
+                    )}
                   </Box>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </motion.div>
+                ))}
+              </Box>
+            );
+          })}
+        </SoftCard>
       )}
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
@@ -209,12 +229,12 @@ export default function Rtp() {
             <Grid size={{ xs: 12 }}><TextField fullWidth label="ID pacienta" value={form.patientId} onChange={e => update('patientId', e.target.value)} /></Grid>
             <Grid size={{ xs: 12 }}><TextField fullWidth label="ID poranění (nepovinné)" value={form.injuryId} onChange={e => update('injuryId', e.target.value)} /></Grid>
             <Grid size={{ xs: 12 }}><TextField fullWidth label="Název protokolu" value={form.name} onChange={e => update('name', e.target.value)}
-              placeholder="např. ACL Rehabilitation, Concussion RTP" /></Grid>
+              placeholder="např. Rehabilitace ACL, RTP po otřesu mozku" /></Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>Zrušit</Button>
-          <Button variant="contained" onClick={handleCreate} sx={{ bgcolor: '#0D7377' }}>Vytvořit</Button>
+          <Button variant="outlined" onClick={() => setOpen(false)}>Zrušit</Button>
+          <Button variant="contained" onClick={handleCreate}>Vytvořit</Button>
         </DialogActions>
       </Dialog>
     </Box>

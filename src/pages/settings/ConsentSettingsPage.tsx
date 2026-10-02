@@ -17,8 +17,6 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   CircularProgress,
   FormControlLabel,
   Stack,
@@ -33,6 +31,8 @@ import {
   saveConsentSettings,
 } from '../../api/consentSettings';
 import type { ConsentSettings } from '../../api/consentSettings';
+import { SectionLabel, SoftCard } from '../../components/ui';
+import { SettingsScreen } from './SettingsFrame';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 
 export default function ConsentSettingsPage() {
@@ -72,75 +72,84 @@ export default function ConsentSettingsPage() {
   };
 
   return (
-    <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>Souhlasy</Typography>
-        <Typography sx={{ color: 'text.secondary' }}>
-          Marketingový souhlas na objednávkovém formuláři — zda se pacientovi ukáže a jak zní.
-          Souhlas s poskytnutím zdravotní služby a souhlasy vázané na činnost se řídí zákonem a
-          nastavením činnosti, proto tu nejsou.
-        </Typography>
-      </Box>
+    <SettingsScreen
+      title="Souhlasy"
+      subtitle="Marketingový souhlas na objednávkovém formuláři — zda se pacientovi ukáže a jak zní"
+      width={720}
+      actions={
+        <>
+          <Button
+            variant="outlined"
+            disabled={edited === null || save.isPending}
+            onClick={() => { setSaved(false); setDraft(null); }}
+          >
+            Zahodit
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => save.mutate(draft)}
+            disabled={save.isPending || edited === null}
+          >
+            {save.isPending ? 'Ukládám…' : 'Uložit'}
+          </Button>
+        </>
+      }
+    >
+      <SoftCard>
+        <Stack spacing={2.5}>
+          <Box>
+            <SectionLabel>Marketingový souhlas</SectionLabel>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Souhlas s poskytnutím zdravotní služby a souhlasy vázané na činnost se řídí zákonem a
+              nastavením činnosti, proto tu nejsou.
+            </Typography>
+          </Box>
 
-      <Card variant="outlined" sx={{ maxWidth: 640 }}>
-        <CardContent>
-          <Stack spacing={2.5}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={draft.communicationVisible}
-                  onChange={(event) => set('communicationVisible', event.target.checked)}
-                />
-              }
-              label="Zobrazit marketingový souhlas na formuláři"
-            />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={draft.communicationVisible}
+                onChange={(event) => set('communicationVisible', event.target.checked)}
+              />
+            }
+            label="Zobrazit marketingový souhlas na formuláři"
+          />
 
-            <TextField
-              label="Nadpis"
-              value={draft.communicationTitle}
-              onChange={(event) => set('communicationTitle', event.target.value)}
-              disabled={!draft.communicationVisible}
-              error={Boolean(errors.communicationTitle)}
-              helperText={errors.communicationTitle}
-              fullWidth
-              slotProps={{ htmlInput: { maxLength: 120 } }}
-            />
+          <TextField
+            label="Nadpis"
+            value={draft.communicationTitle}
+            onChange={(event) => set('communicationTitle', event.target.value)}
+            disabled={!draft.communicationVisible}
+            error={Boolean(errors.communicationTitle)}
+            helperText={errors.communicationTitle}
+            fullWidth
+            slotProps={{ htmlInput: { maxLength: 120 } }}
+          />
 
-            <TextField
-              label="Text souhlasu"
-              value={draft.communicationDetail}
-              onChange={(event) => set('communicationDetail', event.target.value)}
-              disabled={!draft.communicationVisible}
-              error={Boolean(errors.communicationDetail)}
-              helperText={
-                errors.communicationDetail
-                ?? 'Co pacient odsouhlasí. Netýká se potvrzení a připomínek k termínu.'
-              }
-              fullWidth
-              multiline
-              minRows={2}
-              slotProps={{ htmlInput: { maxLength: 1000 } }}
-            />
+          <TextField
+            label="Text souhlasu"
+            value={draft.communicationDetail}
+            onChange={(event) => set('communicationDetail', event.target.value)}
+            disabled={!draft.communicationVisible}
+            error={Boolean(errors.communicationDetail)}
+            helperText={
+              errors.communicationDetail
+              ?? 'Co pacient odsouhlasí. Netýká se potvrzení a připomínek k termínu.'
+            }
+            fullWidth
+            multiline
+            minRows={2}
+            slotProps={{ htmlInput: { maxLength: 1000 } }}
+          />
 
-            {save.isError && !Object.keys(errors).length && (
-              <Alert severity="error">
-                {problemMessageOf(save.error, 'Nastavení se nepodařilo uložit.')}
-              </Alert>
-            )}
-            {saved && <Alert severity="success">Uloženo.</Alert>}
-
-            <Box>
-              <Button
-                variant="contained"
-                onClick={() => save.mutate(draft)}
-                disabled={save.isPending || edited === null}
-              >
-                Uložit
-              </Button>
-            </Box>
-          </Stack>
-        </CardContent>
-      </Card>
-    </Box>
+          {save.isError && !Object.keys(errors).length && (
+            <Alert severity="error">
+              {problemMessageOf(save.error, 'Nastavení se nepodařilo uložit.')}
+            </Alert>
+          )}
+          {saved && <Alert severity="success">Uloženo.</Alert>}
+        </Stack>
+      </SoftCard>
+    </SettingsScreen>
   );
 }

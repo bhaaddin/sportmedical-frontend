@@ -4,15 +4,20 @@ import {
   Box, Paper, Typography, TextField, Button, Alert,
   InputAdornment, IconButton, CircularProgress,
 } from '@mui/material';
-import { Visibility, VisibilityOff, LocalHospital, Email, Lock } from '@mui/icons-material';
-import { motion } from 'framer-motion';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { authApi, isSecondFactorChallenge } from '../api/auth';
 import { savePermissions, saveUser } from '../auth/localSession';
+import { DESIGN } from '../components/ui';
 
 /** What the sign-in says when the client ended a session nobody closed here. */
 export const SESSION_EXPIRED_MESSAGE =
   'Vaše přihlášení vypršelo nebo bylo ukončeno. Přihlaste se prosím znovu.';
 
+/*
+ * The staff sign-in, in the board's look: the page background, one white
+ * bordered card in the middle, the brand as text, the fields, one accent
+ * button. Nothing moves and nothing glows - the calm is the point.
+ */
 export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -149,177 +154,142 @@ export default function Login() {
   return (
     <Box sx={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0D7377 0%, #14A3A8 30%, #1A1A2E 100%)',
-      p: 2, position: 'relative', overflow: 'hidden',
+      bgcolor: 'background.default', p: 2,
     }}>
-      <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.15, 0.1] }}
-        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ position: 'absolute', width: 400, height: 400, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', top: -100, right: -100 }} />
-      <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.05, 0.1, 0.05] }}
-        transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-        style={{ position: 'absolute', width: 300, height: 300, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', bottom: -80, left: -80 }} />
+      <Paper variant="outlined" sx={{ p: { xs: 3, sm: 5 }, maxWidth: 440, width: '100%', borderRadius: 3 }}>
+        <Box sx={{ mb: 3.5 }}>
+          <Typography sx={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.2 }}>
+            SportMedical
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+            Přihlášení pro ordinaci
+          </Typography>
+        </Box>
 
-      <motion.div initial={{ opacity: 0, y: 30, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.6, ease: 'easeOut' }}>
-        <Paper elevation={24} sx={{ p: 5, maxWidth: 440, width: '100%', borderRadius: 4, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-            <Box sx={{ textAlign: 'center', mb: 4 }}>
-              <motion.div whileHover={{ rotate: 10, scale: 1.1 }} transition={{ type: 'spring', stiffness: 300 }}>
-                <LocalHospital sx={{ fontSize: 56, color: '#0D7377', mb: 1.5 }} />
-              </motion.div>
-              <Typography variant="h4" sx={{ fontWeight: 800, color: '#0D7377' }}>SportMedical</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>Diagnostics Platform</Typography>
-            </Box>
-          </motion.div>
+        {sessionExpired && !error && !mustChange && (
+          <Alert severity="warning" sx={{ mb: 2 }}>{SESSION_EXPIRED_MESSAGE}</Alert>
+        )}
 
-          {sessionExpired && !error && !mustChange && (
-            <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>{SESSION_EXPIRED_MESSAGE}</Alert>
-          )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+        )}
 
-          {error && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
-              <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>
-            </motion.div>
-          )}
+        {secondFactorToken !== null ? (
+        <form onSubmit={handleSecondFactor}>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Zadejte šestimístný kód z ověřovací aplikace.
+          </Alert>
+          <TextField fullWidth label="Ověřovací kód" required value={twoFactorCode} autoFocus
+            onChange={e => setTwoFactorCode(e.target.value)} margin="normal"
+            slotProps={{
+              htmlInput: { inputMode: 'numeric', maxLength: 10, style: { letterSpacing: 4, fontSize: 20, textAlign: 'center' } },
+            }} />
+          <Button type="submit" fullWidth variant="contained" size="large"
+            disabled={loading || twoFactorCode.trim().length < 6}
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
+            sx={{ mt: 2 }}>
+            {loading ? 'Ověřuji…' : 'Ověřit a přihlásit'}
+          </Button>
+          <Box sx={{ textAlign: 'center', mt: 2 }}>
+            <Button size="small" onClick={() => { setSecondFactorToken(null); setTwoFactorCode(''); setError(''); }}>
+              Zpět na přihlášení
+            </Button>
+          </Box>
+        </form>
+        ) : mustChange ? (
+        <form onSubmit={handlePasswordChange}>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            První přihlášení — nastavte si vlastní heslo pro účet {email}.
+          </Alert>
+          <TextField fullWidth label="Nové heslo" required value={newPassword}
+            type={showPassword ? 'text' : 'password'}
+            onChange={e => setNewPassword(e.target.value)} margin="normal"
+            helperText="Min. 15 znaků, velké + malé písmeno, číslice a speciální znak"
+            sx={{ mb: 1 }} />
+          <TextField fullWidth label="Nové heslo znovu" required value={confirmPassword}
+            type={showPassword ? 'text' : 'password'}
+            onChange={e => setConfirmPassword(e.target.value)} margin="normal" />
+          <Button type="submit" fullWidth variant="contained" size="large" disabled={changing}
+            startIcon={changing ? <CircularProgress size={20} color="inherit" /> : null}
+            sx={{ mt: 2 }}>
+            {changing ? 'Ukládání...' : 'Nastavit heslo a přihlásit'}
+          </Button>
+          <Box sx={{ textAlign: 'center', mt: 2 }}>
+            <Button size="small" onClick={() => { setMustChange(false); setError(''); }}>
+              Zpět na přihlášení
+            </Button>
+          </Box>
+        </form>
+        ) : (
+        <form onSubmit={handleSubmit}>
+          <TextField fullWidth label="E-mail" type="email" required value={email}
+            onChange={e => setEmail(e.target.value)} margin="normal" autoComplete="username"
+            sx={{ mb: 1 }} />
+          <TextField fullWidth label="Heslo" required value={password}
+            type={showPassword ? 'text' : 'password'} autoComplete="current-password"
+            onChange={e => setPassword(e.target.value)} margin="normal"
+            slotProps={{
+              input: {
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                      size="small"
+                      aria-label={showPassword ? 'Skrýt heslo' : 'Zobrazit heslo'}
+                    >
+                      {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              },
+            }} />
 
-          {secondFactorToken !== null ? (
-          <motion.form onSubmit={handleSecondFactor} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
-            <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
-              Zadejte šestimístný kód z ověřovací aplikace.
-            </Alert>
-            <TextField fullWidth label="Ověřovací kód" required value={twoFactorCode} autoFocus
-              onChange={e => setTwoFactorCode(e.target.value)} margin="normal"
-              slotProps={{
-                htmlInput: { inputMode: 'numeric', maxLength: 10, style: { letterSpacing: 4, fontSize: 20, textAlign: 'center' } },
-                input: { startAdornment: <InputAdornment position="start"><Lock color="action" /></InputAdornment> },
-              }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
-            <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
-              <Button type="submit" fullWidth variant="contained" size="large"
-                disabled={loading || twoFactorCode.trim().length < 6}
-                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
-                sx={{
-                  mt: 2, py: 1.5, borderRadius: 2, fontWeight: 700, fontSize: 16,
-                  bgcolor: '#0D7377', boxShadow: '0 4px 20px rgba(13,115,119,0.4)',
-                  '&:hover': { bgcolor: '#095456' },
-                }}>
-                {loading ? 'Ověřuji…' : 'Ověřit a přihlásit'}
-              </Button>
-            </motion.div>
-            <Box sx={{ textAlign: 'center', mt: 2 }}>
-              <Button size="small" onClick={() => { setSecondFactorToken(null); setTwoFactorCode(''); setError(''); }}>
-                Zpět na přihlášení
-              </Button>
-            </Box>
-          </motion.form>
-          ) : mustChange ? (
-          <motion.form onSubmit={handlePasswordChange} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
-            <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
-              První přihlášení — nastavte si vlastní heslo pro účet {email}.
-            </Alert>
-            <TextField fullWidth label="Nové heslo" required value={newPassword}
-              type={showPassword ? 'text' : 'password'}
-              onChange={e => setNewPassword(e.target.value)} margin="normal"
-              helperText="Min. 15 znaků, velké + malé písmeno, číslice a speciální znak"
-              slotProps={{ input: { startAdornment: <InputAdornment position="start"><Lock color="action" /></InputAdornment> } }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 }, mb: 1 }} />
-            <TextField fullWidth label="Nové heslo znovu" required value={confirmPassword}
-              type={showPassword ? 'text' : 'password'}
-              onChange={e => setConfirmPassword(e.target.value)} margin="normal"
-              slotProps={{ input: { startAdornment: <InputAdornment position="start"><Lock color="action" /></InputAdornment> } }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
-            <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
-              <Button type="submit" fullWidth variant="contained" size="large" disabled={changing}
-                startIcon={changing ? <CircularProgress size={20} color="inherit" /> : null}
-                sx={{
-                  mt: 2, py: 1.5, borderRadius: 2, fontWeight: 700, fontSize: 16,
-                  bgcolor: '#0D7377', boxShadow: '0 4px 20px rgba(13,115,119,0.4)',
-                  '&:hover': { bgcolor: '#095456' },
-                }}>
-                {changing ? 'Ukládání...' : 'Nastavit heslo a přihlásit'}
-              </Button>
-            </motion.div>
-            <Box sx={{ textAlign: 'center', mt: 2 }}>
-              <Button size="small" onClick={() => { setMustChange(false); setError(''); }}>
-                Zpět na přihlášení
-              </Button>
-            </Box>
-          </motion.form>
-          ) : (
-          <motion.form onSubmit={handleSubmit} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
-            <TextField fullWidth label="E-mail" type="email" required value={email}
-              onChange={e => setEmail(e.target.value)} margin="normal"
-              slotProps={{ input: { startAdornment: <InputAdornment position="start"><Email color="action" /></InputAdornment> } }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 }, mb: 1 }} />
-            <TextField fullWidth label="Heslo" required value={password}
-              type={showPassword ? 'text' : 'password'}
-              onChange={e => setPassword(e.target.value)} margin="normal"
-              slotProps={{
-                input: {
-                  startAdornment: <InputAdornment position="start"><Lock color="action" /></InputAdornment>,
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" size="small">
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                },
-              }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
+          {/*
+            This was `<Link href="#">Zapomenuté heslo?</Link>` - a link that
+            looked like a way out and did nothing when clicked.
 
-            {/*
-              This was `<Link href="#">Zapomenuté heslo?</Link>` - a link that
-              looked like a way out and did nothing when clicked.
+            The person who has forgotten their password is the only person who
+            ever clicks it, so the silence lands on exactly the one who cannot
+            afford it. It happened to the owner of this system on 11. 9. 2026,
+            which is how it was found.
 
-              The person who has forgotten their password is the only person who
-              ever clicks it, so the silence lands on exactly the one who cannot
-              afford it. It happened to the owner of this system on 11. 9. 2026,
-              which is how it was found.
+            There is no anonymous reset to point it at, and that is measured,
+            not assumed: the API has two password routes and both require a
+            session - `/api/v1/account/password` (change your own) and
+            `/api/v1/users/{id}/reset-password` (admin, [Authorize]). Building
+            a self-service reset to fill the gap would be a security surface
+            invented on the side of another task - what proves the identity of
+            whoever asks, how long a link lives, what happens to open
+            sessions. That is its own job with its own brief.
 
-              There is no anonymous reset to point it at, and that is measured,
-              not assumed: the API has two password routes and both require a
-              session - `/api/v1/account/password` (change your own) and
-              `/api/v1/users/{id}/reset-password` (admin, [Authorize]). Building
-              a self-service reset to fill the gap would be a security surface
-              invented on the side of another task - what proves the identity of
-              whoever asks, how long a link lives, what happens to open
-              sessions. That is its own job with its own brief.
-
-              So it says what is true instead. Less pretty, and it stops
-              promising.
-            */}
-            <Box sx={{ textAlign: 'right', mt: 0.5, mb: 1 }}>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                Zapomenuté heslo? Nové vám nastaví správce v sekci Tým.
-              </Typography>
-            </Box>
-
-            <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
-              <Button type="submit" fullWidth variant="contained" size="large" disabled={loading}
-                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
-                sx={{
-                  mt: 1, py: 1.5, borderRadius: 2, fontWeight: 700, fontSize: 16,
-                  bgcolor: '#0D7377', boxShadow: '0 4px 20px rgba(13,115,119,0.4)',
-                  '&:hover': { bgcolor: '#095456', boxShadow: '0 6px 24px rgba(13,115,119,0.5)' },
-                  transition: 'all 0.2s ease',
-                }}>
-                {loading ? 'Přihlašování...' : 'Přihlásit se'}
-              </Button>
-            </motion.div>
-
-            {/*
-              The same fault again, two lines down: "Požádat o přístup" was also
-              `href="#"`. There is no self-registration - an account is only ever
-              created by an administrator through `POST /api/v1/users` on the
-              Tým screen - so the invitation to ask for one led nowhere.
-            */}
-            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 3 }}>
-              Nemáte účet? Přístup zakládá správce ordinace.
+            So it says what is true instead. Less pretty, and it stops
+            promising.
+          */}
+          <Box sx={{ mt: 0.5, mb: 1 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              Zapomenuté heslo? Nové vám nastaví správce v sekci Tým.
             </Typography>
-          </motion.form>
-          )}
-        </Paper>
-      </motion.div>
+          </Box>
+
+          <Button type="submit" fullWidth variant="contained" size="large" disabled={loading}
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
+            sx={{ mt: 1 }}>
+            {loading ? 'Přihlašování...' : 'Přihlásit se'}
+          </Button>
+
+          {/*
+            The same fault again, two lines down: "Požádat o přístup" was also
+            `href="#"`. There is no self-registration - an account is only ever
+            created by an administrator through `POST /api/v1/users` on the
+            Tým screen - so the invitation to ask for one led nowhere.
+          */}
+          <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', mt: 3, pt: 2.5, borderTop: `1px solid ${DESIGN.line}` }}>
+            Nemáte účet? Přístup zakládá správce ordinace.
+          </Typography>
+        </form>
+        )}
+      </Paper>
     </Box>
   );
 }

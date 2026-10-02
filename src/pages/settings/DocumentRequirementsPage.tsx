@@ -42,6 +42,7 @@ import {
   SETTINGS_PROBLEM_TEXT, WHEN_OPTIONS, blockingWillHappen, settingsAreValid,
   settingsProblems, settingsSummary,
 } from './requirementSettings';
+import { SettingsScreen } from './SettingsFrame';
 
 export default function DocumentRequirementsPage() {
   const { t } = useTranslation();
@@ -167,14 +168,11 @@ export default function DocumentRequirementsPage() {
   const summary = summaryText(rules);
 
   return (
-    <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>Pravidla dokumentů</Typography>
-        <Typography sx={{ color: 'text.secondary' }}>
-          Co musí pacient doložit a ke které službě. Každá činnost pod tou službou
-          pravidlo zdědí — nemusí se nastavovat po jedné.
-        </Typography>
-      </Box>
+    <SettingsScreen
+      title="Pravidla dokumentů"
+      subtitle="Co musí pacient doložit a ke které službě — každá činnost pod tou službou pravidlo zdědí"
+      width={960}
+    >
 
       <Card sx={{ borderRadius: 3, mb: 3 }}>
         <CardContent>
@@ -544,6 +542,6 @@ export default function DocumentRequirementsPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </SettingsScreen>
   );
 }

@@ -57,6 +57,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import { SettingsScreen } from './SettingsFrame';
 import {
   draftOf,
   isActive,
@@ -310,11 +311,20 @@ export default function QuestionnairePage() {
   const isDefault = definition.id === defaultId;
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1100, mx: 'auto' }}>
+    <SettingsScreen
+      title="Dotazníky"
+      subtitle="Dotazníky pro pacienty — otázky, koncepty a zveřejnění; který dotazník se ptá, určuje činnost nebo výchozí"
+      width={1100}
+      actions={
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating('')}>
+          Nový dotazník
+        </Button>
+      }
+    >
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { sm: 'center' } }}>
         <Box sx={{ flexGrow: 1 }}>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-            <Typography variant="h5">{definition.displayName}</Typography>
+            <Typography variant="h6">{definition.displayName}</Typography>
             <Chip
               size="small"
               color={active ? 'success' : 'default'}
@@ -344,10 +354,6 @@ export default function QuestionnairePage() {
             ))}
           </TextField>
         )}
-
-        <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setCreating('')}>
-          Nový dotazník
-        </Button>
       </Stack>
 
       {/*
@@ -833,7 +839,7 @@ export default function QuestionnairePage() {
           </DialogActions>
         </Dialog>
       )}
-    </Box>
+    </SettingsScreen>
   );
 }
 

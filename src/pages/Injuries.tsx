@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import {
-  Box, Typography, Grid, Card, CardContent, Chip, Button, TextField, Dialog,
+  Box, Typography, Grid, Button, TextField, Dialog,
   DialogTitle, DialogContent, DialogActions, MenuItem, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Paper, IconButton, Tooltip,
+  TableContainer, TableHead, TableRow, Paper,
 } from '@mui/material';
-import { Add, Warning, CheckCircle, Healing, FitnessCenter } from '@mui/icons-material';
-import { motion } from 'framer-motion';
+import { Add } from '@mui/icons-material';
 import { injuriesApi } from '../api/injuries';
 import type { Patient } from '../api/patients';
 import PatientPicker from '../components/patients/PatientPicker';
+import { KpiCard, PageHeader, StatusChip, type ChipTone } from '../components/ui';
 import toast from 'react-hot-toast';
 
 interface Injury {
@@ -42,14 +42,14 @@ const bodyRegions = [
   { value: 'Ankle', label: 'Hlezno' }, { value: 'Foot', label: 'Chodidlo' },
 ];
 const severityLabels = ['', 'Mírné', 'Střední', 'Vážné', 'Kritické'];
-const severityColors = ['', '#2E7D32', '#ED6C02', '#D32F2F', '#B71C1C'];
+const severityTones: ChipTone[] = ['grey', 'green', 'beige', 'red', 'red'];
 const statusLabels: Record<string, string> = {
   Acute: 'Akutní', Rehabilitating: 'Rehabilitace', ReturningToPlay: 'Návrat do hry',
   Cleared: 'Vyléčeno', Chronic: 'Chronické',
 };
-const statusColors: Record<string, string> = {
-  Acute: '#D32F2F', Rehabilitating: '#ED6C02', ReturningToPlay: '#0288D1',
-  Cleared: '#2E7D32', Chronic: '#9C27B0',
+const statusTones: Record<string, ChipTone> = {
+  Acute: 'red', Rehabilitating: 'beige', ReturningToPlay: 'blue',
+  Cleared: 'green', Chronic: 'grey',
 };
 
 export default function Injuries() {
@@ -112,101 +112,79 @@ export default function Injuries() {
 
   return (
     <Box>
-      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Warning color="primary" /> Poranění
-            </Typography>
-            <Typography variant="body2" color="text.secondary">Evidence a sledování poranění sportovců</Typography>
-          </Box>
-          <Button variant="contained" startIcon={<Add />} onClick={() => setOpen(true)}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, px: 3 }}>
+      <PageHeader
+        title="Poranění"
+        subtitle={`Evidence a sledování poranění sportovců · ${injuries.length} záznamů`}
+        actions={
+          <Button variant="contained" startIcon={<Add />} onClick={() => setOpen(true)}>
             Nové poranění
           </Button>
-        </Box>
-      </motion.div>
+        }
+      />
 
       {/* Stats */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        {[
-          { label: 'Aktivní poranění', value: activeInjuries.length, color: '#D32F2F', icon: <Warning /> },
-          { label: 'Vyléčeno', value: clearedInjuries.length, color: '#2E7D32', icon: <CheckCircle /> },
-          { label: 'Průměr dnů mimo', value: avgDaysOut, color: '#ED6C02', icon: <FitnessCenter /> },
-        ].map((stat, i) => (
-          <Grid key={stat.label} size={{ xs: 12, sm: 4 }}>
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.1 }}>
-              <Card>
-                <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 3 }}>
-                  <Box sx={{ color: stat.color }}>{stat.icon}</Box>
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 800, color: stat.color }}>{stat.value}</Typography>
-                    <Typography variant="body2" color="text.secondary">{stat.label}</Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </Grid>
-        ))}
+      <Grid container spacing={2} sx={{ mb: 2.5 }}>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <KpiCard label="Aktivní poranění" value={activeInjuries.length} hint="v léčbě nebo rehabilitaci" tone={activeInjuries.length > 0 ? 'red' : 'ink'} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <KpiCard label="Vyléčeno" value={clearedInjuries.length} hint="uzavřených záznamů" tone="green" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <KpiCard label="Průměr dnů mimo" value={avgDaysOut} hint="u vyléčených poranění" />
+        </Grid>
       </Grid>
 
       {/* Injury Table */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-        <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ bgcolor: '#f8f9fa' }}>
-                <TableCell sx={{ fontWeight: 700 }}>Datum</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Oblast</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Strana</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Závažnost</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Stav</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Diagnóza</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Dny mimo</TableCell>
+      <TableContainer component={Paper} variant="outlined">
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Datum</TableCell>
+              <TableCell>Oblast</TableCell>
+              <TableCell>Strana</TableCell>
+              <TableCell>Závažnost</TableCell>
+              <TableCell>Stav</TableCell>
+              <TableCell>Diagnóza</TableCell>
+              <TableCell align="right">Dny mimo</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {injuries.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                  <Typography variant="body2">Žádná poranění zatím neevidována</Typography>
+                </TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {injuries.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 6, color: 'text.secondary' }}>
-                    <Healing sx={{ fontSize: 48, mb: 1, opacity: 0.3 }} />
-                    <Typography>Žádná poranění zatím neevidována</Typography>
+            ) : (
+              injuries.map(injury => (
+                <TableRow key={injury.id} hover>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(injury.injuryDate).toLocaleDateString('cs-CZ')}</TableCell>
+                  <TableCell>
+                    <Typography sx={{ fontSize: 14, fontWeight: 600 }}>{bodyRegions.find(r => r.value === injury.bodyRegion)?.label || injury.bodyRegion}</Typography>
+                    {injury.specificLocation && (
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>{injury.specificLocation}</Typography>
+                    )}
                   </TableCell>
+                  <TableCell>{injury.side === 'Left' ? 'Levá' : injury.side === 'Right' ? 'Pravá' : 'Obě'}</TableCell>
+                  <TableCell>
+                    <StatusChip tone={severityTones[injury.severity] ?? 'grey'}>{severityLabels[injury.severity]}</StatusChip>
+                  </TableCell>
+                  <TableCell>
+                    <StatusChip tone={statusTones[injury.status] ?? 'grey'}>{statusLabels[injury.status] || injury.status}</StatusChip>
+                  </TableCell>
+                  <TableCell>{injury.diagnosis || '—'}</TableCell>
+                  <TableCell align="right">{injury.actualDaysOut ?? injury.estimatedDaysOut ?? '—'}</TableCell>
                 </TableRow>
-              ) : (
-                injuries.map(injury => (
-                  <TableRow key={injury.id} hover>
-                    <TableCell>{new Date(injury.injuryDate).toLocaleDateString('cs-CZ')}</TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography sx={{ fontWeight: 500 }}>{bodyRegions.find(r => r.value === injury.bodyRegion)?.label || injury.bodyRegion}</Typography>
-                        {injury.specificLocation && (
-                          <Typography variant="caption" color="text.secondary">{injury.specificLocation}</Typography>
-                        )}
-                      </Box>
-                    </TableCell>
-                    <TableCell>{injury.side === 'Left' ? 'Levá' : injury.side === 'Right' ? 'Pravá' : 'Obě'}</TableCell>
-                    <TableCell>
-                      <Chip label={severityLabels[injury.severity]} size="small"
-                        sx={{ bgcolor: `${severityColors[injury.severity]}18`, color: severityColors[injury.severity], fontWeight: 500 }} />
-                    </TableCell>
-                    <TableCell>
-                      <Chip label={statusLabels[injury.status] || injury.status} size="small"
-                        sx={{ bgcolor: `${statusColors[injury.status] || '#666'}18`, color: statusColors[injury.status] || '#666', fontWeight: 500 }} />
-                    </TableCell>
-                    <TableCell>{injury.diagnosis || '—'}</TableCell>
-                    <TableCell>{injury.actualDaysOut ?? injury.estimatedDaysOut ?? '—'}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </motion.div>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       {/* Add Dialog */}
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Nové záznam poranění</DialogTitle>
+        <DialogTitle>Nový záznam poranění</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid size={{ xs: 12 }}>
@@ -260,7 +238,7 @@ export default function Injuries() {
             <Grid size={{ xs: 12 }}>
               <TextField fullWidth multiline rows={2} label="Mechanismus poranění" value={form.mechanism}
                 onChange={e => update('mechanism', e.target.value)}
-                placeholder="např.kontakt s protihráčem při sprintu" />
+                placeholder="např. kontakt s protihráčem při sprintu" />
             </Grid>
             <Grid size={{ xs: 12 }}>
               <TextField fullWidth label="Diagnóza" value={form.diagnosis}
@@ -270,21 +248,19 @@ export default function Injuries() {
               <TextField fullWidth label="Ošetřující praktik" value={form.practitioner}
                 onChange={e => update('practitioner', e.target.value)} />
             </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField fullWidth multiline rows={2} label="Poznámky" value={form.notes}
-                onChange={e => update('notes', e.target.value)} />
-            </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField fullWidth type="number" label="Odhad dnů mimo" value={form.estimatedDaysOut}
                 onChange={e => update('estimatedDaysOut', e.target.value)} />
             </Grid>
-
+            <Grid size={{ xs: 12 }}>
+              <TextField fullWidth multiline rows={2} label="Poznámky" value={form.notes}
+                onChange={e => update('notes', e.target.value)} />
+            </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>Zrušit</Button>
-          <Button variant="contained" onClick={handleSubmit}
-            sx={{ bgcolor: '#0D7377', '&:hover': { bgcolor: '#095456' } }}>
+          <Button variant="outlined" onClick={() => setOpen(false)}>Zrušit</Button>
+          <Button variant="contained" onClick={handleSubmit}>
             Vytvořit
           </Button>
         </DialogActions>

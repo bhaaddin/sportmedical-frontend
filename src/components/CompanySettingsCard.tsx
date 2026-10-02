@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
-  Card, CardContent, Typography, TextField, Button, Grid, Box, Alert,
+  Typography, TextField, Button, Grid, Box,
 } from '@mui/material';
-import { Search, Save } from '@mui/icons-material';
+import { Search } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import { companySettingsApi } from '../services/companySettingsApi';
+import { SectionLabel, SoftCard } from './ui';
 
 export default function CompanySettingsCard() {
   const [form, setForm] = useState({
@@ -69,48 +70,44 @@ export default function CompanySettingsCard() {
     <Grid size={{ xs: 12, sm: 6, md: 4 }}>
       <TextField fullWidth size="small" label={label} value={form[key]}
         onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} {...extra} />
+        {...extra} />
     </Grid>
   );
 
   return (
-    <Card sx={{ borderRadius: 3, mb: 3 }}>
-      <CardContent>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Firemní údaje + ARES</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Objeví se na fakturách. IČO → načíst z registru.
-        </Typography>
-        <Grid container spacing={2}>
-          {F('companyName', 'Název firmy')}
-          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <TextField fullWidth size="small" label="IČO" value={form.ico}
-                onChange={e => setForm(f => ({ ...f, ico: e.target.value.replace(/[^0-9]/g, '').slice(0, 8) }))}
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
-              <Button variant="outlined" startIcon={<Search />} onClick={lookup} disabled={looking}
-                sx={{ borderRadius: 2, whiteSpace: 'nowrap' }}>
-                ARES
-              </Button>
-            </Box>
-          </Grid>
-          {F('dic', 'DIČ')}
-          {F('address', 'Ulice a číslo')}
-          {F('city', 'Město')}
-          {F('postalCode', 'PSČ')}
-          {F('bankAccount', 'Číslo účtu')}
-          {F('bankCode', 'Kód banky')}
-          {F('iban', 'IBAN')}
-          {F('phone', 'Telefon')}
-          {F('email', 'Email')}
-          {F('website', 'Web')}
+    <SoftCard sx={{ mb: 2 }}>
+      <SectionLabel>Firemní údaje</SectionLabel>
+      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+        Objeví se na fakturách. Zadejte IČO a načtěte zbytek z registru ARES.
+      </Typography>
+      <Grid container spacing={2}>
+        {F('companyName', 'Název firmy')}
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <TextField fullWidth size="small" label="IČO" value={form.ico}
+              onChange={e => setForm(f => ({ ...f, ico: e.target.value.replace(/[^0-9]/g, '').slice(0, 8) }))} />
+            <Button variant="outlined" size="small" startIcon={<Search />} onClick={lookup} disabled={looking}
+              sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+              ARES
+            </Button>
+          </Box>
         </Grid>
-        <Box sx={{ mt: 2, textAlign: 'right' }}>
-          <Button variant="contained" startIcon={<Save />} onClick={save} disabled={saving}
-            sx={{ bgcolor: '#0D7377', borderRadius: 2, fontWeight: 600 }}>
-            Uložit
-          </Button>
-        </Box>
-      </CardContent>
-    </Card>
+        {F('dic', 'DIČ')}
+        {F('address', 'Ulice a číslo')}
+        {F('city', 'Město')}
+        {F('postalCode', 'PSČ')}
+        {F('bankAccount', 'Číslo účtu')}
+        {F('bankCode', 'Kód banky')}
+        {F('iban', 'IBAN')}
+        {F('phone', 'Telefon')}
+        {F('email', 'Email')}
+        {F('website', 'Web')}
+      </Grid>
+      <Box sx={{ mt: 2, textAlign: 'right' }}>
+        <Button variant="outlined" onClick={save} disabled={saving}>
+          Uložit firemní údaje
+        </Button>
+      </Box>
+    </SoftCard>
   );
 }

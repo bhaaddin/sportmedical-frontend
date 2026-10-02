@@ -15,9 +15,9 @@ import {
   Notifications, CalendarMonth, Description, Warning,
   Info, Delete, DoneAll, Settings, ExpandMore, ExpandLess,
 } from '@mui/icons-material';
-import { AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
+import { DESIGN } from './ui';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import {
   buildNotificationSections,
@@ -44,34 +44,37 @@ export interface Notification {
   kind?: string | null;
 }
 
-/* ── Notification config ── */
+/* ── Notification config: an icon and one of the board's tones per kind ── */
 const NOTIFICATION_CONFIG: Record<string, { icon: React.ReactNode; color: string; bgColor: string }> = {
   appointment: {
-    icon: <CalendarMonth sx={{ fontSize: 20 }} />,
-    color: '#0D7377',
-    bgColor: '#E0F2F1',
+    icon: <CalendarMonth sx={{ fontSize: 18 }} />,
+    color: DESIGN.tone.green.fg,
+    bgColor: DESIGN.tone.green.bg,
   },
   document: {
-    icon: <Description sx={{ fontSize: 20 }} />,
-    color: '#0288D1',
-    bgColor: '#E1F5FE',
+    icon: <Description sx={{ fontSize: 18 }} />,
+    color: DESIGN.tone.blue.fg,
+    bgColor: DESIGN.tone.blue.bg,
   },
   system: {
-    icon: <Settings sx={{ fontSize: 20 }} />,
-    color: '#757575',
-    bgColor: '#F5F5F5',
+    icon: <Settings sx={{ fontSize: 18 }} />,
+    color: DESIGN.tone.grey.fg,
+    bgColor: DESIGN.tone.grey.bg,
   },
   alert: {
-    icon: <Warning sx={{ fontSize: 20 }} />,
-    color: '#D32F2F',
-    bgColor: '#FFEBEE',
+    icon: <Warning sx={{ fontSize: 18 }} />,
+    color: DESIGN.tone.red.fg,
+    bgColor: DESIGN.tone.red.bg,
   },
   info: {
-    icon: <Info sx={{ fontSize: 20 }} />,
-    color: '#2E7D32',
-    bgColor: '#E8F5E9',
+    icon: <Info sx={{ fontSize: 18 }} />,
+    color: DESIGN.tone.beige.fg,
+    bgColor: DESIGN.tone.beige.bg,
   },
 };
+
+/* The unread tint: the board's soft accent surface, with the accent as the left edge. */
+const UNREAD_BG = DESIGN.softPrimary.bg;
 
 /**
  * One notification. Lives apart from the list so a row inside an expanded
@@ -99,15 +102,16 @@ function NotificationLine({
           py: 1.5,
           pl: inset ? 5 : 2,
           pr: 2,
-          bgcolor: row.read ? 'transparent' : '#F5F9FF',
-          borderLeft: row.read ? '3px solid transparent' : `3px solid ${config.color}`,
-          '&:hover': { bgcolor: '#F5F5F5' },
+          bgcolor: row.read ? 'transparent' : UNREAD_BG,
+          borderLeft: '3px solid',
+          borderLeftColor: row.read ? 'transparent' : 'primary.main',
+          '&:hover': { bgcolor: 'action.hover' },
           cursor: 'pointer',
         }}
         onClick={onOpen}
       >
         <ListItemIcon sx={{ minWidth: 44 }}>
-          <Box sx={{ color: config.color, bgcolor: config.bgColor, p: 1, borderRadius: 2 }}>
+          <Box sx={{ color: config.color, bgcolor: config.bgColor, width: 32, height: 32, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {config.icon}
           </Box>
         </ListItemIcon>
@@ -434,14 +438,16 @@ export default function NotificationCenter() {
               maxHeight: 480,
               borderRadius: 3,
               mt: 1,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+              border: '1px solid',
+              borderColor: 'divider',
+              boxShadow: DESIGN.shadow.menu,
             },
           },
         }}
       >
         {/* ── Header ── */}
-        <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+        <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography sx={{ fontSize: 15, fontWeight: 700 }}>
             Oznámení
           </Typography>
           {unreadCount > 0 && (
@@ -460,12 +466,12 @@ export default function NotificationCenter() {
           </Box>
         ) : notifications.length === 0 ? (
           <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Notifications sx={{ fontSize: 48, color: '#ddd', mb: 1 }} />
-            <Typography color="text.secondary">Žádná oznámení</Typography>
+            <Notifications sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>Žádná oznámení</Typography>
           </Box>
         ) : (
           <List sx={{ p: 0, maxHeight: 360, overflow: 'auto' }}>
-            <AnimatePresence>
+            <>
               {sections.map((section) => (
                 <Box key={section.key}>
                   {/* Day heading. Sticky so it stays readable while scrolling
@@ -477,13 +483,15 @@ export default function NotificationCenter() {
                       zIndex: 1,
                       px: 2,
                       py: 0.75,
-                      bgcolor: '#FAFAFA',
-                      borderBottom: '1px solid #eee',
+                      bgcolor: (t) => (t.palette.mode === 'light' ? DESIGN.head : t.palette.background.default),
+                      borderBottom: '1px solid',
+                      borderColor: 'divider',
                     }}
                   >
                     <Typography
-                      variant="caption"
-                      sx={{ fontWeight: 700, color: 'text.secondary', letterSpacing: 0.4 }}
+                      variant="overline"
+                      component="div"
+                      sx={{ color: 'text.secondary' }}
                     >
                       {section.heading}
                     </Typography>
@@ -520,19 +528,17 @@ export default function NotificationCenter() {
                             sx={{
                               py: 1.25,
                               px: 2,
-                              bgcolor: item.unreadCount > 0 ? '#F5F9FF' : 'transparent',
-                              borderLeft:
-                                item.unreadCount > 0
-                                  ? `3px solid ${config.color}`
-                                  : '3px solid transparent',
+                              bgcolor: item.unreadCount > 0 ? UNREAD_BG : 'transparent',
+                              borderLeft: '3px solid',
+                              borderLeftColor: item.unreadCount > 0 ? 'primary.main' : 'transparent',
                               cursor: 'pointer',
-                              '&:hover': { bgcolor: '#F5F5F5' },
+                              '&:hover': { bgcolor: 'action.hover' },
                             }}
                             onClick={() => toggleGroup(groupKey)}
                           >
                             <ListItemIcon sx={{ minWidth: 44 }}>
                               <Box
-                                sx={{ color: config.color, bgcolor: config.bgColor, p: 1, borderRadius: 2 }}
+                                sx={{ color: config.color, bgcolor: config.bgColor, width: 32, height: 32, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                               >
                                 {config.icon}
                               </Box>
@@ -595,13 +601,13 @@ export default function NotificationCenter() {
                   })}
                 </Box>
               ))}
-            </AnimatePresence>
+            </>
           </List>
         )}
 
         {/* ── Footer ── */}
         {notifications.length > 0 && (
-          <Box sx={{ p: 1.5, borderTop: '1px solid #e0e0e0', textAlign: 'center' }}>
+          <Box sx={{ p: 1, borderTop: '1px solid', borderColor: 'divider', textAlign: 'center' }}>
             <Button size="small" color="primary" onClick={handleClose}>
               Zobrazit vše
             </Button>

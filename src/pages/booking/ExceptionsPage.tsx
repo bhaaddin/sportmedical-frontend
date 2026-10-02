@@ -30,6 +30,7 @@ import type { ScheduleExceptionInput } from "../../api/bookingContracts";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { errorText } from "../../components/booking/errorText";
 import { addDaysToDateOnly, formatDateOnly, toDateOnly } from "../../utils/time";
+import { SettingsScreen } from "../settings/SettingsFrame";
 
 /**
  * Exceptions - contract screen 5.5: closed, different hours, different worker.
@@ -149,29 +150,19 @@ export default function ExceptionsPage() {
   const kindLabel = (value: ExceptionKind) => t(`booking.exceptions.kind.${value}`);
 
   return (
-    <Box sx={{ maxWidth: 1000, mx: "auto" }}>
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 2,
-          mb: 3,
-        }}
-      >
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>
-            {t("booking.exceptions.title")}
-          </Typography>
-          <Typography sx={{ color: "text.secondary" }}>
-            {t("booking.exceptions.subtitle")}{" "}
-            {t("booking.exceptions.window", {
-              from: formatDateOnly(windowFrom),
-              to: formatDateOnly(windowTo),
-            })}
-          </Typography>
-        </Box>
+    <SettingsScreen
+      title={t("booking.exceptions.title")}
+      subtitle={
+        <>
+          {t("booking.exceptions.subtitle")}{" "}
+          {t("booking.exceptions.window", {
+            from: formatDateOnly(windowFrom),
+            to: formatDateOnly(windowTo),
+          })}
+        </>
+      }
+      width={1000}
+      actions={
         <Button
           variant="contained"
           startIcon={<AddIcon />}
@@ -180,7 +171,8 @@ export default function ExceptionsPage() {
         >
           {t("booking.exceptions.new")}
         </Button>
-      </Box>
+      }
+    >
 
       <AsyncSection
         isLoading={calendarsQuery.isLoading}
@@ -432,6 +424,6 @@ export default function ExceptionsPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </SettingsScreen>
   );
 }

@@ -64,9 +64,10 @@ export const CALENDAR_DISPLAY_OFFLINE: CalendarDisplaySettings = {
   slotMinutes: 30,
   dayStartHour: 7,
   dayEndHour: 19,
-  nowLineColor: '#D32F2F',
-  holidayColor: '#64748B',
-  lunchColor: '#E11D48',
+  /* The board's colours (3. 10. 2026), the same ones the server opens with. */
+  nowLineColor: '#C0392B',
+  holidayColor: '#E7CBA9',
+  lunchColor: '#CBD1D8',
   hoverFields: ['patientName', 'activity', 'status', 'phone', 'paperwork'],
 };
 

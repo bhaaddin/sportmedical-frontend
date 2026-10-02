@@ -36,6 +36,7 @@ import {
   switchingOffText, templateChanged, templateIsValid, templateProblems,
 } from './documentTemplates';
 import type { TemplateDraft } from './documentTemplates';
+import { SettingsScreen } from './SettingsFrame';
 
 export default function DocumentTemplatesPage() {
   const { t } = useTranslation();
@@ -100,14 +101,11 @@ export default function DocumentTemplatesPage() {
     && templateIsValid(draft) && templateChanged(editing, draft) && !save.isPending;
 
   return (
-    <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>Dokumenty</Typography>
-        <Typography sx={{ color: 'text.secondary' }}>
-          Druhy dokumentů, které ordinace vede. Kdo který musí doložit, se nastavuje
-          v Pravidlech dokumentů — tady jen to, jak se jmenují a jestli se používají.
-        </Typography>
-      </Box>
+    <SettingsScreen
+      title="Dokumenty"
+      subtitle="Druhy dokumentů, které ordinace vede — jak se jmenují a jestli se používají; kdo který musí doložit, říkají Pravidla dokumentů"
+      width={960}
+    >
 
       {/*
         * Off, never deleted: a filed document keeps its `templateId` forever,
@@ -261,6 +259,6 @@ export default function DocumentTemplatesPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </SettingsScreen>
   );
 }

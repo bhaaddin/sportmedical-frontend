@@ -11,10 +11,12 @@ import {
   TableContainer, TableHead, TableRow, Skeleton, Alert, IconButton, Tooltip,
 } from '@mui/material';
 import {
-  MonitorHeart, Speed, People, ErrorOutlined, Refresh, CheckCircle,
+  People, ErrorOutlined, Refresh, CheckCircle,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import client from '../api/client';
+import { KpiCard } from '../components/ui';
+import { SettingsScreen } from './settings/SettingsFrame';
 
 /* ── What the server sends (api/client.ts has already unwrapped the envelope) ── */
 interface SystemHealthDto {
@@ -119,55 +121,34 @@ export default function SystemHealth() {
   }
 
   return (
-    <Box>
-      {/* ── Header ── */}
-      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <MonitorHeart color="primary" /> Zdraví systému
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {health
-                ? `Změřeno ${formatDateTime(health.timestamp)}`
-                : 'Odezva databáze, přihlášení uživatelé a poslední chyby'}
-            </Typography>
-          </Box>
-          <Tooltip title="Obnovit data">
-            <span>
-              <IconButton onClick={() => { void handleRefresh(); }} disabled={refreshing}>
-                <Refresh sx={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
-      </motion.div>
-
+    <SettingsScreen
+      title="Zdraví systému"
+      subtitle={health
+        ? `Změřeno ${formatDateTime(health.timestamp)}`
+        : 'Odezva databáze, přihlášení uživatelé a poslední chyby'}
+      actions={
+        <Tooltip title="Obnovit data">
+          <span>
+            <IconButton aria-label="Obnovit data" onClick={() => { void handleRefresh(); }} disabled={refreshing}>
+              <Refresh sx={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
+            </IconButton>
+          </span>
+        </Tooltip>
+      }
+    >
       {/* ── Measured values ── */}
       {healthFailed ? (
         <Alert severity="error" sx={{ mb: 3 }}>
           Stav systému se nepodařilo načíst.
         </Alert>
       ) : health && (
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          {[
-            { label: 'Odezva databáze', value: `${health.dbLatencyMs} ms`, color: '#0288D1', icon: <Speed /> },
-            { label: 'Aktivní relace', value: health.activeSessions, color: '#7B1FA2', icon: <People /> },
-          ].map((stat, i) => (
-            <Grid key={stat.label} size={{ xs: 12, sm: 6 }}>
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
-                <Card>
-                  <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Box sx={{ color: stat.color }}>{stat.icon}</Box>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="body2" color="text.secondary">{stat.label}</Typography>
-                      <Typography variant="h5" sx={{ fontWeight: 700, color: stat.color }}>{stat.value}</Typography>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </Grid>
-          ))}
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <KpiCard label="Odezva databáze" value={`${health.dbLatencyMs} ms`} hint="Jedna otázka databázi a zpět" />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <KpiCard label="Aktivní relace" value={health.activeSessions} hint="Kdo je právě přihlášený" />
+          </Grid>
         </Grid>
       )}
 
@@ -259,7 +240,7 @@ export default function SystemHealth() {
                     {errors.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
-                          <CheckCircle sx={{ fontSize: 48, color: '#E8F5E9', mb: 1 }} />
+                          <CheckCircle sx={{ fontSize: 48, color: 'success.main', opacity: 0.35, mb: 1 }} />
                           <Typography color="text.secondary">Žádné chyby</Typography>
                         </TableCell>
                       </TableRow>
@@ -279,6 +260,6 @@ export default function SystemHealth() {
           to { transform: rotate(360deg); }
         }
       `}</style>
-    </Box>
+    </SettingsScreen>
   );
 }

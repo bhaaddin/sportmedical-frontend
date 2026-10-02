@@ -1,26 +1,39 @@
 /* ══════════════════════════════════════════════════════════════
-   SKUPINOVÉ SLEVY  (route: /nastaveni/skupinove-slevy)
+   SLEVY A CENOVÉ HLADINY  (route: /nastaveni/skupinove-slevy)
 
-   A bigger group booked together pays less, by how many people. The bands and
+   A bigger group booked together pays less, by how many people. The tiers and
    percentages are the clinic's to set — nothing hard-coded. The server refuses
-   overlapping bands and percentages out of range, and sends its own defaults so
+   overlapping tiers and percentages out of range, and sends its own defaults so
    this screen keeps no copy of the rule.
+
+   The board's screen 19: an editor table (NÁZEV HLADINY · OD · DO · SLEVA ·
+   AKCE), "+ Přidat hladinu", a card saying how the discount is applied with
+   the way to the price list and to the clubs, and a NÁHLED card pricing a
+   sample order on the dearest činnost so the owner sees what a tier does
+   before saving it. "Zahodit" · "Uložit" sit top-right, as on every settings
+   screen that saves.
    ══════════════════════════════════════════════════════════════ */
 
 import { useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   CircularProgress,
-  IconButton,
+  Divider,
+  InputAdornment,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Typography,
 } from '@mui/material';
-import { AddOutlined, DeleteOutlined } from '@mui/icons-material';
+import { AddOutlined } from '@mui/icons-material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   GROUP_DISCOUNTS_QUERY_KEY,
@@ -28,7 +41,17 @@ import {
   saveGroupDiscounts,
 } from '../../api/groupDiscounts';
 import type { GroupDiscountSettings, GroupDiscountTier } from '../../api/groupDiscounts';
+import { activitiesApi } from '../../api/activities';
+import { formatCzk } from '../../components/booking/appointmentEdit';
+import { SectionLabel, SoftCard, DESIGN } from '../../components/ui';
+import { SettingsScreen } from './SettingsFrame';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
+import {
+  dearestPriced,
+  discountPreview,
+  sampleHeadcount,
+  tierName,
+} from './groupDiscountPreview';
 
 /** A tier as the row edits it — numbers as strings so a half-typed field is allowed. */
 interface TierDraft {
@@ -49,9 +72,17 @@ const toTier = (draft: TierDraft): GroupDiscountTier => ({
   percent: Number.parseFloat(draft.percent.replace(',', '.')) || 0,
 });
 
+/** A sample price for the preview when no činnost in the price list has one yet. */
+const SAMPLE_UNIT_PRICE = 1000;
+
+const cellInput = { width: 96 };
+
 export default function GroupDiscountsPage() {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: GROUP_DISCOUNTS_QUERY_KEY, queryFn: readGroupDiscounts });
+  /* The price list, for the preview only - the dearest činnost is what a club
+     books by the dozen. A failed read leaves the sample price in its place. */
+  const activities = useQuery({ queryKey: ['activities'], queryFn: () => activitiesApi.list() });
   const [rows, setRows] = useState<TierDraft[] | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -79,6 +110,7 @@ export default function GroupDiscountsPage() {
 
   const { defaults, maxTiers } = query.data;
   const draft = rows ?? query.data.settings.tiers.map(toDraft);
+  const dirty = rows !== null;
   const errors = save.isError ? fieldErrorsOf(save.error) : {};
   const problem = save.isError ? problemMessageOf(save.error, 'Nastavení nelze uložit.') : null;
 
@@ -98,101 +130,195 @@ export default function GroupDiscountsPage() {
     setSaved(false);
     setRows(defaults.tiers.map(toDraft));
   };
+  const discard = () => {
+    setSaved(false);
+    setRows(null);
+  };
+
+  /* The preview prices what is on screen - the unsaved tiers - so the owner
+     sees a tier work before committing it. */
+  const tiers = draft.map(toTier);
+  const dearest = dearestPriced(activities.data?.activities ?? []);
+  const unitPrice = dearest?.priceCzk ?? SAMPLE_UNIT_PRICE;
+  const unitLabel = dearest?.name ?? 'vzorová cena';
+  const preview = discountPreview(tiers, unitPrice, sampleHeadcount(tiers));
 
   return (
-    <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>Skupinové slevy</Typography>
-        <Typography sx={{ color: 'text.secondary' }}>
-          Čím víc lidí přijde společně, tím větší sleva. Pásma a procenta jsou vaše — nastavte je,
-          jak potřebujete. Sleva se použije automaticky podle počtu osob.
-        </Typography>
-      </Box>
+    <SettingsScreen
+      title="Slevy a cenové hladiny"
+      subtitle="Hladinu systém dopočítá podle počtu objednaných osob"
+      actions={
+        <>
+          <Button variant="outlined" onClick={discard} disabled={!dirty || save.isPending}>
+            Zahodit
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => save.mutate({ tiers })}
+            disabled={save.isPending || !dirty}
+          >
+            {save.isPending ? 'Ukládám…' : 'Uložit'}
+          </Button>
+        </>
+      }
+    >
+      <Stack spacing={2.5}>
+        {errors.tiers !== undefined ? <Alert severity="error">{errors.tiers}</Alert> : null}
+        {problem !== null && errors.tiers === undefined ? (
+          <Alert severity="error">{problem}</Alert>
+        ) : null}
+        {saved ? <Alert severity="success">Uloženo.</Alert> : null}
 
-      <Card variant="outlined" sx={{ maxWidth: 680 }}>
-        <CardContent>
-          <Stack spacing={2}>
-            {errors.tiers !== undefined ? <Alert severity="error">{errors.tiers}</Alert> : null}
-            {problem !== null && errors.tiers === undefined ? (
-              <Alert severity="error">{problem}</Alert>
-            ) : null}
-            {saved ? <Alert severity="success">Uloženo.</Alert> : null}
+        <TableContainer component={SoftCard} sx={{ p: 0 }}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Název hladiny</TableCell>
+                <TableCell>Od</TableCell>
+                <TableCell>Do</TableCell>
+                <TableCell>Sleva</TableCell>
+                <TableCell align="right">Akce</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {draft.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} sx={{ color: 'text.secondary', py: 3 }}>
+                    Zatím žádná hladina — každá skupina platí plnou cenu.
+                  </TableCell>
+                </TableRow>
+              )}
+              {draft.map((row, index) => (
+                <TableRow key={index}>
+                  {/* The API carries no tier names, so a tier is called by its
+                      place. A name field would be a field that saves nowhere. */}
+                  <TableCell sx={{ fontWeight: 600 }}>{tierName(index)}</TableCell>
+                  <TableCell>
+                    <TextField
+                      size="small"
+                      type="number"
+                      value={row.min}
+                      onChange={(e) => edit(index, { min: e.target.value })}
+                      sx={cellInput}
+                      slotProps={{ htmlInput: { min: 1, step: 1, 'aria-label': `${tierName(index)} od` } }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <TextField
+                      size="small"
+                      type="number"
+                      placeholder="∞"
+                      value={row.max}
+                      onChange={(e) => edit(index, { max: e.target.value })}
+                      sx={cellInput}
+                      slotProps={{ htmlInput: { min: 1, step: 1, 'aria-label': `${tierName(index)} do` } }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <TextField
+                      size="small"
+                      type="number"
+                      value={row.percent}
+                      onChange={(e) => edit(index, { percent: e.target.value })}
+                      sx={cellInput}
+                      slotProps={{
+                        htmlInput: { min: 0, max: 100, step: 1, 'aria-label': `${tierName(index)} sleva` },
+                        input: { endAdornment: <InputAdornment position="end">%</InputAdornment> },
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell align="right">
+                    <Button
+                      size="small"
+                      onClick={() => removeRow(index)}
+                      sx={{ color: DESIGN.danger, fontWeight: 600 }}
+                    >
+                      Odebrat
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              <TableRow>
+                <TableCell colSpan={5} sx={{ borderBottom: 0 }}>
+                  <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<AddOutlined />}
+                      onClick={addRow}
+                      disabled={draft.length >= maxTiers}
+                      sx={{ borderStyle: 'dashed', color: 'primary.main' }}
+                    >
+                      Přidat hladinu
+                    </Button>
+                    <Button size="small" onClick={resetToDefaults} disabled={save.isPending} sx={{ color: 'text.secondary' }}>
+                      Obnovit výchozí hladiny
+                    </Button>
+                    {draft.length >= maxTiers && (
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        Nejvýše {maxTiers} hladin.
+                      </Typography>
+                    )}
+                  </Stack>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </TableContainer>
 
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ px: 0.5, color: 'text.secondary', fontSize: 13, fontWeight: 600 }}
-            >
-              <Box sx={{ flex: 1 }}>Od (osob)</Box>
-              <Box sx={{ flex: 1 }}>Do (osob)</Box>
-              <Box sx={{ flex: 1 }}>Sleva %</Box>
-              <Box sx={{ width: 40 }} />
+        <Box
+          sx={{
+            display: 'grid',
+            gap: 2,
+            gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 2fr) minmax(260px, 1fr)' },
+            alignItems: 'start',
+          }}
+        >
+          <SoftCard>
+            <SectionLabel>Jak se sleva použije</SectionLabel>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Při objednávce pro více osob najde systém hladinu podle počtu a odečte ji z
+              ceníkové ceny. Platba zůstává samostatný krok — sleva jen upraví částku k úhradě.
+              Prázdné „Do“ znamená bez horní hranice.
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              <Button variant="outlined" component={RouterLink} to="/cenik">Otevřít ceník</Button>
+              <Button variant="outlined" component={RouterLink} to="/clubs">Kluby</Button>
             </Stack>
+          </SoftCard>
 
-            {draft.map((row, index) => (
-              <Stack key={index} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                <TextField
-                  size="small"
-                  type="number"
-                  value={row.min}
-                  onChange={(e) => edit(index, { min: e.target.value })}
-                  sx={{ flex: 1 }}
-                  slotProps={{ htmlInput: { min: 1, step: 1 } }}
-                />
-                <TextField
-                  size="small"
-                  type="number"
-                  placeholder="∞"
-                  value={row.max}
-                  onChange={(e) => edit(index, { max: e.target.value })}
-                  sx={{ flex: 1 }}
-                  slotProps={{ htmlInput: { min: 1, step: 1 } }}
-                  helperText="prázdné = bez horní hranice"
-                />
-                <TextField
-                  size="small"
-                  type="number"
-                  value={row.percent}
-                  onChange={(e) => edit(index, { percent: e.target.value })}
-                  sx={{ flex: 1 }}
-                  slotProps={{ htmlInput: { min: 0, max: 100, step: 1 } }}
-                />
-                <IconButton
-                  aria-label="Odebrat pásmo"
-                  onClick={() => removeRow(index)}
-                  size="small"
-                >
-                  <DeleteOutlined fontSize="small" />
-                </IconButton>
+          <SoftCard>
+            <SectionLabel>Náhled</SectionLabel>
+            <Stack spacing={0.75}>
+              <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
+                <Typography variant="body2">
+                  {preview.headcount} × {unitLabel}
+                </Typography>
+                <Typography variant="body2">{formatCzk(preview.subtotal)}</Typography>
               </Stack>
-            ))}
-
-            <Box>
-              <Button
-                startIcon={<AddOutlined />}
-                onClick={addRow}
-                disabled={draft.length >= maxTiers}
-                size="small"
-              >
-                Přidat pásmo
-              </Button>
-            </Box>
-
-            <Stack direction="row" spacing={1} sx={{ pt: 1 }}>
-              <Button
-                variant="contained"
-                onClick={() => save.mutate({ tiers: draft.map(toTier) })}
-                disabled={save.isPending || rows === null}
-              >
-                {save.isPending ? 'Ukládám…' : 'Uložit'}
-              </Button>
-              <Button onClick={resetToDefaults} disabled={save.isPending}>
-                Výchozí pásma
-              </Button>
+              <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  {preview.tierIndex >= 0
+                    ? `${tierName(preview.tierIndex)} −${preview.percent} %`
+                    : 'Bez hladiny'}
+                </Typography>
+                <Typography variant="body2" sx={{ color: DESIGN.danger }}>
+                  {preview.discount > 0 ? `−${formatCzk(preview.discount)}` : formatCzk(0)}
+                </Typography>
+              </Stack>
+              <Divider sx={{ my: 0.5 }} />
+              <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <Typography sx={{ fontWeight: 700 }}>Celkem</Typography>
+                <Typography sx={{ fontWeight: 700, fontSize: 18 }}>{formatCzk(preview.total)}</Typography>
+              </Stack>
             </Stack>
-          </Stack>
-        </CardContent>
-      </Card>
-    </Box>
+            {dearest === null && (
+              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1.5 }}>
+                Žádná činnost zatím nemá cenu v ceníku; náhled počítá se vzorovou cenou.
+              </Typography>
+            )}
+          </SoftCard>
+        </Box>
+      </Stack>
+    </SettingsScreen>
   );
 }

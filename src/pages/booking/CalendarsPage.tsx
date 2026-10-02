@@ -39,6 +39,7 @@ import type { Calendar, CalendarInput } from "../../api/bookingContracts";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { errorText } from "../../components/booking/errorText";
 import { CalendarAccessDialog } from "../../components/booking/CalendarAccessDialog";
+import { SettingsScreen } from "../settings/SettingsFrame";
 import { ColorSelect } from "../../components/booking/ColorSelect";
 import {
   DEFAULT_PALETTE_ENTRY,
@@ -261,26 +262,12 @@ export default function CalendarsPage() {
   const nameIsValid = (draft?.name ?? "").trim().length > 0;
 
   return (
-    <Box sx={{ maxWidth: 1100, mx: "auto" }}>
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 2,
-          mb: 3,
-        }}
-      >
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>
-            {t("booking.calendars.title")}
-          </Typography>
-          <Typography sx={{ color: "text.secondary" }}>
-            {t("booking.calendars.subtitle")}
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+    <SettingsScreen
+      title={t("booking.calendars.title")}
+      subtitle={t("booking.calendars.subtitle")}
+      width={1100}
+      actions={
+        <>
           {/* Offered only when something is hidden. A switch that never
               changes anything is furniture, and it would sit here forever on
               a clinic that never deactivates a calendar. */}
@@ -302,8 +289,9 @@ export default function CalendarsPage() {
           >
             {t("booking.calendars.new")}
           </Button>
-        </Stack>
-      </Box>
+        </>
+      }
+    >
 
       {/* Says which service is waiting, and leaves the choice where it
           belongs. Which calendar should run it is his decision - a form
@@ -746,6 +734,6 @@ export default function CalendarsPage() {
           onClose={() => setAccessFor(null)}
         />
       ) : null}
-    </Box>
+    </SettingsScreen>
   );
 }

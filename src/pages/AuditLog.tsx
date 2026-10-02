@@ -8,8 +8,7 @@
 import { useState, useEffect } from 'react';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Chip, TextField, Grid, IconButton, Tooltip,
-  Avatar, Skeleton, Collapse, Button
+  TableHead, TableRow, TextField, Grid, IconButton, Tooltip, Skeleton,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon, Search as SearchIcon, History as HistoryIcon,
@@ -17,6 +16,8 @@ import {
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import client from '../api/client';
+import { DESIGN, KpiCard, StatusChip, type ChipTone } from '../components/ui';
+import { SettingsScreen } from './settings/SettingsFrame';
 
 /* ── Types ── */
 interface AuditEntry {
@@ -33,17 +34,19 @@ interface AuditEntry {
   afterState?: any;
 }
 
-/* ── Config ── */
-const ACTION_COLORS: Record<string, string> = {
-  Create: '#2E7D32',
-  Update: '#0288D1',
-  Delete: '#D32F2F',
-  Sign: '#9C27B0',
-  Import: '#ED6C02',
-  Override: '#FF5722',
-  Login: '#795548',
-  Logout: '#607D8B',
+/* ── Config: the board's soft tones, one per kind of action ── */
+const ACTION_TONES: Record<string, ChipTone> = {
+  Create: 'green',
+  Update: 'blue',
+  Delete: 'red',
+  Sign: 'primary',
+  Import: 'beige',
+  Override: 'beige',
+  Login: 'grey',
+  Logout: 'grey',
 };
+
+const toneOf = (action: string): ChipTone => ACTION_TONES[action] ?? 'grey';
 
 /* ══════════════════════════════════════════════════════════════ */
 export default function AuditLog() {
@@ -94,43 +97,29 @@ export default function AuditLog() {
   }
 
   return (
-    <Box>
-      {/* Header */}
-      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <HistoryIcon color="primary" /> Auditní log
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Historie všech akcí v systému
-            </Typography>
-          </Box>
-          <Tooltip title="Obnovit">
-            <IconButton onClick={loadAuditLog}><RefreshIcon /></IconButton>
-          </Tooltip>
-        </Box>
-      </motion.div>
-
+    <SettingsScreen
+      title="Auditní log"
+      subtitle="Kdo co změnil a kdy — včetně přístupů k citlivým údajům"
+      actions={
+        <Tooltip title="Obnovit">
+          <IconButton aria-label="Obnovit" onClick={loadAuditLog}><RefreshIcon /></IconButton>
+        </Tooltip>
+      }
+    >
       {/* Search */}
-      <Paper sx={{ p: 2, mb: 3, borderRadius: 3 }}>
-        <TextField fullWidth size="small" placeholder="Hledat v auditním logu..."
-          value={search} onChange={(e) => setSearch(e.target.value)}
-          slotProps={{ input: { startAdornment: <SearchIcon sx={{ mr: 1, color: '#999' }} fontSize="small" /> } }}
-          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
-      </Paper>
+      <TextField fullWidth size="small" placeholder="Hledat v auditním logu — uživatel, akce, entita"
+        value={search} onChange={(e) => setSearch(e.target.value)}
+        slotProps={{ input: { startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} fontSize="small" /> } }}
+        sx={{ mb: 2.5 }} />
 
       {/* Stats */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        {Object.entries(ACTION_COLORS).map(([action, color]) => {
+        {Object.keys(ACTION_TONES).map((action) => {
           const count = entries.filter(e => e.action === action).length;
           if (count === 0) return null;
           return (
             <Grid key={action} size={{ xs: 6, sm: 4, md: 2 }}>
-              <Paper sx={{ p: 2, textAlign: 'center' }}>
-                <Typography variant="h5" sx={{ fontWeight: 700, color }}>{count}</Typography>
-                <Typography variant="body2" color="text.secondary">{action}</Typography>
-              </Paper>
+              <KpiCard label={action} value={count} tone={action === 'Delete' ? 'red' : 'ink'} />
             </Grid>
           );
         })}
@@ -138,24 +127,24 @@ export default function AuditLog() {
 
       {/* Table */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-        <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
+        <TableContainer component={Paper}>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f8f9fa' }}>
-                <TableCell sx={{ fontWeight: 700, width: 40 }} />
-                <TableCell sx={{ fontWeight: 700 }}>Čas</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Uživatel</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Akce</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Entita</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Poznámky</TableCell>
+              <TableRow>
+                <TableCell sx={{ width: 40 }} />
+                <TableCell>Čas</TableCell>
+                <TableCell>Uživatel</TableCell>
+                <TableCell>Akce</TableCell>
+                <TableCell>Entita</TableCell>
+                <TableCell>ID</TableCell>
+                <TableCell>Poznámky</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredEntries.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
-                    <HistoryIcon sx={{ fontSize: 48, color: '#ddd', mb: 1 }} />
+                    <HistoryIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
                     <Typography color="text.secondary">Žádné záznamy</Typography>
                   </TableCell>
                 </TableRow>
@@ -165,7 +154,7 @@ export default function AuditLog() {
                     initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: Math.min(i * 0.02, 0.5) }}>
                     <TableCell colSpan={7} sx={{ p: 0 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #f0f0f0' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider' }}>
                         {(entry.beforeState || entry.afterState) && (
                           <IconButton size="small" onClick={() => setExpandedRow(expandedRow === entry.id ? null : entry.id)}>
                             {expandedRow === entry.id ? <CollapseIcon fontSize="small" /> : <ExpandIcon fontSize="small" />}
@@ -178,8 +167,9 @@ export default function AuditLog() {
                           <Typography sx={{ fontWeight: 500, minWidth: 150 }}>
                             {entry.userEmail || entry.userName || 'System'}
                           </Typography>
-                          <Chip label={entry.action} size="small"
-                            sx={{ bgcolor: (ACTION_COLORS[entry.action] || '#666') + '18', color: ACTION_COLORS[entry.action] || '#666', fontWeight: 500, minWidth: 70 }} />
+                          <StatusChip tone={toneOf(entry.action)} sx={{ minWidth: 70, justifyContent: 'center' }}>
+                            {entry.action}
+                          </StatusChip>
                           <Typography sx={{ minWidth: 100 }}>{entry.entity}</Typography>
                           <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: 11 }}>
                             {entry.entityId?.slice(0, 8)}
@@ -191,11 +181,11 @@ export default function AuditLog() {
                       </Box>
                       {/* Expanded JSON diff */}
                       {expandedRow === entry.id && (entry.beforeState || entry.afterState) && (
-                        <Box sx={{ p: 2, bgcolor: '#f8f9fa', borderBottom: '1px solid #e0e0e0' }}>
+                        <Box sx={{ p: 2, bgcolor: 'background.default', borderBottom: '1px solid', borderColor: 'divider' }}>
                           <Grid container spacing={2}>
                             {entry.beforeState && (
                               <Grid size={{ xs: 6 }}>
-                                <Typography variant="caption" sx={{ fontWeight: 700, color: '#D32F2F' }}>PŘED</Typography>
+                                <Typography variant="overline" sx={{ color: DESIGN.tone.red.fg }}>Před</Typography>
                                 <Paper sx={{ p: 1, mt: 0.5, maxHeight: 200, overflow: 'auto' }}>
                                   <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
                                     {JSON.stringify(entry.beforeState, null, 2)}
@@ -205,7 +195,7 @@ export default function AuditLog() {
                             )}
                             {entry.afterState && (
                               <Grid size={{ xs: 6 }}>
-                                <Typography variant="caption" sx={{ fontWeight: 700, color: '#2E7D32' }}>PO</Typography>
+                                <Typography variant="overline" sx={{ color: DESIGN.tone.green.fg }}>Po</Typography>
                                 <Paper sx={{ p: 1, mt: 0.5, maxHeight: 200, overflow: 'auto' }}>
                                   <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
                                     {JSON.stringify(entry.afterState, null, 2)}
@@ -224,6 +214,6 @@ export default function AuditLog() {
           </Table>
         </TableContainer>
       </motion.div>
-    </Box>
+    </SettingsScreen>
   );
 }

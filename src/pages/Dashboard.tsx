@@ -1,15 +1,10 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Grid, Typography, Card, Avatar, Button, Chip, TextField,
-  InputAdornment, List, ListItemButton, Divider, CircularProgress,
+  Box, Grid, Typography, Avatar, Button, TextField,
+  InputAdornment, List, ListItemButton, Divider, CircularProgress, Stack,
 } from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
-import {
-  Search, PersonAdd, EventAvailable, MeetingRoom, History as HistoryIcon,
-  NotificationsNone, ArrowForward, CalendarMonth,
-} from '@mui/icons-material';
-import { motion } from 'framer-motion';
+import { Search, PersonAdd, ArrowForward } from '@mui/icons-material';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
@@ -20,31 +15,14 @@ import { statusName, statusTally } from '../api/bookingContracts';
 import DayOverviewPage from './booking/DayOverviewPage';
 import { toDateOnly, formatPragueTime } from '../utils/time';
 import { DashboardSkeleton } from '../components/SkeletonLoader';
+import { KpiCard, PageHeader, SectionLabel, SoftCard, StatusChip, type ChipTone } from '../components/ui';
 
-
-/* ── Animated counter (kept: a number that cannot animate must still show) ── */
-function AnimatedNumber({ value, duration = 1 }: { value: number; duration?: number }) {
-  const [display, setDisplay] = useState(0);
-  const frame = useRef<number | null>(null);
-
-  useEffect(() => {
-    const start = performance.now();
-    const animate = (now: number) => {
-      const progress = Math.min((now - start) / (duration * 1000), 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplay(Math.round(value * eased));
-      if (progress < 1) frame.current = requestAnimationFrame(animate);
-    };
-    frame.current = requestAnimationFrame(animate);
-    const settle = setTimeout(() => setDisplay(value), duration * 1000 + 50);
-    return () => {
-      if (frame.current) cancelAnimationFrame(frame.current);
-      clearTimeout(settle);
-    };
-  }, [value, duration]);
-
-  return <>{display}</>;
-}
+/*
+ * The plocha (owner/admin home), in the board's look: a greeting, the day's
+ * facts as KPI cards, the patient search, and the four lists as bordered
+ * cards. Same data and the same actions as before; no gradients, no shadows,
+ * no counters that count up.
+ */
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -60,6 +38,15 @@ const STATUS_LABELS: Record<string, string> = {
   Completed: 'Hotovo',
   Cancelled: 'Zrušeno',
   NoShow: 'Nepřišel',
+};
+
+const STATUS_TONES: Record<string, ChipTone> = {
+  Scheduled: 'grey',
+  Confirmed: 'green',
+  CheckedIn: 'green',
+  Completed: 'grey',
+  Cancelled: 'red',
+  NoShow: 'red',
 };
 
 const czechDob = (iso: string): string => {
@@ -88,46 +75,34 @@ export default function Dashboard() {
   return <OwnerDashboard />;
 }
 
-/* ── One panel of the plocha ── */
+/* ── One panel of the plocha: a bordered card with a section label, a count and a footer action ── */
 function Panel({
-  title, icon, count, accent, action, children,
+  title, count, action, children,
 }: {
   title: string;
-  icon: React.ReactNode;
   count?: number;
-  accent?: string;
   action?: { label: string; onClick: () => void };
   children: React.ReactNode;
 }) {
-  const theme = useTheme();
-  /* A panel with no accent of its own is the clinic's own colour, so the plocha
-     follows the owner's chosen theme. The tiles that pass a colour (waiting,
-     history, …) keep their own — those say what kind of panel it is. */
-  const accentColor = accent ?? theme.palette.primary.main;
   return (
-    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 2.5, py: 1.75, borderBottom: '1px solid #EEF1F1' }}>
-        <Avatar sx={{ bgcolor: alpha(accentColor, 0.08), color: accentColor, width: 34, height: 34 }}>{icon}</Avatar>
-        <Typography sx={{ fontWeight: 800, flex: 1 }}>{title}</Typography>
+    <SoftCard sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 0, overflow: 'hidden' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2.5, pt: 2, pb: 1.25 }}>
+        <SectionLabel sx={{ mb: 0, flex: 1 }}>{title}</SectionLabel>
         {count !== undefined && (
-          <Chip
-            label={<AnimatedNumber value={count} />}
-            size="small"
-            sx={{ fontWeight: 800, bgcolor: alpha(accentColor, 0.08), color: accentColor }}
-          />
+          <StatusChip tone={count > 0 ? 'green' : 'grey'} size="sm">{count}</StatusChip>
         )}
       </Box>
-      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 1, py: 1 }}>{children}</Box>
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 1, pb: 1 }}>{children}</Box>
       {action && (
         <Button
           onClick={action.onClick}
           endIcon={<ArrowForward sx={{ fontSize: 16 }} />}
-          sx={{ justifyContent: 'space-between', px: 2.5, py: 1.25, color: accentColor, fontWeight: 700, borderTop: '1px solid #EEF1F1', borderRadius: 0 }}
+          sx={{ justifyContent: 'space-between', px: 2.5, py: 1.25, borderTop: '1px solid', borderColor: 'divider', borderRadius: 0, color: 'primary.main' }}
         >
           {action.label}
         </Button>
       )}
-    </Card>
+    </SoftCard>
   );
 }
 
@@ -140,7 +115,6 @@ function EmptyRow({ text }: { text: string }) {
 }
 
 function OwnerDashboard() {
-  const theme = useTheme();
   const navigate = useNavigate();
   const canSeePatients = usePermission('patients.view');
   const canRegister = usePermission('patients.register');
@@ -149,7 +123,7 @@ function OwnerDashboard() {
   const [loading, setLoading] = useState(true);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  /* ── Patient search: the centre of the plocha ── */
+  /* ── Patient search ── */
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   useEffect(() => {
@@ -239,138 +213,133 @@ function OwnerDashboard() {
 
   if (loading) return <DashboardSkeleton />;
 
-  const appointmentRow = (appt: DayAppointment) => (
-    <ListItemButton
-      key={appt.id}
-      onClick={() => navigate('/planovani')}
-      sx={{ borderRadius: 2, mb: 0.5, gap: 1.5, alignItems: 'center' }}
-    >
-      <Typography variant="caption" sx={{ fontWeight: 800, color: theme.palette.primary.main, minWidth: 44 }}>
-        {formatPragueTime(appt.startUtc)}
-      </Typography>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {patientName(appt.patientId)}
+  const appointmentRow = (appt: DayAppointment) => {
+    const status = statusName(appt.status) ?? '';
+    return (
+      <ListItemButton
+        key={appt.id}
+        onClick={() => navigate('/planovani')}
+        sx={{ borderRadius: 2, mb: 0.25, gap: 1.5, alignItems: 'center' }}
+      >
+        <Typography sx={{ fontSize: 13, fontWeight: 700, minWidth: 44 }}>
+          {formatPragueTime(appt.startUtc)}
         </Typography>
-        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
-          {appt.activityName}
-        </Typography>
-      </Box>
-      <Chip
-        label={STATUS_LABELS[statusName(appt.status) ?? ''] ?? `stav ${appt.status}`}
-        size="small"
-        sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08), color: theme.palette.primary.main, fontWeight: 600 }}
-      />
-    </ListItemButton>
-  );
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {patientName(appt.patientId)}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+            {appt.activityName}
+          </Typography>
+        </Box>
+        <StatusChip tone={STATUS_TONES[status] ?? 'grey'} size="sm">
+          {STATUS_LABELS[status] ?? `stav ${appt.status}`}
+        </StatusChip>
+      </ListItemButton>
+    );
+  };
+
+  const today = new Date().toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
     <Box>
-      {/* ── Greeting ── */}
-      <Box sx={{ mb: 2.5 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800, color: '#14202B' }}>
-          {getGreeting()}, {user.firstName || 'Doktore'}
-        </Typography>
-        <Typography color="text.secondary" sx={{ mt: 0.25 }}>
-          {new Date().toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-          {patientTotal !== null ? ` · ${patientTotal} pacientů v registru` : ''}
-        </Typography>
-      </Box>
+      <PageHeader
+        title={`${getGreeting()}, ${user.firstName || 'Doktore'}`}
+        subtitle={`${today.charAt(0).toUpperCase()}${today.slice(1)}${patientTotal !== null ? ` · ${patientTotal} pacientů v registru` : ''}`}
+        actions={
+          <Button variant="contained" onClick={() => navigate('/planovani')}>
+            Otevřít kalendář
+          </Button>
+        }
+      />
 
-      {/* ── Vyhledání pacienta — the centre of the plocha ── */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-        <Card
-          sx={{
-            p: { xs: 2.5, md: 3.5 },
-            mb: 3,
-            borderRadius: 4,
-            color: '#fff',
-            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-            boxShadow: '0 12px 30px rgba(13,115,119,0.28)',
-            position: 'relative',
-          }}
-        >
-          <Typography sx={{ fontWeight: 700, opacity: 0.9, mb: 1.5, letterSpacing: 0.2 }}>
-            Vyhledání pacienta
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1.5, flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
-            <TextField
-              fullWidth
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Jméno, příjmení nebo číslo pojištěnce"
-              autoComplete="off"
-              disabled={!canSeePatients}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search sx={{ color: '#fff' }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: searchResults.isFetching ? (
-                    <InputAdornment position="end"><CircularProgress size={18} sx={{ color: '#fff' }} /></InputAdornment>
-                  ) : undefined,
-                  sx: {
-                    bgcolor: 'rgba(255,255,255,0.16)',
-                    borderRadius: 2.5,
-                    color: '#fff',
-                    '& input::placeholder': { color: 'rgba(255,255,255,0.75)', opacity: 1 },
-                    '& fieldset': { border: 'none' },
-                  },
-                },
-              }}
-            />
-            {canRegister && (
-              <Button
-                variant="contained"
-                startIcon={<PersonAdd />}
-                onClick={() => navigate('/patients/register')}
-                sx={{
-                  bgcolor: '#fff', color: theme.palette.primary.main, fontWeight: 800, borderRadius: 2.5,
-                  px: 3, whiteSpace: 'nowrap', flexShrink: 0,
-                  '&:hover': { bgcolor: '#F2FBFB' },
-                }}
-              >
-                Nový pacient
-              </Button>
-            )}
-          </Box>
+      {/* ── The day's facts ── */}
+      <Grid container spacing={2} sx={{ mb: 2.5 }}>
+        <Grid size={{ xs: 6, md: 3 }}>
+          <KpiCard label="Dnes objednáno" value={booked.length} hint="termínů, které ještě stojí" />
+        </Grid>
+        <Grid size={{ xs: 6, md: 3 }}>
+          <KpiCard label="V čekárně" value={waiting.length} hint="přišli a čekají" tone={waiting.length > 0 ? 'green' : 'ink'} />
+        </Grid>
+        <Grid size={{ xs: 6, md: 3 }}>
+          <KpiCard label="Chybí podklady" value={alerts.length} hint="dnešních termínů bez dotazníku" tone={alerts.length > 0 ? 'red' : 'ink'} />
+        </Grid>
+        <Grid size={{ xs: 6, md: 3 }}>
+          <KpiCard
+            label="Kartotéka"
+            value={patientTotal !== null ? patientTotal : '—'}
+            hint={patientTotal !== null ? 'registrovaných pacientů' : 'bez oprávnění'}
+          />
+        </Grid>
+      </Grid>
 
-          {/* Live results, over the hero. */}
-          {canSeePatients && query.length >= 2 && (
-            <Card sx={{ mt: 1.5, borderRadius: 2.5, color: 'text.primary', maxHeight: 320, overflowY: 'auto' }}>
-              {searchResults.isLoading ? (
-                <EmptyRow text="Hledám…" />
-              ) : (searchResults.data ?? []).length === 0 ? (
-                <EmptyRow text="Nikdo takový v registru není." />
-              ) : (
-                <List disablePadding>
-                  {(searchResults.data ?? []).map((p) => (
-                    <ListItemButton key={p.id} onClick={() => navigate(`/patients/${p.id}`)} sx={{ gap: 1.5 }}>
-                      <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08), color: theme.palette.primary.main, width: 34, height: 34, fontSize: 14, fontWeight: 700 }}>
-                        {(p.firstName[0] ?? '') + (p.lastName[0] ?? '')}
-                      </Avatar>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={{ fontWeight: 600 }}>{p.lastName} {p.firstName}</Typography>
-                        <Typography variant="caption" color="text.secondary">nar. {czechDob(p.dateOfBirth)}</Typography>
-                      </Box>
-                      <ArrowForward sx={{ fontSize: 18, color: 'text.disabled' }} />
-                    </ListItemButton>
-                  ))}
-                </List>
-              )}
-            </Card>
+      {/* ── Vyhledání pacienta ── */}
+      <SoftCard sx={{ mb: 2.5 }}>
+        <SectionLabel>Vyhledání pacienta</SectionLabel>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+          <TextField
+            fullWidth
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Jméno, příjmení, telefon nebo e-mail"
+            autoComplete="off"
+            disabled={!canSeePatients}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search sx={{ color: 'text.secondary', fontSize: 20 }} />
+                  </InputAdornment>
+                ),
+                endAdornment: searchResults.isFetching ? (
+                  <InputAdornment position="end"><CircularProgress size={18} /></InputAdornment>
+                ) : undefined,
+              },
+            }}
+          />
+          {canRegister && (
+            <Button
+              variant="contained"
+              startIcon={<PersonAdd />}
+              onClick={() => navigate('/patients/register')}
+              sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+            >
+              Nový pacient
+            </Button>
           )}
-        </Card>
-      </motion.div>
+        </Stack>
+
+        {canSeePatients && query.length >= 2 && (
+          <SoftCard tone="muted" sx={{ mt: 1.5, p: 0, maxHeight: 320, overflowY: 'auto' }}>
+            {searchResults.isLoading ? (
+              <EmptyRow text="Hledám…" />
+            ) : (searchResults.data ?? []).length === 0 ? (
+              <EmptyRow text="Nikdo takový v registru není." />
+            ) : (
+              <List disablePadding>
+                {(searchResults.data ?? []).map((p) => (
+                  <ListItemButton key={p.id} onClick={() => navigate(`/patients/${p.id}`)} sx={{ gap: 1.5 }}>
+                    <Avatar sx={{ width: 34, height: 34, fontSize: 13 }}>
+                      {(p.firstName[0] ?? '') + (p.lastName[0] ?? '')}
+                    </Avatar>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontWeight: 600 }}>{p.lastName} {p.firstName}</Typography>
+                      <Typography variant="caption" color="text.secondary">nar. {czechDob(p.dateOfBirth)}</Typography>
+                    </Box>
+                    <ArrowForward sx={{ fontSize: 18, color: 'text.disabled' }} />
+                  </ListItemButton>
+                ))}
+              </List>
+            )}
+          </SoftCard>
+        )}
+      </SoftCard>
 
       {/* ── Panels ── */}
-      <Grid container spacing={2.5}>
+      <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 6, lg: 3 }}>
           <Panel
             title="Objednaní"
-            icon={<CalendarMonth sx={{ fontSize: 20 }} />}
             count={booked.length}
             action={{ label: 'Otevřít kalendář', onClick: () => navigate('/planovani') }}
           >
@@ -381,9 +350,7 @@ function OwnerDashboard() {
         <Grid size={{ xs: 12, md: 6, lg: 3 }}>
           <Panel
             title="Čekárna"
-            icon={<MeetingRoom sx={{ fontSize: 20 }} />}
             count={waiting.length}
-            accent="#2E7D32"
             action={{ label: 'Dnešní přehled', onClick: () => navigate('/dnes') }}
           >
             {waiting.length === 0 ? <EmptyRow text="Čekárna je prázdná." /> : waiting.map(appointmentRow)}
@@ -393,8 +360,6 @@ function OwnerDashboard() {
         <Grid size={{ xs: 12, md: 6, lg: 3 }}>
           <Panel
             title="Historie"
-            icon={<HistoryIcon sx={{ fontSize: 20 }} />}
-            accent="#5B4B8A"
             action={{ label: 'Všichni pacienti', onClick: () => navigate('/patients') }}
           >
             {!canSeePatients ? (
@@ -409,11 +374,11 @@ function OwnerDashboard() {
                   <Box key={p.id}>
                     {i > 0 && <Divider component="li" sx={{ mx: 1.5 }} />}
                     <ListItemButton onClick={() => navigate(`/patients/${p.id}`)} sx={{ borderRadius: 2, gap: 1.5 }}>
-                      <Avatar sx={{ bgcolor: '#5B4B8A14', color: '#5B4B8A', width: 32, height: 32, fontSize: 13, fontWeight: 700 }}>
+                      <Avatar sx={{ width: 32, height: 32, fontSize: 13 }}>
                         {(p.firstName[0] ?? '') + (p.lastName[0] ?? '')}
                       </Avatar>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <Typography sx={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {p.lastName} {p.firstName}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">nar. {czechDob(p.dateOfBirth)}</Typography>
@@ -427,33 +392,22 @@ function OwnerDashboard() {
         </Grid>
 
         <Grid size={{ xs: 12, md: 6, lg: 3 }}>
-          <Panel
-            title="Notifikace"
-            icon={<NotificationsNone sx={{ fontSize: 20 }} />}
-            count={alerts.length}
-            accent="#ED6C02"
-          >
+          <Panel title="Notifikace" count={alerts.length}>
             {alerts.length === 0 ? (
-              <Box sx={{ textAlign: 'center', py: 3, color: 'text.secondary' }}>
-                <EventAvailable sx={{ fontSize: 40, color: '#2E7D3255', mb: 0.5 }} />
-                <Typography variant="body2">Vše vyřízeno — žádné notifikace.</Typography>
-              </Box>
+              <EmptyRow text="Vše vyřízeno — žádné notifikace." />
             ) : (
               <List disablePadding>
                 {alerts.map((a) => (
-                  <ListItemButton key={a.id} onClick={() => navigate('/planovani')} sx={{ borderRadius: 2, mb: 0.5, gap: 1.5 }}>
-                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#ED6C02', flexShrink: 0 }} />
+                  <ListItemButton key={a.id} onClick={() => navigate('/planovani')} sx={{ borderRadius: 2, mb: 0.25, gap: 1.5 }}>
+                    <StatusChip tone="beige" size="sm">{formatPragueTime(a.startUtc)}</StatusChip>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <Typography sx={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {patientName(a.patientId)}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         Chybí podklady — {a.activityName}
                       </Typography>
                     </Box>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: theme.palette.primary.main }}>
-                      {formatPragueTime(a.startUtc)}
-                    </Typography>
                   </ListItemButton>
                 ))}
               </List>
