@@ -112,8 +112,10 @@ export interface RegisterPatientRequest {
   mode: RegistrationMode;
   source: RegistrationSource;
   email: ContactRequest;
-  phone: ContactRequest;
-  address: AddressRequest;
+  /** Null in Quick (pre-)registration — the server accepts a patient with no phone. */
+  phone: ContactRequest | null;
+  /** Null in Quick (pre-)registration — the address is filled in on the first visit. */
+  address: AddressRequest | null;
   administrativeProfile: AdministrativeProfileRequest;
   confirmation?: RegistrationConfirmation | null;
 }

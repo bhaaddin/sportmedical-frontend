@@ -411,22 +411,31 @@ export default function PatientRegistration() {
           contactPointId: ids.emailContactPointId,
           value: form.email.trim(),
         },
-        phone: {
-          contactPointId: ids.phoneContactPointId,
-          value: form.phone.trim(),
-          regionCode: form.phoneRegionCode,
-        },
-        address: {
-          patientAddressId: ids.patientAddressId,
-          residenceType: form.residenceType,
-          // Whole-republic Mapy.cz address: code 0, the parts carry it.
-          ruianAddressPointCode: 0,
-          street: addressPoint?.street ?? null,
-          number: addressPoint?.number ?? null,
-          municipalityPart: addressPoint?.municipalityPart ?? null,
-          municipality: addressPoint?.municipality ?? null,
-          zip: addressPoint?.zip ?? null,
-        },
+        // Quick is a pre-registration: a patient with no phone/address is accepted
+        // and completed later. Send null rather than an empty contact the server
+        // would reject, so the fast path is genuinely fast.
+        phone:
+          form.mode === 'Quick' && form.phone.trim().length === 0
+            ? null
+            : {
+                contactPointId: ids.phoneContactPointId,
+                value: form.phone.trim(),
+                regionCode: form.phoneRegionCode,
+              },
+        address:
+          form.mode === 'Quick' && addressPoint === null
+            ? null
+            : {
+                patientAddressId: ids.patientAddressId,
+                residenceType: form.residenceType,
+                // Whole-republic Mapy.cz address: code 0, the parts carry it.
+                ruianAddressPointCode: 0,
+                street: addressPoint?.street ?? null,
+                number: addressPoint?.number ?? null,
+                municipalityPart: addressPoint?.municipalityPart ?? null,
+                municipality: addressPoint?.municipality ?? null,
+                zip: addressPoint?.zip ?? null,
+              },
         administrativeProfile: {
           profileId: ids.administrativeProfileId,
           insuranceRegistrationKind: form.insuranceRegistrationKind,
@@ -582,7 +591,18 @@ export default function PatientRegistration() {
       .map((field) => FIELD_LABEL[field] ?? field);
   }, [form]);
 
-  const requiredCount = czechBranch ? 11 : 12;
+  /* How many fields this mode and branch actually require — counted from the
+     rules, not a fixed number, so Rychlá registrace shows its own short total
+     (a pre-registration asks for far fewer than a full one). */
+  const requiredCount = useMemo(() => {
+    const probe: RegistrationFormState = {
+      ...createEmptyForm(),
+      mode: form.mode,
+      insuranceRegistrationKind: form.insuranceRegistrationKind,
+      residenceType: form.residenceType,
+    };
+    return Object.keys(validateAll(probe)).length;
+  }, [form.mode, form.insuranceRegistrationKind, form.residenceType]);
   const doneCount = Math.max(0, requiredCount - outstanding.length);
 
   if (loadingOptions) {
@@ -962,7 +982,7 @@ export default function PatientRegistration() {
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, md: 4 }}>
                 <TextField
-                  select fullWidth size="small" label="Typ pobytu *"
+                  select fullWidth size="small" label={`Typ pobytu${form.mode === 'Quick' ? '' : ' *'}`}
                   value={form.residenceType}
                   onChange={(e) =>
                     update('residenceType', e.target.value as RegistrationFormState['residenceType'])}
@@ -1004,7 +1024,7 @@ export default function PatientRegistration() {
               </Grid>
               <Grid size={{ xs: 12, md: 2 }} data-field="phoneRegionCode">
                 <TextField
-                  select fullWidth size="small" label="Předvolba *"
+                  select fullWidth size="small" label={`Předvolba${form.mode === 'Quick' ? '' : ' *'}`}
                   value={form.phoneRegionCode}
                   onChange={(e) => update('phoneRegionCode', e.target.value)}
                   onBlur={checkOnLeave('phoneRegionCode')}
@@ -1024,7 +1044,7 @@ export default function PatientRegistration() {
               </Grid>
               <Grid size={{ xs: 12, md: 4 }} data-field="phone">
                 <TextField
-                  fullWidth size="small" label="Telefon *"
+                  fullWidth size="small" label={`Telefon${form.mode === 'Quick' ? '' : ' *'}`}
                   value={form.phone}
                   onChange={(e) => update('phone', e.target.value)}
                   onBlur={checkOnLeave('phone')}

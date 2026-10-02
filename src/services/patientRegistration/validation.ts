@@ -201,6 +201,23 @@ function validateResidence(form: RegistrationFormState, errors: FieldErrors): vo
 
 function validateContact(form: RegistrationFormState, errors: FieldErrors): void {
   /*
+   * Rychlá registrace is for a patient standing at the desk who will be fully
+   * registered later — the server accepts it with no phone and no address (a
+   * pre-registration). So Quick asks only for the e-mail the confirmation needs,
+   * and leaves the telephone optional; a number that IS typed is still checked.
+   * This is the owner's "má to být rychlé": eleven fields become a handful.
+   */
+  if (form.mode === 'Quick') {
+    if (form.email.trim().length === 0) {
+      errors.email = 'E-mail je povinný.';
+    }
+    if (form.phone.trim().length > 0 && !isPhone(form.phone)) {
+      errors.phone = 'Telefon není ve správném tvaru.';
+    }
+    return;
+  }
+
+  /*
    * Only whether there is one. WHETHER IT IS AN ADDRESS IS NOT DECIDED HERE
    * any more — `POST /api/v1/patients/email/inspect` decides it, on the same
    * canonicaliser that stores it.
@@ -250,7 +267,11 @@ export function validateAll(form: RegistrationFormState): FieldErrors {
 
   validateIdentity(form, errors);
   validateInsurance(form, errors);
-  validateResidence(form, errors);
+  // Quick is a pre-registration: no address required. The server accepts a Quick
+  // patient with none and the desk fills it in on the first visit.
+  if (form.mode !== 'Quick') {
+    validateResidence(form, errors);
+  }
   validateContact(form, errors);
 
   return errors;
