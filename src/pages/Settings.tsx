@@ -22,11 +22,11 @@ import {
   Accordion,
   AccordionDetails, AccordionSummary, Alert, Avatar, Box, Button,
   Card, CardContent, Divider, List, ListItemButton, ListItemText,
-  Stack, Typography,
+  Stack, Typography, TextField, InputAdornment,
 } from '@mui/material';
 import {
   ExpandMore, ChevronRight, Logout, Person, Lock, Check,
-  Palette, LightMode, DarkMode,
+  Palette, LightMode, DarkMode, Search as SearchIcon,
 } from '@mui/icons-material';
 import { visibleSections, type SettingsItem } from './settings/catalogue';
 import { hasStoredPermissions, usePermissions } from '../auth/usePermission';
@@ -78,6 +78,27 @@ export default function Settings() {
   const appearance = useThemePrefs();
 
   /*
+   * Search across every settings row so nothing is a hunt. It matches an item's
+   * label and description and its section's name, and while searching every
+   * matching section is expanded so the hit is visible without a click. Empty
+   * query = the normal accordion.
+   */
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+  const filteredSections = q
+    ? sections
+        .map((section) => ({
+          ...section,
+          items: section.items.filter((item) =>
+            `${item.label} ${item.description} ${section.label} ${section.description}`
+              .toLowerCase()
+              .includes(q),
+          ),
+        }))
+        .filter((section) => section.items.length > 0)
+    : sections;
+
+  /*
    * A session from before the server started sending the list.
    *
    * Every guarded row would be hidden, which on this screen reads as the
@@ -123,9 +144,33 @@ export default function Settings() {
       <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>
         Nastavení
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Klikněte na okruh a rozbalí se jen ten.
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Klikněte na okruh a rozbalí se jen ten, nebo hledejte napříč vším nastavením.
       </Typography>
+
+      <TextField
+        fullWidth
+        size="small"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Hledat v nastavení — např. ceník, souhlasy, dvoufázové…"
+        sx={{ mb: 3 }}
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          },
+        }}
+      />
+
+      {q && filteredSections.length === 0 && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Nic odpovídajícího „{query}“. Zkuste jiné slovo.
+        </Typography>
+      )}
 
       {staleSession && (
         <Alert severity="info" sx={{ mb: 2 }}>
@@ -134,10 +179,10 @@ export default function Settings() {
         </Alert>
       )}
 
-      {sections.map((section) => (
+      {filteredSections.map((section) => (
         <Accordion
           key={section.id}
-          expanded={open === section.id}
+          expanded={q !== '' || open === section.id}
           onChange={() => toggle(section.id)}
           disableGutters
           sx={{
