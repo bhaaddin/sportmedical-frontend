@@ -494,7 +494,12 @@ export default function CalendarGridPage() {
         const end = parseTimeOfDay(row.endTime);
         if (row.isOpen && start !== null && end !== null) working.push({ start, end });
       }
-      for (const a of byDay.get(dayKey) ?? []) items.push(spanOnDay(a.startUtc, a.endUtc, dayKey));
+      /* A cancelled booking is not drawn, so it must not stretch the day either:
+         one cancelled 01:00 slot used to open every day at one in the morning. */
+      for (const a of byDay.get(dayKey) ?? []) {
+        if (statusTally(a.status) === "cancelled") continue;
+        items.push(spanOnDay(a.startUtc, a.endUtc, dayKey));
+      }
       for (const blocks of blocksByCalendar.values()) {
         for (const b of blocks) {
           if (touchesDay(b.startUtc, b.endUtc, dayKey)) items.push(spanOnDay(b.startUtc, b.endUtc, dayKey));
