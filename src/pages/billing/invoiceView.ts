@@ -8,10 +8,22 @@
  * the server stores; it is an open invoice whose due date has passed, so it is
  * worked out here from `dueDateUtc` against the clock the caller passes in.
  */
-import type { Invoice, InvoicePaymentMethod } from '../../api/billing';
+import type { Invoice, InvoicePaymentMethod, RecipientType } from '../../api/billing';
 import type { ChipTone } from '../../components/ui';
 
-export type InvoiceFilter = 'all' | 'unpaid' | 'overdue' | 'clubs';
+export type InvoiceFilter = 'all' | 'unpaid' | 'overdue' | 'clubs' | 'approval';
+
+/** How the recipient type is called on the screen. */
+export const RECIPIENT_LABEL: Record<RecipientType, string> = {
+  Person: 'Osoba',
+  Group: 'Skupina',
+  Team: 'Tým',
+};
+
+/** Over somebody's discount limit and waiting for an approver; it cannot be paid. */
+export function isPendingApproval(inv: Invoice): boolean {
+  return inv.status === 'PendingApproval';
+}
 
 /** Still collectable: issued or partly paid, with money outstanding. */
 export function isOpen(inv: Invoice): boolean {
@@ -26,7 +38,18 @@ export function isOverdue(inv: Invoice, now: Date): boolean {
 
 /** Billed to a club rather than a patient - only once the API says so. */
 export function isClub(inv: Invoice): boolean {
-  return Boolean(inv.clubId) || Boolean(inv.clubName);
+  return inv.recipientType === 'Team' || Boolean(inv.clubId) || Boolean(inv.clubName);
+}
+
+/**
+ * Person, Group or Team. An older server sends no `recipientType`: a club on
+ * the invoice means a team, anything else a person.
+ */
+export function recipientTypeOf(inv: Invoice): RecipientType {
+  if (inv.recipientType === 'Group' || inv.recipientType === 'Team' || inv.recipientType === 'Person') {
+    return inv.recipientType;
+  }
+  return isClub(inv) ? 'Team' : 'Person';
 }
 
 /** Counts towards turnover: issued and not taken back. */
@@ -52,10 +75,17 @@ export interface InvoiceStatusView {
 export function statusOf(inv: Invoice, now: Date): InvoiceStatusView {
   if (isOverdue(inv, now)) return { label: 'Po splatnosti', tone: 'red' };
   switch (inv.status) {
+    case 'PendingApproval':
+      return { label: 'Čeká na schválení', tone: 'beige' };
+    case 'Rejected':
+      return { label: 'Zamítnuto', tone: 'grey' };
     case 'Paid':
       return { label: 'Zaplaceno', tone: 'green' };
     case 'Issued':
-      return isClub(inv) ? { label: 'Vystaveno', tone: 'beige' } : { label: 'Nezaplaceno', tone: 'red' };
+      /* A person should have paid at the desk; a group or a club is sent the invoice. */
+      return recipientTypeOf(inv) !== 'Person'
+        ? { label: 'Vystaveno', tone: 'beige' }
+        : { label: 'Nezaplaceno', tone: 'red' };
     case 'PartiallyPaid':
       return { label: 'Částečně zaplaceno', tone: 'beige' };
     case 'Draft':
@@ -78,9 +108,30 @@ export function itemsLabel(inv: Invoice): string {
     .join(' · ');
 }
 
-/** Who the invoice is for, as the search box sees it. */
+/** The applied discounts as the list writes them: "−10 %", "−10 % · −5 %". */
+export function discountSuffix(inv: Invoice): string {
+  const applied = (inv.discounts ?? []).filter((d) => d.amountCzk > 0 && d.percent > 0);
+  return applied.map((d) => `−${formatPercent(d.percent)}`).join(' · ');
+}
+
+/** "10 %", "7,5 %" - with a non-breaking space, as Czech typography wants it. */
+export function formatPercent(percent: number): string {
+  return `${percent.toLocaleString('cs-CZ', { maximumFractionDigits: 2 })} %`;
+}
+
+/** The lines and, when something was taken off, how much: "12× Komplexní prohlídka · −10 %". */
+export function itemsWithDiscount(inv: Invoice): string {
+  const base = itemsLabel(inv);
+  const suffix = discountSuffix(inv);
+  return suffix === '' ? base : `${base} · ${suffix}`;
+}
+
+/** Who the invoice is for: the group's or the club's name, else the patient's. */
 export function customerOf(inv: Invoice): string {
-  return (isClub(inv) ? inv.clubName : null) || inv.patientName || '';
+  const type = recipientTypeOf(inv);
+  if (type === 'Team') return inv.clubName || inv.recipientName || inv.patientName || '';
+  if (type === 'Group') return inv.recipientName || inv.patientName || '';
+  return inv.patientName || inv.recipientName || '';
 }
 
 export function matchesSearch(inv: Invoice, query: string): boolean {
@@ -90,6 +141,7 @@ export function matchesSearch(inv: Invoice, query: string): boolean {
     (inv.invoiceNumber ?? '').toLowerCase().includes(q) ||
     (inv.patientName ?? '').toLowerCase().includes(q) ||
     (inv.clubName ?? '').toLowerCase().includes(q) ||
+    (inv.recipientName ?? '').toLowerCase().includes(q) ||
     itemsLabel(inv).toLowerCase().includes(q)
   );
 }
@@ -102,6 +154,8 @@ export function matchesFilter(inv: Invoice, filter: InvoiceFilter, now: Date): b
       return isOverdue(inv, now);
     case 'clubs':
       return isClub(inv);
+    case 'approval':
+      return isPendingApproval(inv);
     default:
       return true;
   }
@@ -114,6 +168,8 @@ export interface InvoiceSummary {
   /** Everything still outstanding, whatever month it is from. */
   unpaid: number;
   overdueCount: number;
+  /** Invoices above somebody's discount limit, waiting for an approver. */
+  pendingApprovalCount: number;
   /** This month's turnover per distinct patient, or null when nothing was billed. */
   averagePerPatient: number | null;
   /** Money taken this month at the desk: in cash, and by card. */
@@ -146,7 +202,10 @@ function paidThisMonth(inv: Invoice, method: InvoicePaymentMethod, now: Date): n
 export function summarize(invoices: Invoice[], now: Date): InvoiceSummary {
   const thisMonth = invoices.filter((i) => counts(i) && sameMonth(i.issueDateUtc, now));
   const invoicedThisMonth = thisMonth.reduce((s, i) => s + i.totalCzk, 0);
-  const patients = new Set(thisMonth.map((i) => i.patientId));
+  /* "Per patient" is about people: a group's or a club's invoice has no patient. */
+  const persons = thisMonth.filter((i) => recipientTypeOf(i) === 'Person' && Boolean(i.patientId));
+  const personTurnover = persons.reduce((s, i) => s + i.totalCzk, 0);
+  const patients = new Set(persons.map((i) => i.patientId));
 
   const open = invoices.filter(isOpen);
   return {
@@ -154,7 +213,8 @@ export function summarize(invoices: Invoice[], now: Date): InvoiceSummary {
     invoicedThisMonthCount: thisMonth.length,
     unpaid: open.reduce((s, i) => s + i.remainingCzk, 0),
     overdueCount: invoices.filter((i) => isOverdue(i, now)).length,
-    averagePerPatient: patients.size === 0 ? null : Math.round(invoicedThisMonth / patients.size),
+    pendingApprovalCount: invoices.filter(isPendingApproval).length,
+    averagePerPatient: patients.size === 0 ? null : Math.round(personTurnover / patients.size),
     cashThisMonth: invoices.reduce((sum, i) => sum + paidThisMonth(i, 'Cash', now), 0),
     cardThisMonth: invoices.reduce((sum, i) => sum + paidThisMonth(i, 'Card', now), 0),
   };

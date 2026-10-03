@@ -5,7 +5,8 @@
 import { describe, it, expect } from 'vitest';
 import type { Invoice } from '../../api/billing';
 import {
-  doklady, isOverdue, itemsLabel, matchesFilter, matchesSearch, monthIn, statusOf, summarize,
+  customerOf, discountSuffix, doklady, isOverdue, isPendingApproval, itemsLabel, itemsWithDiscount, matchesFilter,
+  matchesSearch, monthIn, recipientTypeOf, statusOf, summarize,
 } from './invoiceView';
 import { czk } from './money';
 
@@ -122,5 +123,61 @@ describe('words', () => {
     expect(czk(0)).toBe('0 Kč');
     expect(czk(2200.5)).toMatch(/^2\s200,5 Kč$/);
     expect(czk(undefined)).toBe('0 Kč');
+  });
+});
+
+describe('recipient types, approval and discounts (contract C3)', () => {
+  const pending = invoice({ status: 'PendingApproval', recipientType: 'Group', recipientName: 'ČEZ Sport', patientId: '' , patientName: ''});
+
+  it('reads a waiting invoice as Čeká na schválení, in beige, even past its due date', () => {
+    expect(statusOf(pending, NOW)).toEqual({ label: 'Čeká na schválení', tone: 'beige' });
+    expect(statusOf({ ...pending, dueDateUtc: '2026-10-01T00:00:00Z' }, NOW).label).toBe('Čeká na schválení');
+    expect(isPendingApproval(pending)).toBe(true);
+    expect(statusOf(invoice({ status: 'Rejected' }), NOW)).toEqual({ label: 'Zamítnuto', tone: 'grey' });
+  });
+
+  it('a waiting invoice is not collectable and not turnover yet', () => {
+    expect(summarize([pending], NOW).unpaid).toBe(0);
+    expect(summarize([pending], NOW).invoicedThisMonth).toBe(0);
+    expect(summarize([pending, invoice({})], NOW).pendingApprovalCount).toBe(1);
+    expect(matchesFilter(pending, 'unpaid', NOW)).toBe(false);
+    expect(matchesFilter(pending, 'approval', NOW)).toBe(true);
+    expect(matchesFilter(invoice({}), 'approval', NOW)).toBe(false);
+  });
+
+  it('knows the recipient type, from an older server too', () => {
+    expect(recipientTypeOf(invoice({}))).toBe('Person');
+    expect(recipientTypeOf(invoice({ clubName: 'FK Slaný' }))).toBe('Team');
+    expect(recipientTypeOf(invoice({ recipientType: 'Group' }))).toBe('Group');
+  });
+
+  it('names the customer by type and finds a group by its name', () => {
+    expect(customerOf(pending)).toBe('ČEZ Sport');
+    expect(customerOf(invoice({ recipientType: 'Team', clubName: 'FK Slaný', patientName: 'Kontakt' }))).toBe('FK Slaný');
+    expect(customerOf(invoice({}))).toBe('Bohumil Komárek');
+    expect(matchesSearch(pending, 'čez')).toBe(true);
+  });
+
+  it('a group or a club invoice reads Vystaveno, a person Nezaplaceno', () => {
+    expect(statusOf(invoice({ recipientType: 'Group' }), NOW)).toEqual({ label: 'Vystaveno', tone: 'beige' });
+    expect(statusOf(invoice({ recipientType: 'Person' }), NOW)).toEqual({ label: 'Nezaplaceno', tone: 'red' });
+  });
+
+  it('averages per patient over people only', () => {
+    const club = invoice({ id: 'c', recipientType: 'Team', clubName: 'FK', patientId: '', totalCzk: 23760, remainingCzk: 23760 });
+    expect(summarize([invoice({}), club], NOW).averagePerPatient).toBe(2200);
+  });
+
+  it('writes the applied discounts after the lines, not the ones that lost', () => {
+    const inv = invoice({
+      items: [{ id: 'l', description: 'Komplexní prohlídka', serviceCode: 'KP', quantity: 12, unitPriceCzk: 2200, amountCzk: 26400 }],
+      discounts: [
+        { kind: 'tier', label: 'Velká skupina', percent: 10, amountCzk: 2640 },
+        { kind: 'club', label: 'FK', percent: 5, amountCzk: 0 },
+      ],
+    });
+    expect(discountSuffix(inv)).toBe('−10 %');
+    expect(itemsWithDiscount(inv)).toBe('12× Komplexní prohlídka · −10 %');
+    expect(itemsWithDiscount(invoice({}))).toBe(itemsLabel(invoice({})));
   });
 });
