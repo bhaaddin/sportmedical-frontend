@@ -294,6 +294,8 @@ function WhereAmI({
 }) {
   const crumbs: { label: string; to?: string }[] = [];
   if (settingsHere !== null) {
+    /* A settings screen in the board's frame draws its own breadcrumb; one line of place is enough. */
+    if (SETTINGS_FRAMED.has(settingsHere.item.to)) return null;
     crumbs.push({ label: 'Nastavení', to: '/settings' }, { label: settingsHere.section.label }, { label: settingsHere.item.label });
   } else if (patientId !== null) {
     const section = PATIENT_SECTIONS.find((s) => sectionPath(patientId, s) === pathname);
