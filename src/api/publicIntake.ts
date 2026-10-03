@@ -42,8 +42,12 @@ publicClient.interceptors.response.use((res) => {
 export interface IntakeIdentity {
   givenName: string;
   familyName: string;
-  /** ISO yyyy-MM-dd. */
-  dateOfBirth: string;
+  /**
+   * ISO yyyy-MM-dd. `null` when the patient did not give one — allowed only when
+   * the clinic does not ask for it on a desk-started completion link (Etapa 2,
+   * decision 7: the switch is `requireDateOfBirthOnCompletion`, default off).
+   */
+  dateOfBirth: string | null;
   sex: Sex;
   /** Digits only, no slash. Optional — improves matching when present. */
   birthNumber: string | null;
@@ -301,6 +305,121 @@ export interface CompletionOpen {
   expiresAtUtc: string;
   activityName?: string | null;
   startUtc?: string | null;
+}
+
+/** One document the činnost asks the patient to deal with (the admin's template). */
+export interface CompletionDocument {
+  templateId: string;
+  name: string;
+}
+
+/** The booking the desk made, as the completion link describes it. */
+export interface CompletionAppointment {
+  activityName: string;
+  serviceName: string;
+  startUtc: string;
+  endUtc: string | null;
+  /** Empty is normal: the admin picks documents per činnost and the default is none. */
+  requiredDocuments: CompletionDocument[];
+}
+
+/**
+ * What the completion link opens with, normalised (Etapa 2, contract C2).
+ *
+ * The server's names moved while this was built (givenName/firstName,
+ * phone/phoneE164, appointmentStartUtc/appointment.startUtc), so the raw answer
+ * is read tolerantly here and the page only ever sees this shape.
+ */
+export interface CompletionView {
+  referenceNumber: string;
+  givenName: string;
+  familyName: string;
+  email: string;
+  phoneE164: string | null;
+  /** Until when the registration can be finished: registrationDeadlineUtc, else the link's expiry. */
+  deadlineUtc: string | null;
+  appointment: CompletionAppointment | null;
+  /** The admin's switch; when the server sends none, the form asks as it always did. */
+  requireDateOfBirth: boolean;
+  /** Whether the health questionnaire is asked for on this link (default: not asked). */
+  questionnaire: 'NotAsked' | 'Optional' | 'Required';
+}
+
+export type CompletionResult =
+  | { status: 'ok'; view: CompletionView }
+  /** 410: the deadline passed; the reservation is cancelled and the slot is free again. */
+  | { status: 'expired'; message: string | null }
+  /** 404: unknown or already used. */
+  | { status: 'missing' }
+  | { status: 'error' };
+
+const text = (value: unknown): string => (typeof value === 'string' ? value : '');
+const textOrNull = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);
+
+/** Reads the raw completion answer into a CompletionView (exported for the tests). */
+export function normaliseCompletion(raw: Record<string, unknown>): CompletionView {
+  const nested = (raw.appointment ?? null) as Record<string, unknown> | null;
+  const startUtc = textOrNull(nested?.startUtc) ?? textOrNull(raw.appointmentStartUtc) ?? textOrNull(raw.startUtc);
+  const activityName = textOrNull(nested?.activityName) ?? textOrNull(raw.activityName);
+
+  const documents = Array.isArray(nested?.requiredDocuments)
+    ? (nested?.requiredDocuments as Array<Record<string, unknown>>)
+      .map((d) => ({ templateId: text(d.templateId), name: text(d.name) }))
+      .filter((d) => d.name !== '')
+    : [];
+
+  const appointment: CompletionAppointment | null = startUtc !== null || activityName !== null
+    ? {
+        activityName: activityName ?? '',
+        serviceName: text(nested?.serviceName),
+        startUtc: startUtc ?? '',
+        endUtc: textOrNull(nested?.endUtc),
+        requiredDocuments: documents,
+      }
+    : null;
+
+  const required = raw.requireDateOfBirthOnCompletion ?? raw.requireDateOfBirth;
+  const questionnaireRaw = raw.questionnaireRequirement;
+  const questionnaire: CompletionView['questionnaire'] =
+    questionnaireRaw === 'Required' || questionnaireRaw === 2 ? 'Required'
+      : questionnaireRaw === 'Optional' || questionnaireRaw === 1 ? 'Optional'
+        : raw.questionnaireRequired === true ? 'Required' : 'NotAsked';
+
+  return {
+    referenceNumber: text(raw.referenceNumber),
+    givenName: text(raw.firstName) || text(raw.givenName),
+    familyName: text(raw.lastName) || text(raw.familyName),
+    email: text(raw.email),
+    phoneE164: textOrNull(raw.phone) ?? textOrNull(raw.phoneE164),
+    deadlineUtc: textOrNull(raw.registrationDeadlineUtc) ?? textOrNull(raw.expiresAtUtc),
+    appointment,
+    requireDateOfBirth: typeof required === 'boolean' ? required : true,
+    questionnaire,
+  };
+}
+
+/**
+ * Opens a completion link and tells the four outcomes apart, which
+ * {@link openCompletion} cannot: 410 is "the deadline passed and the reservation
+ * is gone" (a calm page with a way to book again), 404 is "unknown or used",
+ * anything else is a failed load worth a "Zkusit znovu".
+ */
+export async function openCompletionResult(token: string): Promise<CompletionResult> {
+  try {
+    const res = await publicClient.get<Record<string, unknown>>(
+      `/api/public/intake/complete/${encodeURIComponent(token)}`,
+    );
+    return { status: 'ok', view: normaliseCompletion(res.data ?? {}) };
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status ?? 0;
+      if (status === 410) {
+        return { status: 'expired', message: textOrNull((error.response?.data as { message?: unknown } | undefined)?.message) };
+      }
+      if (status === 404) return { status: 'missing' };
+    }
+    return { status: 'error' };
+  }
 }
 
 /**

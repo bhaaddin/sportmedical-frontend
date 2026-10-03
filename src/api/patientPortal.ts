@@ -59,6 +59,30 @@ export interface PortalInvoice {
   status: string;
 }
 
+/**
+ * One diagnostic session as the patient's own portal shows it (Výsledky).
+ *
+ * The same facts a session stores (DiagnosticSession); the doctor's manual
+ * entry travels in `rawPractitionerNotes` as the labelled "[Ruční zápis]"
+ * block, which the page reads with `parseManualExtras`. A value the session
+ * does not carry arrives null or 0 and is shown as "—".
+ */
+export interface PortalResult {
+  id: string;
+  /** When the session was recorded. */
+  sessionDate: string;
+  practitionerName?: string | null;
+  restingHeartRateBpm?: number | null;
+  maxHeartRateBpm?: number | null;
+  vo2MaxMlMinKg?: number | null;
+  anaerobicThresholdBpm?: number | null;
+  systolicBloodPressure?: number | null;
+  diastolicBloodPressure?: number | null;
+  bodyFatPercentage?: number | null;
+  muscleMassKg?: number | null;
+  rawPractitionerNotes?: string | null;
+}
+
 export interface PortalDashboard {
   givenName: string;
   familyName: string;
@@ -79,6 +103,11 @@ export interface PortalDashboard {
    * 'Missing' (not filled in), 'Complete', or 'NotRequired'. Absent otherwise.
    */
   questionnaireStatus?: 'Missing' | 'Complete' | 'NotRequired' | null;
+  /**
+   * The patient's own measurements, newest first. Absent on an API that does not
+   * send them yet — the Výsledky tab then says there are none, it invents nothing.
+   */
+  results?: PortalResult[];
 }
 
 /** The patient's own dashboard, or null for an unknown/revoked token. */

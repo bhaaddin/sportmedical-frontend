@@ -36,6 +36,14 @@ export interface ClubWindow {
   places: number;
 }
 
+/** One free time inside the club's block, when the server offers a choice of them. */
+export interface ClubSlot {
+  startUtc: string;
+  endUtc: string;
+  /** False when a team-mate already took it. */
+  free: boolean;
+}
+
 /** What the club link resolves to: nothing sensitive, no token, no contacts. */
 export interface ClubOffer {
   partnerName: string;
@@ -43,6 +51,24 @@ export interface ClubOffer {
   activities: ClubActivity[];
   windows: ClubWindow[];
   remaining: number;
+  /*
+   * Etapa 2 (contract C4, ClubBlockView): all optional — an older server omits
+   * them and the page then shows only what it has.
+   */
+  /** The club's colour (#RRGGBB), stable per club. */
+  colorHex?: string | null;
+  /** How many places the block holds and how many are taken (registered / seats). */
+  seats?: number | null;
+  registered?: number | null;
+  /** The block's period, yyyy-MM-dd. */
+  fromDate?: string | null;
+  toDate?: string | null;
+  /** Until when the link takes registrations. */
+  expiresAtUtc?: string | null;
+  /** The clinic's switch: ask the athlete for a date of birth. */
+  requireDateOfBirth?: boolean | null;
+  /** The block's free times, when the athlete may choose one; otherwise the server assigns it. */
+  slots?: ClubSlot[] | null;
 }
 
 /** The slot an athlete's claim got. */
@@ -91,6 +117,11 @@ export interface ClaimInput {
   name: string;
   phone?: string;
   note?: string;
+  email?: string;
+  /** yyyy-MM-dd; sent only when the clinic asks for it. */
+  dateOfBirth?: string;
+  /** The free time the athlete chose, when the offer lists times to choose from. */
+  startUtc?: string;
 }
 
 /**

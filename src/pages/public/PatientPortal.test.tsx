@@ -5,10 +5,11 @@
  * its own link, bound to this token, and an empty list says why it is empty.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { PortalAppointment, PortalDashboard } from '../../api/patientPortal';
+import { VIEWPORTS, setViewport } from '../../test/viewport';
 
 const openPortal = vi.fn();
 const cancelPortalAppointment = vi.fn();
@@ -56,6 +57,7 @@ const renderPortal = (token = 'tok-123') =>
   );
 
 beforeEach(() => {
+  setViewport(VIEWPORTS.desktop);
   openPortal.mockReset();
   cancelPortalAppointment.mockReset();
 });
@@ -139,5 +141,179 @@ describe('documents in the patient portal', () => {
     );
     expect(link).toHaveAttribute('target', '_blank');
     expect(link.getAttribute('rel')).toContain('noopener');
+  });
+});
+
+/* ── Výsledky (artboard V-Vysledky) ── */
+
+const session = (over: Partial<NonNullable<PortalDashboard['results']>[number]> = {}) => ({
+  id: 'ses-1',
+  sessionDate: '2026-09-24T07:30:00Z',
+  practitionerName: 'MUDr. Nováková',
+  restingHeartRateBpm: 0,
+  maxHeartRateBpm: 191,
+  vo2MaxMlMinKg: 54.2,
+  anaerobicThresholdBpm: 168,
+  systolicBloodPressure: 0,
+  diastolicBloodPressure: 0,
+  bodyFatPercentage: 0,
+  muscleMassKg: 0,
+  rawPractitionerNotes: null,
+  ...over,
+});
+
+const MANUAL_NOTES = [
+  'Soukromá poznámka lékaře, kterou pacient nemá vidět.',
+  '',
+  '[Ruční zápis]',
+  'Datum měření: 2026-09-20',
+  'Protokol: Bicyklový ergometr',
+  'Hmotnost: 79,1 kg',
+  'Práh: 82 % VO₂max',
+  'Max. výkon: 348 W',
+  'Zóna 1: Regenerace | do 124 bpm',
+  'Zóna 2: Vytrvalost | 125–148 bpm',
+].join('\n');
+
+const tile = (label: string): HTMLElement => {
+  const latest = screen.getByRole('region', { name: 'Poslední měření' });
+  const element = within(latest).getByText(label).parentElement;
+  if (element === null) throw new Error(`no tile for ${label}`);
+  return element;
+};
+
+const openResults = async () => {
+  await userEvent.click(await screen.findByRole('button', { name: 'Výsledky' }));
+  return screen.findByTestId('results-view');
+};
+
+describe('the results tab', () => {
+  beforeEach(() => {
+    setViewport(VIEWPORTS.desktop);
+  });
+
+  it('shows what the session stores and "—" for everything it does not', async () => {
+    openPortal.mockResolvedValue(dashboard({ results: [session()] }));
+    renderPortal();
+    await openResults();
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Moje výsledky' })).toBeInTheDocument();
+    expect(screen.getByText('1 měření')).toBeInTheDocument();
+    expect(within(tile('VO₂max')).getByText('54,2')).toBeInTheDocument();
+    expect(within(tile('Maximální tep')).getByText('191')).toBeInTheDocument();
+    expect(within(tile('Tep na prahu')).getByText('168')).toBeInTheDocument();
+    // What the session does not carry is a dash, never a guess.
+    for (const label of ['Klidový tep', 'Tělesný tuk', 'Svalová hmota', 'Krevní tlak', 'Hmotnost']) {
+      expect(within(tile(label)).getByText('—')).toBeInTheDocument();
+    }
+  });
+
+  it('draws a blood pressure when both numbers are there', async () => {
+    openPortal.mockResolvedValue(dashboard({ results: [session({ systolicBloodPressure: 120, diastolicBloodPressure: 80, bodyFatPercentage: 12.4 })] }));
+    renderPortal();
+    await openResults();
+
+    expect(within(tile('Krevní tlak')).getByText('120/80')).toBeInTheDocument();
+    expect(within(tile('Tělesný tuk')).getByText('12,4')).toBeInTheDocument();
+  });
+
+  it('reads the doctor\'s manual entry: weight, date, zones and the other facts - and not the free note', async () => {
+    openPortal.mockResolvedValue(dashboard({ results: [session({ rawPractitionerNotes: MANUAL_NOTES })] }));
+    renderPortal();
+    await openResults();
+
+    expect(within(tile('Hmotnost')).getByText('79,1 kg')).toBeInTheDocument();
+    expect(screen.getByText(/20\. 9\. 2026 · MUDr\. Nováková/)).toBeInTheDocument();
+    expect(within(tile('Tep na prahu')).getByText(/82 % VO₂max/)).toBeInTheDocument();
+    const zones = screen.getByRole('list', { name: 'Tréninkové zóny' });
+    expect(within(zones).getByText('Regenerace')).toBeInTheDocument();
+    expect(within(zones).getByText('do 124 bpm')).toBeInTheDocument();
+    expect(within(zones).getByText('125–148 bpm')).toBeInTheDocument();
+    expect(screen.getByText('Bicyklový ergometr')).toBeInTheDocument();
+    expect(screen.getByText('348 W')).toBeInTheDocument();
+    expect(screen.queryByText(/Soukromá poznámka/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Ruční zápis/)).not.toBeInTheDocument();
+  });
+
+  it('says there are no measurements instead of drawing empty tiles or a chart', async () => {
+    openPortal.mockResolvedValue(dashboard());
+    renderPortal();
+    await openResults();
+
+    expect(screen.getAllByText('Zatím tu nejsou žádná měření.').length).toBeGreaterThan(0);
+    expect(screen.queryByText('VO₂max')).not.toBeInTheDocument();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('lists every measurement, newest first', async () => {
+    openPortal.mockResolvedValue(dashboard({
+      results: [
+        session({ id: 'a', sessionDate: '2026-03-16T10:00:00Z', vo2MaxMlMinKg: 52.6 }),
+        session({ id: 'b', sessionDate: '2026-09-24T10:00:00Z', vo2MaxMlMinKg: 54.2 }),
+      ],
+    }));
+    renderPortal();
+    await openResults();
+
+    const table = screen.getByRole('table', { name: 'Všechna měření' });
+    const rows = within(table).getAllByRole('row');
+    expect(rows).toHaveLength(3);
+    expect(within(rows[1]).getByText('24. 9. 2026')).toBeInTheDocument();
+    expect(within(rows[2]).getByText('16. 3. 2026')).toBeInTheDocument();
+  });
+
+  it('the overview teases the latest measurement only when there is one', async () => {
+    openPortal.mockResolvedValue(dashboard());
+    const { unmount } = renderPortal();
+    await screen.findByText(/Jakmile vám je ordinace uvolní/);
+    expect(screen.queryByText('Jak se vyvíjíte')).not.toBeInTheDocument();
+    unmount();
+
+    openPortal.mockResolvedValue(dashboard({ results: [session()] }));
+    renderPortal();
+    expect(await screen.findByText('Jak se vyvíjíte')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Všechna měření' }));
+    expect(await screen.findByTestId('results-view')).toBeInTheDocument();
+  });
+
+  it('says nothing about device import on screen', async () => {
+    openPortal.mockResolvedValue(dashboard({ results: [session()] }));
+    renderPortal();
+    await openResults();
+    expect(screen.queryByText(/import|přístroj|Vald|zařízení/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('three layouts', () => {
+  const withResults = () => openPortal.mockResolvedValue(
+    dashboard({ appointments: [upcoming()], results: [session()] }),
+  );
+
+  it('phone: one column, "Objednat termín" pinned at the bottom, measurements as cards', async () => {
+    setViewport(VIEWPORTS.phone);
+    withResults();
+    renderPortal();
+
+    expect(await screen.findByText('Sportovní prohlídka')).toBeInTheDocument();
+    const bar = document.querySelector('[data-pinned="true"]') as HTMLElement | null;
+    expect(bar).not.toBeNull();
+    expect(within(bar as HTMLElement).getByRole('link', { name: 'Objednat termín' })).toBeInTheDocument();
+
+    await openResults();
+    expect(screen.getByRole('list', { name: 'Všechna měření' })).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it.each([['iPad', VIEWPORTS.tablet], ['desktop', VIEWPORTS.desktop]])('%s: nothing is pinned and measurements are a table', async (_n, width) => {
+    setViewport(width);
+    withResults();
+    renderPortal();
+
+    expect(await screen.findByText('Sportovní prohlídka')).toBeInTheDocument();
+    expect(document.querySelector('[data-pinned="true"]')).toBeNull();
+    expect(screen.getByRole('navigation', { name: 'Portál' })).toBeInTheDocument();
+
+    await openResults();
+    expect(screen.getByRole('table', { name: 'Všechna měření' })).toBeInTheDocument();
   });
 });

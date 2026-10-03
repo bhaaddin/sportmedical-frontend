@@ -30,9 +30,7 @@ import {
   Alert,
   Box,
   Button,
-  Card,
   CircularProgress,
-  Container,
   Dialog,
   DialogActions,
   DialogContent,
@@ -59,6 +57,14 @@ import { readPublicClinic } from '../../api/clinicSettings';
 import type { PublicClinic } from '../../api/clinicSettings';
 import PublicLayout from './PublicLayout';
 import { BRAND } from '../../components/public/brand';
+import { PageTitle, Panel, PublicMain } from '../../components/public/kit';
+import type { ReactNode } from 'react';
+import type { SxProps, Theme } from '@mui/material/styles';
+
+/* The artboards' white panel; the content keeps its own spacing. */
+function Card({ children, sx }: { children: ReactNode; sx?: SxProps<Theme> }) {
+  return <Panel component="div" sx={{ display: 'block', ...sx }}>{children}</Panel>;
+}
 
 /* Brand: the website identity every public page wears — components/public/brand.ts. */
 
@@ -217,10 +223,10 @@ export default function ManageBooking() {
 
   return (
     <PublicLayout clinic={clinic}>
-      <Box sx={{ pb: { xs: 6, md: 10 } }}>
-        <Hero />
+      <PublicMain maxWidth={640} gap={2.5}>
+        <PageTitle>Vaše rezervace</PageTitle>
 
-        <Container maxWidth="sm" sx={{ mt: { xs: -7, md: -9 } }}>
+        <Box>
           {loadFailed !== null && (
             <Card sx={{ p: 3 }}>
               <Typography sx={{ fontWeight: 800, fontSize: 19, mb: 1 }}>
@@ -338,11 +344,7 @@ export default function ManageBooking() {
             </Card>
           )}
 
-          <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 2, textAlign: 'center' }}>
-            K vyšetření si prosím vezměte výpis ze zdravotní dokumentace od
-            svého praktického lékaře.
-          </Typography>
-        </Container>
+        </Box>
 
         {/*
           Cancelling gives the time away to whoever books it next, and there is
@@ -455,29 +457,7 @@ export default function ManageBooking() {
             </Button>
           </DialogActions>
         </Dialog>
-      </Box>
+      </PublicMain>
     </PublicLayout>
-  );
-}
-
-function Hero() {
-  return (
-    <Box
-      sx={{
-        bgcolor: BRAND.ink,
-        color: '#FFFFFF',
-        pt: { xs: 4, md: 6 },
-        pb: { xs: 10, md: 13 },
-      }}
-    >
-      <Container maxWidth="sm">
-        <Typography sx={{ color: BRAND.accent, fontWeight: 800, fontSize: 12.5, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
-          Správa rezervace
-        </Typography>
-        <Typography component="h1" sx={{ fontWeight: 800, letterSpacing: '-0.02em', mt: 1, fontSize: { xs: 28, md: 36 }, lineHeight: 1.1 }}>
-          Vaše rezervace
-        </Typography>
-      </Container>
-    </Box>
   );
 }

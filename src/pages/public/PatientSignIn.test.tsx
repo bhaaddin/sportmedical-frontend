@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { VIEWPORTS, setViewport } from '../../test/viewport';
 
 const portalLogin = vi.fn();
 
@@ -118,5 +119,26 @@ describe('PatientSignIn', () => {
 
     expect(screen.getByText(/Zapomněli jste heslo\? Ozvěte se ordinaci — heslo vám smaže a pošle nový odkaz\./))
       .toBeInTheDocument();
+  });
+});
+
+describe('three layouts', () => {
+  it('phone: one field per row and "Přihlásit se" pinned at the bottom', () => {
+    setViewport(VIEWPORTS.phone);
+    renderSignIn();
+
+    const bar = document.querySelector('[data-pinned="true"]') as HTMLElement | null;
+    expect(bar).not.toBeNull();
+    expect(bar?.querySelector('button[type="submit"]')?.textContent).toBe('Přihlásit se');
+    expect(screen.getByLabelText('E-mail')).toBeInTheDocument();
+    expect(screen.getByLabelText('Heslo')).toBeInTheDocument();
+  });
+
+  it.each([['iPad', VIEWPORTS.tablet], ['desktop', VIEWPORTS.desktop]])('%s: the button is inline, nothing is pinned', (_n, width) => {
+    setViewport(width);
+    renderSignIn();
+
+    expect(document.querySelector('[data-pinned="true"]')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Přihlásit se' })).toBeInTheDocument();
   });
 });

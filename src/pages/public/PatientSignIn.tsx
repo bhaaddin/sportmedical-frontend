@@ -9,24 +9,31 @@
    the identity. A password is a convenience the patient sets inside the
    portal, so the sign-in page says so rather than offering a "forgot
    password" it cannot honour.
+
+   Phone: one field per row, "Přihlásit se" pinned at the bottom of the screen.
    ══════════════════════════════════════════════════════════════ */
 
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { Alert, Box, Button, Card, CircularProgress, Container, Link, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Link, TextField, Typography } from '@mui/material';
 import { LockOutlined, PersonOutlined } from '@mui/icons-material';
 import {
   PortalAuthError, portalLogin, portalSignInMessage, readPortalToken, rememberPortalToken,
 } from '../../api/patientPortal';
+import { useIsPhone } from '../../layout/useDevice';
 import PublicLayout from './PublicLayout';
 import { BRAND } from '../../components/public/brand';
 import { LANDING_PATH } from '../../components/public/PublicHeader';
+import {
+  LABEL_COLOR, PageTitle, Panel, PinnedBar, PublicMain, ctaSx,
+} from '../../components/public/kit';
 
 export const portalPath = (token: string): string => `/portal/${encodeURIComponent(token)}`;
 
 export default function PatientSignIn() {
   const navigate = useNavigate();
+  const phone = useIsPhone();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -65,23 +72,16 @@ export default function PatientSignIn() {
 
   return (
     <PublicLayout hidePortalLink noFooter>
-      <Box sx={{ bgcolor: BRAND.ink, color: '#FFFFFF', pt: { xs: 5, md: 7 }, pb: { xs: 9, md: 11 } }}>
-        <Container maxWidth="xs">
-          <Typography sx={{ color: BRAND.accent, fontWeight: 800, fontSize: 12.5, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
-            Můj portál
-          </Typography>
-          <Typography component="h1" sx={{ fontWeight: 800, letterSpacing: '-0.02em', fontSize: { xs: 30, md: 36 }, mt: 1, lineHeight: 1.1 }}>
-            Přihlášení
-          </Typography>
-          <Typography sx={{ color: BRAND.onInk, mt: 1 }}>
-            Vaše termíny, dokumenty a doklady na jednom místě.
-          </Typography>
-        </Container>
-      </Box>
+      <PublicMain maxWidth={520} gap={2.5}>
+        <PageTitle sub="Vaše termíny, výsledky a dokumenty na jednom místě.">Přihlášení do portálu</PageTitle>
 
-      <Container maxWidth="xs" sx={{ mt: { xs: -6, md: -7 }, pb: 8 }}>
-        <Card sx={{ p: { xs: 2.5, md: 3.5 }, boxShadow: BRAND.shadow }}>
-          <Box component="form" onSubmit={(event) => { void submit(event); }} noValidate sx={{ display: 'grid', gap: 2 }}>
+        <Panel component="div" sx={{ flex: phone ? 1 : undefined }}>
+          <Box
+            component="form"
+            onSubmit={(event) => { void submit(event); }}
+            noValidate
+            sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}
+          >
             <TextField
               label="E-mail"
               type="email"
@@ -106,33 +106,34 @@ export default function PatientSignIn() {
               <Alert severity="warning" role="alert">{complaint}</Alert>
             )}
 
-            <Button
-              type="submit"
-              variant="contained"
-              size="large"
-              disabled={busy}
-              startIcon={busy ? <CircularProgress size={18} sx={{ color: BRAND.ink }} /> : undefined}
-              sx={{ color: BRAND.ink }}
-            >
-              {busy ? 'Přihlašuji…' : 'Přihlásit se'}
-            </Button>
-          </Box>
+            <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
+              Nemáte heslo? Přístup vám vydá ordinace — nebo si ho nastavte z odkazu, který jste dostali.
+            </Typography>
+            <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
+              Zapomněli jste heslo? Ozvěte se ordinaci — heslo vám smaže a pošle nový odkaz.
+            </Typography>
 
-          <Typography variant="body2" sx={{ color: BRAND.muted, mt: 3 }}>
-            Nemáte heslo? Přístup vám vydá ordinace — nebo si ho nastavte z odkazu, který jste dostali.
-          </Typography>
-          <Typography variant="body2" sx={{ color: BRAND.muted, mt: 1 }}>
-            Zapomněli jste heslo? Ozvěte se ordinaci — heslo vám smaže a pošle nový odkaz.
-          </Typography>
+            <Box sx={{ borderTop: `1px solid ${BRAND.line}`, pt: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+              <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>Ještě nemáte termín?</Typography>
+              <Link component={RouterLink} to={LANDING_PATH} sx={{ fontWeight: 700, color: '#A8560D', minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>
+                Objednat se
+              </Link>
+            </Box>
 
-          <Box sx={{ borderTop: `1px solid ${BRAND.line}`, mt: 2.5, pt: 2.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
-            <Typography variant="body2" sx={{ color: BRAND.muted }}>Ještě nemáte termín?</Typography>
-            <Link component={RouterLink} to={LANDING_PATH} sx={{ fontWeight: 700, color: BRAND.accentDark }}>
-              Objednat se
-            </Link>
+            <PinnedBar label="Přihlásit se">
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={busy}
+                startIcon={busy ? <CircularProgress size={18} sx={{ color: BRAND.ink }} /> : undefined}
+                sx={ctaSx(50)}
+              >
+                {busy ? 'Přihlašuji…' : 'Přihlásit se'}
+              </Button>
+            </PinnedBar>
           </Box>
-        </Card>
-      </Container>
+        </Panel>
+      </PublicMain>
     </PublicLayout>
   );
 }

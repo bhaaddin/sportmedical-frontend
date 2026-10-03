@@ -11,19 +11,24 @@
    rozdelene na 5 fazi tak na jedno fazy ... potrebujem aby
    registrace trvala pod minutou".
 
-   ── Why this page does not look like the rest of the app ──
+   ── The look ──
 
-   Everything behind the login is the staff application and wears the
-   teal in theme.ts. This is the ONE screen a patient ever sees, and
-   the clinic they think they are dealing with is the one at
-   sportmedical-diagnostics.cz: near-black, a single orange accent,
-   Inter. So the brand here is taken from that site and scoped to
-   this page by a local ThemeProvider. The staff theme is untouched.
+   Etapa 2: the page wears the same frame as every patient-facing page
+   (PublicLayout: the V-Web2 header and footer, Archivo, the warm page) and the
+   artboards V-Dotaznik / V-Rezervace — one column, white panels, a 48 px field,
+   the main action pinned at the bottom on a phone. The local theme and hero
+   banner it used to carry are gone; the form's field sizes live in
+   intake/intakeParts.tsx.
 
-   Measured off the live site on 18. 9. 2026 rather than guessed:
-   accent rgb(255,157,0), ink rgb(17,17,17), Inter throughout, pill
-   and 20px radii. If the site is redesigned, BRAND below is the one
-   place that has to move.
+   ── The completion link (/dokonceni/:token) ──
+
+   Decisions 6, 7, 10, 11: the desk books first and the link carries the
+   prefilled facts server-side. The page shows the reservation at the top with
+   the deadline, the prefilled fields (editable), the date of birth only when
+   the server says so, ONLY the documents the činnost asks for (none is normal)
+   and the health questionnaire only when the server says it is required. An
+   expired link (410) is a calm page with the clinic's phone and a way to book
+   again.
 
    Validation is delegated to services/publicIntake/validation, which
    mirrors the backend domain rules 1:1.
@@ -37,7 +42,6 @@ import {
   Button,
   Checkbox,
   Chip,
-  Container,
   Divider,
   FormControl,
   FormControlLabel,
@@ -48,17 +52,14 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { ThemeProvider } from '@mui/material/styles';
 import {
   AutoAwesomeOutlined,
   CheckCircleOutlined,
   DownloadOutlined,
-  EventAvailableOutlined,
   GavelOutlined,
   OpenInFullOutlined,
   LockOutlined,
-  ScheduleOutlined,
-  VerifiedUserOutlined,
 } from '@mui/icons-material';
 import {
   CZECH_INSURERS,
@@ -78,10 +79,10 @@ import {
   IntakeError,
   IntakeOutcome,
   clearIdempotencyKey,
-  openCompletion,
+  openCompletionResult,
   submitIntake,
 } from '../../api/publicIntake';
-import type { CompletionOpen, IntakeInsurance, IntakeResponse } from '../../api/publicIntake';
+import type { CompletionResult, IntakeInsurance, IntakeResponse } from '../../api/publicIntake';
 import {
   checkPublicEmail, checkPublicPhone, publicPhoneRegions,
 } from '../../api/publicContactCheck';
@@ -103,71 +104,34 @@ import { forgetHeld, readHeld } from '../../api/publicBooking';
 import { loadQuestionnaire } from '../../api/publicQuestionnaire';
 import type { LoadedQuestionnaire } from '../../api/publicQuestionnaire';
 import { questionnaireSatisfied, questionnaireStance } from '../../services/publicIntake/questionnaireRequirement';
+import type { QuestionnaireRequirement } from '../../services/publicIntake/questionnaireRequirement';
 import { calendarFileUrl } from '../../api/publicManage';
 import type { HeldBooking } from '../../api/publicBooking';
 import type { MapySuggestion } from '../../api/addressLookup';
 import { readPublicClinic } from '../../api/clinicSettings';
+import type { PublicClinic } from '../../api/clinicSettings';
+import PublicLayout from './PublicLayout';
+import { BRAND as PUBLIC_BRAND } from '../../components/public/brand';
+import {
+  LABEL_COLOR, Panel, PanelTitle, PageTitle, PinnedBar, PublicMain, ctaSx, longWhen,
+} from '../../components/public/kit';
+import {
+  FormSection, LinkProblem, RequiredDocuments, ReservationSummary, intakeTheme,
+} from './intake/intakeParts';
 import { useConsentSettings } from '../../api/consentSettings';
 
-/* ── Brand, taken from sportmedical-diagnostics.cz ── */
+/* ── Brand: the public identity, components/public/brand.ts (V-Web2) ── */
 
 const BRAND = {
-  ink: '#0B0B0C',
-  inkSoft: '#17171A',
-  accent: '#FF9D00',
-  accentDark: '#E08A00',
-  accentWash: 'rgba(255, 157, 0, 0.09)',
-  accentEdge: 'rgba(255, 157, 0, 0.32)',
-  page: '#F4F4F6',
-  line: '#E5E5E9',
-  muted: 'rgba(17, 17, 17, 0.58)',
+  ink: PUBLIC_BRAND.ink,
+  accent: PUBLIC_BRAND.accent,
+  accentDark: PUBLIC_BRAND.accentDark,
+  accentWash: PUBLIC_BRAND.accentWash,
+  accentEdge: PUBLIC_BRAND.accentEdge,
+  page: PUBLIC_BRAND.page,
+  line: PUBLIC_BRAND.line,
+  muted: PUBLIC_BRAND.muted,
 };
-
-const INTER = '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-
-/*
- * Scoped to this page. The orange is the accent of a brand, not a semantic
- * colour, so it is `primary` here only — an error is still red and a success
- * is still green, because a patient reading a refusal must not have to learn
- * a palette first.
- */
-const publicTheme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: { main: BRAND.accent, dark: BRAND.accentDark, contrastText: BRAND.ink },
-    background: { default: BRAND.page, paper: '#FFFFFF' },
-    text: { primary: '#111111', secondary: BRAND.muted },
-    divider: BRAND.line,
-  },
-  shape: { borderRadius: 12 },
-  typography: {
-    fontFamily: INTER,
-    h4: { fontWeight: 800, letterSpacing: '-0.02em' },
-    h5: { fontWeight: 800, letterSpacing: '-0.01em' },
-    button: { textTransform: 'none', fontWeight: 700 },
-  },
-  components: {
-    MuiTextField: { defaultProps: { fullWidth: true } },
-    MuiOutlinedInput: {
-      styleOverrides: {
-        root: {
-          backgroundColor: '#FFFFFF',
-          borderRadius: 12,
-          fontSize: 15.5,
-          '& fieldset': { borderColor: BRAND.line },
-          '&:hover fieldset': { borderColor: 'rgba(17,17,17,0.28)' },
-          '&.Mui-focused fieldset': { borderWidth: 2, borderColor: BRAND.accent },
-        },
-        // A patient's box, not a spreadsheet cell. 15.5/56 reads at arm's
-        // length and is a target a thumb can hit; the default 14/40 is what
-        // "it looks small" was about.
-        input: { paddingTop: 15, paddingBottom: 15 },
-      },
-    },
-    MuiInputLabel: { styleOverrides: { root: { fontSize: 15 } } },
-    MuiFormHelperText: { styleOverrides: { root: { marginLeft: 2, marginTop: 6 } } },
-  },
-});
 
 /* ── Form state ── */
 
@@ -355,18 +319,24 @@ export default function IntakeQuestionnaire() {
    */
   const { token: completionToken } = useParams<{ token: string }>();
   /*
-   * What the completion link is finishing: the činnost and the time the desk
-   * booked, returned by openCompletion. Kept so the page can show the patient
-   * what/when they are here for — the desk flow has no `held` slot in this tab,
-   * so without this they completed the form never seeing their own appointment.
+   * What the completion link is finishing, as the server describes it: the
+   * booked činnost and time, the deadline, the documents the činnost asks for,
+   * the prefilled facts and the admin's switches. 'loading' until it answers;
+   * a 410/404/failure is a page of its own (see the render below).
    */
-  const [completionInfo, setCompletionInfo] = useState<CompletionOpen | null>(null);
+  const [completion, setCompletion] = useState<CompletionResult | 'loading' | null>(
+    completionToken ? 'loading' : null,
+  );
+  const [completionAttempt, setCompletionAttempt] = useState(0);
   useEffect(() => {
-    if (!completionToken) return;
+    if (!completionToken) return undefined;
     let alive = true;
-    void openCompletion(completionToken).then((open) => {
-      if (!alive || open === null) return;
-      setCompletionInfo(open);
+    setCompletion('loading');
+    void openCompletionResult(completionToken).then((answer) => {
+      if (!alive) return;
+      setCompletion(answer);
+      if (answer.status !== 'ok') return;
+      const open = answer.view;
       setForm((prev) => {
         const next: FormState = {
           ...prev,
@@ -387,7 +357,13 @@ export default function IntakeQuestionnaire() {
     return () => {
       alive = false;
     };
-  }, [completionToken]);
+  }, [completionToken, completionAttempt]);
+  const completionView = completion !== null && completion !== 'loading' && completion.status === 'ok'
+    ? completion.view
+    : null;
+  /* The date of birth is asked for as it always was, except on a completion
+     link whose clinic has switched it off (decision 7: default off). */
+  const dobRequired = completionView === null ? true : completionView.requireDateOfBirth;
   /* The health questionnaire starts closed. It is ~76 questions and it is
      optional today; opening it by default would turn a one-minute
      registration into a page nobody scrolls to the bottom of. */
@@ -417,8 +393,13 @@ export default function IntakeQuestionnaire() {
    * before: optional. Nothing here decides the rule — the clinic set it per
    * činnost and the server checks it again.
    */
+  /* On a completion link the questionnaire is asked ONLY when the server says so
+     (default: not asked); otherwise the held činnost decides, as before. */
+  const questionnaireRule: QuestionnaireRequirement | undefined = completionToken
+    ? (completionView?.questionnaire ?? 'NotAsked')
+    : held?.questionnaireRequirement;
   const { asked: questionnaireAskedFor, required: questionnaireRequired } =
-    questionnaireStance(held?.questionnaireRequirement);
+    questionnaireStance(questionnaireRule);
 
   /*
    * The questionnaire itself: the one the booked činnost names, or the
@@ -470,7 +451,7 @@ export default function IntakeQuestionnaire() {
   /* A required questionnaire with nothing answered in it; opening it and
      closing it again does not count. */
   const questionnaireMissing = !questionnaireSatisfied(
-    held?.questionnaireRequirement,
+    questionnaireRule,
     questionnaireProgress,
   );
   /*
@@ -546,12 +527,13 @@ export default function IntakeQuestionnaire() {
   /* Where consent is withdrawn: the address the clinic set under Veřejný web
      a kontakty. Left out of the sentence while it is blank rather than
      replaced by one the clinic never chose. */
-  const [clinicEmail, setClinicEmail] = useState('');
+  const [clinic, setClinic] = useState<PublicClinic | null>(null);
+  const clinicEmail = clinic?.email.trim() ?? '';
 
   useEffect(() => {
     let cancelled = false;
     // Never throws -- see readPublicClinic.
-    void readPublicClinic().then((details) => { if (!cancelled) setClinicEmail(details.email.trim()); });
+    void readPublicClinic().then((details) => { if (!cancelled) setClinic(details); });
     return () => { cancelled = true; };
   }, []);
 
@@ -699,7 +681,11 @@ export default function IntakeQuestionnaire() {
 
     collect(next, 'givenName', validateName(form.givenName, 'given'));
     collect(next, 'familyName', validateName(form.familyName, 'family'));
-    collect(next, 'dateOfBirth', validateDateOfBirth(form.dateOfBirth));
+    // Asked only when the clinic wants it (always, off a completion link); a
+    // date that was typed is still checked.
+    if (dobRequired || form.dateOfBirth !== '') {
+      collect(next, 'dateOfBirth', validateDateOfBirth(form.dateOfBirth));
+    }
     if (form.sex === '') next.sex = 'Vyberte prosím pohlaví.';
 
     // Birth number is optional, but if supplied it must be valid and agree
@@ -708,7 +694,7 @@ export default function IntakeQuestionnaire() {
       const parsed = parseBirthNumber(form.birthNumber);
       if (!parsed.ok) {
         next.birthNumber = parsed.error.message;
-      } else if (next.dateOfBirth === undefined && form.sex !== '') {
+      } else if (next.dateOfBirth === undefined && form.dateOfBirth !== '' && form.sex !== '') {
         const cross = crossCheckBirthNumber(parsed.value, form.dateOfBirth, form.sex);
         if (!cross.ok) next.birthNumber = cross.error.message;
       }
@@ -882,7 +868,7 @@ export default function IntakeQuestionnaire() {
         identity: {
           givenName: form.givenName.trim(),
           familyName: form.familyName.trim(),
-          dateOfBirth: form.dateOfBirth,
+          dateOfBirth: form.dateOfBirth === '' ? null : form.dateOfBirth,
           sex: form.sex === '' ? Sex.Male : form.sex,
           birthNumber:
             form.birthNumber.trim().length > 0
@@ -962,211 +948,207 @@ export default function IntakeQuestionnaire() {
 
   if (result !== null) {
     return (
-      <ThemeProvider theme={publicTheme}>
-        <Box sx={{ minHeight: '100vh', bgcolor: BRAND.page }}>
-          <Hero compact />
-          <Container maxWidth="sm" sx={{ mt: -7, pb: 8 }}>
-            <Card sx={{ textAlign: 'center' }}>
-              <CheckCircleOutlined sx={{ fontSize: 64, color: 'success.main', mb: 1 }} />
+      <PublicLayout clinic={clinic}>
+        <PublicMain maxWidth={760}>
+          <Panel sx={{ textAlign: 'center', alignItems: 'stretch' }}>
+                  <CheckCircleOutlined sx={{ fontSize: 64, color: 'success.main', mb: 1 }} />
 
-              {/*
-                What happened, in the words of what actually happened.
-
-                "Dotazník jsme přijali" was shown to everybody, including somebody
-                who had just booked a time — who was then given a reference
-                number and never told the time they had booked. The server has
-                returned the appointment all along; nothing read it.
-              */}
-              <Typography variant="h5" sx={{ mb: 1 }}>
-                {result.appointmentStartUtc !== null
-                  ? 'Termín je váš'
-                  : result.bookingFailed
-                    ? 'Registraci máme, termín zatím ne'
-                    : 'Dotazník jsme přijali'}
-              </Typography>
-
-              {/*
-                Said plainly, because the alternative is somebody arriving on a
-                day nobody expects them.
-
-                The registration IS saved -- they do not fill it in again. What
-                is missing is the appointment, and for three days this screen
-                showed the ordinary confirmation to a patient who had just lost
-                one without being told.
-              */}
-              {result.bookingFailed && (
-                <Alert severity="warning" sx={{ mb: 2, textAlign: 'left', borderRadius: 2 }}>
-                  Vaše údaje máme uložené, ale vybraný termín se nám nepodařilo
-                  potvrdit. Vyberte si prosím termín znovu — už nebudete nic vyplňovat.
-                </Alert>
-              )}
-
-              {result.appointmentStartUtc !== null && (
-                <Typography sx={{ fontWeight: 800, fontSize: 19, mb: 2 }}>
-                  {clinicMoment(result.appointmentStartUtc)}
-                </Typography>
-              )}
-
-              <Typography variant="body2" sx={{ color: BRAND.muted, mb: 3 }}>
-                Číslo vaší žádosti
-              </Typography>
-              <Box
-                sx={{
-                  display: 'inline-block',
-                  px: 3,
-                  py: 1.5,
-                  borderRadius: 999,
-                  bgcolor: BRAND.accentWash,
-                  border: `1px solid ${BRAND.accentEdge}`,
-                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                  fontWeight: 800,
-                  fontSize: 24,
-                  letterSpacing: 1,
-                  mb: 3,
-                }}
-              >
-                {result.referenceNumber}
-              </Box>
-
-              <Divider sx={{ my: 3 }} />
-
-              <Box sx={{ textAlign: 'left' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
-                  Co bude dál
-                </Typography>
-                <Typography variant="body2" sx={{ color: BRAND.muted, mb: 2 }}>
                   {/*
-                    What is promised depends on what will really happen.
+                    What happened, in the words of what actually happened.
 
-                    Both sentences used to end "na uvedený e-mail" whatever the
-                    server could do, and for a fortnight the server could do
-                    nothing: no sender was configured and every confirmation sat
-                    in the queue. A patient told to watch their inbox watched it
-                    for nothing. The server now says whether a message is
-                    actually coming, and only then is one promised.
+                    "Dotazník jsme přijali" was shown to everybody, including somebody
+                    who had just booked a time — who was then given a reference
+                    number and never told the time they had booked. The server has
+                    returned the appointment all along; nothing read it.
                   */}
-                  {result.outcome === IntakeOutcome.CandidateReviewRequired
-                    ? (result.confirmationEmailExpected
-                      ? 'Vaše údaje ověří naše recepce, abychom vás nezaložili dvakrát. Ozveme se vám na uvedený e-mail.'
-                      : 'Vaše údaje ověří naše recepce, abychom vás nezaložili dvakrát, a pak se vám ozveme. Poznamenejte si prosím číslo žádosti.')
-                    : (result.confirmationEmailExpected
-                      ? 'Vaše údaje máme uložené a potvrzení jsme vám poslali e-mailem.'
-                      : 'Vaše údaje máme uložené. Potvrzení máte na této obrazovce — poznamenejte si prosím číslo žádosti.')}
-                </Typography>
+                  <Typography variant="h5" sx={{ mb: 1 }}>
+                    {result.appointmentStartUtc !== null
+                      ? 'Termín je váš'
+                      : result.bookingFailed
+                        ? 'Registraci máme, termín zatím ne'
+                        : 'Dotazník jsme přijali'}
+                  </Typography>
 
-                {result.bookingFailed && (
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    disableElevation
-                    href="/objednat"
-                    sx={{ mt: 1, borderRadius: 999, py: 1.25, color: BRAND.ink }}
+                  {/*
+                    Said plainly, because the alternative is somebody arriving on a
+                    day nobody expects them.
+
+                    The registration IS saved -- they do not fill it in again. What
+                    is missing is the appointment, and for three days this screen
+                    showed the ordinary confirmation to a patient who had just lost
+                    one without being told.
+                  */}
+                  {result.bookingFailed && (
+                    <Alert severity="warning" sx={{ mb: 2, textAlign: 'left', borderRadius: 2 }}>
+                      Vaše údaje máme uložené, ale vybraný termín se nám nepodařilo
+                      potvrdit. Vyberte si prosím termín znovu — už nebudete nic vyplňovat.
+                    </Alert>
+                  )}
+
+                  {result.appointmentStartUtc !== null && (
+                    <Typography sx={{ fontWeight: 800, fontSize: 19, mb: 2 }}>
+                      {clinicMoment(result.appointmentStartUtc)}
+                    </Typography>
+                  )}
+
+                  <Typography variant="body2" sx={{ color: BRAND.muted, mb: 3 }}>
+                    Číslo vaší žádosti
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: 'inline-block',
+                      px: 3,
+                      py: 1.5,
+                      borderRadius: 999,
+                      bgcolor: BRAND.accentWash,
+                      border: `1px solid ${BRAND.accentEdge}`,
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                      fontWeight: 800,
+                      fontSize: 24,
+                      letterSpacing: 1,
+                      mb: 3,
+                    }}
                   >
-                    Vybrat termín znovu
-                  </Button>
-                )}
+                    {result.referenceNumber}
+                  </Box>
 
-                {result.manageToken !== null && (
-                  <>
-                    {/*
-                      The calendar file, offered here and not only one page
-                      further in. The owner asked for a confirmation the patient
-                      "can download like a calendar reminder and lock into
-                      Google or Apple" — making them follow a link first was a
-                      step between them and the thing they were promised.
-                    */}
-                    {result.appointmentStartUtc !== null && (
+                  <Divider sx={{ my: 3 }} />
+
+                  <Box sx={{ textAlign: 'left' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
+                      Co bude dál
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: BRAND.muted, mb: 2 }}>
+                      {/*
+                        What is promised depends on what will really happen.
+
+                        Both sentences used to end "na uvedený e-mail" whatever the
+                        server could do, and for a fortnight the server could do
+                        nothing: no sender was configured and every confirmation sat
+                        in the queue. A patient told to watch their inbox watched it
+                        for nothing. The server now says whether a message is
+                        actually coming, and only then is one promised.
+                      */}
+                      {result.outcome === IntakeOutcome.CandidateReviewRequired
+                        ? (result.confirmationEmailExpected
+                          ? 'Vaše údaje ověří naše recepce, abychom vás nezaložili dvakrát. Ozveme se vám na uvedený e-mail.'
+                          : 'Vaše údaje ověří naše recepce, abychom vás nezaložili dvakrát, a pak se vám ozveme. Poznamenejte si prosím číslo žádosti.')
+                        : (result.confirmationEmailExpected
+                          ? 'Vaše údaje máme uložené a potvrzení jsme vám poslali e-mailem.'
+                          : 'Vaše údaje máme uložené. Potvrzení máte na této obrazovce — poznamenejte si prosím číslo žádosti.')}
+                    </Typography>
+
+                    {result.bookingFailed && (
                       <Button
                         fullWidth
                         variant="contained"
                         disableElevation
-                        href={calendarFileUrl(result.manageToken)}
-                        startIcon={<DownloadOutlined />}
+                        href="/objednat"
                         sx={{ mt: 1, borderRadius: 999, py: 1.25, color: BRAND.ink }}
                       >
-                        Přidat do kalendáře
+                        Vybrat termín znovu
                       </Button>
                     )}
 
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      color="inherit"
-                      href={`/rezervace/${result.manageToken}`}
-                      sx={{ mt: 1.25, borderRadius: 999, py: 1.25, borderColor: BRAND.line }}
-                    >
-                      Správa rezervace — změna nebo zrušení termínu
-                    </Button>
-                  </>
-                )}
+                    {result.manageToken !== null && (
+                      <>
+                        {/*
+                          The calendar file, offered here and not only one page
+                          further in. The owner asked for a confirmation the patient
+                          "can download like a calendar reminder and lock into
+                          Google or Apple" — making them follow a link first was a
+                          step between them and the thing they were promised.
+                        */}
+                        {result.appointmentStartUtc !== null && (
+                          <Button
+                            fullWidth
+                            variant="contained"
+                            disableElevation
+                            href={calendarFileUrl(result.manageToken)}
+                            startIcon={<DownloadOutlined />}
+                            sx={{ mt: 1, borderRadius: 999, py: 1.25, color: BRAND.ink }}
+                          >
+                            Přidat do kalendáře
+                          </Button>
+                        )}
 
-                {/* The patient's own portal, created with this registration: a
-                    personal link back to their appointments and documents, and
-                    the place to set a password so the link is not the only way in. */}
-                {result.portalToken && (
-                  <Box
-                    sx={{
-                      mt: 2.5,
-                      p: 2.25,
-                      borderRadius: 3,
-                      bgcolor: BRAND.accentWash,
-                      border: `1px solid ${BRAND.accentEdge}`,
-                    }}
-                  >
-                    <Typography sx={{ fontWeight: 800, fontSize: 17, mb: 0.5 }}>
-                      Váš portál je připraven
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: BRAND.muted, mb: 1.5 }}>
-                      Termíny, dokumenty a doklady najdete v portálu. Nastavte si tam heslo,
-                      abyste se příště přihlásili e-mailem i bez tohoto odkazu.
-                    </Typography>
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      disableElevation
-                      href={`/portal/${encodeURIComponent(result.portalToken)}`}
-                      sx={{ borderRadius: 999, py: 1.25, color: BRAND.ink }}
-                    >
-                      Otevřít můj portál
-                    </Button>
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          color="inherit"
+                          href={`/rezervace/${result.manageToken}`}
+                          sx={{ mt: 1.25, borderRadius: 999, py: 1.25, borderColor: BRAND.line }}
+                        >
+                          Správa rezervace — změna nebo zrušení termínu
+                        </Button>
+                      </>
+                    )}
+
+                    {/* The patient's own portal, created with this registration: a
+                        personal link back to their appointments and documents, and
+                        the place to set a password so the link is not the only way in. */}
+                    {result.portalToken && (
+                      <Box
+                        sx={{
+                          mt: 2.5,
+                          p: 2.25,
+                          borderRadius: 3,
+                          bgcolor: BRAND.accentWash,
+                          border: `1px solid ${BRAND.accentEdge}`,
+                        }}
+                      >
+                        <Typography sx={{ fontWeight: 800, fontSize: 17, mb: 0.5 }}>
+                          Váš portál je připraven
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: BRAND.muted, mb: 1.5 }}>
+                          Termíny, dokumenty a doklady najdete v portálu. Nastavte si tam heslo,
+                          abyste se příště přihlásili e-mailem i bez tohoto odkazu.
+                        </Typography>
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          disableElevation
+                          href={`/portal/${encodeURIComponent(result.portalToken)}`}
+                          sx={{ borderRadius: 999, py: 1.25, color: BRAND.ink }}
+                        >
+                          Otevřít můj portál
+                        </Button>
+                      </Box>
+                    )}
                   </Box>
-                )}
-              </Box>
-            </Card>
-          </Container>
-        </Box>
-      </ThemeProvider>
+          </Panel>
+        </PublicMain>
+      </PublicLayout>
+    );
+  }
+
+  /* ── A link that does not open a registration ── */
+
+  if (completionToken && completion !== null && completionView === null) {
+    return (
+      <PublicLayout clinic={clinic}>
+        <PublicMain maxWidth={760}>
+          <PageTitle>Dokončete registraci</PageTitle>
+          {completion === 'loading' ? (
+            <Box role="status" sx={{ color: LABEL_COLOR, fontSize: 15 }}>Načítáme vaši rezervaci…</Box>
+          ) : (
+            <LinkProblem
+              kind={completion.status === 'expired' ? 'expired' : completion.status === 'missing' ? 'missing' : 'failed'}
+              phone={clinic?.phone ?? ''}
+              onRetry={() => setCompletionAttempt((attempt) => attempt + 1)}
+            />
+          )}
+        </PublicMain>
+      </PublicLayout>
     );
   }
 
   /* ── The page ── */
 
-  /*
-   * Two columns on a wide screen, one on a narrow one.
-   *
-   * It was a single 600px column down the middle of a 1920px monitor until
-   * 18. 9. 2026 — "dont make it centrel make it for the whole page". The
-   * column was not only wasteful, it was the reason the form looked long: four
-   * sections stacked into one strip means the patient scrolls past three of
-   * them to reach the end, and a form you cannot see the end of feels like one
-   * that has no end.
-   *
-   * Side by side, the whole thing is visible at once on a laptop, which is the
-   * same argument that killed the wizard.
-   */
-  return (
-    <ThemeProvider theme={publicTheme}>
-      <Box sx={{ minHeight: '100vh', bgcolor: BRAND.page, pb: { xs: 6, md: 10 } }}>
-        {/*
-          Printing gives you the questionnaire and nothing else.
+  const appointment = completionView?.appointment ?? null;
 
-          The clinic's flow today is "fill it in at home and bring it", so the
-          print has to be the document, not a screenshot of a web page with a
-          registration form and a hero banner around it. Everything outside
-          `.smd-questionnaire` is hidden, the block is pulled to the top of the
-          sheet, and colours are forced through so the answered rows are still
-          distinguishable on paper.
-        */}
+  return (
+    <PublicLayout clinic={clinic}>
         <style>{`
           @media print {
             body * { visibility: hidden !important; }
@@ -1176,7 +1158,6 @@ export default function IntakeQuestionnaire() {
             .smd-questionnaire { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           }
         `}</style>
-        <Hero booked={held !== null} />
 
         {/* Honeypot — visually hidden, never focusable. */}
         {/*
@@ -1237,935 +1218,544 @@ export default function IntakeQuestionnaire() {
           }}
         />
 
-        <Container maxWidth="lg" sx={{ mt: { xs: -7, md: -9 } }}>
-          {/* What they are finishing, if they came from the booking page. It is
-              above the form rather than in the rail because it is the reason
-              they are here, and a reason belongs before the work. */}
-          {held !== null && (
-            <Box
-              sx={{
-                mb: 3,
-                p: 2.5,
-                borderRadius: 4,
-                bgcolor: BRAND.ink,
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-                flexWrap: 'wrap',
-              }}
-            >
-              <EventAvailableOutlined sx={{ color: BRAND.accent }} />
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography sx={{ fontWeight: 800, fontSize: 15.5 }}>
-                  Držíme vám {heldWhen(held)}
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.68)' }}>
-                  {held.activityName} — {held.serviceName}. Dokončete prosím
-                  registraci a termín je váš.
-                </Typography>
-              </Box>
-            </Box>
-          )}
+      <PublicMain maxWidth={760}>
+        <PageTitle
+          sub={completionView !== null
+            ? 'Zabere to minutu. Údaje, které už máme, jsou vyplněné — stačí je zkontrolovat a doplnit zbytek.'
+            : held !== null
+              ? `Pro vaši prohlídku ${longWhen(held.startUtc)}. Vyplňte jednou a na místě pak nic nevypisujete.`
+              : 'Vyplňte jednou a máte hotovo. Nemusíte se nikam registrovat ani si nic pamatovat.'}
+        >
+          {completionView !== null ? 'Dokončete registraci' : 'Vstupní dotazník'}
+        </PageTitle>
 
-          {/* The desk-started flow (/dokonceni/:token) has no held slot in this
-              tab, so the patient never saw what they are finishing. The term
-              the desk booked comes back from openCompletion; show it here for
-              the same reason as above — the appointment is the reason they are
-              on this page. */}
-          {held === null && completionInfo !== null
-            && (completionInfo.activityName || completionInfo.startUtc) && (
-            <Box
-              sx={{
-                mb: 3,
-                p: 2.5,
-                borderRadius: 4,
-                bgcolor: BRAND.ink,
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-                flexWrap: 'wrap',
-              }}
-            >
-              <EventAvailableOutlined sx={{ color: BRAND.accent }} />
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography sx={{ fontWeight: 800, fontSize: 15.5 }}>
-                  {completionInfo.startUtc
-                    ? `Váš termín — ${clinicMoment(completionInfo.startUtc)}`
-                    : 'Dokončení registrace'}
-                </Typography>
-                {completionInfo.activityName && (
-                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.68)' }}>
-                    {completionInfo.activityName}. Dokončete prosím registraci.
+        {/* What they are finishing: it is the reason they are here, so it comes first. */}
+        {held !== null && (
+          <ReservationSummary
+            held
+            activityName={held.activityName}
+            serviceName={held.serviceName}
+            startUtc={held.startUtc}
+          />
+        )}
+        {held === null && appointment !== null && (
+          <ReservationSummary
+            activityName={appointment.activityName}
+            serviceName={appointment.serviceName}
+            startUtc={appointment.startUtc === '' ? null : appointment.startUtc}
+            deadlineUtc={completionView?.deadlineUtc}
+          />
+        )}
+
+        <ThemeProvider theme={intakeTheme}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25 }}>
+            <FormSection title="Kdo jste" labelledBy="sec-who">
+
+            <Box sx={{ display: 'grid', gap: 2 }}>
+              <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+                <TextField
+                  label="Jméno"
+                  placeholder="Jan"
+                  autoComplete="given-name"
+                  value={form.givenName}
+                  onChange={(event) => set('givenName', event.target.value)}
+                  error={errors.givenName !== undefined}
+                  helperText={errors.givenName ?? ' '}
+                />
+                <TextField
+                  label="Příjmení"
+                  placeholder="Novák"
+                  autoComplete="family-name"
+                  value={form.familyName}
+                  onChange={(event) => set('familyName', event.target.value)}
+                  error={errors.familyName !== undefined}
+                  helperText={errors.familyName ?? ' '}
+                />
+              </Box>
+
+              {/*
+                The accelerator, and it is drawn like one.
+
+                A Czech birth number fills in the three fields below it, so
+                it belongs above them and it belongs looking different from
+                them — a patient who does not read the helper text should
+                still be able to tell that this box is the one that saves
+                them work. It sat at the BOTTOM of step 1 until 18. 9. 2026,
+                under the word "nepovinné", where it read like an
+                afterthought.
+
+                `autoComplete="off"` here is on purpose and not an
+                oversight: this is the one value on the page no browser
+                should keep, and unlike the honeypot there is nothing
+                cleverer to be done about it than asking.
+              */}
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  bgcolor: BRAND.accentWash,
+                  border: `1px solid ${BRAND.accentEdge}`,
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                  <AutoAwesomeOutlined sx={{ fontSize: 18, color: BRAND.accentDark }} />
+                  <Typography
+                    variant="caption"
+                    sx={{ fontWeight: 800, letterSpacing: 0.8, color: BRAND.accentDark }}
+                  >
+                    VYPLNÍ TŘI POLE ZA VÁS
                   </Typography>
+                </Box>
+
+                <TextField
+                  label="Rodné číslo"
+                  placeholder="990101/1234"
+                  autoComplete="off"
+                  inputMode="numeric"
+                  value={form.birthNumber}
+                  onChange={(event) => fillFromBirthNumber(event.target.value)}
+                  error={errors.birthNumber !== undefined}
+                  helperText={
+                    errors.birthNumber
+                    ?? 'Nepovinné. Doplní datum narození, pohlaví i číslo pojištěnce.'
+                  }
+                />
+
+                {birthNumberSays !== null && (
+                  <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    <Chip
+                      size="small"
+                      label={czechDate(birthNumberSays.dateOfBirth)}
+                      sx={{ fontWeight: 700, bgcolor: '#FFFFFF', border: `1px solid ${BRAND.accentEdge}` }}
+                    />
+                    <Chip
+                      size="small"
+                      label={birthNumberSays.sex === Sex.Female ? 'žena' : 'muž'}
+                      sx={{ fontWeight: 700, bgcolor: '#FFFFFF', border: `1px solid ${BRAND.accentEdge}` }}
+                    />
+                    <Typography variant="caption" sx={{ color: BRAND.muted }}>
+                      doplněno — níže můžete přepsat
+                    </Typography>
+                  </Box>
                 )}
               </Box>
-            </Box>
-          )}
 
-          {/*
-            One form down the page, one rail beside it.
-
-            It was two columns of form cards until 18. 9. 2026, side by side and
-            of different heights, so nothing lined up with anything and the eye
-            had no order to follow -- "its not orgenized ... not combatebul".
-            A form is read top to bottom; splitting it in half sideways means
-            deciding, at every card, which side to read next.
-
-            So the form is one column now, and what sits beside it is a
-            different KIND of thing: what to bring, what is left to do, and the
-            button that sends it. That rail is sticky, which is the other half
-            of the answer -- the thing you are working towards stays on screen
-            instead of being eight sections below you.
-          */}
-          <Box
-            sx={{
-              display: 'grid',
-              gap: 3,
-              alignItems: 'start',
-              gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) 360px' },
-            }}
-          >
-            {/* ---- The form ---- */}
-            <Box sx={{ display: 'grid', gap: 3 }}>
-              <Card>
-                <Section number={1} title="Kdo jste" />
-
-                <Box sx={{ display: 'grid', gap: 2 }}>
-                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-                    <TextField
-                      label="Jméno"
-                      placeholder="Jan"
-                      autoComplete="given-name"
-                      value={form.givenName}
-                      onChange={(event) => set('givenName', event.target.value)}
-                      error={errors.givenName !== undefined}
-                      helperText={errors.givenName ?? ' '}
-                    />
-                    <TextField
-                      label="Příjmení"
-                      placeholder="Novák"
-                      autoComplete="family-name"
-                      value={form.familyName}
-                      onChange={(event) => set('familyName', event.target.value)}
-                      error={errors.familyName !== undefined}
-                      helperText={errors.familyName ?? ' '}
-                    />
-                  </Box>
-
-                  {/*
-                    The accelerator, and it is drawn like one.
-
-                    A Czech birth number fills in the three fields below it, so
-                    it belongs above them and it belongs looking different from
-                    them — a patient who does not read the helper text should
-                    still be able to tell that this box is the one that saves
-                    them work. It sat at the BOTTOM of step 1 until 18. 9. 2026,
-                    under the word "nepovinné", where it read like an
-                    afterthought.
-
-                    `autoComplete="off"` here is on purpose and not an
-                    oversight: this is the one value on the page no browser
-                    should keep, and unlike the honeypot there is nothing
-                    cleverer to be done about it than asking.
-                  */}
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderRadius: 3,
-                      bgcolor: BRAND.accentWash,
-                      border: `1px solid ${BRAND.accentEdge}`,
+              <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+                <TextField
+                  type="date"
+                  label={dobRequired ? 'Datum narození' : 'Datum narození (nepovinné)'}
+                  autoComplete="bday"
+                  value={form.dateOfBirth}
+                  onChange={(event) => {
+                    set('dateOfBirth', event.target.value);
+                    /* Typed by hand from here on, so the birth number
+                       stops moving it. */
+                    setDerived((previous) => ({ ...previous, dateOfBirth: false }));
+                  }}
+                  error={errors.dateOfBirth !== undefined}
+                  helperText={errors.dateOfBirth ?? ' '}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+                <FormControl error={errors.sex !== undefined}>
+                  <FormLabel sx={{ fontSize: 13, fontWeight: 600, mb: 0.5 }}>Pohlaví</FormLabel>
+                  <RadioGroup
+                    row
+                    value={form.sex}
+                    onChange={(event) => {
+                      set('sex', event.target.value as Sex);
+                      setDerived((previous) => ({ ...previous, sex: false }));
                     }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                      <AutoAwesomeOutlined sx={{ fontSize: 18, color: BRAND.accentDark }} />
-                      <Typography
-                        variant="caption"
-                        sx={{ fontWeight: 800, letterSpacing: 0.8, color: BRAND.accentDark }}
-                      >
-                        VYPLNÍ TŘI POLE ZA VÁS
-                      </Typography>
-                    </Box>
+                    <FormControlLabel value={Sex.Male} control={<Radio />} label="Muž" />
+                    <FormControlLabel value={Sex.Female} control={<Radio />} label="Žena" />
+                  </RadioGroup>
+                  {errors.sex !== undefined && (
+                    <Typography variant="caption" color="error">
+                      {errors.sex}
+                    </Typography>
+                  )}
+                </FormControl>
+              </Box>
+            </Box>
+            </FormSection>
 
+            <FormSection title="Kontakt" labelledBy="sec-contact">
+
+            <Box sx={{ display: 'grid', gap: 2 }}>
+              <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '1fr 170px 1fr' } }}>
+                <TextField
+                  type="email"
+                  label="E-mail"
+                  placeholder="jan.novak@email.cz"
+                  autoComplete="email"
+                  value={form.email}
+                  onChange={(event) => set('email', event.target.value)}
+                  onBlur={() => { void askAboutEmail(form.email); }}
+                  error={errors.email !== undefined || emailSays !== ''}
+                  helperText={
+                    errors.email
+                    ?? (emailSays !== '' ? emailSays : 'Pošleme na něj potvrzení rezervace.')
+                  }
+                />
+                <TextField
+                  select
+                  label="Země"
+                  value={form.phoneRegion}
+                  onChange={(event) => set('phoneRegion', event.target.value)}
+                  helperText=" "
+                >
+                  {phoneRegions.map((region, index) => [
+                    /* A line under the common ones, never above the first row. */
+                    index === preferredRegions && preferredRegions > 0
+                      ? <Divider key="preferred-divider" />
+                      : null,
+                    <MenuItem key={region.code} value={region.code}>
+                      {region.displayValue}
+                    </MenuItem>,
+                  ])}
+                </TextField>
+                <TextField
+                  label="Telefon"
+                  placeholder="601 234 567"
+                  autoComplete="tel-national"
+                  inputMode="tel"
+                  value={form.phone}
+                  onChange={(event) => set('phone', event.target.value)}
+                  error={errors.phone !== undefined || phoneState === 'unreadable'}
+                  /* Grouped as it is typed, complained about only once it
+                     is long enough to be finished and still does not fit. */
+                  helperText={
+                    errors.phone
+                    ?? (phoneSays !== '' ? phoneSays : undefined)
+                    ?? (phoneGrouped !== '' ? phoneGrouped : 'Například 601 234 567')
+                  }
+                />
+              </Box>
+
+              <Box>
+                <Typography variant="body2" sx={{ mb: 1, fontWeight: 700 }}>
+                  Adresa trvalého pobytu
+                </Typography>
+                {/* Whole-republic Mapy.cz search, on both the online form and
+                    the desk completion link. It used to be the 40-address RUIAN
+                    demo catalogue on the online form, which found almost nothing
+                    outside Prague — the same address system now serves both. */}
+                <MapyAddressPicker
+                  selected={mapyAddress}
+                  onSelect={(value) => {
+                    setMapyAddress(value);
+                    if (value !== null) {
+                      setErrors((previous) => ({ ...previous, address: undefined }));
+                    }
+                  }}
+                  error={errors.address}
+                />
+              </Box>
+            </Box>
+            </FormSection>
+
+            <FormSection title="Pojištění" labelledBy="sec-insurance">
+
+            <Box sx={{ display: 'grid', gap: 2 }}>
+              <FormControl>
+                <RadioGroup
+                  row
+                  value={form.hasCzechInsurance ? 'cz' : 'foreign'}
+                  onChange={(event) => set('hasCzechInsurance', event.target.value === 'cz')}
+                >
+                  <FormControlLabel value="cz" control={<Radio />} label="Mám české pojištění" />
+                  <FormControlLabel value="foreign" control={<Radio />} label="Nemám české pojištění" />
+                </RadioGroup>
+              </FormControl>
+
+              {form.hasCzechInsurance ? (
+                <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+                  <TextField
+                    label="Číslo pojištěnce"
+                    placeholder="9901011234"
+                    autoComplete="off"
+                    inputMode="numeric"
+                    value={form.insuranceNumber}
+                    onChange={(event) => {
+                      set('insuranceNumber', event.target.value);
+                      setDerived((previous) => ({ ...previous, insuranceNumber: false }));
+                    }}
+                    error={errors.insuranceNumber !== undefined}
+                    helperText={
+                      errors.insuranceNumber
+                      ?? (derived.insuranceNumber && form.insuranceNumber !== ''
+                        ? 'Doplněno z rodného čísla.'
+                        : '9 nebo 10 číslic z kartičky.')
+                    }
+                  />
+                  {/*
+                    Appears only for a number that cannot check itself, and
+                    spans both columns so it reads as a follow-up question
+                    rather than a field somebody missed.
+                  */}
+                  {needsSecondTyping(form.insuranceNumber) && (
                     <TextField
-                      label="Rodné číslo"
-                      placeholder="990101/1234"
+                      label="Číslo pojištěnce znovu"
+                      placeholder="Opište stejné číslo"
                       autoComplete="off"
                       inputMode="numeric"
-                      value={form.birthNumber}
-                      onChange={(event) => fillFromBirthNumber(event.target.value)}
-                      error={errors.birthNumber !== undefined}
+                      value={form.insuranceNumberConfirmation}
+                      onChange={(event) => set('insuranceNumberConfirmation', event.target.value)}
+                      error={errors.insuranceNumberConfirmation !== undefined}
                       helperText={
-                        errors.birthNumber
-                        ?? 'Nepovinné. Doplní datum narození, pohlaví i číslo pojištěnce.'
+                        errors.insuranceNumberConfirmation
+                        ?? 'Toto číslo nejde ověřit výpočtem, takže ho prosím opište dvakrát.'
                       }
+                      sx={{ gridColumn: { sm: '1 / -1' } }}
                     />
+                  )}
 
-                    {birthNumberSays !== null && (
-                      <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                        <Chip
-                          size="small"
-                          label={czechDate(birthNumberSays.dateOfBirth)}
-                          sx={{ fontWeight: 700, bgcolor: '#FFFFFF', border: `1px solid ${BRAND.accentEdge}` }}
-                        />
-                        <Chip
-                          size="small"
-                          label={birthNumberSays.sex === Sex.Female ? 'žena' : 'muž'}
-                          sx={{ fontWeight: 700, bgcolor: '#FFFFFF', border: `1px solid ${BRAND.accentEdge}` }}
-                        />
-                        <Typography variant="caption" sx={{ color: BRAND.muted }}>
-                          doplněno — níže můžete přepsat
-                        </Typography>
-                      </Box>
-                    )}
-                  </Box>
-
+                  <TextField
+                    select
+                    label="Zdravotní pojišťovna"
+                    value={form.insurerCode}
+                    onChange={(event) => set('insurerCode', event.target.value)}
+                    error={errors.insurerCode !== undefined}
+                    helperText={errors.insurerCode ?? ' '}
+                  >
+                    {CZECH_INSURERS.map((insurer) => (
+                      <MenuItem key={insurer.code} value={String(insurer.code)}>
+                        {insurer.code} — {insurer.short} ({insurer.name})
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+              ) : (
+                <Box sx={{ display: 'grid', gap: 2 }}>
                   <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
                     <TextField
-                      type="date"
-                      label="Datum narození"
-                      autoComplete="bday"
-                      value={form.dateOfBirth}
-                      onChange={(event) => {
-                        set('dateOfBirth', event.target.value);
-                        /* Typed by hand from here on, so the birth number
-                           stops moving it. */
-                        setDerived((previous) => ({ ...previous, dateOfBirth: false }));
-                      }}
-                      error={errors.dateOfBirth !== undefined}
-                      helperText={errors.dateOfBirth ?? ' '}
-                      slotProps={{ inputLabel: { shrink: true } }}
-                    />
-                    <FormControl error={errors.sex !== undefined}>
-                      <FormLabel sx={{ fontSize: 13, fontWeight: 600, mb: 0.5 }}>Pohlaví</FormLabel>
-                      <RadioGroup
-                        row
-                        value={form.sex}
-                        onChange={(event) => {
-                          set('sex', event.target.value as Sex);
-                          setDerived((previous) => ({ ...previous, sex: false }));
-                        }}
-                      >
-                        <FormControlLabel value={Sex.Male} control={<Radio />} label="Muž" />
-                        <FormControlLabel value={Sex.Female} control={<Radio />} label="Žena" />
-                      </RadioGroup>
-                      {errors.sex !== undefined && (
-                        <Typography variant="caption" color="error">
-                          {errors.sex}
-                        </Typography>
-                      )}
-                    </FormControl>
-                  </Box>
-                </Box>
-              </Card>
-
-              <Card>
-                <Section number={2} title="Kontakt" />
-
-                <Box sx={{ display: 'grid', gap: 2 }}>
-                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '1fr 170px 1fr' } }}>
-                    <TextField
-                      type="email"
-                      label="E-mail"
-                      placeholder="jan.novak@email.cz"
-                      autoComplete="email"
-                      value={form.email}
-                      onChange={(event) => set('email', event.target.value)}
-                      onBlur={() => { void askAboutEmail(form.email); }}
-                      error={errors.email !== undefined || emailSays !== ''}
-                      helperText={
-                        errors.email
-                        ?? (emailSays !== '' ? emailSays : 'Pošleme na něj potvrzení rezervace.')
-                      }
-                    />
-                    <TextField
                       select
-                      label="Země"
-                      value={form.phoneRegion}
-                      onChange={(event) => set('phoneRegion', event.target.value)}
+                      label="Typ dokladu"
+                      value={form.documentType}
+                      onChange={(event) =>
+                        set('documentType', event.target.value as 'IdentityCard' | 'Passport')
+                      }
                       helperText=" "
                     >
-                      {phoneRegions.map((region, index) => [
-                        /* A line under the common ones, never above the first row. */
-                        index === preferredRegions && preferredRegions > 0
-                          ? <Divider key="preferred-divider" />
-                          : null,
-                        <MenuItem key={region.code} value={region.code}>
-                          {region.displayValue}
-                        </MenuItem>,
-                      ])}
+                      <MenuItem value="IdentityCard">Občanský průkaz</MenuItem>
+                      <MenuItem value="Passport">Cestovní pas</MenuItem>
                     </TextField>
                     <TextField
-                      label="Telefon"
-                      placeholder="601 234 567"
-                      autoComplete="tel-national"
-                      inputMode="tel"
-                      value={form.phone}
-                      onChange={(event) => set('phone', event.target.value)}
-                      error={errors.phone !== undefined || phoneState === 'unreadable'}
-                      /* Grouped as it is typed, complained about only once it
-                         is long enough to be finished and still does not fit. */
-                      helperText={
-                        errors.phone
-                        ?? (phoneSays !== '' ? phoneSays : undefined)
-                        ?? (phoneGrouped !== '' ? phoneGrouped : 'Například 601 234 567')
-                      }
+                      label="Stát, který doklad vydal"
+                      placeholder="SK"
+                      value={form.issuingCountry}
+                      onChange={(event) => set('issuingCountry', event.target.value.toUpperCase())}
+                      error={errors.issuingCountry !== undefined}
+                      helperText={errors.issuingCountry ?? 'Například SK nebo DE.'}
                     />
                   </Box>
-
-                  <Box>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 700 }}>
-                      Adresa trvalého pobytu
-                    </Typography>
-                    {/* Whole-republic Mapy.cz search, on both the online form and
-                        the desk completion link. It used to be the 40-address RUIAN
-                        demo catalogue on the online form, which found almost nothing
-                        outside Prague — the same address system now serves both. */}
-                    <MapyAddressPicker
-                      selected={mapyAddress}
-                      onSelect={(value) => {
-                        setMapyAddress(value);
-                        if (value !== null) {
-                          setErrors((previous) => ({ ...previous, address: undefined }));
-                        }
-                      }}
-                      error={errors.address}
-                    />
-                  </Box>
-                </Box>
-              </Card>
-              <Card>
-                <Section number={3} title="Pojištění" />
-
-                <Box sx={{ display: 'grid', gap: 2 }}>
-                  <FormControl>
-                    <RadioGroup
-                      row
-                      value={form.hasCzechInsurance ? 'cz' : 'foreign'}
-                      onChange={(event) => set('hasCzechInsurance', event.target.value === 'cz')}
-                    >
-                      <FormControlLabel value="cz" control={<Radio />} label="Mám české pojištění" />
-                      <FormControlLabel value="foreign" control={<Radio />} label="Nemám české pojištění" />
-                    </RadioGroup>
-                  </FormControl>
-
-                  {form.hasCzechInsurance ? (
-                    <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-                      <TextField
-                        label="Číslo pojištěnce"
-                        placeholder="9901011234"
-                        autoComplete="off"
-                        inputMode="numeric"
-                        value={form.insuranceNumber}
-                        onChange={(event) => {
-                          set('insuranceNumber', event.target.value);
-                          setDerived((previous) => ({ ...previous, insuranceNumber: false }));
-                        }}
-                        error={errors.insuranceNumber !== undefined}
-                        helperText={
-                          errors.insuranceNumber
-                          ?? (derived.insuranceNumber && form.insuranceNumber !== ''
-                            ? 'Doplněno z rodného čísla.'
-                            : '9 nebo 10 číslic z kartičky.')
-                        }
-                      />
-                      {/*
-                        Appears only for a number that cannot check itself, and
-                        spans both columns so it reads as a follow-up question
-                        rather than a field somebody missed.
-                      */}
-                      {needsSecondTyping(form.insuranceNumber) && (
-                        <TextField
-                          label="Číslo pojištěnce znovu"
-                          placeholder="Opište stejné číslo"
-                          autoComplete="off"
-                          inputMode="numeric"
-                          value={form.insuranceNumberConfirmation}
-                          onChange={(event) => set('insuranceNumberConfirmation', event.target.value)}
-                          error={errors.insuranceNumberConfirmation !== undefined}
-                          helperText={
-                            errors.insuranceNumberConfirmation
-                            ?? 'Toto číslo nejde ověřit výpočtem, takže ho prosím opište dvakrát.'
-                          }
-                          sx={{ gridColumn: { sm: '1 / -1' } }}
-                        />
-                      )}
-
-                      <TextField
-                        select
-                        label="Zdravotní pojišťovna"
-                        value={form.insurerCode}
-                        onChange={(event) => set('insurerCode', event.target.value)}
-                        error={errors.insurerCode !== undefined}
-                        helperText={errors.insurerCode ?? ' '}
-                      >
-                        {CZECH_INSURERS.map((insurer) => (
-                          <MenuItem key={insurer.code} value={String(insurer.code)}>
-                            {insurer.code} — {insurer.short} ({insurer.name})
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Box>
-                  ) : (
-                    <Box sx={{ display: 'grid', gap: 2 }}>
-                      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-                        <TextField
-                          select
-                          label="Typ dokladu"
-                          value={form.documentType}
-                          onChange={(event) =>
-                            set('documentType', event.target.value as 'IdentityCard' | 'Passport')
-                          }
-                          helperText=" "
-                        >
-                          <MenuItem value="IdentityCard">Občanský průkaz</MenuItem>
-                          <MenuItem value="Passport">Cestovní pas</MenuItem>
-                        </TextField>
-                        <TextField
-                          label="Stát, který doklad vydal"
-                          placeholder="SK"
-                          value={form.issuingCountry}
-                          onChange={(event) => set('issuingCountry', event.target.value.toUpperCase())}
-                          error={errors.issuingCountry !== undefined}
-                          helperText={errors.issuingCountry ?? 'Například SK nebo DE.'}
-                        />
-                      </Box>
-                      <TextField
-                        label="Číslo dokladu"
-                        autoComplete="off"
-                        value={form.documentNumber}
-                        onChange={(event) => set('documentNumber', event.target.value)}
-                        error={errors.documentNumber !== undefined}
-                        helperText={errors.documentNumber ?? ' '}
-                      />
-                    </Box>
-                  )}
-                </Box>
-              </Card>
-
-              <Card>
-                <Section number={4} title="Souhlasy" />
-
-                {/*
-                  Three consents, drawn as three separate things to agree to
-                  rather than a stack of ticks, because that is what they are:
-                  each one is stored with its own timestamp, its own policy text
-                  version and its own purpose, and each can be withdrawn on its
-                  own. A row that looks like a row is a row somebody can point
-                  at later and say which one they gave.
-                */}
-                {/*
-                  Split on legal basis, 18. 9. 2026.
-
-                  The clinic's own GDPR document asks the patient to consent to
-                  five purposes, three of which are things the clinic must do by
-                  law: keeping the medical record, evaluating the results, and
-                  archiving for ten years (zákon č. 372/2011 Sb., GDPR čl. 9(2)(h)).
-                  A tick implies it can be unticked, and none of those three can.
-                  Asking for consent where a statute already applies produces a
-                  consent that cannot be withdrawn, which is not a valid consent
-                  and is a promise the clinic cannot keep.
-
-                  So the statutory purposes are shown and not asked; what is asked
-                  is only what the patient can genuinely refuse without changing
-                  what care they get.
-
-                  The owner has this in writing and it is pending his lawyer's
-                  sign-off. The wording may move; the split should not.
-                */}
-                <Box
-                  sx={{
-                    p: 2,
-                    mb: 2,
-                    borderRadius: 3,
-                    bgcolor: 'rgba(17,17,17,0.03)',
-                    border: `1px solid ${BRAND.line}`,
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <GavelOutlined sx={{ fontSize: 16, color: BRAND.muted }} />
-                    <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: 0.6 }}>
-                      CO DĚLÁME ZE ZÁKONA — NEPTÁME SE NA TO
-                    </Typography>
-                  </Box>
-                  <Typography variant="body2" sx={{ color: BRAND.muted }}>
-                    Vedeme zdravotnickou dokumentaci, vyhodnocujeme výsledky a
-                    archivujeme je 10 let od poslední služby. Vyplývá to ze zákona
-                    č. 372/2011 Sb. a z nařízení GDPR, čl. 9(2)(h) — nejde
-                    o volbu, kterou bychom vám mohli nabídnout.
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 1 }}>
-                    Máte právo na přístup, opravu i výmaz svých údajů a na stížnost
-                    u ÚOOÚ. Souhlasy níže můžete kdykoli odvolat
-                    {clinicEmail !== '' ? ` na ${clinicEmail}` : ''}.
-                  </Typography>
-                </Box>
-
-                {/*
-                  Four consents, drawn as four separate things to agree to rather
-                  than a stack of ticks, because that is what they are: each is
-                  stored with its own timestamp, its own policy text version and
-                  its own purpose, and each can be withdrawn on its own. A row that
-                  looks like a row is a row somebody can point at later and say
-                  which one they gave.
-
-                  Which of them say "povinné" is the clinic's setting, not this
-                  file's: the admin ticks them on the činnost and the answer
-                  arrives with the held slot. Two are never settable — the
-                  examination is required by zákon 372/2011 whatever anybody
-                  ticks, and a marketing consent that has to be given to get an
-                  appointment is not freely given, so it stays voluntary.
-                */}
-                <Box sx={{ display: 'grid', gap: 1.25 }}>
-                  {/*
-                    Names what was actually booked. It said "sportovní lékařské
-                    prohlídky" for everybody until 23. 9. 2026 — somebody who
-                    booked a diagnostic session was consenting, in writing, to
-                    an examination they had not asked for. Somebody who came
-                    without booking has nothing to name yet, so the consent
-                    covers the service they will book.
-                  */}
-                  <ConsentRow
-                    required
-                    checked={form.consentTreatment}
-                    onChange={(value) => set('consentTreatment', value)}
-                    error={errors.consentTreatment}
-                    title={held !== null ? `Provedení: ${held.activityName}` : 'Poskytnutí zdravotní služby'}
-                    detail={held !== null
-                      ? `Souhlasím s provedením činnosti ${held.activityName}${held.serviceName !== '' ? ` (${held.serviceName})` : ''} a se zpracováním údajů o zdravotním stavu, které si vyžádá.`
-                      : 'Souhlasím s poskytnutím zdravotní služby, kterou si objednám, a se zpracováním údajů o zdravotním stavu, které si vyžádá.'}
-                  />
-                  <ConsentRow
-                    required={held?.requiresReportByEmail === true}
-                    checked={form.consentReportEmail}
-                    onChange={(value) => set('consentReportEmail', value)}
-                    error={errors.consentReportEmail}
-                    title="Lékařská zpráva e-mailem"
-                    detail={held?.requiresReportByEmail === true
-                      ? `Zprávu z činnosti ${held.activityName} předáváme elektronicky na uvedený e-mail. Bez tohoto souhlasu ji nelze objednat.`
-                      : 'Souhlasím, aby mi byla lékařská zpráva zaslána elektronicky na uvedený e-mail. Bez souhlasu si ji vyzvednete na recepci.'}
-                  />
-                  {consentSettings.communicationVisible && (
-                    <ConsentRow
-                      checked={form.consentCommunication}
-                      onChange={(value) => set('consentCommunication', value)}
-                      title={consentSettings.communicationTitle}
-                      detail={consentSettings.communicationDetail}
-                    />
-                  )}
-                  <ConsentRow
-                    required={held?.requiresClubSharing === true}
-                    checked={form.consentClub}
-                    onChange={(value) => set('consentClub', value)}
-                    error={errors.consentClub}
-                    title="Sdílení výsledků s klubem"
-                    detail={held?.requiresClubSharing === true
-                      ? `Činnost ${held.activityName} objednáváme se sdílením výsledků s vaším klubem. Bez tohoto souhlasu ji nelze objednat.`
-                      : 'Souhlasím se sdílením výsledků s mým sportovním klubem. Jde o předání údajů někomu mimo ordinaci, takže bez vašeho souhlasu je nesdílíme.'}
+                  <TextField
+                    label="Číslo dokladu"
+                    autoComplete="off"
+                    value={form.documentNumber}
+                    onChange={(event) => set('documentNumber', event.target.value)}
+                    error={errors.documentNumber !== undefined}
+                    helperText={errors.documentNumber ?? ' '}
                   />
                 </Box>
-              </Card>
+              )}
             </Box>
+            </FormSection>
 
-            {/* ---- The rail ---- */}
+            <FormSection title="Souhlasy" labelledBy="sec-consents">
+
+            {/*
+              Three consents, drawn as three separate things to agree to
+              rather than a stack of ticks, because that is what they are:
+              each one is stored with its own timestamp, its own policy text
+              version and its own purpose, and each can be withdrawn on its
+              own. A row that looks like a row is a row somebody can point
+              at later and say which one they gave.
+            */}
+            {/*
+              Split on legal basis, 18. 9. 2026.
+
+              The clinic's own GDPR document asks the patient to consent to
+              five purposes, three of which are things the clinic must do by
+              law: keeping the medical record, evaluating the results, and
+              archiving for ten years (zákon č. 372/2011 Sb., GDPR čl. 9(2)(h)).
+              A tick implies it can be unticked, and none of those three can.
+              Asking for consent where a statute already applies produces a
+              consent that cannot be withdrawn, which is not a valid consent
+              and is a promise the clinic cannot keep.
+
+              So the statutory purposes are shown and not asked; what is asked
+              is only what the patient can genuinely refuse without changing
+              what care they get.
+
+              The owner has this in writing and it is pending his lawyer's
+              sign-off. The wording may move; the split should not.
+            */}
             <Box
               sx={{
-                display: 'grid',
-                gap: 3,
-                position: { md: 'sticky' },
-                top: { md: 24 },
+                p: 2,
+                mb: 2,
+                borderRadius: 3,
+                bgcolor: 'rgba(17,17,17,0.03)',
+                border: `1px solid ${BRAND.line}`,
               }}
             >
-              <Card>
-                <RailTitle>Než přijdete</RailTitle>
-
-                {/*
-                  What the clinic actually asks people to bring, read off its own
-                  page on 18. 9. 2026 rather than from anyone's memory of it.
-
-                  Filling them in here is not built yet — the questionnaire alone
-                  is 76 answers and the model cannot yet carry its sections,
-                  its "show only if" rules or its family table. Until it can, the
-                  honest thing is to say plainly which documents exist, when each
-                  is wanted, and to hand over the real file. A patient who reads
-                  this before they travel is better off than one who finds out at
-                  reception, which is the whole point of the page.
-
-                  Each row says WHEN it applies, because the clinic's rules differ
-                  per document and getting that wrong is what wastes the visit.
-                */}
-                <Box sx={{ display: 'grid', gap: 1.25 }}>
-                  <DocumentRow
-                    title="Výpis ze zdravotní dokumentace"
-                    when="Přineste s sebou — pokaždé"
-                    detail="Od praktického lékaře nebo pediatra. Bez něj nelze vystavit posudek o zdravotní způsobilosti. Při opakované návštěvě stačí, když lékař potvrdí, že se váš stav nezměnil."
-                    emphasis
-                  />
-                  {/*
-                    The one document filled in HERE rather than carried in on
-                    paper. The button opens it over the whole screen — see the
-                    header of HealthQuestionnaire.tsx for why it stopped being
-                    an accordion inside this column.
-                  */}
-                  {/*
-                    Not shown at all when the činnost does not ask for it.
-                    Offering seventy-six questions to somebody booking a
-                    ten-minute re-examination is how a form gets abandoned.
-                  */}
-                  {questionnaireAskedFor && (
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderRadius: 3,
-                      border: `1px solid ${questionnaireMissing
-                        ? '#D32F2F'
-                        : BRAND.accentEdge}`,
-                      bgcolor: BRAND.accentWash,
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.25 }}>
-                      <Typography sx={{ fontWeight: 700, fontSize: 14.5 }}>
-                        {questionnaire?.name ?? 'Zdravotní dotazník'}
-                      </Typography>
-                      <Chip
-                        size="small"
-                        label={questionnaireRequired ? 'Povinný' : 'Nepovinný'}
-                        sx={{
-                          height: 19,
-                          fontSize: 11,
-                          fontWeight: 700,
-                          bgcolor: BRAND.ink,
-                          color: BRAND.accent,
-                        }}
-                      />
-                    </Box>
-                    <Typography variant="body2" sx={{ color: BRAND.muted, mb: 1.5 }}>
-                      Vyplňte ho rovnou tady — otevře se celý přes obrazovku.
-                      {questionnaireProgress > 0 && ` Rozepsáno: ${questionnaireProgress} odpovědí.`}
-                    </Typography>
-
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      disableElevation
-                      onClick={openQuestionnaire}
-                      endIcon={<OpenInFullOutlined sx={{ fontSize: 16 }} />}
-                      sx={{ borderRadius: 999, py: 1.1, color: BRAND.ink }}
-                    >
-                      {questionnaireProgress > 0 ? 'Pokračovat ve vyplňování' : 'Vyplnit dotazník'}
-                    </Button>
-
-                    {questionnaireMissing && (
-                      <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
-                        Bez vyplněného dotazníku nelze objednávku dokončit.
-                      </Typography>
-                    )}
-                  </Box>
-                  )}
-
-                  <DocumentRow
-                    title="Souhlas se zpracováním údajů (GDPR)"
-                    when="Jen při první návštěvě"
-                    detail="Při dalších vyšetřeních už jej znovu vyplňovat nemusíte, pokud se nezmění údaje ani účel zpracování."
-                  />
-                  {/* Only for a minor. The age comes from the date of birth, which
-                      the birth number has usually already filled in — so this row
-                      appears by itself, without anybody being asked their age. */}
-                  {isMinor && (
-                    <DocumentRow
-                      title="Souhlas zákonného zástupce"
-                      when="Jen když nezletilý přijde bez doprovodu"
-                      detail="Podle data narození je klient mladší 18 let. Pokud přijde v doprovodu zákonného zástupce, tento formulář nepotřebujete."
-                    />
-                  )}
-                </Box>
-
-                <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 2 }}>
-                  Souhlasy pro vás připravíme na recepci.
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <GavelOutlined sx={{ fontSize: 16, color: BRAND.muted }} />
+                <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: 0.6 }}>
+                  CO DĚLÁME ZE ZÁKONA — NEPTÁME SE NA TO
                 </Typography>
-              </Card>
-
-              <Card>
-                {submitError !== null && (
-                  <Alert severity="error" sx={{ mt: 3, borderRadius: 2 }}>
-                    {submitError}
-                  </Alert>
-                )}
-
-                {/*
-                  One button, because there is one page. There is no Zpět any
-                  more: everything the patient might want to go back to is
-                  already on the screen beside this one.
-                */}
-                <Button
-                  fullWidth
-                  size="large"
-                  variant="contained"
-                  disableElevation
-                  onClick={() => void handleSubmit()}
-                  disabled={submitting}
-                  sx={{
-                    mt: 3,
-                    py: 1.6,
-                    fontSize: 16,
-                    borderRadius: 999,
-                    color: BRAND.ink,
-                    boxShadow: `0 8px 20px ${BRAND.accentEdge}`,
-                    '&:hover': { boxShadow: `0 10px 24px ${BRAND.accentEdge}` },
-                  }}
-                >
-                  {submitting ? 'Odesílám…' : 'Odeslat dotazník'}
-                </Button>
-
-                <Box
-                  sx={{
-                    mt: 2,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 0.75,
-                    color: BRAND.muted,
-                  }}
-                >
-                  <LockOutlined sx={{ fontSize: 15 }} />
-                  <Typography variant="caption">
-                    Údaje putují šifrovaně a vidí je jen naše ordinace.
-                  </Typography>
-                </Box>
-              </Card>
+              </Box>
+              <Typography variant="body2" sx={{ color: BRAND.muted }}>
+                Vedeme zdravotnickou dokumentaci, vyhodnocujeme výsledky a
+                archivujeme je 10 let od poslední služby. Vyplývá to ze zákona
+                č. 372/2011 Sb. a z nařízení GDPR, čl. 9(2)(h) — nejde
+                o volbu, kterou bychom vám mohli nabídnout.
+              </Typography>
+              <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 1 }}>
+                Máte právo na přístup, opravu i výmaz svých údajů a na stížnost
+                u ÚOOÚ. Souhlasy níže můžete kdykoli odvolat
+                {clinicEmail !== '' ? ` na ${clinicEmail}` : ''}.
+              </Typography>
             </Box>
+
+            {/*
+              Four consents, drawn as four separate things to agree to rather
+              than a stack of ticks, because that is what they are: each is
+              stored with its own timestamp, its own policy text version and
+              its own purpose, and each can be withdrawn on its own. A row that
+              looks like a row is a row somebody can point at later and say
+              which one they gave.
+
+              Which of them say "povinné" is the clinic's setting, not this
+              file's: the admin ticks them on the činnost and the answer
+              arrives with the held slot. Two are never settable — the
+              examination is required by zákon 372/2011 whatever anybody
+              ticks, and a marketing consent that has to be given to get an
+              appointment is not freely given, so it stays voluntary.
+            */}
+            <Box sx={{ display: 'grid', gap: 1.25 }}>
+              {/*
+                Names what was actually booked. It said "sportovní lékařské
+                prohlídky" for everybody until 23. 9. 2026 — somebody who
+                booked a diagnostic session was consenting, in writing, to
+                an examination they had not asked for. Somebody who came
+                without booking has nothing to name yet, so the consent
+                covers the service they will book.
+              */}
+              <ConsentRow
+                required
+                checked={form.consentTreatment}
+                onChange={(value) => set('consentTreatment', value)}
+                error={errors.consentTreatment}
+                title={held !== null ? `Provedení: ${held.activityName}` : 'Poskytnutí zdravotní služby'}
+                detail={held !== null
+                  ? `Souhlasím s provedením činnosti ${held.activityName}${held.serviceName !== '' ? ` (${held.serviceName})` : ''} a se zpracováním údajů o zdravotním stavu, které si vyžádá.`
+                  : 'Souhlasím s poskytnutím zdravotní služby, kterou si objednám, a se zpracováním údajů o zdravotním stavu, které si vyžádá.'}
+              />
+              <ConsentRow
+                required={held?.requiresReportByEmail === true}
+                checked={form.consentReportEmail}
+                onChange={(value) => set('consentReportEmail', value)}
+                error={errors.consentReportEmail}
+                title="Lékařská zpráva e-mailem"
+                detail={held?.requiresReportByEmail === true
+                  ? `Zprávu z činnosti ${held.activityName} předáváme elektronicky na uvedený e-mail. Bez tohoto souhlasu ji nelze objednat.`
+                  : 'Souhlasím, aby mi byla lékařská zpráva zaslána elektronicky na uvedený e-mail. Bez souhlasu si ji vyzvednete na recepci.'}
+              />
+              {consentSettings.communicationVisible && (
+                <ConsentRow
+                  checked={form.consentCommunication}
+                  onChange={(value) => set('consentCommunication', value)}
+                  title={consentSettings.communicationTitle}
+                  detail={consentSettings.communicationDetail}
+                />
+              )}
+              <ConsentRow
+                required={held?.requiresClubSharing === true}
+                checked={form.consentClub}
+                onChange={(value) => set('consentClub', value)}
+                error={errors.consentClub}
+                title="Sdílení výsledků s klubem"
+                detail={held?.requiresClubSharing === true
+                  ? `Činnost ${held.activityName} objednáváme se sdílením výsledků s vaším klubem. Bez tohoto souhlasu ji nelze objednat.`
+                  : 'Souhlasím se sdílením výsledků s mým sportovním klubem. Jde o předání údajů někomu mimo ordinaci, takže bez vašeho souhlasu je nesdílíme.'}
+              />
+            </Box>
+            </FormSection>
+
+            {/* Only what the činnost asks for; empty is normal and then nothing is shown. */}
+            {held === null && appointment !== null && (
+              <RequiredDocuments documents={appointment.requiredDocuments} />
+            )}
+
+            {/* The questionnaire: not asked at all unless the činnost (or the completion link) says so. */}
+            {questionnaireAskedFor && (
+              <Panel
+                labelledBy="sec-questionnaire"
+                sx={{ borderColor: questionnaireMissing ? '#D32F2F' : BRAND.accentEdge, bgcolor: BRAND.accentWash }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  <PanelTitle id="sec-questionnaire">{questionnaire?.name ?? 'Zdravotní dotazník'}</PanelTitle>
+                  <Chip
+                    size="small"
+                    label={questionnaireRequired ? 'Povinný' : 'Nepovinný'}
+                    sx={{ height: 20, fontSize: 11, fontWeight: 700, bgcolor: BRAND.ink, color: BRAND.accent }}
+                  />
+                </Box>
+                <Typography variant="body2" sx={{ color: BRAND.muted }}>
+                  Vyplňte ho rovnou tady — otevře se celý přes obrazovku. Rozepsané se ukládá samo.
+                  {questionnaireProgress > 0 && ` Rozepsáno: ${questionnaireProgress} odpovědí.`}
+                </Typography>
+                <Box>
+                  <Button
+                    variant="contained"
+                    onClick={openQuestionnaire}
+                    endIcon={<OpenInFullOutlined sx={{ fontSize: 16 }} />}
+                    sx={ctaSx(48)}
+                  >
+                    {questionnaireProgress > 0 ? 'Pokračovat ve vyplňování' : 'Vyplnit dotazník'}
+                  </Button>
+                </Box>
+                {questionnaireMissing && (
+                  <Typography variant="caption" color="error">
+                    Bez vyplněného dotazníku nelze objednávku dokončit.
+                  </Typography>
+                )}
+              </Panel>
+            )}
+
+            {submitError !== null && (
+              <Alert severity="error" role="alert" sx={{ borderRadius: 2 }}>
+                {submitError}
+              </Alert>
+            )}
+
+            {/* One button, because there is one page; pinned at the bottom on a phone. */}
+            <PinnedBar label="Odeslat registraci" card>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: LABEL_COLOR, mr: { sm: 'auto' } }}>
+                <LockOutlined sx={{ fontSize: 15 }} aria-hidden />
+                <Typography variant="caption">Údaje putují šifrovaně a vidí je jen naše ordinace.</Typography>
+              </Box>
+              <Button
+                variant="contained"
+                onClick={() => void handleSubmit()}
+                disabled={submitting}
+                sx={ctaSx(52)}
+              >
+                {submitting ? 'Odesílám…' : completionView !== null ? 'Dokončit registraci' : 'Odeslat dotazník'}
+              </Button>
+            </PinnedBar>
           </Box>
-        </Container>
-      </Box>
-    </ThemeProvider>
+        </ThemeProvider>
+      </PublicMain>
+    </PublicLayout>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════
    Presentation
    ══════════════════════════════════════════════════════════════ */
-
-/**
- * @param booked
- * Whether the reader already holds a slot. It decides which three steps the
- * hero lists, and it is a prop rather than something read here: this is a
- * separate component, and an earlier version referenced the page's own `held`
- * from inside it — an identifier that does not exist in this scope, which threw
- * on render and left the whole page blank. Caught on 19. 9. 2026 by running the
- * type check that actually checks something.
- */
-function Hero({ compact = false, booked = false }: { compact?: boolean; booked?: boolean }) {
-  return (
-    <Box
-      sx={{
-        bgcolor: BRAND.ink,
-        backgroundImage: `radial-gradient(1200px 420px at 78% -20%, rgba(255,157,0,0.16), transparent 68%)`,
-        color: '#FFFFFF',
-        pt: { xs: 3.5, md: 5 },
-        pb: { xs: 11, md: 15 },
-        px: 2,
-      }}
-    >
-      <Container maxWidth="lg" sx={{ px: { xs: '0 !important', md: 3 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.25, mb: compact ? 2 : 4 }}>
-          <Typography component="span" sx={{ fontWeight: 800, fontSize: { xs: 18, md: 22 }, letterSpacing: '-0.01em' }}>
-            SportMedical
-          </Typography>
-          <Typography
-            component="span"
-            sx={{ fontWeight: 500, fontSize: { xs: 18, md: 22 }, letterSpacing: 2.5, color: BRAND.accent }}
-          >
-            DIAGNOSTICS
-          </Typography>
-        </Box>
-
-        {!compact && (
-          /*
-            Two columns, because one left the right half of a 1440 px banner
-            empty and the page opened on a lot of nothing. What fills it is the
-            three steps -- the shortest honest answer to "how long is this
-            going to take me", which is the question somebody about to close
-            the tab is actually asking.
-          */
-          <Box
-            sx={{
-              display: 'grid',
-              gap: { xs: 3, md: 6 },
-              alignItems: 'end',
-              gridTemplateColumns: { xs: '1fr', md: '1.35fr 1fr' },
-            }}
-          >
-            <Box>
-              <Typography
-                variant="h4"
-                sx={{ fontSize: { xs: 32, sm: 44, md: 52 }, mb: 1.5, lineHeight: 1.08 }}
-              >
-                Dotazník před návštěvou
-              </Typography>
-              <Typography
-                sx={{ color: 'rgba(255,255,255,0.68)', mb: 3, maxWidth: 520, fontSize: { xs: 15, md: 17 } }}
-              >
-                Vyplňte jednou a máte hotovo. Nemusíte se nikam registrovat ani
-                si nic pamatovat.
-              </Typography>
-
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Trust icon={<ScheduleOutlined sx={{ fontSize: 15 }} />} label="Zhruba minuta" />
-                <Trust icon={<VerifiedUserOutlined sx={{ fontSize: 15 }} />} label="Bez registrace" />
-                <Trust icon={<LockOutlined sx={{ fontSize: 15 }} />} label="Šifrovaný přenos" />
-              </Box>
-            </Box>
-
-            <Box
-              sx={{
-                display: { xs: 'none', md: 'grid' },
-                gap: 1.75,
-                p: 3,
-                borderRadius: 4,
-                border: '1px solid rgba(255,255,255,0.14)',
-                bgcolor: 'rgba(255,255,255,0.04)',
-              }}
-            >
-              <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: 1, color: BRAND.accent }}>
-                JAK TO PROBĚHNE
-              </Typography>
-              {/*
-                Two different truths, and the page must not tell the wrong one.
-
-                Somebody who booked a slot already has a time; telling them "we
-                will call you and arrange one" contradicts the banner directly
-                above, which names the day and the hour we are holding for them.
-                Somebody who came straight here has no time yet, and for them
-                the original three steps are exactly right.
-              */}
-              {booked ? (
-                <>
-                  <HeroStep n="1" text="Vyplníte tento formulář — stačí minuta." />
-                  <HeroStep n="2" text="Termín je hned váš — potvrzení uvidíte na obrazovce." />
-                  <HeroStep n="3" text="Přijdete s výpisem od praktického lékaře." />
-                </>
-              ) : (
-                <>
-                  <HeroStep n="1" text="Vyplníte tento formulář — stačí minuta." />
-                  <HeroStep n="2" text="Ozveme se vám a domluvíme termín." />
-                  <HeroStep n="3" text="Přijdete s výpisem od praktického lékaře." />
-                </>
-              )}
-            </Box>
-          </Box>
-        )}
-      </Container>
-    </Box>
-  );
-}
-
-function HeroStep({ n, text }: { n: string; text: string }) {
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-      <Box
-        sx={{
-          width: 22,
-          height: 22,
-          borderRadius: '50%',
-          flexShrink: 0,
-          mt: '1px',
-          display: 'grid',
-          placeItems: 'center',
-          fontSize: 11,
-          fontWeight: 800,
-          bgcolor: 'rgba(255,255,255,0.12)',
-          color: '#FFFFFF',
-        }}
-      >
-        {n}
-      </Box>
-      <Typography sx={{ color: 'rgba(255,255,255,0.82)', fontSize: 14.5, lineHeight: 1.4 }}>
-        {text}
-      </Typography>
-    </Box>
-  );
-}
-
-function Trust({ icon, label }: { icon: ReactNode; label: string }) {
-  return (
-    <Box
-      sx={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 0.75,
-        px: 1.5,
-        py: 0.65,
-        borderRadius: 999,
-        border: '1px solid rgba(255,255,255,0.16)',
-        bgcolor: 'rgba(255,255,255,0.05)',
-        color: 'rgba(255,255,255,0.85)',
-        fontSize: 12.5,
-        fontWeight: 600,
-      }}
-    >
-      {icon}
-      {label}
-    </Box>
-  );
-}
-
-function Card({ children, sx }: { children: ReactNode; sx?: object }) {
-  return (
-    <Box
-      sx={{
-        position: 'relative',
-        bgcolor: '#FFFFFF',
-        borderRadius: 4,
-        border: `1px solid ${BRAND.line}`,
-        boxShadow: '0 18px 50px rgba(11, 11, 12, 0.10)',
-        p: { xs: 2.5, sm: 3.5 },
-        ...sx,
-      }}
-    >
-      {children}
-    </Box>
-  );
-}
-
-/** A heading in the rail. No number: the rail is not a step of the form. */
-function RailTitle({ children }: { children: string }) {
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-      <Typography sx={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.01em' }}>
-        {children}
-      </Typography>
-      <Box sx={{ flex: 1, height: '1px', bgcolor: BRAND.line }} />
-    </Box>
-  );
-}
-
-function Section({ number, title }: { number: number; title: string }) {
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-      <Box
-        sx={{
-          width: 30,
-          height: 30,
-          borderRadius: 1.75,
-          bgcolor: BRAND.ink,
-          color: BRAND.accent,
-          display: 'grid',
-          placeItems: 'center',
-          fontSize: 14,
-          fontWeight: 800,
-          flexShrink: 0,
-        }}
-      >
-        {number}
-      </Box>
-      <Typography sx={{ fontWeight: 800, fontSize: 19, letterSpacing: '-0.01em' }}>
-        {title}
-      </Typography>
-      <Box sx={{ flex: 1, height: '1px', bgcolor: BRAND.line }} />
-    </Box>
-  );
-}
 
 function ConsentRow({
   checked,
@@ -2231,75 +1821,4 @@ function ConsentRow({
       </Box>
     </Box>
   );
-}
-
-/*
- * One document the patient has to deal with before they arrive. A link, not a
- * form — see the comment where these are rendered.
- */
-function DocumentRow({
-  title,
-  when,
-  detail,
-  emphasis = false,
-}: {
-  title: string;
-  when: string;
-  detail: string;
-  emphasis?: boolean;
-}) {
-  return (
-    <Box
-      sx={{
-        p: 1.75,
-        borderRadius: 3,
-        border: `1px solid ${emphasis ? BRAND.accentEdge : BRAND.line}`,
-        bgcolor: emphasis ? BRAND.accentWash : 'transparent',
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.25 }}>
-        <Typography sx={{ fontWeight: 700, fontSize: 14.5 }}>{title}</Typography>
-        <Chip
-          size="small"
-          label={when}
-          sx={{
-            height: 19,
-            fontSize: 11,
-            fontWeight: 700,
-            bgcolor: emphasis ? BRAND.ink : 'transparent',
-            color: emphasis ? BRAND.accent : BRAND.muted,
-            border: emphasis ? 'none' : `1px solid ${BRAND.line}`,
-          }}
-        />
-      </Box>
-      <Typography variant="body2" sx={{ color: BRAND.muted }}>
-        {detail}
-      </Typography>
-    </Box>
-  );
-}
-
-/**
- * The held slot in one line, in the clinic's own time zone.
- *
- * Named rather than left to the device: somebody booking from a phone that
- * thinks it is in London must still read the Prague time they are expected at.
- */
-function heldWhen(held: HeldBooking): string {
-  const when = new Date(held.startUtc);
-
-  const day = when.toLocaleDateString('cs-CZ', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'Europe/Prague',
-  });
-
-  const time = when.toLocaleTimeString('cs-CZ', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Europe/Prague',
-  });
-
-  return `${day} v ${time}`;
 }

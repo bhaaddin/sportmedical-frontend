@@ -2,33 +2,25 @@
    HODNOCENÍ NÁVŠTĚVY  (route: /hodnoceni/:token)
 
    The link a patient follows after a completed visit: one rating on a 1–5 scale,
-   a few optional words, one submission. No account, no login — the same brand
-   the other public pages wear. A dead or already-used link is told apart plainly.
+   a few optional words, one submission. No account, no login — the same frame
+   the other public pages wear (PublicLayout, artboard family V-Web2). A dead or
+   already-used link is told apart plainly. Phone: "Odeslat hodnocení" is pinned
+   at the bottom of the screen.
    ══════════════════════════════════════════════════════════════ */
 
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
-import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  Container,
-  Rating,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
-import { CheckCircleOutlined, StarOutlined } from '@mui/icons-material';
+import { Alert, Box, CircularProgress, Button, Rating, TextField, Typography } from '@mui/material';
+import { CheckCircleOutlined } from '@mui/icons-material';
 import {
   FeedbackAlreadySubmittedError,
   FeedbackLinkDeadError,
   submitFeedback,
 } from '../../api/feedback';
 import PublicLayout from './PublicLayout';
-import { BRAND } from '../../components/public/brand';
-
-/* Brand: the website identity every public page wears — components/public/brand.ts. */
+import { ARCHIVO, BRAND } from '../../components/public/brand';
+import { LABEL_COLOR, PageTitle, Panel, PinnedBar, PublicMain, ctaSx } from '../../components/public/kit';
 
 const RATING_WORDS: Record<number, string> = {
   1: 'Špatné',
@@ -38,16 +30,10 @@ const RATING_WORDS: Record<number, string> = {
   5: 'Výborné',
 };
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children }: { children: ReactNode }) {
   return (
     <PublicLayout>
-      <Box sx={{ py: { xs: 3, sm: 6 } }}>
-        <Container maxWidth="sm">
-          <Box sx={{ bgcolor: BRAND.paper, border: `1px solid ${BRAND.line}`, borderRadius: 4, p: { xs: 2.5, sm: 3.5 } }}>
-            {children}
-          </Box>
-        </Container>
-      </Box>
+      <PublicMain maxWidth={640} gap={2.5}>{children}</PublicMain>
     </PublicLayout>
   );
 }
@@ -103,37 +89,30 @@ export default function FeedbackPage() {
   if (outcome === 'thanks') {
     return (
       <Shell>
-        <Stack spacing={2} sx={{ alignItems: 'center', textAlign: 'center', py: 4 }}>
-          <CheckCircleOutlined sx={{ fontSize: 56, color: BRAND.accent }} />
-          <Typography variant="h4">Děkujeme</Typography>
-          <Typography sx={{ color: BRAND.muted }}>
+        <Panel component="div" sx={{ alignItems: 'center', textAlign: 'center', py: 5 }}>
+          <CheckCircleOutlined sx={{ fontSize: 56, color: BRAND.accent }} aria-hidden />
+          <Typography component="h1" sx={{ m: 0, fontFamily: ARCHIVO, fontWeight: 800, fontSize: 30, letterSpacing: '-0.03em' }}>
+            Děkujeme
+          </Typography>
+          <Typography sx={{ color: LABEL_COLOR }}>
             Vaše hodnocení nám pomáhá zlepšovat péči.
           </Typography>
-        </Stack>
+        </Panel>
       </Shell>
     );
   }
 
   return (
     <Shell>
-      <Stack spacing={3}>
-        <Box>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
-            <StarOutlined sx={{ color: BRAND.accent }} />
-            <Typography variant="overline" sx={{ color: BRAND.muted, letterSpacing: '0.08em' }}>
-              Hodnocení návštěvy
-            </Typography>
-          </Stack>
-          <Typography variant="h4">Jak jste byli spokojeni?</Typography>
-          <Typography sx={{ color: BRAND.muted, mt: 0.5 }}>
-            Zabere to půl minuty. Hodnocení je soukromé — čte ho jen ordinace.
-          </Typography>
-        </Box>
+      <PageTitle sub="Zabere to půl minuty. Hodnocení je soukromé — čte ho jen ordinace.">
+        Jak jste byli spokojeni?
+      </PageTitle>
 
+      <Panel component="div">
         <Box
           sx={{
             border: `1px solid ${BRAND.accentEdge}`,
-            borderRadius: 3,
+            borderRadius: '12px',
             p: 3,
             bgcolor: BRAND.accentWash,
             textAlign: 'center',
@@ -166,18 +145,19 @@ export default function FeedbackPage() {
             {complaint}
           </Alert>
         ) : null}
+      </Panel>
 
+      <PinnedBar label="Odeslat hodnocení">
         <Button
           variant="contained"
-          size="large"
           disabled={rating === null || submitting}
           onClick={submit}
           startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : null}
-          sx={{ color: BRAND.ink }}
+          sx={ctaSx(50)}
         >
           {submitting ? 'Odesílám…' : 'Odeslat hodnocení'}
         </Button>
-      </Stack>
+      </PinnedBar>
     </Shell>
   );
 }
