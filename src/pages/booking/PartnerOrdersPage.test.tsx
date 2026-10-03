@@ -15,11 +15,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { pragueWallClockToInstant } from '../../utils/time';
+import { setViewport, VIEWPORTS } from '../../test/viewport';
 
 const listOrders = vi.fn();
 const notices = vi.fn();
 const getClubs = vi.fn();
 const preview = vi.fn();
+const listBlocks = vi.fn();
 
 vi.mock('../../api/calendars', () => ({
   calendarsApi: {
@@ -40,6 +42,10 @@ vi.mock('../../api/activities', () => ({
     }),
   },
 }));
+vi.mock('../../api/clubBlocks', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../api/clubBlocks')>();
+  return { ...actual, clubBlocksApi: { ...actual.clubBlocksApi, list: listBlocks } };
+});
 vi.mock('../../api/workingHours', () => ({ workingHoursApi: { preview } }));
 vi.mock('../../services/clubsApi', () => ({ clubsApi: { getAll: getClubs } }));
 
@@ -57,6 +63,7 @@ function Wrap({ state, children }: { state: unknown; children: ReactNode }) {
       <MemoryRouter initialEntries={[{ pathname: '/vyhrazeni', state }]}>
         <Routes>
           <Route path="/vyhrazeni" element={<>{children}<StateProbe /></>} />
+          <Route path="/clubs" element={<><div data-testid="clubs-page">Kluby</div><StateProbe /></>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -67,6 +74,8 @@ const startUtc = pragueWallClockToInstant('2026-10-26', '10:00').toISOString();
 const endUtc = pragueWallClockToInstant('2026-10-26', '11:00').toISOString();
 
 beforeEach(() => {
+  setViewport(VIEWPORTS.desktop);
+  listBlocks.mockReset().mockResolvedValue([]);
   listOrders.mockReset().mockResolvedValue([]);
   notices.mockReset().mockResolvedValue([]);
   preview.mockReset().mockResolvedValue([]);
@@ -138,7 +147,90 @@ describe('PartnerOrdersPage with a handoff', () => {
 
   it('opens nothing without a handoff', async () => {
     render(<Wrap state={null}><PartnerOrdersPage /></Wrap>);
-    await screen.findByRole('heading', { name: 'Partnerská vyhrazení' });
+    await screen.findByRole('heading', { name: 'Hromadné objednávky' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+/* ── Etapa 2: three layouts and the link to the block ── */
+
+const order = (over: Record<string, unknown> = {}) => ({
+  id: 'o-1', calendarId: 'c-1', partnerName: 'FK Slaný', partnerType: 0, note: '', contactEmail: null,
+  linkSentAt: null, expiresAt: null, isRevoked: false,
+  requestedCount: 12, bookedCount: 4, requiredMinutes: 180, coveredMinutes: 120, missingMinutes: 60,
+  items: [{ activityId: 'a-1', activityName: 'Komplexní prohlídka', durationMinutes: 15, requestedCount: 12, bookedCount: 4, remaining: 8, requiredMinutes: 180 }],
+  windows: [{ id: 'w-1', date: '2026-10-26', startTime: '11:00:00', endTime: '12:00:00', coveredMinutes: 60, releaseDate: null, warnDate: null, partnerReminderDate: null, releasedAt: null, isExclusive: true }],
+  clubId: 'club-1', token: 'tok', clubDiscountPercent: null, clubBlockId: null, ...over,
+});
+
+describe('PartnerOrdersPage in three layouts', () => {
+  beforeEach(() => {
+    listOrders.mockResolvedValue([order(), order({ id: 'o-2', partnerName: 'SK Kladno' })]);
+  });
+
+  it.each([
+    ['phone', VIEWPORTS.phone, '1'],
+    ['tablet', VIEWPORTS.tablet, '2'],
+    ['desktop', VIEWPORTS.desktop, '2'],
+  ])('draws the %s layout with %s column(s)', async (device, width, columns) => {
+    setViewport(width);
+    render(<Wrap state={null}><PartnerOrdersPage /></Wrap>);
+    const page = await screen.findByTestId('partner-orders');
+    expect(page).toHaveAttribute('data-layout', device);
+    expect(page).toHaveAttribute('data-columns', columns);
+    expect(await screen.findAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: 'Hromadné objednávky' })).toBeInTheDocument();
+  });
+
+  it('keeps "Nová hromadná objednávka" in the header on desktop and pins it to the bottom on a phone', async () => {
+    const { unmount } = render(<Wrap state={null}><PartnerOrdersPage /></Wrap>);
+    await screen.findAllByRole('listitem');
+    expect(screen.queryByTestId('pinned-actions')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nová hromadná objednávka' })).toBeInTheDocument();
+    unmount();
+
+    setViewport(VIEWPORTS.phone);
+    render(<Wrap state={null}><PartnerOrdersPage /></Wrap>);
+    await screen.findAllByRole('listitem');
+    const bar = screen.getByTestId('pinned-actions');
+    expect(within(bar).getByRole('button', { name: 'Nová hromadná objednávka' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Nová hromadná objednávka' })).toHaveLength(1);
+  });
+
+  it('opens the creating dialog from the pinned button on a phone, full screen', async () => {
+    setViewport(VIEWPORTS.phone);
+    const user = userEvent.setup();
+    render(<Wrap state={null}><PartnerOrdersPage /></Wrap>);
+    await screen.findAllByRole('listitem');
+    await user.click(within(screen.getByTestId('pinned-actions')).getByRole('button', { name: 'Nová hromadná objednávka' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.className).toMatch(/paperFullScreen/);
+  });
+});
+
+describe('PartnerOrdersPage and club blocks', () => {
+  it('links an order that came from a block to that block, and not one that did not', async () => {
+    listOrders.mockResolvedValue([
+      order({ clubBlockId: 'b-1' }),
+      order({ id: 'o-2', partnerName: 'SK Kladno', clubId: 'club-2' }),
+    ]);
+    listBlocks.mockResolvedValue([{ id: 'b-1', clubId: 'club-1', fromDate: '2026-10-26', toDate: '2026-10-27' }]);
+    const user = userEvent.setup();
+    render(<Wrap state={null}><PartnerOrdersPage /></Wrap>);
+
+    const link = await screen.findByTestId('order-block-link');
+    expect(screen.getAllByTestId('order-block-link')).toHaveLength(1);
+    await waitFor(() => expect(link).toHaveTextContent('Z bloku 26.—27. října 2026'));
+
+    await user.click(link);
+    expect(await screen.findByTestId('clubs-page')).toBeInTheDocument();
+    expect(JSON.parse(screen.getByTestId('state').textContent ?? 'null')).toEqual({ clubId: 'club-1', clubBlockId: 'b-1' });
+  });
+
+  it('still links when the blocks cannot be read, without the days', async () => {
+    listOrders.mockResolvedValue([order({ clubBlockId: 'b-1' })]);
+    listBlocks.mockRejectedValue(new Error('500'));
+    render(<Wrap state={null}><PartnerOrdersPage /></Wrap>);
+    expect(await screen.findByTestId('order-block-link')).toHaveTextContent('Z bloku klubu');
   });
 });

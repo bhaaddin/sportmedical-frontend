@@ -9,21 +9,41 @@
  * editable from there.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { addDaysToDateOnly, pragueWallClockToInstant, toDateOnly } from '../utils/time';
+import { setViewport, VIEWPORTS } from '../test/viewport';
+import type { ClubBlockView } from '../api/clubBlocks';
 
 const getAll = vi.fn();
 const update = vi.fn();
 const listOrders = vi.fn();
 const range = vi.fn();
+const listBlocks = vi.fn();
+const getBlock = vi.fn();
+const createBlock = vi.fn();
+const createClub = vi.fn();
+const fetchActivities = vi.fn();
 
-vi.mock('../api/clubs', () => ({
-  clubsApi: { getAll, create: vi.fn(), update, deactivate: vi.fn() },
-}));
+vi.mock('../api/clubs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/clubs')>();
+  return {
+    ...actual,
+    clubsApi: { getAll, create: createClub, update, deactivate: vi.fn() },
+    clubSettingsApi: { get: vi.fn().mockResolvedValue({ registrationLinkValidityDays: 14, minimumPlayers: 30 }), put: vi.fn() },
+  };
+});
+vi.mock('../api/clubBlocks', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/clubBlocks')>();
+  return {
+    ...actual,
+    clubBlocksApi: { list: listBlocks, get: getBlock, create: createBlock, update: vi.fn(), cancel: vi.fn(), calculate: vi.fn().mockResolvedValue({}) },
+    fetchBlockableActivities: fetchActivities,
+  };
+});
 vi.mock('../api/calendars', () => ({
   calendarsApi: {
     list: vi.fn().mockResolvedValue([
@@ -82,16 +102,39 @@ const appt = (id: string, date: string, time: string, name: string, ready = true
   patientName: name,
 });
 
-function Wrap({ children }: { children: ReactNode }) {
+function StateProbe() {
+  const location = useLocation();
+  return <div data-testid="state">{JSON.stringify(location.state)}</div>;
+}
+
+function Wrap({ children, state = null }: { children: ReactNode; state?: unknown }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/clubs']}>{children}</MemoryRouter>
+      <MemoryRouter initialEntries={[{ pathname: '/clubs', state }]}>
+        <Routes>
+          <Route path="/clubs" element={<>{children}<StateProbe /></>} />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>
   );
 }
 
+const block = (over: Partial<ClubBlockView> = {}): ClubBlockView => ({
+  id: 'b-1', clubId: 'club-2', clubName: 'HC Kladno', colorHex: '#2E7D6B', name: null, calendarIds: ['c-1'], activityIds: ['a-1'],
+  fromDate: day1, toDate: day2, dailyFrom: null, dailyTo: null, playerCount: 40, seats: 40, registered: 3, status: 'Active',
+  registrationToken: 'kladno-tok', registrationUrl: 'https://app.test/klub/kladno-tok', note: null, createdAtUtc: null, athletes: [], ...over,
+});
+
 beforeEach(() => {
+  setViewport(VIEWPORTS.desktop);
+  listBlocks.mockReset().mockResolvedValue([]);
+  getBlock.mockReset().mockImplementation(async (id: string) => block({ id }));
+  createBlock.mockReset();
+  createClub.mockReset();
+  fetchActivities.mockReset().mockResolvedValue([
+    { id: 'a-1', name: 'Komplexní prohlídka', durationMinutes: 15, clinicServiceId: null, colorHex: '#2E7D6B', parallelCapacity: 1 },
+  ]);
   getAll.mockReset().mockResolvedValue([slany, kladno]);
   update.mockReset().mockResolvedValue(slany);
   listOrders.mockReset().mockResolvedValue([slanyOrder]);
@@ -283,5 +326,220 @@ describe('ClubsPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Uložit' }));
 
     await waitFor(() => expect(update).toHaveBeenCalledWith('club-2', expect.objectContaining({ name: 'HC Kladno', city: 'Kladno' })));
+  });
+});
+
+/* ── Etapa 2: three layouts, club blocks and the router state ── */
+
+describe('ClubsPage in three layouts', () => {
+  it.each([
+    ['phone', VIEWPORTS.phone, '1'],
+    ['tablet', VIEWPORTS.tablet, '2'],
+    ['desktop', VIEWPORTS.desktop, '3'],
+  ])('draws the %s list with %s column(s) of cards', async (device, width, columns) => {
+    setViewport(width);
+    render(<Wrap><ClubsPage /></Wrap>);
+    const list = await screen.findByTestId('clubs-list');
+    expect(list).toHaveAttribute('data-layout', device);
+    expect(list).toHaveAttribute('data-columns', columns);
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('puts the actions in the header on a desktop', async () => {
+    render(<Wrap><ClubsPage /></Wrap>);
+    await screen.findAllByRole('listitem');
+    expect(screen.queryByTestId('pinned-actions')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nový blok' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nový klub' })).toBeInTheDocument();
+  });
+
+  it('pins "Nový blok" and "Nový klub" on a phone, and keeps the header free of them', async () => {
+    setViewport(VIEWPORTS.phone);
+    render(<Wrap><ClubsPage /></Wrap>);
+    await screen.findAllByRole('listitem');
+    const bar = screen.getByTestId('pinned-actions');
+    expect(within(bar).getByRole('button', { name: 'Nový blok' })).toBeInTheDocument();
+    expect(within(bar).getByRole('button', { name: 'Nový klub' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Nový blok' })).toHaveLength(1);
+  });
+
+  it.each([
+    ['phone', VIEWPORTS.phone, '1'],
+    ['tablet', VIEWPORTS.tablet, '2'],
+    ['desktop', VIEWPORTS.desktop, '2'],
+  ])('draws the %s detail in %s column(s)', async (device, width, columns) => {
+    setViewport(width);
+    const user = userEvent.setup();
+    render(<Wrap><ClubsPage /></Wrap>);
+    const cards = await screen.findAllByRole('listitem');
+    await screen.findByText('Aktivní rezervace');
+    await user.click(cards[0]);
+    const detail = await screen.findByTestId('club-detail');
+    expect(detail).toHaveAttribute('data-layout', device);
+    expect(detail).toHaveAttribute('data-columns', columns);
+    expect(screen.getByTestId('club-link')).toBeInTheDocument();
+    /* Phone: the places are small cards; elsewhere the table. */
+    if (device === 'phone') {
+      expect(await screen.findByRole('list', { name: 'Rezervovaná místa' })).toBeInTheDocument();
+      expect(screen.queryByRole('table', { name: 'Rezervovaná místa' })).not.toBeInTheDocument();
+      expect(screen.getByTestId('pinned-actions')).toBeInTheDocument();
+    } else {
+      expect(await screen.findByRole('table', { name: 'Rezervovaná místa' })).toBeInTheDocument();
+    }
+  });
+});
+
+describe('ClubsPage with club blocks', () => {
+  it("draws the club's colour as its avatar and counts a block's players when there is no order", async () => {
+    listBlocks.mockResolvedValue([block()]);
+    render(<Wrap><ClubsPage /></Wrap>);
+    const cards = await screen.findAllByRole('listitem');
+    await waitFor(() => expect(within(cards[1]).getByText('Aktivní rezervace')).toBeInTheDocument());
+    expect(within(cards[1]).getByTestId('club-avatar')).toHaveAttribute('data-color', '#2E7D6B');
+    expect(within(cards[1]).getByText('40')).toBeInTheDocument();
+    /* A club with no block and no colour known gets the neutral chip, not an invented colour. */
+    expect(within(cards[0]).getByTestId('club-avatar')).toHaveAttribute('data-color', '');
+  });
+
+  it("shows the club's blocks in the detail, with a link to register and 'Nový blok' for this club", async () => {
+    listBlocks.mockResolvedValue([block(), block({ id: 'b-old', status: 'Cancelled', fromDate: '2026-01-05', toDate: '2026-01-09' })]);
+    const user = userEvent.setup();
+    render(<Wrap><ClubsPage /></Wrap>);
+    const cards = await screen.findAllByRole('listitem');
+    await screen.findAllByText('Aktivní rezervace');
+    await user.click(cards[1]);
+
+    const panels = await screen.findAllByTestId('club-block-panel');
+    expect(panels).toHaveLength(2);
+    expect(within(panels[0]).getByText('Aktivní blok')).toBeInTheDocument();
+    expect(within(panels[0]).getByTestId('block-link')).toHaveTextContent('https://app.test/klub/kladno-tok');
+    expect(within(panels[1]).getByText('Zrušen')).toBeInTheDocument();
+    expect(screen.queryByText('Tento klub zatím nemá hromadnou rezervaci.')).not.toBeInTheDocument();
+    expect(screen.getByText(/^Blok /)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Nový blok' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: /Nový blok pro klub/ })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Klub')).toHaveValue('HC Kladno');
+  });
+
+  it('tells a club without anything to make a block or the older reservation', async () => {
+    const user = userEvent.setup();
+    render(<Wrap><ClubsPage /></Wrap>);
+    const cards = await screen.findAllByRole('listitem');
+    await user.click(cards[1]);
+    expect(await screen.findByText('Tento klub zatím nemá hromadnou rezervaci.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vytvořit blok' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vytvořit rezervaci' })).toBeInTheDocument();
+  });
+
+  it('keeps the cards and names the missing part when the blocks cannot be read', async () => {
+    listBlocks.mockRejectedValue(new Error('500'));
+    render(<Wrap><ClubsPage /></Wrap>);
+    await screen.findAllByRole('listitem');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nepodařilo se načíst: bloky klubů');
+  });
+
+  it("opens the new block in the club's detail after it is created", async () => {
+    createBlock.mockResolvedValue(block({ id: 'b-new', clubId: 'club-2' }));
+    listBlocks.mockResolvedValueOnce([]).mockResolvedValue([block({ id: 'b-new', clubId: 'club-2' })]);
+    const user = userEvent.setup();
+    render(<Wrap><ClubsPage /></Wrap>);
+    await screen.findAllByRole('listitem');
+    await user.click(screen.getByRole('button', { name: 'Nový blok' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByLabelText('Klub'));
+    await user.click(await screen.findByRole('option', { name: 'HC Kladno' }));
+    await user.type(within(dialog).getByLabelText('Počet hráčů'), '40');
+    fireEvent.change(within(dialog).getByLabelText('Od'), { target: { value: day1 } });
+    fireEvent.change(within(dialog).getByLabelText('Do'), { target: { value: day2 } });
+    await user.click(await within(dialog).findByRole('checkbox', { name: /Prohlídky/ }));
+    await user.click(await within(dialog).findByRole('checkbox', { name: /Komplexní prohlídka/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Vytvořit blok' }));
+
+    await waitFor(() => expect(createBlock).toHaveBeenCalledWith(expect.objectContaining({ clubId: 'club-2', playerCount: 40, fromDate: day1, toDate: day2 })));
+    expect(await screen.findByRole('heading', { name: 'HC Kladno', level: 1 })).toBeInTheDocument();
+    expect((await screen.findAllByTestId('club-block-panel'))[0]).toHaveAttribute('data-block-id', 'b-new');
+  });
+});
+
+describe('ClubsPage router state', () => {
+  it('opens the new-block dialog for a club that does not exist yet, filled from the state, and spends the state', async () => {
+    const state = {
+      newBlock: {
+        newClub: { name: 'TJ Sokol Slaný', contactPerson: 'Jan Trenér', contactPhone: '+420 603 221 004', headcount: 40 },
+        calendarIds: ['c-1'], fromDate: day1, toDate: day2, dailyFrom: '08:00', dailyTo: '12:00',
+      },
+    };
+    render(<Wrap state={state}><ClubsPage /></Wrap>);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: /Nový blok pro klub/ })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Název klubu')).toHaveValue('TJ Sokol Slaný');
+    expect(within(dialog).getByLabelText('Kontaktní osoba')).toHaveValue('Jan Trenér');
+    expect(within(dialog).getByLabelText('Počet hráčů')).toHaveValue('40');
+    expect(within(dialog).getByLabelText('Od')).toHaveValue(day1);
+    expect(within(dialog).getByLabelText('Do')).toHaveValue(day2);
+    expect(within(dialog).getByLabelText('Denně od')).toHaveValue('08:00');
+    expect(within(dialog).getByLabelText('Denně do')).toHaveValue('12:00');
+    expect(await within(dialog).findByRole('checkbox', { name: /Prohlídky/ })).toBeChecked();
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('null'));
+  });
+
+  it('creates the club and the block together from a not-yet-created club', async () => {
+    createClub.mockResolvedValue({ id: 'club-new', name: 'TJ Sokol Slaný', ico: '00000019', paymentTermsDays: 14, isActive: true, createdAt: '' });
+    createBlock.mockResolvedValue(block({ id: 'b-new', clubId: 'club-new', clubName: 'TJ Sokol Slaný' }));
+    const user = userEvent.setup();
+    render(
+      <Wrap state={{ newBlock: { newClub: { name: 'TJ Sokol Slaný', headcount: 40 }, calendarIds: ['c-1'], fromDate: day1, toDate: day2 } }}>
+        <ClubsPage />
+      </Wrap>,
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('IČO'), '00000019');
+    await user.click(await within(dialog).findByRole('checkbox', { name: /Komplexní prohlídka/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Vytvořit blok' }));
+
+    await waitFor(() => expect(createClub).toHaveBeenCalledWith(expect.objectContaining({ name: 'TJ Sokol Slaný', ico: '00000019' })));
+    await waitFor(() => expect(createBlock).toHaveBeenCalledWith(expect.objectContaining({ clubId: 'club-new', playerCount: 40 })));
+  });
+
+  it('opens an empty dialog for `newBlock: true` and a club-filled one for a club id', async () => {
+    const { unmount } = render(<Wrap state={{ newBlock: true }}><ClubsPage /></Wrap>);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Počet hráčů')).toHaveValue('');
+    unmount();
+
+    render(<Wrap state={{ newBlock: { clubId: 'club-1' } }}><ClubsPage /></Wrap>);
+    const second = await screen.findByRole('dialog');
+    expect(within(second).getByLabelText('Klub')).toHaveValue('FK Slaný');
+  });
+
+  it("opens the club's detail on the block it was sent to", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    listBlocks.mockResolvedValue([block({ id: 'b-1', clubId: 'club-2' }), block({ id: 'b-2', clubId: 'club-2', fromDate: day2, toDate: day2 })]);
+    render(<Wrap state={{ clubId: 'club-2', clubBlockId: 'b-2' }}><ClubsPage /></Wrap>);
+
+    expect(await screen.findByRole('heading', { name: 'HC Kladno', level: 1 })).toBeInTheDocument();
+    const panels = await screen.findAllByTestId('club-block-panel');
+    const target = panels.find((p) => p.getAttribute('data-block-id') === 'b-2');
+    expect(target).toBeDefined();
+    await waitFor(() => expect(scroll).toHaveBeenCalled());
+    expect(scroll.mock.contexts.some((c) => c === target)).toBe(true);
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('null'));
+  });
+
+  it('finds the club from the block when only the block id is given', async () => {
+    listBlocks.mockResolvedValue([block({ id: 'b-7', clubId: 'club-2' })]);
+    render(<Wrap state={{ clubBlockId: 'b-7' }}><ClubsPage /></Wrap>);
+    expect(await screen.findByRole('heading', { name: 'HC Kladno', level: 1 })).toBeInTheDocument();
+    expect(await screen.findByTestId('club-block-panel')).toHaveAttribute('data-block-id', 'b-7');
+  });
+
+  it('still opens a club straight away from the older { clubId } hand-off', async () => {
+    render(<Wrap state={{ clubId: 'club-1' }}><ClubsPage /></Wrap>);
+    expect(await screen.findByRole('heading', { name: 'FK Slaný', level: 1 })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('null'));
   });
 });

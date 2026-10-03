@@ -1,0 +1,253 @@
+/*
+ * One club block in the club's page: status, days, how many of the places the
+ * athletes have taken, the registration link, who took them, and the actions -
+ * Upravit, Zkrátit, Prodloužit, Zrušit blok.
+ *
+ * Drawn as a card; on a phone the athletes become small cards and the actions
+ * stack full width (no table to scroll sideways, no touch target under 44 px).
+ * A cancelled block stays visible, muted and without actions: the history of
+ * what the club had is worth more than a list that forgets.
+ */
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Box, Button, LinearProgress, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material';
+import { ContentCopy } from '@mui/icons-material';
+import { useQuery } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import { calendarsApi } from '../../api/calendars';
+import { clubBlocksApi, fetchBlockableActivities } from '../../api/clubBlocks';
+import type { ClubBlockView } from '../../api/clubBlocks';
+import { clubRegistrationLink } from '../../api/publicClub';
+import { useDevice } from '../../layout/useDevice';
+import { formatSlotTime } from '../../pages/clubs/clubOrders';
+import { SectionLabel, SoftCard, StatusChip } from '../ui';
+import { blockFree, blockPercent, blockRange, blockTitle, formatPlayers, inkOn } from './blockLogic';
+import { ClubBlockDialog } from './ClubBlockDialog';
+import { ClubBlockRangeDialog } from './ClubBlockRangeDialog';
+import type { RangeMode } from './ClubBlockRangeDialog';
+import { CancelClubBlockDialog } from './CancelClubBlockDialog';
+import type { Club } from '../../api/clubs';
+
+const mono = '"JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace';
+
+export function ClubBlockPanel({
+  block,
+  clubs,
+  allBlocks,
+  highlighted = false,
+  contactEmail,
+  clubName,
+}: {
+  block: ClubBlockView;
+  clubs: Club[];
+  allBlocks: ClubBlockView[];
+  /** Opened straight from the router: scrolled to and outlined. */
+  highlighted?: boolean;
+  contactEmail?: string | null;
+  clubName: string;
+}) {
+  const device = useDevice();
+  const phone = device === 'phone';
+  const active = block.status === 'Active';
+  const [dialog, setDialog] = useState<null | 'edit' | 'cancel' | RangeMode>(null);
+  const root = useRef<HTMLDivElement | null>(null);
+
+  /* Landed on from the calendar or the booking drawer: bring the block into view. */
+  useEffect(() => {
+    if (highlighted) root.current?.scrollIntoView?.({ block: 'center' });
+  }, [highlighted]);
+
+  const detailQuery = useQuery({
+    queryKey: ['club-blocks', 'detail', block.id],
+    queryFn: () => clubBlocksApi.get(block.id),
+    enabled: active,
+    staleTime: 15_000,
+  });
+  const detail = detailQuery.data ?? block;
+  const athletes = detail.athletes;
+
+  const calendarsQuery = useQuery({ queryKey: ['calendars'], queryFn: calendarsApi.list, staleTime: 5 * 60 * 1000 });
+  const activitiesQuery = useQuery({ queryKey: ['club-block-activities'], queryFn: fetchBlockableActivities, staleTime: 5 * 60 * 1000 });
+  const calendarNames = block.calendarIds.map((id) => (calendarsQuery.data ?? []).find((c) => c.id === id)?.name).filter(Boolean) as string[];
+  const activityNames = block.activityIds.map((id) => (activitiesQuery.data ?? []).find((a) => a.id === id)?.name).filter(Boolean) as string[];
+
+  const link = block.registrationUrl ?? (block.registrationToken ? clubRegistrationLink(block.registrationToken) : null);
+  const free = blockFree(block);
+
+  const copy = async () => {
+    if (link === null) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success('Odkaz zkopírován');
+    } catch {
+      toast.error('Odkaz se nepodařilo zkopírovat');
+    }
+  };
+
+  const mailto =
+    link !== null && (contactEmail ?? '') !== ''
+      ? `mailto:${encodeURIComponent(contactEmail ?? '')}?subject=${encodeURIComponent(`Registrace sportovců — ${clubName}`)}&body=${encodeURIComponent(
+          `Dobrý den,\n\nsportovci klubu ${clubName} se na prohlídku registrují tímto odkazem:\n${link}\n\nS pozdravem`,
+        )}`
+      : null;
+
+  return (
+    <SoftCard
+      ref={root}
+      id={`club-block-${block.id}`}
+      data-testid="club-block-panel"
+      data-block-id={block.id}
+      sx={{
+        opacity: active ? 1 : 0.75,
+        ...(highlighted ? { borderColor: 'primary.main', borderWidth: 2 } : {}),
+      }}
+    >
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start', minWidth: 0 }}>
+          <Box
+            aria-hidden="true"
+            data-testid="block-color"
+            data-color={block.colorHex ?? ''}
+            sx={{
+              flex: '0 0 40px', height: 40, borderRadius: '10px',
+              bgcolor: block.colorHex ?? 'action.hover',
+              color: block.colorHex ? inkOn(block.colorHex) : 'text.secondary',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700,
+            }}
+          >
+            {clubName.slice(0, 2).toUpperCase()}
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography component="h3" sx={{ fontSize: 17, fontWeight: 700, lineHeight: 1.3 }}>
+              {blockTitle(block)}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              {blockRange(block)}
+              {block.dailyFrom && block.dailyTo ? ` · denně ${block.dailyFrom}–${block.dailyTo}` : ''}
+              {` · ${formatPlayers(block.playerCount)}`}
+            </Typography>
+          </Box>
+        </Stack>
+        <StatusChip tone={active ? 'green' : 'grey'}>{active ? 'Aktivní blok' : 'Zrušen'}</StatusChip>
+      </Stack>
+
+      {calendarNames.length > 0 || activityNames.length > 0 ? (
+        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1.5 }}>
+          {calendarNames.length > 0 ? `Kalendáře: ${calendarNames.join(', ')}` : ''}
+          {calendarNames.length > 0 && activityNames.length > 0 ? ' · ' : ''}
+          {activityNames.length > 0 ? `Činnosti: ${activityNames.join(', ')}` : ''}
+        </Typography>
+      ) : null}
+      {block.note ? <Typography variant="body2" sx={{ mb: 1.5 }}>{block.note}</Typography> : null}
+
+      {active ? (
+        <>
+          <SectionLabel>Registrační odkaz pro sportovce</SectionLabel>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ alignItems: { sm: 'center' } }}>
+            <Box
+              data-testid="block-link"
+              sx={{
+                flex: 1, minWidth: 0, px: 1.75, py: 1.25, borderRadius: 2.5, border: '1px solid', borderColor: 'divider',
+                bgcolor: 'background.default', fontFamily: mono, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                color: link === null ? 'text.secondary' : 'text.primary',
+              }}
+            >
+              {link ?? 'Odkaz zatím není k dispozici — server ho nevrací.'}
+            </Box>
+            <Button variant="contained" startIcon={<ContentCopy sx={{ fontSize: 16 }} />} disabled={link === null} onClick={() => void copy()} sx={{ minHeight: 44 }}>
+              Kopírovat
+            </Button>
+            <Button variant="outlined" component="a" href={mailto ?? undefined} disabled={mailto === null} sx={{ minHeight: 44 }}>
+              Poslat klubu
+            </Button>
+          </Stack>
+        </>
+      ) : null}
+
+      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'baseline', mt: 2.5, mb: 0.75 }}>
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          Obsazeno {block.registered} z {block.seats} míst
+        </Typography>
+        <Typography variant="body2" sx={{ fontWeight: 700 }}>{free} volných</Typography>
+      </Stack>
+      <LinearProgress variant="determinate" value={blockPercent(block)} aria-label={`Obsazenost bloku ${blockTitle(block)}`} />
+
+      {active ? (
+        <Box sx={{ mt: 2.5 }}>
+          <SectionLabel>Sportovci v bloku</SectionLabel>
+          {detailQuery.isError ? (
+            <Alert severity="warning" sx={{ mb: 1 }} action={<Button color="inherit" size="small" onClick={() => void detailQuery.refetch()}>Zkusit znovu</Button>}>
+              Sportovce bloku se nepodařilo načíst.
+            </Alert>
+          ) : null}
+          {detailQuery.isLoading ? (
+            <Stack spacing={1}>{[0, 1].map((i) => <Skeleton key={i} variant="rounded" height={44} />)}</Stack>
+          ) : athletes === null || athletes.length === 0 ? (
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              {block.registered > 0 && athletes === null
+                ? `Registrováno ${block.registered} — jmenný seznam server zatím nevrací.`
+                : 'Zatím se nikdo neregistroval. Sportovci se zapisují přes odkaz výše.'}
+            </Typography>
+          ) : phone ? (
+            <Stack spacing={1} role="list" aria-label="Sportovci v bloku">
+              {athletes.map((a) => (
+                <Box key={a.id} role="listitem" sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2.5, p: 1.5 }}>
+                  <Stack direction="row" sx={{ justifyContent: 'space-between', gap: 1 }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: 14 }}>{a.name}</Typography>
+                    <StatusChip tone={a.ready ? 'green' : 'beige'} size="sm">{a.ready ? 'Registrován' : 'Chybí dotazník'}</StatusChip>
+                  </Stack>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    {[a.activityName, a.startUtc ? formatSlotTime(a.startUtc) : null].filter(Boolean).join(' · ')}
+                  </Typography>
+                </Box>
+              ))}
+            </Stack>
+          ) : (
+            <TableContainer sx={{ border: '1px solid', borderColor: 'divider' }}>
+              <Table size="small" aria-label={`Sportovci v bloku ${blockTitle(block)}`}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Sportovec</TableCell>
+                    <TableCell>Činnost</TableCell>
+                    <TableCell>Termín</TableCell>
+                    <TableCell>Stav</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {athletes.map((a) => (
+                    <TableRow key={a.id} hover>
+                      <TableCell sx={{ fontWeight: 600 }}>{a.name}</TableCell>
+                      <TableCell>{a.activityName || '—'}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{a.startUtc ? formatSlotTime(a.startUtc) : '—'}</TableCell>
+                      <TableCell>
+                        <StatusChip tone={a.ready ? 'green' : 'beige'}>{a.ready ? 'Registrován' : 'Chybí dotazník'}</StatusChip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Box>
+      ) : null}
+
+      {active ? (
+        <Stack direction={phone ? 'column' : 'row'} spacing={1} sx={{ mt: 2.5, flexWrap: 'wrap', gap: 1 }}>
+          <Button variant="outlined" onClick={() => setDialog('shorten')} sx={{ minHeight: 44 }}>Zkrátit</Button>
+          <Button variant="outlined" onClick={() => setDialog('extend')} sx={{ minHeight: 44 }}>Prodloužit</Button>
+          <Button variant="outlined" onClick={() => setDialog('edit')} sx={{ minHeight: 44 }}>Upravit blok</Button>
+          <Button variant="outlined" color="error" onClick={() => setDialog('cancel')} sx={{ minHeight: 44, ml: phone ? 0 : 'auto' }}>
+            Zrušit blok
+          </Button>
+        </Stack>
+      ) : null}
+
+      {dialog === 'shorten' || dialog === 'extend' ? (
+        <ClubBlockRangeDialog block={detail} mode={dialog} onClose={() => setDialog(null)} />
+      ) : null}
+      {dialog === 'cancel' ? <CancelClubBlockDialog block={detail} onClose={() => setDialog(null)} /> : null}
+      {dialog === 'edit' ? <ClubBlockDialog clubs={clubs} block={detail} blocks={allBlocks} onClose={() => setDialog(null)} /> : null}
+    </SoftCard>
+  );
+}
+
+export default ClubBlockPanel;

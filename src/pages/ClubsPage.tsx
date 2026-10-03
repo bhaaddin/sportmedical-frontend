@@ -1,19 +1,29 @@
 /*
- * Kluby a týmy - design board 3. 10. 2026, screens 16 and 17.
+ * Kluby a týmy - design board 3. 10. 2026, screens 16 and 17, in three layouts
+ * (phone: cards in one column and the actions pinned to the bottom; tablet: two
+ * columns; desktop: the board's three).
  *
  * One screen, two views. The list is a grid of cards: the club, whether it has
- * a reservation running, who to call, how many athletes it brings and which
- * discount band that puts it in. Opening a card shows the club's bulk
- * reservation the way the board draws it - the athletes' registration link,
- * how many of the places are taken, who took them and when, and on the right
- * the club's facts and the order's money.
+ * a reservation or a block running, who to call, how many athletes it brings and
+ * the discount the administrator gave it. Opening a card shows the club's
+ * blocks and bulk reservation - the athletes' registration link, how many of the
+ * places are taken, who took them - and on the right the club's facts and the
+ * order's money.
  *
- * The data is what the API already answers. Payers come from `/api/clubs`,
- * reservations are the partner orders of every calendar the user may see
- * (4.7), the discount is the one the administrator set on the club's card, and
- * prices come through the activities from the price list. Nothing on this
- * screen is a number of its own: every count is the server's and every sum is
- * worked out in `clubs/clubOrders.ts`, where the tests can see it.
+ * The data is what the API answers. Payers come from `/api/clubs`, club blocks
+ * from `/api/v1/club-blocks` (C4), reservations are the partner orders of every
+ * calendar the user may see (4.7), the discount is the one the administrator
+ * set on the club's card, and prices come through the activities from the price
+ * list. Nothing on this screen is a number of its own: every count is the
+ * server's and every sum is worked out in `clubs/clubOrders.ts`.
+ *
+ * Router state this page understands (all optional, spent once read):
+ *
+ *   { clubId }                       open that club's detail
+ *   { clubId, clubBlockId }          ... and land on that block
+ *   { clubBlockId }                  the same, the club is found from the block
+ *   { newBlock: NewBlockPrefill }    open the new-block dialog; a club that does
+ *                                    not exist yet (`newClub`) is created with it
  *
  * The payer record itself - IČO, fakturační adresa, bankovní spojení - is still
  * edited here ("Upravit klub", "Nový klub"), because an invoice to a club
@@ -21,66 +31,30 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider,
-  Grid, IconButton, InputAdornment, LinearProgress, MenuItem, Skeleton, Stack,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField,
-  Tooltip, Typography,
-} from '@mui/material';
-import { ContentCopy, Delete, Search } from '@mui/icons-material';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Alert, Box, Button, InputAdornment, Skeleton, Stack, TextField, Typography } from '@mui/material';
+import { Search } from '@mui/icons-material';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { clubsApi } from '../api/clubs';
 import type { Club } from '../api/clubs';
 import { calendarsApi } from '../api/calendars';
 import { activitiesApi } from '../api/activities';
-import { appointmentsApi } from '../api/appointments';
-import { partnerOrdersApi, type PartnerOrderDetail } from '../api/partnerOrders';
-import { clubRegistrationLink } from '../api/publicClub';
-import { formatPragueDate, toDateOnly } from '../utils/time';
-import { ClubScheduleReport } from '../components/booking/ClubScheduleReport';
-import { FilterChips, PageHeader, SectionLabel, SoftCard, StatusChip } from '../components/ui';
-import type { ChipTone } from '../components/ui';
-import {
-  EMPTY_PAYER, canBeInvoiced, hasPayerErrors, toPayerRequest, validatePayer,
-} from './clubs/payerForm';
-import type { PayerDraft, PayerErrors } from './clubs/payerForm';
-import {
-  clubDiscountOf, clubStatus, describeDiscount, formatCzk, formatDateRange, formatDiscount,
-  formatShortRange, headcountOf, matchesFilter, matchesSearch, orderDateRange, orderTotal,
-  ordersOfClub, primaryOrder, seatRows,
-} from './clubs/clubOrders';
-import type { ClubFilter, ClubStatus, SeatState } from './clubs/clubOrders';
-
-const draftFromClub = (club: Club): PayerDraft => ({
-  name: club.name ?? '',
-  ico: club.ico ?? '',
-  dic: club.dic ?? '',
-  address: club.address ?? '',
-  city: club.city ?? '',
-  postalCode: club.postalCode ?? '',
-  contactPerson: club.contactPerson ?? '',
-  contactEmail: club.contactEmail ?? '',
-  contactPhone: club.contactPhone ?? '',
-  bankAccount: club.bankAccount ?? '',
-  bankCode: club.bankCode ?? '',
-  iban: club.iban ?? '',
-  paymentTermsDays: String(club.paymentTermsDays ?? 14),
-  discountPercent:
-    typeof club.discountPercent === 'number' ? club.discountPercent.toLocaleString('cs-CZ') : '',
-});
-
-const STATUS_CHIP: Record<ClubStatus, { tone: ChipTone; label: string }> = {
-  active: { tone: 'green', label: 'Aktivní rezervace' },
-  none: { tone: 'grey', label: 'Bez objednávky' },
-  done: { tone: 'grey', label: 'Dokončeno' },
-};
-
-const SEAT_CHIP: Record<SeatState, { tone: ChipTone; label: string }> = {
-  registered: { tone: 'green', label: 'Registrován' },
-  missingQuestionnaire: { tone: 'beige', label: 'Chybí dotazník' },
-  waiting: { tone: 'grey', label: 'Čeká na sportovce' },
-};
+import { clubBlocksApi } from '../api/clubBlocks';
+import type { ClubBlockView } from '../api/clubBlocks';
+import { partnerOrdersApi } from '../api/partnerOrders';
+import { useDevice } from '../layout/useDevice';
+import { toDateOnly } from '../utils/time';
+import { FilterChips, PageHeader, SoftCard } from '../components/ui';
+import { ClubBlockDialog, isNewBlockPrefill } from '../components/clubs/ClubBlockDialog';
+import type { NewBlockPrefill } from '../components/clubs/ClubBlockDialog';
+import { matchesFilter, matchesSearch } from './clubs/clubOrders';
+import type { ClubFilter } from './clubs/clubOrders';
+import { buildClubRow } from './clubs/clubRow';
+import type { ClubRow } from './clubs/clubRow';
+import { ClubCard } from './clubs/ClubCard';
+import { ClubDetail } from './clubs/ClubDetail';
+import { PayerDialog } from './clubs/PayerDialog';
+import { PinnedActions } from './clubs/PinnedActions';
 
 const FILTERS: { key: ClubFilter; label: string }[] = [
   { key: 'all', label: 'Všechny' },
@@ -88,41 +62,36 @@ const FILTERS: { key: ClubFilter; label: string }[] = [
   { key: 'none', label: 'Bez objednávky' },
 ];
 
-/** What the calendar or another screen may hand over: open one club straight away. */
-interface ClubsHandoff {
+/** What the calendar, the booking drawer or another screen may hand over. */
+export interface ClubsRouteState {
   clubId?: string;
+  clubBlockId?: string;
+  /** `true` opens an empty dialog; an object pre-fills it. */
+  newBlock?: NewBlockPrefill | true;
 }
 
-/** One club with everything the card and the detail need worked out once. */
-interface ClubRow {
-  club: Club;
-  orders: PartnerOrderDetail[];
-  status: ClubStatus;
-  order: PartnerOrderDetail | null;
-  headcount: number | null;
-  percent: number | null;
-}
-
-const contactLine = (club: Club): string => {
-  const parts = [club.contactPerson, club.contactPhone].filter((p) => (p ?? '').trim() !== '');
-  return parts.length > 0 ? parts.join(' · ') : 'Bez kontaktu';
-};
+const readState = (state: unknown): ClubsRouteState | null =>
+  state !== null && typeof state === 'object' ? (state as ClubsRouteState) : null;
 
 export default function ClubsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const handoff = (location.state ?? null) as ClubsHandoff | null;
+  const device = useDevice();
+  const phone = device === 'phone';
+  const handoff = readState(location.state);
 
   const [filter, setFilter] = useState<ClubFilter>('all');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(handoff?.clubId ?? null);
+  const [focusBlockId, setFocusBlockId] = useState<string | null>(handoff?.clubBlockId ?? null);
 
   /* `null` closed; a club to change it; `'new'` to add one. */
   const [editing, setEditing] = useState<Club | 'new' | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<PayerDraft>(EMPTY_PAYER);
-  const [errors, setErrors] = useState<PayerErrors>({});
+  /* `null` closed; otherwise the head start of the new-block dialog. */
+  const [blockDialog, setBlockDialog] = useState<NewBlockPrefill | null>(() =>
+    handoff?.newBlock === undefined ? null : isNewBlockPrefill(handoff.newBlock) ? handoff.newBlock : {},
+  );
 
   const clubsQuery = useQuery({
     queryKey: ['clubs'],
@@ -131,6 +100,12 @@ export default function ClubsPage() {
       return Array.isArray(list) ? list : [];
     },
   });
+
+  const blocksQuery = useQuery({
+    queryKey: ['club-blocks', 'list'],
+    queryFn: () => clubBlocksApi.list(),
+  });
+  const allBlocks = useMemo<ClubBlockView[]>(() => blocksQuery.data ?? [], [blocksQuery.data]);
 
   const calendarsQuery = useQuery({
     queryKey: ['calendars'],
@@ -150,7 +125,7 @@ export default function ClubsPage() {
     })),
   });
   const orders = useMemo(() => ordersQueries.flatMap((q) => q.data ?? []), [ordersQueries]);
-  const ordersLoading = ordersQueries.some((q) => q.isLoading);
+  const ordersLoading = ordersQueries.some((q) => q.isLoading) || blocksQuery.isLoading;
   const ordersFailed = ordersQueries.some((q) => q.isError);
   /* Which calendars' orders are missing, by name, so the note says what the
      cards cannot know rather than "something". */
@@ -168,11 +143,9 @@ export default function ClubsPage() {
 
   /*
    * The one required read is `/api/clubs`. Everything else on this screen -
-   * calendars, each calendar's orders, the discount table, the price list - is
-   * an enrichment: when one fails the cards still draw what is known and this
-   * list says which part is missing. Before 3. 10. 2026 a failed discount read
-   * was silent and a failed calendar read left every club "Bez objednávky"
-   * without a word.
+   * calendars, each calendar's orders, the club blocks, the price list - is an
+   * enrichment: when one fails the cards still draw what is known and this list
+   * says which part is missing.
    */
   const missingParts: { what: string; retry: () => void }[] = [];
   if (calendarsQuery.isError) {
@@ -186,28 +159,17 @@ export default function ClubsPage() {
       retry: () => ordersQueries.forEach((q) => { if (q.isError) void q.refetch(); }),
     });
   }
+  if (blocksQuery.isError) {
+    missingParts.push({ what: 'bloky klubů', retry: () => void blocksQuery.refetch() });
+  }
   if (activitiesQuery.isError) {
     missingParts.push({ what: 'ceník činností (částky objednávek se nezobrazí)', retry: () => void activitiesQuery.refetch() });
   }
 
   const today = toDateOnly(new Date());
   const rows = useMemo<ClubRow[]>(
-    () =>
-      (clubsQuery.data ?? []).map((club) => {
-        const own = ordersOfClub(club, orders);
-        const order = primaryOrder(own, today);
-        const headcount = headcountOf(order);
-        return {
-          club,
-          orders: own,
-          status: clubStatus(own, today),
-          order,
-          headcount,
-          /* The administrator's number for this club - never derived from the headcount. */
-          percent: clubDiscountOf(club, order),
-        };
-      }),
-    [clubsQuery.data, orders, today],
+    () => (clubsQuery.data ?? []).map((club) => buildClubRow(club, orders, allBlocks, today)),
+    [clubsQuery.data, orders, allBlocks, today],
   );
 
   const counts = useMemo(
@@ -223,53 +185,25 @@ export default function ClubsPage() {
   const selected = selectedId === null ? null : (rows.find((r) => r.club.id === selectedId) ?? null);
 
   /* Spend the handoff once it has done its job, so Back does not reopen it.
-     Mount-only on purpose: the club id has already been read into state. */
+     Mount-only on purpose: everything it carried has been read into state. */
   useEffect(() => {
-    if (handoff !== null && handoff.clubId !== undefined) {
+    if (handoff !== null && (handoff.clubId !== undefined || handoff.clubBlockId !== undefined || handoff.newBlock !== undefined)) {
       navigate(location.pathname, { replace: true, state: null });
     }
   }, []);
 
+  /* A block id without its club: find the club once the blocks have arrived. */
+  useEffect(() => {
+    if (selectedId === null && focusBlockId !== null && blocksQuery.data !== undefined) {
+      const owner = blocksQuery.data.find((b) => b.id === focusBlockId)?.clubId;
+      if (owner !== undefined && owner !== '') setSelectedId(owner);
+    }
+  }, [selectedId, focusBlockId, blocksQuery.data]);
+
   const reload = () => {
     void queryClient.invalidateQueries({ queryKey: ['clubs'] });
     void queryClient.invalidateQueries({ queryKey: ['partner-orders'] });
-  };
-
-  /* ── The payer record (unchanged behaviour, the board's look) ── */
-
-  const openFor = (club: Club | 'new') => {
-    setForm(club === 'new' ? EMPTY_PAYER : draftFromClub(club));
-    setErrors({});
-    setEditing(club);
-  };
-
-  const set = (field: keyof PayerDraft, value: string) => {
-    setForm((f) => ({ ...f, [field]: value }));
-    /* Clear this field's complaint as it is being fixed; leave the others, so
-       correcting one does not hide the rest. */
-    setErrors((e) => ({ ...e, [field]: undefined }));
-  };
-
-  const save = async () => {
-    const found = validatePayer(form);
-    if (hasPayerErrors(found)) {
-      setErrors(found);
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const body = toPayerRequest(form);
-      if (editing === 'new') await clubsApi.create(body);
-      else if (editing !== null) await clubsApi.update(editing.id, body);
-      toast.success(editing === 'new' ? 'Klub založen' : 'Změny uloženy');
-      setEditing(null);
-      reload();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || 'Uložení selhalo');
-    } finally {
-      setSaving(false);
-    }
+    void queryClient.invalidateQueries({ queryKey: ['club-blocks'] });
   };
 
   const remove = async (id: string, name: string) => {
@@ -284,86 +218,33 @@ export default function ClubsPage() {
     }
   };
 
-  const field = (
-    key: keyof PayerDraft,
-    label: string,
-    extra: { help?: string; width?: number } = {},
-  ) => (
-    <Grid size={{ xs: 12, sm: extra.width ?? 6 }}>
-      <TextField
-        fullWidth
-        size="small"
-        label={label}
-        value={form[key]}
-        onChange={(e) => set(key, e.target.value)}
-        error={errors[key] !== undefined}
-        helperText={errors[key] ?? extra.help}
-      />
-    </Grid>
-  );
-
-  const payerDialog = (
-    <Dialog open={editing !== null} onClose={saving ? undefined : () => setEditing(null)}
-      maxWidth="md" fullWidth>
-      <DialogTitle>{editing === 'new' ? 'Nový klub' : 'Upravit klub'}</DialogTitle>
-      <DialogContent>
-        <SectionLabel sx={{ mt: 1 }}>Identifikace</SectionLabel>
-        <Grid container spacing={2} sx={{ mb: 2 }}>
-          {field('name', 'Název', { width: 12 })}
-          {field('ico', 'IČO', { help: 'Osm číslic' })}
-          {field('dic', 'DIČ', { help: 'Nepovinné — CZ a 8 až 10 číslic' })}
-        </Grid>
-
-        <Divider />
-        <SectionLabel sx={{ mt: 2 }}>Fakturační adresa</SectionLabel>
-        <Grid container spacing={2} sx={{ mb: 2 }}>
-          {field('address', 'Ulice a číslo', { width: 12 })}
-          {field('city', 'Město')}
-          {field('postalCode', 'PSČ')}
-        </Grid>
-
-        <Divider />
-        <SectionLabel sx={{ mt: 2 }}>Bankovní spojení a splatnost</SectionLabel>
-        <Grid container spacing={2} sx={{ mb: 2 }}>
-          {field('bankAccount', 'Číslo účtu')}
-          {field('bankCode', 'Kód banky', { help: 'Čtyři číslice' })}
-          {field('iban', 'IBAN', { help: 'Nepovinné, pokud je vyplněn účet' })}
-          {field('paymentTermsDays', 'Splatnost (dní)')}
-        </Grid>
-
-        <Divider />
-        <SectionLabel sx={{ mt: 2 }}>Kontakt</SectionLabel>
-        <Grid container spacing={2} sx={{ mb: 2 }}>
-          {field('contactPerson', 'Kontaktní osoba')}
-          {field('contactEmail', 'E-mail')}
-          {field('contactPhone', 'Telefon')}
-        </Grid>
-
-        <Divider />
-        <SectionLabel sx={{ mt: 2 }}>Sleva</SectionLabel>
-        <Grid container spacing={2}>
-          {field('discountPercent', 'Sleva klubu (%)', { help: 'Prázdné = bez slevy. Platí pro každou objednávku klubu.' })}
-        </Grid>
-      </DialogContent>
-      <DialogActions>
-        <Button variant="outlined" onClick={() => setEditing(null)} disabled={saving}>
-          Zrušit
-        </Button>
-        <Button variant="contained" onClick={save} disabled={saving}>
-          {saving ? 'Ukládám…' : 'Uložit'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+  const dialogs = (
+    <>
+      {editing !== null ? <PayerDialog editing={editing} onClose={() => setEditing(null)} onSaved={reload} /> : null}
+      {blockDialog !== null ? (
+        <ClubBlockDialog
+          clubs={clubsQuery.data ?? []}
+          prefill={blockDialog}
+          blocks={allBlocks}
+          onClose={() => setBlockDialog(null)}
+          onSaved={(saved) => {
+            if (saved.clubId !== '') setSelectedId(saved.clubId);
+            setFocusBlockId(saved.id);
+          }}
+        />
+      ) : null}
+    </>
   );
 
   /* ── Loading and failure ── */
 
   if (clubsQuery.isLoading) {
+    const columns = phone ? 1 : device === 'tablet' ? 2 : 3;
     return (
       <Box>
         <Skeleton variant="rounded" height={48} sx={{ mb: 2.5, maxWidth: 420 }} />
         <Skeleton variant="rounded" height={44} sx={{ mb: 2 }} />
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '1fr 1fr 1fr' }, gap: 2 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: 2 }}>
           {[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={150} />)}
         </Box>
       </Box>
@@ -391,10 +272,13 @@ export default function ClubsPage() {
       <Box>
         <ClubDetail
           row={selected}
+          clubs={clubsQuery.data ?? []}
+          allBlocks={allBlocks}
           priceOf={priceOf}
           pricesReady={activitiesQuery.isSuccess || activitiesQuery.isError}
-          onBack={() => setSelectedId(null)}
-          onEdit={() => openFor(selected.club)}
+          focusBlockId={focusBlockId}
+          onBack={() => { setSelectedId(null); setFocusBlockId(null); }}
+          onEdit={() => setEditing(selected.club)}
           onDeactivate={() => void remove(selected.club.id, selected.club.name)}
           onReload={reload}
           onInvoice={() =>
@@ -405,26 +289,36 @@ export default function ClubsPage() {
               state: { clubId: selected.club.id, calendarId: selected.order?.calendarId ?? calendars[0]?.id },
             })
           }
+          onNewBlock={() => setBlockDialog({ clubId: selected.club.id })}
         />
-        {payerDialog}
+        {dialogs}
       </Box>
     );
   }
 
   /* ── List: design-16 ── */
 
+  const columns = phone ? 1 : device === 'tablet' ? 2 : 3;
+
   return (
-    <Box>
+    <Box data-testid="clubs-list" data-layout={device} data-columns={columns}>
       <PageHeader
         title="Kluby a týmy"
         subtitle="Hromadné objednávky a registrační odkazy"
-        actions={<Button variant="contained" onClick={() => openFor('new')}>Nový klub</Button>}
+        actions={
+          phone ? undefined : (
+            <>
+              <Button variant="outlined" onClick={() => setEditing('new')}>Nový klub</Button>
+              <Button variant="contained" onClick={() => setBlockDialog({})}>Nový blok</Button>
+            </>
+          )
+        }
       />
 
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mb: 2.5, alignItems: { md: 'center' } }}>
         <TextField
           fullWidth
-          size="small"
+          size={phone ? 'medium' : 'small'}
           placeholder="Název klubu nebo kontaktní osoba"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -467,7 +361,7 @@ export default function ClubsPage() {
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
             Přidejte klub nebo organizaci, která objednává prohlídky pro své sportovce.
           </Typography>
-          <Button variant="contained" onClick={() => openFor('new')}>Nový klub</Button>
+          <Button variant="contained" onClick={() => setEditing('new')} sx={{ minHeight: 44 }}>Nový klub</Button>
         </SoftCard>
       ) : visible.length === 0 ? (
         <SoftCard sx={{ textAlign: 'center', py: 5 }}>
@@ -479,7 +373,7 @@ export default function ClubsPage() {
         <Box
           role="list"
           aria-label="Kluby"
-          sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '1fr 1fr 1fr' }, gap: 2 }}
+          sx={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: phone ? 1.5 : 2 }}
         >
           {visible.map((row) => (
             <ClubCard
@@ -492,406 +386,12 @@ export default function ClubsPage() {
         </Box>
       )}
 
-      {payerDialog}
+      <PinnedActions>
+        <Button variant="outlined" onClick={() => setEditing('new')}>Nový klub</Button>
+        <Button variant="contained" onClick={() => setBlockDialog({})}>Nový blok</Button>
+      </PinnedActions>
+
+      {dialogs}
     </Box>
-  );
-}
-
-/* ── One card of the grid ── */
-
-function ClubCard({ row, ordersLoading, onOpen }: { row: ClubRow; ordersLoading: boolean; onOpen: () => void }) {
-  const chip = STATUS_CHIP[row.status];
-  return (
-    <SoftCard
-      role="listitem"
-      sx={{
-        p: 2.5,
-        cursor: 'pointer',
-        transition: 'border-color 120ms',
-        '&:hover, &:focus-visible': { borderColor: 'primary.main', outline: 'none' },
-        ...(row.club.isActive ? {} : { opacity: 0.6 }),
-      }}
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onOpen();
-        }
-      }}
-    >
-      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 0.75 }}>
-        <Typography component="h2" sx={{ fontSize: 17, fontWeight: 700, lineHeight: 1.3, minWidth: 0 }} noWrap>
-          {row.club.name}
-        </Typography>
-        {ordersLoading && row.status === 'none' ? (
-          <Skeleton variant="rounded" width={96} height={22} sx={{ borderRadius: 999 }} />
-        ) : (
-          <StatusChip tone={chip.tone}>{row.club.isActive ? chip.label : 'Neaktivní'}</StatusChip>
-        )}
-      </Stack>
-      <Typography variant="body2" sx={{ color: 'text.secondary' }} noWrap>
-        {contactLine(row.club)}
-      </Typography>
-      <Divider sx={{ my: 1.75 }} />
-      <Stack direction="row" spacing={4}>
-        <Figure value={row.headcount === null ? '—' : String(row.headcount)} label="sportovců" />
-        <Figure value={formatDiscount(row.percent)} label="sleva" />
-      </Stack>
-    </SoftCard>
-  );
-}
-
-function Figure({ value, label }: { value: string; label: string }) {
-  return (
-    <Box>
-      <Typography sx={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.15 }}>{value}</Typography>
-      <Typography variant="caption" sx={{ color: 'text.secondary' }}>{label}</Typography>
-    </Box>
-  );
-}
-
-/** A small-caps label over its value, the board's way of listing facts. */
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Box>
-      <SectionLabel sx={{ mb: 0 }}>{label}</SectionLabel>
-      <Typography sx={{ fontSize: 15, fontWeight: 600, lineHeight: 1.35 }}>{children}</Typography>
-    </Box>
-  );
-}
-
-/* ── The detail ── */
-
-function ClubDetail({
-  row, priceOf, pricesReady, onBack, onEdit, onDeactivate, onReload, onInvoice, onNewReservation,
-}: {
-  row: ClubRow;
-  priceOf: (activityId: string) => number | null;
-  pricesReady: boolean;
-  onBack: () => void;
-  onEdit: () => void;
-  onDeactivate: () => void;
-  onReload: () => void;
-  onInvoice: () => void;
-  onNewReservation: () => void;
-}) {
-  const { club, order, headcount, percent } = row;
-  const range = order === null ? null : orderDateRange(order);
-  const [reportOpen, setReportOpen] = useState(false);
-  const [addingSeats, setAddingSeats] = useState(false);
-
-  const link = order?.token ? clubRegistrationLink(order.token) : null;
-  const booked = order?.bookedCount ?? 0;
-  const requested = order?.requestedCount ?? 0;
-  const freePlaces = Math.max(0, requested - booked);
-
-  /* The athletes who took a place: the appointments inside the held windows. */
-  const appointmentsQuery = useQuery({
-    queryKey: ['partner-order-seats', order?.id, range?.from, range?.to],
-    queryFn: () => appointmentsApi.range(range!.from, range!.to, [order!.calendarId]),
-    enabled: order !== null && range !== null,
-  });
-  const seats = order === null ? [] : seatRows(order, appointmentsQuery.data ?? []);
-
-  const money = order === null ? null : orderTotal(order, priceOf, percent);
-
-  const copy = async () => {
-    if (link === null) return;
-    try {
-      await navigator.clipboard.writeText(link);
-      toast.success('Odkaz zkopírován');
-    } catch {
-      toast.error('Odkaz se nepodařilo zkopírovat');
-    }
-  };
-
-  const mailto =
-    link !== null && (club.contactEmail ?? order?.contactEmail ?? '') !== ''
-      ? `mailto:${encodeURIComponent(club.contactEmail || order?.contactEmail || '')}?subject=${encodeURIComponent(
-          `Registrace sportovců — ${club.name}`,
-        )}&body=${encodeURIComponent(
-          `Dobrý den,\n\nsportovci klubu ${club.name} se na prohlídku registrují tímto odkazem:\n${link}\n\n` +
-            (order?.expiresAt ? `Odkaz platí do ${formatPragueDate(order.expiresAt)}.\n\n` : '') +
-            'S pozdravem',
-        )}`
-      : null;
-
-  return (
-    <Box>
-      <PageHeader
-        title={club.name}
-        subtitle={
-          order === null
-            ? 'Zatím bez hromadné rezervace'
-            : range === null
-              ? 'Hromadná rezervace — termíny zatím nejsou vyhrazené'
-              : `Hromadná rezervace ${formatDateRange(range.from, range.to)}`
-        }
-        actions={<Button variant="outlined" onClick={onBack}>Zpět na kluby</Button>}
-      />
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) 280px' }, gap: 2.5, alignItems: 'start' }}>
-        <Stack spacing={2.5}>
-          {order === null ? (
-            <SoftCard sx={{ textAlign: 'center', py: 5 }}>
-              <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Tento klub zatím nemá hromadnou rezervaci.</Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-                Vyhraďte klubu termíny a pošlete mu odkaz, přes který se sportovci sami registrují.
-              </Typography>
-              <Button variant="contained" onClick={onNewReservation}>Vytvořit rezervaci</Button>
-            </SoftCard>
-          ) : (
-            <>
-              <SoftCard>
-                <SectionLabel>Registrační odkaz pro sportovce</SectionLabel>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ alignItems: { sm: 'center' } }}>
-                  <Box
-                    data-testid="club-link"
-                    sx={{
-                      flex: 1,
-                      minWidth: 0,
-                      px: 1.75,
-                      py: 1.25,
-                      borderRadius: 2.5,
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      bgcolor: 'background.default',
-                      fontFamily: '"JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace',
-                      fontSize: 13,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      color: link === null ? 'text.secondary' : 'text.primary',
-                    }}
-                  >
-                    {order.isRevoked
-                      ? 'Odkaz byl zrušen.'
-                      : (link ?? 'Odkaz zatím není k dispozici — server ho nevrací.')}
-                  </Box>
-                  <Button
-                    variant="contained"
-                    startIcon={<ContentCopy sx={{ fontSize: 16 }} />}
-                    disabled={link === null || order.isRevoked}
-                    onClick={() => void copy()}
-                  >
-                    Kopírovat
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    component="a"
-                    href={mailto ?? undefined}
-                    disabled={mailto === null || order.isRevoked}
-                  >
-                    Poslat klubu
-                  </Button>
-                </Stack>
-
-                <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'baseline', mt: 2.5, mb: 0.75 }}>
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    Obsazeno {booked} z {requested} míst
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    {freePlaces} volných
-                  </Typography>
-                </Stack>
-                <LinearProgress
-                  variant="determinate"
-                  value={requested > 0 ? Math.min(100, (booked / requested) * 100) : 0}
-                  aria-label="Obsazenost míst"
-                />
-                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1.5 }}>
-                  {order.isRevoked
-                    ? 'Odkaz byl zrušen — nové registrace přes něj už nejdou. Kdo má termín, ten mu zůstává.'
-                    : order.expiresAt
-                      ? `Odkaz platí do ${formatPragueDate(order.expiresAt)}. Každý sportovec si vybere jeden z rezervovaných časů.`
-                      : 'Každý sportovec si vybere jeden z rezervovaných časů.'}
-                </Typography>
-              </SoftCard>
-
-              <SoftCard>
-                <SectionLabel>Rezervovaná místa</SectionLabel>
-                {appointmentsQuery.isError ? (
-                  <Alert
-                    severity="warning"
-                    sx={{ mb: 1.5 }}
-                    action={<Button color="inherit" size="small" onClick={() => void appointmentsQuery.refetch()}>Zkusit znovu</Button>}
-                  >
-                    Registrované sportovce se nepodařilo načíst.
-                  </Alert>
-                ) : null}
-                {appointmentsQuery.isLoading ? (
-                  <Stack spacing={1}>
-                    {[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={44} />)}
-                  </Stack>
-                ) : seats.length === 0 ? (
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    Objednávka zatím nemá žádná místa — přidejte je vpravo.
-                  </Typography>
-                ) : (
-                  <TableContainer sx={{ border: '1px solid', borderColor: 'divider' }}>
-                    <Table size="small" aria-label="Rezervovaná místa">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Sportovec</TableCell>
-                          <TableCell>Činnost</TableCell>
-                          <TableCell>Termín</TableCell>
-                          <TableCell>Stav</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {seats.map((seat) => (
-                          <TableRow key={seat.key} hover>
-                            <TableCell sx={{ fontWeight: 600 }}>{seat.name ?? '—'}</TableCell>
-                            <TableCell sx={{ color: seat.name === null ? 'text.secondary' : 'text.primary' }}>
-                              {seat.name === null ? 'volné místo' : seat.activityName}
-                            </TableCell>
-                            <TableCell sx={{ whiteSpace: 'nowrap' }}>{seat.when || '—'}</TableCell>
-                            <TableCell>
-                              <StatusChip tone={SEAT_CHIP[seat.state].tone}>{SEAT_CHIP[seat.state].label}</StatusChip>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                )}
-              </SoftCard>
-            </>
-          )}
-        </Stack>
-
-        <Stack spacing={2.5}>
-          <SoftCard>
-            <SectionLabel>Klub</SectionLabel>
-            <Stack spacing={1.5}>
-              <Fact label="Název">{club.name}</Fact>
-              <Fact label="Kontakt">{club.contactPerson || '—'}</Fact>
-              <Fact label="Telefon">{club.contactPhone || '—'}</Fact>
-              <Fact label="E-mail">{club.contactEmail || order?.contactEmail || '—'}</Fact>
-              <Fact label="Sportovců">{headcount ?? '—'}</Fact>
-              <Fact label="Sleva klubu">{describeDiscount(percent)}</Fact>
-              <Fact label="Fakturace">
-                {canBeInvoiced(club) ? 'Na klub' : (
-                  <Box component="span" sx={{ color: 'warning.main' }}>Chybí fakturační údaje</Box>
-                )}
-              </Fact>
-            </Stack>
-            <Stack direction="row" spacing={1} sx={{ mt: 2.5, flexWrap: 'wrap', gap: 1 }}>
-              <Button variant="outlined" size="small" onClick={onEdit}>Upravit klub</Button>
-              {club.isActive ? (
-                <Tooltip title="Deaktivovat klub">
-                  <IconButton size="small" color="error" aria-label={`Deaktivovat klub ${club.name}`} onClick={onDeactivate}>
-                    <Delete fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              ) : null}
-            </Stack>
-          </SoftCard>
-
-          {order !== null && money !== null ? (
-            <SoftCard>
-              <SectionLabel>Objednávka</SectionLabel>
-              <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
-                {money.seats} míst
-                {order.items.length > 0 ? ` · ${order.items.map((i) => i.activityName).join(', ')}` : ''}
-                {range !== null ? ` · ${formatShortRange(range.from, range.to)}` : ''}
-              </Typography>
-              <Typography sx={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.15 }}>
-                {money.total === null ? (pricesReady ? '—' : '…') : formatCzk(money.total)}
-              </Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5, mb: 2 }}>
-                {money.explain}
-              </Typography>
-              <Stack spacing={1}>
-                <Button variant="contained" onClick={() => setAddingSeats(true)} disabled={order.isRevoked}>
-                  Přidat místa
-                </Button>
-                <Button variant="outlined" onClick={onInvoice}>Vystavit fakturu</Button>
-                <Button variant="text" size="small" onClick={() => setReportOpen(true)}>Rozpis / tisk</Button>
-              </Stack>
-              <ClubScheduleReport order={order} open={reportOpen} onClose={() => setReportOpen(false)} />
-              {addingSeats ? (
-                <AddSeatsDialog order={order} onClose={() => setAddingSeats(false)} onSaved={onReload} />
-              ) : null}
-            </SoftCard>
-          ) : null}
-        </Stack>
-      </Box>
-    </Box>
-  );
-}
-
-/* ── Přidat místa: more of a činnost the club already ordered ── */
-
-function AddSeatsDialog({
-  order, onClose, onSaved,
-}: {
-  order: PartnerOrderDetail;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [activityId, setActivityId] = useState(order.items[0]?.activityId ?? '');
-  const [count, setCount] = useState('1');
-  const n = Number.parseInt(count, 10);
-  const valid = activityId !== '' && Number.isInteger(n) && n > 0;
-
-  const save = useMutation({
-    mutationFn: () =>
-      partnerOrdersApi.setItems(
-        order.calendarId,
-        order.id,
-        order.items.map((i) => ({
-          activityId: i.activityId,
-          requestedCount: i.activityId === activityId ? i.requestedCount + n : i.requestedCount,
-        })),
-      ),
-    onSuccess: () => {
-      toast.success(`Přidáno ${n} míst`);
-      onSaved();
-      onClose();
-    },
-  });
-
-  return (
-    <Dialog open onClose={save.isPending ? undefined : onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Přidat místa</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          {order.items.length === 0 ? (
-            <Alert severity="info">Objednávka zatím nemá žádnou činnost — doplňte ji ve Vyhrazení pro kluby.</Alert>
-          ) : (
-            <TextField
-              select
-              size="small"
-              label="Činnost"
-              value={activityId}
-              onChange={(e) => setActivityId(e.target.value)}
-            >
-              {order.items.map((i) => (
-                <MenuItem key={i.activityId} value={i.activityId}>
-                  {i.activityName} · nyní {i.requestedCount} míst
-                </MenuItem>
-              ))}
-            </TextField>
-          )}
-          <TextField
-            size="small"
-            type="number"
-            label="Kolik míst přidat"
-            value={count}
-            onChange={(e) => setCount(e.target.value)}
-            slotProps={{ htmlInput: { min: 1 } }}
-          />
-          {save.isError ? <Alert severity="error">Místa se nepodařilo přidat.</Alert> : null}
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button variant="outlined" onClick={onClose} disabled={save.isPending}>Zrušit</Button>
-        <Button variant="contained" disabled={!valid || save.isPending} onClick={() => save.mutate()}>
-          Přidat
-        </Button>
-      </DialogActions>
-    </Dialog>
   );
 }

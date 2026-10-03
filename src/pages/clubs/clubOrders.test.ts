@@ -36,7 +36,7 @@ const order = (over: Partial<PartnerOrderDetail> = {}): PartnerOrderDetail => ({
     { id: 'w-2', date: '2026-10-27', startTime: '09:00:00', endTime: '10:00:00', coveredMinutes: 60,
       releaseDate: null, warnDate: null, partnerReminderDate: null, releasedAt: null, isExclusive: true },
   ],
-  clubId: 'club-1', token: null, clubDiscountPercent: null, ...over,
+  clubId: 'club-1', token: null, clubDiscountPercent: null, clubBlockId: null, ...over,
 });
 
 describe("the club's discount", () => {

@@ -39,6 +39,12 @@ export const partnerOrderDetailSchema = partnerOrderSchema.extend({
    * Read, never computed: a headcount earns nothing by itself.
    */
   clubDiscountPercent: z.number().nullish().transform((v) => v ?? null),
+  /**
+   * The club block this order came from (C4), when it was made from one - the
+   * page then links the order to the block. Absent on an older server and on
+   * every order made by hand.
+   */
+  clubBlockId: z.string().nullish().transform((v) => v ?? null),
 });
 export type PartnerOrderDetail = z.infer<typeof partnerOrderDetailSchema>;
 const partnerOrderDetailListSchema = z.array(partnerOrderDetailSchema);

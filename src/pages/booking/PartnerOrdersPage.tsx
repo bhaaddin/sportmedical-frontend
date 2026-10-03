@@ -15,8 +15,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { calendarsApi } from "../../api/calendars";
 import { partnerOrdersApi } from "../../api/partnerOrders";
+import type { PartnerOrderDetail as PartnerOrder } from "../../api/partnerOrders";
+import { clubBlocksApi } from "../../api/clubBlocks";
+import type { ClubBlockView } from "../../api/clubBlocks";
 import { partnerTypeName } from "../../api/bookingContracts";
-import type { PartnerOrder, PartnerWindow } from "../../api/bookingContracts";
+import type { PartnerWindow } from "../../api/bookingContracts";
+import { useDevice } from "../../layout/useDevice";
 import { formatDateOnly, formatPragueDate, pragueDateKey, toDateOnly } from "../../utils/time";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import {
@@ -26,8 +30,10 @@ import {
 import { ReleaseWindowDialog } from "../../components/booking/ReleaseWindowDialog";
 import { ClubScheduleReport } from "../../components/booking/ClubScheduleReport";
 import { errorText } from "../../components/booking/errorText";
-import { SectionLabel, SoftCard, StatusChip } from "../../components/ui";
+import { PageHeader, SectionLabel, SoftCard, StatusChip } from "../../components/ui";
+import { blockRange } from "../../components/clubs/blockLogic";
 import { pragueHHMM } from "../clubs/clubOrders";
+import { PinnedActions } from "../clubs/PinnedActions";
 
 /**
  * Partner reservations — contract 5.11, with 5.10 as the dialog that creates
@@ -57,6 +63,10 @@ import { pragueHHMM } from "../clubs/clubOrders";
  * The one that is missing is not left as a dead button or a silent gap: the
  * screen says what is absent and why, which is the repository rule about a
  * removed function applied to one that has not arrived yet.
+ *
+ * Etapa 2: the page is "Hromadné objednávky" in three layouts (phone: one column,
+ * the main action pinned to the bottom, full-width buttons; tablet and desktop:
+ * two columns) and an order that came from a club block links back to it.
  *
  * Since the design board (3. 10. 2026) the calendar's "Rezervovat pro klub"
  * and the clubs page land here with a {@link ReservationHandoff} in
@@ -121,6 +131,9 @@ export default function PartnerOrdersPage() {
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
+  const device = useDevice();
+  const phone = device === "phone";
+  const columns = phone ? 1 : 2;
 
   const handoff = isReservationHandoff(location.state) ? location.state : null;
 
@@ -163,6 +176,19 @@ export default function PartnerOrdersPage() {
     enabled: chosen !== "",
   });
 
+  /* Which block an order came from, for its link. An enrichment: when the read
+     fails the order simply shows the link without the block's days. */
+  const blocksQuery = useQuery({
+    queryKey: ["club-blocks", "list"],
+    queryFn: () => clubBlocksApi.list(),
+    staleTime: 60 * 1000,
+    retry: false,
+  });
+  const blockById = useMemo(
+    () => new Map((blocksQuery.data ?? []).map((b) => [b.id, b] as const)),
+    [blocksQuery.data],
+  );
+
   const reload = () => {
     void queryClient.invalidateQueries({ queryKey: ["partner-orders"] });
     void queryClient.invalidateQueries({ queryKey: ["partner-notices"] });
@@ -197,49 +223,46 @@ export default function PartnerOrdersPage() {
 
   const orders = ordersQuery.data ?? [];
 
+  const calendarPicker = (
+    <TextField
+      select
+      size={phone ? "medium" : "small"}
+      label={t("booking.new.calendar")}
+      value={chosen}
+      onChange={(e) => setCalendarId(e.target.value)}
+      sx={{ minWidth: phone ? undefined : 200 }}
+      fullWidth={phone}
+    >
+      {calendars.map((c) => (
+        <MenuItem key={c.id} value={c.id}>
+          {c.name}
+        </MenuItem>
+      ))}
+    </TextField>
+  );
+
   return (
-    <Box sx={{ maxWidth: 1100, mx: "auto" }}>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={1.5}
-        sx={{
-          alignItems: { xs: "flex-start", sm: "center" },
-          justifyContent: "space-between",
-          mb: 2.5,
-        }}
-      >
-        <Box>
-          <Typography variant="h4" component="h1" sx={{ fontSize: { xs: 22, md: 24 } }}>
-            {t("booking.partner.title")}
-          </Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.25 }}>
-            {t("booking.partner.subtitle")}
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, alignItems: "center" }}>
-          <TextField
-            select
-            size="small"
-            label={t("booking.new.calendar")}
-            value={chosen}
-            onChange={(e) => setCalendarId(e.target.value)}
-            sx={{ minWidth: 200 }}
-          >
-            {calendars.map((c) => (
-              <MenuItem key={c.id} value={c.id}>
-                {c.name}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Button
-            variant="contained"
-            disabled={chosen === ""}
-            onClick={() => setCreating(true)}
-          >
-            {t("booking.partner.new")}
-          </Button>
-        </Stack>
-      </Stack>
+    <Box
+      data-testid="partner-orders"
+      data-layout={device}
+      data-columns={columns}
+      sx={{ maxWidth: 1180, mx: "auto" }}
+    >
+      <PageHeader
+        title="Hromadné objednávky"
+        subtitle="Kluby a firmy, kterým je vyhrazen čas. Počty se počítají z termínů, nesčítají se tady."
+        actions={
+          phone ? undefined : (
+            <>
+              {calendarPicker}
+              <Button variant="contained" disabled={chosen === ""} onClick={() => setCreating(true)}>
+                Nová hromadná objednávka
+              </Button>
+            </>
+          )
+        }
+      />
+      {phone ? <Box sx={{ mb: 2 }}>{calendarPicker}</Box> : null}
 
       {/*
         When this call fails the banner simply does not appear, and an absent
@@ -297,9 +320,9 @@ export default function PartnerOrdersPage() {
           isSettled={ordersQuery.isSuccess || ordersQuery.isError}
           error={ordersQuery.error}
           isEmpty={orders.length === 0}
-          emptyText={t("booking.partner.empty")}
+          emptyText="Zatím žádná hromadná objednávka. Objednávka drží čas pro klub nebo firmu, dokud si ho nezaplní."
           emptyAction={{
-            label: t("booking.partner.new"),
+            label: "Nová hromadná objednávka",
             onClick: () => setCreating(true),
           }}
           onRetry={() => void ordersQuery.refetch()}
@@ -309,10 +332,25 @@ export default function PartnerOrdersPage() {
             {revoke.error ? (
               <Alert severity="error">{errorText(revoke.error, t)}</Alert>
             ) : null}
+            <Box
+              role="list"
+              aria-label="Hromadné objednávky"
+              sx={{ display: "grid", gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: 2, alignItems: "start" }}
+            >
             {orders.map((order) => (
               <OrderCard
                 key={order.id}
                 order={order}
+                block={order.clubBlockId !== null ? (blockById.get(order.clubBlockId) ?? null) : null}
+                phone={phone}
+                onOpenBlock={() =>
+                  navigate("/clubs", {
+                    state: {
+                      clubId: order.clubId ?? blockById.get(order.clubBlockId ?? "")?.clubId ?? undefined,
+                      clubBlockId: order.clubBlockId ?? undefined,
+                    },
+                  })
+                }
                 busy={revoke.isPending}
                 onRelease={(w) => setReleasing({ order, window: w })}
                 onExtend={() => {
@@ -322,6 +360,7 @@ export default function PartnerOrdersPage() {
                 onRevoke={() => revoke.mutate(order)}
               />
             ))}
+            </Box>
           </Stack>
         </AsyncSection>
       </AsyncSection>
@@ -365,6 +404,12 @@ export default function PartnerOrdersPage() {
         </SoftCard>
       ) : null}
 
+      <PinnedActions>
+        <Button variant="contained" disabled={chosen === ""} onClick={() => setCreating(true)}>
+          Nová hromadná objednávka
+        </Button>
+      </PinnedActions>
+
       {creating && chosen !== "" ? (
         <NewPartnerOrderDialog
           open
@@ -392,12 +437,19 @@ export default function PartnerOrdersPage() {
 /** One partner order, laid out as 5.11 draws it, in the board's clothes. */
 function OrderCard({
   order,
+  block,
+  phone,
+  onOpenBlock,
   busy,
   onRelease,
   onExtend,
   onRevoke,
 }: {
   order: PartnerOrder;
+  /** The club block this order came from, when it came from one and is known. */
+  block: ClubBlockView | null;
+  phone: boolean;
+  onOpenBlock: () => void;
   busy: boolean;
   onRelease: (w: PartnerWindow) => void;
   onExtend: () => void;
@@ -410,7 +462,7 @@ function OrderCard({
   const free = Math.max(0, order.requestedCount - order.bookedCount);
 
   return (
-    <SoftCard>
+    <SoftCard role="listitem" sx={{ minWidth: 0 }}>
       <Stack
         direction="row"
         spacing={1.5}
@@ -433,12 +485,23 @@ function OrderCard({
         <Button
           size="small"
           variant="outlined"
-          sx={{ ml: "auto" }}
+          sx={{ ml: "auto", minHeight: phone ? 44 : undefined }}
           onClick={() => setReportOpen(true)}
         >
           Rozpis / tisk
         </Button>
       </Stack>
+      {order.clubBlockId !== null ? (
+        <Button
+          size="small"
+          variant="text"
+          data-testid="order-block-link"
+          onClick={onOpenBlock}
+          sx={{ px: 0, minHeight: phone ? 44 : undefined, mb: 0.5 }}
+        >
+          {block !== null ? `Z bloku ${blockRange(block)} — otevřít blok` : "Z bloku klubu — otevřít blok"}
+        </Button>
+      ) : null}
       <ClubScheduleReport order={order} open={reportOpen} onClose={() => setReportOpen(false)} />
 
       <Typography variant="body2" sx={{ color: "text.secondary", mb: 1.5 }}>
@@ -524,11 +587,11 @@ function OrderCard({
             return (
               <Stack
                 key={w.id}
-                direction="row"
-                spacing={2}
+                direction={phone ? "column" : "row"}
+                spacing={phone ? 1 : 2}
                 sx={{
                   py: 1,
-                  alignItems: "center",
+                  alignItems: phone ? "stretch" : "center",
                   justifyContent: "space-between",
                   flexWrap: "wrap",
                   opacity: w.releasedAt ? 0.6 : 1,
@@ -537,7 +600,7 @@ function OrderCard({
                 <Stack
                   direction="row"
                   spacing={2}
-                  sx={{ alignItems: "center", flexWrap: "wrap" }}
+                  sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 0.5 }}
                 >
                   <Typography sx={{ fontWeight: 600 }}>
                     {formatDateOnly(w.date)}
@@ -576,6 +639,7 @@ function OrderCard({
                   variant="outlined"
                   disabled={w.releasedAt !== null}
                   onClick={() => onRelease(w)}
+                  sx={{ minHeight: phone ? 44 : undefined }}
                 >
                   {t("booking.partner.release")}
                 </Button>
@@ -585,8 +649,8 @@ function OrderCard({
         </Stack>
       )}
 
-      <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: "wrap", gap: 1 }}>
-        <Button size="small" variant="outlined" onClick={onExtend}>
+      <Stack direction={phone ? "column" : "row"} spacing={1} sx={{ mt: 1.5, flexWrap: "wrap", gap: 1 }}>
+        <Button size="small" variant="outlined" onClick={onExtend} sx={{ minHeight: phone ? 44 : undefined }}>
           {t("booking.partner.extend")}
         </Button>
         {/*
@@ -600,6 +664,7 @@ function OrderCard({
           color="error"
           disabled={busy || order.isRevoked}
           onClick={onRevoke}
+          sx={{ minHeight: phone ? 44 : undefined }}
         >
           {t("booking.partner.revokeLink")}
         </Button>
