@@ -8,7 +8,7 @@
  * the server stores; it is an open invoice whose due date has passed, so it is
  * worked out here from `dueDateUtc` against the clock the caller passes in.
  */
-import type { Invoice } from '../../api/billing';
+import type { Invoice, InvoicePaymentMethod } from '../../api/billing';
 import type { ChipTone } from '../../components/ui';
 
 export type InvoiceFilter = 'all' | 'unpaid' | 'overdue' | 'clubs';
@@ -116,6 +116,31 @@ export interface InvoiceSummary {
   overdueCount: number;
   /** This month's turnover per distinct patient, or null when nothing was billed. */
   averagePerPatient: number | null;
+  /** Money taken this month at the desk: in cash, and by card. */
+  cashThisMonth: number;
+  cardThisMonth: number;
+}
+
+/**
+ * What came in this month in one way. Read off the payments when the invoice
+ * lists them (so a payment made today on an old invoice counts today); an
+ * invoice that only carries the per-method totals counts them in the month it
+ * was issued.
+ */
+function paidThisMonth(inv: Invoice, method: InvoicePaymentMethod, now: Date): number {
+  if (inv.status === 'Cancelled' || inv.status === 'Refunded') return 0;
+  if (inv.payments !== undefined && inv.payments.length > 0) {
+    return inv.payments
+      .filter((p) => p.method === method && sameMonth(p.paidAtUtc, now))
+      .reduce((sum, p) => sum + p.amountCzk, 0);
+  }
+  if (!sameMonth(inv.issueDateUtc, now)) return 0;
+  switch (method) {
+    case 'Cash': return inv.cashPaidCzk ?? 0;
+    case 'Card': return inv.cardPaidCzk ?? 0;
+    case 'Transfer': return inv.transferPaidCzk ?? 0;
+    default: return inv.clubPaidCzk ?? 0;
+  }
 }
 
 export function summarize(invoices: Invoice[], now: Date): InvoiceSummary {
@@ -130,6 +155,8 @@ export function summarize(invoices: Invoice[], now: Date): InvoiceSummary {
     unpaid: open.reduce((s, i) => s + i.remainingCzk, 0),
     overdueCount: invoices.filter((i) => isOverdue(i, now)).length,
     averagePerPatient: patients.size === 0 ? null : Math.round(invoicedThisMonth / patients.size),
+    cashThisMonth: invoices.reduce((sum, i) => sum + paidThisMonth(i, 'Cash', now), 0),
+    cardThisMonth: invoices.reduce((sum, i) => sum + paidThisMonth(i, 'Card', now), 0),
   };
 }
 
@@ -148,6 +175,14 @@ export function monthIn(now: Date): string {
 export function monthYear(now: Date): string {
   return now.toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 }
+
+/** How a payment is called on the screen. */
+export const PAYMENT_METHOD_LABEL: Record<InvoicePaymentMethod, string> = {
+  Cash: 'Hotově',
+  Card: 'Kartou',
+  Transfer: 'Převodem',
+  ClubBilling: 'Na klub',
+};
 
 /** Czech plural for "doklad": 1 doklad, 2–4 doklady, 5+ dokladů. */
 export function doklady(n: number): string {

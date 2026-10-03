@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import { Email, ContactPhone, LocationOn } from '@mui/icons-material';
 import CompanySettingsCard from '../components/CompanySettingsCard';
-import { PUBLIC_CLINIC_KEYS, readSettings, saveSettings } from '../api/clinicSettings';
+import { OPENING_HOURS_MAX_LENGTH, PUBLIC_CLINIC_KEYS, readSettings, saveSettings } from '../api/clinicSettings';
 import { SectionLabel, SoftCard } from '../components/ui';
 import { SettingsScreen } from './settings/SettingsFrame';
 
@@ -53,6 +53,7 @@ export default function Admin() {
     contactEmail: '',
     contactPhone: '',
     contactAddress: '',
+    openingHours: '',
     enableBooking: true,
   });
 
@@ -88,6 +89,7 @@ export default function Admin() {
           contactEmail: stored[PUBLIC_CLINIC_KEYS.email] ?? previous.contactEmail,
           contactPhone: stored[PUBLIC_CLINIC_KEYS.phone] ?? previous.contactPhone,
           contactAddress: stored[PUBLIC_CLINIC_KEYS.address] ?? previous.contactAddress,
+          openingHours: stored[PUBLIC_CLINIC_KEYS.openingHours] ?? previous.openingHours,
           enableBooking: (stored[PUBLIC_CLINIC_KEYS.bookingEnabled] ?? 'true') !== 'false',
         }));
         setLoaded(true);
@@ -112,6 +114,7 @@ export default function Admin() {
         [PUBLIC_CLINIC_KEYS.email]: pub.contactEmail.trim(),
         [PUBLIC_CLINIC_KEYS.phone]: pub.contactPhone.trim(),
         [PUBLIC_CLINIC_KEYS.address]: pub.contactAddress.trim(),
+        [PUBLIC_CLINIC_KEYS.openingHours]: pub.openingHours.trim(),
         [PUBLIC_CLINIC_KEYS.bookingEnabled]: pub.enableBooking ? 'true' : 'false',
       });
 
@@ -179,6 +182,13 @@ export default function Admin() {
             <TextField fullWidth label="Adresa" value={pub.contactAddress}
               onChange={e => updatePub('contactAddress', e.target.value)}
               slotProps={{ input: { startAdornment: adornment(<LocationOn fontSize="small" />) } }} />
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <TextField fullWidth label="Otevírací doba (text pro web)" value={pub.openingHours}
+              onChange={e => updatePub('openingHours', e.target.value)}
+              placeholder="Po–Pá 8:00–18:00 · So 8:00–12:00"
+              helperText={`Zobrazí se v patičce a na stránkách objednání. ${pub.openingHours.length}/${OPENING_HOURS_MAX_LENGTH}`}
+              slotProps={{ htmlInput: { maxLength: OPENING_HOURS_MAX_LENGTH } }} />
           </Grid>
         </Grid>
       </SoftCard>

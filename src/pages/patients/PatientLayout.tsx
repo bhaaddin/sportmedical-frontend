@@ -32,6 +32,7 @@ import patientRegistryApi from '../../api/patientRegistry';
 import type { PhoneInspection } from '../../api/patientRegistry';
 import { HOME_REGION, storedNumberDisplay } from '../../services/patientRegistration/phoneDisplay';
 import ConsentLine from '../../components/patients/ConsentLine';
+import PortalPasswordReset from '../../components/patients/PortalPasswordReset';
 import { PageHeader, SoftCard, StatusChip } from '../../components/ui';
 import { fetchUpcomingWindow } from '../../components/patients/appointmentsSource';
 import { birthYear, initialsOf, questionnaireMissing } from '../../components/patients/patientActivity';
@@ -124,8 +125,8 @@ function cardTabs(patientId: string, mayBill: boolean) {
   return [
     section('prehled'),
     section('terminy'),
-    { value: 'vysledky', label: 'Výsledky', to: `/diagnostics/new?patientId=${patientId}` },
-    mayBill ? { value: 'faktury', label: 'Faktury', to: '/billing' } : null,
+    section('vysledky'),
+    mayBill ? section('faktury') : null,
     section('dokumenty'),
     section('historie'),
   ].filter((tab): tab is { value: string; label: string; to: string } => tab !== null);
@@ -384,6 +385,7 @@ export default function PatientLayout() {
                 Upravit kartu
               </Button>
             )}
+            {mayEdit && <PortalPasswordReset patientId={id} />}
           </Stack>
         </Stack>
 

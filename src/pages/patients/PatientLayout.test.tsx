@@ -402,6 +402,6 @@ describe('the tabs', () => {
     renderLayout();
 
     await screen.findByText('PŘEHLED');
-    expect(screen.getByRole('tab', { name: 'Faktury' })).toHaveAttribute('href', '/billing');
+    expect(screen.getByRole('tab', { name: 'Faktury' })).toHaveAttribute('href', '/patients/p1/faktury');
   });
 });

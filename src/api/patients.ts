@@ -42,6 +42,18 @@ export interface PatientPage {
 /** The most `GET /api/patients` answers in one page. */
 export const PATIENT_PAGE_SIZE_MAX = 100;
 
+/**
+ * The server sends `phone` and `email` as `null` when the patient left none.
+ * Said once here, so no screen has to tell "null" from "absent": either way
+ * the field is simply not there.
+ */
+function withContacts<T extends { phone?: string | null; email?: string | null }>(row: T): T {
+  const out = { ...row };
+  if (out.phone === null) delete out.phone;
+  if (out.email === null) delete out.email;
+  return out;
+}
+
 function extractItems<T>(data: any): T[] {
   if (Array.isArray(data)) return data;
   if (data?.items) return data.items;
@@ -63,7 +75,7 @@ export const patientsApi = {
     const res = await client.get('/api/patients', {
       params: { query: params.query?.trim() || undefined, page, pageSize },
     });
-    const items = extractItems<Patient>(res.data);
+    const items = extractItems<Patient>(res.data).map(withContacts);
     const totalCount =
       typeof res.data?.totalCount === 'number' ? res.data.totalCount : items.length;
     return { items, totalCount, page, pageSize };
@@ -71,7 +83,7 @@ export const patientsApi = {
 
   getById: async (id: string): Promise<Patient> => {
     const res = await client.get(`/api/patients/${id}`);
-    return res.data?.value ?? res.data;
+    return withContacts<Patient>(res.data?.value ?? res.data);
   },
 
   update: async (id: string, data: PatientIdentityCorrection): Promise<Patient> => {
@@ -82,7 +94,7 @@ export const patientsApi = {
   search: async (query: string): Promise<Patient[]> => {
     const res = await client.get(`/api/patients/search?q=${encodeURIComponent(query)}`);
     const d = res.data;
-    return extractItems<Patient>(d);
+    return extractItems<Patient>(d).map(withContacts);
   },
 
   getProfile: async (id: string): Promise<any> => {

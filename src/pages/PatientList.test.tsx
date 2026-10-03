@@ -123,6 +123,20 @@ describe('the register', () => {
   });
 });
 
+describe('the contact columns', () => {
+  it('draws the phone in its column and the e-mail under the name', async () => {
+    list.mockResolvedValue({
+      items: [{ ...person(1), phone: '+420 777 123 456', email: 'jan@example.cz' }, { ...person(2), phone: null, email: null }],
+      totalCount: 2, page: 1, pageSize: 50,
+    });
+
+    renderList();
+
+    expect(await screen.findByText('+420 777 123 456')).toBeInTheDocument();
+    expect(screen.getByText('jan@example.cz')).toBeInTheDocument();
+  });
+});
+
 describe('the standing column and the filters', () => {
   it('draws where each patient stands, off the appointment list', async () => {
     fetchAllAppointments.mockResolvedValue([

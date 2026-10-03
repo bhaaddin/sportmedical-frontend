@@ -26,26 +26,46 @@ export interface Invoice {
   issueDateUtc: string;
   dueDateUtc: string;
   items: InvoiceLineItem[];
-  /*
-   * Not in InvoiceDto today. A club invoice ("FK Slaný · 12× Komplexní
-   * prohlídka") is what the board's "Kluby" filter and the "Vystaveno" state
-   * are about; the screen reads these when the server starts sending them and
-   * treats every invoice as a patient's until then.
-   */
+  /** The visit this invoice was issued for, when it came from one. */
+  appointmentId?: string | null;
+  /** The club that pays, when a club pays; `clubName` is its name. */
   clubId?: string | null;
   clubName?: string | null;
+  /** How much of `paidCzk` came in each way. Absent on an older server. */
+  cashPaidCzk?: number;
+  cardPaidCzk?: number;
+  transferPaidCzk?: number;
+  clubPaidCzk?: number;
+  /** Every payment received against the invoice, oldest first. */
+  payments?: InvoicePayment[];
+}
+
+export interface InvoicePayment {
+  id: string;
+  amountCzk: number;
+  method: InvoicePaymentMethod;
+  paidAtUtc: string;
+  note?: string | null;
 }
 
 /** The names `POST /api/billing/invoices/{id}/payment` parses into its PaymentMethod enum. */
 export type InvoicePaymentMethod = 'Cash' | 'Card' | 'Transfer' | 'ClubBilling';
 
 export const billingApi = {
-  getInvoices: async (): Promise<Invoice[]> => {
-    const res = await client.get('/api/billing/invoices');
+  getInvoices: async (filter: { patientId?: string; clubId?: string } = {}): Promise<Invoice[]> => {
+    const res = await client.get('/api/billing/invoices', {
+      params: { patientId: filter.patientId || undefined, clubId: filter.clubId || undefined },
+    });
     return res.data?.value ?? res.data ?? [];
   },
 
-  createInvoice: async (data: { patientId: string; serviceId: string; notes?: string }): Promise<Invoice> => {
+  createInvoice: async (data: {
+    patientId: string;
+    serviceId: string;
+    notes?: string;
+    appointmentId?: string;
+    clubId?: string;
+  }): Promise<Invoice> => {
     const res = await client.post('/api/billing/invoices', data);
     return res.data?.value ?? res.data;
   },
@@ -59,7 +79,7 @@ export const billingApi = {
      PartiallyPaid or Paid by itself and refuses a cancelled or refunded one. */
   recordPayment: async (
     invoiceId: string,
-    data: { amount: number; method: InvoicePaymentMethod },
+    data: { amountCzk: number; method: InvoicePaymentMethod; note?: string },
   ): Promise<Invoice> => {
     const res = await client.post(`/api/billing/invoices/${invoiceId}/payment`, data);
     return res.data?.value ?? res.data;

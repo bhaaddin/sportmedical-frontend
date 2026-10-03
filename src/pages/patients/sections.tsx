@@ -8,13 +8,13 @@
  * to draw the sidebar, and importing it from the layout would pull that whole
  * page into the main bundle and undo its lazy loading.
  *
- * The order is the board's (design-15): Přehled · Termíny · Dokumenty ·
- * Historie. Výsledky and Faktury sit between them on the card as links to the
- * existing diagnostics and billing screens; they have no section of their
- * own yet, so they are not here - a route that does not exist must not be
- * offered in the sidebar.
+ * The order is the board's (design-15): Přehled · Termíny · Výsledky · Faktury ·
+ * Dokumenty · Historie. Výsledky and Faktury are pages of their own now
+ * (`PatientResultsPage`, `PatientInvoicesPage`); the routes hang under
+ * `/patients/:id` in App.tsx, and a section listed here without its route
+ * would be a dead link in the sidebar.
  */
-import { Dashboard, Description, Event, History } from '@mui/icons-material';
+import { Dashboard, Description, Event, History, ReceiptLong, Science } from '@mui/icons-material';
 
 export interface PatientSection {
   id: string;
@@ -27,6 +27,8 @@ export interface PatientSection {
 export const PATIENT_SECTIONS: PatientSection[] = [
   { id: 'prehled', label: 'Přehled', path: '', icon: <Dashboard /> },
   { id: 'terminy', label: 'Termíny', path: 'terminy', icon: <Event /> },
+  { id: 'vysledky', label: 'Výsledky', path: 'vysledky', icon: <Science /> },
+  { id: 'faktury', label: 'Faktury', path: 'faktury', icon: <ReceiptLong /> },
   { id: 'dokumenty', label: 'Dokumenty', path: 'dokumenty', icon: <Description /> },
   { id: 'historie', label: 'Historie', path: 'historie', icon: <History /> },
 ];

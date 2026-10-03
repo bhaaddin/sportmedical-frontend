@@ -19,11 +19,12 @@ export interface PublicClinic {
   address: string;
   bookingEnabled: boolean;
   /**
-   * Opening hours as one line ("Po–Pá 8:00–18:00"), when the API sends them.
-   * Absent on today's endpoint; the public pages then fall back to the line in
+   * Opening hours as one line ("Po–Pá 8:00–18:00"), as the clinic typed them
+   * in the staff screen (setting `pub.openingHours`). `null`/absent when it
+   * has not; the public pages then fall back to the line in
    * src/pages/public/content.ts. Never invented here.
    */
-  openingHours?: string;
+  openingHours?: string | null;
 }
 
 /**
@@ -109,4 +110,8 @@ export const PUBLIC_CLINIC_KEYS = {
   phone: 'pub.contactPhone',
   address: 'pub.contactAddress',
   bookingEnabled: 'pub.bookingEnabled',
+  openingHours: 'pub.openingHours',
 } as const;
+
+/** The server refuses a longer text with a 400. */
+export const OPENING_HOURS_MAX_LENGTH = 200;

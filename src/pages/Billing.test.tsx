@@ -12,7 +12,17 @@ const recordPayment = vi.fn();
 vi.mock('../api/billing', () => ({
   billingApi: { getInvoices, recordPayment, createInvoice: vi.fn(), addLineItem: vi.fn() },
 }));
-vi.mock('../api/services', () => ({ servicesApi: { getAll: vi.fn().mockResolvedValue([]) } }));
+const getPatient = vi.fn();
+vi.mock('../api/patients', () => ({ patientsApi: { getById: getPatient } }));
+const getClub = vi.fn();
+vi.mock('../api/clubs', () => ({ clubsApi: { getById: getClub } }));
+const listActivities = vi.fn();
+vi.mock('../api/activities', () => ({ activitiesApi: { list: listActivities } }));
+vi.mock('../api/calendars', () => ({ calendarsApi: { list: vi.fn().mockResolvedValue([]) } }));
+vi.mock('../api/partnerOrders', () => ({ partnerOrdersApi: { list: vi.fn().mockResolvedValue([]) } }));
+vi.mock('../api/services', () => ({ servicesApi: { getAll: vi.fn().mockResolvedValue([
+  { id: 's1', code: 'KP', name: 'Komplexní prohlídka', description: '', durationMinutes: 60, priceCzk: 2200, isActive: true },
+]) } }));
 vi.mock('../components/patients/PatientPicker', () => ({ default: () => <div data-testid="picker" /> }));
 vi.mock('../components/NumberSeriesPreview', () => ({ NumberSeriesPreview: () => null }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
@@ -46,8 +56,10 @@ beforeEach(() => {
   recordPayment.mockReset().mockResolvedValue(invoices[0]);
 });
 
-function renderPage() {
-  return render(<MemoryRouter><Billing /></MemoryRouter>);
+function renderPage(state?: unknown) {
+  return render(
+    <MemoryRouter initialEntries={[{ pathname: '/billing', state }]}><Billing /></MemoryRouter>,
+  );
 }
 
 describe('Fakturace', () => {
@@ -102,7 +114,71 @@ describe('Fakturace', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Zaevidovat platbu' }));
 
-    await waitFor(() => expect(recordPayment).toHaveBeenCalledWith('a', { amount: 2200, method: 'Cash' }));
+    await waitFor(() => expect(recordPayment).toHaveBeenCalledWith('a', { amountCzk: 2200, method: 'Cash' }));
     await waitFor(() => expect(getInvoices).toHaveBeenCalledTimes(2));
+  });
+
+  it('sends the method and the note the desk chose', async () => {
+    renderPage();
+    await screen.findByText('2026-0418');
+
+    fireEvent.click(screen.getByLabelText('Přijmout platbu 2026-0418'));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Částka'), { target: { value: '1000' } });
+    fireEvent.change(within(dialog).getByLabelText('Poznámka'), { target: { value: ' záloha ' } });
+    fireEvent.mouseDown(within(dialog).getByRole('combobox', { name: 'Způsob platby' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Kartou' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Zaevidovat platbu' }));
+
+    await waitFor(() =>
+      expect(recordPayment).toHaveBeenCalledWith('a', { amountCzk: 1000, method: 'Card', note: 'záloha' }));
+  });
+
+  it('adds up the cash taken this month and says how much came by card', async () => {
+    getInvoices.mockResolvedValue([
+      { ...invoices[1], payments: [
+        { id: 'x1', amountCzk: 3000, method: 'Cash', paidAtUtc: now, note: null },
+        { id: 'x2', amountCzk: 1000, method: 'Card', paidAtUtc: now, note: 'zbytek' },
+      ] },
+    ]);
+    renderPage();
+    await screen.findByText('2026-0416');
+
+    expect(screen.getByText('Hotově na místě')).toBeInTheDocument();
+    expect(screen.getByText(/^3\s000 Kč$/)).toBeInTheDocument();
+    expect(screen.getByText(/^kartou 1\s000 Kč$/)).toBeInTheDocument();
+  });
+
+  it('opens a row into its payments', async () => {
+    getInvoices.mockResolvedValue([
+      { ...invoices[1], payments: [{ id: 'x1', amountCzk: 4000, method: 'ClubBilling', paidAtUtc: now, note: 'faktura klubu' }] },
+    ]);
+    renderPage();
+    await screen.findByText('2026-0416');
+    expect(screen.queryByText('faktura klubu')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Platby dokladu 2026-0416'));
+
+    expect(await screen.findByText('faktura klubu')).toBeInTheDocument();
+    expect(screen.getByText('Na klub')).toBeInTheDocument();
+  });
+
+  it('opens the new-document dialog for a visit with the patient and the price-list item of the činnost', async () => {
+    getPatient.mockResolvedValue({ id: 'p9', firstName: 'Jan', lastName: 'Novák' });
+    listActivities.mockResolvedValue({ activities: [{ id: 'act1', serviceItemId: 's1' }], warnings: [] });
+    renderPage({ patientId: 'p9', appointmentId: 'ap1', activityId: 'act1' });
+
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(getPatient).toHaveBeenCalledWith('p9'));
+    expect(await within(dialog).findByLabelText('Počet Komplexní prohlídka')).toHaveValue(1);
+    expect(within(dialog).getByText(/Celkem k úhradě 2\s200 Kč/)).toBeInTheDocument();
+  });
+
+  it('draws a club as the odběratel when sent from a club', async () => {
+    getClub.mockResolvedValue({ id: 'c1', name: 'FK Slaný' });
+    renderPage({ clubId: 'c1' });
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('Klub: FK Slaný')).toBeInTheDocument();
   });
 });

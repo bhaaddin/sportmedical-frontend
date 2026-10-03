@@ -112,4 +112,11 @@ describe('PatientSignIn', () => {
 
     expect(await screen.findByText('PORTAL OPENED')).toBeInTheDocument();
   });
+
+  it('tells a patient who forgot the password to ask the clinic', () => {
+    renderSignIn();
+
+    expect(screen.getByText(/Zapomněli jste heslo\? Ozvěte se ordinaci — heslo vám smaže a pošle nový odkaz\./))
+      .toBeInTheDocument();
+  });
 });

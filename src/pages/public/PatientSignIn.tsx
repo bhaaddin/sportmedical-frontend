@@ -121,6 +121,9 @@ export default function PatientSignIn() {
           <Typography variant="body2" sx={{ color: BRAND.muted, mt: 3 }}>
             Nemáte heslo? Přístup vám vydá ordinace — nebo si ho nastavte z odkazu, který jste dostali.
           </Typography>
+          <Typography variant="body2" sx={{ color: BRAND.muted, mt: 1 }}>
+            Zapomněli jste heslo? Ozvěte se ordinaci — heslo vám smaže a pošle nový odkaz.
+          </Typography>
 
           <Box sx={{ borderTop: `1px solid ${BRAND.line}`, mt: 2.5, pt: 2.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
             <Typography variant="body2" sx={{ color: BRAND.muted }}>Ještě nemáte termín?</Typography>

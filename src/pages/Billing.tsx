@@ -2,25 +2,31 @@
  * Fakturace - doklady, platby a přehled tržeb, laid out as on the design board
  * (screen 18): four numbers, a search with filters, one table.
  *
- * The board's third card, "HOTOVĚ NA MÍSTĚ - vybral lékař", is not drawn:
- * InvoiceDto carries how much was paid but not how. The card comes back the
- * day the API says which payments were cash. The "Kluby" filter likewise
- * appears only once an invoice in the list carries a club.
+ * "Hotově na místě" is the money taken at the desk this month, read off the
+ * payments each invoice lists; "Kluby" appears once an invoice carries a club.
+ * A row opens into its payments. The page can be entered with a `state`
+ * (see `billing/invoicePrefill`): from a visit, from a club, or from a link to
+ * one document - and then the new-document dialog is already filled in.
  */
-import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Fragment, useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Paper, Button, Chip, Grid, TextField, MenuItem, Link,
-  Dialog, DialogTitle, DialogContent, DialogActions, Skeleton, InputAdornment,
+  Dialog, DialogTitle, DialogContent, DialogActions, Skeleton, InputAdornment, Collapse, IconButton,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, Stack,
 } from '@mui/material';
-import { Add, Search } from '@mui/icons-material';
+import { Add, ExpandLess, ExpandMore, Search } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import { billingApi } from '../api/billing';
 import type { Invoice, InvoicePaymentMethod } from '../api/billing';
 import { servicesApi } from '../api/services';
 import type { ServiceItem } from '../api/services';
+import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
+import { activitiesApi } from '../api/activities';
+import { calendarsApi } from '../api/calendars';
+import { clubsApi } from '../api/clubs';
+import { partnerOrdersApi } from '../api/partnerOrders';
 import PatientPicker from '../components/patients/PatientPicker';
 import { NumberSeriesPreview } from '../components/NumberSeriesPreview';
 import { PageHeader, KpiCard, FilterChips, StatusChip, SectionLabel } from '../components/ui';
@@ -28,18 +34,18 @@ import type { FilterOption } from '../components/ui';
 import { czk, czDate } from './billing/money';
 import {
   doklady, isClub, isOpen, itemsLabel, matchesFilter, matchesSearch, monthIn, monthYear,
-  statusOf, summarize, customerOf,
+  statusOf, summarize, customerOf, PAYMENT_METHOD_LABEL,
 } from './billing/invoiceView';
 import type { InvoiceFilter } from './billing/invoiceView';
+import InvoicePayments from './billing/InvoicePayments';
+import { addLine, hasPrefill, linesFromActivities, readNavState } from './billing/invoicePrefill';
+import type { BillingNavState, DraftLine } from './billing/invoicePrefill';
 
 type SortKey = 'invoiceNumber' | 'customer' | 'issueDateUtc' | 'totalCzk' | 'status';
 
-const PAYMENT_METHODS: { value: InvoicePaymentMethod; label: string }[] = [
-  { value: 'Cash', label: 'Hotově' },
-  { value: 'Card', label: 'Kartou' },
-  { value: 'Transfer', label: 'Převodem' },
-  { value: 'ClubBilling', label: 'Na klub' },
-];
+const PAYMENT_METHODS: { value: InvoicePaymentMethod; label: string }[] = (
+  Object.keys(PAYMENT_METHOD_LABEL) as InvoicePaymentMethod[]
+).map((value) => ({ value, label: PAYMENT_METHOD_LABEL[value] }));
 
 export default function Billing() {
   /* ── Data ── */
@@ -57,8 +63,15 @@ export default function Billing() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newInvoice, setNewInvoice] = useState({ patientId: '', serviceId: '', notes: '' });
   const [invoicePatient, setInvoicePatient] = useState<Patient | null>(null);
+  /* Where the document comes from, when another screen sent it here. */
+  const [appointmentId, setAppointmentId] = useState<string | null>(null);
+  const [club, setClub] = useState<{ id: string; name: string } | null>(null);
   const [paying, setPaying] = useState<Invoice | null>(null);
-  const [payment, setPayment] = useState<{ amount: string; method: InvoicePaymentMethod }>({ amount: '', method: 'Cash' });
+  const [payment, setPayment] = useState<{ amount: string; method: InvoicePaymentMethod; note: string }>({
+    amount: '', method: 'Cash', note: '',
+  });
+  /* The row opened into its payments. */
+  const [openId, setOpenId] = useState<string | null>(null);
   const [savingPayment, setSavingPayment] = useState(false);
 
   const now = useMemo(() => new Date(), []);
@@ -114,27 +127,40 @@ export default function Billing() {
   };
 
   /* ── Create invoice ── */
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [lines, setLines] = useState<DraftLine[]>([]);
+
+  const resetDraft = () => {
+    setCreateDialogOpen(false);
+    setNewInvoice({ patientId: '', serviceId: '', notes: '' });
+    setInvoicePatient(null);
+    setAppointmentId(null);
+    setClub(null);
+    setLines([]);
+  };
 
   const handleCreateInvoice = async () => {
-    if (!newInvoice.patientId || selectedServices.length === 0) return;
+    if (!newInvoice.patientId || lines.length === 0) return;
     try {
       const inv = await billingApi.createInvoice({
         patientId: newInvoice.patientId,
-        serviceId: selectedServices[0],
+        serviceId: lines[0].serviceId,
         notes: newInvoice.notes,
+        ...(appointmentId !== null ? { appointmentId } : {}),
+        ...(club !== null ? { clubId: club.id } : {}),
       });
-      /* Add additional services as line items */
-      for (let i = 1; i < selectedServices.length; i++) {
-        try {
-          await billingApi.addLineItem(inv.id, selectedServices[i]);
-        } catch { /* skip failed line items */ }
+      /* The server adds one unit per call, so 12x is the first one plus eleven. */
+      let failed = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const extra = i === 0 ? lines[i].quantity - 1 : lines[i].quantity;
+        for (let n = 0; n < extra; n++) {
+          try {
+            await billingApi.addLineItem(inv.id, lines[i].serviceId);
+          } catch { failed += 1; }
+        }
       }
-      toast.success('Doklad vystaven');
-      setCreateDialogOpen(false);
-      setNewInvoice({ patientId: '', serviceId: '', notes: '' });
-      setInvoicePatient(null);
-      setSelectedServices([]);
+      if (failed > 0) toast.error(`Doklad vystaven, ale ${failed} položek se nepodařilo přidat`);
+      else toast.success('Doklad vystaven');
+      resetDraft();
       await reload();
     } catch {
       toast.error('Doklad se nepodařilo vystavit');
@@ -142,20 +168,93 @@ export default function Billing() {
   };
 
   const toggleService = (serviceId: string) => {
-    setSelectedServices(prev =>
-      prev.includes(serviceId) ? prev.filter(s => s !== serviceId) : [...prev, serviceId]
+    setLines((prev) =>
+      prev.some((l) => l.serviceId === serviceId)
+        ? prev.filter((l) => l.serviceId !== serviceId)
+        : addLine(prev, serviceId),
     );
   };
 
+  const setQuantity = (serviceId: string, raw: string) => {
+    const quantity = Math.max(1, Math.min(200, Math.floor(Number(raw)) || 1));
+    setLines((prev) => prev.map((l) => (l.serviceId === serviceId ? { ...l, quantity } : l)));
+  };
+
   const invoiceTotal = useMemo(() => {
-    return services
-      .filter(s => selectedServices.includes(s.id))
-      .reduce((sum, s) => sum + (s.priceCzk || 0), 0);
-  }, [services, selectedServices]);
+    return lines.reduce(
+      (sum, l) => sum + (services.find((s) => s.id === l.serviceId)?.priceCzk ?? 0) * l.quantity,
+      0,
+    );
+  }, [services, lines]);
+
+  /* ── Entered from another screen ── */
+  const location = useLocation();
+  const navigate = useNavigate();
+  const entered = useRef(false);
+
+  const applyPrefill = useCallback(async (state: BillingNavState) => {
+    if (state.invoiceId !== undefined) setOpenId(state.invoiceId);
+    if (state.patientId === undefined && state.clubId === undefined && state.appointmentId === undefined
+      && state.activityId === undefined && state.partnerOrderId === undefined) return;
+
+    setCreateDialogOpen(true);
+    if (state.appointmentId !== undefined) setAppointmentId(state.appointmentId);
+    if (state.patientId !== undefined) {
+      patientsApi.getById(state.patientId)
+        .then((patient) => {
+          setInvoicePatient(patient);
+          setNewInvoice((p) => ({ ...p, patientId: patient.id }));
+        })
+        .catch(() => toast.error('Pacienta se nepodařilo načíst'));
+    }
+    if (state.clubId !== undefined) {
+      clubsApi.getById(state.clubId)
+        .then((c) => setClub({ id: c.id, name: c.name }))
+        .catch(() => toast.error('Klub se nepodařilo načíst'));
+    }
+    if (state.activityId === undefined && state.partnerOrderId === undefined) return;
+
+    try {
+      const wanted: { activityId: string; count: number }[] = [];
+      if (state.activityId !== undefined) wanted.push({ activityId: state.activityId, count: 1 });
+      if (state.partnerOrderId !== undefined) {
+        const calendars = await calendarsApi.list();
+        const lists = await Promise.allSettled(calendars.map((c) => partnerOrdersApi.list(c.id)));
+        const order = lists
+          .flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
+          .find((o) => o.id === state.partnerOrderId);
+        for (const item of order?.items ?? []) {
+          wanted.push({ activityId: item.activityId, count: Math.max(1, item.requestedCount) });
+        }
+      }
+      const { activities } = await activitiesApi.list();
+      const { lines: found, unpriced } = linesFromActivities(wanted, activities);
+      setLines((prev) => found.reduce((acc, l) => addLine(acc, l.serviceId, l.quantity), prev));
+      if (unpriced > 0) toast.error('Některá činnost nemá v ceníku položku - přidejte ji ručně');
+    } catch {
+      toast.error('Položky z objednávky se nepodařilo načíst - vyberte je z ceníku');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (loading || entered.current) return;
+    const state = readNavState(location.state);
+    if (!hasPrefill(state)) return;
+    entered.current = true;
+    /* Spent: a reload must not open the dialog again. */
+    navigate(location.pathname, { replace: true, state: null });
+    void applyPrefill(state);
+  }, [loading, location.state, location.pathname, navigate, applyPrefill]);
+
+  /* A link to one document brings it into view. */
+  useEffect(() => {
+    if (openId === null || loading) return;
+    document.getElementById(`invoice-${openId}`)?.scrollIntoView?.({ block: 'center' });
+  }, [openId, loading]);
 
   /* ── Record payment ── */
   const openPayment = (inv: Invoice) => {
-    setPayment({ amount: String(inv.remainingCzk), method: isClub(inv) ? 'Transfer' : 'Cash' });
+    setPayment({ amount: String(inv.remainingCzk), method: isClub(inv) ? 'Transfer' : 'Cash', note: '' });
     setPaying(inv);
   };
 
@@ -166,7 +265,12 @@ export default function Billing() {
     if (paying === null || !paymentValid) return;
     setSavingPayment(true);
     try {
-      await billingApi.recordPayment(paying.id, { amount: paymentAmount, method: payment.method });
+      const note = payment.note.trim();
+      await billingApi.recordPayment(paying.id, {
+        amountCzk: paymentAmount,
+        method: payment.method,
+        ...(note !== '' ? { note } : {}),
+      });
       toast.success('Platba zaevidována');
       setPaying(null);
       await reload();
@@ -201,8 +305,8 @@ export default function Billing() {
       <Box>
         {header}
         <Grid container spacing={2} sx={{ mb: 2.5 }}>
-          {[1, 2, 3].map((i) => (
-            <Grid key={i} size={{ xs: 12, sm: 6, md: 4 }}>
+          {[1, 2, 3, 4].map((i) => (
+            <Grid key={i} size={{ xs: 12, sm: 6, md: 3 }}>
               <Skeleton variant="rounded" height={96} />
             </Grid>
           ))}
@@ -227,14 +331,14 @@ export default function Billing() {
 
       {/* ── KPI cards ── */}
       <Grid container spacing={2} sx={{ mb: 2.5 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <KpiCard
             label={`Vyfakturováno ${monthIn(now)}`}
             value={czk(stats.invoicedThisMonth)}
             hint={doklady(stats.invoicedThisMonthCount)}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <KpiCard
             label="Nezaplaceno"
             value={czk(stats.unpaid)}
@@ -242,7 +346,14 @@ export default function Billing() {
             hint={`${doklady(stats.overdueCount)} po splatnosti`}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <KpiCard
+            label="Hotově na místě"
+            value={czk(stats.cashThisMonth)}
+            hint={`kartou ${czk(stats.cardThisMonth)}`}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <KpiCard
             label="Průměr na pacienta"
             value={stats.averagePerPatient === null ? '—' : czk(stats.averagePerPatient)}
@@ -293,8 +404,10 @@ export default function Billing() {
             {filteredInvoices.map((inv) => {
               const st = statusOf(inv, now);
               const club = isClub(inv);
+              const open = openId === inv.id;
               return (
-                <TableRow key={inv.id} hover>
+                <Fragment key={inv.id}>
+                <TableRow id={`invoice-${inv.id}`} hover selected={open}>
                   <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{inv.invoiceNumber}</TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     {club ? (
@@ -331,8 +444,27 @@ export default function Billing() {
                         Přijmout platbu
                       </Button>
                     )}
+                    <IconButton
+                      size="small"
+                      onClick={() => setOpenId(open ? null : inv.id)}
+                      aria-expanded={open}
+                      aria-label={`Platby dokladu ${inv.invoiceNumber}`}
+                      sx={{ ml: 0.5 }}
+                    >
+                      {open ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                    </IconButton>
                   </TableCell>
                 </TableRow>
+                <TableRow>
+                  <TableCell colSpan={7} sx={{ py: 0, borderBottom: open ? undefined : 'none' }}>
+                    <Collapse in={open} timeout="auto" unmountOnExit>
+                      <Box sx={{ py: 1.5 }}>
+                        <InvoicePayments invoice={inv} />
+                      </Box>
+                    </Collapse>
+                  </TableCell>
+                </TableRow>
+                </Fragment>
               );
             })}
             {filteredInvoices.length === 0 && (
@@ -365,7 +497,16 @@ export default function Billing() {
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid size={{ xs: 12 }}>
               <SectionLabel>Odběratel</SectionLabel>
+              {club !== null && (
+                <Chip
+                  color="primary"
+                  label={`Klub: ${club.name}`}
+                  onDelete={() => setClub(null)}
+                  sx={{ mb: 1.5 }}
+                />
+              )}
               <PatientPicker
+                label={club !== null ? 'Pacient (kontakt klubu)' : undefined}
                 value={invoicePatient}
                 onChange={(patient) => {
                   setInvoicePatient(patient);
@@ -381,15 +522,39 @@ export default function Billing() {
                     key={s.id}
                     label={`${s.name} — ${czk(s.priceCzk)}`}
                     onClick={() => toggleService(s.id)}
-                    color={selectedServices.includes(s.id) ? 'primary' : 'default'}
-                    variant={selectedServices.includes(s.id) ? 'filled' : 'outlined'}
+                    color={lines.some((l) => l.serviceId === s.id) ? 'primary' : 'default'}
+                    variant={lines.some((l) => l.serviceId === s.id) ? 'filled' : 'outlined'}
                   />
                 ))}
                 {services.filter(s => s.isActive).length === 0 && (
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>Ceník je prázdný.</Typography>
                 )}
               </Box>
-              {selectedServices.length > 0 && (
+              {lines.length > 0 && (
+                <Stack spacing={1} sx={{ mt: 1.5 }}>
+                  {lines.map((l) => {
+                    const item = services.find((s) => s.id === l.serviceId);
+                    return (
+                      <Stack key={l.serviceId} direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                        <Typography variant="body2" sx={{ flex: 1 }}>{item?.name ?? 'Položka ceníku'}</Typography>
+                        <TextField
+                          size="small"
+                          type="number"
+                          label="Počet"
+                          value={l.quantity}
+                          onChange={(e) => setQuantity(l.serviceId, e.target.value)}
+                          slotProps={{ htmlInput: { min: 1, max: 200, 'aria-label': `Počet ${item?.name ?? ''}` } }}
+                          sx={{ width: 96 }}
+                        />
+                        <Typography variant="body2" sx={{ width: 100, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                          {czk((item?.priceCzk ?? 0) * l.quantity)}
+                        </Typography>
+                      </Stack>
+                    );
+                  })}
+                </Stack>
+              )}
+              {lines.length > 0 && (
                 <Typography variant="body2" sx={{ mt: 1, fontWeight: 600 }}>
                   Celkem k úhradě {czk(invoiceTotal)}
                 </Typography>
@@ -402,9 +567,9 @@ export default function Billing() {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button variant="outlined" onClick={() => { setCreateDialogOpen(false); setSelectedServices([]); }}>Zrušit</Button>
+          <Button variant="outlined" onClick={resetDraft}>Zrušit</Button>
           <Button variant="contained" onClick={handleCreateInvoice}
-            disabled={!newInvoice.patientId || selectedServices.length === 0}>
+            disabled={!newInvoice.patientId || lines.length === 0}>
             Vystavit doklad
           </Button>
         </DialogActions>
@@ -439,6 +604,13 @@ export default function Billing() {
                   <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
                 ))}
               </TextField>
+              <TextField
+                label="Poznámka"
+                value={payment.note}
+                onChange={(e) => setPayment((p) => ({ ...p, note: e.target.value }))}
+                slotProps={{ htmlInput: { maxLength: 200 } }}
+                fullWidth
+              />
             </Stack>
           )}
         </DialogContent>

@@ -256,6 +256,11 @@ export default function PatientList() {
                       >
                         {p.firstName} {p.lastName}
                       </Link>
+                      {p.email && p.email.trim() !== '' && (
+                        <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                          {p.email}
+                        </Typography>
+                      )}
                       {showRecordId && (
                         <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
                           {p.id.slice(0, 8)}…
@@ -268,9 +273,9 @@ export default function PatientList() {
                     {extraColumns.map((field) => (
                       <TableCell key={field.key}>{EXTRA_COLUMN_CELLS[field.key].cell(p)}</TableCell>
                     ))}
-                    {/* The register's row carries no telephone today; the
-                        profile does, one request per patient. Drawn when the
-                        row starts carrying it, dashed until then. */}
+                    {/* The register's row carries `phone` and `email` (null
+                        when the patient left none); the e-mail is the second
+                        line under the name. */}
                     <TableCell>{p.phone && p.phone.trim() !== '' ? p.phone : '—'}</TableCell>
                     <TableCell>
                       {row?.summary.lastVisit ? formatPragueDate(row.summary.lastVisit.startTime) : '—'}

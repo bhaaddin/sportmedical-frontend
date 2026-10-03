@@ -24,7 +24,9 @@ vi.mock('../api/clinicSettings', () => ({
     phone: 'pub.contactPhone',
     address: 'pub.contactAddress',
     bookingEnabled: 'pub.bookingEnabled',
+    openingHours: 'pub.openingHours',
   },
+  OPENING_HOURS_MAX_LENGTH: 200,
 }));
 vi.mock('../components/CompanySettingsCard', () => ({ default: () => null }));
 
@@ -50,6 +52,20 @@ describe('saving the public contacts', () => {
       'pub.siteName': 'SportMedical',
       'pub.bookingEnabled': 'false',
     }));
+  });
+
+  it('reads and saves the opening hours the web shows', async () => {
+    readSettings.mockResolvedValue({ 'pub.siteName': 'SportMedical', 'pub.openingHours': 'Po–Pá 8–16' });
+    const user = userEvent.setup();
+    render(<Admin />);
+
+    const field = await screen.findByLabelText('Otevírací doba (text pro web)');
+    expect(field).toHaveValue('Po–Pá 8–16');
+    await user.clear(field);
+    await user.type(field, ' Po–So 7–19 ');
+    await user.click(saveButton());
+
+    expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ 'pub.openingHours': 'Po–So 7–19' }));
   });
 
   it('is not possible while the stored values have not been read', () => {
