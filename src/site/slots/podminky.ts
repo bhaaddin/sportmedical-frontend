@@ -3,149 +3,84 @@ import type { TextSection } from './textPage';
 import { textPageSlots } from './textPage';
 
 /*
- * Slots of the page /obchodni-podminky. The defaults are the live page "Podmínky služby"
- * (https://sportmedical-diagnostics.cz/policies/terms-of-service, captured 2026-10-03). That live text is
- * Shopify's generic e-shop template, and the capture is a condensed rendering of it: the section
- * structure and headings are exact, the body sentences are condensed. It does not fit a clinic that
- * sells appointment-based health services. It is shown as the live site shows it — NOT improved — and
- * it NEEDS A LEGAL REVIEW and a re-copy from the live page before it is relied on.
+ * Slots of the page /obchodni-podminky: terms for the provision of health services (ordering,
+ * payment, cancellation, complaints).
+ *
+ * This is a BASIC TEXT written for the clinic, not a legal document approved by a lawyer: it must be
+ * reviewed by the operator before regular operation. It replaces the shortened Shopify e-shop terms
+ * (shipping, returns, product orders) that do not describe a clinic. Cancellation conditions are
+ * not repeated here: they are the clinic's own written terms on the page "Storno a reklamace", so the
+ * two cannot disagree. Prices are never typed — the price list is the only source. Every sentence is
+ * an editable slot in Nastavení → Média a texty; "{telefon}", "{email}" and "{adresa}" come from the
+ * clinic's own settings.
  */
 
 export const PODMINKY_SECTIONS: readonly TextSection[] = [
   {
-    id: 'prehled',
-    title: 'Přehled',
-    text: 'Vítejte v obchodě SportMedical Diagnostics s.r.o.! Výrazy „my", „nás" a „náš" označují obchod SportMedical Diagnostics s.r.o.. Obchod provozuje tento web a všechny související informace, obsah, funkce, nástroje, produkty a služby s cílem poskytnout zákazníkům přizpůsobený nákupní zážitek. SportMedical Diagnostics s.r.o. využívá službu Shopify. Níže uvedené Podmínky spolu se všemi zásadami, na které se zde odkazuje, popisují vaše práva a povinnosti při používání služeb. Pečlivě si přečtěte tyto Podmínky služby, protože obsahují důležité informace týkající se vašich zákonných práv. Návštěvou, interakcí nebo používáním našich služeb vyjadřujete svůj souhlas s těmito Podmínkami a našimi zásadami ochrany osobních údajů. Pokud nesouhlasíte, neměli byste naše Služby používat.',
-  },
-  {
-    id: 's1',
-    title: 'Oddíl 1 – Přístup a účet',
-    text: 'Odsouhlasením těchto Podmínek potvrzujete, že jste dosáhli plnoletosti a že jste nám dali souhlas s tím, abychom umožnili nezletilým závislým osobám používat Služby. Chcete-li používat Služby, můžete být požádáni o poskytnutí určitých informací, například e-mailu nebo fakturačních a platebních údajů. Prohlašujete a zaručujete, že všechny informace, které uvedete, jsou správné, aktuální a úplné. Za bezpečnost svých přihlašovacích údajů k účtu a za všechny své aktivity na účtu nesete výhradní odpovědnost. Svůj účet nesmíte převést, prodat, postoupit ani poskytnout licenci jiné osobě.',
-  },
-  {
-    id: 's2',
-    title: 'Oddíl 2 – Naše produkty',
-    text: 'Vynaložili jsme veškeré úsilí, aby se produkty zobrazily věrně. Barvy nebo vzhled se však mohou lišit v důsledku typu zařízení a jeho nastavení. Nezaručujeme, že vzhled nebo kvalita vámi zakoupených produktů bude odpovídat vašim očekáváním. Všechny popisy se mohou změnit bez předchozího upozornění. Vyhrazujeme si právo kdykoli ukončit prodej jakéhokoli produktu a omezit množství.',
-  },
-  {
-    id: 's3',
-    title: 'Oddíl 3 – Objednávky',
-    text: 'Při zadávání objednávky činíte nabídku ke koupi. Obchod si vyhrazuje právo přijmout nebo odmítnout vaši objednávku z jakéhokoli důvodu. Objednávka není přijata, dokud obchod její přijetí nepotvrdí a obdrží vaši platbu. Před odesláním objednávky si ji pečlivě prohlédněte, protože po přijetí ji nemusíme moci zrušit. V případě nepřijetí se pokusíme vás informovat e-mailem, adresou nebo telefonicky. Vaše nákupy mohou být vráceny nebo vyměněny výhradně v souladu s našimi Zásadami vracení peněz. Prohlašujete a zaručujete, že vaše nákupy jsou určeny pro vaše osobní použití nebo použití v domácnosti, nikoli pro další prodej nebo vývoz.',
-  },
-  {
-    id: 's4',
-    title: 'Oddíl 4 – Ceny a fakturace',
-    text: 'Ceny, slevy a propagační akce se mohou změnit bez předchozího upozornění. Cena účtovaná je cena platná v čase podání objednávky, uvedená v e-mailu s potvrzením. Pokud není uvedeno jinak, zveřejněné ceny nezahrnují daně, poštovné, manipulační nebo celní poplatky. Ceny se mohou lišit od cen v kamenných obchodech či v jiných online obchodech třetích stran. Čas od času můžeme nabízet propagační akce na Služby, které se řídí oddělenými podmínkami. Pokud dojde k rozporu, platí podmínky propagační akce. Souhlasíte s tím, že budete poskytovat aktuální, úplné a přesné informace o nákupu, platbě a účtu. Souhlasíte s bezodkladnou aktualizací údajů. Prohlašujete a zaručujete, že (i) údaje o kreditní kartě jsou pravdivé a úplné, (ii) jste oprávněni kartu použít, (iii) poplatky budou vydavatelem uznány a (iv) zaplatíte je.',
-  },
-  {
-    id: 's5',
-    title: 'Oddíl 5 – Doprava a doručení',
-    text: 'Neneseme odpovědnost za zpoždění při dopravě a doručení. Všechny lhůty jsou odhadované a nejsou garantované. Nejsme zodpovědní za zpoždění způsobené přepravci, clem nebo vnějšími faktory. Po předání produktů přepravci přechází vlastnictví a riziko ztráty na vás.',
-  },
-  {
-    id: 's6',
-    title: 'Oddíl 6 – Duševní vlastnictví',
-    text: 'Naše služby, včetně všech ochranných známek, textu, obrázků, grafiky, videa a zvuku a jejich vzoru, výběru a uspořádání, jsou vlastnictvím obchodu nebo jeho partnerů a jsou chráněny zákony o duševním vlastnictví. Tyto Podmínky vám umožňují používat Služby pouze pro osobní, nekomerční účely. Bez písemného souhlasu nesmíte reprodukovat, distribuovat, upravovat, veřejně vystavovat nebo přenášet jakýkoli materiál. Neoprávněné používání služeb může být porušením federálních a státních zákonů o duševním vlastnictví. Všechna nezmiňovaná práva si obchod vyhrazuje. Názvy, loga, názvy produktů a služeb, vzory a slogany obchodu jsou jeho ochrannými známkami. Tyto nesmíte používat bez písemného souhlasu.',
-  },
-  {
-    id: 's7',
-    title: 'Oddíl 7 – Volitelné nástroje',
-    text: 'Můžete mít přístup k zákaznickým nástrojům nabízeným třetími stranami, které nesledujeme nebo nemáme pod kontrolou. Berete na vědomí a souhlasíte s tím, že poskytujeme přístup k těmto nástrojům „tak, jak jsou", bez záruk. Neneseme odpovědnost za jejich používání. Jakékoli použití volitelných nástrojů je zcela na vaše vlastní riziko a měli byste se seznámit s podmínkami externího poskytovatele. V budoucnu můžeme nabízet nové funkce, které se považují za součást Služeb.',
-  },
-  {
-    id: 's8',
-    title: 'Oddíl 8 – Odkazy třetích stran',
-    text: 'Služby mohou obsahovat materiály a hypertextové odkazy na webové stránky třetích stran. Nejsme zodpovědní za zkoumání nebo hodnocení obsahu nebo správnosti těchto webů. Pokud se rozhodnete navštívit třetí strany, činíte tak na vlastní nebezpečí. Neneseme odpovědnost za jakoukoli škodu nebo újmu související s vaším přístupem na tyto webové stránky. Pečlivě si prostudujte zásady třetí strany a ujistěte se, že jim rozumíte. Stížnosti na produkty třetích stran směřujte přímo na ně.',
-  },
-  {
-    id: 's9',
-    title: 'Oddíl 9 – Vztah se společností Shopify',
-    text: 'SportMedical Diagnostics s.r.o. je provozován na platformě Shopify. Veškeré prodeje probíhají přímo v obchodě, nikoli prostřednictvím Shopify. Používáním služeb berete na vědomí a souhlasíte s tím, že společnost Shopify nenese odpovědnost za jakýkoli aspekt prodeje či nákupu. Tímto výslovně zprošťujete společnost Shopify a její přidružené společnosti všech nároků.',
-  },
-  {
-    id: 's10',
-    title: 'Oddíl 10 – Zásady ochrany osobních údajů',
-    text: 'Na všechny osobní údaje, které shromažďujeme prostřednictvím služeb, se vztahují naše Zásady ochrany osobních údajů. Hostitelem Služeb je Shopify, která shromažďuje a zpracovává osobní údaje o vašem přístupu. Informace budou předávány Shopify a třetím stranám, které se mohou nacházet v jiných zemích.',
-  },
-  {
-    id: 's11',
-    title: 'Oddíl 11 – Zpětná vazba',
-    text: 'Pokud odešlete nápady, návrhy, recenze nebo jiný obsah, udělujete nám trvalou, celosvětovou, dále poskytovatelnou, bezplatnou licenci k jejich použití, reprodukci, úpravě a distribuci. Veškerá práva vyplývající z této licence můžeme využívat k provozu, vyhodnocení a zlepšování Služeb. Prohlašujete a zaručujete, že: (i) vlastníte veškerá potřebná práva k obsahu; (ii) zveřejnili jste veškeré kompenzace; a (iii) vaše zpětná vazba je v souladu s Podmínkami. Nejsme povinni zachovávat důvěrnost, vyplácet náhradu nebo reagovat. Můžeme monitorovat, upravovat nebo odstraňovat obsah, který považujeme za nevhodný. Souhlasíte s tím, že vaše zpětná vazba nebude porušovat žádná práva třetích stran.',
-  },
-  {
-    id: 's12',
-    title: 'Oddíl 12 – Chyby, nepřesnosti a opomenutí',
-    text: 'Příležitostně se mohou objevit typografické chyby nebo nepřesnosti v popisech, cenách, promocích nebo dostupnosti. Vyhrazujeme si právo opravit jakékoli chyby a změnit informace bez upozornění.',
-  },
-  {
-    id: 's13',
-    title: 'Oddíl 13 – Zakázané způsoby použití',
-    text: `Ke službám můžete přistupovat a používat je pouze pro zákonné účely. Nesmíte je používat přímo ani nepřímo:
-- za nezákonným nebo zlovolným účelem
-- k porušování mezinárodních nebo místních právních předpisů
-- k porušování duševního vlastnictví
-- k obtěžování nebo poškozování osob
-- k předávání nepravdivých informací
-- k odesílání reklam, spamu nebo řetězových dopisů
-- k vydávání se za jinou osobu
-- k omezování používání Služeb ostatními
+    id: 'poskytovatel',
+    title: 'Poskytovatel a rozsah podmínek',
+    text: `Poskytovatelem služeb je **SportMedical Diagnostics s.r.o.**, IČO 23351632, se sídlem Krátká 283, 252 65 Tursko. Služby poskytujeme na adrese {adresa}.
 
-Také souhlasíte s tím, že nebudete: (a) nahrávat nebo přenášet viry nebo škodlivý kód; (b) reprodukovat, duplikovat, kopírovat nebo prodávat Služby; (c) shromažďovat osobní údaje jiných osob; (d) rozesílat spam nebo phishing; (e) zasahovat do bezpečnostních prvků. Vyhrazujeme si právo kdykoli pozastavit, zakázat nebo zrušit váš účet bez upozornění, pokud porušíte Podmínky.`,
+Tyto podmínky upravují objednání, poskytnutí, platbu a reklamaci služeb kliniky: sportovních lékařských prohlídek, sportovní diagnostiky (včetně spiroergometrie a VO₂max) a měření složení těla InBody. Objednáním služby s nimi vyslovujete souhlas.`,
   },
   {
-    id: 's14',
-    title: 'Oddíl 14 – Ukončení',
-    text: 'Tuto smlouvu nebo váš přístup ke službám můžeme kdykoli ukončit bez upozornění a vy musíte uhradit vše až do data ukončení. Určité oddíly zůstávají v platnosti po ukončení: Duševní vlastnictví, Zpětná vazba, Ukončení, Zřeknutí se záruk, Zřeknutí se odpovědnosti, Odškodnění a další.',
+    id: 'povaha',
+    title: 'Povaha služeb',
+    text: `Poskytujeme zdravotní a sportovně-diagnostické služby výhradně **na základě předchozí objednávky na konkrétní termín**. Nejde o prodej zboží: nic nezasíláme ani nedoručujeme. Výsledkem služby je vyšetření a podle jeho druhu lékařský posudek, zpráva nebo vyhodnocení měření.`,
   },
   {
-    id: 's15',
-    title: 'Oddíl 15 – Zřeknutí se záruk',
-    text: 'Informace prezentované ve službách jsou k dispozici pouze pro obecné informační účely. Nezaručujeme jejich přesnost či užitečnost. S VÝJIMKOU VÝSLOVNĚ UVEDENOU OBCHODEM, JSOU SLUŽBY poskytovány „BEZ JAKÝCHKOLIV PROHLÁŠENÍ, ZÁRUK A PODMÍNEK," včetně předpokládaných záruk prodejnosti nebo vhodnosti. NEZARUČUJEME, NEPROHLAŠUJEME ANI NERUČÍME ZA TO, ŽE POUŽÍVÁNÍ SLUŽEB BUDE NEPŘERUŠOVANÉ či bezchybné. Některé jurisdikce neumožňují odmítnutí záruk.',
+    id: 'objednani',
+    title: 'Objednání termínu',
+    text: `Termín si můžete objednat online na našem webu, telefonicky na {telefon} nebo e-mailem na {email}. Objednávka je závazná, jakmile vám termín potvrdíme, nebo jakmile se vám zobrazí potvrzení rezervace.
+
+- Při online objednání vás systém může požádat o dokončení registrace přes odkaz. Odkaz platí po omezenou dobu uvedenou u rezervace. Nedokončenou registraci a rezervaci po uplynutí této doby zrušíme a termín se uvolní pro další zájemce.
+- Při objednání uvádějte pravdivé a úplné údaje. Za nesprávné údaje, které způsobí, že službu nelze poskytnout, neneseme odpovědnost.
+- Termín můžeme výjimečně změnit nebo zrušit z provozních nebo zdravotních důvodů na naší straně. Domluvíme s vámi náhradní termín, případně vrátíme uhrazenou částku.`,
   },
   {
-    id: 's16',
-    title: 'Oddíl 16 – Omezení odpovědnosti',
-    text: 'V MAXIMÁLNÍM ROZSAHU STANOVENÉM ZÁKONEM NEBUDE OBCHOD ani Shopify V ŽÁDNÉM PŘÍPADĚ ODPOVĚDNÍ ZA JAKOUKOLI ÚJMU, ztrátu nebo nárok, ať už přímý či nepřímý. To zahrnuje ušlý zisk, ztrátu dat či následné škody vyplývající z používání Služeb nebo nákupů.',
+    id: 'priprava',
+    title: 'Příprava a dokumenty',
+    text: `Před vyšetřením vás informujeme o přípravě (například o jídle, oblečení nebo lécích) a o dokumentech, které je třeba přinést nebo vyplnit. Aktuální přehled najdete na stránce **Dokumenty** a v pokynech k objednanému termínu. Nesplnění přípravy nebo chybějící dokument může znamenat, že vyšetření nebude možné provést nebo dokončit.
+
+Zdravotní dotazník a souhlas s poskytnutím zdravotních služeb vyplňujete pravdivě. Bez souhlasu s vyšetřením jej nelze provést. Souhlas můžete před vyšetřením i během něj odmítnout nebo odvolat.`,
   },
   {
-    id: 's17',
-    title: 'Oddíl 17 – Odškodnění',
-    text: 'Souhlasíte s tím, že obchod a Shopify odškodníte, budete hájit a zbavíte odpovědnosti za ztráty, škody či nároky třetích stran. To zahrnuje nároky vyplývající z porušení Podmínek, porušení zákona nebo práv třetích stran. Budeme vás informovat o nároku. Můžeme vést obhajobu na vaše náklady. Budete spolupracovat na obraně.',
+    id: 'cena',
+    title: 'Ceny a platba',
+    text: `Cena služby je uvedena v **ceníku** na našem webu a platí v den objednání. Ceník je jediným závazným zdrojem cen; zobrazuje i případné skupinové slevy.
+
+Platba probíhá podle zvoleného typu služby předem online, nebo na místě. U vybraných služeb můžeme požadovat platbu předem nebo zálohu jako potvrzení rezervace. Na požádání vystavíme fakturu na osobu nebo firmu. Doklad o platbě vám vydáme vždy.`,
   },
   {
-    id: 's18',
-    title: 'Oddíl 18 – Oddělitelnost',
-    text: 'Pokud bude některé ustanovení označeno za neplatné, bude takové ustanovení přesto vymahatelné v maximálním rozsahu povoleném zákonem a nevymahatelná část bude oddělena bez vlivu na ostatní.',
+    id: 'storno',
+    title: 'Zrušení a změna termínu',
+    text: `Podmínky zrušení nebo změny termínu, nedostavení se a náhradní termíny při onemocnění jsou na stránce **Storno a reklamace**. Jsou součástí těchto podmínek.`,
   },
   {
-    id: 's19',
-    title: 'Oddíl 19 – Zřeknutí se práva; úplná smlouva',
-    text: 'Neuplatnění práva neznamená jeho zřeknutí. Tyto Podmínky služby a veškeré zásady na těchto stránkách představují úplnou smlouvu a ujednání mezi vámi a obchodem, nahrazující veškeré předchozí dohody. Jakékoli nejasnosti při výkladu nebude vykládáno v neprospěch strany, která je vypracovala.',
+    id: 'pacient',
+    title: 'Povinnosti pacienta',
+    text: `Dostavte se včas a s doklady, které jsme vás požádali přinést. Při vyšetření dodržujte pokyny zdravotnického personálu. Informujte nás o změnách zdravotního stavu a o užívaných lécích, které mohou ovlivnit vyšetření. Pokud se necítíte zdráv nebo máte akutní potíže, termín včas zrušte; viz Storno a reklamace.`,
   },
   {
-    id: 's20',
-    title: 'Oddíl 20 – Postoupení',
-    text: 'Bez našeho předchozího písemného souhlasu nesmíte delegovat, převádět ani postoupit tuto smlouvu. Tyto Podmínky a naše práva a povinnosti můžeme převést bez vašeho souhlasu.',
+    id: 'reklamace',
+    title: 'Reklamace a stížnosti',
+    text: `Pokud jste se službou nebyli spokojeni nebo se domníváte, že nebyla poskytnuta řádně, napište nám na {email} nebo zavolejte na {telefon}. Uveďte jméno, datum služby a čeho se reklamace týká. Reklamaci vyřídíme bez zbytečného odkladu, nejpozději do 30 dnů.
+
+Dále je podrobnější postup v části **Storno a reklamace**. Nevyřešíme-li spor s vámi jako spotřebitelem k vaší spokojenosti, můžete se obrátit na subjekt mimosoudního řešení spotřebitelských sporů, kterým je Česká obchodní inspekce (www.coi.cz). Právo obrátit se na soud tím není dotčeno.`,
   },
   {
-    id: 's21',
-    title: 'Oddíl 21 – Rozhodné právo',
-    text: 'Tyto Podmínky služby se řídí federálními a státními zákony jurisdikce, kde má obchod sídlo. Vy a obchod souhlasíte s místní příslušností těchto soudů.',
+    id: 'udaje',
+    title: 'Ochrana osobních údajů',
+    text: `Údaje o vás zpracováváme podle zásad uvedených na stránce **Ochrana osobních údajů**. Údaje pacientů neprodáváme ani nepředáváme obchodním nebo marketingovým partnerům.`,
   },
   {
-    id: 's22',
-    title: 'Oddíl 22 – Nadpisy',
-    text: 'Nadpisy jsou uvedeny pouze pro usnadnění a neovlivňují Podmínky.',
-  },
-  {
-    id: 's23',
-    title: 'Oddíl 23 – Změny podmínek služby',
-    text: 'Aktuální verzi smluvních Podmínek si můžete kdykoli prohlédnout na této stránce. Vyhrazujeme si právo dle vlastního uvážení aktualizovat, měnit nebo nahradit Podmínky. Je vaší povinností pravidelně kontrolovat web na změny. Významné změny vám oznámíme. Vaše další používání služeb po zveřejnění změn znamená souhlas.',
-  },
-  {
-    id: 's24',
-    title: 'Oddíl 24 – Kontaktní údaje',
-    text: 'Dotazy týkající se Podmínek služby zasílejte na: {email}',
+    id: 'zaverecna',
+    title: 'Závěrečná ustanovení',
+    text: `Tyto podmínky se řídí právem České republiky. Dojde-li ke sporu, příslušný je soud podle obecných předpisů. Podmínky můžeme změnit; pro objednanou službu platí znění účinné v den objednání. Aktuální znění je vždy na této stránce.
+
+Máte-li dotaz, napište nám na {email}.
+
+Poslední aktualizace: 3. října 2026`,
   },
 ];
 
@@ -154,6 +89,6 @@ export const podminkySlots: SlotDef[] = textPageSlots({
   page: 'Obchodní podmínky',
   eyebrow: 'Právní informace',
   title: 'Obchodní podmínky',
-  lead: 'Podmínky služby.',
+  lead: 'Podmínky poskytování zdravotních služeb: objednání, platba, zrušení a reklamace.',
   sections: PODMINKY_SECTIONS,
 });

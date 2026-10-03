@@ -103,5 +103,5 @@ Everything else matches exactly: Základní prohlídka 1 600 · Komplexní prohl
 - The mobilni-testovani page repeats legacy package price ranges (3.100–3.400 … 5.900–6.400) that contradict the Ceník.
 - The three Shopify product descriptions are the ergometry/spiroergometry texts; the "Základní" product shows the Komplexní ECG description; product handles ("komplexni-sportovni-prohlidka-kopie" = Základní, "zakladni-zatezovy-test-…" = Komplexní) are crossed.
 - "Vo2max Analýza" card on the diagnostics hub says "Již brzy dostupné" while the service has a price and booking button.
-- The privacy policy mentions "prodali" and "sdíleli" osobní údaje to marketing partners — wrong for a clinic; needs a lawyer.
+- The live privacy policy and terms are Shopify e-shop boilerplate (the privacy text claimed data were sold to marketing partners). Their text was REMOVED from this folder and replaced by a clinic-specific basic text; see `pages/policies-*.md` tombstones.
 - Slovak words leak into Czech texts (Zdravotní Agentúra, veľmi presné, záťaž, …) — copy-edit before reuse; the extraction keeps them as published.

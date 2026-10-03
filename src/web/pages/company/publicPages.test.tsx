@@ -166,7 +166,7 @@ describe('the text pages — details', () => {
     renderWeb(<PodminkyPage />);
     const toc = screen.getByRole('navigation', { name: 'Obsah' });
     expect(within(toc).getAllByRole('link')).toHaveLength(PODMINKY_SECTIONS.length);
-    expect(within(toc).getAllByRole('link')[1]).toHaveAttribute('href', '#podminky-s1');
+    expect(within(toc).getAllByRole('link')[1]).toHaveAttribute('href', '#podminky-povaha');
   });
 
   it('the admin\'s wording replaces a section text, but not the heading structure', () => {
@@ -176,9 +176,11 @@ describe('the text pages — details', () => {
     expect(h(2, 'Charakter poskytovaných služeb')).toBeInTheDocument();
   });
 
-  it('the privacy page is the live text — nothing about health data is added', () => {
+  it('the privacy page is the own text of the clinic: health data, no selling of data, no e-shop template', () => {
     const { container } = renderWeb(<SoukromiPage />);
-    expect(container.textContent).not.toMatch(/zdravotní údaj|zdravotních údajů|zvláštní kategori/i);
+    expect(container.textContent).toMatch(/zdravotní údaje/i);
+    expect(container.textContent).toContain('neprodáváme a nepředáváme je obchodním ani marketingovým partnerům');
+    expect(container.textContent).not.toMatch(/prodali|sdíleli|Shopify/i);
   });
 });
 

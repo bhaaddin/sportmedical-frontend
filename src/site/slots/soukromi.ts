@@ -3,142 +3,115 @@ import type { TextSection } from './textPage';
 import { textPageSlots } from './textPage';
 
 /*
- * Slots of the page /ochrana-osobnich-udaju. The defaults are the live page "Zásady ochrany osobních údajů"
- * (https://sportmedical-diagnostics.cz/policies/privacy-policy, last updated 18. 1. 2026 as published,
- * captured 2026-10-03). That live text is Shopify's generic template: it is silent on health data,
- * retention periods and the Czech supervisory authority, and it contains US-style clauses about "selling"
- * and "sharing" data. It is shown as the live site shows it — NOT improved, NOTHING added — and it NEEDS
- * a legal review and a proper clinic text. The capture cut some sentences; they are left out, not
- * reconstructed. The two tables of the live page are written as lists.
+ * Slots of the page /ochrana-osobnich-udaju: the privacy notice of a health service provider.
+ *
+ * This is a BASIC TEXT written for the clinic, not a legal document approved by a lawyer: it must be
+ * reviewed by the operator before regular operation (the admin-only note on the page says so, and so
+ * does the Etapa 3 report). It replaces the generic e-shop template of the old Shopify site, which
+ * claimed that data are sold to marketing partners — a statement that is false for a clinic and must
+ * never come back. Nothing here is a settings value hard-coded for convenience: every sentence is an
+ * editable slot in Nastavení → Média a texty. The phone, e-mail and address are never typed:
+ * "{telefon}", "{email}" and "{adresa}" are filled from the clinic's own settings.
  */
 
 export const SOUKROMI_SECTIONS: readonly TextSection[] = [
   {
-    id: 'uvod',
-    title: 'Zásady ochrany osobních údajů',
-    text: `Poslední aktualizace: 18. leden 2026
+    id: 'spravce',
+    title: 'Kdo je správcem vašich údajů',
+    text: `Správcem osobních údajů je **SportMedical Diagnostics s.r.o.**, IČO 23351632, se sídlem Krátká 283, 252 65 Tursko (dále jen „klinika“, „my“). Zdravotní služby poskytujeme na adrese {adresa}.
 
-Tyto Zásady ochrany osobních údajů popisují, jak SportMedical Diagnostics s.r.o. („Stránky", „my", „nás" nebo „náš") shromažďuje, používá a zveřejňuje vaše osobní údaje, když navštívíte, používáte naše služby nebo provedete nákup na sportmedical-diagnostics.cz (dále jen „Stránky") nebo s námi jinak komunikujete ohledně Stránek (dále souhrnně „Služby").
-
-Přečtěte si tyto Zásady ochrany osobních údajů pozorně.`,
+Tento dokument vysvětluje, jaké údaje o vás zpracováváme, proč, na jakém právním základě, jak dlouho je uchováváme, komu je předáváme a jaká máte práva. Vztahuje se na pacienty, na zájemce o objednání a na návštěvníky našeho webu.`,
   },
   {
-    id: 'zmeny',
-    title: 'Změny těchto Zásad ochrany osobních údajů',
-    text: 'Revidované Zásady ochrany osobních údajů zveřejníme na Stránkách, aktualizujeme datum „Poslední aktualizace" a podnikneme veškeré další kroky požadované platnými zákony.',
+    id: 'udaje',
+    title: 'Jaké údaje zpracováváme',
+    text: `### Identifikační a kontaktní údaje
+Jméno a příjmení, datum narození, pohlaví, rodné číslo nebo číslo pojištěnce a zdravotní pojišťovna, adresa trvalého pobytu, telefon a e-mail. U nezletilých také údaje o zákonném zástupci.
+
+### Zdravotní údaje
+Údaje o vašem zdravotním stavu, které nám sdělíte nebo které vzniknou při vyšetření: zdravotní dotazník, výsledky a záznamy z vyšetření (například klidové a zátěžové EKG, spirometrie, spiroergometrie a VO₂max, měření složení těla InBody, sportovní diagnostika), lékařské zprávy a posudky o zdravotní způsobilosti ke sportu. Je to zdravotnická dokumentace.
+
+### Údaje o objednání a platbě
+Termín a druh služby, historie objednávek a změn, doklady o platbě a faktury.
+
+### Údaje o komunikaci
+Zprávy, které nám pošlete e-mailem, telefonem nebo přes formulář, a záznam o tom, jak jsme je vyřídili.
+
+### Technické údaje
+Při používání webu a pacientského portálu běžné provozní záznamy (například čas přístupu a IP adresa) nezbytné pro bezpečnost a provoz. Neprovozujeme reklamní ani sledovací soubory cookie.`,
   },
   {
-    id: 'sber',
-    title: 'Jak shromažďujeme a používáme vaše osobní údaje',
-    text: `Údaje používáme pro komunikaci s vámi, poskytování služeb, dodržování právních povinností, vymáhání podmínek a ochranu Služby.
+    id: 'ucely',
+    title: 'Proč údaje zpracováváme a na jakém právním základě',
+    text: `- **Poskytování zdravotních služeb a vedení zdravotnické dokumentace.** Právním základem je plnění smlouvy o poskytnutí služby (čl. 6 odst. 1 písm. b) GDPR), splnění právní povinnosti (čl. 6 odst. 1 písm. c) GDPR, zejména zákon č. 372/2011 Sb., o zdravotních službách) a u zdravotních údajů poskytování zdravotní péče (čl. 9 odst. 2 písm. h) GDPR).
+- **Objednávání, platba a účetnictví.** Plnění smlouvy a splnění právních povinností (účetní a daňové předpisy).
+- **Komunikace s vámi** o objednaném termínu a o vaší žádosti. Plnění smlouvy, případně náš oprávněný zájem odpovědět na dotaz (čl. 6 odst. 1 písm. f) GDPR).
+- **Bezpečnost systému, ochrana práv a řešení reklamací či sporů.** Náš oprávněný zájem a plnění právních povinností.
+- **Předání výsledků vašemu klubu, trenérovi nebo jiné osobě.** Jen na základě vašeho výslovného souhlasu, který můžete kdykoli odvolat.
 
-### Jaké osobní údaje shromažďujeme
-- Kontaktní údaje (jméno, adresa, telefon, e-mail)
-- Informace o objednávce (fakturační/doručovací adresy, potvrzení platby)
-- Informace o účtu (uživatelské jméno, heslo, bezpečnostní otázky)
-- Informace o zákaznické podpoře
-
-### Údaje o používání
-K tomu můžeme používat soubory cookie, pixely a podobné technologie (údaje o zařízení, prohlížeči, síťovém připojení, IP adrese a interakci se Stránkami)
-
-### Údaje od třetích stran
-Data získáváme také od poskytovatelů služeb (např. Shopify), zpracovatelů plateb a prostřednictvím online sledovacích technologií.
-
-### Jak používáme vaše osobní údaje
-- Poskytování produktů a služeb
-- Marketing a reklama
-- Bezpečnost a prevence podvodů
-- Komunikace a zlepšování služeb`,
+Neprovádíme automatizované rozhodování ani profilování, které by mělo právní účinky na vás.`,
   },
   {
-    id: 'cookies',
-    title: 'Soubory cookie',
-    text: `Stejně jako mnoho jiných webových stránek i my používáme na našich Stránkách soubory cookie. Konkrétní informace o souborech cookie, kterých používáme v souvislosti s provozem našeho obchodu se Shopify, najdete na https://www.shopify.com/legal/cookies. Soubory cookie používáme k provozu a zlepšování našich Stránek a našich Služeb (včetně zapamatování vašich akcí a preferencí), k provádění analýz a lepšímu porozumění uživatelské interakci se Službami (v našem oprávněném zájmu spravovat, zlepšovat a optimalizovat Služby).
-
-Většina prohlížečů ve výchozím nastavení automaticky přijímá soubory cookie, ale pomocí ovládacích prvků můžete svůj prohlížeč nastavit tak, aby soubory cookie odstraňoval nebo odmítal. Mějte na paměti, že odstranění nebo blokování souborů cookie může negativně ovlivnit váš uživatelský zážitek a může způsobit, že některé ze Služeb, včetně určitých funkcí a obecné funkčnosti, nebudou pracovat správně nebo přestanou být dostupné. Blokování souborů cookie navíc nemusí zcela bránit tomu, jak sdílíme informace s třetími stranami, jako jsou naši reklamní partneři.`,
+    id: 'nepredavame',
+    title: 'Neprodáváme a nepředáváme údaje k reklamě',
+    text: `**Vaše osobní údaje neprodáváme a nepředáváme je obchodním ani marketingovým partnerům.** Nepoužíváme je k cílené reklamě a nezveřejňujeme je. Zdravotní údaje vidí jen osoby, které se na vaší péči podílejí, v rozsahu nezbytném pro jejich práci.`,
   },
   {
-    id: 'zpristupneni',
-    title: 'Jak zpřístupňujeme osobní údaje',
-    text: `Za určitých okolností můžeme vaše osobní údaje zpřístupnit třetím stranám pro účely plnění smlouvy, legitimní účely a další důvody, na které se vztahují tyto Zásady ochrany osobních údajů. To může být:
-- S prodejci nebo jinými třetími stranami, které provádějí služby naším jménem (např. správa IT, zpracování plateb, analýza dat, zákaznická podpora, cloudové úložiště, plnění a přeprava).
-- S obchodními a marketingovými partnery k poskytování služeb a reklamy pro vás. Naši obchodní a marketingoví partneři budou používat vaše údaje v souladu se svými vlastními oznámeními o ochraně osobních údajů.
-- Když nám svým souhlasem nařídíte, požádáte nás nebo jinak souhlasíte se zpřístupněním určitých údajů třetím stranám, například zasláním vašich produktů nebo prostřednictvím používání widgetů sociálních médií nebo integrací přihlášení.
-- S našimi přidruženými společnostmi nebo jinak v rámci naší firemní skupiny, v našem oprávněném zájmu provozovat úspěšný podnik.
-- V souvislosti s obchodní transakcí, jako je fúze nebo úpadek, ke splnění všech platných zákonných povinností (včetně reagování na předvolání, příkaz k domovní prohlídce a podobné žádosti), k vymáhání dodržování všech platných podmínek služby a ochraně nebo obraně Služby, našich práv a práv našich uživatelů nebo jiných osob.
+    id: 'prijemci',
+    title: 'Komu údaje předáváme',
+    text: `Údaje předáváme jen tam, kde to ukládá zákon nebo kde je to nezbytné pro provoz služby, a vždy v nejmenším nutném rozsahu:
 
-Odhalujeme následující kategorie osobních údajů a citlivých osobních údajů o uživatelích pro účely uvedené výše v dokumentech „Jak shromažďujeme a používáme vaše osobní údaje" a „Jak zpřístupňujeme osobní údaje":
-- Identifikátory, jako jsou základní kontaktní údaje a určité informace o objednávce a účtu — příjemci: prodejci a třetí strany, které provádějí služby naším jménem (jako jsou poskytovatelé internetových služeb, zpracovatelé plateb, partneři pro plnění, partneři zákaznické podpory a poskytovatelé analýzy dat)
-- Komerční údaje, jako jsou informace o objednávkách, informace o nakupování a informace o zákaznické podpoře — příjemci: obchodní a marketingoví partneři
-- Internet nebo jiná podobná síťová aktivita, jako jsou data o používání — příjemci: přidružené společnosti
-- Geolokační údaje, jako jsou polohy určené IP adresou nebo jinými technickými opatřeními
+- **Orgány a instituce, pokud to stanoví zákon:** například zdravotní pojišťovny, správní orgány, soudy, orgány činné v trestním řízení.
+- **Vámi určené osoby:** klub, trenér nebo jiný lékař, jen s vaším souhlasem nebo na vaši žádost.
+- **Zpracovatelé, kteří pro nás zajišťují provoz technického systému** a jsou vázáni smlouvou o zpracování údajů:
+  - poskytovatel cloudového hostingu aplikace (Render),
+  - poskytovatel hostingu veřejného webu (Vercel),
+  - poskytovatel databázové služby, ve které je uložena evidence pacientů,
+  - poskytovatel úložiště fotografií a videí veřejného webu (Cloudinary); neukládá žádné zdravotní ani osobní údaje pacientů,
+  - poskytovatel e-mailových služeb, jakmile bude zapojeno odesílání zpráv.
 
-Nepoužíváme ani nezveřejňujeme citlivé osobní údaje bez vašeho souhlasu nebo pro účely odvození vašich vlastností.
-
-S vaším souhlasem sdílíme osobní údaje za účelem provádění reklamních a marketingových aktivit, a to následovně.
-
-Během předchozích 12 měsíců jsme „prodali" a „sdíleli" (jak jsou tyto pojmy definovány v platných zákonech) osobní údaje za účelem zapojení do reklamních a marketingových aktivit, jak je uvedeno níže.
-- Identifikátory, jako je jméno, e-mailová adresa a telefonní číslo — příjemci: obchodní a marketingoví partneři
-- Komerční údaje, jako jsou záznamy o zakoupených produktech nebo službách — příjemci: obchodní a marketingoví partneři
-- Data o používání — příjemci: obchodní a marketingoví partneři`,
+Pokud některý poskytovatel sídlí nebo zpracovává údaje mimo Evropskou unii, předáváme údaje jen se zárukami požadovanými GDPR (rozhodnutí o odpovídající úrovni ochrany nebo standardní smluvní doložky).`,
   },
   {
-    id: 'odkazy',
-    title: 'Webové stránky a odkazy třetích stran',
-    text: `Naše stránky mohou poskytovat odkazy na webové stránky nebo jiné online platformy provozované třetími stranami. Pokud budete následovat odkazy na stránky, které nejsou přidruženy nebo kontrolovány námi, měli byste si přečíst jejich zásady ochrany osobních údajů a zabezpečení a další smluvní podmínky. Nezaručujeme a neodpovídáme za soukromí nebo bezpečnost takových stránek, a to včetně přesnosti, úplnosti nebo spolehlivosti informací na těchto stránkách.
+    id: 'doba',
+    title: 'Jak dlouho údaje uchováváme',
+    text: `- **Zdravotnická dokumentace:** po dobu stanovenou právními předpisy, u naší dokumentace 10 let od poslední poskytnuté služby. Do té doby ji nelze na žádost vymazat, i když o to požádáte.
+- **Účetní a daňové doklady:** po dobu stanovenou účetními a daňovými předpisy, obvykle 10 let.
+- **Dotazy a komunikace, které nevedly k poskytnutí služby:** jen po dobu nezbytnou k vyřízení a ochraně našich práv.
+- **Nedokončená rychlá registrace:** pokud ji nedokončíte v časovém limitu, rezervace se zruší a termín se uvolní. Údaje z ní již nepoužíváme k jinému účelu.
+- **Technické záznamy:** po dobu nezbytnou pro bezpečnost a provoz systému.
 
-Naše uvedení takových odkazů samo o sobě neznamená žádnou podporu obsahu těchto platforem nebo jejich vlastníků či provozovatelů, s výjimkou případů zveřejněných na Službách.`,
-  },
-  {
-    id: 'deti',
-    title: 'Údaje o dětech',
-    text: `Služby nejsou určeny pro děti a my vědomě neshromažďujeme žádné osobní údaje o dětech. Pokud jste rodičem nebo opatrovníkem dítěte, které nám poskytlo své osobní údaje, můžete nás kontaktovat pomocí následujících kontaktních údajů a požádat o jejich vymazání.
-
-K datu účinnosti těchto Zásad ochrany osobních údajů si nejsme vědomi, že bychom „sdíleli" nebo „prodávali" (jak jsou tyto pojmy definovány v platných zákonech) osobní údaje osob mladších 16 let.`,
+Po uplynutí doby údaje bezpečně vymažeme nebo anonymizujeme.`,
   },
   {
     id: 'zabezpeceni',
-    title: 'Zabezpečení a uchovávání vašich údajů',
-    text: `Uvědomte si, že žádná bezpečnostní opatření nejsou dokonalá či neporušitelná a nemůžeme zaručit „dokonalou bezpečnost". Navíc jakékoli údaje, které nám zašlete, nemusí být během cesty v bezpečí. Doporučujeme, abyste ke sdělování citlivých nebo důvěrných údajů nepoužívali nezabezpečené kanály.
-
-Jak dlouho uchováváme vaše osobní údaje, závisí na různých faktorech, například na tom, zda tyto údaje potřebujeme k udržování vašeho účtu, poskytování Služeb, plnění zákonných povinností, řešení sporů nebo vymáhání jiných platných smluv a zásad.`,
+    title: 'Jak údaje chráníme',
+    text: `Přístup k údajům mají jen oprávněné osoby podle své role. Přenos údajů mezi vaším zařízením a naším systémem je šifrovaný, přístupy se zaznamenávají a citlivé identifikátory (například rodné číslo) se nezobrazují v provozních záznamech ani v chybových hlášeních. Při porušení zabezpečení, které by pro vás představovalo riziko, splníme ohlašovací povinnosti podle GDPR.`,
   },
   {
     id: 'prava',
     title: 'Vaše práva',
-    text: `V závislosti na tom, kde žijete, můžete mít některá nebo všechna následující práva ve vztahu k vašim osobním údajům. Tato práva však nejsou absolutní, mohou se uplatňovat pouze za určitých okolností a v určitých případech můžeme vaši žádost odmítnout, jak to umožňuje zákon.
-- Právo vědět: Můžete mít právo vyžádat si přístup k osobním údajům, které o vás uchováváme, včetně podrobností o tom, jak vaše údaje používáme a sdílíme.
-- Právo na výmaz: Můžete mít právo vyžádat si, abychom vymazali osobní údaje, které o vás uchováváme.
-- Právo na opravu: Můžete mít právo vyžádat si, abychom opravili nepřesné osobní údaje, které o vás uchováváme.
-- Právo na přenositelnost: Za určitých okolností a s určitými výjimkami můžete mít právo na kopii osobních údajů, které o vás uchováváme, a požádat, abychom je předali třetí straně.
-- Právo odhlásit se z prodeje či sdílení nebo cílené reklamy: Můžete mít právo nařídit nám, abychom „neprodávali" ani „nesdíleli" vaše osobní údaje nebo vás odhlásit ze zpracování vašich osobních údajů pro účely považované za „cílenou reklamu", jak je definováno v platných zákonech na ochranu soukromí.
-- Omezení zpracování: Můžete mít právo nás požádat, abychom zastavili nebo omezili zpracování osobních údajů.
-- Odvolání souhlasu: Pokud se spoléháme na souhlas se zpracováním vašich osobních údajů, můžete mít právo tento souhlas odvolat.
-- Odvolání: Pokud odmítneme zpracovat vaši žádost, můžete se proti našemu rozhodnutí odvolat. Můžete tak učinit přímou odpovědí na naše odmítnutí.
-- Správa předvoleb komunikace: Můžeme vám zasílat propagační e-maily a vy se kdykoli můžete se z jejich zasílání odhlásit pomocí odhlášení zobrazeného v našich e-mailech, které vám zasíláme. Pokud se odhlásíte, můžeme vám stále zasílat nepropagační e-maily, jako jsou e-maily ohledně vašeho účtu nebo objednávek, které jste provedli.
+    text: `Podle GDPR máte právo:
 
-Jakékoli z těchto práv můžete uplatnit tam, kde je to uvedeno na našich Stránkách, nebo nás můžete kontaktovat pomocí kontaktních údajů uvedených níže.
+- na **přístup** k údajům, které o vás zpracováváme, a na kopii,
+- na **opravu** nepřesných nebo neúplných údajů,
+- na **výmaz** údajů, pokud pominul důvod zpracování a nebrání tomu zákonná povinnost uchovávat dokumentaci,
+- na **omezení** zpracování,
+- na **přenositelnost** údajů, které jste nám poskytli, tam, kde se na ně právo vztahuje,
+- vznést **námitku** proti zpracování založenému na našem oprávněném zájmu,
+- kdykoli **odvolat souhlas**, který jste nám dali; odvolání nemá vliv na zákonnost zpracování před jeho odvoláním,
+- podat **stížnost** u dozorového úřadu: Úřad pro ochranu osobních údajů, Pplk. Sochora 27, 170 00 Praha 7, www.uoou.gov.cz.
 
-Za uplatňování kteréhokoli z těchto práv vás nebudeme diskriminovat. Možná od vás budeme potřebovat údaje k ověření totožnosti, jako je vaše e-mailová adresa nebo informace o účtu, než poskytneme věcnou odpověď na žádost. V souladu s platnými zákony můžete určit oprávněného zástupce, který bude vaším jménem podávat žádosti o výkon vašich práv. Před přijetím takové žádosti budeme od zástupce vyžadovat, aby poskytl důkaz, že jste ho zmocnili jednat vaším jménem, a možná budeme potřebovat, abyste ověřili svou totožnost přímo u nás. Na vaši žádost odpovíme včas, jak to vyžadují platné zákony.`,
-  },
-  {
-    id: 'stiznosti',
-    title: 'Stížnosti',
-    text: 'Pokud máte stížnosti na to, jak zpracováváme vaše osobní údaje, kontaktujte nás pomocí níže uvedených kontaktních údajů. Pokud nejste spokojeni s naší odpovědí na vaši stížnost, v závislosti na tom, kde žijete, můžete mít právo odvolat se proti našemu rozhodnutí tím, že nás kontaktujete pomocí kontaktních údajů uvedených níže, nebo podáte stížnost místnímu úřadu pro ochranu údajů. Seznam odpovědných dozorových úřadů pro ochranu údajů v zemích EHP najdete zde.',
-  },
-  {
-    id: 'mezinarodni',
-    title: 'Mezinárodní uživatelé',
-    text: `Vezměte na vědomí, že vaše osobní údaje můžeme přenášet, uchovávat a zpracovávat mimo zemi, ve které žijete. Vaše osobní údaje zpracovávají také zaměstnanci a poskytovatelé služeb a partneři třetích stran v těchto zemích.
-
-Pokud přenášíme vaše osobní údaje mimo Evropu, budeme se spoléhat na uznávané mechanismy přenosu, jako jsou standardní smluvní doložky Evropské komise nebo jakékoli ekvivalentní smlouvy vydané příslušným orgánem Spojeného království, pokud je to relevantní, pokud se údaje nepředávají do země, která poskytuje odpovídající úroveň ochrany.`,
+Nahlížet do své zdravotnické dokumentace a pořizovat si z ní kopie můžete také podle zákona o zdravotních službách. Žádost nám pošlete na níže uvedený kontakt. Abychom údaje nevydali nesprávné osobě, můžeme vás požádat o ověření totožnosti. Odpovíme bez zbytečného odkladu, nejpozději do jednoho měsíce.`,
   },
   {
     id: 'kontakt',
     title: 'Kontakt',
-    text: `Máte-li jakékoliv dotazy ohledně našich postupů v oblasti ochrany osobních údajů nebo těchto Zásad ochrany osobních údajů, případně chcete-li uplatnit některá ze svých práv, zavolejte nám na {telefon} či napište e-mail na adresu {email}, nebo nás kontaktujte na adrese {adresa}.
+    text: `S otázkami k ochraně osobních údajů a s uplatněním svých práv se na nás obraťte telefonicky na {telefon}, e-mailem na {email} nebo na adrese {adresa}.
 
-Pro účely platných zákonů o ochraně údajů a není-li výslovně uvedeno jinak, jsme správcem vašich osobních údajů.`,
+Tyto zásady můžeme aktualizovat. Aktuální znění je vždy na této stránce.
+
+Poslední aktualizace: 3. října 2026`,
   },
 ];
 
@@ -147,6 +120,6 @@ export const soukromiSlots: SlotDef[] = textPageSlots({
   page: 'Ochrana osobních údajů',
   eyebrow: 'Právní informace',
   title: 'Ochrana osobních údajů',
-  lead: 'Zásady ochrany osobních údajů.',
+  lead: 'Jak klinika zpracovává osobní a zdravotní údaje pacientů, na jakém základě a jaká máte práva.',
   sections: SOUKROMI_SECTIONS,
 });
