@@ -34,6 +34,7 @@ import { activitiesApi } from "../../api/activities";
 import { documentsApi } from "../../api/documents";
 import { patientPreRegistrationApi } from "../../api/patientPreRegistration";
 import { BookingApiError } from "../../api/apiError";
+import { linkErrorText } from "./patient/linkErrorText";
 import {
   canChangeStatus,
   historyActionName,
@@ -1301,7 +1302,7 @@ function RegistrationWarning({
           ) : null}
           {issue.isError ? (
             <Typography variant="caption" sx={{ display: "block", mt: 0.75, color: DESIGN.tone.red.fg }}>
-              Odkaz se nepodařilo vygenerovat. Zkuste to prosím znovu.
+              {linkErrorText(issue.error)}
             </Typography>
           ) : null}
         </Box>

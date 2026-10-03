@@ -5,6 +5,7 @@ import LinkIcon from "@mui/icons-material/Link";
 import { useMutation } from "@tanstack/react-query";
 import { patientPreRegistrationApi } from "../../../api/patientPreRegistration";
 import { formatDeadline } from "../quick/quickBooking";
+import { linkErrorText } from "./linkErrorText";
 
 /**
  * From the appointment detail: (re)issues the patient's completion link so the
@@ -92,7 +93,7 @@ export function CompletionLinkButton({ patientId }: { patientId: string }) {
       </Button>
       {issue.isError ? (
         <Typography variant="caption" sx={{ color: "error.main", display: "block", mt: 0.5 }}>
-          Odkaz se nepodařilo vygenerovat. Zkuste to prosím znovu.
+          {linkErrorText(issue.error)}
         </Typography>
       ) : null}
     </Box>
