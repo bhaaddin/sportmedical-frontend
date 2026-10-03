@@ -149,7 +149,6 @@ export default function EmployeeAbsencesPage() {
     <SettingsScreen
       title={t("booking.absences.title")}
       subtitle={t("booking.absences.subtitle")}
-      width={1000}
       actions={
         <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
           {t("booking.absences.new")}

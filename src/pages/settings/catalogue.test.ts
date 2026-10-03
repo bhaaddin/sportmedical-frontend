@@ -19,6 +19,9 @@ import {
   searchSections,
   searchSettingsItems,
   normalizeText,
+  groupPath,
+  sectionById,
+  itemCountLabel,
 } from './catalogue';
 
 /* Vite hands us the file's text; `node:fs` would need Node types this project
@@ -144,7 +147,10 @@ describe('what each person sees', () => {
   });
 
   it('drops a section entirely once nothing in it is hers', () => {
-    expect(visibleSections(RECEPTIONIST).map((s) => s.id)).not.toContain('system');
+    /* Vzhled webu is all behind settings.clinic.manage; Systém keeps Zabezpečení, which is everybody's own. */
+    const ids = visibleSections(RECEPTIONIST).map((s) => s.id);
+    expect(ids).not.toContain('vzhled-webu');
+    expect(ids).toContain('system');
   });
 
   /*
@@ -234,7 +240,7 @@ describe('finding the way back', () => {
    * screen in the application. Settings itself is not a settings sub-screen.
    */
   it('says nothing about screens that are not settings', () => {
-    for (const path of ['/settings', '/planovani', '/patients', '/dnes', '/']) {
+    for (const path of ['/settings', '/settings/provoz', '/planovani', '/patients', '/dnes', '/']) {
       expect(settingsItemAt(path), `${path} should have no crumb`).toBeNull();
     }
   });
@@ -261,7 +267,7 @@ describe('finding the way back', () => {
  * wrote the previous arrangement into a test too, and confidently.
  */
 describe('the payments section', () => {
-  const platby = () => SETTINGS_SECTIONS.find((s) => s.id === 'platby');
+  const platby = () => SETTINGS_SECTIONS.find((s) => s.id === 'sluzby-a-ceny');
 
   /*
    * The payers (Kluby) left this section on 3. 10. 2026: on the design board
@@ -279,7 +285,7 @@ describe('the payments section', () => {
   /* Not left behind in the section it used to be in. */
   it('is the only section the price list is in', () => {
     const sections = SETTINGS_SECTIONS.filter((s) => s.items.some((i) => i.id === 'cenik'));
-    expect(sections.map((s) => s.id)).toEqual(['platby']);
+    expect(sections.map((s) => s.id)).toEqual(['sluzby-a-ceny']);
   });
 
   /*
@@ -288,7 +294,7 @@ describe('the payments section', () => {
    * screen.
    */
   it('is open to a receptionist, not just an administrator', () => {
-    const hers = visibleSections(RECEPTIONIST).find((s) => s.id === 'platby');
+    const hers = visibleSections(RECEPTIONIST).find((s) => s.id === 'sluzby-a-ceny');
     expect(hers?.items.map((i) => i.id)).toContain('cenik');
   });
 
@@ -386,8 +392,8 @@ describe('the smart search', () => {
     ['2fa', 'dvoufazove'],
     ['ico', 'verejny-web'],
     ['IČO', 'verejny-web'],
-    ['sleva', 'skupinove-slevy'],
-    ['procenta', 'skupinove-slevy'],
+    ['sleva', 'slevy'],
+    ['procenta', 'slevy'],
     ['mrizka', 'vzhled-kalendare'],
     ['barvy', 'vzhled-kalendare'],
     ['anamneza', 'zdravotni-dotaznik'],
@@ -408,6 +414,7 @@ describe('the smart search', () => {
     expect(ids('dovolena')).toContain('nepritomnosti');
     /* "dokumenty" is Dokumenty's label and a keyword of Pravidla dokumentů. */
     expect(ids('dokumenty')[0]).toBe('dokumenty-sablony');
+    expect(ids('dokumenty')).toContain('pravidla-dokumentu');
   });
 
   it('narrows with every word rather than widening', () => {
@@ -424,5 +431,76 @@ describe('the smart search', () => {
     const hers = visibleSections(RECEPTIONIST);
     expect(searchSettingsItems(hers, 'heslo').map((h) => h.item.id)).toEqual(['dvoufazove']);
     expect(searchSettingsItems(hers, 'opravneni')).toEqual([]);
+  });
+});
+
+/*
+ * Three levels: hub, group, item. The groups and their order are the Etapa 2
+ * brief's, and every old destination is still reachable from one of them.
+ */
+describe('the groups', () => {
+  it('are the brief\'s seven, in its order', () => {
+    expect(SETTINGS_SECTIONS.map((s) => s.label)).toEqual([
+      'Provoz', 'Služby a ceny', 'Kluby', 'Komunikace', 'Dokumenty', 'Vzhled webu', 'Systém',
+    ]);
+  });
+
+  it('have a page of their own at /settings/:group', () => {
+    expect(groupPath('provoz')).toBe('/settings/provoz');
+    expect(sectionById('system')?.label).toBe('Systém');
+    expect(sectionById('nope')).toBeNull();
+    expect(sectionById(undefined)).toBeNull();
+  });
+
+  it('keep every destination the application had before the regrouping', () => {
+    const reachable = new Set([...allDestinations(), ...SETTINGS_SECTIONS.flatMap((s) => s.items.flatMap((i) => i.aliases ?? []))]);
+    for (const old of [
+      '/working-hours', '/blokovany-cas', '/svatky', '/nepritomnosti', '/exceptions', '/nastaveni/vzhled-kalendare',
+      '/calendars', '/admin', '/sluzby', '/activities', '/cenik', '/nastaveni/skupinove-slevy', '/vyhrazeni',
+      '/nastaveni/sablony-emailu', '/nastaveni/pripominky', '/hodnoceni-pacientu', '/dotaznik-nastaveni',
+      '/nastaveni/souhlasy', '/dokumenty-sablony', '/pravidla-dokumentu', '/nastaveni/udaje-pacienta',
+      '/staff-management', '/nastaveni/zabezpeceni', '/audit-log', '/system-health',
+    ]) {
+      expect(reachable.has(old), `${old} is no longer in the catalogue`).toBe(true);
+    }
+  });
+
+  it('send the older tiers-only discounts address to the new discounts item', () => {
+    expect(settingsItemAt('/nastaveni/skupinove-slevy')?.item.id).toBe('slevy');
+    expect(allDestinations()).toContain('/nastaveni/slevy');
+  });
+
+  it('give the new screens the routes the other agents build to', () => {
+    const to = Object.fromEntries(SETTINGS_SECTIONS.flatMap((s) => s.items.map((i) => [i.id, i.to])));
+    expect(to).toMatchObject({
+      slevy: '/nastaveni/slevy',
+      'barvy-sluzeb': '/nastaveni/barvy-sluzeb',
+      'rychla-registrace': '/nastaveni/rychla-registrace',
+      'firma-a-faktury': '/nastaveni/firma-a-faktury',
+      'media-a-texty': '/nastaveni/media-a-texty',
+      'uloziste-medii': '/nastaveni/uloziste-medii',
+      'nastaveni-klubu': '/nastaveni/kluby',
+      'blokace-klubu': '/vyhrazeni',
+      integrace: '/nastaveni/integrace',
+      'historie-zmen': '/nastaveni/historie-zmen',
+    });
+  });
+
+  it('counts items in Czech', () => {
+    expect(itemCountLabel(1)).toBe('1 položka');
+    expect(itemCountLabel(3)).toBe('3 položky');
+    expect(itemCountLabel(7)).toBe('7 položek');
+  });
+
+  it('finds an item by a current value the caller knows', () => {
+    const hit = searchSettingsItems(SETTINGS_SECTIONS, '15 %', { slevy: 'od 10 osob 15 %' });
+    expect(hit.map((h) => h.item.id)).toContain('slevy');
+  });
+
+  /* Tým / Zaměstnanci / Zabezpečení "looked the same": three rows, two of them one screen. */
+  it('never offers two rows for one screen', () => {
+    const all = allDestinations();
+    expect(new Set(all).size).toBe(all.length);
+    expect(SETTINGS_SECTIONS.flatMap((s) => s.items).filter((i) => i.to === '/staff-management')).toHaveLength(1);
   });
 });

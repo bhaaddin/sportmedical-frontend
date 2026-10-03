@@ -26,6 +26,16 @@ import { SectionLabel, SoftCard } from '../../components/ui';
 import { SettingsScreen } from './SettingsFrame';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 
+/** "24 hodin" as "1 den", "30 hodin" as "1 den a 6 hodin" - how far ahead a reminder is, said plainly. */
+function reminderLead(hours: number): string {
+  const days = Math.floor(hours / 24);
+  const rest = hours % 24;
+  const hoursText = `${rest} ${rest === 1 ? 'hodinu' : rest >= 2 && rest <= 4 ? 'hodiny' : 'hodin'}`;
+  const daysText = `${days} ${days === 1 ? 'den' : days >= 2 && days <= 4 ? 'dny' : 'dní'}`;
+  if (days === 0) return hoursText;
+  return rest === 0 ? daysText : `${daysText} a ${hoursText}`;
+}
+
 export default function RemindersPage() {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: REMINDER_SETTINGS_QUERY_KEY, queryFn: readReminderSettings });
@@ -65,31 +75,25 @@ export default function RemindersPage() {
     <SettingsScreen
       title="Připomínky"
       subtitle="Kolik hodin před termínem pacientovi odejde připomínka"
-      width={640}
-      actions={
-        <>
-          <Button
-            variant="outlined"
-            disabled={edited === null || save.isPending}
-            onClick={() => { setSaved(false); setEdited(null); }}
-          >
-            Zahodit
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => save.mutate(hours)}
-            disabled={save.isPending || edited === null || Number.isNaN(hours)}
-          >
-            {save.isPending ? 'Ukládám…' : 'Uložit'}
-          </Button>
-        </>
+      save={{
+        dirty: edited !== null && !Number.isNaN(hours),
+        saving: save.isPending,
+        onSave: () => save.mutate(hours),
+        onDiscard: () => { setSaved(false); setEdited(null); },
+      }}
+      aside={
+        <Typography sx={{ fontSize: 14, color: 'text.primary' }}>
+          {Number.isNaN(hours)
+            ? 'Zadejte počet hodin a uvidíte, kdy se připomínka připraví.'
+            : `Pacient s termínem v 10:00 dostane připomínku ${reminderLead(hours)} před termínem.`}
+        </Typography>
       }
     >
       <SoftCard>
         <Stack spacing={2}>
           <SectionLabel sx={{ mb: 0 }}>Předstih</SectionLabel>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Připomínka se posílá jednou, jen pacientům z registru a jen u termínů, které stále platí.
+            Připomínka se připraví jednou, jen pacientům z registru a jen u termínů, které stále platí. Odesílání zpráv zatím není zapnuté.
           </Typography>
 
           {problem !== null && errors.hoursBefore === undefined ? (

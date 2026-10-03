@@ -135,14 +135,28 @@ export default function Admin() {
 
   return (
     <SettingsScreen
-      title="Údaje ordinace a veřejný web"
+      title="Údaje ordinace"
       subtitle="Údaje o firmě a to, co z nich vidí pacienti při online objednání"
-      width={960}
+      aside={
+        <Box sx={{ display: 'grid', gap: 1 }}>
+          <Typography sx={{ fontSize: 15, fontWeight: 600, color: 'text.primary' }}>{pub.siteName.trim() || '—'}</Typography>
+          <Typography sx={{ fontSize: 14, color: 'text.primary' }}>{pub.contactAddress.trim() || 'Adresa není vyplněná'}</Typography>
+          <Typography sx={{ fontSize: 14, color: 'text.primary' }}>
+            {[pub.contactPhone.trim(), pub.contactEmail.trim()].filter(Boolean).join(' · ') || 'Kontakt není vyplněný'}
+          </Typography>
+          <Typography sx={{ fontSize: 14, color: 'text.primary' }}>{pub.openingHours.trim() || 'Otevírací doba není vyplněná'}</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 600, color: pub.enableBooking ? 'success.main' : 'text.primary' }}>
+            {pub.enableBooking ? 'Online rezervace zapnuté' : 'Online rezervace vypnuté'}
+          </Typography>
+        </Box>
+      }
+      asideTitle="Tak to uvidí pacient"
       actions={
         <Button
           variant="contained"
           onClick={() => { void handleSave(); }}
           disabled={saving || !loaded}
+          sx={{ minHeight: 44 }}
         >
           Uložit kontakty a rezervace
         </Button>

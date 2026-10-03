@@ -228,19 +228,17 @@ export default function QuestionnairePage() {
 
   const run = (work: () => Promise<void>) => act.mutate(work);
 
+  const sentence = 'Dotazníky pro pacienty — otázky, koncepty a zveřejnění; který dotazník se ptá, určuje činnost nebo výchozí';
+
   if (list.isLoading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <SettingsScreen title="Vstupní dotazník" subtitle={sentence} loading>{null}</SettingsScreen>;
   }
 
   if (list.isError) {
     return (
-      <Alert severity="error" sx={{ m: 2 }}>
-        Dotazníky se nepodařilo načíst.
-      </Alert>
+      <SettingsScreen title="Vstupní dotazník" subtitle={sentence} error="Dotazníky se nepodařilo načíst." onRetry={() => { void list.refetch(); }}>
+        {null}
+      </SettingsScreen>
     );
   }
 
@@ -312,9 +310,10 @@ export default function QuestionnairePage() {
 
   return (
     <SettingsScreen
-      title="Dotazníky"
-      subtitle="Dotazníky pro pacienty — otázky, koncepty a zveřejnění; který dotazník se ptá, určuje činnost nebo výchozí"
-      width={1100}
+      title="Vstupní dotazník"
+      subtitle={sentence}
+      aside={false}
+      related={false}
       actions={
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating('')}>
           Nový dotazník

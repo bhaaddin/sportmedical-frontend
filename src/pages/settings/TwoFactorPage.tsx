@@ -9,7 +9,7 @@
  */
 import { useState } from 'react';
 import {
-  Alert, Box, Button, Card, CardContent, Chip, Divider, Stack, TextField, Typography,
+  Alert, Box, Button, Card, CardContent, Chip, Divider, Skeleton, Stack, TextField, Typography,
 } from '@mui/material';
 import ShieldIcon from '@mui/icons-material/Shield';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -53,7 +53,15 @@ export default function TwoFactorPage() {
     <SettingsScreen
       title="Zabezpečení"
       subtitle="Dvoufázové ověření — k heslu přidá jednorázový kód z ověřovací aplikace. Platí jen pro váš účet."
-      width={640}
+      aside={
+        <Box component="ol" sx={{ m: 0, pl: 2.5, display: 'grid', gap: 1, fontSize: 14, color: 'text.primary' }}>
+          <li>Zapnete ověření a do aplikace v telefonu opíšete klíč.</li>
+          <li>Aplikace ukáže šestimístný kód — opíšete ho zpátky.</li>
+          <li>Uložíte si záložní kódy pro den, kdy nebudete mít telefon.</li>
+          <li>Při každém přihlášení pak k heslu zadáte aktuální kód.</li>
+        </Box>
+      }
+      asideTitle="Jak se zapíná"
     >
 
       {/* Recovery codes — shown once, right after enabling. */}
@@ -77,9 +85,17 @@ export default function TwoFactorPage() {
       <Card variant="outlined">
         <CardContent>
           {statusQuery.isLoading ? (
-            <Typography sx={{ color: 'text.secondary' }}>Načítám…</Typography>
+            <Box aria-busy="true" aria-label="Načítám stav ověření">
+              <Skeleton variant="text" height={32} width="60%" />
+              <Skeleton variant="rounded" height={44} width={260} sx={{ mt: 2 }} />
+            </Box>
           ) : statusQuery.error ? (
-            <Alert severity="error">{errorText(statusQuery.error, t)}</Alert>
+            <Alert
+              severity="error"
+              action={<Button color="inherit" size="small" onClick={() => { void statusQuery.refetch(); }} sx={{ minHeight: 44 }}>Zkusit znovu</Button>}
+            >
+              {errorText(statusQuery.error, t)}
+            </Alert>
           ) : status?.enabled ? (
             /* ── Enabled: offer to turn off ── */
             <Stack spacing={2}>

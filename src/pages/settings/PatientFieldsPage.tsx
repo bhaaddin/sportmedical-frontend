@@ -76,16 +76,18 @@ export default function PatientFieldsPage() {
     onError: () => setSaved(false),
   });
 
+  const sentence = 'Které údaje karta pacienta a seznam pacientů ukazují a v jakém pořadí — jméno je vidět vždy';
+
   if (query.isPending) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <SettingsScreen title="Údaje pacienta" subtitle={sentence} loading>{null}</SettingsScreen>;
   }
 
   if (query.isError || !query.data) {
-    return <Alert severity="error">Nastavení údajů o pacientovi se nepodařilo načíst.</Alert>;
+    return (
+      <SettingsScreen title="Údaje pacienta" subtitle={sentence} error="Nastavení údajů o pacientovi se nepodařilo načíst." onRetry={() => { void query.refetch(); }}>
+        {null}
+      </SettingsScreen>
+    );
   }
 
   const visible = edited ?? query.data.visible;
@@ -102,25 +104,12 @@ export default function PatientFieldsPage() {
     <SettingsScreen
       title="Údaje pacienta"
       subtitle="Které údaje karta pacienta a seznam pacientů ukazují a v jakém pořadí — jméno je vidět vždy"
-      width={760}
-      actions={
-        <>
-          <Button
-            variant="outlined"
-            disabled={edited === null || save.isPending}
-            onClick={() => { setSaved(false); setVisible(null); }}
-          >
-            Zahodit
-          </Button>
-          <Button
-            variant="contained"
-            disabled={edited === null || save.isPending}
-            onClick={() => save.mutate(visible)}
-          >
-            {save.isPending ? 'Ukládám…' : 'Uložit'}
-          </Button>
-        </>
-      }
+      save={{
+        dirty: edited !== null,
+        saving: save.isPending,
+        onSave: () => save.mutate(visible),
+        onDiscard: () => { setSaved(false); setVisible(null); },
+      }}
     >
       <Alert severity="info" sx={{ mb: 2 }}>
         Rodné číslo a číslo pojištěnce uvidí jen ten, kdo má oprávnění k citlivým identifikátorům —

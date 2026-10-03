@@ -197,7 +197,6 @@ export default function HolidaysPage() {
     <SettingsScreen
       title="Svátky a dovolené"
       subtitle="Ve svátek je ordinace zavřená a nikdo se nemůže objednat; vlastní volno ordinace přidáte sem"
-      width={960}
       actions={
         <Button
           variant="contained"

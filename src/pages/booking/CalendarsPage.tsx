@@ -265,7 +265,6 @@ export default function CalendarsPage() {
     <SettingsScreen
       title={t("booking.calendars.title")}
       subtitle={t("booking.calendars.subtitle")}
-      width={1100}
       actions={
         <>
           {/* Offered only when something is hidden. A switch that never

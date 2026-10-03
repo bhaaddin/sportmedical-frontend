@@ -78,16 +78,18 @@ export default function CalendarDisplayPage() {
     onError: () => setSaved(false),
   });
 
+  const sentence = 'Jak se kalendář kreslí všem v ordinaci — den se roztáhne tak, aby byla vidět pracovní doba i každá rezervace mimo ni';
+
   if (query.isPending) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <SettingsScreen title="Kalendář a mřížka" subtitle={sentence} loading>{null}</SettingsScreen>;
   }
 
   if (query.isError || !query.data) {
-    return <Alert severity="error">Nastavení kalendáře se nepodařilo načíst.</Alert>;
+    return (
+      <SettingsScreen title="Kalendář a mřížka" subtitle={sentence} error="Nastavení kalendáře se nepodařilo načíst." onRetry={() => { void query.refetch(); }}>
+        {null}
+      </SettingsScreen>
+    );
   }
 
   const { views, slotLengths, defaults } = query.data;
@@ -102,25 +104,12 @@ export default function CalendarDisplayPage() {
     <SettingsScreen
       title="Kalendář a mřížka"
       subtitle="Jak se kalendář kreslí všem v ordinaci — den se roztáhne tak, aby byla vidět pracovní doba i každá rezervace mimo ni"
-      width={720}
-      actions={
-        <>
-          <Button
-            variant="outlined"
-            disabled={edited === null || save.isPending}
-            onClick={() => { setSaved(false); setDraft(null); }}
-          >
-            Zahodit
-          </Button>
-          <Button
-            variant="contained"
-            disabled={edited === null || save.isPending}
-            onClick={() => save.mutate(draft)}
-          >
-            {save.isPending ? 'Ukládám…' : 'Uložit'}
-          </Button>
-        </>
-      }
+      save={{
+        dirty: edited !== null,
+        saving: save.isPending,
+        onSave: () => save.mutate(draft),
+        onDiscard: () => { setSaved(false); setDraft(null); },
+      }}
     >
       <SoftCard>
           <Stack spacing={2.5}>

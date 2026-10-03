@@ -28,7 +28,6 @@ import KeyIcon from '@mui/icons-material/VpnKey';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import EventBusyIcon from '@mui/icons-material/EventBusy';
 import { Link as RouterLink } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { UserPermissionsDialog } from '../components/admin/UserPermissionsDialog';
 import { WhereSomebodyWorksDialog } from '../components/admin/WhereSomebodyWorksDialog';
 import {
@@ -217,12 +216,20 @@ export default function StaffManagement() {
     }
   };
 
+  /* Loading keeps the frame: the title and the way back are on screen while the table fills in. */
   if (loading) {
     return (
-      <Box>
-        <Skeleton variant="rounded" width={250} height={40} sx={{ mb: 3 }} />
-        <Skeleton variant="rounded" height={400} sx={{ borderRadius: 3 }} />
-      </Box>
+      <SettingsScreen
+        title="Uživatelé a práva"
+        subtitle="Tým: kdo se přihlašuje, s jakou rolí, co smí a kde pracuje"
+        aside={false}
+        related={false}
+      >
+        <Box aria-busy="true" aria-label="Načítám zaměstnance">
+          <Skeleton variant="rounded" height={88} sx={{ borderRadius: 3, mb: 2 }} />
+          <Skeleton variant="rounded" height={320} sx={{ borderRadius: 3 }} />
+        </Box>
+      </SettingsScreen>
     );
   }
 
@@ -230,8 +237,19 @@ export default function StaffManagement() {
 
   return (
     <SettingsScreen
-      title="Zaměstnanci"
-      subtitle="Kdo se přihlašuje, s jakou rolí, co smí a kde pracuje"
+      title="Uživatelé a práva"
+      subtitle="Tým: kdo se přihlašuje, s jakou rolí, co smí a kde pracuje"
+      aside={
+        <Box>
+          <Typography sx={{ fontSize: 14, color: 'text.primary', mb: 1 }}>
+            Role dává výchozí oprávnění. U každého zaměstnance je upravíte klíčem „Co smí“ — přidat nebo vzít.
+          </Typography>
+          <Typography sx={{ fontSize: 14, color: 'text.primary' }}>
+            Kdo odešel, se vypíná, nemaže: účet přestane fungovat a otevřená přihlášení skončí.
+          </Typography>
+        </Box>
+      }
+      asideTitle="Jak to funguje"
       actions={
         <>
           <Tooltip title="Obnovit">
@@ -244,7 +262,13 @@ export default function StaffManagement() {
       }
     >
       {loadFailed && (
-        <Alert severity="error" sx={{ mb: 2 }}>Seznam účtů se nepodařilo načíst.</Alert>
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={<Button color="inherit" size="small" startIcon={<RefreshIcon />} onClick={load} sx={{ minHeight: 44 }}>Zkusit znovu</Button>}
+        >
+          Seznam účtů se nepodařilo načíst.
+        </Alert>
       )}
 
       {/* Stats: active accounts per role */}
@@ -260,7 +284,7 @@ export default function StaffManagement() {
       </Grid>
 
       {/* Accounts */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+      <div>
         <TableContainer component={Paper}>
           <Table>
             <TableHead>
@@ -387,7 +411,7 @@ export default function StaffManagement() {
             </TableBody>
           </Table>
         </TableContainer>
-      </motion.div>
+      </div>
 
       <WhereSomebodyWorksDialog
         userId={scheduleFor?.userId ?? null}

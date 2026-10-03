@@ -8,12 +8,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Grid, Card, CardContent, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Skeleton, Alert, IconButton, Tooltip,
+  TableContainer, TableHead, TableRow, Skeleton, Alert, Button, IconButton, Tooltip,
 } from '@mui/material';
 import {
   People, ErrorOutlined, Refresh, CheckCircle,
 } from '@mui/icons-material';
-import { motion } from 'framer-motion';
+import { DESKTOP_UP } from '../components/settings/settingsStyle';
 import client from '../api/client';
 import { KpiCard } from '../components/ui';
 import { SettingsScreen } from './settings/SettingsFrame';
@@ -105,18 +105,25 @@ export default function SystemHealth() {
     setRefreshing(false);
   };
 
+  /* Loading keeps the frame: the title and the way back are on screen while the numbers arrive. */
   if (loading) {
     return (
-      <Box>
-        <Skeleton variant="rounded" width={250} height={40} sx={{ mb: 3 }} />
-        <Grid container spacing={3}>
-          {[1, 2].map(i => (
-            <Grid key={i} size={{ xs: 12, sm: 6 }}>
-              <Skeleton variant="rounded" height={120} />
-            </Grid>
-          ))}
-        </Grid>
-      </Box>
+      <SettingsScreen
+        title="Zdraví systému"
+        subtitle="Odezva databáze, přihlášení uživatelé a poslední chyby"
+        aside={false}
+        related={false}
+      >
+        <Box aria-busy="true" aria-label="Načítám stav systému">
+          <Grid container spacing={3}>
+            {[1, 2].map(i => (
+              <Grid key={i} size={{ xs: 12, sm: 6 }}>
+                <Skeleton variant="rounded" height={120} />
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+      </SettingsScreen>
     );
   }
 
@@ -126,6 +133,9 @@ export default function SystemHealth() {
       subtitle={health
         ? `Změřeno ${formatDateTime(health.timestamp)}`
         : 'Odezva databáze, přihlášení uživatelé a poslední chyby'}
+      aside={false}
+      related={false}
+      scope={false}
       actions={
         <Tooltip title="Obnovit data">
           <span>
@@ -138,7 +148,7 @@ export default function SystemHealth() {
     >
       {/* ── Measured values ── */}
       {healthFailed ? (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" sx={{ mb: 3 }} action={<Button color="inherit" size="small" startIcon={<Refresh />} onClick={() => { void handleRefresh(); }} sx={{ minHeight: 44 }}>Zkusit znovu</Button>}>
           Stav systému se nepodařilo načíst.
         </Alert>
       ) : health && (
@@ -152,16 +162,18 @@ export default function SystemHealth() {
         </Grid>
       )}
 
+      {/* Sessions and errors side by side from 1280, one under the other below. */}
+      <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: 'minmax(0, 1fr)', alignItems: 'start', [DESKTOP_UP]: { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' } }}>
       {/* ── Active Sessions ── */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-        <Card sx={{ mb: 3 }}>
+      <div>
+        <Card>
           <CardContent>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               <People sx={{ mr: 1, verticalAlign: 'middle' }} />
               Aktivní relace{sessionsFailed ? '' : ` (${sessions.length})`}
             </Typography>
             {sessionsFailed ? (
-              <Alert severity="error">Aktivní relace se nepodařilo načíst.</Alert>
+              <Alert severity="error" action={<Button color="inherit" size="small" startIcon={<Refresh />} onClick={() => { void handleRefresh(); }} sx={{ minHeight: 44 }}>Zkusit znovu</Button>}>Aktivní relace se nepodařilo načíst.</Alert>
             ) : (
               <TableContainer>
                 <Table size="small">
@@ -203,10 +215,10 @@ export default function SystemHealth() {
             )}
           </CardContent>
         </Card>
-      </motion.div>
+      </div>
 
       {/* ── Recent failures from the audit log ── */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+      <div>
         <Card>
           <CardContent>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
@@ -214,7 +226,7 @@ export default function SystemHealth() {
               Poslední chyby
             </Typography>
             {errorsFailed ? (
-              <Alert severity="error">Poslední chyby se nepodařilo načíst.</Alert>
+              <Alert severity="error" action={<Button color="inherit" size="small" startIcon={<Refresh />} onClick={() => { void handleRefresh(); }} sx={{ minHeight: 44 }}>Zkusit znovu</Button>}>Poslední chyby se nepodařilo načíst.</Alert>
             ) : (
               <TableContainer>
                 <Table size="small">
@@ -251,7 +263,8 @@ export default function SystemHealth() {
             )}
           </CardContent>
         </Card>
-      </motion.div>
+      </div>
+      </Box>
 
       {/* ── Spin animation for refresh ── */}
       <style>{`

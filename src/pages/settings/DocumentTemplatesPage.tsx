@@ -102,9 +102,8 @@ export default function DocumentTemplatesPage() {
 
   return (
     <SettingsScreen
-      title="Dokumenty"
+      title="Dokumenty, šablony a hlavičky"
       subtitle="Druhy dokumentů, které ordinace vede — jak se jmenují a jestli se používají; kdo který musí doložit, říkají Pravidla dokumentů"
-      width={960}
     >
 
       {/*

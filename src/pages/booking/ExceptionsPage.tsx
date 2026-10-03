@@ -168,7 +168,6 @@ export default function ExceptionsPage() {
           .
         </>
       }
-      width={1000}
       actions={
         <Button
           variant="contained"

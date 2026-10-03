@@ -35,6 +35,7 @@ import { QuickPlanDialog } from "../../components/booking/plan/QuickPlanDialog";
 import { errorText } from "../../components/booking/errorText";
 import { addDaysToDateOnly, formatDateOnly, pragueDateKey } from "../../utils/time";
 import { SettingsScreen } from "../settings/SettingsFrame";
+import { WeekSummary } from "../../components/settings/WeekSummary";
 import {
   DEFAULT_PERIOD_NAME,
   defaultPeriodStart,
@@ -167,7 +168,8 @@ export default function WorkingHoursPage() {
           .
         </>
       }
-      width={1200}
+      aside={rowsReady ? <WeekSummary timetable={timetableFrom(rows)} /> : undefined}
+      asideTitle="Přehled týdne"
       actions={
         <Button
           variant="contained"

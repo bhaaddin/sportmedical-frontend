@@ -52,16 +52,19 @@ export default function ConsentSettingsPage() {
     onError: () => setSaved(false),
   });
 
+  const title = 'Souhlasy a GDPR';
+  const sentence = 'Marketingový souhlas na objednávkovém formuláři — zda se pacientovi ukáže a jak zní';
+
   if (query.isPending) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <SettingsScreen title={title} subtitle={sentence} loading>{null}</SettingsScreen>;
   }
 
   if (query.isError || !query.data) {
-    return <Alert severity="error">Nastavení souhlasů se nepodařilo načíst.</Alert>;
+    return (
+      <SettingsScreen title={title} subtitle={sentence} error="Nastavení souhlasů se nepodařilo načíst." onRetry={() => { void query.refetch(); }}>
+        {null}
+      </SettingsScreen>
+    );
   }
 
   const draft = edited ?? query.data;
@@ -73,27 +76,27 @@ export default function ConsentSettingsPage() {
 
   return (
     <SettingsScreen
-      title="Souhlasy"
-      subtitle="Marketingový souhlas na objednávkovém formuláři — zda se pacientovi ukáže a jak zní"
-      width={720}
-      actions={
-        <>
-          <Button
-            variant="outlined"
-            disabled={edited === null || save.isPending}
-            onClick={() => { setSaved(false); setDraft(null); }}
-          >
-            Zahodit
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => save.mutate(draft)}
-            disabled={save.isPending || edited === null}
-          >
-            {save.isPending ? 'Ukládám…' : 'Uložit'}
-          </Button>
-        </>
+      title={title}
+      subtitle={sentence}
+      save={{
+        dirty: edited !== null,
+        saving: save.isPending,
+        onSave: () => save.mutate(draft),
+        onDiscard: () => { setSaved(false); setDraft(null); },
+      }}
+      aside={
+        draft.communicationVisible ? (
+          <Box>
+            <Typography sx={{ fontSize: 15, fontWeight: 600, color: 'text.primary', mb: 0.5 }}>{draft.communicationTitle || '—'}</Typography>
+            <Typography sx={{ fontSize: 14, color: 'text.primary' }}>{draft.communicationDetail || '—'}</Typography>
+          </Box>
+        ) : (
+          <Typography sx={{ fontSize: 14, color: 'text.primary' }}>
+            Marketingový souhlas se na formuláři neukazuje. Zákonné souhlasy zůstávají vždy zapnuté.
+          </Typography>
+        )
       }
+      asideTitle="Tak to uvidí pacient"
     >
       <SoftCard>
         <Stack spacing={2.5}>

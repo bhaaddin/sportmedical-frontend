@@ -171,7 +171,6 @@ export default function DocumentRequirementsPage() {
     <SettingsScreen
       title="Pravidla dokumentů"
       subtitle="Co musí pacient doložit a ke které službě — každá činnost pod tou službou pravidlo zdědí"
-      width={960}
     >
 
       <Card sx={{ borderRadius: 3, mb: 3 }}>

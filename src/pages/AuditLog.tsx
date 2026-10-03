@@ -7,14 +7,13 @@
    ══════════════════════════════════════════════════════════════ */
 import { useState, useEffect } from 'react';
 import {
-  Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
+  Alert, Box, Button, Typography, Paper, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, TextField, Grid, IconButton, Tooltip, Skeleton,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon, Search as SearchIcon, History as HistoryIcon,
   ExpandMore as ExpandIcon, ExpandLess as CollapseIcon
 } from '@mui/icons-material';
-import { motion } from 'framer-motion';
 import client from '../api/client';
 import { DESIGN, KpiCard, StatusChip, type ChipTone } from '../components/ui';
 import { SettingsScreen } from './settings/SettingsFrame';
@@ -54,6 +53,7 @@ export default function AuditLog() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   /* ── Load audit log ── */
   useEffect(() => {
@@ -62,12 +62,15 @@ export default function AuditLog() {
 
   const loadAuditLog = async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const res = await client.get('/api/audit?take=100');
       const data = res.data?.value ?? res.data;
       setEntries(Array.isArray(data) ? data : data?.items ?? []);
     } catch {
+      /* Not "Žádné záznamy": an empty log and a log that did not load are different things. */
       setEntries([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -87,12 +90,20 @@ export default function AuditLog() {
     );
   });
 
+  /* Loading keeps the frame: the title and the way back are on screen while the log fills in. */
   if (loading) {
     return (
-      <Box>
-        <Skeleton variant="rounded" width={200} height={40} sx={{ mb: 3 }} />
-        <Skeleton variant="rounded" height={400} sx={{ borderRadius: 3 }} />
-      </Box>
+      <SettingsScreen
+        title="Auditní log"
+        subtitle="Kdo co změnil a kdy — včetně přístupů k citlivým údajům"
+        aside={false}
+        related={false}
+      >
+        <Box aria-busy="true" aria-label="Načítám auditní log">
+          <Skeleton variant="rounded" height={48} sx={{ borderRadius: 2, mb: 2.5 }} />
+          <Skeleton variant="rounded" height={360} sx={{ borderRadius: 3 }} />
+        </Box>
+      </SettingsScreen>
     );
   }
 
@@ -100,12 +111,25 @@ export default function AuditLog() {
     <SettingsScreen
       title="Auditní log"
       subtitle="Kdo co změnil a kdy — včetně přístupů k citlivým údajům"
+      aside={false}
+      related={false}
+      scope={false}
       actions={
         <Tooltip title="Obnovit">
           <IconButton aria-label="Obnovit" onClick={loadAuditLog}><RefreshIcon /></IconButton>
         </Tooltip>
       }
     >
+      {loadError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2.5 }}
+          action={<Button color="inherit" size="small" startIcon={<RefreshIcon />} onClick={loadAuditLog} sx={{ minHeight: 44 }}>Zkusit znovu</Button>}
+        >
+          Auditní log se nepodařilo načíst.
+        </Alert>
+      )}
+
       {/* Search */}
       <TextField fullWidth size="small" placeholder="Hledat v auditním logu — uživatel, akce, entita"
         value={search} onChange={(e) => setSearch(e.target.value)}
@@ -126,7 +150,7 @@ export default function AuditLog() {
       </Grid>
 
       {/* Table */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+      <div>
         <TableContainer component={Paper}>
           <Table>
             <TableHead>
@@ -149,10 +173,8 @@ export default function AuditLog() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredEntries.map((entry, i) => (
-                  <motion.tr key={entry.id}
-                    initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: Math.min(i * 0.02, 0.5) }}>
+                filteredEntries.map((entry) => (
+                  <tr key={entry.id}>
                     <TableCell colSpan={7} sx={{ p: 0 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider' }}>
                         {(entry.beforeState || entry.afterState) && (
@@ -207,13 +229,13 @@ export default function AuditLog() {
                         </Box>
                       )}
                     </TableCell>
-                  </motion.tr>
+                  </tr>
                 ))
               )}
             </TableBody>
           </Table>
         </TableContainer>
-      </motion.div>
+      </div>
     </SettingsScreen>
   );
 }
