@@ -65,6 +65,7 @@ into your final report (`decisions`), and move on. **Nobody asks Matko anything.
 14. **Results (patient portal).** Show what diagnostic sessions already store, "—" for the rest, plus manual entry for doctors. No device import now.
 15. **Integrations** page: ADAM credentials fields and a "nepřipojeno" state, no live calls. MEDISTAR is being abandoned: show it as "ukončeno", no fields.
 16. Render's paid plan is not part of the build (reminder at the end only).
+17. **Where the public site lives** (decided by the integrator, because the staff app owns `/`): the prerendered public site is under `/web` (`/web`, `/web/sluzby`, `/web/prohlidky`, `/web/diagnostika`, `/web/inbody`, `/web/cenik`, `/web/dokumenty`, `/web/kontakt`, `/web/o-nas`, `/web/kluby`). The patient-facing app pages keep their addresses (`/objednat` = booking only, `/portal/prihlaseni`, `/portal/:token`, `/klub/:token`, `/dotaznik`, `/dokonceni/:token`, `/rezervace/:token`, `/hodnoceni/:token`). When the clinic's domain moves to Vercel, a host-based rewrite maps `sportmedical-diagnostics.cz/*` to `/web/*` (prepared in the report, not enabled now).
 17. **Where the public site lives** (decided by the integrator, because the staff app owns ): the prerendered public site is under  (, , , , , , , , , ). The patient-facing app pages keep their addresses ( = booking only, , , , , , , ). When the clinic's domain moves to Vercel, a host-based rewrite maps  to  (prepared in the report, not enabled now).
 
 ## API contracts (backend ships exactly this; frontend codes against it; DTO JSON is camelCase)
@@ -108,6 +109,8 @@ All staff endpoints `[Authorize]`; the permission names are the existing ones (`
 - `GET /api/calendars/{id}/blocks` items gain `kind: "manual"|"club"`, `clubBlockId?`, `clubName?`, `colorHex?`. Public availability and non-club booking exclude club-block time; athletes registering through the club link book **inside** it. `parallelCapacity` is on the activity (C1).
 
 -  →  (BE-3).
+
+- `GET/PUT /api/v1/settings/clubs` → `{ registrationLinkValidityDays: number (default 14), minimumPlayers: number (default 30, informational warning only) }` (BE-3).
 
 ### C5 Site content, media, integrations, change history
 - Public: `GET /api/public/site-content` → `{ version: string, slots: { "<key>": { kind: "text"|"image"|"video", text?: string, mediaUrl?: string, posterUrl?: string, alt?: string, width?: number, height?: number } }, partners: [{ id, name, sport, description, url, logoUrl? , sort }], faq: [{ id, question, answer, sort }] }` (cacheable, ETag). Slot keys are free-form `^[a-z0-9][a-z0-9._-]{0,79}$`; **the registry of known slots (key, label, group, kind, recommended size, default text) lives in the frontend** (`src/site/siteSlots.ts`) and the backend stores whatever keys it is given.
