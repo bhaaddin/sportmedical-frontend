@@ -1,7 +1,9 @@
 import client from '../api/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+/* The shared client already carries the API origin (VITE_API_BASE_URL); building the
+   URL from the variable again sent these calls to `https://<api>/clubs` on Vercel. */
+const API_BASE = '/api';
 
 export const ExportFormat = {
   CSV: 0,

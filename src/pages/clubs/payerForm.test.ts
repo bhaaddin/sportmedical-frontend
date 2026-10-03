@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  EMPTY_PAYER, canBeInvoiced, hasPayerErrors, isValidBankCode, isValidDic,
+  EMPTY_PAYER, canBeInvoiced, hasPayerErrors, isValidBankCode, isValidDic, parseDiscountPercent,
   isValidIban, isValidIco, toPayerRequest, validatePayer,
 } from './payerForm';
 import type { PayerDraft } from './payerForm';
@@ -202,5 +202,32 @@ describe('whether a payer can actually be billed', () => {
 
   it('treats a null from the server the same as a blank', () => {
     expect(canBeInvoiced({ iban: null, bankAccount: null, address: null })).toBe(false);
+  });
+});
+
+describe("the club's discount", () => {
+  it('is empty for no discount, and a number from 0 to 100 with two decimals at most', () => {
+    expect(parseDiscountPercent('')).toBeNull();
+    expect(parseDiscountPercent('  ')).toBeNull();
+    expect(parseDiscountPercent('10')).toBe(10);
+    expect(parseDiscountPercent('7,5')).toBe(7.5);
+    expect(parseDiscountPercent('12.25')).toBe(12.25);
+    expect(parseDiscountPercent('0')).toBe(0);
+    expect(parseDiscountPercent('100')).toBe(100);
+  });
+
+  it('refuses more than two decimals, more than 100, and anything that is not a number', () => {
+    expect(parseDiscountPercent('12,345')).toBe('invalid');
+    expect(parseDiscountPercent('101')).toBe('invalid');
+    expect(parseDiscountPercent('-5')).toBe('invalid');
+    expect(parseDiscountPercent('deset')).toBe('invalid');
+  });
+
+  it('is checked with the rest of the form and sent as a number or null', () => {
+    const valid = draft({ name: 'FK Slaný', ico: '25596641' });
+    expect(validatePayer({ ...valid, discountPercent: '12,345' }).discountPercent).toBeDefined();
+    expect(validatePayer({ ...valid, discountPercent: '10' }).discountPercent).toBeUndefined();
+    expect(toPayerRequest({ ...valid, discountPercent: '7,5' }).discountPercent).toBe(7.5);
+    expect(toPayerRequest({ ...valid, discountPercent: '' }).discountPercent).toBeNull();
   });
 });

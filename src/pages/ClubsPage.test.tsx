@@ -21,7 +21,7 @@ const update = vi.fn();
 const listOrders = vi.fn();
 const range = vi.fn();
 
-vi.mock('../services/clubsApi', () => ({
+vi.mock('../api/clubs', () => ({
   clubsApi: { getAll, create: vi.fn(), update, deactivate: vi.fn() },
 }));
 vi.mock('../api/calendars', () => ({
@@ -44,14 +44,6 @@ vi.mock('../api/activities', () => ({
   },
 }));
 vi.mock('../api/appointments', () => ({ appointmentsApi: { range } }));
-vi.mock('../api/groupDiscounts', () => ({
-  GROUP_DISCOUNTS_QUERY_KEY: ['settings', 'group-discounts'],
-  readGroupDiscounts: vi.fn().mockResolvedValue({
-    settings: { tiers: [{ minHeadcount: 5, maxHeadcount: 9, percent: 5 }, { minHeadcount: 10, maxHeadcount: null, percent: 10 }] },
-    defaults: { tiers: [] },
-    maxTiers: 5,
-  }),
-}));
 
 const { default: ClubsPage } = await import('./ClubsPage');
 
@@ -62,7 +54,7 @@ const day2 = addDaysToDateOnly(today, 21);
 const slany = {
   id: 'club-1', name: 'FK Slaný', ico: '25596641', address: 'Sportovní 1', city: 'Slaný', postalCode: '27401',
   contactPerson: 'Jan Trenér', contactPhone: '+420 603 221 004', contactEmail: 'klub@fkslany.cz',
-  bankAccount: '123456', bankCode: '0100', iban: '', paymentTermsDays: 14, isActive: true, createdAt: '2026-01-01T00:00:00Z',
+  bankAccount: '123456', bankCode: '0100', iban: '', paymentTermsDays: 14, discountPercent: 10, isActive: true, createdAt: '2026-01-01T00:00:00Z',
 };
 const kladno = {
   id: 'club-2', name: 'HC Kladno', ico: '00000019', contactPerson: 'Eva Vedoucí', contactPhone: '+420 602 554 117',
@@ -78,7 +70,7 @@ const slanyOrder = {
   requestedCount: 12, bookedCount: 4, requiredMinutes: 180, coveredMinutes: 120, missingMinutes: 60,
   items: [{ activityId: 'a-1', activityName: 'Komplexní prohlídka', durationMinutes: 15, requestedCount: 12, bookedCount: 4, remaining: 8, requiredMinutes: 180 }],
   windows: [window1, window2],
-  clubId: 'club-1', token: 'fk-slany-rijen26',
+  clubId: 'club-1', token: 'fk-slany-rijen26', clubDiscountPercent: 10,
 };
 
 const appt = (id: string, date: string, time: string, name: string, ready = true) => ({
@@ -112,7 +104,7 @@ beforeEach(() => {
 });
 
 describe('ClubsPage', () => {
-  it('draws one card per club with its state, headcount and discount band', async () => {
+  it("draws one card per club with its state, headcount and the administrator's discount", async () => {
     render(<Wrap><ClubsPage /></Wrap>);
 
     const cards = await screen.findAllByRole('listitem');
@@ -181,7 +173,7 @@ describe('ClubsPage', () => {
     expect(range).toHaveBeenCalledWith(day1, day2, ['c-1']);
 
     /* The rail: the club's facts and the order's money. */
-    expect(screen.getByText('−10 % (10+ osob)')).toBeInTheDocument();
+    expect(screen.getByText('−10 %')).toBeInTheDocument();
     expect(screen.getByText('Na klub')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(/23.760 Kč/)).toBeInTheDocument());
     expect(screen.getByText(/12 × 2.200 Kč se slevou 10 %/)).toBeInTheDocument();
@@ -202,6 +194,76 @@ describe('ClubsPage', () => {
 
     expect(await screen.findByTestId('club-link')).toHaveTextContent('Odkaz zatím není k dispozici');
     expect(screen.getByRole('button', { name: 'Kopírovat' })).toBeDisabled();
+  });
+
+  /*
+   * `/api/clubs` is the one required read. Everything else is an enrichment:
+   * when it fails the cards still draw and one note says what is missing. The
+   * morning of 3. 10. 2026 the page said only "Kluby se nepodařilo načíst".
+   */
+  it("keeps the cards when a calendar's partner orders fail, and says which part is missing", async () => {
+    listOrders.mockRejectedValue(new Error('500'));
+    const user = userEvent.setup();
+    render(<Wrap><ClubsPage /></Wrap>);
+
+    const cards = await screen.findAllByRole('listitem');
+    expect(cards).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: 'FK Slaný' })).toBeInTheDocument();
+    expect(screen.queryByText('Kluby se nepodařilo načíst.')).not.toBeInTheDocument();
+
+    const note = await screen.findByRole('alert');
+    expect(note).toHaveTextContent('Nepodařilo se načíst: rezervace kalendářů Prohlídky');
+    expect(within(cards[0]).getByText('Bez objednávky')).toBeInTheDocument();
+
+    listOrders.mockResolvedValue([slanyOrder]);
+    await user.click(within(note).getByRole('button', { name: 'Zkusit znovu' }));
+    await waitFor(() => expect(within(cards[0]).getByText('Aktivní rezervace')).toBeInTheDocument());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows no discount for a club the administrator gave none, whatever its headcount', async () => {
+    getAll.mockResolvedValue([{ ...slany, discountPercent: null }, kladno]);
+    listOrders.mockResolvedValue([{ ...slanyOrder, clubDiscountPercent: null }]);
+    const user = userEvent.setup();
+    render(<Wrap><ClubsPage /></Wrap>);
+
+    const cards = await screen.findAllByRole('listitem');
+    await waitFor(() => expect(within(cards[0]).getByText('Aktivní rezervace')).toBeInTheDocument());
+    expect(within(cards[0]).getByText('12')).toBeInTheDocument();
+    expect(within(cards[0]).getAllByText('—')).toHaveLength(1);
+
+    await user.click(cards[0]);
+    expect(await screen.findByText('Bez slevy')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/26.400 Kč/)).toBeInTheDocument());
+    expect(screen.getByText(/^12 × 2.200 Kč$/)).toBeInTheDocument();
+  });
+
+  it('saves the discount the administrator types, as a number', async () => {
+    const user = userEvent.setup();
+    render(<Wrap><ClubsPage /></Wrap>);
+    const cards = await screen.findAllByRole('listitem');
+    await user.click(cards[1]);
+    await user.click(await screen.findByRole('button', { name: 'Upravit klub' }));
+    const dialog = await screen.findByRole('dialog');
+    const discount = within(dialog).getByLabelText('Sleva klubu (%)');
+    expect(discount).toHaveValue('');
+
+    await user.type(discount, '12,345');
+    await user.click(within(dialog).getByRole('button', { name: 'Uložit' }));
+    expect(await within(dialog).findByText('Sleva je číslo od 0 do 100, nejvýše dvě desetinná místa.')).toBeInTheDocument();
+    expect(update).not.toHaveBeenCalled();
+
+    await user.clear(discount);
+    await user.type(discount, '7,5');
+    await user.click(within(dialog).getByRole('button', { name: 'Uložit' }));
+    await waitFor(() => expect(update).toHaveBeenCalledWith('club-2', expect.objectContaining({ discountPercent: 7.5 })));
+  });
+
+  it('shows the one required failure with a retry when the clubs themselves cannot be read', async () => {
+    getAll.mockRejectedValue(new Error('404'));
+    render(<Wrap><ClubsPage /></Wrap>);
+    expect(await screen.findByText('Kluby se nepodařilo načíst.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zkusit znovu' })).toBeInTheDocument();
   });
 
   it('still edits the payer record from the detail', async () => {

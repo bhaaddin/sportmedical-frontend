@@ -6,20 +6,15 @@
  * the plan's times.
  */
 import { describe, expect, it } from 'vitest';
-import type { Club } from '../../services/clubsApi';
+import type { Club } from '../../api/clubs';
 import type { PartnerOrderDetail } from '../../api/partnerOrders';
 import type { DayAppointment } from '../../api/bookingContracts';
 import { pragueWallClockToInstant } from '../../utils/time';
 import {
-  clubStatus, describeTier, discountPercentFor, formatCzk, formatDateRange, formatDiscount,
+  clubDiscountOf, clubStatus, describeDiscount, formatCzk, formatDateRange, formatDiscount,
   formatShortRange, formatWeekdayDate, isOrderActive, matchesSearch, orderTotal, ordersOfClub,
   pragueHHMM, primaryOrder, seatRows,
 } from './clubOrders';
-
-const tiers = [
-  { minHeadcount: 10, maxHeadcount: null, percent: 10 },
-  { minHeadcount: 5, maxHeadcount: 9, percent: 5 },
-];
 
 const club = (over: Partial<Club> = {}): Club => ({
   id: 'club-1', name: 'FK Slaný', ico: '12345678', contactPerson: 'Jan Trenér',
@@ -41,36 +36,36 @@ const order = (over: Partial<PartnerOrderDetail> = {}): PartnerOrderDetail => ({
     { id: 'w-2', date: '2026-10-27', startTime: '09:00:00', endTime: '10:00:00', coveredMinutes: 60,
       releaseDate: null, warnDate: null, partnerReminderDate: null, releasedAt: null, isExclusive: true },
   ],
-  clubId: 'club-1', token: null, ...over,
+  clubId: 'club-1', token: null, clubDiscountPercent: null, ...over,
 });
 
-describe('discount bands', () => {
-  it('lands a headcount in the clinic\'s band, in ascending order of the lower bound', () => {
-    expect(discountPercentFor(tiers, 12)).toBe(10);
-    expect(discountPercentFor(tiers, 7)).toBe(5);
-    expect(discountPercentFor(tiers, 10)).toBe(10);
-    expect(discountPercentFor(tiers, 9)).toBe(5);
+describe("the club's discount", () => {
+  it("is the administrator's number, read off the order first and the club second", () => {
+    expect(clubDiscountOf({ discountPercent: 10 }, null)).toBe(10);
+    expect(clubDiscountOf({ discountPercent: 10 }, { clubDiscountPercent: 7.5 })).toBe(7.5);
+    expect(clubDiscountOf(null, { clubDiscountPercent: 12 })).toBe(12);
   });
 
-  it('applies no band below the first one, for no headcount, or with no table', () => {
-    expect(discountPercentFor(tiers, 3)).toBeNull();
-    expect(discountPercentFor(tiers, null)).toBeNull();
-    expect(discountPercentFor(tiers, 0)).toBeNull();
-    expect(discountPercentFor([], 50)).toBeNull();
+  it('is none for no club, no number, zero, or a value outside 0-100', () => {
+    expect(clubDiscountOf(null, null)).toBeNull();
+    expect(clubDiscountOf({ discountPercent: null }, { clubDiscountPercent: null })).toBeNull();
+    expect(clubDiscountOf({ discountPercent: 0 }, null)).toBeNull();
+    expect(clubDiscountOf({ discountPercent: 120 }, null)).toBeNull();
+    expect(clubDiscountOf({ discountPercent: Number.NaN }, null)).toBeNull();
   });
 
-  it('writes the band the board\'s way', () => {
+  it("writes it the board's way", () => {
     expect(formatDiscount(10)).toBe('−10 %');
+    expect(formatDiscount(7.5)).toBe('−7,5 %');
     expect(formatDiscount(null)).toBe('—');
-    expect(describeTier(tiers, 12)).toBe('−10 % (10+ osob)');
-    expect(describeTier(tiers, 6)).toBe('−5 % (5–9 osob)');
-    expect(describeTier(tiers, 2)).toBe('—');
+    expect(describeDiscount(10)).toBe('−10 %');
+    expect(describeDiscount(null)).toBe('Bez slevy');
   });
 });
 
 describe('money', () => {
-  it('is seats × price less the band for that many seats', () => {
-    const total = orderTotal(order(), () => 2200, tiers);
+  it("is seats × price less the club's own discount", () => {
+    const total = orderTotal(order(), () => 2200, 10);
     expect(total.seats).toBe(12);
     expect(total.percent).toBe(10);
     expect(total.total).toBe(23760);
@@ -78,7 +73,7 @@ describe('money', () => {
   });
 
   it('says so when a činnost has no price rather than summing a zero', () => {
-    const total = orderTotal(order(), () => null, tiers);
+    const total = orderTotal(order(), () => null, 10);
     expect(total.total).toBeNull();
     expect(total.explain).toBe('Některá činnost nemá cenu v ceníku');
   });
@@ -90,7 +85,7 @@ describe('money', () => {
         { activityId: 'a-2', activityName: 'Spiro', durationMinutes: 30, requestedCount: 2, bookedCount: 0, remaining: 2, requiredMinutes: 60 },
       ],
     });
-    const total = orderTotal(two, (id) => (id === 'a-1' ? 2200 : 4000), tiers);
+    const total = orderTotal(two, (id) => (id === 'a-1' ? 2200 : 4000), 10);
     expect(total.seats).toBe(14);
     expect(total.total).toBe((12 * 2200 + 2 * 4000) * 0.9);
     expect(total.unitPrice).toBeNull();
@@ -153,7 +148,7 @@ describe('club status', () => {
 });
 
 describe('dates', () => {
-  it('writes the board\'s ranges', () => {
+  it("writes the board's ranges", () => {
     expect(formatDateRange('2026-10-26', '2026-10-27')).toBe('26.—27. října 2026');
     expect(formatDateRange('2026-10-26', '2026-10-26')).toBe('26. října 2026');
     expect(formatDateRange('2026-10-30', '2026-11-02')).toBe('30. října — 2. listopadu 2026');
@@ -175,7 +170,7 @@ describe('seat rows', () => {
     status: 0, isRunningLate: false, checkedInUtc: null, paperwork: null, patientName: 'Jan Novák', ...over,
   });
 
-  it('lists the athletes inside the held windows, then the open places on the plan\'s times', () => {
+  it("lists the athletes inside the held windows, then the open places on the plan's times", () => {
     const rows = seatRows(order({ requestedCount: 6, bookedCount: 3, items: [{ ...order().items[0], requestedCount: 6, bookedCount: 3, remaining: 3 }] }), [
       appt('a', '2026-10-26', '11:15', { patientName: 'Petr Malý' }),
       appt('b', '2026-10-26', '11:00'),

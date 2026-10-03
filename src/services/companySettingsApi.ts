@@ -1,6 +1,8 @@
 import client from '../api/client';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+/* The shared client already carries the API origin (VITE_API_BASE_URL); building the
+   URL from the variable again sent these calls to `https://<api>/clubs` on Vercel. */
+const API_BASE = '/api';
 
 export interface CompanySettings {
   id: string;

@@ -532,6 +532,16 @@ export function isTerminalStatus(code: number): boolean {
  * `isRunningLate` arrives computed but is never stored (6.2); the screen
  * recomputes it locally with `isLate` so the number moves without a reload.
  */
+/**
+ * How the visit stands with the till: no invoice, one owed, one partly paid,
+ * one paid. The server's words; anything else reads as `none`.
+ */
+export const APPOINTMENT_PAYMENT_STATES = ['none', 'unpaid', 'partial', 'paid'] as const;
+export type AppointmentPaymentState = (typeof APPOINTMENT_PAYMENT_STATES)[number];
+export function isPaymentState(value: unknown): value is AppointmentPaymentState {
+  return typeof value === 'string' && (APPOINTMENT_PAYMENT_STATES as readonly string[]).includes(value);
+}
+
 export const dayAppointmentSchema = z.object({
   id: z.string(),
   /** Which column the row belongs to; present on the range answer and on /day. */
@@ -555,6 +565,16 @@ export const dayAppointmentSchema = z.object({
   patientName: z.string().nullable().optional(),
   /** Contact phone for a slot with no registered patient; absent or `null` otherwise. */
   unregisteredPhone: z.string().nullable().optional(),
+  /**
+   * G3 (3. 10. 2026): the row names its partner, its discount and its payment.
+   * All optional, so a grid fixture or an older server reads as "no partner,
+   * no discount, no invoice" rather than failing; a payment state the server
+   * has not named yet reads as absent, which `paymentView` draws as `none`.
+   */
+  partnerName: z.string().nullable().optional(),
+  clubDiscountPercent: z.number().nullable().optional(),
+  paymentState: z.enum(APPOINTMENT_PAYMENT_STATES).nullable().optional().catch(undefined),
+  invoiceId: z.string().nullable().optional(),
 });
 export type DayAppointment = z.infer<typeof dayAppointmentSchema>;
 export const dayAppointmentListSchema = z.array(dayAppointmentSchema);

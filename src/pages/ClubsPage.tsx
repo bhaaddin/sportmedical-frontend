@@ -10,8 +10,8 @@
  *
  * The data is what the API already answers. Payers come from `/api/clubs`,
  * reservations are the partner orders of every calendar the user may see
- * (4.7), the discount is the clinic's own band table applied to the headcount,
- * and prices come through the activities from the price list. Nothing on this
+ * (4.7), the discount is the one the administrator set on the club's card, and
+ * prices come through the activities from the price list. Nothing on this
  * screen is a number of its own: every count is the server's and every sum is
  * worked out in `clubs/clubOrders.ts`, where the tests can see it.
  *
@@ -30,15 +30,13 @@ import {
 import { ContentCopy, Delete, Search } from '@mui/icons-material';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { clubsApi } from '../services/clubsApi';
-import type { Club } from '../services/clubsApi';
+import { clubsApi } from '../api/clubs';
+import type { Club } from '../api/clubs';
 import { calendarsApi } from '../api/calendars';
 import { activitiesApi } from '../api/activities';
 import { appointmentsApi } from '../api/appointments';
 import { partnerOrdersApi, type PartnerOrderDetail } from '../api/partnerOrders';
 import { clubRegistrationLink } from '../api/publicClub';
-import { GROUP_DISCOUNTS_QUERY_KEY, readGroupDiscounts } from '../api/groupDiscounts';
-import type { GroupDiscountTier } from '../api/groupDiscounts';
 import { formatPragueDate, toDateOnly } from '../utils/time';
 import { ClubScheduleReport } from '../components/booking/ClubScheduleReport';
 import { FilterChips, PageHeader, SectionLabel, SoftCard, StatusChip } from '../components/ui';
@@ -48,7 +46,7 @@ import {
 } from './clubs/payerForm';
 import type { PayerDraft, PayerErrors } from './clubs/payerForm';
 import {
-  clubStatus, describeTier, discountPercentFor, formatCzk, formatDateRange, formatDiscount,
+  clubDiscountOf, clubStatus, describeDiscount, formatCzk, formatDateRange, formatDiscount,
   formatShortRange, headcountOf, matchesFilter, matchesSearch, orderDateRange, orderTotal,
   ordersOfClub, primaryOrder, seatRows,
 } from './clubs/clubOrders';
@@ -68,6 +66,8 @@ const draftFromClub = (club: Club): PayerDraft => ({
   bankCode: club.bankCode ?? '',
   iban: club.iban ?? '',
   paymentTermsDays: String(club.paymentTermsDays ?? 14),
+  discountPercent:
+    typeof club.discountPercent === 'number' ? club.discountPercent.toLocaleString('cs-CZ') : '',
 });
 
 const STATUS_CHIP: Record<ClubStatus, { tone: ChipTone; label: string }> = {
@@ -152,12 +152,11 @@ export default function ClubsPage() {
   const orders = useMemo(() => ordersQueries.flatMap((q) => q.data ?? []), [ordersQueries]);
   const ordersLoading = ordersQueries.some((q) => q.isLoading);
   const ordersFailed = ordersQueries.some((q) => q.isError);
-
-  const discountsQuery = useQuery({ queryKey: GROUP_DISCOUNTS_QUERY_KEY, queryFn: readGroupDiscounts });
-  const tiers = useMemo<GroupDiscountTier[]>(
-    () => discountsQuery.data?.settings.tiers ?? [],
-    [discountsQuery.data],
-  );
+  /* Which calendars' orders are missing, by name, so the note says what the
+     cards cannot know rather than "something". */
+  const failedOrderCalendars = calendars
+    .filter((_c, i) => ordersQueries[i]?.isError)
+    .map((c) => c.name);
 
   const activitiesQuery = useQuery({
     queryKey: ['activities'],
@@ -166,6 +165,30 @@ export default function ClubsPage() {
   });
   const priceOf = (activityId: string): number | null =>
     (activitiesQuery.data?.activities ?? []).find((a) => a.id === activityId)?.priceCzk ?? null;
+
+  /*
+   * The one required read is `/api/clubs`. Everything else on this screen -
+   * calendars, each calendar's orders, the discount table, the price list - is
+   * an enrichment: when one fails the cards still draw what is known and this
+   * list says which part is missing. Before 3. 10. 2026 a failed discount read
+   * was silent and a failed calendar read left every club "Bez objednávky"
+   * without a word.
+   */
+  const missingParts: { what: string; retry: () => void }[] = [];
+  if (calendarsQuery.isError) {
+    missingParts.push({ what: 'kalendáře (bez nich nelze načíst rezervace)', retry: () => void calendarsQuery.refetch() });
+  }
+  if (ordersFailed) {
+    missingParts.push({
+      what: failedOrderCalendars.length > 0
+        ? `rezervace kalendářů ${failedOrderCalendars.join(', ')}`
+        : 'rezervace některých kalendářů',
+      retry: () => ordersQueries.forEach((q) => { if (q.isError) void q.refetch(); }),
+    });
+  }
+  if (activitiesQuery.isError) {
+    missingParts.push({ what: 'ceník činností (částky objednávek se nezobrazí)', retry: () => void activitiesQuery.refetch() });
+  }
 
   const today = toDateOnly(new Date());
   const rows = useMemo<ClubRow[]>(
@@ -180,10 +203,11 @@ export default function ClubsPage() {
           status: clubStatus(own, today),
           order,
           headcount,
-          percent: discountPercentFor(tiers, headcount),
+          /* The administrator's number for this club - never derived from the headcount. */
+          percent: clubDiscountOf(club, order),
         };
       }),
-    [clubsQuery.data, orders, tiers, today],
+    [clubsQuery.data, orders, today],
   );
 
   const counts = useMemo(
@@ -309,10 +333,16 @@ export default function ClubsPage() {
 
         <Divider />
         <SectionLabel sx={{ mt: 2 }}>Kontakt</SectionLabel>
-        <Grid container spacing={2}>
+        <Grid container spacing={2} sx={{ mb: 2 }}>
           {field('contactPerson', 'Kontaktní osoba')}
           {field('contactEmail', 'E-mail')}
           {field('contactPhone', 'Telefon')}
+        </Grid>
+
+        <Divider />
+        <SectionLabel sx={{ mt: 2 }}>Sleva</SectionLabel>
+        <Grid container spacing={2}>
+          {field('discountPercent', 'Sleva klubu (%)', { help: 'Prázdné = bez slevy. Platí pro každou objednávku klubu.' })}
         </Grid>
       </DialogContent>
       <DialogActions>
@@ -361,7 +391,6 @@ export default function ClubsPage() {
       <Box>
         <ClubDetail
           row={selected}
-          tiers={tiers}
           priceOf={priceOf}
           pricesReady={activitiesQuery.isSuccess || activitiesQuery.isError}
           onBack={() => setSelectedId(null)}
@@ -418,17 +447,17 @@ export default function ClubsPage() {
         />
       </Stack>
 
-      {ordersFailed ? (
+      {missingParts.length > 0 ? (
         <Alert
           severity="warning"
           sx={{ mb: 2 }}
           action={
-            <Button color="inherit" size="small" onClick={() => ordersQueries.forEach((q) => void q.refetch())}>
+            <Button color="inherit" size="small" onClick={() => missingParts.forEach((p) => p.retry())}>
               Zkusit znovu
             </Button>
           }
         >
-          Rezervace některých kalendářů se nepodařilo načíst — stav klubů může být neúplný.
+          Nepodařilo se načíst: {missingParts.map((p) => p.what).join(' · ')}. Karty ukazují jen to, co je známo.
         </Alert>
       ) : null}
 
@@ -535,10 +564,9 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
 /* ── The detail ── */
 
 function ClubDetail({
-  row, tiers, priceOf, pricesReady, onBack, onEdit, onDeactivate, onReload, onInvoice, onNewReservation,
+  row, priceOf, pricesReady, onBack, onEdit, onDeactivate, onReload, onInvoice, onNewReservation,
 }: {
   row: ClubRow;
-  tiers: GroupDiscountTier[];
   priceOf: (activityId: string) => number | null;
   pricesReady: boolean;
   onBack: () => void;
@@ -548,7 +576,7 @@ function ClubDetail({
   onInvoice: () => void;
   onNewReservation: () => void;
 }) {
-  const { club, order, headcount } = row;
+  const { club, order, headcount, percent } = row;
   const range = order === null ? null : orderDateRange(order);
   const [reportOpen, setReportOpen] = useState(false);
   const [addingSeats, setAddingSeats] = useState(false);
@@ -566,7 +594,7 @@ function ClubDetail({
   });
   const seats = order === null ? [] : seatRows(order, appointmentsQuery.data ?? []);
 
-  const money = order === null ? null : orderTotal(order, priceOf, tiers);
+  const money = order === null ? null : orderTotal(order, priceOf, percent);
 
   const copy = async () => {
     if (link === null) return;
@@ -742,7 +770,7 @@ function ClubDetail({
               <Fact label="Telefon">{club.contactPhone || '—'}</Fact>
               <Fact label="E-mail">{club.contactEmail || order?.contactEmail || '—'}</Fact>
               <Fact label="Sportovců">{headcount ?? '—'}</Fact>
-              <Fact label="Cenová hladina">{describeTier(tiers, headcount)}</Fact>
+              <Fact label="Sleva klubu">{describeDiscount(percent)}</Fact>
               <Fact label="Fakturace">
                 {canBeInvoiced(club) ? 'Na klub' : (
                   <Box component="span" sx={{ color: 'warning.main' }}>Chybí fakturační údaje</Box>

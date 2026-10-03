@@ -19,18 +19,26 @@ import type { DateOnly } from '../utils/time';
  *     carried it since the `PartnerOrderClubLink` migration (2. 10. 2026) and
  *     takes it on create. The clubs page matches orders to clubs by it, and
  *     only falls back to the name when it is missing.
- *   - `token` - the athletes' self-registration link, `/klub/{token}`. **Not
- *     sent by the API today**: `PartnerOrderView` has no token field, so this
- *     parses as `null` and the screen says the link is not available rather
- *     than inventing one. The day the view carries it (or a `publicLink`),
- *     nothing else here changes.
+ *   - `token` - the athletes' self-registration link, `/klub/{token}`. Carried
+ *     by `PartnerOrderView` since 3. 10. 2026 (empty once revoked); an older
+ *     server leaves it out and the screen says the link is not available
+ *     rather than inventing one.
+ *   - `clubDiscountPercent` - the linked club's own discount, see below.
  *
  * Both are supersets of `PartnerOrder`, so every caller typed against the
  * shared type keeps compiling.
  */
 export const partnerOrderDetailSchema = partnerOrderSchema.extend({
   clubId: z.string().nullish().transform((v) => v ?? null),
-  token: z.string().nullish().transform((v) => v ?? null),
+  /* Sent since 3. 10. 2026; empty once the order is revoked, and an older
+     server leaves it out - both read as "no link". */
+  token: z.string().nullish().transform((v) => (v ? v : null)),
+  /**
+   * The discount the linked club's card carries, as the administrator set it
+   * (3. 10. 2026). `null` when the order has no club or the club has none.
+   * Read, never computed: a headcount earns nothing by itself.
+   */
+  clubDiscountPercent: z.number().nullish().transform((v) => v ?? null),
 });
 export type PartnerOrderDetail = z.infer<typeof partnerOrderDetailSchema>;
 const partnerOrderDetailListSchema = z.array(partnerOrderDetailSchema);

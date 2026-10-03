@@ -3,18 +3,17 @@
  * (design board 3. 10. 2026, screens 16 and 17).
  *
  * Everything on those two screens is derived from four things the API already
- * answers: the payers (`/api/clubs`), the partner orders of each calendar
- * (4.7), the group-discount table (a clinic setting) and the price list
+ * answers: the payers (`/api/clubs`) with the discount the administrator gave
+ * each one, the partner orders of each calendar (4.7) and the price list
  * through the activities. Nothing here keeps a number of its own: the counts
- * are the server's, the discount is the clinic's table applied to a headcount,
- * and the total is seats × price with that discount taken off.
+ * are the server's, the discount is the club's own, and the total is seats ×
+ * price with that discount taken off.
  *
  * Pure functions, so the screen test can stay short and this file's test can
  * say exactly which band a headcount lands in.
  */
-import type { Club } from '../../services/clubsApi';
+import type { Club } from '../../api/clubs';
 import type { PartnerOrderDetail } from '../../api/partnerOrders';
-import type { GroupDiscountTier } from '../../api/groupDiscounts';
 import type { DayAppointment, PartnerWindow } from '../../api/bookingContracts';
 import { pragueDateKey, PRAGUE_TZ, type DateOnly } from '../../utils/time';
 import { planSchedule } from '../../components/booking/ClubScheduleReport';
@@ -95,20 +94,26 @@ export function formatSlotTime(instantUtc: string): string {
   return `${formatWeekdayDate(pragueDateKey(instantUtc))} ${pragueHHMM(instantUtc)}`;
 }
 
-/* ── The clinic's discount table, applied ── */
+/* ── The club's discount - the administrator's choice ── */
 
 /**
- * Which band a headcount falls in, as a percentage, or `null` when none
- * applies. The same rule the server applies (`FractionForHeadcount`): the
- * first band whose range contains the headcount, bands read in ascending
- * order of their lower bound. A headcount of zero or less lands nowhere.
+ * Which discount an order gets: the one the administrator set on the club's
+ * card, carried by the order as `clubDiscountPercent` and by the club as
+ * `discountPercent`. Read, never computed. Until 3. 10. 2026 this screen
+ * derived a percentage from a headcount table; the owner's rule is that a
+ * headcount earns nothing by itself - the discount is a decision about a club.
+ *
+ * `null` and `0` both mean "bez slevy"; a value outside 0-100 or not a number
+ * is treated as none rather than applied.
  */
-export function discountPercentFor(tiers: readonly GroupDiscountTier[], headcount: number | null): number | null {
-  if (headcount === null || !Number.isFinite(headcount) || headcount <= 0) return null;
-  const ordered = [...tiers].sort((a, b) => a.minHeadcount - b.minHeadcount);
-  for (const tier of ordered) {
-    if (headcount >= tier.minHeadcount && (tier.maxHeadcount === null || headcount <= tier.maxHeadcount)) {
-      return tier.percent;
+export function clubDiscountOf(
+  club: { discountPercent?: number | null } | null,
+  order: { clubDiscountPercent?: number | null } | null,
+): number | null {
+  const candidates = [order?.clubDiscountPercent, club?.discountPercent];
+  for (const value of candidates) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value > 0 && value <= 100 ? value : null;
     }
   }
   return null;
@@ -120,16 +125,9 @@ export function formatDiscount(percent: number | null): string {
   return `−${percent.toLocaleString('cs-CZ')} %`;
 }
 
-/** The band's own words for the rail: "−10 % (10+ osob)" / "−5 % (5–9 osob)". */
-export function describeTier(tiers: readonly GroupDiscountTier[], headcount: number | null): string {
-  const percent = discountPercentFor(tiers, headcount);
-  if (percent === null || headcount === null) return '—';
-  const tier = [...tiers]
-    .sort((a, b) => a.minHeadcount - b.minHeadcount)
-    .find((t) => headcount >= t.minHeadcount && (t.maxHeadcount === null || headcount <= t.maxHeadcount));
-  if (!tier) return formatDiscount(percent);
-  const range = tier.maxHeadcount === null ? `${tier.minHeadcount}+ osob` : `${tier.minHeadcount}–${tier.maxHeadcount} osob`;
-  return `${formatDiscount(percent)} (${range})`;
+/** The rail's wording: "−10 %" or "Bez slevy". */
+export function describeDiscount(percent: number | null): string {
+  return percent === null || percent <= 0 ? 'Bez slevy' : formatDiscount(percent);
 }
 
 /* ── Clubs and their orders ── */
@@ -215,17 +213,17 @@ export interface OrderTotal {
 }
 
 /**
- * Seats × price, less the clinic's group discount for that many seats. An
- * order with several činnosti sums each line; when the lines have different
- * prices the explanation lists them rather than inventing an average.
+ * Seats × price, less the club's own discount. An order with several činnosti
+ * sums each line; when the lines have different prices the explanation lists
+ * them rather than inventing an average.
  */
 export function orderTotal(
   order: PartnerOrderDetail,
   priceOf: (activityId: string) => number | null,
-  tiers: readonly GroupDiscountTier[],
+  discountPercent: number | null,
 ): OrderTotal {
   const seats = order.items.reduce((n, i) => n + i.requestedCount, 0);
-  const percent = discountPercentFor(tiers, seats);
+  const percent = discountPercent !== null && discountPercent > 0 ? discountPercent : null;
   const factor = percent === null ? 1 : 1 - percent / 100;
 
   let gross = 0;

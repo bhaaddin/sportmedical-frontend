@@ -30,6 +30,11 @@ export interface PayerDraft {
   iban: string;
   /* Text, because an empty field is not a term of zero days. */
   paymentTermsDays: string;
+  /**
+   * The club's discount in percent, as the administrator decides it (3. 10.
+   * 2026). Text: an empty field is "bez slevy", not a discount of zero.
+   */
+  discountPercent: string;
 }
 
 export type PayerErrors = Partial<Record<keyof PayerDraft, string>>;
@@ -37,7 +42,7 @@ export type PayerErrors = Partial<Record<keyof PayerDraft, string>>;
 export const EMPTY_PAYER: PayerDraft = {
   name: '', ico: '', dic: '', address: '', city: '', postalCode: '',
   contactPerson: '', contactEmail: '', contactPhone: '',
-  bankAccount: '', bankCode: '', iban: '', paymentTermsDays: '14',
+  bankAccount: '', bankCode: '', iban: '', paymentTermsDays: '14', discountPercent: '',
 };
 
 /** Spaces are how people write these; they are never part of the value. */
@@ -101,6 +106,19 @@ export function isValidBankCode(code: string): boolean {
   return value === '' || /^\d{4}$/.test(value);
 }
 
+/**
+ * The discount as typed: empty, or a number from 0 to 100 with at most two
+ * decimals, comma or point. That is the server's rule for `discountPercent`
+ * and the reason the field refuses "12,345" before the round trip.
+ */
+export function parseDiscountPercent(text: string): number | null | 'invalid' {
+  const value = squash(text).replace(',', '.');
+  if (value === '') return null;
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(value)) return 'invalid';
+  const n = Number(value);
+  return n >= 0 && n <= 100 ? n : 'invalid';
+}
+
 export function validatePayer(draft: PayerDraft): PayerErrors {
   const errors: PayerErrors = {};
 
@@ -128,6 +146,10 @@ export function validatePayer(draft: PayerDraft): PayerErrors {
     errors.paymentTermsDays = 'Splatnost delší než rok je nejspíš překlep.';
   }
 
+  if (parseDiscountPercent(draft.discountPercent) === 'invalid') {
+    errors.discountPercent = 'Sleva je číslo od 0 do 100, nejvýše dvě desetinná místa.';
+  }
+
   return errors;
 }
 
@@ -151,6 +173,10 @@ export function toPayerRequest(draft: PayerDraft) {
     bankCode: squash(draft.bankCode),
     iban: squash(draft.iban).toUpperCase(),
     paymentTermsDays: Number(squash(draft.paymentTermsDays)),
+    discountPercent: ((): number | null => {
+      const parsed = parseDiscountPercent(draft.discountPercent);
+      return parsed === 'invalid' ? null : parsed;
+    })(),
   };
 }
 
