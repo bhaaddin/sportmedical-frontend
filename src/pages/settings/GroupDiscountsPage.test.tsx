@@ -128,7 +128,7 @@ describe('the tier editor', () => {
 
   it('points at the price list and the clubs', async () => {
     renderPage();
-    expect(await screen.findByRole('link', { name: 'Otevřít ceník' })).toHaveAttribute('href', '/cenik');
+    expect(await screen.findByRole('link', { name: 'Otevřít ceník' })).toHaveAttribute('href', '/nastaveni/cenik');
     expect(screen.getByRole('link', { name: 'Kluby' })).toHaveAttribute('href', '/clubs');
   });
 

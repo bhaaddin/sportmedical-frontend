@@ -82,23 +82,23 @@ interface PageCase {
 
 const PAGES: PageCase[] = [
   {
-    name: 'Služby', path: '/web/sluzby', Page: SluzbyPage, slotPage: 'sluzby',
+    name: 'Služby', path: '/sluzby', Page: SluzbyPage, slotPage: 'sluzby',
     h1: /Tři okruhy, jedna klinika/, h2: [/Co u nás absolvujete/, /Na čem měříme/], caption: '[FOTO: tým v ordinaci]',
   },
   {
-    name: 'Prohlídky', path: '/web/prohlidky', Page: ProhlidkyPage, slotPage: 'prohlidky',
+    name: 'Prohlídky', path: '/prohlidky', Page: ProhlidkyPage, slotPage: 'prohlidky',
     h1: /Potvrzení, že můžete naplno/, h2: [/Porovnání prohlídek/, /Důležité informace před vyšetřením/, /Jak vyšetření probíhá/], caption: '[FOTO: prohlídka u lékaře]',
   },
   {
-    name: 'Diagnostika', path: '/web/diagnostika', Page: DiagnostikaPage, slotPage: 'diagnostika',
+    name: 'Diagnostika', path: '/diagnostika', Page: DiagnostikaPage, slotPage: 'diagnostika',
     h1: /Čísla, podle kterých se dá trénovat/, h2: [/Hlavní vyšetření/, /Balíčky/, /Co dostanete/], caption: '[FOTO: ForceDecks měření]',
   },
   {
-    name: 'InBody', path: '/web/inbody', Page: InBodyPage, slotPage: 'inbody',
+    name: 'InBody', path: '/inbody', Page: InBodyPage, slotPage: 'inbody',
     h1: /Přesný obraz těla, ne jen váha/, h2: [/Co InBody 770 měří/, /Varianty měření/, /Proč balíček pěti měření/, /Příprava na měření/], caption: '[FOTO: přístroj InBody 770]',
   },
   {
-    name: 'Ceník', path: '/web/cenik', Page: CenikPage, slotPage: 'cenik',
+    name: 'Ceník', path: '/cenik', Page: CenikPage, slotPage: 'cenik',
     h1: /Všechny ceny na jednom místě/, h2: [/Sportovní lékařské prohlídky/, /Sportovní diagnostika/, /InBody 770/], caption: '[FOTO: recepce kliniky]',
   },
 ];
@@ -192,9 +192,9 @@ describe('the prices of the services pages come from the price list', () => {
     renderWeb(<SluzbyPage />);
     expect(await screen.findByText(/^1\s111\sKč$/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: 'Sportovní lékařské prohlídky' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Základní sportovní prohlídka/ })).toHaveAttribute('href', '/web/prohlidky');
-    expect(screen.getByRole('link', { name: /^Základní diagnostika/ })).toHaveAttribute('href', '/web/diagnostika');
-    expect(screen.getByRole('link', { name: /Základní InBody měření/ })).toHaveAttribute('href', '/web/inbody');
+    expect(screen.getByRole('link', { name: /Základní sportovní prohlídka/ })).toHaveAttribute('href', '/prohlidky');
+    expect(screen.getByRole('link', { name: /^Základní diagnostika/ })).toHaveAttribute('href', '/diagnostika');
+    expect(screen.getByRole('link', { name: /Základní InBody měření/ })).toHaveAttribute('href', '/inbody');
   });
 
   it('matches items by name, not by amount, and never takes a "+" package for a single service', () => {
@@ -272,7 +272,7 @@ describe('the group-discount block', () => {
     expect(screen.getByText('6–9 osob')).toBeInTheDocument();
     expect(screen.getByText('10 a více osob')).toBeInTheDocument();
     expect(screen.getAllByText('na osobu')).toHaveLength(3);
-    expect(screen.getByRole('link', { name: /Kluby a organizace/ })).toHaveAttribute('href', '/web/kluby');
+    expect(screen.getByRole('link', { name: /Kluby a organizace/ })).toHaveAttribute('href', '/kluby');
   });
 
   it('on the price list the club card stays even without tiers (the "Kluby" chip points at it)', () => {

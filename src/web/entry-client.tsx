@@ -5,7 +5,7 @@
    HTML that was already painted becomes interactive without being thrown away.
    The query cache is seeded from the snapshot the page embeds, so the first
    client render equals the server's; the queries then refresh prices, texts and
-   photos from the API. Any other address (the dev server, an unknown /web/… path)
+   photos from the API. Any other address (the dev server, an unknown public path)
    is rendered from scratch.
    ══════════════════════════════════════════════════════════════ */
 

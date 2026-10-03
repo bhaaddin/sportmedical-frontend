@@ -27,6 +27,7 @@ const checkRequired = vi.fn();
 const getConsents = vi.fn();
 const getByPatient = vi.fn();
 const createSession = vi.fn();
+const updateSession = vi.fn();
 const listActivities = vi.fn();
 
 vi.mock('../../api/patients', () => ({ patientsApi: { getById, getProfile: vi.fn(), search: vi.fn().mockResolvedValue([]) } }));
@@ -36,7 +37,7 @@ vi.mock('../../api/documents', async () => {
 });
 vi.mock('../../api/client', () => ({ default: { get: getConsents } }));
 vi.mock('../../api/diagnostics', () => ({
-  diagnosticsApi: { getByPatient, create: createSession, downloadPdf: vi.fn() },
+  diagnosticsApi: { getByPatient, create: createSession, update: updateSession, downloadPdf: vi.fn() },
 }));
 vi.mock('../../api/activities', () => ({ activitiesApi: { list: listActivities } }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
@@ -69,6 +70,7 @@ beforeEach(() => {
   getConsents.mockReset().mockResolvedValue({ data: [] });
   getByPatient.mockReset().mockResolvedValue([session()]);
   createSession.mockReset().mockResolvedValue(session());
+  updateSession.mockReset().mockResolvedValue(session());
   listActivities.mockReset().mockResolvedValue({ activities: [{ id: 'a1', name: 'Spiroergometrie' }] });
 });
 
@@ -219,29 +221,57 @@ describe('Výsledky', () => {
   it('draws three columns on an iPad and four on a desktop', async () => {
     setViewport(VIEWPORTS.tablet);
     const first = renderResults();
-    await screen.findByText(/VO₂max 52/);
+    await screen.findAllByTestId('session-values');
     /* three columns: date, summary and the (unnamed) report button */
-    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Datum', 'Shrnutí', '']);
+    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Datum', 'Naměřené hodnoty', '']);
     first.unmount();
   });
 
   it('shows the full table on a desktop', async () => {
     setViewport(VIEWPORTS.desktop);
     renderResults();
-    await screen.findByText(/VO₂max 52/);
+    await screen.findAllByTestId('session-values');
 
-    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Datum', 'Typ', 'Shrnutí', '']);
+    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Datum', 'Typ', 'Naměřené hodnoty', '']);
   });
 
-  it('draws what the doctor typed by hand, read back from the notes', async () => {
+  it('draws every measured value from the columns of the session, "—" for the missing ones', async () => {
     setViewport(VIEWPORTS.desktop);
     getByPatient.mockResolvedValue([
-      session({ rawPractitionerNotes: 'Nalačno.\n\n[Ruční zápis]\nPřístroj: Cortex\nMax. výkon: 320 W' }),
+      session({
+        measuredOn: '2026-09-18', thresholdPercentVo2Max: 82, maxPowerWatts: 320, weightKg: 78.4, powerPerKg: 4.08,
+        device: 'Cortex', protocolType: 'Spiroergometrie',
+        trainingZones: [{ name: 'Aerobní', fromBpm: 120, toBpm: 150 }],
+        rawPractitionerNotes: 'Nalačno.',
+      }),
     ]);
     renderResults();
 
-    expect(await screen.findByText('Cortex')).toBeInTheDocument();
-    expect(screen.getByText('320 W')).toBeInTheDocument();
+    const values = await screen.findByTestId('session-values');
+    const read = (label: string) => within(values).getByText(label).nextElementSibling?.textContent;
+    expect(read('Max. tep')).toBe('190 bpm');
+    expect(read('Tep prahu')).toBe('160 bpm');
+    expect(read('Práh v % VO₂max')).toBe('82 %');
+    expect(read('Max. výkon')).toBe('320 W');
+    expect(read('Výkon na kg')).toBe('4,08 W/kg');
+    expect(read('Hmotnost')).toBe('78,4 kg');
+    expect(read('Přístroj')).toBe('Cortex');
+    expect(read('Protokol')).toBe('Spiroergometrie');
+    expect(within(values).getByText('120–150 bpm')).toBeInTheDocument();
+    /* the date column is the day of the measurement, not the day it was recorded */
+    expect(screen.getByText('18. 9. 2026')).toBeInTheDocument();
+    /* the doctor's notes are not a source of values and are not drawn here */
+    expect(screen.queryByText('Nalačno.')).not.toBeInTheDocument();
+  });
+
+  it('draws a dash for every value the session does not carry', async () => {
+    setViewport(VIEWPORTS.desktop);
+    renderResults();
+
+    const values = await screen.findByTestId('session-values');
+    for (const label of ['Práh v % VO₂max', 'Max. výkon', 'Výkon na kg', 'Hmotnost', 'Přístroj', 'Protokol']) {
+      expect(within(values).getByText(label).nextElementSibling?.textContent, label).toBe('—');
+    }
   });
 
   it('says it could not load, with a way to retry', async () => {
@@ -256,7 +286,7 @@ describe('Výsledky', () => {
     setViewport(VIEWPORTS.desktop);
     const user = userEvent.setup();
     renderResults();
-    await screen.findByText(/VO₂max 52/);
+    await screen.findAllByTestId('session-values');
 
     await user.click(screen.getByRole('button', { name: 'Zapsat hodnoty ručně' }));
 
@@ -343,13 +373,14 @@ describe('manual entry of results', () => {
     expect(createSession).not.toHaveBeenCalled();
   });
 
-  it('sends the typed numbers, keeps the rest in the notes, and reports the saved session', async () => {
+  it('sends the typed numbers and the extra values as fields, and nothing into the notes', async () => {
     setViewport(VIEWPORTS.desktop);
     const { onSaved } = renderForm();
     await screen.findByLabelText(/^VO₂max/);
     fillRequired();
     type(/^Přístroj/, 'Cortex');
     type(/^Max\. výkon/, '320');
+    type(/^Hmotnost/, '80');
     fireEvent.click(screen.getByRole('button', { name: 'Přidat zónu' }));
     type('Zóna 1', 'Aerobní');
     type('Zóna 1 od', '120');
@@ -363,10 +394,11 @@ describe('manual entry of results', () => {
       patientId: 'p1', practitionerName: 'Jana Lékařová', vo2MaxMlMinKg: 52.5, restingHeartRateBpm: 58,
       maxHeartRateBpm: 190, anaerobicThresholdBpm: 160, bodyFatPercentage: 12, muscleMassKg: 41,
       systolicBloodPressure: 118, diastolicBloodPressure: 76,
+      device: 'Cortex', maxPowerWatts: 320, weightKg: 80,
+      trainingZones: [{ name: 'Aerobní', fromBpm: 120, toBpm: 150 }],
     });
-    expect(sent.rawPractitionerNotes).toContain('Přístroj: Cortex');
-    expect(sent.rawPractitionerNotes).toContain('Max. výkon: 320 W');
-    expect(sent.rawPractitionerNotes).toContain('Zóna 1: Aerobní | 120–150 bpm');
+    expect(sent).not.toHaveProperty('rawPractitionerNotes');
+    expect(sent).not.toHaveProperty('powerPerKg');
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
   });
 

@@ -6,9 +6,11 @@
  * matter; "Otevřít zprávu" is the existing PDF report of that session, and
  * "Nové měření" the existing diagnostics form for this patient.
  *
- * "Zapsat hodnoty ručně" is the doctor's manual entry (Etapa 2, decision 14):
- * the portal shows what a session stores, "—" for the rest, and this form is
- * how the rest gets typed in when no device handed it over.
+ * Every value comes from the session's own columns (contract C-M) - the date of
+ * the measurement, threshold %, power and W/kg, weight, zones, device and
+ * protocol type included; "—" for what was not measured. Nothing is read out
+ * of the doctor's notes. "Zapsat hodnoty ručně" is the doctor's manual entry,
+ * and "Upravit" opens the same form prefilled from the session (PUT).
  *
  * Three layouts: a card per measurement on a phone, a three-column table on
  * an iPad, the full table on a desktop.
@@ -23,7 +25,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box, Button, Dialog, DialogContent, DialogTitle, IconButton, Stack, Typography,
 } from '@mui/material';
-import { Close } from '@mui/icons-material';
+import { Close, EditOutlined } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import { diagnosticsApi } from '../../api/diagnostics';
 import type { DiagnosticSession } from '../../api/diagnostics';
@@ -31,48 +33,28 @@ import { AsyncSection } from '../../components/booking/AsyncSection';
 import { SectionLabel, SoftCard, StatusChip } from '../../components/ui';
 import { ResponsiveDataList } from '../../components/ui/ResponsiveDataList';
 import type { DataColumn } from '../../components/ui/ResponsiveDataList';
+import { usePermission } from '../../auth/usePermission';
 import { useIsPhone } from '../../layout/useDevice';
 import { formatPragueDate } from '../../utils/time';
 import ManualResultsForm from './ManualResultsForm';
-import { parseManualExtras } from './manualResults';
+import SessionValues from './results/SessionValues';
+import { measurementDate } from './results/measuredValues';
 
-const present = (n: number | null | undefined): n is number =>
-  typeof n === 'number' && Number.isFinite(n) && n > 0;
-
-/** "VO2max 52 ml/min/kg · klidová TF 58 · TK 120/80" - only what was measured. */
-export function sessionSummary(s: DiagnosticSession): string {
-  const parts: string[] = [];
-  if (present(s.vo2MaxMlMinKg)) parts.push(`VO₂max ${s.vo2MaxMlMinKg} ml/min/kg`);
-  if (present(s.restingHeartRateBpm)) parts.push(`klidová TF ${s.restingHeartRateBpm}`);
-  if (present(s.maxHeartRateBpm)) parts.push(`max. TF ${s.maxHeartRateBpm}`);
-  if (present(s.systolicBloodPressure) && present(s.diastolicBloodPressure)) {
-    parts.push(`TK ${s.systolicBloodPressure}/${s.diastolicBloodPressure}`);
-  }
-  if (present(s.bodyFatPercentage)) parts.push(`tuk ${s.bodyFatPercentage} %`);
-  return parts.length === 0 ? '—' : parts.join(' · ');
-}
-
-/** What a doctor typed by hand beyond the stored columns: device, power, zones... */
-function ExtraFacts({ session }: { session: DiagnosticSession }) {
-  const { facts } = parseManualExtras(session.rawPractitionerNotes);
-  if (facts.length === 0) return null;
-  return (
-    <Box component="dl" sx={{ m: 0, mt: 0.75, display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 1.5, rowGap: 0.25 }}>
-      {facts.map(([label, value], i) => (
-        <Box key={`${label}-${i}`} sx={{ display: 'contents' }}>
-          <Typography component="dt" variant="caption" sx={{ color: 'text.secondary' }}>{label}</Typography>
-          <Typography component="dd" variant="caption" sx={{ m: 0 }}>{value}</Typography>
-        </Box>
-      ))}
-    </Box>
-  );
-}
+/** A yyyy-MM-dd day, or an instant read in the clinic's zone. */
+const formatDay = (value: string): string => {
+  const plain = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return plain !== null ? `${Number(plain[3])}. ${Number(plain[2])}. ${plain[1]}` : formatPragueDate(value);
+};
 
 export default function PatientResultsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const phone = useIsPhone();
+  const mayEdit = usePermission('patients.edit');
+  /** The dialog: a new entry, or the session being edited. */
   const [entering, setEntering] = useState(false);
+  const [editing, setEditing] = useState<DiagnosticSession | null>(null);
+  const closeDialog = () => { setEntering(false); setEditing(null); };
 
   const query = useQuery({
     queryKey: ['patient', id, 'diagnostic-sessions'],
@@ -81,7 +63,7 @@ export default function PatientResultsPage() {
   });
 
   const sessions = [...(query.data ?? [])].sort(
-    (a, b) => Date.parse(b.sessionDate) - Date.parse(a.sessionDate),
+    (a, b) => Date.parse(measurementDate(b)) - Date.parse(measurementDate(a)),
   );
 
   const openReport = async (session: DiagnosticSession) => {
@@ -97,7 +79,7 @@ export default function PatientResultsPage() {
       key: 'date',
       header: 'Datum',
       tablet: true,
-      cell: (s) => <Box sx={{ whiteSpace: 'nowrap', fontWeight: 700 }}>{formatPragueDate(s.sessionDate)}</Box>,
+      cell: (s) => <Box sx={{ whiteSpace: 'nowrap', fontWeight: 700 }}>{formatDay(measurementDate(s))}</Box>,
     },
     {
       key: 'type',
@@ -110,18 +92,17 @@ export default function PatientResultsPage() {
       ),
     },
     {
-      key: 'summary',
-      header: 'Shrnutí',
+      key: 'values',
+      header: 'Naměřené hodnoty',
       tablet: true,
       cell: (s) => (
         <>
-          <Typography variant="body2">{sessionSummary(s)}</Typography>
+          <SessionValues session={s} />
           {s.practitionerName && (
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}>
               {s.practitionerName}
             </Typography>
           )}
-          <ExtraFacts session={s} />
         </>
       ),
     },
@@ -131,9 +112,23 @@ export default function PatientResultsPage() {
       align: 'right',
       tablet: true,
       cell: (s) => (
-        <Button size="small" variant="outlined" onClick={() => void openReport(s)} sx={{ minHeight: 36 }}>
-          Otevřít zprávu
-        </Button>
+        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
+          {mayEdit && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<EditOutlined />}
+              aria-label={`Upravit měření ${formatDay(measurementDate(s))}`}
+              onClick={() => setEditing(s)}
+              sx={{ minHeight: 36 }}
+            >
+              Upravit
+            </Button>
+          )}
+          <Button size="small" variant="outlined" onClick={() => void openReport(s)} sx={{ minHeight: 36 }}>
+            Otevřít zprávu
+          </Button>
+        </Stack>
       ),
     },
   ];
@@ -141,14 +136,24 @@ export default function PatientResultsPage() {
   const renderCard = (s: DiagnosticSession) => (
     <Stack spacing={0.75}>
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography sx={{ fontSize: 15, fontWeight: 600 }}>{formatPragueDate(s.sessionDate)}</Typography>
+        <Typography sx={{ fontSize: 15, fontWeight: 600 }}>{formatDay(measurementDate(s))}</Typography>
         {s.requiresDoctorReview && <StatusChip tone="beige" size="sm">Ke kontrole lékařem</StatusChip>}
       </Stack>
-      <Typography variant="body2">{sessionSummary(s)}</Typography>
+      <SessionValues session={s} />
       {s.practitionerName && (
         <Typography variant="caption" sx={{ color: 'text.secondary' }}>{s.practitionerName}</Typography>
       )}
-      <ExtraFacts session={s} />
+      {mayEdit && (
+        <Button
+          variant="outlined"
+          startIcon={<EditOutlined />}
+          aria-label={`Upravit měření ${formatDay(measurementDate(s))}`}
+          onClick={(e) => { e.stopPropagation(); setEditing(s); }}
+          sx={{ minHeight: 44, alignSelf: 'stretch' }}
+        >
+          Upravit
+        </Button>
+      )}
       <Button
         variant="outlined"
         onClick={(e) => { e.stopPropagation(); void openReport(s); }}
@@ -198,25 +203,27 @@ export default function PatientResultsPage() {
       </AsyncSection>
 
       <Dialog
-        open={entering}
-        onClose={() => setEntering(false)}
+        open={entering || editing !== null}
+        onClose={closeDialog}
         fullScreen={phone}
         fullWidth
         maxWidth="md"
         scroll="paper"
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          Zapsat naměřené hodnoty
-          <IconButton aria-label="Zavřít" onClick={() => setEntering(false)} sx={{ width: 44, height: 44 }}>
+          {editing !== null ? 'Upravit naměřené hodnoty' : 'Zapsat naměřené hodnoty'}
+          <IconButton aria-label="Zavřít" onClick={closeDialog} sx={{ width: 44, height: 44 }}>
             <Close />
           </IconButton>
         </DialogTitle>
         {/* No shell bottom bar over a dialog: the pinned save button sits at the edge. */}
         <DialogContent sx={{ '--bottom-bar-height': '0px', bgcolor: 'background.default' }}>
           <ManualResultsForm
+            key={editing?.id ?? 'new'}
             patientId={id}
-            onCancel={() => setEntering(false)}
-            onSaved={() => { setEntering(false); void query.refetch(); }}
+            {...(editing !== null ? { session: editing } : {})}
+            onCancel={closeDialog}
+            onSaved={() => { closeDialog(); void query.refetch(); }}
           />
         </DialogContent>
       </Dialog>

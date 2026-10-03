@@ -11,7 +11,7 @@ export function KeyboardShortcuts() {
     const handler = (e: KeyboardEvent) => {
       if (e.altKey && e.key === '1') {
         e.preventDefault();
-        window.location.href = '/';
+        window.location.href = '/prehled';
       }
       if (e.altKey && e.key === '2') {
         e.preventDefault();

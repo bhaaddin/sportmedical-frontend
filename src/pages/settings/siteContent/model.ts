@@ -8,23 +8,12 @@
    ══════════════════════════════════════════════════════════════ */
 
 import { SLOTS_BY_PAGE } from '../../../site/siteSlots';
+import { FAQ_PATH, PARTNERS_PATH, PUBLIC_PATHS } from './publicPaths';
 import type { SlotDef } from '../../../site/slotTypes';
 import type { AdminSlot } from '../../../api/siteContentAdmin';
 
-/** The public page a registry page lives on. Kept in step with src/web/routes.ts by a test. */
-export const PUBLIC_PATHS: Record<string, string> = {
-  spolecne: '/web',
-  landing: '/web',
-  sluzby: '/web/sluzby',
-  prohlidky: '/web/prohlidky',
-  diagnostika: '/web/diagnostika',
-  inbody: '/web/inbody',
-  cenik: '/web/cenik',
-  dokumenty: '/web/dokumenty',
-  kontakt: '/web/kontakt',
-  onas: '/web/o-nas',
-  kluby: '/web/kluby',
-};
+/** The public page a registry page lives on: src/pages/settings/siteContent/publicPaths.ts (derived from src/web/sitePaths.ts). */
+export { PUBLIC_PATHS } from './publicPaths';
 
 export const PARTNERS_ID = 'partners';
 export const FAQ_ID = 'faq';
@@ -78,8 +67,8 @@ export function buildPages(): AdminPage[] {
   pages.sort((a, b) => Number(a.id === 'spolecne') - Number(b.id === 'spolecne'));
   return [
     ...pages,
-    { type: 'partners', id: PARTNERS_ID, label: 'Partneři', path: '/web' },
-    { type: 'faq', id: FAQ_ID, label: 'Časté otázky', path: '/web' },
+    { type: 'partners', id: PARTNERS_ID, label: 'Partneři', path: PARTNERS_PATH },
+    { type: 'faq', id: FAQ_ID, label: 'Časté otázky', path: FAQ_PATH },
   ];
 }
 

@@ -52,7 +52,7 @@ describe.each(widths)('the landing at %s (%i px)', (_name, width) => {
     expect(screen.getByRole('heading', { name: /Mobilní testování\s*přímo u vás/ })).toBeInTheDocument();
     expect(screen.getByText('Naše filozofie')).toBeInTheDocument();
     // The club CTA "Mám odkaz od klubu" and the booking CTA.
-    expect(screen.getByRole('link', { name: 'Mám odkaz od klubu' })).toHaveAttribute('href', '/web/kluby#mam-odkaz');
+    expect(screen.getByRole('link', { name: 'Mám odkaz od klubu' })).toHaveAttribute('href', '/kluby#mam-odkaz');
     expect(screen.getAllByRole('link', { name: /Objednat termín/ })[0]).toHaveAttribute('href', '/objednat');
     // The partner marquee: the ten default clubs (the strip is doubled for the loop, the copy is aria-hidden).
     expect(screen.getAllByText('Black Angels').length).toBeGreaterThanOrEqual(1);
@@ -123,18 +123,18 @@ describe('the landing starts from a prerendered snapshot', () => {
   });
 });
 
-describe('the whole /web app at the three widths', () => {
+describe('the whole public app at the three widths', () => {
   it.each(widths)('renders the header, the main landmark and the footer at %s', async (_name, width) => {
     serverDown();
-    renderWeb(<WebApp />, { width, route: '/web' });
+    renderWeb(<WebApp />, { width, route: '/' });
     const header = screen.getByRole('banner');
-    expect(within(header).getByRole('link', { name: /SportMedical Diagnostics — úvod/ })).toHaveAttribute('href', '/web');
+    expect(within(header).getByRole('link', { name: /SportMedical Diagnostics — úvod/ })).toHaveAttribute('href', '/');
     expect(within(header).getAllByRole('link', { name: 'Objednat termín', hidden: true }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('main')).toBeInTheDocument();
     expect(screen.getByRole('contentinfo')).toHaveTextContent('Provozní doba');
     // The unknown route is a page, never a white screen.
     cleanup();
-    renderWeb(<WebApp />, { width, route: '/web/neexistuje' });
+    renderWeb(<WebApp />, { width, route: '/neexistuje' });
     expect(screen.getByRole('heading', { level: 1, name: 'Stránka nenalezena' })).toBeInTheDocument();
   });
 

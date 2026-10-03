@@ -53,14 +53,14 @@ const clubs = [club('club-1', 'FK Slaný'), club('club-2', 'SK Kladno')];
 
 const calc = (over: Partial<Calculation> = {}): Calculation => ({
   minutesPerPlayer: 60, parallelCapacity: 2, neededMinutes: 3600, dailyOpenMinutes: 600,
-  suggestedDays: 7, suggestedFrom: '2026-10-26', suggestedTo: '2026-11-03', fitsHorizon: true, minimumPlayers: null,
+  suggestedDays: 7, suggestedFrom: '2026-10-26', suggestedTo: '2026-11-03', fitsHorizon: true, minimumPlayers: null, belowMinimum: false,
   perDay: [{ date: '2026-10-26', openMinutes: 600 }, { date: '2026-10-27', openMinutes: 600 }], ...over,
 });
 
 const saved = (over: Partial<ClubBlockView> = {}): ClubBlockView => ({
   id: 'b-1', clubId: 'club-1', clubName: 'FK Slaný', colorHex: '#2E7D6B', name: null, calendarIds: ['c-1'], activityIds: ['a-1'],
   fromDate: '2026-10-26', toDate: '2026-11-03', dailyFrom: null, dailyTo: null, playerCount: 120, seats: 120, registered: 0,
-  status: 'Active', registrationToken: 'tok', registrationUrl: 'https://app/klub/tok', note: null, createdAtUtc: null, athletes: null, ...over,
+  status: 'Active', registrationToken: 'tok', registrationUrl: 'https://app/klub/tok', note: null, createdAtUtc: null, athletes: [], ...over,
 });
 
 function Wrap({ children }: { children: ReactNode }) {
@@ -85,7 +85,7 @@ beforeEach(() => {
   create.mockReset().mockResolvedValue(saved());
   update.mockReset().mockResolvedValue(saved());
   createClub.mockReset().mockResolvedValue(club('club-new', 'TJ Sokol Slaný'));
-  settingsGet.mockReset().mockResolvedValue({ registrationLinkValidityDays: 14, minimumPlayers: 30 });
+  settingsGet.mockReset().mockResolvedValue({ registrationLinkValidityDays: 14, minimumPlayers: null });
   fetchActivities.mockReset().mockResolvedValue([
     { id: 'a-1', name: 'Základní prohlídka', durationMinutes: 60, clinicServiceId: 's-1', colorHex: '#2E7D6B', parallelCapacity: 2 },
     { id: 'a-2', name: 'Spiroergometrie', durationMinutes: 45, clinicServiceId: 's-2', colorHex: '#3B6EA8', parallelCapacity: 1 },
@@ -148,13 +148,32 @@ describe('the calculator', () => {
     expect(screen.getByLabelText('Do')).toHaveValue('2026-11-03');
   });
 
-  it('warns below the minimum from the club settings, and does not block', async () => {
+  it('warns below the minimum only when the answer says so, and does not block', async () => {
+    calculate.mockResolvedValue(calc({ minimumPlayers: 25, belowMinimum: true }));
     const user = userEvent.setup();
     open();
     await fillCalculatorInputs(user, '20');
     const warning = await screen.findByRole('status');
-    expect(warning).toHaveTextContent('Méně než doporučené minimum 30 hráčů');
+    expect(warning).toHaveTextContent('Méně než minimum 25 hráčů');
     expect(screen.getByRole('button', { name: 'Použít návrh' })).toBeEnabled();
+  });
+
+  it('shows no warning when no minimum is set, however few players', async () => {
+    calculate.mockResolvedValue(calc({ minimumPlayers: null, belowMinimum: false }));
+    const user = userEvent.setup();
+    open();
+    await fillCalculatorInputs(user, '2');
+    await screen.findByRole('button', { name: 'Použít návrh' });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('shows no warning from a number alone: without belowMinimum the answer is not a warning', async () => {
+    calculate.mockResolvedValue(calc({ minimumPlayers: 25, belowMinimum: false }));
+    const user = userEvent.setup();
+    open();
+    await fillCalculatorInputs(user, '2');
+    await screen.findByRole('button', { name: 'Použít návrh' });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('says "nevejde se" when the need does not fit the horizon', async () => {
@@ -337,8 +356,8 @@ describe('editing a block', () => {
   it('lists the athletes a 409 names and sends the confirmation only when asked twice', async () => {
     update
       .mockRejectedValueOnce(new ClubBlockError('Změna se dotkne sportovců.', 409, [
-        { name: 'Jan Novák', activityName: 'Základní prohlídka', startUtc: '2026-11-03T09:00:00Z' },
-        { name: 'Petr Malý', activityName: null, startUtc: null },
+        { id: 'a1', name: 'Jan Novák', activityName: 'Základní prohlídka', startUtc: '2026-11-03T09:00:00Z', endUtc: '2026-11-03T09:40:00Z', status: 'Booked', phone: '' },
+        { id: 'a2', name: 'Petr Malý', activityName: '', startUtc: '', endUtc: '', status: 'Booked', phone: '' },
       ]))
       .mockResolvedValue(saved({ toDate: '2026-10-30' }));
     const user = userEvent.setup();

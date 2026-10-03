@@ -1,0 +1,136 @@
+{
+  "capturedOn": "2026-10-03",
+  "note": "All files are PDFs on the Shopify CDN (https://cdn.shopify.com/s/files/1/0913/0799/9614/files/). Several documents exist in more than one version; the 'current' entry is the one linked from /pages/dokumenty-ke-stazeni (modified 2026-06-04, newest ?v=1780… timestamps). File sizes were not checked (not downloaded). No XLSX or other formats exist on the live site.",
+  "documents": [
+    {
+      "title": "Výpis ze zdravotní dokumentace",
+      "url": "https://cdn.shopify.com/s/files/1/0913/0799/9614/files/VYPIS_ze_zdravtni_dokumentace.pdf?v=1780562021",
+      "format": "pdf",
+      "section": "Potřebné dokumenty ke sportovní lékařské prohlídce",
+      "required": "první návštěva; při opakovaném vyšetření potvrzení praktického lékaře, že se zdravotní stav nezměnil",
+      "description": "Výpis od praktického lékaře je nezbytný pro vystavení zdravotního posudku!",
+      "current": true,
+      "foundOn": ["/pages/dokumenty-ke-stazeni", "/pages/sportovni-lekarske-prohlidky"]
+    },
+    {
+      "title": "Zdravotní dotazník",
+      "url": "https://cdn.shopify.com/s/files/1/0913/0799/9614/files/zdravotni_dotaznik.pdf?v=1780561779",
+      "format": "pdf",
+      "section": "Potřebné dokumenty ke sportovní lékařské prohlídce",
+      "required": "před každým vyšetřením",
+      "description": "Vyplňte předem z pohodlí domova, urychlete tím průběh vyšetření.",
+      "current": true,
+      "foundOn": ["/pages/dokumenty-ke-stazeni", "/pages/sportovni-lekarske-prohlidky"]
+    },
+    {
+      "title": "Souhlas pacienta (GDPR)",
+      "url": "https://cdn.shopify.com/s/files/1/0913/0799/9614/files/GDPR_final.pdf?v=1780561628",
+      "format": "pdf",
+      "section": "Potřebné dokumenty ke sportovní lékařské prohlídce",
+      "required": "pouze při první návštěvě (znovu jen při změně údajů nebo účelu zpracování)",
+      "description": "Vyplňte předem z pohodlí domova a urychlete tím průběh vyšetření.",
+      "current": true,
+      "foundOn": ["/pages/dokumenty-ke-stazeni", "/pages/sportovni-lekarske-prohlidky"]
+    },
+    {
+      "title": "Souhlas zákonného zástupce",
+      "url": "https://cdn.shopify.com/s/files/1/0913/0799/9614/files/Souhlas_zakonneho_zastupce_3ff9ec9a-fe46-4e0f-8fd0-2fae5adce636.pdf?v=1780561681",
+      "format": "pdf",
+      "section": "Potřebné dokumenty ke sportovní lékařské prohlídce",
+      "required": "pokud se nezletilý klient (<18) dostaví na vyšetření bez doprovodu zákonného zástupce",
+      "description": "Vyplňte předem, pokud se nezletilý klient dostaví na vyšetření bez doprovodu.",
+      "current": true,
+      "foundOn": ["/pages/dokumenty-ke-stazeni", "/pages/sportovni-lekarske-prohlidky"]
+    },
+    {
+      "title": "Sportovní lékařské prohlídky – doporučení pro přípravu a hladký průběh",
+      "url": "https://cdn.shopify.com/s/files/1/0913/0799/9614/files/Informace_pro_pacienta_-_SPORTOVNI_LEKARSKE_PROHLIDKY_8d9a3bc7-2396-403c-8d63-8368a8ef6d29.pdf?v=1780564931",
+      "format": "pdf",
+      "section": "Důležité informace k jednotlivým vyšetřením",
+      "required": "informace",
+      "description": "Souhrn praktických informací k účelu, přípravě a průběhu zátěžového vyšetření.",
+      "current": true,
+      "foundOn": ["/pages/dokumenty-ke-stazeni"]
+    },
+    {
+      "title": "Sportovní diagnostika – doporučení pro přesný a spolehlivý výsledek",
+      "url": "https://cdn.shopify.com/s/files/1/0913/0799/9614/files/Informace_pro_pacienta_Sportovni_diagnostika.pdf?v=1769076502",
+      "format": "pdf",
+      "section": "Důležité informace k jednotlivým vyšetřením",
+      "required": "informace",
+      "description": "Souhrn praktických informací k účelu, přípravě a průběhu zátěžového vyšetření. (Přehled pro ForceDecks, HumanTrak a VO₂max, doporučené kroky k přípravě.)",
+      "current": true,
+      "foundOn": ["/pages/dokumenty-ke-stazeni", "/pages/rezervacni-system"]
+    },
+    {
+      "title": "InBody měření – doporučení pro přesný a spolehlivý výsledek",
+      "url": "https://cdn.shopify.com/s/files/1/0913/0799/9614/files/Informace_pro_pacienta_InBody_971717d8-51ee-4e1f-8011-cb13018d3178.pdf?v=1780564468",
+      "format": "pdf",
+      "section": "Důležité informace k jednotlivým vyšetřením",
+      "required": "informace",
+      "description": "Souhrn praktických informací pro přípravu, průběh a vyhodnocení analýzy tělesného složení.",
+      "current": true,
+      "foundOn": ["/pages/dokumenty-ke-stazeni"]
+    },
+    {
+      "title": "Povinnost předložení výpisu ze zdravotní dokumentace (footer link, older file version)",
+      "url": "https://cdn.shopify.com/s/files/1/0913/0799/9614/files/VYPIS_ze_zdravtni_dokumentace_f3c5c6c3-600a-4449-88ec-a7dbe4961e22.pdf?v=1765967307",
+      "format": "pdf",
+      "section": "Footer: Důležité sekce",
+      "current": false,
+      "supersededBy": "Výpis ze zdravotní dokumentace (v=1780562021)",
+      "foundOn": ["footer of every page", "/pages/rezervacni-system"]
+    },
+    {
+      "title": "Zdravotní dotazník (older version)",
+      "url": "https://cdn.shopify.com/s/files/1/0913/0799/9614/files/zdravotni_dotaznik_433a8e72-ca12-4aeb-82b1-bb22b579d99c.pdf?v=1768078744",
+      "format": "pdf",
+      "section": "Potřebné dokumenty ke sportovní lékařské prohlídce",
+      "current": false,
+      "supersededBy": "Zdravotní dotazník (v=1780561779)",
+      "foundOn": ["/pages/rezervacni-system"]
+    },
+    {
+      "title": "Souhlas pacienta (GDPR) (older version)",
+      "url": "https://cdn.shopify.com/s/files/1/0913/0799/9614/files/GDPR.pdf?v=1765966970",
+      "format": "pdf",
+      "section": "Potřebné dokumenty ke sportovní lékařské prohlídce",
+      "current": false,
+      "supersededBy": "Souhlas pacienta (GDPR) (GDPR_final.pdf)",
+      "foundOn": ["/pages/rezervacni-system"]
+    },
+    {
+      "title": "Souhlas zákonného zástupce (older version)",
+      "url": "https://cdn.shopify.com/s/files/1/0913/0799/9614/files/Souhlas_zakonneho_zastupce.pdf?v=1765967067",
+      "format": "pdf",
+      "section": "Potřebné dokumenty ke sportovní lékařské prohlídce",
+      "current": false,
+      "supersededBy": "Souhlas zákonného zástupce (v=1780561681)",
+      "foundOn": ["/pages/rezervacni-system"]
+    },
+    {
+      "title": "Sportovní lékařské prohlídky – doporučení (older version)",
+      "url": "https://cdn.shopify.com/s/files/1/0913/0799/9614/files/Informace_pro_pacienta_-_SPORTOVNI_LEKARSKE_PROHLIDKY.pdf?v=1769076513",
+      "format": "pdf",
+      "section": "Důležité informace před vyšetřením",
+      "current": false,
+      "supersededBy": "Sportovní lékařské prohlídky – doporučení (v=1780564931)",
+      "foundOn": ["/pages/sportovni-lekarske-prohlidky", "/pages/rezervacni-system"]
+    },
+    {
+      "title": "InBody měření – doporučení (older version)",
+      "url": "https://cdn.shopify.com/s/files/1/0913/0799/9614/files/Informace_pro_pacienta_InBody.pdf?v=1769076490",
+      "format": "pdf",
+      "section": "Důležité informace k jednotlivým vyšetřením",
+      "current": false,
+      "supersededBy": "InBody měření – doporučení (v=1780564468)",
+      "foundOn": ["/pages/rezervacni-system"]
+    }
+  ],
+  "notOnLiveSite": [
+    "Informovaný souhlas s vyšetřením (PDF) — our dokumenty slot expects one, none is published",
+    "Jak číst výsledky InBody",
+    "Hromadná objednávka / seznam sportovců (tabulka) for clubs",
+    "Obchodní podmínky as a document (only the Shopify 'Podmínky služby' page exists)"
+  ]
+}

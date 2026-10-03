@@ -23,7 +23,7 @@ function HeroButtons() {
   return (
     <>
       <CtaButton to={BOOKING_PATH} height={52} fontSize={16} px={28} sx={{ width: { xs: '100%', sm: 'auto' } }}>{book}</CtaButton>
-      <CtaButton to="/web/cenik" variant="ghostDark" height={52} fontSize={16} px={26} sx={{ width: { xs: '100%', sm: 'auto' } }}>{prices}</CtaButton>
+      <CtaButton to="/cenik" variant="ghostDark" height={52} fontSize={16} px={26} sx={{ width: { xs: '100%', sm: 'auto' } }}>{prices}</CtaButton>
     </>
   );
 }
@@ -76,7 +76,7 @@ function MissionSection() {
       <SlotText slotKey="onas.mission.text" as="p" sx={{ m: 0, fontSize: { xs: 17, md: 19 }, lineHeight: 1.65, color: W.onInk, maxWidth: '62ch' }} />
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: '12px', pt: '6px' }}>
         <CtaButton to={BOOKING_PATH} height={54} fontSize={16} px={28} sx={{ width: { xs: '100%', sm: 'auto' } }}>{book}</CtaButton>
-        <CtaButton to="/web/kontakt" variant="ghostDark" height={54} fontSize={16} px={26} sx={{ width: { xs: '100%', sm: 'auto' } }}>{contact}</CtaButton>
+        <CtaButton to="/kontakt" variant="ghostDark" height={54} fontSize={16} px={26} sx={{ width: { xs: '100%', sm: 'auto' } }}>{contact}</CtaButton>
       </Box>
     </WebSection>
   );

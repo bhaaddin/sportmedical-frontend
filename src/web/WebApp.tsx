@@ -1,5 +1,5 @@
 /* The public bundle's component tree, shared by the server render (entry-server) and the browser
-   (entry-client): theme, the "this is the /web bundle" flag for SiteLink, the route table inside
+   (entry-client): theme, the "this is the public bundle" flag for SiteLink, the route table inside
    the layout, and a not-found page. Providers that differ (router, query client, emotion cache)
    are added by the entries. */
 
@@ -55,7 +55,7 @@ function NotFoundPage() {
   useRouteMeta(NOT_FOUND_META);
   return (
     <PageHero eyebrow="404" title="Stránka nenalezena" lead="Tuto stránku jsme nenašli. Zkuste úvodní stránku nebo objednání termínu.">
-      <CtaButton to="/web" height={54} fontSize={16}>Na úvodní stránku</CtaButton>
+      <CtaButton to="/" height={54} fontSize={16}>Na úvodní stránku</CtaButton>
     </PageHero>
   );
 }

@@ -10,7 +10,7 @@ const club = (over: Partial<Club> = {}): Club => ({
 const block = (over: Partial<ClubBlockView> = {}): ClubBlockView => ({
   id: 'b-1', clubId: 'club-1', clubName: 'FK Slaný', colorHex: '#2E7D6B', name: null, calendarIds: [], activityIds: [],
   fromDate: '2026-10-26', toDate: '2026-11-03', dailyFrom: null, dailyTo: null, playerCount: 40, seats: 40, registered: 0,
-  status: 'Active', registrationToken: null, registrationUrl: null, note: null, createdAtUtc: null, athletes: null, ...over,
+  status: 'Active', registrationToken: null, registrationUrl: null, note: null, createdAtUtc: null, athletes: [], ...over,
 });
 
 describe('block order and liveness', () => {

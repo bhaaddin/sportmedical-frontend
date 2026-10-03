@@ -54,7 +54,7 @@ export function computeCrumbs({
     }
     if (!parent) {
       parent = menu.find((i) => i.path === pathname)
-        ?? menu.find((i) => i.path !== '/' && pathname.startsWith(`${i.path}/`));
+        ?? menu.find((i) => pathname.startsWith(`${i.path}/`));
     }
     if (parent) crumbs.push({ label: parent.text, to: parent.path });
     if (child && child.text !== parent?.text) crumbs.push({ label: child.text });

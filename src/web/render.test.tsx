@@ -22,7 +22,7 @@ describe('render() — the prerender entry', () => {
   });
 
   it('puts the H1, the service names and the footer in the landing HTML', () => {
-    const { html } = render('/web', EMPTY_BOOTSTRAP);
+    const { html } = render('/', EMPTY_BOOTSTRAP);
     const h1 = /<h1[^>]*>(.*?)<\/h1>/.exec(html)?.[1] ?? '';
     expect(h1.replace(/<[^>]+>/g, '|')).toMatch(/Výkon,.*který se dá.*změřit/);
     expect(h1.match(/<br\/>/g)).toHaveLength(2);
@@ -32,30 +32,30 @@ describe('render() — the prerender entry', () => {
   });
 
   it('puts no amount in the HTML when the price list is unknown — a dash, never a remembered number', () => {
-    const { html } = render('/web', EMPTY_BOOTSTRAP);
+    const { html } = render('/', EMPTY_BOOTSTRAP);
     expect(html).not.toMatch(/\d(?:&nbsp;|\s| )*Kč/);
     expect(html).toContain('—');
   });
 
   it('puts the prices of the build-time snapshot in the HTML', () => {
     const data = normalizeBootstrap({ priceList: TEST_PRICE_LIST }, 1);
-    const { html } = render('/web', data);
+    const { html } = render('/', data);
     expect(html).toMatch(/1 234 Kč/);
     expect(html).toMatch(/4 567 Kč/);
     // "Ceník od …" is the cheapest item of the list.
     expect(html).toMatch(/Ceník od 678 Kč/);
-    expect(render('/web', data).data).toBe(data);
+    expect(render('/', data).data).toBe(data);
   });
 
   it('renders the not-found page for an address that is not in the table', () => {
-    const result = render('/web/neexistuje', EMPTY_BOOTSTRAP);
+    const result = render('/neexistuje', EMPTY_BOOTSTRAP);
     expect(result.found).toBe(false);
     expect(result.html).toContain('Stránka nenalezena');
   });
 
   it('is deterministic: the same input gives the same HTML (so hydration matches)', () => {
     const data = normalizeBootstrap({ priceList: TEST_PRICE_LIST }, 1);
-    expect(render('/web', data).html).toBe(render('/web', data).html);
+    expect(render('/', data).html).toBe(render('/', data).html);
   });
 });
 

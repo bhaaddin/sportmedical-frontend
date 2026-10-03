@@ -284,7 +284,7 @@ export default function GroupDiscountsPage() {
               částku k úhradě. Prázdné „Do“ znamená bez horní hranice.
             </Typography>
             <Stack direction="row" spacing={1}>
-              <Button variant="outlined" component={RouterLink} to="/cenik">Otevřít ceník</Button>
+              <Button variant="outlined" component={RouterLink} to="/nastaveni/cenik">Otevřít ceník</Button>
               <Button variant="outlined" component={RouterLink} to="/clubs">Kluby</Button>
             </Stack>
           </SoftCard>

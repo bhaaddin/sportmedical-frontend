@@ -105,8 +105,13 @@ export const clubsApi = {
 export interface ClubSettings {
   /** How many days a club's registration link stays valid. */
   registrationLinkValidityDays: number;
-  /** Below this a block is only warned about - informational, never refused. */
-  minimumPlayers: number;
+  /**
+   * Below this a block is only warned about - informational, never refused.
+   * `null` = no minimum (the default); there is no number in code.
+   */
+  minimumPlayers: number | null;
+  /** Owned by the palette settings; carried through untouched so a save here cannot wipe it. */
+  blockPalette?: unknown;
 }
 
 export const CLUB_SETTINGS_QUERY_KEY = ['settings', 'clubs'] as const;
@@ -116,7 +121,8 @@ function toClubSettings(data: unknown): ClubSettings {
   const num = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
   return {
     registrationLinkValidityDays: num(r.registrationLinkValidityDays, 14),
-    minimumPlayers: num(r.minimumPlayers, 30),
+    minimumPlayers: typeof r.minimumPlayers === 'number' && Number.isFinite(r.minimumPlayers) ? r.minimumPlayers : null,
+    ...(r.blockPalette !== undefined ? { blockPalette: r.blockPalette } : {}),
   };
 }
 

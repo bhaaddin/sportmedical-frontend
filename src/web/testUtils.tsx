@@ -1,5 +1,5 @@
 /* Helpers for the tests of the public site: the providers the real entries add (query client,
-   router, the "this is the /web bundle" flag, the public theme) and a viewport. */
+   router, the "this is the public bundle" flag, the public theme) and a viewport. */
 
 import type { ReactElement } from 'react';
 import { render } from '@testing-library/react';
@@ -24,7 +24,7 @@ export function newTestQueryClient(): QueryClient {
   return new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { retry: false } } });
 }
 
-export function renderWeb(ui: ReactElement, { route = '/web', width = 1440, seed }: RenderWebOptions = {}) {
+export function renderWeb(ui: ReactElement, { route = '/', width = 1440, seed }: RenderWebOptions = {}) {
   setViewport(width);
   const client = newTestQueryClient();
   seedQueryClient(client, seed);

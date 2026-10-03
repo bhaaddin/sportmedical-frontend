@@ -47,6 +47,11 @@ export function assetsForEntry(manifest, entryKey) {
   return { js: [...new Set(js)], css: [...new Set(css)] };
 }
 
+/** Is this HTML a page the prerender wrote (and not the SPA shell Vite produced)? */
+export function isPrerendered(html) {
+  return html.includes('data-prerendered');
+}
+
 /** The woff2 files worth preloading: the faces the first screen is set in, Latin and Latin-ext (Czech). */
 const PRELOAD_FACES = [/^archivo-latin(?:-ext)?-800-normal/, /^public-sans-latin(?:-ext)?-400-normal/];
 
@@ -63,7 +68,7 @@ export function pickFontPreloads(cssText) {
 /**
  * Turns the built index.html (the template) into one prerendered page.
  *
- * @param {string} template  dist/index.html as Vite wrote it
+ * @param {string} template  the SPA shell as Vite wrote it (dist/app.html)
  * @param {object} page
  * @param {string} page.html         markup for inside #root
  * @param {string} page.styles       emotion <style> tags for exactly this page

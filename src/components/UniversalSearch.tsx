@@ -101,7 +101,7 @@ export default function UniversalSearch() {
 
   /* ── Static page results for navigation ── */
   const pages: SearchResult[] = useMemo(() => [
-    { id: 'p-dashboard', title: 'Přehled', subtitle: 'Úvodní plocha', type: 'page', icon: <Home />, path: '/' },
+    { id: 'p-dashboard', title: 'Přehled', subtitle: 'Úvodní plocha', type: 'page', icon: <Home />, path: '/prehled' },
     { id: 'p-calendar', title: 'Kalendář', subtitle: 'Správa termínů', type: 'page', icon: <CalendarMonth />, path: '/planovani' },
     ...(canSeePatients
       ? [{ id: 'p-patients', title: 'Pacienti', subtitle: 'Kartotéka kliniky', type: 'page' as const, icon: <People />, path: '/patients' }]

@@ -161,7 +161,7 @@ export function GroupDiscounts({ alwaysShowClub = false, id }: { alwaysShowClub?
         ))}
         <Box
           component={SiteLink}
-          to="/web/kluby"
+          to="/kluby"
           sx={[
             { flex: '1 1 180px', p: '18px 20px', display: 'flex', flexDirection: 'column', gap: '5px', textDecoration: 'none', color: W.text, minHeight: 44 },
             CARD_SX as object,

@@ -139,8 +139,8 @@ export function ClubSection() {
             </Box>
           )}
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: '13px', pt: '8px' }}>
-            <CtaButton to="/web/kluby" height={54} px={28} fontSize={16} sx={{ width: { xs: '100%', sm: 'auto' } }}>{inquiry}</CtaButton>
-            <CtaButton to="/web/kluby#mam-odkaz" variant="ghostDark" height={54} px={26} fontSize={16} sx={{ width: { xs: '100%', sm: 'auto' } }}>{link}</CtaButton>
+            <CtaButton to="/kluby" height={54} px={28} fontSize={16} sx={{ width: { xs: '100%', sm: 'auto' } }}>{inquiry}</CtaButton>
+            <CtaButton to="/kluby#mam-odkaz" variant="ghostDark" height={54} px={26} fontSize={16} sx={{ width: { xs: '100%', sm: 'auto' } }}>{link}</CtaButton>
           </Box>
         </Box>
         <MediaSlot
@@ -166,7 +166,7 @@ export function PhilosophySection() {
         as="blockquote"
         sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 600, fontSize: 'clamp(20px, 2.6vw, 29px)', lineHeight: 1.38, letterSpacing: '-0.02em' }}
       />
-      <ArrowLink to="/web/o-nas" sx={{ alignSelf: 'center' }}>{link}</ArrowLink>
+      <ArrowLink to="/o-nas" sx={{ alignSelf: 'center' }}>{link}</ArrowLink>
     </WebSection>
   );
 }

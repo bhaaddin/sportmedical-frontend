@@ -59,28 +59,46 @@ export interface PortalInvoice {
   status: string;
 }
 
+/** One training zone of a measurement, as the doctor entered it. */
+export interface PortalTrainingZone {
+  name: string;
+  fromBpm?: number | null;
+  toBpm?: number | null;
+  note?: string | null;
+}
+
 /**
  * One diagnostic session as the patient's own portal shows it (Výsledky).
  *
- * The same facts a session stores (DiagnosticSession); the doctor's manual
- * entry travels in `rawPractitionerNotes` as the labelled "[Ruční zápis]"
- * block, which the page reads with `parseManualExtras`. A value the session
- * does not carry arrives null or 0 and is shown as "—".
+ * The measured values are real columns of the session (contract C-M). The
+ * doctor's own notes are NEVER part of this: `rawPractitionerNotes` is not
+ * sent to the portal. A value the session does not carry arrives null, absent
+ * or 0 and is shown as "—".
  */
 export interface PortalResult {
   id: string;
   /** When the session was recorded. */
   sessionDate: string;
+  /** yyyy-MM-dd - the day of the measurement; absent on older sessions. */
+  measuredOn?: string | null;
   practitionerName?: string | null;
   restingHeartRateBpm?: number | null;
   maxHeartRateBpm?: number | null;
   vo2MaxMlMinKg?: number | null;
   anaerobicThresholdBpm?: number | null;
+  /** The anaerobic threshold as a share of VO₂max, 0-100. */
+  thresholdPercentVo2Max?: number | null;
+  maxPowerWatts?: number | null;
+  weightKg?: number | null;
+  /** Computed by the server (power / weight), 2 decimals; null unless both exist. */
+  powerPerKg?: number | null;
+  trainingZones?: PortalTrainingZone[] | null;
+  device?: string | null;
+  protocolType?: string | null;
   systolicBloodPressure?: number | null;
   diastolicBloodPressure?: number | null;
   bodyFatPercentage?: number | null;
   muscleMassKg?: number | null;
-  rawPractitionerNotes?: string | null;
 }
 
 export interface PortalDashboard {

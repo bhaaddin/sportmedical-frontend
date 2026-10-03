@@ -4,10 +4,11 @@
    Two numbers the clinic decides about club blocks, nothing hard-coded:
 
      registrationLinkValidityDays   how long a club's registration link stays
-                                    valid (default 14 days)
-     minimumPlayers                 below this a new block only shows a warning
-                                    in the calculator (default 30) - it never
-                                    refuses
+                                    valid
+     minimumPlayers                 optional. Empty = no minimum (saved as
+                                    null). When set, the calculator warns
+                                    below it and the public Kluby page names it
+                                    - it never refuses a block
 
      GET/PUT /api/v1/settings/clubs
 
@@ -36,7 +37,7 @@ interface Draft {
 
 const toDraft = (s: ClubSettings): Draft => ({
   registrationLinkValidityDays: String(s.registrationLinkValidityDays),
-  minimumPlayers: String(s.minimumPlayers),
+  minimumPlayers: s.minimumPlayers === null ? '' : String(s.minimumPlayers),
 });
 
 const wholeNumber = (text: string): number | null => {
@@ -51,8 +52,11 @@ export function validateClubSettings(draft: Draft): Partial<Record<keyof Draft, 
   if (days === null) errors.registrationLinkValidityDays = 'Zadejte celý počet dní.';
   else if (days < 1) errors.registrationLinkValidityDays = 'Odkaz musí platit aspoň jeden den.';
   else if (days > 3650) errors.registrationLinkValidityDays = 'Víc než deset let je nejspíš překlep.';
-  const players = wholeNumber(draft.minimumPlayers);
-  if (players === null) errors.minimumPlayers = 'Zadejte celý počet hráčů (0 = bez upozornění).';
+  /* Empty is a valid answer: no minimum. */
+  if (draft.minimumPlayers.trim() !== '') {
+    const players = wholeNumber(draft.minimumPlayers);
+    if (players === null || players < 1) errors.minimumPlayers = 'Zadejte celý počet sportovců od 1, nebo pole nechte prázdné.';
+  }
   return errors;
 }
 
@@ -96,9 +100,11 @@ export default function ClubSettingsPage() {
   const submit = () => {
     setAttempted(true);
     if (draft === null || !valid) return;
+    if (saved === undefined) return;
     save.mutate({
+      ...saved,
       registrationLinkValidityDays: wholeNumber(draft.registrationLinkValidityDays) as number,
-      minimumPlayers: wholeNumber(draft.minimumPlayers) as number,
+      minimumPlayers: draft.minimumPlayers.trim() === '' ? null : (wholeNumber(draft.minimumPlayers) as number),
     });
   };
 
@@ -123,7 +129,7 @@ export default function ClubSettingsPage() {
   return (
     <SettingsScreen
       title="Nastavení klubů"
-      subtitle="Platnost registračních odkazů a doporučené minimum hráčů v bloku."
+      subtitle="Platnost registračních odkazů a nepovinné minimum sportovců v bloku."
       width={760}
       scope="clubs"
       save={{ dirty, saving: save.isPending, onSave: submit, onDiscard: discard }}
@@ -142,7 +148,7 @@ export default function ClubSettingsPage() {
               value={draft.registrationLinkValidityDays}
               onChange={(e) => edit('registrationLinkValidityDays', e.target.value)}
               error={fieldError('registrationLinkValidityDays') !== undefined}
-              helperText={fieldError('registrationLinkValidityDays') ?? 'Po tolika dnech od založení bloku sportovci přes odkaz už nevstoupí. Výchozí je 14 dní.'}
+              helperText={fieldError('registrationLinkValidityDays') ?? 'Po tolika dnech od založení bloku sportovci přes odkaz už nevstoupí.'}
               size={phone ? 'medium' : 'small'}
               fullWidth
               slotProps={{
@@ -155,16 +161,16 @@ export default function ClubSettingsPage() {
           <SoftCard>
             <SectionLabel>Velikost bloku</SectionLabel>
             <TextField
-              label="Doporučené minimum hráčů"
+              label="Minimální počet sportovců pro blok (nepovinné)"
               value={draft.minimumPlayers}
               onChange={(e) => edit('minimumPlayers', e.target.value)}
               error={fieldError('minimumPlayers') !== undefined}
-              helperText={fieldError('minimumPlayers') ?? 'Blok s menším počtem hráčů jde vytvořit, kalkulačka jen upozorní, že se nemusí vyplatit. 0 = bez upozornění.'}
+              helperText={fieldError('minimumPlayers') ?? 'Pro mobilní testování. Prázdné pole = bez minima. Je-li číslo vyplněno, kalkulačka u menšího bloku upozorní a veřejná stránka Kluby minimum uvede; blok jde vytvořit i tak.'}
               size={phone ? 'medium' : 'small'}
               fullWidth
               slotProps={{
                 htmlInput: { inputMode: 'numeric' },
-                input: { endAdornment: <InputAdornment position="end">hráčů</InputAdornment> },
+                input: { endAdornment: <InputAdornment position="end">sportovců</InputAdornment> },
               }}
             />
           </SoftCard>
@@ -172,7 +178,7 @@ export default function ClubSettingsPage() {
           <SoftCard tone="muted">
             <SectionLabel>Jak se to používá</SectionLabel>
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Horní strop počtu hráčů neexistuje — blok může mít 20 i 2 000 hráčů, kalkulačka spočítá, kolik dní potřebuje.
+              Horní strop počtu hráčů neexistuje — kalkulačka spočítá, kolik dní blok potřebuje.
               Slevu pro klub nastavuje administrátor v kartě klubu v sekci{' '}
               <Box component={RouterLink} to="/clubs" sx={{ color: 'primary.main' }}>Kluby a týmy</Box>.
             </Typography>

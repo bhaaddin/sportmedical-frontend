@@ -5,7 +5,7 @@
    and hours come from the clinic's own settings (GET /api/public/clinic); a field
    the clinic has not filled in falls back to the text slot `site.footer.*`
    (editable in "Média a texty", default = the clinic's published details).
-   `content` is passed by the /web layout (the admin's slot texts); the application's
+   `content` is passed by the public layout (the admin's slot texts); the application's
    public pages pass nothing and get the registry defaults — no react-query needed.
    ══════════════════════════════════════════════════════════════ */
 
@@ -20,6 +20,7 @@ import { Lines } from '../../site/SlotText';
 import { mapsHref, telHref } from './brand';
 import { Brand } from './PublicHeader';
 import { SITE } from '../../pages/public/content';
+import { LOGIN_PATH } from '../../web/sitePaths';
 
 const colLabel = { fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: W.onInkMuted } as const;
 const linkStyle = {
@@ -86,10 +87,10 @@ export function PublicFooter({ clinic, content = DEFAULT_SITE_CONTENT }: { clini
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 0, md: '6px' }, minWidth: 0 }}>
             <Box component="span" sx={{ ...colLabel, mb: { xs: '4px', md: '4px' } }}>Odkazy</Box>
-            <Box component={SiteLink} to="/web/cenik" sx={linkStyle}>Ceník služeb</Box>
-            <Box component={SiteLink} to="/web/kluby" sx={linkStyle}>Pro kluby</Box>
+            <Box component={SiteLink} to="/cenik" sx={linkStyle}>Ceník služeb</Box>
+            <Box component={SiteLink} to="/kluby" sx={linkStyle}>Pro kluby</Box>
             <Box component={SiteLink} to="/portal/prihlaseni" sx={linkStyle}>Můj portál</Box>
-            <Box component={SiteLink} to="/web/dokumenty" sx={linkStyle}>Dokumenty k testům</Box>
+            <Box component={SiteLink} to="/dokumenty" sx={linkStyle}>Dokumenty k testům</Box>
             {SITE.policies.map((policy) => (
               <Box key={policy.href} component="a" href={policy.href} target="_blank" rel="noopener noreferrer" sx={linkStyle}>
                 Zpracování osobních údajů
@@ -100,7 +101,20 @@ export function PublicFooter({ clinic, content = DEFAULT_SITE_CONTENT }: { clini
 
         <Box sx={{ mt: { xs: '32px', md: '34px' }, pt: '22px', borderTop: `1px solid ${W.inkLine}`, fontSize: 13, color: W.onInkMuted, display: 'flex', flexWrap: 'wrap', gap: '8px 24px', justifyContent: 'space-between' }}>
           <span>{slot('site.footer.legal')}</span>
-          <span suppressHydrationWarning>© {new Date().getFullYear()} {SITE.legalName}</span>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0 24px' }}>
+            {/* The way into the staff portal: for the clinic's own people, so it is small and sits in the legal line, not in the menu. */}
+            <Box
+              component={SiteLink}
+              to={LOGIN_PATH}
+              sx={{
+                display: 'inline-flex', alignItems: 'center', minHeight: 44, fontSize: 13, color: W.onInkMuted, textDecoration: 'none',
+                '&:hover': { color: W.white, textDecoration: 'underline' },
+              }}
+            >
+              Pro personál
+            </Box>
+            <span suppressHydrationWarning>© {new Date().getFullYear()} {SITE.legalName}</span>
+          </Box>
         </Box>
       </Box>
     </Box>

@@ -21,6 +21,7 @@ import { signOut } from '../../auth/signOut';
 import { AppearanceControls } from './AccountMenu';
 import { Trail, type Crumb } from './whereAmI';
 import { isActivePath, shortLabel } from './shellModel';
+import { STAFF_HOME_PATH } from '../../web/sitePaths';
 import { BAR_HEIGHT, activeBg, focusRing } from './shellStyles';
 import type { MenuEntry, ShellNav } from './shellTypes';
 
@@ -171,7 +172,7 @@ export function PhoneBottomBar({ nav }: { nav: ShellNav }) {
   const results = entry('/diagnostics/new');
   const resultKids = (results?.children ?? []).filter((c) => c.path !== '/statistiky');
   const statistics = results?.children?.find((c) => c.path === '/statistiky');
-  const overview = entry('/');
+  const overview = entry(STAFF_HOME_PATH);
   const settings = entry('/settings');
   /* The screens that belong under the bar's entries - there is no sidebar to show them. */
   const withScreens = bar.filter((e) => (e.children?.length ?? 0) > 0);

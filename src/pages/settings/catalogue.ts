@@ -179,7 +179,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         id: 'sluzby',
         label: 'Služby',
         description: 'Co ordinace dělá — činnosti patří pod službu a kalendář službu provozuje',
-        to: '/sluzby',
+        to: '/nastaveni/sluzby',
         keywords: ['služba', 'služby', 'nabídka', 'co děláme', 'prohlídka'],
         requires: 'settings.clinic.manage',
       },
@@ -195,7 +195,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         id: 'cenik',
         label: 'Ceník',
         description: 'Co ordinace účtuje — odsud si činnost bere svou cenu',
-        to: '/cenik',
+        to: '/nastaveni/cenik',
         keywords: ['ceny', 'cena', 'kč', 'ceník', 'položka', 'položky', 'kolik stojí', 'sazba', 'účtování'],
       },
       {

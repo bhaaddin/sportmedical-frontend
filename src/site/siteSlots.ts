@@ -17,6 +17,16 @@ import { dokumentySlots } from './slots/dokumenty';
 import { kontaktSlots } from './slots/kontakt';
 import { onasSlots } from './slots/onas';
 import { klubySlots } from './slots/kluby';
+import { otazkySlots } from './slots/otazky';
+import { podminkySlots } from './slots/podminky';
+import { soukromiSlots } from './slots/soukromi';
+import { stornoSlots } from './slots/storno';
+import { vybaveniSlots } from './slots/vybaveni';
+import { partneriSlots } from './slots/partneri';
+import { diagzakladniSlots } from './slots/diagzakladni';
+import { diagkomplexniSlots } from './slots/diagkomplexni';
+import { diagvo2maxSlots } from './slots/diagvo2max';
+import { diagkompenzacniSlots } from './slots/diagkompenzacni';
 import { spolecneSlots } from './slots/spolecne';
 
 export type { SlotDef, SlotKind } from './slotTypes';
@@ -35,6 +45,16 @@ export const SLOTS_BY_PAGE = {
   kontakt: kontaktSlots,
   onas: onasSlots,
   kluby: klubySlots,
+  otazky: otazkySlots,
+  podminky: podminkySlots,
+  soukromi: soukromiSlots,
+  storno: stornoSlots,
+  vybaveni: vybaveniSlots,
+  partneri: partneriSlots,
+  diagzakladni: diagzakladniSlots,
+  diagkomplexni: diagkomplexniSlots,
+  diagvo2max: diagvo2maxSlots,
+  diagkompenzacni: diagkompenzacniSlots,
 } as const;
 
 export const SLOT_REGISTRY: SlotDef[] = Object.values(SLOTS_BY_PAGE).flat();

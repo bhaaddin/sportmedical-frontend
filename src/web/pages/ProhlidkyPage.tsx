@@ -80,7 +80,7 @@ export default function ProhlidkyPage() {
 
       <PageSection title="prohlidky.info.title" tone="warm">
         <InfoCards prefix="prohlidky.info" count={4} numbered />
-        <ArrowLink to="/web/dokumenty">{docs}</ArrowLink>
+        <ArrowLink to="/dokumenty">{docs}</ArrowLink>
       </PageSection>
 
       <PageSection title="prohlidky.flow.title" lead="prohlidky.flow.lead">

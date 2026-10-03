@@ -6,7 +6,7 @@
    into a menu panel (every target ≥ 44 px); the booking button stays in the bar
    on an iPad and moves to the pinned bottom bar on a phone (WebLayout).
 
-   The same header sits on the prerendered /web pages and on the application's
+   The same header sits on the prerendered public pages and on the application's
    public pages (PublicLayout); `SiteLink` takes care of which links are
    client-side and which are real page loads.
    ══════════════════════════════════════════════════════════════ */
@@ -19,6 +19,8 @@ import { SiteLink } from '../../web/SiteLink';
 import { ArrowIcon, ChevronDownIcon, CtaButton, PersonIcon } from '../../web/ui';
 import { FONT_HEAD, GUTTER, MAX_WIDTH, MQ, W } from '../../web/tokens';
 import { SITE } from '../../pages/public/content';
+import { SITE_HOME_PATH, STAFF_HOME_PATH } from '../../web/sitePaths';
+import { useStaffSession } from '../../web/useStaffSession';
 
 export interface HeaderSection {
   label: string;
@@ -26,7 +28,7 @@ export interface HeaderSection {
   anchor: string;
 }
 
-/** @deprecated The sections are pages of /web now (see NAV_LINKS); kept so old imports compile. */
+/** @deprecated The sections are pages of the public site now (see NAV_LINKS); kept so old imports compile. */
 export const LANDING_SECTIONS: HeaderSection[] = [
   { label: 'Služby', anchor: 'sluzby' },
   { label: 'Ceník', anchor: 'cenik' },
@@ -38,24 +40,24 @@ export const LANDING_SECTIONS: HeaderSection[] = [
 export const LANDING_PATH = '/objednat';
 export const BOOKING_PATH = LANDING_PATH;
 export const PORTAL_SIGN_IN_PATH = '/portal/prihlaseni';
-export const WEB_HOME_PATH = '/web';
+export const WEB_HOME_PATH = SITE_HOME_PATH;
 
 export interface NavLinkDef { label: string; to: string }
 export interface ServiceMenuItem { label: string; hint: string; to: string }
 
 export const SERVICE_MENU: ServiceMenuItem[] = [
-  { label: 'Sportovní lékařské prohlídky', hint: 'Základní · Komplexní · Spiroergometrie', to: '/web/prohlidky' },
-  { label: 'Sportovní diagnostika', hint: 'VO₂max · ForceDecks · HumanTrak', to: '/web/diagnostika' },
-  { label: 'InBody 770', hint: 'Složení těla · výživový plán', to: '/web/inbody' },
+  { label: 'Sportovní lékařské prohlídky', hint: 'Základní · Komplexní · Spiroergometrie', to: '/prohlidky' },
+  { label: 'Sportovní diagnostika', hint: 'VO₂max · ForceDecks · HumanTrak', to: '/diagnostika' },
+  { label: 'InBody 770', hint: 'Složení těla · výživový plán', to: '/inbody' },
 ];
 
-export const NAV_BEFORE_SERVICES: NavLinkDef[] = [{ label: 'O nás', to: '/web/o-nas' }];
-export const SERVICES_LINK: NavLinkDef = { label: 'Služby', to: '/web/sluzby' };
+export const NAV_BEFORE_SERVICES: NavLinkDef[] = [{ label: 'O nás', to: '/o-nas' }];
+export const SERVICES_LINK: NavLinkDef = { label: 'Služby', to: '/sluzby' };
 export const NAV_AFTER_SERVICES: NavLinkDef[] = [
-  { label: 'Ceník', to: '/web/cenik' },
-  { label: 'Pro kluby', to: '/web/kluby' },
-  { label: 'Dokumenty', to: '/web/dokumenty' },
-  { label: 'Kontakt', to: '/web/kontakt' },
+  { label: 'Ceník', to: '/cenik' },
+  { label: 'Pro kluby', to: '/kluby' },
+  { label: 'Dokumenty', to: '/dokumenty' },
+  { label: 'Kontakt', to: '/kontakt' },
 ];
 
 /**
@@ -108,6 +110,8 @@ const navItem = {
 export function PublicHeader({ extra, hidePortalLink = false }: PublicHeaderProps) {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
+  /* False on the server and on the first client render (the page is prerendered), true after mount for a signed-in staff member. */
+  const staffSignedIn = useStaffSession();
 
   // A navigation closes the panel; Escape too.
   useEffect(() => { setOpen(false); }, [pathname]);
@@ -192,6 +196,19 @@ export function PublicHeader({ extra, hidePortalLink = false }: PublicHeaderProp
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           {extra}
+          {staffSignedIn && (
+            <Box
+              component={SiteLink}
+              to={STAFF_HOME_PATH}
+              data-testid="to-app-link"
+              sx={{
+                ...navItem, display: 'none', [MQ.nav]: { display: 'flex' }, p: 0, fontSize: 13, color: W.onInkMuted,
+                textDecoration: 'underline', textUnderlineOffset: '3px', textDecorationColor: W.inkBorder,
+              }}
+            >
+              Do aplikace
+            </Box>
+          )}
           {!hidePortalLink && (
             <Box
               component={SiteLink}
@@ -250,6 +267,7 @@ export function PublicHeader({ extra, hidePortalLink = false }: PublicHeaderProp
             {NAV_AFTER_SERVICES.map((item) => (
               <MobileLink key={item.to} to={item.to} current={current(item.to)}>{item.label}</MobileLink>
             ))}
+            {staffSignedIn && <MobileLink to={STAFF_HOME_PATH}>Do aplikace</MobileLink>}
             {!hidePortalLink && (
               <MobileLink to={PORTAL_SIGN_IN_PATH}>
                 <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>

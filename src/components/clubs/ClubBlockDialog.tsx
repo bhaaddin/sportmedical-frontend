@@ -31,7 +31,7 @@ import { Close } from '@mui/icons-material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { calendarsApi } from '../../api/calendars';
-import { clubSettingsApi, clubsApi, CLUB_SETTINGS_QUERY_KEY } from '../../api/clubs';
+import { clubsApi } from '../../api/clubs';
 import type { Club } from '../../api/clubs';
 import { clubBlocksApi, ClubBlockError, fetchBlockableActivities } from '../../api/clubBlocks';
 import type { ClubBlockConflict, ClubBlockView } from '../../api/clubBlocks';
@@ -125,7 +125,6 @@ export function ClubBlockDialog({
 
   const calendarsQuery = useQuery({ queryKey: ['calendars'], queryFn: calendarsApi.list, staleTime: 5 * 60 * 1000 });
   const activitiesQuery = useQuery({ queryKey: ['club-block-activities'], queryFn: fetchBlockableActivities, staleTime: 5 * 60 * 1000 });
-  const settingsQuery = useQuery({ queryKey: CLUB_SETTINGS_QUERY_KEY, queryFn: clubSettingsApi.get, staleTime: 5 * 60 * 1000, retry: false });
 
   const calendars = useMemo(() => (calendarsQuery.data ?? []).filter((c) => c.isActive), [calendarsQuery.data]);
   const activities = activitiesQuery.data ?? [];
@@ -516,7 +515,6 @@ export function ClubBlockDialog({
         activityIds={draft.activityIds}
         calendarIds={draft.calendarIds}
         fromDate={draft.fromDate}
-        minimumPlayers={settingsQuery.data?.minimumPlayers ?? null}
         onApply={(from, to) => {
           setDraft((d) => ({ ...d, fromDate: from, toDate: to }));
           setConflicts(null);

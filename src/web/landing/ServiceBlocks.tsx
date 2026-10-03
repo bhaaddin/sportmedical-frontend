@@ -24,9 +24,9 @@ interface BlockDef {
 }
 
 const BLOCKS: BlockDef[] = [
-  { n: 1, to: '/web/prohlidky', spec: ROW_SPECS.prohlidky, fallback: FALLBACK_ROWS.prohlidky, layout: 'a' },
-  { n: 2, to: '/web/diagnostika', spec: ROW_SPECS.diagnostika, fallback: FALLBACK_ROWS.diagnostika, layout: 'b' },
-  { n: 3, to: '/web/inbody', spec: ROW_SPECS.inbody, fallback: FALLBACK_ROWS.inbody, layout: 'c' },
+  { n: 1, to: '/prohlidky', spec: ROW_SPECS.prohlidky, fallback: FALLBACK_ROWS.prohlidky, layout: 'a' },
+  { n: 2, to: '/diagnostika', spec: ROW_SPECS.diagnostika, fallback: FALLBACK_ROWS.diagnostika, layout: 'b' },
+  { n: 3, to: '/inbody', spec: ROW_SPECS.inbody, fallback: FALLBACK_ROWS.inbody, layout: 'c' },
 ];
 
 function ServiceBlock({ def }: { def: BlockDef }) {
@@ -104,7 +104,7 @@ export function ServiceBlocks() {
           <Eyebrow><SlotText slotKey="landing.services.eyebrow" /></Eyebrow>
           <SectionTitle><SlotText slotKey="landing.services.title" /></SectionTitle>
         </Box>
-        <CtaButton to="/web/cenik" variant="ghostLight" height={50} fontSize={16} arrow>{allPrices}</CtaButton>
+        <CtaButton to="/cenik" variant="ghostLight" height={50} fontSize={16} arrow>{allPrices}</CtaButton>
       </Box>
       {BLOCKS.map((def) => (
         <ServiceBlock key={def.n} def={def} />

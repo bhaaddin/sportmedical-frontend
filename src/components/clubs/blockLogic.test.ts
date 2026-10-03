@@ -9,7 +9,7 @@ import type { BlockDraft } from './blockLogic';
 const calc = (over: Partial<Calculation> = {}): Calculation => ({
   minutesPerPlayer: 60, parallelCapacity: 2, neededMinutes: 3600, dailyOpenMinutes: 600,
   suggestedDays: 7, suggestedFrom: '2026-10-26', suggestedTo: '2026-11-03', fitsHorizon: true,
-  minimumPlayers: null, perDay: [], ...over,
+  minimumPlayers: null, belowMinimum: false, perDay: [], ...over,
 });
 
 const draft = (over: Partial<BlockDraft> = {}): BlockDraft => ({

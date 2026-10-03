@@ -1,5 +1,6 @@
 import client from './client';
 import { AxiosError } from 'axios';
+import { z } from 'zod';
 
 /*
  * Club blocks - Etapa 2 contract C4 (`docs/etapa2/BRIEF.md`).
@@ -29,14 +30,22 @@ import { AxiosError } from 'axios';
 
 export type ClubBlockStatus = 'Active' | 'Cancelled';
 
-/** One athlete who took a place inside the block. Optional on the detail read. */
+export const ATHLETE_STATUSES = ['Booked', 'Attended', 'NoShow', 'Cancelled'] as const;
+export type ClubBlockAthleteStatus = (typeof ATHLETE_STATUSES)[number];
+
+/**
+ * One athlete registered through the block's link (contract C-C). Names are as
+ * the athlete entered them; the server never sends a birth number, and neither
+ * does this type carry one.
+ */
 export interface ClubBlockAthlete {
   id: string;
   name: string;
   activityName: string;
   startUtc: string | null;
-  /** False while the questionnaire or a required document is missing. */
-  ready: boolean;
+  endUtc: string | null;
+  status: ClubBlockAthleteStatus;
+  phone: string | null;
 }
 
 export interface ClubBlockView {
@@ -60,8 +69,8 @@ export interface ClubBlockView {
   registrationUrl: string | null;
   note: string | null;
   createdAtUtc: string | null;
-  /** Only the detail read (`GET /{id}`) lists them; the list read leaves it out. */
-  athletes: ClubBlockAthlete[] | null;
+  /** Newest registration last. Missing in the answer = no athletes yet = []. */
+  athletes: ClubBlockAthlete[];
 }
 
 export interface ClubBlockInput {
@@ -116,17 +125,15 @@ export interface Calculation {
   suggestedTo: string | null;
   /** False when the need does not fit into the booking horizon. Absent means "fits". */
   fitsHorizon: boolean;
-  /** When the server sends the warning threshold with the answer. */
+  /** The clinic's minimum (club settings), or null when none is set. */
   minimumPlayers: number | null;
+  /** The server's verdict; false whenever `minimumPlayers` is null. */
+  belowMinimum: boolean;
   perDay: DayOpen[];
 }
 
-/** An athlete a shortening or a cancellation would hit. */
-export interface ClubBlockConflict {
-  name: string;
-  activityName: string | null;
-  startUtc: string | null;
-}
+/** An athlete a shortening or a cancellation would hit: the same shape as in the block (`affectedAthletes`). */
+export type ClubBlockConflict = ClubBlockAthlete;
 
 /* ── Reading ── */
 
@@ -137,26 +144,31 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
 const dateOnly = (v: unknown): string => (typeof v === 'string' ? v.slice(0, 10) : '');
 const hhmm = (v: unknown): string | null => (typeof v === 'string' && v.length >= 5 ? v.slice(0, 5) : null);
 
-function toAthlete(raw: unknown, index: number): ClubBlockAthlete | null {
-  if (!isRecord(raw)) return null;
-  const name = str(raw.name) ?? str(raw.patientName) ?? str(raw.athleteName);
-  if (name === null) return null;
-  const paperwork = isRecord(raw.paperwork) ? raw.paperwork : null;
-  return {
-    id: str(raw.id) ?? str(raw.appointmentId) ?? `athlete-${index}`,
-    name,
-    activityName: str(raw.activityName) ?? '',
-    startUtc: str(raw.startUtc),
-    ready: typeof raw.ready === 'boolean' ? raw.ready : paperwork !== null ? paperwork.ready !== false : true,
-  };
+const text = z.preprocess((v) => (typeof v === 'string' && v.trim() !== '' ? v : null), z.string().nullable());
+
+const athleteSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().trim().min(1),
+  activityName: text,
+  startUtc: text,
+  endUtc: text,
+  status: z.enum(ATHLETE_STATUSES).catch('Booked'),
+  phone: text,
+});
+
+/** Athletes that cannot be read (no name) are left out; a list that is not a list is empty. */
+export function toAthletes(raw: unknown): ClubBlockAthlete[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item, index): ClubBlockAthlete[] => {
+    const withId = isRecord(item) && typeof item.id !== 'string' ? { ...item, id: `athlete-${index}` } : item;
+    const parsed = athleteSchema.safeParse(withId);
+    return parsed.success ? [{ ...parsed.data, activityName: parsed.data.activityName ?? '' }] : [];
+  });
 }
 
 export function toBlock(raw: unknown): ClubBlockView {
   const r = isRecord(raw) ? raw : {};
   const status = typeof r.status === 'string' && r.status.toLowerCase().startsWith('cancel') ? 'Cancelled' : 'Active';
-  const athletes = Array.isArray(r.athletes)
-    ? r.athletes.map(toAthlete).filter((a): a is ClubBlockAthlete => a !== null)
-    : null;
   return {
     id: str(r.id) ?? '',
     clubId: str(r.clubId) ?? '',
@@ -177,7 +189,7 @@ export function toBlock(raw: unknown): ClubBlockView {
     registrationUrl: str(r.registrationUrl),
     note: str(r.note),
     createdAtUtc: str(r.createdAtUtc),
-    athletes,
+    athletes: toAthletes(r.athletes),
   };
 }
 
@@ -198,6 +210,7 @@ export function toCalculation(raw: unknown): Calculation {
         .map((d) => ({ date: dateOnly(d.date), openMinutes: num(d.openMinutes) }))
         .filter((d) => d.date !== '')
     : [];
+  const minimumPlayers = typeof r.minimumPlayers === 'number' && Number.isFinite(r.minimumPlayers) ? r.minimumPlayers : null;
   return {
     minutesPerPlayer: num(r.minutesPerPlayer),
     parallelCapacity: Math.max(1, num(r.parallelCapacity, 1)),
@@ -207,7 +220,8 @@ export function toCalculation(raw: unknown): Calculation {
     suggestedFrom: str(r.suggestedFrom) ? dateOnly(r.suggestedFrom) : null,
     suggestedTo: str(r.suggestedTo) ? dateOnly(r.suggestedTo) : null,
     fitsHorizon: r.fitsHorizon !== false,
-    minimumPlayers: typeof r.minimumPlayers === 'number' ? r.minimumPlayers : null,
+    minimumPlayers,
+    belowMinimum: minimumPlayers !== null && r.belowMinimum === true,
     perDay,
   };
 }
@@ -244,16 +258,7 @@ const FALLBACK_BY_STATUS: Record<number, string> = {
 };
 
 function conflictsOf(data: unknown): ClubBlockConflict[] {
-  if (!isRecord(data)) return [];
-  const list = data.affected ?? data.athletes ?? data.conflicts ?? data.appointments ?? data.affectedAthletes;
-  if (!Array.isArray(list)) return [];
-  return list
-    .filter(isRecord)
-    .map((a) => ({
-      name: str(a.name) ?? str(a.patientName) ?? str(a.athleteName) ?? 'Sportovec',
-      activityName: str(a.activityName),
-      startUtc: str(a.startUtc),
-    }));
+  return isRecord(data) ? toAthletes(data.affectedAthletes) : [];
 }
 
 function fieldsOf(data: unknown): Record<string, string> {

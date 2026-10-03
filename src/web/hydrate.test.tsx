@@ -28,7 +28,7 @@ afterEach(() => {
 });
 
 describe('hydrating a prerendered page', () => {
-  it.each(['/web', '/web/cenik', '/web/kluby'])('adopts the server HTML of %s without a mismatch', async (path) => {
+  it.each(['/', '/cenik', '/kluby'])('adopts the server HTML of %s without a mismatch', async (path) => {
     const data = normalizeBootstrap({ priceList: TEST_PRICE_LIST }, 1);
     const result = render(path, data);
 
@@ -52,12 +52,12 @@ describe('hydrating a prerendered page', () => {
 
   it('shows the snapshot prices after hydration even though the refresh failed', async () => {
     const data = normalizeBootstrap({ priceList: TEST_PRICE_LIST }, 1);
-    const result = render('/web', data);
+    const result = render('/', data);
     document.body.innerHTML = '<div id="root" data-prerendered="1"></div>';
     const container = document.getElementById('root') as HTMLElement;
     container.innerHTML = result.html;
     window.__SM_WEB__ = result.data;
-    window.history.pushState({}, '', '/web');
+    window.history.pushState({}, '', '/');
 
     await act(async () => { mountWeb(container); });
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 30)); });
@@ -68,7 +68,7 @@ describe('hydrating a prerendered page', () => {
   it('renders from scratch when the page was not prerendered (the dev server)', async () => {
     document.body.innerHTML = '<div id="root"></div>';
     const container = document.getElementById('root') as HTMLElement;
-    window.history.pushState({}, '', '/web/kontakt');
+    window.history.pushState({}, '', '/kontakt');
     await act(async () => { mountWeb(container); });
     expect(container.querySelector('h1')?.textContent).toBe('Najdete nás v Michli');
     expect(document.title).toContain('Kontakt');

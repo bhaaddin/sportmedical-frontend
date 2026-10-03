@@ -152,7 +152,7 @@ function AskBand() {
 
 function ClubsLink() {
   const label = useSlotText('kontakt.ask.cta.clubs');
-  return <CtaButton to="/web/kluby" variant="ghostDark" height={44} px={0} fontSize={15} arrow sx={{ border: 'none', justifyContent: 'flex-start', '&:hover': { boxShadow: 'none', transform: 'none', color: W.orange } }}>{label}</CtaButton>;
+  return <CtaButton to="/kluby" variant="ghostDark" height={44} px={0} fontSize={15} arrow sx={{ border: 'none', justifyContent: 'flex-start', '&:hover': { boxShadow: 'none', transform: 'none', color: W.orange } }}>{label}</CtaButton>;
 }
 
 /* ── Billing details ── */
@@ -228,7 +228,7 @@ function HeroButtons() {
   return (
     <>
       <CtaButton to={BOOKING_PATH} height={52} fontSize={16} px={28} sx={{ width: { xs: '100%', sm: 'auto' } }}>{book}</CtaButton>
-      <CtaButton to="/web/cenik" variant="ghostDark" height={52} fontSize={16} px={26} sx={{ width: { xs: '100%', sm: 'auto' } }}>{prices}</CtaButton>
+      <CtaButton to="/cenik" variant="ghostDark" height={52} fontSize={16} px={26} sx={{ width: { xs: '100%', sm: 'auto' } }}>{prices}</CtaButton>
     </>
   );
 }

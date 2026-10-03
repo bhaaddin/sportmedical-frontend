@@ -37,15 +37,18 @@ const refused = (status: number, data: unknown) => new AxiosError('x', 'ERR', un
 
 beforeEach(() => {
   setViewport(VIEWPORTS.desktop);
-  get.mockReset().mockResolvedValue({ registrationLinkValidityDays: 14, minimumPlayers: 30 });
+  get.mockReset().mockResolvedValue({ registrationLinkValidityDays: 14, minimumPlayers: null });
   put.mockReset().mockImplementation(async (settings) => settings);
 });
 
 describe('ClubSettingsPage', () => {
-  it('shows the two saved values, with Uložit and Zahodit off until something changes', async () => {
+  it('shows the saved values - an empty minimum when none is set - with Uložit and Zahodit off until something changes', async () => {
     renderPage();
     expect(await screen.findByLabelText('Platnost odkazu')).toHaveValue('14');
-    expect(screen.getByLabelText('Doporučené minimum hráčů')).toHaveValue('30');
+    const minimum = screen.getByLabelText('Minimální počet sportovců pro blok (nepovinné)');
+    expect(minimum).toHaveValue('');
+    expect(minimum).not.toHaveAttribute('placeholder');
+    expect(screen.getByText(/Prázdné pole = bez minima/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Nastavení klubů' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Uložit' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Zahodit' })).toBeDisabled();
@@ -57,14 +60,55 @@ describe('ClubSettingsPage', () => {
     const days = await screen.findByLabelText('Platnost odkazu');
     await user.clear(days);
     await user.type(days, '21');
-    await user.clear(screen.getByLabelText('Doporučené minimum hráčů'));
-    await user.type(screen.getByLabelText('Doporučené minimum hráčů'), '0');
+    await user.clear(screen.getByLabelText('Minimální počet sportovců pro blok (nepovinné)'));
+    await user.type(screen.getByLabelText('Minimální počet sportovců pro blok (nepovinné)'), '25');
 
     expect(screen.getByRole('button', { name: 'Uložit' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: 'Uložit' }));
-    await waitFor(() => expect(put).toHaveBeenCalledWith({ registrationLinkValidityDays: 21, minimumPlayers: 0 }));
+    await waitFor(() => expect(put).toHaveBeenCalledWith({ registrationLinkValidityDays: 21, minimumPlayers: 25 }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Uložit' })).toBeDisabled());
     expect(screen.getByLabelText('Platnost odkazu')).toHaveValue('21');
+  });
+
+  it('sends null when the minimum is left empty, and null again after clearing a saved one', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const days = await screen.findByLabelText('Platnost odkazu');
+    await user.clear(days);
+    await user.type(days, '20');
+    await user.click(screen.getByRole('button', { name: 'Uložit' }));
+    await waitFor(() => expect(put).toHaveBeenCalledWith({ registrationLinkValidityDays: 20, minimumPlayers: null }));
+  });
+
+  it('clears a saved minimum to "no minimum"', async () => {
+    get.mockResolvedValue({ registrationLinkValidityDays: 14, minimumPlayers: 18 });
+    const user = userEvent.setup();
+    renderPage();
+    const minimum = await screen.findByLabelText('Minimální počet sportovců pro blok (nepovinné)');
+    expect(minimum).toHaveValue('18');
+    await user.clear(minimum);
+    expect(screen.queryByText(/Zadejte celý počet sportovců/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Uložit' }));
+    await waitFor(() => expect(put).toHaveBeenCalledWith({ registrationLinkValidityDays: 14, minimumPlayers: null }));
+  });
+
+  it('keeps the palette the server sent, so saving here cannot wipe it', async () => {
+    get.mockResolvedValue({ registrationLinkValidityDays: 14, minimumPlayers: null, blockPalette: ['#112233'] });
+    const user = userEvent.setup();
+    renderPage();
+    const minimum = await screen.findByLabelText('Minimální počet sportovců pro blok (nepovinné)');
+    await user.type(minimum, '12');
+    await user.click(screen.getByRole('button', { name: 'Uložit' }));
+    await waitFor(() => expect(put).toHaveBeenCalledWith({ registrationLinkValidityDays: 14, minimumPlayers: 12, blockPalette: ['#112233'] }));
+  });
+
+  it('shows the server sentence under the minimum field', async () => {
+    put.mockRejectedValue(refused(400, { message: 'Neplatné.', errors: { minimumPlayers: ['Minimum nesmí být větší než kapacita.'] } }));
+    const user = userEvent.setup();
+    renderPage();
+    await user.type(await screen.findByLabelText('Minimální počet sportovců pro blok (nepovinné)'), '500');
+    await user.click(screen.getByRole('button', { name: 'Uložit' }));
+    expect(await screen.findByText('Minimum nesmí být větší než kapacita.')).toBeInTheDocument();
   });
 
   it('puts the saved values back with Zahodit, without a request', async () => {
@@ -125,7 +169,7 @@ describe('ClubSettingsPage', () => {
     put.mockRejectedValue(new Error('network'));
     const user = userEvent.setup();
     renderPage();
-    const players = await screen.findByLabelText('Doporučené minimum hráčů');
+    const players = await screen.findByLabelText('Minimální počet sportovců pro blok (nepovinné)');
     await user.clear(players);
     await user.type(players, '40');
     await user.click(screen.getByRole('button', { name: 'Uložit' }));
@@ -143,7 +187,7 @@ describe('ClubSettingsPage in three layouts', () => {
     setViewport(width);
     renderPage();
     expect(await screen.findByLabelText('Platnost odkazu')).toBeInTheDocument();
-    expect(screen.getByLabelText('Doporučené minimum hráčů')).toBeInTheDocument();
+    expect(screen.getByLabelText('Minimální počet sportovců pro blok (nepovinné)')).toBeInTheDocument();
     /* On a phone the frame pins the pair to the bottom; either way each button exists once. */
     expect(screen.getAllByRole('button', { name: 'Uložit' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Zahodit' })).toHaveLength(1);
@@ -151,12 +195,14 @@ describe('ClubSettingsPage in three layouts', () => {
 });
 
 describe('validateClubSettings', () => {
-  it('wants whole numbers, at least a day, and allows 0 players for "no warning"', () => {
-    expect(validateClubSettings({ registrationLinkValidityDays: '14', minimumPlayers: '0' })).toEqual({});
-    expect(validateClubSettings({ registrationLinkValidityDays: '', minimumPlayers: '' })).toEqual({
+  it('wants whole numbers and at least a day; the minimum may be empty, otherwise a whole number from 1', () => {
+    expect(validateClubSettings({ registrationLinkValidityDays: '14', minimumPlayers: '' })).toEqual({});
+    expect(validateClubSettings({ registrationLinkValidityDays: '14', minimumPlayers: '8' })).toEqual({});
+    expect(validateClubSettings({ registrationLinkValidityDays: '', minimumPlayers: '0' })).toEqual({
       registrationLinkValidityDays: 'Zadejte celý počet dní.',
-      minimumPlayers: 'Zadejte celý počet hráčů (0 = bez upozornění).',
+      minimumPlayers: 'Zadejte celý počet sportovců od 1, nebo pole nechte prázdné.',
     });
-    expect(validateClubSettings({ registrationLinkValidityDays: '5000', minimumPlayers: '1' }).registrationLinkValidityDays).toMatch(/překlep/);
+    expect(validateClubSettings({ registrationLinkValidityDays: '14', minimumPlayers: 'abc' }).minimumPlayers).toMatch(/celý počet sportovců/);
+    expect(validateClubSettings({ registrationLinkValidityDays: '5000', minimumPlayers: '' }).registrationLinkValidityDays).toMatch(/překlep/);
   });
 });

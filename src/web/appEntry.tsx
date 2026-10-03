@@ -1,4 +1,4 @@
-/* The staff / patient APPLICATION entry (everything that is not /web). Split out of main.tsx and
+/* The staff / patient APPLICATION entry (everything that is not a page of the public site). Split out of main.tsx and
    loaded on demand, so the prerendered public site never downloads the staff app, its router, its
    charts or its live connection. */
 

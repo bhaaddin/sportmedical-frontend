@@ -1,0 +1,119 @@
+{
+  "capturedOn": "2026-10-03",
+  "source": "https://sportmedical-diagnostics.cz (footer 'Fakturační údaje', /policies/contact-information, /pages/contact, /policies/refund-policy, /policies/terms-of-service)",
+  "legalName": "SportMedical Diagnostics s.r.o.",
+  "tagline": "Klinika sportovní medicíny a diagnostiky",
+  "description": "SportMedical Diagnostics s.r.o. je moderní soukromé zdravotnické zařízení zaměřené na tělovýchovné lékařství a vysoce specializovanou sportovní diagnostiku.",
+  "ico": "23351632",
+  "dic": null,
+  "dicNote": "Not published anywhere on the live site (no DIČ, no statement whether the company is a VAT payer).",
+  "registeredOffice": {
+    "label": "Sídlo společnosti",
+    "lines": ["Krátká 283", "252 65 Tursko"],
+    "oneLine": "Krátká 283, 252 65 Tursko"
+  },
+  "premises": {
+    "label": "Adresa provozovny (místo poskytování zdravotních služeb)",
+    "lines": ["Budova GreenLine (5.patro)", "Jihlavská 1558/21", "140 00 Praha 4 – Michle"],
+    "oneLine": "Budova GreenLine (5.patro), Jihlavská 1558/21, 140 00 Praha 4 – Michle",
+    "variantsOnSite": [
+      "Budova GreenLine(5.patro LM Clinic), Jihlavská 1558/21, Praha 4-Michle, 140 00",
+      "Budova GreenLine, 5. patro, Jihlavská 1558/21, 140 00 Praha 4 – Michle",
+      "Budova GreenLine (5. patro), Jihlavská 1558/21, Praha 4-Michle, 140 00"
+    ],
+    "metro": "stanice metra - Kačerov"
+  },
+  "phone": {
+    "primary": "606 785 271",
+    "international": "+420 606 785 271",
+    "note": "Policies use +420 606 785 271; page footers use 606 785 271."
+  },
+  "email": "recepce@sportmedical-diagnostics.cz",
+  "website": "https://sportmedical-diagnostics.cz",
+  "openingHours": {
+    "label": "Provozní doba / Ordinační doba",
+    "prefix": "(provoz podle objednání)",
+    "linesAsPublished": [
+      "Pondělí - Pátek: 8.00 - 18.00 hodin",
+      "Sobota: 8.00 - 18.00 hodin",
+      "Neděle: ZAVŘENO"
+    ],
+    "shortFormAsPublished": "Po–Pá: 8:00–18:00 | So: 8:00–18:00 / Ne: zavřeno",
+    "staleVariantsOnSite": [
+      {
+        "where": "footer block 'Ordinační doba' on /pages/zakladni-diagnostika, /pages/komplexni-diagnostika, /pages/vo2max-analyza, /pages/vidoeo-kompenzacne-plany and /pages/inbody",
+        "lines": ["Pondělí - Pátek: 9.00 - 16.00 hodin", "Sobota: 8.00 - 12.00 hodin", "Neděle: ZAVŘENO"],
+        "status": "contradicts the 'Provozní doba' block on the same pages; use the 8–18 / 8–18 hours (the 'Kontakt' footer block on every page, plus /policies/contact-information, /pages/contact and the home page)"
+      },
+      {
+        "where": "footer 'Adresa provozovny' block on /pages/sportovni-lekarske-prohlidky and /pages/mobilni-testovani (one capture)",
+        "lines": ["Pondělí - Pátek: 9.00 - 18.00 hodin", "Sobota: 8.00 - 18.00 hodin", "Neděle: ZAVŘENO"],
+        "status": "differs only in Monday–Friday start (9 vs 8)"
+      }
+    ]
+  },
+  "datovaSchranka": null,
+  "datovaSchrankaNote": "NOT published on the live site (searched footer, contact page, policies, o-nas). Leave empty; Matko fills it in Nastavení.",
+  "bankAccount": null,
+  "bankAccountNote": "NOT published. Payment is stated as 'předem online (rezervace s platbou nebo zálohou) nebo na místě dle zvoleného typu služby' (refund policy); no account number, IBAN or card-terminal statement.",
+  "registryNumber": null,
+  "healthcareRegistration": null,
+  "socialLinks": [],
+  "socialNote": "No Facebook / Instagram / LinkedIn / YouTube links anywhere (header, footer, pages). Partner club websites are listed under partners.",
+  "map": {
+    "label": "Navigovat",
+    "url": "https://maps.app.goo.gl/F6hq4G15PjULs4yi9"
+  },
+  "howToGetHere": {
+    "heading": "Dostupnost",
+    "linesAsPublished": [
+      "Metrem: Stanice linky C Kačerov",
+      "Autobusem: Zastávky Lísek a Kačerov",
+      "Autem: Snadný přístup na hlavní tahy – Magistrálu a Jižní spojku",
+      "Vlakem: Zastávka Praha-Kačerov"
+    ],
+    "extraPublished": ["stanice metra - Kačerov", "Budova GreenLine (5.patro LM Clinic)"],
+    "notPublished": ["parking", "reception on the ground floor / lift to the 5th floor", "response time promises"]
+  },
+  "booking": {
+    "medicalExaminations": "https://obj.cgm-medistar.cz/cal/3c7bW",
+    "diagnosticsPackagesNutrition": "https://obj.cgm-medistar.cz/cal/9lNfZ",
+    "phoneOrMessageOnly": ["Videoinstruovaný kompenzační plán", "all InBody services"]
+  },
+  "ratingText": "Hodnocení 4,9 z 5 – Dlouhodobá důvěra našich klientů (text on /pages/rezervacni-system, no source stated)",
+  "cancellation": {
+    "freeUntilHoursBefore": 24,
+    "summary": "Zrušení nebo změna termínu zdarma nejpozději 24 hodin před začátkem; při zrušení později / nedostavení se zaniká nárok na vrácení uhrazené částky nebo zálohy; výjimka: individuální posouzení při akutním onemocnění (jednorázové bezplatné přeobjednání). Source: /policies/refund-policy",
+    "contact": ["recepce@sportmedical-diagnostics.cz", "+420 606 785 271"]
+  },
+  "mobileTesting": {
+    "textsOnHome": [
+      "Realizujeme mobilní testování po celé České republice",
+      "Podmínkou výjezdu je minimálně 30 sportovců",
+      "Zvýhodněná cenová nabídka a individuální podmínky spolupráce",
+      "Flexibilní termíny podle potřeb klubu - včetně víkendů"
+    ],
+    "minimumSportsmenPublished": 30,
+    "note": "The brief (item 4) makes the minimum a nullable setting with no number in code; the live site publishes 30. Seed decision is for the integrator/Matko."
+  },
+  "partners": [
+    { "name": "SPORTOVNÍ AGENTÚRA (Fall and Get Up / Sportovní klinika)", "sport": "agentura", "url": "http://www.fallandgetup.com/", "url2": "http://www.sportovniklinika.cz/" },
+    { "name": "Black Angels", "sport": "florbal", "url": "https://www.blackangels.cz/" },
+    { "name": "Újezd nad Lesy", "sport": "basketbal", "url": "https://basketujezd.cz/" },
+    { "name": "FK Dukla Jižní město", "sport": "fotbal", "url": "https://www.fkduklajm.cz/" },
+    { "name": "SK Jourds (footer: SK Joudrs)", "sport": "softball", "url": "https://www.joudrs.cz/" },
+    { "name": "Beach klub Ládví", "sport": "beach volejbal", "url": "https://beachklubladvi.cz/" },
+    { "name": "STRONG GIRLS", "sport": "rugby", "url": "https://stronggirls.cz/" },
+    { "name": "SGB MULTISPORT ACADEMY", "sport": "rugby", "url": null },
+    { "name": "VK Blesk", "sport": "veslování", "url": "https://www.vkblesk.cz/" },
+    { "name": "SportMetrics Lab", "sport": null, "url": "/pages/o-nas-1" },
+    { "name": "Zdravotní Agentúra", "sport": null, "url": "https://zdravotniagentura.cz/" }
+  ],
+  "legacyDoNotUse": [
+    {
+      "text": "Pod Krejcárkem 975/2, Praha 3 Žižkov, vstup A/B - 3. patro · info@barnamedical.cz / info@sportlab-medical.cz · +420 792 314 456 · sportmedical-diagnostics@seznam.cz · 792 314 456 · hours 9–16 / 8–12",
+      "where": "/pages/o-nas (Naša predajňa), /pages/zatezove-testy-teren, /pages/zatazovy-test-laborator, /pages/inbody (address block), stale footer hours",
+      "status": "Belongs to the previous 'SportLab Medical' site content; not the clinic's current data."
+    }
+  ]
+}

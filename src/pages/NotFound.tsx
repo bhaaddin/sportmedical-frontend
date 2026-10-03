@@ -27,7 +27,7 @@ export default function NotFound() {
             variant="contained"
             startIcon={<Home />}
             component={RouterLink}
-            to="/"
+            to="/prehled"
             sx={{ minHeight: 44 }}
           >
             Zpět na přehled

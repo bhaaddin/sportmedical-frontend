@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline, Box, Typography, CircularProgress, Button } from '@mui/material';
 import { Science, Dashboard, People, Settings, CalendarMonth, Receipt, AttachMoney, Today, ArrowBack, Assessment, Groups, EventBusy, RateReview, FactCheck, HealthAndSafety, Psychology, MonitorHeart, Spa, EventAvailable, PersonAdd, BarChart } from '@mui/icons-material';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -16,6 +16,7 @@ import { TabletRail } from './components/shell/TabletRail';
 import { PhoneBottomBar, PhoneTopBar, PHONE_BOTTOM_BAR, PHONE_TOP_BAR } from './components/shell/PhoneShell';
 import { AccountMenu } from './components/shell/AccountMenu';
 import { WhereAmI, computeCrumbs, useDocumentTitle } from './components/shell/whereAmI';
+import { loginUrl } from './components/shell/loginRedirect';
 import { RAIL_WIDTH, SIDEBAR_WIDTH } from './components/shell/shellStyles';
 import type { MenuEntry, ShellNav } from './components/shell/shellTypes';
 import { useDevice } from './layout/useDevice';
@@ -191,7 +192,7 @@ const MENU_CHILDREN: Record<string, MenuEntry[]> = {
  * `settingsDoesNotDuplicateTheSidebar` in catalogue.test.ts holds the line.
  */
 const menuItems: MenuEntry[] = ([
-  { text: 'Přehled', icon: <Dashboard />, path: '/' },
+  { text: 'Přehled', icon: <Dashboard />, path: '/prehled' },
   { text: 'Kalendář', icon: <CalendarMonth />, path: '/planovani' },
   { text: 'Pacienti', icon: <People />, path: '/patients', requires: 'patients.view' },
   { text: 'Kluby a týmy', icon: <Groups />, path: '/clubs' },
@@ -207,7 +208,7 @@ const menuItems: MenuEntry[] = ([
  * /nastaveni/ screen - draws its own breadcrumb and header. Take a path out of
  * this list the moment its page wears SettingsScreen.
  */
-const SETTINGS_UNFRAMED = new Set<string>(['/blokovany-cas', '/cenik', '/vyhrazeni']);
+const SETTINGS_UNFRAMED = new Set<string>(['/blokovany-cas', '/nastaveni/cenik', '/vyhrazeni']);
 
 /*
  * A screen the signed-in employee has no permission for is not there for them.
@@ -224,11 +225,19 @@ function RequirePermission({ of, children }: { of: Permission; children: React.R
   return <>{children}</>;
 }
 
+/*
+ * Everything the router does not name above is the staff portal, and it is behind the
+ * sign-in: without a session the person is sent to /login and, once signed in, comes back to
+ * the screen they asked for (?next=). The public patient site is NOT in this router at all -
+ * it is the other bundle, served at the root of the domain (see src/main.tsx and
+ * src/web/sitePaths.ts), so no staff path may ever equal a public one
+ * (src/web/routeCollisions.test.ts).
+ */
 function AuthGuard({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
   const token = localStorage.getItem('token');
   if (!token) {
-    window.location.href = '/login';
-    return null;
+    return <Navigate to={loginUrl(`${location.pathname}${location.search}${location.hash}`)} replace />;
   }
   return <>{children}</>;
 }
@@ -278,8 +287,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const settingsMode = isSettingsRoute(location.pathname, settingsHere);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [settingsQuery, setSettingsQuery] = useState('');
-  /* Where "Zpět do aplikace" goes: the last screen that was not a settings one. */
-  const lastAppRoute = useRef('/planovani');
+  /* Where "Zpět do aplikace" goes: the last screen that was not a settings one (the staff overview when there was none). */
+  const lastAppRoute = useRef('/prehled');
   const user = useMemo(readUser, []);
 
   if (!settingsMode) lastAppRoute.current = `${location.pathname}${location.search}`;
@@ -451,7 +460,7 @@ export default function App() {
                 <Layout>
                   <Suspense fallback={<PageLoader />}>
                   <Routes>
-                    <Route path="/" element={<DashboardPage />} />
+                    <Route path="/prehled" element={<DashboardPage />} />
                     <Route path="/patients" element={<RequirePermission of="patients.view"><PatientList /></RequirePermission>} />
                     <Route path="/patients/register" element={<RequirePermission of="patients.register"><PatientRegistrationPage /></RequirePermission>} />
                     <Route path="/patients/:id/edit" element={<RequirePermission of="patients.edit"><PatientFormPage /></RequirePermission>} />
@@ -468,7 +477,8 @@ export default function App() {
                     </Route>
                     <Route path="/diagnostics/new" element={<DiagnosticForm />} />
                     <Route path="/billing" element={<RequirePermission of="billing.manage"><BillingPage /></RequirePermission>} />
-                    <Route path="/cenik" element={<CenikPage />} />
+                    {/* The staff price list. /cenik is the PUBLIC price list now (the other bundle). */}
+                    <Route path="/nastaveni/cenik" element={<CenikPage />} />
                     <Route path="/injuries" element={<InjuriesPage />} />
                     <Route path="/rtp" element={<RtpPage />} />
                     <Route path="/concussion" element={<ConcussionPage />} />
@@ -509,7 +519,8 @@ export default function App() {
                       path="/kalendar/:calendarId/termin/:appointmentId"
                       element={<AppointmentLinkPage />}
                     />
-                    <Route path="/sluzby" element={<RequirePermission of="settings.clinic.manage"><ClinicServicesPage /></RequirePermission>} />
+                    {/* /sluzby is the public Služby page; the staff list of services sits under /nastaveni. */}
+                    <Route path="/nastaveni/sluzby" element={<RequirePermission of="settings.clinic.manage"><ClinicServicesPage /></RequirePermission>} />
                     <Route path="/pravidla-dokumentu" element={<RequirePermission of="settings.clinic.manage"><DocumentRequirementsPage /></RequirePermission>} />
                     <Route path="/dokumenty-sablony" element={<RequirePermission of="settings.clinic.manage"><DocumentTemplatesPage /></RequirePermission>} />
                     <Route path="/nastaveni/sablony-emailu" element={<RequirePermission of="communication.manage"><EmailTemplatesPage /></RequirePermission>} />

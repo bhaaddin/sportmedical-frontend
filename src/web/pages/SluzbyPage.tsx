@@ -23,9 +23,9 @@ interface ServiceDef {
 }
 
 const SERVICES: ServiceDef[] = [
-  { n: 1, to: '/web/prohlidky', spec: ROW_SPECS.prohlidky, fallback: FALLBACK_ROWS.prohlidky },
-  { n: 2, to: '/web/diagnostika', spec: ROW_SPECS.diagnostika, fallback: FALLBACK_ROWS.diagnostika },
-  { n: 3, to: '/web/inbody', spec: ROW_SPECS.inbody, fallback: FALLBACK_ROWS.inbody },
+  { n: 1, to: '/prohlidky', spec: ROW_SPECS.prohlidky, fallback: FALLBACK_ROWS.prohlidky },
+  { n: 2, to: '/diagnostika', spec: ROW_SPECS.diagnostika, fallback: FALLBACK_ROWS.diagnostika },
+  { n: 3, to: '/inbody', spec: ROW_SPECS.inbody, fallback: FALLBACK_ROWS.inbody },
 ];
 
 function ServiceCard({ def }: { def: ServiceDef }) {

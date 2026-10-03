@@ -1,0 +1,455 @@
+{
+  "capturedOn": "2026-10-03",
+  "source": "https://sportmedical-diagnostics.cz (pages: cenik-sluzeb, sportovni-lekarske-prohlidky, sportovni-diagnostika, zakladni-diagnostika, komplexni-diagnostika, vo2max-analyza, vidoeo-kompenzacne-plany, inbody + Shopify /products.json)",
+  "currency": "CZK",
+  "method": "WebFetch (HTML->markdown->extraction). Prices cross-checked across at least two pages each; the Shopify product prices come from /products.json (saved 2026-10-03 16:11).",
+  "variantSelectors": "None. The three Shopify products have a single variant 'Default Title' (no size/option selector). The five packages and every other service are NOT Shopify products: they are price cards on pages; ordering is via the CGM MEDISTAR booking links (cal/3c7bW for medical examinations, cal/9lNfZ for diagnostics and packages) or 'Objednání telefonicky nebo zprávou' (compensation plan, all InBody items).",
+  "vat": "No DPH statement is published on the Ceník or service pages. Shopify variants: Základní and Komplexní prohlídka taxable=false, Spiroergometrie taxable=true; the product page of Spiroergometrie shows '(including VAT)'. Do not print 'vč. DPH' / 'bez DPH' anywhere until Matko decides.",
+  "needsOwnerDecision": [
+    {
+      "id": "spiroergometrie-price",
+      "text": "The live site contradicts itself: Spiroergometrické vyšetření is 3 500 Kč in the Shopify product, the product cards and the comparison table of /pages/sportovni-lekarske-prohlidky, but 4 000 Kč in the 'CENÍK SLUŽEB' card of the same page and on /pages/cenik-sluzeb. The package compare-at prices (5 200 and 6 000) only add up with 4 000. priceCzk below uses 4000 (the Ceník = the price list) and keeps 3500 in alternatePriceCzk."
+    },
+    {
+      "id": "group-discount-scale",
+      "text": "Two scales are published (see groupDiscounts). Our seed (4->5 %, 6->10 %, 10->15 %) matches neither exactly."
+    },
+    {
+      "id": "vo2max-price",
+      "text": "VO2max analýza is 3 500 Kč everywhere on the live site; our catalogue says 4 000."
+    }
+  ],
+  "groupDiscounts": {
+    "scaleA": {
+      "publishedOn": ["/pages/sportovni-lekarske-prohlidky", "/pages/sportovni-diagnostika", "/pages/zakladni-diagnostika", "/pages/komplexni-diagnostika", "/pages/inbody", "/pages/mobilni-testovani"],
+      "tiers": [
+        { "label": "4-5 osob", "minPersons": 4, "maxPersons": 5, "percent": 5, "text": "−5 % / osoba" },
+        { "label": "5–9 osob", "minPersons": 5, "maxPersons": 9, "percent": 10, "text": "−10 % / osoba" },
+        { "label": "10+ osob", "minPersons": 10, "maxPersons": null, "percent": 15, "text": "−15 % / osoba" }
+      ],
+      "clubs": "Sportovní kluby/organizace: speciální cenová nabídka",
+      "note": "4-5 and 5–9 overlap at 5 persons as published."
+    },
+    "scaleB": {
+      "publishedOn": ["/pages/cenik-sluzeb", "/pages/vo2max-analyza", "/pages/vidoeo-kompenzacne-plany"],
+      "tiers": [
+        { "label": "5–9 osob", "minPersons": 5, "maxPersons": 9, "percent": 5, "text": "−5% / osoba" },
+        { "label": "10+ osob", "minPersons": 10, "maxPersons": null, "percent": 10, "text": "−10 % / osoba" }
+      ],
+      "clubs": "Sportovní kluby/organizace: speciální cenová nabídka"
+    }
+  },
+  "items": [
+    {
+      "slug": "zakladni-sportovni-prohlidka",
+      "name": "Základní sportovní prohlídka",
+      "category": "Sportovní lékařské prohlídky",
+      "description": "Klidové EKG + základní vyšetření plic. Bez zátěžového testování a bez spiroergometrie. Vhodné zejména pro malé děti.",
+      "priceCzk": 1600,
+      "compareAtPriceCzk": null,
+      "durationMinutes": 40,
+      "durationText": "30–40 min (comparison table)",
+      "isPackage": false,
+      "includes": [
+        "Komplexní zdravotní a sportovní anamnéza",
+        "Tělesná analýza InBody 770 a antropometrické měření",
+        "Klidové měření: klidové EKG a krevní tlak",
+        "Komplexní vyšetření tělovýchovným lékařem",
+        "Klidové 12svodové EKG a měření krevního tlaku",
+        "Základní funkční vyšetření plic (spirometrie)",
+        "Fyzikální vyšetření"
+      ],
+      "excludes": ["Zátěžové EKG a krevní tlaky", "Ventilace plic a výměny plynů (VO₂ a VCO₂)", "Maximální spotřeba kyslíku (VO₂max)", "Ventilační a metabolické prahy (aerobní a anaerobní)", "Respirační kvocient (RQ)", "O₂/HR – kyslíkový puls"],
+      "badge": null,
+      "url": "https://sportmedical-diagnostics.cz/products/komplexni-sportovni-prohlidka-kopie",
+      "bookingUrl": "https://obj.cgm-medistar.cz/cal/3c7bW",
+      "sources": ["/pages/cenik-sluzeb", "/pages/sportovni-lekarske-prohlidky", "/products.json"]
+    },
+    {
+      "slug": "komplexni-sportovni-prohlidka",
+      "name": "Komplexní sportovní prohlídka",
+      "category": "Sportovní lékařské prohlídky",
+      "description": "Klidové + zátěžové EKG + základní vyšetření plic. Hodnocení reakce srdce na zátěž bez analýzy respiračních plynů. Vhodné pro širokou veřejnost i výkonnostní sportovce.",
+      "priceCzk": 2200,
+      "compareAtPriceCzk": null,
+      "durationMinutes": 60,
+      "durationText": "50–60 min (comparison table)",
+      "isPackage": false,
+      "includes": [
+        "Komplexní zdravotní a sportovní anamnéza",
+        "Tělesná analýza InBody 770 a antropometrické měření",
+        "Klidové měření: klidové EKG a krevní tlak",
+        "Zátěžové měření: zátěžové EKG a krevní tlaky (kontinuální záznam EKG, krevní tlak každé dvě minuty)",
+        "Funkční zátěžový test na ergometru (kolo / běžecký pás)",
+        "Komplexní vyšetření tělovýchovným lékařem",
+        "Základní funkční vyšetření plic (spirometrie)"
+      ],
+      "excludes": ["Ventilace plic a výměny plynů (VO₂ a VCO₂)", "Maximální spotřeba kyslíku (VO₂max)", "Ventilační a metabolické prahy (aerobní a anaerobní)", "Respirační kvocient (RQ)", "O₂/HR – kyslíkový puls"],
+      "badge": "Oblíbené",
+      "url": "https://sportmedical-diagnostics.cz/products/zakladni-zatezovy-test-vcetne-zatetoveho-ekg",
+      "bookingUrl": "https://obj.cgm-medistar.cz/cal/3c7bW",
+      "sources": ["/pages/cenik-sluzeb", "/pages/sportovni-lekarske-prohlidky", "/products.json"]
+    },
+    {
+      "slug": "spiroergometricke-vysetreni",
+      "name": "Spiroergometrické vyšetření",
+      "category": "Sportovní lékařské prohlídky",
+      "description": "Nejkomplexnější zátěžové vyšetření. Detailní analýza kardiopulmonární a metabolické odezvy (srdce, plíce, metabolismus), VO₂max, ventilační a metabolické prahy a tréninkové zóny. Vhodné pro vrcholové a náročné sportovce.",
+      "priceCzk": 4000,
+      "alternatePriceCzk": 3500,
+      "priceConflict": "4 000 Kč in the 'CENÍK SLUŽEB' card on /pages/sportovni-lekarske-prohlidky and on /pages/cenik-sluzeb; 3 500 Kč in the Shopify product 'Spiroergometrie', in the product cards and in the comparison table (and on the legacy zatezove-testy-teren page). Needs Matko's decision.",
+      "compareAtPriceCzk": null,
+      "durationMinutes": 90,
+      "durationText": "60–90 min (comparison table); FAQ says 65–70 min",
+      "isPackage": false,
+      "includes": [
+        "Komplexní zdravotní a sportovní anamnéza",
+        "Tělesná analýza InBody 770 a antropometrické měření",
+        "Klidové měření: klidové EKG a krevní tlak",
+        "Zátěžové měření: zátěžové EKG a krevní tlaky",
+        "Ventilace plic a výměny plynů (VO₂ a VCO₂)",
+        "Maximální spotřeba kyslíku (VO₂max)",
+        "Ventilační a metabolické prahy (aerobní a anaerobní)",
+        "Respirační kvocient (RQ)",
+        "O₂/HR – kyslíkový puls",
+        "Komplexní vyšetření tělovýchovným lékařem",
+        "Funkční vyšetření plic, určení tréninkových zón"
+      ],
+      "excludes": [],
+      "badge": "Oblíbené",
+      "url": "https://sportmedical-diagnostics.cz/products/spiroergometricke-vysetreni-vcetne-zatezoveho-ekg",
+      "bookingUrl": "https://obj.cgm-medistar.cz/cal/3c7bW",
+      "sources": ["/pages/cenik-sluzeb", "/pages/sportovni-lekarske-prohlidky", "/products.json"]
+    },
+    {
+      "slug": "zakladni-diagnostika",
+      "name": "Základní diagnostika",
+      "category": "Sportovní diagnostika",
+      "description": "Základní vyšetření zaměřené na hodnocení síly, explozivity, výkonu, stability, koordinace, asymetrií mezi končetinami, kvality pohybu, kontroly odrazu a dopadu, neuromuskulární výkonnosti a klíčových ukazatelů ovlivňujících sportovní výkon. Nezahrnuje komplexní video-analýzu jednotlivých fází pohybu.",
+      "priceCzk": 1200,
+      "compareAtPriceCzk": null,
+      "durationMinutes": null,
+      "durationText": "not stated on the live site",
+      "isPackage": false,
+      "includes": [
+        "Přesně definované testy, přizpůsobené sportovní specializaci",
+        "Výsledkový přehled s odborným vysvětlením jednotlivých testů",
+        "Detailně zpracovaná výstupní zpráva s hodnocením všech metrik podle norem a odborným doporučením",
+        "InBody 770 – základní tělesná analýza zahrnutá v ceně",
+        "Balanční, balistické a izometrické testy na silových platformách s milisekundovým rozlišením"
+      ],
+      "excludes": ["Komplexní video-biomechanická analýza", "Vo2max", "Videoinstruovaný kompenzační plán na míru", "Odeslání kompenzačního plánu do mobilní aplikace"],
+      "badge": null,
+      "url": "https://sportmedical-diagnostics.cz/pages/zakladni-diagnostika",
+      "bookingUrl": "https://obj.cgm-medistar.cz/cal/9lNfZ",
+      "sources": ["/pages/cenik-sluzeb", "/pages/sportovni-diagnostika", "/pages/zakladni-diagnostika"]
+    },
+    {
+      "slug": "komplexni-diagnostika",
+      "name": "Komplexní diagnostika",
+      "category": "Sportovní diagnostika",
+      "description": "Komplexní vyšetření zaměřené na hodnocení síly, explozivity, výkonu, stability, koordinace, asymetrií mezi končetinami, kvality pohybu… Díky synchronizovanému videozáznamu propojenému s naměřenými daty získává vyšetření skutečně komplexní charakter.",
+      "priceCzk": 2000,
+      "compareAtPriceCzk": null,
+      "durationMinutes": null,
+      "durationText": "not stated on the live site",
+      "isPackage": false,
+      "includes": [
+        "Komplexní video-biomechanická analýza všech fází pohybu propojená s naměřenými daty",
+        "Přesně definované testy, přizpůsobené sportovní specializaci",
+        "Výsledkový přehled s odborným vysvětlením jednotlivých testů",
+        "Detailně zpracovaná výstupní zpráva s hodnocením všech metrik podle norem a odborným doporučením",
+        "InBody 770 – základní tělesná analýza zahrnutá v ceně"
+      ],
+      "excludes": ["Vo2max", "Videoinstruovaný kompenzační plán na míru", "Odeslání kompenzačního plánu do mobilní aplikace"],
+      "badge": "Oblíbené",
+      "url": "https://sportmedical-diagnostics.cz/pages/komplexni-diagnostika",
+      "bookingUrl": "https://obj.cgm-medistar.cz/cal/9lNfZ",
+      "sources": ["/pages/cenik-sluzeb", "/pages/sportovni-diagnostika", "/pages/komplexni-diagnostika"]
+    },
+    {
+      "slug": "vo2max-analyza",
+      "name": "Vo2max analýza",
+      "category": "Sportovní diagnostika",
+      "description": "Vyšetření sleduje kompletní metabolickou odezvu organismu na fyzickou zátěž prostřednictvím měření spotřeby kyslíku (VO₂), výdeje oxidu uhličitého (VCO₂), ventilace plic a respiračního kvocientu (RQ). Analýza umožňuje přesné určení aerobního a anaerobního prahu (VT1, VT2) a stanovení maximální spotřeby kyslíku (VO₂max).",
+      "priceCzk": 3500,
+      "compareAtPriceCzk": null,
+      "durationMinutes": null,
+      "durationText": "not stated on the live site",
+      "isPackage": false,
+      "includes": [
+        "Test prováděný na běhátku nebo ergometru podle typu sportu",
+        "Ventilace plic a výměny plynů (VO₂ a VCO₂)",
+        "Maximální spotřeba kyslíku (VO₂max)",
+        "Ventilační a metabolické prahy (aerobní a anaerobní)",
+        "Respirační kvocient (RQ)",
+        "O₂/HR – kyslíkový puls",
+        "Detailně zpracovaná výstupní zpráva s doporučením"
+      ],
+      "excludes": ["Klidové a zátěžové EKG", "Základní, komplexní diagnostika"],
+      "badge": null,
+      "note": "Page title/context: 'Vo2max' in the menu, 'Vo2max analýza' in the price list. The sportovni-diagnostika card says 'Již brzy dostupné' (coming soon) next to the Vo2max Analýza description although it has a price and a booking button.",
+      "url": "https://sportmedical-diagnostics.cz/pages/vo2max-analyza",
+      "bookingUrl": "https://obj.cgm-medistar.cz/cal/9lNfZ",
+      "sources": ["/pages/cenik-sluzeb", "/pages/sportovni-diagnostika", "/pages/vo2max-analyza"]
+    },
+    {
+      "slug": "videoinstruovany-kompenzacni-plan",
+      "name": "Sestavení individuálního videoinstruovaného kompenzačního plánu",
+      "category": "Sportovní diagnostika",
+      "description": "Personalizovaný plán vycházející z naměřených diagnostických dat. Kompenzační plán je sestaven na základě konkrétních výsledků z diagnostiky HumanTrak, ForceDecks nebo VO₂max.",
+      "priceCzk": 1000,
+      "compareAtPriceCzk": null,
+      "durationMinutes": null,
+      "durationText": "not stated; plan validity 3 měsíce, then control retest recommended",
+      "isPackage": false,
+      "includes": [
+        "Videoinstruktáž každého cviku s přesným popisem klíčových bodů provedení",
+        "Přesná struktura plánu – série, opakování, pauzy i kombinace cviků (supersérie)",
+        "Zaměření na kompenzaci, stabilitu a prevenci přetížení",
+        "Plně personalizovaný plán podle dostupných pomůcek a vybavení",
+        "Optimalizace tréninkové frekvence a týdenního rozvrhu jednotek",
+        "Odeslání kompenzačního plánu přímo do mobilní aplikace",
+        "Platnost plánu: 3 měsíce, následně doporučujeme kontrolní retest"
+      ],
+      "excludes": [],
+      "badge": "Oblíbené",
+      "orderingNote": "Objednání telefonicky nebo zprávou (no online booking link). Requires a prior diagnostic.",
+      "url": "https://sportmedical-diagnostics.cz/pages/vidoeo-kompenzacne-plany",
+      "bookingUrl": null,
+      "sources": ["/pages/cenik-sluzeb", "/pages/sportovni-diagnostika", "/pages/vidoeo-kompenzacne-plany"]
+    },
+    {
+      "slug": "inbody-zakladni-mereni",
+      "name": "Základní InBody měření",
+      "category": "InBody 770",
+      "description": "Základní měření tělesného složení na InBody 770: hmotnost, tuk, svaly, BMI, segmentální analýza, metabolismus a voda, zdravotní ukazatele, růstová křivka (děti a mládež). Bez doplňující interpretace a vizuálního zobrazení.",
+      "priceCzk": 500,
+      "compareAtPriceCzk": null,
+      "durationMinutes": null,
+      "durationText": "měření trvá méně než 60 sekund (FAQ: celý proces cca 5 minut)",
+      "isPackage": false,
+      "includes": [
+        "Tělesné složení (hmotnost, tuk, svaly, BMI)",
+        "Segmentální analýza svalové hmoty a tuku",
+        "Metabolismus & voda (BMR, TBW, WHR, ECW/TBW, ICW/ECW)",
+        "Zdravotní ukazatele (viscerální tuk, fázový úhel, minerály, SMI, nutriční indexy)",
+        "Růstová křivka (pro děti a mládež)"
+      ],
+      "excludes": ["Rozšířená interpretace a grafické znázornění výsledků", "Komplexní přehled výživy, metabolismu a energetické rovnováhy", "Komplexní přehled svalové a tukové hmoty", "Odborná konzultace", "Personalizovaný výživový plán"],
+      "badge": null,
+      "orderingNote": "Objednání telefonicky nebo zprávou",
+      "url": "https://sportmedical-diagnostics.cz/pages/inbody",
+      "bookingUrl": null,
+      "sources": ["/pages/cenik-sluzeb", "/pages/inbody"]
+    },
+    {
+      "slug": "inbody-komplexni-mereni-konzultace",
+      "name": "InBody komplexní měření + Odborná Konzultace",
+      "category": "InBody 770",
+      "description": "Všechny parametry základního měření + grafické znázornění + interpretace a odborná konzultace.",
+      "priceCzk": 1200,
+      "compareAtPriceCzk": null,
+      "durationMinutes": null,
+      "durationText": "not stated",
+      "isPackage": false,
+      "includes": [
+        "Vše ze základního InBody měření",
+        "Rozšířená interpretace a grafické znázornění výsledků",
+        "Komplexní přehled výživy, metabolismu a energetické rovnováhy",
+        "Komplexní přehled svalové a tukové hmoty",
+        "Odborná konzultace s doporučením pro výživu, trénink a regeneraci"
+      ],
+      "excludes": ["Personalizovaný výživový plán (samostatná služba)"],
+      "badge": "Oblíbené",
+      "orderingNote": "Objednání telefonicky nebo zprávou",
+      "url": "https://sportmedical-diagnostics.cz/pages/inbody",
+      "bookingUrl": null,
+      "sources": ["/pages/cenik-sluzeb", "/pages/inbody"]
+    },
+    {
+      "slug": "personalizovany-vyzivovy-plan",
+      "name": "Sestavení Personalizovaného Výživového Plánu",
+      "category": "InBody 770",
+      "description": "Výživový plán vychází z kompletní analýzy tělesného složení, metabolismu a energetické bilance.",
+      "priceCzk": 2500,
+      "compareAtPriceCzk": null,
+      "durationMinutes": null,
+      "durationText": "not stated",
+      "isPackage": false,
+      "includes": [
+        "Komplexní nutriční analýza",
+        "Individuální výživový plán",
+        "Strukturovaný jídelníček podle dne",
+        "Respektování individuálních preferencí",
+        "Odborná konzultace",
+        "Možnost následné revize plánu",
+        "2 měření InBody v ceně"
+      ],
+      "excludes": [],
+      "badge": "Oblíbené",
+      "orderingNote": "Objednání telefonicky nebo zprávou",
+      "url": "https://sportmedical-diagnostics.cz/pages/inbody",
+      "bookingUrl": null,
+      "sources": ["/pages/cenik-sluzeb", "/pages/inbody"]
+    },
+    {
+      "slug": "inbody-balicek-5-mereni",
+      "name": "Zvýhodněný Balíček 5 Měření (Základní)",
+      "category": "InBody 770",
+      "description": "Balíček nabízí výhodnější cenu a současně vyšší diagnostickou hodnotu díky možnosti dlouhodobého sledování a vyhodnocování dat.",
+      "priceCzk": 2000,
+      "compareAtPriceCzk": 2500,
+      "durationMinutes": null,
+      "durationText": "not stated",
+      "isPackage": false,
+      "isMultiVisitBundle": true,
+      "includes": [
+        "5 × základní InBody měření",
+        "Detailní rozbor složení těla při každém měření",
+        "Sledování trendů a skutečného progresu"
+      ],
+      "excludes": [],
+      "badge": "Oblíbené",
+      "note": "Not one of the exam+diagnostics 'balíčky'; it is five repeats of the 500 Kč basic measurement (5 × 500 = 2 500 = compare-at price).",
+      "orderingNote": "Objednání telefonicky nebo zprávou",
+      "url": "https://sportmedical-diagnostics.cz/pages/inbody",
+      "bookingUrl": null,
+      "sources": ["/pages/cenik-sluzeb", "/pages/inbody"]
+    },
+    {
+      "slug": "balicek-komplexni-prohlidka-zakladni-diagnostika",
+      "name": "Komplexní sportovní prohlídka + Základní diagnostika",
+      "category": "Zvýhodněné balíčky – prohlídka + diagnostika",
+      "description": "Balíčky kombinují sportovně-lékařská vyšetření s nejmodernější detailní sportovní diagnostikou. Dvoufázový proces: 1. část diagnostická, 2. část vyhodnocení výsledků (samostatný termín).",
+      "priceCzk": 3000,
+      "compareAtPriceCzk": 3400,
+      "durationMinutes": 60,
+      "durationText": "Celková délka balíčku: přibližně 60 minut (rezervační systém); rozděleno do dvou částí",
+      "isPackage": true,
+      "combines": ["komplexni-sportovni-prohlidka", "zakladni-diagnostika"],
+      "includes": [
+        "Komplexní sportovní prohlídka – plný diagnostický rozsah",
+        "Základní diagnostika – plný diagnostický rozsah",
+        "InBody 770 – základní tělesná analýza zahrnutá v ceně",
+        "Klidové a zátěžové EKG a krevní tlaky"
+      ],
+      "excludes": ["Vo2max analýza", "Komplexní video-biomechanická analýza (nezahrnuje komplexní video-analýzu)"],
+      "badge": null,
+      "url": "https://sportmedical-diagnostics.cz/pages/cenik-sluzeb",
+      "bookingUrl": "https://obj.cgm-medistar.cz/cal/9lNfZ",
+      "sources": ["/pages/cenik-sluzeb", "/pages/sportovni-lekarske-prohlidky", "/pages/sportovni-diagnostika"]
+    },
+    {
+      "slug": "balicek-komplexni-prohlidka-komplexni-diagnostika",
+      "name": "Komplexní sportovní prohlídka + Komplexní diagnostika",
+      "category": "Zvýhodněné balíčky – prohlídka + diagnostika",
+      "description": "Komplexní prohlídka a komplexní diagnostika včetně synchronizované video-biomechanické analýzy; dvoufázový proces (diagnostika + vyhodnocení).",
+      "priceCzk": 3600,
+      "compareAtPriceCzk": 4200,
+      "durationMinutes": 60,
+      "durationText": "Celková délka balíčku: přibližně 60 minut; rozděleno do dvou částí",
+      "isPackage": true,
+      "combines": ["komplexni-sportovni-prohlidka", "komplexni-diagnostika"],
+      "includes": [
+        "Komplexní sportovní prohlídka – plný diagnostický rozsah",
+        "Komplexní diagnostika – plný diagnostický rozsah",
+        "InBody 770 – základní tělesná analýza zahrnutá v ceně",
+        "Klidové a zátěžové EKG a krevní tlaky",
+        "Komplexní video-biomechanická analýza všech fází pohybu propojená s naměřenými daty"
+      ],
+      "excludes": ["Vo2max analýza"],
+      "badge": "Oblíbené",
+      "url": "https://sportmedical-diagnostics.cz/pages/cenik-sluzeb",
+      "bookingUrl": "https://obj.cgm-medistar.cz/cal/9lNfZ",
+      "sources": ["/pages/cenik-sluzeb", "/pages/sportovni-lekarske-prohlidky", "/pages/sportovni-diagnostika"]
+    },
+    {
+      "slug": "balicek-spiroergometrie-zakladni-diagnostika",
+      "name": "Spiroergometrické vyšetření + Základní diagnostika",
+      "category": "Zvýhodněné balíčky – prohlídka + diagnostika",
+      "description": "Spiroergometrické vyšetření a základní diagnostika (bez video-biomechanické analýzy); dvoufázový proces.",
+      "priceCzk": 4800,
+      "compareAtPriceCzk": 5200,
+      "durationMinutes": 60,
+      "durationText": "Celková délka balíčku: přibližně 60 minut; rozděleno do dvou částí",
+      "isPackage": true,
+      "combines": ["spiroergometricke-vysetreni", "zakladni-diagnostika"],
+      "includes": [
+        "SpiroErgometrické vyšetření – plný diagnostický rozsah",
+        "Základní diagnostika – plný diagnostický rozsah",
+        "Vo2max analýza",
+        "InBody 770 – základní tělesná analýza zahrnutá v ceně",
+        "Klidové a zátěžové EKG a krevní tlaky"
+      ],
+      "excludes": ["Komplexní video-biomechanická analýza (nutné zvolit balíček Komplexní diagnostika + spiroergometrické vyšetření)"],
+      "badge": null,
+      "url": "https://sportmedical-diagnostics.cz/pages/cenik-sluzeb",
+      "bookingUrl": "https://obj.cgm-medistar.cz/cal/9lNfZ",
+      "sources": ["/pages/cenik-sluzeb", "/pages/sportovni-lekarske-prohlidky", "/pages/sportovni-diagnostika"]
+    },
+    {
+      "slug": "balicek-spiroergometrie-komplexni-diagnostika",
+      "name": "Spiroergometrické vyšetření + Komplexní diagnostika",
+      "category": "Zvýhodněné balíčky – prohlídka + diagnostika",
+      "description": "Spiroergometrické vyšetření a komplexní diagnostika včetně VO₂max a video-biomechanické analýzy; dvoufázový proces. (Called 'Kompletní diagnostika + Spiroergometrické vyšetření' on the diagnostics pages.)",
+      "priceCzk": 5400,
+      "compareAtPriceCzk": 6000,
+      "durationMinutes": 60,
+      "durationText": "Celková délka balíčku: přibližně 60 minut; rozděleno do dvou částí",
+      "isPackage": true,
+      "combines": ["spiroergometricke-vysetreni", "komplexni-diagnostika"],
+      "includes": [
+        "SpiroErgometrické vyšetření – plný diagnostický rozsah",
+        "Komplexní diagnostika – plný diagnostický rozsah",
+        "Vo2max analýza",
+        "InBody 770 – základní tělesná analýza zahrnutá v ceně",
+        "Klidové a zátěžové EKG a krevní tlaky",
+        "Komplexní video-biomechanická analýza všech fází pohybu propojená s naměřenými daty"
+      ],
+      "excludes": [],
+      "badge": "Oblíbené",
+      "url": "https://sportmedical-diagnostics.cz/pages/cenik-sluzeb",
+      "bookingUrl": "https://obj.cgm-medistar.cz/cal/9lNfZ",
+      "sources": ["/pages/cenik-sluzeb", "/pages/sportovni-lekarske-prohlidky", "/pages/sportovni-diagnostika"]
+    },
+    {
+      "slug": "balicek-komplexni-diagnostika-vo2max",
+      "name": "Komplexní diagnostika + Vo2max analýza",
+      "category": "Zvýhodněné balíčky – diagnostika + VO₂max",
+      "description": "Komplexní diagnostika (včetně video-biomechanické analýzy) a Vo2max analýza v jednom balíčku. Not an exam + diagnostics package: it combines two diagnostics services.",
+      "priceCzk": 5000,
+      "compareAtPriceCzk": 5500,
+      "durationMinutes": null,
+      "durationText": "not stated",
+      "isPackage": true,
+      "combines": ["komplexni-diagnostika", "vo2max-analyza"],
+      "includes": [
+        "Komplexní diagnostika – plný diagnostický rozsah",
+        "Komplexní video-biomechanická analýza všech fází pohybu propojená s naměřenými daty",
+        "Vo2max – plný diagnostický rozsah (komplexní analýza výměny dýchacích plynů, VO₂max, ventilační prahy, tréninkové zóny)",
+        "InBody 770 – základní tělesná analýza zahrnutá v ceně"
+      ],
+      "excludes": ["Videoinstruovaný kompenzační plán na míru", "Odeslání kompenzačního plánu přímo do mobilní aplikace"],
+      "badge": "Oblíbené",
+      "note": "The extractor on /pages/vo2max-analyza and /pages/vidoeo-kompenzacne-plany printed the strike-through order reversed (5 000 crossed, 5 500 price); cenik-sluzeb, sportovni-diagnostika, zakladni- and komplexni-diagnostika agree on price 5 000 / compare-at 5 500, which also equals 2 000 + 3 500.",
+      "url": "https://sportmedical-diagnostics.cz/pages/cenik-sluzeb",
+      "bookingUrl": "https://obj.cgm-medistar.cz/cal/9lNfZ",
+      "sources": ["/pages/cenik-sluzeb", "/pages/sportovni-diagnostika", "/pages/zakladni-diagnostika", "/pages/komplexni-diagnostika"]
+    }
+  ],
+  "packageSanityCheck": {
+    "formula": "compareAt = sum of the single prices (spiroergometrie counted at 4 000)",
+    "rows": [
+      { "package": "balicek-komplexni-prohlidka-zakladni-diagnostika", "sum": "2200 + 1200 = 3400", "price": 3000, "saving": 400 },
+      { "package": "balicek-komplexni-prohlidka-komplexni-diagnostika", "sum": "2200 + 2000 = 4200", "price": 3600, "saving": 600 },
+      { "package": "balicek-spiroergometrie-zakladni-diagnostika", "sum": "4000 + 1200 = 5200", "price": 4800, "saving": 400 },
+      { "package": "balicek-spiroergometrie-komplexni-diagnostika", "sum": "4000 + 2000 = 6000", "price": 5400, "saving": 600 },
+      { "package": "balicek-komplexni-diagnostika-vo2max", "sum": "2000 + 3500 = 5500", "price": 5000, "saving": 500 }
+    ]
+  },
+  "legacyIgnored": [
+    { "where": "/pages/mobilni-testovani", "text": "price ranges for exam + HumanTrak / ForceDecks / Komplexní diagnostika packages (3.100–3.400, 4.100–4.600, 4.900–5.200, 5.900–6.400 Kč) are older text and do not match the Ceník." },
+    { "where": "/pages/zatezove-testy-teren, /pages/zatazovy-test-laborator, /pages/rozdiel-zatazove-testy", "text": "old business 'SportLab Medical': 2 000 / 2 500 Kč tests, other address, e-mail and phone — not valid." }
+  ]
+}

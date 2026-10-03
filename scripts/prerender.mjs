@@ -2,9 +2,15 @@
    PRERENDER THE PUBLIC SITE  (runs after `vite build` and `vite build --ssr`)
 
    For every route of the public site (src/web/routes.ts) this writes a complete
-   HTML page to dist/web/<route>/index.html: the markup, exactly the CSS it uses, the
-   fonts, and a snapshot of the clinic's data, so the first paint needs no
+   HTML page at the root of the domain — the landing page is dist/index.html, the others
+   dist/sluzby/index.html, dist/cenik/index.html, … — with the markup, exactly the CSS it
+   uses, the fonts, and a snapshot of the clinic's data, so the first paint needs no
    JavaScript and no API. The browser then hydrates it and refreshes the data.
+
+   Because the landing page takes over dist/index.html, the SPA shell that Vite wrote there
+   (what the application — the staff portal, /objednat, /portal … — is served from) is first
+   copied to dist/app.html; vercel.json sends every address that is not a file to it. The
+   copy is made once: a second run finds app.html and never copies a prerendered page over it.
 
    The API is asked for prices, clinic details, site content and discount tiers
    with a short timeout. It may be asleep (the free Render plan) or not know an
@@ -23,6 +29,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { ensureAppShell } from './app-shell.mjs';
 import { assetsForEntry, buildPage, pickFontPreloads } from './prerender-lib.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -60,8 +67,9 @@ async function getJson(endpoint) {
 }
 
 async function main() {
-  const templatePath = path.join(dist, 'index.html');
-  if (!existsSync(templatePath)) throw new Error('dist/index.html is missing — run `vite build` first');
+  const shell = await ensureAppShell(dist);
+  if (shell.created) log('SPA shell kept as dist/app.html');
+  const templatePath = shell.file;
   const entryFile = ['entry-server.js', 'entry-server.mjs'].map((f) => path.join(ssrDir, f)).find((f) => existsSync(f));
   if (entryFile === undefined) throw new Error(`the server bundle is missing in ${ssrDir} — run \`npm run build:ssr\` first`);
 
@@ -113,7 +121,7 @@ async function main() {
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, page, 'utf8');
     written += 1;
-    log(`${route.path.padEnd(18)} → ${path.relative(root, file)}  (${(Buffer.byteLength(page) / 1024).toFixed(1)} kB)`);
+    log(`${route.path.padEnd(16)} → ${path.relative(root, file)}  (${(Buffer.byteLength(page) / 1024).toFixed(1)} kB)`);
   }
   log(`${written} pages written.`);
 }

@@ -148,7 +148,7 @@ describe('a group page', () => {
     renderSettings('/settings/sluzby-a-ceny');
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Služby a ceny' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Ceník/ })).toHaveAttribute('href', '/cenik');
+    expect(screen.getByRole('link', { name: /Ceník/ })).toHaveAttribute('href', '/nastaveni/cenik');
     expect(screen.getByRole('link', { name: /Slevy a cenové hladiny/ })).toHaveAttribute('href', '/nastaveni/slevy');
     expect(screen.getByRole('link', { name: /Barvy služeb/ })).toHaveAttribute('href', '/nastaveni/barvy-sluzeb');
     expect(screen.getByText(/Čím víc lidí přijde společně/)).toBeInTheDocument();

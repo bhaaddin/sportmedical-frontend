@@ -124,7 +124,7 @@ export function Hero() {
           <SlotText slotKey="landing.hero.lead" as="p" sx={{ m: 0, fontSize: { xs: 17, md: 19 }, lineHeight: 1.55, color: W.onInk, maxWidth: '48ch' }} />
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: '13px', pt: '6px' }}>
             <CtaButton to={BOOKING_PATH} arrow sx={{ width: { xs: '100%', sm: 'auto' } }}>{primary}</CtaButton>
-            <CtaButton to="/web/cenik" variant="ghostDark" sx={{ width: { xs: '100%', sm: 'auto' } }}>
+            <CtaButton to="/cenik" variant="ghostDark" sx={{ width: { xs: '100%', sm: 'auto' } }}>
               {lowest !== null ? `${secondary} od ${lowest}` : secondary}
             </CtaButton>
           </Box>

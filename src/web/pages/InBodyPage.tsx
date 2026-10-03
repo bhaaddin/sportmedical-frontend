@@ -42,7 +42,7 @@ export default function InBodyPage() {
 
       <PageSection title="inbody.prep.title">
         <SlotText slotKey="inbody.prep.text" as="p" sx={{ m: 0, fontSize: 17, lineHeight: 1.65, color: W.body, maxWidth: '64ch' }} />
-        <ArrowLink to="/web/dokumenty">{prepLink}</ArrowLink>
+        <ArrowLink to="/dokumenty">{prepLink}</ArrowLink>
       </PageSection>
 
       <GroupDiscounts />

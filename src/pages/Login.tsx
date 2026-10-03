@@ -8,6 +8,9 @@ import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { authApi, isSecondFactorChallenge } from '../api/auth';
 import { savePermissions, saveUser } from '../auth/localSession';
 import { DESIGN, SoftCard } from '../components/ui';
+import { safeNextPath } from '../components/shell/loginRedirect';
+import { SiteLink } from '../web/SiteLink';
+import { SITE_HOME_PATH, STAFF_HOME_PATH, isPublicSitePath } from '../web/sitePaths';
 
 /** What the sign-in says when the client ended a session nobody closed here. */
 export const SESSION_EXPIRED_MESSAGE =
@@ -55,7 +58,15 @@ export default function Login() {
      * read it.
      */
     savePermissions(res.permissions ?? []);
-    navigate('/');
+
+    /* Back to the screen the person was heading for (?next=), else the staff overview. */
+    const target = safeNextPath(searchParams.get('next')) ?? STAFF_HOME_PATH;
+    if (isPublicSitePath(target)) {
+      /* A page of the public site is another bundle: a real page load. */
+      window.location.assign(target);
+    } else {
+      navigate(target, { replace: true });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -166,6 +177,16 @@ export default function Login() {
         }}
       >
         <Box sx={{ mb: 3.5 }}>
+          <Box
+            component={SiteLink}
+            to={SITE_HOME_PATH}
+            sx={{
+              display: 'inline-flex', alignItems: 'center', minHeight: 44, mb: 1, mt: -1,
+              fontSize: 14, color: 'text.secondary', textDecoration: 'none', '&:hover': { color: 'text.primary', textDecoration: 'underline' },
+            }}
+          >
+            ← Zpět na web kliniky
+          </Box>
           <Typography variant="h1" component="h1" sx={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
             SportMedical
           </Typography>

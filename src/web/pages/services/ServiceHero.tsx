@@ -39,7 +39,7 @@ export function ServiceHero({ page, priceButton = true }: ServiceHeroProps) {
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: '12px', pt: '4px' }}>
             <CtaButton to={BOOKING_PATH} height={52} px={28} fontSize={16} sx={{ width: { xs: '100%', sm: 'auto' } }}>{book}</CtaButton>
             {priceButton && (
-              <CtaButton to="/web/cenik" variant="ghostDark" height={52} px={26} fontSize={16} sx={{ width: { xs: '100%', sm: 'auto' } }}>{prices}</CtaButton>
+              <CtaButton to="/cenik" variant="ghostDark" height={52} px={26} fontSize={16} sx={{ width: { xs: '100%', sm: 'auto' } }}>{prices}</CtaButton>
             )}
           </Box>
         </Box>

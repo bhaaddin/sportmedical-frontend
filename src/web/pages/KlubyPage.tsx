@@ -26,7 +26,7 @@ function HeroButtons() {
   const link = useSlotText('kluby.hero.cta.link');
   return (
     <>
-      <CtaButton to="/web/kontakt#poptavka" height={52} fontSize={16} px={28} sx={{ width: { xs: '100%', sm: 'auto' } }}>{inquiry}</CtaButton>
+      <CtaButton to="/kontakt#poptavka" height={52} fontSize={16} px={28} sx={{ width: { xs: '100%', sm: 'auto' } }}>{inquiry}</CtaButton>
       <CtaButton to="#mam-odkaz" variant="ghostDark" height={52} fontSize={16} px={26} sx={{ width: { xs: '100%', sm: 'auto' } }}>{link}</CtaButton>
     </>
   );
@@ -224,7 +224,7 @@ function AskBand() {
           <SlotText slotKey="kluby.ask.text" as="p" sx={{ m: 0, fontSize: 17, lineHeight: 1.6, color: W.onInk, maxWidth: '54ch' }} />
         </Box>
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: '12px' }}>
-          <CtaButton to="/web/kontakt#poptavka" height={54} fontSize={16} px={28} sx={{ width: { xs: '100%', sm: 'auto' } }}>{label}</CtaButton>
+          <CtaButton to="/kontakt#poptavka" height={54} fontSize={16} px={28} sx={{ width: { xs: '100%', sm: 'auto' } }}>{label}</CtaButton>
           <Box
             component="a"
             href={contact.phoneHref}

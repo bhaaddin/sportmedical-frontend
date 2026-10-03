@@ -26,19 +26,38 @@ describe('toBlock', () => {
       seats: 120, registered: 4, status: 'Active', registrationToken: 'tok', registrationUrl: 'https://x/klub/tok', note: null,
     });
     expect(block).toMatchObject({
-      fromDate: '2026-10-26', dailyFrom: '08:00', dailyTo: '16:00', status: 'Active', registered: 4, note: null, athletes: null,
+      fromDate: '2026-10-26', dailyFrom: '08:00', dailyTo: '16:00', status: 'Active', registered: 4, note: null, athletes: [],
       createdAtUtc: null, name: null,
     });
   });
 
-  it('reads a cancelled block and the athletes of a detail answer', () => {
+  it('reads a cancelled block and the athletes it lists, newest registration last', () => {
     const block = toBlock({
       id: 'b-1', status: 'Cancelled', playerCount: 10,
-      athletes: [{ appointmentId: 'p1', patientName: 'Jan Novák', activityName: 'Prohlídka', startUtc: '2026-10-26T09:00:00Z', paperwork: { ready: false } }, { nothing: true }],
+      athletes: [
+        { id: 'p1', name: 'Jan Novák', activityName: 'Prohlídka', startUtc: '2026-10-26T09:00:00Z', endUtc: '2026-10-26T10:00:00Z', status: 'Attended', phone: '+420 777 123 456' },
+        { id: 'p2', name: 'Petr Malý', status: 'Něco nového' },
+        { nothing: true },
+        'x',
+      ],
     });
     expect(block.status).toBe('Cancelled');
     expect(block.seats).toBe(10);
-    expect(block.athletes).toEqual([{ id: 'p1', name: 'Jan Novák', activityName: 'Prohlídka', startUtc: '2026-10-26T09:00:00Z', ready: false }]);
+    expect(block.athletes).toEqual([
+      { id: 'p1', name: 'Jan Novák', activityName: 'Prohlídka', startUtc: '2026-10-26T09:00:00Z', endUtc: '2026-10-26T10:00:00Z', status: 'Attended', phone: '+420 777 123 456' },
+      { id: 'p2', name: 'Petr Malý', activityName: '', startUtc: null, endUtc: null, status: 'Booked', phone: null },
+    ]);
+  });
+
+  it('reads an answer without athletes (or with nonsense) as an empty list', () => {
+    expect(toBlock({ id: 'b-1' }).athletes).toEqual([]);
+    expect(toBlock({ id: 'b-1', athletes: null }).athletes).toEqual([]);
+    expect(toBlock({ id: 'b-1', athletes: 'nope' }).athletes).toEqual([]);
+  });
+
+  it('keeps every status the contract names', () => {
+    const statuses = ['Booked', 'Attended', 'NoShow', 'Cancelled'].map((status, i) => ({ id: `p${i}`, name: 'N', status }));
+    expect(toBlock({ athletes: statuses }).athletes.map((a) => a.status)).toEqual(['Booked', 'Attended', 'NoShow', 'Cancelled']);
   });
 });
 
@@ -50,17 +69,34 @@ describe('toCalculation', () => {
     expect(calc.perDay).toEqual([{ date: '2026-10-26', openMinutes: 480 }]);
     expect(toCalculation({ fitsHorizon: false }).fitsHorizon).toBe(false);
   });
+
+  it('reads belowMinimum only together with a minimum: no minimum, no warning', () => {
+    expect(toCalculation({ minimumPlayers: 25, belowMinimum: true })).toMatchObject({ minimumPlayers: 25, belowMinimum: true });
+    expect(toCalculation({ minimumPlayers: null, belowMinimum: true })).toMatchObject({ minimumPlayers: null, belowMinimum: false });
+    expect(toCalculation({})).toMatchObject({ minimumPlayers: null, belowMinimum: false });
+  });
 });
 
 describe('errors', () => {
-  it('keeps a 409 body\'s message and the athletes it names', () => {
-    const e = toClubBlockError(refused(409, { message: 'Dotkne se 2 sportovců.', affected: [{ name: 'Jan Novák', activityName: 'Prohlídka', startUtc: '2026-10-26T09:00:00Z' }, { patientName: 'Petr Malý' }] }));
+  it('keeps a 409 message and the affectedAthletes it names, in the athlete shape', () => {
+    const e = toClubBlockError(refused(409, {
+      code: 'club-block.athletes-affected',
+      message: 'Dotkne se 2 sportovců.',
+      affectedAthletes: [
+        { id: 'p1', name: 'Jan Novák', activityName: 'Prohlídka', startUtc: '2026-10-26T09:00:00Z', endUtc: '2026-10-26T10:00:00Z', status: 'Booked', phone: '+420 777 123 456' },
+        { id: 'p2', name: 'Petr Malý' },
+      ],
+    }));
     expect(e.isConflict).toBe(true);
     expect(e.message).toBe('Dotkne se 2 sportovců.');
     expect(e.conflicts).toEqual([
-      { name: 'Jan Novák', activityName: 'Prohlídka', startUtc: '2026-10-26T09:00:00Z' },
-      { name: 'Petr Malý', activityName: null, startUtc: null },
+      { id: 'p1', name: 'Jan Novák', activityName: 'Prohlídka', startUtc: '2026-10-26T09:00:00Z', endUtc: '2026-10-26T10:00:00Z', status: 'Booked', phone: '+420 777 123 456' },
+      { id: 'p2', name: 'Petr Malý', activityName: '', startUtc: null, endUtc: null, status: 'Booked', phone: null },
     ]);
+  });
+
+  it('does not guess other field names for the affected athletes', () => {
+    expect(toClubBlockError(refused(409, { message: 'x', affected: [{ name: 'Jan' }], athletes: [{ name: 'Jan' }] })).conflicts).toEqual([]);
   });
 
   it('keeps a 400\'s field sentences and says "offline" in Czech when nothing answered', () => {
@@ -103,7 +139,7 @@ describe('calls', () => {
   });
 
   it('throws a ClubBlockError carrying the 409 athletes', async () => {
-    del.mockRejectedValue(refused(409, { message: 'Registrovaní sportovci.', athletes: [{ name: 'Jan' }] }));
+    del.mockRejectedValue(refused(409, { message: 'Registrovaní sportovci.', affectedAthletes: [{ id: 'p1', name: 'Jan' }] }));
     await expect(clubBlocksApi.cancel('b-1', false)).rejects.toMatchObject({ status: 409, conflicts: [{ name: 'Jan' }] });
   });
 });

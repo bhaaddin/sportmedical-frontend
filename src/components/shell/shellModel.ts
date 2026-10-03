@@ -1,9 +1,10 @@
 import type { MenuEntry, ShellNav } from './shellTypes';
+import { STAFF_HOME_PATH } from '../../web/sitePaths';
 import { PATIENT_SECTIONS, sectionPath } from '../../pages/patients/sections';
 
 /** Is `pathname` the screen at `path`, or inside it? (`/patients` is not `/patients-x`.) */
 export function isActivePath(pathname: string, path: string): boolean {
-  return pathname === path || (path !== '/' && pathname.startsWith(`${path}/`));
+  return pathname === path || pathname.startsWith(`${path}/`);
 }
 
 /**
@@ -49,7 +50,7 @@ export function childIsActive(nav: ShellNav, child: MenuEntry, exact: boolean): 
 }
 
 /** The six entries of the working day: the menu without "Přehled" (the brand is its way in). */
-export const mainEntries = (menu: MenuEntry[]): MenuEntry[] => menu.filter((e) => e.path !== '/');
+export const mainEntries = (menu: MenuEntry[]): MenuEntry[] => menu.filter((e) => e.path !== STAFF_HOME_PATH);
 
 /** A shorter label where a narrow column cannot hold the full one. */
 export const shortLabel = (text: string): string => (text === 'Kluby a týmy' ? 'Kluby' : text);

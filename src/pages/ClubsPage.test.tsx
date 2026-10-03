@@ -33,7 +33,7 @@ vi.mock('../api/clubs', async (importOriginal) => {
   return {
     ...actual,
     clubsApi: { getAll, create: createClub, update, deactivate: vi.fn() },
-    clubSettingsApi: { get: vi.fn().mockResolvedValue({ registrationLinkValidityDays: 14, minimumPlayers: 30 }), put: vi.fn() },
+    clubSettingsApi: { get: vi.fn().mockResolvedValue({ registrationLinkValidityDays: 14, minimumPlayers: null }), put: vi.fn() },
   };
 });
 vi.mock('../api/clubBlocks', async (importOriginal) => {

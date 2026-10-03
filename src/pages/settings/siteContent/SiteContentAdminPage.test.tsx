@@ -250,9 +250,9 @@ describe('text slots', () => {
   it('links each card to its public page', async () => {
     await loaded();
     const link = within(cardOf(textA.key)).getByRole('link', { name: `Zobrazit na webu: ${textA.label}` });
-    expect(link).toHaveAttribute('href', '/web');
+    expect(link).toHaveAttribute('href', '/');
     expect(link).toHaveAttribute('target', '_blank');
-    expect(screen.getByRole('link', { name: /Zobrazit stránku .* na webu/ })).toHaveAttribute('href', '/web');
+    expect(screen.getByRole('link', { name: /Zobrazit stránku .* na webu/ })).toHaveAttribute('href', '/');
   });
 });
 

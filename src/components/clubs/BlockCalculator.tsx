@@ -9,7 +9,8 @@
  * pause, and draws the answer - never a number of its own.
  *
  * Three things the answer can warn about, none of them blocking:
- *   - fewer players than the clinic's `minimumPlayers` (informational);
+ *   - fewer players than the clinic's minimum - only when the answer itself says
+ *     `belowMinimum` and carries a `minimumPlayers` (no minimum set = no warning);
  *   - the need does not fit the booking horizon ("nevejde se");
  *   - nothing is open on the chosen calendars (zero minutes a day).
  */
@@ -37,7 +38,6 @@ export function BlockCalculator({
   activityIds,
   calendarIds,
   fromDate,
-  minimumPlayers,
   onApply,
 }: {
   /** `null` while the headcount is empty or not a number. */
@@ -46,8 +46,6 @@ export function BlockCalculator({
   calendarIds: string[];
   /** The first day typed so far; the suggestion starts there when it is set. */
   fromDate: string;
-  /** The clinic's informational minimum (club settings); `null` until known. */
-  minimumPlayers: number | null;
   onApply: (from: string, to: string) => void;
 }) {
   const ready = playerCount !== null && activityIds.length > 0 && calendarIds.length > 0;
@@ -85,8 +83,8 @@ export function BlockCalculator({
     calendarIds: [...calendarIds].sort(),
     fromDate: /^\d{4}-\d{2}-\d{2}$/.test(fromDate) ? fromDate : undefined,
   });
-  const minimum = minimumPlayers ?? calc?.minimumPlayers ?? null;
-  const belowMinimum = playerCount !== null && minimum !== null && minimum > 0 && playerCount < minimum;
+  /* The warning is the server's verdict, shown only while a minimum is set. */
+  const minimum = calc !== undefined && calc.belowMinimum ? calc.minimumPlayers : null;
 
   return (
     <SoftCard tone="soft" sx={{ p: 2.25 }} data-testid="block-calculator" aria-live="polite">
@@ -125,9 +123,9 @@ export function BlockCalculator({
             <Alert severity="warning">Ve vybraných kalendářích není v tomto období nic otevřeno.</Alert>
           ) : null}
 
-          {belowMinimum ? (
+          {minimum !== null ? (
             <Alert severity="warning" role="status">
-              Méně než doporučené minimum {formatPlayers(minimum as number)} — blok jde vytvořit, ale nemusí se vyplatit.
+              Méně než minimum {formatPlayers(minimum)} — blok jde vytvořit, ale nemusí se vyplatit.
             </Alert>
           ) : null}
 

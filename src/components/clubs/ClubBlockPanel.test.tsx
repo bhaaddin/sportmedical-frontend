@@ -11,7 +11,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { setViewport, VIEWPORTS } from '../../test/viewport';
 import { pragueWallClockToInstant } from '../../utils/time';
-import type { ClubBlockView } from '../../api/clubBlocks';
+import type { ClubBlockAthlete, ClubBlockView } from '../../api/clubBlocks';
+import { athletesToCsv } from './athleteList';
 
 const getBlock = vi.fn();
 const update = vi.fn();
@@ -35,7 +36,7 @@ vi.mock('../../api/calendars', () => ({
 }));
 vi.mock('../../api/clubs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../api/clubs')>();
-  return { ...actual, clubSettingsApi: { get: vi.fn().mockResolvedValue({ registrationLinkValidityDays: 14, minimumPlayers: 30 }), put: vi.fn() } };
+  return { ...actual, clubSettingsApi: { get: vi.fn().mockResolvedValue({ registrationLinkValidityDays: 14, minimumPlayers: null }), put: vi.fn() } };
 });
 
 const { ClubBlockPanel } = await import('./ClubBlockPanel');
@@ -43,13 +44,17 @@ const { ClubBlockError } = await import('../../api/clubBlocks');
 
 const when = pragueWallClockToInstant('2026-10-26', '11:00').toISOString();
 
+const athlete = (over: Partial<ClubBlockAthlete> = {}): ClubBlockAthlete => ({
+  id: 'p1', name: 'Jan Novák', activityName: 'Základní prohlídka', startUtc: when, endUtc: null, status: 'Booked', phone: null, ...over,
+});
+
 const block = (over: Partial<ClubBlockView> = {}): ClubBlockView => ({
   id: 'b-1', clubId: 'club-1', clubName: 'FK Slaný', colorHex: '#2E7D6B', name: null, calendarIds: ['c-1'], activityIds: ['a-1'],
   fromDate: '2026-10-26', toDate: '2026-11-03', dailyFrom: null, dailyTo: null, playerCount: 120, seats: 120, registered: 4,
   status: 'Active', registrationToken: 'tok', registrationUrl: 'https://app.test/klub/tok', note: 'Jarní příprava', createdAtUtc: null,
   athletes: [
-    { id: 'p1', name: 'Jan Novák', activityName: 'Základní prohlídka', startUtc: when, ready: true },
-    { id: 'p2', name: 'Petr Malý', activityName: 'Základní prohlídka', startUtc: when, ready: false },
+    athlete({ id: 'p1', phone: '+420 777 123 456' }),
+    athlete({ id: 'p2', name: 'Petr Malý', status: 'Attended' }),
   ],
   ...over,
 });
@@ -88,8 +93,11 @@ describe('what a block shows', () => {
     const table = await screen.findByRole('table', { name: /Sportovci v bloku/ });
     const rows = within(table).getAllByRole('row').slice(1);
     expect(rows).toHaveLength(2);
-    expect(within(rows[0]).getByText('Registrován')).toBeInTheDocument();
-    expect(within(rows[1]).getByText('Chybí dotazník')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('Zaregistrován')).toBeInTheDocument();
+    expect(within(rows[0]).getByRole('link', { name: '+420 777 123 456' })).toHaveAttribute('href', 'tel:+420777123456');
+    expect(within(rows[1]).getByText('Dorazil')).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Telefon' })).toBeInTheDocument();
+    expect(screen.getByText('Sportovci v bloku (4)')).toBeInTheDocument();
   });
 
   it('copies the registration link', async () => {
@@ -101,15 +109,39 @@ describe('what a block shows', () => {
     expect(screen.getByRole('link', { name: 'Poslat klubu' })).toHaveAttribute('href', expect.stringContaining('mailto:klub%40fkslany.cz'));
   });
 
-  it('says so when nobody has registered, and when the server gives no names', async () => {
+  it('says so when nobody has registered, and offers no download then', async () => {
     getBlock.mockResolvedValue(block({ registered: 0, athletes: [] }));
-    const { unmount } = open(block({ registered: 0, athletes: [] }));
-    expect(await screen.findByText(/Zatím se nikdo neregistroval/)).toBeInTheDocument();
-    unmount();
+    open(block({ registered: 0, athletes: [] }));
+    expect(await screen.findByText(/Zatím se nikdo nezaregistroval/)).toBeInTheDocument();
+    expect(screen.queryByText(/server zatím nevrací/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Stáhnout seznam' })).not.toBeInTheDocument();
+  });
 
-    getBlock.mockResolvedValue(block({ athletes: null }));
-    open(block({ athletes: null }));
-    expect(await screen.findByText(/jmenný seznam server zatím nevrací/)).toBeInTheDocument();
+  it('keeps the list in time order and lets the term column flip it', async () => {
+    const later = pragueWallClockToInstant('2026-10-27', '09:00').toISOString();
+    const list = [athlete({ id: 'x', name: 'Později', startUtc: later }), athlete({ id: 'y', name: 'Dříve', startUtc: when }), athlete({ id: 'z', name: 'Bez času', startUtc: null })];
+    getBlock.mockResolvedValue(block({ athletes: list }));
+    const user = userEvent.setup();
+    open(block({ athletes: list }));
+    const names = () => screen.getAllByTestId('block-athlete').map((r) => r.querySelector('td')?.textContent);
+    await waitFor(() => expect(names()).toEqual(['Dříve', 'Později', 'Bez času']));
+    await user.click(screen.getByText('Termín'));
+    expect(names()).toEqual(['Později', 'Dříve', 'Bez času']);
+  });
+
+  it('downloads the list as a CSV file', async () => {
+    const user = userEvent.setup();
+    const createUrl = vi.fn().mockReturnValue('blob:csv');
+    const revoke = vi.fn();
+    Object.assign(URL, { createObjectURL: createUrl, revokeObjectURL: revoke });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    open();
+    await user.click(await screen.findByRole('button', { name: 'Stáhnout seznam' }));
+    expect(createUrl).toHaveBeenCalledTimes(1);
+    const blob = createUrl.mock.calls[0][0] as Blob;
+    expect(blob.type).toBe('text/csv;charset=utf-8');
+    expect(click).toHaveBeenCalled();
+    click.mockRestore();
   });
 
   it('keeps a cancelled block visible, muted and without actions', () => {
@@ -144,6 +176,52 @@ describe('three layouts', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     /* Touch targets: the actions are full-height buttons. */
     expect(screen.getByRole('button', { name: 'Zrušit blok' })).toBeInTheDocument();
+  });
+});
+
+describe('athletes at 390, 834 and 1440', () => {
+  it.each([
+    ['phone', VIEWPORTS.phone],
+    ['tablet', VIEWPORTS.tablet],
+    ['desktop', VIEWPORTS.desktop],
+  ])('says "Zatím se nikdo nezaregistroval" on %s when the list is empty', async (_name, width) => {
+    setViewport(width);
+    getBlock.mockResolvedValue(block({ registered: 0, athletes: [] }));
+    open(block({ registered: 0, athletes: [] }));
+    expect(await screen.findByTestId('block-athletes-empty')).toHaveTextContent('Zatím se nikdo nezaregistroval');
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Sportovci v bloku' })).not.toBeInTheDocument();
+  });
+
+  it('draws a card per athlete on a phone: name, status, činnost, time and a call link', async () => {
+    setViewport(VIEWPORTS.phone);
+    open();
+    const list = await screen.findByRole('list', { name: 'Sportovci v bloku' });
+    const [first, second] = within(list).getAllByRole('listitem');
+    expect(first).toHaveTextContent('Jan Novák');
+    expect(first).toHaveTextContent('Zaregistrován');
+    expect(first).toHaveTextContent('Základní prohlídka');
+    expect(within(first).getByRole('link', { name: '+420 777 123 456' })).toHaveAttribute('href', 'tel:+420777123456');
+    expect(second).toHaveTextContent('Dorazil');
+    expect(within(second).queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Stáhnout seznam' })).toBeInTheDocument();
+  });
+
+  it('shows every status in the table with its Czech word, a cancelled one included', async () => {
+    const list = [
+      athlete({ id: 'a', name: 'A', status: 'Booked' }), athlete({ id: 'b', name: 'B', status: 'Attended' }),
+      athlete({ id: 'c', name: 'C', status: 'NoShow' }), athlete({ id: 'd', name: 'D', status: 'Cancelled' }),
+    ];
+    getBlock.mockResolvedValue(block({ athletes: list }));
+    open(block({ athletes: list }));
+    const table = await screen.findByRole('table', { name: /Sportovci v bloku/ });
+    for (const word of ['Zaregistrován', 'Dorazil', 'Nedostavil se', 'Zrušeno']) expect(within(table).getByText(word)).toBeInTheDocument();
+  });
+
+  it('uses the athletes the list read already carries while the detail loads, and the header count is registered', async () => {
+    getBlock.mockImplementation(() => new Promise(() => {}));
+    open(block({ registered: 2 }));
+    expect(screen.getByText('Sportovci v bloku (2)')).toBeInTheDocument();
   });
 });
 
@@ -182,8 +260,8 @@ describe('Zkrátit and Prodloužit', () => {
   it('lists the athletes a 409 names, and cancels them only after a second confirmation', async () => {
     update
       .mockRejectedValueOnce(new ClubBlockError('Zkrácení se dotkne 2 sportovců.', 409, [
-        { name: 'Jan Novák', activityName: 'Základní prohlídka', startUtc: when },
-        { name: 'Petr Malý', activityName: null, startUtc: null },
+        { id: 'a1', name: 'Jan Novák', activityName: 'Základní prohlídka', startUtc: when, endUtc: when, status: 'Booked', phone: '' },
+        { id: 'a2', name: 'Petr Malý', activityName: '', startUtc: '', endUtc: '', status: 'Booked', phone: '' },
       ]))
       .mockResolvedValue(block({ toDate: '2026-10-28' }));
     const user = userEvent.setup();
@@ -207,7 +285,7 @@ describe('Zkrátit and Prodloužit', () => {
   });
 
   it('withdraws the confirmation when the dates are changed again', async () => {
-    update.mockRejectedValue(new ClubBlockError('Dotkne se sportovců.', 409, [{ name: 'Jan Novák', activityName: null, startUtc: null }]));
+    update.mockRejectedValue(new ClubBlockError('Dotkne se sportovců.', 409, [athlete({ activityName: '', startUtc: null })]));
     const user = userEvent.setup();
     open();
     await user.click(screen.getByRole('button', { name: 'Zkrátit' }));
@@ -263,7 +341,7 @@ describe('Zrušit blok', () => {
 
   it('turns a 409 from a registration that happened meanwhile into the same confirmation', async () => {
     cancel
-      .mockRejectedValueOnce(new ClubBlockError('Na blok se mezitím někdo registroval.', 409, [{ name: 'Jan Novák', activityName: null, startUtc: null }]))
+      .mockRejectedValueOnce(new ClubBlockError('Na blok se mezitím někdo registroval.', 409, [athlete({ activityName: '', startUtc: null })]))
       .mockResolvedValue(undefined);
     getBlock.mockResolvedValue(block({ registered: 0, athletes: [] }));
     const user = userEvent.setup();

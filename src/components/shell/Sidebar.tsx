@@ -19,6 +19,7 @@ import NotificationCenter from '../NotificationCenter';
 import { openUniversalSearch } from '../UniversalSearch';
 import { SettingsNav } from '../../pages/settings/SettingsFrame';
 import { SidebarSlot } from './SidebarSlot';
+import { STAFF_HOME_PATH } from '../../web/sitePaths';
 import { childIsActive, entryState, mainEntries } from './shellModel';
 import { SIDEBAR_WIDTH, activeBg, focusRing } from './shellStyles';
 import type { MenuEntry, ShellNav } from './shellTypes';
@@ -48,7 +49,7 @@ export function Brand({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <Box
       component={Link}
-      to="/"
+      to={STAFF_HOME_PATH}
       onClick={onNavigate}
       aria-label="SportMedical — přehled"
       sx={{

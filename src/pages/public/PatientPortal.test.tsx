@@ -158,22 +158,23 @@ const session = (over: Partial<NonNullable<PortalDashboard['results']>[number]> 
   diastolicBloodPressure: 0,
   bodyFatPercentage: 0,
   muscleMassKg: 0,
-  rawPractitionerNotes: null,
   ...over,
 });
 
-const MANUAL_NOTES = [
-  'Soukromá poznámka lékaře, kterou pacient nemá vidět.',
-  '',
-  '[Ruční zápis]',
-  'Datum měření: 2026-09-20',
-  'Protokol: Bicyklový ergometr',
-  'Hmotnost: 79,1 kg',
-  'Práh: 82 % VO₂max',
-  'Max. výkon: 348 W',
-  'Zóna 1: Regenerace | do 124 bpm',
-  'Zóna 2: Vytrvalost | 125–148 bpm',
-].join('\n');
+/* Every column of contract C-M filled in. */
+const FULL = {
+  measuredOn: '2026-09-20',
+  thresholdPercentVo2Max: 82,
+  maxPowerWatts: 348,
+  weightKg: 79.1,
+  powerPerKg: 4.4,
+  device: 'Cortex MetaMax',
+  protocolType: 'Bicyklový ergometr',
+  trainingZones: [
+    { name: 'Regenerace', toBpm: 124 },
+    { name: 'Vytrvalost', fromBpm: 125, toBpm: 148, note: 'dlouhé výjezdy' },
+  ],
+};
 
 const tile = (label: string): HTMLElement => {
   const latest = screen.getByRole('region', { name: 'Poslední měření' });
@@ -203,7 +204,10 @@ describe('the results tab', () => {
     expect(within(tile('Maximální tep')).getByText('191')).toBeInTheDocument();
     expect(within(tile('Tep na prahu')).getByText('168')).toBeInTheDocument();
     // What the session does not carry is a dash, never a guess.
-    for (const label of ['Klidový tep', 'Tělesný tuk', 'Svalová hmota', 'Krevní tlak', 'Hmotnost']) {
+    for (const label of [
+      'Klidový tep', 'Tělesný tuk', 'Svalová hmota', 'Krevní tlak', 'Hmotnost',
+      'Práh v % VO₂max', 'Maximální výkon', 'Výkon na kg',
+    ]) {
       expect(within(tile(label)).getByText('—')).toBeInTheDocument();
     }
   });
@@ -217,22 +221,47 @@ describe('the results tab', () => {
     expect(within(tile('Tělesný tuk')).getByText('12,4')).toBeInTheDocument();
   });
 
-  it('reads the doctor\'s manual entry: weight, date, zones and the other facts - and not the free note', async () => {
-    openPortal.mockResolvedValue(dashboard({ results: [session({ rawPractitionerNotes: MANUAL_NOTES })] }));
+  it('reads every measured value from the columns of the result', async () => {
+    openPortal.mockResolvedValue(dashboard({ results: [session(FULL)] }));
     renderPortal();
     await openResults();
 
-    expect(within(tile('Hmotnost')).getByText('79,1 kg')).toBeInTheDocument();
+    expect(within(tile('Hmotnost')).getByText('79,1')).toBeInTheDocument();
+    expect(within(tile('Práh v % VO₂max')).getByText('82')).toBeInTheDocument();
+    expect(within(tile('Maximální výkon')).getByText('348')).toBeInTheDocument();
+    expect(within(tile('Výkon na kg')).getByText('4,4')).toBeInTheDocument();
     expect(screen.getByText(/20\. 9\. 2026 · MUDr\. Nováková/)).toBeInTheDocument();
-    expect(within(tile('Tep na prahu')).getByText(/82 % VO₂max/)).toBeInTheDocument();
     const zones = screen.getByRole('list', { name: 'Tréninkové zóny' });
     expect(within(zones).getByText('Regenerace')).toBeInTheDocument();
     expect(within(zones).getByText('do 124 bpm')).toBeInTheDocument();
     expect(within(zones).getByText('125–148 bpm')).toBeInTheDocument();
-    expect(screen.getByText('Bicyklový ergometr')).toBeInTheDocument();
-    expect(screen.getByText('348 W')).toBeInTheDocument();
+    expect(within(zones).getByText('dlouhé výjezdy')).toBeInTheDocument();
+    const facts = screen.getByText('Údaje o měření').parentElement as HTMLElement;
+    expect(within(facts).getByText('Bicyklový ergometr')).toBeInTheDocument();
+    expect(within(facts).getByText('Cortex MetaMax')).toBeInTheDocument();
+  });
+
+  it('never shows the notes of the doctor, even if an older API still sends them', async () => {
+    openPortal.mockResolvedValue(dashboard({
+      results: [session({ ...FULL, ...({ rawPractitionerNotes: 'Soukromá poznámka lékaře.\n\n[Ruční zápis]\nPřístroj: Starý\nMax. výkon: 999 W' } as object) })],
+    }));
+    renderPortal();
+    await openResults();
+
     expect(screen.queryByText(/Soukromá poznámka/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Ruční zápis/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/999/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Starý')).not.toBeInTheDocument();
+  });
+
+  it('draws "—" for the facts of the measurement it does not have', async () => {
+    openPortal.mockResolvedValue(dashboard({ results: [session()] }));
+    renderPortal();
+    await openResults();
+
+    const facts = screen.getByText('Údaje o měření').parentElement as HTMLElement;
+    expect(within(facts).getAllByText('—')).toHaveLength(2);
+    expect(screen.queryByRole('list', { name: 'Tréninkové zóny' })).not.toBeInTheDocument();
   });
 
   it('says there are no measurements instead of drawing empty tiles or a chart', async () => {
@@ -276,11 +305,11 @@ describe('the results tab', () => {
     expect(await screen.findByTestId('results-view')).toBeInTheDocument();
   });
 
-  it('says nothing about device import on screen', async () => {
+  it('says nothing about importing from a device on screen', async () => {
     openPortal.mockResolvedValue(dashboard({ results: [session()] }));
     renderPortal();
     await openResults();
-    expect(screen.queryByText(/import|přístroj|Vald|zařízení/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/import|Vald|zařízení/i)).not.toBeInTheDocument();
   });
 });
 
@@ -315,5 +344,55 @@ describe('three layouts', () => {
 
     await openResults();
     expect(screen.getByRole('table', { name: 'Všechna měření' })).toBeInTheDocument();
+  });
+});
+
+describe.each([
+  ['phone', VIEWPORTS.phone],
+  ['iPad', VIEWPORTS.tablet],
+  ['desktop', VIEWPORTS.desktop],
+])('results with all, some and no values on a %s', (name, width) => {
+  beforeEach(() => setViewport(width));
+
+  const listing = () => (name === 'phone'
+    ? screen.getByRole('list', { name: 'Všechna měření' })
+    : screen.getByRole('table', { name: 'Všechna měření' }));
+
+  it('all values: the tiles and the list of every measurement carry the columns', async () => {
+    openPortal.mockResolvedValue(dashboard({ results: [session(FULL)] }));
+    renderPortal();
+    await openResults();
+
+    expect(within(tile('Maximální výkon')).getByText('348')).toBeInTheDocument();
+    expect(within(tile('Výkon na kg')).getByText('4,4')).toBeInTheDocument();
+    const all = within(listing());
+    expect(all.getByText('348 W')).toBeInTheDocument();
+    expect(all.getByText('79,1 kg')).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Tréninkové zóny' })).toBeInTheDocument();
+  });
+
+  it('some values: what is missing is a dash, what is there is shown', async () => {
+    openPortal.mockResolvedValue(dashboard({
+      results: [session({ maxPowerWatts: 300, weightKg: null, powerPerKg: null, thresholdPercentVo2Max: null, device: null, trainingZones: null })],
+    }));
+    renderPortal();
+    await openResults();
+
+    expect(within(tile('Maximální výkon')).getByText('300')).toBeInTheDocument();
+    for (const label of ['Hmotnost', 'Výkon na kg', 'Práh v % VO₂max']) {
+      expect(within(tile(label)).getByText('—'), label).toBeInTheDocument();
+    }
+    const all = within(listing());
+    expect(all.getByText('300 W')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Tréninkové zóny' })).not.toBeInTheDocument();
+  });
+
+  it('no values: the page says there are no measurements', async () => {
+    openPortal.mockResolvedValue(dashboard({ results: [] }));
+    renderPortal();
+    await openResults();
+
+    expect(screen.getAllByText('Zatím tu nejsou žádná měření.').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Maximální výkon')).not.toBeInTheDocument();
   });
 });

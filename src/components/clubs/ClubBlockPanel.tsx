@@ -9,8 +9,8 @@
  * what the club had is worth more than a list that forgets.
  */
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Box, Button, LinearProgress, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material';
-import { ContentCopy } from '@mui/icons-material';
+import { Alert, Box, Button, LinearProgress, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, Typography } from '@mui/material';
+import { ContentCopy, FileDownloadOutlined } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { calendarsApi } from '../../api/calendars';
@@ -25,6 +25,8 @@ import { ClubBlockDialog } from './ClubBlockDialog';
 import { ClubBlockRangeDialog } from './ClubBlockRangeDialog';
 import type { RangeMode } from './ClubBlockRangeDialog';
 import { CancelClubBlockDialog } from './CancelClubBlockDialog';
+import { ATHLETE_STATUS_LABEL, ATHLETE_STATUS_TONE, downloadAthletesCsv, sortAthletes } from './athleteList';
+import type { SortDirection } from './athleteList';
 import type { Club } from '../../api/clubs';
 
 const mono = '"JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace';
@@ -63,7 +65,8 @@ export function ClubBlockPanel({
     staleTime: 15_000,
   });
   const detail = detailQuery.data ?? block;
-  const athletes = detail.athletes;
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const athletes = sortAthletes(detail.athletes, sortDirection);
 
   const calendarsQuery = useQuery({ queryKey: ['calendars'], queryFn: calendarsApi.list, staleTime: 5 * 60 * 1000 });
   const activitiesQuery = useQuery({ queryKey: ['club-block-activities'], queryFn: fetchBlockableActivities, staleTime: 5 * 60 * 1000 });
@@ -173,7 +176,20 @@ export function ClubBlockPanel({
 
       {active ? (
         <Box sx={{ mt: 2.5 }}>
-          <SectionLabel>Sportovci v bloku</SectionLabel>
+          <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 1 }}>
+            <SectionLabel sx={{ mb: 0 }}>{`Sportovci v bloku (${detail.registered})`}</SectionLabel>
+            {athletes.length > 0 ? (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<FileDownloadOutlined sx={{ fontSize: 18 }} />}
+                onClick={() => downloadAthletesCsv(athletes, blockTitle(block))}
+                sx={{ minHeight: 44 }}
+              >
+                Stáhnout seznam
+              </Button>
+            ) : null}
+          </Stack>
           {detailQuery.isError ? (
             <Alert severity="warning" sx={{ mb: 1 }} action={<Button color="inherit" size="small" onClick={() => void detailQuery.refetch()}>Zkusit znovu</Button>}>
               Sportovce bloku se nepodařilo načíst.
@@ -181,23 +197,26 @@ export function ClubBlockPanel({
           ) : null}
           {detailQuery.isLoading ? (
             <Stack spacing={1}>{[0, 1].map((i) => <Skeleton key={i} variant="rounded" height={44} />)}</Stack>
-          ) : athletes === null || athletes.length === 0 ? (
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              {block.registered > 0 && athletes === null
-                ? `Registrováno ${block.registered} — jmenný seznam server zatím nevrací.`
-                : 'Zatím se nikdo neregistroval. Sportovci se zapisují přes odkaz výše.'}
+          ) : athletes.length === 0 ? (
+            <Typography variant="body2" data-testid="block-athletes-empty" sx={{ color: 'text.secondary' }}>
+              Zatím se nikdo nezaregistroval. Sportovci se zapisují přes odkaz výše.
             </Typography>
           ) : phone ? (
             <Stack spacing={1} role="list" aria-label="Sportovci v bloku">
               {athletes.map((a) => (
-                <Box key={a.id} role="listitem" sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2.5, p: 1.5 }}>
+                <Box key={a.id} role="listitem" data-testid="block-athlete" sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2.5, p: 1.5, opacity: a.status === 'Cancelled' ? 0.65 : 1 }}>
                   <Stack direction="row" sx={{ justifyContent: 'space-between', gap: 1 }}>
                     <Typography sx={{ fontWeight: 600, fontSize: 14 }}>{a.name}</Typography>
-                    <StatusChip tone={a.ready ? 'green' : 'beige'} size="sm">{a.ready ? 'Registrován' : 'Chybí dotazník'}</StatusChip>
+                    <StatusChip tone={ATHLETE_STATUS_TONE[a.status]} size="sm">{ATHLETE_STATUS_LABEL[a.status]}</StatusChip>
                   </Stack>
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                     {[a.activityName, a.startUtc ? formatSlotTime(a.startUtc) : null].filter(Boolean).join(' · ')}
                   </Typography>
+                  {a.phone ? (
+                    <Typography variant="body2" component="a" href={`tel:${a.phone.replace(/\s/g, '')}`} sx={{ color: 'primary.main', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>
+                      {a.phone}
+                    </Typography>
+                  ) : null}
                 </Box>
               ))}
             </Stack>
@@ -208,18 +227,26 @@ export function ClubBlockPanel({
                   <TableRow>
                     <TableCell>Sportovec</TableCell>
                     <TableCell>Činnost</TableCell>
-                    <TableCell>Termín</TableCell>
+                    <TableCell sortDirection={sortDirection}>
+                      <TableSortLabel active direction={sortDirection} onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}>
+                        Termín
+                      </TableSortLabel>
+                    </TableCell>
                     <TableCell>Stav</TableCell>
+                    <TableCell>Telefon</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {athletes.map((a) => (
-                    <TableRow key={a.id} hover>
+                    <TableRow key={a.id} hover data-testid="block-athlete" sx={{ opacity: a.status === 'Cancelled' ? 0.65 : 1 }}>
                       <TableCell sx={{ fontWeight: 600 }}>{a.name}</TableCell>
                       <TableCell>{a.activityName || '—'}</TableCell>
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>{a.startUtc ? formatSlotTime(a.startUtc) : '—'}</TableCell>
                       <TableCell>
-                        <StatusChip tone={a.ready ? 'green' : 'beige'}>{a.ready ? 'Registrován' : 'Chybí dotazník'}</StatusChip>
+                        <StatusChip tone={ATHLETE_STATUS_TONE[a.status]}>{ATHLETE_STATUS_LABEL[a.status]}</StatusChip>
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        {a.phone ? <Box component="a" href={`tel:${a.phone.replace(/\s/g, '')}`} sx={{ color: 'primary.main' }}>{a.phone}</Box> : '—'}
                       </TableCell>
                     </TableRow>
                   ))}

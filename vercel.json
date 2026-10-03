@@ -3,27 +3,127 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "redirects": [
+    {
+      "source": "/web",
+      "destination": "/",
+      "statusCode": 308
+    },
+    {
+      "source": "/web/:path*",
+      "destination": "/:path*",
+      "statusCode": 308
+    }
+  ],
   "rewrites": [
-    { "source": "/web", "destination": "/web/index.html" },
-    { "source": "/web/sluzby", "destination": "/web/sluzby/index.html" },
-    { "source": "/web/prohlidky", "destination": "/web/prohlidky/index.html" },
-    { "source": "/web/diagnostika", "destination": "/web/diagnostika/index.html" },
-    { "source": "/web/inbody", "destination": "/web/inbody/index.html" },
-    { "source": "/web/cenik", "destination": "/web/cenik/index.html" },
-    { "source": "/web/dokumenty", "destination": "/web/dokumenty/index.html" },
-    { "source": "/web/kontakt", "destination": "/web/kontakt/index.html" },
-    { "source": "/web/o-nas", "destination": "/web/o-nas/index.html" },
-    { "source": "/web/kluby", "destination": "/web/kluby/index.html" },
-    { "source": "/((?!assets/).*)", "destination": "/index.html" }
+    {
+      "source": "/sluzby",
+      "destination": "/sluzby/index.html"
+    },
+    {
+      "source": "/prohlidky",
+      "destination": "/prohlidky/index.html"
+    },
+    {
+      "source": "/diagnostika",
+      "destination": "/diagnostika/index.html"
+    },
+    {
+      "source": "/inbody",
+      "destination": "/inbody/index.html"
+    },
+    {
+      "source": "/cenik",
+      "destination": "/cenik/index.html"
+    },
+    {
+      "source": "/dokumenty",
+      "destination": "/dokumenty/index.html"
+    },
+    {
+      "source": "/kontakt",
+      "destination": "/kontakt/index.html"
+    },
+    {
+      "source": "/o-nas",
+      "destination": "/o-nas/index.html"
+    },
+    {
+      "source": "/kluby",
+      "destination": "/kluby/index.html"
+    },
+    {
+      "source": "/faq",
+      "destination": "/faq/index.html"
+    },
+    {
+      "source": "/obchodni-podminky",
+      "destination": "/obchodni-podminky/index.html"
+    },
+    {
+      "source": "/ochrana-osobnich-udaju",
+      "destination": "/ochrana-osobnich-udaju/index.html"
+    },
+    {
+      "source": "/storno-a-reklamace",
+      "destination": "/storno-a-reklamace/index.html"
+    },
+    {
+      "source": "/vybaveni",
+      "destination": "/vybaveni/index.html"
+    },
+    {
+      "source": "/partneri",
+      "destination": "/partneri/index.html"
+    },
+    {
+      "source": "/diagnostika/zakladni",
+      "destination": "/diagnostika/zakladni/index.html"
+    },
+    {
+      "source": "/diagnostika/komplexni",
+      "destination": "/diagnostika/komplexni/index.html"
+    },
+    {
+      "source": "/diagnostika/vo2max",
+      "destination": "/diagnostika/vo2max/index.html"
+    },
+    {
+      "source": "/diagnostika/kompenzacni-plan",
+      "destination": "/diagnostika/kompenzacni-plan/index.html"
+    },
+    {
+      "source": "/((?!assets/).+)",
+      "destination": "/app.html"
+    }
   ],
   "headers": [
     {
       "source": "/assets/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     },
     {
-      "source": "/web(/.*)?",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, s-maxage=300, stale-while-revalidate=86400" }]
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, s-maxage=300, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/(sluzby|prohlidky|diagnostika|inbody|cenik|dokumenty|kontakt|o-nas|kluby|faq|obchodni-podminky|ochrana-osobnich-udaju|storno-a-reklamace|vybaveni|partneri|diagnostika/zakladni|diagnostika/komplexni|diagnostika/vo2max|diagnostika/kompenzacni-plan)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, s-maxage=300, stale-while-revalidate=86400"
+        }
+      ]
     }
   ]
 }

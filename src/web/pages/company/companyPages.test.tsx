@@ -66,7 +66,7 @@ describe.each(widths)('the company pages at %s (%i px)', (_name, width) => {
     expect(screen.getAllByText('Připravujeme').length).toBeGreaterThanOrEqual(2);
 
     // The club how-to is a page of this site; the portal button leaves for the application.
-    expect(screen.getByRole('link', { name: /Hromadná objednávka/ })).toHaveAttribute('href', '/web/kluby');
+    expect(screen.getByRole('link', { name: /Hromadná objednávka/ })).toHaveAttribute('href', '/kluby');
     expect(screen.getByRole('link', { name: 'Otevřít portál' })).toHaveAttribute('href', '/portal/prihlaseni');
     expect(container.querySelector('[data-slot="dokumenty.hero.photo"]')).not.toBeNull();
     expect(screen.getByText('[FOTO: dokumenty na recepci]')).toBeInTheDocument();
@@ -169,7 +169,7 @@ describe.each(widths)('the company pages at %s (%i px)', (_name, width) => {
     expect(within(anchor as HTMLElement).getByLabelText('Odkaz od klubu')).toBeInTheDocument();
     expect(within(anchor as HTMLElement).getByRole('button', { name: 'Pokračovat k registraci' })).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Mám odkaz od klubu' })[0]).toHaveAttribute('href', '#mam-odkaz');
-    expect(screen.getAllByRole('link', { name: 'Nezávazná poptávka' })[0]).toHaveAttribute('href', '/web/kontakt#poptavka');
+    expect(screen.getAllByRole('link', { name: 'Nezávazná poptávka' })[0]).toHaveAttribute('href', '/kontakt#poptavka');
     // The server publishes no tiers: no percentage anywhere, no tier table.
     expect(container.textContent).not.toMatch(/\d\s*%/);
     expect(screen.queryByText('Sleva podle počtu osob')).toBeNull();
@@ -243,7 +243,7 @@ describe('"Mám odkaz od klubu"', () => {
 });
 
 describe('prerendering (renderToString, no browser, no API)', () => {
-  it.each(['/web/dokumenty', '/web/kontakt', '/web/o-nas', '/web/kluby'])('%s renders with one H1 and no amount', (path) => {
+  it.each(['/dokumenty', '/kontakt', '/o-nas', '/kluby'])('%s renders with one H1 and no amount', (path) => {
     const result = renderToHtml(path, EMPTY_BOOTSTRAP);
     expect(result.found).toBe(true);
     expect(result.html.match(/<h1[\s>]/g)).toHaveLength(1);
@@ -254,14 +254,14 @@ describe('prerendering (renderToString, no browser, no API)', () => {
   });
 
   it('Pro kluby has the anchor "mam-odkaz" and the input in the HTML', () => {
-    const { html } = renderToHtml('/web/kluby', EMPTY_BOOTSTRAP);
+    const { html } = renderToHtml('/kluby', EMPTY_BOOTSTRAP);
     expect(html).toContain('id="mam-odkaz"');
     expect(html).toContain('id="club-link-input"');
   });
 
   it("Kontakt puts the clinic's build-time details into the HTML", () => {
     const data = normalizeBootstrap({ clinic: { name: 'K', phone: '+420 111 222 333', email: 'a@b.example', address: 'Nová 5', openingHours: 'Po–Pá 9:00–17:00' } }, 1);
-    const { html } = renderToHtml('/web/kontakt', data);
+    const { html } = renderToHtml('/kontakt', data);
     expect(html).toContain('href="tel:+420111222333"');
     expect(html).toContain('mailto:a@b.example');
     expect(html).toContain('9:00–17:00');

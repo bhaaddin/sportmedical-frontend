@@ -83,7 +83,7 @@ export const DOCUMENT_ENTRIES: readonly DocumentEntry[] = [
   {
     id: 'objednavka', section: 'clubs', title: 'Hromadná objednávka — jak to funguje',
     text: 'Postup od poptávky po registrační odkaz pro sportovce.',
-    url: '', to: '/web/kluby',
+    url: '', to: '/kluby',
   },
   {
     id: 'seznam', section: 'clubs', title: 'Seznam sportovců — tabulka',

@@ -100,7 +100,8 @@ describe('desktop (1440): the full sidebar', () => {
       const link = within(nav).getByRole('link', { name });
       expect(getComputedStyle(link).minHeight).toBe('44px');
     }
-    expect(screen.getByRole('link', { name: 'SportMedical — přehled' })).toHaveAttribute('href', '/');
+    /* The brand opens the staff overview. '/' is the public site now and is never a link of the staff shell. */
+    expect(screen.getByRole('link', { name: 'SportMedical — přehled' })).toHaveAttribute('href', '/prehled');
     expect(screen.getByRole('button', { name: 'Nová objednávka' })).toBeInTheDocument();
   });
 
@@ -208,7 +209,7 @@ describe('settings replace the navigation', () => {
   it('a /nastaveni/ address is settings too, even before the catalogue knows it', () => {
     renderShell('/nastaveni/neco-noveho', VIEWPORTS.desktop);
     expect(mainNavs()).toHaveLength(0);
-    expect(screen.getByRole('link', { name: 'Zpět do aplikace' })).toHaveAttribute('href', '/planovani');
+    expect(screen.getByRole('link', { name: 'Zpět do aplikace' })).toHaveAttribute('href', '/prehled');
   });
 
   it('phone: the bottom bar stays and Více → Nastavení opens the hub', async () => {

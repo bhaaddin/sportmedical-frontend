@@ -18,3 +18,4 @@ export interface PageParts {
   canonical?: string;
 }
 export function buildPage(template: string, page: PageParts): string;
+export function isPrerendered(html: string): boolean;

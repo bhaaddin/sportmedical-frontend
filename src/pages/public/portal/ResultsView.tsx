@@ -1,10 +1,11 @@
 /* ══════════════════════════════════════════════════════════════
    MOJE VÝSLEDKY  (patient portal tab — artboard V-Vysledky)
 
-   The latest measurement as tiles, the training zones and the other facts the
-   doctor typed, then every measurement in a table (a card each on a phone).
-   Everything is the API's: a value the session does not carry reads "—", there
-   are no charts of data that does not exist, and nothing is said about devices.
+   The latest measurement as tiles, the training zones and the facts of the
+   measurement (date, protocol type, device), then every measurement in a table
+   (a card each on a phone). Everything is a column the API sends: a value the
+   session does not carry reads "—", there are no charts of data that does not
+   exist, and the doctor's notes are never shown.
    ══════════════════════════════════════════════════════════════ */
 
 import { Box, Typography } from '@mui/material';
@@ -47,18 +48,15 @@ export function MeasurementTiles({ m, compact = false }: { m: Measurement; compa
     <Box sx={tileGrid}>
       <MeasureTile label="VO₂max" value={m.vo2Max} unit="ml/kg/min" />
       {!compact && <MeasureTile label="Maximální tep" value={m.maxHeartRate} unit="tepů/min" />}
-      {!compact && (
-        <MeasureTile
-          label="Tep na prahu"
-          value={m.thresholdHeartRate}
-          unit={m.thresholdShare !== null ? `tepů/min · ${m.thresholdShare}` : 'tepů/min'}
-        />
-      )}
+      {!compact && <MeasureTile label="Tep na prahu" value={m.thresholdHeartRate} unit="tepů/min" />}
+      {!compact && <MeasureTile label="Práh v % VO₂max" value={m.thresholdPercent} unit="%" />}
+      {!compact && <MeasureTile label="Maximální výkon" value={m.maxPower} unit="W" />}
+      {!compact && <MeasureTile label="Výkon na kg" value={m.powerPerKg} unit="W/kg" />}
       <MeasureTile label="Klidový tep" value={m.restingHeartRate} unit="tepů/min" />
       <MeasureTile label="Tělesný tuk" value={m.bodyFat} unit="%" />
       {!compact && <MeasureTile label="Svalová hmota" value={m.muscleMass} unit="kg" />}
       {!compact && <MeasureTile label="Krevní tlak" value={m.bloodPressure} unit="mmHg" />}
-      {!compact && <MeasureTile label="Hmotnost" value={m.weight} />}
+      {!compact && <MeasureTile label="Hmotnost" value={m.weight} unit="kg" />}
     </Box>
   );
 }
@@ -75,7 +73,10 @@ function ZonesList({ m }: { m: Measurement }) {
             key={`${zone.name}-${index}`}
             sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, minHeight: 44, alignItems: 'center', borderTop: index === 0 ? 'none' : `1px solid ${BRAND.line}`, fontSize: 15 }}
           >
-            <span>{zone.name}</span>
+            <span>
+              {zone.name}
+              {zone.note !== '' && <Box component="span" sx={{ display: 'block', fontSize: 13, color: LABEL_COLOR }}>{zone.note}</Box>}
+            </span>
             <Box component="span" sx={{ color: LABEL_COLOR, fontVariantNumeric: 'tabular-nums' }}>{zone.range === '' ? MISSING : zone.range}</Box>
           </Box>
         ))}
@@ -85,10 +86,9 @@ function ZonesList({ m }: { m: Measurement }) {
 }
 
 function ExtraFacts({ m }: { m: Measurement }) {
-  if (m.extras.length === 0) return null;
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-      <FieldLabel>Další údaje z měření</FieldLabel>
+      <FieldLabel>Údaje o měření</FieldLabel>
       <Box component="dl" sx={{ m: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.4fr)', columnGap: 2, rowGap: 1 }}>
         {m.extras.map(([label, value], index) => (
           <Box key={`${label}-${index}`} sx={{ display: 'contents' }}>
@@ -101,6 +101,8 @@ function ExtraFacts({ m }: { m: Measurement }) {
   );
 }
 
+const withUnit = (value: string, unit: string) => (value === MISSING ? MISSING : `${value} ${unit}`);
+
 function AllMeasurements({ list }: { list: Measurement[] }) {
   const device = useDevice();
   if (device === 'phone') {
@@ -112,8 +114,12 @@ function AllMeasurements({ list }: { list: Measurement[] }) {
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1, fontSize: 14 }}>
               <span>VO₂max: <b>{m.vo2Max}</b></span>
               <span>Max. tep: <b>{m.maxHeartRate}</b></span>
-              <span>Tuk: <b>{m.bodyFat === MISSING ? MISSING : `${m.bodyFat} %`}</b></span>
-              <span>Hmotnost: <b>{m.weight}</b></span>
+              <span>Tep na prahu: <b>{m.thresholdHeartRate}</b></span>
+              <span>Práh v % VO₂max: <b>{m.thresholdPercent}</b></span>
+              <span>Max. výkon: <b>{withUnit(m.maxPower, 'W')}</b></span>
+              <span>Výkon na kg: <b>{withUnit(m.powerPerKg, 'W/kg')}</b></span>
+              <span>Tuk: <b>{withUnit(m.bodyFat, '%')}</b></span>
+              <span>Hmotnost: <b>{withUnit(m.weight, 'kg')}</b></span>
             </Box>
           </Box>
         ))}
@@ -127,7 +133,7 @@ function AllMeasurements({ list }: { list: Measurement[] }) {
       <Box component="table" aria-label="Všechna měření" sx={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr>
-            {['Datum', 'VO₂max', 'Max. tep', 'Tuk', 'Hmotnost'].map((h) => (
+            {['Datum', 'VO₂max', 'Max. tep', 'Tep na prahu', 'Práh % VO₂max', 'Max. výkon', 'W/kg', 'Tuk', 'Hmotnost'].map((h) => (
               <Box component="th" scope="col" key={h} sx={head}>{h}</Box>
             ))}
           </tr>
@@ -138,8 +144,12 @@ function AllMeasurements({ list }: { list: Measurement[] }) {
               <Box component="td" sx={{ ...cell, fontWeight: 600 }}>{m.date}</Box>
               <Box component="td" sx={cell}>{m.vo2Max}</Box>
               <Box component="td" sx={cell}>{m.maxHeartRate}</Box>
-              <Box component="td" sx={cell}>{m.bodyFat === MISSING ? MISSING : `${m.bodyFat} %`}</Box>
-              <Box component="td" sx={cell}>{m.weight}</Box>
+              <Box component="td" sx={cell}>{m.thresholdHeartRate}</Box>
+              <Box component="td" sx={cell}>{m.thresholdPercent}</Box>
+              <Box component="td" sx={cell}>{withUnit(m.maxPower, 'W')}</Box>
+              <Box component="td" sx={cell}>{m.powerPerKg}</Box>
+              <Box component="td" sx={cell}>{withUnit(m.bodyFat, '%')}</Box>
+              <Box component="td" sx={cell}>{withUnit(m.weight, 'kg')}</Box>
             </tr>
           ))}
         </tbody>

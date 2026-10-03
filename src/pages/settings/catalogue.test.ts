@@ -341,7 +341,7 @@ describe('the sidebar and the settings do not overlap', () => {
     /* Both sides asserted to exist first. An empty catalogue overlaps nothing
        either, and this is the test somebody would be handed as the proof. */
     expect(destinations.length).toBeGreaterThan(5);
-    expect(destinations).toContain('/cenik');
+    expect(destinations).toContain('/nastaveni/cenik');
 
     const both = destinations.filter((to) => sidebarPaths.includes(to));
     expect(both, `v liště i v nastavení: ${both.join(', ')}`).toEqual([]);
@@ -456,7 +456,7 @@ describe('the groups', () => {
     const reachable = new Set([...allDestinations(), ...SETTINGS_SECTIONS.flatMap((s) => s.items.flatMap((i) => i.aliases ?? []))]);
     for (const old of [
       '/working-hours', '/blokovany-cas', '/svatky', '/nepritomnosti', '/exceptions', '/nastaveni/vzhled-kalendare',
-      '/calendars', '/admin', '/sluzby', '/activities', '/cenik', '/nastaveni/skupinove-slevy', '/vyhrazeni',
+      '/calendars', '/admin', '/nastaveni/sluzby', '/activities', '/nastaveni/cenik', '/nastaveni/skupinove-slevy', '/vyhrazeni',
       '/nastaveni/sablony-emailu', '/nastaveni/pripominky', '/hodnoceni-pacientu', '/dotaznik-nastaveni',
       '/nastaveni/souhlasy', '/dokumenty-sablony', '/pravidla-dokumentu', '/nastaveni/udaje-pacienta',
       '/staff-management', '/nastaveni/zabezpeceni', '/audit-log', '/system-health',
