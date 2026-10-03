@@ -23,6 +23,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import BoltOutlinedIcon from "@mui/icons-material/BoltOutlined";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { calendarsApi } from "../../api/calendars";
@@ -30,6 +31,7 @@ import { workingHoursApi } from "../../api/workingHours";
 import type { SchedulePeriod, WorkingHour } from "../../api/bookingContracts";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { DayActivityGrid } from "../../components/booking/DayActivityGrid";
+import { QuickPlanDialog } from "../../components/booking/plan/QuickPlanDialog";
 import { errorText } from "../../components/booking/errorText";
 import { addDaysToDateOnly, formatDateOnly, pragueDateKey } from "../../utils/time";
 import { SettingsScreen } from "../settings/SettingsFrame";
@@ -81,6 +83,9 @@ export default function WorkingHoursPage() {
   const [removing, setRemoving] = useState<SchedulePeriod | null>(null);
   /* Lives here, not in the editor: a save refetches, and the editor starts over. */
   const [justSaved, setJustSaved] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
+  /* Said on this screen, not in the dialog: the dialog closes when the plan is saved. */
+  const [planMessage, setPlanMessage] = useState<string | null>(null);
 
   const calendarsQuery = useQuery({
     queryKey: ["calendars"],
@@ -90,6 +95,7 @@ export default function WorkingHoursPage() {
 
   const calendars = calendarsQuery.data ?? [];
   const activeCalendarId = calendarId || calendars[0]?.id || "";
+  const activeCalendar = calendars.find((calendar) => calendar.id === activeCalendarId);
 
   const periodsQuery = useQuery({
     queryKey: ["periods", activeCalendarId],
@@ -162,7 +168,22 @@ export default function WorkingHoursPage() {
         </>
       }
       width={1200}
+      actions={
+        <Button
+          variant="contained"
+          startIcon={<BoltOutlinedIcon />}
+          disabled={activeCalendar === undefined || !periodsQuery.isSuccess}
+          onClick={() => setPlanOpen(true)}
+        >
+          Rychlý plán
+        </Button>
+      }
     >
+      {planMessage ? (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setPlanMessage(null)}>
+          {planMessage}
+        </Alert>
+      ) : null}
 
       <AsyncSection
         isLoading={calendarsQuery.isLoading}
@@ -180,6 +201,7 @@ export default function WorkingHoursPage() {
           onChange={(e) => {
             setCalendarId(e.target.value);
             setJustSaved(false);
+            setPlanMessage(null);
           }}
           sx={{ minWidth: 260, mb: 3 }}
         >
@@ -232,10 +254,10 @@ export default function WorkingHoursPage() {
           ) : null}
 
           {stillInForce.length > 0 ? (
-            <Alert severity="warning" sx={{ mb: 2 }}>
+            <Alert severity="info" sx={{ mb: 2 }}>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                Z dřívějšího nastavení podle období zůstaly v tomto kalendáři ještě další pracovní
-                doby. Platí dál ve svých datech, i když je tady nevidíte:
+                Kromě pracovní doby níže platí v tomto kalendáři i další plány a období - každé jen ve svých
+                datech (třeba plány z Rychlého plánu):
               </Typography>
               <Stack spacing={0.5}>
                 {stillInForce.map((period) => (
@@ -251,6 +273,13 @@ export default function WorkingHoursPage() {
                 ))}
               </Stack>
             </Alert>
+          ) : null}
+
+          {main !== null && stillInForce.length > 0 ? (
+            <Typography variant="body2" sx={{ color: "text.secondary", mb: 1 }}>
+              Upravujete: {main.name} · {formatDateOnly(main.validFrom)}
+              {main.validTo ? ` – ${formatDateOnly(main.validTo)}` : " – bez konce"}
+            </Typography>
           ) : null}
 
           <TimetableEditor
@@ -279,11 +308,22 @@ export default function WorkingHoursPage() {
                 calendarId={activeCalendarId}
                 periodId={main.id}
                 workingDays={new Set(rows.map((row) => row.dayOfWeek))}
+                clinicServiceId={activeCalendar?.clinicServiceId ?? null}
               />
             </>
           ) : null}
         </AsyncSection>
       </AsyncSection>
+
+      <QuickPlanDialog
+        open={planOpen}
+        onClose={() => setPlanOpen(false)}
+        calendarId={activeCalendarId}
+        calendarName={activeCalendar?.name ?? ""}
+        clinicServiceId={activeCalendar?.clinicServiceId ?? null}
+        periods={periods}
+        onSaved={setPlanMessage}
+      />
 
       <Dialog open={removing !== null} onClose={() => setRemoving(null)} maxWidth="xs" fullWidth>
         <DialogTitle>Smazat starou pracovní dobu?</DialogTitle>

@@ -46,6 +46,8 @@ vi.mock('../../api/workingHours', () => ({
   },
 }));
 
+vi.mock('../../api/appointments', () => ({ appointmentsApi: { range: vi.fn().mockResolvedValue([]) } }));
+
 vi.mock('../../api/activities', () => ({
   activitiesApi: { list: vi.fn().mockResolvedValue({ activities: [], warnings: [] }) },
 }));
@@ -151,5 +153,22 @@ describe('working hours without periods', () => {
 
     expect(await screen.findByText('Pauza musí ležet uvnitř pracovní doby.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Uložit' })).toBeDisabled();
+  });
+});
+
+describe('Rychlý plán on the working-hours screen', () => {
+  it('has a prominent button that opens the plan dialog for this calendar', async () => {
+    const user = userEvent.setup();
+    listPeriods.mockResolvedValue([{ id: 'p1', name: 'Celoroční provoz', validFrom: '2026-01-01', validTo: null }]);
+    render(withQueries(<WorkingHoursPage />));
+
+    const button = await screen.findByRole('button', { name: 'Rychlý plán' });
+    await waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Sportovní diagnostika: otevírací doba i činnosti/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Měsíc' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(dialog).getByRole('button', { name: 'Uložit plán' })).toBeInTheDocument();
   });
 });

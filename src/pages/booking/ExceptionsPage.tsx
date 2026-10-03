@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  Link,
   MenuItem,
   Stack,
   Table,
@@ -23,6 +24,7 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link as RouterLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { calendarsApi } from "../../api/calendars";
 import { workingHoursApi } from "../../api/workingHours";
@@ -158,7 +160,12 @@ export default function ExceptionsPage() {
           {t("booking.exceptions.window", {
             from: formatDateOnly(windowFrom),
             to: formatDateOnly(windowTo),
-          })}
+          })}{" "}
+          Celý týden nebo měsíc najednou nastavíte v{" "}
+          <Link component={RouterLink} to="/working-hours">
+            Rychlém plánu
+          </Link>
+          .
         </>
       }
       width={1000}

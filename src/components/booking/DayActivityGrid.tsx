@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import {
-  Alert, Box, Button, Checkbox, Stack, Table, TableBody, TableCell, TableHead,
-  TableRow, Typography,
+  Alert, Box, Button, Checkbox, Menu, MenuItem, Stack, Table, TableBody, TableCell, TableHead,
+  TableRow, Tooltip, Typography,
 } from '@mui/material';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { activitiesApi } from '../../api/activities';
@@ -12,7 +13,6 @@ import { warningDays } from '../../api/bookingContracts';
 import type { ActivityWarning, DayActivityRow } from '../../api/bookingContracts';
 import { AsyncSection } from './AsyncSection';
 import { errorText } from './errorText';
-import { readableTextOn } from '../../utils/calendarPalette';
 import { offersNothingAtAll, offersNothingOn } from './dayActivityRule';
 
 /**
@@ -25,26 +25,55 @@ import { offersNothingAtAll, offersNothingOn } from './dayActivityRule';
  * A day with working hours but no activity offers nothing when booking. The
  * contract calls that the most common reason a calendar "looks broken", so the
  * screen says it in place rather than leaving it to be discovered.
+ *
+ * Quick ways to fill it (3. 10. 2026): a tri-state checkbox over every column
+ * (one činnost on every working day), one in front of every row (every činnost
+ * on that day) and "Kopírovat z jiného dne" on each row.
  */
 
 /** Displayed Monday first, stored 0 = Sunday. */
 const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0];
+
+/** A window an activity is offered in; null = the whole working day. */
+interface TimeWindow {
+  from: string | null;
+  to: string | null;
+}
+
+/** The ticks and the windows that go with them, as one unit so a copy keeps both. */
+interface Draft {
+  ids: Map<number, Set<string>>;
+  windows: Map<number, Map<string, TimeWindow>>;
+}
 
 interface DayActivityGridProps {
   calendarId: string;
   periodId: string;
   /** Days that have working hours, so the screen can point out the empty ones. */
   workingDays: Set<number>;
+  /**
+   * The calendar's service. The server only offers the active activities of that
+   * service, so the others are not shown: a tick on one would be dropped on save.
+   * Left out, every activity is listed.
+   */
+  clinicServiceId?: string | null;
 }
 
-export function DayActivityGrid({ calendarId, periodId, workingDays }: DayActivityGridProps) {
+const cloneDraft = (draft: Draft): Draft => ({
+  ids: new Map([...draft.ids].map(([day, ids]) => [day, new Set(ids)])),
+  windows: new Map([...draft.windows].map(([day, w]) => [day, new Map(w)])),
+});
+
+export function DayActivityGrid({ calendarId, periodId, workingDays, clinicServiceId }: DayActivityGridProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   /** Null until something is ticked; the server's grid stands until then. */
-  const [edited, setEdited] = useState<Map<number, Set<string>> | null>(null);
+  const [edited, setEdited] = useState<Draft | null>(null);
   /** Warnings the owner has clicked away this session. */
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  /** The row whose "Kopírovat z jiného dne" menu is open. */
+  const [copyMenu, setCopyMenu] = useState<{ day: number; anchor: HTMLElement } | null>(null);
 
   const activitiesQuery = useQuery({
     queryKey: ['activities'],
@@ -58,12 +87,18 @@ export function DayActivityGrid({ calendarId, periodId, workingDays }: DayActivi
     enabled: calendarId !== '' && periodId !== '',
   });
 
-  const serverGrid = useMemo(() => {
-    const map = new Map<number, Set<string>>();
+  const serverDraft = useMemo<Draft>(() => {
+    const ids = new Map<number, Set<string>>();
+    const windows = new Map<number, Map<string, TimeWindow>>();
     for (const row of gridQuery.data?.rows ?? []) {
-      map.set(row.dayOfWeek, new Set(row.activityIds));
+      ids.set(row.dayOfWeek, new Set(row.activityIds));
+      const forDay = new Map<string, TimeWindow>();
+      for (const slot of row.activities ?? []) {
+        if (slot.from !== null || slot.to !== null) forDay.set(slot.activityId, { from: slot.from, to: slot.to });
+      }
+      windows.set(row.dayOfWeek, forDay);
     }
-    return map;
+    return { ids, windows };
   }, [gridQuery.data]);
 
   /**
@@ -80,19 +115,39 @@ export function DayActivityGrid({ calendarId, periodId, workingDays }: DayActivi
     [warnings],
   );
 
-  const grid = edited ?? serverGrid;
+  const draft = edited ?? serverDraft;
+  const grid = draft.ids;
   const activities = useMemo(
-    () => [...(activitiesQuery.data?.activities ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
-    [activitiesQuery.data],
+    () =>
+      [...(activitiesQuery.data?.activities ?? [])]
+        .filter((a) => clinicServiceId === undefined || (a.isActive && a.clinicServiceId === clinicServiceId))
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+    [activitiesQuery.data, clinicServiceId],
   );
+
+  /** A column acts on the days that work; a calendar with none yet, on every day. */
+  const columnDays = useMemo(() => {
+    const working = WEEK_DAYS.filter((day) => workingDays.has(day));
+    return working.length > 0 ? working : WEEK_DAYS;
+  }, [workingDays]);
 
   const save = useMutation({
     mutationFn: () => {
       // A full replacement: every day is sent, including the empty ones (4.2).
-      const body: DayActivityRow[] = WEEK_DAYS.map((dayOfWeek) => ({
-        dayOfWeek,
-        activityIds: Array.from(grid.get(dayOfWeek) ?? []),
-      }));
+      const body: DayActivityRow[] = WEEK_DAYS.map((dayOfWeek) => {
+        const activityIds = Array.from(draft.ids.get(dayOfWeek) ?? []);
+        const windows = draft.windows.get(dayOfWeek);
+        const row: DayActivityRow = { dayOfWeek, activityIds };
+        // Windows are carried through, never widened to the whole day by a save.
+        if (windows && activityIds.some((id) => windows.has(id))) {
+          row.activities = activityIds.map((activityId) => ({
+            activityId,
+            from: windows.get(activityId)?.from ?? null,
+            to: windows.get(activityId)?.to ?? null,
+          }));
+        }
+        return row;
+      });
       return workingHoursApi.saveDayActivities(calendarId, periodId, body);
     },
     onSuccess: async () => {
@@ -105,15 +160,57 @@ export function DayActivityGrid({ calendarId, periodId, workingDays }: DayActivi
     },
   });
 
-  const toggle = (dayOfWeek: number, activityId: string) => {
-    const next = new Map<number, Set<string>>();
-    for (const [day, ids] of grid) next.set(day, new Set(ids));
-    const forDay = next.get(dayOfWeek) ?? new Set<string>();
-    if (forDay.has(activityId)) forDay.delete(activityId);
-    else forDay.add(activityId);
-    next.set(dayOfWeek, forDay);
+  /** Applies one change to a copy of the current draft. */
+  const change = (apply: (next: Draft) => void) => {
+    const next = cloneDraft(draft);
+    apply(next);
     setEdited(next);
   };
+
+  const setCell = (next: Draft, dayOfWeek: number, activityId: string, on: boolean) => {
+    const ids = next.ids.get(dayOfWeek) ?? new Set<string>();
+    if (on) ids.add(activityId);
+    else {
+      ids.delete(activityId);
+      next.windows.get(dayOfWeek)?.delete(activityId);
+    }
+    next.ids.set(dayOfWeek, ids);
+  };
+
+  const toggle = (dayOfWeek: number, activityId: string) =>
+    change((next) => setCell(next, dayOfWeek, activityId, !(grid.get(dayOfWeek)?.has(activityId) ?? false)));
+
+  const columnState = (activityId: string) => {
+    const on = columnDays.filter((day) => grid.get(day)?.has(activityId)).length;
+    return { checked: on === columnDays.length, indeterminate: on > 0 && on < columnDays.length };
+  };
+
+  const toggleColumn = (activityId: string) => {
+    const turnOn = !columnState(activityId).checked;
+    change((next) => columnDays.forEach((day) => setCell(next, day, activityId, turnOn)));
+  };
+
+  const rowState = (dayOfWeek: number) => {
+    const forDay = grid.get(dayOfWeek) ?? new Set<string>();
+    const on = activities.filter((a) => forDay.has(a.id)).length;
+    return {
+      checked: activities.length > 0 && on === activities.length,
+      indeterminate: on > 0 && on < activities.length,
+    };
+  };
+
+  const toggleRow = (dayOfWeek: number) => {
+    const turnOn = !rowState(dayOfWeek).checked;
+    change((next) => activities.forEach((a) => setCell(next, dayOfWeek, a.id, turnOn)));
+  };
+
+  const copyDay = (from: number, to: number) =>
+    change((next) => {
+      next.ids.set(to, new Set(next.ids.get(from) ?? []));
+      next.windows.set(to, new Map(next.windows.get(from) ?? []));
+    });
+
+  const dayName = (dayOfWeek: number) => t(`booking.workingHours.weekday.${dayOfWeek}`);
 
   return (
     <Box>
@@ -160,33 +257,61 @@ export function DayActivityGrid({ calendarId, periodId, workingDays }: DayActivi
       >
         <Box sx={{ overflowX: 'auto' }}>
           <Table size="small">
-            <TableHead>
+            {/* The board's plain header: white, normal case - not the filled uppercase of other tables. */}
+            <TableHead
+              sx={{
+                '& .MuiTableCell-head': {
+                  backgroundColor: 'background.paper',
+                  color: 'text.primary',
+                  textTransform: 'none',
+                  letterSpacing: 0,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  verticalAlign: 'bottom',
+                },
+              }}
+            >
               <TableRow>
                 <TableCell>{t('booking.workingHours.day')}</TableCell>
-                {activities.map((activity) => (
-                  <TableCell key={activity.id} align="center">
-                    <Box
-                      sx={{
-                        display: 'inline-block',
-                        px: 1,
-                        py: 0.25,
-                        borderRadius: 1,
-                        backgroundColor: activity.color,
-                        color: readableTextOn(activity.color),
-                        fontSize: 12,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {activity.name}
-                    </Box>
-                  </TableCell>
-                ))}
+                {activities.map((activity) => {
+                  const state = columnState(activity.id);
+                  return (
+                    <TableCell key={activity.id} align="center" sx={{ minWidth: 112 }}>
+                      <Stack sx={{ alignItems: 'center' }}>
+                        <Tooltip title="Vybrat celý sloupec">
+                          <Checkbox
+                            size="small"
+                            checked={state.checked}
+                            indeterminate={state.indeterminate}
+                            onChange={() => toggleColumn(activity.id)}
+                            slotProps={{ input: { 'aria-label': `Vybrat celý sloupec: ${activity.name}` } }}
+                          />
+                        </Tooltip>
+                        <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', justifyContent: 'center' }}>
+                          <Box
+                            aria-hidden
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              flexShrink: 0,
+                              backgroundColor: activity.color,
+                            }}
+                          />
+                          <span>{activity.name}</span>
+                        </Stack>
+                      </Stack>
+                    </TableCell>
+                  );
+                })}
+                <TableCell />
               </TableRow>
             </TableHead>
             <TableBody>
               {WEEK_DAYS.map((dayOfWeek) => {
                 const forDay = grid.get(dayOfWeek) ?? new Set<string>();
                 const works = workingDays.has(dayOfWeek);
+                const row = rowState(dayOfWeek);
                 // Unsaved state is the client's to mark; the saved state is the
                 // server's, and it names the day in the warning context (3.1).
                 const bookableNothing = offersNothingOn(dayOfWeek, grid, workingDays);
@@ -195,8 +320,18 @@ export function DayActivityGrid({ calendarId, periodId, workingDays }: DayActivi
                   <TableRow key={dayOfWeek} hover>
                     <TableCell>
                       <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                        <Tooltip title="Vybrat celý řádek">
+                          <Checkbox
+                            size="small"
+                            checked={row.checked}
+                            indeterminate={row.indeterminate}
+                            onChange={() => toggleRow(dayOfWeek)}
+                            slotProps={{ input: { 'aria-label': `Vybrat celý řádek: ${dayName(dayOfWeek)}` } }}
+                            sx={{ ml: -1 }}
+                          />
+                        </Tooltip>
                         <Typography sx={{ fontWeight: works ? 600 : 400 }}>
-                          {t(`booking.workingHours.weekday.${dayOfWeek}`)}
+                          {dayName(dayOfWeek)}
                         </Typography>
                         {bookableNothing || flaggedByServer ? (
                           <Stack
@@ -225,7 +360,7 @@ export function DayActivityGrid({ calendarId, periodId, workingDays }: DayActivi
                           slotProps={{
                             input: {
                               'aria-label': t('booking.dayActivities.cellLabel', {
-                                day: t(`booking.workingHours.weekday.${dayOfWeek}`),
+                                day: dayName(dayOfWeek),
                                 activity: activity.name,
                               }),
                             },
@@ -233,12 +368,43 @@ export function DayActivityGrid({ calendarId, periodId, workingDays }: DayActivi
                         />
                       </TableCell>
                     ))}
+                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                      <Button
+                        size="small"
+                        color="inherit"
+                        startIcon={<ContentCopyOutlinedIcon fontSize="small" />}
+                        aria-label={`Kopírovat z jiného dne: ${dayName(dayOfWeek)}`}
+                        onClick={(e) => setCopyMenu({ day: dayOfWeek, anchor: e.currentTarget })}
+                      >
+                        Kopírovat z jiného dne
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 );
               })}
             </TableBody>
           </Table>
         </Box>
+
+        <Menu
+          open={copyMenu !== null}
+          anchorEl={copyMenu?.anchor}
+          onClose={() => setCopyMenu(null)}
+        >
+          {copyMenu
+            ? WEEK_DAYS.filter((day) => day !== copyMenu.day).map((day) => (
+                <MenuItem
+                  key={day}
+                  onClick={() => {
+                    copyDay(day, copyMenu.day);
+                    setCopyMenu(null);
+                  }}
+                >
+                  {dayName(day)}
+                </MenuItem>
+              ))
+            : null}
+        </Menu>
 
         {save.error ? (
           <Alert severity="error" sx={{ mt: 2 }}>

@@ -1043,6 +1043,24 @@ export type ScheduleExceptionInput = z.infer<typeof scheduleExceptionInputSchema
 export const dayActivityRowSchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6),
   activityIds: z.array(z.string()).nullish().transform((v) => v ?? []),
+  /**
+   * The same activities with the window each one is offered in (`from`/`to`,
+   * null = the whole working day). The API sends it next to `activityIds` and,
+   * when a save carries it, it wins over the ids - so a copy of a day keeps the
+   * windows instead of quietly widening them to the whole day.
+   */
+  activities: z.preprocess(
+    (value) => value ?? undefined,
+    z
+      .array(
+        z.object({
+          activityId: z.string(),
+          from: z.string().nullish().transform((v) => v ?? null),
+          to: z.string().nullish().transform((v) => v ?? null),
+        }),
+      )
+      .optional(),
+  ),
 });
 export type DayActivityRow = z.infer<typeof dayActivityRowSchema>;
 
