@@ -185,7 +185,7 @@ describe('Stránka nenalezena', () => {
       expect(container.querySelectorAll('[data-layout="not-found"]')).toHaveLength(1);
       expect(screen.getByRole('heading', { level: 1, name: 'Stránka nenalezena' })).toBeInTheDocument();
       const back = screen.getByRole('link', { name: 'Zpět na přehled' });
-      expect(back).toHaveAttribute('href', '/');
+      expect(back).toHaveAttribute('href', '/prehled');
       expect(back).toHaveStyle({ minHeight: '44px' });
     });
   });

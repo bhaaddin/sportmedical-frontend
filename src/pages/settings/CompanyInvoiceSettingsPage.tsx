@@ -71,7 +71,7 @@ export function validateCompany(d: Draft): Partial<Record<Field, string>> {
   if (d.bankAccount.trim() !== '' && !isValidBankAccount(d.bankAccount)) e.bankAccount = 'Číslo účtu ve tvaru [předčíslí-]číslo/kód banky, např. 123456789/0800.';
   if (d.iban.trim() !== '' && !isValidIban(d.iban)) e.iban = 'IBAN nemá správný kontrolní součet. Zkontrolujte ho.';
   if (d.dataBox.trim() !== '' && !/^[0-9A-Za-z]{7}$/.test(d.dataBox.trim())) e.dataBox = 'ID datové schránky má sedm znaků.';
-  if (d.phone.trim() !== '' && !/^\+?[\d\s]{9,18}$/.test(d.phone.trim())) e.phone = 'Telefon zadejte s předvolbou, např. +420 606 785 271.';
+  if (d.phone.trim() !== '' && !/^\+?[\d\s]{9,18}$/.test(d.phone.trim())) e.phone = 'Telefon zadejte s předvolbou, např. +420 123 456 789.';
   if (d.email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email.trim())) e.email = 'E-mail nemá správný tvar.';
   const days = /^\d+$/.test(d.invoiceDueDays.trim()) ? Number(d.invoiceDueDays) : null;
   if (days === null || days < 1 || days > 365) e.invoiceDueDays = 'Splatnost je celý počet dní od 1 do 365.';

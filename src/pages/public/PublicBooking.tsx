@@ -46,6 +46,8 @@ import {
   ctaSx, ghostSx, shortDate,
 } from '../../components/public/kit';
 import ServiceGroup, { minuteWord, priceLine } from './booking/ServiceGroup';
+import { useSlotTexts } from '../../site/useSlotTexts';
+import { fillText } from '../../site/fillText';
 import SlotPicker from './booking/SlotPicker';
 import type { DaySlots } from './booking/SlotPicker';
 import { addDays, isoOf, mondayOf, weekOf } from './booking/weekGrid';
@@ -53,11 +55,17 @@ import { addDays, isoOf, mondayOf, weekOf } from './booking/weekGrid';
 /** How far ahead the day list asks. The calendar's own horizon still applies. */
 const HORIZON_DAYS = 60;
 
-/** ", nebo nám zavolejte na 123" — or nothing at all when there is no number. */
+/** ". Zavolejte nám prosím na 123" (the lead is an editable text) — or nothing at all when there is no number. */
 function ringUs(clinic: PublicClinic | null, lead: string): string {
   const phone = clinic?.phone.trim() ?? '';
-  return phone === '' ? '' : `${lead}${phone}`;
+  return phone === '' ? '' : `. ${lead} ${phone}`;
 }
+
+/** The editable wording of this page (registry: src/site/slots/formulare.ts). */
+const BOOKING_TEXT_KEYS = [
+  'formulare.booking.call-us', 'formulare.booking.closed.title', 'formulare.booking.closed.with-phone',
+  'formulare.booking.closed.no-phone', 'formulare.booking.pick-time', 'formulare.booking.no-slots',
+] as const;
 
 type Chosen = { service: BookableService; activity: BookableActivity };
 type Picked = { slot: BookableSlot; day: string };
@@ -83,6 +91,7 @@ export default function PublicBooking() {
      Null while loading, empty when nobody has filled it in — both mean "say
      nothing" rather than invent one. */
   const [clinic, setClinic] = useState<PublicClinic | null>(null);
+  const txt = useSlotTexts(BOOKING_TEXT_KEYS);
 
   const [chosen, setChosen] = useState<Chosen | null>(null);
   const [days, setDays] = useState<string[] | null>(null);
@@ -248,7 +257,7 @@ export default function PublicBooking() {
           <>
             {offerFailed && (
               <LoadError
-                what={`Nabídku se nepodařilo načíst${ringUs(clinic, '. Zavolejte nám prosím na ')}.`}
+                what={`Nabídku se nepodařilo načíst${ringUs(clinic, txt['formulare.booking.call-us'])}.`}
                 onRetry={() => setOfferAttempt((n) => n + 1)}
               />
             )}
@@ -257,11 +266,11 @@ export default function PublicBooking() {
 
             {nothingOffered && (
               <Panel>
-                <PanelTitle>Online objednávání právě není otevřené</PanelTitle>
+                <PanelTitle>{txt['formulare.booking.closed.title']}</PanelTitle>
                 <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
                   {phone !== ''
-                    ? `Termín vám rádi domluvíme telefonicky na ${phone}.`
-                    : 'Zkuste to prosím později.'}
+                    ? fillText(txt['formulare.booking.closed.with-phone'], { phone })
+                    : txt['formulare.booking.closed.no-phone']}
                 </Typography>
                 {phone !== '' && (
                   <Box>
@@ -315,7 +324,7 @@ export default function PublicBooking() {
 
                 {days !== null && days.length === 0 && (
                   <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
-                    V nejbližších {HORIZON_DAYS} dnech nemáme volno{ringUs(clinic, '. Zavolejte nám prosím na ')}.
+                    {fillText(txt['formulare.booking.no-slots'], { days: String(HORIZON_DAYS) })}{ringUs(clinic, txt['formulare.booking.call-us'])}.
                   </Typography>
                 )}
 
@@ -375,7 +384,7 @@ export default function PublicBooking() {
               {device !== 'phone' && cta}
               {picked === null && (
                 <Typography sx={{ fontSize: 13, color: LABEL_COLOR, lineHeight: 1.6 }}>
-                  Vyberte čas v kalendáři. Dotazník a souhlasy vyplníte hned v dalším kroku.
+                  {txt['formulare.booking.pick-time']}
                 </Typography>
               )}
             </Panel>

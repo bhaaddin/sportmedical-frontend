@@ -2,7 +2,7 @@
 
 import { Hero } from '../landing/Hero';
 import { ServiceBlocks } from '../landing/ServiceBlocks';
-import { ClubSection, EquipmentSection, PhilosophySection, StepsSection } from '../landing/sections';
+import { BookingSection, ClubSection, EquipmentSection, PartnersJoinSection, PhilosophySection, StepsSection } from '../landing/sections';
 import { PartnerMarquee } from '../landing/PartnerMarquee';
 
 export default function LandingPage() {
@@ -10,10 +10,12 @@ export default function LandingPage() {
     <>
       <Hero />
       <ServiceBlocks />
+      <BookingSection />
       <EquipmentSection />
       <StepsSection />
       <ClubSection />
       <PartnerMarquee />
+      <PartnersJoinSection />
       <PhilosophySection />
     </>
   );

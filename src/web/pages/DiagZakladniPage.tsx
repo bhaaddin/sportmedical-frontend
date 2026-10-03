@@ -1,8 +1,9 @@
-/* /diagnostika/zakladni — placeholder page, replaced wholesale by its page agent (keep the default export). */
+/* /diagnostika/zakladni — a detail page of Sportovní diagnostika: its spec is src/web/pages/services/content/details.ts,
+   its slots src/site/slots/ (the same spec), its price comes from the price list. */
 
-import { SlotText } from '../../site/SlotText';
-import { PageHero } from '../ui';
+import { DetailPage } from './services/DetailPage';
+import { DIAG_ZAKLADNI } from './services/content/details';
 
 export default function DiagZakladniPage() {
-  return <PageHero title={<SlotText slotKey="diagzakladni.hero.title" />} />;
+  return <DetailPage spec={DIAG_ZAKLADNI} />;
 }

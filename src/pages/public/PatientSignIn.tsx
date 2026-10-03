@@ -23,6 +23,7 @@ import {
 } from '../../api/patientPortal';
 import { useIsPhone } from '../../layout/useDevice';
 import PublicLayout from './PublicLayout';
+import { useSlotTexts } from '../../site/useSlotTexts';
 import { BRAND } from '../../components/public/brand';
 import { LANDING_PATH } from '../../components/public/PublicHeader';
 import {
@@ -32,6 +33,7 @@ import {
 export const portalPath = (token: string): string => `/portal/${encodeURIComponent(token)}`;
 
 export default function PatientSignIn() {
+  const txt = useSlotTexts(['formulare.portal.signin.sub', 'formulare.portal.signin.no-password', 'formulare.portal.signin.forgot'] as const);
   const navigate = useNavigate();
   const phone = useIsPhone();
   const [email, setEmail] = useState('');
@@ -73,7 +75,7 @@ export default function PatientSignIn() {
   return (
     <PublicLayout hidePortalLink noFooter>
       <PublicMain maxWidth={520} gap={2.5}>
-        <PageTitle sub="Vaše termíny, výsledky a dokumenty na jednom místě.">Přihlášení do portálu</PageTitle>
+        <PageTitle sub={txt['formulare.portal.signin.sub']}>Přihlášení do portálu</PageTitle>
 
         <Panel component="div" sx={{ flex: phone ? 1 : undefined }}>
           <Box
@@ -107,10 +109,10 @@ export default function PatientSignIn() {
             )}
 
             <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
-              Nemáte heslo? Přístup vám vydá ordinace — nebo si ho nastavte z odkazu, který jste dostali.
+              {txt['formulare.portal.signin.no-password']}
             </Typography>
             <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
-              Zapomněli jste heslo? Ozvěte se ordinaci — heslo vám smaže a pošle nový odkaz.
+              {txt['formulare.portal.signin.forgot']}
             </Typography>
 
             <Box sx={{ borderTop: `1px solid ${BRAND.line}`, pt: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>

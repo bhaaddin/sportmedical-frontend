@@ -148,7 +148,7 @@ describe('the slot registry', () => {
 
   it('carries the artboard captions of the landing and groups slots by page section', () => {
     expect(slotDef('landing.service2.photo')?.caption).toBe('ForceDecks — výskok na silových deskách');
-    expect(slotDef('landing.hero.headline')?.defaultText).toBe('Výkon,\nkterý se dá\nzměřit');
+    expect(slotDef('landing.hero.headline')?.defaultText).toBe('Sportovní lékařské\nprohlídky\na diagnostika');
     const groups = slotGroups();
     expect(groups.some((g) => g.group.startsWith('Úvodní stránka'))).toBe(true);
     expect(groups.flatMap((g) => g.slots).length).toBe(SLOT_REGISTRY.length);

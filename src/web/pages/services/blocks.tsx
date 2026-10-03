@@ -11,14 +11,16 @@ import type { ReactNode } from 'react';
 import { Box } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material/styles';
 import { formatPercent, useDiscountTiers } from '../../../api/publicDiscounts';
+import { formatCzk, formatMinutes } from '../../../api/priceList';
 import type { DiscountTier } from '../../../api/publicDiscounts';
 import type { PriceItem } from '../../../api/priceList';
 import { MediaSlot } from '../../../site/MediaSlot';
 import { SlotText } from '../../../site/SlotText';
 import { BOOKING_PATH } from '../../../components/public/PublicHeader';
 import { SiteLink } from '../../SiteLink';
-import { PriceRow, SectionTitle, WebSection } from '../../ui';
-import { FONT_HEAD, MQ, W } from '../../tokens';
+import { PKG_NOTE } from './content/shared';
+import { CtaButton, SectionTitle, WebSection } from '../../ui';
+import { FONT_BODY, FONT_HEAD, MQ, W } from '../../tokens';
 
 /* ── Card look (the artboards' ".karta") ── */
 
@@ -66,7 +68,9 @@ export function PageSection({ title, lead, tone = 'white', id, children, borderT
 
 /* ── Cards of a title and a sentence (optionally numbered 01, 02 …) ── */
 
-export function InfoCards({ prefix, count, numbered = false, minWidth = 260 }: { prefix: string; count: number; numbered?: boolean; minWidth?: number }) {
+export function InfoCards({
+  prefix, count, numbered = false, minWidth = 260, more = false,
+}: { prefix: string; count: number; numbered?: boolean; minWidth?: number; /** Cards that also have a `.more` line. */ more?: boolean }) {
   return (
     <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, ...(gridOf(minWidth) as object) }}>
       {Array.from({ length: count }, (_, index) => index + 1).map((n) => (
@@ -76,6 +80,7 @@ export function InfoCards({ prefix, count, numbered = false, minWidth = 260 }: {
           )}
           <SlotText slotKey={`${prefix}.${n}.title`} as="h3" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 17, lineHeight: 1.25 }} />
           <SlotText slotKey={`${prefix}.${n}.text`} as="p" sx={{ m: 0, fontSize: 15, lineHeight: 1.6, color: W.bodySoft }} />
+          {more && <SlotText slotKey={`${prefix}.${n}.more`} as="p" sx={{ m: 0, fontSize: 14, lineHeight: 1.6, color: W.muted }} />}
         </Box>
       ))}
     </Box>
@@ -107,11 +112,65 @@ export function PhotoGallery({ prefix, count, label }: { prefix: string; count: 
   );
 }
 
+/* ── A price: the amount from the price list, the list price crossed out ── */
+
+/**
+ * "2 200 Kč", or "—" when nobody has set it. When the price list carries the price before a
+ * package discount (`listPriceCzk`) it is drawn crossed out in front — never a word like "běžně".
+ */
+export function PriceTag({ item, size = 20, color }: { item: PriceItem | null | undefined; size?: number; color?: string }) {
+  const price = formatCzk(item?.priceCzk);
+  const list = typeof item?.listPriceCzk === 'number' && typeof item.priceCzk === 'number' && item.listPriceCzk > item.priceCzk ? formatCzk(item.listPriceCzk) : null;
+  return (
+    <Box component="span" sx={{ display: 'inline-flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+      {list !== null && (
+        <Box component="s" sx={{ fontFamily: FONT_BODY, fontWeight: 500, fontSize: Math.max(13, Math.round(size * 0.7)), color: W.muted, fontVariantNumeric: 'tabular-nums' }}>{list}</Box>
+      )}
+      <Box
+        component="span"
+        sx={{ fontFamily: FONT_HEAD, fontWeight: 800, fontSize: size, fontVariantNumeric: 'tabular-nums', ...(price === null ? { color: W.muted } : color !== undefined ? { color } : {}) }}
+      >
+        {price ?? '—'}
+      </Box>
+    </Box>
+  );
+}
+
 /* ── A list of price rows (hover rows, name · minutes · price; "—" when the price is unknown) ── */
 
+function ServicePriceRow({
+  to, name, item, last, showDuration, showDescription,
+}: { to: string; name: string; item: PriceItem | null; last: boolean; showDuration: boolean; showDescription: boolean }) {
+  const minutes = showDuration ? formatMinutes(item?.durationMinutes) : null;
+  return (
+    <Box
+      component={SiteLink}
+      to={to}
+      sx={{
+        display: 'flex', flexWrap: 'wrap', gap: '4px 16px', alignItems: 'baseline', py: '15px', textDecoration: 'none', color: W.text,
+        borderTop: `1px solid ${W.line}`, ...(last ? { borderBottom: `1px solid ${W.line}` } : {}),
+        transition: 'background-color .14s ease, padding-left .14s ease', [MQ.reduceMotion]: { transition: 'none' },
+        '@media (hover: hover)': { '&:hover': { bgcolor: W.warm, pl: '24px' } },
+        minHeight: 44,
+      }}
+    >
+      <Box component="span" sx={{ flex: '999 1 200px', minWidth: 0, fontSize: 17, fontWeight: 600 }}>
+        {name}
+        {showDescription && item !== null && item.description.trim() !== '' && (
+          <Box component="span" sx={{ display: 'block', mt: '3px', fontSize: 14, fontWeight: 400, lineHeight: 1.5, color: W.muted }}>{item.description}</Box>
+        )}
+      </Box>
+      {minutes !== null && (
+        <Box component="span" sx={{ flex: { xs: '0 0 auto', sm: '0 0 110px' }, fontSize: 14, color: W.muted }}>{minutes}</Box>
+      )}
+      <Box component="span" sx={{ flex: '0 0 auto' }}><PriceTag item={item} /></Box>
+    </Box>
+  );
+}
+
 export function PriceRowList({
-  items, fallback, to = BOOKING_PATH, showDuration = true,
-}: { items: PriceItem[]; fallback?: readonly string[]; to?: string; showDuration?: boolean }) {
+  items, fallback, to = BOOKING_PATH, showDuration = true, showDescription = false,
+}: { items: PriceItem[]; fallback?: readonly string[]; to?: string; showDuration?: boolean; /** The item's description from the price list, under its name. */ showDescription?: boolean }) {
   const rows: { key: string; name: string; item: PriceItem | null }[] =
     items.length > 0
       ? items.map((item) => ({ key: item.code || item.name, name: item.name, item }))
@@ -121,9 +180,51 @@ export function PriceRowList({
     <Box component="div" role="list" sx={{ display: 'flex', flexDirection: 'column' }}>
       {rows.map((row, index) => (
         <Box key={row.key} role="listitem" sx={{ display: 'flex', flexDirection: 'column' }}>
-          <PriceRow to={to} name={row.name} item={row.item} last={index === rows.length - 1} showDuration={showDuration} />
+          <ServicePriceRow to={to} name={row.name} item={row.item} last={index === rows.length - 1} showDuration={showDuration} showDescription={showDescription} />
         </Box>
       ))}
+    </Box>
+  );
+}
+
+/* ── Paragraphs and bullets of a text slot series (`<prefix>.p1…`, `<prefix>.li1…`) ── */
+
+export function Paras({ prefix, count, sx }: { prefix: string; count: number; sx?: SxProps<Theme> }) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, index) => index + 1).map((n) => (
+        <SlotText key={n} slotKey={`${prefix}.p${n}`} as="p" sx={[{ m: 0, fontSize: 16, lineHeight: 1.65, color: W.body, maxWidth: '72ch' }, ...(Array.isArray(sx) ? sx : sx !== undefined ? [sx] : [])]} />
+      ))}
+    </>
+  );
+}
+
+export function Bullets({ prefix, count, minWidth }: { prefix: string; count: number; minWidth?: number }) {
+  return (
+    <Box
+      component="ul"
+      sx={{
+        m: 0, pl: '22px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 16, lineHeight: 1.6, color: W.body, maxWidth: '72ch',
+        ...(minWidth !== undefined ? { maxWidth: 'none', display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(min(${minWidth}px, 100%), 1fr))`, gap: '8px 28px' } : {}),
+      }}
+    >
+      {Array.from({ length: count }, (_, index) => index + 1).map((n) => (
+        <SlotText key={n} slotKey={`${prefix}.li${n}`} as="li" />
+      ))}
+    </Box>
+  );
+}
+
+/** A small sub-heading inside a section (an H3). */
+export function SubTitle({ slotKey, tone = 'dark' }: { slotKey: string; tone?: 'dark' | 'accent' }) {
+  return <SlotText slotKey={slotKey} as="h3" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 700, fontSize: { xs: 19, md: 21 }, letterSpacing: '-0.015em', lineHeight: 1.25, color: tone === 'accent' ? W.orangeText : W.text }} />;
+}
+
+/** The booking button of a section — the shared "Objednat termín" text. */
+export function BookButton({ text, to = BOOKING_PATH }: { text: string; to?: string }) {
+  return (
+    <Box sx={{ display: 'flex' }}>
+      <CtaButton to={to} height={50} fontSize={16} px={28} sx={{ width: { xs: '100%', sm: 'auto' } }}>{text}</CtaButton>
     </Box>
   );
 }
@@ -167,12 +268,23 @@ export function GroupDiscounts({ alwaysShowClub = false, id }: { alwaysShowClub?
             CARD_SX as object,
           ]}
         >
-          <SlotText slotKey="sluzby.shared.club.value" sx={{ fontFamily: FONT_HEAD, fontWeight: 800, fontSize: 26, color: W.orangeText }} />
+          <SlotText slotKey="sluzby.shared.club.value" sx={{ fontFamily: FONT_HEAD, fontWeight: 800, fontSize: 20, lineHeight: 1.2, color: W.orangeText }} />
           <SlotText slotKey="sluzby.shared.club.label" sx={{ fontSize: 15, fontWeight: 600 }} />
-          <SlotText slotKey="sluzby.shared.club.note" sx={{ fontSize: 13, color: W.muted }} />
         </Box>
       </Box>
       {hasTiers && <SlotText slotKey="sluzby.shared.discount.note" as="p" sx={{ m: 0, fontSize: 14, color: W.muted }} />}
     </WebSection>
+  );
+}
+
+/* ── "Důležité informace k objednávce balíčku" (the shared slots `sluzby.shared.pkgnote.*`) ── */
+
+export function PackageNote() {
+  return (
+    <Box sx={[{ p: { xs: '20px', md: '24px' }, display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: 760 }, CARD_SX as object, { borderRadius: '16px', bgcolor: W.warm }]}>
+      <SubTitle slotKey="sluzby.shared.pkgnote.title" />
+      <Paras prefix="sluzby.shared.pkgnote" count={PKG_NOTE.paras.length} />
+      <Bullets prefix="sluzby.shared.pkgnote" count={PKG_NOTE.items.length} />
+    </Box>
   );
 }

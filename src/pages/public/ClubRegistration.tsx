@@ -36,6 +36,7 @@ import {
 } from '../../components/public/kit';
 import { PhoneField } from '../../components/ui/PhoneField';
 import { LANDING_PATH } from '../../components/public/PublicHeader';
+import { useSlotTexts } from '../../site/useSlotTexts';
 
 const hhmm = (time: string): string => time.slice(0, 5);
 
@@ -163,6 +164,7 @@ function TimePill({ slot, selected, onPick }: { slot: ClubSlot; selected: boolea
 }
 
 export default function ClubRegistration() {
+  const txt = useSlotTexts(['formulare.club.closed', 'formulare.club.full'] as const);
   const { token = '' } = useParams();
 
   const [offer, setOffer] = useState<ClubOffer | null>(null);
@@ -303,9 +305,7 @@ export default function ClubRegistration() {
       <Panel>
         <PanelTitle>{expired ? 'Odkaz vypršel' : 'Všechna místa jsou obsazená'}</PanelTitle>
         <Typography role="status" sx={{ fontSize: 16, color: '#5C6067', lineHeight: 1.6 }}>
-          {expired
-            ? 'Tento odkaz už nepřijímá registrace. Ozvěte se prosím svému klubu.'
-            : 'Všechna místa jsou obsazená. Ozvěte se prosím svému klubu.'}
+          {expired ? txt['formulare.club.closed'] : txt['formulare.club.full']}
         </Typography>
       </Panel>,
       <Hero offer={offer} />,

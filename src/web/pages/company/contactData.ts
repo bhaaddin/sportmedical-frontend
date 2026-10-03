@@ -56,6 +56,8 @@ export interface ContactDetails {
   /** True when the clinic's own settings supplied the address (and not the slot default). */
   addressFromApi: boolean;
   hours: ParsedHours;
+  /** The company's own entries from the clinic settings; '' = not filled in (then nothing is shown for it). */
+  company: { dic: string; bankAccount: string; dataBox: string };
 }
 
 export function useContactDetails(): ContactDetails {
@@ -80,5 +82,6 @@ export function useContactDetails(): ContactDetails {
     addressOneLine: addressLines.join(', '),
     addressFromApi: apiAddress !== '',
     hours,
+    company: { dic: clinic.dic?.trim() ?? '', bankAccount: clinic.bankAccount?.trim() ?? '', dataBox: clinic.dataBox?.trim() ?? '' },
   };
 }

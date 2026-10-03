@@ -28,6 +28,8 @@ import type {
 } from '../../../api/bookingContracts';
 import { dayOfWeekOf, formatPragueDateTime, pragueDateKey } from '../../../utils/time';
 import { SectionLabel, SoftCard, FilterChips } from '../../ui';
+import { useCalendarDisplay } from '../../../api/displaySettings';
+import { hourToTime } from '../../../utils/dayHours';
 import { errorText } from '../errorText';
 import {
   FROM_DAY,
@@ -113,8 +115,12 @@ function QuickPlanBody({
   const [customFrom, setCustomFrom] = useState(today);
   const [customTo, setCustomTo] = useState(today);
   const [weekdays, setWeekdays] = useState<number[]>(WORKDAYS);
-  const [start, setStart] = useState('08:00');
-  const [end, setEnd] = useState('18:00');
+  /* The working day starts and ends as the clinic's calendar settings say; typing overrides it. */
+  const { settings: display } = useCalendarDisplay();
+  const [startEdited, setStart] = useState<string | null>(null);
+  const [endEdited, setEnd] = useState<string | null>(null);
+  const start = startEdited ?? hourToTime(display.dayStartHour);
+  const end = endEdited ?? hourToTime(display.dayEndHour);
   const [breakStart, setBreakStart] = useState('');
   const [breakEnd, setBreakEnd] = useState('');
   /** null = every činnost, until somebody unticks one. */

@@ -16,6 +16,11 @@ export interface PriceItem {
   description: string;
   priceCzk: number | null;
   durationMinutes: number | null;
+  /**
+   * The price before a package discount (shown crossed out next to `priceCzk`). Optional: the public
+   * endpoint may not send it yet; a page then simply shows no crossed-out number.
+   */
+  listPriceCzk?: number | null;
 }
 
 export interface PriceCategory {
@@ -41,7 +46,9 @@ export function normalizePriceList(raw: unknown): PriceCategory[] {
         if (item === null || typeof item !== 'object') return [];
         const row = item as Record<string, unknown>;
         if (typeof row.name !== 'string' || row.name.trim() === '') return [];
+        const listPrice = typeof row.listPriceCzk === 'number' && Number.isFinite(row.listPriceCzk) && row.listPriceCzk > 0 ? row.listPriceCzk : null;
         return [{
+          ...(listPrice !== null ? { listPriceCzk: listPrice } : {}),
           code: typeof row.code === 'string' ? row.code : '',
           name: row.name,
           description: typeof row.description === 'string' ? row.description : '',

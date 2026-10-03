@@ -13,6 +13,7 @@ import { SITE_HOME_PATH, SITE_PAGES } from '../../../web/sitePaths';
 /** Registry page id → the public address it is shown on. */
 export const PUBLIC_PATHS: Record<string, string> = {
   spolecne: SITE_HOME_PATH,
+  formulare: '/objednat',
   ...Object.fromEntries(SITE_PAGES.map((page) => [page.id, page.path])),
 };
 

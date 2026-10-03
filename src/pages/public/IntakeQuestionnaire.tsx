@@ -119,6 +119,8 @@ import {
   FormSection, LinkProblem, RequiredDocuments, ReservationSummary, intakeTheme,
 } from './intake/intakeParts';
 import { useConsentSettings } from '../../api/consentSettings';
+import { useSlotTexts } from '../../site/useSlotTexts';
+import { fillText } from '../../site/fillText';
 
 /* ── Brand: the public identity, components/public/brand.ts (V-Web2) ── */
 
@@ -231,6 +233,17 @@ const FALLBACK_PHONE_REGIONS: PublicPhoneRegion[] = [
   { code: 'DE', displayValue: 'DE (+49)' },
   { code: 'AT', displayValue: 'AT (+43)' },
 ];
+
+/** The editable wording of this form (registry: src/site/slots/formulare.ts). */
+const FORM_TEXT_KEYS = [
+  'formulare.consent.statutory.heading', 'formulare.consent.statutory.text', 'formulare.consent.rights.text',
+  'formulare.consent.treatment.title.activity', 'formulare.consent.treatment.title.generic',
+  'formulare.consent.treatment.detail.activity', 'formulare.consent.treatment.detail.generic', 'formulare.consent.treatment.error',
+  'formulare.consent.report.title', 'formulare.consent.report.detail.required', 'formulare.consent.report.detail.optional', 'formulare.consent.report.error',
+  'formulare.consent.club.title', 'formulare.consent.club.detail.required', 'formulare.consent.club.detail.optional', 'formulare.consent.club.error',
+  'formulare.form.questionnaire.error', 'formulare.form.privacy-line',
+  'formulare.finish.review.email', 'formulare.finish.review.no-email', 'formulare.finish.saved.email', 'formulare.finish.saved.no-email',
+] as const;
 
 const collect = (errors: Errors, field: keyof FormState, result: { ok: boolean; error?: FieldError }): void => {
   if (!result.ok && result.error) errors[field] = result.error.message;
@@ -385,6 +398,7 @@ export default function IntakeQuestionnaire() {
   /* The marketing consent's wording and whether it is shown are the clinic's,
      set in Nastavení. The legally required consents below are not. */
   const { settings: consentSettings } = useConsentSettings();
+  const txt = useSlotTexts(FORM_TEXT_KEYS);
 
   /*
    * What this činnost asks of the questionnaire.
@@ -749,12 +763,11 @@ export default function IntakeQuestionnaire() {
      * one that anything which is not the form can skip.
      */
     if (questionnaireMissing) {
-      next.healthQuestionnaire =
-        'U této činnosti je zdravotní dotazník povinný. Vyplňte ho prosím.';
+      next.healthQuestionnaire = txt['formulare.form.questionnaire.error'];
     }
 
     if (!form.consentTreatment) {
-      next.consentTreatment = 'Bez souhlasu s poskytnutím zdravotních služeb nelze dotazník odeslat.';
+      next.consentTreatment = txt['formulare.consent.treatment.error'];
     }
 
     /*
@@ -766,13 +779,11 @@ export default function IntakeQuestionnaire() {
      * and that is right, because there is nothing to refuse them.
      */
     if (held?.requiresReportByEmail === true && !form.consentReportEmail) {
-      next.consentReportEmail =
-        'U této činnosti posíláme lékařskou zprávu e-mailem, bez tohoto souhlasu ji nelze objednat.';
+      next.consentReportEmail = txt['formulare.consent.report.error'];
     }
 
     if (held?.requiresClubSharing === true && !form.consentClub) {
-      next.consentClub =
-        'Tuto činnost objednáváme se sdílením výsledků s klubem, bez tohoto souhlasu ji nelze objednat.';
+      next.consentClub = txt['formulare.consent.club.error'];
     }
 
     return next;
@@ -1031,11 +1042,11 @@ export default function IntakeQuestionnaire() {
                       */}
                       {result.outcome === IntakeOutcome.CandidateReviewRequired
                         ? (result.confirmationEmailExpected
-                          ? 'Vaše údaje ověří naše recepce, abychom vás nezaložili dvakrát. Ozveme se vám na uvedený e-mail.'
-                          : 'Vaše údaje ověří naše recepce, abychom vás nezaložili dvakrát, a pak se vám ozveme. Poznamenejte si prosím číslo žádosti.')
+                          ? txt['formulare.finish.review.email']
+                          : txt['formulare.finish.review.no-email'])
                         : (result.confirmationEmailExpected
-                          ? 'Vaše údaje máme uložené a potvrzení jsme vám poslali e-mailem.'
-                          : 'Vaše údaje máme uložené. Potvrzení máte na této obrazovce — poznamenejte si prosím číslo žádosti.')}
+                          ? txt['formulare.finish.saved.email']
+                          : txt['formulare.finish.saved.no-email'])}
                     </Typography>
 
                     {result.bookingFailed && (
@@ -1603,19 +1614,14 @@ export default function IntakeQuestionnaire() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <GavelOutlined sx={{ fontSize: 16, color: BRAND.muted }} />
                 <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: 0.6 }}>
-                  CO DĚLÁME ZE ZÁKONA — NEPTÁME SE NA TO
+                  {txt['formulare.consent.statutory.heading']}
                 </Typography>
               </Box>
               <Typography variant="body2" sx={{ color: BRAND.muted }}>
-                Vedeme zdravotnickou dokumentaci, vyhodnocujeme výsledky a
-                archivujeme je 10 let od poslední služby. Vyplývá to ze zákona
-                č. 372/2011 Sb. a z nařízení GDPR, čl. 9(2)(h) — nejde
-                o volbu, kterou bychom vám mohli nabídnout.
+                {txt['formulare.consent.statutory.text']}
               </Typography>
               <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 1 }}>
-                Máte právo na přístup, opravu i výmaz svých údajů a na stížnost
-                u ÚOOÚ. Souhlasy níže můžete kdykoli odvolat
-                {clinicEmail !== '' ? ` na ${clinicEmail}` : ''}.
+                {fillText(txt['formulare.consent.rights.text'], { email: clinicEmail })}
               </Typography>
             </Box>
 
@@ -1648,20 +1654,22 @@ export default function IntakeQuestionnaire() {
                 checked={form.consentTreatment}
                 onChange={(value) => set('consentTreatment', value)}
                 error={errors.consentTreatment}
-                title={held !== null ? `Provedení: ${held.activityName}` : 'Poskytnutí zdravotní služby'}
+                title={held !== null
+                  ? fillText(txt['formulare.consent.treatment.title.activity'], { activity: held.activityName })
+                  : txt['formulare.consent.treatment.title.generic']}
                 detail={held !== null
-                  ? `Souhlasím s provedením činnosti ${held.activityName}${held.serviceName !== '' ? ` (${held.serviceName})` : ''} a se zpracováním údajů o zdravotním stavu, které si vyžádá.`
-                  : 'Souhlasím s poskytnutím zdravotní služby, kterou si objednám, a se zpracováním údajů o zdravotním stavu, které si vyžádá.'}
+                  ? fillText(txt['formulare.consent.treatment.detail.activity'], { activity: held.activityName, service: held.serviceName })
+                  : txt['formulare.consent.treatment.detail.generic']}
               />
               <ConsentRow
                 required={held?.requiresReportByEmail === true}
                 checked={form.consentReportEmail}
                 onChange={(value) => set('consentReportEmail', value)}
                 error={errors.consentReportEmail}
-                title="Lékařská zpráva e-mailem"
+                title={txt['formulare.consent.report.title']}
                 detail={held?.requiresReportByEmail === true
-                  ? `Zprávu z činnosti ${held.activityName} předáváme elektronicky na uvedený e-mail. Bez tohoto souhlasu ji nelze objednat.`
-                  : 'Souhlasím, aby mi byla lékařská zpráva zaslána elektronicky na uvedený e-mail. Bez souhlasu si ji vyzvednete na recepci.'}
+                  ? fillText(txt['formulare.consent.report.detail.required'], { activity: held.activityName })
+                  : txt['formulare.consent.report.detail.optional']}
               />
               {consentSettings.communicationVisible && (
                 <ConsentRow
@@ -1676,10 +1684,10 @@ export default function IntakeQuestionnaire() {
                 checked={form.consentClub}
                 onChange={(value) => set('consentClub', value)}
                 error={errors.consentClub}
-                title="Sdílení výsledků s klubem"
+                title={txt['formulare.consent.club.title']}
                 detail={held?.requiresClubSharing === true
-                  ? `Činnost ${held.activityName} objednáváme se sdílením výsledků s vaším klubem. Bez tohoto souhlasu ji nelze objednat.`
-                  : 'Souhlasím se sdílením výsledků s mým sportovním klubem. Jde o předání údajů někomu mimo ordinaci, takže bez vašeho souhlasu je nesdílíme.'}
+                  ? fillText(txt['formulare.consent.club.detail.required'], { activity: held.activityName })
+                  : txt['formulare.consent.club.detail.optional']}
               />
             </Box>
             </FormSection>
@@ -1735,7 +1743,7 @@ export default function IntakeQuestionnaire() {
             <PinnedBar label="Odeslat registraci" card>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: LABEL_COLOR, mr: { sm: 'auto' } }}>
                 <LockOutlined sx={{ fontSize: 15 }} aria-hidden />
-                <Typography variant="caption">Údaje putují šifrovaně a vidí je jen naše ordinace.</Typography>
+                <Typography variant="caption">{txt['formulare.form.privacy-line']}</Typography>
               </Box>
               <Button
                 variant="contained"

@@ -157,3 +157,24 @@ describe('the výpis and its year', () => {
     expect(row.text).not.toMatch(/platí do/);
   });
 });
+
+describe('the requirement rule drives validity and the warning window', () => {
+  it('uses the rule\'s own months instead of a fixed year', () => {
+    const row = requiredRowState(template(), doc({ reportDate: '2026-05-03' }), TODAY, { validityMonths: 24, warnDaysBefore: 30 });
+    expect(row.text).toContain('platí do 3. 5. 2028');
+  });
+
+  it('never expires when the rule says 0 months', () => {
+    const row = requiredRowState(template(), doc({ reportDate: '2020-01-01' }), TODAY, { validityMonths: 0, warnDaysBefore: 30 });
+    expect(row.tone).toBe('on-file');
+    expect(row.text).not.toContain('platí do');
+  });
+
+  it('warns only inside the rule\'s window, and never when it is 0', () => {
+    // Issued 20. 9. 2025: valid to 20. 9. 2026 = 7 days left on 13. 9. 2026.
+    const issued = doc({ reportDate: '2025-09-20' });
+    expect(requiredRowState(template(), issued, TODAY, { validityMonths: 12, warnDaysBefore: 3 }).tone).toBe('on-file');
+    expect(requiredRowState(template(), issued, TODAY, { validityMonths: 12, warnDaysBefore: 14 }).tone).toBe('expiring');
+    expect(requiredRowState(template(), issued, TODAY, { validityMonths: 12, warnDaysBefore: 0 }).tone).toBe('on-file');
+  });
+});

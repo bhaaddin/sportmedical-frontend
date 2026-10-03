@@ -16,7 +16,8 @@ describe('PUBLIC_PATHS', () => {
   });
 
   it('has a path for every registry page, and every path is a real public route', () => {
-    const real = new Set(WEB_ROUTES.map((r) => r.path));
+    // The patient-facing forms live on app pages (the booking flow), not on a prerendered public route.
+    const real = new Set([...WEB_ROUTES.map((r) => r.path), '/objednat']);
     for (const id of Object.keys(SLOTS_BY_PAGE)) {
       expect(PUBLIC_PATHS[id], id).toBeDefined();
       expect(real.has(PUBLIC_PATHS[id]), `${id} → ${PUBLIC_PATHS[id]}`).toBe(true);
@@ -33,7 +34,7 @@ describe('PUBLIC_PATHS', () => {
 
   it('is the same table the admin screen reads, and every page it lists points at a public address', () => {
     expect(REEXPORTED).toBe(PUBLIC_PATHS);
-    const real = new Set(WEB_ROUTES.map((r) => r.path));
+    const real = new Set([...WEB_ROUTES.map((r) => r.path), '/objednat']);
     for (const page of buildPages()) {
       if (page.path !== undefined) expect(real.has(page.path), `${page.id} → ${page.path}`).toBe(true);
     }

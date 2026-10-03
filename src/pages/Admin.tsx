@@ -43,7 +43,7 @@ export default function Admin() {
    * Empty, not plausible.
    *
    * This screen used to open with "+420 XXX XXX XXX", an address of
-   * "GreenLine, 5. patro, Praha" and an e-mail nobody had chosen -- and since
+   * a made-up street address and an e-mail nobody had chosen -- and since
    * nothing was ever loaded or saved, those invented values were what the
    * owner saw every time he opened it. A blank field asks to be filled in; a
    * plausible one gets left alone.

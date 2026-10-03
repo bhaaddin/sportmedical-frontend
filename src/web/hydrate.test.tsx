@@ -70,7 +70,7 @@ describe('hydrating a prerendered page', () => {
     const container = document.getElementById('root') as HTMLElement;
     window.history.pushState({}, '', '/kontakt');
     await act(async () => { mountWeb(container); });
-    expect(container.querySelector('h1')?.textContent).toBe('Najdete nás v Michli');
+    expect(container.querySelector('h1')?.textContent).toBe('Kontakt');
     expect(document.title).toContain('Kontakt');
   });
 });

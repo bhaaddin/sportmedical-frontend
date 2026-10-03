@@ -11,27 +11,39 @@
 import { FAQ as CONTENT_FAQ } from '../pages/public/content';
 import type { SiteContent, SiteFaq, SitePartner } from '../api/siteContent';
 
-const partner = (sort: number, name: string, sport: string): SitePartner => ({
+const partner = (sort: number, name: string, sport: string, description: string, url: string): SitePartner => ({
   id: `default-${sort}`,
   name,
   sport,
-  description: '',
-  url: '',
+  description,
+  url,
   sort,
 });
 
-/** The ten clubs the clinic lists on its website; the sport is what the artboard shows above the name. */
+/**
+ * The nine partner cards of the clinic's live home page (captured 2026-10-03), in the page's order, with
+ * the live descriptions and links. Shown until the admin enters a partner of their own (then the admin's
+ * list replaces this one). Logos are text until the admin uploads files. The live "Sportovní agentura"
+ * card names two web addresses; the list has room for one.
+ */
 export const DEFAULT_PARTNERS: SitePartner[] = [
-  partner(1, 'Black Angels', 'Florbal'),
-  partner(2, 'Basket Újezd nad Lesy', 'Basketbal'),
-  partner(3, 'FK Dukla Jižní Město', 'Fotbal'),
-  partner(4, 'SK Joudrs', 'Softball'),
-  partner(5, 'Beach klub Ládví', 'Beach volejbal'),
-  partner(6, 'Strong Girls', 'Rugby'),
-  partner(7, 'VK Blesk', 'Veslování'),
-  partner(8, 'SGB Multisport Academy', 'Rugby'),
-  partner(9, 'Fall and Get Up / Sportovní klinika', ''),
-  partner(10, 'Zdravotní agentura', ''),
+  partner(
+    1, 'Sportovní agentura', '',
+    'Nabízíme: organizaci zdravotní péče u specialistů, sportovní prohlídky, výkonnostní diagnostiku, rehabilitaci a fyzioterapii, prevenci zranění, péči o sportovní kluby a jejich hráče. Rychle. Kvalitně. Odpovědně.',
+    'http://www.fallandgetup.com/',
+  ),
+  partner(
+    2, 'Black Angels', 'Florbal',
+    'Ambiciózní florbalový klub s dlouhodobě úspěšným systémem práce s mládeží, který vychoval vlastní generaci hráčů až do nejvyšší české soutěže. Staví na moderním tréninkovém přístupu, kvalitních trenérech a rozvoji nejen sportovní výkonnosti, ale i charakteru, odolnosti a týmových hodnot.',
+    'https://www.blackangels.cz/',
+  ),
+  partner(3, 'Basket Újezd nad Lesy', 'Basketbal', 'Dynamicky rostoucí klub, který buduje silnou komunitu a podporuje rozvoj mladých sportovců.', 'https://basketujezd.cz/'),
+  partner(4, 'FK Dukla Jižní Město', 'Fotbal', 'Všechny mužské kategorie od školičky až po A tým', 'https://www.fkduklajm.cz/'),
+  partner(5, 'SK Joudrs', 'Softball', 'Všechny věkové kategorie mužů i žen od T-ball až po dospělé týmy.', 'https://www.joudrs.cz/'),
+  partner(6, 'Beach klub Ládví', 'Beach volejbal', 'Největší mládežnický oddíl s největším beachvolejbalovým areálem v Praze.', 'https://beachklubladvi.cz/'),
+  partner(7, 'Strong Girls', 'Rugby', 'dorostenský a ženský klub', 'https://stronggirls.cz/'),
+  partner(8, 'SGB Multisport Academy', 'Rugby', 'dětská akademie', ''),
+  partner(9, 'VK Blesk', 'Veslování', 'Vítěz českého poháru v roce 2025, 2024, 2023, 2022, 2021 a 2020', 'https://www.vkblesk.cz/'),
 ];
 
 export const DEFAULT_FAQ: SiteFaq[] = CONTENT_FAQ.map((item, index) => ({
@@ -40,12 +52,6 @@ export const DEFAULT_FAQ: SiteFaq[] = CONTENT_FAQ.map((item, index) => ({
   answer: item.a,
   sort: index + 1,
 }));
-
-/** Contact details shown when the clinic's own settings have none (the public clinic answer wins). */
-export const DEFAULT_CONTACT = {
-  phone: '+420 606 785 271',
-  email: 'recepce@sportmedical-diagnostics.cz',
-} as const;
 
 export const DEFAULT_SITE_CONTENT: SiteContent = {
   version: 'defaults',

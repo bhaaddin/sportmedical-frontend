@@ -1,8 +1,9 @@
-/* /diagnostika/kompenzacni-plan — placeholder page, replaced wholesale by its page agent (keep the default export). */
+/* /diagnostika/kompenzacni-plan — a detail page of Sportovní diagnostika: its spec is src/web/pages/services/content/details.ts,
+   its slots src/site/slots/ (the same spec), its price comes from the price list. */
 
-import { SlotText } from '../../site/SlotText';
-import { PageHero } from '../ui';
+import { DetailPage } from './services/DetailPage';
+import { DIAG_KOMPENZACNI } from './services/content/details';
 
 export default function DiagKompenzacniPage() {
-  return <PageHero title={<SlotText slotKey="diagkompenzacni.hero.title" />} />;
+  return <DetailPage spec={DIAG_KOMPENZACNI} />;
 }

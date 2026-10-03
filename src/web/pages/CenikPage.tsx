@@ -1,16 +1,20 @@
-/* /web/cenik — the whole price list (artboard V-Cenik), rendered live from the price list: every
-   category and every row as the admin keeps them, grouped by category, hover rows, "—" for a price
-   nobody has set. The group-discount block appears only when the server publishes tiers. If the list
-   cannot be loaded the page says so and offers "Zkusit znovu" — never an empty screen. */
+/* /cenik — the whole price list (artboard V-Cenik), rendered live from the price list: every
+   category and every row as the admin keeps them (the description of the row under its name, the list
+   price crossed out when the list has one), grouped by category, hover rows, "—" for a price nobody has
+   set. Under it the notes of the live price list (InBody in the stress tests, payment, required
+   documents, validity of the posudek, packages) and the group discounts (the discount tiers; the
+   club card stays). If the list cannot be loaded the page says so and offers "Zkusit znovu" — never an
+   empty screen. */
 
+import type { ReactNode } from 'react';
 import { Box } from '@mui/material';
 import { usePriceList } from '../../api/priceList';
 import type { PriceCategory } from '../../api/priceList';
 import { SlotText, useSlotText } from '../../site/SlotText';
-import { BOOKING_PATH } from '../../components/public/PublicHeader';
-import { CtaButton, WebSection } from '../ui';
+import { CENIK_DOCS } from '../../site/slots/cenik';
+import { ArrowLink, WebSection } from '../ui';
 import { FONT_HEAD, MQ, W } from '../tokens';
-import { GroupDiscounts, PriceRowList } from './services/blocks';
+import { BookButton, Bullets, CARD_SX, GroupDiscounts, PackageNote, PriceRowList, SubTitle } from './services/blocks';
 import { FALLBACK_CATEGORIES, categorySlug } from './services/pricing';
 import { ServiceHero } from './services/ServiceHero';
 
@@ -32,11 +36,17 @@ function Chip({ href, children }: { href: string; children: string }) {
   );
 }
 
+function NoteCard({ children }: { children: ReactNode }) {
+  return <Box component="article" sx={[{ p: { xs: '20px', md: '24px' }, display: 'flex', flexDirection: 'column', gap: '10px' }, CARD_SX as object, { borderRadius: '16px' }]}>{children}</Box>;
+}
+
 export default function CenikPage() {
   const query = usePriceList();
   const book = useSlotText('cenik.book.cta');
   const retry = useSlotText('cenik.error.retry');
   const clubs = useSlotText('cenik.nav.clubs');
+  const docsLink = useSlotText('cenik.note.docs.link');
+  const contactLink = useSlotText('cenik.note.contact.link');
   const live = query.data;
 
   // What the page lists: the API's categories; only while it has said nothing, the three service names with dashes.
@@ -85,14 +95,34 @@ export default function CenikPage() {
             >
               {group.category}
             </Box>
-            <PriceRowList items={group.items} fallback={group.names} />
+            <PriceRowList items={group.items} fallback={group.names} showDescription />
           </Box>
         ))}
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '18px', alignItems: 'flex-start' }}>
-          <SlotText slotKey="cenik.note" as="p" sx={{ m: 0, fontSize: 15, lineHeight: 1.6, color: W.bodySoft, maxWidth: '70ch' }} />
-          <CtaButton to={BOOKING_PATH} height={50} fontSize={16} px={28} sx={{ width: { xs: '100%', sm: 'auto' } }}>{book}</CtaButton>
+        <BookButton text={book} />
+      </WebSection>
+
+      <WebSection tone="warm" py={[44, 64]} borderTop innerSx={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+        <SlotText slotKey="cenik.notes.title" as="h2" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 700, fontSize: { xs: 22, md: 26 }, letterSpacing: '-0.02em' }} />
+        <SlotText slotKey="cenik.note.inbody" as="p" sx={{ m: 0, fontSize: 16, lineHeight: 1.6, color: W.body, maxWidth: '70ch' }} />
+        <Box sx={{ display: 'grid', gap: '18px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))' }}>
+          <NoteCard>
+            <SubTitle slotKey="cenik.note.pay.title" />
+            <SlotText slotKey="cenik.note.pay" as="p" sx={{ m: 0, fontSize: 15, lineHeight: 1.65, color: W.bodySoft }} />
+          </NoteCard>
+          <NoteCard>
+            <SubTitle slotKey="cenik.note.docs.title" />
+            <Bullets prefix="cenik.note.docs" count={CENIK_DOCS.length} />
+            <SlotText slotKey="cenik.note.docs.text" as="p" sx={{ m: 0, fontSize: 15, lineHeight: 1.65, color: W.bodySoft }} />
+            <ArrowLink to="/dokumenty">{docsLink}</ArrowLink>
+          </NoteCard>
+          <NoteCard>
+            <SubTitle slotKey="cenik.note.validity.title" />
+            <SlotText slotKey="cenik.note.validity" as="p" sx={{ m: 0, fontSize: 15, lineHeight: 1.65, color: W.bodySoft }} />
+          </NoteCard>
         </Box>
+        <PackageNote />
+        <ArrowLink to="/kontakt">{contactLink}</ArrowLink>
       </WebSection>
 
       <GroupDiscounts alwaysShowClub id={CLUBS_ID} />

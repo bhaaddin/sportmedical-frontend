@@ -19,6 +19,7 @@ import {
   submitFeedback,
 } from '../../api/feedback';
 import PublicLayout from './PublicLayout';
+import { useSlotText } from '../../site/SlotText';
 import { ARCHIVO, BRAND } from '../../components/public/brand';
 import { LABEL_COLOR, PageTitle, Panel, PinnedBar, PublicMain, ctaSx } from '../../components/public/kit';
 
@@ -39,6 +40,7 @@ function Shell({ children }: { children: ReactNode }) {
 }
 
 export default function FeedbackPage() {
+  const subtitle = useSlotText('formulare.feedback.sub');
   const { token = '' } = useParams();
 
   const [rating, setRating] = useState<number | null>(null);
@@ -104,7 +106,7 @@ export default function FeedbackPage() {
 
   return (
     <Shell>
-      <PageTitle sub="Zabere to půl minuty. Hodnocení je soukromé — čte ho jen ordinace.">
+      <PageTitle sub={subtitle}>
         Jak jste byli spokojeni?
       </PageTitle>
 

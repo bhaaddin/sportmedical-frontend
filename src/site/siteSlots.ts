@@ -27,6 +27,7 @@ import { diagzakladniSlots } from './slots/diagzakladni';
 import { diagkomplexniSlots } from './slots/diagkomplexni';
 import { diagvo2maxSlots } from './slots/diagvo2max';
 import { diagkompenzacniSlots } from './slots/diagkompenzacni';
+import { formulareSlots } from './slots/formulare';
 import { spolecneSlots } from './slots/spolecne';
 
 export type { SlotDef, SlotKind } from './slotTypes';
@@ -46,6 +47,7 @@ export const SLOTS_BY_PAGE = {
   onas: onasSlots,
   kluby: klubySlots,
   otazky: otazkySlots,
+  formulare: formulareSlots,
   podminky: podminkySlots,
   soukromi: soukromiSlots,
   storno: stornoSlots,

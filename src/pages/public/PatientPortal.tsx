@@ -30,6 +30,7 @@ import { readPublicClinic } from '../../api/clinicSettings';
 import type { PublicClinic } from '../../api/clinicSettings';
 import { useDevice } from '../../layout/useDevice';
 import PublicLayout from './PublicLayout';
+import { useSlotText } from '../../site/SlotText';
 import PatientSignIn from './PatientSignIn';
 import PortalNav from './portal/PortalNav';
 import type { PortalView } from './portal/PortalNav';
@@ -244,6 +245,7 @@ const plainList = { listStyle: 'none', m: 0, p: 0 } as const;
  * and only what the clinic has filled in is shown.
  */
 function ClinicContactCard({ clinic }: { clinic: PublicClinic | null }) {
+  const helpText = useSlotText('formulare.portal.help');
   if (clinic === null) return null;
   const phone = clinic.phone.trim();
   const email = clinic.email.trim();
@@ -257,7 +259,7 @@ function ClinicContactCard({ clinic }: { clinic: PublicClinic | null }) {
     <Panel labelledBy="portal-help">
       <PanelTitle id="portal-help">Potřebujete pomoc?</PanelTitle>
       <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
-        Co tu nejde vyřídit — jiný termín, dotaz k vyšetření — domluvíte přímo s ordinací.
+        {helpText}
       </Typography>
       <Box sx={{ display: 'flex', flexDirection: 'column' }}>
         {phone !== '' && (

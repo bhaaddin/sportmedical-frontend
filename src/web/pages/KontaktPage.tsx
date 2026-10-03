@@ -12,6 +12,8 @@ import { ArrowIcon, CtaButton, WebSection } from '../ui';
 import { BOOKING_PATH } from '../../components/public/PublicHeader';
 import { FONT_HEAD, MQ, W } from '../tokens';
 import { Card, CardGrid, CompanyHero, SectionHead, labelSx, sectionStack } from './company/blocks';
+import { LegalLinks } from './company/TextPage';
+import { SiteLink } from '../SiteLink';
 import { mapyCzHref, useContactDetails } from './company/contactData';
 
 const linkReset = { color: 'inherit', textDecoration: 'none', '&:hover': { color: W.orangeTextHover, textDecoration: 'underline' } } as const;
@@ -38,7 +40,6 @@ function ContactCards() {
         <Box component="a" href={`mailto:${contact.email}`} sx={{ ...linkReset, fontSize: 17, fontWeight: 600, overflowWrap: 'anywhere', display: 'flex', alignItems: 'center', minHeight: 44 }}>
           {contact.email}
         </Box>
-        <SlotText slotKey="kontakt.email.note" sx={{ fontSize: 14, color: W.bodySoft }} />
       </Card>
       <Card>
         <SlotText slotKey="kontakt.address.label" sx={labelSx} />
@@ -155,9 +156,41 @@ function ClubsLink() {
   return <CtaButton to="/kluby" variant="ghostDark" height={44} px={0} fontSize={15} arrow sx={{ border: 'none', justifyContent: 'flex-start', '&:hover': { boxShadow: 'none', transform: 'none', color: W.orange } }}>{label}</CtaButton>;
 }
 
+/* ── Useful links (live page: prices, documents, patient zone) and the FAQ ── */
+
+const USEFUL = [
+  { id: 'prices', to: '/cenik' },
+  { id: 'documents', to: '/dokumenty' },
+  { id: 'portal', to: '/portal/prihlaseni' },
+  { id: 'faq', to: '/faq' },
+] as const;
+
+function UsefulLinks() {
+  return (
+    <WebSection py={[44, 64]} innerSx={sectionStack}>
+      <SectionHead title="kontakt.links.title" />
+      <CardGrid desktop={4} component="ul">
+        {USEFUL.map((link) => (
+          <Card key={link.id} component="li" sx={{ p: 0 }}>
+            <Box
+              component={SiteLink}
+              to={link.to}
+              sx={{ display: 'flex', flexDirection: 'column', gap: '8px', p: { xs: '20px', md: '24px' }, height: '100%', minHeight: 44, color: 'inherit', textDecoration: 'none', '&:hover h3': { color: W.orangeTextHover } }}
+            >
+              <SlotText slotKey={`kontakt.links.${link.id}.title`} as="h3" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 17 }} />
+              <SlotText slotKey={`kontakt.links.${link.id}.text`} as="p" sx={{ m: 0, fontSize: 15, lineHeight: 1.6, color: W.bodySoft }} />
+            </Box>
+          </Card>
+        ))}
+      </CardGrid>
+      <LegalLinks titleKey="kontakt.legal.title" />
+    </WebSection>
+  );
+}
+
 /* ── Billing details ── */
 
-const BILLING = ['name', 'ico', 'seat', 'site', 'databox'] as const;
+const BILLING = ['name', 'ico', 'seat', 'site'] as const;
 
 export default function KontaktPage() {
   return (
@@ -191,6 +224,8 @@ export default function KontaktPage() {
 
       <AskBand />
 
+      <UsefulLinks />
+
       <WebSection tone="warm" py={[44, 64]} innerSx={sectionStack}>
         <SectionHead title="kontakt.billing.title" />
         <Box
@@ -204,8 +239,29 @@ export default function KontaktPage() {
           {BILLING.map((field) => (
             <BillingField key={field} field={field} />
           ))}
+          <CompanyEntries />
         </Box>
       </WebSection>
+    </>
+  );
+}
+
+/** DIČ, bank account and data box: the clinic's own entries — each one is shown only when it is filled in. */
+function CompanyEntries() {
+  const { company } = useContactDetails();
+  const entries = [
+    { key: 'dic', value: company.dic },
+    { key: 'bank', value: company.bankAccount },
+    { key: 'databox', value: company.dataBox },
+  ].filter((entry) => entry.value !== '');
+  return (
+    <>
+      {entries.map((entry) => (
+        <Box key={entry.key} sx={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+          <SlotText slotKey={`kontakt.billing.${entry.key}.label`} as="dt" sx={{ ...labelSx, letterSpacing: '0.07em' }} />
+          <Box component="dd" sx={{ m: 0, fontSize: 16, fontWeight: 600, lineHeight: 1.5, overflowWrap: 'anywhere' }}>{entry.value}</Box>
+        </Box>
+      ))}
     </>
   );
 }

@@ -1,21 +1,23 @@
-/* /web/o-nas — the clinic, the team, the equipment, the clubs it works for (artboard V-ONas).
+/* /o-nas — the clinic, its three pillars, diagnostics without borders (artboard V-ONas).
 
-   Sentences and photos are slots (src/site/slots/onas.ts). The equipment's names and descriptions are
-   the landing's slots, so they are written once; the partner strip is the landing's marquee, fed by the
-   partner list (logos are text until the admin uploads files). The team is placeholders until the clinic
-   sends names and portraits. */
+   The text is the live site's page "O nás" (src/site/slots/onas.ts), every sentence a slot. There is no team
+   and no history on the live page, so none is shown; the gallery and the equipment photos are grey
+   placeholders until the clinic sends pictures. The equipment's names and descriptions are the landing's
+   slots, so they are written once; the partner strip is the landing's marquee, fed by the partner list. */
 
 import { Box } from '@mui/material';
 import { MediaSlot } from '../../site/MediaSlot';
 import { SlotText, useSlotText } from '../../site/SlotText';
 import { BOOKING_PATH } from '../../components/public/PublicHeader';
-import { GEAR_COUNT, GALLERY_COUNT, TEAM_SIZE, VALUE_COUNT } from '../../site/slots/onas';
+import { GEAR_COUNT, GALLERY_COUNT, PILLAR_COUNT } from '../../site/slots/onas';
 import { PartnerMarquee } from '../landing/PartnerMarquee';
-import { CtaButton, Eyebrow, SectionTitle, WebSection } from '../ui';
-import { FONT_HEAD, W } from '../tokens';
+import { ArrowLink, CtaButton, Eyebrow, SectionTitle, WebSection } from '../ui';
+import { FONT_HEAD, MQ, W } from '../tokens';
 import { Card, CardGrid, CompanyHero, NumberedCard, PhotoGrid, SectionHead, sectionStack } from './company/blocks';
 
 const range = (count: number) => Array.from({ length: count }, (_, index) => index + 1);
+
+const bodyText = { m: 0, fontSize: { xs: 16, md: 17 }, lineHeight: 1.7, color: W.body, maxWidth: '62ch' } as const;
 
 function HeroButtons() {
   const book = useSlotText('onas.hero.cta.book');
@@ -28,28 +30,61 @@ function HeroButtons() {
   );
 }
 
-function TeamSection() {
+function IntroSection() {
   return (
-    <WebSection py={[44, 64]} innerSx={sectionStack}>
-      <SectionHead title="onas.team.title" lead="onas.team.lead" />
-      <CardGrid desktop={4} component="ul">
-        {range(TEAM_SIZE).map((n) => (
-          <Box key={n} component="li" sx={{ display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0 }}>
-            <MediaSlot slotKey={`onas.team.${n}.photo`} sizes="(max-width: 767px) 100vw, (max-width: 1279px) 50vw, 25vw" />
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <SlotText slotKey={`onas.team.${n}.name`} as="h3" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 18 }} />
-              <SlotText slotKey={`onas.team.${n}.role`} sx={{ fontSize: 15, color: W.bodySoft }} />
-            </Box>
-          </Box>
+    <WebSection py={[44, 72]}>
+      <Box
+        sx={{
+          display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: { xs: '28px', md: '40px' }, alignItems: 'center',
+          [MQ.tablet]: { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
+          [MQ.desktop]: { gridTemplateColumns: 'minmax(0, 1fr) 520px', gap: '56px' },
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '18px', minWidth: 0 }}>
+          <SectionTitle size="md"><SlotText slotKey="onas.intro.title" /></SectionTitle>
+          <SlotText slotKey="onas.intro.1" as="p" sx={bodyText} />
+          <SlotText slotKey="onas.intro.2" as="p" sx={bodyText} />
+        </Box>
+        <MediaSlot slotKey="onas.intro.photo" sizes="(max-width: 767px) 100vw, 520px" sx={{ borderRadius: '18px' }} />
+      </Box>
+    </WebSection>
+  );
+}
+
+function GuaranteeSection() {
+  return (
+    <WebSection tone="warm" py={[44, 72]} innerSx={sectionStack}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '14px', minWidth: 0 }}>
+        <Eyebrow><SlotText slotKey="onas.guarantee.eyebrow" /></Eyebrow>
+        <SectionTitle size="md"><SlotText slotKey="onas.guarantee.title" /></SectionTitle>
+        <SlotText slotKey="onas.guarantee.text" as="p" sx={{ ...bodyText, maxWidth: '70ch' }} />
+        <SlotText slotKey="onas.guarantee.pillars" as="p" sx={{ ...bodyText, fontWeight: 600, color: W.text }} />
+      </Box>
+      <CardGrid desktop={3} component="ul">
+        {range(PILLAR_COUNT).map((n) => (
+          <NumberedCard key={n} n={n} titleKey={`onas.pillar.${n}.title`} textKey={`onas.pillar.${n}.text`} />
         ))}
       </CardGrid>
+      <MediaSlot slotKey="onas.guarantee.graphic" sizes="(max-width: 1320px) 100vw, 1320px" sx={{ borderRadius: '16px', minHeight: { xs: 160, md: 220 } }} />
+    </WebSection>
+  );
+}
+
+function NoLimitSection() {
+  const clubs = useSlotText('onas.nolimit.cta');
+  return (
+    <WebSection py={[44, 72]} maxWidth={900} innerSx={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+      <SectionTitle size="md"><SlotText slotKey="onas.nolimit.title" /></SectionTitle>
+      <SlotText slotKey="onas.nolimit.1" as="p" sx={bodyText} />
+      <SlotText slotKey="onas.nolimit.2" as="p" sx={bodyText} />
+      <ArrowLink to="/kluby">{clubs}</ArrowLink>
     </WebSection>
   );
 }
 
 function EquipmentSection() {
   return (
-    <WebSection tone="warm" py={[44, 64]} innerSx={sectionStack}>
+    <WebSection py={[44, 64]} innerSx={sectionStack}>
       <SectionHead title="onas.gear.title" />
       <CardGrid desktop={4} component="ul">
         {range(GEAR_COUNT).map((n) => (
@@ -83,31 +118,27 @@ function MissionSection() {
 }
 
 export default function ONasPage() {
+  const partners = useSlotText('onas.who.cta');
   return (
     <>
       <CompanyHero slots={{ eyebrow: 'onas.hero.eyebrow', title: 'onas.hero.title', lead: 'onas.hero.lead', photo: 'onas.hero.photo' }}>
         <HeroButtons />
       </CompanyHero>
 
-      <WebSection py={[44, 64]} innerSx={sectionStack}>
-        <SectionHead title="onas.values.title" />
-        <CardGrid desktop={4} component="ul">
-          {range(VALUE_COUNT).map((n) => (
-            <NumberedCard key={n} n={n} titleKey={`onas.values.${n}.title`} textKey={`onas.values.${n}.text`} />
-          ))}
-        </CardGrid>
-      </WebSection>
+      <IntroSection />
+      <GuaranteeSection />
+      <NoLimitSection />
 
       <WebSection tone="warm" py={[44, 64]} innerSx={sectionStack}>
         <SectionHead title="onas.gallery.title" />
         <PhotoGrid keys={range(GALLERY_COUNT).map((n) => `onas.gallery.photo${n}`)} desktop={4} />
       </WebSection>
 
-      <TeamSection />
       <EquipmentSection />
 
-      <WebSection py={[44, 64]} pb={[28, 36]} innerSx={sectionStack}>
+      <WebSection tone="warm" py={[44, 64]} pb={[28, 36]} innerSx={sectionStack}>
         <SectionHead title="onas.who.title" lead="onas.who.lead" />
+        <ArrowLink to="/partneri">{partners}</ArrowLink>
       </WebSection>
       <PartnerMarquee />
 

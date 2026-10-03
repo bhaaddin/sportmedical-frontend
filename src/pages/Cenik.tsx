@@ -165,9 +165,20 @@ export default function Cenik() {
     </Stack>
   );
 
-  const price = (service: ServiceItem) => (
-    <Typography sx={[TYPE.itemName, { whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }]}>{kc(service.priceCzk)}</Typography>
-  );
+  const price = (service: ServiceItem) => {
+    const list = service.listPriceCzk;
+    const hasList = typeof list === 'number' && Number.isFinite(list) && list > service.priceCzk;
+    return (
+      <Box sx={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>
+        {hasList && (
+          <Typography component="s" data-testid="list-price" aria-label={`Původní cena ${kc(list)}`} sx={[TYPE.caption, { textDecoration: 'line-through', mr: 1 }]}>
+            {kc(list)}
+          </Typography>
+        )}
+        <Typography component="span" sx={TYPE.itemName}>{kc(service.priceCzk)}</Typography>
+      </Box>
+    );
+  };
 
   const columns: DataColumn<ServiceItem>[] = [
     { key: 'name', header: 'Název a činnosti', tablet: true, cell: (s) => nameBlock(s, false) },

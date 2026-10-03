@@ -1,78 +1,116 @@
 import type { SlotDef } from '../slotTypes';
-import { textSlot } from '../slotTypes';
-import { cardSlots, gallerySlots, heroSlots } from '../../web/pages/services/slotFactory';
+import { mediaSlot, textSlot } from '../slotTypes';
+import { heroSlots, listSlots, paraSlots } from '../../web/pages/services/slotFactory';
+import { cardSlotDefs, lineSlotDefs } from '../../web/pages/services/content/cards';
+import {
+  CMP, CMP_ROWS, DOCS, DOCS_INTRO, DURATION, EQUIPMENT_TEASER, EXAMS, EXAMS_INTRO, EXAM_CARDS, EXAM_CARD_PREFIX, EXAM_LINES,
+  EXAM_LINE_PREFIX, INSTRUCTIONS, MOBILE, PACKAGES, PREP, PRICE_SECTION, PROHLIDKY_HERO, VALIDITY, WHEN_NOT,
+} from '../../web/pages/services/content/prohlidky';
 
 /*
- * Sportovní lékařské prohlídky (/web/prohlidky). Defaults: the artboard V-Prohlidky for the headings
- * and captions, the clinic's website for what each examination contains, for whom it is and how
- * long it takes. Prices are NOT here: they come from the price list, matched by name.
+ * Sportovní lékařské prohlídky (/prohlidky). Defaults: the wording of the live page
+ * sportmedical-diagnostics.cz/pages/sportovni-lekarske-prohlidky (and the preparation / duration /
+ * validity answers of its FAQ), as published. Prices are NOT here: they come from the price list,
+ * matched by name; so are the group discounts (the discount tiers).
+ * The page draws the very same arrays (src/web/pages/services/content/prohlidky.ts).
  */
 
 const HERO = 'Prohlídky › Hero';
-const CMP = 'Prohlídky › Porovnání prohlídek';
-const INFO = 'Prohlídky › Důležité informace';
-const FLOW = 'Prohlídky › Jak vyšetření probíhá';
+const EXAMS_G = 'Prohlídky › Tři prohlídky';
+const CMP_G = 'Prohlídky › Porovnání prohlídek (tabulka)';
+const DOCS_G = 'Prohlídky › Potřebné dokumenty';
+const PREP_G = 'Prohlídky › Příprava, délka a platnost';
+const PKG_G = 'Prohlídky › Zvýhodněné balíčky';
+const MOBILE_G = 'Prohlídky › Mobilní testy pro kluby';
+const PRICE_G = 'Prohlídky › Ceník — karty vyšetření';
 
-const pkg = (n: 1 | 2 | 3, title: string, what: string, forWhom: string, duration: string): SlotDef[] => [
-  textSlot(`prohlidky.pkg.${n}.title`, `Prohlídka ${n} — název`, CMP, title),
-  textSlot(`prohlidky.pkg.${n}.what`, `Prohlídka ${n} — co je zahrnuto`, CMP, what, { multiline: true }),
-  textSlot(`prohlidky.pkg.${n}.for`, `Prohlídka ${n} — pro koho`, CMP, forWhom, { multiline: true }),
-  textSlot(`prohlidky.pkg.${n}.duration`, `Prohlídka ${n} — délka`, CMP, duration),
+const examSlots = EXAMS.flatMap((exam, index): SlotDef[] => {
+  const n = index + 1;
+  return [
+    textSlot(`prohlidky.exam.${n}.title`, `Prohlídka ${n} — název`, EXAMS_G, exam.title),
+    textSlot(`prohlidky.exam.${n}.text`, `Prohlídka ${n} — krátký popis`, EXAMS_G, exam.text, { multiline: true }),
+    ...listSlots(`prohlidky.exam.${n}`, EXAMS_G, `Prohlídka ${n}`, exam.bullets),
+    textSlot(`prohlidky.exam.${n}.more`, `Prohlídka ${n} — úplný popis`, EXAMS_G, exam.more, { multiline: true }),
+    mediaSlot(`prohlidky.exam.${n}.photo`, `Prohlídka ${n} — foto`, EXAMS_G, exam.photoCaption, '1200 × 800 px', '3 / 2'),
+  ];
+});
+
+const cmpSlots = [
+  textSlot('prohlidky.cmp.title', 'Porovnání — titulek sekce', CMP_G, CMP.title),
+  textSlot('prohlidky.cmp.lead', 'Porovnání — úvod', CMP_G, CMP.lead, { multiline: true }),
+  textSlot('prohlidky.cmp.caption', 'Porovnání — popis tabulky pro čtečky obrazovky', CMP_G, CMP.caption),
+  textSlot('prohlidky.cmp.yes', 'Porovnání — „ano“ v buňce', CMP_G, CMP.yes),
+  textSlot('prohlidky.cmp.no', 'Porovnání — „ne“ v buňce', CMP_G, CMP.no),
+  textSlot('prohlidky.cmp.price', 'Porovnání — název řádku s cenou (cena je z ceníku)', CMP_G, CMP.priceLabel),
+  ...CMP.heads.map((head, index) => textSlot(`prohlidky.cmp.h${index}`, `Porovnání — záhlaví sloupce ${index}`, CMP_G, head, { multiline: true })),
+  ...CMP_ROWS.flatMap((row, index): SlotDef[] => [
+    textSlot(`prohlidky.cmp.r${index + 1}.label`, `Porovnání — řádek ${index + 1}: název`, CMP_G, row.label),
+    ...row.cells.flatMap((cell, cellIndex): SlotDef[] =>
+      typeof cell === 'string'
+        ? [textSlot(`prohlidky.cmp.r${index + 1}.c${cellIndex + 1}`, `Porovnání — řádek ${index + 1}, sloupec ${cellIndex + 1}`, CMP_G, cell, { multiline: true })]
+        : [],
+    ),
+  ]),
 ];
 
+const docSlots = DOCS.flatMap((doc, index): SlotDef[] => [
+  textSlot(`prohlidky.docs.${index + 1}.title`, `Dokument ${index + 1} — název`, DOCS_G, doc.title),
+  ...paraSlots(`prohlidky.docs.${index + 1}`, DOCS_G, `Dokument ${index + 1}`, doc.paras),
+]);
+
 export const prohlidkySlots: SlotDef[] = [
-  ...heroSlots('prohlidky', HERO, {
-    eyebrow: 'Sportovní lékařské prohlídky',
-    title: 'Potvrzení, že můžete naplno',
-    lead: 'Posouzení zdravotního stavu, reakce na zátěž, asymetrií a dysbalancí. Dvoufázový proces — vyšetření a vyhodnocení s lékařem.',
-    photoCaption: 'prohlídka u lékaře',
-  }),
+  ...heroSlots('prohlidky', HERO, PROHLIDKY_HERO),
 
-  textSlot('prohlidky.cmp.title', 'Porovnání — titulek sekce', CMP, 'Porovnání prohlídek'),
-  textSlot('prohlidky.cmp.lead', 'Porovnání — úvod', CMP, 'Všechny tři zahrnují základní měření InBody 770 bez příplatku.'),
-  textSlot('prohlidky.cmp.label.what', 'Porovnání — popisek „co je zahrnuto“', CMP, 'Co je zahrnuto'),
-  textSlot('prohlidky.cmp.label.for', 'Porovnání — popisek „pro koho“', CMP, 'Pro koho'),
-  textSlot('prohlidky.cmp.label.duration', 'Porovnání — popisek „délka“', CMP, 'Délka vyšetření'),
-  ...pkg(
-    1,
-    'Základní sportovní prohlídka',
-    'Klidové EKG a základní vyšetření plic, bez zátěžového testování a bez spiroergometrie. Součástí je rozhovor s lékařem, analýza InBody 770, antropometrické měření a fyzikální vyšetření.',
-    'Zejména pro malé děti při zahájení sportovní činnosti nebo jako základní preventivní posouzení zdravotní způsobilosti.',
-    '30–40 minut',
-  ),
-  ...pkg(
-    2,
-    'Komplexní sportovní prohlídka',
-    'Klidové i zátěžové EKG a základní vyšetření plic, bez analýzy respiračních plynů. Zahrnuje vyšetření na ergometru (kolo či běžecký pás), kontinuální záznam EKG během zátěže a měření krevního tlaku každé dvě minuty.',
-    'Vhodné pro širokou veřejnost i výkonnostní sportovce — rekreační, amatérské i vrcholové.',
-    '50–60 minut',
-  ),
-  ...pkg(
-    3,
-    'Spiroergometrické vyšetření',
-    'Nejkomplexnější forma vyšetření: klidové i zátěžové EKG, funkční vyšetření plic a detailní analýza respiračních plynů. Měří spotřebu kyslíku (VO₂), produkci oxidu uhličitého, ventilační a metabolické prahy, VO₂max a stanovuje tréninkové zóny.',
-    'Vhodné pro vrcholové a náročné sportovce, kteří potřebují detailní informace pro řízení tréninku.',
-    '60–90 minut',
-  ),
-  textSlot('prohlidky.cmp.more', 'Porovnání — titulek dalších variant z ceníku', CMP, 'Další varianty'),
+  textSlot('prohlidky.exams.title', 'Tři prohlídky — titulek sekce', EXAMS_G, EXAMS_INTRO.title),
+  textSlot('prohlidky.exams.lead', 'Tři prohlídky — úvod', EXAMS_G, EXAMS_INTRO.lead, { multiline: true }),
+  ...examSlots,
 
-  textSlot('prohlidky.info.title', 'Důležité informace — titulek sekce', INFO, 'Důležité informace před vyšetřením'),
-  ...cardSlots('prohlidky.info', INFO, 'Informace', [
-    {
-      title: 'Výpis ze zdravotní dokumentace',
-      text: 'Bez výpisu od praktického lékaře nelze vystavit posudek o zdravotní způsobilosti ke sportu. Potřebujete ho při první návštěvě a vždy, když se změnil váš zdravotní stav.',
-    },
-    { title: 'Vstupní dotazník', text: 'Zdravotní dotazník a registraci vyplníte online za pár minut. Nic nemusíte tisknout.' },
-    { title: 'Před vyšetřením', text: 'Přijďte odpočatí, 2–3 hodiny před zátěžovým testem jen lehké jídlo, bez kávy a alkoholu.' },
-    { title: 'S sebou', text: 'Sportovní oblečení a obuv. Nezletilý sportovec přichází s rodičem, nebo přinese podepsaný souhlas zákonného zástupce.' },
-  ]),
+  ...cmpSlots,
 
-  textSlot('prohlidky.flow.title', 'Jak vyšetření probíhá — titulek sekce', FLOW, 'Jak vyšetření probíhá'),
-  textSlot('prohlidky.flow.lead', 'Jak vyšetření probíhá — úvod', FLOW, 'Vyšetření probíhají pod odborným dohledem specializovaných lékařů s využitím nejmodernějšího vybavení.', { multiline: true }),
-  ...gallerySlots('prohlidky.flow', FLOW, 'Průběh', [
-    'průběh vyšetření — příjem',
-    'průběh vyšetření — měření',
-    'průběh vyšetření — zátěž',
-    'průběh vyšetření — vyhodnocení',
-  ]),
+  textSlot('prohlidky.docs.title', 'Dokumenty — titulek sekce', DOCS_G, DOCS_INTRO.title),
+  ...docSlots,
+  textSlot('prohlidky.instr.title', 'Důležité informace před vyšetřením — titulek', DOCS_G, INSTRUCTIONS.title),
+  textSlot('prohlidky.instr.subtitle', 'Důležité informace před vyšetřením — podtitulek', DOCS_G, INSTRUCTIONS.subtitle),
+  textSlot('prohlidky.instr.text', 'Důležité informace před vyšetřením — text', DOCS_G, INSTRUCTIONS.text, { multiline: true }),
+
+  textSlot('prohlidky.prep.title', 'Příprava — titulek sekce', PREP_G, PREP.title),
+  textSlot('prohlidky.prep.before.title', 'Příprava — „co je důležité vědět“: titulek', PREP_G, PREP.before.title),
+  ...paraSlots('prohlidky.prep.before', PREP_G, 'Příprava — co je důležité vědět', PREP.before.paras),
+  textSlot('prohlidky.prep.bring.title', 'Příprava — „co mít s sebou“: titulek', PREP_G, PREP.bring.title),
+  ...listSlots('prohlidky.prep.bring', PREP_G, 'Příprava — co mít s sebou', PREP.bring.items),
+  textSlot('prohlidky.prep.closing.title', 'Příprava — závěrečné doporučení: titulek', PREP_G, PREP.closing.title),
+  ...paraSlots('prohlidky.prep.closing', PREP_G, 'Příprava — závěrečné doporučení', PREP.closing.paras),
+
+  textSlot('prohlidky.duration.title', 'Délka vyšetření — titulek sekce', PREP_G, DURATION.title),
+  textSlot('prohlidky.duration.ergo.title', 'Délka — ergometrie: titulek', PREP_G, DURATION.ergo.title),
+  ...paraSlots('prohlidky.duration.ergo', PREP_G, 'Délka — ergometrie', DURATION.ergo.paras),
+  textSlot('prohlidky.duration.spiro.title', 'Délka — spiroergometrie: titulek', PREP_G, DURATION.spiro.title),
+  ...paraSlots('prohlidky.duration.spiro', PREP_G, 'Délka — spiroergometrie', DURATION.spiro.paras),
+
+  textSlot('prohlidky.whennot.title', 'Kdy test nelze provést — titulek sekce', PREP_G, WHEN_NOT.title),
+  ...listSlots('prohlidky.whennot', PREP_G, 'Kdy test nelze provést', WHEN_NOT.items),
+  ...paraSlots('prohlidky.whennot', PREP_G, 'Kdy test nelze provést', WHEN_NOT.paras),
+  textSlot('prohlidky.whennot.legal.title', 'Právní rámec — titulek', PREP_G, WHEN_NOT.legalTitle),
+  ...paraSlots('prohlidky.whennot.legal', PREP_G, 'Právní rámec', WHEN_NOT.legal),
+
+  textSlot('prohlidky.validity.title', 'Platnost posudku — titulek sekce', PREP_G, VALIDITY.title),
+  ...paraSlots('prohlidky.validity', PREP_G, 'Platnost posudku', VALIDITY.paras),
+
+  textSlot('prohlidky.packages.title', 'Balíčky — titulek sekce', PKG_G, PACKAGES.title),
+  ...paraSlots('prohlidky.packages', PKG_G, 'Balíčky', PACKAGES.paras),
+
+  textSlot('prohlidky.mobile.eyebrow', 'Mobilní testy — nadpis nad titulkem', MOBILE_G, MOBILE.eyebrow),
+  textSlot('prohlidky.mobile.title', 'Mobilní testy — titulek sekce', MOBILE_G, MOBILE.title),
+  ...paraSlots('prohlidky.mobile', MOBILE_G, 'Mobilní testy', MOBILE.paras),
+  textSlot('prohlidky.mobile.link', 'Mobilní testy — odkaz na stránku pro kluby', MOBILE_G, MOBILE.link),
+  mediaSlot('prohlidky.mobile.photo', 'Mobilní testy — foto', MOBILE_G, MOBILE.photoCaption, '1200 × 800 px', '3 / 2'),
+
+  textSlot('prohlidky.equipment.title', 'Vybavení — titulek sekce', MOBILE_G, EQUIPMENT_TEASER.title),
+  textSlot('prohlidky.equipment.link', 'Vybavení — odkaz na stránku Vybavení', MOBILE_G, EQUIPMENT_TEASER.link),
+
+  textSlot('prohlidky.price.title', 'Ceník — titulek sekce', PRICE_G, PRICE_SECTION.title),
+  ...paraSlots('prohlidky.price', PRICE_G, 'Ceník', PRICE_SECTION.paras),
+  textSlot('prohlidky.price.more', 'Ceník — titulek dalších variant z ceníku', PRICE_G, PRICE_SECTION.more),
+  ...cardSlotDefs(EXAM_CARD_PREFIX, PRICE_G, EXAM_CARDS),
+  ...lineSlotDefs(EXAM_LINE_PREFIX, PRICE_G, EXAM_LINES),
 ];

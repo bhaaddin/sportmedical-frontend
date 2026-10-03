@@ -34,29 +34,38 @@ const widths = [
 ] as const;
 
 describe.each(widths)('the landing at %s (%i px)', (_name, width) => {
-  it('renders every section of the artboard', async () => {
+  it('renders every section of the artboard and of the live home page', async () => {
     serverDown();
     renderWeb(<LandingPage />, { width });
 
     // Hero: the headline is one H1, its last line is the accent one.
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Výkon,\s*který se dá\s*změřit/);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Sportovní lékařské\s*prohlídky\s*a diagnostika/);
     // Three numbered service blocks, as headings.
     for (const n of ['01', '02', '03']) expect(screen.getAllByText(n).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('heading', { level: 3, name: 'Sportovní lékařské prohlídky' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: 'Sportovní diagnostika' })).toBeInTheDocument();
+    // (also a card of the booking section)
+    expect(screen.getAllByRole('heading', { level: 3, name: 'Sportovní diagnostika' }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('heading', { level: 3, name: 'InBody 770' })).toBeInTheDocument();
     // Equipment, the four steps, the club offer, the philosophy.
     expect(screen.getByRole('heading', { name: 'Na čem měříme' })).toBeInTheDocument();
     expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(8);
     expect(screen.getByRole('heading', { name: /Od objednání\s*k výsledkům/ })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Mobilní testování\s*přímo u vás/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Nabídka pro\s*sportovní kluby/ })).toBeInTheDocument();
+    // The four slogans, the booking cards and the partner statements of the live home page.
+    expect(screen.getByText('Komplexní zdravotní péče')).toBeInTheDocument();
+    expect(screen.getByText('a nejmodernější vybavení')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Rychlé termíny' })).toBeInTheDocument();
+    for (const card of ['Sportovní prohlídky', 'Výživové poradenství']) expect(screen.getByRole('heading', { level: 3, name: card })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: 'Mobilní testování' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Staňte se i Vy našimi spokojenými partnery' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Všichni partneři' })).toHaveAttribute('href', '/partneri');
     expect(screen.getByText('Naše filozofie')).toBeInTheDocument();
     // The club CTA "Mám odkaz od klubu" and the booking CTA.
     expect(screen.getByRole('link', { name: 'Mám odkaz od klubu' })).toHaveAttribute('href', '/kluby#mam-odkaz');
     expect(screen.getAllByRole('link', { name: /Objednat termín/ })[0]).toHaveAttribute('href', '/objednat');
     // The partner marquee: the ten default clubs (the strip is doubled for the loop, the copy is aria-hidden).
     expect(screen.getAllByText('Black Angels').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Zdravotní agentura').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('VK Blesk').length).toBeGreaterThanOrEqual(1);
     // The hero carousel: three photo slots, all placeholders with the artboard's captions.
     expect(screen.getByText('[FOTO: spiroergometrie na ergometru]')).toBeInTheDocument();
     expect(screen.getByText('[FOTO: měření na InBody 770]')).toBeInTheDocument();
@@ -88,13 +97,30 @@ describe.each(widths)('the landing at %s (%i px)', (_name, width) => {
   });
 });
 
+describe('the landing and the club minimum', () => {
+  it('shows the minimum only when GET /api/public/club-terms publishes one', async () => {
+    get.mockImplementation((url: string) => (url === '/api/public/club-terms' ? Promise.resolve({ data: { minimumPlayers: 17 } }) : Promise.reject(new Error('404'))));
+    renderWeb(<LandingPage />);
+    expect(await screen.findByText('sportovců minimálně')).toBeInTheDocument();
+    expect(screen.getByText('17')).toBeInTheDocument();
+  });
+
+  it('says nothing about a minimum for a null answer', async () => {
+    get.mockImplementation((url: string) => (url === '/api/public/club-terms' ? Promise.resolve({ data: { minimumPlayers: null } }) : Promise.reject(new Error('404'))));
+    renderWeb(<LandingPage />);
+    await waitFor(() => { expect(get).toHaveBeenCalledWith('/api/public/club-terms'); });
+    expect(screen.queryByText('sportovců minimálně')).toBeNull();
+  });
+});
+
 describe('the landing and the club discount', () => {
   it('hides the discount number when the server publishes no tiers', async () => {
     serverUp();
     const { container } = renderWeb(<LandingPage />);
     await screen.findByText(/^1\s234\sKč$/);
     expect(container.textContent).not.toMatch(/−\s*\d+\s*%/);
-    expect(screen.getByText('sportovců minimálně')).toBeInTheDocument();
+    // No minimum is published: the club block says nothing about one.
+    expect(screen.queryByText('sportovců minimálně')).toBeNull();
   });
 
   it('shows the biggest tier of GET /api/public/discount-tiers', async () => {

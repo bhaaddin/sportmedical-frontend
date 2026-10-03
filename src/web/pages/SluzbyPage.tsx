@@ -1,18 +1,21 @@
-/* /web/sluzby — the overview of the three services as blocks (artboard V-Sluzby): a card per
-   service with its photo, a sentence and the first rows of its price list (hover rows, amounts
-   from the price list, "—" when unknown), then the equipment, a photo gallery, the group discounts. */
+/* /sluzby — the overview of the services (artboard V-Sluzby), with what the live "Služby" page says:
+   the four slogans, a card per service with its photo, a sentence and the first rows of its price
+   list (amounts from the price list, "—" when unknown), single examinations, packages (the rows of
+   the price list's package category), offers for groups and clubs, a link to the equipment page and
+   the group discounts (from the discount tiers). */
 
 import { Box } from '@mui/material';
 import { pickRows, usePriceList } from '../../api/priceList';
 import type { RowSpec } from '../../api/priceList';
 import { MediaSlot } from '../../site/MediaSlot';
 import { SlotText, useSlotText } from '../../site/SlotText';
+import { SLUZBY_GROUPS, SLUZBY_PACKAGES, SLUZBY_SINGLE, SLUZBY_SLOGANS } from '../../site/slots/sluzby';
 import { BOOKING_PATH } from '../../components/public/PublicHeader';
-import { EquipmentSection } from '../landing/sections';
 import { FALLBACK_ROWS, ROW_SPECS } from '../landing/rows';
-import { CtaButton, SectionTitle, WebSection } from '../ui';
+import { ArrowLink, CtaButton, SectionTitle, WebSection } from '../ui';
 import { FONT_HEAD, W } from '../tokens';
-import { CARD_SX, GroupDiscounts, PhotoGallery, PriceRowList, gridOf } from './services/blocks';
+import { BookButton, Bullets, CARD_SX, GroupDiscounts, PageSection, Paras, PriceRowList, gridOf } from './services/blocks';
+import { CATEGORY, categoryItems } from './services/pricing';
 import { ServiceHero } from './services/ServiceHero';
 
 interface ServiceDef {
@@ -53,29 +56,55 @@ function ServiceCard({ def }: { def: ServiceDef }) {
 }
 
 export default function SluzbyPage() {
+  const { data: prices } = usePriceList();
   const book = useSlotText('sluzby.shared.cta.book');
+  const groupsLink = useSlotText('sluzby.groups.link');
+  const equipmentLink = useSlotText('sluzby.equipment.link');
+  const combos = categoryItems(prices, CATEGORY.balicky);
+
   return (
     <>
       <ServiceHero page="sluzby" />
 
-      <WebSection tone="warm" py={[48, 72]} innerSx={{ display: 'flex', flexDirection: 'column', gap: { xs: '24px', md: '32px' } }}>
+      <WebSection tone="warm" py={[28, 36]} sx={{ borderBottom: `1px solid ${W.line}` }}>
+        <Bullets prefix="sluzby.slogans" count={SLUZBY_SLOGANS.length} minWidth={260} />
+      </WebSection>
+
+      <WebSection py={[48, 72]} innerSx={{ display: 'flex', flexDirection: 'column', gap: { xs: '24px', md: '32px' } }}>
         <SectionTitle size="md"><SlotText slotKey="sluzby.blocks.title" /></SectionTitle>
         <Box sx={gridOf(300, 20)}>
           {SERVICES.map((def) => (
             <ServiceCard key={def.n} def={def} />
           ))}
         </Box>
-        <Box sx={{ display: 'flex' }}>
-          <CtaButton to={BOOKING_PATH} height={50} fontSize={16} px={28} sx={{ width: { xs: '100%', sm: 'auto' } }}>{book}</CtaButton>
-        </Box>
+        <BookButton text={book} />
       </WebSection>
 
-      <EquipmentSection />
-      <WebSection py={[40, 56]}>
-        <PhotoGallery prefix="sluzby.gallery" count={4} label="Fotografie vybavení" />
-      </WebSection>
+      <PageSection tone="warm">
+        <Box sx={gridOf(300, 24)}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <SlotText slotKey="sluzby.single.title" as="h2" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 800, fontSize: { xs: 24, md: 28 }, letterSpacing: '-0.025em' }} />
+            <Paras prefix="sluzby.single" count={SLUZBY_SINGLE.length} />
+          </Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <SlotText slotKey="sluzby.packages.title" as="h2" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 800, fontSize: { xs: 24, md: 28 }, letterSpacing: '-0.025em' }} />
+            <Paras prefix="sluzby.packages" count={SLUZBY_PACKAGES.length} />
+            <PriceRowList items={combos} />
+          </Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <SlotText slotKey="sluzby.groups.title" as="h2" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 800, fontSize: { xs: 24, md: 28 }, letterSpacing: '-0.025em' }} />
+            <Paras prefix="sluzby.groups" count={SLUZBY_GROUPS.length} />
+            <ArrowLink to="/kluby">{groupsLink}</ArrowLink>
+          </Box>
+        </Box>
+      </PageSection>
+
+      <PageSection title="sluzby.equipment.title">
+        <ArrowLink to="/vybaveni">{equipmentLink}</ArrowLink>
+      </PageSection>
 
       <GroupDiscounts />
     </>
   );
 }
+

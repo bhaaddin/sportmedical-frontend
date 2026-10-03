@@ -12,7 +12,8 @@
    arrive.
    ══════════════════════════════════════════════════════════════ */
 
-import { useQuery } from '@tanstack/react-query';
+import { QueryClient, QueryClientContext, useQuery } from '@tanstack/react-query';
+import { useContext } from 'react';
 import { unwrapEnvelope, webHttp } from '../web/http';
 import { DEFAULT_SITE_CONTENT } from '../site/defaults';
 import { slotDef } from '../site/siteSlots';
@@ -152,7 +153,14 @@ export async function fetchSiteContent(): Promise<SiteContent> {
  * the admin's content once it has arrived. In a prerendered page the build-time answer is already
  * in the cache, so the first render matches the HTML; the query then refreshes it.
  */
+/**
+ * Used only when a screen is rendered with no QueryClientProvider (an isolated embed, a unit test):
+ * the editable texts then simply stay at their defaults instead of crashing a patient's form.
+ */
+const FALLBACK_CLIENT = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
 export function useSiteContent() {
+  const inherited = useContext(QueryClientContext);
   return useQuery<SiteContent>({
     queryKey: SITE_CONTENT_KEY,
     queryFn: fetchSiteContent,
@@ -160,7 +168,7 @@ export function useSiteContent() {
     initialDataUpdatedAt: 0,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
-  });
+  }, inherited ?? FALLBACK_CLIENT);
 }
 
 /** One slot as the page needs it: the admin's value over the registry's default. */

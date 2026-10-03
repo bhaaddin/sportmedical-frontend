@@ -16,6 +16,7 @@ import { Box, Button, Typography } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { EventAvailableOutlined, DescriptionOutlined, PhoneOutlined } from '@mui/icons-material';
 import { LANDING_PATH } from '../../../components/public/PublicHeader';
+import { useSlotText } from '../../../site/SlotText';
 import { ARCHIVO, BRAND, publicTheme, telHref } from '../../../components/public/brand';
 import {
   FieldLabel, LABEL_COLOR, LoadError, Panel, PanelTitle, ctaSx, ghostSx, longWhen,
@@ -90,12 +91,13 @@ export function ReservationSummary({
 
 /** The documents the admin asked for on this činnost. Rendered only when there are some. */
 export function RequiredDocuments({ documents }: { documents: CompletionDocument[] }) {
+  const intro = useSlotText('formulare.finish.documents.intro');
   if (documents.length === 0) return null;
   return (
     <Panel labelledBy="required-documents">
       <PanelTitle id="required-documents">Dokumenty k této návštěvě</PanelTitle>
       <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
-        Tyto dokumenty ordinace pro vaši činnost vyžaduje.
+        {intro}
       </Typography>
       <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
         {documents.map((doc) => (
@@ -129,14 +131,14 @@ export function LinkProblem({
   onRetry?: () => void;
 }) {
   const number = phone.trim();
+  const expiredText = useSlotText('formulare.link.expired');
+  const invalidText = useSlotText('formulare.link.invalid');
   if (kind === 'failed') {
     return (
       <LoadError what="Registraci se nepodařilo načíst. Zkontrolujte připojení a zkuste to znovu." onRetry={onRetry} />
     );
   }
-  const message = kind === 'expired'
-    ? 'Tento odkaz už vypršel. Rezervace byla zrušena, zavolejte nám prosím nebo si vyberte nový termín.'
-    : 'Tento odkaz už není platný nebo byl použit. Zavolejte nám prosím nebo si vyberte nový termín.';
+  const message = kind === 'expired' ? expiredText : invalidText;
   return (
     <Panel sx={{ alignItems: 'flex-start' }}>
       <PanelTitle>{kind === 'expired' ? 'Odkaz vypršel' : 'Odkaz neplatí'}</PanelTitle>

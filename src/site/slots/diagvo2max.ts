@@ -1,10 +1,11 @@
 import type { SlotDef } from '../slotTypes';
-import { textSlot } from '../slotTypes';
+import { DIAG_VO2MAX, detailSlots } from '../../web/pages/services/content/details';
 
-/* Slots of the page /diagnostika/vo2max. Placeholder until its page agent fills it from docs/etapa3/live-site. */
+/*
+ * Slots of the page /diagnostika/vo2max: Vo2max analýza. Defaults: the wording of the matching page of the live
+ * site (sportmedical-diagnostics.cz), as published; Slovak words and obvious typos corrected. The price
+ * (card) is NOT here: it comes from the price list by the service's name. The page draws the same spec
+ * (src/web/pages/services/content/details.ts), so a slot cannot be registered without being drawn.
+ */
 
-const HERO = 'VO₂max analýza › Úvod';
-
-export const diagvo2maxSlots: SlotDef[] = [
-  textSlot('diagvo2max.hero.title', 'Úvod — titulek stránky', HERO, 'VO₂max analýza'),
-];
+export const diagvo2maxSlots: SlotDef[] = detailSlots(DIAG_VO2MAX);

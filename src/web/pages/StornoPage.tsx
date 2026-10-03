@@ -1,8 +1,8 @@
-/* /storno-a-reklamace — placeholder page, replaced wholesale by its page agent (keep the default export). */
+/* /storno-a-reklamace — cancellation and complaints, laid out by the shared text-page block (slots in src/site/slots/storno.ts). */
 
-import { SlotText } from '../../site/SlotText';
-import { PageHero } from '../ui';
+import { STORNO_SECTIONS } from '../../site/slots/storno';
+import { TextPage } from './company/TextPage';
 
 export default function StornoPage() {
-  return <PageHero title={<SlotText slotKey="storno.hero.title" />} />;
+  return <TextPage prefix="storno" sections={STORNO_SECTIONS} path="/storno-a-reklamace" />;
 }

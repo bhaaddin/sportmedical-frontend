@@ -38,14 +38,35 @@ export const EMPTY_BOOTSTRAP: WebBootstrap = {
   discountTiers: null,
 };
 
-const NO_CLINIC: PublicClinic = { name: '', email: '', phone: '', address: '', bookingEnabled: true };
+/**
+ * Company data the clinic's settings may carry beyond the contact card: DIČ, bank account, data box.
+ * They are the clinic's own entries — nothing is seeded or typed in a page. The public clinic answer does
+ * not publish them yet; the day it does (fields `dic`, `bankAccount`, `dataBox`) the Kontakt page shows
+ * them, and while they are empty the page shows nothing for them.
+ */
+export interface CompanyBilling {
+  dic?: string;
+  bankAccount?: string;
+  dataBox?: string;
+}
 
-export function normalizeClinic(raw: unknown): PublicClinic | null {
+export type WebClinic = PublicClinic & CompanyBilling;
+
+const NO_CLINIC: WebClinic = { name: '', email: '', phone: '', address: '', bookingEnabled: true };
+
+export function normalizeClinic(raw: unknown): WebClinic | null {
   const body = unwrapEnvelope(raw);
   if (body === null || typeof body !== 'object' || Array.isArray(body)) return null;
   const data = body as Record<string, unknown>;
   const text = (value: unknown) => (typeof value === 'string' ? value : '');
   const hours = typeof data.openingHours === 'string' ? data.openingHours.trim() : '';
+  const first = (...values: unknown[]): string => {
+    for (const value of values) if (typeof value === 'string' && value.trim() !== '') return value.trim();
+    return '';
+  };
+  const dic = first(data.dic);
+  const bankAccount = first(data.bankAccount, data.iban);
+  const dataBox = first(data.dataBox, data.dataBoxId);
   return {
     name: text(data.name),
     email: text(data.email),
@@ -53,6 +74,9 @@ export function normalizeClinic(raw: unknown): PublicClinic | null {
     address: text(data.address),
     bookingEnabled: data.bookingEnabled !== false,
     ...(hours !== '' ? { openingHours: hours } : {}),
+    ...(dic !== '' ? { dic } : {}),
+    ...(bankAccount !== '' ? { bankAccount } : {}),
+    ...(dataBox !== '' ? { dataBox } : {}),
   };
 }
 
@@ -92,7 +116,7 @@ export function seedQueryClient(client: QueryClient, data: WebBootstrap | null |
   if (data.discountTiers !== null) client.setQueryData(DISCOUNT_TIERS_KEY, data.discountTiers, { updatedAt });
 }
 
-export async function fetchPublicClinic(): Promise<PublicClinic> {
+export async function fetchPublicClinic(): Promise<WebClinic> {
   const { data } = await webHttp.get<unknown>('/api/public/clinic');
   const clinic = normalizeClinic(data);
   if (clinic === null) throw new Error('clinic: unexpected response');
@@ -100,8 +124,8 @@ export async function fetchPublicClinic(): Promise<PublicClinic> {
 }
 
 /** The clinic's public details (phone, e-mail, address, hours). Empty fields mean "not filled in". */
-export function usePublicClinic(): PublicClinic {
-  const { data } = useQuery<PublicClinic>({
+export function usePublicClinic(): WebClinic {
+  const { data } = useQuery<WebClinic>({
     queryKey: CLINIC_KEY,
     queryFn: fetchPublicClinic,
     initialData: () => NO_CLINIC,

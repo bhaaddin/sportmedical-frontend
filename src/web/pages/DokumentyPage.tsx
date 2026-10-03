@@ -109,7 +109,6 @@ export default function DokumentyPage() {
       <CompanyHero slots={{ eyebrow: 'dokumenty.hero.eyebrow', title: 'dokumenty.hero.title', lead: 'dokumenty.hero.lead', photo: 'dokumenty.hero.photo' }} />
       <DocumentSectionBlock section="required" tone="white" />
       <DocumentSectionBlock section="guides" tone="warm" />
-      <DocumentSectionBlock section="clubs" tone="white" />
       <WebSection tone="warm" py={[36, 48]} borderTop>
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: '18px', alignItems: { xs: 'stretch', md: 'center' }, justifyContent: 'space-between' }}>
           <SlotText slotKey="dokumenty.portal.text" as="p" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 600, fontSize: 18, lineHeight: 1.45, maxWidth: '60ch' }} />

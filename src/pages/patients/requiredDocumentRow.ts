@@ -83,6 +83,8 @@ export function requiredRowState(
   template: DocumentTemplate,
   filed: PatientDocument | undefined,
   today: Date = new Date(),
+  /** The requirement rule's own settings; without it the fallbacks below apply. */
+  rule?: { validityMonths: number; warnDaysBefore: number },
 ): RequiredRowState {
   if (filed !== undefined) {
     /*
@@ -90,7 +92,7 @@ export function requiredRowState(
      * their own, so asking after one would invent a deadline nobody set.
      */
     const until =
-      template.type === 'Vypis' ? validUntilFromIssued(filed.reportDate) : null;
+      template.type === 'Vypis' ? validUntilFromIssued(filed.reportDate, rule?.validityMonths) : null;
 
     if (until !== null) {
       const validity = reportValidity(until, today);
@@ -114,7 +116,7 @@ export function requiredRowState(
       }
 
       const text = `${dateOf(filed)} · platí do ${formatDateOnly(until)}`;
-      return validity.daysLeft <= EXPIRING_SOON_DAYS
+      return (rule?.warnDaysBefore ?? EXPIRING_SOON_DAYS) > 0 && validity.daysLeft <= (rule?.warnDaysBefore ?? EXPIRING_SOON_DAYS)
         ? { tone: 'expiring', text, detail: remainingText(validity.daysLeft) }
         : { tone: 'on-file', text, detail: remainingText(validity.daysLeft) };
     }

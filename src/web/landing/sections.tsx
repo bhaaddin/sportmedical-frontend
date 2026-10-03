@@ -4,8 +4,11 @@
 
 import { Box } from '@mui/material';
 import { formatPercent, topTier, useDiscountTiers } from '../../api/publicDiscounts';
+import { useClubTerms } from '../../api/publicClubTerms';
 import { MediaSlot } from '../../site/MediaSlot';
 import { SlotText, useSlotText } from '../../site/SlotText';
+import { BENEFIT_COUNT } from '../../site/slots/kluby';
+import { BOOKING_PATH } from '../../components/public/PublicHeader';
 import { ArrowLink, CtaButton, Eyebrow, SectionTitle, WebSection } from '../ui';
 import { FONT_HEAD, MQ, W } from '../tokens';
 
@@ -99,8 +102,9 @@ function Stat({ value, label, first }: { value: string; label: string; first: bo
 
 export function ClubSection() {
   const { data: tiers } = useDiscountTiers();
+  const { data: terms } = useClubTerms();
   const best = topTier(tiers);
-  const stat1Value = useSlotText('landing.club.stat1.value');
+  const minimum = terms.minimumPlayers;
   const stat1Label = useSlotText('landing.club.stat1.label');
   const stat3Value = useSlotText('landing.club.stat3.value');
   const stat3Label = useSlotText('landing.club.stat3.label');
@@ -108,7 +112,8 @@ export function ClubSection() {
   const link = useSlotText('landing.club.cta.link');
 
   const stats = [
-    { value: stat1Value, label: stat1Label },
+    // The minimum is the clinic's own setting; without one this figure is simply not shown.
+    ...(minimum !== null ? [{ value: String(minimum), label: stat1Label }] : []),
     // The discount is the server's own figure; without it the number is simply not shown.
     ...(best !== null ? [{ value: formatPercent(best.percent), label: `od ${best.minPersons} osob` }] : []),
     { value: stat3Value, label: stat3Label },
@@ -127,6 +132,14 @@ export function ClubSection() {
           <Eyebrow onInk><SlotText slotKey="landing.club.eyebrow" /></Eyebrow>
           <SectionTitle size="xl"><SlotText slotKey="landing.club.title" /></SectionTitle>
           <SlotText slotKey="landing.club.text" as="p" sx={{ m: 0, fontSize: 17, lineHeight: 1.6, color: W.onInk, maxWidth: '52ch' }} />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <SlotText slotKey="landing.club.mobile" as="h3" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 18 }} />
+            <Box component="ul" sx={{ m: 0, pl: '20px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: 15, lineHeight: 1.5, color: W.onInk }}>
+              {Array.from({ length: BENEFIT_COUNT }, (_, index) => index + 1).map((n) => (
+                <li key={n}><SlotText slotKey={`kluby.gain.${n}`} /></li>
+              ))}
+            </Box>
+          </Box>
           {stats.length > 0 && (
             <Box
               sx={{
@@ -167,6 +180,50 @@ export function PhilosophySection() {
         sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 600, fontSize: 'clamp(20px, 2.6vw, 29px)', lineHeight: 1.38, letterSpacing: '-0.02em' }}
       />
       <ArrowLink to="/o-nas" sx={{ alignSelf: 'center' }}>{link}</ArrowLink>
+    </WebSection>
+  );
+}
+
+/* ── Online booking: the three cards of the live home page ── */
+
+const BOOKING_CARDS = [1, 2, 3] as const;
+
+export function BookingSection() {
+  const cta = useSlotText('landing.booking.cta');
+  return (
+    <WebSection tone="warm" py={[48, 76]} borderTop innerSx={{ display: 'flex', flexDirection: 'column', gap: { xs: '26px', md: '34px' } }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <Eyebrow><SlotText slotKey="landing.booking.eyebrow" /></Eyebrow>
+        <SectionTitle size="md"><SlotText slotKey="landing.booking.title" /></SectionTitle>
+      </Box>
+      <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '14px', [MQ.tablet]: { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '18px' } }}>
+        {BOOKING_CARDS.map((n) => (
+          <Box
+            key={n}
+            component="li"
+            sx={{ bgcolor: W.white, border: `1px solid ${W.lineStrong}`, borderRadius: '16px', p: { xs: '20px', md: '26px' }, display: 'flex', flexDirection: 'column', gap: '18px', minWidth: 0 }}
+          >
+            <SlotText slotKey={`landing.booking.card${n}`} as="h3" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 21, letterSpacing: '-0.02em' }} />
+            <ArrowLink to={BOOKING_PATH} sx={{ mt: 'auto' }}>{cta}</ArrowLink>
+          </Box>
+        ))}
+      </Box>
+    </WebSection>
+  );
+}
+
+/* ── "Staňte se i Vy našimi spokojenými partnery" (under the partner strip) ── */
+
+export function PartnersJoinSection() {
+  const cta = useSlotText('landing.partners.cta');
+  return (
+    <WebSection tone="warm" py={[8, 8]} pb={[48, 64]} innerSx={{ display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'flex-start' }}>
+      <SlotText slotKey="landing.partners.title" as="h2" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 800, fontSize: 'clamp(24px, 3vw, 34px)', letterSpacing: '-0.03em', lineHeight: 1.1 }} />
+      <Box component="ul" sx={{ m: 0, pl: '20px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: 16, lineHeight: 1.55, color: W.bodySoft }}>
+        <li><SlotText slotKey="landing.partners.1" /></li>
+        <li><SlotText slotKey="landing.partners.2" /></li>
+      </Box>
+      <ArrowLink to="/partneri">{cta}</ArrowLink>
     </WebSection>
   );
 }

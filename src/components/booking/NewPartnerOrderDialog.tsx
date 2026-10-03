@@ -25,6 +25,8 @@ import { clubsApi } from "../../services/clubsApi";
 import { SectionLabel, SoftCard } from "../ui";
 import { AsyncSection } from "./AsyncSection";
 import { errorText } from "./errorText";
+import { useCalendarDisplay } from "../../api/displaySettings";
+import { hourToTime } from "../../utils/dayHours";
 
 /**
  * Creating a partner reservation — contract 5.10.
@@ -126,8 +128,14 @@ export function NewPartnerOrderDialog({
   // whole range of days at once instead of adding them one by one.
   const [bulkFrom, setBulkFrom] = useState("");
   const [bulkTo, setBulkTo] = useState("");
-  const [bulkStart, setBulkStart] = useState("08:00");
-  const [bulkEnd, setBulkEnd] = useState("16:00");
+  // The day's default hours are the clinic's calendar settings; typing overrides them.
+  const { settings: display } = useCalendarDisplay();
+  const defaultStart = hourToTime(display.dayStartHour);
+  const defaultEnd = hourToTime(display.dayEndHour);
+  const [bulkStartEdited, setBulkStart] = useState<string | null>(null);
+  const [bulkEndEdited, setBulkEnd] = useState<string | null>(null);
+  const bulkStart = bulkStartEdited ?? defaultStart;
+  const bulkEnd = bulkEndEdited ?? defaultEnd;
 
   const addRange = () => {
     if (!bulkFrom || !bulkTo) return;
@@ -142,8 +150,8 @@ export function NewPartnerOrderDialog({
       rows.push({
         key: `w${Date.now()}${iso}`,
         date: iso,
-        startTime: bulkStart || "08:00",
-        endTime: bulkEnd || "16:00",
+        startTime: bulkStart || defaultStart,
+        endTime: bulkEnd || defaultEnd,
       });
     }
     setWindows((prev) => [...prev, ...rows]);
@@ -458,8 +466,8 @@ export function NewPartnerOrderDialog({
                     {
                       key: `w${Date.now()}${prev.length}`,
                       date: "",
-                      startTime: "08:00",
-                      endTime: "16:00",
+                      startTime: defaultStart,
+                      endTime: defaultEnd,
                     },
                   ])
                 }

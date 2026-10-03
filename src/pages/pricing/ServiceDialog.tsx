@@ -19,6 +19,7 @@ import {
   draftFrom, hasErrors, toRequest, validateService,
 } from './serviceForm';
 import type { ServiceDraft, ServiceErrors } from './serviceForm';
+import { fieldErrorsOf, problemMessageOf } from '../settings/settingsProblem';
 
 interface Props {
   open: boolean;
@@ -58,8 +59,17 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
       else await servicesApi.update(service.id, body);
       onSaved();
       onClose();
-    } catch {
-      setFailed('Uložení se nepodařilo. Zkuste to prosím znovu.');
+    } catch (error) {
+      /* A refusal that names fields is put at those fields (any casing of the name). */
+      const server = fieldErrorsOf(error);
+      const pick = (name: string) => Object.entries(server).find(([k]) => k.toLowerCase() === name.toLowerCase())?.[1];
+      const atFields: ServiceErrors = {};
+      for (const name of ['listPriceCzk', 'priceCzk', 'code', 'name'] as const) {
+        const sentence = pick(name);
+        if (sentence !== undefined) atFields[name] = sentence;
+      }
+      if (hasErrors(atFields)) setErrors((e) => ({ ...e, ...atFields }));
+      setFailed(hasErrors(atFields) ? 'Uložení se nepodařilo. Opravte označená pole.' : problemMessageOf(error, 'Uložení se nepodařilo. Zkuste to prosím znovu.'));
     } finally {
       setSaving(false);
     }
@@ -129,6 +139,18 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
             fullWidth
           />
 
+          <TextField
+            label="Původní (přeškrtnutá) cena"
+            value={draft.listPriceCzk}
+            onChange={(e) => set('listPriceCzk', e.target.value)}
+            error={errors.listPriceCzk !== undefined}
+            helperText={errors.listPriceCzk ?? 'Zobrazí se na webu přeškrtnutá vedle ceny. Nechte prázdné, pokud nemá být.'}
+            slotProps={{ input: {
+              endAdornment: <InputAdornment position="end">Kč</InputAdornment>,
+            } }}
+            fullWidth
+          />
+
           {/* Only when changing an existing one: a new service is active by
               definition, and the create route has no such field. */}
           {service !== null && (
@@ -152,7 +174,7 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} disabled={saving}>Zrušit</Button>
-        <Button variant="contained" onClick={save} disabled={saving} sx={{ bgcolor: '#0D7377' }}>
+        <Button variant="contained" onClick={save} disabled={saving} color="primary">
           {saving ? 'Ukládám…' : 'Uložit'}
         </Button>
       </DialogActions>

@@ -35,6 +35,8 @@ export interface ServiceDraft {
   /* Text, not numbers: these come out of text fields, and an empty field is
      not 0. Parsing at the edge is what lets "" be told apart from "0". */
   priceCzk: string;
+  /* Optional crossed-out price; "" = none. */
+  listPriceCzk: string;
   /* No longer typed anywhere - carried through so the save does not blank it. */
   durationMinutes: string;
   isActive: boolean;
@@ -62,7 +64,7 @@ export function draftFrom(service: ServiceItem | null): ServiceDraft {
   if (service === null) {
     return {
       code: '', name: '', description: '',
-      durationMinutes: String(DEFAULT_DURATION_MINUTES), priceCzk: '', isActive: true,
+      durationMinutes: String(DEFAULT_DURATION_MINUTES), priceCzk: '', listPriceCzk: '', isActive: true,
     };
   }
   return {
@@ -71,6 +73,7 @@ export function draftFrom(service: ServiceItem | null): ServiceDraft {
     description: service.description,
     durationMinutes: String(service.durationMinutes),
     priceCzk: String(service.priceCzk),
+    listPriceCzk: typeof service.listPriceCzk === 'number' && service.listPriceCzk > 0 ? String(service.listPriceCzk) : '',
     isActive: service.isActive,
   };
 }
@@ -110,6 +113,15 @@ export function validateService(
     errors.priceCzk = 'Cena nemůže být záporná.';
   }
 
+  if ((draft.listPriceCzk ?? '').trim() !== '') {
+    const list = parseCzechNumber(draft.listPriceCzk ?? '');
+    if (list === null) {
+      errors.listPriceCzk = 'Zadejte původní cenu v Kč, nebo pole nechte prázdné.';
+    } else if (list <= 0 || (price !== null && list <= price)) {
+      errors.listPriceCzk = 'Původní cena musí být vyšší než cena.';
+    }
+  }
+
   return errors;
 }
 
@@ -125,6 +137,8 @@ export function toRequest(draft: ServiceDraft) {
     description: draft.description.trim(),
     durationMinutes: parseCzechNumber(draft.durationMinutes) ?? DEFAULT_DURATION_MINUTES,
     priceCzk: parseCzechNumber(draft.priceCzk) ?? 0,
+    /* Empty = none: an explicit null clears a stored value on update. */
+    listPriceCzk: (draft.listPriceCzk ?? '').trim() === '' ? null : parseCzechNumber(draft.listPriceCzk ?? ''),
     isActive: draft.isActive,
   };
 }

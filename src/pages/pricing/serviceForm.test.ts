@@ -158,6 +158,7 @@ describe('turning the form into a request', () => {
         description: '',
         durationMinutes: 15,
         priceCzk: 1500.5,
+        listPriceCzk: null,
         isActive: true,
       });
   });

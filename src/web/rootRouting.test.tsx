@@ -32,7 +32,7 @@ const widths = [['phone', VIEWPORTS.phone], ['tablet', VIEWPORTS.tablet], ['desk
 describe('/ is the landing page for an anonymous visitor', () => {
   it.each(widths)('at %s: the landing H1, the header, the booking action and the staff entry in the footer', (_name, width) => {
     renderWeb(<WebApp />, { route: '/', width });
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Výkon/);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Sportovní lékařské/);
     const header = screen.getByRole('banner');
     expect(within(header).getByRole('link', { name: /SportMedical Diagnostics — úvod/ })).toHaveAttribute('href', '/');
     expect(within(header).getAllByRole('link', { name: 'Objednat termín', hidden: true })[0]).toHaveAttribute('href', '/objednat');

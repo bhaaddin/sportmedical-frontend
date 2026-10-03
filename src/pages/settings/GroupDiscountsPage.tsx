@@ -74,8 +74,8 @@ const toTier = (draft: TierDraft): GroupDiscountTier => ({
   percent: Number.parseFloat(draft.percent.replace(',', '.')) || 0,
 });
 
-/** A sample price for the preview when no činnost in the price list has one yet. */
-const SAMPLE_UNIT_PRICE = 1000;
+/** Percent base of the preview when the price list has no price yet: "100" so the percentages read as they are (not a price of the clinic). */
+const PERCENT_BASE = 100;
 
 const cellInput = { width: 96 };
 
@@ -141,8 +141,8 @@ export default function GroupDiscountsPage() {
      sees a tier work before committing it. */
   const tiers = draft.map(toTier);
   const dearest = dearestPriced(activities.data?.activities ?? []);
-  const unitPrice = dearest?.priceCzk ?? SAMPLE_UNIT_PRICE;
-  const unitLabel = dearest?.name ?? 'vzorová cena';
+  const unitPrice = dearest?.priceCzk ?? PERCENT_BASE;
+  const unitLabel = dearest?.name ?? 'základ pro procenta';
   const preview = discountPreview(tiers, unitPrice, sampleHeadcount(tiers));
 
   return (
@@ -316,7 +316,7 @@ export default function GroupDiscountsPage() {
             </Stack>
             {dearest === null && (
               <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1.5 }}>
-                Žádná činnost zatím nemá cenu v ceníku; příklad počítá se vzorovou cenou.
+                Žádná činnost zatím nemá cenu v ceníku; příklad počítá se základem 100, aby byla vidět procenta.
               </Typography>
             )}
           </SoftCard>

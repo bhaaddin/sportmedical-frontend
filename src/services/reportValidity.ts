@@ -159,8 +159,11 @@ export const VYPIS_VALID_MONTHS = 12;
 
 export function validUntilFromIssued(
   issued: DateOnlyString | null | undefined,
+  /** The requirement rule's own validity (Nastavení › Dokumenty); the constant above is only the fallback. 0 = never expires. */
+  validityMonths: number = VYPIS_VALID_MONTHS,
 ): DateOnlyString | null {
   if (issued === null || issued === undefined) return null;
+  if (validityMonths <= 0) return null;
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(issued);
   if (match === null) return null;
   const [, y, m, d] = match;
@@ -175,7 +178,7 @@ export function validUntilFromIssued(
    * February - the last day of the month it was issued in - which is the
    * reading that never invents a day.
    */
-  const year = Number(y) + Math.floor(VYPIS_VALID_MONTHS / 12);
+  const year = Number(y) + Math.floor(validityMonths / 12);
   const month = Number(m);
   const lastOfMonth = new Date(year, month, 0).getDate();
   const day = Math.min(Number(d), lastOfMonth);

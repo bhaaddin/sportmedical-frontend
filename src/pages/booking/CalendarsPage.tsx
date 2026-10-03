@@ -617,7 +617,7 @@ export default function CalendarsPage() {
                       publicHoldMinutes: numberOrNull(e.target.value),
                     })
                   }
-                  helperText="Jak dlouho termín držíme, než pacient dovyplní registraci. Prázdné = 15 minut."
+                  helperText="Jak dlouho termín držíme, než pacient dovyplní registraci. Prázdné = výchozí délka držení v ordinaci."
                 />
 
                 <TextField
@@ -631,7 +631,7 @@ export default function CalendarsPage() {
                       publicCancellationHours: numberOrNull(e.target.value),
                     })
                   }
-                  helperText="Do kdy může pacient termín zrušit sám. Později už jen telefonicky. Prázdné = 24 hodin."
+                  helperText="Do kdy může pacient termín zrušit sám. Později už jen telefonicky. Prázdné = výchozí lhůta v ordinaci."
                 />
               </Box>
 

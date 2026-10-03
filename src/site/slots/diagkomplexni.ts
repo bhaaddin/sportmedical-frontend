@@ -1,10 +1,11 @@
 import type { SlotDef } from '../slotTypes';
-import { textSlot } from '../slotTypes';
+import { DIAG_KOMPLEXNI, detailSlots } from '../../web/pages/services/content/details';
 
-/* Slots of the page /diagnostika/komplexni. Placeholder until its page agent fills it from docs/etapa3/live-site. */
+/*
+ * Slots of the page /diagnostika/komplexni: Komplexní diagnostika. Defaults: the wording of the matching page of the live
+ * site (sportmedical-diagnostics.cz), as published; Slovak words and obvious typos corrected. The price
+ * (card) is NOT here: it comes from the price list by the service's name. The page draws the same spec
+ * (src/web/pages/services/content/details.ts), so a slot cannot be registered without being drawn.
+ */
 
-const HERO = 'Komplexní diagnostika › Úvod';
-
-export const diagkomplexniSlots: SlotDef[] = [
-  textSlot('diagkomplexni.hero.title', 'Úvod — titulek stránky', HERO, 'Komplexní diagnostika'),
-];
+export const diagkomplexniSlots: SlotDef[] = detailSlots(DIAG_KOMPLEXNI);

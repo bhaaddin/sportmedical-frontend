@@ -2,19 +2,22 @@
 
    What a club gets, how a block reservation works, the discount, "Mám odkaz od klubu" and the way to
    ask. The discount is shown ONLY from the published discount tiers (useDiscountTiers); without them
-   the card says there is a favourable offer and shows no number. The minimum headcount is an editable
-   text slot. "Mám odkaz od klubu" (id="mam-odkaz") takes the link the club sent — a whole address or just
+   the card says there is a favourable offer and shows no number. The minimum headcount comes ONLY from the
+   clinic's setting (useClubTerms, GET /api/public/club-terms): without one the card and its sentence are
+   not shown at all — no number is written in this page or in any slot default. "Mám odkaz od klubu" (id="mam-odkaz") takes the link the club sent — a whole address or just
    its token — and opens that club's registration, /klub/<token>. */
 
 import { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { Box } from '@mui/material';
 import { formatPercent, topTier, useDiscountTiers } from '../../api/publicDiscounts';
+import { useClubTerms } from '../../api/publicClubTerms';
 import { SlotText, useSlotText } from '../../site/SlotText';
-import { BENEFIT_COUNT, CLUB_GALLERY_COUNT, STEP_COUNT } from '../../site/slots/kluby';
-import { CtaButton, Eyebrow, SectionTitle, WebSection } from '../ui';
+import { BENEFIT_COUNT, CLUB_GALLERY_COUNT, EXAM_TYPE_COUNT, STEP_COUNT } from '../../site/slots/kluby';
+import { RichSlotText, fillTokens } from './company/richText';
+import { ArrowLink, CtaButton, Eyebrow, SectionTitle, WebSection } from '../ui';
 import { FONT_HEAD, MQ, W } from '../tokens';
-import { Card, CardGrid, CompanyHero, PhotoGrid, SectionHead, StepList, sectionStack } from './company/blocks';
+import { Card, CardGrid, CompanyHero, PhotoGrid, SectionHead, StepList, labelSx, sectionStack } from './company/blocks';
 import { clubLinkTarget } from './company/clubLink';
 import { useContactDetails } from './company/contactData';
 
@@ -46,8 +49,9 @@ function TermCard({ value, titleKey, text }: { value: string; titleKey: string; 
 
 function TermsSection() {
   const { data: tiers } = useDiscountTiers();
+  const { data: terms } = useClubTerms();
+  const minimum = terms.minimumPlayers;
   const best = topTier(tiers);
-  const minValue = useSlotText('kluby.terms.min.value');
   const minText = useSlotText('kluby.terms.min.text');
   const whereValue = useSlotText('kluby.terms.where.value');
   const whereText = useSlotText('kluby.terms.where.text');
@@ -65,8 +69,10 @@ function TermsSection() {
   return (
     <WebSection py={[44, 64]} innerSx={sectionStack}>
       <SectionHead title="kluby.terms.title" />
-      <CardGrid desktop={4} component="ul">
-        <TermCard value={minValue} titleKey="kluby.terms.min.title" text={minText} />
+      <CardGrid desktop={minimum !== null ? 4 : 3} component="ul">
+        {minimum !== null && (
+          <TermCard value={String(minimum)} titleKey="kluby.terms.min.title" text={fillTokens(minText, { pocet: String(minimum) })} />
+        )}
         <TermCard value={whereValue} titleKey="kluby.terms.where.title" text={whereText} />
         <TermCard value={priceValue} titleKey="kluby.terms.price.title" text={priceBody} />
         <TermCard value={weekendValue} titleKey="kluby.terms.weekend.title" text={weekendText} />
@@ -107,6 +113,38 @@ function GainSection() {
           </Card>
         ))}
       </CardGrid>
+    </WebSection>
+  );
+}
+
+/* ── Mobile stress tests for clubs (live text) ── */
+
+function MobileSection() {
+  return (
+    <WebSection py={[44, 64]} innerSx={sectionStack}>
+      <SectionHead title="kluby.mobile.title" />
+      <SlotText slotKey="kluby.mobile.badge" sx={{ ...labelSx, color: W.orangeText, alignSelf: 'flex-start' }} />
+      <RichSlotText slotKey="kluby.mobile.text" />
+    </WebSection>
+  );
+}
+
+/* ── The examination types the club can order ── */
+
+function ExamsSection() {
+  const prices = useSlotText('kluby.exams.prices');
+  return (
+    <WebSection tone="warm" py={[44, 64]} innerSx={sectionStack}>
+      <SectionHead title="kluby.exams.title" lead="kluby.exams.lead" />
+      <CardGrid desktop={2} component="ul">
+        {range(EXAM_TYPE_COUNT).map((n) => (
+          <Card key={n} component="li">
+            <SlotText slotKey={`kluby.exams.${n}.title`} as="h3" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 18 }} />
+            <SlotText slotKey={`kluby.exams.${n}.text`} as="p" sx={{ m: 0, fontSize: 15, lineHeight: 1.6, color: W.bodySoft }} />
+          </Card>
+        ))}
+      </CardGrid>
+      <ArrowLink to="/cenik">{prices}</ArrowLink>
     </WebSection>
   );
 }
@@ -249,6 +287,8 @@ export default function KlubyPage() {
       </CompanyHero>
       <TermsSection />
       <GainSection />
+      <MobileSection />
+      <ExamsSection />
       <HowSection />
       <ClubLinkSection />
       <AskBand />

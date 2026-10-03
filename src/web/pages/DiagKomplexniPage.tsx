@@ -1,8 +1,9 @@
-/* /diagnostika/komplexni — placeholder page, replaced wholesale by its page agent (keep the default export). */
+/* /diagnostika/komplexni — a detail page of Sportovní diagnostika: its spec is src/web/pages/services/content/details.ts,
+   its slots src/site/slots/ (the same spec), its price comes from the price list. */
 
-import { SlotText } from '../../site/SlotText';
-import { PageHero } from '../ui';
+import { DetailPage } from './services/DetailPage';
+import { DIAG_KOMPLEXNI } from './services/content/details';
 
 export default function DiagKomplexniPage() {
-  return <PageHero title={<SlotText slotKey="diagkomplexni.hero.title" />} />;
+  return <DetailPage spec={DIAG_KOMPLEXNI} />;
 }

@@ -30,13 +30,13 @@ describe('useSiteContent', () => {
       return { data: query.data, isFetching: query.isFetching, isError: query.isError };
     }, { wrapper: wrapper() });
     // Defined on the very first render: the page never waits for the server.
-    expect(result.current.data.partners).toHaveLength(10);
+    expect(result.current.data.partners).toHaveLength(9);
     expect(result.current.data.faq.length).toBeGreaterThan(0);
     await waitFor(() => { expect(get).toHaveBeenCalledWith('/api/public/site-content'); });
     await waitFor(() => { expect(result.current.isError).toBe(true); });
     // The failed refresh left the defaults in place.
     expect(result.current.data.version).toBe(DEFAULT_SITE_CONTENT.version);
-    expect(result.current.data.partners).toHaveLength(10);
+    expect(result.current.data.partners).toHaveLength(9);
   });
 
   it('swaps in the admin content when the API answers', async () => {

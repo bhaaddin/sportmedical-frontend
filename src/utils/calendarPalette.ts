@@ -47,7 +47,14 @@ export function paletteEntryFor(hex: string | undefined): PaletteEntry {
 
 /** Text colour guaranteed to be readable on a stored colour. */
 export function readableTextOn(hex: string | undefined): string {
-  return paletteEntryFor(hex).onHex;
+  const normalised = (hex ?? '').toUpperCase();
+  const known = CALENDAR_PALETTE.find((entry) => entry.hex.toUpperCase() === normalised);
+  if (known !== undefined) return known.onHex;
+  /* A colour from the clinic's own palette: white or black, whichever reads better on it. */
+  if (/^#[0-9A-F]{6}$/.test(normalised)) {
+    return contrastRatio('#FFFFFF', normalised) >= contrastRatio('#000000', normalised) ? '#FFFFFF' : '#000000';
+  }
+  return DEFAULT_PALETTE_ENTRY.onHex;
 }
 
 function channelLuminance(value: number): number {

@@ -1,8 +1,8 @@
-/* /ochrana-osobnich-udaju — placeholder page, replaced wholesale by its page agent (keep the default export). */
+/* /ochrana-osobnich-udaju — the privacy text, laid out by the shared text-page block (slots in src/site/slots/soukromi.ts). */
 
-import { SlotText } from '../../site/SlotText';
-import { PageHero } from '../ui';
+import { SOUKROMI_SECTIONS } from '../../site/slots/soukromi';
+import { TextPage } from './company/TextPage';
 
 export default function SoukromiPage() {
-  return <PageHero title={<SlotText slotKey="soukromi.hero.title" />} />;
+  return <TextPage prefix="soukromi" sections={SOUKROMI_SECTIONS} path="/ochrana-osobnich-udaju" />;
 }

@@ -1,8 +1,8 @@
-/* /obchodni-podminky — placeholder page, replaced wholesale by its page agent (keep the default export). */
+/* /obchodni-podminky — the clinic's terms, laid out by the shared text-page block (slots in src/site/slots/podminky.ts). */
 
-import { SlotText } from '../../site/SlotText';
-import { PageHero } from '../ui';
+import { PODMINKY_SECTIONS } from '../../site/slots/podminky';
+import { TextPage } from './company/TextPage';
 
 export default function PodminkyPage() {
-  return <PageHero title={<SlotText slotKey="podminky.hero.title" />} />;
+  return <TextPage prefix="podminky" sections={PODMINKY_SECTIONS} path="/obchodni-podminky" />;
 }

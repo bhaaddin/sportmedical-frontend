@@ -21,6 +21,7 @@ import { mapsHref, telHref } from './brand';
 import { Brand } from './PublicHeader';
 import { SITE } from '../../pages/public/content';
 import { LOGIN_PATH } from '../../web/sitePaths';
+import { LEGAL_LINKS } from '../../site/slots/spolecne';
 
 const colLabel = { fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: W.onInkMuted } as const;
 const linkStyle = {
@@ -91,16 +92,27 @@ export function PublicFooter({ clinic, content = DEFAULT_SITE_CONTENT }: { clini
             <Box component={SiteLink} to="/kluby" sx={linkStyle}>Pro kluby</Box>
             <Box component={SiteLink} to="/portal/prihlaseni" sx={linkStyle}>Můj portál</Box>
             <Box component={SiteLink} to="/dokumenty" sx={linkStyle}>Dokumenty k testům</Box>
-            {SITE.policies.map((policy) => (
-              <Box key={policy.href} component="a" href={policy.href} target="_blank" rel="noopener noreferrer" sx={linkStyle}>
-                Zpracování osobních údajů
-              </Box>
-            ))}
           </Box>
         </Box>
 
         <Box sx={{ mt: { xs: '32px', md: '34px' }, pt: '22px', borderTop: `1px solid ${W.inkLine}`, fontSize: 13, color: W.onInkMuted, display: 'flex', flexWrap: 'wrap', gap: '8px 24px', justifyContent: 'space-between' }}>
           <span>{slot('site.footer.legal')}</span>
+          {/* The small legal row: terms, privacy, cancellation, FAQ, partners — pages of the public site, labels are slots. */}
+          <Box component="nav" aria-label="Právní informace" sx={{ flexBasis: '100%', order: 3 }}>
+            <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, display: 'flex', flexWrap: 'wrap', gap: '0 22px' }}>
+              {LEGAL_LINKS.map((link) => (
+                <li key={link.to}>
+                  <Box
+                    component={SiteLink}
+                    to={link.to}
+                    sx={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, fontSize: 13, color: W.onInkMuted, textDecoration: 'none', '&:hover': { color: W.white, textDecoration: 'underline' } }}
+                  >
+                    {slot(link.key)}
+                  </Box>
+                </li>
+              ))}
+            </Box>
+          </Box>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0 24px' }}>
             {/* The way into the staff portal: for the clinic's own people, so it is small and sits in the legal line, not in the menu. */}
             <Box

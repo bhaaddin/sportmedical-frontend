@@ -33,6 +33,16 @@ vi.mock('../../../api/workingHours', () => ({
 
 vi.mock('../../../api/appointments', () => ({ appointmentsApi: { range } }));
 
+/* The default working day is the clinic's calendar setting, not a number in the dialog. */
+let dayHours = { dayStartHour: 8, dayEndHour: 18 };
+vi.mock('../../../api/displaySettings', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../api/displaySettings')>();
+  return {
+    ...actual,
+    useCalendarDisplay: () => ({ settings: { ...actual.CALENDAR_DISPLAY_OFFLINE, ...dayHours }, loaded: true }),
+  };
+});
+
 const activity = (id: string, name: string, sortOrder: number, extra: object = {}) => ({
   id, name, slug: id, durationMinutes: 30, color: '#22C55E', publicNote: '', isPubliclyBookable: true,
   sortOrder, isActive: true, clinicServiceId: 's1', ...extra,
@@ -108,6 +118,17 @@ afterEach(() => {
 });
 
 describe('Rychlý plán', () => {
+  it('starts the day at the hours of the clinic calendar settings', async () => {
+    dayHours = { dayStartHour: 9, dayEndHour: 17 };
+    try {
+      renderDialog(dialog());
+      expect(await screen.findByLabelText(/Základní prohlídka/)).toBeChecked();
+      expect(screen.getByTestId('plan-preview')).toHaveTextContent('Po–Pá 09:00–17:00, 2 činnosti');
+    } finally {
+      dayHours = { dayStartHour: 8, dayEndHour: 18 };
+    }
+  });
+
   it('offers only the činnosti the calendar can offer, all on, and a live preview', async () => {
     renderDialog(dialog());
 

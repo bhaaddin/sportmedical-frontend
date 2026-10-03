@@ -7,6 +7,8 @@ export interface ServiceItem {
   description: string;
   durationMinutes: number;
   priceCzk: number;
+  /** Optional crossed-out list price shown on the web next to `priceCzk`; absent/null = none. */
+  listPriceCzk?: number | null;
   isActive: boolean;
 }
 
@@ -16,7 +18,14 @@ export interface ServiceItemInput {
   description: string;
   durationMinutes: number;
   priceCzk: number;
+  /** Omitted keeps the stored value; an explicit `null` clears it. */
+  listPriceCzk?: number | null;
   isActive: boolean;
+}
+
+/** Tolerant: only a finite number above zero is a list price; anything else is "none". */
+export function normalizeListPrice(raw: unknown): number | null {
+  return typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null;
 }
 
 /* The server answers `{ value: … }` on some routes and the bare body on
@@ -29,13 +38,18 @@ function unwrap<T>(data: unknown): T {
 export const servicesApi = {
   getAll: async (): Promise<ServiceItem[]> => {
     const res = await client.get('/api/services');
-    return unwrap<ServiceItem[]>(res.data) ?? [];
+    const items = unwrap<ServiceItem[]>(res.data) ?? [];
+    return Array.isArray(items)
+      ? items.map((item) => ({ ...item, listPriceCzk: normalizeListPrice((item as { listPriceCzk?: unknown }).listPriceCzk) }))
+      : [];
   },
 
   /* `isActive` is not in the create contract - a new service is always active -
      so it is dropped here rather than sent and silently ignored. */
   create: async (input: ServiceItemInput): Promise<ServiceItem> => {
-    const { isActive: _unused, ...body } = input;
+    const { isActive: _unused, listPriceCzk, ...rest } = input;
+    /* A new row with no list price simply omits the key. */
+    const body = listPriceCzk === null || listPriceCzk === undefined ? rest : { ...rest, listPriceCzk };
     const res = await client.post('/api/services', body);
     return unwrap<ServiceItem>(res.data);
   },
