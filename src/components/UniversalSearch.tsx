@@ -17,14 +17,15 @@ import { patientsApi, type Patient } from '../api/patients';
 import { injuriesApi, type Injury } from '../api/injuries';
 import { billingApi, type Invoice } from '../api/billing';
 import { calendarApi, type Appointment } from '../api/calendar';
-import { usePermission } from '../auth/usePermission';
+import { usePermission, usePermissions } from '../auth/usePermission';
+import { normalizeText, searchSettingsItems, visibleSections } from '../pages/settings/catalogue';
 import { DESIGN, StatusChip, type ChipTone } from './ui';
 
 interface SearchResult {
   id: string;
   title: string;
   subtitle: string;
-  type: 'patient' | 'appointment' | 'injury' | 'invoice' | 'staff' | 'page';
+  type: 'patient' | 'appointment' | 'injury' | 'invoice' | 'staff' | 'page' | 'settings';
   icon: React.ReactNode;
   path: string;
 }
@@ -32,11 +33,11 @@ interface SearchResult {
 /* What kind of thing a row is, said with the board's tones rather than a colour per type. */
 const TYPE_LABEL: Record<SearchResult['type'], string> = {
   patient: 'Pacient', appointment: 'Termín', injury: 'Poranění',
-  invoice: 'Faktura', staff: 'Tým', page: 'Stránka',
+  invoice: 'Faktura', staff: 'Tým', page: 'Stránka', settings: 'Nastavení',
 };
 const TYPE_TONE: Record<SearchResult['type'], ChipTone> = {
   patient: 'green', appointment: 'blue', injury: 'red',
-  invoice: 'beige', staff: 'grey', page: 'grey',
+  invoice: 'beige', staff: 'grey', page: 'grey', settings: 'grey',
 };
 
 export default function UniversalSearch() {
@@ -49,6 +50,11 @@ export default function UniversalSearch() {
   const navigate = useNavigate();
   const canBill = usePermission('billing.manage');
   const canSeePatients = usePermission('patients.view');
+  /* The settings rows this person may open - the same smart search the rail
+     has (label, keywords, description; no diacritics needed), so "obed" from
+     Ctrl+K lands on Otevírací doba too. */
+  const held = usePermissions();
+  const settingsSections = useMemo(() => visibleSections(held), [held]);
 
   /* ── Keyboard shortcut Ctrl+K ── */
   useEffect(() => {
@@ -82,8 +88,11 @@ export default function UniversalSearch() {
     ...(canBill
       ? [{ id: 'p-billing', title: 'Fakturace', subtitle: 'Doklady a platby', type: 'page' as const, icon: <Receipt />, path: '/billing' }]
       : []),
+    { id: 'p-today', title: 'Dnešní přehled', subtitle: 'Dnešní den na jeden pohled', type: 'page', icon: <CalendarMonth />, path: '/dnes' },
+    { id: 'p-clubs', title: 'Kluby a týmy', subtitle: 'Hromadné objednávky a odkazy pro sportovce', type: 'page', icon: <People />, path: '/clubs' },
     { id: 'p-injuries', title: 'Poranění', subtitle: 'Evidence poranění', type: 'page', icon: <Warning />, path: '/injuries' },
     { id: 'p-diagnostics', title: 'Výsledky', subtitle: 'Diagnostika a měření', type: 'page', icon: <Science />, path: '/diagnostics/new' },
+    { id: 'p-statistics', title: 'Statistiky', subtitle: 'Statistiky pro všechno na jednom místě', type: 'page', icon: <Science />, path: '/statistiky' },
     { id: 'p-settings', title: 'Nastavení', subtitle: 'Konfigurace', type: 'page', icon: <Settings />, path: '/settings' },
   ], [canBill, canSeePatients]);
 
@@ -92,6 +101,7 @@ export default function UniversalSearch() {
     if (q.length < 2) { setResults([]); return; }
     setLoading(true);
     const lower = q.toLowerCase();
+    const plain = normalizeText(q);
 
     try {
       const [patients, injuries, invoices, appointments] = await Promise.allSettled([
@@ -176,9 +186,21 @@ export default function UniversalSearch() {
 
       /* Pages */
       const matchedPages = pages.filter(p =>
-        p.title.toLowerCase().includes(lower) || p.subtitle.toLowerCase().includes(lower)
+        normalizeText(p.title).includes(plain) || normalizeText(p.subtitle).includes(plain)
       ).slice(0, 3);
       found.push(...matchedPages);
+
+      /* Settings screens - best first, the way the rail's own search ranks them. */
+      for (const hit of searchSettingsItems(settingsSections, q).slice(0, 5)) {
+        found.push({
+          id: `settings-${hit.section.id}-${hit.item.id}`,
+          title: hit.item.label,
+          subtitle: `${hit.section.label} · ${hit.item.description}`,
+          type: 'settings',
+          icon: <Settings />,
+          path: hit.item.to,
+        });
+      }
 
       setResults(found);
       setSelectedIndex(0);
@@ -187,7 +209,7 @@ export default function UniversalSearch() {
     } finally {
       setLoading(false);
     }
-  }, [pages, canBill, canSeePatients]);
+  }, [pages, canBill, canSeePatients, settingsSections]);
 
   /* ── Debounced search ── */
   useEffect(() => {

@@ -16,6 +16,9 @@ import {
   visibleSections,
   allDestinations,
   settingsItemAt,
+  searchSections,
+  searchSettingsItems,
+  normalizeText,
 } from './catalogue';
 
 /* Vite hands us the file's text; `node:fs` would need Node types this project
@@ -343,5 +346,83 @@ describe('the sidebar and the settings do not overlap', () => {
   it('keeps the way into the settings in the sidebar', () => {
     expect(sidebarPaths).toContain('/settings');
     expect(allDestinations()).not.toContain('/settings');
+  });
+});
+
+/*
+ * The smart search.
+ *
+ * Matko, 3. 10. 2026: "add a smart search that understands what I want." A
+ * receptionist types "oběd", not "Otevírací doba"; "heslo", not
+ * "Zabezpečení"; and on a Czech keyboard in a hurry she types "obed". So every
+ * row carries the words somebody would TYPE, the match ignores case and
+ * diacritics, and a row whose label says it outranks one that only a keyword
+ * or a description says it.
+ */
+describe('the smart search', () => {
+  const ids = (query: string) =>
+    searchSections(SETTINGS_SECTIONS, query).flatMap((s) => s.items.map((i) => i.id));
+  const first = (query: string) => searchSettingsItems(SETTINGS_SECTIONS, query)[0]?.item.id;
+
+  it('gives every row words somebody would type', () => {
+    for (const section of SETTINGS_SECTIONS) {
+      for (const item of section.items) {
+        expect(item.keywords.length, `${item.id} has no keywords`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it('strips case and diacritics the same way on both sides', () => {
+    expect(normalizeText('Otevírací  DOBA')).toBe('oteviraci doba');
+    expect(normalizeText('Zaměstnanci')).toBe('zamestnanci');
+  });
+
+  it.each([
+    ['oběd', 'pracovni-doba'],
+    ['obed', 'pracovni-doba'],
+    ['OBĚD', 'pracovni-doba'],
+    ['polední', 'pracovni-doba'],
+    ['heslo', 'dvoufazove'],
+    ['2fa', 'dvoufazove'],
+    ['ico', 'verejny-web'],
+    ['IČO', 'verejny-web'],
+    ['sleva', 'skupinove-slevy'],
+    ['procenta', 'skupinove-slevy'],
+    ['mrizka', 'vzhled-kalendare'],
+    ['barvy', 'vzhled-kalendare'],
+    ['anamneza', 'zdravotni-dotaznik'],
+    ['sms', 'sablony-emailu'],
+    ['svatek', 'svatky'],
+    ['opravneni', 'tym'],
+    ['gdpr', 'souhlasy'],
+    ['kc', 'cenik'],
+  ])('"%s" finds %s, diacritics or not', (query, id) => {
+    expect(ids(query)).toContain(id);
+  });
+
+  it('ranks a label hit above a keyword hit', () => {
+    /* "ceník" is Ceník's own label; it is also a keyword elsewhere. */
+    expect(first('cenik')).toBe('cenik');
+    /* "dovolená" is in the label of Svátky a dovolené and a keyword of Nepřítomnost. */
+    expect(first('dovolena')).toBe('svatky');
+    expect(ids('dovolena')).toContain('nepritomnosti');
+    /* "dokumenty" is Dokumenty's label and a keyword of Pravidla dokumentů. */
+    expect(ids('dokumenty')[0]).toBe('dokumenty-sablony');
+  });
+
+  it('narrows with every word rather than widening', () => {
+    expect(ids('obed pauza')).toContain('pracovni-doba');
+    expect(ids('obed heslo')).toEqual([]);
+  });
+
+  it('keeps every row when nothing is typed', () => {
+    expect(searchSections(SETTINGS_SECTIONS, '')).toBe(SETTINGS_SECTIONS);
+    expect(searchSettingsItems(SETTINGS_SECTIONS, '  ').length).toBe(allDestinations().length);
+  });
+
+  it('searches only what this person may open', () => {
+    const hers = visibleSections(RECEPTIONIST);
+    expect(searchSettingsItems(hers, 'heslo').map((h) => h.item.id)).toEqual(['dvoufazove']);
+    expect(searchSettingsItems(hers, 'opravneni')).toEqual([]);
   });
 });

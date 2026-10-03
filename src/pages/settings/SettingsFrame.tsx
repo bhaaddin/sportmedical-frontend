@@ -1,25 +1,29 @@
 /*
- * The frame every settings screen sits in - the board's screen 19.
+ * The frame every settings screen sits in - the board's screen 19, with one
+ * change Matko asked for on 3. 10. 2026: "In settings two sidebars next to
+ * each other is awful — only ONE, and it is the settings one."
  *
- * Three panes: the application's sidebar (App.tsx, not here), a 240px
- * settings nav with the search box and the catalogue's groups, and the
- * content with its breadcrumb "Nastavení / Skupina / Stránka", a title, one
- * line under it and the screen's actions ("Zahodit" · "Uložit") top-right.
+ * So the settings nav - the search box and the catalogue's groups - is no
+ * longer a 240px column beside the content. On a settings route the shell's
+ * rail (App.tsx) replaces its own menu with `SettingsNav`, and the content
+ * here keeps only its breadcrumb "Nastavení / Skupina / Stránka", a title,
+ * one line under it and the screen's actions ("Zahodit" · "Uložit") top-right.
  *
  * Drawn once, from the catalogue, so the twenty settings screens agree about
  * where they are and the nav never offers a screen the catalogue does not.
  *
  * A screen rendered outside a router - the unit tests do that - gets the
- * header alone: the nav and the breadcrumb are links, and links need a router.
+ * header alone: the breadcrumb is a link, and links need a router.
  */
 import { useState } from 'react';
 import { Link as RouterLink, useInRouterContext, useLocation } from 'react-router-dom';
-import { Box, InputAdornment, Stack, TextField, Typography, useMediaQuery, useTheme } from '@mui/material';
+import { Box, InputAdornment, Stack, TextField, Typography } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
 import { PageHeader, SectionLabel } from '../../components/ui';
 import { usePermissions } from '../../auth/usePermission';
 import { searchSections, settingsItemAt, visibleSections } from './catalogue';
 
+/** The width of the settings nav when it stands as its own column (nowhere in the shell now; kept for a page that wants one). */
 export const SETTINGS_NAV_WIDTH = 240;
 
 /**
@@ -27,18 +31,24 @@ export const SETTINGS_NAV_WIDTH = 240;
  * screen this person may open. The row of the screen being looked at carries
  * the 3px accent bar on its left and accent text.
  *
- * The search is the nav's own unless the screen wants to share it - /settings
- * does, so one query narrows the nav and the cards together.
+ * The search is the nav's own unless the caller wants to share it - the rail
+ * does, so one query narrows the rail and the /settings cards together.
+ *
+ * `plain` is how the rail draws it: no width, border or stickiness of its
+ * own, it fills whatever it is put in.
  */
 export function SettingsNav({
   query,
   onQueryChange,
   compact = false,
+  plain = false,
 }: {
   query?: string;
   onQueryChange?: (query: string) => void;
   /** On a phone: one wrapping row of chips above the content instead of a side column. */
   compact?: boolean;
+  /** Inside the rail: fill the parent, no frame of its own. */
+  plain?: boolean;
 }) {
   const location = useLocation();
   const [ownQuery, setOwnQuery] = useState('');
@@ -52,7 +62,9 @@ export function SettingsNav({
       component="nav"
       aria-label="Nastavení — oddíly"
       sx={
-        compact
+        plain
+          ? { width: '100%' }
+          : compact
           ? { width: '100%', mb: 2, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider' }
           : {
               width: SETTINGS_NAV_WIDTH,
@@ -179,9 +191,13 @@ export function SettingsBreadcrumb({ title }: { title?: React.ReactNode }) {
 }
 
 /**
- * A settings screen: nav on the left, breadcrumb + title + subtitle + actions
- * above the content. `actions` is where "Zahodit" · "Uložit" go on a screen
- * that saves, and "Nová …" on a screen that lists.
+ * A settings screen: breadcrumb + title + subtitle + actions above the
+ * content. `actions` is where "Zahodit" · "Uložit" go on a screen that saves,
+ * and "Nová …" on a screen that lists.
+ *
+ * The settings nav is not drawn here any more: the shell's rail carries it on
+ * every settings route (one sidebar, the settings one), on a laptop and in
+ * the phone's drawer alike.
  *
  * `width` caps the content - a form reads better at 720 than across 1400.
  */
@@ -199,19 +215,12 @@ export function SettingsScreen({
   width?: number;
 }) {
   const inRouter = useInRouterContext();
-  const theme = useTheme();
-  /* The settings nav never disappears: a side column on a laptop, a row of
-     chips above the content on a phone - you always see where you are. */
-  const narrow = useMediaQuery(theme.breakpoints.down('md'));
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: narrow ? 'column' : 'row', gap: 3, alignItems: 'flex-start' }}>
-      {inRouter && <SettingsNav compact={narrow} />}
-      <Box sx={{ flex: 1, minWidth: 0, maxWidth: width, width: '100%' }}>
-        {inRouter && <SettingsBreadcrumb title={title} />}
-        <PageHeader title={title} subtitle={subtitle} actions={actions} />
-        {children}
-      </Box>
+    <Box sx={{ minWidth: 0, maxWidth: width, width: '100%' }}>
+      {inRouter && <SettingsBreadcrumb title={title} />}
+      <PageHeader title={title} subtitle={subtitle} actions={actions} />
+      {children}
     </Box>
   );
 }

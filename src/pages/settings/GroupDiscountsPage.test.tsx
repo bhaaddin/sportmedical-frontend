@@ -131,4 +131,12 @@ describe('the tier editor', () => {
     expect(await screen.findByRole('link', { name: 'Otevřít ceník' })).toHaveAttribute('href', '/cenik');
     expect(screen.getByRole('link', { name: 'Kluby' })).toHaveAttribute('href', '/clubs');
   });
+
+  it('says the tiers are recommendations - the club discount is the administrator choice', async () => {
+    renderPage();
+    expect(await screen.findByText(/slevu klubu určuje administrátor na kartě klubu/)).toBeInTheDocument();
+    expect(screen.getByText('Doporučené hladiny slev')).toBeInTheDocument();
+    expect(screen.getByText('Příklad')).toBeInTheDocument();
+    expect(screen.queryByText('Náhled')).not.toBeInTheDocument();
+  });
 });

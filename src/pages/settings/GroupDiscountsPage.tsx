@@ -1,16 +1,18 @@
 /* ══════════════════════════════════════════════════════════════
    SLEVY A CENOVÉ HLADINY  (route: /nastaveni/skupinove-slevy)
 
-   A bigger group booked together pays less, by how many people. The tiers and
+   A bigger group booked together is offered less per head, by how many people.
+   The tiers are RECOMMENDATIONS: the discount a club actually gets is the
+   administrator's own choice, made on the club's card (/clubs). The tiers and
    percentages are the clinic's to set — nothing hard-coded. The server refuses
    overlapping tiers and percentages out of range, and sends its own defaults so
    this screen keeps no copy of the rule.
 
    The board's screen 19: an editor table (NÁZEV HLADINY · OD · DO · SLEVA ·
-   AKCE), "+ Přidat hladinu", a card saying how the discount is applied with
-   the way to the price list and to the clubs, and a NÁHLED card pricing a
-   sample order on the dearest činnost so the owner sees what a tier does
-   before saving it. "Zahodit" · "Uložit" sit top-right, as on every settings
+   AKCE), "+ Přidat hladinu", a card saying how the recommendation is used with
+   the way to the price list and to the clubs, and a "Příklad" card pricing a
+   sample order on the dearest činnost so the owner sees what a tier would
+   mean before saving it. "Zahodit" · "Uložit" sit top-right, as on every settings
    screen that saves.
    ══════════════════════════════════════════════════════════════ */
 
@@ -145,8 +147,8 @@ export default function GroupDiscountsPage() {
 
   return (
     <SettingsScreen
-      title="Slevy a cenové hladiny"
-      subtitle="Hladinu systém dopočítá podle počtu objednaných osob"
+      title="Doporučené hladiny slev"
+      subtitle="Doporučené hladiny — slevu klubu určuje administrátor na kartě klubu"
       actions={
         <>
           <Button variant="outlined" onClick={discard} disabled={!dirty || save.isPending}>
@@ -274,11 +276,12 @@ export default function GroupDiscountsPage() {
           }}
         >
           <SoftCard>
-            <SectionLabel>Jak se sleva použije</SectionLabel>
+            <SectionLabel>Jak se hladiny použijí</SectionLabel>
             <Typography variant="body2" sx={{ mb: 2 }}>
-              Při objednávce pro více osob najde systém hladinu podle počtu a odečte ji z
-              ceníkové ceny. Platba zůstává samostatný krok — sleva jen upraví částku k úhradě.
-              Prázdné „Do“ znamená bez horní hranice.
+              Hladiny jsou jen doporučení: podle počtu osob ukazují, jakou slevu je rozumné
+              klubu nabídnout. Skutečnou slevu určuje administrátor u každého klubu zvlášť
+              na jeho kartě v sekci Kluby. Platba zůstává samostatný krok — sleva jen upraví
+              částku k úhradě. Prázdné „Do“ znamená bez horní hranice.
             </Typography>
             <Stack direction="row" spacing={1}>
               <Button variant="outlined" component={RouterLink} to="/cenik">Otevřít ceník</Button>
@@ -287,7 +290,7 @@ export default function GroupDiscountsPage() {
           </SoftCard>
 
           <SoftCard>
-            <SectionLabel>Náhled</SectionLabel>
+            <SectionLabel>Příklad</SectionLabel>
             <Stack spacing={0.75}>
               <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
                 <Typography variant="body2">
@@ -313,7 +316,7 @@ export default function GroupDiscountsPage() {
             </Stack>
             {dearest === null && (
               <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1.5 }}>
-                Žádná činnost zatím nemá cenu v ceníku; náhled počítá se vzorovou cenou.
+                Žádná činnost zatím nemá cenu v ceníku; příklad počítá se vzorovou cenou.
               </Typography>
             )}
           </SoftCard>

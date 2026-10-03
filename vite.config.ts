@@ -3,6 +3,23 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        /* Vendor code in its own long-lived chunks: a release of our screens no longer
+           re-downloads React/MUI, and the browser fetches them in parallel with the app. */
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('recharts') || id.includes('d3-')) return 'charts';
+          if (id.includes('@mui') || id.includes('@emotion')) return 'mui';
+          if (id.includes('react-router') || id.includes('@remix-run')) return 'router';
+          if (id.includes('@tanstack')) return 'query';
+          if (id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler')) return 'react';
+          return undefined;
+        },
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,

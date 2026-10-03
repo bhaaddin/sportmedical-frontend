@@ -1,16 +1,18 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, Avatar, IconButton, Menu, MenuItem, CircularProgress, Button, ButtonBase, Collapse, Divider, Stack, useMediaQuery } from '@mui/material';
+import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, Avatar, IconButton, Menu, MenuItem, CircularProgress, Button, ButtonBase, Collapse, Divider, Tooltip, useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { Science, Dashboard, People, Settings, Logout, CalendarMonth, Receipt, Search, AttachMoney, Today, ArrowBack, Assessment, Groups, ExpandLess, ExpandMore, Menu as MenuIcon, EventBusy, Lock, RateReview, FactCheck, HealthAndSafety, Psychology, MonitorHeart, Spa, EventAvailable } from '@mui/icons-material';
+import { Science, Dashboard, People, Settings, Logout, CalendarMonth, Receipt, Search, AttachMoney, Today, ArrowBack, Assessment, Groups, ExpandLess, ExpandMore, Menu as MenuIcon, EventBusy, RateReview, FactCheck, HealthAndSafety, Psychology, MonitorHeart, Spa, EventAvailable, PersonAdd, BarChart, Add } from '@mui/icons-material';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { usePermissions, type Permission } from './auth/usePermission';
 import { useAccountRefresh } from './auth/accountRefresh';
 import { queryClient } from './api/queryClient';
 import { PATIENT_SECTIONS, patientInPath, sectionPath } from './pages/patients/sections';
 import { settingsItemAt } from './pages/settings/catalogue';
+import { SettingsNav } from './pages/settings/SettingsFrame';
 import { Toaster } from 'react-hot-toast';
-import { AnimatePresence, motion } from 'framer-motion';
-import { useState, useMemo, lazy, Suspense, useRef, useCallback, useEffect } from 'react';
+import { useState, useMemo, lazy, Suspense, useRef, useEffect } from 'react';
+import { Rail, RailRow, RailPin, IconCell, RAIL_EXPANDED, RAIL_ICON_COL, RAIL_MOTION, useRailState } from './components/shell/Rail';
+import { SettingsSearchContext } from './components/shell/settingsSearch';
 import { buildTheme, THEME_ACCENTS, type ThemeMode } from './theme';
 import {
   ThemePrefsContext,
@@ -47,6 +49,8 @@ const PatientLayout = lazy(() => import('./pages/patients/PatientLayout'));
 const PatientDocumentsPage = lazy(() => import('./pages/patients/PatientDocumentsPage'));
 const PatientAppointmentsPage = lazy(() => import('./pages/patients/PatientAppointmentsPage'));
 const PatientHistoryPage = lazy(() => import('./pages/patients/PatientHistoryPage'));
+const PatientResultsPage = lazy(() => import('./pages/patients/PatientResultsPage'));
+const PatientInvoicesPage = lazy(() => import('./pages/patients/PatientInvoicesPage'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
 const BillingPage = lazy(() => import('./pages/Billing'));
 const AdminPage = lazy(() => import('./pages/Admin'));
@@ -94,6 +98,8 @@ const AppointmentLinkPage = lazy(() => import('./pages/booking/AppointmentLinkPa
 const CashierPage = lazy(() => import('./pages/CashierPage'));
 const ClubsPage = lazy(() => import('./pages/ClubsPage'));
 const AccountingExportPage = lazy(() => import('./pages/AccountingExportPage'));
+/* "Statistics for everything in one place" - under Výsledky in the rail. */
+const StatisticsPage = lazy(() => import('./pages/Statistics'));
 
 /* ── Loading spinner for Suspense ── */
 function PageLoader() {
@@ -112,74 +118,91 @@ function PageLoader() {
   );
 }
 
-const DRAWER_WIDTH = 240;
-
-/* ── Grouped sidebar menu ── */
-interface MenuItemGroup {
-  label: string;
+/* ── The rail's menu ── */
+interface MenuEntry {
+  text: string;
+  icon: React.ReactNode;
+  path: string;
   /* `requires` is the permission the server checks behind that screen; an
      entry the signed-in employee does not hold is not drawn. */
-  items: { text: string; icon: React.ReactNode; path: string; requires?: Permission }[];
+  requires?: Permission;
+  /** The screens that belong under this one; shown when it is open in the rail. */
+  children?: MenuEntry[];
 }
 
-const menuGroups: MenuItemGroup[] = [
-  /*
-   * The six screens of the working day, in the order the design board lists
-   * them (3. 10. 2026): the calendar, the people, the clubs, the results, the
-   * money, the settings. Nothing else sits at the top level.
-   *
-   * Everything anybody sets up once - calendars, activities, working hours,
-   * exceptions, the team, the public site, the audit log - lives behind
-   * Nastavení, grouped the way the API already groups it.
-   * `settingsDoesNotDuplicateTheSidebar` in catalogue.test.ts holds the line.
-   */
-  {
-    label: '',
-    items: [
-      { text: 'Kalendář', icon: <CalendarMonth />, path: '/planovani' },
-      { text: 'Pacienti', icon: <People />, path: '/patients', requires: 'patients.view' },
-      { text: 'Kluby a týmy', icon: <Groups />, path: '/clubs' },
-      { text: 'Výsledky', icon: <Science />, path: '/diagnostics/new' },
-      { text: 'Fakturace', icon: <Receipt />, path: '/billing', requires: 'billing.manage' },
-      { text: 'Nastavení', icon: <Settings />, path: '/settings' },
-    ],
-  },
-  /*
-   * The rest of the day's screens, folded away under "Další" so the sidebar
-   * stays the board's six lines but nothing that existed is lost.
-   */
-  {
-    label: 'Další',
-    items: [
-      { text: 'Přehled', icon: <Dashboard />, path: '/' },
-      { text: 'Dnešní přehled', icon: <Today />, path: '/dnes' },
-      /*
-       * No `requires`, and that is measured, not forgotten: everything behind
-       * this screen - GET /api/day, …/preview, …/availability, /api/activities,
-       * /api/clinic-services - carries `[Authorize]` and per-calendar
-       * visibility only, no named permission. An employee who sees one
-       * calendar gets the overview of that one calendar, and the server is
-       * what narrows it (6.5).
-       */
-      { text: 'Přehled podle služeb', icon: <Assessment />, path: '/prehled-sluzeb' },
-      { text: 'Pokladna', icon: <AttachMoney />, path: '/cashier', requires: 'billing.manage' },
-      { text: 'Účetní export', icon: <FactCheck />, path: '/accounting-export', requires: 'billing.manage' },
-      { text: 'Kontrola registrací', icon: <RateReview />, path: '/intake-review', requires: 'patients.register' },
-      { text: 'Zranění', icon: <HealthAndSafety />, path: '/injuries' },
-      { text: 'Návrat do hry', icon: <EventAvailable />, path: '/rtp' },
-      { text: 'Otřes mozku', icon: <Psychology />, path: '/concussion' },
-      { text: 'Tréninková zátěž', icon: <MonitorHeart />, path: '/training-load' },
-      { text: 'Wellness', icon: <Spa />, path: '/wellness' },
-      { text: 'Dostupnost', icon: <EventBusy />, path: '/availability' },
-    ],
-  },
-];
+/*
+ * What sits under each of the six main entries.
+ *
+ * Matko, 3. 10. 2026: "the Další section in the left sidebar is bad — put
+ * things where they belong." So there is no "Další" any more: every screen
+ * of the working day is a child of the entry it belongs to, and the rail
+ * shows a parent's children when that parent (or one of them) is open, or
+ * when its chevron is clicked.
+ *
+ * Kept as a map keyed by the parent's path rather than nested in the list
+ * below, so the parents stay the one-line literals two tests read from this
+ * file's text (`catalogue.test.ts`, `patientRoutes.test.ts`).
+ */
+const MENU_CHILDREN: Record<string, MenuEntry[]> = {
+  '/planovani': [
+    { text: 'Dnešní přehled', icon: <Today />, path: '/dnes' },
+    /*
+     * No `requires`, and that is measured, not forgotten: everything behind
+     * this screen - GET /api/day, …/preview, …/availability, /api/activities,
+     * /api/clinic-services - carries `[Authorize]` and per-calendar
+     * visibility only, no named permission. An employee who sees one
+     * calendar gets the overview of that one calendar, and the server is
+     * what narrows it (6.5).
+     */
+    { text: 'Přehled podle služeb', icon: <Assessment />, path: '/prehled-sluzeb' },
+    { text: 'Dostupnost', icon: <EventBusy />, path: '/availability' },
+  ],
+  '/patients': [
+    { text: 'Nový pacient', icon: <PersonAdd />, path: '/patients/register', requires: 'patients.register' },
+    { text: 'Kontrola registrací', icon: <RateReview />, path: '/intake-review', requires: 'patients.register' },
+  ],
+  '/diagnostics/new': [
+    { text: 'Diagnostika a měření', icon: <Science />, path: '/diagnostics/new' },
+    { text: 'Zranění', icon: <HealthAndSafety />, path: '/injuries' },
+    { text: 'Návrat do hry', icon: <EventAvailable />, path: '/rtp' },
+    { text: 'Otřes mozku', icon: <Psychology />, path: '/concussion' },
+    { text: 'Tréninková zátěž', icon: <MonitorHeart />, path: '/training-load' },
+    { text: 'Wellness', icon: <Spa />, path: '/wellness' },
+    /* "Statistics for everything in one place." */
+    { text: 'Statistiky', icon: <BarChart />, path: '/statistiky' },
+  ],
+  '/billing': [
+    { text: 'Pokladna', icon: <AttachMoney />, path: '/cashier', requires: 'billing.manage' },
+    { text: 'Účetní export', icon: <FactCheck />, path: '/accounting-export', requires: 'billing.manage' },
+  ],
+};
+
+/*
+ * The six screens of the working day, in the order the design board lists
+ * them (3. 10. 2026): the calendar, the people, the clubs, the results, the
+ * money, the settings - with Přehled, small, above them, because the brand
+ * also lands there and a home needs a name.
+ *
+ * Everything anybody sets up once - calendars, activities, working hours,
+ * exceptions, the team, the public site, the audit log - lives behind
+ * Nastavení, grouped the way the API already groups it.
+ * `settingsDoesNotDuplicateTheSidebar` in catalogue.test.ts holds the line.
+ */
+const menuItems: MenuEntry[] = ([
+  { text: 'Přehled', icon: <Dashboard />, path: '/' },
+  { text: 'Kalendář', icon: <CalendarMonth />, path: '/planovani' },
+  { text: 'Pacienti', icon: <People />, path: '/patients', requires: 'patients.view' },
+  { text: 'Kluby a týmy', icon: <Groups />, path: '/clubs' },
+  { text: 'Výsledky', icon: <Science />, path: '/diagnostics/new' },
+  { text: 'Fakturace', icon: <Receipt />, path: '/billing', requires: 'billing.manage' },
+  { text: 'Nastavení', icon: <Settings />, path: '/settings' },
+] as MenuEntry[]).map((entry) => ({ ...entry, children: MENU_CHILDREN[entry.path] }));
 
 /*
  * Settings destinations that draw the board's settings frame themselves
- * (SettingsScreen: nav + breadcrumb), so the shell must not draw a second way
- * back above them. Everything else in the catalogue still gets the one-line
- * "Nastavení / Skupina" link.
+ * (SettingsScreen: breadcrumb + header), so the shell must not draw a second
+ * way back above them. Everything else in the catalogue still gets the
+ * one-line "Nastavení / Skupina" link.
  */
 const SETTINGS_FRAMED = new Set<string>([
   '/admin', '/audit-log', '/activities', '/calendars', '/sluzby', '/nepritomnosti', '/exceptions',
@@ -213,76 +236,21 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-/** The sidebar's width on the board: 300px of white with a hairline on the right. */
-const SIDEBAR_WIDTH = 272;
+/** The phone drawer's width - the rail's open width. */
+const SIDEBAR_WIDTH = RAIL_EXPANDED;
 
-/**
- * One row of the sidebar's navigation. The board draws it as plain text with
- * generous height; the open screen sits on a soft tinted pill in the accent.
- */
-function NavRow({
-  to,
-  label,
-  icon,
-  active,
-  indent = false,
-  onNavigate,
-}: {
-  to: string;
-  label: string;
-  icon?: React.ReactNode;
-  active: boolean;
-  indent?: boolean;
-  onNavigate?: () => void;
-}) {
-  return (
-    <ListItemButton
-      component={Link as any}
-      to={to}
-      selected={active}
-      onClick={onNavigate}
-      sx={{
-        borderRadius: 2,
-        mb: 0.25,
-        minHeight: indent ? 38 : 44,
-        px: indent ? 2 : 1.75,
-        ml: indent ? 2 : 0,
-        gap: 1.25,
-        color: active ? 'primary.main' : 'text.primary',
-        fontWeight: active ? 700 : 500,
-        fontSize: indent ? 14 : 15,
-        boxShadow: active ? (t) => `inset 3px 0 0 ${t.palette.primary.main}` : 'none',
-      }}
-    >
-      {icon !== undefined && (
-        <Box sx={{ display: 'flex', color: active ? 'primary.main' : 'text.secondary', '& svg': { fontSize: 20 } }}>
-          {icon}
-        </Box>
-      )}
-      <Box component="span" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</Box>
-    </ListItemButton>
-  );
+/** Is this address inside the settings - a catalogue destination, or /settings itself? */
+function isSettingsRoute(pathname: string, settingsHere: ReturnType<typeof settingsItemAt>): boolean {
+  return settingsHere !== null || pathname === '/settings' || pathname.startsWith('/settings/');
 }
 
 /*
  * "Where am I" - one quiet line at the top of every screen, so a click never
- * costs the sense of place: the sidebar entry, then the screen inside it
- * (Pacienti › Karta pacienta › Termíny; Nastavení › Služby a ceny › Ceník).
- * The browser tab says the same, so ten open tabs are tellable apart.
+ * costs the sense of place: the rail's entry, then the screen inside it
+ * (Pacienti › Karta pacienta › Termíny; Výsledky › Zranění; Nastavení ›
+ * Služby a ceny › Ceník). The browser tab says the same, so ten open tabs are
+ * tellable apart.
  */
-const ROUTE_NAMES: Record<string, string> = {
-  '/': 'Přehled',
-  '/dnes': 'Dnešní přehled',
-  '/prehled-sluzeb': 'Přehled podle služeb',
-  '/vyhrazeni': 'Hromadné objednávky',
-  '/blokovany-cas': 'Blokovaný čas',
-  '/hodnoceni-pacientu': 'Hodnocení pacientů',
-  '/cenik': 'Ceník',
-  '/patients/register': 'Nový pacient',
-  '/intake-review': 'Kontrola registrací',
-  '/diagnostics/new': 'Výsledky',
-};
-
 function WhereAmI({
   pathname,
   patientId,
@@ -305,12 +273,19 @@ function WhereAmI({
   } else if (pathname.startsWith('/kalendar/')) {
     crumbs.push({ label: 'Kalendář', to: '/planovani' }, { label: 'Termín' });
   } else {
-    const items = menuGroups.flatMap((g) => g.items);
-    const exact = items.find((i) => i.path === pathname);
-    const prefix = exact ?? items.find((i) => i.path !== '/' && pathname.startsWith(i.path));
-    if (prefix) crumbs.push({ label: prefix.text, to: prefix.path });
-    const name = ROUTE_NAMES[pathname];
-    if (name && name !== prefix?.text) crumbs.push({ label: name });
+    /* A child of one of the six first - its parent names the place. */
+    let parent: MenuEntry | undefined;
+    let child: MenuEntry | undefined;
+    for (const entry of menuItems) {
+      child = entry.children?.find((c) => c.path === pathname);
+      if (child) { parent = entry; break; }
+    }
+    if (!parent) {
+      parent = menuItems.find((i) => i.path === pathname)
+        ?? menuItems.find((i) => i.path !== '/' && pathname.startsWith(i.path));
+    }
+    if (parent) crumbs.push({ label: parent.text, to: parent.path });
+    if (child && child.text !== parent?.text) crumbs.push({ label: child.text });
   }
   const trail = crumbs.map((c) => c.label).join(' › ');
 
@@ -341,49 +316,72 @@ function WhereAmI({
   );
 }
 
+/** The signed-in person, as stored at sign-in. Read once per shell, not once per render. */
+function readUser(): { firstName?: string; lastName?: string; role?: string } {
+  try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
+}
+
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
-  /* The sidebar is where you are. It only ever folds into a drawer on a phone;
-     on any laptop, whatever the zoom, it stays put. */
+  /* The rail is where you are. It only ever folds into a drawer on a phone;
+     on any laptop, whatever the zoom, it stays put - 76px at rest, 272px
+     when the pointer, the keyboard or the pin is on it. */
   const narrow = useMediaQuery(theme.breakpoints.down('sm'));
-  /*
-   * Inside a patient the sidebar becomes that patient's, and the application's
-   * own menu steps aside. The owner's rule: while you are in somebody's file,
-   * everything on screen is about them.
-   *
-   * On the board that is a sub-list under "Pacienti" rather than a second
-   * sidebar: the file's sections, indented, with the way back out above them.
-   */
   /* Reloaded from GET /api/v1/account on start, on focus and after any 403,
      so a permission the owner changed redraws this menu without a new sign-in. */
   useAccountRefresh();
   const held = new Set(usePermissions());
-  /* Without patients.view the address is NotFound, and a patient's sidebar
-     around it would offer sections that are NotFound too. */
+  /*
+   * Inside a patient the rail becomes that patient's, and the application's
+   * own menu steps aside. The owner's rule: while you are in somebody's file,
+   * everything on screen is about them. On the board that is a sub-list
+   * under "Pacienti": the file's sections, indented.
+   *
+   * Without patients.view the address is NotFound, and a patient's rail
+   * around it would offer sections that are NotFound too.
+   */
   const patientId = held.has('patients.view') ? patientInPath(location.pathname) : null;
   const settingsHere = settingsItemAt(location.pathname);
+  /*
+   * "In settings two sidebars next to each other is awful — only ONE, and it
+   * is the settings one." On a settings route the rail's content is the
+   * settings navigation, pinned open, because it is the only navigation there.
+   */
+  const settingsMode = isSettingsRoute(location.pathname, settingsHere);
+  const rail = useRailState(settingsMode);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState<boolean>(() => {
-    try { return localStorage.getItem('sm-nav-more') === '1'; } catch { return false; }
-  });
+  /* A parent the person opened or shut by its chevron, on top of the default
+     (open while it or one of its children is the screen). Forgotten on the
+     next navigation, so the default rules again. */
+  const [openOverrides, setOpenOverrides] = useState<Record<string, boolean>>({});
+  const [settingsQuery, setSettingsQuery] = useState('');
+  /* Where "Zpět do aplikace" goes: the last screen that was not a settings one. */
+  const lastAppRoute = useRef('/planovani');
   const { accent, mode, setAccent, setMode } = useThemePrefs();
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const visibleMenu = menuGroups
-    .map(group => ({ ...group, items: group.items.filter(item => item.requires === undefined || held.has(item.requires)) }))
-    .filter(group => group.items.length > 0);
+  const user = useMemo(readUser, []);
+
+  useEffect(() => {
+    setMobileOpen(false);
+    setOpenOverrides({});
+    if (!settingsMode) {
+      lastAppRoute.current = `${location.pathname}${location.search}`;
+      setSettingsQuery('');
+    }
+  }, [location.pathname, location.search, settingsMode]);
+
+  const visibleMenu = useMemo(() => {
+    const allowed = (entry: MenuEntry) => entry.requires === undefined || held.has(entry.requires);
+    return menuItems
+      .filter(allowed)
+      .map((entry) => ({ ...entry, children: entry.children?.filter(allowed) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [[...held].sort().join(' ')]);
 
   const isActivePath = (path: string) =>
     location.pathname === path || (path !== '/' && location.pathname.startsWith(path));
-
-  const toggleMore = () => {
-    setMoreOpen((open) => {
-      try { localStorage.setItem('sm-nav-more', open ? '0' : '1'); } catch { /* private mode */ }
-      return !open;
-    });
-  };
 
   const handleLogout = () => {
     setAnchorEl(null);
@@ -393,7 +391,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   const closeMobile = () => setMobileOpen(false);
 
   /*
-   * The big button at the top of the sidebar. It always lands on the calendar;
+   * The big button at the top of the rail. It always lands on the calendar;
    * the calendar reads `state.newAppointment` and opens the booking drawer on
    * the next free time, so the desk never has to find a slot first.
    */
@@ -402,154 +400,265 @@ function Layout({ children }: { children: React.ReactNode }) {
     navigate('/planovani', { state: { newAppointment: Date.now() } });
   };
 
-  const sidebar = (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', px: 2, pt: 2.25, pb: 1.5 }}>
+  const backToApp = () => {
+    closeMobile();
+    navigate(lastAppRoute.current);
+  };
+
+  const settingsSearch = useMemo(
+    () => ({ query: settingsQuery, setQuery: setSettingsQuery, inRail: !narrow }),
+    [settingsQuery, narrow],
+  );
+
+  /*
+   * The rail's content, drawn for one width. `exp` is true when the rail is
+   * open (272px) and in the phone's drawer, which is always open when it is
+   * there at all; false is the 76px rail of icons with their labels under them.
+   */
+  const railContent = (exp: boolean) => {
+    const brand = (
       <Box
         component={Link}
         to="/"
         onClick={closeMobile}
-        sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, px: 0.5, color: 'text.primary' }}
+        aria-label="SportMedical — přehled"
+        sx={{ display: 'flex', alignItems: 'center', height: 40, mb: 1.5, color: 'text.primary', textDecoration: 'none' }}
       >
-        <Typography sx={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em' }}>SportMedical</Typography>
+        <IconCell>
+          <Box
+            sx={{
+              width: 32, height: 32, borderRadius: 2, bgcolor: 'primary.main', color: '#FFF',
+              display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 800, letterSpacing: '0.02em',
+            }}
+          >
+            SM
+          </Box>
+        </IconCell>
+        {exp && (
+          <Typography sx={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
+            SportMedical
+          </Typography>
+        )}
       </Box>
+    );
 
-      <Button variant="contained" size="large" fullWidth onClick={newAppointment} sx={{ mb: 2.5, minHeight: 46 }}>
-        Nová objednávka
-      </Button>
+    const account = (
+      <>
+        <Divider sx={{ my: 1.25 }} />
+        <Box sx={{ display: 'flex', flexDirection: exp ? 'row' : 'column', alignItems: 'center', gap: 0.5 }}>
+          <ButtonBase
+            onClick={(e) => setAnchorEl(e.currentTarget)}
+            aria-label="Účet a vzhled"
+            sx={{
+              flex: exp ? 1 : undefined,
+              width: exp ? undefined : RAIL_ICON_COL,
+              display: 'flex', alignItems: 'center', borderRadius: 2, py: 0.5, pr: exp ? 1 : 0,
+              textAlign: 'left', minWidth: 0, '&:hover': { bgcolor: 'action.hover' },
+            }}
+          >
+            <IconCell>
+              <Avatar sx={{ width: 34, height: 34, bgcolor: 'primary.main', color: '#FFF', fontSize: 13 }}>
+                {user.firstName?.[0]}{user.lastName?.[0]}
+              </Avatar>
+            </IconCell>
+            {exp && (
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {[user.firstName, user.lastName].filter(Boolean).join(' ') || 'Účet'}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {user.role || ''}
+                </Typography>
+              </Box>
+            )}
+          </ButtonBase>
+          <IconButton size="small" title="Hledat (Ctrl+K)" aria-label="Hledat"
+            onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}>
+            <Search fontSize="small" />
+          </IconButton>
+          <NotificationCenter />
+        </Box>
+        {exp && !narrow && !settingsMode && (
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
+            <RailPin pinned={rail.pinned} onToggle={rail.togglePin} />
+          </Box>
+        )}
+      </>
+    );
 
-      <Box sx={{ flex: 1, overflowY: 'auto', mx: -0.5, px: 0.5 }}>
-        <List disablePadding>
-          {visibleMenu.map((group, gi) => {
-            const isMore = group.label === 'Další';
-            const rows = group.items.map((item) => {
+    if (settingsMode) {
+      return (
+        <>
+          <ListItemButton
+            onClick={backToApp}
+            sx={{ flex: '0 0 auto', borderRadius: 2, minHeight: 44, p: 0, pr: 1, mb: 0.5, color: 'text.secondary', fontSize: 14, fontWeight: 600 }}
+          >
+            <IconCell size={20}><ArrowBack /></IconCell>
+            Zpět do aplikace
+          </ListItemButton>
+          {brand}
+          <Divider sx={{ mb: 1.5 }} />
+          <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', mx: -0.5, px: 0.5 }}>
+            <SettingsNav plain query={settingsQuery} onQueryChange={setSettingsQuery} />
+          </Box>
+          {account}
+        </>
+      );
+    }
+
+    return (
+      <>
+        {brand}
+
+        <Box sx={{ height: 46, mb: 2, display: 'flex', alignItems: 'center' }}>
+          {exp ? (
+            <Button
+              variant="contained"
+              size="large"
+              fullWidth
+              onClick={newAppointment}
+              startIcon={<Add />}
+              sx={{ minHeight: 46, justifyContent: 'flex-start', pl: '18px', '& .MuiButton-startIcon': { ml: 0, mr: 1.5 } }}
+            >
+              Nová objednávka
+            </Button>
+          ) : (
+            <Tooltip title="Nová objednávka" placement="right">
+              <Button
+                variant="contained"
+                onClick={newAppointment}
+                aria-label="Nová objednávka"
+                sx={{ minWidth: 46, width: 46, height: 46, p: 0, mx: 'auto' }}
+              >
+                <Add />
+              </Button>
+            </Tooltip>
+          )}
+        </Box>
+
+        <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', mx: -0.5, px: 0.5 }}>
+          <List disablePadding>
+            {visibleMenu.map((item) => {
               const active = isActivePath(item.path);
               const inPatients = item.path === '/patients' && patientId !== null;
+              const kids = inPatients ? [] : (item.children ?? []);
+              const childActive = kids.some((c) => isActivePath(c.path));
+              const hasSublist = kids.length > 0 || inPatients;
+              const open = exp && hasSublist && (openOverrides[item.path] ?? (active || childActive));
               return (
-                <Box key={item.text}>
-                  <NavRow to={item.path} label={item.text} icon={item.icon} active={active && !inPatients} onNavigate={closeMobile} />
-                  {inPatients && (
-                    <Box sx={{ mb: 0.75 }}>
-                      {PATIENT_SECTIONS.map((section) => {
-                        const to = sectionPath(patientId, section);
-                        return (
-                          <NavRow
-                            key={section.id}
-                            to={to}
-                            label={section.label}
-                            active={location.pathname === to}
-                            indent
-                            onNavigate={closeMobile}
-                          />
-                        );
-                      })}
-                    </Box>
+                <Box key={item.path}>
+                  <RailRow
+                    to={item.path}
+                    label={item.text}
+                    icon={item.icon}
+                    active={active && !childActive && !inPatients}
+                    expanded={exp}
+                    onNavigate={closeMobile}
+                    trailing={hasSublist ? (
+                      <IconButton
+                        size="small"
+                        aria-label={open ? `Sbalit ${item.text}` : `Rozbalit ${item.text}`}
+                        aria-expanded={open}
+                        onClick={() => setOpenOverrides((o) => ({ ...o, [item.path]: !open }))}
+                        sx={{ color: 'text.disabled' }}
+                      >
+                        {open ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                      </IconButton>
+                    ) : undefined}
+                  />
+                  {hasSublist && (
+                    <Collapse in={open} timeout={150} unmountOnExit>
+                      <Box sx={{ mb: 0.75 }}>
+                        {inPatients
+                          ? PATIENT_SECTIONS.filter((section) => section.id !== 'faktury' || held.has('billing.manage')).map((section) => {
+                              const to = sectionPath(patientId, section);
+                              return (
+                                <RailRow
+                                  key={section.id}
+                                  to={to}
+                                  label={section.label}
+                                  icon={section.icon}
+                                  active={location.pathname === to}
+                                  expanded
+                                  indent
+                                  onNavigate={closeMobile}
+                                />
+                              );
+                            })
+                          : kids.map((child) => (
+                              <RailRow
+                                key={child.path}
+                                to={child.path}
+                                label={child.text}
+                                icon={child.icon}
+                                active={isActivePath(child.path)}
+                                expanded
+                                indent
+                                onNavigate={closeMobile}
+                              />
+                            ))}
+                      </Box>
+                    </Collapse>
                   )}
                 </Box>
               );
-            });
-
-            if (isMore) {
-              return (
-                <Box key={gi} sx={{ mt: 1.5 }}>
-                  <ListItemButton onClick={toggleMore} sx={{ borderRadius: 2, minHeight: 36, px: 1.75, color: 'text.secondary' }}>
-                    <Typography variant="overline" sx={{ flex: 1 }}>Další</Typography>
-                    {moreOpen ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-                  </ListItemButton>
-                  <Collapse in={moreOpen} timeout="auto" unmountOnExit>
-                    {rows}
-                  </Collapse>
-                </Box>
-              );
-            }
-
-            return (
-              <Box key={gi} sx={{ mt: gi > 0 ? 1 : 0 }}>
-                {group.label && (
-                  <Typography variant="overline" sx={{ px: 1.75, pb: 0.5, display: 'block', color: 'text.secondary' }}>
-                    {group.label}
-                  </Typography>
-                )}
-                {rows}
-              </Box>
-            );
-          })}
-        </List>
-      </Box>
-
-      <Divider sx={{ my: 1.25 }} />
-
-      <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-        <ButtonBase
-          onClick={(e) => setAnchorEl(e.currentTarget)}
-          aria-label="Účet a vzhled"
-          sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1.25, borderRadius: 2, px: 1, py: 0.75, textAlign: 'left', minWidth: 0, '&:hover': { bgcolor: 'action.hover' } }}
-        >
-          <Avatar sx={{ width: 34, height: 34, bgcolor: 'primary.main', color: '#FFF', fontSize: 13 }}>
-            {user.firstName?.[0]}{user.lastName?.[0]}
-          </Avatar>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {[user.firstName, user.lastName].filter(Boolean).join(' ') || 'Účet'}
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {user.role || ''}
-            </Typography>
-          </Box>
-        </ButtonBase>
-        <IconButton size="small" title="Hledat (Ctrl+K)" aria-label="Hledat"
-          onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}>
-          <Search fontSize="small" />
-        </IconButton>
-        <NotificationCenter />
-      </Stack>
-
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'left' }} transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
-        <MenuItem onClick={() => { setAnchorEl(null); navigate('/settings'); }}>
-          <ListItemIcon><Settings fontSize="small" /></ListItemIcon> Nastavení
-        </MenuItem>
-        <Box sx={{ px: 2, py: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.75 }}>
-            Vzhled
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 0.75, mb: 1 }}>
-            {THEME_ACCENTS.map((a) => (
-              <Box
-                key={a.key}
-                role="button"
-                aria-label={a.label}
-                title={a.label}
-                onClick={() => setAccent(a.color)}
-                sx={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: '50%',
-                  cursor: 'pointer',
-                  bgcolor: a.color,
-                  outline: '2px solid',
-                  outlineColor: accent === a.color ? 'text.primary' : 'transparent',
-                  outlineOffset: 2,
-                }}
-              />
-            ))}
-          </Box>
-          <Button
-            size="small"
-            variant="outlined"
-            fullWidth
-            onClick={() => setMode(mode === 'light' ? 'dark' : 'light')}
-          >
-            {mode === 'light' ? 'Tmavý režim' : 'Světlý režim'}
-          </Button>
+            })}
+          </List>
         </Box>
-        <MenuItem onClick={handleLogout}>
-          <ListItemIcon><Logout fontSize="small" /></ListItemIcon> Odhlásit se
-        </MenuItem>
-      </Menu>
-    </Box>
+
+        {account}
+      </>
+    );
+  };
+
+  const accountMenu = (
+    <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
+      anchorOrigin={{ vertical: 'top', horizontal: 'left' }} transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
+      <MenuItem onClick={() => { setAnchorEl(null); navigate('/settings'); }}>
+        <ListItemIcon><Settings fontSize="small" /></ListItemIcon> Nastavení
+      </MenuItem>
+      <Box sx={{ px: 2, py: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.75 }}>
+          Vzhled
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 0.75, mb: 1 }}>
+          {THEME_ACCENTS.map((a) => (
+            <Box
+              key={a.key}
+              role="button"
+              aria-label={a.label}
+              title={a.label}
+              onClick={() => setAccent(a.color)}
+              sx={{
+                width: 22,
+                height: 22,
+                borderRadius: '50%',
+                cursor: 'pointer',
+                bgcolor: a.color,
+                outline: '2px solid',
+                outlineColor: accent === a.color ? 'text.primary' : 'transparent',
+                outlineOffset: 2,
+              }}
+            />
+          ))}
+        </Box>
+        <Button
+          size="small"
+          variant="outlined"
+          fullWidth
+          onClick={() => setMode(mode === 'light' ? 'dark' : 'light')}
+        >
+          {mode === 'light' ? 'Tmavý režim' : 'Světlý režim'}
+        </Button>
+      </Box>
+      <MenuItem onClick={handleLogout}>
+        <ListItemIcon><Logout fontSize="small" /></ListItemIcon> Odhlásit se
+      </MenuItem>
+    </Menu>
   );
 
   return (
+    <SettingsSearchContext.Provider value={settingsSearch}>
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <a href="#main-content" className="skip-link">
         Přeskočit na hlavní obsah
@@ -573,27 +682,17 @@ function Layout({ children }: { children: React.ReactNode }) {
             ModalProps={{ keepMounted: true }}
             sx={{ '& .MuiDrawer-paper': { width: SIDEBAR_WIDTH, boxSizing: 'border-box' } }}
           >
-            {sidebar}
+            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', px: 1, pt: 1.5, pb: 1.25 }}>
+              {railContent(true)}
+            </Box>
           </Drawer>
         </>
       ) : (
-        <Drawer
-          variant="permanent"
-          sx={{
-            width: SIDEBAR_WIDTH,
-            flexShrink: 0,
-            '& .MuiDrawer-paper': {
-              width: SIDEBAR_WIDTH,
-              boxSizing: 'border-box',
-              borderRight: '1px solid',
-              borderColor: 'divider',
-              bgcolor: 'background.paper',
-            },
-          }}
-        >
-          {sidebar}
-        </Drawer>
+        <Rail state={rail} label={settingsMode ? 'Nastavení' : 'Hlavní navigace'}>
+          {railContent(rail.expanded)}
+        </Rail>
       )}
+      {accountMenu}
 
       <Box component="main" id="main-content" role="main" aria-label="Hlavní obsah"
         sx={{
@@ -602,16 +701,20 @@ function Layout({ children }: { children: React.ReactNode }) {
           p: { xs: 2, md: 3 },
           pt: { xs: '72px', md: 3 },
           minHeight: '100vh',
+          /* The rail pushes the work area: this margin and the rail's width
+             move together, 180ms, and nothing is covered. */
+          ml: narrow ? 0 : `${rail.width}px`,
+          transition: `margin-left ${RAIL_MOTION}`,
         }}
       >
         <WhereAmI pathname={location.pathname} patientId={patientId} settingsHere={settingsHere} />
 
         {/*
-          * The way out of a settings screen is drawn by the screens themselves
-          * now (SettingsScreen in src/pages/settings/SettingsFrame.tsx: the
-          * board's settings nav + "Nastavení / Skupina / Stránka" breadcrumb).
-          * A settings destination that does not wear that frame yet still gets
-          * this one line back, so no screen is ever a dead end.
+          * The way out of a settings screen is the rail itself now ("Zpět do
+          * aplikace" and the settings nav), and a screen in the board's frame
+          * (SettingsScreen) draws its own breadcrumb. A settings destination
+          * that does not wear that frame yet still gets this one line, so no
+          * screen is ever a dead end.
           */}
         {settingsHere !== null && !SETTINGS_FRAMED.has(settingsHere.item.to) && (
           <Box sx={{ mb: 2 }}>
@@ -631,21 +734,20 @@ function Layout({ children }: { children: React.ReactNode }) {
           </Box>
         )}
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-          >
-            {children}
-          </motion.div>
-        </AnimatePresence>
+        {/*
+          * No page transition. The framer-motion fade that was here (0.18s out
+          * + 0.18s in, `mode="wait"`) cost 360ms on every click and remounted
+          * the whole page tree by keying it on the pathname - so a patient's
+          * layout was torn down between two of their own sections. Routes now
+          * render at once, and a nested layout stays mounted across its children.
+          */}
+        {children}
       </Box>
     </Box>
+    </SettingsSearchContext.Provider>
   );
 }
+
 
 export default function App() {
   const [accent, setAccentState] = useState<string>(readStoredAccent);
@@ -705,6 +807,8 @@ export default function App() {
                       <Route path="dokumenty" element={<PatientDocumentsPage />} />
                       <Route path="terminy" element={<PatientAppointmentsPage />} />
                       <Route path="historie" element={<PatientHistoryPage />} />
+                      <Route path="vysledky" element={<PatientResultsPage />} />
+                      <Route path="faktury" element={<RequirePermission of="billing.manage"><PatientInvoicesPage /></RequirePermission>} />
                     </Route>
                     <Route path="/diagnostics/new" element={<DiagnosticForm />} />
                     <Route path="/billing" element={<RequirePermission of="billing.manage"><BillingPage /></RequirePermission>} />
@@ -723,6 +827,7 @@ export default function App() {
                     <Route path="/nastaveni/souhlasy" element={<RequirePermission of="settings.clinic.manage"><ConsentSettingsPage /></RequirePermission>} />
                     <Route path="/training-load" element={<TrainingLoadPage />} />
                     <Route path="/wellness" element={<WellnessPage />} />
+                    <Route path="/statistiky" element={<StatisticsPage />} />
                     <Route path="/cashier" element={<RequirePermission of="billing.manage"><CashierPage /></RequirePermission>} />
                     <Route path="/clubs" element={<ClubsPage />} />
                     <Route path="/accounting-export" element={<RequirePermission of="billing.manage"><AccountingExportPage /></RequirePermission>} />

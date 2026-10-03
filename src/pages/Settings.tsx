@@ -1,28 +1,26 @@
 /*
- * Nastavení: the board's three-pane screen (design 19).
+ * Nastavení: the board's screen 19, with one sidebar.
  *
- * The application's sidebar on the left (App.tsx), the 240px settings nav
- * with its search and the catalogue's groups, and here in the content the
- * same catalogue as cards - one card per screen, one line under each saying
- * what is inside, grouped under the board's headings. Nothing is drawn twice
- * from two lists: the nav and the cards both read `catalogue.ts`, so what
- * one offers the other offers.
+ * On a settings route the shell's rail (App.tsx) becomes the settings nav -
+ * the search box and the catalogue's groups - and here in the content the
+ * same catalogue is drawn as cards: one card per screen, one line under each
+ * saying what is inside, grouped under the board's headings. Nothing is drawn
+ * twice from two lists: the rail and the cards both read `catalogue.ts`, so
+ * what one offers the other offers, and the rail's search narrows the cards.
  *
  * Last come the two things that belong to the person rather than to the
  * clinic - the look of their workspace and their own account - because two
  * receptionists sharing a desk each have their own, and share everything above.
  */
-import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Alert, Avatar, Box, Button, InputAdornment, Stack, TextField, Typography,
-  useMediaQuery, useTheme,
 } from '@mui/material';
 import {
   Logout, Lock, Check, LightMode, DarkMode, Search as SearchIcon,
 } from '@mui/icons-material';
 import { searchSections, visibleSections, type SettingsItem } from './settings/catalogue';
-import { SettingsNav } from './settings/SettingsFrame';
+import { useSettingsSearch } from '../components/shell/settingsSearch';
 import { PageHeader, SectionLabel, SoftCard } from '../components/ui';
 import { hasStoredPermissions, usePermissions } from '../auth/usePermission';
 import { signOut } from '../auth/signOut';
@@ -77,15 +75,15 @@ export default function Settings() {
    */
   const sections = visibleSections(usePermissions());
   const appearance = useThemePrefs();
-  const theme = useTheme();
-  const narrow = useMediaQuery(theme.breakpoints.down('md'));
 
   /*
-   * One search for the nav and the cards: it matches an item's label and
-   * description and its section's name, so nothing is a hunt. Empty query =
-   * the whole catalogue.
+   * One search for the rail and the cards: the shell shares the query with
+   * the rail's box when it is drawing one, and this screen draws the box
+   * itself only when the rail is not (a phone, or a test without the shell).
+   * It matches label, keywords, description and section, without regard to
+   * diacritics, so nothing is a hunt. Empty query = the whole catalogue.
    */
-  const [query, setQuery] = useState('');
+  const { query, setQuery, inRail } = useSettingsSearch();
   const q = query.trim();
   const filteredSections = searchSections(sections, query);
 
@@ -127,17 +125,15 @@ export default function Settings() {
 
   return (
     <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
-      {!narrow && <SettingsNav query={query} onQueryChange={setQuery} />}
-
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <PageHeader
           title="Nastavení"
           subtitle="Provoz, služby a ceny, kluby, komunikace a vše ostatní na jednom místě"
         />
 
-        {/* The nav carries the search on a wide screen; on a narrow one the
-            nav is gone and the search has to be here. */}
-        {narrow && searchField}
+        {/* The rail carries the search on a laptop; where it does not - a
+            phone's drawer, a test - the search has to be here. */}
+        {!inRail && searchField}
 
         {staleSession && (
           <Alert severity="info" sx={{ mb: 2.5 }}>
