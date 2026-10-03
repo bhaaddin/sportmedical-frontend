@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && npm run build:ssr && npm run prerender",
+    "build:client": "vite build",
+    "build:ssr": "vite build --ssr src/web/entry-server.tsx --outDir node_modules/.cache/sm-ssr --emptyOutDir",
+    "prerender": "node scripts/prerender.mjs",
     "typecheck": "tsc -b",
     "lint": "oxlint",
     "preview": "vite preview",
@@ -13,8 +16,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
+    "@emotion/server": "^11.11.0",
     "@emotion/styled": "^11.14.1",
+    "@fontsource/archivo": "^5.3.0",
     "@fontsource/inter": "^5.3.0",
     "@fontsource/public-sans": "^5.3.0",
     "@microsoft/signalr": "^10.0.11",

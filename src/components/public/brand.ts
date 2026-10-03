@@ -2,8 +2,8 @@
    THE PUBLIC SIDE'S IDENTITY
 
    Everything a patient sees — /objednat, /dotaznik, /rezervace, /portal, /klub,
-   /hodnoceni — wears the clinic's website: near-black header, white content,
-   Inter, one orange accent. The staff application wears the board's forest
+   /hodnoceni, and the prerendered site under /web — wears the clinic's website: near-black header, warm-white content,
+   Archivo + Public Sans (artboard V-Web2), one orange accent. The staff application wears the board's forest
    green and Public Sans; that is deliberately NOT this. The two must never be
    confused, so the public tokens live here, once, and every public page reads
    them rather than carrying its own copy.
@@ -12,30 +12,33 @@
 import { createTheme } from '@mui/material/styles';
 
 export const BRAND = {
-  ink: '#0B0B0C',
-  inkSoft: '#17171A',
-  accent: '#FF9D00',
-  accentDark: '#E08A00',
-  accentWash: 'rgba(255, 157, 0, 0.09)',
-  accentEdge: 'rgba(255, 157, 0, 0.32)',
-  page: '#F4F4F6',
+  ink: '#0E1013',
+  inkSoft: '#16191E',
+  accent: '#F0912E',
+  accentDark: '#D97F1C',
+  accentWash: 'rgba(240, 145, 46, 0.09)',
+  accentEdge: 'rgba(240, 145, 46, 0.32)',
+  page: '#FAF8F5',
   paper: '#FFFFFF',
-  line: '#E5E5E9',
-  lineStrong: 'rgba(17, 17, 17, 0.24)',
-  text: '#111111',
-  muted: 'rgba(17, 17, 17, 0.58)',
-  faint: 'rgba(17, 17, 17, 0.36)',
-  onInk: 'rgba(255,255,255,0.72)',
-  onInkLine: 'rgba(255,255,255,0.14)',
-  onInkWash: 'rgba(255,255,255,0.05)',
+  line: '#E6E1DA',
+  lineStrong: 'rgba(21, 22, 26, 0.24)',
+  text: '#15161A',
+  muted: 'rgba(21, 22, 26, 0.62)',
+  faint: 'rgba(21, 22, 26, 0.4)',
+  onInk: '#B9BFC7',
+  onInkLine: '#22262C',
+  onInkWash: 'rgba(255,255,255,0.06)',
   success: '#1F7A4D',
   successWash: '#E4F3EA',
   warn: '#8A5A2F',
   warnWash: '#FBF1E7',
-  shadow: '0 18px 50px rgba(11, 11, 12, 0.10)',
+  shadow: '0 18px 50px rgba(14, 16, 19, 0.10)',
 } as const;
 
 export const INTER = '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+/** The public site's faces (artboard V-Web2): Archivo for headings and numbers, Public Sans for text. */
+export const ARCHIVO = '"Archivo", "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+export const PUBLIC_SANS = '"Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
 /** The one MUI theme every public page renders under. */
 export const publicTheme = createTheme({
@@ -50,11 +53,13 @@ export const publicTheme = createTheme({
   },
   shape: { borderRadius: 12 },
   typography: {
-    fontFamily: INTER,
-    h3: { fontWeight: 800, letterSpacing: '-0.02em' },
-    h4: { fontWeight: 800, letterSpacing: '-0.02em' },
-    h5: { fontWeight: 800, letterSpacing: '-0.015em' },
-    h6: { fontWeight: 800, letterSpacing: '-0.01em' },
+    fontFamily: PUBLIC_SANS,
+    h1: { fontFamily: ARCHIVO, fontWeight: 800, letterSpacing: '-0.04em' },
+    h2: { fontFamily: ARCHIVO, fontWeight: 800, letterSpacing: '-0.035em' },
+    h3: { fontFamily: ARCHIVO, fontWeight: 800, letterSpacing: '-0.03em' },
+    h4: { fontFamily: ARCHIVO, fontWeight: 800, letterSpacing: '-0.02em' },
+    h5: { fontFamily: ARCHIVO, fontWeight: 800, letterSpacing: '-0.015em' },
+    h6: { fontFamily: ARCHIVO, fontWeight: 800, letterSpacing: '-0.01em' },
     button: { textTransform: 'none', fontWeight: 700 },
   },
   components: {
@@ -92,9 +97,11 @@ export const publicTheme = createTheme({
   },
 });
 
-/** "2 200 Kč", or null for a price the clinic has not set. */
+/** "2 200 Kč" (non-breaking spaces, Czech typography), or null for a price the clinic has not set. */
 export const czk = (value: number | null | undefined): string | null =>
-  typeof value === 'number' && Number.isFinite(value) ? `${value.toLocaleString('cs-CZ')} Kč` : null;
+  typeof value === 'number' && Number.isFinite(value)
+    ? `${value.toLocaleString('cs-CZ').replace(/\p{Zs}/gu, String.fromCharCode(0xa0))}${String.fromCharCode(0xa0)}Kč`
+    : null;
 
 /** A UTC instant as the clinic's clock reads it: "pondělí 26. října 10:00". */
 export const clinicMoment = (utc: string): string =>

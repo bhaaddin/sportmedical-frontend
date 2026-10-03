@@ -4,6 +4,26 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
+    { "source": "/web", "destination": "/web/index.html" },
+    { "source": "/web/sluzby", "destination": "/web/sluzby/index.html" },
+    { "source": "/web/prohlidky", "destination": "/web/prohlidky/index.html" },
+    { "source": "/web/diagnostika", "destination": "/web/diagnostika/index.html" },
+    { "source": "/web/inbody", "destination": "/web/inbody/index.html" },
+    { "source": "/web/cenik", "destination": "/web/cenik/index.html" },
+    { "source": "/web/dokumenty", "destination": "/web/dokumenty/index.html" },
+    { "source": "/web/kontakt", "destination": "/web/kontakt/index.html" },
+    { "source": "/web/o-nas", "destination": "/web/o-nas/index.html" },
+    { "source": "/web/kluby", "destination": "/web/kluby/index.html" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/web(/.*)?",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, s-maxage=300, stale-while-revalidate=86400" }]
+    }
   ]
 }
