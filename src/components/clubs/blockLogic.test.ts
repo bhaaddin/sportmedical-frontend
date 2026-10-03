@@ -4,6 +4,7 @@ import {
   blockFree, blockPercent, calculationSentence, clubColorOf, formatMinutes, formatPlayers, formatShortSpan,
   formatWeekdayDayMonth, hasBlockErrors, initialsOf, inkOn, parsePlayerCount, plural, validateBlockDraft,
 } from './blockLogic';
+import { coveredMinutes, moveToToday, nextDay, overlapErrors, sortRows, startsInPast, todayInPrague } from './blockLogic';
 import type { BlockDraft } from './blockLogic';
 
 const calc = (over: Partial<Calculation> = {}): Calculation => ({
@@ -110,5 +111,51 @@ describe('club colour', () => {
     expect(inkOn('nonsense')).toBe('#14181C');
     expect(initialsOf('FK Slaný')).toBe('FS');
     expect(initialsOf('Sparta')).toBe('SP');
+  });
+});
+
+describe('several ranges', () => {
+  it('finds today in Prague, not in the browser zone', () => {
+    expect(todayInPrague(new Date('2026-10-03T23:30:00Z'))).toBe('2026-10-04');
+    expect(todayInPrague(new Date('2026-10-04T10:00:00Z'))).toBe('2026-10-04');
+  });
+
+  it('steps to the next day across month and year ends', () => {
+    expect(nextDay('2026-10-31')).toBe('2026-11-01');
+    expect(nextDay('2026-12-31')).toBe('2027-01-01');
+    expect(nextDay('')).toBe('');
+  });
+
+  it('moves a past start to today and keeps a later end', () => {
+    expect(moveToToday({ fromDate: '2026-09-30', toDate: '2026-10-02' }, '2026-10-04')).toEqual({ fromDate: '2026-10-04', toDate: '2026-10-04' });
+    expect(moveToToday({ fromDate: '2026-09-30', toDate: '2026-10-09' }, '2026-10-04')).toEqual({ fromDate: '2026-10-04', toDate: '2026-10-09' });
+    expect(startsInPast({ fromDate: '2026-10-04' }, '2026-10-04')).toBe(false);
+    expect(startsInPast({ fromDate: '2026-10-03' }, '2026-10-04')).toBe(true);
+  });
+
+  it('flags overlapping and duplicate rows', () => {
+    const rows = [
+      { fromDate: '2026-10-26', toDate: '2026-10-28' },
+      { fromDate: '2026-10-28', toDate: '2026-10-30' },
+      { fromDate: '2026-11-02', toDate: '2026-11-03' },
+    ];
+    expect(overlapErrors(rows)).toEqual(['Tento termín se překrývá s řádkem 2', 'Tento termín se překrývá s řádkem 1', undefined]);
+    expect(overlapErrors([rows[2], rows[2]])).toEqual(['Tento termín se překrývá s řádkem 2', 'Tento termín se překrývá s řádkem 1']);
+  });
+
+  it('sorts by first day, rows without one last', () => {
+    expect(sortRows([{ fromDate: '2026-11-02' }, { fromDate: '' }, { fromDate: '2026-10-26' }]).map((r) => r.fromDate)).toEqual(['2026-10-26', '2026-11-02', '']);
+  });
+
+  it('sums open minutes inside each row, capped by its daily window', () => {
+    const rows = [
+      { fromDate: '2026-10-26', toDate: '2026-10-27', dailyFrom: '', dailyTo: '' },
+      { fromDate: '2026-11-02', toDate: '2026-11-02', dailyFrom: '08:00', dailyTo: '10:00' },
+    ];
+    const per = [
+      [{ date: '2026-10-26', openMinutes: 600 }, { date: '2026-10-27', openMinutes: 600 }, { date: '2026-10-28', openMinutes: 600 }],
+      [{ date: '2026-11-02', openMinutes: 600 }, { date: '2026-11-03', openMinutes: 600 }],
+    ];
+    expect(coveredMinutes(rows, (i) => per[i])).toBe(1200 + 120);
   });
 });

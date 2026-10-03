@@ -8,7 +8,7 @@
  * exist yet is created together with the block; and that an edit that would hit
  * registered athletes lists them and waits for a second, explicit confirmation.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -80,6 +80,9 @@ async function fillCalculatorInputs(user: ReturnType<typeof userEvent.setup>, pl
 }
 
 beforeEach(() => {
+  /* The fixtures use days in late October 2026: pin 'today' so they are never in the past. */
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-04T10:00:00+02:00'));
   setViewport(VIEWPORTS.desktop);
   calculate.mockReset().mockResolvedValue(calc());
   create.mockReset().mockResolvedValue(saved());
@@ -91,6 +94,8 @@ beforeEach(() => {
     { id: 'a-2', name: 'Spiroergometrie', durationMinutes: 45, clinicServiceId: 's-2', colorHex: '#3B6EA8', parallelCapacity: 1 },
   ]);
 });
+
+afterEach(() => vi.useRealTimers());
 
 describe('layouts', () => {
   it.each([

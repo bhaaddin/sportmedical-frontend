@@ -43,7 +43,7 @@ import { AsyncSection } from "../../components/booking/AsyncSection";
 import { AppointmentDetail } from "../../components/booking/AppointmentDetail";
 import { NewAppointmentDialog } from "../../components/booking/NewAppointmentDialog";
 import { CalendarFilters, GridSidebar, type GridView, type LegendService } from "../../components/booking/grid/GridSidebar";
-import { TimeGrid, type GridBookingRequest, type GridMoveRequest } from "../../components/booking/grid/TimeGrid";
+import { TimeGrid, toRequest, type GridBookingRequest, type GridMoveRequest } from "../../components/booking/grid/TimeGrid";
 import {
   closedHolidayDates,
   dayMark,
@@ -105,6 +105,10 @@ import {
 } from "../../components/booking/calendar/model";
 import { useCalendarCatalogue } from "../../components/booking/calendar/useCalendarCatalogue";
 import { useDayRange } from "../../components/booking/calendar/useDayRange";
+import { useMultiSelect } from "../../components/booking/calendar/useMultiSelect";
+import { MultiBlockDialog } from "../../components/booking/calendar/MultiBlockDialog";
+import { SelectionTray } from "../../components/booking/calendar/SelectionTray";
+import { clubRanges, clubStateForRanges } from "../../components/booking/calendar/multiSelect";
 import { SidebarPortal, useHasSidebarSlot } from "../../components/shell/SidebarSlot";
 import { PinnedActionBar } from "../../components/ui/PinnedActionBar";
 import { useDevice } from "../../layout/useDevice";
@@ -304,7 +308,21 @@ export default function CalendarGridPage() {
   const [clubPick, setClubPick] = useState<ClubBlockPick | null>(null);
   const [rangeBlock, setRangeBlock] = useState<{ from: string; to: string } | null>(null);
   const [moveProposal, setMoveProposal] = useState<GridMoveRequest | null>(null);
-  const rangeSelect = useDayRange();
+  /* Several different places at once: marked with Ctrl/⌘/Shift (or the touch toggle), acted on from the tray. */
+  const multi = useMultiSelect(pragueDateKey(now));
+  const rangeSelect = useDayRange(multi);
+  const [multiBlock, setMultiBlock] = useState(false);
+  /* Escape drops every marked place, wherever the focus is (a dialog keeps its own Escape). */
+  const multiCount = multi.items.length;
+  const clearMulti = multi.clear;
+  useEffect(() => {
+    if (multiCount === 0 || multiBlock) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") clearMulti();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [multiCount, multiBlock, clearMulti]);
 
   /*
    * 6.2 and the now-line: both are facts about the clock. The tick lands on
@@ -919,6 +937,7 @@ export default function CalendarGridPage() {
     if (event.key === "Escape") {
       setOpenId(null);
       rangeSelect.clear();
+      multi.clear();
       return;
     }
     if (event.key === "PageUp") {
@@ -1132,6 +1151,17 @@ export default function CalendarGridPage() {
               {CAL_TEXT.rangeMode}
             </Button>
           ) : null}
+          {/* Touch: every tap or long press adds one more place, until switched off. */}
+          {isTablet && canSelectRange ? (
+            <Button
+              variant={multi.touchMode ? "contained" : "outlined"}
+              aria-pressed={multi.touchMode}
+              onClick={() => multi.setTouchMode(!multi.touchMode)}
+              sx={{ minHeight: 44 }}
+            >
+              {CAL_TEXT.multiMode}
+            </Button>
+          ) : null}
           <Badge color="primary" badgeContent={calendarFilterCount} invisible={calendarFilterCount === 0}>
             <Button
               variant="outlined"
@@ -1331,6 +1361,7 @@ export default function CalendarGridPage() {
                   catalogue={catalogue}
                   device={isTablet ? "tablet" : "desktop"}
                   rangeSelect={rangeSelect}
+                  multi={multi}
                   onOpenClubBlock={setClubPick}
                   onMove={setMoveProposal}
                 />
@@ -1413,6 +1444,41 @@ export default function CalendarGridPage() {
         }}
         onClose={rangeSelect.clear}
       />
+
+      {/* Several marked places: the tray, and its block dialog. */}
+      <SelectionTray
+        items={multi.items}
+        today={todayKey}
+        phone={isPhone}
+        mayBook={mayBook}
+        mayBlock={mayBlock}
+        onRemove={multi.remove}
+        onClear={multi.clear}
+        onBook={() => {
+          const only = multi.items[0];
+          if (!only || only.kind !== "time") return;
+          multi.clear();
+          bookFromGrid(toRequest(only.calendarId, only.activityId, only.dayKey, only.range));
+        }}
+        onBlock={() => setMultiBlock(true)}
+        onClub={() => {
+          const ranges = clubRanges(multi.items, todayKey);
+          if (ranges.length === 0) return;
+          multi.clear();
+          navigate("/clubs", { state: clubStateForRanges(chosenCalendarIds, ranges) });
+        }}
+      />
+      {multiBlock ? (
+        <MultiBlockDialog
+          items={multi.items}
+          calendars={shown}
+          onClose={() => setMultiBlock(false)}
+          onDone={() => {
+            setMultiBlock(false);
+            multi.clear();
+          }}
+        />
+      ) : null}
 
       {rangeBlock ? (
         <RangeBlockDialog range={rangeBlock} calendars={shown} onClose={() => setRangeBlock(null)} />

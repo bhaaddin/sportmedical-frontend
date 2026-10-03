@@ -168,3 +168,101 @@ export function initialsOf(name: string): string {
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
+
+/* ── Several ranges in one booking ── */
+
+/** One row of "Termíny bloku": the days and the optional daily window. */
+export interface RangeRow {
+  /** Local key, never sent. */
+  key: string;
+  fromDate: string;
+  toDate: string;
+  dailyFrom: string;
+  dailyTo: string;
+}
+
+export type RowErrors = Partial<Record<'fromDate' | 'toDate' | 'dailyFrom' | 'dailyTo' | 'overlap' | 'past', string>>;
+
+/** Today's date in Prague, yyyy-MM-dd (the clinic's calendar day, whatever the browser's zone is). */
+export function todayInPrague(now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Prague', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+/** The day after a yyyy-MM-dd date; '' for anything else. */
+export function nextDay(date: string): string {
+  if (!DATE.test(date)) return '';
+  const [y, m, d] = date.split('-').map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + 1));
+  return next.toISOString().slice(0, 10);
+}
+
+/** Field errors of one row (dates and daily window); the same sentences as the single range had. */
+export function validateRow(row: Pick<RangeRow, 'fromDate' | 'toDate' | 'dailyFrom' | 'dailyTo'>): RowErrors {
+  const errors: RowErrors = {};
+  if (!DATE.test(row.fromDate)) errors.fromDate = 'Zadejte první den bloku.';
+  if (!DATE.test(row.toDate)) errors.toDate = 'Zadejte poslední den bloku.';
+  else if (DATE.test(row.fromDate) && row.toDate < row.fromDate) errors.toDate = 'Konec nesmí být před začátkem.';
+  const from = row.dailyFrom.trim();
+  const to = row.dailyTo.trim();
+  if ((from === '') !== (to === '')) errors.dailyFrom = 'Vyplňte obě hodiny denního okna, nebo žádnou.';
+  else if (from !== '') {
+    if (!TIME.test(from) || !TIME.test(to)) errors.dailyFrom = 'Čas zadejte jako HH:mm.';
+    else if (to <= from) errors.dailyTo = 'Okno musí končit později, než začíná.';
+  }
+  return errors;
+}
+
+/** True when the row starts before `today`. */
+export const startsInPast = (row: Pick<RangeRow, 'fromDate'>, today: string): boolean => DATE.test(row.fromDate) && row.fromDate < today;
+
+/** The row with its start moved to today (and its end too when that was earlier). */
+export function moveToToday<T extends Pick<RangeRow, 'fromDate' | 'toDate'>>(row: T, today: string): T {
+  return { ...row, fromDate: today, toDate: DATE.test(row.toDate) && row.toDate < today ? today : row.toDate };
+}
+
+/** Per row: the first other row it overlaps, as "Tento termín se překrývá s řádkem N" (N counts from 1). */
+export function overlapErrors(rows: readonly Pick<RangeRow, 'fromDate' | 'toDate'>[]): (string | undefined)[] {
+  const valid = (r: Pick<RangeRow, 'fromDate' | 'toDate'>) => DATE.test(r.fromDate) && DATE.test(r.toDate) && r.toDate >= r.fromDate;
+  return rows.map((a, i) => {
+    if (!valid(a)) return undefined;
+    const j = rows.findIndex((b, k) => k !== i && valid(b) && a.fromDate <= b.toDate && b.fromDate <= a.toDate);
+    return j === -1 ? undefined : `Tento termín se překrývá s řádkem ${j + 1}`;
+  });
+}
+
+/** Rows ordered by their first day (rows without a valid day keep their place at the end). */
+export function sortRows<T extends Pick<RangeRow, 'fromDate'>>(rows: readonly T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const av = DATE.test(a.fromDate);
+    const bv = DATE.test(b.fromDate);
+    if (av && bv) return a.fromDate < b.fromDate ? -1 : a.fromDate > b.fromDate ? 1 : 0;
+    return av === bv ? 0 : av ? -1 : 1;
+  });
+}
+
+const minutesOf = (hhmm: string): number => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+/**
+ * Open minutes the rows give together: per row, the `perDay` entries of that
+ * row's own calculation that fall inside its days, each capped by the row's
+ * daily window when it has one. `perDayOf(i)` is row i's answer (undefined = unknown yet).
+ */
+export function coveredMinutes(
+  rows: readonly Pick<RangeRow, 'fromDate' | 'toDate' | 'dailyFrom' | 'dailyTo'>[],
+  perDayOf: (index: number) => readonly { date: string; openMinutes: number }[] | undefined,
+): number {
+  let sum = 0;
+  rows.forEach((row, i) => {
+    if (!DATE.test(row.fromDate) || !DATE.test(row.toDate) || row.toDate < row.fromDate) return;
+    const window = row.dailyFrom.trim() !== '' && row.dailyTo.trim() !== '' && TIME.test(row.dailyFrom) && TIME.test(row.dailyTo) && row.dailyTo > row.dailyFrom
+      ? minutesOf(row.dailyTo) - minutesOf(row.dailyFrom)
+      : null;
+    for (const day of perDayOf(i) ?? []) {
+      if (day.date < row.fromDate || day.date > row.toDate) continue;
+      sum += window === null ? day.openMinutes : Math.min(day.openMinutes, window);
+    }
+  });
+  return sum;
+}

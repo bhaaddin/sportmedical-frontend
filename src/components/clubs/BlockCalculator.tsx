@@ -16,11 +16,12 @@
  */
 import { useEffect, useState } from 'react';
 import { Alert, Box, Button, Skeleton, Stack, Typography } from '@mui/material';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
 import { clubBlocksApi } from '../../api/clubBlocks';
 import type { Calculation } from '../../api/clubBlocks';
 import { SectionLabel, SoftCard } from '../ui';
-import { calculationSentence, formatMinutes, formatPlayers, formatWeekdayDayMonth } from './blockLogic';
+import { calculationSentence, coveredMinutes, formatMinutes, formatPlayers, formatWeekdayDayMonth } from './blockLogic';
+import type { RangeRow } from './blockLogic';
 
 function useDebounced<T>(value: T, ms: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -37,17 +38,23 @@ export function BlockCalculator({
   playerCount,
   activityIds,
   calendarIds,
-  fromDate,
+  ranges,
   onApply,
 }: {
   /** `null` while the headcount is empty or not a number. */
   playerCount: number | null;
   activityIds: string[];
   calendarIds: string[];
-  /** The first day typed so far; the suggestion starts there when it is set. */
-  fromDate: string;
+  /**
+   * The ranges of the whole booking. The suggestion starts at the first row's
+   * day; the open minutes of ALL rows are summed against the one need.
+   */
+  ranges: Pick<RangeRow, 'fromDate' | 'toDate' | 'dailyFrom' | 'dailyTo'>[];
+  /** Fills the FIRST row. */
   onApply: (from: string, to: string) => void;
 }) {
+  const isDate = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d);
+  const fromDate = ranges[0]?.fromDate ?? '';
   const ready = playerCount !== null && activityIds.length > 0 && calendarIds.length > 0;
 
   const input = useDebounced(
@@ -76,7 +83,38 @@ export function BlockCalculator({
     placeholderData: keepPreviousData,
   });
 
+  /* The other rows: one call each, with that row's own first day. */
+  const extraFroms = useDebounced(
+    [...new Set(ranges.slice(1).map((r) => r.fromDate).filter((d) => isDate(d) && d !== fromDate))].sort().join(','),
+    CALCULATOR_DEBOUNCE_MS,
+  );
+  const extraList = extraFroms === '' ? [] : extraFroms.split(',');
+  const extraQueries = useQueries({
+    queries: extraList.map((from) => ({
+      queryKey: ['club-block-calculation', { ...input, fromDate: from }],
+      queryFn: () =>
+        clubBlocksApi.calculate({
+          playerCount: input.playerCount as number,
+          activityIds: input.activityIds,
+          calendarIds: input.calendarIds,
+          fromDate: from,
+        }),
+      enabled: inputReady,
+      retry: false,
+      staleTime: 30_000,
+    })),
+  });
+
   const calc: Calculation | undefined = ready ? query.data : undefined;
+  const perDayByFrom = new Map<string, Calculation['perDay']>();
+  if (calc !== undefined) perDayByFrom.set(fromDate, calc.perDay);
+  extraList.forEach((from, i) => {
+    const data = extraQueries[i]?.data;
+    if (data !== undefined) perDayByFrom.set(from, data.perDay);
+  });
+  const validRows = ranges.filter((r) => isDate(r.fromDate) && isDate(r.toDate) && r.toDate >= r.fromDate);
+  const coverageReady = calc !== undefined && validRows.length > 0 && validRows.every((r) => perDayByFrom.has(r.fromDate));
+  const covered = coverageReady ? coveredMinutes(ranges, (i) => perDayByFrom.get(ranges[i].fromDate)) : 0;
   const typing = ready && JSON.stringify(input) !== JSON.stringify({
     playerCount,
     activityIds: [...activityIds].sort(),
@@ -126,6 +164,18 @@ export function BlockCalculator({
           {minimum !== null ? (
             <Alert severity="warning" role="status">
               Méně než minimum {formatPlayers(minimum)} — blok jde vytvořit, ale nemusí se vyplatit.
+            </Alert>
+          ) : null}
+
+          {coverageReady ? (
+            <Alert
+              severity={covered >= calc.neededMinutes ? 'success' : 'error'}
+              role="note"
+              data-testid="coverage"
+              data-state={covered >= calc.neededMinutes ? 'enough' : 'short'}
+            >
+              Vybrané termíny pojmou {formatMinutes(covered)} z potřebných {formatMinutes(calc.neededMinutes)}.
+              {covered >= calc.neededMinutes ? '' : ' Přidejte termín nebo prodlužte některý z nich — blok i tak jde vytvořit.'}
             </Alert>
           ) : null}
 

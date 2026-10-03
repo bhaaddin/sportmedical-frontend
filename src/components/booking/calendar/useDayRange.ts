@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { DateOnly } from "../../../utils/time";
 import { orderRange, type DayRange } from "./model";
+import type { MultiSelectApi } from "./useMultiSelect";
 
 /*
  * Picking a run of days by dragging across them (month and week), or - on a
@@ -31,7 +32,16 @@ export interface DayRangeApi {
   tapMode: boolean;
   setTapMode: (on: boolean) => void;
   /** Pointer pressed on a day. Touch presses wait for a long press first. */
-  begin: (day: DateOnly, event?: { pointerType?: string }) => void;
+  begin: (
+    day: DateOnly,
+    event?: { pointerType?: string; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean },
+  ) => void;
+  /** Taps pick days: "tap first, tap last" mode, or the several-places touch toggle. */
+  tapsSelect: boolean;
+  /** The day is part of a marked place (several-places selection); `past` ones are drawn muted. */
+  pickedState: (day: DateOnly) => "active" | "past" | null;
+  /** Whether a click on a day was a Ctrl/⌘/Shift press that added it (so it must not also navigate). */
+  isAdditive: (event?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) => boolean;
   /** The pointer is over another day while pressed. */
   enter: (day: DateOnly) => void;
   /** The pointer was let go. */
@@ -48,7 +58,7 @@ export interface DayRangeApi {
 
 const LONG_PRESS_MS = 380;
 
-export function useDayRange(): DayRangeApi {
+export function useDayRange(multi?: MultiSelectApi): DayRangeApi {
   const [anchor, setAnchor] = useState<DateOnly | null>(null);
   const [current, setCurrent] = useState<DateOnly | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -57,6 +67,10 @@ export function useDayRange(): DayRangeApi {
   const timer = useRef<number | undefined>(undefined);
   const draggingRef = useRef(false);
   const lastRef = useRef<DateOnly | null>(null);
+  const additiveRef = useRef(false);
+  const finishedAt = useRef(0);
+  const multiRef = useRef(multi);
+  multiRef.current = multi;
 
   const stopTimer = () => {
     if (timer.current !== undefined) {
@@ -65,7 +79,10 @@ export function useDayRange(): DayRangeApi {
     }
   };
 
-  const start = useCallback((day: DateOnly) => {
+  const start = useCallback((day: DateOnly, additive: boolean) => {
+    /* A plain drag starts over; an additive one keeps the places already marked. */
+    if (!additive) multiRef.current?.clear();
+    additiveRef.current = additive;
     draggingRef.current = true;
     lastRef.current = day;
     setDragging(true);
@@ -78,10 +95,11 @@ export function useDayRange(): DayRangeApi {
     (day, event) => {
       if (event?.pointerType === "touch" || event?.pointerType === "pen") {
         stopTimer();
-        timer.current = window.setTimeout(() => start(day), LONG_PRESS_MS);
+        const additive = multiRef.current?.isAdditive(event) ?? false;
+        timer.current = window.setTimeout(() => start(day, additive), LONG_PRESS_MS);
         return;
       }
-      start(day);
+      start(day, multiRef.current?.isAdditive(event) ?? false);
     },
     [start],
   );
@@ -110,6 +128,14 @@ export function useDayRange(): DayRangeApi {
       setDragging(false);
       const a = anchor;
       const c = lastRef.current ?? current;
+      if (additiveRef.current && a !== null && c !== null && multiRef.current) {
+        const { from, to } = orderRange(a, c);
+        multiRef.current.add({ kind: "days", from, to });
+        finishedAt.current = Date.now();
+        setAnchor(null);
+        setCurrent(null);
+        return;
+      }
       if (a === null || c === null || a === c) {
         setAnchor(null);
         setCurrent(null);
@@ -124,7 +150,15 @@ export function useDayRange(): DayRangeApi {
 
   const tap = useCallback<DayRangeApi["tap"]>(
     (day, point) => {
-      if (!tapMode) return false;
+      const m = multiRef.current;
+      /* The click that follows the end of a long-press drag is not a tap of its own. */
+      if (Date.now() - finishedAt.current < 400) return m?.touchMode ?? false;
+      if (!tapMode) {
+        /* The several-places toggle without "tap first, tap last": a tap marks that one day. */
+        if (!m?.touchMode) return false;
+        m.add({ kind: "days", from: day, to: day });
+        return true;
+      }
       if (anchor === null || chosen !== null) {
         setChosen(null);
         setAnchor(day);
@@ -132,6 +166,12 @@ export function useDayRange(): DayRangeApi {
         return true;
       }
       if (anchor === day) {
+        setAnchor(null);
+        setCurrent(null);
+        return true;
+      }
+      if (m?.touchMode) {
+        m.add({ kind: "days", ...orderRange(anchor, day) });
         setAnchor(null);
         setCurrent(null);
         return true;
@@ -150,7 +190,12 @@ export function useDayRange(): DayRangeApi {
       ? orderRange(anchor, current)
       : null;
 
-  return { highlight, chosen, tapMode, setTapMode, begin, enter, finish, cancelPress, tap, clear, dragging };
+  const tapsSelect = tapMode || (multi?.touchMode ?? false);
+  const pickedState = (day: DateOnly) => multi?.dayState(day) ?? null;
+  const isAdditive = (event?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) =>
+    multi?.isAdditive(event) ?? false;
+
+  return { highlight, chosen, tapMode, tapsSelect, pickedState, isAdditive, setTapMode, begin, enter, finish, cancelPress, tap, clear, dragging };
 }
 
 /**

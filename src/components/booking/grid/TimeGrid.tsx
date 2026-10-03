@@ -49,6 +49,8 @@ import {
 } from "../calendar/model";
 import { SelectionPopover } from "../calendar/SelectionPopover";
 import { useDayRangeSurface, type DayRangeApi } from "../calendar/useDayRange";
+import type { MultiSelectApi } from "../calendar/useMultiSelect";
+import type { PickedTime } from "../calendar/multiSelect";
 
 /*
  * The day and week grid - contract 5.1, drawn to the board of 3. 10. 2026
@@ -166,6 +168,8 @@ export interface TimeGridProps {
   device?: "tablet" | "desktop";
   /** Dragging across day headers (week) picks a run of days; the page owns the popover. */
   rangeSelect?: DayRangeApi;
+  /** Several places at once: a Ctrl/⌘/Shift drag (or the touch toggle) adds to it instead of replacing. */
+  multi?: MultiSelectApi;
   /** A click on a club's block: the page opens its popover. */
   onOpenClubBlock?: (pick: ClubBlockPick) => void;
   /** Drag a booking to another time of its own calendar (mouse); the page confirms and moves it. */
@@ -174,7 +178,7 @@ export interface TimeGridProps {
 
 const OPEN_MARK: DayMark = { redNumber: false, closed: false, label: null, detail: null };
 
-function toRequest(
+export function toRequest(
   calendarId: string,
   activityId: string | null,
   dayKey: DateOnly,
@@ -214,6 +218,7 @@ export function TimeGrid(props: TimeGridProps) {
     catalogue = EMPTY_CATALOGUE,
     device = "desktop",
     rangeSelect,
+    multi,
   } = props;
   const light = theme.palette.mode === "light";
 
@@ -322,6 +327,25 @@ export function TimeGrid(props: TimeGridProps) {
   const scrollByColumn = (direction: -1 | 1) =>
     scrollRef.current?.scrollBy({ left: direction * dayMin, behavior: "smooth" });
 
+  /* A drag or tap ended: it is the one selection (popover), or - Ctrl/⌘/Shift or the touch
+     toggle - one more place in the tray. */
+  const handleSelect = (selection: Selection, additive: boolean) => {
+    if (multi && (additive || multi.touchMode)) {
+      setPending(null);
+      multi.add({
+        kind: "time",
+        columnKey: selection.columnKey,
+        calendarId: selection.calendarId,
+        activityId: selection.activityId,
+        dayKey: selection.dayKey,
+        range: selection.range,
+      });
+      return;
+    }
+    multi?.clear();
+    setPending(selection);
+  };
+
   const choose = (action: "book" | "block" | "club") => {
     if (!pending) return;
     const request = toRequest(pending.calendarId, pending.activityId, pending.dayKey, pending.range);
@@ -428,7 +452,9 @@ export function TimeGrid(props: TimeGridProps) {
               const holiday = mark.label === GRID_TEXT.publicHoliday;
               const chip = headerChip(mark);
               const dateRow = view === "week" || mark.label !== null || mark.redNumber;
-              const picked = inRange(dayKey, highlight);
+              const pickedNow = rangeSelect?.pickedState(dayKey) ?? null;
+              const picked = inRange(dayKey, highlight) || pickedNow === "active";
+              const pickedPast = !picked && pickedNow === "past";
               const weekendShut = mark.closed && !holiday;
               return (
                 <Box
@@ -440,7 +466,9 @@ export function TimeGrid(props: TimeGridProps) {
                     borderColor: "divider",
                     bgcolor: picked
                       ? DESIGN.selection.bg
-                      : holiday
+                      : pickedPast
+                        ? alpha(DESIGN.selection.bg, 0.4)
+                        : holiday
                         ? alpha(holidayColor, 0.1)
                         : today && view === "week"
                           ? alpha(theme.palette.text.primary, 0.05)
@@ -463,11 +491,12 @@ export function TimeGrid(props: TimeGridProps) {
                       onPointerCancel={() => rangeSelect?.cancelPress()}
                       onClick={(event) => {
                         if (rangeEnabled && rangeSelect) {
-                          if (rangeSelect.tapMode) {
+                          if (rangeSelect.tapsSelect) {
                             rangeSelect.tap(dayKey, { x: event.clientX, y: event.clientY });
                             return;
                           }
                           if (rangeSelect.chosen) return;
+                          if (rangeSelect.isAdditive(event)) return;
                         }
                         props.onPickDay(dayKey);
                       }}
@@ -752,7 +781,11 @@ export function TimeGrid(props: TimeGridProps) {
                               ? pending.range
                               : null
                           }
-                          onSelect={setPending}
+                          picked={(multi?.items ?? []).filter(
+                            (i): i is PickedTime => i.kind === "time" && i.columnKey === spec.key && i.dayKey === dayKey,
+                          )}
+                          pickedPast={dayKey < todayKey}
+                          onSelect={handleSelect}
                           onOpen={props.onOpen}
                           onOpenBlock={(block) => setOpenBlock({ calendar, block })}
                           onOpenClubBlock={props.onOpenClubBlock}
@@ -1056,6 +1089,9 @@ function Legend({ holidayColor, nowLineColor }: { holidayColor: string; nowLineC
   );
 }
 
+const additiveKey = (event: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) =>
+  event.ctrlKey || event.metaKey || event.shiftKey;
+
 function SubColumn({
   spec,
   calendar,
@@ -1074,6 +1110,8 @@ function SubColumn({
   gridStep,
   now,
   pending,
+  picked,
+  pickedPast,
   onSelect,
   onOpen,
   onOpenBlock,
@@ -1106,7 +1144,11 @@ function SubColumn({
   gridStep: number;
   now: Date;
   pending: MinuteRange | null;
-  onSelect: (selection: Selection) => void;
+  /** The places marked for the tray that fall in this column and day. */
+  picked: PickedTime[];
+  /** The day is before today: the marks are drawn muted. */
+  pickedPast: boolean;
+  onSelect: (selection: Selection, additive: boolean) => void;
   onOpen: (id: string) => void;
   onOpenBlock: (block: TimeBlock) => void;
   onOpenClubBlock?: (pick: ClubBlockPick) => void;
@@ -1190,16 +1232,19 @@ function SubColumn({
       ? `, repeating-linear-gradient(to bottom, transparent 0, transparent ${gridStep * pxPerMinute - 1}px, ${alpha(theme.palette.divider, 0.6)} ${gridStep * pxPerMinute - 1}px, ${alpha(theme.palette.divider, 0.6)} ${gridStep * pxPerMinute}px)`
       : "";
 
-  const select = (range: MinuteRange, x: number, y: number) =>
-    onSelect({
-      columnKey: spec.key,
-      calendarId: calendar.id,
-      activityId: spec.activityId,
-      dayKey,
-      range,
-      x,
-      y,
-    });
+  const select = (range: MinuteRange, x: number, y: number, additive = false) =>
+    onSelect(
+      {
+        columnKey: spec.key,
+        calendarId: calendar.id,
+        activityId: spec.activityId,
+        dayKey,
+        range,
+        x,
+        y,
+      },
+      additive,
+    );
 
   /* Moving a booking by dragging it: only within its own calendar and činnost, only while it is still open. */
   const mayDropHere =
@@ -1283,14 +1328,14 @@ function SubColumn({
           window.clearTimeout(press.timer);
           if (!press.dragging) {
             /* A tap on a free slot: that one slot is the selection. */
-            select(dragRange(press.minute, press.minute, step, bounds), event.clientX, event.clientY);
+            select(dragRange(press.minute, press.minute, step, bounds), event.clientX, event.clientY, additiveKey(event));
             return;
           }
         }
         if (!drag) return;
         const range = dragRange(drag.anchor, minuteOf(event), step, bounds);
         setDrag(null);
-        select(range, event.clientX, event.clientY);
+        select(range, event.clientX, event.clientY, additiveKey(event));
       }}
       onPointerCancel={() => {
         if (touch.current) window.clearTimeout(touch.current.timer);
@@ -1648,6 +1693,46 @@ function SubColumn({
           </Typography>
         </Box>
       ) : null}
+
+      {picked.map((item) => (
+        <Box
+          key={item.id}
+          data-testid="picked-range"
+          data-past={pickedPast ? "true" : undefined}
+          sx={{
+            position: "absolute",
+            left: 4,
+            right: 4,
+            ...place(item.range),
+            zIndex: 3,
+            pointerEvents: "none",
+            border: `2px ${pickedPast ? "dashed" : "solid"} ${DESIGN.selection.line}`,
+            borderRadius: `${DESIGN.radius.md}px`,
+            backgroundColor: DESIGN.selection.bg,
+            opacity: pickedPast ? 0.45 : 1,
+          }}
+        >
+          <Typography
+            sx={{
+              position: "absolute",
+              top: -13,
+              left: -2,
+              px: 1.1,
+              py: "3px",
+              fontSize: 11,
+              fontWeight: 700,
+              lineHeight: 1.3,
+              borderRadius: "6px",
+              backgroundColor: DESIGN.selection.line,
+              color: "#FFFFFF",
+              whiteSpace: "nowrap",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {selectionLabel(item.range)}
+          </Typography>
+        </Box>
+      ))}
 
       {liveRange ? (
         <Box

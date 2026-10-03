@@ -163,7 +163,9 @@ export function MonthView(props: MonthViewProps) {
           const today = dayKey === todayKey;
           const firstOfMonth = dayKey.slice(8, 10) === "01";
           const lastRow = index >= days.length - 7;
-          const picked = inRange(dayKey, highlight);
+          const pickedNow = rangeSelect.pickedState(dayKey);
+          const picked = inRange(dayKey, highlight) || pickedNow === "active";
+          const pickedPast = !picked && pickedNow === "past";
           const clubBlocks = props.clubBlocksByDay.get(dayKey) ?? [];
           const column = index % 7;
           const showPanel = hoverDay === dayKey && !rangeSelect.dragging && (counts.total > 0 || holiday);
@@ -172,7 +174,7 @@ export function MonthView(props: MonthViewProps) {
               key={dayKey}
               data-testid={`month-day-${dayKey}`}
               data-range-day={dayKey}
-              data-picked={picked ? "true" : undefined}
+              data-picked={picked ? "true" : pickedPast ? "past" : undefined}
               tabIndex={0}
               onPointerDown={(event: React.PointerEvent<HTMLElement>) => {
                 pointerType.current = event.pointerType || "mouse";
@@ -199,7 +201,7 @@ export function MonthView(props: MonthViewProps) {
               onClick={(event: React.MouseEvent<HTMLElement>) => {
                 const target = event.target as HTMLElement;
                 if (target.closest("[data-grid-item], a")) return;
-                if (canSelectRange && rangeSelect.tapMode) {
+                if (canSelectRange && rangeSelect.tapsSelect) {
                   rangeSelect.tap(dayKey, { x: event.clientX, y: event.clientY });
                   return;
                 }
@@ -224,7 +226,9 @@ export function MonthView(props: MonthViewProps) {
                 WebkitTouchCallout: "none",
                 bgcolor: picked
                   ? DESIGN.selection.bg
-                  : holiday
+                  : pickedPast
+                    ? alpha(DESIGN.selection.bg, 0.4)
+                    : holiday
                     ? mixOver(holidayColor, paper, 0.28)
                     : mark.closed
                       ? alpha(theme.palette.text.primary, 0.035)
@@ -236,7 +240,9 @@ export function MonthView(props: MonthViewProps) {
                 boxShadow:
                   picked
                     ? `inset 0 0 0 1px ${DESIGN.selection.line}`
-                    : lit === "day"
+                    : pickedPast
+                      ? `inset 0 0 0 1px ${alpha(DESIGN.selection.line, 0.4)}`
+                      : lit === "day"
                       ? `inset 0 0 0 2px ${theme.palette.primary.main}`
                       : "none",
                 zIndex: showPanel ? 30 : picked ? 2 : 0,
@@ -271,11 +277,13 @@ export function MonthView(props: MonthViewProps) {
                 <ButtonBase
                   onClick={(event) => {
                     event.stopPropagation();
-                    if (canSelectRange && rangeSelect.tapMode) {
+                    if (canSelectRange && rangeSelect.tapsSelect) {
                       rangeSelect.tap(dayKey, { x: event.clientX, y: event.clientY });
                       return;
                     }
                     if (rangeSelect.chosen) return;
+                    /* Ctrl/⌘/Shift adds the day to the places marked; it does not open it. */
+                    if (canSelectRange && rangeSelect.isAdditive(event)) return;
                     props.onPickDay(dayKey);
                   }}
                   aria-label={formatDateOnly(dayKey)}

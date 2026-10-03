@@ -17,23 +17,29 @@
  * a club that does not exist yet - then the "Nový klub" fields are open and
  * filled, and the club is created together with the block.
  *
+ * Several different ranges can be booked in one step ("Termíny bloku"): every row
+ * becomes its own block, created one after another. A failure stops the run at
+ * that row, keeps the blocks already made and lets the operator fix it and press
+ * the button again - only the missing rows are sent.
+ *
  * Editing changes only what `PUT` accepts (days, headcount, note, daily
  * window); the club, the calendars and the činnosti are shown and locked.
  * A change that would hit registered athletes comes back `409`; the dialog
  * lists them and the operator confirms once more.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Alert, Autocomplete, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle,
   FormControlLabel, IconButton, Stack, TextField, Typography,
 } from '@mui/material';
-import { Close } from '@mui/icons-material';
+import { Close, ContentCopy, DeleteOutlined } from '@mui/icons-material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { calendarsApi } from '../../api/calendars';
 import { clubsApi } from '../../api/clubs';
 import type { Club } from '../../api/clubs';
-import { clubBlocksApi, ClubBlockError, fetchBlockableActivities } from '../../api/clubBlocks';
+import { clubBlocksApi, ClubBlockError, fetchBlockableActivities, toClubBlockError } from '../../api/clubBlocks';
+import { clubRegistrationLink } from '../../api/publicClub';
 import type { ClubBlockConflict, ClubBlockView } from '../../api/clubBlocks';
 import { useDevice } from '../../layout/useDevice';
 import { EMPTY_PAYER, isValidIco, toPayerRequest } from '../../pages/clubs/payerForm';
@@ -41,9 +47,10 @@ import { DESIGN, SectionLabel, SoftCard } from '../ui';
 import { BlockCalculator } from './BlockCalculator';
 import { ConflictList } from './ConflictList';
 import {
-  blockRange, clubColorOf, formatPlayers, hasBlockErrors, inkOn, parsePlayerCount, validateBlockDraft,
+  blockRange, clubColorOf, formatPlayers, formatShortSpan, hasBlockErrors, inkOn, nextDay, overlapErrors, parsePlayerCount,
+  moveToToday, sortRows, startsInPast, todayInPrague, validateBlockDraft, validateRow,
 } from './blockLogic';
-import type { BlockDraft, BlockErrors } from './blockLogic';
+import type { BlockDraft, BlockErrors, RangeRow, RowErrors } from './blockLogic';
 
 /** What `/clubs` `state.newBlock` may carry. Every field is optional. */
 export interface NewBlockPrefill {
@@ -62,7 +69,40 @@ export interface NewBlockPrefill {
   toDate?: string;
   dailyFrom?: string;
   dailyTo?: string;
+  /**
+   * Several separate ranges for one club. When present (and not empty) it wins
+   * over the single `fromDate` / `toDate` / `dailyFrom` / `dailyTo` above.
+   */
+  ranges?: { fromDate: string; toDate: string; dailyFrom?: string; dailyTo?: string }[];
 }
+
+let rowSeq = 0;
+const newRowKey = (): string => `row-${++rowSeq}`;
+
+function initialRows(block: ClubBlockView | null, prefill: NewBlockPrefill | null | undefined): RangeRow[] {
+  if (block !== null) {
+    return [{ key: newRowKey(), fromDate: block.fromDate, toDate: block.toDate, dailyFrom: block.dailyFrom ?? '', dailyTo: block.dailyTo ?? '' }];
+  }
+  if (Array.isArray(prefill?.ranges) && prefill.ranges.length > 0) {
+    return prefill.ranges.map((r) => ({
+      key: newRowKey(), fromDate: r?.fromDate ?? '', toDate: r?.toDate ?? '', dailyFrom: r?.dailyFrom ?? '', dailyTo: r?.dailyTo ?? '',
+    }));
+  }
+  return [{ key: newRowKey(), fromDate: prefill?.fromDate ?? '', toDate: prefill?.toDate ?? '', dailyFrom: prefill?.dailyFrom ?? '', dailyTo: prefill?.dailyTo ?? '' }];
+}
+
+/** A block of the run failed: which row, and what the server said. */
+class RowFailure extends Error {
+  readonly rowKey: string;
+  readonly reason: ClubBlockError;
+  constructor(rowKey: string, reason: ClubBlockError) {
+    super(reason.message);
+    this.rowKey = rowKey;
+    this.reason = reason;
+  }
+}
+
+const PAST_MESSAGE = 'Termín začíná v minulosti';
 
 /** True when a router state's `newBlock` is a usable object. */
 export function isNewBlockPrefill(value: unknown): value is NewBlockPrefill {
@@ -149,13 +189,20 @@ export function ClubBlockDialog({
     name: block?.name ?? '',
     calendarIds: block?.calendarIds ?? prefill?.calendarIds ?? [],
     activityIds: block?.activityIds ?? [],
-    fromDate: block?.fromDate ?? prefill?.fromDate ?? '',
-    toDate: block?.toDate ?? prefill?.toDate ?? '',
-    dailyFrom: block?.dailyFrom ?? prefill?.dailyFrom ?? '',
-    dailyTo: block?.dailyTo ?? prefill?.dailyTo ?? '',
+    /* The days live in `rows`; these stay empty. */
+    fromDate: '',
+    toDate: '',
+    dailyFrom: '',
+    dailyTo: '',
     playerCount: block !== null ? String(block.playerCount) : headcountHint,
     note: block?.note ?? '',
   });
+  const [rows, setRows] = useState<RangeRow[]>(() => initialRows(block, prefill));
+  /* Blocks of this run that exist already, by row key - a retry never sends them again. */
+  const [created, setCreated] = useState<Record<string, ClubBlockView>>({});
+  const createdRef = useRef<Record<string, ClubBlockView>>({});
+  const [rowFailures, setRowFailures] = useState<Record<string, string>>({});
+  const [results, setResults] = useState<ClubBlockView[] | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const [failure, setFailure] = useState<ClubBlockError | null>(null);
   const [conflicts, setConflicts] = useState<{ message: string; list: ClubBlockConflict[] } | null>(null);
@@ -198,22 +245,58 @@ export function ClubBlockDialog({
     clubMode === 'new' && createdClub === null
       ? newClub.name.trim() !== ''
       : (createdClub?.id ?? clubId) !== '';
-  const errors: BlockErrors = validateBlockDraft({ ...draft, clubId: createdClub?.id ?? clubId }, clubReady, editing);
+  /* The days are checked per row; the rest of the draft gets a day that always passes. */
+  const errors: BlockErrors = validateBlockDraft(
+    { ...draft, clubId: createdClub?.id ?? clubId, fromDate: '2000-01-01', toDate: '2000-01-01', dailyFrom: '', dailyTo: '' },
+    clubReady,
+    editing,
+  );
+  const today = todayInPrague();
+  const overlaps = overlapErrors(rows);
+  const rowErrors: RowErrors[] = rows.map((row, i) => {
+    if (created[row.key] !== undefined) return {};
+    return {
+      ...validateRow(row),
+      overlap: overlaps[i],
+      past: !editing && startsInPast(row, today) ? PAST_MESSAGE : undefined,
+    };
+  });
+  const hasPast = rowErrors.some((e) => e.past !== undefined);
+  const hasRowErrors = rowErrors.some((e) => Object.values(e).some((v) => v !== undefined));
+  const pendingCount = rows.filter((r) => created[r.key] === undefined).length;
+
+  const changeRow = (key: string, patch: Partial<RangeRow>) => {
+    setRows((list) => list.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+    setRowFailures((f) => {
+      if (f[key] === undefined) return f;
+      const { [key]: _gone, ...rest } = f;
+      return rest;
+    });
+    setConflicts(null);
+  };
+  const addRow = () =>
+    setRows((list) => [...list, { key: newRowKey(), fromDate: nextDay(list[list.length - 1]?.toDate ?? ''), toDate: '', dailyFrom: '', dailyTo: '' }]);
+  const removeRow = (key: string) => setRows((list) => (list.length > 1 ? list.filter((r) => r.key !== key) : list));
   const playerCount = parsePlayerCount(draft.playerCount);
 
   const save = useMutation({
-    mutationFn: async (confirmed: boolean): Promise<ClubBlockView> => {
+    mutationFn: async ({ confirmed, send }: { confirmed: boolean; send: RangeRow[] }): Promise<ClubBlockView[]> => {
       const count = playerCount as number;
-      const dailyFrom = draft.dailyFrom.trim() === '' ? null : draft.dailyFrom.trim();
-      const dailyTo = draft.dailyTo.trim() === '' ? null : draft.dailyTo.trim();
+      const windowOf = (row: RangeRow) => ({
+        dailyFrom: row.dailyFrom.trim() === '' ? null : row.dailyFrom.trim(),
+        dailyTo: row.dailyTo.trim() === '' ? null : row.dailyTo.trim(),
+      });
       const note = draft.note.trim() === '' ? null : draft.note.trim();
 
       if (block !== null) {
-        return clubBlocksApi.update(
-          block.id,
-          { fromDate: draft.fromDate, toDate: draft.toDate, playerCount: count, note, dailyFrom, dailyTo },
-          { cancelAthletes: confirmed },
-        );
+        const only = send[0];
+        return [
+          await clubBlocksApi.update(
+            block.id,
+            { fromDate: only.fromDate, toDate: only.toDate, playerCount: count, note, ...windowOf(only) },
+            { cancelAthletes: confirmed },
+          ),
+        ];
       }
 
       let targetClubId = createdClub?.id ?? clubId;
@@ -231,28 +314,55 @@ export function ClubBlockDialog({
         setCreatedClub(created);
         targetClubId = created.id;
       }
-      return clubBlocksApi.create({
-        clubId: targetClubId,
-        name: draft.name.trim() === '' ? null : draft.name.trim(),
-        calendarIds: draft.calendarIds,
-        activityIds: draft.activityIds,
-        fromDate: draft.fromDate,
-        toDate: draft.toDate,
-        dailyFrom,
-        dailyTo,
-        playerCount: count,
-        note,
-      });
+      /* One block per row, in order; stop at the first refusal. Rows made already are skipped. */
+      for (const row of send) {
+        if (createdRef.current[row.key] !== undefined) continue;
+        try {
+          const made = await clubBlocksApi.create({
+            clubId: targetClubId,
+            name: draft.name.trim() === '' ? null : draft.name.trim(),
+            calendarIds: draft.calendarIds,
+            activityIds: draft.activityIds,
+            fromDate: row.fromDate,
+            toDate: row.toDate,
+            ...windowOf(row),
+            playerCount: count,
+            note,
+          });
+          createdRef.current = { ...createdRef.current, [row.key]: made };
+          setCreated(createdRef.current);
+        } catch (error) {
+          throw new RowFailure(row.key, toClubBlockError(error));
+        }
+      }
+      return send.map((row) => createdRef.current[row.key]);
     },
-    onSuccess: (saved) => {
-      toast.success(editing ? 'Blok uložen' : 'Blok vytvořen');
+    onSuccess: (saved, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['clubs'] });
       void queryClient.invalidateQueries({ queryKey: ['club-blocks'] });
       void queryClient.invalidateQueries({ queryKey: ['blocks'] });
-      onSaved?.(saved);
-      onClose();
+      if (editing || variables.send.length === 1) {
+        toast.success(editing ? 'Blok uložen' : 'Blok vytvořen');
+        onSaved?.(saved[0]);
+        onClose();
+        return;
+      }
+      toast.success(`Vytvořeno ${saved.length} bloků`);
+      setResults(saved);
     },
     onError: (error) => {
+      if (Object.keys(createdRef.current).length > 0) {
+        void queryClient.invalidateQueries({ queryKey: ['club-blocks'] });
+        void queryClient.invalidateQueries({ queryKey: ['blocks'] });
+      }
+      if (error instanceof RowFailure) {
+        const e = error.reason;
+        const extra = Object.values(e.fields).length > 0 ? ` ${Object.values(e.fields).join(' ')}` : '';
+        setRowFailures((f) => ({ ...f, [error.rowKey]: `${e.message}${extra}` }));
+        setConflicts(e.conflicts.length > 0 ? { message: e.message, list: e.conflicts } : null);
+        setFailure(null);
+        return;
+      }
       const e =
         error instanceof ClubBlockError
           ? error
@@ -273,14 +383,25 @@ export function ClubBlockDialog({
   const submit = () => {
     setShowErrors(true);
     setFailure(null);
-    let ok = !hasBlockErrors(errors);
+    setRowFailures({});
+    let ok = !hasBlockErrors(errors) && !hasRowErrors;
     if (!editing && clubMode === 'new' && createdClub === null) {
       const found = validateNewClub(newClub);
       setNewClubErrors(found);
       if (Object.keys(found).length > 0) ok = false;
     }
     if (!ok) return;
-    save.mutate(conflicts !== null && editing);
+    /* Earliest first - the order the blocks are made in and the result lists them in. */
+    const send = editing ? rows : sortRows(rows);
+    setRows(send);
+    save.mutate({ confirmed: conflicts !== null && editing, send });
+  };
+
+  /** Closing after some blocks were made (a partial run or the result screen): hand the first one back. */
+  const finish = () => {
+    const made = rows.map((r) => created[r.key]).filter((b): b is ClubBlockView => b !== undefined);
+    if (made.length > 0) onSaved?.(made[0]);
+    onClose();
   };
 
   const confirming = editing && conflicts !== null;
@@ -414,6 +535,42 @@ export function ClubBlockDialog({
     </>
   );
 
+  const termsSection = (
+    <Box data-testid="block-terms">
+      <SectionLabel>{editing ? 'Termín bloku' : 'Termíny bloku'}</SectionLabel>
+      <Stack spacing={1.5}>
+        {rows.map((row, i) => (
+          <RangeRowEditor
+            key={row.key}
+            index={i}
+            total={rows.length}
+            row={row}
+            errors={rowErrors[i]}
+            showErrors={showErrors}
+            made={created[row.key] ?? null}
+            failure={rowFailures[row.key] ?? null}
+            fieldSize={fieldSize}
+            canRemove={!editing && rows.length > 1}
+            disabled={save.isPending}
+            onChange={(patch) => changeRow(row.key, patch)}
+            onRemove={() => removeRow(row.key)}
+            onMoveToToday={() => changeRow(row.key, moveToToday(row, today))}
+          />
+        ))}
+        {!editing ? (
+          <Button variant="outlined" onClick={addRow} disabled={save.isPending} sx={{ minHeight: 44, alignSelf: 'flex-start' }}>
+            + Přidat další termín
+          </Button>
+        ) : null}
+      </Stack>
+      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.75 }}>
+        {editing
+          ? 'Prázdné denní okno = blok drží celé otevírací hodiny.'
+          : 'Každý termín se uloží jako samostatný blok se svým odkazem. Prázdné denní okno = celé otevírací hodiny.'}
+      </Typography>
+    </Box>
+  );
+
   const fields = (
     <Stack spacing={2.5}>
       {clubSection}
@@ -429,63 +586,9 @@ export function ClubBlockDialog({
         fullWidth
       />
 
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-        <TextField
-          type="date"
-          size={fieldSize}
-          label="Od"
-          value={draft.fromDate}
-          onChange={(e) => set('fromDate', e.target.value)}
-          error={shown('fromDate') !== undefined}
-          helperText={shown('fromDate')}
-          slotProps={{ inputLabel: { shrink: true } }}
-          fullWidth
-        />
-        <TextField
-          type="date"
-          size={fieldSize}
-          label="Do"
-          value={draft.toDate}
-          onChange={(e) => set('toDate', e.target.value)}
-          error={shown('toDate') !== undefined}
-          helperText={shown('toDate')}
-          slotProps={{ inputLabel: { shrink: true } }}
-          fullWidth
-        />
-      </Stack>
-
       {listSection}
 
-      <Box>
-        <SectionLabel>Denní okno (nepovinné)</SectionLabel>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-          <TextField
-            type="time"
-            size={fieldSize}
-            label="Denně od"
-            value={draft.dailyFrom}
-            onChange={(e) => set('dailyFrom', e.target.value)}
-            error={shown('dailyFrom') !== undefined}
-            helperText={shown('dailyFrom')}
-            slotProps={{ inputLabel: { shrink: true } }}
-            fullWidth
-          />
-          <TextField
-            type="time"
-            size={fieldSize}
-            label="Denně do"
-            value={draft.dailyTo}
-            onChange={(e) => set('dailyTo', e.target.value)}
-            error={shown('dailyTo') !== undefined}
-            helperText={shown('dailyTo')}
-            slotProps={{ inputLabel: { shrink: true } }}
-            fullWidth
-          />
-        </Stack>
-        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.75 }}>
-          Prázdné = blok drží celé otevírací hodiny.
-        </Typography>
-      </Box>
+      {termsSection}
 
       <TextField
         size={fieldSize}
@@ -508,22 +611,87 @@ export function ClubBlockDialog({
     </Stack>
   );
 
+  const firstRange = rows.find((r) => r.fromDate !== '' && r.toDate !== '' && r.toDate >= r.fromDate);
+  const previewRange =
+    firstRange === undefined
+      ? null
+      : `${blockRange(firstRange)}${rows.length > 1 ? ` + ${rows.length - 1} další` : ''}`;
+
+  const linkOf = (b: ClubBlockView): string | null => b.registrationUrl ?? (b.registrationToken ? clubRegistrationLink(b.registrationToken) : null);
+  const copyText = async (text: string, ok: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(ok);
+    } catch {
+      toast.error('Odkaz se nepodařilo zkopírovat');
+    }
+  };
+  const copyAll = () => {
+    const lines = (results ?? []).flatMap((b) => {
+      const link = linkOf(b);
+      return link === null ? [] : [`${formatShortSpan(b.fromDate, b.toDate)}: ${link}`];
+    });
+    void copyText(lines.join('\n'), 'Odkazy zkopírovány');
+  };
+
+  const resultView =
+    results === null ? null : (
+      <Stack spacing={2} data-testid="club-block-results">
+        <Alert severity="success">
+          Vytvořeno {results.length} bloků{results[0]?.clubName ? ` pro ${results[0].clubName}` : ''}. Každý má svůj registrační odkaz pro sportovce.
+        </Alert>
+        {results.map((b) => {
+          const link = linkOf(b);
+          return (
+            <SoftCard key={b.id} sx={{ p: 2 }} data-testid="club-block-result">
+              <SectionLabel>{blockRange(b)}</SectionLabel>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ alignItems: { sm: 'center' } }}>
+                <Box
+                  data-testid="block-link"
+                  sx={{
+                    flex: 1, minWidth: 0, px: 1.75, py: 1.25, borderRadius: 2.5, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default',
+                    fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    color: link === null ? 'text.secondary' : 'text.primary',
+                  }}
+                >
+                  {link ?? 'Odkaz zatím není k dispozici — server ho nevrací.'}
+                </Box>
+                <Button
+                  variant="contained"
+                  startIcon={<ContentCopy sx={{ fontSize: 16 }} />}
+                  disabled={link === null}
+                  onClick={() => link !== null && void copyText(link, 'Odkaz zkopírován')}
+                  aria-label={`Kopírovat odkaz ${formatShortSpan(b.fromDate, b.toDate)}`}
+                  sx={{ minHeight: 44 }}
+                >
+                  Kopírovat
+                </Button>
+              </Stack>
+            </SoftCard>
+          );
+        })}
+        <Button variant="outlined" startIcon={<ContentCopy sx={{ fontSize: 16 }} />} onClick={copyAll} sx={{ minHeight: 44, alignSelf: 'flex-start' }}>
+          Kopírovat všechny odkazy
+        </Button>
+      </Stack>
+    );
+
   const side = (
     <Stack spacing={2} sx={{ minWidth: 0 }}>
       <BlockCalculator
         playerCount={playerCount}
         activityIds={draft.activityIds}
         calendarIds={draft.calendarIds}
-        fromDate={draft.fromDate}
+        ranges={rows}
         onApply={(from, to) => {
-          setDraft((d) => ({ ...d, fromDate: from, toDate: to }));
-          setConflicts(null);
+          const first = rows[0];
+          if (first !== undefined) changeRow(first.key, { fromDate: from, toDate: to });
         }}
       />
       <BlockPreview
         clubName={previewClubName}
         color={previewColor}
-        range={draft.fromDate !== '' && draft.toDate !== '' && draft.toDate >= draft.fromDate ? blockRange({ fromDate: draft.fromDate, toDate: draft.toDate }) : null}
+        range={previewRange}
         players={playerCount}
       />
     </Stack>
@@ -532,7 +700,7 @@ export function ClubBlockDialog({
   return (
     <Dialog
       open
-      onClose={save.isPending ? undefined : onClose}
+      onClose={save.isPending ? undefined : finish}
       fullWidth
       maxWidth={device === 'desktop' ? 'lg' : 'md'}
       fullScreen={phone}
@@ -544,15 +712,23 @@ export function ClubBlockDialog({
             {editing ? 'Upravit blok' : 'Nový blok pro klub'}
           </Typography>
           <Typography component="span" variant="body2" sx={{ display: 'block', color: 'text.secondary', fontWeight: 400 }}>
-            {editing ? `${block?.clubName} · ${blockRange(block as ClubBlockView)}` : 'Vyhrazené časy s odkazem, přes který se sportovci sami registrují'}
+            {editing
+              ? `${block?.clubName} · ${blockRange(block as ClubBlockView)}`
+              : results !== null
+                ? 'Hotovo — odkazy pošlete klubu'
+                : 'Vyhrazené časy s odkazem, přes který se sportovci sami registrují'}
           </Typography>
         </Box>
-        <IconButton aria-label="Zavřít" onClick={onClose} disabled={save.isPending} sx={{ width: 44, height: 44, flexShrink: 0 }}>
+        <IconButton aria-label="Zavřít" onClick={finish} disabled={save.isPending} sx={{ width: 44, height: 44, flexShrink: 0 }}>
           <Close />
         </IconButton>
       </DialogTitle>
 
       <DialogContent dividers data-testid="club-block-form" data-layout={device} data-columns={columns}>
+        {results !== null ? (
+          resultView
+        ) : (
+          <>
         {failure !== null ? (
           <Alert severity="error" sx={{ mb: 2 }}>
             {failure.message}
@@ -581,23 +757,165 @@ export function ClubBlockDialog({
           {fields}
           {side}
         </Box>
+          </>
+        )}
       </DialogContent>
 
       <DialogActions sx={{ px: 3, py: 1.75, gap: 1, flexWrap: 'wrap', justifyContent: phone ? 'stretch' : 'flex-end' }}>
-        <Button variant="outlined" onClick={onClose} disabled={save.isPending} sx={{ minHeight: 44, flex: phone ? 1 : undefined }}>
-          Zrušit
-        </Button>
-        <Button
-          variant="contained"
-          color={confirming ? 'error' : 'primary'}
-          onClick={submit}
-          disabled={save.isPending}
-          sx={{ minHeight: 44, flex: phone ? 2 : undefined }}
-        >
-          {save.isPending ? 'Ukládám…' : confirming ? 'Potvrdit a zrušit rezervace' : editing ? 'Uložit změny' : 'Vytvořit blok'}
-        </Button>
+        {results !== null ? (
+          <Button variant="contained" onClick={finish} sx={{ minHeight: 44, flex: phone ? 1 : undefined }}>
+            Hotovo
+          </Button>
+        ) : (
+          <>
+            <Button variant="outlined" onClick={finish} disabled={save.isPending} sx={{ minHeight: 44, flex: phone ? 1 : undefined }}>
+              Zrušit
+            </Button>
+            <Button
+              variant="contained"
+              color={confirming ? 'error' : 'primary'}
+              onClick={submit}
+              disabled={save.isPending || hasPast}
+              sx={{ minHeight: 44, flex: phone ? 2 : undefined }}
+            >
+              {save.isPending
+                ? 'Ukládám…'
+                : confirming
+                  ? 'Potvrdit a zrušit rezervace'
+                  : editing
+                    ? 'Uložit změny'
+                    : pendingCount > 1 || pendingCount < rows.length
+                      ? `Vytvořit bloky (${pendingCount})`
+                      : 'Vytvořit blok'}
+            </Button>
+          </>
+        )}
       </DialogActions>
     </Dialog>
+  );
+}
+
+/* ── One row of "Termíny bloku" ── */
+
+function RangeRowEditor({
+  index, total, row, errors, showErrors, made, failure, fieldSize, canRemove, disabled, onChange, onRemove, onMoveToToday,
+}: {
+  index: number;
+  total: number;
+  row: RangeRow;
+  errors: RowErrors;
+  showErrors: boolean;
+  /** The block this row already became. */
+  made: ClubBlockView | null;
+  failure: string | null;
+  fieldSize: 'small' | 'medium';
+  canRemove: boolean;
+  disabled: boolean;
+  onChange: (patch: Partial<RangeRow>) => void;
+  onRemove: () => void;
+  onMoveToToday: () => void;
+}) {
+  const locked = made !== null || disabled;
+  const n = index + 1;
+  /* With one row the labels stay "Od" / "Do"; with several each carries its row number. */
+  const aria = (label: string): { 'aria-label'?: string } => (total > 1 ? { 'aria-label': `${label}, termín ${n}` } : {});
+  const shownField = (key: 'fromDate' | 'toDate' | 'dailyFrom' | 'dailyTo'): string | undefined => (showErrors ? errors[key] : undefined);
+  return (
+    <SoftCard sx={{ p: 1.75 }} data-testid="block-term" data-row={n}>
+      <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          {total > 1 ? <Typography sx={{ fontSize: 14, fontWeight: 700 }}>Termín {n}</Typography> : null}
+          {made !== null ? (
+            <Typography component="span" variant="caption" sx={{ color: 'success.main', fontWeight: 700 }}>
+              vytvořeno ✓
+            </Typography>
+          ) : null}
+        </Stack>
+        {canRemove && made === null ? (
+          <IconButton aria-label={`Odebrat termín ${n}`} onClick={onRemove} disabled={disabled} sx={{ width: 44, height: 44 }}>
+            <DeleteOutlined />
+          </IconButton>
+        ) : null}
+      </Stack>
+      <Stack spacing={1.5}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+          <TextField
+            type="date"
+            size={fieldSize}
+            label="Od"
+            value={row.fromDate}
+            onChange={(e) => onChange({ fromDate: e.target.value })}
+            error={shownField('fromDate') !== undefined || errors.past !== undefined}
+            helperText={shownField('fromDate')}
+            disabled={locked}
+            slotProps={{ inputLabel: { shrink: true }, htmlInput: aria('Od') }}
+            fullWidth
+          />
+          <TextField
+            type="date"
+            size={fieldSize}
+            label="Do"
+            value={row.toDate}
+            onChange={(e) => onChange({ toDate: e.target.value })}
+            error={shownField('toDate') !== undefined}
+            helperText={shownField('toDate')}
+            disabled={locked}
+            slotProps={{ inputLabel: { shrink: true }, htmlInput: aria('Do') }}
+            fullWidth
+          />
+        </Stack>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+          <TextField
+            type="time"
+            size={fieldSize}
+            label="Denně od"
+            value={row.dailyFrom}
+            onChange={(e) => onChange({ dailyFrom: e.target.value })}
+            error={shownField('dailyFrom') !== undefined}
+            helperText={shownField('dailyFrom')}
+            disabled={locked}
+            slotProps={{ inputLabel: { shrink: true }, htmlInput: aria('Denně od') }}
+            fullWidth
+          />
+          <TextField
+            type="time"
+            size={fieldSize}
+            label="Denně do"
+            value={row.dailyTo}
+            onChange={(e) => onChange({ dailyTo: e.target.value })}
+            error={shownField('dailyTo') !== undefined}
+            helperText={shownField('dailyTo')}
+            disabled={locked}
+            slotProps={{ inputLabel: { shrink: true }, htmlInput: aria('Denně do') }}
+            fullWidth
+          />
+        </Stack>
+      </Stack>
+      {errors.past !== undefined ? (
+        <Alert
+          severity="warning"
+          role="alert"
+          sx={{ mt: 1.25 }}
+          action={
+            <Button color="inherit" size="small" onClick={onMoveToToday} disabled={disabled} sx={{ minHeight: 36 }}>
+              Posunout na dnešek
+            </Button>
+          }
+        >
+          {errors.past}
+        </Alert>
+      ) : null}
+      {errors.overlap !== undefined ? (
+        <Typography role="alert" variant="body2" sx={{ color: 'error.main', mt: 1 }}>
+          {errors.overlap}
+        </Typography>
+      ) : null}
+      {failure !== null ? (
+        <Alert severity="error" sx={{ mt: 1.25 }}>
+          {failure}
+        </Alert>
+      ) : null}
+    </SoftCard>
   );
 }
 

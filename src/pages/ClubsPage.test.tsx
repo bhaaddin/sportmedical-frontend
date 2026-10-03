@@ -486,6 +486,22 @@ describe('ClubsPage router state', () => {
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('null'));
   });
 
+  it('opens the dialog with every range of ranges, ahead of the single fields', async () => {
+    const state = {
+      newBlock: {
+        clubId: 'club-1', calendarIds: ['c-1'], fromDate: day1, toDate: day1,
+        ranges: [{ fromDate: day1, toDate: day1, dailyFrom: '08:00', dailyTo: '12:00' }, { fromDate: day2, toDate: day2 }],
+      },
+    };
+    render(<Wrap state={state}><ClubsPage /></Wrap>);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getAllByTestId('block-term')).toHaveLength(2);
+    expect(within(dialog).getByLabelText('Od, termín 1')).toHaveValue(day1);
+    expect(within(dialog).getByLabelText('Denně od, termín 1')).toHaveValue('08:00');
+    expect(within(dialog).getByLabelText('Od, termín 2')).toHaveValue(day2);
+    expect(within(dialog).getByRole('button', { name: 'Vytvořit bloky (2)' })).toBeInTheDocument();
+  });
+
   it('creates the club and the block together from a not-yet-created club', async () => {
     createClub.mockResolvedValue({ id: 'club-new', name: 'TJ Sokol Slaný', ico: '00000019', paymentTermsDays: 14, isActive: true, createdAt: '' });
     createBlock.mockResolvedValue(block({ id: 'b-new', clubId: 'club-new', clubName: 'TJ Sokol Slaný' }));
