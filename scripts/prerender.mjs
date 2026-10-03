@@ -20,7 +20,7 @@
 
    Environment:
      PRERENDER_API_URL      default https://sportmedical-api.onrender.com  ("off" = do not ask)
-     PRERENDER_TIMEOUT_MS   default 8000 per request (all four run in parallel)
+     PRERENDER_TIMEOUT_MS   default 20000 per request (all four run in parallel)
      PRERENDER_SITE_URL     e.g. https://sportmedical-diagnostics.cz — adds canonical/og:url
      PRERENDER_INDEXABLE    "1" removes the noindex of the template (set when the domain moves here)
    ══════════════════════════════════════════════════════════════ */
@@ -37,14 +37,38 @@ const dist = path.join(root, 'dist');
 const ssrDir = path.join(root, 'node_modules', '.cache', 'sm-ssr');
 
 const API = (process.env.PRERENDER_API_URL || 'https://sportmedical-api.onrender.com').replace(/\/+$/, '');
-const TIMEOUT_MS = Number(process.env.PRERENDER_TIMEOUT_MS) > 0 ? Number(process.env.PRERENDER_TIMEOUT_MS) : 8000;
+const TIMEOUT_MS = Number(process.env.PRERENDER_TIMEOUT_MS) > 0 ? Number(process.env.PRERENDER_TIMEOUT_MS) : 20000;
 const SITE_URL = (process.env.PRERENDER_SITE_URL || '').replace(/\/+$/, '');
 const INDEXABLE = process.env.PRERENDER_INDEXABLE === '1';
 
 const log = (message) => console.log(`[prerender] ${message}`);
 
-/** One GET; null on ANY failure (timeout, 404, DNS, bad JSON). Never throws. */
-async function getJson(endpoint) {
+/**
+ * The API on the free Render plan sleeps and needs about a minute to wake. Ask /health until it
+ * answers (at most WAKE_MS), so the pages are built with the real price list and not with the
+ * "—" fallbacks. Never throws and never fails the build: a dead API just means defaults.
+ */
+const WAKE_MS = 75_000;
+async function wakeApi() {
+  if (API === 'off') return;
+  const started = Date.now();
+  while (Date.now() - started < WAKE_MS) {
+    try {
+      const response = await fetch(`${API}/health`, { signal: AbortSignal.timeout(10_000) });
+      if (response.ok) {
+        log(`/health: awake after ${Date.now() - started} ms`);
+        return;
+      }
+    } catch {
+      // asleep or unreachable: try again
+    }
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+  log(`/health: no answer in ${WAKE_MS} ms — continuing, pages may use defaults`);
+}
+
+/** One GET (one retry on a failure); null on ANY failure (timeout, 404, DNS, bad JSON). Never throws. */
+async function getJson(endpoint, attempt = 1) {
   if (API === 'off') return null;
   const started = Date.now();
   try {
@@ -60,6 +84,7 @@ async function getJson(endpoint) {
     log(`${endpoint}: ok (${Date.now() - started} ms)`);
     return body;
   } catch (error) {
+    if (attempt === 1) return getJson(endpoint, 2);
     const reason = error?.name === 'TimeoutError' ? `no answer in ${TIMEOUT_MS} ms` : (error?.cause?.code ?? error?.message ?? 'failed');
     log(`${endpoint}: ${reason} — using defaults`);
     return null;
@@ -86,6 +111,7 @@ async function main() {
 
   const ssr = await import(pathToFileURL(entryFile).href);
 
+  await wakeApi();
   const [priceList, clinic, siteContent, discountTiers] = await Promise.all([
     getJson('/api/public/price-list'),
     getJson('/api/public/clinic'),
