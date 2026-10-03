@@ -17,6 +17,9 @@ vi.mock('../../../api/holidays', () => ({ holidaysApi: { year: vi.fn() } }));
 vi.mock('../../../api/clinicSettings', () => ({ readPublicClinic: vi.fn(), readSettings: vi.fn() }));
 vi.mock('../../../api/workingHours', () => ({ workingHoursApi: { preview: vi.fn() } }));
 vi.mock('../../../api/appointments', () => ({ appointmentsApi: { range: vi.fn(), blocks: vi.fn() } }));
+vi.mock('../../../api/activities', () => ({ activitiesApi: { list: vi.fn() } }));
+/* The service colours are read raw from the same endpoint as the services; nothing here needs them. */
+vi.mock('../../../api/client', () => ({ default: { get: vi.fn().mockRejectedValue(new Error('offline')) }, client: {} }));
 /*
  * The booking dialog is a screen of its own with its own tests; here only
  * what the calendar hands it matters - which calendar, which time.
@@ -55,6 +58,7 @@ import { holidaysApi } from '../../../api/holidays';
 import { readPublicClinic, readSettings } from '../../../api/clinicSettings';
 import { workingHoursApi } from '../../../api/workingHours';
 import { appointmentsApi } from '../../../api/appointments';
+import { activitiesApi } from '../../../api/activities';
 
 const base = {
   location: '',
@@ -103,9 +107,10 @@ beforeEach(() => {
 
   vi.mocked(calendarsApi.list).mockResolvedValue([diagnostika, prohlidka]);
   vi.mocked(clinicServicesApi.list).mockResolvedValue([
-    { id: 's1', name: 'Diagnostika', description: '', sortOrder: 0, isActive: true, activities: 1, calendars: 1 },
-    { id: 's2', name: 'Lékařské prohlídky', description: '', sortOrder: 1, isActive: true, activities: 1, calendars: 1 },
+    { id: 's1', name: 'Diagnostika', description: '', sortOrder: 0, isActive: true, activities: 1, calendars: 1, colorHex: null },
+    { id: 's2', name: 'Lékařské prohlídky', description: '', sortOrder: 1, isActive: true, activities: 1, calendars: 1, colorHex: null },
   ]);
+  vi.mocked(activitiesApi.list).mockResolvedValue({ activities: [], warnings: [] });
   vi.mocked(holidaysApi.year).mockResolvedValue([
     { date: '2026-09-25', name: 'Firemní volno', isHoliday: true, isStatutory: false, isAmended: true },
   ]);
@@ -159,6 +164,13 @@ function renderPage(state?: Record<string, unknown>) {
 }
 
 const sidebarSection = (name: string) => screen.getByRole('region', { name });
+/* The calendars to show and the worker live in the toolbar's "Kalendáře" menu. */
+const openCalendarMenu = () => fireEvent.click(screen.getByRole('button', { name: 'Kalendáře' }));
+/* The menu is modal while it is open; the grid behind it is read once it has gone. */
+const closeCalendarMenu = async () => {
+  fireEvent.keyDown(screen.getByRole('dialog', { name: 'Kalendáře' }), { key: 'Escape' });
+  await vi.waitFor(() => expect(screen.queryByRole('dialog', { name: 'Kalendáře' })).not.toBeInTheDocument());
+};
 
 describe('the calendar screen', () => {
   it('draws every calendar side by side, with its bookings and blocks', async () => {
@@ -199,7 +211,9 @@ describe('the calendar screen', () => {
   it('unticking a calendar takes its column and bookings away', async () => {
     renderPage();
     await screen.findByRole('button', { name: /Vstupní prohlídka/ });
+    openCalendarMenu();
     fireEvent.click(within(sidebarSection('Kalendáře')).getByRole('checkbox', { name: 'Sportovní prohlídka' }));
+    await closeCalendarMenu();
     expect(screen.queryByRole('button', { name: /Vstupní prohlídka/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId('sub-column-c2-2026-09-23')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Spiroergometrie/ })).toBeInTheDocument();
@@ -208,7 +222,9 @@ describe('the calendar screen', () => {
   it('clicking a calendar name shows only that one', async () => {
     renderPage();
     await screen.findByRole('button', { name: /Spiroergometrie/ });
+    openCalendarMenu();
     fireEvent.click(within(sidebarSection('Kalendáře')).getByRole('button', { name: 'Sportovní prohlídka' }));
+    await closeCalendarMenu();
     expect(screen.queryByRole('button', { name: /Spiroergometrie/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Vstupní prohlídka/ })).toBeInTheDocument();
   });
@@ -216,7 +232,9 @@ describe('the calendar screen', () => {
   it('the employee filter leaves only that worker’s days', async () => {
     renderPage();
     await screen.findByRole('button', { name: /Vstupní prohlídka/ });
+    openCalendarMenu();
     fireEvent.click(within(sidebarSection('Pracovníci v zobrazeném období')).getByText('Anna Černá'));
+    await closeCalendarMenu();
     expect(screen.getByRole('button', { name: /Spiroergometrie/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Vstupní prohlídka/ })).not.toBeInTheDocument();
   });
@@ -224,7 +242,7 @@ describe('the calendar screen', () => {
   it('the service filter leaves only its calendars', async () => {
     renderPage();
     await screen.findByRole('button', { name: /Vstupní prohlídka/ });
-    fireEvent.click(within(sidebarSection('Služby')).getByText('Lékařské prohlídky'));
+    fireEvent.click(within(sidebarSection('Služby')).getByRole('button', { name: /jen.*Lékařské prohlídky/ }));
     expect(screen.queryByRole('button', { name: /Spiroergometrie/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId('sub-column-c1-2026-09-23')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Vstupní prohlídka/ })).toBeInTheDocument();

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Box, IconButton, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import { DESIGN } from "../../theme";
 import ChevronLeft from "@mui/icons-material/ChevronLeft";
 import ChevronRight from "@mui/icons-material/ChevronRight";
 import {
@@ -41,9 +42,13 @@ export interface MiniCalendarProps {
   holidays?: ReadonlySet<string>;
   /** `yyyy-MM-dd` of days nobody can book (booking pause, closed day). */
   closedDays?: ReadonlySet<string>;
+  /** Finger-sized days (44 px) for a phone or a tablet; the sidebar draws the board's 26 px. */
+  touch?: boolean;
 }
 
-const CELL = 30;
+/** The board's day cell is 26 px tall (Main.dc.html); on touch it is 44. */
+const CELL_HEIGHT = 26;
+const CELL_HEIGHT_TOUCH = 44;
 
 export function MiniCalendar({
   value,
@@ -51,6 +56,7 @@ export function MiniCalendar({
   onSelect,
   holidays,
   closedDays,
+  touch = false,
 }: MiniCalendarProps) {
   const [shown, setShown] = useState<ShownMonth>(() => monthOf(value));
 
@@ -85,17 +91,17 @@ export function MiniCalendar({
       >
         <Typography
           component="h2"
-          sx={{ fontSize: 14, fontWeight: 700 }}
+          sx={{ fontSize: 13, fontWeight: 600 }}
           aria-live="polite"
         >
           {title}
         </Typography>
-        <Stack direction="row" spacing={0.5}>
+        <Stack direction="row" spacing={0.25}>
           <IconButton
             size="small"
             aria-label="Předchozí měsíc"
             onClick={() => setShown((m) => shiftMonth(m, -1))}
-            sx={{ width: 28, height: 28, color: "text.secondary" }}
+            sx={{ width: 44, height: touch ? 44 : 32, color: "text.secondary" }}
           >
             <ChevronLeft fontSize="small" />
           </IconButton>
@@ -103,7 +109,7 @@ export function MiniCalendar({
             size="small"
             aria-label="Další měsíc"
             onClick={() => setShown((m) => shiftMonth(m, 1))}
-            sx={{ width: 28, height: 28, color: "text.secondary" }}
+            sx={{ width: 44, height: touch ? 44 : 32, color: "text.secondary" }}
           >
             <ChevronRight fontSize="small" />
           </IconButton>
@@ -120,8 +126,7 @@ export function MiniCalendar({
             sx={{
               textAlign: "center",
               fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.08em",
+              fontWeight: 400,
               color: "text.secondary",
             }}
           >
@@ -150,6 +155,7 @@ export function MiniCalendar({
                   label={dayLabel(cell, flags)}
                   outside={flags.outside}
                   today={flags.today}
+                  touch={touch}
                   holiday={flags.holiday}
                   closed={flags.closed}
                   onSelect={() => {
@@ -203,6 +209,7 @@ function DayCell({
   label,
   outside,
   today,
+  touch,
   holiday,
   closed,
   onSelect,
@@ -215,6 +222,7 @@ function DayCell({
   label: string;
   outside: boolean;
   today: boolean;
+  touch: boolean;
   holiday: boolean;
   closed: boolean;
   onSelect: () => void;
@@ -254,17 +262,15 @@ function DayCell({
         data-holiday={holiday ? "true" : undefined}
         data-closed={closed ? "true" : undefined}
         sx={(theme) => ({
-          width: CELL,
-          height: CELL,
+          width: touch ? CELL_HEIGHT_TOUCH : CELL_HEIGHT,
+          height: touch ? CELL_HEIGHT_TOUCH : CELL_HEIGHT,
           borderRadius: "50%",
           border: "1.5px solid",
-          borderColor:
-            today && mark !== "day" ? theme.palette.primary.main : "transparent",
-          backgroundColor:
-            mark === "day" ? theme.palette.primary.main : "transparent",
+          borderColor: mark === "day" && !today ? DESIGN.ink : "transparent",
+          backgroundColor: today ? DESIGN.ink : "transparent",
           color:
-            mark === "day"
-              ? theme.palette.primary.contrastText
+            today
+              ? "#FFFFFF"
               : holiday
                 ? theme.palette.error.main
                 : outside
@@ -273,17 +279,14 @@ function DayCell({
                     ? theme.palette.text.disabled
                     : theme.palette.text.primary,
           font: "inherit",
-          fontSize: 13,
-          fontWeight: mark === "day" || holiday || today ? 700 : 400,
+          fontSize: 12,
+          fontWeight: mark === "day" || holiday || today ? 600 : 400,
           textDecoration: holiday && mark === "day" ? "underline" : "none",
           textUnderlineOffset: 3,
           cursor: "pointer",
           p: 0,
           "&:hover": {
-            backgroundColor:
-              mark === "day"
-                ? theme.palette.primary.dark
-                : alpha(theme.palette.primary.main, 0.12),
+            backgroundColor: today ? DESIGN.ink : alpha(theme.palette.primary.main, 0.12),
           },
           "&:focus-visible": {
             outline: `2px solid ${theme.palette.primary.main}`,

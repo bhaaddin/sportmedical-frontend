@@ -104,3 +104,10 @@ export function minutesWord(minutes: number): string {
 export function minutesFree(minutes: number): string {
   return `${minutesWord(minutes)} volno`;
 }
+
+/** "Jan Novák" -> "J. Novák"; one word stays as it is. For a narrow month cell. */
+export function shortName(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length < 2) return name.trim();
+  return `${parts[0].charAt(0)}. ${parts.slice(1).join(' ')}`;
+}

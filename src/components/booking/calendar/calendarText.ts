@@ -1,0 +1,56 @@
+/*
+ * The Czech words the Etapa 2 calendar adds (panels, range selection, the
+ * phone and tablet chrome). Literal strings, as the brief asks - no new i18n
+ * keys - kept beside the calendar so the locale file is not touched.
+ */
+export const CAL_TEXT = {
+  /* month panel */
+  nobody: "Bez rezervací",
+  otherService: "Ostatní",
+  openDay: "Otevřít den",
+  startRange: "Vybrat od tohoto dne",
+  closePanel: "Zavřít",
+  holiday: "Státní svátek",
+  closedDay: "Zavřeno",
+
+  /* range selection */
+  rangeMode: "Vybrat dny",
+  rangeModeHint: "Klepněte na první a pak na poslední den.",
+  rangeModeFirst: "Klepněte na poslední den výběru.",
+  rangeTitle: "Výběr dnů",
+  rangeBookHint: "Od prvního dne výběru",
+  rangeBlockHint: "Celé dny, pauza, dovolená, školení",
+  rangeClubHint: "Blok míst s odkazem pro sportovce",
+  clubBlockLabel: (club: string) => `Blok · ${club}`,
+
+  /* tablet / phone chrome */
+  filters: "Kalendář a filtry",
+  filtersClose: "Zavřít",
+  calendarsFilter: "Kalendáře",
+  services: "Služby",
+  serviceOnly: "Zobrazit jen tuto službu",
+  nothingToShow: "Podle zvolených filtrů se nic nezobrazuje.",
+  noBookings: "Žádné rezervace",
+  previousDay: "Předchozí den",
+  nextDay: "Další den",
+  weekStrip: "Dny týdne",
+  dayList: "Seznam rezervací dne",
+  monthList: "Dny měsíce",
+  tapDayHint: "Klepnutím otevřete den",
+  newAppointment: "Nová objednávka",
+
+  /* a click on a club's block */
+  clubPopover: {
+    title: (club: string) => `Blok pro ${club}`,
+    open: "Otevřít blok",
+    close: "Zavřít",
+    hint: "Čas drží klub – běžné objednávky sem nejdou. Sportovci se do něj registrují přes odkaz klubu.",
+  },
+
+  /* moving a booking by dragging it */
+  moveTitle: "Přesunout rezervaci",
+  moveFrom: "Z",
+  moveTo: "Na",
+  moveBack: "Zpět",
+  moveConfirm: "Přesunout",
+} as const;

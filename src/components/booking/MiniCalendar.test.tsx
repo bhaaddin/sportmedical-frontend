@@ -90,3 +90,27 @@ describe('MiniCalendar', () => {
     expect(cellOf('2026-11-02').dataset.highlight).toBe('day');
   });
 });
+
+describe('MiniCalendar as the board draws it', () => {
+  beforeAll(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 26, 10, 0, 0));
+  });
+  afterAll(() => vi.useRealTimers());
+
+  it('draws today as a filled dark circle, a selected day only as a ring', () => {
+    render(<MiniCalendar value={new Date(2026, 9, 14)} view="day" onSelect={() => {}} />);
+    expect(cellOf('2026-10-26')).toHaveStyle({ backgroundColor: 'rgb(26, 29, 33)', color: 'rgb(255, 255, 255)' });
+    expect(cellOf('2026-10-14')).toHaveStyle({ backgroundColor: 'rgba(0, 0, 0, 0)' });
+    expect(cellOf('2026-10-14')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('is 26 px a day on the sidebar and finger-sized (44 px) on touch', () => {
+    const { rerender } = render(<MiniCalendar value={new Date(2026, 9, 14)} view="month" onSelect={() => {}} />);
+    expect(cellOf('2026-10-14')).toHaveStyle({ width: '26px', height: '26px' });
+    expect(screen.getByRole('button', { name: 'Další měsíc' })).toHaveStyle({ width: '44px', height: '32px' });
+    rerender(<MiniCalendar value={new Date(2026, 9, 14)} view="month" onSelect={() => {}} touch />);
+    expect(cellOf('2026-10-14')).toHaveStyle({ width: '44px', height: '44px' });
+    expect(screen.getByRole('button', { name: 'Další měsíc' })).toHaveStyle({ height: '44px' });
+  });
+});

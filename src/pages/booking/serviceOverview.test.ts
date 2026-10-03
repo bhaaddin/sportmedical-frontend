@@ -28,6 +28,7 @@ const service = (id: string, name: string, sortOrder: number): ClinicService => 
   isActive: true,
   activities: 0,
   calendars: 0,
+  colorHex: null,
 });
 
 const activity = (id: string, name: string, clinicServiceId: string | null, sortOrder = 0): Activity => ({
@@ -46,6 +47,7 @@ const activity = (id: string, name: string, clinicServiceId: string | null, sort
   serviceItemId: null,
   priceCzk: null,
   clinicServiceId,
+  requiredDocumentTemplateIds: [],
 });
 
 const day = (date: string, over: Partial<PreviewDay> = {}): PreviewDay => ({

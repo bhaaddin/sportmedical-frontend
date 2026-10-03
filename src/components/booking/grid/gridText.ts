@@ -77,4 +77,6 @@ export const GRID_TEXT = {
   legendHoliday: 'Svátek',
   legendNow: 'Aktuální čas',
   clubLine: 'Klub',
+  clubBlock: 'Blok klubu',
+  afternoonFree: 'odpoledne volno',
 } as const;

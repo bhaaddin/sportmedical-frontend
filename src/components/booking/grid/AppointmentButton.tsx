@@ -1,4 +1,4 @@
-import { Box, Tooltip } from "@mui/material";
+import { Box, Tooltip, useTheme } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
@@ -10,9 +10,11 @@ import {
 import { patientsApi } from "../../../api/patients";
 import { useCalendarDisplay } from "../../../api/displaySettings";
 import { DESIGN } from "../../../theme";
+import { cardTones } from "../calendar/colors";
 import { formatPragueTime, isLate } from "../../../utils/time";
 import { AppointmentHoverCard } from "./AppointmentHoverCard";
 import { clubLine } from "./clubLine";
+import { shortName } from "./periodTitle";
 
 /**
  * One appointment, drawn the board's way (3. 10. 2026): a flat grey card
@@ -30,16 +32,33 @@ export function AppointmentButton({
   now,
   onOpen,
   layout,
+  accent,
+  dense = false,
+  shortLabel = false,
 }: {
   appointment: DayAppointment;
   calendar?: { id: string; name: string; color: string };
   now: Date;
   onOpen: (id: string) => void;
   layout: "row" | "block" | "compact";
+  /** The činnost's colour (contract C1): the card's edge and tint. Without it, the board's grey. */
+  accent?: string;
+  /** A short card: one line, "09:30 Tomáš Kříž" - the rest is in the hover/tap card. */
+  dense?: boolean;
+  /** Month on a tablet: "J. Novák" instead of "Jan Novák". */
+  shortLabel?: boolean;
 }) {
   const { t } = useTranslation();
+  const theme = useTheme();
   const { settings } = useCalendarDisplay();
-  const edge = calendar?.color ?? DESIGN.appointment.edge;
+  const tones = accent
+    ? cardTones(accent, theme.palette.background.paper)
+    : {
+        bg: DESIGN.appointment.bg,
+        bgActive: DESIGN.appointment.bgActive,
+        edge: calendar?.color ?? DESIGN.appointment.edge,
+      };
+  const edge = tones.edge;
 
   /*
    * The patient's name on the cell itself, not only in the hover (owner: "každá
@@ -100,6 +119,9 @@ export function AppointmentButton({
   ) : null;
 
   const compact = layout === "compact";
+  /* A grid card is drawn at the board's size (Main.dc.html: time 11/600, name 12/500, status 11);
+     a phone's list row is read at arm's length and keeps the larger type. */
+  const gridCard = layout === "block";
 
   return (
     <Tooltip
@@ -120,12 +142,17 @@ export function AppointmentButton({
         },
         arrow: { sx: { color: "background.paper" } },
       }}
+      /* A list row already says everything the card does, and a phone has no hover: no card there. */
       title={
-        <AppointmentHoverCard
-          appointment={appointment}
-          calendarName={calendar?.name}
-          fields={settings.hoverFields}
-        />
+        layout === "row" ? (
+          ""
+        ) : (
+          <AppointmentHoverCard
+            appointment={appointment}
+            calendarName={calendar?.name}
+            fields={settings.hoverFields}
+          />
+        )
       }
     >
     <Box
@@ -135,6 +162,18 @@ export function AppointmentButton({
       data-status={tally}
       onClick={() => onOpen(appointment.id)}
       aria-haspopup="dialog"
+      aria-label={
+        dense && layout === "block"
+          ? [
+              `${formatPragueTime(appointment.startUtc)} – ${formatPragueTime(appointment.endUtc)}`,
+              patientName,
+              club,
+              appointment.activityName ? `${statusLine} · ${appointment.activityName}` : statusLine,
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : undefined
+      }
       sx={{
         display: "block",
         width: "100%",
@@ -142,20 +181,20 @@ export function AppointmentButton({
         textAlign: "left",
         cursor: "pointer",
         border: "none",
-        borderLeft: `3px solid ${edge}`,
-        borderRadius: `${DESIGN.radius.sm}px`,
-        px: compact ? 0.75 : 1,
-        py: compact ? 0.125 : 0.5,
+        borderLeft: `${compact ? 2 : 3}px solid ${edge}`,
+        borderRadius: compact ? "3px" : `${DESIGN.radius.sm}px`,
+        px: compact ? 0.75 : gridCard ? "7px" : 1,
+        py: compact ? "2px" : gridCard ? "5px" : 0.5,
         font: "inherit",
         lineHeight: 1.25,
         overflow: "hidden",
-        backgroundColor: active ? DESIGN.appointment.bgActive : DESIGN.appointment.bg,
-        color: DESIGN.ink,
+        backgroundColor: active ? tones.bgActive : tones.bg,
+        color: accent ? theme.palette.text.primary : DESIGN.ink,
         opacity: cancelled ? 0.55 : 1,
         textDecoration: cancelled ? "line-through" : "none",
         whiteSpace: compact ? "nowrap" : "normal",
         textOverflow: "ellipsis",
-        "&:hover": { backgroundColor: DESIGN.appointment.bgActive },
+        "&:hover": { backgroundColor: tones.bgActive },
         "&:focus-visible": {
           outline: "2px solid",
           outlineColor: "primary.main",
@@ -163,18 +202,37 @@ export function AppointmentButton({
         },
       }}
     >
-      {compact ? (
+      {dense && layout === "block" ? (
+        <Box
+          component="span"
+          sx={{
+            display: "block",
+            fontSize: 12,
+            lineHeight: 1.2,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          <Box component="span" sx={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+            {formatPragueTime(appointment.startUtc)}
+          </Box>{" "}
+          {patientName ?? appointment.activityName}
+          {club ? ` · ${club}` : ""}
+          {paperworkMark}
+        </Box>
+      ) : compact ? (
         /*
           A month cell has one line to spare: the time, then whoever is coming
           - or the činnost when the row carries no name. A status other than
           "booked" is still said in words, never only by shading (7.1).
         */
         <>
-          <Box component="span" sx={{ fontSize: 12, fontWeight: 700 }}>
+          <Box component="span" sx={{ fontSize: 11, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
             {formatPragueTime(appointment.startUtc)}
           </Box>{" "}
-          <Box component="span" sx={{ fontSize: 12 }}>
-            {rowName ?? appointment.activityName}
+          <Box component="span" sx={{ fontSize: 11 }}>
+            {(shortLabel && rowName ? shortName(rowName) : rowName) ?? appointment.activityName}
           </Box>
           {club ? (
             <Box component="span" sx={{ ml: 0.5, fontSize: 10, color: DESIGN.muted }}>
@@ -192,7 +250,13 @@ export function AppointmentButton({
         <>
           <Box
             component="span"
-            sx={{ display: "block", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}
+            sx={{
+              display: "block",
+              fontSize: gridCard ? 11 : 13,
+              fontWeight: gridCard ? 600 : 700,
+              fontVariantNumeric: "tabular-nums",
+              whiteSpace: "nowrap",
+            }}
           >
             {formatPragueTime(appointment.startUtc)} – {formatPragueTime(appointment.endUtc)}
           </Box>
@@ -201,7 +265,8 @@ export function AppointmentButton({
               component="span"
               sx={{
                 display: "block",
-                fontSize: 13,
+                fontSize: gridCard ? 12 : 14,
+                fontWeight: gridCard ? 500 : 600,
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -248,3 +313,4 @@ export function AppointmentButton({
     </Tooltip>
   );
 }
+

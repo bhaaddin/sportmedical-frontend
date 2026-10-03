@@ -13,7 +13,7 @@ import { dayMark } from './dayMarks';
  */
 
 const DAY = '2026-09-23';
-const PX_PER_MINUTE = 46 / 30;
+const PX_PER_MINUTE = 52 / 60;
 /* The grid below draws from 07:00, so a pointer this far down is at `minute`. */
 const yAt = (minute: number) => (minute - 7 * 60) * PX_PER_MINUTE + 1;
 
