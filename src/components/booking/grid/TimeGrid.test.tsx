@@ -213,6 +213,10 @@ describe('dragging on the grid', () => {
               isRunningLate: false,
               checkedInUtc: null,
               paperwork: null,
+              partnerName: null,
+              clubDiscountPercent: null,
+              paymentState: "none",
+              invoiceId: null,
             },
           ],
         ],
@@ -252,6 +256,10 @@ describe('dragging on the grid', () => {
               isRunningLate: false,
               checkedInUtc: null,
               paperwork: null,
+              partnerName: null,
+              clubDiscountPercent: null,
+              paymentState: "none",
+              invoiceId: null,
             },
           ],
         ],
@@ -318,5 +326,89 @@ describe('a holiday on the grid', () => {
     );
     expect(screen.getByTestId(`calendar-closed-c1-${DAY}`)).toHaveTextContent('Dovolená — Anna Černá');
     expect(screen.queryByTestId(`closed-block-${DAY}`)).not.toBeInTheDocument();
+  });
+});
+
+describe('a booking on a shut day', () => {
+  const saturday: TimeGridProps['appointmentsByDay'] = new Map([
+    [
+      DAY,
+      [
+        {
+          id: 'ap-sat',
+          calendarId: 'c1',
+          patientId: 'p1',
+          activityId: 'a1',
+          activityName: 'Spiroergometrie',
+          startUtc: '2026-09-23T08:00:00Z',
+          endUtc: '2026-09-23T09:00:00Z',
+          status: 0,
+          isRunningLate: false,
+          checkedInUtc: null,
+          paperwork: null,
+          partnerName: null,
+          clubDiscountPercent: null,
+          paymentState: 'none' as const,
+          invoiceId: null,
+        },
+      ],
+    ],
+  ]);
+
+  it('is drawn as a full card above the hatched block, and opens', () => {
+    const preview = row(DAY, { isOpen: false, closedBecause: 'notAWorkingDay', offeredActivityIds: [] });
+    const props = renderGrid({ appointmentsByDay: saturday }, preview);
+
+    const block = screen.getByTestId(`closed-block-${DAY}`);
+    expect(block).toHaveTextContent('Nepracovní den');
+    const button = screen.getByRole('button', { name: /Spiroergometrie/ });
+    const cell = screen.getByTestId('appointment-cell-ap-sat');
+    expect(Number(getComputedStyle(cell).zIndex)).toBeGreaterThan(Number(getComputedStyle(block).zIndex));
+    fireEvent.click(button);
+    expect(props.onOpen).toHaveBeenCalledWith('ap-sat');
+  });
+
+  it('sits above a holiday hatch too', () => {
+    const preview = row(DAY, { isOpen: false, closedBecause: 'holiday', offeredActivityIds: [] });
+    renderGrid(
+      {
+        appointmentsByDay: saturday,
+        marks: new Map([[DAY, dayMark({ date: DAY, name: 'Den české státnosti', isHoliday: true, isStatutory: true }, [preview])]]),
+      },
+      preview,
+    );
+    const block = screen.getByTestId(`closed-block-${DAY}`);
+    const cell = screen.getByTestId('appointment-cell-ap-sat');
+    expect(Number(getComputedStyle(cell).zIndex)).toBeGreaterThan(Number(getComputedStyle(block).zIndex));
+  });
+});
+
+describe('a club booking on the grid', () => {
+  it('says "Klub · FK Slaný · −10 %" on the cell, and leaves the percent out when there is none', () => {
+    const base = {
+      calendarId: 'c1',
+      patientId: '',
+      activityId: 'a1',
+      activityName: 'Prohlídka',
+      status: 0,
+      isRunningLate: false,
+      checkedInUtc: null,
+      paperwork: null,
+      paymentState: 'none' as const,
+      invoiceId: null,
+    };
+    renderGrid({
+      appointmentsByDay: new Map([
+        [
+          DAY,
+          [
+            { ...base, id: 'k1', startUtc: '2026-09-23T06:00:00Z', endUtc: '2026-09-23T07:00:00Z', patientName: 'Jan Novák', partnerName: 'FK Slaný', clubDiscountPercent: 10 },
+            { ...base, id: 'k2', startUtc: '2026-09-23T07:00:00Z', endUtc: '2026-09-23T08:00:00Z', patientName: 'Petr Malý', partnerName: 'TJ Sokol', clubDiscountPercent: null },
+          ],
+        ],
+      ]),
+    });
+    expect(screen.getByText('Klub · FK Slaný · −10 %')).toBeInTheDocument();
+    expect(screen.getByText('Klub · TJ Sokol')).toBeInTheDocument();
   });
 });

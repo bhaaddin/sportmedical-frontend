@@ -7,6 +7,7 @@ import {
   Checkbox,
   FormControlLabel,
   Link,
+  Menu,
   MenuItem,
   Stack,
   TextField,
@@ -28,7 +29,12 @@ import { BookingApiError } from "../../api/apiError";
 import { isKnownPaperworkReason } from "../../api/bookingContracts";
 import { usePermission } from "../../auth/usePermission";
 import { DESIGN, SectionLabel, SoftCard } from "../ui";
-import { formatDateOnly, formatPragueDateTime, toDateOnly } from "../../utils/time";
+import {
+  addDaysToDateOnly,
+  formatDateOnly,
+  formatPragueDateTime,
+  toDateOnly,
+} from "../../utils/time";
 import { dayState, dayStateLabelKey } from "../../pages/booking/dayState";
 import { AsyncSection } from "./AsyncSection";
 import { errorText } from "./errorText";
@@ -39,6 +45,12 @@ import { ModeCards } from "./drawer/ModeCards";
 import { PatientSearch } from "./patient/PatientSearch";
 import { PatientFilled } from "./patient/PatientFilled";
 import { QuickPatientForm } from "./patient/QuickPatientForm";
+import {
+  NOT_CREATED,
+  QuickRegisterError,
+  isNotFound,
+  toQuickRegisterError,
+} from "./patient/quickRegisterErrors";
 import { usePatientCard } from "./patient/patientCard";
 import { toHit, type PatientHit } from "./patient/patientTypeahead";
 import { patientsApi } from "../../api/patients";
@@ -65,6 +77,7 @@ import {
   toStartUtc,
   type DrawerMode,
   type DrawerStep,
+  type LocalMoment,
   type NewClubDraft,
   type QuickPatientDraft,
 } from "./NewAppointmentDialog.logic";
@@ -132,6 +145,14 @@ const TEXT = {
   duration: "Trvání",
   until: "Čas do",
   change: "Změnit",
+  changeMenu: "Změnit termín",
+  nextFree: "Příští volný termín",
+  tomorrow: "Zítra",
+  nextWeek: "Příští týden",
+  otherWhen: "Jiný datum a čas",
+  pickInGrid: "Vybrat v kalendáři",
+  noneFree: "V příštích 31 dnech kalendář nenabízí žádný volný termín.",
+  seeking: "Hledám volný termín…",
   continue: "Pokračovat",
   createAndContinue: "Vytvořit a pokračovat",
   book: "Objednat termín",
@@ -156,11 +177,24 @@ const TEXT = {
   linkRetry: "Zkusit znovu",
 };
 
+/** A slot the calendar found: clinic local date, `HH:mm` start and `HH:mm` end. */
+export interface FoundSlot {
+  date: string;
+  time: string;
+  end: string;
+}
+
 interface NewAppointmentDialogProps {
   open: boolean;
   onClose: () => void;
   /** Whatever list the dialog was opened from reloads itself (6.3). */
   onBooked: () => void;
+  /**
+   * "Příští volný termín" on the slot card: the calendar screen knows what is
+   * booked, blocked and closed, so it answers; the drawer only asks. From the
+   * moment given (exclusive), on the calendar given.
+   */
+  onFindNextFree?: (after: LocalMoment, calendarId: string) => Promise<FoundSlot | null>;
   /** The day the caller was looking at, when no time was chosen. */
   initialDate?: string;
   /** The calendar the caller was looking at, or the column clicked. */
@@ -199,6 +233,7 @@ export function NewAppointmentDialog({
   initialStart,
   initialEnd,
   initialPatientId,
+  onFindNextFree,
 }: NewAppointmentDialogProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -229,6 +264,10 @@ export function NewAppointmentDialog({
       : null;
   });
   const [editingWhen, setEditingWhen] = useState(!fromGrid);
+  /* "Změnit" on the slot card opens a small menu rather than only closing. */
+  const [changeAnchor, setChangeAnchor] = useState<HTMLElement | null>(null);
+  const [seekingFree, setSeekingFree] = useState(false);
+  const [whenNote, setWhenNote] = useState<string | null>(null);
 
   /* ── The two steps and who the slot is for ── */
   const [step, setStep] = useState<DrawerStep>(1);
@@ -370,14 +409,34 @@ export function NewAppointmentDialog({
   const register = useMutation({
     mutationFn: async (): Promise<PatientHit> => {
       const name = splitFullName(quick.name);
-      if (!name) throw new Error("name");
-      const { patientId } = await patientPreRegistrationApi.preRegister({
-        firstName: name.firstName,
-        lastName: name.lastName,
-        dateOfBirth: quick.dateOfBirth,
-        email: quick.email.trim(),
-        phone: quickPhone ?? undefined,
-      });
+      if (!name) throw new QuickRegisterError("Zadejte jméno i příjmení.", "name", "client.name");
+      let patientId: string;
+      try {
+        ({ patientId } = await patientPreRegistrationApi.preRegister({
+          firstName: name.firstName,
+          lastName: name.lastName,
+          dateOfBirth: quick.dateOfBirth,
+          email: quick.email.trim(),
+          phone: quickPhone ?? undefined,
+        }));
+      } catch (error) {
+        /* The server's own Czech sentence and the field it names - never the
+           generic "něco se pokazilo" that hid every refusal until 3. 10. 2026. */
+        throw toQuickRegisterError(error);
+      }
+      /*
+       * The route answers 200 for `CandidateReviewRequired` as well - a namesake
+       * with the same date of birth - and then NO patient was created, while the
+       * client-side api still hands back the id it minted. Booking against that
+       * id would fail two screens later with "Záznam se nenašel". So the id is
+       * looked up once; only a definite "no such patient" stops the flow, any
+       * other hiccup lets the booking try as before.
+       */
+      try {
+        await patientsApi.getById(patientId);
+      } catch (error) {
+        if (isNotFound(error)) throw NOT_CREATED;
+      }
       return {
         id: patientId,
         firstName: name.firstName,
@@ -553,14 +612,58 @@ export function NewAppointmentDialog({
     onClose();
   };
 
-  /* The time on the slot card was wrong: from the grid, close and pick again
-     there; from elsewhere, show the fields. */
-  const changeWhen = () => {
-    if (fromGrid) {
-      close();
-    } else {
-      setEditingWhen(true);
+  /*
+   * The time on the slot card was wrong. "Změnit" offers the quick ways out -
+   * the next free slot, tomorrow, next week - before the date and time fields
+   * or, from the grid, picking again there.
+   */
+  const moveTo = (next: { date: string; time?: string; end?: string | null }) => {
+    setDate(next.date);
+    if (next.time !== undefined) setTime(next.time);
+    if (next.end !== undefined) setSelectionEnd(next.end);
+    setOverriding(false);
+    setConflict(null);
+    setWhenNote(null);
+    setEditingWhen(false);
+  };
+
+  const shiftDays = (days: number) => {
+    setChangeAnchor(null);
+    if (!isDateOnly(date)) return;
+    moveTo({ date: addDaysToDateOnly(date, days) });
+  };
+
+  const findNextFree = async () => {
+    setChangeAnchor(null);
+    if (!onFindNextFree || effectiveCalendarId === "") return;
+    setSeekingFree(true);
+    setWhenNote(null);
+    try {
+      const from: LocalMoment = {
+        date: isDateOnly(date) ? date : toDateOnly(new Date()),
+        time: normalizeTime(time) || "00:00",
+      };
+      const found = await onFindNextFree(from, effectiveCalendarId);
+      if (found) {
+        moveTo({ date: found.date, time: found.time, end: found.end });
+      } else {
+        setWhenNote(TEXT.noneFree);
+      }
+    } catch {
+      setWhenNote(TEXT.noneFree);
+    } finally {
+      setSeekingFree(false);
     }
+  };
+
+  const editWhen = () => {
+    setChangeAnchor(null);
+    setEditingWhen(true);
+  };
+
+  const pickInGrid = () => {
+    setChangeAnchor(null);
+    close();
   };
 
   const goToStep2 = () => {
@@ -623,6 +726,8 @@ export function NewAppointmentDialog({
     ready && availabilityQuery.isSuccess && !offered && overrideReason.trim().length > 0;
 
   const labelId = "new-appointment-title";
+  /* Why the quick registration was refused - the server's sentence, pointed at its box. */
+  const registerError = register.error ? toQuickRegisterError(register.error) : null;
 
   /* ── What the drawer looks like once the booking went through ── */
   if (booked) {
@@ -770,10 +875,22 @@ export function NewAppointmentDialog({
               {[slotSubtitle(dragged), calendar?.name].filter(Boolean).join(" · ")}
             </Typography>
           </Box>
-          <Button variant="outlined" size="small" onClick={changeWhen}>
-            {TEXT.change}
+          <Button
+            variant="outlined"
+            size="small"
+            aria-haspopup="menu"
+            aria-expanded={changeAnchor !== null}
+            disabled={seekingFree}
+            onClick={(e) => setChangeAnchor(e.currentTarget)}
+          >
+            {seekingFree ? TEXT.seeking : TEXT.change}
           </Button>
         </Stack>
+        {whenNote ? (
+          <Typography variant="caption" sx={{ color: "warning.dark", display: "block", mt: 1 }}>
+            {whenNote}
+          </Typography>
+        ) : null}
       </SoftCard>
     ) : (
       <SoftCard tone="soft" sx={{ p: 2 }}>
@@ -822,9 +939,48 @@ export function NewAppointmentDialog({
               {TEXT.pickWhenFirst}
             </Typography>
           ) : null}
+          {/* The same quick choices the slot card's menu offers, for a drawer opened with no time. */}
+          <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75 }}>
+            {onFindNextFree ? (
+              <Button size="small" variant="outlined" disabled={seekingFree || effectiveCalendarId === ""} onClick={() => void findNextFree()}>
+                {seekingFree ? TEXT.seeking : TEXT.nextFree}
+              </Button>
+            ) : null}
+            <Button size="small" variant="outlined" disabled={!isDateOnly(date)} onClick={() => shiftDays(1)}>
+              {TEXT.tomorrow}
+            </Button>
+            <Button size="small" variant="outlined" disabled={!isDateOnly(date)} onClick={() => shiftDays(7)}>
+              {TEXT.nextWeek}
+            </Button>
+          </Stack>
+          {whenNote ? (
+            <Typography variant="caption" sx={{ color: "warning.dark" }}>
+              {whenNote}
+            </Typography>
+          ) : null}
         </Stack>
       </SoftCard>
     );
+
+  /* "Změnit" on the slot card: the quick ways to another time, then the fields. */
+  const changeMenu = (
+    <Menu
+      open={changeAnchor !== null}
+      anchorEl={changeAnchor}
+      onClose={() => setChangeAnchor(null)}
+      slotProps={{ list: { "aria-label": TEXT.changeMenu, dense: true } }}
+    >
+      {onFindNextFree ? (
+        <MenuItem onClick={() => void findNextFree()} disabled={effectiveCalendarId === ""}>
+          {TEXT.nextFree}
+        </MenuItem>
+      ) : null}
+      <MenuItem onClick={() => shiftDays(1)}>{TEXT.tomorrow}</MenuItem>
+      <MenuItem onClick={() => shiftDays(7)}>{TEXT.nextWeek}</MenuItem>
+      <MenuItem onClick={editWhen}>{TEXT.otherWhen}</MenuItem>
+      {fromGrid ? <MenuItem onClick={pickInGrid}>{TEXT.pickInGrid}</MenuItem> : null}
+    </Menu>
+  );
 
   const step1 = (
     <Stack spacing={3}>
@@ -839,6 +995,7 @@ export function NewAppointmentDialog({
       >
         {slotCard}
       </AsyncSection>
+      {changeMenu}
       {dayNotice}
 
       {mode === "event" ? (
@@ -915,11 +1072,14 @@ export function NewAppointmentDialog({
               path={quickPath}
               mayRegister={mayRegister}
               disabled={register.isPending}
+              fieldErrors={
+                registerError?.field ? { [registerError.field]: registerError.message } : undefined
+              }
             />
           )}
-          {register.error ? (
+          {registerError ? (
             <Alert severity="error" sx={{ mt: 1.5 }}>
-              {errorText(register.error, t)}
+              {registerError.message}
             </Alert>
           ) : null}
         </Box>

@@ -27,10 +27,11 @@ import PhoneOutlinedIcon from "@mui/icons-material/PhoneOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { appointmentsApi } from "../../api/appointments";
 import { patientsApi } from "../../api/patients";
 import { activitiesApi } from "../../api/activities";
+import { documentsApi } from "../../api/documents";
 import { patientPreRegistrationApi } from "../../api/patientPreRegistration";
 import { BookingApiError } from "../../api/apiError";
 import {
@@ -41,9 +42,10 @@ import {
   isTerminalStatus,
   statusName,
 } from "../../api/bookingContracts";
-import type { Activity, Appointment, HistoryLine } from "../../api/bookingContracts";
+import type { Activity, Appointment, DayAppointment, HistoryLine } from "../../api/bookingContracts";
 import {
   addDaysToDateOnly,
+  formatDateOnly,
   formatPragueDateTime,
   formatPragueTime,
   isLate,
@@ -65,11 +67,17 @@ import {
   formatWallClock,
   initials,
   isOfferedStart,
+  PAPERWORK_STATE_LABEL,
+  PAPERWORK_STATE_TONE,
+  paperworkRows,
+  paperworkSummary,
+  paymentView,
   planEdit,
   reachableStatuses,
   sourceLabel,
   statusTone,
   type EditDraft,
+  type PaperworkRow,
 } from "./appointmentEdit";
 
 /**
@@ -266,6 +274,16 @@ function DetailBody({
   const historyQuery = useQuery({
     queryKey: ["appointment-history", calendarId, appointment.id],
     queryFn: () => appointmentsApi.history(calendarId, appointment.id),
+  });
+
+  /* The grid's row for this appointment: partner, discount and payment (G3). */
+  const appointmentDay = pragueDateKey(appointment.startUtc);
+  const dayRowQuery = useQuery({
+    queryKey: ["appointment-day-row", calendarId, appointment.id, appointmentDay],
+    queryFn: async () => {
+      const rows = await appointmentsApi.range(appointmentDay, appointmentDay, [calendarId]);
+      return rows.find((r) => r.id === appointment.id) ?? null;
+    },
   });
 
   const activity = activities.find((a) => a.id === appointment.activityId) ?? null;
@@ -498,6 +516,19 @@ function DetailBody({
         {/* ── Left column ── */}
         <Stack spacing={2.5} sx={{ flex: 1, minWidth: 0, p: 3 }}>
           {/*
+            The owner's rule (3. 10. 2026): a patient in the system sees, at the
+            top, every protocol this visit requires and where each one stands.
+            A slot with no register entry has nothing to track.
+          */}
+          {hasPatient ? (
+            <PaperworkSection
+              appointment={appointment}
+              activity={activity}
+              patientId={appointment.patientId}
+            />
+          ) : null}
+
+          {/*
             4.5, v29; live since v32. Rendered only when there is an answer - see
             `paperworkSchema`. When the register does not know the patient this
             whole block is absent rather than reassuring.
@@ -588,8 +619,18 @@ function DetailBody({
           {/* ── CENA · PLATBA · ZDROJ ── */}
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 2 }}>
             <Fact label="Cena" value={price != null ? formatCzk(price) : "—"} />
-            {/* No billing endpoint answers per appointment yet; a dash is honest. */}
-            <Fact label="Platba" value="—" muted />
+            {/*
+              G3 (3. 10. 2026): the day row carries `paymentState` and `invoiceId`;
+              the single-appointment view does not, so the row is read from the
+              one-day range of this calendar - one bounded request.
+            */}
+            <PaymentFact
+              row={dayRowQuery.data ?? null}
+              pending={dayRowQuery.isPending}
+              failed={dayRowQuery.isError}
+              appointment={appointment}
+              hasPatient={hasPatient}
+            />
             <Fact label="Zdroj" value={sourceLabel(appointment.source)} />
           </Box>
 
@@ -813,6 +854,70 @@ function DetailBody({
   );
 }
 
+/**
+ * PLATBA, from the day row: Bez dokladu / Nezaplaceno / Částečně zaplaceno /
+ * Zaplaceno, with the one step that follows - open the invoice there is, or
+ * issue one. Both land on Fakturace with what it needs in `location.state`.
+ */
+function PaymentFact({
+  row,
+  pending,
+  failed,
+  appointment,
+  hasPatient,
+}: {
+  row: DayAppointment | null;
+  pending: boolean;
+  failed: boolean;
+  appointment: Appointment;
+  hasPatient: boolean;
+}) {
+  const navigate = useNavigate();
+  const view = paymentView(row?.paymentState ?? null);
+  const invoiceId = row?.invoiceId ?? null;
+  return (
+    <Box>
+      <SectionLabel sx={{ mb: 0.25 }}>Platba</SectionLabel>
+      {pending ? (
+        <Skeleton width={96} height={22} />
+      ) : failed || row === null ? (
+        <Typography sx={{ fontWeight: 600, fontSize: 15, color: "text.secondary" }}>—</Typography>
+      ) : (
+        <Stack sx={{ alignItems: "flex-start", gap: 0.5 }}>
+          <StatusChip tone={view.tone}>{view.label}</StatusChip>
+          {invoiceId ? (
+            <Button
+              size="small"
+              variant="text"
+              sx={{ px: 0.5, minWidth: 0 }}
+              onClick={() => navigate("/billing", { state: { invoiceId } })}
+            >
+              Otevřít doklad
+            </Button>
+          ) : hasPatient ? (
+            <Button
+              size="small"
+              variant="text"
+              sx={{ px: 0.5, minWidth: 0 }}
+              onClick={() =>
+                navigate("/billing", {
+                  state: {
+                    patientId: appointment.patientId,
+                    appointmentId: appointment.id,
+                    activityId: appointment.activityId,
+                  },
+                })
+              }
+            >
+              Vystavit doklad
+            </Button>
+          ) : null}
+        </Stack>
+      )}
+    </Box>
+  );
+}
+
 /** A label in small caps over a value - CENA, PLATBA, ZDROJ. */
 function Fact({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) {
   return (
@@ -1003,6 +1108,162 @@ function RegistrationWarning({
         </Box>
       </Stack>
     </Box>
+  );
+}
+
+/**
+ * PODKLADY K TÉTO PROHLÍDCE - every requirement of this činnost/service with a
+ * state pill each. What is required comes from the server three ways (see
+ * `paperworkRows`); this component only fetches the document check, words the
+ * rows and offers the one action that exists today for a missing one.
+ */
+function PaperworkSection({
+  appointment,
+  activity,
+  patientId,
+}: {
+  appointment: Appointment;
+  activity: Activity | null;
+  patientId: string;
+}) {
+  const mayManageRules = usePermission("settings.clinic.manage");
+
+  /* One read for the patient, filtered to this appointment: the same call the
+     patient card makes, so the two never disagree. */
+  const checkQuery = useQuery({
+    queryKey: ["patient-document-check", patientId],
+    queryFn: () => documentsApi.checkRequired(patientId),
+    staleTime: 60 * 1000,
+  });
+  const documents = checkQuery.data
+    ? checkQuery.data.requirements.filter((r) => r.appointmentId === appointment.id)
+    : null;
+
+  const rows = paperworkRows({
+    paperwork: appointment.paperwork,
+    questionnaireRequirement: activity?.questionnaireRequirement ?? null,
+    documents,
+    formatDate: (iso) => formatDateOnly(iso.slice(0, 10)),
+  }).map((row) =>
+    /* While the check is still on its way, say so instead of "could not". */
+    row.key === "documents" && row.state === "unknown" && checkQuery.isPending
+      ? { ...row, detail: "ověřuji…" }
+      : row,
+  );
+  const summary = paperworkSummary(rows);
+
+  return (
+    <SoftCard sx={{ p: 2 }} data-testid="paperwork-section">
+      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", gap: 1, mb: 1 }}>
+        <SectionLabel component="h3" sx={{ mb: 0 }}>
+          Podklady k této prohlídce
+        </SectionLabel>
+        <StatusChip tone={checkQuery.isPending && summary.text !== "vše v pořádku" ? "grey" : summary.tone} size="sm">
+          {summary.text}
+        </StatusChip>
+      </Stack>
+
+      <Stack component="ul" spacing={0} sx={{ listStyle: "none", p: 0, m: 0 }} aria-label="Podklady k této prohlídce">
+        {rows.map((row) => (
+          <PaperworkRowView key={row.key} row={row} patientId={patientId} />
+        ))}
+      </Stack>
+
+      <Stack direction="row" sx={{ alignItems: "center", gap: 1.5, mt: 1.25, flexWrap: "wrap" }}>
+        {checkQuery.isError ? (
+          <Button size="small" variant="text" onClick={() => void checkQuery.refetch()}>
+            Zkusit znovu
+          </Button>
+        ) : null}
+        {mayManageRules ? (
+          <MuiLink component={RouterLink} to="/pravidla-dokumentu" underline="hover" sx={{ fontSize: 13 }}>
+            Pravidla dokumentů
+          </MuiLink>
+        ) : null}
+      </Stack>
+    </SoftCard>
+  );
+}
+
+/** One line of the section: the requirement, its pill, its reason, its one action. */
+function PaperworkRowView({ row, patientId }: { row: PaperworkRow; patientId: string }) {
+  return (
+    <Stack
+      component="li"
+      direction="row"
+      sx={{
+        alignItems: "center",
+        gap: 1.5,
+        py: 0.875,
+        borderTop: "1px solid",
+        borderColor: "divider",
+        "&:first-of-type": { borderTop: "none" },
+      }}
+    >
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}>{row.label}</Typography>
+        {row.detail ? (
+          <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+            {row.detail}
+          </Typography>
+        ) : null}
+      </Box>
+      {row.action === "completionLink" && row.state === "missing" ? (
+        <CopyCompletionLink patientId={patientId} />
+      ) : null}
+      {row.action === "documents" ? (
+        <Button
+          size="small"
+          variant="text"
+          component={RouterLink}
+          to={`/patients/${patientId}/dokumenty`}
+          sx={{ whiteSpace: "nowrap" }}
+        >
+          Dokumenty pacienta
+        </Button>
+      ) : null}
+      <StatusChip tone={PAPERWORK_STATE_TONE[row.state]} size="sm">
+        {row.state === "ok" ? "✓ " : ""}
+        {PAPERWORK_STATE_LABEL[row.state]}
+      </StatusChip>
+    </Stack>
+  );
+}
+
+/**
+ * The action for a missing registration or questionnaire: issue the patient's
+ * 24-hour completion link and put it on the clipboard. The same link the beige
+ * card below issues; this one is the short form for a row.
+ */
+function CopyCompletionLink({ patientId }: { patientId: string }) {
+  const [copied, setCopied] = useState(false);
+  const issue = useMutation({
+    mutationFn: async () => {
+      const issued = await patientPreRegistrationApi.issueLink(patientId);
+      return issued.url ?? `${window.location.origin}${issued.path}`;
+    },
+    onSuccess: async (full) => {
+      try {
+        await navigator.clipboard.writeText(full);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 2000);
+      } catch {
+        /* clipboard blocked; the beige card below shows the address to copy by hand */
+      }
+    },
+  });
+  return (
+    <Tooltip title={issue.isError ? "Odkaz se nepodařilo vygenerovat." : ""}>
+      <Button
+        size="small"
+        variant="text"
+        disabled={issue.isPending}
+        onClick={() => issue.mutate()}
+        sx={{ whiteSpace: "nowrap" }}
+      >
+        {copied ? "Zkopírováno" : "Zkopírovat odkaz"}
+      </Button>
+    </Tooltip>
   );
 }
 

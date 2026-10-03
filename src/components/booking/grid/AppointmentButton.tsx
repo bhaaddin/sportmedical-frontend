@@ -12,6 +12,7 @@ import { useCalendarDisplay } from "../../../api/displaySettings";
 import { DESIGN } from "../../../theme";
 import { formatPragueTime, isLate } from "../../../utils/time";
 import { AppointmentHoverCard } from "./AppointmentHoverCard";
+import { clubLine } from "./clubLine";
 
 /**
  * One appointment, drawn the board's way (3. 10. 2026): a flat grey card
@@ -76,6 +77,8 @@ export function AppointmentButton({
   const statusLine = late ? `${statusLabel} · ${t("booking.status.late")}` : statusLabel;
   const cancelled = tally === "cancelled";
   const active = tally === "arrived";
+  /* "Klub · FK Slaný · −10 %" - the board's club line, from what the server sent. */
+  const club = clubLine(appointment.partnerName, appointment.clubDiscountPercent);
 
   const paperworkMark = appointment.paperwork ? (
     /*
@@ -173,6 +176,11 @@ export function AppointmentButton({
           <Box component="span" sx={{ fontSize: 12 }}>
             {rowName ?? appointment.activityName}
           </Box>
+          {club ? (
+            <Box component="span" sx={{ ml: 0.5, fontSize: 10, color: DESIGN.muted }}>
+              {club}
+            </Box>
+          ) : null}
           {tally !== "booked" || late ? (
             <Box component="span" sx={{ ml: 0.5, fontSize: 10, color: DESIGN.muted }}>
               {late ? t("booking.status.late") : statusLabel}
@@ -200,6 +208,23 @@ export function AppointmentButton({
               }}
             >
               {patientName}
+            </Box>
+          ) : null}
+          {club ? (
+            <Box
+              component="span"
+              data-testid="club-line"
+              sx={{
+                display: "block",
+                fontSize: 11,
+                fontWeight: 600,
+                color: DESIGN.muted,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {club}
             </Box>
           ) : null}
           <Box

@@ -204,6 +204,9 @@ describe('Úplná registrace', () => {
 
     await fillTheSeven(user);
     await user.type(screen.getByLabelText('Telefon'), '773539001');
+    /* Česko by default, named under the field; the number grouped as it is typed. */
+    expect(screen.getByTestId('phone-country-note')).toHaveTextContent('Česko');
+    expect(screen.getByLabelText('Telefon')).toHaveValue('773 539 001');
     await user.click(screen.getByRole('button', { name: 'vybrat-adresu' }));
 
     const footer = screen.getByRole('contentinfo');
@@ -213,7 +216,8 @@ describe('Úplná registrace', () => {
     const request = register.mock.calls[0]![0];
     expect(request.mode).toBe('Standard');
     expect(request.address).toMatchObject({ municipality: 'Kladno', zip: '27201', ruianAddressPointCode: 0 });
-    expect(request.phone).toMatchObject({ value: '773539001', regionCode: 'CZ' });
+    /* One stored string with the dialling code - the server refuses a number without one. */
+    expect(request.phone).toMatchObject({ value: '+420773539001', regionCode: 'CZ' });
 
     expect(await screen.findByText('karta-pacienta')).toBeInTheDocument();
     expect(issueLink).not.toHaveBeenCalled();

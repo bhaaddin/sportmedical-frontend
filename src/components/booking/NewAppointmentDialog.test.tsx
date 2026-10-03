@@ -18,6 +18,7 @@ const create = vi.fn();
 const createUnregistered = vi.fn();
 const listPatients = vi.fn();
 const getProfile = vi.fn();
+const getById = vi.fn();
 const preRegister = vi.fn();
 const issueLink = vi.fn();
 const getAllClubs = vi.fn();
@@ -28,7 +29,7 @@ vi.mock('../../api/workingHours', () => ({ workingHoursApi: { preview } }));
 vi.mock('../../api/appointments', () => ({
   appointmentsApi: { getAvailability, create, createUnregistered },
 }));
-vi.mock('../../api/patients', () => ({ patientsApi: { list: listPatients, getProfile } }));
+vi.mock('../../api/patients', () => ({ patientsApi: { list: listPatients, getProfile, getById } }));
 vi.mock('../../api/patientPreRegistration', () => ({
   patientPreRegistrationApi: { preRegister, issueLink },
 }));
@@ -123,6 +124,7 @@ beforeEach(() => {
   });
   getProfile.mockReset().mockResolvedValue({ phone: '+420 777 123 456', email: 'filip@example.cz' });
   preRegister.mockReset().mockResolvedValue({ patientId: 'np1' });
+  getById.mockReset().mockResolvedValue({ id: 'np1', firstName: 'Nový', lastName: 'Pacient', fullName: 'Nový Pacient' });
   issueLink.mockReset().mockResolvedValue({
     url: 'https://sportmedical.test/r/abc',
     path: '/r/abc',
@@ -179,10 +181,56 @@ describe('step 1 — kdo přijde', () => {
     expect(screen.getByRole('button', { name: 'Pokračovat' })).toBeEnabled();
   });
 
-  it('"Změnit" from the grid closes the drawer so the slot is picked again there', async () => {
+  it('"Změnit" offers the quick choices, and "Vybrat v kalendáři" closes the drawer', async () => {
     const { onClose } = renderDialog();
     await userEvent.click(await screen.findByRole('button', { name: 'Změnit' }));
+    const menu = screen.getByRole('menu', { name: 'Změnit termín' });
+    expect(within(menu).getByRole('menuitem', { name: 'Zítra' })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: 'Příští týden' })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: 'Jiný datum a čas' })).toBeInTheDocument();
+    /* Nobody answers "next free" here, so it is not offered. */
+    expect(within(menu).queryByRole('menuitem', { name: 'Příští volný termín' })).not.toBeInTheDocument();
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Vybrat v kalendáři' }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('"Zítra" and "Příští týden" move the slot card a day and a week on, keeping the time', async () => {
+    renderDialog();
+    expect(await screen.findByText('Čtvrtek 24. 9. 2026 · 09:00 — 10:00')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Změnit' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Zítra' }));
+    expect(screen.getByText('Pátek 25. 9. 2026 · 09:00 — 10:00')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Změnit' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Příští týden' }));
+    expect(screen.getByText('Pátek 2. 10. 2026 · 09:00 — 10:00')).toBeInTheDocument();
+    /* The day's offer is asked again for the new date. */
+    await waitFor(() => expect(preview).toHaveBeenCalledWith('c1', '2026-10-02', '2026-10-02'));
+  });
+
+  it('"Příští volný termín" asks the calendar and takes what it answers', async () => {
+    const onFindNextFree = vi.fn().mockResolvedValue({ date: '2026-09-28', time: '08:00', end: '08:30' });
+    renderDialog({ onFindNextFree });
+    await userEvent.click(await screen.findByRole('button', { name: 'Změnit' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Příští volný termín' }));
+    await waitFor(() => expect(onFindNextFree).toHaveBeenCalledWith({ date: '2026-09-24', time: '09:00' }, 'c1'));
+    expect(await screen.findByText('Pondělí 28. 9. 2026 · 08:00 — 08:30')).toBeInTheDocument();
+  });
+
+  it('says so when there is no free slot in the month ahead', async () => {
+    const onFindNextFree = vi.fn().mockResolvedValue(null);
+    renderDialog({ onFindNextFree });
+    await userEvent.click(await screen.findByRole('button', { name: 'Změnit' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Příští volný termín' }));
+    expect(await screen.findByText('V příštích 31 dnech kalendář nenabízí žádný volný termín.')).toBeInTheDocument();
+    expect(screen.getByText('Čtvrtek 24. 9. 2026 · 09:00 — 10:00')).toBeInTheDocument();
+  });
+
+  it('"Jiný datum a čas" shows the fields', async () => {
+    renderDialog();
+    await userEvent.click(await screen.findByRole('button', { name: 'Změnit' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Jiný datum a čas' }));
+    expect(screen.getByLabelText('Datum')).toHaveValue('2026-09-24');
+    expect(screen.getByLabelText('Čas od')).toHaveValue('09:00');
   });
 
   it('says why a closed day offers nothing', async () => {
@@ -383,6 +431,88 @@ describe('rychlá registrace', () => {
     await waitFor(() => expect(issueLink).toHaveBeenCalledWith('np1'));
     expect(await screen.findByText('https://sportmedical.test/r/abc')).toBeInTheDocument();
     expect(screen.getByText(/E-mail s odkazem je ve frontě/)).toBeInTheDocument();
+  });
+
+  it('shows the server\'s own refusal at the box it names instead of "něco se pokazilo"', async () => {
+    window.localStorage.setItem(
+      'permissions',
+      JSON.stringify(['bookings.create', 'patients.view', 'patients.register']),
+    );
+    const { AxiosError, AxiosHeaders } = await import('axios');
+    const config = { headers: new AxiosHeaders() };
+    preRegister.mockRejectedValue(
+      new AxiosError('Request failed', '400', config as never, undefined, {
+        status: 400,
+        statusText: '',
+        headers: {},
+        config: config as never,
+        data: {
+          code: 'intake.registration.phone_unusable',
+          message: 'Telefon není platné číslo. Zadejte ho s předvolbou, nebo ho vynechte.',
+          errors: { field: ['phone'] },
+        },
+      }),
+    );
+    renderDialog();
+    await userEvent.click(screen.getByRole('radio', { name: 'Rychlá registrace' }));
+    await userEvent.type(screen.getByLabelText('Jméno a příjmení'), 'Nový Pacient');
+    await userEvent.type(screen.getByLabelText('E-mail'), 'novy@example.cz');
+    fireEvent.change(screen.getByLabelText('Datum narození'), { target: { value: '1990-05-05' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Vytvořit a pokračovat' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Telefon není platné číslo. Zadejte ho s předvolbou, nebo ho vynechte.',
+    );
+    expect(screen.getByLabelText('Telefon')).toHaveAttribute('aria-invalid', 'true');
+    /* Still on step 1, the form intact, nothing booked. */
+    expect(screen.getByText('Krok 1 ze 2 — nový pacient')).toBeInTheDocument();
+    expect(screen.getByLabelText('Jméno a příjmení')).toHaveValue('Nový Pacient');
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('does not book against a patient the register did not create (a namesake needs review)', async () => {
+    window.localStorage.setItem(
+      'permissions',
+      JSON.stringify(['bookings.create', 'patients.view', 'patients.register']),
+    );
+    const { AxiosError, AxiosHeaders } = await import('axios');
+    const config = { headers: new AxiosHeaders() };
+    getById.mockRejectedValue(
+      new AxiosError('Not found', '404', config as never, undefined, {
+        status: 404, statusText: '', headers: {}, config: config as never, data: {},
+      }),
+    );
+    renderDialog();
+    await userEvent.click(screen.getByRole('radio', { name: 'Rychlá registrace' }));
+    await userEvent.type(screen.getByLabelText('Jméno a příjmení'), 'Nový Pacient');
+    await userEvent.type(screen.getByLabelText('E-mail'), 'novy@example.cz');
+    fireEvent.change(screen.getByLabelText('Datum narození'), { target: { value: '1990-05-05' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Vytvořit a pokračovat' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Pacient nebyl založen/);
+    expect(screen.getByText('Krok 1 ze 2 — nový pacient')).toBeInTheDocument();
+    expect(screen.queryByText('Krok 2 ze 2 — co se bude dělat')).not.toBeInTheDocument();
+  });
+
+  it('types the telephone with the country picker and sends one +420 string', async () => {
+    window.localStorage.setItem(
+      'permissions',
+      JSON.stringify(['bookings.create', 'patients.view', 'patients.register']),
+    );
+    renderDialog();
+    await userEvent.click(screen.getByRole('radio', { name: 'Rychlá registrace' }));
+    expect(screen.getByTestId('phone-country-note')).toHaveTextContent('Česko');
+    await userEvent.type(screen.getByLabelText('Telefon'), '773539001');
+    expect(screen.getByLabelText('Telefon')).toHaveValue('773 539 001');
+    await userEvent.click(screen.getByRole('button', { name: /Předvolba \+420/ }));
+    await userEvent.type(screen.getByLabelText('Hledat zemi nebo předvolbu'), '421');
+    await userEvent.click(screen.getByRole('menuitem', { name: /Slovensko/ }));
+    expect(screen.getByTestId('phone-country-note')).toHaveTextContent('Slovensko');
+    await userEvent.type(screen.getByLabelText('Jméno a příjmení'), 'Nový Pacient');
+    await userEvent.type(screen.getByLabelText('E-mail'), 'novy@example.cz');
+    fireEvent.change(screen.getByLabelText('Datum narození'), { target: { value: '1990-05-05' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Vytvořit a pokračovat' }));
+    await waitFor(() => expect(preRegister).toHaveBeenCalledWith(expect.objectContaining({ phone: '+421773539001' })));
   });
 
   it('is offered from an empty search with the typed name carried over', async () => {

@@ -48,9 +48,11 @@ function newId(): string {
 
 export const patientPreRegistrationApi = {
   /** Creates a provisional patient and returns its id (the id we generated). */
-  async preRegister(input: PreRegisterInput): Promise<{ patientId: string }> {
+  async preRegister(
+    input: PreRegisterInput,
+  ): Promise<{ patientId: string; outcome: string | null; created: boolean }> {
     const patientId = newId();
-    await client.post('/api/patients/pre-registrations', {
+    const res = await client.post('/api/patients/pre-registrations', {
       patientId,
       firstName: input.firstName,
       lastName: input.lastName,
@@ -58,7 +60,10 @@ export const patientPreRegistrationApi = {
       email: input.email,
       phone: input.phone && input.phone.trim() !== '' ? input.phone.trim() : null,
     });
-    return { patientId };
+    /* The registry answers 200 with the outcome even when it created nobody - a
+       namesake with the same birth date comes back as CandidateReviewRequired. */
+    const outcome = typeof res.data?.outcome === 'string' ? (res.data.outcome as string) : null;
+    return { patientId, outcome, created: outcome === null || !/candidatereview/i.test(outcome) };
   },
 
   /** Issues (or re-issues) the completion link for a provisional patient. */

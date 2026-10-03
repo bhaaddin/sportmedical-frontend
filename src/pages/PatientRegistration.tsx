@@ -71,7 +71,6 @@ import {
 import {
   AGREES_TEXT, disagreementText, verdictOf, worthInspecting,
 } from '../services/patientRegistration/identityInspection';
-import { preferredCount, withPreferredFirst } from '../services/patientRegistration/phoneRegions';
 import {
   groupedDisplay, phoneComplaint, phoneDisplayState, worthInspectingPhone,
 } from '../services/patientRegistration/phoneDisplay';
@@ -79,6 +78,7 @@ import {
   MODE_LABEL, progressSubtitle, requiredFieldCount,
 } from '../services/patientRegistration/progress';
 import { PageHeader, SectionLabel, SoftCard, StatusChip } from '../components/ui';
+import { PhoneField } from '../components/ui/PhoneField';
 import MapyAddressPicker from '../components/registration/MapyAddressPicker';
 import CandidateReviewDialog from '../components/registration/CandidateReviewDialog';
 import FormField from '../components/registration/FormField';
@@ -647,18 +647,6 @@ export default function PatientRegistration() {
   const quick = form.mode === 'Quick';
   const identifier = classifyInsuranceNumber(form.healthInsuranceNumber);
 
-  /*
-   * Czech and Slovak first. The server sends 245 regions in ISO order — AC,
-   * AD, AE — so `CZ` sits two hundred rows down, and a Czech clinic reaches
-   * for it all day. Lifted here rather than asked of the server: which two are
-   * common is a fact about this reception desk, not about the catalogue.
-   */
-  const phoneRegions = useMemo(
-    () => withPreferredFirst(options?.phoneRegions ?? []),
-    [options],
-  );
-  const preferredRegions = preferredCount(options?.phoneRegions ?? []);
-
   const titleOptions = useMemo(
     () => ({
       before: options?.titlesBeforeName ?? [],
@@ -977,56 +965,48 @@ export default function PatientRegistration() {
                 </FormField>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
-                <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
-                  <FormField label="Předvolba" required={!quick} name="phoneRegionCode" sx={{ width: 150, flexShrink: 0 }}>
-                    {(id) => (
-                      <TextField
-                        id={id} select fullWidth
-                        value={form.phoneRegionCode}
-                        onChange={(e) => update('phoneRegionCode', e.target.value)}
-                        onBlur={checkOnLeave('phoneRegionCode')}
-                        error={errors.phoneRegionCode !== undefined}
-                        helperText={errors.phoneRegionCode}
-                        slotProps={selectLabelledBy(id)}
-                      >
-                        {phoneRegions.map((region, index) => [
-                          /* A line under the common ones, never above the first row. */
-                          index === preferredRegions && preferredRegions > 0
-                            ? <Divider key="preferred-divider" />
-                            : null,
-                          <MenuItem key={region.code} value={region.code}>
-                            {region.displayValue}
-                          </MenuItem>,
-                        ])}
-                      </TextField>
-                    )}
-                  </FormField>
-                  <FormField label={`Telefon${optionalInQuick}`} required={!quick} name="phone" sx={{ flexGrow: 1, minWidth: 0 }}>
-                    {(id) => (
-                      <TextField
-                        id={id} fullWidth placeholder="773 539 001"
-                        value={form.phone}
-                        onChange={(e) => update('phone', e.target.value)}
-                        onBlur={checkOnLeave('phone')}
-                        error={errors.phone !== undefined || phoneState === 'unreadable'}
-                        /* Grouped while it is being typed, and complained about only
-                           when it is finished and still does not fit the country. A
-                           red border on every second keystroke is a red border people
-                           stop reading. */
-                        helperText={
-                          errors.phone
-                          ?? (phoneSays !== '' ? phoneSays : undefined)
-                          ?? (phoneGrouped !== '' ? phoneGrouped : undefined)
-                        }
-                        slotProps={{
-                          formHelperText: phoneState === 'valid'
-                            ? { sx: { color: 'success.main', fontWeight: 500 } }
-                            : undefined,
-                        }}
-                      />
-                    )}
-                  </FormField>
-                </Stack>
+                {/*
+                  One field, the owner's way (3. 10. 2026): the country is a compact
+                  picker in front of the number, Česko by default, searchable by digits
+                  or name, and named under the field as a note. What is stored is one
+                  `+420773539001` - the register's canonicaliser then groups it (the
+                  helper line) and the server, not this screen, says whether it is
+                  valid. The region code travels with it, as it always did.
+                */}
+                <FormField label={`Telefon${optionalInQuick}`} required={!quick} name="phone">
+                  {(id) => (
+                    <PhoneField
+                      id={id}
+                      value={form.phone}
+                      defaultCountryCode={form.phoneRegionCode || undefined}
+                      onChange={(next, country) => {
+                        setForm((previous) => ({
+                          ...previous,
+                          phone: next,
+                          phoneRegionCode: country?.code ?? previous.phoneRegionCode,
+                        }));
+                        setErrors((previous) => ({ ...previous, phone: undefined, phoneRegionCode: undefined }));
+                      }}
+                      onBlur={checkOnLeave('phone')}
+                      error={
+                        errors.phone !== undefined
+                        || errors.phoneRegionCode !== undefined
+                        || phoneState === 'unreadable'
+                      }
+                      /* Grouped while it is being typed, and complained about only
+                         when it is finished and still does not fit the country. A
+                         red border on every second keystroke is a red border people
+                         stop reading. */
+                      helperText={
+                        errors.phone
+                        ?? errors.phoneRegionCode
+                        ?? (phoneSays !== '' ? phoneSays : undefined)
+                        ?? (phoneGrouped !== '' ? phoneGrouped : undefined)
+                      }
+                      helperTone={phoneState === 'valid' ? 'success' : 'default'}
+                    />
+                  )}
+                </FormField>
               </Grid>
             </Grid>
           </SoftCard>

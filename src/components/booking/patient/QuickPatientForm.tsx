@@ -1,8 +1,14 @@
 import { Box, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import InfoOutlined from "@mui/icons-material/InfoOutlined";
 import { SectionLabel, SoftCard } from "../../ui";
+import { PhoneField } from "../../ui/PhoneField";
 import type { Activity } from "../../../api/bookingContracts";
-import { formatCzk, type QuickPatientDraft, type QuickPath } from "../NewAppointmentDialog.logic";
+import {
+  formatCzk,
+  splitFullName,
+  type QuickPatientDraft,
+  type QuickPath,
+} from "../NewAppointmentDialog.logic";
 
 export type { QuickPatientDraft };
 
@@ -22,6 +28,7 @@ export function QuickPatientForm({
   path,
   mayRegister,
   disabled = false,
+  fieldErrors,
 }: {
   value: QuickPatientDraft;
   onChange: (next: QuickPatientDraft) => void;
@@ -30,9 +37,14 @@ export function QuickPatientForm({
   path: QuickPath | null;
   mayRegister: boolean;
   disabled?: boolean;
+  /** The field the server named when it refused the registration, so that box goes red. */
+  fieldErrors?: Partial<Record<keyof QuickPatientDraft, string>>;
 }) {
   const set = (field: keyof QuickPatientDraft, next: string) =>
     onChange({ ...value, [field]: next });
+  const errors = fieldErrors ?? {};
+  /* Jméno alone cannot register anybody; the box says so before the button is pressed. */
+  const oneWordName = value.name.trim() !== "" && splitFullName(value.name) === null;
 
   const field = (
     label: string,
@@ -48,6 +60,8 @@ export function QuickPatientForm({
         disabled={disabled}
         value={value[key]}
         onChange={(e) => set(key, e.target.value)}
+        error={errors[key] !== undefined}
+        helperText={errors[key]}
         slotProps={{ htmlInput: { "aria-label": label } }}
         {...props}
       />
@@ -57,9 +71,27 @@ export function QuickPatientForm({
   return (
     <SoftCard sx={{ p: 2.5 }}>
       <Stack spacing={2}>
-        {field("Jméno a příjmení", "name", { placeholder: "Filip Fehér", autoFocus: true })}
+        {field("Jméno a příjmení", "name", {
+          placeholder: "Filip Fehér",
+          autoFocus: true,
+          helperText:
+            errors.name ??
+            (oneWordName && mayRegister ? "Pro založení pacienta zadejte jméno i příjmení." : undefined),
+        })}
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
-          {field("Telefon", "phone", { type: "tel", placeholder: "+420 773 539 001" })}
+          <Box>
+            <SectionLabel component="label" sx={{ mb: 0.5 }}>
+              Telefon
+            </SectionLabel>
+            <PhoneField
+              label="Telefon"
+              value={value.phone}
+              onChange={(next) => set("phone", next)}
+              disabled={disabled}
+              error={errors.phone !== undefined}
+              helperText={errors.phone}
+            />
+          </Box>
           {field("E-mail", "email", { type: "email", placeholder: "filip@email.cz" })}
         </Box>
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>

@@ -18,9 +18,15 @@ const history = vi.fn();
 const setStatus = vi.fn();
 const reschedule = vi.fn();
 const getAvailability = vi.fn();
+const range = vi.fn();
+const checkRequired = vi.fn();
 
 vi.mock('../../api/appointments', () => ({
-  appointmentsApi: { get, history, setStatus, reschedule, getAvailability, cancel: vi.fn() },
+  appointmentsApi: { get, history, setStatus, reschedule, getAvailability, range, cancel: vi.fn() },
+}));
+
+vi.mock('../../api/documents', () => ({
+  documentsApi: { checkRequired },
 }));
 
 vi.mock('../../api/patients', () => ({
@@ -84,8 +90,34 @@ const appointment = {
   unregisteredPhone: null,
 };
 
+/* The grid's row for the same appointment: it carries what the detail view does not (G3). */
+const dayRow = {
+  id: 't1', calendarId: 'c1', patientId: 'p1', activityId: 'a-basic', activityName: 'Základní prohlídka',
+  startUtc: '2026-10-26T08:30:00Z', endUtc: '2026-10-26T09:00:00Z', status: 0, isRunningLate: false,
+  checkedInUtc: null, paperwork: { ready: false, missing: ['questionnaire_missing'] },
+  patientName: 'Bohumil Komárek', partnerName: null, clubDiscountPercent: null,
+  paymentState: 'unpaid' as const, invoiceId: 'inv-1',
+};
+
+/* `/check` answers for the whole patient; only the rows of THIS appointment belong here. */
+const documentCheck = {
+  allRequiredPresent: false,
+  requirements: [
+    {
+      templateId: 'tpl-vypis', templateName: 'Výpis ze zdravotní dokumentace', serviceName: 'Sportovní lékařská prohlídka',
+      appointmentId: 't1', startUtc: '2026-10-26T08:30:00Z', standing: 'Missing', validUntil: null, daysLeft: null, blocksBooking: false,
+    },
+    {
+      templateId: 'tpl-other', templateName: 'Jiný dokument', serviceName: 'Jiná služba',
+      appointmentId: 't2', startUtc: '2026-11-02T08:30:00Z', standing: 'Missing', validUntil: null, daysLeft: null, blocksBooking: false,
+    },
+  ],
+};
+
 beforeEach(() => {
   get.mockReset().mockResolvedValue(appointment);
+  range.mockReset().mockResolvedValue([dayRow]);
+  checkRequired.mockReset().mockResolvedValue(documentCheck);
   history.mockReset().mockResolvedValue([
     { action: 0, actorId: 'u1', actorDisplayName: 'Recepce', atUtc: '2026-10-24T20:26:00Z', reason: null, oldValue: null, newValue: null },
   ]);
@@ -126,6 +158,69 @@ describe('the appointment detail', () => {
     expect(await screen.findByText('Bohumil Komárek')).toBeInTheDocument();
     expect((await screen.findByText(/1.600 Kč/)).textContent?.replace(/ /g, ' ')).toBe('1 600 Kč');
     expect(await screen.findByText(/Objednáno — 24\. 10\. 2026/)).toBeInTheDocument();
+  });
+
+  it('lists every podklad of this visit at the top, each with its state and its one action', async () => {
+    renderDetail();
+    const section = await screen.findByTestId('paperwork-section');
+    expect(within(section).getByRole('heading', { name: 'Podklady k této prohlídce' })).toBeInTheDocument();
+
+    /* The section is up before the document check answers; wait for its row. */
+    await within(section).findByText('Výpis ze zdravotní dokumentace');
+    const rows = within(section).getAllByRole('listitem');
+    expect(rows.map((r) => r.textContent)).toEqual([
+      expect.stringContaining('Dokončená registrace'),
+      expect.stringContaining('Vstupní dotazník'),
+      expect.stringContaining('Výpis ze zdravotní dokumentace'),
+    ]);
+    expect(within(rows[0]).getByText('✓ V pořádku')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('Chybí')).toBeInTheDocument();
+    expect(within(rows[1]).getByRole('button', { name: 'Zkopírovat odkaz' })).toBeInTheDocument();
+    expect(within(rows[2]).getByText('Chybí')).toBeInTheDocument();
+    expect(within(rows[2]).getByText('vyžaduje služba Sportovní lékařská prohlídka · nic není doloženo')).toBeInTheDocument();
+    expect(within(rows[2]).getByRole('link', { name: 'Dokumenty pacienta' })).toHaveAttribute('href', '/patients/p1/dokumenty');
+    /* Another appointment's document is not this visit's business. */
+    expect(within(section).queryByText('Jiný dokument')).not.toBeInTheDocument();
+
+    expect(within(section).getByText('2 chybí')).toBeInTheDocument();
+    expect(within(section).getByRole('link', { name: 'Pravidla dokumentů' })).toHaveAttribute('href', '/pravidla-dokumentu');
+    expect(checkRequired).toHaveBeenCalledWith('p1');
+
+    /* The beige card below is untouched. */
+    expect(screen.getByText('Registrace není dokončena')).toBeInTheDocument();
+  });
+
+  it('says the documents could not be checked rather than that none are needed', async () => {
+    checkRequired.mockRejectedValue(new Error('500'));
+    renderDetail();
+    const section = await screen.findByTestId('paperwork-section');
+    const row = await within(section).findByText('Lékařské dokumenty');
+    expect(row.closest('li')).toHaveTextContent('Nelze ověřit');
+    expect(row.closest('li')).toHaveTextContent('seznam požadovaných dokumentů se nepodařilo načíst');
+    expect(within(section).getByRole('button', { name: 'Zkusit znovu' })).toBeInTheDocument();
+    expect(within(section).queryByText('Nevyžaduje se')).not.toBeInTheDocument();
+  });
+
+  it('says a document is not wanted when the service asks for none', async () => {
+    checkRequired.mockResolvedValue({ allRequiredPresent: true, requirements: [] });
+    renderDetail();
+    const section = await screen.findByTestId('paperwork-section');
+    const row = await within(section).findByText('Lékařské dokumenty');
+    expect(row.closest('li')).toHaveTextContent('Nevyžaduje se');
+  });
+
+  it('reads PLATBA off the day row and offers to open the invoice there is', async () => {
+    renderDetail();
+    expect(await screen.findByText('Nezaplaceno')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Otevřít doklad' })).toBeInTheDocument();
+    expect(range).toHaveBeenCalledWith('2026-10-26', '2026-10-26', ['c1']);
+  });
+
+  it('offers to issue an invoice when the visit has none', async () => {
+    range.mockResolvedValue([{ ...dayRow, paymentState: 'none', invoiceId: null }]);
+    renderDetail();
+    expect(await screen.findByText('Bez dokladu')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vystavit doklad' })).toBeInTheDocument();
   });
 
   it('opens the edit form from "Upravit" and only enables saving once something changed', async () => {

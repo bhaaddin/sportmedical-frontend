@@ -21,7 +21,7 @@ import AddIcon from "@mui/icons-material/Add";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import RemoveIcon from "@mui/icons-material/Remove";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import { Link as MuiLink } from "@mui/material";
@@ -57,7 +57,12 @@ import {
   type Employee,
 } from "../../components/booking/grid/filters";
 import { GRID_TEXT } from "../../components/booking/grid/gridText";
-import { nextFreeSlot } from "../../components/booking/grid/nextFreeSlot";
+import {
+  NEXT_FREE_HORIZON_DAYS,
+  nextFreeSlotAcrossDays,
+  type DayFacts,
+} from "../../components/booking/grid/nextFreeSlot";
+import type { FoundSlot } from "../../components/booking/NewAppointmentDialog";
 import { resolveNowLineColor } from "../../components/booking/grid/nowLine";
 import {
   WEEKDAY_ABBREVIATION,
@@ -72,6 +77,7 @@ import {
 } from "../../components/booking/grid/resolution";
 import { useCalendarDisplay } from "../../api/displaySettings";
 import {
+  formatMinutes,
   localDateTime,
   parseTimeOfDay,
   pragueMinuteOfDay,
@@ -136,6 +142,39 @@ function addMonths(date: string, months: number): string {
 
 const OPEN_MARK: DayMark = { redNumber: false, closed: false, label: null, detail: null };
 
+/**
+ * The last resort of "Nová objednávka" when the preview for the days ahead
+ * cannot be had: the first Monday-to-Friday that is not a known holiday, at
+ * the earliest opening time any known day has (08:00 when none is known).
+ * A proposal, not a claim - the drawer asks the server whether it is free.
+ */
+function firstOpenWeekday(
+  start: { dayKey: string; minute: number },
+  known: ReadonlyMap<string, PreviewDay>,
+  holidays: ReadonlyMap<string, ClinicHoliday>,
+): { dayKey: string; slot: MinuteRange } | null {
+  let opening: number | null = null;
+  for (const row of known.values()) {
+    const at = row.isOpen ? parseTimeOfDay(row.startTime) : null;
+    if (at !== null && (opening === null || at < opening)) opening = at;
+  }
+  const openAt = opening ?? 8 * 60;
+  let dayKey = start.dayKey;
+  for (let i = 0; i < NEXT_FREE_HORIZON_DAYS; i += 1) {
+    const [y, m, d] = dayKey.split("-").map(Number);
+    const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    const holiday = holidays.get(dayKey);
+    const workday = weekday >= 1 && weekday <= 5 && !(holiday?.isHoliday ?? false);
+    const known_ = known.get(dayKey);
+    const shut = known_ !== undefined && !known_.isOpen;
+    if (workday && !shut && (i > 0 || start.minute <= openAt)) {
+      return { dayKey, slot: { start: openAt, end: openAt + 30 } };
+    }
+    dayKey = addDaysToDateOnly(dayKey, 1);
+  }
+  return null;
+}
+
 /*
  * Stable `combine` functions: TanStack reruns one only when a result changed,
  * so the lists below keep their identity between renders and the memos built
@@ -190,6 +229,7 @@ export default function CalendarGridPage() {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
   const mayManageCalendars = usePermission("settings.clinic.manage");
   const mayBook = usePermission("bookings.create");
@@ -565,47 +605,147 @@ export default function CalendarGridPage() {
 
   /**
    * "Nová objednávka" - the sidebar's big button and the one in the top bar:
-   * open the booking dialog on the next free half hour from now on the first
+   * open the booking dialog on the next free half hour from now, on the first
    * calendar on screen, exactly as if it had been dragged. What is on the
    * calendar already, the lunch break and the working hours are stepped
-   * over; whether the time can really be booked is still the server's answer
-   * in the dialog (6.1).
+   * over - and so is a day the clinic is shut or offers nothing: on a Saturday
+   * the proposal is Monday at opening time, not "today, zavřeno" (owner,
+   * 3. 10. 2026). The grid moves to that day so the slot is in view. Whether
+   * the time can really be booked is still the server's answer in the dialog
+   * (6.1).
    */
-  const bookNextFree = useCallback((extra: Pick<BookingPrefill, "initialPatientId"> = {}) => {
-    const calendar = shown[0];
-    if (!calendar) return;
-    const nowDate = new Date();
-    const dayKey = pragueDateKey(nowDate);
-    const minute = pragueMinuteOfDay(nowDate);
-    const step = calendar.displayStepMinutes > 0 ? calendar.displayStepMinutes : 30;
-    const row = previewByCalendar.get(calendar.id)?.get(dayKey);
-    const busy: MinuteRange[] = [];
-    for (const a of appointmentsQuery.data ?? []) {
-      if (a.calendarId !== calendar.id || statusTally(a.status) === "cancelled") continue;
-      if (touchesDay(a.startUtc, a.endUtc, dayKey)) busy.push(spanOnDay(a.startUtc, a.endUtc, dayKey));
-    }
-    for (const b of blocksByCalendar.get(calendar.id) ?? []) {
-      if (touchesDay(b.startUtc, b.endUtc, dayKey)) busy.push(spanOnDay(b.startUtc, b.endUtc, dayKey));
-    }
-    const breakStart = parseTimeOfDay(row?.breakStart);
-    const breakEnd = parseTimeOfDay(row?.breakEnd);
-    if (breakStart !== null && breakEnd !== null) busy.push({ start: breakStart, end: breakEnd });
-    const workStart = row?.isOpen ? parseTimeOfDay(row.startTime) : null;
-    const workEnd = row?.isOpen ? parseTimeOfDay(row.endTime) : null;
-    const bounds = { start: workStart ?? 0, end: workEnd ?? 24 * 60 };
-    const slot = nextFreeSlot(minute, step, busy, 30, bounds);
-    openBooking(
-      slot
-        ? {
-            initialDate: dayKey,
-            initialCalendarId: calendar.id,
-            initialStart: localDateTime(dayKey, slot.start),
-            initialEnd: localDateTime(dayKey, slot.end),
-            ...extra,
-          }
-        : { initialDate: dayKey, initialCalendarId: calendar.id, ...extra },
-    );
-  }, [shown, previewByCalendar, appointmentsQuery.data, blocksByCalendar, openBooking]);
+  const factsOf = useCallback(
+    (
+      row: PreviewDay | undefined,
+      dayKey: string,
+      calendarId: string,
+      appointments: readonly DayAppointment[],
+      blocks: readonly TimeBlock[],
+    ): DayFacts | undefined => {
+      if (row === undefined) return undefined;
+      const mark = dayMark(holidayByDate.get(dayKey), [row]);
+      const offers = (row.offeredActivityIds ?? []).length > 0;
+      if (mark.closed || !row.isOpen || !offers) return { open: false, bounds: null, busy: [] };
+      const busy: MinuteRange[] = [];
+      for (const a of appointments) {
+        if (a.calendarId !== calendarId || statusTally(a.status) === "cancelled") continue;
+        if (touchesDay(a.startUtc, a.endUtc, dayKey)) busy.push(spanOnDay(a.startUtc, a.endUtc, dayKey));
+      }
+      for (const b of blocks) {
+        if (touchesDay(b.startUtc, b.endUtc, dayKey)) busy.push(spanOnDay(b.startUtc, b.endUtc, dayKey));
+      }
+      const breakStart = parseTimeOfDay(row.breakStart);
+      const breakEnd = parseTimeOfDay(row.breakEnd);
+      if (breakStart !== null && breakEnd !== null) busy.push({ start: breakStart, end: breakEnd });
+      const workStart = parseTimeOfDay(row.startTime);
+      const workEnd = parseTimeOfDay(row.endTime);
+      const bounds = workStart !== null && workEnd !== null ? { start: workStart, end: workEnd } : null;
+      return { open: true, bounds, busy };
+    },
+    [holidayByDate],
+  );
+
+  /*
+   * The month ahead for one calendar, asked for only when the days on screen
+   * cannot answer. Cached briefly, so "Příští volný termín" pressed twice in
+   * the drawer is one round trip.
+   */
+  const horizonFor = useCallback(
+    (calendarId: string, fromDay: string) =>
+      queryClient.fetchQuery({
+        queryKey: ["next-free-horizon", calendarId, fromDay],
+        queryFn: async () => {
+          const to = addDaysToDateOnly(fromDay, NEXT_FREE_HORIZON_DAYS);
+          const [rows, appointments, blocks] = await Promise.all([
+            workingHoursApi.preview(calendarId, fromDay, to),
+            appointmentsApi.range(fromDay, to, [calendarId]),
+            appointmentsApi.blocks(calendarId, fromDay, to),
+          ]);
+          return { rows: new Map(rows.map((r) => [r.date, r])), appointments, blocks };
+        },
+        staleTime: 30_000,
+      }),
+    [queryClient],
+  );
+
+  const findNextFree = useCallback(
+    async (
+      calendarId: string,
+      start: { dayKey: string; minute: number },
+    ): Promise<{ dayKey: string; slot: MinuteRange } | null> => {
+      const calendar = calendarById.get(calendarId);
+      const step = calendar && calendar.displayStepMinutes > 0 ? calendar.displayStepMinutes : 30;
+
+      /* The days on screen first: no request when today or tomorrow has room. */
+      const visible = nextFreeSlotAcrossDays(start, step, (day) =>
+        factsOf(
+          previewByCalendar.get(calendarId)?.get(day),
+          day,
+          calendarId,
+          appointmentsQuery.data ?? [],
+          blocksByCalendar.get(calendarId) ?? [],
+        ),
+      );
+      if (visible.kind === "found") return visible;
+      if (visible.kind === "none") return null;
+
+      /* Then the month ahead; if even that cannot be had, the first open weekday at opening time. */
+      let known: ReadonlyMap<string, PreviewDay> = previewByCalendar.get(calendarId) ?? new Map();
+      try {
+        const horizon = await horizonFor(calendarId, start.dayKey);
+        known = horizon.rows;
+        const walk = nextFreeSlotAcrossDays(start, step, (day) =>
+          factsOf(horizon.rows.get(day), day, calendarId, horizon.appointments, horizon.blocks),
+        );
+        if (walk.kind === "found") return walk;
+        if (walk.kind === "none") return null;
+      } catch {
+        /* The preview could not be fetched; the fallback below says so by being generic. */
+      }
+      return firstOpenWeekday(start, known, holidayByDate);
+    },
+    [calendarById, factsOf, previewByCalendar, appointmentsQuery.data, blocksByCalendar, horizonFor, holidayByDate],
+  );
+
+  const bookNextFree = useCallback(
+    async (extra: Pick<BookingPrefill, "initialPatientId"> = {}) => {
+      const calendar = shown[0];
+      if (!calendar) return;
+      const nowDate = new Date();
+      const dayKey = pragueDateKey(nowDate);
+      const found = await findNextFree(calendar.id, { dayKey, minute: pragueMinuteOfDay(nowDate) });
+      if (found) setAnchor(found.dayKey);
+      openBooking(
+        found
+          ? {
+              initialDate: found.dayKey,
+              initialCalendarId: calendar.id,
+              initialStart: localDateTime(found.dayKey, found.slot.start),
+              initialEnd: localDateTime(found.dayKey, found.slot.end),
+              ...extra,
+            }
+          : { initialDate: dayKey, initialCalendarId: calendar.id, ...extra },
+      );
+    },
+    [shown, findNextFree, openBooking],
+  );
+
+  /* "Příští volný termín" on the drawer's slot card: after the moment it shows, exclusive. */
+  const findNextFreeForDialog = useCallback(
+    async (after: { date: string; time: string }, calendarId: string): Promise<FoundSlot | null> => {
+      const [h, m] = after.time.split(":").map(Number);
+      const minute = (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0) + 1;
+      const found = await findNextFree(calendarId, { dayKey: after.date, minute });
+      if (!found) return null;
+      setAnchor(found.dayKey);
+      return {
+        date: found.dayKey,
+        time: formatMinutes(found.slot.start),
+        end: formatMinutes(found.slot.end),
+      };
+    },
+    [findNextFree],
+  );
 
   /*
    * The sidebar lands here with `state.newAppointment` (a timestamp). Each new
@@ -623,7 +763,7 @@ export default function CalendarGridPage() {
     if (handledNewAppointment.current === newAppointmentKey) return;
     if (!mayBook || shown.length === 0 || !bookingsKnown) return;
     handledNewAppointment.current = newAppointmentKey;
-    bookNextFree(landingPatientId ? { initialPatientId: landingPatientId } : {});
+    void bookNextFree(landingPatientId ? { initialPatientId: landingPatientId } : {});
   }, [newAppointmentKey, landingPatientId, mayBook, shown.length, bookingsKnown, bookNextFree]);
 
   /**
@@ -707,7 +847,7 @@ export default function CalendarGridPage() {
             <ToggleButton value="month">{GRID_TEXT.monthView}</ToggleButton>
           </ToggleButtonGroup>
           {mayBook ? (
-            <Button variant="contained" onClick={() => bookNextFree()}>
+            <Button variant="contained" onClick={() => void bookNextFree()}>
               {GRID_TEXT.newAppointment}
             </Button>
           ) : null}
@@ -934,6 +1074,7 @@ export default function CalendarGridPage() {
           open
           onClose={() => setBooking(null)}
           onBooked={() => void appointmentsQuery.refetch()}
+          onFindNextFree={findNextFreeForDialog}
           {...booking.prefill}
         />
       ) : null}
@@ -1160,6 +1301,8 @@ function MonthGrid({
                       }}
                     >
                       {mark.label ?? GRID_TEXT.closedCaps}
+                      {/* A booking taken on a shut day still counts - and is listed below, like any other. */}
+                      {count > 0 ? ` · ${count}` : ""}
                     </Typography>
                   </Tooltip>
                 ) : mark.label ? (

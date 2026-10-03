@@ -86,6 +86,10 @@ function appointment(id: string, calendarId: string, activityName: string): DayA
     isRunningLate: false,
     checkedInUtc: null,
     paperwork: null,
+    partnerName: null,
+    clubDiscountPercent: null,
+    paymentState: 'none',
+    invoiceId: null,
   };
 }
 
@@ -268,5 +272,66 @@ describe('the calendar screen', () => {
     const dialog = await screen.findByTestId('new-appointment');
     expect(dialog).toHaveAttribute('data-start', '2026-09-23T11:30');
     expect(dialog).toHaveAttribute('data-end', '2026-09-23T12:00');
+  });
+});
+
+describe('"Nová objednávka" on a day the clinic is shut', () => {
+  it('skips the weekend and opens Monday at opening time, moving the grid there', async () => {
+    /* Saturday 26. 9. 2026, 10:15 in Prague. The clinic works Monday to Friday. */
+    vi.setSystemTime(new Date('2026-09-26T08:15:00Z'));
+    vi.mocked(workingHoursApi.preview).mockImplementation(async (calendarId, from, to) => {
+      const rows: PreviewDay[] = [];
+      for (let d = from; d <= to; d = addDaysToDateOnly(d, 1)) {
+        const weekday = new Date(`${d}T12:00:00Z`).getUTCDay();
+        const weekend = weekday === 0 || weekday === 6;
+        rows.push({
+          date: d,
+          isOpen: !weekend,
+          closedBecause: weekend ? 'notAWorkingDay' : null,
+          startTime: weekend ? null : '08:00:00',
+          endTime: weekend ? null : '16:00:00',
+          breakStart: null,
+          breakEnd: null,
+          workerUserId: WORKER[calendarId][0],
+          workerDisplayName: WORKER[calendarId][1],
+          isChangedByOverride: false,
+          offeredActivityIds: weekend ? [] : ['a'],
+        });
+      }
+      return rows;
+    });
+    renderPage({ newAppointment: 1 });
+
+    const dialog = await screen.findByTestId('new-appointment');
+    expect(dialog).toHaveAttribute('data-calendar', 'c1');
+    expect(dialog).toHaveAttribute('data-start', '2026-09-28T08:00');
+    expect(dialog).toHaveAttribute('data-end', '2026-09-28T08:30');
+    /* The month ahead was asked for, because the week on screen ends on Sunday. */
+    expect(workingHoursApi.preview).toHaveBeenCalledWith('c1', '2026-09-26', '2026-10-27');
+    /* And the grid followed: the week of Monday 28. 9. */
+    expect(await screen.findByRole('heading', { name: '28. září — 4. října 2026' })).toBeInTheDocument();
+  });
+});
+
+describe('a booking on a closed day', () => {
+  it('is drawn on the week grid over the hatch and listed in the month', async () => {
+    vi.mocked(appointmentsApi.range).mockResolvedValue([
+      appointment('ap1', 'c1', 'Spiroergometrie'),
+      /* Friday 25. 9. is "Firemní volno" - shut - and somebody was booked anyway. */
+      { ...appointment('ap-off', 'c1', 'Sobotní prohlídka'), startUtc: '2026-09-25T07:00:00Z', endUtc: '2026-09-25T08:00:00Z' },
+    ]);
+    renderPage();
+    await screen.findByRole('button', { name: /Spiroergometrie/ });
+    expect(screen.getByTestId('closed-block-2026-09-25')).toBeInTheDocument();
+    const cell = screen.getByTestId('appointment-cell-ap-off');
+    expect(within(cell).getByRole('button', { name: /Sobotní prohlídka/ })).toBeInTheDocument();
+    expect(Number(getComputedStyle(cell).zIndex)).toBeGreaterThan(
+      Number(getComputedStyle(screen.getByTestId('closed-block-2026-09-25')).zIndex),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Měsíc' }));
+    const day = await screen.findByTestId('month-day-2026-09-25');
+    expect(within(day).getByRole('button', { name: /Sobotní prohlídka/ })).toBeInTheDocument();
+    expect(within(day).getByText(/Zavřeno · 1/)).toBeInTheDocument();
   });
 });

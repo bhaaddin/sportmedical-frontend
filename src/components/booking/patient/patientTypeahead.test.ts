@@ -72,6 +72,7 @@ describe('reading a row of GET /api/patients', () => {
         dateOfBirth: '1990-01-01',
         sex: 'Male',
         phone: '+420 777 123 456',
+        email: 'filip@example.cz',
       }),
     ).toEqual({
       id: 'p1',
@@ -80,11 +81,12 @@ describe('reading a row of GET /api/patients', () => {
       fullName: 'Filip Fehér',
       dateOfBirth: '1990-01-01',
       phone: '+420 777 123 456',
+      email: 'filip@example.cz',
     });
   });
 
   it('survives missing fields and drops a row without an id', () => {
-    expect(toHit({ id: 'p2' })).toEqual({ id: 'p2', firstName: '', lastName: '', fullName: '', dateOfBirth: null, phone: null });
+    expect(toHit({ id: 'p2' })).toEqual({ id: 'p2', firstName: '', lastName: '', fullName: '', dateOfBirth: null, phone: null, email: null });
     expect(toHit({ firstName: 'Nikdo' })).toBeNull();
     expect(toHit(null)).toBeNull();
   });

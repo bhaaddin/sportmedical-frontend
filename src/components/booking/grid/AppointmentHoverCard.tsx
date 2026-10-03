@@ -5,6 +5,8 @@ import { patientsApi } from "../../../api/patients";
 import { activitiesApi } from "../../../api/activities";
 import { statusName, type DayAppointment } from "../../../api/bookingContracts";
 import { formatPragueTime, formatPragueDate } from "../../../utils/time";
+import { clubLine } from "./clubLine";
+import { GRID_TEXT } from "./gridText";
 
 /** What the card shows when the server sent no hover-field choice of its own. */
 const DEFAULT_HOVER_FIELDS = [
@@ -181,6 +183,9 @@ export function AppointmentHoverCard({
   const rows = activeFields
     .map((key) => ({ key, label: labelFor(key), val: value(key) }))
     .filter((r) => r.val !== null);
+  /* A club booking says so whatever fields the owner picked: the partner and its discount. */
+  const club = clubLine(appointment.partnerName, appointment.clubDiscountPercent);
+  if (club !== null) rows.unshift({ key: "club", label: GRID_TEXT.clubLine, val: club });
 
   return (
     <Box sx={{ p: 0.5, minWidth: 180, maxWidth: 280 }}>

@@ -185,6 +185,7 @@ export function PatientSearch({
                       ? `nar. ${formatDateOnly(hit.dateOfBirth)}`
                       : "datum narození neuvedeno"}
                     {hit.phone ? ` · ${hit.phone}` : ""}
+                    {hit.email ? ` · ${hit.email}` : ""}
                   </Typography>
                 </Box>
               </Box>

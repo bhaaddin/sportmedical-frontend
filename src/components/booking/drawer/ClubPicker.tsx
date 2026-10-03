@@ -17,7 +17,9 @@ import Search from "@mui/icons-material/Search";
 import { useQuery } from "@tanstack/react-query";
 import { clubsApi, type Club } from "../../../services/clubsApi";
 import { DESIGN, SectionLabel, SoftCard } from "../../ui";
+import { PhoneField } from "../../ui/PhoneField";
 import { clubMatches, clubsWord, initials, type NewClubDraft } from "../NewAppointmentDialog.logic";
+import { clubDiscountLine } from "../grid/clubLine";
 
 export type { NewClubDraft };
 
@@ -179,6 +181,12 @@ export function ClubPicker({
                         {contactLine(club)}
                       </Typography>
                     </Box>
+                    {/* The club's own discount from the server - "Sleva −10 %" - and nothing when it has none. */}
+                    {clubDiscountLine(club.discountPercent) ? (
+                      <Typography variant="caption" sx={{ color: "text.secondary", whiteSpace: "nowrap", fontWeight: 600 }}>
+                        {clubDiscountLine(club.discountPercent)}
+                      </Typography>
+                    ) : null}
                   </ButtonBase>
                 );
               })}
@@ -213,7 +221,17 @@ export function ClubPicker({
               {field("Název klubu", "name", { placeholder: "např. TJ Sokol Slaný" })}
               <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
                 {field("Kontaktní osoba", "contactPerson", { placeholder: "Jméno a příjmení" })}
-                {field("Telefon", "phone", { type: "tel", placeholder: "+420 773 539 001" })}
+                <Box>
+                  <SectionLabel component="label" sx={{ mb: 0.5 }}>
+                    Telefon
+                  </SectionLabel>
+                  <PhoneField
+                    label="Telefon"
+                    value={draft.phone}
+                    onChange={(next) => set("phone", next)}
+                    disabled={disabled}
+                  />
+                </Box>
               </Box>
               <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
                 {field("E-mail", "email", { type: "email", placeholder: "klub@email.cz" })}

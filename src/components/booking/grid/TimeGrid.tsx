@@ -1174,13 +1174,20 @@ function SubColumn({
         return (
           <Box
             key={appointment.id}
+            data-testid={`appointment-cell-${appointment.id}`}
             sx={{
               position: "absolute",
               left: 3,
               right: 3,
               top: placed.top + 1,
               height: Math.max(18, placed.height - 2),
-              zIndex: 2,
+              /*
+               * A booking on a shut day - the owner took a Saturday patient and
+               * could find them only through the hover - sits ABOVE the day's
+               * hatched block (zIndex 4), under the now-line (5). Full card,
+               * clickable; the hatch stays visible around it.
+               */
+              zIndex: dayClosed ? 5 : 2,
             }}
           >
             <AppointmentButton

@@ -142,3 +142,18 @@ describe('searching the database for a patient', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('what a result row says', () => {
+  it('shows the telephone and the e-mail the register row carries', async () => {
+    list.mockResolvedValueOnce({
+      items: [{ ...row('f9', 'Karel', 'Dvořák', '1980-03-03'), phone: '+420 606 112 884', email: 'karel@example.cz' }],
+      totalCount: 1,
+      page: 1,
+      pageSize: 50,
+    });
+    renderSearch();
+    await userEvent.type(screen.getByLabelText('Jméno nebo příjmení'), 'Dvořák');
+    const results = await screen.findByRole('list', { name: 'Nalezení pacienti' });
+    expect(within(results).getByText('nar. 3. 3. 1980 · +420 606 112 884 · karel@example.cz')).toBeInTheDocument();
+  });
+});

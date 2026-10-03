@@ -14,6 +14,9 @@ import {
   formatWallClock,
   initials,
   isOfferedStart,
+  paperworkRows,
+  paperworkSummary,
+  paymentView,
   planEdit,
   pragueWallDate,
   reachableStatuses,
@@ -93,5 +96,81 @@ describe("the edit plan", () => {
     expect(isOfferedStart(slots, "2026-10-26T09:00:00.000Z")).toBe(true);
     expect(isOfferedStart(slots, "2026-10-26T09:15:00.000Z")).toBe(false);
     expect(isOfferedStart(undefined, "2026-10-26T09:00:00.000Z")).toBe(false);
+  });
+});
+
+describe("podklady k této prohlídce", () => {
+  const fmt = (iso: string) => iso;
+  const base = { questionnaireRequirement: "Required" as const, documents: [] as never[], formatDate: fmt };
+
+  it("reads registration and questionnaire off the server's reasons, and documents off the check", () => {
+    const rows = paperworkRows({
+      ...base,
+      paperwork: { ready: false, missing: ["questionnaire_missing"] },
+      documents: [
+        { templateId: "v", templateName: "Výpis", serviceName: "Prohlídka", standing: "Missing", validUntil: null },
+        { templateId: "s", templateName: "Souhlas", serviceName: "Prohlídka", standing: "Valid", validUntil: "2027-03-01" },
+      ],
+    });
+    expect(rows.map((r) => [r.label, r.state, r.action ?? null])).toEqual([
+      ["Dokončená registrace", "ok", null],
+      ["Vstupní dotazník", "missing", "completionLink"],
+      ["Výpis", "missing", "documents"],
+      ["Souhlas", "ok", null],
+    ]);
+    expect(rows[3].detail).toBe("vyžaduje služba Prohlídka · platí do 2027-03-01");
+    expect(paperworkSummary(rows)).toEqual({ text: "2 chybí", tone: "beige" });
+  });
+
+  it("tells 'nothing missing' from 'not wanted' by the činnost's setting", () => {
+    const fine = paperworkRows({ ...base, paperwork: { ready: true, missing: [] } });
+    expect(fine.map((r) => r.state)).toEqual(["ok", "ok", "notRequired"]);
+    expect(paperworkSummary(fine)).toEqual({ text: "vše v pořádku", tone: "green" });
+
+    const notAsked = paperworkRows({ ...base, questionnaireRequirement: "NotAsked", paperwork: { ready: true, missing: [] } });
+    expect(notAsked[1]).toMatchObject({ state: "notRequired", detail: "tato činnost dotazník nevyžaduje" });
+
+    /* The server's verdict wins over the setting: a code present is a gap. */
+    const contradicted = paperworkRows({ ...base, questionnaireRequirement: "NotAsked", paperwork: { ready: false, missing: ["questionnaire_expired"] } });
+    expect(contradicted[1]).toMatchObject({ state: "missing", detail: "vyplněný dotazník je starší než 2 roky" });
+  });
+
+  it("never reassures when nobody could look", () => {
+    const rows = paperworkRows({ ...base, paperwork: null, documents: null });
+    expect(rows.map((r) => r.state)).toEqual(["unknown", "unknown", "unknown"]);
+    expect(paperworkSummary(rows)).toEqual({ text: "nelze ověřit", tone: "grey" });
+  });
+
+  it("names a report the registry wants when the document list cannot, and an unknown reason as unknown", () => {
+    const rows = paperworkRows({ ...base, documents: null, paperwork: { ready: false, missing: ["report_missing", "registration_incomplete", "something_new"] } });
+    expect(rows.map((r) => [r.label, r.state])).toEqual([
+      ["Dokončená registrace", "missing"],
+      ["Vstupní dotazník", "ok"],
+      ["Výpis od předchozího lékaře", "missing"],
+      ["Neznámý požadavek (something_new)", "missing"],
+    ]);
+  });
+
+  it("words an expired or expiring document the owner's way", () => {
+    const rows = paperworkRows({
+      ...base,
+      paperwork: { ready: true, missing: [] },
+      documents: [
+        { templateId: "e", templateName: "Výpis", serviceName: "", standing: "Expired", validUntil: "2026-01-01" },
+        { templateId: "x", templateName: "Výpis", serviceName: "", standing: "ExpiringSoon", validUntil: "2026-10-20" },
+      ],
+    });
+    expect(rows[2]).toMatchObject({ state: "missing", detail: "platnost skončila 2026-01-01", action: "documents" });
+    expect(rows[3]).toMatchObject({ state: "ok", detail: "platí do 2026-10-20 · brzy vyprší", action: "documents" });
+  });
+});
+
+describe("PLATBA", () => {
+  it("speaks the board's four words and falls back to 'no invoice'", () => {
+    expect(paymentView("paid")).toEqual({ label: "Zaplaceno", tone: "green" });
+    expect(paymentView("partial")).toEqual({ label: "Částečně zaplaceno", tone: "beige" });
+    expect(paymentView("unpaid")).toEqual({ label: "Nezaplaceno", tone: "red" });
+    expect(paymentView("none")).toEqual({ label: "Bez dokladu", tone: "grey" });
+    expect(paymentView(null)).toEqual({ label: "Bez dokladu", tone: "grey" });
   });
 });
