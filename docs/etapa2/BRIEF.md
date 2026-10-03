@@ -135,3 +135,14 @@ Do not git commit/stash/checkout (backend agents commit on their own branch in t
 
 ## Report format (your final message)
 `summary` (what is done, per item, honest), `filesChanged`, `testsRun` (commands + counts), `decisions` (each: decision + why), `notDone` (each: what + why), `notesForIntegrator` (routes, catalogue entries, contract deviations).
+
+## Shipped — where the built contract differs from the text above (3. 10. 2026, after integration)
+
+- **Envelope.** Staff endpoints that answer a domain result use `{ success, message, data }` (e.g. `POST /api/calendars/{id}/appointments/quick`, `/api/billing/invoices`); the settings endpoints (`/api/v1/settings/*`) are flat. Field-level 400s are `{ code, message, errors: { field: [...] }, traceId }`.
+- **Quick registration.** `completionLink.url` is a relative path (`/dokonceni/<token>`) unless a public site address is set; the frontend prefixes its own origin. The provisional patient is **archived**, not deleted, when a reservation expires (patient tables are protected by triggers); the slot is freed at once.
+- **PUT semantics.** `PUT /api/activities/{id}`: `requiredDocumentTemplateIds` left out keeps the stored list (an empty list clears); `parallelCapacity` left out keeps; `colorHex` null clears the override. `PUT clinic-services`: `colorHex` left out keeps.
+- **Discounts.** `GET/PUT /api/v1/settings/discounts` role keys are `Staff` and `Administrator` (shown as Recepce / Admin); there is no Lékař role. A manual discount is taken from the list price and added to the group discount. `GET /api/public/discount-tiers` → `{ tiers: [{ minPersons, percent }] }` (public, tiers only).
+- **Club blocks.** `PUT` also takes `cancelAffectedAthletes`, `renewRegistrationLink`; the 409 body is `{ code, message, affectedAthletes[] }`. `ClubBlockView` has no athletes list. `/api/v1/settings/clubs` also returns `blockPalette`.
+- **Portal.** `GET /api/patient-portal/...` dashboard carries `results[]` (sessions not waiting for the doctor's review); `rawPractitionerNotes` holds only the "[Ruční zápis]" block.
+- **Day range.** `GET /api/day?from&to` allows a difference of at most 61 days (62 days inclusive).
+- **Catalogue.** The import writes `questionnaireRequirement: NotAsked` for every činnost; the migration also sets existing ones to NotAsked and deactivates service-level document rules.
