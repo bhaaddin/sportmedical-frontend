@@ -1,22 +1,27 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ThemeProvider, CssBaseline, AppBar, Toolbar, Typography, Box, Drawer, List, ListItemButton, ListItemIcon, Avatar, IconButton, Menu, MenuItem, CircularProgress, Button, ButtonBase, Collapse, Divider, Tooltip, useMediaQuery } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
-import { Science, Dashboard, People, Settings, Logout, CalendarMonth, Receipt, Search, AttachMoney, Today, ArrowBack, Assessment, Groups, ExpandLess, ExpandMore, Menu as MenuIcon, EventBusy, RateReview, FactCheck, HealthAndSafety, Psychology, MonitorHeart, Spa, EventAvailable, PersonAdd, BarChart, Add } from '@mui/icons-material';
+import { ThemeProvider, CssBaseline, Box, Typography, CircularProgress, Button } from '@mui/material';
+import { Science, Dashboard, People, Settings, CalendarMonth, Receipt, AttachMoney, Today, ArrowBack, Assessment, Groups, EventBusy, RateReview, FactCheck, HealthAndSafety, Psychology, MonitorHeart, Spa, EventAvailable, PersonAdd, BarChart } from '@mui/icons-material';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { usePermissions, type Permission } from './auth/usePermission';
 import { useAccountRefresh } from './auth/accountRefresh';
 import { queryClient } from './api/queryClient';
-import { PATIENT_SECTIONS, patientInPath, sectionPath } from './pages/patients/sections';
+import { patientInPath } from './pages/patients/sections';
 import { settingsItemAt } from './pages/settings/catalogue';
-import { SettingsNav } from './pages/settings/SettingsFrame';
 import { Toaster } from 'react-hot-toast';
 import { useState, useMemo, lazy, Suspense, useRef, useEffect } from 'react';
-import { Rail, RailRow, RailPin, IconCell, RAIL_EXPANDED, RAIL_ICON_COL, RAIL_MOTION, useRailState } from './components/shell/Rail';
 import { SettingsSearchContext } from './components/shell/settingsSearch';
-import { buildTheme, THEME_ACCENTS, type ThemeMode } from './theme';
+import { SidebarSlotProvider } from './components/shell/SidebarSlot';
+import { DesktopSidebar } from './components/shell/Sidebar';
+import { TabletRail } from './components/shell/TabletRail';
+import { PhoneBottomBar, PhoneTopBar, PHONE_BOTTOM_BAR, PHONE_TOP_BAR } from './components/shell/PhoneShell';
+import { AccountMenu } from './components/shell/AccountMenu';
+import { WhereAmI, computeCrumbs, useDocumentTitle } from './components/shell/whereAmI';
+import { RAIL_WIDTH, SIDEBAR_WIDTH } from './components/shell/shellStyles';
+import type { MenuEntry, ShellNav } from './components/shell/shellTypes';
+import { useDevice } from './layout/useDevice';
+import { buildTheme, type ThemeMode } from './theme';
 import {
   ThemePrefsContext,
-  useThemePrefs,
   readStoredAccent,
   readStoredMode,
   ACCENT_STORAGE_KEY,
@@ -26,8 +31,6 @@ import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import NetworkBanner from './components/NetworkBanner';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
 import UniversalSearch from './components/UniversalSearch';
-import NotificationCenter from './components/NotificationCenter';
-import { signOut } from './auth/signOut';
 
 /* ── Lazy-loaded routes (code-split per page) ── */
 const NotFound = lazy(() => import('./pages/NotFound'));
@@ -78,6 +81,15 @@ const QuestionnairePage = lazy(() => import('./pages/settings/QuestionnairePage'
 const CalendarDisplayPage = lazy(() => import('./pages/settings/CalendarDisplayPage'));
 const PatientFieldsPage = lazy(() => import('./pages/settings/PatientFieldsPage'));
 const GroupDiscountsPage = lazy(() => import('./pages/settings/GroupDiscountsPage'));
+const IntegrationsPage = lazy(() => import('./pages/settings/IntegrationsPage'));
+const ChangeHistoryPage = lazy(() => import('./pages/settings/ChangeHistoryPage'));
+const DiscountsPage = lazy(() => import('./pages/settings/DiscountsPage'));
+const ServiceColorsPage = lazy(() => import('./pages/settings/ServiceColorsPage'));
+const QuickRegistrationSettingsPage = lazy(() => import('./pages/settings/QuickRegistrationSettingsPage'));
+const CompanyInvoiceSettingsPage = lazy(() => import('./pages/settings/CompanyInvoiceSettingsPage'));
+const SiteContentAdminPage = lazy(() => import('./pages/settings/SiteContentAdminPage'));
+const MediaStorageSettingsPage = lazy(() => import('./pages/settings/MediaStorageSettingsPage'));
+const ClubSettingsPage = lazy(() => import('./pages/settings/ClubSettingsPage'));
 const RemindersPage = lazy(() => import('./pages/settings/RemindersPage'));
 const ConsentSettingsPage = lazy(() => import('./pages/settings/ConsentSettingsPage'));
 const BookingActivitiesPage = lazy(() => import('./pages/booking/ActivitiesPage'));
@@ -118,17 +130,7 @@ function PageLoader() {
   );
 }
 
-/* ── The rail's menu ── */
-interface MenuEntry {
-  text: string;
-  icon: React.ReactNode;
-  path: string;
-  /* `requires` is the permission the server checks behind that screen; an
-     entry the signed-in employee does not hold is not drawn. */
-  requires?: Permission;
-  /** The screens that belong under this one; shown when it is open in the rail. */
-  children?: MenuEntry[];
-}
+/* ── The navigation's menu (the type lives in components/shell/shellTypes) ── */
 
 /*
  * What sits under each of the six main entries.
@@ -199,18 +201,13 @@ const menuItems: MenuEntry[] = ([
 ] as MenuEntry[]).map((entry) => ({ ...entry, children: MENU_CHILDREN[entry.path] }));
 
 /*
- * Settings destinations that draw the board's settings frame themselves
- * (SettingsScreen: breadcrumb + header), so the shell must not draw a second
- * way back above them. Everything else in the catalogue still gets the
- * one-line "Nastavení / Skupina" link.
+ * Settings destinations that do NOT draw the board's settings frame themselves
+ * (SettingsScreen: breadcrumb + header), so the shell gives them the one-line
+ * "Nastavení / Skupina" way back. Every other settings screen - and every new
+ * /nastaveni/ screen - draws its own breadcrumb and header. Take a path out of
+ * this list the moment its page wears SettingsScreen.
  */
-const SETTINGS_FRAMED = new Set<string>([
-  '/admin', '/audit-log', '/activities', '/calendars', '/sluzby', '/nepritomnosti', '/exceptions',
-  '/working-hours', '/nastaveni/vzhled-kalendare', '/nastaveni/souhlasy', '/pravidla-dokumentu',
-  '/dokumenty-sablony', '/nastaveni/sablony-emailu', '/nastaveni/skupinove-slevy', '/svatky',
-  '/nastaveni/udaje-pacienta', '/dotaznik-nastaveni', '/nastaveni/pripominky', '/nastaveni/zabezpeceni',
-  '/staff-management', '/system-health',
-]);
+const SETTINGS_UNFRAMED = new Set<string>(['/blokovany-cas', '/cenik', '/vyhrazeni']);
 
 /*
  * A screen the signed-in employee has no permission for is not there for them.
@@ -236,83 +233,15 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-/** The phone drawer's width - the rail's open width. */
-const SIDEBAR_WIDTH = RAIL_EXPANDED;
 
-/** Is this address inside the settings - a catalogue destination, or /settings itself? */
+/** Is this address inside the settings - a catalogue destination, /settings itself, or a /nastaveni/ screen? */
 function isSettingsRoute(pathname: string, settingsHere: ReturnType<typeof settingsItemAt>): boolean {
-  return settingsHere !== null || pathname === '/settings' || pathname.startsWith('/settings/');
-}
-
-/*
- * "Where am I" - one quiet line at the top of every screen, so a click never
- * costs the sense of place: the rail's entry, then the screen inside it
- * (Pacienti › Karta pacienta › Termíny; Výsledky › Zranění; Nastavení ›
- * Služby a ceny › Ceník). The browser tab says the same, so ten open tabs are
- * tellable apart.
- */
-function WhereAmI({
-  pathname,
-  patientId,
-  settingsHere,
-}: {
-  pathname: string;
-  patientId: string | null;
-  settingsHere: ReturnType<typeof settingsItemAt>;
-}) {
-  const crumbs: { label: string; to?: string }[] = [];
-  if (settingsHere !== null) {
-    /* A settings screen in the board's frame draws its own breadcrumb; one line of place is enough. */
-    if (SETTINGS_FRAMED.has(settingsHere.item.to)) return null;
-    crumbs.push({ label: 'Nastavení', to: '/settings' }, { label: settingsHere.section.label }, { label: settingsHere.item.label });
-  } else if (patientId !== null) {
-    const section = PATIENT_SECTIONS.find((s) => sectionPath(patientId, s) === pathname);
-    crumbs.push({ label: 'Pacienti', to: '/patients' }, { label: 'Karta pacienta', to: `/patients/${patientId}` });
-    if (section && section.path !== '') crumbs.push({ label: section.label });
-    if (pathname.endsWith('/edit')) crumbs.push({ label: 'Úprava karty' });
-  } else if (pathname.startsWith('/kalendar/')) {
-    crumbs.push({ label: 'Kalendář', to: '/planovani' }, { label: 'Termín' });
-  } else {
-    /* A child of one of the six first - its parent names the place. */
-    let parent: MenuEntry | undefined;
-    let child: MenuEntry | undefined;
-    for (const entry of menuItems) {
-      child = entry.children?.find((c) => c.path === pathname);
-      if (child) { parent = entry; break; }
-    }
-    if (!parent) {
-      parent = menuItems.find((i) => i.path === pathname)
-        ?? menuItems.find((i) => i.path !== '/' && pathname.startsWith(i.path));
-    }
-    if (parent) crumbs.push({ label: parent.text, to: parent.path });
-    if (child && child.text !== parent?.text) crumbs.push({ label: child.text });
-  }
-  const trail = crumbs.map((c) => c.label).join(' › ');
-
-  useEffect(() => {
-    const here = crumbs.length ? crumbs[crumbs.length - 1].label : 'SportMedical';
-    document.title = `${here} · SportMedical`;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trail]);
-
-  if (crumbs.length === 0) return null;
   return (
-    <Box
-      aria-label="Kde jsem"
-      sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1.5, fontSize: 13, color: 'text.secondary', flexWrap: 'wrap' }}
-    >
-      <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0 }} />
-      {crumbs.map((c, i) => (
-        <Box key={i} component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
-          {i > 0 && <Box component="span" sx={{ color: 'text.disabled' }}>›</Box>}
-          {c.to && i < crumbs.length - 1 ? (
-            <Box component={Link} to={c.to} sx={{ color: 'text.secondary', fontWeight: 600, '&:hover': { color: 'primary.main' } }}>{c.label}</Box>
-          ) : (
-            <Box component="span" sx={{ color: i === crumbs.length - 1 ? 'text.primary' : 'text.secondary', fontWeight: i === crumbs.length - 1 ? 700 : 600 }}>{c.label}</Box>
-          )}
-        </Box>
-      ))}
-    </Box>
+    settingsHere !== null ||
+    pathname === '/settings' ||
+    pathname.startsWith('/settings/') ||
+    pathname === '/nastaveni' ||
+    pathname.startsWith('/nastaveni/')
   );
 }
 
@@ -321,56 +250,42 @@ function readUser(): { firstName?: string; lastName?: string; role?: string } {
   try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
 }
 
-function Layout({ children }: { children: React.ReactNode }) {
+/*
+ * The shell: one of three navigations, chosen by width, never two at once.
+ *
+ *   ≥1280  a fixed 258px sidebar with text            (components/shell/Sidebar)
+ *   768+   a 72px rail that opens as an overlay        (components/shell/TabletRail)
+ *   ≤767   a bottom bar, a top bar and a "Více" sheet  (components/shell/PhoneShell)
+ *
+ * On a settings route the navigation's content is replaced by the settings
+ * one; the main entries are not drawn at all there.
+ */
+export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const theme = useTheme();
-  /* The rail is where you are. It only ever folds into a drawer on a phone;
-     on any laptop, whatever the zoom, it stays put - 76px at rest, 272px
-     when the pointer, the keyboard or the pin is on it. */
-  const narrow = useMediaQuery(theme.breakpoints.down('sm'));
+  const device = useDevice();
   /* Reloaded from GET /api/v1/account on start, on focus and after any 403,
      so a permission the owner changed redraws this menu without a new sign-in. */
   useAccountRefresh();
   const held = new Set(usePermissions());
   /*
-   * Inside a patient the rail becomes that patient's, and the application's
-   * own menu steps aside. The owner's rule: while you are in somebody's file,
-   * everything on screen is about them. On the board that is a sub-list
-   * under "Pacienti": the file's sections, indented.
-   *
-   * Without patients.view the address is NotFound, and a patient's rail
-   * around it would offer sections that are NotFound too.
+   * Inside a patient the sidebar becomes that patient's: under "Pacienti" the
+   * file's sections, indented. Without patients.view the address is NotFound,
+   * and sections around it would be NotFound too.
    */
   const patientId = held.has('patients.view') ? patientInPath(location.pathname) : null;
   const settingsHere = settingsItemAt(location.pathname);
-  /*
-   * "In settings two sidebars next to each other is awful — only ONE, and it
-   * is the settings one." On a settings route the rail's content is the
-   * settings navigation, pinned open, because it is the only navigation there.
-   */
   const settingsMode = isSettingsRoute(location.pathname, settingsHere);
-  const rail = useRailState(settingsMode);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  /* A parent the person opened or shut by its chevron, on top of the default
-     (open while it or one of its children is the screen). Forgotten on the
-     next navigation, so the default rules again. */
-  const [openOverrides, setOpenOverrides] = useState<Record<string, boolean>>({});
   const [settingsQuery, setSettingsQuery] = useState('');
   /* Where "Zpět do aplikace" goes: the last screen that was not a settings one. */
   const lastAppRoute = useRef('/planovani');
-  const { accent, mode, setAccent, setMode } = useThemePrefs();
   const user = useMemo(readUser, []);
 
+  if (!settingsMode) lastAppRoute.current = `${location.pathname}${location.search}`;
   useEffect(() => {
-    setMobileOpen(false);
-    setOpenOverrides({});
-    if (!settingsMode) {
-      lastAppRoute.current = `${location.pathname}${location.search}`;
-      setSettingsQuery('');
-    }
-  }, [location.pathname, location.search, settingsMode]);
+    if (!settingsMode) setSettingsQuery('');
+  }, [settingsMode]);
 
   const visibleMenu = useMemo(() => {
     const allowed = (entry: MenuEntry) => entry.requires === undefined || held.has(entry.requires);
@@ -380,370 +295,111 @@ function Layout({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [[...held].sort().join(' ')]);
 
-  const isActivePath = (path: string) =>
-    location.pathname === path || (path !== '/' && location.pathname.startsWith(path));
-
-  const handleLogout = () => {
-    setAnchorEl(null);
-    void signOut();
-  };
-
-  const closeMobile = () => setMobileOpen(false);
-
   /*
-   * The big button at the top of the rail. It always lands on the calendar;
-   * the calendar reads `state.newAppointment` and opens the booking drawer on
-   * the next free time, so the desk never has to find a slot first.
+   * The big button. It always lands on the calendar; the calendar reads
+   * `state.newAppointment` and opens the booking drawer on the next free time,
+   * so the desk never has to find a slot first.
    */
-  const newAppointment = () => {
-    closeMobile();
-    navigate('/planovani', { state: { newAppointment: Date.now() } });
-  };
-
-  const backToApp = () => {
-    closeMobile();
-    navigate(lastAppRoute.current);
-  };
+  const newAppointment = () => navigate('/planovani', { state: { newAppointment: Date.now() } });
 
   const settingsSearch = useMemo(
-    () => ({ query: settingsQuery, setQuery: setSettingsQuery, inRail: !narrow }),
-    [settingsQuery, narrow],
+    () => ({ query: settingsQuery, setQuery: setSettingsQuery, inRail: device === 'desktop' }),
+    [settingsQuery, device],
   );
 
-  /*
-   * The rail's content, drawn for one width. `exp` is true when the rail is
-   * open (272px) and in the phone's drawer, which is always open when it is
-   * there at all; false is the 76px rail of icons with their labels under them.
-   */
-  const railContent = (exp: boolean) => {
-    const brand = (
-      <Box
-        component={Link}
-        to="/"
-        onClick={closeMobile}
-        aria-label="SportMedical — přehled"
-        sx={{ display: 'flex', alignItems: 'center', height: 40, mb: 1.5, color: 'text.primary', textDecoration: 'none' }}
-      >
-        <IconCell>
-          <Box
-            sx={{
-              width: 32, height: 32, borderRadius: 2, bgcolor: 'primary.main', color: '#FFF',
-              display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 800, letterSpacing: '0.02em',
-            }}
-          >
-            SM
-          </Box>
-        </IconCell>
-        {exp && (
-          <Typography sx={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
-            SportMedical
-          </Typography>
-        )}
-      </Box>
-    );
-
-    const account = (
-      <>
-        <Divider sx={{ my: 1.25 }} />
-        <Box sx={{ display: 'flex', flexDirection: exp ? 'row' : 'column', alignItems: 'center', gap: 0.5 }}>
-          <ButtonBase
-            onClick={(e) => setAnchorEl(e.currentTarget)}
-            aria-label="Účet a vzhled"
-            sx={{
-              flex: exp ? 1 : undefined,
-              width: exp ? undefined : RAIL_ICON_COL,
-              display: 'flex', alignItems: 'center', borderRadius: 2, py: 0.5, pr: exp ? 1 : 0,
-              textAlign: 'left', minWidth: 0, '&:hover': { bgcolor: 'action.hover' },
-            }}
-          >
-            <IconCell>
-              <Avatar sx={{ width: 34, height: 34, bgcolor: 'primary.main', color: '#FFF', fontSize: 13 }}>
-                {user.firstName?.[0]}{user.lastName?.[0]}
-              </Avatar>
-            </IconCell>
-            {exp && (
-              <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {[user.firstName, user.lastName].filter(Boolean).join(' ') || 'Účet'}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {user.role || ''}
-                </Typography>
-              </Box>
-            )}
-          </ButtonBase>
-          <IconButton size="small" title="Hledat (Ctrl+K)" aria-label="Hledat"
-            onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}>
-            <Search fontSize="small" />
-          </IconButton>
-          <NotificationCenter />
-        </Box>
-        {exp && !narrow && !settingsMode && (
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
-            <RailPin pinned={rail.pinned} onToggle={rail.togglePin} />
-          </Box>
-        )}
-      </>
-    );
-
-    if (settingsMode) {
-      return (
-        <>
-          <ListItemButton
-            onClick={backToApp}
-            sx={{ flex: '0 0 auto', borderRadius: 2, minHeight: 44, p: 0, pr: 1, mb: 0.5, color: 'text.secondary', fontSize: 14, fontWeight: 600 }}
-          >
-            <IconCell size={20}><ArrowBack /></IconCell>
-            Zpět do aplikace
-          </ListItemButton>
-          {brand}
-          <Divider sx={{ mb: 1.5 }} />
-          <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', mx: -0.5, px: 0.5 }}>
-            <SettingsNav plain query={settingsQuery} onQueryChange={setSettingsQuery} />
-          </Box>
-          {account}
-        </>
-      );
-    }
-
-    return (
-      <>
-        {brand}
-
-        <Box sx={{ height: 46, mb: 2, display: 'flex', alignItems: 'center' }}>
-          {exp ? (
-            <Button
-              variant="contained"
-              size="large"
-              fullWidth
-              onClick={newAppointment}
-              startIcon={<Add />}
-              sx={{ minHeight: 46, justifyContent: 'flex-start', pl: '18px', '& .MuiButton-startIcon': { ml: 0, mr: 1.5 } }}
-            >
-              Nová objednávka
-            </Button>
-          ) : (
-            <Tooltip title="Nová objednávka" placement="right">
-              <Button
-                variant="contained"
-                onClick={newAppointment}
-                aria-label="Nová objednávka"
-                sx={{ minWidth: 46, width: 46, height: 46, p: 0, mx: 'auto' }}
-              >
-                <Add />
-              </Button>
-            </Tooltip>
-          )}
-        </Box>
-
-        <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', mx: -0.5, px: 0.5 }}>
-          <List disablePadding>
-            {visibleMenu.map((item) => {
-              const active = isActivePath(item.path);
-              const inPatients = item.path === '/patients' && patientId !== null;
-              const kids = inPatients ? [] : (item.children ?? []);
-              const childActive = kids.some((c) => isActivePath(c.path));
-              const hasSublist = kids.length > 0 || inPatients;
-              const open = exp && hasSublist && (openOverrides[item.path] ?? (active || childActive));
-              return (
-                <Box key={item.path}>
-                  <RailRow
-                    to={item.path}
-                    label={item.text}
-                    icon={item.icon}
-                    active={active && !childActive && !inPatients}
-                    expanded={exp}
-                    onNavigate={closeMobile}
-                    trailing={hasSublist ? (
-                      <IconButton
-                        size="small"
-                        aria-label={open ? `Sbalit ${item.text}` : `Rozbalit ${item.text}`}
-                        aria-expanded={open}
-                        onClick={() => setOpenOverrides((o) => ({ ...o, [item.path]: !open }))}
-                        sx={{ color: 'text.disabled' }}
-                      >
-                        {open ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-                      </IconButton>
-                    ) : undefined}
-                  />
-                  {hasSublist && (
-                    <Collapse in={open} timeout={150} unmountOnExit>
-                      <Box sx={{ mb: 0.75 }}>
-                        {inPatients
-                          ? PATIENT_SECTIONS.filter((section) => section.id !== 'faktury' || held.has('billing.manage')).map((section) => {
-                              const to = sectionPath(patientId, section);
-                              return (
-                                <RailRow
-                                  key={section.id}
-                                  to={to}
-                                  label={section.label}
-                                  icon={section.icon}
-                                  active={location.pathname === to}
-                                  expanded
-                                  indent
-                                  onNavigate={closeMobile}
-                                />
-                              );
-                            })
-                          : kids.map((child) => (
-                              <RailRow
-                                key={child.path}
-                                to={child.path}
-                                label={child.text}
-                                icon={child.icon}
-                                active={isActivePath(child.path)}
-                                expanded
-                                indent
-                                onNavigate={closeMobile}
-                              />
-                            ))}
-                      </Box>
-                    </Collapse>
-                  )}
-                </Box>
-              );
-            })}
-          </List>
-        </Box>
-
-        {account}
-      </>
-    );
+  const nav: ShellNav = {
+    pathname: location.pathname,
+    menu: visibleMenu,
+    patientId,
+    canSeeInvoices: held.has('billing.manage'),
+    settingsMode,
+    settingsQuery,
+    onSettingsQueryChange: setSettingsQuery,
+    backToAppPath: lastAppRoute.current,
+    user,
+    onNewAppointment: newAppointment,
+    onOpenAccountMenu: setAnchorEl,
   };
 
-  const accountMenu = (
-    <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
-      anchorOrigin={{ vertical: 'top', horizontal: 'left' }} transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
-      <MenuItem onClick={() => { setAnchorEl(null); navigate('/settings'); }}>
-        <ListItemIcon><Settings fontSize="small" /></ListItemIcon> Nastavení
-      </MenuItem>
-      <Box sx={{ px: 2, py: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.75 }}>
-          Vzhled
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 0.75, mb: 1 }}>
-          {THEME_ACCENTS.map((a) => (
-            <Box
-              key={a.key}
-              role="button"
-              aria-label={a.label}
-              title={a.label}
-              onClick={() => setAccent(a.color)}
-              sx={{
-                width: 22,
-                height: 22,
-                borderRadius: '50%',
-                cursor: 'pointer',
-                bgcolor: a.color,
-                outline: '2px solid',
-                outlineColor: accent === a.color ? 'text.primary' : 'transparent',
-                outlineOffset: 2,
-              }}
-            />
-          ))}
-        </Box>
-        <Button
-          size="small"
-          variant="outlined"
-          fullWidth
-          onClick={() => setMode(mode === 'light' ? 'dark' : 'light')}
-        >
-          {mode === 'light' ? 'Tmavý režim' : 'Světlý režim'}
-        </Button>
-      </Box>
-      <MenuItem onClick={handleLogout}>
-        <ListItemIcon><Logout fontSize="small" /></ListItemIcon> Odhlásit se
-      </MenuItem>
-    </Menu>
-  );
+  const crumbs = computeCrumbs({ pathname: location.pathname, patientId, settingsHere, menu: menuItems });
+  useDocumentTitle(crumbs);
+
+  const settingsNeedsFrame = settingsHere !== null && SETTINGS_UNFRAMED.has(settingsHere.item.to);
+
+  /* The area's offset is a pixel STRING: sx `ml` with a number is spacing × 8. */
+  const marginLeft = device === 'desktop' ? `${SIDEBAR_WIDTH}px` : device === 'tablet' ? `${RAIL_WIDTH}px` : '0px';
 
   return (
     <SettingsSearchContext.Provider value={settingsSearch}>
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      <a href="#main-content" className="skip-link">
-        Přeskočit na hlavní obsah
-      </a>
+      <SidebarSlotProvider available={device === 'desktop' && !settingsMode}>
+        <Box sx={{ minHeight: '100vh' }}>
+          <a href="#main-content" className="skip-link">
+            Přeskočit na hlavní obsah
+          </a>
 
-      {narrow ? (
-        <>
-          <AppBar position="fixed">
-            <Toolbar sx={{ minHeight: 56, gap: 1 }}>
-              <IconButton edge="start" aria-label="Otevřít menu" onClick={() => setMobileOpen(true)}>
-                <MenuIcon />
-              </IconButton>
-              <Typography sx={{ fontWeight: 700, fontSize: 16, flexGrow: 1 }}>SportMedical</Typography>
-              <Button size="small" variant="contained" onClick={newAppointment}>Objednat</Button>
-            </Toolbar>
-          </AppBar>
-          <Drawer
-            variant="temporary"
-            open={mobileOpen}
-            onClose={closeMobile}
-            ModalProps={{ keepMounted: true }}
-            sx={{ '& .MuiDrawer-paper': { width: SIDEBAR_WIDTH, boxSizing: 'border-box' } }}
+          {device === 'desktop' && <DesktopSidebar nav={nav} />}
+          {device === 'tablet' && <TabletRail nav={nav} />}
+          {device === 'phone' && (
+            <>
+              <PhoneTopBar nav={nav} crumbs={settingsMode ? [{ label: 'Nastavení' }] : crumbs} />
+              <PhoneBottomBar nav={nav} />
+            </>
+          )}
+          <AccountMenu anchorEl={anchorEl} onClose={() => setAnchorEl(null)} onOpenSettings={() => navigate('/settings')} />
+
+          <Box
+            component="main"
+            id="main-content"
+            role="main"
+            aria-label="Hlavní obsah"
+            data-device={device}
+            sx={{
+              minWidth: 0,
+              minHeight: '100vh',
+              boxSizing: 'border-box',
+              /* One margin per device and no transition: nothing moves while a page loads. */
+              ml: marginLeft,
+              ...(device === 'desktop'
+                ? { px: '28px', pt: '24px', pb: '40px' }
+                : device === 'tablet'
+                  ? { px: 3, pt: 3, pb: 4 }
+                  : { px: 2, pt: `calc(${PHONE_TOP_BAR} + 16px)`, pb: `calc(${PHONE_BOTTOM_BAR} + 24px)` }),
+            }}
           >
-            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', px: 1, pt: 1.5, pb: 1.25 }}>
-              {railContent(true)}
-            </Box>
-          </Drawer>
-        </>
-      ) : (
-        <Rail state={rail} label={settingsMode ? 'Nastavení' : 'Hlavní navigace'}>
-          {railContent(rail.expanded)}
-        </Rail>
-      )}
-      {accountMenu}
+            {/* The line of place; on a phone it lives in the top bar, in settings the screens draw their own. */}
+            {device !== 'phone' && !settingsMode && <WhereAmI crumbs={crumbs} />}
 
-      <Box component="main" id="main-content" role="main" aria-label="Hlavní obsah"
-        sx={{
-          flexGrow: 1,
-          minWidth: 0,
-          p: { xs: 2, md: 3 },
-          pt: { xs: '72px', md: 3 },
-          minHeight: '100vh',
-          /* The rail pushes the work area: this margin and the rail's width
-             move together, 180ms, and nothing is covered. */
-          ml: narrow ? 0 : `${rail.width}px`,
-          transition: `margin-left ${RAIL_MOTION}`,
-        }}
-      >
-        <WhereAmI pathname={location.pathname} patientId={patientId} settingsHere={settingsHere} />
-
-        {/*
-          * The way out of a settings screen is the rail itself now ("Zpět do
-          * aplikace" and the settings nav), and a screen in the board's frame
-          * (SettingsScreen) draws its own breadcrumb. A settings destination
-          * that does not wear that frame yet still gets this one line, so no
-          * screen is ever a dead end.
-          */}
-        {settingsHere !== null && !SETTINGS_FRAMED.has(settingsHere.item.to) && (
-          <Box sx={{ mb: 2 }}>
-            <Button
-              component={Link as any}
-              to="/settings"
-              startIcon={<ArrowBack />}
-              size="small"
-              sx={{ color: 'text.secondary', textTransform: 'none' }}
-            >
-              Nastavení
-              <Box component="span" sx={{ mx: 0.75, color: 'text.disabled' }}>/</Box>
-              <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>
-                {settingsHere.section.label}
+            {/*
+              * A settings destination that does not wear the board's frame
+              * (SettingsScreen) yet still gets this one line - the crumb and the
+              * way back - so no screen is ever a dead end.
+              */}
+            {settingsNeedsFrame && settingsHere !== null && (
+              <Box sx={{ mb: 2 }}>
+                <Button
+                  component={Link as any}
+                  to="/settings"
+                  startIcon={<ArrowBack />}
+                  size="small"
+                  sx={{ color: 'text.secondary', textTransform: 'none', minHeight: 44 }}
+                >
+                  Nastavení
+                  <Box component="span" sx={{ mx: 0.75, color: 'text.disabled' }}>/</Box>
+                  <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                    {settingsHere.section.label}
+                  </Box>
+                </Button>
               </Box>
-            </Button>
-          </Box>
-        )}
+            )}
 
-        {/*
-          * No page transition. The framer-motion fade that was here (0.18s out
-          * + 0.18s in, `mode="wait"`) cost 360ms on every click and remounted
-          * the whole page tree by keying it on the pathname - so a patient's
-          * layout was torn down between two of their own sections. Routes now
-          * render at once, and a nested layout stays mounted across its children.
-          */}
-        {children}
-      </Box>
-    </Box>
+            {/*
+              * No page transition: routes render at once, and a nested layout
+              * stays mounted across its children.
+              */}
+            {children}
+          </Box>
+        </Box>
+      </SidebarSlotProvider>
     </SettingsSearchContext.Provider>
   );
 }
@@ -821,6 +477,15 @@ export default function App() {
                     <Route path="/dotaznik-nastaveni" element={<RequirePermission of="questionnaires.manage"><QuestionnairePage /></RequirePermission>} />
                     <Route path="/nastaveni/vzhled-kalendare" element={<RequirePermission of="settings.clinic.manage"><CalendarDisplayPage /></RequirePermission>} />
                     <Route path="/nastaveni/udaje-pacienta" element={<RequirePermission of="settings.clinic.manage"><PatientFieldsPage /></RequirePermission>} />
+                    <Route path="/nastaveni/slevy" element={<RequirePermission of="settings.clinic.manage"><DiscountsPage /></RequirePermission>} />
+                    <Route path="/nastaveni/barvy-sluzeb" element={<RequirePermission of="settings.clinic.manage"><ServiceColorsPage /></RequirePermission>} />
+                    <Route path="/nastaveni/rychla-registrace" element={<RequirePermission of="settings.clinic.manage"><QuickRegistrationSettingsPage /></RequirePermission>} />
+                    <Route path="/nastaveni/firma-a-faktury" element={<RequirePermission of="settings.clinic.manage"><CompanyInvoiceSettingsPage /></RequirePermission>} />
+                    <Route path="/nastaveni/media-a-texty" element={<RequirePermission of="settings.clinic.manage"><SiteContentAdminPage /></RequirePermission>} />
+                    <Route path="/nastaveni/uloziste-medii" element={<RequirePermission of="settings.clinic.manage"><MediaStorageSettingsPage /></RequirePermission>} />
+                    <Route path="/nastaveni/kluby" element={<RequirePermission of="settings.clinic.manage"><ClubSettingsPage /></RequirePermission>} />
+                    <Route path="/nastaveni/integrace" element={<RequirePermission of="settings.clinic.manage"><IntegrationsPage /></RequirePermission>} />
+                    <Route path="/nastaveni/historie-zmen" element={<RequirePermission of="settings.clinic.manage"><ChangeHistoryPage /></RequirePermission>} />
                     <Route path="/nastaveni/skupinove-slevy" element={<RequirePermission of="settings.clinic.manage"><GroupDiscountsPage /></RequirePermission>} />
                     <Route path="/hodnoceni-pacientu" element={<FeedbackReviewPage />} />
                     <Route path="/nastaveni/pripominky" element={<RequirePermission of="settings.clinic.manage"><RemindersPage /></RequirePermission>} />
@@ -859,6 +524,7 @@ export default function App() {
                     <Route path="/staff-management" element={<RequirePermission of="users.manage"><StaffManagementPage /></RequirePermission>} />
                     <Route path="/audit-log" element={<RequirePermission of="settings.clinic.manage"><AuditLogPage /></RequirePermission>} />
                     <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/settings/:group" element={<SettingsPage />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                   </Suspense>

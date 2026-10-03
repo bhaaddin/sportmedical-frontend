@@ -10,6 +10,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box, Typography, IconButton, Badge, Popover, List, ListItem, ListItemIcon,
   ListItemText, Button, Divider, Skeleton, Tooltip,
+  type SxProps, type Theme,
 } from '@mui/material';
 import {
   Notifications, CalendarMonth, Description, Warning,
@@ -211,7 +212,22 @@ function NotificationLine({
 }
 
 /* ══════════════════════════════════════════════════════════════ */
-export default function NotificationCenter() {
+/**
+ * The bell and its panel.
+ *
+ * `placement` is where the panel opens relative to the bell: "below" for a
+ * bell in a top bar (phone), "side" for a bell at the foot of a sidebar or
+ * rail, where there is no room below - the panel opens upward and to the
+ * right, over the content. Either way it never wider than the screen.
+ */
+export default function NotificationCenter({
+  placement = 'below',
+  buttonSx,
+}: {
+  placement?: 'below' | 'side';
+  /** Extra styling for the bell button, e.g. a 44px touch target. */
+  buttonSx?: SxProps<Theme>;
+} = {}) {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -410,6 +426,7 @@ export default function NotificationCenter() {
           onClick={handleOpen}
           aria-label={`${unreadCount} nepřečtených oznámení`}
           aria-describedby={popoverId}
+          sx={buttonSx}
         >
           <Badge badgeContent={unreadCount} color="error" max={99}>
             <Notifications />
@@ -423,21 +440,21 @@ export default function NotificationCenter() {
         open={open}
         anchorEl={anchorEl}
         onClose={handleClose}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'right',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'right',
-        }}
+        anchorOrigin={placement === 'side'
+          ? { vertical: 'top', horizontal: 'right' }
+          : { vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={placement === 'side'
+          ? { vertical: 'bottom', horizontal: 'left' }
+          : { vertical: 'top', horizontal: 'right' }}
         slotProps={{
           paper: {
             sx: {
               width: 380,
-              maxHeight: 480,
+              maxWidth: 'calc(100vw - 16px)',
+              maxHeight: 'min(480px, calc(100dvh - 24px))',
               borderRadius: 3,
-              mt: 1,
+              mt: placement === 'side' ? 0 : 1,
+              mb: placement === 'side' ? 1 : 0,
               border: '1px solid',
               borderColor: 'divider',
               boxShadow: DESIGN.shadow.menu,

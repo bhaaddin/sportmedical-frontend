@@ -20,6 +20,21 @@ import { calendarApi, type Appointment } from '../api/calendar';
 import { usePermission, usePermissions } from '../auth/usePermission';
 import { normalizeText, searchSettingsItems, visibleSections } from '../pages/settings/catalogue';
 import { DESIGN, StatusChip, type ChipTone } from './ui';
+import { useIsPhone } from '../layout/useDevice';
+
+/** Event the shell's search buttons fire; the palette listens for it (and for Ctrl+K). */
+export const OPEN_SEARCH_EVENT = 'sm-open-search';
+
+/**
+ * Opens the palette from a button.
+ *
+ * The buttons used to dispatch a synthetic Ctrl+K on `document`; a keyboard
+ * event made by hand does not bubble, so the listener on `window` never
+ * heard it. A named event on `window` itself cannot be missed.
+ */
+export function openUniversalSearch(): void {
+  window.dispatchEvent(new Event(OPEN_SEARCH_EVENT));
+}
 
 interface SearchResult {
   id: string;
@@ -48,6 +63,7 @@ export default function UniversalSearch() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const phone = useIsPhone();
   const canBill = usePermission('billing.manage');
   const canSeePatients = usePermission('patients.view');
   /* The settings rows this person may open - the same smart search the rail
@@ -64,8 +80,13 @@ export default function UniversalSearch() {
         setOpen(prev => !prev);
       }
     };
+    const openFromButton = () => setOpen(true);
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener(OPEN_SEARCH_EVENT, openFromButton);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      window.removeEventListener(OPEN_SEARCH_EVENT, openFromButton);
+    };
   }, []);
 
   /* ── Focus input when dialog opens ── */
@@ -239,10 +260,12 @@ export default function UniversalSearch() {
       onClose={() => setOpen(false)}
       maxWidth="sm"
       fullWidth
+      fullScreen={phone}
+      transitionDuration={150}
       slotProps={{
         paper: {
           sx: {
-            borderRadius: 3, overflow: 'hidden', border: '1px solid', borderColor: 'divider',
+            borderRadius: phone ? 0 : 3, overflow: 'hidden', border: '1px solid', borderColor: 'divider',
             boxShadow: DESIGN.shadow.menu,
           },
         },
@@ -263,7 +286,7 @@ export default function UniversalSearch() {
                   {loading ? <CircularProgress size={18} /> : <Search sx={{ color: 'text.secondary', fontSize: 20 }} />}
                 </InputAdornment>
               ),
-              endAdornment: (
+              endAdornment: phone ? undefined : (
                 <InputAdornment position="end">
                   <Box
                     component="kbd"
@@ -283,14 +306,14 @@ export default function UniversalSearch() {
           sx={{ '& .MuiOutlinedInput-notchedOutline': { border: 'none' }, px: 1 }}
         />
         {results.length > 0 && (
-          <List sx={{ maxHeight: 400, overflow: 'auto', borderTop: '1px solid', borderColor: 'divider', py: 0.75 }}>
+          <List sx={{ maxHeight: phone ? 'calc(100dvh - 72px)' : 400, overflow: 'auto', borderTop: '1px solid', borderColor: 'divider', py: 0.75 }}>
             {results.map((r, i) => (
               <ListItem
                 key={r.id}
                 onClick={() => { navigate(r.path); setOpen(false); }}
                 aria-selected={i === selectedIndex}
                 sx={{
-                  cursor: 'pointer', mx: 1, width: 'auto', borderRadius: 2, mb: 0.25, py: 1,
+                  cursor: 'pointer', mx: 1, width: 'auto', borderRadius: 2, mb: 0.25, py: 1, minHeight: 48,
                   bgcolor: i === selectedIndex ? 'action.selected' : 'transparent',
                   '&:hover': { bgcolor: 'action.hover' },
                 }}
