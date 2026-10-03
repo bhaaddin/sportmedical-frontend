@@ -17,7 +17,7 @@ export function SectionLabel({
     <Typography
       variant="overline"
       component={component}
-      sx={[{ color: 'text.secondary', display: 'block', mb: 1 }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
+      sx={[{ color: 'text.primary', opacity: 0.78, fontSize: 12, letterSpacing: '0.1em', display: 'block', mb: 1 }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
     >
       {children}
     </Typography>

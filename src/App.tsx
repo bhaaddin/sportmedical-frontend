@@ -10,7 +10,7 @@ import { PATIENT_SECTIONS, patientInPath, sectionPath } from './pages/patients/s
 import { settingsItemAt } from './pages/settings/catalogue';
 import { Toaster } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useState, useMemo, lazy, Suspense, useRef, useCallback } from 'react';
+import { useState, useMemo, lazy, Suspense, useRef, useCallback, useEffect } from 'react';
 import { buildTheme, THEME_ACCENTS, type ThemeMode } from './theme';
 import {
   ThemePrefsContext,
@@ -249,8 +249,9 @@ function NavRow({
         ml: indent ? 2 : 0,
         gap: 1.25,
         color: active ? 'primary.main' : 'text.primary',
-        fontWeight: active ? 600 : 500,
-        fontSize: indent ? 13.5 : 14.5,
+        fontWeight: active ? 700 : 500,
+        fontSize: indent ? 14 : 15,
+        boxShadow: active ? (t) => `inset 3px 0 0 ${t.palette.primary.main}` : 'none',
       }}
     >
       {icon !== undefined && (
@@ -263,11 +264,88 @@ function NavRow({
   );
 }
 
+/*
+ * "Where am I" - one quiet line at the top of every screen, so a click never
+ * costs the sense of place: the sidebar entry, then the screen inside it
+ * (Pacienti › Karta pacienta › Termíny; Nastavení › Služby a ceny › Ceník).
+ * The browser tab says the same, so ten open tabs are tellable apart.
+ */
+const ROUTE_NAMES: Record<string, string> = {
+  '/': 'Přehled',
+  '/dnes': 'Dnešní přehled',
+  '/prehled-sluzeb': 'Přehled podle služeb',
+  '/vyhrazeni': 'Hromadné objednávky',
+  '/blokovany-cas': 'Blokovaný čas',
+  '/hodnoceni-pacientu': 'Hodnocení pacientů',
+  '/cenik': 'Ceník',
+  '/patients/register': 'Nový pacient',
+  '/intake-review': 'Kontrola registrací',
+  '/diagnostics/new': 'Výsledky',
+};
+
+function WhereAmI({
+  pathname,
+  patientId,
+  settingsHere,
+}: {
+  pathname: string;
+  patientId: string | null;
+  settingsHere: ReturnType<typeof settingsItemAt>;
+}) {
+  const crumbs: { label: string; to?: string }[] = [];
+  if (settingsHere !== null) {
+    crumbs.push({ label: 'Nastavení', to: '/settings' }, { label: settingsHere.section.label }, { label: settingsHere.item.label });
+  } else if (patientId !== null) {
+    const section = PATIENT_SECTIONS.find((s) => sectionPath(patientId, s) === pathname);
+    crumbs.push({ label: 'Pacienti', to: '/patients' }, { label: 'Karta pacienta', to: `/patients/${patientId}` });
+    if (section && section.path !== '') crumbs.push({ label: section.label });
+    if (pathname.endsWith('/edit')) crumbs.push({ label: 'Úprava karty' });
+  } else if (pathname.startsWith('/kalendar/')) {
+    crumbs.push({ label: 'Kalendář', to: '/planovani' }, { label: 'Termín' });
+  } else {
+    const items = menuGroups.flatMap((g) => g.items);
+    const exact = items.find((i) => i.path === pathname);
+    const prefix = exact ?? items.find((i) => i.path !== '/' && pathname.startsWith(i.path));
+    if (prefix) crumbs.push({ label: prefix.text, to: prefix.path });
+    const name = ROUTE_NAMES[pathname];
+    if (name && name !== prefix?.text) crumbs.push({ label: name });
+  }
+  const trail = crumbs.map((c) => c.label).join(' › ');
+
+  useEffect(() => {
+    const here = crumbs.length ? crumbs[crumbs.length - 1].label : 'SportMedical';
+    document.title = `${here} · SportMedical`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trail]);
+
+  if (crumbs.length === 0) return null;
+  return (
+    <Box
+      aria-label="Kde jsem"
+      sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1.5, fontSize: 13, color: 'text.secondary', flexWrap: 'wrap' }}
+    >
+      <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0 }} />
+      {crumbs.map((c, i) => (
+        <Box key={i} component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+          {i > 0 && <Box component="span" sx={{ color: 'text.disabled' }}>›</Box>}
+          {c.to && i < crumbs.length - 1 ? (
+            <Box component={Link} to={c.to} sx={{ color: 'text.secondary', fontWeight: 600, '&:hover': { color: 'primary.main' } }}>{c.label}</Box>
+          ) : (
+            <Box component="span" sx={{ color: i === crumbs.length - 1 ? 'text.primary' : 'text.secondary', fontWeight: i === crumbs.length - 1 ? 700 : 600 }}>{c.label}</Box>
+          )}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
-  const narrow = useMediaQuery(theme.breakpoints.down('md'));
+  /* The sidebar is where you are. It only ever folds into a drawer on a phone;
+     on any laptop, whatever the zoom, it stays put. */
+  const narrow = useMediaQuery(theme.breakpoints.down('sm'));
   /*
    * Inside a patient the sidebar becomes that patient's, and the application's
    * own menu steps aside. The owner's rule: while you are in somebody's file,
@@ -524,6 +602,8 @@ function Layout({ children }: { children: React.ReactNode }) {
           minHeight: '100vh',
         }}
       >
+        <WhereAmI pathname={location.pathname} patientId={patientId} settingsHere={settingsHere} />
+
         {/*
           * The way out of a settings screen is drawn by the screens themselves
           * now (SettingsScreen in src/pages/settings/SettingsFrame.tsx: the

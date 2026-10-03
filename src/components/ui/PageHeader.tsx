@@ -28,11 +28,11 @@ export function PageHeader({
       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', minWidth: 0 }}>
         {leading}
         <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h4" component="h1" sx={{ fontSize: { xs: 22, md: 24 } }}>
+          <Typography variant="h4" component="h1" sx={{ fontSize: { xs: 24, md: 28 }, fontWeight: 800, letterSpacing: '-0.02em' }}>
             {title}
           </Typography>
           {subtitle !== undefined && (
-            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.25 }}>
+            <Typography variant="body1" sx={{ color: 'text.secondary', mt: 0.25, fontSize: 15 }}>
               {subtitle}
             </Typography>
           )}

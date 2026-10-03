@@ -33,9 +33,12 @@ export const SETTINGS_NAV_WIDTH = 240;
 export function SettingsNav({
   query,
   onQueryChange,
+  compact = false,
 }: {
   query?: string;
   onQueryChange?: (query: string) => void;
+  /** On a phone: one wrapping row of chips above the content instead of a side column. */
+  compact?: boolean;
 }) {
   const location = useLocation();
   const [ownQuery, setOwnQuery] = useState('');
@@ -48,19 +51,23 @@ export function SettingsNav({
     <Box
       component="nav"
       aria-label="Nastavení — oddíly"
-      sx={{
-        width: SETTINGS_NAV_WIDTH,
-        flexShrink: 0,
-        position: 'sticky',
-        top: 0,
-        alignSelf: 'flex-start',
-        borderRight: '1px solid',
-        borderColor: 'divider',
-        pr: 2,
-        pb: 2,
-        maxHeight: '100vh',
-        overflowY: 'auto',
-      }}
+      sx={
+        compact
+          ? { width: '100%', mb: 2, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider' }
+          : {
+              width: SETTINGS_NAV_WIDTH,
+              flexShrink: 0,
+              position: 'sticky',
+              top: 0,
+              alignSelf: 'flex-start',
+              borderRight: '1px solid',
+              borderColor: 'divider',
+              pr: 2,
+              pb: 2,
+              maxHeight: '100vh',
+              overflowY: 'auto',
+            }
+      }
     >
       <TextField
         fullWidth
@@ -88,8 +95,8 @@ export function SettingsNav({
       )}
 
       {sections.map((section) => (
-        <Box key={section.id} sx={{ mt: 2 }}>
-          <SectionLabel sx={{ px: 1.5, mb: 0.5 }}>{section.label}</SectionLabel>
+        <Box key={section.id} sx={compact ? { mt: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.5 } : { mt: 2 }}>
+          <SectionLabel sx={compact ? { mb: 0, mr: 1, width: '100%' } : { px: 1.5, mb: 0.5 }}>{section.label}</SectionLabel>
           {section.items.map((item) => {
             const active = here?.item.id === item.id && here?.section.id === section.id;
             return (
@@ -98,21 +105,37 @@ export function SettingsNav({
                 component={RouterLink}
                 to={item.to}
                 aria-current={active ? 'page' : undefined}
-                sx={{
-                  display: 'block',
-                  px: 1.5,
-                  py: 1.125,
-                  fontSize: 14,
-                  lineHeight: 1.35,
-                  textDecoration: 'none',
-                  borderLeft: '3px solid',
-                  borderColor: active ? 'primary.main' : 'transparent',
-                  borderRadius: '0 8px 8px 0',
-                  color: active ? 'primary.main' : 'text.primary',
-                  fontWeight: active ? 600 : 500,
-                  bgcolor: active ? 'background.paper' : 'transparent',
-                  '&:hover': { bgcolor: 'background.paper', color: active ? 'primary.main' : 'text.primary' },
-                }}
+                sx={
+                  compact
+                    ? {
+                        display: 'inline-block',
+                        px: 1.25,
+                        py: 0.5,
+                        fontSize: 13,
+                        textDecoration: 'none',
+                        borderRadius: 999,
+                        border: '1px solid',
+                        borderColor: active ? 'primary.main' : 'divider',
+                        color: active ? '#FFFFFF' : 'text.primary',
+                        bgcolor: active ? 'primary.main' : 'background.paper',
+                        fontWeight: 600,
+                      }
+                    : {
+                        display: 'block',
+                        px: 1.5,
+                        py: 1.125,
+                        fontSize: 14.5,
+                        lineHeight: 1.35,
+                        textDecoration: 'none',
+                        borderLeft: '3px solid',
+                        borderColor: active ? 'primary.main' : 'transparent',
+                        borderRadius: '0 8px 8px 0',
+                        color: active ? 'primary.main' : 'text.primary',
+                        fontWeight: active ? 700 : 500,
+                        bgcolor: active ? 'background.paper' : 'transparent',
+                        '&:hover': { bgcolor: 'background.paper', color: active ? 'primary.main' : 'text.primary' },
+                      }
+                }
               >
                 {item.label}
               </Box>
@@ -177,13 +200,14 @@ export function SettingsScreen({
 }) {
   const inRouter = useInRouterContext();
   const theme = useTheme();
+  /* The settings nav never disappears: a side column on a laptop, a row of
+     chips above the content on a phone - you always see where you are. */
   const narrow = useMediaQuery(theme.breakpoints.down('md'));
-  const withNav = inRouter && !narrow;
 
   return (
-    <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
-      {withNav && <SettingsNav />}
-      <Box sx={{ flex: 1, minWidth: 0, maxWidth: width }}>
+    <Box sx={{ display: 'flex', flexDirection: narrow ? 'column' : 'row', gap: 3, alignItems: 'flex-start' }}>
+      {inRouter && <SettingsNav compact={narrow} />}
+      <Box sx={{ flex: 1, minWidth: 0, maxWidth: width, width: '100%' }}>
         {inRouter && <SettingsBreadcrumb title={title} />}
         <PageHeader title={title} subtitle={subtitle} actions={actions} />
         {children}
