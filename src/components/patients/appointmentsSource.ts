@@ -30,7 +30,7 @@ export async function fetchAllAppointments(): Promise<PatientAppointment[]> {
 }
 
 /** How far ahead the card looks for the next booking and its paperwork. */
-export const UPCOMING_WINDOW_DAYS = 62;
+export const UPCOMING_WINDOW_DAYS = 61;
 
 /** The booking grid's window from today, every calendar this account may see. */
 export function fetchUpcomingWindow(now: Date = new Date()): Promise<DayAppointment[]> {

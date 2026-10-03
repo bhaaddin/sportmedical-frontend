@@ -218,6 +218,11 @@ export default function ActivitiesPage() {
       serviceItemId: activity.serviceItemId,
       /* Sent back as it came, for the same reason: `PUT` is the whole činnost. */
       questionnaireDefinitionId: activity.questionnaireDefinitionId,
+      /* Etapa 2: the činnost's own colour, how many it serves at once and the documents it asks for
+         travel back as they were read, or this form would clear them. */
+      colorHex: activity.colorHex ?? null,
+      parallelCapacity: activity.parallelCapacity ?? 1,
+      requiredDocumentTemplateIds: activity.requiredDocumentTemplateIds,
     });
     save.reset();
   };

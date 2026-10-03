@@ -106,7 +106,7 @@ export function MediaUpload({ kind, slotKey, forLabel, buttonLabel, onUploaded, 
           accept={acceptFor(kind)}
           aria-label={`Soubor pro ${forLabel}`}
           onChange={(event: React.ChangeEvent<HTMLInputElement>) => void pick(event.target.files?.[0])}
-          sx={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}
+          sx={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}
         />
       </Button>
       {busy && (

@@ -79,7 +79,7 @@ function DocumentRow({ entry }: { entry: DocumentEntry }) {
     return (
       <Box component="a" href={fileUrl} target="_blank" rel="noopener noreferrer" sx={[rowSx, hover]}>
         {body}
-        <Box component="span" sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>(otevře se v novém okně)</Box>
+        <Box component="span" sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>(otevře se v novém okně)</Box>
       </Box>
     );
   }

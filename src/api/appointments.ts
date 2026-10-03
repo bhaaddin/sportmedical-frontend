@@ -71,7 +71,7 @@ export type QuickBooked = z.infer<typeof quickBookedSchema>;
 const MAX_RANGE_DAYS = 62;
 
 function assertRangeWithinLimit(from: DateOnly, to: DateOnly): void {
-  if (to < from || addDaysToDateOnly(from, MAX_RANGE_DAYS) < to) {
+  if (to < from || addDaysToDateOnly(from, MAX_RANGE_DAYS - 1) < to) {
     throw new Error(`Rozsah smí být nejvýše ${MAX_RANGE_DAYS} dní`);
   }
 }
@@ -204,7 +204,13 @@ export const appointmentsApi = {
       `/api/calendars/${requireId(calendarId, 'calendarId')}/appointments/quick`,
       { ...input, startUtc: asUtcInstant(input.startUtc) },
     );
-    return parseResponse(quickBookedSchema, res.data);
+    // Every sibling endpoint answers inside `{ success, message, data }`; accept a flat body too.
+    const body: unknown = res.data;
+    const inner =
+      body !== null && typeof body === 'object' && 'data' in body && !('appointment' in body)
+        ? (body as { data: unknown }).data
+        : body;
+    return parseResponse(quickBookedSchema, inner);
   },
 
   /** A move is its own operation, not a cancel plus a new booking (4.5). */

@@ -70,6 +70,8 @@ describe('the completion link', () => {
 
   it('builds it from the token, and only the token, when the server sent none', () => {
     expect(completionUrl({ url: null, token: 't1' }, 'https://app.test')).toBe('https://app.test/dokonceni/t1');
+    // A relative path from the server gets the app's origin: a bare path cannot be pasted into a message.
+    expect(completionUrl({ url: '/dokonceni/t1', token: 't1' }, 'https://app.test')).toBe('https://app.test/dokonceni/t1');
     expect(completionUrl({ url: '  ', token: 't1' }, 'https://app.test')).toBe('https://app.test/dokonceni/t1');
   });
 });

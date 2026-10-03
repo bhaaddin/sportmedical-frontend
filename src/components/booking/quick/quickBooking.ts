@@ -80,5 +80,9 @@ export function completionUrl(
   link: { url: string | null; token: string },
   origin: string,
 ): string {
-  return link.url && link.url.trim() !== "" ? link.url : `${origin}/dokonceni/${link.token}`;
+  const url = link.url?.trim() ?? "";
+  if (url === "") return `${origin}/dokonceni/${link.token}`;
+  // The server answers a relative path when it does not know the public address; a path alone
+  // cannot be pasted into a message, so it gets the app's own origin.
+  return url.startsWith("/") ? `${origin}${url}` : url;
 }

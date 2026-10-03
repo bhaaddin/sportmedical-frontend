@@ -92,7 +92,7 @@ export function ServiceLegend({
                   checked={shown}
                   onChange={() => onToggle(service.id)}
                   aria-label={service.name}
-                  sx={{ position: "absolute", opacity: 0, width: 1, height: 1 }}
+                  sx={{ position: "absolute", opacity: 0, width: '1px', height: '1px' }}
                 />
                 <Box
                   aria-hidden
