@@ -33,11 +33,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert, AlertTitle, Autocomplete, Box, Button, Checkbox, CircularProgress,
-  Divider, FormControlLabel, Grid, LinearProgress, MenuItem, Stack, TextField,
+  Divider, FormControlLabel, LinearProgress, MenuItem, Stack, TextField,
   ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
 import { InfoOutlined, PersonAdd, Search } from '@mui/icons-material';
 import toast from 'react-hot-toast';
+import { activitiesApi } from '../api/activities';
+import type { Activity } from '../api/bookingContracts';
 import patientRegistryApi, {
   type EmailInspection,
   type IdentityInspection,
@@ -84,6 +86,9 @@ import CandidateReviewDialog from '../components/registration/CandidateReviewDia
 import FormField from '../components/registration/FormField';
 import IssuedLinkCard from '../components/registration/IssuedLinkCard';
 import StickyFormFooter from '../components/registration/StickyFormFooter';
+import { FieldCell, FieldGrid } from '../components/registration/FieldGrid';
+import { PHONE_TOUCH_TARGETS } from '../components/registration/touchTargets';
+import { useDevice } from '../layout/useDevice';
 
 interface RegistrationIdentifiers {
   patientId: string;
@@ -134,6 +139,7 @@ const FIELD_ORDER: (keyof RegistrationFormState)[] = [
   'healthInsuranceNumber', 'healthInsuranceNumberConfirmation', 'healthInsurerCode',
   'birthNumber', 'identityDocumentType', 'identityDocumentIssuingCountryCode',
   'identityDocumentNumber', 'ruianAddressPointCode', 'email', 'phoneRegionCode', 'phone',
+  'activityId',
 ];
 
 /** What is still missing, in the words of the field rather than its name. */
@@ -147,6 +153,7 @@ const FIELD_LABEL: Partial<Record<keyof RegistrationFormState, string>> = {
   identityDocumentNumber: 'Číslo dokladu',
   ruianAddressPointCode: 'Adresa z registru RÚIAN',
   email: 'E-mail', phone: 'Telefon', phoneRegionCode: 'Předvolba',
+  activityId: 'Činnost',
 };
 
 /** The label element a select names itself after - see FormField. */
@@ -166,7 +173,17 @@ interface IssuedRegistration {
   name: string;
   email: string;
   link: string;
+  activityName: string;
   issued: IssuedLink;
+}
+
+/** "Komplexní prohlídka · 45 min · 2 200 Kč" - the price from the ceník, never typed here. */
+function activityLabel(activity: Activity): string {
+  const parts = [activity.name, `${activity.durationMinutes} min`];
+  if (activity.priceCzk !== null) {
+    parts.push(`${activity.priceCzk.toLocaleString('cs-CZ')} Kč`);
+  }
+  return parts.join(' · ');
 }
 
 function formatExpiry(iso: string): string {
@@ -178,6 +195,8 @@ function formatExpiry(iso: string): string {
 
 export default function PatientRegistration() {
   const navigate = useNavigate();
+  const device = useDevice();
+  const phoneLayout = device === 'phone';
 
   const [form, setForm] = useState<RegistrationFormState>(createEmptyForm);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -187,6 +206,13 @@ export default function PatientRegistration() {
   const [options, setOptions] = useState<PatientRegistrationOptions | null>(null);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [optionsError, setOptionsError] = useState('');
+  const [optionsAttempt, setOptionsAttempt] = useState(0);
+
+  /* The činnosti a quick registration is for. A failed load says so and offers
+     "Zkusit znovu"; it never leaves an empty select that looks like a choice. */
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [activitiesState, setActivitiesState] = useState<'loading' | 'ready' | 'failed'>('loading');
+  const [activitiesAttempt, setActivitiesAttempt] = useState(0);
 
   const [similar, setSimilar] = useState<PatientSearchResult[]>([]);
   const [addressPoint, setAddressPoint] = useState<MapySuggestion | null>(null);
@@ -231,12 +257,28 @@ export default function PatientRegistration() {
 
   /* ── Options ── */
   useEffect(() => {
+    setLoadingOptions(true);
+    setOptionsError('');
     patientRegistryApi
       .getOptions()
       .then(setOptions)
       .catch((error) => setOptionsError(resolveRegistrationError(error).message))
       .finally(() => setLoadingOptions(false));
-  }, []);
+  }, [optionsAttempt]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setActivitiesState('loading');
+    activitiesApi
+      .list()
+      .then((result) => {
+        if (cancelled) return;
+        setActivities(result.activities.filter((activity) => activity.isActive));
+        setActivitiesState('ready');
+      })
+      .catch(() => { if (!cancelled) setActivitiesState('failed'); });
+    return () => { cancelled = true; };
+  }, [activitiesAttempt]);
 
   /* ── Advisory duplicate check while the operator types ── */
   useEffect(() => {
@@ -447,7 +489,12 @@ export default function PatientRegistration() {
         preferredName: form.preferredName.trim() || null,
         titlesBeforeName: form.titlesBeforeName,
         titlesAfterName: form.titlesAfterName,
-        dateOfBirth: form.dateOfBirth,
+        /* A quick registration has no date of birth and no sex (decision 7 of
+           Etapa 2): the patient gives them through the completion link. The
+           contract types the date as a string; the server reads it as optional. */
+        dateOfBirth: (form.mode === 'Quick' && form.dateOfBirth === ''
+          ? null
+          : form.dateOfBirth) as string,
         sex: form.sex === '' ? 'NotSpecified' : form.sex,
         mode: form.mode,
         source: 'ClinicOperator',
@@ -480,7 +527,8 @@ export default function PatientRegistration() {
                 municipality: addressPoint?.municipality ?? null,
                 zip: addressPoint?.zip ?? null,
               },
-        administrativeProfile: {
+        /* Quick: no insurance yet - the patient gives it through the link. */
+        administrativeProfile: (form.mode === 'Quick' ? null : {
           profileId: ids.administrativeProfileId,
           insuranceRegistrationKind: form.insuranceRegistrationKind,
           // The two branches are exclusive: the Domain refuses facts from
@@ -497,7 +545,7 @@ export default function PatientRegistration() {
             ? null
             : form.identityDocumentIssuingCountryCode.trim().toUpperCase(),
           identityDocumentNumber: czech ? null : form.identityDocumentNumber.trim(),
-        },
+        }) as RegisterPatientRequest['administrativeProfile'],
         confirmation,
       };
     },
@@ -559,6 +607,7 @@ export default function PatientRegistration() {
               name: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
               email: form.email.trim(),
               link: link.url ?? `${window.location.origin}${link.path}`,
+              activityName: activities.find((activity) => activity.id === form.activityId)?.name ?? '',
               issued: link,
             });
             return;
@@ -590,7 +639,7 @@ export default function PatientRegistration() {
         setSubmitting(false);
       }
     },
-    [buildRequest, navigate, form.mode, form.firstName, form.lastName, form.email],
+    [buildRequest, navigate, form.mode, form.firstName, form.lastName, form.email, form.activityId, activities],
   );
 
   /*
@@ -686,17 +735,21 @@ export default function PatientRegistration() {
 
   if (options === null) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">
+      <Box sx={{ p: { xs: 2, md: 3 } }}>
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => setOptionsAttempt((n) => n + 1)}>
+              Zkusit znovu
+            </Button>
+          }
+        >
           <AlertTitle>Registraci nelze otevřít</AlertTitle>
           {optionsError || 'Číselníky registrace se nepodařilo načíst.'}
         </Alert>
       </Box>
     );
   }
-
-  /* The optional-field note, said once per label rather than with an asterisk. */
-  const optionalInQuick = quick ? ' (nepovinné)' : '';
 
   /* ═══ Success: a quick registration and the link that finishes it ═══ */
   if (issued !== null) {
@@ -727,7 +780,7 @@ export default function PatientRegistration() {
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="h6">{issued.name} je zaregistrován</Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                {issued.email}
+                {issued.activityName !== '' ? `${issued.email} · ${issued.activityName}` : issued.email}
               </Typography>
             </Box>
             <StatusChip tone="beige" sx={{ ml: 'auto' }}>Registrace není dokončena</StatusChip>
@@ -742,7 +795,7 @@ export default function PatientRegistration() {
                   ? `E-mail s odkazem odešel na ${issued.issued.sentTo ?? issued.email}. `
                   : 'E-mail se neodesílá automaticky — odkaz pacientovi pošlete sami. '}
                 {expiry !== '' ? `Odkaz platí do ${expiry}. ` : ''}
-                Pacient přes něj doplní adresu, rodné číslo a vstupní dotazník.
+                Pacient přes něj doplní datum narození, adresu, rodné číslo a vstupní dotazník.
               </>
             }
           />
@@ -763,7 +816,11 @@ export default function PatientRegistration() {
   }
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, pb: 0, maxWidth: 1200, mx: 'auto' }}>
+    <Box
+      data-device={device}
+      data-mode={quick ? 'quick' : 'standard'}
+      sx={[{ p: { xs: 2, md: 3 }, pb: 0, maxWidth: 1200, mx: 'auto' }, phoneLayout && PHONE_TOUCH_TARGETS]}
+    >
       {/* ── Header ── */}
       <PageHeader
         title="Nový pacient"
@@ -774,7 +831,13 @@ export default function PatientRegistration() {
             size="small"
             value={form.mode}
             aria-label="Režim registrace"
-            onChange={(_, value) => value !== null && update('mode', value)}
+            onChange={(_, value) => {
+              if (value === null) return;
+              update('mode', value);
+              /* Each mode has its own rules; what the other one flagged is not this one's. */
+              setErrors({});
+              setBanner(null);
+            }}
           >
             <ToggleButton value="Quick">Rychlá</ToggleButton>
             <ToggleButton value="Standard">Úplná</ToggleButton>
@@ -796,8 +859,8 @@ export default function PatientRegistration() {
             <SoftCard tone="muted" sx={{ p: 2, display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
               <InfoOutlined fontSize="small" sx={{ color: 'text.secondary', mt: '1px' }} />
               <Typography variant="body2">
-                Víc teď nepotřebujeme. Adresu, rodné číslo a vstupní dotazník vyplní pacient
-                sám přes odkaz, který mu odejde hned po registraci.
+                Víc teď nepotřebujeme. Datum narození, adresu, rodné číslo, pojištění
+                a vstupní dotazník vyplní pacient sám přes odkaz, který mu odejde hned po registraci.
               </Typography>
             </SoftCard>
           )}
@@ -805,8 +868,8 @@ export default function PatientRegistration() {
           {/* ── Základní údaje ── */}
           <SoftCard>
             <SectionLabel>Základní údaje</SectionLabel>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 6 }}>
+            <FieldGrid>
+              <FieldCell>
                 <FormField label="Jméno" required name="firstName">
                   {(id) => (
                     <TextField
@@ -819,8 +882,8 @@ export default function PatientRegistration() {
                     />
                   )}
                 </FormField>
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              </FieldCell>
+              <FieldCell>
                 <FormField label="Příjmení" required name="lastName">
                   {(id) => (
                     <TextField
@@ -833,9 +896,11 @@ export default function PatientRegistration() {
                     />
                   )}
                 </FormField>
-              </Grid>
+              </FieldCell>
 
-              <Grid size={{ xs: 12, md: 6 }}>
+              {!quick && (
+              <>
+              <FieldCell>
                 <FormField label="Datum narození" required name="dateOfBirth">
                   {(id) => (
                     <TextField
@@ -848,8 +913,8 @@ export default function PatientRegistration() {
                     />
                   )}
                 </FormField>
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              </FieldCell>
+              <FieldCell>
                 <FormField label="Pohlaví" required name="sex">
                   {(id) => (
                     <TextField
@@ -867,9 +932,9 @@ export default function PatientRegistration() {
                     </TextField>
                   )}
                 </FormField>
-              </Grid>
+              </FieldCell>
 
-              <Grid size={{ xs: 12, md: 6 }}>
+              <FieldCell>
                 <FormField label="Oslovení" name="preferredName">
                   {(id) => (
                     <TextField
@@ -882,8 +947,8 @@ export default function PatientRegistration() {
                     />
                   )}
                 </FormField>
-              </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
+              </FieldCell>
+              <FieldCell>
                 <FormField label="Tituly před">
                   {(id) => (
                     <Autocomplete
@@ -899,8 +964,8 @@ export default function PatientRegistration() {
                     />
                   )}
                 </FormField>
-              </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
+              </FieldCell>
+              <FieldCell>
                 <FormField label="Tituly za">
                   {(id) => (
                     <Autocomplete
@@ -916,8 +981,10 @@ export default function PatientRegistration() {
                     />
                   )}
                 </FormField>
-              </Grid>
-            </Grid>
+              </FieldCell>
+              </>
+            )}
+            </FieldGrid>
 
             {/* Live duplicate check — said where it applies, not after the save. */}
             {similar.length > 0 && (
@@ -944,8 +1011,8 @@ export default function PatientRegistration() {
           {/* ── Kontakt ── */}
           <SoftCard>
             <SectionLabel>Kontakt</SectionLabel>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 6 }}>
+            <FieldGrid>
+              <FieldCell>
                 <FormField label="E-mail" required name="email">
                   {(id) => (
                     <TextField
@@ -963,8 +1030,8 @@ export default function PatientRegistration() {
                     />
                   )}
                 </FormField>
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              </FieldCell>
+              <FieldCell>
                 {/*
                   One field, the owner's way (3. 10. 2026): the country is a compact
                   picker in front of the number, Česko by default, searchable by digits
@@ -973,7 +1040,7 @@ export default function PatientRegistration() {
                   helper line) and the server, not this screen, says whether it is
                   valid. The region code travels with it, as it always did.
                 */}
-                <FormField label={`Telefon${optionalInQuick}`} required={!quick} name="phone">
+                <FormField label="Telefon" required name="phone">
                   {(id) => (
                     <PhoneField
                       id={id}
@@ -1007,10 +1074,64 @@ export default function PatientRegistration() {
                     />
                   )}
                 </FormField>
-              </Grid>
-            </Grid>
+              </FieldCell>
+            </FieldGrid>
           </SoftCard>
 
+          {/* ── Činnost (rychlá registrace) ── */}
+          {quick && (
+            <SoftCard data-field="activityId">
+              <SectionLabel>Činnost</SectionLabel>
+              {activitiesState === 'failed' ? (
+                <Alert
+                  severity="error"
+                  action={
+                    <Button color="inherit" size="small" onClick={() => setActivitiesAttempt((n) => n + 1)}>
+                      Zkusit znovu
+                    </Button>
+                  }
+                >
+                  Činnosti se nepodařilo načíst.
+                </Alert>
+              ) : (
+                <FieldGrid>
+                  <FieldCell full>
+                    <FormField label="Prohlídka, na kterou volal" required name="activityId">
+                      {(id) => (
+                        <TextField
+                          id={id} select fullWidth
+                          value={form.activityId}
+                          disabled={activitiesState === 'loading'}
+                          onChange={(e) => update('activityId', e.target.value)}
+                          onBlur={checkOnLeave('activityId')}
+                          error={errors.activityId !== undefined}
+                          helperText={
+                            errors.activityId
+                            ?? (activitiesState === 'loading'
+                              ? 'Načítám činnosti…'
+                              : activities.length === 0
+                                ? 'V nastavení zatím není žádná aktivní činnost.'
+                                : undefined)
+                          }
+                          slotProps={selectLabelledBy(id)}
+                        >
+                          {activities.map((activity) => (
+                            <MenuItem key={activity.id} value={activity.id}>
+                              {activityLabel(activity)}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      )}
+                    </FormField>
+                  </FieldCell>
+                </FieldGrid>
+              )}
+            </SoftCard>
+          )}
+
+          {/* The patient gives insurance and address through the link in a quick registration. */}
+          {!quick && (
+            <>
           {/* ── Pojištění ── */}
           <SoftCard>
             <SectionLabel>Pojištění</SectionLabel>
@@ -1036,8 +1157,8 @@ export default function PatientRegistration() {
             </ToggleButtonGroup>
 
             {czechBranch ? (
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, md: 6 }}>
+              <FieldGrid>
+                <FieldCell>
                   <FormField label="Číslo pojištěnce" required name="healthInsuranceNumber">
                     {(id) => (
                       <TextField
@@ -1056,12 +1177,12 @@ export default function PatientRegistration() {
                       />
                     )}
                   </FormField>
-                </Grid>
+                </FieldCell>
 
                 {/* Only an insurer-assigned number is typed twice — nothing
                     else can be checked against anything but itself. */}
                 {identifier.requiresConfirmation && (
-                  <Grid size={{ xs: 12, md: 6 }}>
+                  <FieldCell>
                     <FormField label="Číslo pojištěnce ještě jednou" required name="healthInsuranceNumberConfirmation">
                       {(id) => (
                         <TextField
@@ -1078,10 +1199,10 @@ export default function PatientRegistration() {
                         />
                       )}
                     </FormField>
-                  </Grid>
+                  </FieldCell>
                 )}
 
-                <Grid size={{ xs: 12, md: 6 }}>
+                <FieldCell>
                   <FormField label="Zdravotní pojišťovna" required name="healthInsurerCode">
                     {(id) => (
                       <TextField
@@ -1104,9 +1225,9 @@ export default function PatientRegistration() {
                       </TextField>
                     )}
                   </FormField>
-                </Grid>
+                </FieldCell>
 
-                <Grid size={{ xs: 12, md: 6 }}>
+                <FieldCell>
                   <FormField label="Rodné číslo (nepovinné)" name="birthNumber">
                     {(id) => (
                       <TextField
@@ -1120,9 +1241,9 @@ export default function PatientRegistration() {
                       />
                     )}
                   </FormField>
-                </Grid>
+                </FieldCell>
 
-                <Grid size={12}>
+                <FieldCell full>
                   <FormControlLabel
                     control={
                       <Checkbox
@@ -1136,29 +1257,29 @@ export default function PatientRegistration() {
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                     Zaškrtněte, když jste průkaz viděli. Zapíše se jako zdroj evidence.
                   </Typography>
-                </Grid>
+                </FieldCell>
 
                 {/* What the identifier itself says — with both values in it. */}
                 {verdict === 'disagrees' && inspection !== null && (
-                  <Grid size={12}>
+                  <FieldCell full>
                     <Alert severity="warning">
                       {disagreementText(inspection, {
                         dateOfBirth: form.dateOfBirth, sex: form.sex,
                       })}
                     </Alert>
-                  </Grid>
+                  </FieldCell>
                 )}
                 {verdict === 'agrees' && (
-                  <Grid size={12}>
+                  <FieldCell full>
                     <Typography variant="caption" sx={{ color: 'success.main' }}>
                       {AGREES_TEXT}
                     </Typography>
-                  </Grid>
+                  </FieldCell>
                 )}
-              </Grid>
+              </FieldGrid>
             ) : (
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, md: 6 }}>
+              <FieldGrid>
+                <FieldCell>
                   <FormField label="Typ dokladu" required name="identityDocumentType">
                     {(id) => (
                       <TextField
@@ -1176,8 +1297,8 @@ export default function PatientRegistration() {
                       </TextField>
                     )}
                   </FormField>
-                </Grid>
-                <Grid size={{ xs: 12, md: 6 }}>
+                </FieldCell>
+                <FieldCell>
                   <FormField label="Stát vydání" required name="identityDocumentIssuingCountryCode">
                     {(id) => (
                       <TextField
@@ -1193,8 +1314,8 @@ export default function PatientRegistration() {
                       />
                     )}
                   </FormField>
-                </Grid>
-                <Grid size={{ xs: 12, md: 6 }}>
+                </FieldCell>
+                <FieldCell>
                   <FormField label="Číslo dokladu" required name="identityDocumentNumber">
                     {(id) => (
                       <TextField
@@ -1207,23 +1328,23 @@ export default function PatientRegistration() {
                       />
                     )}
                   </FormField>
-                </Grid>
-                <Grid size={12}>
+                </FieldCell>
+                <FieldCell full>
                   <Typography variant="caption" color="text.secondary">
                     Datum narození a pohlaví vyplňte v základních údajích ručně — ze zahraničního
                     dokladu se odvodit nedají.
                   </Typography>
-                </Grid>
-              </Grid>
+                </FieldCell>
+              </FieldGrid>
             )}
           </SoftCard>
 
           {/* ── Adresa ── */}
           <SoftCard data-field="ruianAddressPointCode">
-            <SectionLabel>{`Adresa${optionalInQuick}`}</SectionLabel>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <FormField label="Typ pobytu" required={!quick}>
+            <SectionLabel>Adresa</SectionLabel>
+            <FieldGrid>
+              <FieldCell>
+                <FormField label="Typ pobytu" required>
                   {(id) => (
                     <TextField
                       id={id} select fullWidth
@@ -1238,17 +1359,19 @@ export default function PatientRegistration() {
                     </TextField>
                   )}
                 </FormField>
-              </Grid>
-              <Grid size={12}>
+              </FieldCell>
+              <FieldCell full>
                 <MapyAddressPicker
                   selected={addressPoint}
                   onSelect={handleAddressPoint}
                   error={errors.ruianAddressPointCode}
                   disabled={submitting}
                 />
-              </Grid>
-            </Grid>
+              </FieldCell>
+            </FieldGrid>
           </SoftCard>
+            </>
+          )}
         </Stack>
 
         {/* ═══ The card — the former "Shrnutí" step ═══ */}
@@ -1268,13 +1391,21 @@ export default function PatientRegistration() {
               <StatusChip tone={quick ? 'beige' : 'green'}>
                 {quick ? 'Rychlá' : 'Úplná'}
               </StatusChip>
-              {form.dateOfBirth !== '' && <StatusChip>{form.dateOfBirth}</StatusChip>}
-              {form.sex !== '' && (
+              {!quick && form.dateOfBirth !== '' && <StatusChip>{form.dateOfBirth}</StatusChip>}
+              {!quick && form.sex !== '' && (
                 <StatusChip>{SEX_OPTIONS.find((s) => s.code === form.sex)?.label ?? form.sex}</StatusChip>
               )}
             </Stack>
 
             <Stack spacing={1.5}>
+              {quick && (
+                <LabelValue
+                  label="Činnost"
+                  value={activities.find((activity) => activity.id === form.activityId)?.name ?? '—'}
+                />
+              )}
+              {!quick && (
+                <>
               <LabelValue label="Pojištění" value={
                 czechBranch
                   ? (options.czechHealthInsurers.find((i) => i.code === form.healthInsurerCode)
@@ -1292,6 +1423,8 @@ export default function PatientRegistration() {
                 <LabelValue label="Rodné číslo" value={maskBirthNumber(form.birthNumber)} />
               )}
               <LabelValue label="Adresa" value={form.addressDisplay || '—'} />
+                </>
+              )}
               <LabelValue label="E-mail" value={storedAs(emailAnswer, form.email) || '—'} />
               {/* The card shows the grouped form — what will actually be
                   stored and shown everywhere after the save. */}

@@ -48,6 +48,12 @@ export interface RegistrationFormState {
 
   /* Registration metadata */
   mode: 'Standard' | 'Quick';
+
+  /**
+   * Quick registration only: the činnost the patient phoned about
+   * (`ActivityDto.id`). Empty and unused in the standard registration.
+   */
+  activityId: string;
 }
 
 export type FieldErrors = Partial<Record<keyof RegistrationFormState, string>>;
@@ -91,6 +97,19 @@ function validateIdentity(form: RegistrationFormState, errors: FieldErrors): voi
 
   if (form.preferredName.trim().length > NAME_MAX_LENGTH) {
     errors.preferredName = `Oslovení může mít nejvýše ${NAME_MAX_LENGTH} znaků.`;
+  }
+
+  /*
+   * A quick registration never asks for a date of birth or a sex (decision 7 of
+   * Etapa 2): the desk has a name, a telephone and an e-mail, and the patient
+   * gives the rest through the completion link. A date that IS somehow present
+   * is still not allowed to lie in the future.
+   */
+  if (form.mode === 'Quick') {
+    if (form.dateOfBirth.length > 0 && form.dateOfBirth > new Date().toISOString().slice(0, 10)) {
+      errors.dateOfBirth = 'Datum narození nemůže být v budoucnosti.';
+    }
+    return;
   }
 
   if (form.dateOfBirth.length === 0) {
@@ -201,18 +220,28 @@ function validateResidence(form: RegistrationFormState, errors: FieldErrors): vo
 
 function validateContact(form: RegistrationFormState, errors: FieldErrors): void {
   /*
-   * Rychlá registrace is for a patient standing at the desk who will be fully
-   * registered later — the server accepts it with no phone and no address (a
-   * pre-registration). So Quick asks only for the e-mail the confirmation needs,
-   * and leaves the telephone optional; a number that IS typed is still checked.
-   * This is the owner's "má to být rychlé": eleven fields become a handful.
+   * Rychlá registrace: the desk enters FOUR things - name, telephone, e-mail and
+   * the činnost - and the patient gives everything else through the completion
+   * link. The telephone is required here (it is how the clinic reaches the
+   * patient) and must carry its dialling code, which `PhoneField` always adds.
+   * Nothing else is asked: no date of birth, no insurance, no address.
    */
   if (form.mode === 'Quick') {
     if (form.email.trim().length === 0) {
       errors.email = 'E-mail je povinný.';
     }
-    if (form.phone.trim().length > 0 && !isPhone(form.phone)) {
+    if (form.phone.trim().length === 0) {
+      errors.phone = 'Telefon je povinný.';
+    } else if (!isPhone(form.phone)) {
       errors.phone = 'Telefon není ve správném tvaru.';
+    } else if (!form.phone.trim().startsWith('+')) {
+      errors.phone = 'Telefon musí mít předvolbu země (například +420).';
+    }
+    if (form.phoneRegionCode.length === 0) {
+      errors.phoneRegionCode = 'Vyberte zemi telefonního čísla.';
+    }
+    if (form.activityId.length === 0) {
+      errors.activityId = 'Vyberte činnost.';
     }
     return;
   }
@@ -266,10 +295,10 @@ export function validateAll(form: RegistrationFormState): FieldErrors {
   const errors: FieldErrors = {};
 
   validateIdentity(form, errors);
-  validateInsurance(form, errors);
-  // Quick is a pre-registration: no address required. The server accepts a Quick
-  // patient with none and the desk fills it in on the first visit.
+  // Quick is a pre-registration: no insurance and no address. The patient gives
+  // both through the completion link, so the desk is never asked for them.
   if (form.mode !== 'Quick') {
+    validateInsurance(form, errors);
     validateResidence(form, errors);
   }
   validateContact(form, errors);
@@ -302,5 +331,6 @@ export function createEmptyForm(): RegistrationFormState {
     phone: '',
     phoneRegionCode: 'CZ',
     mode: 'Standard',
+    activityId: '',
   };
 }

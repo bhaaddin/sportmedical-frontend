@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
-  Grid,
   MenuItem,
   Stack,
   TextField,
@@ -32,6 +31,9 @@ import MapyAddressPicker from "../components/registration/MapyAddressPicker";
 import FormField from "../components/registration/FormField";
 import IssuedLinkCard from "../components/registration/IssuedLinkCard";
 import StickyFormFooter from "../components/registration/StickyFormFooter";
+import { FieldCell, FieldGrid } from "../components/registration/FieldGrid";
+import { PHONE_TOUCH_TARGETS } from "../components/registration/touchTargets";
+import { useIsPhone } from "../layout/useDevice";
 
 /**
  * Editing a patient - the `app` lane's contract,
@@ -144,6 +146,7 @@ export default function PatientForm() {
    * and every save would be refused.
    */
   const maySeeIdentity = usePermission("patients.sensitive_identity.view");
+  const phone = useIsPhone();
 
   /**
    * Loaded through the same machinery as the booking screens: a query, and the
@@ -354,7 +357,10 @@ export default function PatientForm() {
   const busy = savingDemographics || savingProfile || savingAll;
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, pb: 0, maxWidth: 1200, mx: "auto" }}>
+    <Box
+      data-device={phone ? "phone" : "other"}
+      sx={[{ p: { xs: 2, md: 3 }, pb: 0, maxWidth: 1200, mx: "auto" }, phone && PHONE_TOUCH_TARGETS]}
+    >
       <PageHeader
         title="Úprava karty"
         subtitle={fullName !== "" ? `${fullName} · karta pacienta` : "Karta pacienta"}
@@ -370,8 +376,8 @@ export default function PatientForm() {
           {/* 1. Name and demographics — route 1 */}
           <SoftCard>
             <SectionLabel>Základní údaje</SectionLabel>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 6 }}>
+            <FieldGrid>
+              <FieldCell>
                 <FormField label="Jméno">
                   {(id) => (
                     <TextField
@@ -384,8 +390,8 @@ export default function PatientForm() {
                     />
                   )}
                 </FormField>
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              </FieldCell>
+              <FieldCell>
                 <FormField label="Příjmení">
                   {(id) => (
                     <TextField
@@ -398,8 +404,8 @@ export default function PatientForm() {
                     />
                   )}
                 </FormField>
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              </FieldCell>
+              <FieldCell>
                 <FormField label="Datum narození">
                   {(id) => (
                     <TextField
@@ -413,8 +419,8 @@ export default function PatientForm() {
                     />
                   )}
                 </FormField>
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              </FieldCell>
+              <FieldCell>
                 <FormField label="Pohlaví">
                   {(id) => (
                     <TextField
@@ -435,8 +441,8 @@ export default function PatientForm() {
                     </TextField>
                   )}
                 </FormField>
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              </FieldCell>
+              <FieldCell>
                 <FormField label="Oslovení">
                   {(id) => (
                     <TextField
@@ -450,8 +456,8 @@ export default function PatientForm() {
                     />
                   )}
                 </FormField>
-              </Grid>
-              <Grid size={12}>
+              </FieldCell>
+              <FieldCell full>
                 <FormField label="Důvod změny" required name="changeReason">
                   {(id) => (
                     <TextField
@@ -466,13 +472,13 @@ export default function PatientForm() {
                     />
                   )}
                 </FormField>
-              </Grid>
+              </FieldCell>
               {demographicsError ? (
-                <Grid size={12}>
+                <FieldCell full>
                   <Alert severity="error">{demographicsError}</Alert>
-                </Grid>
+                </FieldCell>
               ) : null}
-              <Grid size={12}>
+              <FieldCell full>
                 <Button
                   variant="outlined"
                   onClick={() => { void saveDemographics(); }}
@@ -480,15 +486,15 @@ export default function PatientForm() {
                 >
                   Uložit
                 </Button>
-              </Grid>
-            </Grid>
+              </FieldCell>
+            </FieldGrid>
           </SoftCard>
 
           {/* 3. Everything else — route 2 */}
           <SoftCard>
             <SectionLabel>Ostatní</SectionLabel>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 6 }}>
+            <FieldGrid>
+              <FieldCell>
                 <FormField label="Povolání">
                   {(id) => (
                     <TextField
@@ -499,8 +505,8 @@ export default function PatientForm() {
                     />
                   )}
                 </FormField>
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              </FieldCell>
+              <FieldCell>
                 <FormField label="Zaměstnavatel">
                   {(id) => (
                     <TextField
@@ -511,8 +517,8 @@ export default function PatientForm() {
                     />
                   )}
                 </FormField>
-              </Grid>
-              <Grid size={12}>
+              </FieldCell>
+              <FieldCell full>
                 <FormField label="Ošetřující lékaři">
                   {(id) => (
                     <TextField
@@ -525,8 +531,8 @@ export default function PatientForm() {
                     />
                   )}
                 </FormField>
-              </Grid>
-              <Grid size={12}>
+              </FieldCell>
+              <FieldCell full>
                 <FormField label="Poznámky">
                   {(id) => (
                     <TextField
@@ -539,13 +545,13 @@ export default function PatientForm() {
                     />
                   )}
                 </FormField>
-              </Grid>
-              <Grid size={12}>
+              </FieldCell>
+              <FieldCell full>
                 <Button variant="outlined" onClick={() => { void saveProfile(); }} disabled={busy}>
                   Uložit
                 </Button>
-              </Grid>
-            </Grid>
+              </FieldCell>
+            </FieldGrid>
           </SoftCard>
         </Stack>
 
@@ -700,6 +706,7 @@ function InsuranceDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const phone = useIsPhone();
   const [kind, setKind] = useState<InsuranceRegistrationKind>("CzechPublicHealthInsurance");
   const [birthNumber, setBirthNumber] = useState(current.birthNumber);
   const [number, setNumber] = useState(current.insuranceNumber);
@@ -766,7 +773,14 @@ function InsuranceDialog({
   };
 
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog
+      open
+      onClose={onClose}
+      fullWidth
+      maxWidth="sm"
+      fullScreen={phone}
+      sx={phone ? PHONE_TOUCH_TARGETS : undefined}
+    >
       <DialogTitle>Oprava pojištění</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
@@ -871,6 +885,7 @@ function AddressDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const phone = useIsPhone();
   const [residenceType, setResidenceType] = useState<ResidenceType>(
     "PermanentResidenceInCzechia",
   );
@@ -908,7 +923,14 @@ function AddressDialog({
   };
 
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog
+      open
+      onClose={onClose}
+      fullWidth
+      maxWidth="sm"
+      fullScreen={phone}
+      sx={phone ? PHONE_TOUCH_TARGETS : undefined}
+    >
       <DialogTitle>Oprava adresy</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>

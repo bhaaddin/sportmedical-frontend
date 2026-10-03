@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Box, Paper, Typography, TextField, Button, Alert,
+  Box, Typography, TextField, Button, Alert,
   InputAdornment, IconButton, CircularProgress,
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { authApi, isSecondFactorChallenge } from '../api/auth';
 import { savePermissions, saveUser } from '../auth/localSession';
-import { DESIGN } from '../components/ui';
+import { DESIGN, SoftCard } from '../components/ui';
 
 /** What the sign-in says when the client ended a session nobody closed here. */
 export const SESSION_EXPIRED_MESSAGE =
@@ -156,9 +156,17 @@ export default function Login() {
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
       bgcolor: 'background.default', p: 2,
     }}>
-      <Paper variant="outlined" sx={{ p: { xs: 3, sm: 5 }, maxWidth: 440, width: '100%', borderRadius: 3 }}>
+      <SoftCard
+        data-layout="login-card"
+        sx={{
+          p: { xs: 2.5, sm: 5 }, maxWidth: 440, width: '100%',
+          /* 16 px type on a phone: below that iOS zooms the page when a field is focused. */
+          '& .MuiInputBase-input': { fontSize: { xs: 16, sm: 15 } },
+          '& .MuiButton-root': { minHeight: 44 },
+        }}
+      >
         <Box sx={{ mb: 3.5 }}>
-          <Typography sx={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.2 }}>
+          <Typography variant="h1" component="h1" sx={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
             SportMedical
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
@@ -236,6 +244,7 @@ export default function Login() {
                       onClick={() => setShowPassword(!showPassword)}
                       edge="end"
                       size="small"
+                      sx={{ width: 44, height: 44 }}
                       aria-label={showPassword ? 'Skrýt heslo' : 'Zobrazit heslo'}
                     >
                       {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
@@ -289,7 +298,7 @@ export default function Login() {
           </Typography>
         </form>
         )}
-      </Paper>
+      </SoftCard>
     </Box>
   );
 }

@@ -12,13 +12,20 @@
  *
  * Each chart has a table of its numbers behind a toggle and a CSV of the
  * period, because a chart answers "is it growing" and a table answers "by how
- * much, exactly", and the účetní wants the second one in Excel.
+ * much, exactly", and the účetní wants the second one in Excel. The page
+ * itself exports everything on screen in one file (`statistics/csv.ts`).
+ *
+ * Three layouts (Etapa 2, rule 3):
+ *   phone    charts stacked one per row, the three areas are scrollable tabs,
+ *            the filters are 44px controls, the export is pinned at the bottom
+ *   tablet   chart cards in a grid that fits (one column portrait, two landscape)
+ *   desktop  two-column grid of chart cards, the areas as chips with "Vše"
  */
 import { useMemo, useState } from 'react';
 import {
-  Alert, Box, Button, MenuItem, Skeleton, Stack, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, TextField, ToggleButton, ToggleButtonGroup, Typography,
+  Alert, Box, Button, MenuItem, Skeleton, Stack, Tab, Tabs, TextField, ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
+import { Download } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import {
@@ -31,24 +38,31 @@ import { patientsApi, PATIENT_PAGE_SIZE_MAX, type Patient } from '../api/patient
 import type { DayAppointment } from '../api/bookingContracts';
 import { toDateOnly, type DateOnly } from '../utils/time';
 import { DESIGN, FilterChips, KpiCard, PageHeader, SectionLabel, SoftCard, StatusChip } from '../components/ui';
+import { PinnedActionBar } from '../components/ui/PinnedActionBar';
+import { useDevice } from '../layout/useDevice';
 import {
   GROUPING_OPTIONS, PERIOD_OPTIONS, STATUS_GROUPS,
-  appointmentsPerBucket, averagePerInvoice, bucketsFor, byActivity, byCalendar, csvFileName,
+  appointmentsPerBucket, averagePerInvoice, bucketsFor, byActivity, byCalendar,
   cumulativeRegister, dayOfAppointment, deltaLabel, deltaPercent, financePerBucket, formatCount,
   formatCzk, formatPeriod, inPeriod, invoicedTotal, invoicesIn, isCancelled, monthChunks,
   newPatientsPerBucket, newVsReturning, paidTotal, periodFor, previousPeriod, revenueByItem,
-  toCsv, unpaidTotal,
+  unpaidTotal,
 } from './statistics/aggregate';
-import type { CsvCell, Grouping, Period, PeriodKey } from './statistics/aggregate';
+import type { Grouping, PeriodKey } from './statistics/aggregate';
+import { buildStatisticsCsv, downloadCsv, statisticsCsvFileName } from './statistics/csv';
+import {
+  CHART_HEIGHT, ChartCard, ChartGrid, HorizontalBars, isExportable,
+  type ChartDef, type StatisticsGroup,
+} from './statistics/StatisticsCharts';
 
-type Area = 'all' | 'appointments' | 'patients' | 'finance';
+type Area = 'all' | StatisticsGroup;
 
-const AREAS: { key: Area; label: string }[] = [
+const GROUPS: { key: StatisticsGroup; label: string }[] = [
   { key: 'appointments', label: 'Objednávky' },
   { key: 'patients', label: 'Pacienti' },
   { key: 'finance', label: 'Finance' },
-  { key: 'all', label: 'Vše' },
 ];
+const AREAS: { key: Area; label: string }[] = [...GROUPS, { key: 'all', label: 'Vše' }];
 
 /**
  * How much of the register the patient statistics read: a hundred a page,
@@ -84,13 +98,17 @@ const STATUS_COLOURS: Record<(typeof STATUS_GROUPS)[number]['key'], string> = {
 
 export default function StatisticsPage() {
   const theme = useTheme();
+  const device = useDevice();
+  const phone = device === 'phone';
   const today = toDateOnly(new Date());
 
   const [periodKey, setPeriodKey] = useState<PeriodKey>('thisMonth');
   const [customFrom, setCustomFrom] = useState<DateOnly>(periodFor('thisMonth', today).from);
   const [customTo, setCustomTo] = useState<DateOnly>(today);
   const [grouping, setGrouping] = useState<Grouping>('day');
-  const [area, setArea] = useState<Area>('all');
+  const [areaChoice, setArea] = useState<Area>('all');
+  /* A phone has no "Vše": three tabs, one area at a time (the first until one is picked). */
+  const area: Area = phone && areaChoice === 'all' ? 'appointments' : areaChoice;
 
   const period = useMemo(
     () => periodFor(periodKey, today, { from: customFrom, to: customTo }),
@@ -154,40 +172,251 @@ export default function StatisticsPage() {
 
   const accent = theme.palette.primary.main;
   const axis = { fontSize: 12, fill: theme.palette.text.secondary };
+  const tickGap = 16;
+
+  const retryAppointments = () => appointmentQueries.forEach((q) => { if (q.isError) void q.refetch(); });
+  const retryRegister = () => void registerQuery.refetch();
+  const retryInvoices = () => void invoicesQuery.refetch();
 
   const failures: { what: string; retry: () => void }[] = [];
-  if (appointmentsFailed) {
-    failures.push({
-      what: 'objednávky',
-      retry: () => appointmentQueries.forEach((q) => { if (q.isError) void q.refetch(); }),
-    });
-  }
-  if (registerQuery.isError) failures.push({ what: 'kartotéku', retry: () => void registerQuery.refetch() });
-  if (invoicesQuery.isError) failures.push({ what: 'doklady', retry: () => void invoicesQuery.refetch() });
+  if (appointmentsFailed) failures.push({ what: 'objednávky', retry: retryAppointments });
+  if (registerQuery.isError) failures.push({ what: 'kartotéku', retry: retryRegister });
+  if (invoicesQuery.isError) failures.push({ what: 'doklady', retry: retryInvoices });
+
+  /* ── The charts, each described once: what the card draws and what the CSV exports ── */
+
+  const noBookings = 'Za zvolené období zatím nic. Objednávky se tu objeví, jakmile nějaké budou.';
+  const noPatients = 'Za zvolené období zatím nic. Nové registrace se tu objeví, jakmile nějaké budou.';
+  const noInvoices = 'Zatím žádné doklady v tomto období.';
+
+  const appointmentsBase = { group: 'appointments' as const, loading: appointmentsLoading, failed: appointmentsFailed, retry: retryAppointments };
+  const patientsBase = { group: 'patients' as const, loading: registerQuery.isPending, failed: registerQuery.isError, retry: retryRegister };
+  const financeBase = { group: 'finance' as const, loading: invoicesQuery.isPending, failed: invoicesQuery.isError, retry: retryInvoices };
+
+  const charts: ChartDef[] = [
+    {
+      ...appointmentsBase,
+      id: 'appointments-over-time',
+      title: 'Objednávky v čase',
+      subtitle: 'Všechny termíny v období, včetně zrušených',
+      empty: statusRows.every((r) => r.total === 0) ? noBookings : null,
+      columns: ['Období', 'Objednávky'],
+      rows: statusRows.map((r) => [r.label, r.total]),
+      chart: (
+        <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+          <LineChart data={statusRows}>
+            <CartesianGrid stroke={DESIGN.line} vertical={false} />
+            <XAxis dataKey="label" tick={axis} stroke={DESIGN.line} minTickGap={tickGap} />
+            <YAxis allowDecimals={false} tick={axis} stroke={DESIGN.line} width={32} />
+            <Tooltip />
+            <Line type="monotone" dataKey="total" name="Objednávky" stroke={accent} strokeWidth={2} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      ),
+    },
+    {
+      ...appointmentsBase,
+      id: 'appointments-by-status',
+      title: 'Podle stavu',
+      subtitle: 'Objednáno · Potvrzeno · Dokončeno · Zrušeno · Nepřišel',
+      empty: statusRows.every((r) => r.total === 0) ? noBookings : null,
+      columns: ['Období', ...STATUS_GROUPS.map((g) => g.label)],
+      rows: statusRows.map((r) => [r.label, ...STATUS_GROUPS.map((g) => r[g.key])]),
+      chart: (
+        <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+          <BarChart data={statusRows}>
+            <CartesianGrid stroke={DESIGN.line} vertical={false} />
+            <XAxis dataKey="label" tick={axis} stroke={DESIGN.line} minTickGap={tickGap} />
+            <YAxis allowDecimals={false} tick={axis} stroke={DESIGN.line} width={32} />
+            <Tooltip />
+            <Legend />
+            {STATUS_GROUPS.map((g) => (
+              <Bar key={g.key} dataKey={g.key} name={g.label} stackId="s" fill={STATUS_COLOURS[g.key]} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      ),
+    },
+    {
+      ...appointmentsBase,
+      id: 'appointments-by-activity',
+      title: 'Podle činnosti',
+      subtitle: 'Osm nejčastějších, bez zrušených',
+      empty: activityRows.length === 0 ? noBookings : null,
+      columns: ['Činnost', 'Objednávky'],
+      rows: activityRows.map((r) => [r.label, r.count]),
+      chart: <HorizontalBars data={activityRows} dataKey="count" name="Objednávky" fill={accent} axis={axis} />,
+    },
+    {
+      ...appointmentsBase,
+      id: 'appointments-by-calendar',
+      title: 'Podle kalendáře',
+      subtitle: 'Bez zrušených',
+      loading: appointmentsLoading || calendarsQuery.isPending,
+      empty: calendarRows.length === 0 ? noBookings : null,
+      columns: ['Kalendář', 'Objednávky'],
+      rows: calendarRows.map((r) => [r.label, r.count]),
+      chart: <HorizontalBars data={calendarRows} dataKey="count" name="Objednávky" fill={accent} axis={axis} />,
+    },
+    {
+      ...patientsBase,
+      id: 'patients-new',
+      title: 'Nové registrace',
+      subtitle: 'Podle data založení karty',
+      empty: newNowTotal === 0 ? noPatients : null,
+      columns: ['Období', 'Noví pacienti'],
+      rows: buckets.map((b, i) => [b.label, newNow[i]]),
+      chart: (
+        <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+          <BarChart data={buckets.map((b, i) => ({ label: b.label, count: newNow[i] }))}>
+            <CartesianGrid stroke={DESIGN.line} vertical={false} />
+            <XAxis dataKey="label" tick={axis} stroke={DESIGN.line} minTickGap={tickGap} />
+            <YAxis allowDecimals={false} tick={axis} stroke={DESIGN.line} width={32} />
+            <Tooltip />
+            <Bar dataKey="count" name="Noví pacienti" fill={accent} />
+          </BarChart>
+        </ResponsiveContainer>
+      ),
+    },
+    {
+      ...patientsBase,
+      id: 'patients-register-size',
+      title: 'Velikost kartotéky',
+      subtitle: 'Počet karet ke konci každého období',
+      empty: patients.length === 0 ? 'Kartotéka je zatím prázdná.' : null,
+      columns: ['Období', 'Karet celkem'],
+      rows: buckets.map((b, i) => [b.label, register[i]]),
+      chart: (
+        <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+          <LineChart data={buckets.map((b, i) => ({ label: b.label, count: register[i] }))}>
+            <CartesianGrid stroke={DESIGN.line} vertical={false} />
+            <XAxis dataKey="label" tick={axis} stroke={DESIGN.line} minTickGap={tickGap} />
+            <YAxis allowDecimals={false} tick={axis} stroke={DESIGN.line} width={40} />
+            <Tooltip />
+            <Line type="monotone" dataKey="count" name="Karet celkem" stroke={accent} strokeWidth={2} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      ),
+    },
+    {
+      ...patientsBase,
+      id: 'patients-new-vs-returning',
+      title: 'Noví a vracející se',
+      subtitle:
+        mix.unknown > 0
+          ? `Pacienti s návštěvou v období · ${formatCount(mix.unknown)} bez karty v načtené kartotéce`
+          : 'Pacienti s návštěvou v období, každý jednou',
+      loading: registerQuery.isPending || appointmentsLoading,
+      failed: registerQuery.isError || appointmentsFailed,
+      retry: () => { retryRegister(); retryAppointments(); },
+      empty: mix.newPatients + mix.returning === 0 ? 'Za zvolené období zatím nic. Návštěvy pacientů se tu objeví, jakmile nějaké budou.' : null,
+      columns: ['Skupina', 'Pacienti'],
+      rows: [['Noví', mix.newPatients], ['Vracející se', mix.returning]],
+      chart: (
+        <HorizontalBars
+          data={[{ label: 'Noví', count: mix.newPatients }, { label: 'Vracející se', count: mix.returning }]}
+          dataKey="count"
+          name="Pacienti"
+          fill={accent}
+          axis={axis}
+          height={140}
+        />
+      ),
+    },
+    {
+      ...financeBase,
+      id: 'finance-invoiced-paid',
+      title: 'Vyfakturováno a zaplaceno',
+      subtitle: 'Podle data vystavení dokladu, bez zrušených a vrácených',
+      empty: financeRows.every((r) => r.invoiced === 0 && r.paid === 0) ? noInvoices : null,
+      columns: ['Období', 'Vyfakturováno (Kč)', 'Zaplaceno (Kč)'],
+      rows: financeRows.map((r) => [r.label, r.invoiced, r.paid]),
+      chart: (
+        <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+          <BarChart data={financeRows}>
+            <CartesianGrid stroke={DESIGN.line} vertical={false} />
+            <XAxis dataKey="label" tick={axis} stroke={DESIGN.line} minTickGap={tickGap} />
+            <YAxis tick={axis} stroke={DESIGN.line} width={phone ? 52 : 64} tickFormatter={(v: number) => v.toLocaleString('cs-CZ')} />
+            <Tooltip formatter={(v) => formatCzk(Number(v))} />
+            <Legend />
+            <Bar dataKey="invoiced" name="Vyfakturováno" fill={accent} />
+            <Bar dataKey="paid" name="Zaplaceno" fill={DESIGN.tone.green.fg} />
+          </BarChart>
+        </ResponsiveContainer>
+      ),
+    },
+    {
+      ...financeBase,
+      id: 'finance-revenue-by-item',
+      title: 'Tržby podle činnosti',
+      subtitle: 'Osm největších položek dokladů',
+      empty: revenueRows.length === 0 ? noInvoices : null,
+      columns: ['Činnost', 'Tržba (Kč)'],
+      rows: revenueRows.map((r) => [r.label, r.amount]),
+      chart: <HorizontalBars data={revenueRows} dataKey="amount" name="Tržba" fill={accent} axis={axis} money />,
+    },
+  ];
+
+
+  const visibleGroups = GROUPS.filter((g) => area === 'all' || area === g.key);
+  const shown = charts.filter((c) => area === 'all' || c.group === area);
+  const exportable = shown.filter(isExportable);
+
+  const exportShown = () => {
+    const csv = buildStatisticsCsv(
+      exportable.map((c) => ({ title: c.title, columns: c.columns, rows: c.rows })),
+      period,
+    );
+    const label = area === 'all' ? 'Vše' : (GROUPS.find((g) => g.key === area)?.label ?? 'Vše');
+    downloadCsv(statisticsCsvFileName(label, period), csv);
+  };
+
+  const exportButton = (
+    <Button
+      variant="contained"
+      startIcon={<Download />}
+      disabled={exportable.length === 0}
+      onClick={exportShown}
+      sx={{ minHeight: phone ? 44 : undefined }}
+    >
+      Exportovat zobrazené (CSV)
+    </Button>
+  );
+
+  const target = phone ? { minHeight: 44 } : {};
 
   return (
-    <Box>
-      <PageHeader title="Statistiky" subtitle="Objednávky, pacienti a peníze v čase" />
+    <Box data-device={device}>
+      <PageHeader
+        title="Statistiky"
+        subtitle="Objednávky, pacienti a peníze v čase"
+        actions={phone ? undefined : exportButton}
+      />
 
       {/* ── Period · grouping · area ── */}
-      <SoftCard sx={{ p: 2, mb: 2.5 }}>
-        <Stack direction={{ xs: 'column', lg: 'row' }} spacing={1.5} sx={{ alignItems: { lg: 'center' }, flexWrap: 'wrap' }}>
+      <SoftCard sx={{ p: 2, mb: 2.5 }} data-region="filters">
+        <Stack
+          direction={{ xs: 'column', lg: 'row' }}
+          spacing={1.5}
+          sx={{ alignItems: { lg: 'center' }, flexWrap: 'wrap', minWidth: 0 }}
+        >
           <TextField
             select
-            size="small"
+            size={phone ? 'medium' : 'small'}
             label="Období"
             value={periodKey}
             onChange={(e) => setPeriodKey(e.target.value as PeriodKey)}
-            sx={{ minWidth: 200 }}
+            sx={{ minWidth: phone ? 0 : 200 }}
+            fullWidth={phone}
           >
             {PERIOD_OPTIONS.map((o) => (
-              <MenuItem key={o.key} value={o.key}>{o.label}</MenuItem>
+              <MenuItem key={o.key} value={o.key} sx={target}>{o.label}</MenuItem>
             ))}
           </TextField>
           {periodKey === 'custom' ? (
-            <>
+            <Stack direction={phone ? 'column' : 'row'} spacing={1.5}>
               <TextField
-                size="small"
+                size={phone ? 'medium' : 'small'}
                 type="date"
                 label="Od"
                 value={customFrom}
@@ -195,39 +424,60 @@ export default function StatisticsPage() {
                 slotProps={{ inputLabel: { shrink: true } }}
               />
               <TextField
-                size="small"
+                size={phone ? 'medium' : 'small'}
                 type="date"
                 label="Do"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
                 slotProps={{ inputLabel: { shrink: true } }}
               />
-            </>
+            </Stack>
           ) : null}
-          <ToggleButtonGroup
-            exclusive
-            size="small"
-            value={grouping}
-            onChange={(_e, next: Grouping | null) => { if (next) setGrouping(next); }}
-            aria-label="Seskupení"
-          >
-            {GROUPING_OPTIONS.map((o) => (
-              <ToggleButton key={o.key} value={o.key} sx={{ px: 2 }}>{o.label}</ToggleButton>
-            ))}
-          </ToggleButtonGroup>
+          {/* A wide row scrolls inside its own box on a phone rather than pushing the page sideways. */}
+          <Box sx={{ overflowX: 'auto', maxWidth: '100%', flexShrink: 0 }} data-scroll={phone ? 'x' : undefined}>
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              fullWidth={phone}
+              value={grouping}
+              onChange={(_e, next: Grouping | null) => { if (next) setGrouping(next); }}
+              aria-label="Seskupení"
+              sx={{ flexWrap: 'nowrap' }}
+            >
+              {GROUPING_OPTIONS.map((o) => (
+                <ToggleButton key={o.key} value={o.key} sx={{ px: 2, whiteSpace: 'nowrap', ...target }}>{o.label}</ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Box>
           <Box sx={{ flex: 1 }} />
-          <FilterChips ariaLabel="Oblast" options={AREAS} value={area} onChange={setArea} />
+          {phone ? null : <FilterChips ariaLabel="Oblast" options={AREAS} value={area} onChange={setArea} />}
         </Stack>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1.5 }}>
+        <Typography sx={{ fontSize: 14, color: 'text.secondary', mt: 1.5 }}>
           {formatPeriod(period)} · srovnání s {formatPeriod(previous)}
         </Typography>
       </SoftCard>
+
+      {/* ── Phone: the three areas as tabs ── */}
+      {phone ? (
+        <Tabs
+          value={area}
+          onChange={(_e, next: StatisticsGroup) => setArea(next)}
+          variant="scrollable"
+          scrollButtons={false}
+          aria-label="Oblast"
+          sx={{ minHeight: 44, mb: 2, borderBottom: '1px solid', borderColor: 'divider' }}
+        >
+          {GROUPS.map((g) => (
+            <Tab key={g.key} value={g.key} label={g.label} sx={{ minHeight: 44, minWidth: 96, fontWeight: 600 }} />
+          ))}
+        </Tabs>
+      ) : null}
 
       {failures.length > 0 ? (
         <Alert
           severity="warning"
           sx={{ mb: 2.5 }}
-          action={<Button color="inherit" size="small" onClick={() => failures.forEach((f) => f.retry())}>Zkusit znovu</Button>}
+          action={<Button color="inherit" size="small" sx={target} onClick={() => failures.forEach((f) => f.retry())}>Zkusit znovu</Button>}
         >
           Nepodařilo se načíst {failures.map((f) => f.what).join(', ')}. Ostatní čísla platí.
         </Alert>
@@ -240,7 +490,10 @@ export default function StatisticsPage() {
       ) : null}
 
       {/* ── KPI row ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 2.5 }}>
+      <Box
+        data-layout={phone ? 'kpi-1up' : 'kpi'}
+        sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: '1fr 1fr', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 2.5 }}
+      >
         {showAppointments ? (
           <Kpi label="Objednávky" value={formatCount(visitsNow.length)} loading={appointmentsLoading}
             delta={deltaPercent(visitsNow.length, visitsBefore.length)} />
@@ -280,184 +533,17 @@ export default function StatisticsPage() {
         ) : null}
       </Box>
 
-      {/* ── Objednávky ── */}
-      {showAppointments ? (
-        <Section title="Objednávky">
-          <ChartCard
-            title="Objednávky v čase"
-            subtitle="Všechny termíny v období, včetně zrušených"
-            loading={appointmentsLoading}
-            empty={statusRows.every((r) => r.total === 0) ? 'Zatím žádné objednávky v tomto období.' : null}
-            columns={['Období', 'Objednávky']}
-            rows={statusRows.map((r) => [r.label, r.total])}
-            period={period}
-          >
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={statusRows}>
-                <CartesianGrid stroke={DESIGN.line} vertical={false} />
-                <XAxis dataKey="label" tick={axis} stroke={DESIGN.line} />
-                <YAxis allowDecimals={false} tick={axis} stroke={DESIGN.line} width={32} />
-                <Tooltip />
-                <Line type="monotone" dataKey="total" name="Objednávky" stroke={accent} strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartCard>
+      {/* ── The charts, grouped: Objednávky · Pacienti · Finance ── */}
+      {visibleGroups.map((g) => (
+        <ChartGrid key={g.key} title={g.label}>
+          {charts.filter((c) => c.group === g.key).map((c) => (
+            <ChartCard key={c.id} def={c} period={period} />
+          ))}
+        </ChartGrid>
+      ))}
 
-          <ChartCard
-            title="Podle stavu"
-            subtitle="Objednáno · Potvrzeno · Dokončeno · Zrušeno · Nepřišel"
-            loading={appointmentsLoading}
-            empty={statusRows.every((r) => r.total === 0) ? 'Zatím žádné objednávky v tomto období.' : null}
-            columns={['Období', ...STATUS_GROUPS.map((g) => g.label)]}
-            rows={statusRows.map((r) => [r.label, ...STATUS_GROUPS.map((g) => r[g.key])])}
-            period={period}
-          >
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={statusRows}>
-                <CartesianGrid stroke={DESIGN.line} vertical={false} />
-                <XAxis dataKey="label" tick={axis} stroke={DESIGN.line} />
-                <YAxis allowDecimals={false} tick={axis} stroke={DESIGN.line} width={32} />
-                <Tooltip />
-                <Legend />
-                {STATUS_GROUPS.map((g) => (
-                  <Bar key={g.key} dataKey={g.key} name={g.label} stackId="s" fill={STATUS_COLOURS[g.key]} />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-
-          <ChartCard
-            title="Podle činnosti"
-            subtitle="Osm nejčastějších, bez zrušených"
-            loading={appointmentsLoading}
-            empty={activityRows.length === 0 ? 'Zatím žádné objednávky v tomto období.' : null}
-            columns={['Činnost', 'Objednávky']}
-            rows={activityRows.map((r) => [r.label, r.count])}
-            period={period}
-          >
-            <HorizontalBars data={activityRows} dataKey="count" name="Objednávky" fill={accent} axis={axis} />
-          </ChartCard>
-
-          <ChartCard
-            title="Podle kalendáře"
-            subtitle="Bez zrušených"
-            loading={appointmentsLoading || calendarsQuery.isPending}
-            empty={calendarRows.length === 0 ? 'Zatím žádné objednávky v tomto období.' : null}
-            columns={['Kalendář', 'Objednávky']}
-            rows={calendarRows.map((r) => [r.label, r.count])}
-            period={period}
-          >
-            <HorizontalBars data={calendarRows} dataKey="count" name="Objednávky" fill={accent} axis={axis} />
-          </ChartCard>
-        </Section>
-      ) : null}
-
-      {/* ── Pacienti ── */}
-      {showPatients ? (
-        <Section title="Pacienti">
-          <ChartCard
-            title="Nové registrace"
-            subtitle="Podle data založení karty"
-            loading={registerQuery.isPending}
-            empty={newNowTotal === 0 ? 'Zatím žádná nová registrace v tomto období.' : null}
-            columns={['Období', 'Noví pacienti']}
-            rows={buckets.map((b, i) => [b.label, newNow[i]])}
-            period={period}
-          >
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={buckets.map((b, i) => ({ label: b.label, count: newNow[i] }))}>
-                <CartesianGrid stroke={DESIGN.line} vertical={false} />
-                <XAxis dataKey="label" tick={axis} stroke={DESIGN.line} />
-                <YAxis allowDecimals={false} tick={axis} stroke={DESIGN.line} width={32} />
-                <Tooltip />
-                <Bar dataKey="count" name="Noví pacienti" fill={accent} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-
-          <ChartCard
-            title="Velikost kartotéky"
-            subtitle="Počet karet ke konci každého období"
-            loading={registerQuery.isPending}
-            empty={patients.length === 0 ? 'Kartotéka je zatím prázdná.' : null}
-            columns={['Období', 'Karet celkem']}
-            rows={buckets.map((b, i) => [b.label, register[i]])}
-            period={period}
-          >
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={buckets.map((b, i) => ({ label: b.label, count: register[i] }))}>
-                <CartesianGrid stroke={DESIGN.line} vertical={false} />
-                <XAxis dataKey="label" tick={axis} stroke={DESIGN.line} />
-                <YAxis allowDecimals={false} tick={axis} stroke={DESIGN.line} width={40} />
-                <Tooltip />
-                <Line type="monotone" dataKey="count" name="Karet celkem" stroke={accent} strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartCard>
-
-          <ChartCard
-            title="Noví a vracející se"
-            subtitle={
-              mix.unknown > 0
-                ? `Pacienti s návštěvou v období · ${formatCount(mix.unknown)} bez karty v načtené kartotéce`
-                : 'Pacienti s návštěvou v období, každý jednou'
-            }
-            loading={registerQuery.isPending || appointmentsLoading}
-            empty={mix.newPatients + mix.returning === 0 ? 'Zatím žádná návštěva pacienta v tomto období.' : null}
-            columns={['Skupina', 'Pacienti']}
-            rows={[['Noví', mix.newPatients], ['Vracející se', mix.returning]]}
-            period={period}
-          >
-            <HorizontalBars
-              data={[{ label: 'Noví', count: mix.newPatients }, { label: 'Vracející se', count: mix.returning }]}
-              dataKey="count"
-              name="Pacienti"
-              fill={accent}
-              axis={axis}
-              height={140}
-            />
-          </ChartCard>
-        </Section>
-      ) : null}
-
-      {/* ── Finance ── */}
-      {showFinance ? (
-        <Section title="Finance">
-          <ChartCard
-            title="Vyfakturováno a zaplaceno"
-            subtitle="Podle data vystavení dokladu, bez zrušených a vrácených"
-            loading={invoicesQuery.isPending}
-            empty={financeRows.every((r) => r.invoiced === 0 && r.paid === 0) ? 'Zatím žádné doklady v tomto období.' : null}
-            columns={['Období', 'Vyfakturováno (Kč)', 'Zaplaceno (Kč)']}
-            rows={financeRows.map((r) => [r.label, r.invoiced, r.paid])}
-            period={period}
-          >
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={financeRows}>
-                <CartesianGrid stroke={DESIGN.line} vertical={false} />
-                <XAxis dataKey="label" tick={axis} stroke={DESIGN.line} />
-                <YAxis tick={axis} stroke={DESIGN.line} width={64} tickFormatter={(v: number) => v.toLocaleString('cs-CZ')} />
-                <Tooltip formatter={(v) => formatCzk(Number(v))} />
-                <Legend />
-                <Bar dataKey="invoiced" name="Vyfakturováno" fill={accent} />
-                <Bar dataKey="paid" name="Zaplaceno" fill={DESIGN.tone.green.fg} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-
-          <ChartCard
-            title="Tržby podle činnosti"
-            subtitle="Osm největších položek dokladů"
-            loading={invoicesQuery.isPending}
-            empty={revenueRows.length === 0 ? 'Zatím žádné doklady v tomto období.' : null}
-            columns={['Činnost', 'Tržba (Kč)']}
-            rows={revenueRows.map((r) => [r.label, r.amount])}
-            period={period}
-          >
-            <HorizontalBars data={revenueRows} dataKey="amount" name="Tržba" fill={accent} axis={axis} money />
-          </ChartCard>
-        </Section>
-      ) : null}
+      {/* ── The main action of a phone screen is pinned at the bottom ── */}
+      {phone ? <PinnedActionBar label="Hlavní akce">{exportButton}</PinnedActionBar> : null}
     </Box>
   );
 }
@@ -480,7 +566,8 @@ function Kpi({
   return (
     <Box role="group" aria-label={label} sx={{ display: 'contents' }}>
       {loading ? (
-        <SoftCard sx={{ p: 2.25 }} aria-busy="true">
+        /* Same height as the real card, so the row does not jump when the number arrives. */
+        <SoftCard sx={{ p: 2.25, minHeight: 112 }} aria-busy="true">
           <SectionLabel sx={{ mb: 0.75 }}>{label}</SectionLabel>
           <Skeleton width={96} height={32} />
         </SoftCard>
@@ -493,139 +580,5 @@ function Kpi({
         />
       )}
     </Box>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <Box component="section" aria-label={title} sx={{ mb: 3 }}>
-      <SectionLabel component="h2" sx={{ mb: 1.5 }}>{title}</SectionLabel>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 2 }}>{children}</Box>
-    </Box>
-  );
-}
-
-/** Downloads a CSV through a one-off link; nothing is sent anywhere. */
-function downloadCsv(fileName: string, csv: string): void {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-/**
- * One chart with its numbers behind a "Tabulka" toggle and an "Export CSV"
- * for the period. The empty state says what will appear, not just that
- * nothing did.
- */
-function ChartCard({
-  title, subtitle, loading, empty, columns, rows, period, children,
-}: {
-  title: string;
-  subtitle?: string;
-  loading: boolean;
-  empty: string | null;
-  columns: string[];
-  rows: CsvCell[][];
-  period: Period;
-  children: React.ReactNode;
-}) {
-  const [view, setView] = useState<'chart' | 'table'>('chart');
-  const numeric = (i: number) => rows.some((r) => typeof r[i] === 'number');
-  return (
-    <SoftCard sx={{ p: 2.25 }} component="article" aria-label={title}>
-      <Stack direction="row" sx={{ alignItems: 'flex-start', justifyContent: 'space-between', gap: 1, mb: 1.5 }}>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography component="h3" sx={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3 }}>{title}</Typography>
-          {subtitle ? (
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{subtitle}</Typography>
-          ) : null}
-        </Box>
-        <Stack direction="row" spacing={1} sx={{ flexShrink: 0, alignItems: 'center' }}>
-          <ToggleButtonGroup
-            exclusive
-            size="small"
-            value={view}
-            onChange={(_e, next: 'chart' | 'table' | null) => { if (next) setView(next); }}
-            aria-label={`Zobrazení: ${title}`}
-          >
-            <ToggleButton value="chart" sx={{ px: 1.5, py: 0.25, fontSize: 12 }}>Graf</ToggleButton>
-            <ToggleButton value="table" sx={{ px: 1.5, py: 0.25, fontSize: 12 }}>Tabulka</ToggleButton>
-          </ToggleButtonGroup>
-          <Button
-            size="small"
-            variant="outlined"
-            disabled={loading || rows.length === 0}
-            onClick={() => downloadCsv(csvFileName(title, period), toCsv(columns, rows))}
-          >
-            Export CSV
-          </Button>
-        </Stack>
-      </Stack>
-
-      {loading ? (
-        <Skeleton variant="rounded" height={220} />
-      ) : empty !== null ? (
-        <Box sx={{ height: 220, display: 'grid', placeItems: 'center' }}>
-          <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center' }}>{empty}</Typography>
-        </Box>
-      ) : view === 'table' ? (
-        <TableContainer sx={{ border: '1px solid', borderColor: 'divider', maxHeight: 320 }}>
-          <Table size="small" stickyHeader aria-label={`Tabulka: ${title}`}>
-            <TableHead>
-              <TableRow>
-                {columns.map((c, i) => (
-                  <TableCell key={c} align={numeric(i) ? 'right' : 'left'}>{c}</TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((r, ri) => (
-                <TableRow key={ri} hover>
-                  {r.map((cell, ci) => (
-                    <TableCell key={ci} align={typeof cell === 'number' ? 'right' : 'left'}>
-                      {typeof cell === 'number' ? cell.toLocaleString('cs-CZ') : cell ?? ''}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      ) : (
-        children
-      )}
-    </SoftCard>
-  );
-}
-
-/** Horizontal bars for a ranked list: the činnosti, the calendars, the revenue. */
-function HorizontalBars({
-  data, dataKey, name, fill, axis, money = false, height,
-}: {
-  data: readonly { label: string; count?: number; amount?: number }[];
-  dataKey: 'count' | 'amount';
-  name: string;
-  fill: string;
-  axis: { fontSize: number; fill: string };
-  money?: boolean;
-  height?: number;
-}) {
-  return (
-    <ResponsiveContainer width="100%" height={height ?? Math.max(140, 36 * data.length + 40)}>
-      <BarChart data={data} layout="vertical" margin={{ left: 8, right: 24 }}>
-        <CartesianGrid stroke={DESIGN.line} horizontal={false} />
-        <XAxis type="number" allowDecimals={false} tick={axis} stroke={DESIGN.line}
-          tickFormatter={money ? (v: number) => v.toLocaleString('cs-CZ') : undefined} />
-        <YAxis type="category" dataKey="label" width={160} tick={axis} stroke={DESIGN.line} />
-        <Tooltip formatter={money ? (v) => formatCzk(Number(v)) : undefined} />
-        <Bar dataKey={dataKey} name={name} fill={fill} radius={[0, 4, 4, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
   );
 }

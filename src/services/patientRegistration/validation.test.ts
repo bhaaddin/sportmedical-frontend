@@ -166,3 +166,92 @@ describe('asking about a single field', () => {
     expect(validateField('birthNumber', coupled)).toBeDefined();
   });
 });
+
+/*
+ * Rychlá registrace - decision 7 of Etapa 2: the desk enters four things (name,
+ * telephone, e-mail, činnost) and NEVER a date of birth. The standard registration
+ * keeps every rule it had.
+ */
+describe('Rychlá registrace', () => {
+  const quick = (over: Partial<RegistrationFormState> = {}): RegistrationFormState => ({
+    ...createEmptyForm(),
+    mode: 'Quick',
+    firstName: 'Filip',
+    lastName: 'Fehér',
+    email: 'filip@email.cz',
+    phone: '+420773539001',
+    phoneRegionCode: 'CZ',
+    activityId: 'act-1',
+    ...over,
+  });
+
+  it('accepts a submission without a date of birth', () => {
+    const form = quick();
+    expect(form.dateOfBirth).toBe('');
+    expect(validateAll(form)).toEqual({});
+  });
+
+  it('asks for neither a sex, an insurance number nor an address', () => {
+    const errors = validateAll(quick());
+    expect(errors.sex).toBeUndefined();
+    expect(errors.healthInsuranceNumber).toBeUndefined();
+    expect(errors.healthInsurerCode).toBeUndefined();
+    expect(errors.ruianAddressPointCode).toBeUndefined();
+  });
+
+  it('measures exactly the four things on an empty form', () => {
+    expect(Object.keys(validateAll({ ...createEmptyForm(), mode: 'Quick' })).sort()).toEqual(
+      ['activityId', 'email', 'firstName', 'lastName', 'phone'],
+    );
+  });
+
+  it('requires the telephone, with its dialling code', () => {
+    expect(validateAll(quick({ phone: '' })).phone).toMatch(/povinný/);
+    expect(validateAll(quick({ phone: '773539001' })).phone).toMatch(/předvolbu/);
+    expect(validateAll(quick({ phone: '+420 773 539 001' })).phone).toBeUndefined();
+  });
+
+  it('requires the činnost', () => {
+    expect(validateAll(quick({ activityId: '' })).activityId).toMatch(/činnost/);
+  });
+
+  it('still refuses a date of birth that lies in the future if one is present', () => {
+    expect(validateAll(quick({ dateOfBirth: '2999-01-01' })).dateOfBirth).toBeDefined();
+  });
+});
+
+describe('Úplná registrace keeps its rules', () => {
+  const complete = (over: Partial<RegistrationFormState> = {}): RegistrationFormState => ({
+    ...createEmptyForm(),
+    firstName: 'Filip',
+    lastName: 'Fehér',
+    dateOfBirth: '1990-05-15',
+    sex: 'Male',
+    healthInsuranceNumber: NOT_A_BIRTH_NUMBER,
+    healthInsuranceNumberConfirmation: NOT_A_BIRTH_NUMBER,
+    healthInsurerCode: '111',
+    ruianAddressPointCode: 1,
+    email: 'filip@email.cz',
+    phone: '+420773539001',
+    ...over,
+  });
+
+  it('is accepted when complete', () => {
+    expect(validateAll(complete())).toEqual({});
+  });
+
+  it('rejects a submission without a date of birth', () => {
+    expect(validateAll(complete({ dateOfBirth: '' })).dateOfBirth).toBe('Datum narození je povinné.');
+  });
+
+  it('still asks for a sex, an insurer and an address', () => {
+    const errors = validateAll(complete({ sex: '', healthInsurerCode: '', ruianAddressPointCode: null }));
+    expect(errors.sex).toBeDefined();
+    expect(errors.healthInsurerCode).toBeDefined();
+    expect(errors.ruianAddressPointCode).toBeDefined();
+  });
+
+  it('does not ask for a činnost', () => {
+    expect(validateAll(complete()).activityId).toBeUndefined();
+  });
+});

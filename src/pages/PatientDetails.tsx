@@ -225,7 +225,7 @@ export default function PatientDetails() {
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
               <SectionLabel sx={{ mb: 0 }}>Výsledky · diagnostická sezení</SectionLabel>
               <Box sx={{ flex: 1 }} />
-              <Button size="small" variant="outlined" onClick={() => navigate(`/diagnostics/new?patientId=${patient.id}`)}>
+              <Button size="small" variant="outlined" sx={{ minHeight: 44 }} onClick={() => navigate(`/diagnostics/new?patientId=${patient.id}`)}>
                 Nové vyšetření
               </Button>
             </Stack>
@@ -261,6 +261,8 @@ export default function PatientDetails() {
                             size="small"
                             onClick={(e) => { e.stopPropagation(); void handleDownloadPdf(s.id); }}
                             title="Stáhnout PDF"
+                            aria-label="Stáhnout PDF"
+                            sx={{ width: 44, height: 44 }}
                           >
                             {loadingPdf === s.id ? <LinearProgress sx={{ width: 20 }} /> : <Download sx={{ fontSize: 18 }} />}
                           </IconButton>
@@ -317,7 +319,7 @@ export default function PatientDetails() {
                             variant="outlined"
                             startIcon={<Download />}
                             onClick={() => void handleDownloadPdf(s.id)}
-                            sx={{ mt: 2 }}
+                            sx={{ mt: 2, minHeight: 44 }}
                           >
                             PDF report
                           </Button>

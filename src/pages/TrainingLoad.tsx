@@ -12,6 +12,12 @@ import { trainingApi, type TrainingSession, type AcwrData } from '../api/trainin
 import type { Patient } from '../api/patients';
 import PatientPicker from '../components/patients/PatientPicker';
 import { DESIGN, KpiCard, PageHeader, SectionLabel, SoftCard, StatusChip, type ChipTone } from '../components/ui';
+import { ResponsiveDataList, type DataColumn } from '../components/ui/ResponsiveDataList';
+import { PinnedActionBar } from '../components/ui/PinnedActionBar';
+import { useDevice } from '../layout/useDevice';
+import { ListSkeleton, LoadError } from './sports/LoadStates';
+import { min } from './sports/format';
+import { useTouchSx } from './sports/touch';
 import toast from 'react-hot-toast';
 
 const sessionTypes = [
@@ -65,29 +71,42 @@ function AcwrGauge({ value }: { value: number }) {
 
 export default function TrainingLoad() {
   const theme = useTheme();
+  const device = useDevice();
+  const touch = useTouchSx();
   const [patient, setPatient] = useState<Patient | null>(null);
   const selectedPatient = patient?.id ?? '';
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
   const [acwr, setAcwr] = useState<AcwrData | null>(null);
   const [loadTrend, setLoadTrend] = useState<any[]>([]);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [dataFailed, setDataFailed] = useState(false);
   const [form, setForm] = useState({
     type: 'Training', description: '', durationMinutes: 60, rpe: 5,
     avgHeartRate: 0, maxHeartRate: 0, coach: '', notes: '',
   });
   const update = (f: string, v: any) => setForm(p => ({ ...p, [f]: v }));
 
-  const loadPatientData = async (patientId: string) => {
-    if (!patientId) { setSessions([]); setAcwr(null); setLoadTrend([]); return; }
+  const loadPatientData = async (patientId: string, silent = false) => {
+    if (!patientId) { setSessions([]); setAcwr(null); setLoadTrend([]); setDataFailed(false); return; }
+    if (!silent) setDataLoading(true);
+    setDataFailed(false);
     try {
+      /* The sessions are the screen's content: if they cannot be read the page
+         says so and offers a retry. ACWR and the trend are derived figures that
+         legitimately do not exist for a new athlete, so those stay soft. */
       const [sess, acwrData, trend] = await Promise.all([
-        trainingApi.getByPatient(patientId, 30).catch(() => []),
+        trainingApi.getByPatient(patientId, 30),
         trainingApi.getAcwr(patientId).catch(() => null),
         trainingApi.getLoadTrend(patientId, 8).catch(() => []),
       ]);
       setSessions(sess);
       setAcwr(acwrData);
       setLoadTrend(trend);
-    } catch {}
+    } catch {
+      setDataFailed(true);
+    } finally {
+      setDataLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -109,12 +128,27 @@ export default function TrainingLoad() {
         notes: form.notes,
       });
       toast.success('Tréninková jednotka zaznamenána');
-      loadPatientData(selectedPatient);
+      void loadPatientData(selectedPatient, true);
       setForm(prev => ({ ...prev, description: '', notes: '' }));
     } catch { toast.error('Chyba při ukládání'); }
   };
 
   const weeklyLoad = sessions.reduce((sum, s) => sum + s.sessionRPE, 0);
+  const typeLabel = (s: TrainingSession) => sessionTypes.find(t => t.value === s.type)?.label || s.type;
+  const dateOf = (s: TrainingSession) => new Date(s.sessionDate).toLocaleDateString('cs-CZ');
+
+  /* Tablet keeps date, type and load; the desktop table adds the rest. */
+  const sessionColumns: DataColumn<TrainingSession>[] = [
+    { key: 'date', header: 'Datum', tablet: true, cell: (s) => <Box sx={{ whiteSpace: 'nowrap' }}>{dateOf(s)}</Box> },
+    { key: 'type', header: 'Typ', tablet: true, cell: (s) => <StatusChip tone="grey" size="sm">{typeLabel(s)}</StatusChip> },
+    { key: 'description', header: 'Popis', cell: (s) => s.description || '—' },
+    { key: 'duration', header: 'Trvání', align: 'right', cell: (s) => min(s.durationMinutes) },
+    { key: 'rpe', header: 'sRPE', align: 'right', cell: (s) => s.rpe },
+    {
+      key: 'load', header: 'Zátěž', align: 'right', tablet: true,
+      cell: (s) => <Box component="span" sx={{ fontWeight: 700, color: 'primary.main' }}>{s.sessionRPE}</Box>,
+    },
+  ];
 
   return (
     <Box>
@@ -130,9 +164,9 @@ export default function TrainingLoad() {
           <Grid size={{ xs: 12, md: 6 }}>
             <PatientPicker label="Sportovec / pacient" value={patient} onChange={setPatient} />
           </Grid>
-          {selectedPatient && (
+          {selectedPatient && !dataLoading && !dataFailed && (
             <Grid size={{ xs: 12, md: 6 }}>
-              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}>
                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>Zátěž za 30 dní:</Typography>
                 <StatusChip tone="green">{weeklyLoad} sRPE · {sessions.length} tréninků</StatusChip>
               </Stack>
@@ -141,14 +175,29 @@ export default function TrainingLoad() {
         </Grid>
       </SoftCard>
 
-      {selectedPatient && (
+      {!selectedPatient && (
+        <SoftCard data-state="empty" sx={{ py: 5, textAlign: 'center' }}>
+          <Typography sx={{ fontWeight: 600 }}>Vyberte sportovce</Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+            Po výběru se zobrazí jeho zátěž, poměr ACWR a poslední tréninky.
+          </Typography>
+        </SoftCard>
+      )}
+
+      {selectedPatient && dataLoading && <ListSkeleton rows={3} height={120} />}
+
+      {selectedPatient && !dataLoading && dataFailed && (
+        <LoadError what="Tréninková data" onRetry={() => void loadPatientData(selectedPatient)} />
+      )}
+
+      {selectedPatient && !dataLoading && !dataFailed && (
         <>
           {/* ACWR & Stats Row */}
           <Grid container spacing={2} sx={{ mb: 2.5 }}>
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid size={{ xs: 12, lg: 4 }}>
               <AcwrGauge value={acwr?.acwrValue ?? 0} />
             </Grid>
-            <Grid size={{ xs: 12, md: 8 }}>
+            <Grid size={{ xs: 12, lg: 8 }}>
               <SoftCard sx={{ height: '100%' }}>
                 <SectionLabel>Podrobnosti ACWR</SectionLabel>
                 {acwr ? (
@@ -177,12 +226,12 @@ export default function TrainingLoad() {
             <SoftCard sx={{ mb: 2.5 }}>
               <SectionLabel>Trend zátěže</SectionLabel>
               <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>Celková týdenní zátěž (sRPE)</Typography>
-              <ResponsiveContainer width="100%" height={280}>
+              <ResponsiveContainer width="100%" height={device === 'phone' ? 220 : 280}>
                 <BarChart data={loadTrend}>
                   <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} vertical={false} />
                   <XAxis dataKey="week" tick={{ fontSize: 12, fill: theme.palette.text.secondary }} stroke={theme.palette.divider} />
                   <YAxis tick={{ fontSize: 12, fill: theme.palette.text.secondary }} stroke={theme.palette.divider} />
-                  <Tooltip contentStyle={{ borderRadius: 10, border: `1px solid ${theme.palette.divider}`, boxShadow: DESIGN.shadow.menu, fontFamily: DESIGN.font }} />
+                  <Tooltip contentStyle={{ borderRadius: 10, border: `1px solid ${theme.palette.divider}`, boxShadow: 'none', fontFamily: DESIGN.font }} />
                   <Legend />
                   <ReferenceLine y={acwr?.chronicLoad ?? 0} stroke={theme.palette.text.secondary} strokeDasharray="5 5" label={{ value: 'Chronický průměr', position: 'right', fontSize: 11, fill: theme.palette.text.secondary }} />
                   <Bar dataKey="totalLoad" name="Celková zátěž" fill={theme.palette.primary.main} radius={[4, 4, 0, 0]} />
@@ -195,79 +244,78 @@ export default function TrainingLoad() {
           <SoftCard sx={{ mb: 2.5 }}>
             <SectionLabel>Zaznamenat trénink</SectionLabel>
             <Grid container spacing={2}>
-              <Grid size={{ xs: 12, sm: 4 }}>
+              <Grid size={{ xs: 12, md: 6, lg: 4 }}>
                 <TextField fullWidth select label="Typ" value={form.type} onChange={e => update('type', e.target.value)}>
                   {sessionTypes.map(t => <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>)}
                 </TextField>
               </Grid>
-              <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth label="Popis" value={form.description} onChange={e => update('description', e.target.value)}
+              <Grid size={{ xs: 12, md: 6, lg: 4 }}><TextField fullWidth label="Popis" value={form.description} onChange={e => update('description', e.target.value)}
                 placeholder="např. Intervaly 4×4 min, posilovna horní polovina" /></Grid>
-              <Grid size={{ xs: 6, sm: 2 }}><TextField fullWidth type="number" label="Trvání (min)" value={form.durationMinutes} onChange={e => update('durationMinutes', parseInt(e.target.value) || 0)} /></Grid>
-              <Grid size={{ xs: 6, sm: 2 }}><TextField fullWidth label="Trenér" value={form.coach} onChange={e => update('coach', e.target.value)} /></Grid>
+              <Grid size={{ xs: 12, md: 6, lg: 2 }}><TextField fullWidth type="number" label="Trvání (min)" value={form.durationMinutes} onChange={e => update('durationMinutes', parseInt(e.target.value) || 0)} /></Grid>
+              <Grid size={{ xs: 12, md: 6, lg: 2 }}><TextField fullWidth label="Trenér" value={form.coach} onChange={e => update('coach', e.target.value)} /></Grid>
             </Grid>
 
             {/* RPE Slider */}
             <Box sx={{ mt: 3, mb: 2 }}>
-              <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1, gap: 1, flexWrap: 'wrap' }}>
                 <Typography sx={{ fontWeight: 600, fontSize: 14 }}>sRPE — jak těžký byl trénink?</Typography>
                 <StatusChip tone="primary">{form.rpe} — {rpeLabels[form.rpe]}</StatusChip>
               </Stack>
               <Slider value={form.rpe} onChange={(_, v) => update('rpe', v as number)}
                 min={1} max={10} step={1} marks
-                sx={{ '& .MuiSlider-markLabel': { fontSize: 10 } }} />
+                aria-label="sRPE"
+                sx={{ py: '20px', '& .MuiSlider-thumb': { width: 22, height: 22 }, '& .MuiSlider-markLabel': { fontSize: 10 } }} />
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>1 — Odpočinek</Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>10 — Maximální</Typography>
               </Box>
             </Box>
 
-            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Tréninková zátěž = sRPE × trvání = <Box component="strong" sx={{ color: 'text.primary' }}>{form.rpe * form.durationMinutes}</Box>
-              </Typography>
-              <Button variant="contained" startIcon={<Add />} onClick={handleCreateSession}>
-                Zaznamenat
-              </Button>
-            </Stack>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 2 }}>
+              Tréninková zátěž = sRPE × trvání = <Box component="strong" sx={{ color: 'text.primary' }}>{form.rpe * form.durationMinutes}</Box>
+            </Typography>
           </SoftCard>
 
+          <PinnedActionBar label="Zaznamenat trénink">
+            <Button variant="contained" startIcon={<Add />} onClick={handleCreateSession} sx={touch}>
+              Zaznamenat
+            </Button>
+          </PinnedActionBar>
+
           {/* Recent Sessions */}
-          {sessions.length > 0 && (
-            <>
-              <SectionLabel>Poslední tréninky</SectionLabel>
-              <Grid container spacing={2}>
-                {sessions.slice(0, 10).map((session) => (
-                  <Grid key={session.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                    <SoftCard sx={{ height: '100%' }}>
-                      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                        <StatusChip tone="grey" size="sm">{sessionTypes.find(t => t.value === session.type)?.label || session.type}</StatusChip>
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                          {new Date(session.sessionDate).toLocaleDateString('cs-CZ')}
-                        </Typography>
-                      </Stack>
-                      {session.description && (
-                        <Typography variant="body2" sx={{ mb: 1 }}>{session.description}</Typography>
-                      )}
-                      <Stack direction="row" spacing={2}>
-                        <Box>
-                          <SectionLabel sx={{ mb: 0 }}>Trvání</SectionLabel>
-                          <Typography sx={{ fontSize: 14, fontWeight: 600 }}>{session.durationMinutes} min</Typography>
-                        </Box>
-                        <Box>
-                          <SectionLabel sx={{ mb: 0 }}>sRPE</SectionLabel>
-                          <Typography sx={{ fontSize: 14, fontWeight: 600 }}>{session.rpe}</Typography>
-                        </Box>
-                        <Box>
-                          <SectionLabel sx={{ mb: 0 }}>Zátěž</SectionLabel>
-                          <Typography sx={{ fontSize: 14, fontWeight: 700, color: 'primary.main' }}>{session.sessionRPE}</Typography>
-                        </Box>
-                      </Stack>
-                    </SoftCard>
-                  </Grid>
-                ))}
-              </Grid>
-            </>
-          )}
+          <Box sx={{ mt: 2.5 }}>
+            <SectionLabel>Poslední tréninky</SectionLabel>
+            <ResponsiveDataList
+              ariaLabel="Poslední tréninky"
+              rows={sessions.slice(0, 10)}
+              rowKey={(s) => s.id}
+              columns={sessionColumns}
+              empty="Zatím žádné tréninky. Zaznamenejte první formulářem výše."
+              renderCard={(s) => (
+                <Stack spacing={1}>
+                  <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                    <StatusChip tone="grey" size="sm">{typeLabel(s)}</StatusChip>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>{dateOf(s)}</Typography>
+                  </Stack>
+                  {s.description && <Typography variant="body2">{s.description}</Typography>}
+                  <Stack direction="row" spacing={2}>
+                    <Box>
+                      <SectionLabel sx={{ mb: 0 }}>Trvání</SectionLabel>
+                      <Typography sx={{ fontSize: 15, fontWeight: 600 }}>{min(s.durationMinutes)}</Typography>
+                    </Box>
+                    <Box>
+                      <SectionLabel sx={{ mb: 0 }}>sRPE</SectionLabel>
+                      <Typography sx={{ fontSize: 15, fontWeight: 600 }}>{s.rpe}</Typography>
+                    </Box>
+                    <Box>
+                      <SectionLabel sx={{ mb: 0 }}>Zátěž</SectionLabel>
+                      <Typography sx={{ fontSize: 15, fontWeight: 700, color: 'primary.main' }}>{s.sessionRPE}</Typography>
+                    </Box>
+                  </Stack>
+                </Stack>
+              )}
+            />
+          </Box>
         </>
       )}
     </Box>

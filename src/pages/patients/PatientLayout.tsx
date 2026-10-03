@@ -19,6 +19,8 @@ import {
 import {
   Alert, Avatar, Box, Button, CircularProgress, Stack, Tab, Tabs, Typography,
 } from '@mui/material';
+import { useIsPhone } from '../../layout/useDevice';
+import PinnedActionBar from '../../components/ui/PinnedActionBar';
 import { ArrowBack } from '@mui/icons-material';
 import { patientsApi } from '../../api/patients';
 import { usePermission } from '../../auth/usePermission';
@@ -145,6 +147,7 @@ export default function PatientLayout() {
   const location = useLocation();
   const mayEdit = usePermission('patients.edit');
   const mayBill = usePermission('billing.manage');
+  const phone = useIsPhone();
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
@@ -305,7 +308,7 @@ export default function PatientLayout() {
         * most patients most of the time.
         */}
       {requirements !== null && requirements.length === 0 && (
-        <Alert severity="info" sx={{ mb: 2 }}>{NOTHING_REQUIRED_TEXT}</Alert>
+        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>{NOTHING_REQUIRED_TEXT}</Typography>
       )}
 
       {/* Still good, and this is the cheap moment to renew it. Amber, because
@@ -371,15 +374,19 @@ export default function PatientLayout() {
             <StatusChip tone={archived ? 'grey' : 'green'}>{archived ? 'Archivovaný' : 'Aktivní'}</StatusChip>
           </Stack>
 
-          <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
-            {/* The calendar opens its booking drawer on `newAppointment` and
-                takes this patient as the one being booked. */}
-            <Button
+          {/* The calendar opens its booking drawer on `newAppointment` and
+              takes this patient as the one being booked. On a phone that
+              button is the screen's main action and is pinned at the bottom
+              (below); on the wider layouts it stands with the others. */}
+          <Stack direction="row" spacing={1} sx={{ flexShrink: 0, flexWrap: 'wrap', rowGap: 1, '& .MuiButton-root': { minHeight: 44 } }}>
+            {!phone && (
+              <Button
               variant="contained"
               onClick={() => navigate('/planovani', { state: { newAppointment: Date.now(), patientId: id } })}
             >
               Objednat termín
             </Button>
+            )}
             {mayEdit && (
               <Button variant="outlined" onClick={() => navigate(`/patients/${id}/edit`)}>
                 Upravit kartu
@@ -399,7 +406,7 @@ export default function PatientLayout() {
           both read `PATIENT_SECTIONS`. */}
       <Tabs
         value={tabs.some((t) => t.value === current) ? current : false}
-        sx={{ mb: 2.5 }}
+        sx={{ mb: 2.5, borderBottom: 1, borderColor: 'divider', '& .MuiTab-root': { minHeight: 44 } }}
         variant="scrollable"
         scrollButtons="auto"
         allowScrollButtonsMobile
@@ -410,6 +417,17 @@ export default function PatientLayout() {
       </Tabs>
 
       <Outlet context={context} />
+
+      {phone && (
+        <PinnedActionBar label="Objednat termín">
+          <Button
+              variant="contained"
+              onClick={() => navigate('/planovani', { state: { newAppointment: Date.now(), patientId: id } })}
+            >
+              Objednat termín
+            </Button>
+        </PinnedActionBar>
+      )}
     </Box>
   );
 }

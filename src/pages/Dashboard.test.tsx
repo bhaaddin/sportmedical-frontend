@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { setViewport, VIEWPORTS } from '../test/viewport';
 
 const range = vi.fn();
 const getById = vi.fn();
@@ -40,6 +41,7 @@ beforeEach(() => {
   list.mockReset().mockResolvedValue({ items: [], totalCount: 137, page: 1, pageSize: 1 });
   search.mockReset().mockResolvedValue([]);
   range.mockReset().mockResolvedValue([]);
+  setViewport(VIEWPORTS.desktop);
 });
 
 const { default: Dashboard } = await import('./Dashboard');
@@ -230,5 +232,89 @@ describe('Nový pacient', () => {
     await screen.findByText('Vyhledání pacienta');
 
     expect(screen.queryByRole('button', { name: 'Nový pacient' })).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * Three layouts (Etapa 2, rule 3): the same plocha at 390 / 834 / 1440.
+ * Phone: every row a card, the main action pinned at the bottom. Tablet: the
+ * lists are tables of three columns. Desktop: four compact panels, the action
+ * in the header.
+ */
+describe('three layouts', () => {
+  const panelAt = async (title: string) => {
+    const heading = await screen.findByText(title, { selector: '.MuiTypography-overline' });
+    return within(heading.closest('[data-panel]') as HTMLElement);
+  };
+
+  it('phone: rows are cards, KPIs sit two-up and "Otevřít kalendář" is pinned at the bottom', async () => {
+    setViewport(VIEWPORTS.phone);
+    range.mockResolvedValue([at(8, 0, 'a', 'p1'), at(9, 1, 'b', 'p2')]);
+
+    const { container } = renderDashboard();
+
+    const objednani = await panelAt('Objednaní');
+    const list = await objednani.findByRole('list', { name: 'Objednaní' });
+    expect(list).toHaveAttribute('data-layout', 'cards');
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    expect(await objednani.findByText('Jana Marková')).toBeInTheDocument();
+    expect(container.querySelector('table')).toBeNull();
+
+    expect(container.querySelector('[data-layout="kpi-2up"]')).not.toBeNull();
+    expect(container.querySelector('[data-layout="stack"]')).not.toBeNull();
+
+    const pinned = screen.getByRole('region', { name: 'Hlavní akce' });
+    expect(pinned).toHaveAttribute('data-pinned', 'true');
+    expect(within(pinned).getByRole('button', { name: 'Otevřít kalendář' })).toBeInTheDocument();
+    /* The header no longer carries the same button: it is never drawn twice up there. */
+    const header = screen.getByRole('heading', { level: 1 }).closest('.MuiStack-root')!.parentElement!;
+    expect(within(header).queryByRole('button', { name: 'Otevřít kalendář' })).toBeNull();
+  });
+
+  it('phone: the search and "Nový pacient" are 44px targets', async () => {
+    setViewport(VIEWPORTS.phone);
+    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'patients.register']));
+    renderDashboard();
+
+    const button = await screen.findByRole('button', { name: 'Nový pacient' });
+    expect(getComputedStyle(button).minHeight).toBe('44px');
+  });
+
+  it('tablet: the lists are tables of three columns, and nothing is pinned', async () => {
+    setViewport(VIEWPORTS.tablet);
+    range.mockResolvedValue([at(8, 0, 'a', 'p1')]);
+
+    const { container } = renderDashboard();
+
+    const objednani = await panelAt('Objednaní');
+    const table = await objednani.findByRole('table', { name: 'Objednaní' });
+    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Čas', 'Pacient', 'Stav']);
+    expect(await objednani.findByText('Jana Marková')).toBeInTheDocument();
+
+    expect(container.querySelector('[data-layout="tablet"]')).not.toBeNull();
+    expect(screen.queryByRole('region', { name: 'Hlavní akce' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Otevřít kalendář' }).length).toBeGreaterThan(0);
+  });
+
+  it('desktop: four compact panels, no tables, the action in the header', async () => {
+    setViewport(VIEWPORTS.desktop);
+    range.mockResolvedValue([at(8, 0, 'a', 'p1')]);
+
+    const { container } = renderDashboard();
+
+    expect(await (await panelAt('Objednaní')).findByText('Jana Marková')).toBeInTheDocument();
+    expect(container.querySelector('[data-layout="four"]')).not.toBeNull();
+    expect(container.querySelectorAll('[data-panel]')).toHaveLength(4);
+    expect(container.querySelector('table')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Hlavní akce' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Otevřít kalendář' }).length).toBeGreaterThan(0);
+  });
+
+  it('phone: an empty list says so in a card instead of a blank gap', async () => {
+    setViewport(VIEWPORTS.phone);
+    renderDashboard();
+
+    const card = await panelAt('Čekárna');
+    expect(await card.findByText('Čekárna je prázdná.')).toBeInTheDocument();
   });
 });

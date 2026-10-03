@@ -11,6 +11,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
+import { setViewport, VIEWPORTS } from '../test/viewport';
 import type { ReactNode } from 'react';
 import { addDaysToDateOnly, toDateOnly } from '../utils/time';
 import { daysIn, monthOf, previousPeriod } from './statistics/aggregate';
@@ -61,6 +62,7 @@ function Wrap({ children }: { children: ReactNode }) {
 }
 
 beforeEach(() => {
+  setViewport(VIEWPORTS.desktop);
   range.mockReset().mockImplementation(async (from: string, to: string) => {
     const rows = [
       appt('1', at(thisMonth.from), 0, 'Základní prohlídka', 'p-1'),
@@ -171,3 +173,145 @@ describe('Statistiky', () => {
     expect(within(note).getByRole('button', { name: 'Zkusit znovu' })).toBeInTheDocument();
   });
 });
+
+/*
+ * Three layouts (Etapa 2, rule 3): the same screen at 390 / 834 / 1440.
+ * Phone: the areas are tabs and the charts stack one per row. Desktop: all
+ * three groups, chart cards in a grid, "Vše" among the chips.
+ */
+describe('Statistiky at three widths', () => {
+  it('phone: three tabs, one area at a time, charts stacked, export pinned', async () => {
+    setViewport(VIEWPORTS.phone);
+    const { container } = render(<Wrap><StatisticsPage /></Wrap>);
+
+    const tabs = await screen.findByRole('tablist', { name: 'Oblast' });
+    expect(within(tabs).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Objednávky', 'Pacienti', 'Finance']);
+    expect(within(tabs).getByRole('tab', { name: 'Objednávky' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('button', { name: 'Vše' })).toBeNull();
+
+    /* Only the selected group is on the page, and its cards sit one per row. */
+    expect(await screen.findByRole('article', { name: 'Podle činnosti' })).toBeInTheDocument();
+    expect(screen.queryByRole('article', { name: 'Nové registrace' })).toBeNull();
+    const grid = container.querySelector('section[aria-label="Objednávky"] [data-layout]')!;
+    expect(grid).toHaveAttribute('data-layout', 'stack');
+    expect(getComputedStyle(grid).gridTemplateColumns).toBe('minmax(0, 1fr)');
+
+    /* The tab hands over to another group. */
+    const user = userEvent.setup();
+    await user.click(within(tabs).getByRole('tab', { name: 'Finance' }));
+    expect(await screen.findByRole('article', { name: 'Vyfakturováno a zaplaceno' })).toBeInTheDocument();
+    expect(screen.queryByRole('article', { name: 'Podle činnosti' })).toBeNull();
+
+    const pinned = screen.getByRole('region', { name: 'Hlavní akce' });
+    expect(within(pinned).getByRole('button', { name: 'Exportovat zobrazené (CSV)' })).toBeInTheDocument();
+    expect(getComputedStyle(within(tabs).getAllByRole('tab')[0]).minHeight).toBe('44px');
+  });
+
+  it('desktop: no tabs, every group on the page, charts in a grid, "Vše" offered', async () => {
+    setViewport(VIEWPORTS.desktop);
+    const { container } = render(<Wrap><StatisticsPage /></Wrap>);
+
+    expect(await screen.findByRole('article', { name: 'Vyfakturováno a zaplaceno' })).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).toBeNull();
+    for (const name of ['Objednávky', 'Pacienti', 'Finance']) {
+      expect(container.querySelector(`section[aria-label="${name}"]`)).not.toBeNull();
+    }
+    expect(container.querySelector('section[aria-label="Objednávky"] [data-layout]')).toHaveAttribute('data-layout', 'grid');
+    expect(screen.getByRole('button', { name: 'Vše' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Hlavní akce' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Exportovat zobrazené (CSV)' })).toBeInTheDocument();
+  });
+
+  it('tablet: no tabs, every group, cards in a grid that fits', async () => {
+    setViewport(VIEWPORTS.tablet);
+    const { container } = render(<Wrap><StatisticsPage /></Wrap>);
+
+    expect(await screen.findByRole('article', { name: 'Nové registrace' })).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(container.querySelector('section[aria-label="Pacienti"] [data-layout]')).toHaveAttribute('data-layout', 'grid');
+  });
+});
+
+describe('the page-level CSV', () => {
+  it('exports every chart on screen, Czech headers, no personal identifiers', async () => {
+    setViewport(VIEWPORTS.desktop);
+    const user = userEvent.setup();
+    const createObjectURL = vi.fn((_blob: Blob) => 'blob:vse');
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+    render(<Wrap><StatisticsPage /></Wrap>);
+    const button = await screen.findByRole('button', { name: 'Exportovat zobrazené (CSV)' });
+    await waitFor(() => expect(button).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('article', { name: 'Vyfakturováno a zaplaceno' })).toHaveAttribute('data-state', 'ready'));
+
+    await user.click(button);
+    const text = await createObjectURL.mock.calls[0][0].text();
+    const lines = text.split('\r\n');
+    expect(lines[0]).toBe(`Statistiky;Období ${thisMonth.from} až ${thisMonth.to}`);
+    expect(lines).toContain('Podle činnosti');
+    expect(lines).toContain('Činnost;Objednávky');
+    expect(lines).toContain('Komplexní prohlídka;1');
+    expect(lines).toContain('Období;Vyfakturováno (Kč);Zaplaceno (Kč)');
+    expect(lines).toContain('Nové registrace');
+    /* Patients' names are in the fixtures; none may reach the file. */
+    expect(text).not.toMatch(/Novák|Malá/);
+    click.mockRestore();
+  });
+
+  it('exports only the group the phone is looking at', async () => {
+    setViewport(VIEWPORTS.phone);
+    const user = userEvent.setup();
+    const createObjectURL = vi.fn((_blob: Blob) => 'blob:obj');
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+    render(<Wrap><StatisticsPage /></Wrap>);
+    const button = await screen.findByRole('button', { name: 'Exportovat zobrazené (CSV)' });
+    await waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+
+    const text = await createObjectURL.mock.calls[0][0].text();
+    expect(text).toContain('Podle činnosti');
+    expect(text).not.toContain('Nové registrace');
+    expect(text).not.toContain('Vyfakturováno (Kč)');
+    click.mockRestore();
+  });
+});
+
+describe('every chart states its state', () => {
+  it('says what is missing for an empty period, with the same card height', async () => {
+    setViewport(VIEWPORTS.desktop);
+    range.mockResolvedValue([]);
+    render(<Wrap><StatisticsPage /></Wrap>);
+
+    const card = await screen.findByRole('article', { name: 'Podle činnosti' });
+    await waitFor(() => expect(card).toHaveAttribute('data-state', 'empty'));
+    expect(within(card).getByText(/Za zvolené období zatím nic/)).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Export CSV' })).toBeDisabled();
+  });
+
+  it('shows a failed chart with its own "Zkusit znovu" that asks again', async () => {
+    setViewport(VIEWPORTS.desktop);
+    const user = userEvent.setup();
+    getInvoices.mockRejectedValueOnce(new Error('500'));
+    render(<Wrap><StatisticsPage /></Wrap>);
+
+    const card = await screen.findByRole('article', { name: 'Tržby podle činnosti' });
+    await waitFor(() => expect(card).toHaveAttribute('data-state', 'error'));
+    await user.click(within(card).getByRole('button', { name: 'Zkusit znovu' }));
+    await waitFor(() => expect(getInvoices).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(card).toHaveAttribute('data-state', 'ready'));
+  });
+
+  it('holds a placeholder while loading', async () => {
+    setViewport(VIEWPORTS.desktop);
+    range.mockImplementation(() => new Promise(() => undefined));
+    render(<Wrap><StatisticsPage /></Wrap>);
+
+    const card = await screen.findByRole('article', { name: 'Podle činnosti' });
+    expect(card).toHaveAttribute('data-state', 'loading');
+    expect(within(card).getByRole('button', { name: 'Export CSV' })).toBeDisabled();
+  });
+});
+

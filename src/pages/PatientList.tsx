@@ -23,8 +23,7 @@ import type { ReactNode } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
-  Alert, Box, Button, InputAdornment, Link, Stack, Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, TextField, Typography,
+  Alert, Box, Button, InputAdornment, Link, Stack, TextField, Typography,
 } from '@mui/material';
 import { Search } from '@mui/icons-material';
 import { patientsApi } from '../api/patients';
@@ -32,8 +31,12 @@ import type { Patient } from '../api/patients';
 import { PatientListSkeleton } from '../components/SkeletonLoader';
 import { usePermission } from '../auth/usePermission';
 import { SENSITIVE_IDENTITY, shownFields, usePatientFields } from '../api/displaySettings';
-import { FilterChips, PageHeader, SoftCard, StatusChip } from '../components/ui';
+import { FilterChips, PageHeader, StatusChip } from '../components/ui';
 import type { FilterOption } from '../components/ui';
+import { ResponsiveDataList } from '../components/ui/ResponsiveDataList';
+import type { DataColumn } from '../components/ui/ResponsiveDataList';
+import { PinnedActionBar } from '../components/ui/PinnedActionBar';
+import { useIsPhone } from '../layout/useDevice';
 import {
   ALL_APPOINTMENTS_KEY, UPCOMING_WINDOW_KEY, fetchAllAppointments, fetchUpcomingWindow,
 } from '../components/patients/appointmentsSource';
@@ -76,6 +79,7 @@ interface RowActivity {
 
 export default function PatientList() {
   const navigate = useNavigate();
+  const phone = useIsPhone();
   const mayRegister = usePermission('patients.register');
   const maySeeSensitive = usePermission(SENSITIVE_IDENTITY);
   const fieldVisibility = usePatientFields();
@@ -180,14 +184,94 @@ export default function PatientList() {
     : 'Na této stránce nikdo filtru neodpovídá.';
   const activityKnown = appointmentsQuery.data !== undefined;
 
-  const columnCount = 5 + (shows('dateOfBirth') ? 1 : 0) + extraColumns.length;
+  const standingOf = (p: Patient) => {
+    const row = activity.get(p.id);
+    return row === undefined ? null : patientStanding(p, row.summary, row.questionnaireIsMissing);
+  };
+  const standingNode = (p: Patient) => {
+    const standing = standingOf(p);
+    return standing === null
+      ? <Typography variant="caption" sx={{ color: 'text.disabled' }}>{activityKnown ? '—' : '…'}</Typography>
+      : <StatusChip tone={standing.tone}>{standing.label}</StatusChip>;
+  };
+  const nextText = (p: Patient) => {
+    const next = activity.get(p.id)?.summary.nextAppointment;
+    return next ? shortDayTime(next.startTime) : '—';
+  };
+  const phoneText = (p: Patient) => (p.phone && p.phone.trim() !== '' ? p.phone : '—');
+
+  const nameCell = (p: Patient) => (
+    <>
+      <Link
+        component={RouterLink}
+        to={`/patients/${p.id}`}
+        underline="hover"
+        onClick={(e) => e.stopPropagation()}
+        sx={{ fontWeight: 600, color: 'primary.main' }}
+      >
+        {p.firstName} {p.lastName}
+      </Link>
+      {p.email && p.email.trim() !== '' && (
+        <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', overflowWrap: 'anywhere' }}>
+          {p.email}
+        </Typography>
+      )}
+      {showRecordId && (
+        <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+          {p.id.slice(0, 8)}…
+        </Typography>
+      )}
+    </>
+  );
+
+  /* The board's columns. The tablet keeps three - who, when next, where they
+     stand - and the desktop all of them. */
+  const columns: DataColumn<Patient>[] = [
+    { key: 'name', header: 'Pacient', cell: nameCell, tablet: true },
+    ...(shows('dateOfBirth')
+      ? [{ key: 'dob', header: 'Narození', cell: (p: Patient) => formatDateOnly(p.dateOfBirth?.slice(0, 10)) || '—' }]
+      : []),
+    ...extraColumns.map((field) => ({
+      key: field.key,
+      header: EXTRA_COLUMN_CELLS[field.key].head,
+      cell: EXTRA_COLUMN_CELLS[field.key].cell,
+    })),
+    { key: 'phone', header: 'Telefon', cell: phoneText },
+    {
+      key: 'last',
+      header: 'Poslední návštěva',
+      cell: (p) => {
+        const last = activity.get(p.id)?.summary.lastVisit;
+        return last ? formatPragueDate(last.startTime) : '—';
+      },
+    },
+    { key: 'next', header: 'Příští termín', cell: nextText, tablet: true },
+    { key: 'standing', header: 'Stav', cell: standingNode, tablet: true },
+  ];
+
+  /* The phone's card: name, next appointment, status chips - what a thumb
+     needs to pick the right person, nothing else. */
+  const renderCard = (p: Patient) => (
+    <Stack spacing={0.75}>
+      <Typography sx={{ fontSize: 15, fontWeight: 600, color: 'primary.main' }}>
+        {p.firstName} {p.lastName}
+      </Typography>
+      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+        {nextText(p) === '—' ? 'Bez objednaného termínu' : `Příští termín: ${nextText(p)}`}
+      </Typography>
+      {p.phone && p.phone.trim() !== '' && (
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>{p.phone}</Typography>
+      )}
+      <Box>{standingNode(p)}</Box>
+    </Stack>
+  );
 
   return (
     <Box>
       <PageHeader
         title="Pacienti"
         subtitle={query === '' ? `Kartotéka kliniky · ${total} záznamů` : `Nalezeno: ${total}`}
-        actions={mayRegister ? (
+        actions={mayRegister && !phone ? (
           /* One way in. The thinner "Nový pacient" form wrote to a different
              endpoint and skipped the address, birth number and insurer, so
              which button the operator pressed decided how complete the record
@@ -206,6 +290,7 @@ export default function PatientList() {
           onChange={(e) => setSearch(e.target.value)}
           slotProps={{
             input: {
+              sx: { minHeight: 44 },
               startAdornment: (
                 <InputAdornment position="start">
                   <Search sx={{ fontSize: 20, color: 'text.secondary' }} />
@@ -214,94 +299,25 @@ export default function PatientList() {
             },
           }}
         />
-        <FilterChips options={FILTERS} value={filter} onChange={setFilter} ariaLabel="Filtr pacientů" />
+        {/* On a phone the chips run in one row that scrolls sideways, so they
+            never push the list off the screen. */}
+        <Box
+          data-filters={phone ? 'scroll' : 'wrap'}
+          sx={phone ? { overflowX: 'auto', mx: -2, px: 2, pb: 0.5, '& [role="group"]': { flexWrap: 'nowrap' }, '& button': { flexShrink: 0, minHeight: 44 } } : undefined}
+        >
+          <FilterChips options={FILTERS} value={filter} onChange={setFilter} ariaLabel="Filtr pacientů" />
+        </Box>
       </Stack>
 
-      <SoftCard sx={{ p: 0, overflow: 'hidden' }}>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Pacient</TableCell>
-                {shows('dateOfBirth') && <TableCell>Narození</TableCell>}
-                {extraColumns.map((field) => (
-                  <TableCell key={field.key}>{EXTRA_COLUMN_CELLS[field.key].head}</TableCell>
-                ))}
-                <TableCell>Telefon</TableCell>
-                <TableCell>Poslední návštěva</TableCell>
-                <TableCell>Příští termín</TableCell>
-                <TableCell>Stav</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {visible.map((p) => {
-                const row = activity.get(p.id);
-                const standing = row === undefined
-                  ? null
-                  : patientStanding(p, row.summary, row.questionnaireIsMissing);
-                return (
-                  <TableRow
-                    key={p.id}
-                    hover
-                    sx={{ cursor: 'pointer' }}
-                    onClick={() => navigate(`/patients/${p.id}`)}
-                  >
-                    <TableCell>
-                      <Link
-                        component={RouterLink}
-                        to={`/patients/${p.id}`}
-                        underline="hover"
-                        onClick={(e) => e.stopPropagation()}
-                        sx={{ fontWeight: 600, color: 'primary.main' }}
-                      >
-                        {p.firstName} {p.lastName}
-                      </Link>
-                      {p.email && p.email.trim() !== '' && (
-                        <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
-                          {p.email}
-                        </Typography>
-                      )}
-                      {showRecordId && (
-                        <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
-                          {p.id.slice(0, 8)}…
-                        </Typography>
-                      )}
-                    </TableCell>
-                    {shows('dateOfBirth') && (
-                      <TableCell>{formatDateOnly(p.dateOfBirth?.slice(0, 10)) || '—'}</TableCell>
-                    )}
-                    {extraColumns.map((field) => (
-                      <TableCell key={field.key}>{EXTRA_COLUMN_CELLS[field.key].cell(p)}</TableCell>
-                    ))}
-                    {/* The register's row carries `phone` and `email` (null
-                        when the patient left none); the e-mail is the second
-                        line under the name. */}
-                    <TableCell>{p.phone && p.phone.trim() !== '' ? p.phone : '—'}</TableCell>
-                    <TableCell>
-                      {row?.summary.lastVisit ? formatPragueDate(row.summary.lastVisit.startTime) : '—'}
-                    </TableCell>
-                    <TableCell>
-                      {row?.summary.nextAppointment ? shortDayTime(row.summary.nextAppointment.startTime) : '—'}
-                    </TableCell>
-                    <TableCell>
-                      {standing === null
-                        ? <Typography variant="caption" sx={{ color: 'text.disabled' }}>{activityKnown ? '—' : '…'}</Typography>
-                        : <StatusChip tone={standing.tone}>{standing.label}</StatusChip>}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {visible.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={columnCount} align="center" sx={{ py: 6 }}>
-                    <Typography sx={{ color: 'text.secondary' }}>{emptyText}</Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </SoftCard>
+      <ResponsiveDataList
+        rows={visible}
+        rowKey={(p) => p.id}
+        columns={columns}
+        renderCard={renderCard}
+        onRowClick={(p) => navigate(`/patients/${p.id}`)}
+        empty={emptyText}
+        ariaLabel="Pacienti"
+      />
 
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
@@ -312,7 +328,7 @@ export default function PatientList() {
           {`Zobrazeno ${visible.length} z ${total} pacientů`}
           {pageCount > 1 ? ` · strana ${page + 1} z ${pageCount}` : ''}
         </Typography>
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} sx={{ '& .MuiButton-root': { minHeight: 44 }, '& > *': { flex: { xs: 1, sm: 'none' } } }}>
           <Button variant="outlined" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
             Předchozí
           </Button>
@@ -325,6 +341,15 @@ export default function PatientList() {
           </Button>
         </Stack>
       </Stack>
+
+      {/* The screen's one main action, pinned at the bottom on a phone. */}
+      {mayRegister && phone && (
+        <PinnedActionBar label="Nový pacient">
+          <Button variant="contained" onClick={() => navigate('/patients/register')}>
+            Nový pacient
+          </Button>
+        </PinnedActionBar>
+      )}
     </Box>
   );
 }

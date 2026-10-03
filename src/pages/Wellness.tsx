@@ -5,6 +5,8 @@ import {
 import { Send } from '@mui/icons-material';
 import { wellnessApi } from '../api/wellness';
 import { DESIGN, KpiCard, PageHeader, SectionLabel, SoftCard, StatusChip } from '../components/ui';
+import { PinnedActionBar } from '../components/ui/PinnedActionBar';
+import { useTouchSx } from './sports/touch';
 import toast from 'react-hot-toast';
 
 const metricConfig = [
@@ -37,12 +39,13 @@ function MetricCard({ label, desc, value, min, max, step = 1, format, onChange }
         onChange={(_, v) => onChange(v as number)}
         min={min} max={max} step={step}
         aria-label={label}
-        sx={{ '& .MuiSlider-thumb': { width: 18, height: 18 } }} />
+        sx={{ py: '20px', '& .MuiSlider-thumb': { width: 22, height: 22 } }} />
     </SoftCard>
   );
 }
 
 export default function Wellness() {
+  const touch = useTouchSx();
   const [form, setForm] = useState({
     patientId: '',
     sleepQuality: 7,
@@ -87,15 +90,15 @@ export default function Wellness() {
 
       {/* Composite Score */}
       <Grid container spacing={2} sx={{ mb: 2.5 }}>
-        <Grid size={{ xs: 12, sm: 4 }}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <KpiCard
             label="Celkové skóre"
-            value={compositeScore}
+            value={compositeScore.replace(".", ",")}
             hint="průměr ze šesti ukazatelů"
             tone={isFlagged ? 'red' : 'green'}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 8 }}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <SoftCard sx={{ height: '100%' }}>
             <SectionLabel>Připravenost</SectionLabel>
             <StatusChip tone={isFlagged ? 'red' : 'green'} dot>
@@ -121,7 +124,7 @@ export default function Wellness() {
       <SectionLabel>Jak se dnes cítíte</SectionLabel>
       <Grid container spacing={2}>
         {metricConfig.map((metric) => (
-          <Grid key={metric.key} size={{ xs: 12, sm: 6 }}>
+          <Grid key={metric.key} size={{ xs: 12, md: 6 }}>
             <MetricCard
               label={metric.label}
               desc={metric.desc}
@@ -134,19 +137,19 @@ export default function Wellness() {
         ))}
 
         {/* Sleep Hours */}
-        <Grid size={{ xs: 12, sm: 6 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <MetricCard
             label="Délka spánku"
             desc="hodin"
             value={form.sleepHours}
             min={3} max={12} step={0.5}
-            format={(v) => `${v} h`}
+            format={(v) => `${String(v).replace('.', ',')} h`}
             onChange={(v) => update('sleepHours', v)}
           />
         </Grid>
 
         {/* Hydration */}
-        <Grid size={{ xs: 12, sm: 6 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <MetricCard
             label="Hydratace"
             desc="1 = málo, 10 = dostatek"
@@ -163,10 +166,13 @@ export default function Wellness() {
         <TextField fullWidth multiline rows={3} label="Poznámky" value={form.notes}
           onChange={e => update('notes', e.target.value)}
           placeholder="např. Bolí mě koleno po včerejším tréninku..." />
-        <Button variant="contained" startIcon={<Send />} onClick={handleSubmit} sx={{ mt: 2 }}>
+      </SoftCard>
+
+      <PinnedActionBar label="Odeslat denní wellness">
+        <Button variant="contained" startIcon={<Send />} onClick={handleSubmit} sx={touch}>
           Odeslat denní wellness
         </Button>
-      </SoftCard>
+      </PinnedActionBar>
     </Box>
   );
 }

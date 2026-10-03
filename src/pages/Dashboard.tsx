@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Grid, Typography, Avatar, Button, TextField,
-  InputAdornment, List, ListItemButton, Divider, CircularProgress, Stack,
+  InputAdornment, List, ListItemButton, CircularProgress, Stack,
 } from '@mui/material';
 import { Search, PersonAdd, ArrowForward } from '@mui/icons-material';
 import { useQueries, useQuery } from '@tanstack/react-query';
@@ -16,12 +16,22 @@ import DayOverviewPage from './booking/DayOverviewPage';
 import { toDateOnly, formatPragueTime } from '../utils/time';
 import { DashboardSkeleton } from '../components/SkeletonLoader';
 import { KpiCard, PageHeader, SectionLabel, SoftCard, StatusChip, type ChipTone } from '../components/ui';
+import { ResponsiveDataList, type DataColumn } from '../components/ui/ResponsiveDataList';
+import { PinnedActionBar } from '../components/ui/PinnedActionBar';
+import { useDevice } from '../layout/useDevice';
 
 /*
  * The plocha (owner/admin home), in the board's look: a greeting, the day's
  * facts as KPI cards, the patient search, and the four lists as bordered
  * cards. Same data and the same actions as before; no gradients, no shadows,
  * no counters that count up.
+ *
+ * Three layouts (Etapa 2, rule 3):
+ *   desktop  four compact panels across, the primary action in the header
+ *   tablet   panels as tables of three columns - two across when the screen
+ *            is wide enough (landscape), one when it is not (portrait)
+ *   phone    every row its own card with a 44px target, KPI cards two-up,
+ *            and the primary action ("Otevřít kalendář") pinned at the bottom
  */
 
 function getGreeting(): string {
@@ -75,34 +85,46 @@ export default function Dashboard() {
   return <OwnerDashboard />;
 }
 
-/* ── One panel of the plocha: a bordered card with a section label, a count and a footer action ── */
-function Panel({
-  title, count, action, children,
-}: {
+/* ── One row of a panel, said once and drawn three ways ── */
+interface PanelRow {
+  id: string;
+  onClick: () => void;
+  /** A time, an avatar or a chip: what the eye finds first. */
+  lead: React.ReactNode;
   title: string;
-  count?: number;
-  action?: { label: string; onClick: () => void };
-  children: React.ReactNode;
-}) {
+  subtitle?: string;
+  trailing?: React.ReactNode;
+}
+
+const rowTitleSx = { fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } as const;
+const rowSubtitleSx = { fontSize: 14, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } as const;
+
+function MainCell({ row }: { row: PanelRow }) {
   return (
-    <SoftCard sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 0, overflow: 'hidden' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2.5, pt: 2, pb: 1.25 }}>
-        <SectionLabel sx={{ mb: 0, flex: 1 }}>{title}</SectionLabel>
-        {count !== undefined && (
-          <StatusChip tone={count > 0 ? 'green' : 'grey'} size="sm">{count}</StatusChip>
-        )}
-      </Box>
-      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 1, pb: 1 }}>{children}</Box>
-      {action && (
-        <Button
-          onClick={action.onClick}
-          endIcon={<ArrowForward sx={{ fontSize: 16 }} />}
-          sx={{ justifyContent: 'space-between', px: 2.5, py: 1.25, borderTop: '1px solid', borderColor: 'divider', borderRadius: 0, color: 'primary.main' }}
-        >
-          {action.label}
-        </Button>
-      )}
-    </SoftCard>
+    <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Typography sx={rowTitleSx}>{row.title}</Typography>
+      {row.subtitle !== undefined && <Typography sx={rowSubtitleSx}>{row.subtitle}</Typography>}
+    </Box>
+  );
+}
+
+function PanelAction({ action, bordered = false }: { action: { label: string; onClick: () => void }; bordered?: boolean }) {
+  return (
+    <Button
+      onClick={action.onClick}
+      endIcon={<ArrowForward sx={{ fontSize: 16 }} />}
+      sx={{
+        justifyContent: 'space-between',
+        px: bordered ? 2.5 : 0.5,
+        py: 1.25,
+        minHeight: 44,
+        width: '100%',
+        color: 'primary.main',
+        ...(bordered ? { borderTop: '1px solid', borderColor: 'divider', borderRadius: 0 } : {}),
+      }}
+    >
+      {action.label}
+    </Button>
   );
 }
 
@@ -114,8 +136,107 @@ function EmptyRow({ text }: { text: string }) {
   );
 }
 
+/*
+ * One panel of the plocha. Desktop: a bordered card with a compact list.
+ * Tablet: the list becomes a table of three columns. Phone: every row is its
+ * own card. The title, the count and the footer action are the same everywhere.
+ */
+function Panel({
+  title, count, action, rows, headers, empty,
+}: {
+  title: string;
+  count?: number;
+  action?: { label: string; onClick: () => void };
+  rows: PanelRow[];
+  /** Column headings for the tablet's table: lead, main, trailing. */
+  headers: [string, string, string?];
+  empty: string;
+}) {
+  const device = useDevice();
+  const desktop = device === 'desktop';
+  const head = (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: desktop ? 2.5 : 0.5, pt: desktop ? 2 : 0, pb: 1.25 }}>
+      <SectionLabel sx={{ mb: 0, flex: 1 }}>{title}</SectionLabel>
+      {count !== undefined && (
+        <StatusChip tone={count > 0 ? 'green' : 'grey'} size="sm">{count}</StatusChip>
+      )}
+    </Box>
+  );
+
+  if (desktop) {
+    return (
+      <SoftCard data-panel={title} sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 0, overflow: 'hidden' }}>
+        {head}
+        <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 1, pb: 1 }}>
+          {rows.length === 0 ? (
+            <EmptyRow text={empty} />
+          ) : (
+            <List disablePadding>
+              {rows.map((row) => (
+                <ListItemButton key={row.id} onClick={row.onClick} sx={{ borderRadius: 2, mb: 0.25, gap: 1.5, alignItems: 'center' }}>
+                  {row.lead}
+                  <MainCell row={row} />
+                  {row.trailing}
+                </ListItemButton>
+              ))}
+            </List>
+          )}
+        </Box>
+        {action && <PanelAction action={action} bordered />}
+      </SoftCard>
+    );
+  }
+
+  const hasTrailing = rows.some((r) => r.trailing !== undefined);
+  const columns: DataColumn<PanelRow>[] = [
+    { key: 'lead', header: headers[0], cell: (r) => r.lead, tablet: true, width: 96 },
+    { key: 'main', header: headers[1], cell: (r) => <MainCell row={r} />, tablet: true },
+    ...(hasTrailing
+      ? [{ key: 'trailing', header: headers[2] ?? '', cell: (r: PanelRow) => r.trailing, tablet: true, align: 'right' as const }]
+      : []),
+  ];
+
+  return (
+    <Box data-panel={title} sx={{ minWidth: 0 }}>
+      {head}
+      <ResponsiveDataList
+        rows={rows}
+        rowKey={(r) => r.id}
+        columns={columns}
+        onRowClick={(r) => r.onClick()}
+        empty={empty}
+        ariaLabel={title}
+        renderCard={(r) => (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            {r.lead}
+            <MainCell row={r} />
+            {r.trailing}
+          </Box>
+        )}
+      />
+      {action && (
+        <Box sx={{ mt: 0.5 }}>
+          <PanelAction action={action} />
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+const timeLead = (iso: string) => (
+  <Typography sx={{ fontSize: 14, fontWeight: 700, minWidth: 44 }}>{formatPragueTime(iso)}</Typography>
+);
+
+const avatarLead = (p: Patient) => (
+  <Avatar sx={{ width: 34, height: 34, fontSize: 13 }}>
+    {(p.firstName[0] ?? '') + (p.lastName[0] ?? '')}
+  </Avatar>
+);
+
 function OwnerDashboard() {
   const navigate = useNavigate();
+  const device = useDevice();
+  const phone = device === 'phone';
   const canSeePatients = usePermission('patients.view');
   const canRegister = usePermission('patients.register');
   const [patientTotal, setPatientTotal] = useState<number | null>(null);
@@ -213,48 +334,65 @@ function OwnerDashboard() {
 
   if (loading) return <DashboardSkeleton />;
 
-  const appointmentRow = (appt: DayAppointment) => {
+  const toCalendar = () => navigate('/planovani');
+
+  const appointmentRow = (appt: DayAppointment): PanelRow => {
     const status = statusName(appt.status) ?? '';
-    return (
-      <ListItemButton
-        key={appt.id}
-        onClick={() => navigate('/planovani')}
-        sx={{ borderRadius: 2, mb: 0.25, gap: 1.5, alignItems: 'center' }}
-      >
-        <Typography sx={{ fontSize: 13, fontWeight: 700, minWidth: 44 }}>
-          {formatPragueTime(appt.startUtc)}
-        </Typography>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {patientName(appt.patientId)}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
-            {appt.activityName}
-          </Typography>
-        </Box>
+    return {
+      id: appt.id,
+      onClick: toCalendar,
+      lead: timeLead(appt.startUtc),
+      title: patientName(appt.patientId),
+      subtitle: appt.activityName,
+      trailing: (
         <StatusChip tone={STATUS_TONES[status] ?? 'grey'} size="sm">
           {STATUS_LABELS[status] ?? `stav ${appt.status}`}
         </StatusChip>
-      </ListItemButton>
-    );
+      ),
+    };
   };
+
+  const alertRow = (a: DayAppointment): PanelRow => ({
+    id: a.id,
+    onClick: toCalendar,
+    lead: <StatusChip tone="beige" size="sm">{formatPragueTime(a.startUtc)}</StatusChip>,
+    title: patientName(a.patientId),
+    subtitle: `Chybí podklady — ${a.activityName}`,
+  });
+
+  const historyRows: PanelRow[] = !canSeePatients
+    ? []
+    : (recent.data?.items ?? []).map((p) => ({
+        id: p.id,
+        onClick: () => navigate(`/patients/${p.id}`),
+        lead: avatarLead(p),
+        title: `${p.lastName} ${p.firstName}`,
+        subtitle: `nar. ${czechDob(p.dateOfBirth)}`,
+      }));
+  const historyEmpty = !canSeePatients
+    ? 'Bez oprávnění zobrazit pacienty.'
+    : recent.isLoading
+      ? 'Načítám…'
+      : 'Zatím žádní pacienti.';
 
   const today = new Date().toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
+  const openCalendar = (
+    <Button variant="contained" onClick={toCalendar} sx={{ minHeight: phone ? 44 : undefined }}>
+      Otevřít kalendář
+    </Button>
+  );
+
   return (
-    <Box>
+    <Box data-device={device}>
       <PageHeader
         title={`${getGreeting()}, ${user.firstName || 'Doktore'}`}
         subtitle={`${today.charAt(0).toUpperCase()}${today.slice(1)}${patientTotal !== null ? ` · ${patientTotal} pacientů v registru` : ''}`}
-        actions={
-          <Button variant="contained" onClick={() => navigate('/planovani')}>
-            Otevřít kalendář
-          </Button>
-        }
+        actions={phone ? undefined : openCalendar}
       />
 
-      {/* ── The day's facts ── */}
-      <Grid container spacing={2} sx={{ mb: 2.5 }}>
+      {/* ── The day's facts: two-up on a phone and a portrait tablet, four across when there is room ── */}
+      <Grid container spacing={2} sx={{ mb: 2.5 }} data-layout={phone ? 'kpi-2up' : 'kpi'}>
         <Grid size={{ xs: 6, md: 3 }}>
           <KpiCard label="Dnes objednáno" value={booked.length} hint="termínů, které ještě stojí" />
         </Grid>
@@ -286,6 +424,7 @@ function OwnerDashboard() {
             disabled={!canSeePatients}
             slotProps={{
               input: {
+                sx: phone ? { minHeight: 44 } : undefined,
                 startAdornment: (
                   <InputAdornment position="start">
                     <Search sx={{ color: 'text.secondary', fontSize: 20 }} />
@@ -302,7 +441,7 @@ function OwnerDashboard() {
               variant="contained"
               startIcon={<PersonAdd />}
               onClick={() => navigate('/patients/register')}
-              sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+              sx={{ whiteSpace: 'nowrap', flexShrink: 0, minHeight: phone ? 44 : undefined }}
             >
               Nový pacient
             </Button>
@@ -318,13 +457,11 @@ function OwnerDashboard() {
             ) : (
               <List disablePadding>
                 {(searchResults.data ?? []).map((p) => (
-                  <ListItemButton key={p.id} onClick={() => navigate(`/patients/${p.id}`)} sx={{ gap: 1.5 }}>
-                    <Avatar sx={{ width: 34, height: 34, fontSize: 13 }}>
-                      {(p.firstName[0] ?? '') + (p.lastName[0] ?? '')}
-                    </Avatar>
+                  <ListItemButton key={p.id} onClick={() => navigate(`/patients/${p.id}`)} sx={{ gap: 1.5, minHeight: 44 }}>
+                    {avatarLead(p)}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ fontWeight: 600 }}>{p.lastName} {p.firstName}</Typography>
-                      <Typography variant="caption" color="text.secondary">nar. {czechDob(p.dateOfBirth)}</Typography>
+                      <Typography sx={{ fontSize: 15, fontWeight: 600 }}>{p.lastName} {p.firstName}</Typography>
+                      <Typography sx={rowSubtitleSx}>nar. {czechDob(p.dateOfBirth)}</Typography>
                     </Box>
                     <ArrowForward sx={{ fontSize: 18, color: 'text.disabled' }} />
                   </ListItemButton>
@@ -335,86 +472,51 @@ function OwnerDashboard() {
         )}
       </SoftCard>
 
-      {/* ── Panels ── */}
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 6, lg: 3 }}>
-          <Panel
-            title="Objednaní"
-            count={booked.length}
-            action={{ label: 'Otevřít kalendář', onClick: () => navigate('/planovani') }}
-          >
-            {booked.length === 0 ? <EmptyRow text="Na dnešek nikdo objednaný." /> : booked.map(appointmentRow)}
-          </Panel>
-        </Grid>
+      {/* ── Panels: one column on a phone and a portrait tablet, two on a landscape tablet, four on a desktop ── */}
+      <Box
+        data-layout={phone ? 'stack' : device === 'tablet' ? 'tablet' : 'four'}
+        sx={{
+          display: 'grid',
+          gap: 2,
+          gridTemplateColumns: '1fr',
+          '@media (min-width: 768px)': { gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))' },
+          '@media (min-width: 1280px)': { gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' },
+        }}
+      >
+        <Panel
+          title="Objednaní"
+          count={booked.length}
+          action={{ label: 'Otevřít kalendář', onClick: toCalendar }}
+          rows={booked.map(appointmentRow)}
+          headers={['Čas', 'Pacient', 'Stav']}
+          empty="Na dnešek nikdo objednaný."
+        />
+        <Panel
+          title="Čekárna"
+          count={waiting.length}
+          action={{ label: 'Dnešní přehled', onClick: () => navigate('/dnes') }}
+          rows={waiting.map(appointmentRow)}
+          headers={['Čas', 'Pacient', 'Stav']}
+          empty="Čekárna je prázdná."
+        />
+        <Panel
+          title="Historie"
+          action={{ label: 'Všichni pacienti', onClick: () => navigate('/patients') }}
+          rows={historyRows}
+          headers={['', 'Pacient']}
+          empty={historyEmpty}
+        />
+        <Panel
+          title="Notifikace"
+          count={alerts.length}
+          rows={alerts.map(alertRow)}
+          headers={['Čas', 'Pacient']}
+          empty="Vše vyřízeno — žádné notifikace."
+        />
+      </Box>
 
-        <Grid size={{ xs: 12, md: 6, lg: 3 }}>
-          <Panel
-            title="Čekárna"
-            count={waiting.length}
-            action={{ label: 'Dnešní přehled', onClick: () => navigate('/dnes') }}
-          >
-            {waiting.length === 0 ? <EmptyRow text="Čekárna je prázdná." /> : waiting.map(appointmentRow)}
-          </Panel>
-        </Grid>
-
-        <Grid size={{ xs: 12, md: 6, lg: 3 }}>
-          <Panel
-            title="Historie"
-            action={{ label: 'Všichni pacienti', onClick: () => navigate('/patients') }}
-          >
-            {!canSeePatients ? (
-              <EmptyRow text="Bez oprávnění zobrazit pacienty." />
-            ) : recent.isLoading ? (
-              <EmptyRow text="Načítám…" />
-            ) : (recent.data?.items ?? []).length === 0 ? (
-              <EmptyRow text="Zatím žádní pacienti." />
-            ) : (
-              <List disablePadding>
-                {(recent.data?.items ?? []).map((p, i) => (
-                  <Box key={p.id}>
-                    {i > 0 && <Divider component="li" sx={{ mx: 1.5 }} />}
-                    <ListItemButton onClick={() => navigate(`/patients/${p.id}`)} sx={{ borderRadius: 2, gap: 1.5 }}>
-                      <Avatar sx={{ width: 32, height: 32, fontSize: 13 }}>
-                        {(p.firstName[0] ?? '') + (p.lastName[0] ?? '')}
-                      </Avatar>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {p.lastName} {p.firstName}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">nar. {czechDob(p.dateOfBirth)}</Typography>
-                      </Box>
-                    </ListItemButton>
-                  </Box>
-                ))}
-              </List>
-            )}
-          </Panel>
-        </Grid>
-
-        <Grid size={{ xs: 12, md: 6, lg: 3 }}>
-          <Panel title="Notifikace" count={alerts.length}>
-            {alerts.length === 0 ? (
-              <EmptyRow text="Vše vyřízeno — žádné notifikace." />
-            ) : (
-              <List disablePadding>
-                {alerts.map((a) => (
-                  <ListItemButton key={a.id} onClick={() => navigate('/planovani')} sx={{ borderRadius: 2, mb: 0.25, gap: 1.5 }}>
-                    <StatusChip tone="beige" size="sm">{formatPragueTime(a.startUtc)}</StatusChip>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {patientName(a.patientId)}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Chybí podklady — {a.activityName}
-                      </Typography>
-                    </Box>
-                  </ListItemButton>
-                ))}
-              </List>
-            )}
-          </Panel>
-        </Grid>
-      </Grid>
+      {/* ── The main action of a phone screen is pinned at the bottom ── */}
+      {phone && <PinnedActionBar label="Hlavní akce">{openCalendar}</PinnedActionBar>}
     </Box>
   );
 }

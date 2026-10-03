@@ -7,14 +7,14 @@ import { describe, expect, it } from 'vitest';
 import { progressSubtitle, requiredFieldCount } from './progress';
 
 describe('requiredFieldCount', () => {
-  it('counts the seven fields Rychlá registrace asks for', () => {
+  it('counts the five fields (name twice, telephone, e-mail, činnost) Rychlá registrace asks for', () => {
     expect(
       requiredFieldCount({
         mode: 'Quick',
         insuranceRegistrationKind: 'CzechPublicHealthInsurance',
         residenceType: 'PermanentResidenceInCzechia',
       }),
-    ).toBe(7);
+    ).toBe(5);
   });
 
   it('asks for more in Úplná registrace than in Rychlá', () => {

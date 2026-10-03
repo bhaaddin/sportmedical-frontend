@@ -14,6 +14,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { setViewport, VIEWPORTS } from '../test/viewport';
 
 const getById = vi.fn();
 const getProfile = vi.fn();
@@ -28,6 +29,7 @@ vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } 
 const { default: PatientForm } = await import('./PatientForm');
 
 beforeEach(() => {
+  setViewport(VIEWPORTS.desktop);
   getById.mockReset().mockResolvedValue({
     id: 'p1',
     firstName: 'Jana',
@@ -120,5 +122,43 @@ describe('the insurance correction', () => {
 
     expect(screen.queryByRole('button', { name: 'Opravit pojištění' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Opravit adresu' })).toBeInTheDocument();
+  });
+});
+
+/*
+ * The three layouts (brief, rule 3): 390 / 834 / 1440. One field per row on a
+ * phone, the footer pinned above the bottom bar there, nothing hover-only.
+ */
+describe.each([
+  ['phone', VIEWPORTS.phone],
+  ['tablet', VIEWPORTS.tablet],
+  ['desktop', VIEWPORTS.desktop],
+] as const)('layout at %s', (device, width) => {
+  it('lays the fields out for the width and pins the footer on a phone only', async () => {
+    setViewport(width);
+    renderForm();
+    await screen.findByDisplayValue('Markova');
+
+    const grids = Array.from(document.querySelectorAll('[data-layout]'));
+    expect(grids.length).toBeGreaterThan(0);
+    for (const grid of grids) {
+      expect(grid.getAttribute('data-layout')).toBe(device === 'phone' ? 'single' : 'auto');
+    }
+
+    const footer = screen.getByRole('contentinfo');
+    expect(footer.getAttribute('data-pinned')).toBe(device === 'phone' ? 'true' : 'false');
+    expect(screen.getByRole('button', { name: 'Uložit a pokračovat' })).toBeInTheDocument();
+  });
+});
+
+describe('the patient cannot be loaded', () => {
+  it('says what failed and offers "Zkusit znovu"', async () => {
+    getById.mockRejectedValueOnce(new Error('500'));
+    const user = userEvent.setup();
+    renderForm();
+
+    expect(await screen.findByText('Pacienta se nepodařilo načíst.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Zkusit znovu' }));
+    expect(await screen.findByDisplayValue('Markova')).toBeInTheDocument();
   });
 });

@@ -7,10 +7,12 @@
  * money; an invoice for the same patient on the same day overrides it with
  * what was actually charged and says whether it was paid. No invoice, no
  * chip - "Nezaplaceno" is a claim, and a visit nobody invoiced is not one.
+ *
+ * Drawn as the board draws it (P-Pacient): rows of date, činnost, price, chip.
+ * The rows wrap on their own, so one markup serves a phone, an iPad and a
+ * desktop - nothing to turn into cards, nothing that scrolls sideways.
  */
-import {
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography,
-} from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import type { Invoice } from '../../api/billing';
 import { SectionLabel, SoftCard, StatusChip } from '../ui';
 import { formatCzk } from './patientActivity';
@@ -39,48 +41,52 @@ export function VisitHistoryTable({
   priceOf: (activityName: string) => number | null;
 }) {
   return (
-    <SoftCard sx={{ p: 0, overflow: 'hidden' }}>
-      <SectionLabel sx={{ px: 2.5, pt: 2.5, mb: 1 }}>Historie návštěv</SectionLabel>
+    <SoftCard>
+      <SectionLabel>Historie návštěv</SectionLabel>
       {visits.length === 0 ? (
-        <Typography variant="body2" sx={{ color: 'text.secondary', px: 2.5, pb: 2.5 }}>
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           Zatím žádná návštěva.
         </Typography>
       ) : (
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Datum</TableCell>
-                <TableCell>Činnost</TableCell>
-                <TableCell align="right">Cena</TableCell>
-                <TableCell align="right">Platba</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {visits.map((visit) => {
-                const invoice = invoiceForVisit(visit, invoices);
-                const price = invoice === null ? priceOf(visit.eventName) : invoice.totalCzk;
-                const paid = invoice === null ? null : invoice.remainingCzk <= 0;
-                return (
-                  <TableRow key={visit.id}>
-                    <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
-                      {formatPragueDate(visit.startTime)}
-                    </TableCell>
-                    <TableCell>{visit.eventName === '' ? 'Termín' : visit.eventName}</TableCell>
-                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{formatCzk(price)}</TableCell>
-                    <TableCell align="right">
-                      {paid === null ? (
-                        <Typography variant="caption" sx={{ color: 'text.disabled' }}>—</Typography>
-                      ) : (
-                        <StatusChip tone={paid ? 'green' : 'beige'}>{paid ? 'Zaplaceno' : 'Nezaplaceno'}</StatusChip>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <Box component="ol" aria-label="Historie návštěv" sx={{ listStyle: 'none', m: 0, p: 0 }}>
+          {visits.map((visit) => {
+            const invoice = invoiceForVisit(visit, invoices);
+            const price = invoice === null ? priceOf(visit.eventName) : invoice.totalCzk;
+            const paid = invoice === null ? null : invoice.remainingCzk <= 0;
+            return (
+              <Box
+                component="li"
+                key={visit.id}
+                sx={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 1.75,
+                  alignItems: 'center',
+                  py: 1.5,
+                  minHeight: 44,
+                  borderBottom: '1px solid',
+                  borderColor: 'divider',
+                  '&:last-child': { borderBottom: 0 },
+                }}
+              >
+                <Typography sx={{ fontSize: 14, fontWeight: 600, minWidth: 92, fontVariantNumeric: 'tabular-nums' }}>
+                  {formatPragueDate(visit.startTime)}
+                </Typography>
+                <Typography sx={{ fontSize: 14, flex: '999 1 160px', minWidth: 0 }}>
+                  {visit.eventName === '' ? 'Termín' : visit.eventName}
+                </Typography>
+                <Typography sx={{ fontSize: 14, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                  {formatCzk(price)}
+                </Typography>
+                {paid === null ? (
+                  <Typography variant="caption" sx={{ color: 'text.disabled' }}>—</Typography>
+                ) : (
+                  <StatusChip tone={paid ? 'green' : 'red'}>{paid ? 'Zaplaceno' : 'Nezaplaceno'}</StatusChip>
+                )}
+              </Box>
+            );
+          })}
+        </Box>
       )}
     </SoftCard>
   );

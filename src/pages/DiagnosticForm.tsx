@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Box, Typography, TextField, Button, Grid, Alert, CircularProgress, Divider,
-  InputAdornment, Stack,
+  InputAdornment, Stack, ToggleButton, ToggleButtonGroup,
 } from '@mui/material';
 import { Send, ArrowBack, ArrowForward, Check } from '@mui/icons-material';
 import { diagnosticsApi } from '../api/diagnostics';
@@ -9,6 +9,9 @@ import type { CreateSessionRequest, DiagnosticSession } from '../api/diagnostics
 import { DiagnosticFormSkeleton } from '../components/SkeletonLoader';
 import { DESIGN, PageHeader, SectionLabel, SoftCard, StatusChip, type ChipTone } from '../components/ui';
 import toast from 'react-hot-toast';
+import { PinnedActionBar } from '../components/ui/PinnedActionBar';
+import { useIsPhone } from '../layout/useDevice';
+import ManualResultsForm from './patients/ManualResultsForm';
 
 type VitalKey =
   | 'restingHeartRateBpm'
@@ -180,6 +183,10 @@ function StepStrip({ active }: { active: number }) {
 
 /* ── Main Component ── */
 export default function DiagnosticForm() {
+  const phone = useIsPhone();
+  /* Two ways to record a measurement: the guided steps, or one page typed by
+     hand from a printout (manual entry, Etapa 2). */
+  const [mode, setMode] = useState<'wizard' | 'manual'>('wizard');
   const [activeStep, setActiveStep] = useState(0);
   const [form, setForm] = useState<SessionDraft>(emptyDraft);
   const [loading, setLoading] = useState(false);
@@ -294,12 +301,46 @@ export default function DiagnosticForm() {
     );
   }
 
+  const modeToggle = (
+    <ToggleButtonGroup
+      exclusive
+      size="small"
+      value={mode}
+      onChange={(_, next: 'wizard' | 'manual' | null) => { if (next !== null) setMode(next); }}
+      aria-label="Způsob zadání"
+      sx={{ '& .MuiToggleButton-root': { minHeight: 44, px: 2 } }}
+    >
+      <ToggleButton value="wizard">Průvodce</ToggleButton>
+      <ToggleButton value="manual">Ruční zápis</ToggleButton>
+    </ToggleButtonGroup>
+  );
+
+  /* ── Manual entry: one page, typed by the doctor ── */
+  if (mode === 'manual') {
+    const urlPatient = new URLSearchParams(window.location.search).get('patientId') ?? undefined;
+    return (
+      <Box sx={{ maxWidth: 900, mx: 'auto' }}>
+        <PageHeader
+          title="Výsledky"
+          subtitle="Diagnostika a měření · ruční zápis naměřených hodnot"
+          actions={modeToggle}
+        />
+        <ManualResultsForm
+          patientId={urlPatient}
+          onSaved={(session) => setResult(session)}
+          onCancel={() => setMode('wizard')}
+        />
+      </Box>
+    );
+  }
+
   /* ── Wizard View ── */
   return (
     <Box sx={{ maxWidth: 900, mx: 'auto' }}>
       <PageHeader
         title="Výsledky"
         subtitle={`Diagnostika a měření · krok ${activeStep + 1} ze ${steps.length} — ${steps[activeStep].label}`}
+        actions={modeToggle}
       />
 
       <SoftCard sx={{ mb: 2, py: 2 }}>
@@ -446,24 +487,31 @@ export default function DiagnosticForm() {
         )}
       </SoftCard>
 
-      {/* ── Navigation Buttons ── */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-        <Button variant="outlined" startIcon={<ArrowBack />} disabled={activeStep === 0}
-          onClick={() => setActiveStep(s => s - 1)}>
-          Zpět
-        </Button>
-        {activeStep < steps.length - 1 ? (
+      {/* ── Navigation Buttons ── pinned at the bottom on a phone ── */}
+      {(() => {
+        const back = (
+          <Button variant="outlined" startIcon={<ArrowBack />} disabled={activeStep === 0}
+            onClick={() => setActiveStep(s => s - 1)} sx={{ minHeight: 44 }}>
+            Zpět
+          </Button>
+        );
+        const forward = activeStep < steps.length - 1 ? (
           <Button variant="contained" endIcon={<ArrowForward />} disabled={!canNext()}
-            onClick={() => setActiveStep(s => s + 1)}>
+            onClick={() => setActiveStep(s => s + 1)} sx={{ minHeight: 44 }}>
             Další
           </Button>
         ) : (
           <Button variant="contained" endIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Send />}
-            onClick={handleSubmit} disabled={loading || request === null}>
+            onClick={handleSubmit} disabled={loading || request === null} sx={{ minHeight: 44 }}>
             {loading ? 'Odesílám...' : 'Odeslat relaci'}
           </Button>
-        )}
-      </Box>
+        );
+        return phone ? (
+          <PinnedActionBar label="Další krok">{back}{forward}</PinnedActionBar>
+        ) : (
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>{back}{forward}</Box>
+        );
+      })()}
     </Box>
   );
 }

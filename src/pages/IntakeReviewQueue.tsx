@@ -15,10 +15,6 @@ import {
   Box,
   Button,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Divider,
   Stack,
   TextField,
@@ -29,6 +25,9 @@ import { Link as RouterLink } from 'react-router-dom';
 import { formatDateOnly } from '../utils/time';
 import { usePermission } from '../auth/usePermission';
 import { PageHeader, SoftCard, StatusChip } from '../components/ui';
+import { FormDialog } from './sports/FormDialog';
+import { LoadError, PageSkeleton } from './sports/LoadStates';
+import { useTouchSx } from './sports/touch';
 import {
   IntakeOutcome,
   IntakeResolution,
@@ -52,6 +51,10 @@ export default function IntakeReviewQueue() {
   const [entries, setEntries] = useState<IntakeQueueEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /* The queue itself could not be read. Kept apart from `error` (a refused
+     action): "Fronta je prázdná" must never be shown when nobody could ask. */
+  const [loadFailed, setLoadFailed] = useState(false);
+  const touch = useTouchSx();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<IntakeQueueEntry | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -84,13 +87,14 @@ export default function IntakeReviewQueue() {
     }
   };
 
-  const load = useCallback(async (): Promise<void> => {
+  const load = useCallback(async (keepError = false): Promise<void> => {
     setLoading(true);
-    setError(null);
+    setLoadFailed(false);
+    if (!keepError) setError(null);
     try {
       setEntries(await fetchIntakeQueue());
     } catch {
-      setError('Frontu se nepodařilo načíst. Zkuste to prosím znovu.');
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -133,31 +137,27 @@ export default function IntakeReviewQueue() {
           ? 'Údaje se mezitím změnily, takže akci nelze provést. Frontu jsem načetl znovu — zkontrolujte prosím záznam ještě jednou.'
           : 'Akci se nepodařilo provést. Zkuste to prosím znovu.',
       );
-      if (isStaleResolution(caught)) void load();
+      if (isStaleResolution(caught)) void load(true);
     } finally {
       setBusyId(null);
     }
   };
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
 
   return (
     <Box>
       <PageHeader
         title="Fronta ke kontrole"
         subtitle={
-          entries.length === 0
+          loading
+            ? 'Načítání…'
+            : loadFailed
+              ? 'Frontu se nepodařilo načíst.'
+              : entries.length === 0
             ? 'Nic nečeká na kontrolu.'
             : `${entries.length} ${entries.length === 1 ? 'záznam čeká' : 'záznamů čeká'} na rozhodnutí.`
         }
         actions={
-          <Button variant="outlined" startIcon={<Refresh />} onClick={() => void load()}>
+          <Button variant="outlined" startIcon={<Refresh />} onClick={() => void load()} disabled={loading} sx={touch}>
             Načíst znovu
           </Button>
         }
@@ -169,7 +169,11 @@ export default function IntakeReviewQueue() {
         </Alert>
       )}
 
-      {entries.length === 0 ? (
+      {loading ? (
+        <PageSkeleton rows={3} />
+      ) : loadFailed ? (
+        <LoadError what="Frontu ke kontrole" onRetry={() => void load()} />
+      ) : entries.length === 0 ? (
         <SoftCard sx={{ p: 6, textAlign: 'center' }}>
           <StatusChip tone="green" dot sx={{ mb: 1.5 }}>Vše vyřízeno</StatusChip>
           <Typography sx={{ fontSize: 17, fontWeight: 700 }}>
@@ -182,8 +186,8 @@ export default function IntakeReviewQueue() {
       ) : (
         entries.map((entry) => (
           <SoftCard key={entry.intakeId} sx={{ p: { xs: 2, sm: 2.5 }, mb: 2 }}>
-            <Stack direction="row" sx={{ alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
-              <Typography sx={{ fontSize: 17, fontWeight: 700 }}>
+            <Stack direction="row" sx={{ alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 2 }} data-intake-head>
+              <Typography sx={{ fontSize: 18, fontWeight: 700 }}>
                 {entry.givenName} {entry.familyName}
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
@@ -240,7 +244,7 @@ export default function IntakeReviewQueue() {
               looked, or somebody creates a duplicate believing it was checked.
             */}
             <Box sx={{ mb: 2 }}>
-              <Button size="small" onClick={() => void openEntry(entry)}>
+              <Button size="small" onClick={() => void openEntry(entry)} sx={{ ...touch, width: { xs: '100%', md: 'auto' } }}>
                 {openId === entry.intakeId
                   ? 'Skrýt možné shody'
                   : entry.topScore > 0
@@ -289,6 +293,7 @@ export default function IntakeReviewQueue() {
                     {maySeePatients && (
                       <Button
                         size="small"
+                        sx={touch}
                         component={RouterLink}
                         to={`/patients/${candidate.patientId}`}
                         target="_blank"
@@ -300,9 +305,10 @@ export default function IntakeReviewQueue() {
 
                   <SignalSummary signals={candidate.signals} />
 
-                  <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexDirection: { xs: 'column', md: 'row' } }}>
                     <Button
                       size="small"
+                      sx={touch}
                       variant="contained"
                       disabled={busyId === entry.intakeId}
                       onClick={() => {
@@ -318,9 +324,10 @@ export default function IntakeReviewQueue() {
             )}
 
             <Divider sx={{ mb: 2 }} />
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', gap: 1, flexDirection: { xs: 'column', md: 'row' } }}>
               <Button
                 size="small"
+                sx={touch}
                 variant="outlined"
                 startIcon={<PersonAdd />}
                 disabled={busyId === entry.intakeId}
@@ -330,6 +337,7 @@ export default function IntakeReviewQueue() {
               </Button>
               <Button
                 size="small"
+                sx={touch}
                 variant="outlined"
                 color="error"
                 startIcon={<Block />}
@@ -349,25 +357,12 @@ export default function IntakeReviewQueue() {
       {/* Rejection is the one action that destroys a patient's submission, so
           it asks for a reason. Every resolution is audited; this one needs the
           "why" to be readable a year later. */}
-      <Dialog open={merging !== null} onClose={() => setMerging(null)} fullWidth maxWidth="sm">
-        <DialogTitle>Sloučit s pacientem</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Dotazník se připojí ke stávajícímu pacientovi. Důvod se uloží do
-            auditu spolu s vaším jménem a časem.
-          </Typography>
-          <TextField
-            fullWidth
-            multiline
-            minRows={3}
-            autoFocus
-            label="Důvod sloučení"
-            placeholder="Např. shoduje se rodné číslo i telefon, ověřeno u pacienta."
-            value={mergeReason}
-            onChange={(event) => setMergeReason(event.target.value)}
-          />
-        </DialogContent>
-        <DialogActions>
+      <FormDialog
+        open={merging !== null}
+        onClose={() => setMerging(null)}
+        title="Sloučit s pacientem"
+        actions={
+          <>
           <Button onClick={() => setMerging(null)}>Zrušit</Button>
           <Button
             variant="contained"
@@ -382,27 +377,31 @@ export default function IntakeReviewQueue() {
           >
             Sloučit
           </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={rejecting !== null} onClose={() => setRejecting(null)} fullWidth maxWidth="sm">
-        <DialogTitle>Zamítnout dotazník</DialogTitle>
-        <DialogContent>
+          </>
+        }
+      >
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Důvod se uloží do auditu spolu s vaším jménem a časem.
+            Dotazník se připojí ke stávajícímu pacientovi. Důvod se uloží do
+            auditu spolu s vaším jménem a časem.
           </Typography>
           <TextField
             fullWidth
             multiline
             minRows={3}
             autoFocus
-            label="Důvod zamítnutí"
-            value={rejectReason}
-            onChange={(event) => setRejectReason(event.target.value)}
-            placeholder="Například: testovací odeslání, duplicitní žádost…"
+            label="Důvod sloučení"
+            placeholder="Např. shoduje se rodné číslo i telefon, ověřeno u pacienta."
+            value={mergeReason}
+            onChange={(event) => setMergeReason(event.target.value)}
           />
-        </DialogContent>
-        <DialogActions>
+      </FormDialog>
+
+      <FormDialog
+        open={rejecting !== null}
+        onClose={() => setRejecting(null)}
+        title="Zamítnout dotazník"
+        actions={
+          <>
           <Button onClick={() => setRejecting(null)}>Zpět</Button>
           <Button
             color="error"
@@ -418,8 +417,23 @@ export default function IntakeReviewQueue() {
           >
             Zamítnout
           </Button>
-        </DialogActions>
-      </Dialog>
+          </>
+        }
+      >
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Důvod se uloží do auditu spolu s vaším jménem a časem.
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            minRows={3}
+            autoFocus
+            label="Důvod zamítnutí"
+            value={rejectReason}
+            onChange={(event) => setRejectReason(event.target.value)}
+            placeholder="Například: testovací odeslání, duplicitní žádost…"
+          />
+      </FormDialog>
     </Box>
   );
 }

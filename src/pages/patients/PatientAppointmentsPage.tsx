@@ -13,15 +13,21 @@
  * activity's type by reading its Czech name and defaulted when it did not
  * recognise one. Drawing any of the three would be furniture, or worse, a
  * label that is quietly wrong. `eventName` holds the real activity.
+ *
+ * Three layouts: a card per appointment on a phone (with "Objednat" pinned at
+ * the bottom), three columns on an iPad, the full table on a desktop.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import {
-  Alert, Box, Button, CircularProgress, Stack, Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, Typography,
+  Alert, Box, Button, CircularProgress, Stack, Typography,
 } from '@mui/material';
-import { SectionLabel, SoftCard, StatusChip } from '../../components/ui';
+import { SectionLabel, StatusChip } from '../../components/ui';
 import type { ChipTone } from '../../components/ui';
+import { ResponsiveDataList } from '../../components/ui/ResponsiveDataList';
+import type { DataColumn } from '../../components/ui/ResponsiveDataList';
+import { PinnedActionBar } from '../../components/ui/PinnedActionBar';
+import { useIsPhone } from '../../layout/useDevice';
 import { fetchAllAppointments } from '../../components/patients/appointmentsSource';
 import { isCancelled as cancelledOrNoShow, shortDay } from '../../components/patients/patientActivity';
 import type { PatientAppointment } from '../../components/patients/patientActivity';
@@ -85,58 +91,91 @@ export function splitAppointments(
   return { upcoming, past };
 }
 
-function AppointmentRows({ appointments }: { appointments: PatientAppointment[] }) {
+const statusOf = (appointment: PatientAppointment) => ({
+  text: APPOINTMENT_STATUS_LABEL[appointment.status] ?? appointment.status,
+  tone: STATUS_TONE[appointment.status] ?? ('grey' as ChipTone),
+});
+
+const yearOf = (appointment: PatientAppointment) =>
+  formatPragueDate(appointment.startTime).replace(/^.*?(\d{4})$/, '$1');
+
+function WhatCell({ appointment }: { appointment: PatientAppointment }) {
   return (
-    <TableContainer>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>Datum</TableCell>
-            <TableCell>Čas</TableCell>
-            <TableCell>Činnost</TableCell>
-            <TableCell align="right">Stav</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {appointments.map((appointment) => {
-            const label = APPOINTMENT_STATUS_LABEL[appointment.status] ?? appointment.status;
-            const tone = STATUS_TONE[appointment.status] ?? 'grey';
-            return (
-              <TableRow key={appointment.id}>
-                <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 700 }}>
-                  {shortDay(appointment.startTime)}
-                  <Typography component="span" variant="caption" sx={{ color: 'text.secondary', ml: 0.75 }}>
-                    {formatPragueDate(appointment.startTime).replace(/^.*?(\d{4})$/, '$1')}
-                  </Typography>
-                </TableCell>
-                <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                  {formatPragueTime(appointment.startTime)} – {formatPragueTime(appointment.endTime)}
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {appointment.eventName === '' ? 'Termín' : appointment.eventName}
-                  </Typography>
-                  {appointment.notes !== '' && (
-                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                      {appointment.notes}
-                    </Typography>
-                  )}
-                </TableCell>
-                <TableCell align="right">
-                  <StatusChip tone={tone}>{label}</StatusChip>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </TableContainer>
+    <>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+        {appointment.eventName === '' ? 'Termín' : appointment.eventName}
+      </Typography>
+      {appointment.notes !== '' && (
+        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+          {appointment.notes}
+        </Typography>
+      )}
+    </>
+  );
+}
+
+const COLUMNS: DataColumn<PatientAppointment>[] = [
+  {
+    key: 'date',
+    header: 'Datum',
+    tablet: true,
+    cell: (a) => (
+      <Box sx={{ whiteSpace: 'nowrap', fontWeight: 700 }}>
+        {shortDay(a.startTime)}
+        <Typography component="span" variant="caption" sx={{ color: 'text.secondary', ml: 0.75 }}>
+          {yearOf(a)}
+        </Typography>
+      </Box>
+    ),
+  },
+  {
+    key: 'time',
+    header: 'Čas',
+    cell: (a) => (
+      <Box sx={{ whiteSpace: 'nowrap' }}>
+        {formatPragueTime(a.startTime)} – {formatPragueTime(a.endTime)}
+      </Box>
+    ),
+  },
+  { key: 'what', header: 'Činnost', tablet: true, cell: (a) => <WhatCell appointment={a} /> },
+  {
+    key: 'status',
+    header: 'Stav',
+    align: 'right',
+    tablet: true,
+    cell: (a) => <StatusChip tone={statusOf(a).tone}>{statusOf(a).text}</StatusChip>,
+  },
+];
+
+function AppointmentRows({ appointments, label }: { appointments: PatientAppointment[]; label: string }) {
+  return (
+    <ResponsiveDataList
+      rows={appointments}
+      rowKey={(a) => a.id}
+      columns={COLUMNS}
+      ariaLabel={label}
+      renderCard={(a) => (
+        <Stack spacing={0.5}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography sx={{ fontSize: 15, fontWeight: 700 }}>
+              {shortDay(a.startTime)} {yearOf(a)}
+            </Typography>
+            <StatusChip tone={statusOf(a).tone}>{statusOf(a).text}</StatusChip>
+          </Stack>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            {formatPragueTime(a.startTime)} – {formatPragueTime(a.endTime)}
+          </Typography>
+          <WhatCell appointment={a} />
+        </Stack>
+      )}
+    />
   );
 }
 
 export default function PatientAppointmentsPage() {
   const { patient } = useOutletContext<PatientContext>();
   const navigate = useNavigate();
+  const phone = useIsPhone();
   const [all, setAll] = useState<PatientAppointment[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -182,48 +221,52 @@ export default function PatientAppointmentsPage() {
     );
   }
 
+  /* The calendar opens its booking drawer on `newAppointment`, for this
+     patient. On a phone it is the screen's main action and is pinned. */
+  const book = (
+    <Button
+      variant="contained"
+      onClick={() => navigate('/planovani', { state: { newAppointment: Date.now(), patientId: patient.id } })}
+      sx={{ minHeight: 44 }}
+    >
+      Objednat
+    </Button>
+  );
+
   return (
     <Stack spacing={2.5}>
-      <SoftCard sx={{ p: 0, overflow: 'hidden' }}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', px: 2.5, pt: 2.5, pb: 1.5 }}>
+      <Box>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
           <SectionLabel sx={{ mb: 0 }}>Nadcházející termíny</SectionLabel>
           <Box sx={{ flex: 1 }} />
-          {/* The calendar opens its booking drawer on `newAppointment`, for
-              this patient. */}
-          <Button
-            size="small"
-            variant="contained"
-            onClick={() => navigate('/planovani', { state: { newAppointment: Date.now(), patientId: patient.id } })}
-          >
-            Objednat
-          </Button>
+          {!phone && book}
         </Stack>
 
         {upcoming.length === 0 ? (
-          <Typography variant="body2" sx={{ color: 'text.secondary', px: 2.5, pb: 2.5 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             {patient.firstName} nemá objednaný žádný termín.
           </Typography>
         ) : (
-          <AppointmentRows appointments={upcoming} />
+          <AppointmentRows appointments={upcoming} label="Nadcházející termíny" />
         )}
-      </SoftCard>
+      </Box>
 
-      <SoftCard sx={{ p: 0, overflow: 'hidden' }}>
-        <Box sx={{ px: 2.5, pt: 2.5, pb: 1.5 }}>
-          <SectionLabel sx={{ mb: 0.25 }}>Historie</SectionLabel>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Proběhlé a zrušené termíny, od nejnovějšího.
-          </Typography>
-        </Box>
+      <Box>
+        <SectionLabel sx={{ mb: 0.25 }}>Historie</SectionLabel>
+        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1.5 }}>
+          Proběhlé a zrušené termíny, od nejnovějšího.
+        </Typography>
 
         {past.length === 0 ? (
-          <Typography variant="body2" sx={{ color: 'text.secondary', px: 2.5, pb: 2.5 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             Zatím tu žádný termín není.
           </Typography>
         ) : (
-          <AppointmentRows appointments={past} />
+          <AppointmentRows appointments={past} label="Historie termínů" />
         )}
-      </SoftCard>
+      </Box>
+
+      {phone && <PinnedActionBar label="Objednat termín">{book}</PinnedActionBar>}
     </Stack>
   );
 }
