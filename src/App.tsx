@@ -42,6 +42,7 @@ const ManageBooking = lazy(() => import('./pages/public/ManageBooking'));
 const PatientPortal = lazy(() => import('./pages/public/PatientPortal'));
 const PatientSignIn = lazy(() => import('./pages/public/PatientSignIn'));
 const ClubRegistration = lazy(() => import('./pages/public/ClubRegistration'));
+const ClubOrderForm = lazy(() => import('./pages/public/ClubOrderForm'));
 const FeedbackPage = lazy(() => import('./pages/public/FeedbackPage'));
 const FeedbackReviewPage = lazy(() => import('./pages/FeedbackReviewPage'));
 const IntakeReviewQueue = lazy(() => import('./pages/IntakeReviewQueue'));
@@ -110,6 +111,11 @@ const EmployeeAbsencesPage = lazy(() => import('./pages/booking/EmployeeAbsences
 const AppointmentLinkPage = lazy(() => import('./pages/booking/AppointmentLinkPage'));
 const CashierPage = lazy(() => import('./pages/CashierPage'));
 const ClubsPage = lazy(() => import('./pages/ClubsPage'));
+const ClubOrdersPage = lazy(() => import('./pages/clubs/orders/ClubOrdersPage'));
+const ClubReservationsPage = lazy(() => import('./pages/clubs/ClubReservationsPage'));
+const ClubPlayersPage = lazy(() => import('./pages/clubs/ClubPlayersPage'));
+const ClubStatsPage = lazy(() => import('./pages/clubs/ClubStatsPage'));
+const ClubBillingPage = lazy(() => import('./pages/clubs/ClubBillingPage'));
 const AccountingExportPage = lazy(() => import('./pages/AccountingExportPage'));
 /* "Statistics for everything in one place" - under Výsledky in the rail. */
 const StatisticsPage = lazy(() => import('./pages/Statistics'));
@@ -449,6 +455,7 @@ export default function App() {
                 what the confirmation's button did until this route existed. */}
             <Route path="/rezervace/:token" element={<Suspense fallback={<PageLoader />}><ManageBooking /></Suspense>} />
             <Route path="/klub/:token" element={<Suspense fallback={<PageLoader />}><ClubRegistration /></Suspense>} />
+            <Route path="/klub-objednavka/:token" element={<Suspense fallback={<PageLoader />}><ClubOrderForm /></Suspense>} />
             <Route path="/hodnoceni/:token" element={<Suspense fallback={<PageLoader />}><FeedbackPage /></Suspense>} />
             {/* Patient portal. Anonymous like the links above: the personal access
                 token IS the identity, resolving to one patient's own dashboard. */}
@@ -505,6 +512,11 @@ export default function App() {
                     <Route path="/statistiky" element={<StatisticsPage />} />
                     <Route path="/cashier" element={<RequirePermission of="billing.manage"><CashierPage /></RequirePermission>} />
                     <Route path="/clubs" element={<ClubsPage />} />
+                    <Route path="/clubs/objednavky" element={<ClubOrdersPage />} />
+                    <Route path="/clubs/rezervace" element={<ClubReservationsPage />} />
+                    <Route path="/clubs/hraci" element={<ClubPlayersPage />} />
+                    <Route path="/clubs/statistiky" element={<ClubStatsPage />} />
+                    <Route path="/clubs/fakturace" element={<ClubBillingPage />} />
                     <Route path="/accounting-export" element={<RequirePermission of="billing.manage"><AccountingExportPage /></RequirePermission>} />
                     <Route path="/intake-review" element={<RequirePermission of="patients.register"><IntakeReviewQueue /></RequirePermission>} />
                     <Route path="/planovani" element={<BookingGridPage />} />

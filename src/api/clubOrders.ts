@@ -1,0 +1,331 @@
+/* ══════════════════════════════════════════════════════════════
+   KLUBOVÉ OBJEDNÁVKY (club orders) — the shared API module (Etapa 4, contract C-O in docs/etapa4/BRIEF.md)
+
+   Types and calls for the staff endpoints under /api/v1/club-orders and the club summary / stats. Readers are
+   TOLERANT: an absent field reads as empty, an unknown status as 'Requested', so a screen never white-screens
+   because the server has not shipped a field yet. Nothing here knows a price, a day count or a clinic name.
+   ══════════════════════════════════════════════════════════════ */
+
+import client from './client';
+import type { ClubBlockView } from './clubBlocks';
+
+export type ClubOrderStatus = 'Invited' | 'Requested' | 'Confirmed' | 'Completed' | 'Cancelled';
+export type PaymentMethod = 'ClubInvoice' | 'PerPerson';
+
+export const ORDER_STATUSES: readonly ClubOrderStatus[] = ['Invited', 'Requested', 'Confirmed', 'Completed', 'Cancelled'];
+
+/** One term the club asked for or the desk confirmed. Dates yyyy-MM-dd, times HH:mm. */
+export interface OrderRange {
+  fromDate: string;
+  toDate: string;
+  dailyFrom?: string | null;
+  dailyTo?: string | null;
+}
+
+export interface OrderActivitySeats {
+  activityId: string;
+  activityName: string;
+  durationMinutes: number;
+  seats: number;
+  registered: number;
+  unitPriceCzk: number | null;
+}
+
+export interface OrderDiscount {
+  kind: string;
+  label: string;
+  percent: number;
+  amountCzk: number;
+}
+
+export interface OrderPriceQuote {
+  listTotalCzk: number;
+  discounts: OrderDiscount[];
+  totalCzk: number;
+}
+
+export interface OrderContact {
+  name: string;
+  phone: string;
+  email: string;
+}
+
+export interface OrderHistoryItem {
+  atUtc: string;
+  user: string;
+  text: string;
+}
+
+export interface ClubOrderView {
+  id: string;
+  clubId: string;
+  clubName: string;
+  clubColorHex: string | null;
+  serviceId: string | null;
+  serviceName: string;
+  status: ClubOrderStatus;
+  paymentMethod: PaymentMethod | null;
+  activitySeats: OrderActivitySeats[];
+  totalSeats: number;
+  registered: number;
+  priceQuote: OrderPriceQuote | null;
+  requestedRanges: OrderRange[];
+  blocks: ClubBlockView[];
+  note: string;
+  contact: OrderContact | null;
+  formToken: string;
+  formUrl: string;
+  registrationToken: string;
+  registrationUrl: string;
+  releaseDaysBefore: number | null;
+  effectiveReleaseDaysBefore: number | null;
+  createdBy: 'Staff' | 'Club';
+  createdAtUtc: string;
+  submittedAtUtc: string | null;
+  confirmedAtUtc: string | null;
+  history: OrderHistoryItem[];
+}
+
+/** What the desk sends to create an order directly (phone order, "chytrá zkratka"). */
+export interface StaffOrderInput {
+  clubId: string;
+  serviceId: string;
+  activitySeats: { activityId: string; seats: number }[];
+  paymentMethod: PaymentMethod | null;
+  ranges: OrderRange[];
+  calendarIds: string[];
+  status: 'Confirmed' | 'Requested';
+  note?: string;
+  releaseDaysBefore?: number | null;
+}
+
+export interface OrderUpdateInput {
+  activitySeats?: { activityId: string; seats: number }[];
+  paymentMethod?: PaymentMethod | null;
+  ranges?: OrderRange[];
+  calendarIds?: string[];
+  note?: string;
+  releaseDaysBefore?: number | null;
+}
+
+export interface ProposalInput {
+  serviceId: string;
+  activitySeats: { activityId: string; seats: number }[];
+  calendarIds: string[];
+  startDate: string;
+  startTime?: string;
+  daysOfWeek?: number[];
+  weeks?: number;
+}
+
+export interface OrderAnalysis {
+  totalSeats: number;
+  totalNeededMinutes: number;
+  availableMinutes: number;
+  remainingMinutes: number;
+  fits: boolean;
+  capacityNote: string | null;
+  perActivity: {
+    activityId: string;
+    name: string;
+    seats: number;
+    minutesPerSeat: number;
+    parallelCapacity: number;
+    neededMinutes: number;
+    maxSeatsInWindowsAlone: number;
+  }[];
+  byRange: { fromDate: string; toDate: string; dailyFrom: string | null; dailyTo: string | null; availableMinutes: number }[];
+}
+
+export interface ClubSummary {
+  clubId: string;
+  clubName?: string;
+  totalSeats: number;
+  registered: number;
+  remaining: number;
+  byService: { serviceId: string; serviceName: string; seats: number; registered: number }[];
+  byActivity: { activityId: string; activityName: string; serviceName: string; seats: number; registered: number; remaining: number }[];
+  ordersByStatus: Record<ClubOrderStatus, number>;
+  bookedMinutes: number;
+  usedMinutes: number;
+}
+
+export interface ClubOrderStats {
+  totals: ClubSummary;
+  byClub: ClubSummary[];
+  byService: ClubSummary['byService'];
+  byActivity: ClubSummary['byActivity'];
+}
+
+/** A refusal that names the athletes it would hit (409), like the block endpoints. */
+export class ClubOrderError extends Error {
+  readonly status: number | undefined;
+  readonly code: string | undefined;
+  readonly affectedAthletes: { id?: string; name: string; activityName?: string; startUtc?: string }[];
+  readonly fieldErrors: Record<string, string[]>;
+  constructor(message: string, status?: number, code?: string, affected: ClubOrderError['affectedAthletes'] = [], fields: Record<string, string[]> = {}) {
+    super(message);
+    this.name = 'ClubOrderError';
+    this.status = status;
+    this.code = code;
+    this.affectedAthletes = affected;
+    this.fieldErrors = fields;
+  }
+}
+
+const num = (v: unknown, fallback = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback);
+const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+const rec = (v: unknown): Record<string, unknown> => (v !== null && typeof v === 'object' ? (v as Record<string, unknown>) : {});
+
+const statusOf = (v: unknown): ClubOrderStatus => (ORDER_STATUSES.includes(v as ClubOrderStatus) ? (v as ClubOrderStatus) : 'Requested');
+
+export function toRange(raw: unknown): OrderRange {
+  const r = rec(raw);
+  return {
+    fromDate: str(r.fromDate),
+    toDate: str(r.toDate, str(r.fromDate)),
+    dailyFrom: typeof r.dailyFrom === 'string' && r.dailyFrom !== '' ? r.dailyFrom : null,
+    dailyTo: typeof r.dailyTo === 'string' && r.dailyTo !== '' ? r.dailyTo : null,
+  };
+}
+
+export function toOrder(raw: unknown): ClubOrderView {
+  const o = rec(raw);
+  const quote = o.priceQuote === null || o.priceQuote === undefined ? null : rec(o.priceQuote);
+  const contact = o.contact === null || o.contact === undefined ? null : rec(o.contact);
+  return {
+    id: str(o.id),
+    clubId: str(o.clubId),
+    clubName: str(o.clubName),
+    clubColorHex: typeof o.clubColorHex === 'string' ? o.clubColorHex : null,
+    serviceId: typeof o.serviceId === 'string' ? o.serviceId : null,
+    serviceName: str(o.serviceName),
+    status: statusOf(o.status),
+    paymentMethod: o.paymentMethod === 'ClubInvoice' || o.paymentMethod === 'PerPerson' ? o.paymentMethod : null,
+    activitySeats: arr<unknown>(o.activitySeats).map((s) => {
+      const x = rec(s);
+      return {
+        activityId: str(x.activityId),
+        activityName: str(x.activityName),
+        durationMinutes: num(x.durationMinutes),
+        seats: num(x.seats),
+        registered: num(x.registered),
+        unitPriceCzk: typeof x.unitPriceCzk === 'number' ? x.unitPriceCzk : null,
+      };
+    }),
+    totalSeats: num(o.totalSeats),
+    registered: num(o.registered),
+    priceQuote: quote === null
+      ? null
+      : {
+          listTotalCzk: num(quote.listTotalCzk),
+          discounts: arr<unknown>(quote.discounts).map((d) => {
+            const x = rec(d);
+            return { kind: str(x.kind), label: str(x.label), percent: num(x.percent), amountCzk: num(x.amountCzk) };
+          }),
+          totalCzk: num(quote.totalCzk),
+        },
+    requestedRanges: arr<unknown>(o.requestedRanges).map(toRange),
+    blocks: arr<ClubBlockView>(o.blocks),
+    note: str(o.note),
+    contact: contact === null ? null : { name: str(contact.name), phone: str(contact.phone), email: str(contact.email) },
+    formToken: str(o.formToken),
+    formUrl: str(o.formUrl),
+    registrationToken: str(o.registrationToken),
+    registrationUrl: str(o.registrationUrl),
+    releaseDaysBefore: typeof o.releaseDaysBefore === 'number' ? o.releaseDaysBefore : null,
+    effectiveReleaseDaysBefore: typeof o.effectiveReleaseDaysBefore === 'number' ? o.effectiveReleaseDaysBefore : null,
+    createdBy: o.createdBy === 'Club' ? 'Club' : 'Staff',
+    createdAtUtc: str(o.createdAtUtc),
+    submittedAtUtc: typeof o.submittedAtUtc === 'string' ? o.submittedAtUtc : null,
+    confirmedAtUtc: typeof o.confirmedAtUtc === 'string' ? o.confirmedAtUtc : null,
+    history: arr<unknown>(o.history).map((h) => {
+      const x = rec(h);
+      return { atUtc: str(x.atUtc), user: str(x.user), text: str(x.text) };
+    }),
+  };
+}
+
+/** The server wraps some answers in `{ success, data }`; accept both. */
+const unwrap = (body: unknown): unknown => {
+  const b = rec(body);
+  return 'data' in b && !('id' in b) ? b.data : body;
+};
+
+function toError(error: unknown): ClubOrderError {
+  const response = (error as { response?: { status?: number; data?: unknown } } | null)?.response;
+  const data = rec(response?.data);
+  const message = typeof data.message === 'string' && data.message.trim() !== '' ? data.message.trim() : 'Požadavek se nepodařilo dokončit.';
+  const affected = arr<unknown>(data.affectedAthletes).map((a) => {
+    const x = rec(a);
+    return { id: typeof x.id === 'string' ? x.id : undefined, name: str(x.name), activityName: typeof x.activityName === 'string' ? x.activityName : undefined, startUtc: typeof x.startUtc === 'string' ? x.startUtc : undefined };
+  });
+  const errors = rec(data.errors);
+  const fields: Record<string, string[]> = {};
+  for (const [k, v] of Object.entries(errors)) fields[k] = arr<string>(v).filter((s) => typeof s === 'string');
+  return new ClubOrderError(message, response?.status, typeof data.code === 'string' ? data.code : undefined, affected, fields);
+}
+
+async function call<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    throw toError(error);
+  }
+}
+
+const BASE = '/api/v1/club-orders';
+
+export const clubOrdersApi = {
+  /** Creates an order in status Invited and returns it with its form link (nothing is e-mailed). */
+  invite: (input: { clubId: string; serviceId?: string; note?: string }): Promise<ClubOrderView> =>
+    call(async () => toOrder(unwrap((await client.post(BASE, input)).data))),
+
+  /** A phone order or the calendar shortcut: Confirmed creates the blocks atomically. */
+  createStaff: (input: StaffOrderInput): Promise<ClubOrderView> =>
+    call(async () => toOrder(unwrap((await client.post(`${BASE}/staff`, input)).data))),
+
+  list: (filter: { clubId?: string; status?: ClubOrderStatus; from?: string; to?: string } = {}): Promise<ClubOrderView[]> =>
+    call(async () => {
+      const body = unwrap((await client.get(BASE, { params: filter })).data);
+      return arr<unknown>(body).map(toOrder);
+    }),
+
+  get: (id: string): Promise<ClubOrderView> => call(async () => toOrder(unwrap((await client.get(`${BASE}/${id}`)).data))),
+
+  update: (id: string, input: OrderUpdateInput, cancelAffectedAthletes = false): Promise<ClubOrderView> =>
+    call(async () => toOrder(unwrap((await client.put(`${BASE}/${id}`, input, { params: cancelAffectedAthletes ? { cancelAffectedAthletes: true } : undefined })).data))),
+
+  confirm: (id: string, input: { calendarIds: string[]; ranges: OrderRange[] }): Promise<ClubOrderView> =>
+    call(async () => toOrder(unwrap((await client.post(`${BASE}/${id}/confirm`, input)).data))),
+
+  cancel: (id: string, cancelAthletes = false): Promise<ClubOrderView> =>
+    call(async () => toOrder(unwrap((await client.post(`${BASE}/${id}/cancel`, null, { params: { cancelAthletes } })).data))),
+
+  /** The automatic suggestion; the user edits the ranges afterwards. */
+  proposal: (input: ProposalInput): Promise<{ ranges: OrderRange[]; analysis: OrderAnalysis | null }> =>
+    call(async () => {
+      const body = rec(unwrap((await client.post(`${BASE}/proposal`, input)).data));
+      return { ranges: arr<unknown>(body.ranges).map(toRange), analysis: body.analysis ? (body.analysis as OrderAnalysis) : null };
+    }),
+
+  clubSummary: (clubId: string): Promise<ClubSummary> =>
+    call(async () => unwrap((await client.get(`/api/v1/clubs/${clubId}/summary`)).data) as ClubSummary),
+
+  stats: (range: { from?: string; to?: string } = {}): Promise<ClubOrderStats> =>
+    call(async () => unwrap((await client.get(`${BASE}/stats`, { params: range })).data) as ClubOrderStats),
+};
+
+export const ORDER_STATUS_LABEL: Record<ClubOrderStatus, string> = {
+  Invited: 'Čeká na formulář',
+  Requested: 'Odesláno klubem',
+  Confirmed: 'Potvrzeno',
+  Completed: 'Dokončeno',
+  Cancelled: 'Zrušeno',
+};
+
+export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  ClubInvoice: 'Faktura klubu',
+  PerPerson: 'Platí jednotlivé osoby',
+};
