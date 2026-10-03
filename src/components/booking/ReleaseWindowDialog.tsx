@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useIsPhone } from "../../layout/useDevice";
 import { partnerOrdersApi } from "../../api/partnerOrders";
 import type { PartnerOrder, PartnerWindow } from "../../api/bookingContracts";
 import { formatDateOnly } from "../../utils/time";
@@ -47,6 +48,7 @@ export function ReleaseWindowDialog({
   onReleased: () => void;
 }) {
   const { t } = useTranslation();
+  const phone = useIsPhone();
   const [toPublic, setToPublic] = useState(false);
   const [toPartners, setToPartners] = useState<Set<string>>(new Set());
 
@@ -71,7 +73,7 @@ export function ReleaseWindowDialog({
     });
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" fullScreen={phone}>
       <DialogTitle>{t("booking.partner.releaseTitle")}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>

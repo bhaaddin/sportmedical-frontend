@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Avatar,
@@ -57,6 +57,15 @@ import { AvailabilityPanel } from "./AvailabilityPicker";
 import { errorText } from "./errorText";
 import { PortalLinkButton } from "./patient/PortalLinkButton";
 import { usePermission } from "../../auth/usePermission";
+import { useCompletionLink } from "./quick/useCompletionLink";
+import { QuickPendingCard } from "./quick/QuickPendingCard";
+import { formatDeadline } from "./quick/quickBooking";
+import {
+  DockedBar,
+  dialogFrameProps,
+  useDetailLayout,
+  type DetailLayout,
+} from "./AppointmentDetail.layout";
 import {
   STATUS,
   draftFrom,
@@ -67,6 +76,7 @@ import {
   formatWallClock,
   initials,
   isOfferedStart,
+  LEGAL_CONSENTS_TEXT,
   PAPERWORK_STATE_LABEL,
   PAPERWORK_STATE_TONE,
   paperworkRows,
@@ -147,16 +157,13 @@ export function AppointmentDetail({
     enabled: open,
   });
 
+  const layout = useDetailLayout();
+
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      fullWidth
-      maxWidth="md"
-      slotProps={{ paper: { sx: { overflow: "hidden" } } }}
-    >
+    <Dialog open={open} onClose={onClose} {...dialogFrameProps(layout)}>
       {detailQuery.data ? (
         <DetailBody
+          layout={layout}
           appointment={detailQuery.data}
           activities={activitiesQuery.data?.activities ?? []}
           calendarId={calendarId}
@@ -203,6 +210,7 @@ function Footer({ children }: { children: React.ReactNode }) {
         gap: 2,
         px: 3,
         py: 2,
+        flexShrink: 0,
         borderTop: "1px solid",
         borderColor: "divider",
         bgcolor: "background.default",
@@ -214,6 +222,7 @@ function Footer({ children }: { children: React.ReactNode }) {
 }
 
 function DetailBody({
+  layout,
   appointment,
   activities,
   calendarId,
@@ -221,6 +230,7 @@ function DetailBody({
   onChanged,
   onClose,
 }: {
+  layout: DetailLayout;
   appointment: Appointment;
   activities: Activity[];
   calendarId: string;
@@ -237,6 +247,14 @@ function DetailBody({
   const [cancelling, setCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [moving, setMoving] = useState(false);
+  /* On a phone the move panel opens in the scrolling body while the button that
+     opened it is docked below; bring the panel into view so it is not hidden. */
+  const movePanelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (moving && layout === "full-screen") {
+      movePanelRef.current?.scrollIntoView?.({ block: "nearest" });
+    }
+  }, [moving, layout]);
   /**
    * A `409` is not an error (6.3): somebody was faster, or the appointment moved
    * on without us. It gets its own calm line rather than the red box, and it
@@ -285,6 +303,13 @@ function DetailBody({
       return rows.find((r) => r.id === appointment.id) ?? null;
     },
   });
+
+  /* Etapa 2, C2: a desk quick registration whose deadline is still running. The
+     detail answers it; the day row (which the grid carries) is the fallback. */
+  const registrationDeadlineUtc =
+    appointment.registrationDeadlineUtc ?? dayRowQuery.data?.registrationDeadlineUtc ?? null;
+  const quickPending =
+    (appointment.quickRegistrationPending ?? dayRowQuery.data?.quickRegistrationPending ?? false) === true;
 
   const activity = activities.find((a) => a.id === appointment.activityId) ?? null;
   const price = activity?.priceCzk ?? null;
@@ -420,6 +445,7 @@ function DetailBody({
   if (mode === "edit") {
     return (
       <EditMode
+        layout={layout}
         appointment={appointment}
         activities={activities}
         activity={activity}
@@ -444,77 +470,278 @@ function DetailBody({
     );
   }
 
-  return (
+  const compact = layout === "full-screen";
+
+  /* Arrival, the slot, cancelling - in the rail on the right, or docked at the bottom of a phone. */
+  const railActions = (
     <>
-      {/* ── Header: the 3px accent edge, the time, the day, the činnost ── */}
-      <Stack
-        direction="row"
-        sx={{
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 2,
-          px: 3,
-          pt: 2.5,
-          pb: 2,
-          borderBottom: "1px solid",
-          borderColor: "divider",
-        }}
-      >
-        <Box sx={{ borderLeft: "3px solid", borderColor: "primary.main", pl: 2, minWidth: 0 }}>
-          <Typography
-            component="h2"
-            sx={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.2 }}
-          >
-            {formatPragueTime(appointment.startUtc)} — {formatPragueTime(appointment.endUtc)}
-          </Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
-            {formatLongPragueDate(appointment.startUtc)} · {minutes} minut
-          </Typography>
-          <Typography sx={{ fontWeight: 600, fontSize: 15, mt: 0.5 }}>
-            {/* Empty when the activity is gone (4.5) - say so, do not print nothing. */}
-            {appointment.activityName || t("booking.detail.noActivity")}
-            {calendarName ? (
-              <Box component="span" sx={{ color: "text.secondary", fontWeight: 400 }}>
-                {" "}
-                · {calendarName}
+          {!mayEdit && !mayCancel ? (
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              {t("booking.detail.noActionsAllowed")}
+            </Typography>
+          ) : null}
+
+          {/* Arrival, finishing and moving are bookings.edit on the server,
+              cancelling is bookings.cancel; what the account lacks is not
+              offered, rather than offered and then refused. */}
+          {mayEdit ? (
+            <>
+              <Box>
+                <SectionLabel>Příchod</SectionLabel>
+                <Stack spacing={1}>
+                  <StatusButton
+                    label={t("booking.detail.arrived")}
+                    to={STATUS.checkedIn}
+                    from={appointment.status}
+                    disabled={busy}
+                    variant="contained"
+                    onClick={() => statusMutation.mutate({ to: STATUS.checkedIn })}
+                  />
+                  <StatusButton
+                    label={t("booking.detail.noShow")}
+                    to={STATUS.noShow}
+                    from={appointment.status}
+                    disabled={busy}
+                    /*
+                     * `2 -> 5` is allowed on purpose — it is how a mis-click gets
+                     * corrected — but marking a patient who is standing at the desk
+                     * as absent deserves a question first (4.5, v23).
+                     */
+                    confirmText={
+                      appointment.status === STATUS.checkedIn
+                        ? t("booking.detail.confirmNoShow")
+                        : undefined
+                    }
+                    onClick={() => statusMutation.mutate({ to: STATUS.noShow })}
+                  />
+                  {canChangeStatus(appointment.status, STATUS.completed) ? (
+                    <StatusButton
+                      label={t("booking.detail.complete")}
+                      to={STATUS.completed}
+                      from={appointment.status}
+                      disabled={busy}
+                      confirmText={t("booking.detail.confirmComplete")}
+                      onClick={() => statusMutation.mutate({ to: STATUS.completed })}
+                    />
+                  ) : null}
+                  {canChangeStatus(appointment.status, STATUS.scheduled) ? (
+                    <StatusButton
+                      label={t("booking.detail.undo")}
+                      to={STATUS.scheduled}
+                      from={appointment.status}
+                      disabled={busy}
+                      onClick={() => statusMutation.mutate({ to: STATUS.scheduled })}
+                    />
+                  ) : null}
+                </Stack>
               </Box>
-            ) : null}
-          </Typography>
-        </Box>
 
-        <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          {/* Status in words, never colour alone (7.1). */}
-          <StatusChip tone={statusTone(appointment.status)} dot>
-            {statusLabel}
-          </StatusChip>
-          {late ? <StatusChip tone="beige">{t("booking.status.late")}</StatusChip> : null}
-          {/*
-            4.5, v27: completing an appointment now keeps this. Until then the
-            transition wiped it, so "přišel v 9:12" stopped being true the moment
-            the visit ended.
-          */}
-          {appointment.checkedInUtc ? (
-            <StatusChip tone="grey">
-              {t("booking.detail.checkedInAt")} {formatPragueTime(appointment.checkedInUtc)}
-            </StatusChip>
+              <Box>
+                <SectionLabel>Termín</SectionLabel>
+                <Stack spacing={1}>
+                  {/*
+                    A completed or cancelled appointment cannot be moved - the server
+                    answers `409`, which is right, but offering the button and then
+                    refusing it wastes somebody's click and teaches them nothing.
+                  */}
+                  <Tooltip title={terminal ? t("booking.detail.notAllowed") : ""}>
+                    <Box component="span" sx={{ display: "block" }}>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        disabled={busy || terminal}
+                        sx={{ minHeight: 44 }}
+                        onClick={() => {
+                          setConflict(null);
+                          setMoving(false);
+                          setMode("edit");
+                        }}
+                      >
+                        Upravit
+                      </Button>
+                    </Box>
+                  </Tooltip>
+                  <Tooltip title={terminal ? t("booking.detail.notAllowed") : ""}>
+                    <Box component="span" sx={{ display: "block" }}>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        disabled={busy || terminal}
+                        sx={{ minHeight: 44 }}
+                        onClick={() => {
+                          setConflict(null);
+                          setMoving((was) => !was);
+                        }}
+                      >
+                        {t("booking.detail.move")}
+                      </Button>
+                    </Box>
+                  </Tooltip>
+                </Stack>
+              </Box>
+            </>
           ) : null}
-          {appointment.heldUntilUtc ? (
-            <StatusChip tone="blue">
-              {t("booking.detail.heldUntil")} {formatPragueTime(appointment.heldUntilUtc)}
-            </StatusChip>
+
+          {mayCancel ? (
+            <Stack spacing={1.5} sx={{ pt: mayEdit ? 1 : 0 }}>
+              <Button
+                fullWidth
+                color="error"
+                variant="outlined"
+                disabled={busy || !canChangeStatus(appointment.status, STATUS.cancelled)}
+                onClick={() => setCancelling((was) => !was)}
+                sx={{ minHeight: 44 }}
+              >
+                {t("booking.detail.cancel")}
+              </Button>
+              {/* ── Cancelling, which 5.8 makes conditional on a reason ── */}
+              {cancelBox}
+            </Stack>
           ) : null}
-          {appointment.paperwork?.ready ? (
-            <StatusChip tone="green">Podklady v pořádku</StatusChip>
+    </>
+  );
+
+  /*
+   * The same actions for a phone, docked under the scrolling body: arrival on
+   * the first row, the slot on the second, cancelling on its own full row - each
+   * at least 48 px tall. What the account may not do is not offered, as in the rail.
+   */
+  const dockButton = { minHeight: 48, fontSize: 14 } as const;
+  const dockActions = (
+    <>
+      {!mayEdit && !mayCancel ? (
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          {t("booking.detail.noActionsAllowed")}
+        </Typography>
+      ) : null}
+      {mayCancel ? cancelBox : null}
+      {mayEdit ? (
+        <>
+          <Stack direction="row" spacing={1}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <StatusButton
+                minHeight={48}
+                label={t("booking.detail.arrived")}
+                to={STATUS.checkedIn}
+                from={appointment.status}
+                disabled={busy}
+                variant="contained"
+                onClick={() => statusMutation.mutate({ to: STATUS.checkedIn })}
+              />
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <StatusButton
+                minHeight={48}
+                label={t("booking.detail.noShow")}
+                to={STATUS.noShow}
+                from={appointment.status}
+                disabled={busy}
+                confirmText={
+                  appointment.status === STATUS.checkedIn ? t("booking.detail.confirmNoShow") : undefined
+                }
+                onClick={() => statusMutation.mutate({ to: STATUS.noShow })}
+              />
+            </Box>
+          </Stack>
+          {canChangeStatus(appointment.status, STATUS.completed) ||
+          canChangeStatus(appointment.status, STATUS.scheduled) ? (
+            <Stack direction="row" spacing={1}>
+              {canChangeStatus(appointment.status, STATUS.completed) ? (
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <StatusButton
+                minHeight={48}
+                    label={t("booking.detail.complete")}
+                    to={STATUS.completed}
+                    from={appointment.status}
+                    disabled={busy}
+                    confirmText={t("booking.detail.confirmComplete")}
+                    onClick={() => statusMutation.mutate({ to: STATUS.completed })}
+                  />
+                </Box>
+              ) : null}
+              {canChangeStatus(appointment.status, STATUS.scheduled) ? (
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <StatusButton
+                minHeight={48}
+                    label={t("booking.detail.undo")}
+                    to={STATUS.scheduled}
+                    from={appointment.status}
+                    disabled={busy}
+                    onClick={() => statusMutation.mutate({ to: STATUS.scheduled })}
+                  />
+                </Box>
+              ) : null}
+            </Stack>
           ) : null}
-          <IconButton aria-label="Zavřít" onClick={onClose} size="small" sx={{ ml: 0.5 }}>
-            <CloseIcon fontSize="small" />
-          </IconButton>
+          <Stack direction="row" spacing={1}>
+            <Button
+              fullWidth
+              variant="outlined"
+              disabled={busy || terminal}
+              onClick={() => {
+                setConflict(null);
+                setMoving(false);
+                setMode("edit");
+              }}
+              sx={dockButton}
+            >
+              Upravit
+            </Button>
+            <Button
+              fullWidth
+              variant="outlined"
+              disabled={busy || terminal}
+              onClick={() => {
+                setConflict(null);
+                setMoving((was) => !was);
+              }}
+              sx={dockButton}
+            >
+              {t("booking.detail.move")}
+            </Button>
+          </Stack>
+        </>
+      ) : null}
+      {mayCancel ? (
+        <Button
+          fullWidth
+          color="error"
+          variant="outlined"
+          disabled={busy || !canChangeStatus(appointment.status, STATUS.cancelled)}
+          onClick={() => setCancelling((was) => !was)}
+          sx={dockButton}
+        >
+          {t("booking.detail.cancel")}
+        </Button>
+      ) : null}
+    </>
+  );
+
+  const historyBlock = (
+    <Box sx={{ flex: 1, minWidth: 0 }}>
+      <SectionLabel sx={{ mb: 0.75 }}>{t("booking.detail.history")}</SectionLabel>
+      <AsyncSection
+        isLoading={historyQuery.isLoading}
+        error={historyQuery.error}
+        isSettled={historyQuery.isSuccess || historyQuery.isError}
+        isEmpty={(historyQuery.data ?? []).length === 0}
+        emptyText={t("booking.detail.historyEmpty")}
+        onRetry={() => void historyQuery.refetch()}
+        skeletonRows={2}
+      >
+        <Stack component="ul" spacing={0.5} sx={{ listStyle: "none", p: 0, m: 0 }}>
+          {[...(historyQuery.data ?? [])]
+            .sort((a, b) => new Date(b.atUtc).getTime() - new Date(a.atUtc).getTime())
+            .map((line, index) => (
+              <HistoryRow key={`${line.atUtc}-${index}`} line={line} />
+            ))}
         </Stack>
-      </Stack>
+      </AsyncSection>
+    </Box>
+  );
 
-      <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" } }}>
-        {/* ── Left column ── */}
-        <Stack spacing={2.5} sx={{ flex: 1, minWidth: 0, p: 3 }}>
+  const leftColumn = (
+        <Stack spacing={2.5} sx={{ flex: 1, minWidth: 0, p: compact ? 2 : 3 }}>
           {/*
             The owner's rule (3. 10. 2026): a patient in the system sees, at the
             top, every protocol this visit requires and where each one stands.
@@ -533,7 +760,13 @@ function DetailBody({
             `paperworkSchema`. When the register does not know the patient this
             whole block is absent rather than reassuring.
           */}
-          {appointment.paperwork && !appointment.paperwork.ready ? (
+          {quickPending && hasPatient ? (
+            <QuickPendingCard
+              patientId={appointment.patientId}
+              email={email}
+              deadlineUtc={registrationDeadlineUtc}
+            />
+          ) : appointment.paperwork && !appointment.paperwork.ready ? (
             <RegistrationWarning
               patientId={appointment.patientId}
               email={email}
@@ -660,6 +893,7 @@ function DetailBody({
 
           {/* ── Moving, which only ever offers what the server offered (6.1) ── */}
           {moving ? (
+            <Box ref={movePanelRef}>
             <AvailabilityPanel
               title={t("booking.detail.moveTo")}
               calendarId={calendarId}
@@ -677,6 +911,7 @@ function DetailBody({
               */
               error={conflict ? null : rescheduleMutation.error}
             />
+            </Box>
           ) : null}
 
           {/* The patient's personal portal link, issuable straight from the booking. */}
@@ -687,172 +922,129 @@ function DetailBody({
             </Box>
           ) : null}
         </Stack>
+  );
 
-        {/* ── Right rail: arrival, the slot, cancelling ── */}
-        <Stack
-          spacing={2.5}
-          sx={{
-            width: { xs: "auto", md: 300 },
-            flexShrink: 0,
-            p: 3,
-            borderLeft: { md: "1px solid" },
-            borderTop: { xs: "1px solid", md: "none" },
-            borderColor: { xs: "divider", md: "divider" },
-            bgcolor: "background.default",
-          }}
-        >
-          {!mayEdit && !mayCancel ? (
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              {t("booking.detail.noActionsAllowed")}
-            </Typography>
-          ) : null}
-
-          {/* Arrival, finishing and moving are bookings.edit on the server,
-              cancelling is bookings.cancel; what the account lacks is not
-              offered, rather than offered and then refused. */}
-          {mayEdit ? (
-            <>
-              <Box>
-                <SectionLabel>Příchod</SectionLabel>
-                <Stack spacing={1}>
-                  <StatusButton
-                    label={t("booking.detail.arrived")}
-                    to={STATUS.checkedIn}
-                    from={appointment.status}
-                    disabled={busy}
-                    variant="contained"
-                    onClick={() => statusMutation.mutate({ to: STATUS.checkedIn })}
-                  />
-                  <StatusButton
-                    label={t("booking.detail.noShow")}
-                    to={STATUS.noShow}
-                    from={appointment.status}
-                    disabled={busy}
-                    /*
-                     * `2 -> 5` is allowed on purpose — it is how a mis-click gets
-                     * corrected — but marking a patient who is standing at the desk
-                     * as absent deserves a question first (4.5, v23).
-                     */
-                    confirmText={
-                      appointment.status === STATUS.checkedIn
-                        ? t("booking.detail.confirmNoShow")
-                        : undefined
-                    }
-                    onClick={() => statusMutation.mutate({ to: STATUS.noShow })}
-                  />
-                  {canChangeStatus(appointment.status, STATUS.completed) ? (
-                    <StatusButton
-                      label={t("booking.detail.complete")}
-                      to={STATUS.completed}
-                      from={appointment.status}
-                      disabled={busy}
-                      confirmText={t("booking.detail.confirmComplete")}
-                      onClick={() => statusMutation.mutate({ to: STATUS.completed })}
-                    />
-                  ) : null}
-                  {canChangeStatus(appointment.status, STATUS.scheduled) ? (
-                    <StatusButton
-                      label={t("booking.detail.undo")}
-                      to={STATUS.scheduled}
-                      from={appointment.status}
-                      disabled={busy}
-                      onClick={() => statusMutation.mutate({ to: STATUS.scheduled })}
-                    />
-                  ) : null}
-                </Stack>
+  return (
+    <>
+      {/* ── Header: the 3px accent edge, the time, the day, the činnost ── */}
+      <Stack
+        direction={compact ? "column" : "row"}
+        sx={{
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 2,
+          px: compact ? 2 : 3,
+          pt: 2.5,
+          pb: 2,
+          borderBottom: "1px solid",
+          borderColor: "divider",
+          position: "relative",
+          flexShrink: 0,
+        }}
+      >
+        {/* On a phone the close button stands in the corner and the chips run under the title. */}
+        {compact ? (
+          <IconButton
+            aria-label="Zavřít"
+            onClick={onClose}
+            sx={{ position: "absolute", top: 8, right: 8, width: 44, height: 44 }}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        ) : null}
+        <Box sx={{ borderLeft: "3px solid", borderColor: "primary.main", pl: 2, minWidth: 0, pr: compact ? 5 : 0 }}>
+          <Typography
+            component="h2"
+            sx={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.2 }}
+          >
+            {formatPragueTime(appointment.startUtc)} — {formatPragueTime(appointment.endUtc)}
+          </Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
+            {formatLongPragueDate(appointment.startUtc)} · {minutes} minut
+          </Typography>
+          <Typography sx={{ fontWeight: 600, fontSize: 15, mt: 0.5 }}>
+            {/* Empty when the activity is gone (4.5) - say so, do not print nothing. */}
+            {appointment.activityName || t("booking.detail.noActivity")}
+            {calendarName ? (
+              <Box component="span" sx={{ color: "text.secondary", fontWeight: 400 }}>
+                {" "}
+                · {calendarName}
               </Box>
+            ) : null}
+          </Typography>
+        </Box>
 
-              <Box>
-                <SectionLabel>Termín</SectionLabel>
-                <Stack spacing={1}>
-                  {/*
-                    A completed or cancelled appointment cannot be moved - the server
-                    answers `409`, which is right, but offering the button and then
-                    refusing it wastes somebody's click and teaches them nothing.
-                  */}
-                  <Tooltip title={terminal ? t("booking.detail.notAllowed") : ""}>
-                    <Box component="span" sx={{ display: "block" }}>
-                      <Button
-                        fullWidth
-                        variant="outlined"
-                        disabled={busy || terminal}
-                        onClick={() => {
-                          setConflict(null);
-                          setMoving(false);
-                          setMode("edit");
-                        }}
-                      >
-                        Upravit
-                      </Button>
-                    </Box>
-                  </Tooltip>
-                  <Tooltip title={terminal ? t("booking.detail.notAllowed") : ""}>
-                    <Box component="span" sx={{ display: "block" }}>
-                      <Button
-                        fullWidth
-                        variant="outlined"
-                        disabled={busy || terminal}
-                        onClick={() => {
-                          setConflict(null);
-                          setMoving((was) => !was);
-                        }}
-                      >
-                        {t("booking.detail.move")}
-                      </Button>
-                    </Box>
-                  </Tooltip>
-                </Stack>
-              </Box>
-            </>
+        <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap", justifyContent: compact ? "flex-start" : "flex-end" }}>
+          {/* Status in words, never colour alone (7.1). */}
+          <StatusChip tone={statusTone(appointment.status)} dot>
+            {statusLabel}
+          </StatusChip>
+          {late ? <StatusChip tone="beige">{t("booking.status.late")}</StatusChip> : null}
+          {/*
+            4.5, v27: completing an appointment now keeps this. Until then the
+            transition wiped it, so "přišel v 9:12" stopped being true the moment
+            the visit ended.
+          */}
+          {appointment.checkedInUtc ? (
+            <StatusChip tone="grey">
+              {t("booking.detail.checkedInAt")} {formatPragueTime(appointment.checkedInUtc)}
+            </StatusChip>
           ) : null}
-
-          {mayCancel ? (
-            <Stack spacing={1.5} sx={{ pt: mayEdit ? 1 : 0 }}>
-              <Button
-                fullWidth
-                color="error"
-                variant="outlined"
-                disabled={busy || !canChangeStatus(appointment.status, STATUS.cancelled)}
-                onClick={() => setCancelling((was) => !was)}
-              >
-                {t("booking.detail.cancel")}
-              </Button>
-              {/* ── Cancelling, which 5.8 makes conditional on a reason ── */}
-              {cancelBox}
-            </Stack>
+          {appointment.heldUntilUtc ? (
+            <StatusChip tone="blue">
+              {t("booking.detail.heldUntil")} {formatPragueTime(appointment.heldUntilUtc)}
+            </StatusChip>
           ) : null}
+          {appointment.paperwork?.ready ? (
+            <StatusChip tone="green">Podklady v pořádku</StatusChip>
+          ) : null}
+          {compact ? null : (
+            <IconButton aria-label="Zavřít" onClick={onClose} sx={{ ml: 0.5, width: 44, height: 44 }}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          )}
         </Stack>
+      </Stack>
+
+      {/* The body scrolls; the header above and the actions below stay where they are. */}
+      <Box sx={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto" }}>
+        <Box sx={{ display: "flex", flexDirection: compact ? "column" : "row" }}>
+          {leftColumn}
+
+          {/* ── Right rail: arrival, the slot, cancelling ── */}
+          {compact ? null : (
+            <Stack
+              spacing={2.5}
+              sx={{
+                width: layout === "dialog-centered" ? 260 : 300,
+                flexShrink: 0,
+                p: 3,
+                borderLeft: "1px solid",
+                borderColor: "divider",
+                bgcolor: "background.default",
+              }}
+            >
+              {railActions}
+            </Stack>
+          )}
+        </Box>
+        {compact ? <Box sx={{ px: 2, pb: 2.5 }}>{historyBlock}</Box> : null}
       </Box>
 
-      {/* ── Footer: history on the left, the way out on the right ── */}
-      <Footer>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <SectionLabel sx={{ mb: 0.75 }}>{t("booking.detail.history")}</SectionLabel>
-          <AsyncSection
-            isLoading={historyQuery.isLoading}
-            error={historyQuery.error}
-            isSettled={historyQuery.isSuccess || historyQuery.isError}
-            isEmpty={(historyQuery.data ?? []).length === 0}
-            emptyText={t("booking.detail.historyEmpty")}
-            onRetry={() => void historyQuery.refetch()}
-            skeletonRows={2}
-          >
-            <Stack component="ul" spacing={0.5} sx={{ listStyle: "none", p: 0, m: 0 }}>
-              {[...(historyQuery.data ?? [])]
-                .sort((a, b) => new Date(b.atUtc).getTime() - new Date(a.atUtc).getTime())
-                .map((line, index) => (
-                  <HistoryRow key={`${line.atUtc}-${index}`} line={line} />
-                ))}
-            </Stack>
-          </AsyncSection>
-        </Box>
-        <Button variant="outlined" onClick={onClose} sx={{ flexShrink: 0 }}>
-          {t("booking.detail.close")}
-        </Button>
-      </Footer>
+      {compact ? (
+        <DockedBar label="Akce s rezervací">{dockActions}</DockedBar>
+      ) : (
+        <Footer>
+          {historyBlock}
+          <Button variant="outlined" onClick={onClose} sx={{ flexShrink: 0 }}>
+            {t("booking.detail.close")}
+          </Button>
+        </Footer>
+      )}
     </>
   );
 }
+
 
 /**
  * PLATBA, from the day row: Bez dokladu / Nezaplaceno / Částečně zaplaceno /
@@ -974,7 +1166,7 @@ function ContactButton({
 
 /**
  * The beige card: registration is unfinished. "Zkopírovat odkaz" issues the
- * patient's 24-hour completion link and puts it on the clipboard; "Poslat
+ * patient's completion link and puts it on the clipboard; "Poslat
  * znovu" issues it and opens the desk's own mail client with it, because
  * nothing here sends mail by itself yet.
  */
@@ -990,9 +1182,13 @@ function RegistrationWarning({
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  /* When the issued link stops working: the server's answer, never a number written here. */
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+
   const issue = useMutation({
     mutationFn: async () => {
       const issued = await patientPreRegistrationApi.issueLink(patientId);
+      setExpiresAt(issued.expiresAtUtc ?? null);
       return issued.url ?? `${window.location.origin}${issued.path}`;
     },
     onSuccess: (full) => setLink(full),
@@ -1015,7 +1211,9 @@ function RegistrationWarning({
     if (!full || !email) return;
     const subject = encodeURIComponent("Dokončení registrace");
     const body = encodeURIComponent(
-      `Dobrý den,\n\ndokončete prosím registraci na tomto odkazu:\n${full}\n\nOdkaz platí 24 hodin.`,
+      `Dobrý den,\n\ndokončete prosím registraci na tomto odkazu:\n${full}${
+        expiresAt ? `\n\nOdkaz platí do ${formatDeadline(expiresAt)}.` : ""
+      }`,
     );
     window.open(`mailto:${email}?subject=${subject}&body=${body}`, "_self");
   };
@@ -1097,7 +1295,8 @@ function RegistrationWarning({
           ) : null}
           {link ? (
             <Typography variant="caption" sx={{ display: "block", mt: 0.75 }}>
-              Platí 24 hodin. Vygenerování nového odkazu ten předchozí zneplatní.
+              {expiresAt ? `Platí do ${formatDeadline(expiresAt)}. ` : ""}
+              Vygenerování nového odkazu ten předchozí zneplatní.
             </Typography>
           ) : null}
           {issue.isError ? (
@@ -1169,6 +1368,15 @@ function PaperworkSection({
         ))}
       </Stack>
 
+      {/* The legal consents are always required; the list above is only what the činnost adds. */}
+      <Typography
+        variant="caption"
+        data-testid="legal-consents"
+        sx={{ color: "text.secondary", display: "block", mt: 1, pt: 1, borderTop: "1px solid", borderColor: "divider" }}
+      >
+        {LEGAL_CONSENTS_TEXT}
+      </Typography>
+
       <Stack direction="row" sx={{ alignItems: "center", gap: 1.5, mt: 1.25, flexWrap: "wrap" }}>
         {checkQuery.isError ? (
           <Button size="small" variant="text" onClick={() => void checkQuery.refetch()}>
@@ -1232,7 +1440,7 @@ function PaperworkRowView({ row, patientId }: { row: PaperworkRow; patientId: st
 
 /**
  * The action for a missing registration or questionnaire: issue the patient's
- * 24-hour completion link and put it on the clipboard. The same link the beige
+ * completion link and put it on the clipboard. The same link the beige
  * card below issues; this one is the short form for a row.
  */
 function CopyCompletionLink({ patientId }: { patientId: string }) {
@@ -1279,6 +1487,7 @@ function StatusButton({
   disabled,
   confirmText,
   variant = "outlined",
+  minHeight,
   onClick,
 }: {
   label: string;
@@ -1287,6 +1496,8 @@ function StatusButton({
   disabled: boolean;
   confirmText?: string;
   variant?: "outlined" | "contained";
+  /** The board draws "Přišel" 46 px and its neighbours 44; a phone's docked bar asks for 48. */
+  minHeight?: number;
   onClick: () => void;
 }) {
   const { t } = useTranslation();
@@ -1327,7 +1538,10 @@ function StatusButton({
         color={variant === "contained" ? "secondary" : "inherit"}
         disabled={disabled || !allowed}
         onClick={() => (confirmText ? setConfirming(true) : onClick())}
-        sx={variant === "contained" ? { color: "#FFFFFF" } : undefined}
+        sx={{
+          minHeight: minHeight ?? (variant === "contained" ? 46 : 44),
+          ...(variant === "contained" ? { color: "#FFFFFF" } : {}),
+        }}
       >
         {label}
       </Button>
@@ -1406,6 +1620,7 @@ function HistoryRow({ line }: { line: HistoryLine }) {
    ══════════════════════════════════════════════════════════════ */
 
 function EditMode({
+  layout,
   appointment,
   activities,
   activity,
@@ -1421,6 +1636,7 @@ function EditMode({
   onSave,
   onCancelRequest,
 }: {
+  layout: DetailLayout;
   appointment: Appointment;
   activities: Activity[];
   activity: Activity | null;
@@ -1511,6 +1727,8 @@ function EditMode({
     return n ? t(`booking.status.${n}`) : t("booking.status.unknown");
   };
 
+  const compact = layout === "full-screen";
+
   return (
     <>
       {/* ── Header: back, title, who and when ── */}
@@ -1520,10 +1738,11 @@ function EditMode({
           alignItems: "center",
           justifyContent: "space-between",
           gap: 2,
-          px: 3,
-          py: 2.5,
+          px: compact ? 2 : 3,
+          py: compact ? 1.5 : 2.5,
           borderBottom: "1px solid",
           borderColor: "divider",
+          flexShrink: 0,
         }}
       >
         <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", minWidth: 0 }}>
@@ -1533,6 +1752,7 @@ function EditMode({
             sx={{
               width: 46,
               height: 46,
+              flexShrink: 0,
               border: "1px solid",
               borderColor: "divider",
               borderRadius: 2.5,
@@ -1551,12 +1771,14 @@ function EditMode({
             </Typography>
           </Box>
         </Stack>
-        <IconButton aria-label="Zavřít" onClick={onClose} size="small">
+        <IconButton aria-label="Zavřít" onClick={onClose} sx={{ width: 44, height: 44 }}>
           <CloseIcon fontSize="small" />
         </IconButton>
       </Stack>
 
-      <Stack spacing={2.5} sx={{ p: 3 }}>
+      {/* The body scrolls; the header above and the buttons below stay where they are. */}
+      <Box sx={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto" }}>
+      <Stack spacing={2.5} sx={{ p: compact ? 2 : 3 }}>
         {/* ── SLUŽBA ── */}
         <Box>
           <SectionLabel>Služba</SectionLabel>
@@ -1573,6 +1795,7 @@ function EditMode({
                 /* No endpoint changes an appointment's činnost; only the one it has is live. */
                 disabled={a.id !== appointment.activityId}
                 sx={{
+                  minHeight: 44,
                   borderRadius: "10px !important",
                   border: "1px solid !important",
                   borderColor: "divider !important",
@@ -1600,7 +1823,8 @@ function EditMode({
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr 1fr", md: "1.4fr 1fr 1fr 1fr" },
+            /* One field per row on a phone; four across where there is room. */
+            gridTemplateColumns: compact ? "1fr" : layout === "dialog-centered" ? "1fr 1fr" : "1.4fr 1fr 1fr 1fr",
             gap: 2,
           }}
         >
@@ -1697,35 +1921,70 @@ function EditMode({
         {conflict ? <Alert severity="info">{errorText(conflict, t)}</Alert> : null}
         {error && !conflict ? <Alert severity="error">{errorText(error, t)}</Alert> : null}
       </Stack>
+      </Box>
 
-      <Footer>
-        <Box>
-          {mayCancel ? (
-            <Button
-              color="error"
-              variant="outlined"
-              disabled={busy || !canChangeStatus(appointment.status, STATUS.cancelled)}
-              onClick={onCancelRequest}
-            >
-              {t("booking.detail.cancel")}
-            </Button>
-          ) : null}
-        </Box>
-        <Stack direction="row" spacing={1}>
-          <Button variant="outlined" onClick={onBack} disabled={busy}>
-            Zahodit změny
-          </Button>
+      {compact ? (
+        /* Phone: the save button is the pinned primary action, the other two sit under it. */
+        <DockedBar label="Akce úpravy">
           <Button
+            fullWidth
             variant="contained"
             color="secondary"
             disabled={busy || !hasChanges || !dateValid || !timeValid}
             onClick={() => onSave(plan)}
-            sx={{ color: "#FFFFFF" }}
+            sx={{ color: "#FFFFFF", minHeight: 48, fontSize: 15 }}
           >
             Uložit změny
           </Button>
-        </Stack>
-      </Footer>
+          <Stack direction="row" spacing={1}>
+            <Button fullWidth variant="outlined" onClick={onBack} disabled={busy} sx={{ minHeight: 48 }}>
+              Zahodit změny
+            </Button>
+            {mayCancel ? (
+              <Button
+                fullWidth
+                color="error"
+                variant="outlined"
+                disabled={busy || !canChangeStatus(appointment.status, STATUS.cancelled)}
+                onClick={onCancelRequest}
+                sx={{ minHeight: 48 }}
+              >
+                {t("booking.detail.cancel")}
+              </Button>
+            ) : null}
+          </Stack>
+        </DockedBar>
+      ) : (
+        <Footer>
+          <Box>
+            {mayCancel ? (
+              <Button
+                color="error"
+                variant="outlined"
+                disabled={busy || !canChangeStatus(appointment.status, STATUS.cancelled)}
+                onClick={onCancelRequest}
+                sx={{ minHeight: 44 }}
+              >
+                {t("booking.detail.cancel")}
+              </Button>
+            ) : null}
+          </Box>
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" onClick={onBack} disabled={busy} sx={{ minHeight: 44 }}>
+              Zahodit změny
+            </Button>
+            <Button
+              variant="contained"
+              color="secondary"
+              disabled={busy || !hasChanges || !dateValid || !timeValid}
+              onClick={() => onSave(plan)}
+              sx={{ color: "#FFFFFF", minHeight: 44 }}
+            >
+              Uložit změny
+            </Button>
+          </Stack>
+        </Footer>
+      )}
     </>
   );
 }

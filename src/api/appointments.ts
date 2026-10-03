@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import client from './client';
 import { toBookingError } from './apiError';
 import {
@@ -21,6 +22,36 @@ import {
   type TimeBlock,
 } from './bookingContracts';
 import { addDaysToDateOnly, type DateOnly } from '../utils/time';
+
+/**
+ * Etapa 2, contract C2 - the desk's quick registration. The slot is already
+ * chosen, so one call books it, creates the provisional patient and issues the
+ * completion link. No date of birth, ever: four facts and a činnost.
+ */
+export interface CreateQuickInput {
+  activityId: string;
+  startUtc: string | Date;
+  firstName: string;
+  lastName: string;
+  /** Carries its dialling code (`+420…`); the server refuses a number without one. */
+  phone: string;
+  email: string;
+  overrideReason?: string;
+  note?: string | null;
+}
+
+export const quickBookedSchema = z.object({
+  appointment: appointmentSchema,
+  patientId: z.string(),
+  completionLink: z.object({
+    /** `null` when the server does not know the public address; the token still builds one. */
+    url: z.string().nullish().transform((v) => v ?? null),
+    token: z.string(),
+    expiresAtUtc: z.string().nullish().transform((v) => v ?? null),
+  }),
+  registrationDeadlineUtc: z.string().nullish().transform((v) => v ?? null),
+});
+export type QuickBooked = z.infer<typeof quickBookedSchema>;
 
 /**
  * Appointments, blocks, the day and its summary - contract 4.4, 4.5 and 4.6.
@@ -161,6 +192,20 @@ export const appointmentsApi = {
       );
       return parseResponse(appointmentSchema, res.data);
     }),
+
+  /**
+   * Quick registration (C2): books first, then creates the provisional patient
+   * and the link. The refusal is left as the raw axios error on purpose: the
+   * server names the field that is wrong (`errors.field`) and the desk's form
+   * points at that box, which a flattened `BookingApiError` would lose.
+   */
+  createQuick: async (calendarId: string, input: CreateQuickInput): Promise<QuickBooked> => {
+    const res = await client.post(
+      `/api/calendars/${requireId(calendarId, 'calendarId')}/appointments/quick`,
+      { ...input, startUtc: asUtcInstant(input.startUtc) },
+    );
+    return parseResponse(quickBookedSchema, res.data);
+  },
 
   /** A move is its own operation, not a cancel plus a new booking (4.5). */
   reschedule: (

@@ -2,6 +2,7 @@ import { Box, ButtonBase, Typography } from "@mui/material";
 import PersonSearchOutlined from "@mui/icons-material/PersonSearchOutlined";
 import PersonAddAlt1Outlined from "@mui/icons-material/PersonAddAlt1Outlined";
 import GroupsOutlined from "@mui/icons-material/GroupsOutlined";
+import { useDevice } from "../../../layout/useDevice";
 import { DESIGN } from "../../ui";
 import type { DrawerMode } from "../NewAppointmentDialog.logic";
 
@@ -27,11 +28,13 @@ export function ModeCards({
   onChange: (mode: DrawerMode) => void;
   disabled?: boolean;
 }) {
+  /* On a phone the three cards are rows: wide, one under the other, easy to hit. */
+  const phone = useDevice() === "phone";
   return (
     <Box
       role="radiogroup"
       aria-label="Kdo se objednává"
-      sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1.5 }}
+      sx={{ display: "grid", gridTemplateColumns: phone ? "1fr" : "repeat(3, 1fr)", gap: phone ? 1 : 1.5 }}
     >
       {CARDS.map((card) => {
         const selected = value === card.mode;
@@ -44,11 +47,13 @@ export function ModeCards({
             onClick={() => onChange(card.mode)}
             sx={{
               display: "flex",
-              flexDirection: "column",
+              flexDirection: phone ? "row" : "column",
               alignItems: "center",
-              gap: 1,
-              py: 2,
-              px: 1,
+              justifyContent: phone ? "flex-start" : "center",
+              gap: phone ? 1.5 : 1,
+              minHeight: phone ? 56 : 44,
+              py: phone ? 1.5 : 2,
+              px: phone ? 2 : 1,
               borderRadius: 3,
               border: "1px solid",
               borderColor: selected ? "primary.main" : "divider",

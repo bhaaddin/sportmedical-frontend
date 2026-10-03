@@ -212,6 +212,13 @@ export const activitySchema = z.object({
    * `questionnaireRequirement`.
    */
   questionnaireDefinitionId: z.string().nullish().transform((v) => v ?? null),
+  /* Etapa 2, C1: the činnost's own colour (override) and the one actually drawn. */
+  colorHex: z.string().nullable().optional(),
+  effectiveColorHex: z.string().nullable().optional(),
+  /** How many bookings may run at once; absent reads as 1. */
+  parallelCapacity: z.number().int().nullable().optional(),
+  /** Etapa 2, C1: the document templates this činnost makes the patient deliver (default none). */
+  requiredDocumentTemplateIds: z.array(z.string()).nullish().transform((v) => v ?? []),
 });
 export type Activity = z.infer<typeof activitySchema>;
 
@@ -268,6 +275,14 @@ export const activityInputSchema = z.object({
    * would switch the činnost back to the clinic's default questionnaire.
    */
   questionnaireDefinitionId: z.string().nullable(),
+  /**
+   * Etapa 2, C1. Optional here so the older screens that build an input keep
+   * compiling, but a screen that edits a činnost must send them back as it read
+   * them (see `activityToInput`): `PUT` is the whole činnost.
+   */
+  colorHex: z.string().nullable().optional(),
+  parallelCapacity: z.number().int().min(1).optional(),
+  requiredDocumentTemplateIds: z.array(z.string()).optional(),
 });
 export type ActivityInput = z.infer<typeof activityInputSchema>;
 
@@ -575,6 +590,11 @@ export const dayAppointmentSchema = z.object({
   clubDiscountPercent: z.number().nullable().optional(),
   paymentState: z.enum(APPOINTMENT_PAYMENT_STATES).nullable().optional().catch(undefined),
   invoiceId: z.string().nullable().optional(),
+  /** Etapa 2 (calendar): heads in a group/club booking; absent reads as one person. */
+  headcount: z.number().int().positive().nullable().optional(),
+  /** Etapa 2, C2: desk quick registration - the deadline and whether it is still ticking. */
+  registrationDeadlineUtc: z.string().nullable().optional(),
+  quickRegistrationPending: z.boolean().nullable().optional(),
 });
 export type DayAppointment = z.infer<typeof dayAppointmentSchema>;
 export const dayAppointmentListSchema = z.array(dayAppointmentSchema);
@@ -688,6 +708,9 @@ export const appointmentSchema = z.object({
   unregisteredName: z.string().nullish().transform((v) => v ?? null),
   /** Contact phone for a slot with no registered patient; `null` otherwise. */
   unregisteredPhone: z.string().nullish().transform((v) => v ?? null),
+  /** Etapa 2, C2: when a desk quick registration must be completed by, and whether it still waits. */
+  registrationDeadlineUtc: z.string().nullable().optional(),
+  quickRegistrationPending: z.boolean().nullable().optional(),
 }).passthrough();
 export type Appointment = z.infer<typeof appointmentSchema>;
 
@@ -885,6 +908,12 @@ export const timeBlockSchema = z.object({
   startUtc: isoUtc,
   endUtc: isoUtc,
   reason: z.string().nullish().transform((v) => v ?? ''),
+  /* Etapa 2, C4: a club block carries the club it is for and its colour; a manual one is plain. */
+  kind: z.enum(['manual', 'club']).nullable().optional().catch(undefined),
+  clubBlockId: z.string().nullable().optional(),
+  clubId: z.string().nullable().optional(),
+  clubName: z.string().nullable().optional(),
+  colorHex: z.string().nullable().optional(),
 });
 export type TimeBlock = z.infer<typeof timeBlockSchema>;
 export const timeBlockListSchema = z.array(timeBlockSchema);

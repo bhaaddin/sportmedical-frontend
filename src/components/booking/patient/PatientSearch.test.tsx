@@ -30,11 +30,11 @@ const row = (id: string, firstName: string, lastName: string, dateOfBirth: strin
   status: 'Active',
 });
 
-function renderSearch(onPick = vi.fn()) {
+function renderSearch(onPick = vi.fn(), onQuickRegister?: (typed: string) => void) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <PatientSearch enabled mayRegister onPick={onPick} />
+      <PatientSearch enabled mayRegister onPick={onPick} onQuickRegister={onQuickRegister} />
     </QueryClientProvider>,
   );
   return onPick;
@@ -129,17 +129,16 @@ describe('searching the database for a patient', () => {
     expect(onPick.mock.calls[0][0]).toMatchObject({ id: 'f3', dateOfBirth: '2001-02-03' });
   });
 
-  it('says an empty answer is not proof, and still offers a new patient', async () => {
+  it('says an empty answer is not proof, and points to the quick registration with the typed name', async () => {
     list.mockResolvedValueOnce({ items: [], totalCount: 0 });
-    renderSearch();
+    const onQuickRegister = vi.fn();
+    renderSearch(vi.fn(), onQuickRegister);
     await userEvent.type(screen.getByLabelText('Jméno nebo příjmení'), 'Nikdo');
 
     expect(await screen.findByText(/V databázi nikoho takového nenacházím/)).toBeInTheDocument();
-    /* The old "/patients/register" link was replaced by the desk quick-registration
-       flow, which still offers a way to make a new patient right here. */
-    expect(
-      screen.getByRole('button', { name: 'Rychlá registrace + odkaz' }),
-    ).toBeInTheDocument();
+    /* Registering is the drawer's "Rychlá registrace" card; this search only hands the name over. */
+    await userEvent.click(screen.getByRole('button', { name: 'Rychlá registrace' }));
+    expect(onQuickRegister).toHaveBeenCalledWith('Nikdo');
   });
 });
 

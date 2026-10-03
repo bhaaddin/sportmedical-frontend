@@ -8,7 +8,7 @@ import client from './client';
  *
  * Backend:
  *   POST /api/patients/pre-registrations          -> creates a provisional patient
- *   POST /api/patients/{id}/registration-link      -> issues the 24 h link
+ *   POST /api/patients/{id}/registration-link      -> issues the completion link (its length is the server's `expiryHours` setting)
  */
 
 export interface PreRegisterInput {

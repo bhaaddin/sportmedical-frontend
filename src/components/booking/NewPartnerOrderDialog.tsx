@@ -16,6 +16,7 @@ import {
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useIsPhone } from "../../layout/useDevice";
 import { activitiesApi } from "../../api/activities";
 import { partnerOrdersApi } from "../../api/partnerOrders";
 import { workingHoursApi } from "../../api/workingHours";
@@ -109,6 +110,7 @@ export function NewPartnerOrderDialog({
   onCreated: () => void;
 }) {
   const { t } = useTranslation();
+  const phone = useIsPhone();
 
   const [partnerName, setPartnerName] = useState(initial?.partnerName ?? "");
   const [partnerType, setPartnerType] = useState(0);
@@ -301,7 +303,7 @@ export function NewPartnerOrderDialog({
   const short = requiredMinutes > 0 && coveredMinutes < requiredMinutes;
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" fullScreen={phone}>
       <DialogTitle>{t("booking.partner.newTitle")}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={3}>

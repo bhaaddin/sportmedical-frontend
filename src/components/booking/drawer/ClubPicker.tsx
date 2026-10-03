@@ -16,9 +16,16 @@ import Add from "@mui/icons-material/Add";
 import Search from "@mui/icons-material/Search";
 import { useQuery } from "@tanstack/react-query";
 import { clubsApi, type Club } from "../../../services/clubsApi";
+import { useDevice } from "../../../layout/useDevice";
 import { DESIGN, SectionLabel, SoftCard } from "../../ui";
 import { PhoneField } from "../../ui/PhoneField";
-import { clubMatches, clubsWord, initials, type NewClubDraft } from "../NewAppointmentDialog.logic";
+import {
+  athletesWord,
+  clubMatches,
+  clubsWord,
+  initials,
+  type NewClubDraft,
+} from "../NewAppointmentDialog.logic";
 import { clubDiscountLine } from "../grid/clubLine";
 
 export type { NewClubDraft };
@@ -30,22 +37,45 @@ export type { NewClubDraft };
  * the link for the athletes - is the reservation screen's, which this hands
  * off to with the slot.
  *
- * The rows draw what the clubs API carries: name and contact. It carries no
- * athlete count and no price level, so neither is invented here.
+ * The rows draw what the clubs API carries and nothing else: the name, the
+ * contact, "Sleva −N %" from `discountPercent`, and "N sportovců" only when
+ * the club actually has a count on record - a missing number is left out, not
+ * replaced by a made-up one.
+ *
+ * Under the rows sits "Rozsah hromadné rezervace" (Od, Do): which days the
+ * block covers. It starts on the day of the chosen slot.
  */
+
+/** A club as the list may carry it; the athlete count is not guaranteed by every server. */
+type ClubRow = Club & { athleteCount?: number | null; headcount?: number | null };
+
+function athleteCountOf(club: ClubRow): number | null {
+  const n = club.athleteCount ?? club.headcount ?? null;
+  return typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 export function ClubPicker({
   selectedId,
   onSelect,
   draft,
   onDraft,
+  range,
+  onRange,
+  error = null,
   disabled = false,
 }: {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   draft: NewClubDraft;
   onDraft: (next: NewClubDraft) => void;
+  /** The days the block covers, `yyyy-MM-dd`. */
+  range: { from: string; to: string };
+  onRange: (next: { from: string; to: string }) => void;
+  /** Why founding the club failed, in the server's words. */
+  error?: string | null;
   disabled?: boolean;
 }) {
+  const phone = useDevice() === "phone";
   const [query, setQuery] = useState("");
   const [founding, setFounding] = useState(false);
 
@@ -56,7 +86,7 @@ export function ClubPicker({
   });
 
   const rows = useMemo(
-    () => (clubs.data ?? []).filter((c) => c.isActive !== false && clubMatches(c, query)),
+    () => ((clubs.data ?? []) as ClubRow[]).filter((c) => c.isActive !== false && clubMatches(c, query)),
     [clubs.data, query],
   );
 
@@ -65,10 +95,25 @@ export function ClubPicker({
     if (selectedId !== null) onSelect(null);
   };
 
-  const contactLine = (club: Club) =>
-    [club.contactPerson, club.contactPhone ?? club.contactEmail]
-      .filter((v): v is string => Boolean(v && v.trim()))
-      .join(" · ") || "bez kontaktu";
+  const contactLine = (club: ClubRow) => {
+    const count = athleteCountOf(club);
+    return (
+      [
+        count === null ? null : athletesWord(count),
+        club.contactPerson,
+        club.contactPhone ?? club.contactEmail,
+      ]
+        .filter((v): v is string => Boolean(v && v.trim()))
+        .join(" · ") || "bez kontaktu"
+    );
+  };
+
+  const rangeInvalid = range.from !== "" && range.to !== "" && range.to < range.from;
+  const grid = (two: string) => ({
+    display: "grid",
+    gridTemplateColumns: phone ? "1fr" : two,
+    gap: 1.5,
+  });
 
   const field = (label: string, key: keyof NewClubDraft, props: Partial<React.ComponentProps<typeof TextField>> = {}) => (
     <Box>
@@ -162,6 +207,7 @@ export function ClubPicker({
                       width: "100%",
                       px: 2,
                       py: 1.5,
+                      minHeight: 56,
                       borderRadius: 3,
                       border: "1px solid",
                       borderColor: selected ? "primary.main" : "divider",
@@ -219,7 +265,7 @@ export function ClubPicker({
           <Collapse in={founding}>
             <Stack spacing={1.5} sx={{ mt: 2 }}>
               {field("Název klubu", "name", { placeholder: "např. TJ Sokol Slaný" })}
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
+              <Box sx={grid("1fr 1fr")}>
                 {field("Kontaktní osoba", "contactPerson", { placeholder: "Jméno a příjmení" })}
                 <Box>
                   <SectionLabel component="label" sx={{ mb: 0.5 }}>
@@ -233,7 +279,7 @@ export function ClubPicker({
                   />
                 </Box>
               </Box>
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
+              <Box sx={grid("1fr 1fr")}>
                 {field("E-mail", "email", { type: "email", placeholder: "klub@email.cz" })}
                 {field("Počet sportovců", "athleteCount", {
                   type: "number",
@@ -241,10 +287,51 @@ export function ClubPicker({
                   slotProps: { htmlInput: { "aria-label": "Počet sportovců", min: 1, step: 1 } },
                 })}
               </Box>
+              {field("IČO", "ico", {
+                placeholder: "8 číslic — nepovinné",
+                helperText: "S IČO se klub založí hned. Bez něj údaje předáme rezervaci a IČO se doplní tam.",
+                slotProps: { htmlInput: { "aria-label": "IČO", inputMode: "numeric", maxLength: 12 } },
+              })}
             </Stack>
           </Collapse>
         </SoftCard>
       </Box>
+
+      <Box>
+        <SectionLabel>Rozsah hromadné rezervace</SectionLabel>
+        <Box sx={grid("1fr 1fr")}>
+          <Box>
+            <SectionLabel component="label" sx={{ mb: 0.5 }}>
+              Od
+            </SectionLabel>
+            <TextField
+              fullWidth
+              type="date"
+              disabled={disabled}
+              value={range.from}
+              onChange={(e) => onRange({ from: e.target.value, to: range.to })}
+              slotProps={{ htmlInput: { "aria-label": "Od" } }}
+            />
+          </Box>
+          <Box>
+            <SectionLabel component="label" sx={{ mb: 0.5 }}>
+              Do
+            </SectionLabel>
+            <TextField
+              fullWidth
+              type="date"
+              disabled={disabled}
+              value={range.to}
+              onChange={(e) => onRange({ from: range.from, to: e.target.value })}
+              error={rangeInvalid}
+              helperText={rangeInvalid ? "Konec nesmí být před začátkem." : undefined}
+              slotProps={{ htmlInput: { "aria-label": "Do" } }}
+            />
+          </Box>
+        </Box>
+      </Box>
+
+      {error ? <Alert severity="error">{error}</Alert> : null}
     </Stack>
   );
 }

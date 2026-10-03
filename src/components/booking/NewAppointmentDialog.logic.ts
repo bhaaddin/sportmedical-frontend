@@ -187,33 +187,6 @@ export function splitFullName(value: string): { firstName: string; lastName: str
 }
 
 /**
- * What "Rychlá registrace" can do with what was typed.
- *
- * The register will not create a patient without a date of birth and an
- * e-mail (`PatientErrorCodes.DateOfBirthRequired`; the e-mail is where the
- * completion link goes). With both, and a first name and a surname, the desk
- * can register a real patient who then gets the link. Without them the slot
- * is still bookable - as a walk-in taken by name and phone, the way
- * "Neznámý pacient" always worked - only nobody gets a link.
- */
-export type QuickPath = 'registered' | 'walkIn';
-
-export function quickRegistrationPath(input: {
-  name: string;
-  email: string;
-  dateOfBirth: string;
-  mayRegister: boolean;
-}): QuickPath | null {
-  if (input.name.trim() === '') return null;
-  const canRegister =
-    input.mayRegister &&
-    splitFullName(input.name) !== null &&
-    input.email.trim() !== '' &&
-    DATE_ONLY.test(input.dateOfBirth);
-  return canRegister ? 'registered' : 'walkIn';
-}
-
-/**
  * A telephone typed at the desk, made sendable: digits only, with the dialling
  * code the register wants (`Zadejte ho s předvolbou`). `773 539 001` is a Czech
  * number, so it gets `+420`; `00421…` and `+421…` keep their country. Empty
@@ -229,15 +202,18 @@ export function normalizePhone(value: string): string | null {
   return `+420${digits.replace(/^0+/, '')}`;
 }
 
-/** What the desk types for a caller the register does not know yet ("Rychlá registrace"). */
+/**
+ * What the desk types for a caller the register does not know yet ("Rychlá
+ * registrace"): four things, and never a date of birth - the patient gives
+ * that, and the rest, through the completion link (Etapa 2, decision 7).
+ */
 export interface QuickPatientDraft {
   /** `Filip Fehér` - one box, split on the way out. */
   name: string;
+  /** Carries its dialling code once typed through the phone field. */
   phone: string;
   email: string;
-  /** `yyyy-MM-dd`; the register will not create a patient without it. */
-  dateOfBirth: string;
-  /** The činnost the caller asked for; chosen on step 1, used on step 2. */
+  /** The činnost the caller asked for - the slot is already chosen, so this is the booking. */
   activityId: string;
 }
 
@@ -245,9 +221,38 @@ export const EMPTY_QUICK_DRAFT: QuickPatientDraft = {
   name: '',
   phone: '',
   email: '',
-  dateOfBirth: '',
   activityId: '',
 };
+
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Which of the four boxes are not fit to send yet, as the sentence to show -
+ * the server has the last word, this only spares a round trip for the obvious.
+ * An empty result means the form can go.
+ */
+export function quickDraftProblems(
+  draft: QuickPatientDraft,
+): Partial<Record<keyof QuickPatientDraft, string>> {
+  const out: Partial<Record<keyof QuickPatientDraft, string>> = {};
+  if (draft.name.trim() !== '' && splitFullName(draft.name) === null) {
+    out.name = 'Zadejte jméno i příjmení.';
+  }
+  if (draft.email.trim() !== '' && !EMAIL_SHAPE.test(draft.email.trim())) {
+    out.email = 'E-mail nevypadá správně.';
+  }
+  return out;
+}
+
+/** Whether the four boxes are all filled well enough to send. */
+export function isQuickDraftComplete(draft: QuickPatientDraft): boolean {
+  return (
+    splitFullName(draft.name) !== null &&
+    normalizePhone(draft.phone) !== null &&
+    EMAIL_SHAPE.test(draft.email.trim()) &&
+    draft.activityId !== ''
+  );
+}
 
 /** A club the desk is founding from the drawer, handed on to the reservation screen. */
 export interface NewClubDraft {
@@ -257,6 +262,12 @@ export interface NewClubDraft {
   email: string;
   /** Typed as text; parsed where it is used. */
   athleteCount: string;
+  /**
+   * Optional here, but the clubs register will not hold a club without one: with
+   * eight digits the club is created on the spot, without them the reservation
+   * screen is handed the rest of the facts and asks for it there.
+   */
+  ico: string;
 }
 
 export const EMPTY_CLUB_DRAFT: NewClubDraft = {
@@ -265,14 +276,32 @@ export const EMPTY_CLUB_DRAFT: NewClubDraft = {
   phone: '',
   email: '',
   athleteCount: '',
+  ico: '',
 };
+
+/** An IČO is exactly eight digits; spaces typed between them are ignored. */
+export function normalizeIco(value: string): string {
+  return value.replace(/\s+/g, '');
+}
+
+export function isValidIco(value: string): boolean {
+  return /^\d{8}$/.test(normalizeIco(value));
+}
+
+/** `1 sportovec`, `3 sportovci`, `62 sportovců` - the Czech plural, counted. */
+export function athletesWord(count: number): string {
+  const abs = Math.abs(count);
+  const word = abs === 1 ? 'sportovec' : abs >= 2 && abs <= 4 ? 'sportovci' : 'sportovců';
+  return `${count} ${word}`;
+}
 
 /** The header's second line, the way the board words each step. */
 export function stepSubtitle(step: DrawerStep, mode: DrawerMode): string {
   if (step === 2) return 'Krok 2 ze 2 — co se bude dělat';
   switch (mode) {
     case 'quick':
-      return 'Krok 1 ze 2 — nový pacient';
+      /* No second step: the slot is chosen, so the four facts book it. */
+      return 'Rychlá registrace — nový pacient';
     case 'club':
       return 'Krok 1 ze 2 — který klub';
     case 'event':

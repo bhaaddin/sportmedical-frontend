@@ -16,7 +16,6 @@ import { formatDateOnly } from "../../../utils/time";
 import { errorText } from "../errorText";
 import { foundPatientsWord, initials } from "../NewAppointmentDialog.logic";
 import { PatientInfoButton } from "./PatientInfoButton";
-import { QuickRegister } from "./QuickRegister";
 import {
   MIN_QUERY_LENGTH,
   displayName,
@@ -35,24 +34,20 @@ const SHOWN = 12;
  * the count of hits on its right, and under it one card per patient - initials,
  * name, "nar. … · telefon". Searching is still what comes before creating - an
  * empty answer says what it means ("nobody by that name here") and only then
- * offers the registration. Inside the booking drawer that is the drawer's own
- * "Rychlá registrace" card (`onQuickRegister`); on its own, the inline
- * `QuickRegister` form.
+ * offers the registration, which is the drawer's own "Rychlá registrace" card
+ * (`onQuickRegister`).
  */
 export function PatientSearch({
   onPick,
-  onLink,
   onQuickRegister,
   autoFocus = false,
   enabled,
   mayRegister,
 }: {
   onPick: (hit: PatientHit) => void;
-  /** A quick-registration link was generated, lifted for the booked screen. */
-  onLink?: (link: string) => void;
   /**
    * The drawer's quick registration, handed what was typed so the name need not
-   * be typed twice. When given, the inline form is not shown.
+   * be typed twice. Registering is that card's job - this search only points to it.
    */
   onQuickRegister?: (typed: string) => void;
   autoFocus?: boolean;
@@ -201,10 +196,6 @@ export function PatientSearch({
         <Typography variant="caption" sx={{ color: "text.secondary" }}>
           Zobrazena jen část shod — upřesněte jméno.
         </Typography>
-      ) : null}
-
-      {mayRegister && !onQuickRegister ? (
-        <QuickRegister onRegistered={onPick} onLink={onLink} defaultLastName={text.trim()} />
       ) : null}
     </Stack>
   );

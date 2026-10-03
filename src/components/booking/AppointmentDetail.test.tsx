@@ -12,6 +12,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import { setViewport, VIEWPORTS, type ViewportName } from '../../test/viewport';
 
 const get = vi.fn();
 const history = vi.fn();
@@ -20,6 +21,7 @@ const reschedule = vi.fn();
 const getAvailability = vi.fn();
 const range = vi.fn();
 const checkRequired = vi.fn();
+const issueLink = vi.fn();
 
 vi.mock('../../api/appointments', () => ({
   appointmentsApi: { get, history, setStatus, reschedule, getAvailability, range, cancel: vi.fn() },
@@ -56,7 +58,7 @@ vi.mock('../../api/activities', () => ({
 }));
 
 vi.mock('../../api/patientPreRegistration', () => ({
-  patientPreRegistrationApi: { issueLink: vi.fn().mockResolvedValue({ url: null, path: '/dokonceni/abc' }) },
+  patientPreRegistrationApi: { issueLink },
 }));
 
 vi.mock('../../api/patientPortal', () => ({
@@ -115,6 +117,18 @@ const documentCheck = {
 };
 
 beforeEach(() => {
+  setViewport(VIEWPORTS.desktop);
+  issueLink.mockReset().mockResolvedValue({
+    url: 'https://sportmedical.test/dokonceni/tok',
+    path: '/dokonceni/tok',
+    token: 'tok',
+    referenceNumber: 'R1',
+    expiresAtUtc: '2026-10-27T08:30:00Z',
+  });
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    configurable: true,
+  });
   get.mockReset().mockResolvedValue(appointment);
   range.mockReset().mockResolvedValue([dayRow]);
   checkRequired.mockReset().mockResolvedValue(documentCheck);
@@ -201,12 +215,24 @@ describe('the appointment detail', () => {
     expect(within(section).queryByText('Nevyžaduje se')).not.toBeInTheDocument();
   });
 
-  it('says a document is not wanted when the service asks for none', async () => {
+  it('says a document is not wanted when the činnost asks for none, and that the legal consents always are', async () => {
     checkRequired.mockResolvedValue({ allRequiredPresent: true, requirements: [] });
     renderDetail();
     const section = await screen.findByTestId('paperwork-section');
     const row = await within(section).findByText('Lékařské dokumenty');
     expect(row.closest('li')).toHaveTextContent('Nevyžaduje se');
+    expect(within(section).getByText('Tato činnost nevyžaduje žádné dokumenty.')).toBeInTheDocument();
+    expect(within(section).getByTestId('legal-consents')).toHaveTextContent(
+      'Zákonné souhlasy (zpracování osobních údajů, souhlas s výkonem) jsou povinné vždy',
+    );
+  });
+
+  it('lists the documents the činnost asks for, and still the legal consents under them', async () => {
+    renderDetail();
+    const section = await screen.findByTestId('paperwork-section');
+    await within(section).findByText('Výpis ze zdravotní dokumentace');
+    expect(within(section).queryByText('Tato činnost nevyžaduje žádné dokumenty.')).not.toBeInTheDocument();
+    expect(within(section).getByTestId('legal-consents')).toBeInTheDocument();
   });
 
   it('reads PLATBA off the day row and offers to open the invoice there is', async () => {
@@ -267,5 +293,192 @@ describe('the appointment detail', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Uložit změny' }));
     await waitFor(() => expect(reschedule).toHaveBeenCalledWith('c1', 't1', '2026-10-26T09:00:00.000Z'));
     expect(setStatus).not.toHaveBeenCalled();
+  });
+});
+
+
+/* ── Etapa 2: a desk quick registration whose deadline is still running ── */
+
+const HOUR = 3_600_000;
+const inHours = (h: number) => new Date(Date.now() + h * HOUR).toISOString();
+const RED_BG = 'rgb(245, 224, 216)';
+const BEIGE_BG = 'rgb(251, 241, 231)';
+
+describe('a quick registration waiting for the patient', () => {
+  const pending = (hours: number) => ({
+    ...appointment,
+    paperwork: { ready: false, missing: ['registration_incomplete'] },
+    quickRegistrationPending: true,
+    registrationDeadlineUtc: inHours(hours),
+  });
+
+  it('shows the time left as a beige chip, with the deadline in words', async () => {
+    get.mockResolvedValue(pending(20.5));
+    renderDetail();
+    const card = await screen.findByTestId('quick-pending-card');
+    expect(within(card).getByText('Čeká na dokončení registrace · zbývá 21 h')).toHaveStyle({ backgroundColor: BEIGE_BG });
+    expect(within(card).getByText(/^Pacient má čas na dokončení registrace do \d+\. \d+\. \d{4} \d{2}:\d{2}$/)).toBeInTheDocument();
+    /* One card, not the generic beige warning on top of it. */
+    expect(screen.getAllByText('Registrace není dokončena')).toHaveLength(1);
+  });
+
+  it('turns the chip red under three hours', async () => {
+    get.mockResolvedValue(pending(2.5));
+    renderDetail();
+    const card = await screen.findByTestId('quick-pending-card');
+    expect(within(card).getByText('Čeká na dokončení registrace · zbývá 3 h')).toHaveStyle({ backgroundColor: RED_BG });
+  });
+
+  it('re-issues the link through the registration-link endpoint and copies it', async () => {
+    get.mockResolvedValue(pending(10));
+    renderDetail();
+    const card = await screen.findByTestId('quick-pending-card');
+    await userEvent.click(within(card).getByRole('button', { name: 'Zkopírovat odkaz' }));
+
+    await waitFor(() => expect(issueLink).toHaveBeenCalledWith('p1'));
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('https://sportmedical.test/dokonceni/tok'),
+    );
+    expect(await within(card).findByText(/Platí do 27\. 10\. 2026 09:30\./)).toBeInTheDocument();
+  });
+
+  it('takes the deadline from the grid row when the single-appointment view has none', async () => {
+    get.mockResolvedValue({ ...appointment, paperwork: { ready: false, missing: ['registration_incomplete'] } });
+    range.mockResolvedValue([{ ...dayRow, quickRegistrationPending: true, registrationDeadlineUtc: inHours(20.5) }]);
+    renderDetail();
+    const card = await screen.findByTestId('quick-pending-card');
+    expect(await within(card).findByText('Čeká na dokončení registrace · zbývá 21 h')).toBeInTheDocument();
+  });
+
+  it('is absent for an ordinary appointment, which keeps the generic beige warning', async () => {
+    renderDetail();
+    expect(await screen.findByText('Registrace není dokončena')).toBeInTheDocument();
+    expect(screen.queryByTestId('quick-pending-card')).not.toBeInTheDocument();
+  });
+
+  it.each(['phone', 'tablet', 'desktop'] as ViewportName[])('renders at %s width', async (name) => {
+    setViewport(VIEWPORTS[name]);
+    get.mockResolvedValue(pending(20.5));
+    renderDetail();
+    const card = await screen.findByTestId('quick-pending-card');
+    expect(within(card).getByRole('button', { name: 'Zkopírovat odkaz' })).toBeInTheDocument();
+  });
+});
+
+/* ── Etapa 2: the three layouts ── */
+
+describe('the detail on each device', () => {
+  it('desktop (1440): a dialog 880 px wide, the actions in a rail on the right', async () => {
+    renderDetail();
+    await screen.findByText('09:30 — 10:00');
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('data-layout', 'dialog-880');
+    expect(dialog).toHaveStyle({ maxWidth: '880px' });
+    expect(screen.queryByTestId('docked-actions')).not.toBeInTheDocument();
+    expect(screen.getByText('Příchod')).toBeInTheDocument();
+    expect(screen.getByText('Termín')).toBeInTheDocument();
+    for (const name of ['Přišel', 'Nepřišel', 'Upravit', 'Přesunout', 'Zrušit termín']) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    }
+    /* The history and the way out are in the footer, as drawn. */
+    expect(screen.getByText('Historie')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Zavřít' })).toHaveLength(2);
+  });
+
+  it('tablet (834): a centred dialog, not full screen, the rail still beside the content', async () => {
+    setViewport(VIEWPORTS.tablet);
+    renderDetail();
+    await screen.findByText('09:30 — 10:00');
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('data-layout', 'dialog-centered');
+    expect(dialog).not.toHaveStyle({ width: '100%', height: '100%' });
+    expect(screen.queryByTestId('docked-actions')).not.toBeInTheDocument();
+    expect(screen.getByText('Příchod')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upravit' })).toBeInTheDocument();
+  });
+
+  it('phone (390): the whole screen with the five actions docked at the bottom, each 48 px tall', async () => {
+    setViewport(VIEWPORTS.phone, 844);
+    renderDetail();
+    await screen.findByText('09:30 — 10:00');
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('data-layout', 'full-screen');
+    expect(dialog).toHaveStyle({ width: '100%', height: '100%' });
+
+    const dock = screen.getByTestId('docked-actions');
+    for (const name of ['Přišel', 'Nepřišel', 'Upravit', 'Přesunout', 'Zrušit termín']) {
+      const button = within(dock).getByRole('button', { name });
+      expect(button).toHaveStyle({ minHeight: '48px' });
+    }
+    /* No rail on a phone: its labels are not there, the buttons are in the dock. */
+    expect(screen.queryByText('Příchod')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Přišel' })).toHaveLength(1);
+    /* The history scrolls with the content instead of sitting in a footer. */
+    expect(await screen.findByText(/Objednáno — 24\. 10\. 2026/)).toBeInTheDocument();
+    /* One close button, in the corner, 44 px. */
+    const close = within(dialog).getByRole('button', { name: 'Zavřít' });
+    expect(close).toHaveStyle({ width: '44px', height: '44px' });
+  });
+
+  it('phone: arriving goes through the status endpoint from the dock', async () => {
+    setViewport(VIEWPORTS.phone, 844);
+    renderDetail();
+    await screen.findByText('09:30 — 10:00');
+    await userEvent.click(within(screen.getByTestId('docked-actions')).getByRole('button', { name: 'Přišel' }));
+    await waitFor(() => expect(setStatus).toHaveBeenCalledWith('c1', 't1', '2', undefined));
+  });
+
+  it('phone: cancelling asks for its reason inside the dock, so it is not hidden up in the scroll', async () => {
+    setViewport(VIEWPORTS.phone, 844);
+    renderDetail();
+    await screen.findByText('09:30 — 10:00');
+    const dock = screen.getByTestId('docked-actions');
+    await userEvent.click(within(dock).getByRole('button', { name: 'Zrušit termín' }));
+    expect(within(dock).getByLabelText('Důvod')).toBeInTheDocument();
+    expect(within(dock).getByText(/Zrušení se nedá vzít zpět/)).toBeInTheDocument();
+  });
+
+  it('phone: a patient\'s contact buttons are 44 px', async () => {
+    setViewport(VIEWPORTS.phone, 844);
+    renderDetail();
+    await screen.findByText('Bohumil Komárek');
+    for (const name of ['Zavolat', 'Napsat e-mail', 'Otevřít kartu pacienta']) {
+      expect(screen.getByRole('link', { name })).toHaveStyle({ width: '44px', height: '44px' });
+    }
+  });
+
+  it('phone: the edit form is full screen, one field per row, saving docked at the bottom', async () => {
+    setViewport(VIEWPORTS.phone, 844);
+    renderDetail();
+    await screen.findByText('09:30 — 10:00');
+    await userEvent.click(within(screen.getByTestId('docked-actions')).getByRole('button', { name: 'Upravit' }));
+
+    expect(await screen.findByText('Úprava rezervace')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-layout', 'full-screen');
+    const fields = screen.getByLabelText('Datum').closest('div[class*="MuiBox"]')?.parentElement as HTMLElement;
+    expect(fields).toHaveStyle({ gridTemplateColumns: '1fr' });
+
+    const dock = screen.getByTestId('docked-actions');
+    const save = within(dock).getByRole('button', { name: 'Uložit změny' });
+    expect(save).toBeDisabled();
+    expect(save).toHaveStyle({ minHeight: '48px' });
+    expect(within(dock).getByRole('button', { name: 'Zahodit změny' })).toBeInTheDocument();
+    expect(within(dock).getByRole('button', { name: 'Zrušit termín' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Stav' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Potvrzen' }));
+    expect(save).toBeEnabled();
+    await userEvent.click(save);
+    await waitFor(() => expect(setStatus).toHaveBeenCalledWith('c1', 't1', '1'));
+  });
+
+  it('desktop: the edit form keeps its four fields in a row and its footer', async () => {
+    renderDetail();
+    await screen.findByText('09:30 — 10:00');
+    await userEvent.click(screen.getByRole('button', { name: 'Upravit' }));
+    await screen.findByText('Úprava rezervace');
+    expect(screen.queryByTestId('docked-actions')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zahodit změny' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Uložit změny' })).toBeDisabled();
   });
 });

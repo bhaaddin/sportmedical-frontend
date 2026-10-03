@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { AxiosError, AxiosHeaders, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
-import { NOT_CREATED, QuickRegisterError, isNotFound, toQuickRegisterError } from './quickRegisterErrors';
+import {
+  NOT_CREATED,
+  QuickRegisterError,
+  isNotFound,
+  isQuickConflict,
+  quickConflictText,
+  toQuickRegisterError,
+} from './quickRegisterErrors';
 
 /*
  * "Nejde mi ukládat": the pre-registration route explains every refusal in
@@ -28,7 +35,9 @@ describe('why the quick registration was refused', () => {
   });
 
   it('maps the registry\'s field names onto the drawer\'s four boxes', () => {
-    expect(toQuickRegisterError(axiosFailure(400, { code: 'x', message: 'Bez data narození nelze pacienta založit.', errors: { field: ['dateOfBirth'] } })).field).toBe('dateOfBirth');
+    /* No date of birth is asked in quick registration, so there is no box for it. */
+    expect(toQuickRegisterError(axiosFailure(400, { code: 'x', message: 'Bez data narození nelze pacienta založit.', errors: { field: ['dateOfBirth'] } })).field).toBeNull();
+    expect(toQuickRegisterError(axiosFailure(400, { code: 'x', message: 'Prohlídka.', errors: { field: ['activityId'] } })).field).toBe('activityId');
     expect(toQuickRegisterError(axiosFailure(400, { code: 'x', message: 'Příjmení je povinné.', errors: { field: ['lastName'] } })).field).toBe('name');
     expect(toQuickRegisterError(axiosFailure(400, { code: 'x', message: 'E-mail.', errors: { field: ['email'] } })).field).toBe('email');
     /* The controller's own validation puts the field as the key. */
@@ -44,6 +53,23 @@ describe('why the quick registration was refused', () => {
     expect(toQuickRegisterError(axiosFailure(403, {})).message).toBe('Zakládat pacienty v registru nemáte oprávnění.');
     expect(toQuickRegisterError(axiosFailure(403, { message: 'Předregistraci vytváří jen ten, kdo smí zakládat pacienty.' })).message)
       .toBe('Předregistraci vytváří jen ten, kdo smí zakládat pacienty.');
+  });
+
+  it('reads the codes of the quick booking when the server names no field or sentence', () => {
+    const phone = toQuickRegisterError(axiosFailure(400, { code: 'appointments.quick.phone_dialling_code_required' }));
+    expect(phone.field).toBe('phone');
+    expect(phone.message).toBe('Telefon zadejte s předvolbou, například +420 773 539 001.');
+    expect(toQuickRegisterError(axiosFailure(422, { code: 'appointments.quick.email_invalid' })).field).toBe('email');
+    expect(toQuickRegisterError(axiosFailure(422, { code: 'appointments.quick.activity_not_offered' })).field).toBe('activityId');
+    /* The server's sentence still wins over the hint. */
+    expect(toQuickRegisterError(axiosFailure(422, { code: 'appointments.quick.phone_required', message: 'Telefon chybí.' })).message).toBe('Telefon chybí.');
+  });
+
+  it('tells a taken slot (409) from a refusal and uses the server sentence for it', () => {
+    expect(isQuickConflict(axiosFailure(409, { message: 'Termín už je obsazený.' }))).toBe(true);
+    expect(isQuickConflict(axiosFailure(400, {}))).toBe(false);
+    expect(quickConflictText(axiosFailure(409, { message: 'Termín už je obsazený.' }))).toBe('Termín už je obsazený.');
+    expect(quickConflictText(axiosFailure(409, {}))).toMatch(/obsadil někdo jiný/);
   });
 
   it('names a server that could not be reached', () => {

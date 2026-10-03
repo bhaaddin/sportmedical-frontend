@@ -25,6 +25,8 @@ import { activitiesApi } from "../../api/activities";
 import { workingHoursApi } from "../../api/workingHours";
 import { calendarsApi } from "../../api/calendars";
 import { patientPreRegistrationApi } from "../../api/patientPreRegistration";
+import { clubsApi } from "../../services/clubsApi";
+import { useDevice } from "../../layout/useDevice";
 import { BookingApiError } from "../../api/apiError";
 import { isKnownPaperworkReason } from "../../api/bookingContracts";
 import { usePermission } from "../../auth/usePermission";
@@ -46,11 +48,13 @@ import { PatientSearch } from "./patient/PatientSearch";
 import { PatientFilled } from "./patient/PatientFilled";
 import { QuickPatientForm } from "./patient/QuickPatientForm";
 import {
-  NOT_CREATED,
   QuickRegisterError,
-  isNotFound,
+  isQuickConflict,
+  quickConflictText,
   toQuickRegisterError,
 } from "./patient/quickRegisterErrors";
+import { QuickBookedPanel, type QuickBookedView } from "./quick/QuickBookedPanel";
+import { completionUrl, formatDeadline } from "./quick/quickBooking";
 import { usePatientCard } from "./patient/patientCard";
 import { toHit, type PatientHit } from "./patient/patientTypeahead";
 import { patientsApi } from "../../api/patients";
@@ -60,15 +64,16 @@ import {
   drawerTitle,
   endClock,
   formatCzk,
-  initials,
   isCompleteMoment,
   isDateOnly,
+  isQuickDraftComplete,
   isStartOffered,
+  isValidIco,
+  normalizeIco,
   normalizePhone,
   normalizeTime,
   parseLocalDateTime,
   pragueClock,
-  quickRegistrationPath,
   selectionMinutes,
   slotSubtitle,
   slotTitle,
@@ -93,13 +98,16 @@ import {
  *
  * Step 1 - "kdo přijde" - has three cards and one small link:
  *   - **Z databáze**: search the register, pick the row.
- *   - **Rychlá registrace**: the caller is new. With a surname, an e-mail and
- *     a date of birth the register creates a real patient (who gets the
- *     completion link after booking); without them the slot is booked under
- *     the name and telephone alone - the old "Neznámý pacient" - and the
- *     registration is finished at the desk.
- *   - **Klub**: pick or found the club, then hand the slot to the reservation
- *     screen (`/vyhrazeni`), which books places and issues the athletes' link.
+ *   - **Rychlá registrace** (Etapa 2, decision 7, contract C2): the caller is
+ *     new, the slot is already chosen, so four things are typed - name and
+ *     surname, telephone, e-mail, činnost - and ONE call books the slot,
+ *     creates the provisional patient and issues the completion link. No date
+ *     of birth, ever; no second step. The panel that follows shows the
+ *     deadline the server set, the link to copy, and what is prefilled.
+ *     Nothing is sent: there is no mail or SMS provider yet.
+ *   - **Klub**: pick or found the club and the days, then hand over to the
+ *     clubs screen (`/clubs`, `location.state.newBlock`), which opens the block
+ *     dialog with it.
  *   - *Jen zablokovat čas bez pacienta*: the old "Událost bez vazby" - a
  *     slot with nobody behind it, for training or a service visit.
  *
@@ -120,6 +128,12 @@ import {
  *     caller reloads. A `409` is somebody else having been faster: the offer
  *     reloads, the form stays, and the server's sentence is shown calmly.
  *
+ * Where it lives is `DrawerFrame`'s business (Etapa 2, decision 13): the 580 px side
+ * panel on a desktop or a tablet held sideways, a half-height bottom panel that grows
+ * with the keyboard on an upright tablet, the whole screen on a phone. This file
+ * only decides what goes in and switches a few layouts (one field per row, the
+ * mode cards as rows) on `useDevice()`.
+ *
  * The Czech wording lives in `TEXT` below rather than in `cs.json`, which
  * several teams edit at the same time; the keys that were already there are
  * still read through `t()`.
@@ -131,7 +145,7 @@ const SOURCE_STAFF = 0;
 const TEXT = {
   who: "Kdo se objednává",
   findPatient: "Najít pacienta",
-  newPatient: "Nový pacient — základní údaje",
+  newPatient: "Nový pacient — čtyři údaje",
   eventLink: "Jen zablokovat čas bez pacienta",
   eventTitle: "Čas bez pacienta",
   eventExplain: "Termín bez vazby na pacienta — např. školení nebo servis přístroje.",
@@ -154,7 +168,9 @@ const TEXT = {
   noneFree: "V příštích 31 dnech kalendář nenabízí žádný volný termín.",
   seeking: "Hledám volný termín…",
   continue: "Pokračovat",
-  createAndContinue: "Vytvořit a pokračovat",
+  createQuick: "Vytvořit rezervaci",
+  creating: "Vytvářím…",
+  quickBookedTitle: "Rezervace vytvořena",
   book: "Objednat termín",
   total: "Celkem k úhradě",
   pickWhenFirst: "Nejprve vyberte kalendář, datum a čas.",
@@ -169,10 +185,13 @@ const TEXT = {
   smsUnavailable: "SMS zatím nejsou aktivní (připravujeme).",
   sendLink: "Poslat odkaz na vyplnění vstupního dotazníku",
   sendLinkNobody: "Bez registrovaného pacienta není komu odkaz poslat.",
-  walkIn: "nový pacient — registrace se doplní na místě",
   linkTitle: "Odkaz pro pacienta (pošlete e-mailem):",
   linkSent: "E-mail s odkazem je ve frontě k odeslání.",
-  linkValid: "Platí 24 hodin. Když pacient do té doby registraci nedokončí, rezervace se uvolní.",
+  linkValidUntil: (when: string) =>
+    `Platí do ${when}. Když pacient do té doby registraci nedokončí, rezervace se uvolní.`,
+  foundingClub: "Zakládám klub…",
+  clubIcoInvalid: "IČO musí mít přesně 8 číslic.",
+  clubCreateFailed: "Klub se nepodařilo založit. Zkuste to prosím znovu.",
   linkFailed: "Odkaz se nepodařilo vygenerovat.",
   linkRetry: "Zkusit znovu",
 };
@@ -213,6 +232,8 @@ interface NewAppointmentDialogProps {
 interface IssuedLinkView {
   url: string;
   emailQueued: boolean;
+  /** When the link stops working - the server's setting, never a number written here. */
+  expiresAtUtc: string | null;
 }
 
 interface BookedView {
@@ -277,6 +298,14 @@ export function NewAppointmentDialog({
   const [eventName, setEventName] = useState("");
   const [clubId, setClubId] = useState<string | null>(null);
   const [clubDraft, setClubDraft] = useState<NewClubDraft>(EMPTY_CLUB_DRAFT);
+  /* The days a club block covers; empty means "the day of the slot". */
+  const [clubRange, setClubRange] = useState({ from: "", to: "" });
+  const [clubError, setClubError] = useState<string | null>(null);
+  const [foundingClub, setFoundingClub] = useState(false);
+  /* What the desk sees once a quick registration went through. */
+  const [quickBooked, setQuickBooked] = useState<QuickBookedView | null>(null);
+  /* The server's refusal of the four facts, pinned to the box it named. */
+  const [quickRefusal, setQuickRefusal] = useState<QuickRegisterError | null>(null);
 
   /* A patient handed over by their card is looked up once and put in place. */
   useEffect(() => {
@@ -370,7 +399,9 @@ export function NewAppointmentDialog({
   }, [activities, offeredActivities]);
   const day = dayState(previewQuery.data ?? []);
   const dayWordKey = dayStateLabelKey(day);
-  const activity = activities.find((a) => a.id === activityId) ?? null;
+  /* In "Rychlá registrace" the činnost is chosen with the four facts; elsewhere on step 2. */
+  const chosenActivityId = mode === "quick" ? quick.activityId : activityId;
+  const activity = activities.find((a) => a.id === chosenActivityId) ?? null;
 
   /* Is the chosen start offered for this činnost? Only the server knows. */
   const availabilityQuery = useQuery({
@@ -387,77 +418,14 @@ export function NewAppointmentDialog({
   /* The picked patient's contacts, for the SMS line; the same query the card reads. */
   const patientCard = usePatientCard(patient?.id ?? null, patient !== null);
   const quickPhone = normalizePhone(quick.phone);
-  const contactPhone =
-    patient !== null
-      ? (patientCard.data?.phone ?? patient.phone ?? null)
-      : mode === "quick"
-        ? quickPhone
-        : null;
-
-  const quickPath = quickRegistrationPath({
-    name: quick.name,
-    email: quick.email,
-    dateOfBirth: quick.dateOfBirth,
-    mayRegister,
-  });
-
-  /*
-   * "Rychlá registrace" with enough to register: a real patient first, so the
-   * booking carries an id and the patient gets the link. Done on "Vytvořit a
-   * pokračovat", before step 2, the way the inline form always did it.
-   */
-  const register = useMutation({
-    mutationFn: async (): Promise<PatientHit> => {
-      const name = splitFullName(quick.name);
-      if (!name) throw new QuickRegisterError("Zadejte jméno i příjmení.", "name", "client.name");
-      let patientId: string;
-      try {
-        ({ patientId } = await patientPreRegistrationApi.preRegister({
-          firstName: name.firstName,
-          lastName: name.lastName,
-          dateOfBirth: quick.dateOfBirth,
-          email: quick.email.trim(),
-          phone: quickPhone ?? undefined,
-        }));
-      } catch (error) {
-        /* The server's own Czech sentence and the field it names - never the
-           generic "něco se pokazilo" that hid every refusal until 3. 10. 2026. */
-        throw toQuickRegisterError(error);
-      }
-      /*
-       * The route answers 200 for `CandidateReviewRequired` as well - a namesake
-       * with the same date of birth - and then NO patient was created, while the
-       * client-side api still hands back the id it minted. Booking against that
-       * id would fail two screens later with "Záznam se nenašel". So the id is
-       * looked up once; only a definite "no such patient" stops the flow, any
-       * other hiccup lets the booking try as before.
-       */
-      try {
-        await patientsApi.getById(patientId);
-      } catch (error) {
-        if (isNotFound(error)) throw NOT_CREATED;
-      }
-      return {
-        id: patientId,
-        firstName: name.firstName,
-        lastName: name.lastName,
-        fullName: `${name.firstName} ${name.lastName}`,
-        dateOfBirth: quick.dateOfBirth,
-        phone: quickPhone,
-      };
-    },
-    onSuccess: (hit) => {
-      setPatient(hit);
-      setSendLink(true);
-      goToStep2();
-    },
-  });
+  const contactPhone = patient !== null ? (patientCard.data?.phone ?? patient.phone ?? null) : null;
 
   const issueLink = async (patientId: string): Promise<IssuedLinkView> => {
     const issued = await patientPreRegistrationApi.issueLink(patientId);
     return {
       url: issued.url ?? `${window.location.origin}${issued.path}`,
       emailQueued: Boolean(issued.emailQueued || issued.emailWillSend),
+      expiresAtUtc: issued.expiresAtUtc ?? null,
     };
   };
 
@@ -466,8 +434,8 @@ export function NewAppointmentDialog({
       const noteOrNull = note.trim() === "" ? null : note.trim();
 
       /* A registered patient goes through the ordinary booking, with its patient
-         checks and its warnings. A walk-in or an event goes through the
-         unregistered path, which carries the contact instead of a patient id. */
+         checks and its warnings. An event with nobody behind it goes through
+         the unregistered path. (A new caller is "Rychlá registrace" - `bookQuick`.) */
       let view: BookedView;
       if (patient !== null) {
         const result = await appointmentsApi.create({
@@ -487,13 +455,13 @@ export function NewAppointmentDialog({
           patientId: patient.id,
         };
       } else {
-        const name = mode === "event" ? eventName.trim() : quick.name.trim();
+        const name = eventName.trim();
         const appointment = await appointmentsApi.createUnregistered({
           calendarId: effectiveCalendarId,
           activityId: activity?.id ?? "",
           startUtc: startUtc ?? "",
           name: name === "" ? null : name,
-          phone: mode === "quick" ? quickPhone : null,
+          phone: null,
           note: noteOrNull,
           overrideReason: input.overrideReason,
         });
@@ -532,6 +500,71 @@ export function NewAppointmentDialog({
       }
     },
   });
+
+  /*
+   * "Rychlá registrace": one call books the chosen slot, creates the
+   * provisional patient and issues the completion link (C2). A taken slot is a
+   * calm outcome (409): the offer reloads and the form stays. Any other
+   * refusal is shown at the box the server named.
+   */
+  const bookQuick = useMutation({
+    mutationFn: async (input: { overrideReason?: string }): Promise<QuickBookedView> => {
+      const name = splitFullName(quick.name);
+      const phone = normalizePhone(quick.phone);
+      if (!name || !phone || !activity || !startUtc) {
+        throw new QuickRegisterError("Vyplňte všechny čtyři údaje.");
+      }
+      const result = await appointmentsApi.createQuick(effectiveCalendarId, {
+        activityId: activity.id,
+        startUtc,
+        firstName: name.firstName,
+        lastName: name.lastName,
+        phone,
+        email: quick.email.trim(),
+        overrideReason: input.overrideReason,
+      });
+      return {
+        startUtc: result.appointment.startUtc,
+        endUtc: result.appointment.endUtc ?? null,
+        activityName: result.appointment.activityName || activity.name,
+        calendarName: calendar?.name,
+        deadlineUtc:
+          result.registrationDeadlineUtc ??
+          result.appointment.registrationDeadlineUtc ??
+          result.completionLink.expiresAtUtc,
+        linkUrl: completionUrl(result.completionLink, window.location.origin),
+        prefilled: {
+          name: `${name.firstName} ${name.lastName}`,
+          phone,
+          email: quick.email.trim(),
+          activity: `${activity.name} — ${formatCzk(activity.priceCzk)} · ${activity.durationMinutes} min`,
+        },
+      };
+    },
+    onSuccess: (view) => {
+      setConflict(null);
+      setQuickRefusal(null);
+      setQuickBooked(view);
+      onBooked();
+    },
+    onError: (error) => {
+      if (isQuickConflict(error)) {
+        /* 6.3: somebody was faster. Reload the offer, keep what was typed. */
+        setConflict(new BookingApiError("conflict", 409, quickConflictText(error)));
+        setQuickRefusal(null);
+        void queryClient.invalidateQueries({
+          queryKey: ["availability", effectiveCalendarId, activity?.id ?? ""],
+        });
+        return;
+      }
+      setConflict(null);
+      setQuickRefusal(toQuickRegisterError(error));
+    },
+  });
+
+  const submitBooking = (overrideReason?: string) =>
+    mode === "quick" ? bookQuick.mutate({ overrideReason }) : book.mutate({ overrideReason });
+  const booking = book.isPending || bookQuick.isPending;
 
   /* The link, asked for again from the booked screen when the first try failed. */
   const retryLink = useMutation({
@@ -575,6 +608,10 @@ export function NewAppointmentDialog({
     setEventName("");
     setClubId(null);
     setClubDraft(EMPTY_CLUB_DRAFT);
+    setClubRange({ from: "", to: "" });
+    setClubError(null);
+    setQuickBooked(null);
+    setQuickRefusal(null);
     setActivityId("");
     setNote("");
     setSendSms(false);
@@ -585,7 +622,7 @@ export function NewAppointmentDialog({
     setBooked(null);
     setLinkCopied(false);
     book.reset();
-    register.reset();
+    bookQuick.reset();
     retryLink.reset();
   };
 
@@ -598,7 +635,8 @@ export function NewAppointmentDialog({
     setEventName("");
     setSendLink(false);
     setConflict(null);
-    register.reset();
+    setQuickRefusal(null);
+    setClubError(null);
   };
 
   /* From the empty search result straight to the new-patient card, name carried over. */
@@ -666,68 +704,155 @@ export function NewAppointmentDialog({
     close();
   };
 
-  const goToStep2 = () => {
-    /* The examination the caller asked for becomes the činnost, if the day has it. */
-    if (mode === "quick" && quick.activityId !== "" && activityId === "") {
-      setActivityId(quick.activityId);
-    }
-    setStep(2);
-  };
+  const goToStep2 = () => setStep(2);
 
-  /* Who the slot is for is ready when: a patient is picked; a name is typed
-     (quick); a club is picked or named (club); or nothing is needed (event). */
+  /* Who the slot is for is ready when: a patient is picked; a club is picked or
+     named (club); or nothing is needed (event). A new caller (quick) never
+     continues to step 2 - the four facts book the slot straight away. */
   const whoReady =
     patient !== null ||
-    (mode === "quick"
-      ? quick.name.trim().length > 0
-      : mode === "club"
-        ? clubId !== null || clubDraft.name.trim().length > 0
-        : mode === "event");
+    (mode === "club"
+      ? clubId !== null || clubDraft.name.trim().length > 0
+      : mode === "event");
 
-  const canContinue = whoReady && whenComplete && !register.isPending;
+  const rangeFrom = clubRange.from || date;
+  const rangeTo = clubRange.to || clubRange.from || date;
+  const rangeOk = isDateOnly(rangeFrom) && isDateOnly(rangeTo) && rangeTo >= rangeFrom;
+
+  const canContinue =
+    whoReady && whenComplete && !foundingClub && (mode !== "club" || rangeOk);
+
+  /*
+   * Klub: the block itself is the clubs screen's. A club that is not in the list
+   * is founded here when it has an IČO (the register will not hold one without);
+   * without an IČO what was typed goes along as `newClub` and the block dialog
+   * asks for the rest. Either way the days, the calendar and the club arrive in
+   * `location.state.newBlock`.
+   */
+  const continueClub = async () => {
+    setClubError(null);
+    const typedName = clubDraft.name.trim();
+    const headcount = Number.parseInt(clubDraft.athleteCount, 10) || undefined;
+    let resolvedClubId: string | undefined = clubId ?? undefined;
+    let newClub:
+      | {
+          name: string;
+          contactPerson?: string;
+          contactPhone?: string;
+          contactEmail?: string;
+          headcount?: number;
+        }
+      | undefined;
+
+    if (clubId === null && typedName !== "") {
+      const contact = {
+        contactPerson: clubDraft.contactPerson.trim() || undefined,
+        contactPhone: normalizePhone(clubDraft.phone) || undefined,
+        contactEmail: clubDraft.email.trim() || undefined,
+      };
+      if (clubDraft.ico.trim() !== "") {
+        if (!isValidIco(clubDraft.ico)) {
+          setClubError(TEXT.clubIcoInvalid);
+          return;
+        }
+        setFoundingClub(true);
+        try {
+          const created = await clubsApi.create({
+            name: typedName,
+            ico: normalizeIco(clubDraft.ico),
+            ...contact,
+          });
+          resolvedClubId = created.id;
+          void queryClient.invalidateQueries({ queryKey: ["clubs"] });
+        } catch (error) {
+          const data = (error as { response?: { data?: { message?: unknown } } })?.response?.data;
+          setClubError(
+            typeof data?.message === "string" && data.message.trim() !== ""
+              ? data.message
+              : TEXT.clubCreateFailed,
+          );
+          return;
+        } finally {
+          setFoundingClub(false);
+        }
+      } else {
+        newClub = { name: typedName, ...contact, headcount };
+      }
+    }
+
+    navigate("/clubs", {
+      state: {
+        newBlock: {
+          clubId: resolvedClubId,
+          newClub,
+          /* A club founded just now carries its headcount here - the register has no such field. */
+          headcount: resolvedClubId !== undefined && clubId === null ? headcount : undefined,
+          calendarIds: [effectiveCalendarId],
+          fromDate: rangeFrom,
+          toDate: rangeTo,
+          /* The dragged hours, when there were any - the block dialog may use them as its daily window. */
+          dailyFrom: selectionEnd ? normalizeTime(time) : undefined,
+          dailyTo: selectionEnd ?? undefined,
+        },
+      },
+    });
+    close();
+  };
 
   const continueStep1 = () => {
     if (!canContinue) return;
     if (mode === "club") {
-      /* The club flow is the reservation screen's; this hands it the slot. */
-      navigate("/vyhrazeni", {
-        state: {
-          calendarId: effectiveCalendarId,
-          startUtc,
-          endUtc: selectionEnd ? toStartUtc({ date, time: selectionEnd }) : null,
-          clubId: clubId ?? undefined,
-          newClub:
-            clubId === null && clubDraft.name.trim() !== ""
-              ? {
-                  /* The shape /vyhrazeni reads: ReservationHandoff.newClub in
-                     src/pages/booking/PartnerOrdersPage.tsx. */
-                  name: clubDraft.name.trim(),
-                  contactPerson: clubDraft.contactPerson.trim() || undefined,
-                  contactPhone: normalizePhone(clubDraft.phone) || undefined,
-                  contactEmail: clubDraft.email.trim() || undefined,
-                  headcount: Number.parseInt(clubDraft.athleteCount, 10) || undefined,
-                }
-              : undefined,
-        },
-      });
-      close();
-      return;
-    }
-    if (mode === "quick" && patient === null && quickPath === "registered") {
-      register.mutate();
+      void continueClub();
       return;
     }
     goToStep2();
   };
 
-  const ready = whoReady && activity !== null && startUtc !== null && !book.isPending;
+  const ready = whoReady && activity !== null && startUtc !== null && !booking;
   const canBook = ready && availabilityQuery.isSuccess && offered;
   const canBookOverride =
     ready && availabilityQuery.isSuccess && !offered && overrideReason.trim().length > 0;
 
+  /* The same, for the four facts: no "who" to pick, but all four boxes and the činnost. */
+  const quickReady =
+    mode === "quick" &&
+    isQuickDraftComplete(quick) &&
+    activity !== null &&
+    startUtc !== null &&
+    !booking;
+  const canBookQuick = quickReady && availabilityQuery.isSuccess && offered;
+  const canOverrideQuick =
+    quickReady && availabilityQuery.isSuccess && !offered && overrideReason.trim().length > 0;
+
   const labelId = "new-appointment-title";
-  /* Why the quick registration was refused - the server's sentence, pointed at its box. */
-  const registerError = register.error ? toQuickRegisterError(register.error) : null;
+  const device = useDevice();
+  /* Buttons in the pinned footer: 46 px as drawn, and every one a full touch target on a phone. */
+  const footerButton = { minHeight: device === "phone" ? 48 : 46, px: 3 } as const;
+
+  /* ── Rychlá registrace went through: the deadline, the link, what is prefilled ── */
+  if (quickBooked) {
+    return (
+      <DrawerFrame
+        open={open}
+        onClose={close}
+        labelId={labelId}
+        title={TEXT.quickBookedTitle}
+        subtitle={formatPragueDateTime(quickBooked.startUtc)}
+        footer={
+          <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
+            <Button variant="outlined" onClick={resetBooking} sx={{ ...footerButton, flex: device === "phone" ? 1 : "none" }}>
+              {t("booking.new.another")}
+            </Button>
+            <Button variant="contained" onClick={close} sx={{ ...footerButton, flex: device === "phone" ? 1 : "none" }}>
+              {t("booking.detail.close")}
+            </Button>
+          </Stack>
+        }
+      >
+        <QuickBookedPanel view={quickBooked} />
+      </DrawerFrame>
+    );
+  }
 
   /* ── What the drawer looks like once the booking went through ── */
   if (booked) {
@@ -799,7 +924,9 @@ export function NewAppointmentDialog({
               </Stack>
               <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
                 {booked.link.emailQueued ? `${TEXT.linkSent} ` : ""}
-                {TEXT.linkValid}
+                {booked.link.expiresAtUtc
+                  ? TEXT.linkValidUntil(formatDeadline(booked.link.expiresAtUtc))
+                  : ""}
               </Typography>
             </SoftCard>
           ) : booked.linkFailed && booked.patientId ? (
@@ -895,7 +1022,7 @@ export function NewAppointmentDialog({
     ) : (
       <SoftCard tone="soft" sx={{ p: 2 }}>
         <Stack spacing={1.5}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+          <Stack direction={device === "phone" ? "column" : "row"} spacing={1.5}>
             {calendars.length > 1 ? (
               <TextField
                 select
@@ -982,6 +1109,118 @@ export function NewAppointmentDialog({
     </Menu>
   );
 
+  /* Is the chosen time on the server's offer? The same answer for step 2 and for "Rychlá registrace". */
+  const availabilityBlock = activity && whenComplete ? (
+        <AsyncSection
+          isLoading={availabilityQuery.isLoading}
+          isSettled={availabilityQuery.isSuccess || availabilityQuery.isError}
+          error={availabilityQuery.error}
+          isEmpty={false}
+          emptyText=""
+          onRetry={() => void availabilityQuery.refetch()}
+          skeletonRows={1}
+        >
+          {offered ? (
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{
+                alignItems: "center",
+                px: 1.5,
+                py: 1.25,
+                borderRadius: 2.5,
+                bgcolor: DESIGN.tone.green.bg,
+                color: DESIGN.tone.green.fg,
+                border: "1px solid",
+                borderColor: DESIGN.tone.green.line,
+              }}
+            >
+              <CheckCircleOutline fontSize="small" />
+              <Typography variant="body2">{TEXT.free}</Typography>
+            </Stack>
+          ) : (
+            <Stack spacing={1}>
+              <Alert severity="info">{TEXT.notOffered(time)}</Alert>
+              {alternatives.length > 0 ? (
+                <Box>
+                  <Typography variant="body2" sx={{ color: "text.secondary", mb: 0.5 }}>
+                    {TEXT.pickOffered}
+                  </Typography>
+                  <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5 }}>
+                    {alternatives.map((slot) => (
+                      <Button
+                        key={slot.startUtc}
+                        size="small"
+                        variant="outlined"
+                        disabled={booking}
+                        onClick={() => changeTime(pragueClock(slot.startUtc))}
+                      >
+                        {pragueClock(slot.startUtc)}
+                      </Button>
+                    ))}
+                  </Stack>
+                </Box>
+              ) : (
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  {TEXT.noneThatDay}
+                </Typography>
+              )}
+
+              {/*
+                6.4. Not an ordinary action: only a role that may override
+                sees it at all, it is set apart, and it will not submit
+                without a reason somebody typed.
+              */}
+              {mayOverride ? (
+                overriding ? (
+                  <Stack
+                    spacing={1}
+                    sx={{
+                      border: "1px solid",
+                      borderColor: DESIGN.tone.beige.line,
+                      bgcolor: DESIGN.tone.beige.bg,
+                      borderRadius: 2.5,
+                      p: 2,
+                    }}
+                  >
+                    <Typography variant="body2">{t("booking.new.overrideExplain")}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {TEXT.overrideTimeIs(`${formatDateOnly(date)} ${time}`)}
+                    </Typography>
+                    <TextField
+                      size="small"
+                      label={t("booking.new.overrideReason")}
+                      value={overrideReason}
+                      onChange={(e) => setOverrideReason(e.target.value)}
+                    />
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        size="small"
+                        color="warning"
+                        variant="contained"
+                        disabled={!(mode === "quick" ? canOverrideQuick : canBookOverride)}
+                        onClick={() => submitBooking(overrideReason.trim())}
+                      >
+                        {t("booking.new.overrideBook")}
+                      </Button>
+                      <Button size="small" onClick={() => setOverriding(false)}>
+                        {t("booking.common.cancel")}
+                      </Button>
+                    </Stack>
+                  </Stack>
+                ) : (
+                  <Box>
+                    <Button size="small" color="warning" onClick={() => setOverriding(true)}>
+                      {t("booking.new.overrideOpen")}
+                    </Button>
+                  </Box>
+                )
+              ) : null}
+            </Stack>
+          )}
+        </AsyncSection>
+      ) : null;
+
   const step1 = (
     <Stack spacing={3}>
       <AsyncSection
@@ -1008,7 +1247,7 @@ export function NewAppointmentDialog({
               </Typography>
               <TextField
                 fullWidth
-                autoFocus
+                autoFocus={device === "desktop"}
                 placeholder="např. Školení, Servis přístroje"
                 value={eventName}
                 onChange={(e) => setEventName(e.target.value)}
@@ -1029,7 +1268,7 @@ export function NewAppointmentDialog({
       ) : (
         <Box component="section" aria-label={TEXT.who}>
           <SectionLabel>{TEXT.who}</SectionLabel>
-          <ModeCards value={mode} onChange={changeMode} disabled={register.isPending} />
+          <ModeCards value={mode} onChange={changeMode} disabled={booking || foundingClub} />
           <Link
             component="button"
             type="button"
@@ -1050,7 +1289,8 @@ export function NewAppointmentDialog({
           ) : (
             <PatientSearch
               enabled={open}
-              autoFocus={fromGrid}
+              /* A finger does not want the keyboard thrown up the moment the panel opens. */
+              autoFocus={fromGrid && device === "desktop"}
               mayRegister={mayRegister}
               onPick={setPatient}
               onQuickRegister={quickRegisterFromSearch}
@@ -1062,24 +1302,34 @@ export function NewAppointmentDialog({
       {mode === "quick" ? (
         <Box component="section" aria-label={TEXT.newPatient}>
           <SectionLabel>{TEXT.newPatient}</SectionLabel>
-          {patient ? (
-            <PatientFilled hit={patient} onChange={() => setPatient(null)} />
-          ) : (
-            <QuickPatientForm
-              value={quick}
-              onChange={setQuick}
-              activities={offeredActivities.length > 0 ? offeredActivities : activities}
-              path={quickPath}
-              mayRegister={mayRegister}
-              disabled={register.isPending}
-              fieldErrors={
-                registerError?.field ? { [registerError.field]: registerError.message } : undefined
+          <QuickPatientForm
+            value={quick}
+            onChange={(next) => {
+              setQuick(next);
+              /* What was refused is no longer what is typed. */
+              if (quickRefusal) setQuickRefusal(null);
+              if (next.activityId !== quick.activityId) {
+                setOverriding(false);
+                setConflict(null);
               }
-            />
-          )}
-          {registerError ? (
+            }}
+            activities={offeredActivities}
+            otherActivities={otherActivities}
+            disabled={booking}
+            fieldErrors={
+              quickRefusal?.field ? { [quickRefusal.field]: quickRefusal.message } : undefined
+            }
+          />
+          {/* The server's answer on the chosen time, with the override for whoever may use it. */}
+          {availabilityBlock ? <Box sx={{ mt: 2 }}>{availabilityBlock}</Box> : null}
+          {conflict ? (
+            <Alert severity="info" sx={{ mt: 1.5 }} onClose={() => setConflict(null)}>
+              {errorText(conflict, t)}
+            </Alert>
+          ) : null}
+          {quickRefusal && !quickRefusal.field ? (
             <Alert severity="error" sx={{ mt: 1.5 }}>
-              {registerError.message}
+              {quickRefusal.message}
             </Alert>
           ) : null}
         </Box>
@@ -1090,7 +1340,14 @@ export function NewAppointmentDialog({
           selectedId={clubId}
           onSelect={setClubId}
           draft={clubDraft}
-          onDraft={setClubDraft}
+          onDraft={(next) => {
+            setClubDraft(next);
+            setClubError(null);
+          }}
+          range={{ from: rangeFrom, to: rangeTo }}
+          onRange={setClubRange}
+          error={clubError}
+          disabled={foundingClub}
         />
       ) : null}
     </Stack>
@@ -1104,18 +1361,14 @@ export function NewAppointmentDialog({
       <SoftCard tone="soft" sx={{ p: 2 }}>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
           <Avatar sx={{ width: 40, height: 40, bgcolor: "primary.main", color: "primary.contrastText" }}>
-            {mode === "event" ? <EventBusyOutlined fontSize="small" /> : initials(quick.name) || "?"}
+            <EventBusyOutlined fontSize="small" />
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography sx={{ fontWeight: 700, lineHeight: 1.3 }}>
-              {mode === "event" ? eventName.trim() || TEXT.eventTitle : quick.name.trim()}
+              {eventName.trim() || TEXT.eventTitle}
             </Typography>
             <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-              {mode === "event"
-                ? TEXT.eventExplain
-                : [quickPhone, quick.email.trim() || null, TEXT.walkIn]
-                    .filter((v): v is string => Boolean(v))
-                    .join(" · ")}
+              {TEXT.eventExplain}
             </Typography>
           </Box>
           <Button size="small" onClick={() => setStep(1)}>
@@ -1178,7 +1431,7 @@ export function NewAppointmentDialog({
               setOverriding(false);
               setConflict(null);
             }}
-            disabled={book.isPending}
+            disabled={booking}
           />
         </AsyncSection>
       </Box>
@@ -1186,7 +1439,7 @@ export function NewAppointmentDialog({
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr 1fr", sm: "1.4fr 1fr 1fr 1fr" },
+          gridTemplateColumns: device === "phone" ? "1fr" : "1.4fr 1fr 1fr 1fr",
           gap: 1.5,
         }}
       >
@@ -1252,116 +1505,7 @@ export function NewAppointmentDialog({
         </Alert>
       ) : null}
 
-      {activity && whenComplete ? (
-        <AsyncSection
-          isLoading={availabilityQuery.isLoading}
-          isSettled={availabilityQuery.isSuccess || availabilityQuery.isError}
-          error={availabilityQuery.error}
-          isEmpty={false}
-          emptyText=""
-          onRetry={() => void availabilityQuery.refetch()}
-          skeletonRows={1}
-        >
-          {offered ? (
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{
-                alignItems: "center",
-                px: 1.5,
-                py: 1.25,
-                borderRadius: 2.5,
-                bgcolor: DESIGN.tone.green.bg,
-                color: DESIGN.tone.green.fg,
-                border: "1px solid",
-                borderColor: DESIGN.tone.green.line,
-              }}
-            >
-              <CheckCircleOutline fontSize="small" />
-              <Typography variant="body2">{TEXT.free}</Typography>
-            </Stack>
-          ) : (
-            <Stack spacing={1}>
-              <Alert severity="info">{TEXT.notOffered(time)}</Alert>
-              {alternatives.length > 0 ? (
-                <Box>
-                  <Typography variant="body2" sx={{ color: "text.secondary", mb: 0.5 }}>
-                    {TEXT.pickOffered}
-                  </Typography>
-                  <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5 }}>
-                    {alternatives.map((slot) => (
-                      <Button
-                        key={slot.startUtc}
-                        size="small"
-                        variant="outlined"
-                        disabled={book.isPending}
-                        onClick={() => changeTime(pragueClock(slot.startUtc))}
-                      >
-                        {pragueClock(slot.startUtc)}
-                      </Button>
-                    ))}
-                  </Stack>
-                </Box>
-              ) : (
-                <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                  {TEXT.noneThatDay}
-                </Typography>
-              )}
-
-              {/*
-                6.4. Not an ordinary action: only a role that may override
-                sees it at all, it is set apart, and it will not submit
-                without a reason somebody typed.
-              */}
-              {mayOverride ? (
-                overriding ? (
-                  <Stack
-                    spacing={1}
-                    sx={{
-                      border: "1px solid",
-                      borderColor: DESIGN.tone.beige.line,
-                      bgcolor: DESIGN.tone.beige.bg,
-                      borderRadius: 2.5,
-                      p: 2,
-                    }}
-                  >
-                    <Typography variant="body2">{t("booking.new.overrideExplain")}</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {TEXT.overrideTimeIs(`${formatDateOnly(date)} ${time}`)}
-                    </Typography>
-                    <TextField
-                      size="small"
-                      label={t("booking.new.overrideReason")}
-                      value={overrideReason}
-                      onChange={(e) => setOverrideReason(e.target.value)}
-                    />
-                    <Stack direction="row" spacing={1}>
-                      <Button
-                        size="small"
-                        color="warning"
-                        variant="contained"
-                        disabled={!canBookOverride}
-                        onClick={() => book.mutate({ overrideReason: overrideReason.trim() })}
-                      >
-                        {t("booking.new.overrideBook")}
-                      </Button>
-                      <Button size="small" onClick={() => setOverriding(false)}>
-                        {t("booking.common.cancel")}
-                      </Button>
-                    </Stack>
-                  </Stack>
-                ) : (
-                  <Box>
-                    <Button size="small" color="warning" onClick={() => setOverriding(true)}>
-                      {t("booking.new.overrideOpen")}
-                    </Button>
-                  </Box>
-                )
-              ) : null}
-            </Stack>
-          )}
-        </AsyncSection>
-      ) : null}
+      {availabilityBlock}
 
       <Box component="section">
         <SectionLabel>{TEXT.note}</SectionLabel>
@@ -1420,23 +1564,43 @@ export function NewAppointmentDialog({
     </Stack>
   );
 
+  const phone = device === "phone";
+  /* On a phone the primary action is the wider half of the pinned row. */
+  const cancelButton = (
+    <Button variant="outlined" onClick={close} sx={{ ...footerButton, flex: phone ? 1 : "none" }}>
+      {t("booking.common.cancel")}
+    </Button>
+  );
+  const primary = (label: string, disabled: boolean, onClick: () => void) => (
+    <Button
+      variant="contained"
+      disabled={disabled}
+      onClick={onClick}
+      sx={{ ...footerButton, flex: phone ? 2 : "none" }}
+    >
+      {label}
+    </Button>
+  );
+
   const footer =
     step === 1 ? (
       <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
-        <Button variant="outlined" onClick={close}>
-          {t("booking.common.cancel")}
-        </Button>
-        <Button variant="contained" disabled={!canContinue} onClick={continueStep1}>
-          {register.isPending
-            ? "Vytvářím…"
-            : mode === "quick" && patient === null && quickPath === "registered"
-              ? TEXT.createAndContinue
-              : TEXT.continue}
-        </Button>
+        {cancelButton}
+        {mode === "quick"
+          ? primary(
+              bookQuick.isPending ? TEXT.creating : TEXT.createQuick,
+              !canBookQuick,
+              () => submitBooking(),
+            )
+          : primary(
+              foundingClub ? TEXT.foundingClub : TEXT.continue,
+              !canContinue,
+              continueStep1,
+            )}
       </Stack>
     ) : (
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Stack spacing={phone ? 1.5 : 0} direction={phone ? "column" : "row"} sx={{ alignItems: phone ? "stretch" : "center" }}>
+        <Box sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: phone ? "baseline" : "flex-start", justifyContent: "space-between", flexDirection: phone ? "row" : "column" }}>
           <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
             {TEXT.total}
           </Typography>
@@ -1444,12 +1608,10 @@ export function NewAppointmentDialog({
             {formatCzk(activity?.priceCzk ?? null)}
           </Typography>
         </Box>
-        <Button variant="outlined" onClick={close}>
-          {t("booking.common.cancel")}
-        </Button>
-        <Button variant="contained" disabled={!canBook} onClick={() => book.mutate({})}>
-          {TEXT.book}
-        </Button>
+        <Stack direction="row" spacing={1}>
+          {cancelButton}
+          {primary(TEXT.book, !canBook, () => submitBooking())}
+        </Stack>
       </Stack>
     );
 

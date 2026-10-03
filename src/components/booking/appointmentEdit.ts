@@ -213,7 +213,8 @@ export function isOfferedStart(slots: AvailabilitySlot[] | undefined, startUtc: 
  *   - `questionnaireRequirement` on the činnost (4.3): whether a questionnaire
  *     is asked for at all, so "nothing missing" can be told from "not wanted";
  *   - `/api/documents/patient/{id}/check`, filtered to this appointment: one
- *     row per document the service's rules ask for, with the server's standing.
+ *     row per document this činnost asks for (its `requiredDocumentTemplateIds`,
+ *     Etapa 2 C1), with the server's standing. Nothing is required by default.
  *
  * `paperwork === null` means the registry could not answer (see
  * `paperworkSchema`), and that is drawn as "Nelze ověřit", never as fine.
@@ -231,6 +232,17 @@ export interface PaperworkRow {
   /** The one thing the desk can do about a missing row today. */
   action?: PaperworkAction;
 }
+
+/** What the panel says when the činnost asks for no document. */
+export const EMPTY_DOCUMENTS_TEXT = "Tato činnost nevyžaduje žádné dokumenty.";
+
+/**
+ * The legal consents are not a document template and cannot be switched off
+ * (GDPR, and consent to the procedure under zákon č. 372/2011 Sb.): the panel
+ * says so under the list, whatever the činnost asks for besides.
+ */
+export const LEGAL_CONSENTS_TEXT =
+  "Zákonné souhlasy (zpracování osobních údajů, souhlas s výkonem) jsou povinné vždy a pacient je dává při dokončení registrace.";
 
 export const PAPERWORK_STATE_LABEL: Record<PaperworkState, string> = {
   ok: "V pořádku",
@@ -395,7 +407,8 @@ export function paperworkRows(input: PaperworkInput): PaperworkRow[] {
       key: "documents",
       label: "Lékařské dokumenty",
       state: "notRequired",
-      detail: "tato služba žádný dokument nevyžaduje",
+      /* Etapa 2: nothing is required by default; the admin picks documents per činnost. */
+      detail: EMPTY_DOCUMENTS_TEXT,
     });
   }
 

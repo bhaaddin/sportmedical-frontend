@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  athletesWord,
   clubMatches,
   clubsWord,
   drawerTitle,
@@ -8,13 +9,15 @@ import {
   foundPatientsWord,
   initials,
   isCompleteMoment,
+  isQuickDraftComplete,
+  isValidIco,
   isStartOffered,
   minutesWord,
   normalizePhone,
   normalizeTime,
   parseLocalDateTime,
   pragueClock,
-  quickRegistrationPath,
+  quickDraftProblems,
   rangeLabel,
   selectionMinutes,
   slotSubtitle,
@@ -165,19 +168,39 @@ describe('the drawer\'s words (board 2026-10-03)', () => {
     expect(normalizePhone('abc')).toBeNull();
   });
 
-  it('registers a real patient only with a surname, an e-mail and a date of birth', () => {
-    const full = { name: 'Filip Fehér', email: 'f@x.cz', dateOfBirth: '1990-01-01', mayRegister: true };
-    expect(quickRegistrationPath(full)).toBe('registered');
-    expect(quickRegistrationPath({ ...full, email: '' })).toBe('walkIn');
-    expect(quickRegistrationPath({ ...full, dateOfBirth: '' })).toBe('walkIn');
-    expect(quickRegistrationPath({ ...full, name: 'Filip' })).toBe('walkIn');
-    expect(quickRegistrationPath({ ...full, mayRegister: false })).toBe('walkIn');
-    expect(quickRegistrationPath({ ...full, name: ' ' })).toBeNull();
+  it('needs exactly four things for a quick registration, and a date of birth is not one of them', () => {
+    const draft = { name: 'Filip Fehér', phone: '+420773539001', email: 'f@x.cz', activityId: 'a1' };
+    expect(isQuickDraftComplete(draft)).toBe(true);
+    expect(isQuickDraftComplete({ ...draft, name: 'Filip' })).toBe(false);
+    expect(isQuickDraftComplete({ ...draft, phone: '' })).toBe(false);
+    expect(isQuickDraftComplete({ ...draft, email: 'bez-zavinace' })).toBe(false);
+    expect(isQuickDraftComplete({ ...draft, activityId: '' })).toBe(false);
+    /* There is no such field on the draft at all. */
+    expect(Object.keys(draft)).not.toContain('dateOfBirth');
+  });
+
+  it('says what is plainly wrong in the four boxes before the server does', () => {
+    expect(quickDraftProblems({ name: 'Filip', phone: '', email: '', activityId: '' })).toEqual({
+      name: 'Zadejte jméno i příjmení.',
+    });
+    expect(quickDraftProblems({ name: '', phone: '', email: 'x@', activityId: '' }).email).toBe('E-mail nevypadá správně.');
+    expect(quickDraftProblems({ name: 'Filip Fehér', phone: '', email: 'f@x.cz', activityId: '' })).toEqual({});
+  });
+
+  it('knows an IČO is eight digits', () => {
+    expect(isValidIco('12345678')).toBe(true);
+    expect(isValidIco('123 456 78')).toBe(true);
+    expect(isValidIco('1234567')).toBe(false);
+    expect(isValidIco('1234567a')).toBe(false);
+    expect(athletesWord(1)).toBe('1 sportovec');
+    expect(athletesWord(3)).toBe('3 sportovci');
+    expect(athletesWord(62)).toBe('62 sportovců');
   });
 
   it('heads each step the way the board words it', () => {
     expect(stepSubtitle(1, 'database')).toBe('Krok 1 ze 2 — kdo přijde');
-    expect(stepSubtitle(1, 'quick')).toBe('Krok 1 ze 2 — nový pacient');
+    /* A new caller has no second step: the four facts book the slot. */
+    expect(stepSubtitle(1, 'quick')).toBe('Rychlá registrace — nový pacient');
     expect(stepSubtitle(1, 'club')).toBe('Krok 1 ze 2 — který klub');
     expect(stepSubtitle(2, 'quick')).toBe('Krok 2 ze 2 — co se bude dělat');
     expect(drawerTitle('club')).toBe('Hromadná rezervace pro klub');

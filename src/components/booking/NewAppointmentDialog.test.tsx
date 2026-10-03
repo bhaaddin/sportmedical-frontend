@@ -9,6 +9,10 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { setViewport, VIEWPORTS } from '../../test/viewport';
+
+/* Typing through MUI is slow on a loaded machine; these are whole-flow tests. */
+vi.setConfig({ testTimeout: 20000 });
 
 const listCalendars = vi.fn();
 const listActivities = vi.fn();
@@ -16,6 +20,8 @@ const preview = vi.fn();
 const getAvailability = vi.fn();
 const create = vi.fn();
 const createUnregistered = vi.fn();
+const createQuick = vi.fn();
+const createClub = vi.fn();
 const listPatients = vi.fn();
 const getProfile = vi.fn();
 const getById = vi.fn();
@@ -27,20 +33,20 @@ vi.mock('../../api/calendars', () => ({ calendarsApi: { list: listCalendars } })
 vi.mock('../../api/activities', () => ({ activitiesApi: { list: listActivities } }));
 vi.mock('../../api/workingHours', () => ({ workingHoursApi: { preview } }));
 vi.mock('../../api/appointments', () => ({
-  appointmentsApi: { getAvailability, create, createUnregistered },
+  appointmentsApi: { getAvailability, create, createUnregistered, createQuick },
 }));
 vi.mock('../../api/patients', () => ({ patientsApi: { list: listPatients, getProfile, getById } }));
 vi.mock('../../api/patientPreRegistration', () => ({
   patientPreRegistrationApi: { preRegister, issueLink },
 }));
-vi.mock('../../services/clubsApi', () => ({ clubsApi: { getAll: getAllClubs } }));
+vi.mock('../../services/clubsApi', () => ({ clubsApi: { getAll: getAllClubs, create: createClub } }));
 
 const { NewAppointmentDialog } = await import('./NewAppointmentDialog');
 
-/** Where the club flow lands: the reservation screen reads the slot from `location.state`. */
-function ReservationStub() {
+/** Where the club flow lands: the clubs screen reads `location.state.newBlock`. */
+function ClubsStub() {
   const location = useLocation();
-  return <pre data-testid="vyhrazeni-state">{JSON.stringify(location.state)}</pre>;
+  return <pre data-testid="clubs-state">{JSON.stringify(location.state)}</pre>;
 }
 
 function renderDialog(props: Partial<Parameters<typeof NewAppointmentDialog>[0]> = {}) {
@@ -65,7 +71,7 @@ function renderDialog(props: Partial<Parameters<typeof NewAppointmentDialog>[0]>
               />
             }
           />
-          <Route path="/vyhrazeni" element={<ReservationStub />} />
+          <Route path="/clubs" element={<ClubsStub />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -85,6 +91,7 @@ async function pickActivity(name = 'Prohlídka') {
 }
 
 beforeEach(() => {
+  setViewport(VIEWPORTS.desktop);
   window.localStorage.setItem('permissions', JSON.stringify(['bookings.create', 'patients.view']));
   listCalendars.mockReset().mockResolvedValue([
     { id: 'c1', name: 'Sportovní prohlídka', isActive: true },
@@ -109,6 +116,24 @@ beforeEach(() => {
     warnings: [],
   });
   createUnregistered.mockReset().mockResolvedValue({ startUtc: '2026-09-24T07:00:00Z' });
+  createQuick.mockReset().mockResolvedValue({
+    appointment: {
+      id: 'q1',
+      startUtc: '2026-09-24T07:00:00Z',
+      endUtc: '2026-09-24T07:30:00Z',
+      activityName: 'Prohlídka',
+      registrationDeadlineUtc: '2026-09-25T07:00:00Z',
+      quickRegistrationPending: true,
+    },
+    patientId: 'np1',
+    completionLink: {
+      url: 'https://sportmedical.test/dokonceni/tok123',
+      token: 'tok123',
+      expiresAtUtc: '2026-09-25T07:00:00Z',
+    },
+    registrationDeadlineUtc: '2026-09-25T07:00:00Z',
+  });
+  createClub.mockReset().mockResolvedValue({ id: 'k9', name: 'TJ Sokol Slaný' });
   listPatients.mockReset().mockResolvedValue({
     items: [
       {
@@ -140,6 +165,8 @@ beforeEach(() => {
       ico: '123',
       contactPerson: 'Jan Novák',
       contactPhone: '+420 606 112 884',
+      discountPercent: 10,
+      athleteCount: 62,
       paymentTermsDays: 14,
       isActive: true,
       createdAt: '2026-01-01T00:00:00Z',
@@ -350,155 +377,245 @@ describe('step 2 — co se bude dělat', () => {
   });
 });
 
-describe('rychlá registrace', () => {
-  it('books a caller as a walk-in when there is only a name and a telephone', async () => {
-    window.localStorage.setItem(
-      'permissions',
-      JSON.stringify(['bookings.create', 'patients.view', 'patients.register']),
-    );
+const QUICK_PERMISSIONS = ['bookings.create', 'patients.view', 'patients.register'];
+
+/** Axios-shaped refusal, the way the booking endpoint answers it. */
+async function refusal(status: number, data: unknown) {
+  const { AxiosError, AxiosHeaders } = await import('axios');
+  const config = { headers: new AxiosHeaders() };
+  return new AxiosError('Request failed', String(status), config as never, undefined, {
+    status,
+    statusText: '',
+    headers: {},
+    config: config as never,
+    data,
+  });
+}
+
+/** Type the four facts and choose the činnost; the slot's offer is asked of the server after that. */
+async function fillQuick(
+  facts: { name?: string; phone?: string; email?: string; activity?: string | null } = {},
+) {
+  const { name = 'Nový Pacient', phone = '773539001', email = 'novy@example.cz', activity = 'Prohlídka' } = facts;
+  await userEvent.click(screen.getByRole('radio', { name: 'Rychlá registrace' }));
+  await userEvent.type(screen.getByLabelText('Jméno a příjmení'), name);
+  await userEvent.type(screen.getByLabelText('Telefon'), phone);
+  await userEvent.type(screen.getByLabelText('E-mail'), email);
+  if (activity !== null) {
+    await userEvent.click(screen.getByRole('combobox', { name: 'Prohlídka, na kterou volal' }));
+    await userEvent.click(await screen.findByRole('option', { name: new RegExp(`^${activity} —`) }));
+  }
+}
+
+describe('rychlá registrace — čtyři údaje', () => {
+  beforeEach(() => {
+    window.localStorage.setItem('permissions', JSON.stringify(QUICK_PERMISSIONS));
+  });
+
+  it('asks for exactly four things and never for a date of birth', async () => {
     renderDialog();
-
     await userEvent.click(screen.getByRole('radio', { name: 'Rychlá registrace' }));
-    expect(screen.getByText('Krok 1 ze 2 — nový pacient')).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText('Jméno a příjmení'), 'Nový Pacient');
-    await userEvent.type(screen.getByLabelText('Telefon'), '773 539 001');
 
-    const go = screen.getByRole('button', { name: 'Pokračovat' });
-    expect(go).toBeEnabled();
-    await userEvent.click(go);
+    expect(screen.getByText('Rychlá registrace — nový pacient')).toBeInTheDocument();
+    expect(screen.getByText('Nový pacient — čtyři údaje')).toBeInTheDocument();
+    expect(screen.getByLabelText('Jméno a příjmení')).toBeInTheDocument();
+    expect(screen.getByLabelText('Telefon')).toBeInTheDocument();
+    expect(screen.getByLabelText('E-mail')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Prohlídka, na kterou volal' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Datum narození')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Datum narození/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Víc teď nepotřebujeme/)).toBeInTheDocument();
+    /* The slot is chosen, so there is no second step to continue to. */
+    expect(screen.getByRole('button', { name: 'Vytvořit rezervaci' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Pokračovat' })).not.toBeInTheDocument();
+  });
 
-    expect(await screen.findByText('Krok 2 ze 2 — co se bude dělat')).toBeInTheDocument();
-    expect(screen.getByText('Nový Pacient')).toBeInTheDocument();
-    expect(screen.getByText(/registrace se doplní na místě/)).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: /Poslat odkaz/ })).toBeDisabled();
-    expect(preRegister).not.toHaveBeenCalled();
+  it('lists the činnosti with price and minutes from the price list', async () => {
+    renderDialog();
+    await userEvent.click(screen.getByRole('radio', { name: 'Rychlá registrace' }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Prohlídka, na kterou volal' }));
+    expect(await screen.findByRole('option', { name: /^Prohlídka — 1.600.Kč · 30 min$/ })).toBeInTheDocument();
+    /* The rest of the price list follows, marked as not offered today. */
+    expect(screen.getByRole('option', { name: /^Diagnostika — .* · 90 min · dnes se nenabízí$/ })).toBeInTheDocument();
+  });
 
-    await pickActivity();
-    await screen.findByText('Slot je volný. Nekoliduje s žádnou rezervací ani s obědem.');
-    await userEvent.click(screen.getByRole('button', { name: 'Objednat termín' }));
+  it('books the chosen slot with one call and shows the deadline, the link and what is prefilled', async () => {
+    const { onBooked } = renderDialog();
+    await fillQuick();
+    expect(
+      await screen.findByText('Slot je volný. Nekoliduje s žádnou rezervací ani s obědem.'),
+    ).toBeInTheDocument();
+    expect(getAvailability).toHaveBeenCalledWith('c1', 'a1', '2026-09-24', '2026-09-24');
 
-    await waitFor(() => expect(createUnregistered).toHaveBeenCalledTimes(1));
-    expect(createUnregistered).toHaveBeenCalledWith({
-      calendarId: 'c1',
+    await userEvent.click(screen.getByRole('button', { name: 'Vytvořit rezervaci' }));
+
+    await waitFor(() => expect(createQuick).toHaveBeenCalledTimes(1));
+    expect(createQuick).toHaveBeenCalledWith('c1', {
       activityId: 'a1',
       startUtc: '2026-09-24T07:00:00.000Z',
-      name: 'Nový Pacient',
+      firstName: 'Nový',
+      lastName: 'Pacient',
+      /* The dialling code travels with the number. */
       phone: '+420773539001',
-      note: null,
+      email: 'novy@example.cz',
       overrideReason: undefined,
     });
+    /* No second booking path, no separate pre-registration, no walk-in. */
     expect(create).not.toHaveBeenCalled();
-  });
+    expect(createUnregistered).not.toHaveBeenCalled();
+    expect(preRegister).not.toHaveBeenCalled();
+    expect(onBooked).toHaveBeenCalled();
 
-  it('registers a real patient with e-mail and date of birth, then issues the link after booking', async () => {
-    window.localStorage.setItem(
-      'permissions',
-      JSON.stringify(['bookings.create', 'patients.view', 'patients.register']),
+    expect(await screen.findByRole('heading', { name: 'Rezervace vytvořena' })).toBeInTheDocument();
+    /* 2026-09-25T07:00Z is 09:00 in Prague; the length comes from the server, not from a literal. */
+    expect(screen.getByText('Pacient má čas na dokončení registrace do 25. 9. 2026 09:00')).toBeInTheDocument();
+    expect(screen.queryByText(/24 hodin/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('quick-completion-link')).toHaveTextContent(
+      'https://sportmedical.test/dokonceni/tok123',
     );
-    renderDialog();
-
-    await userEvent.click(screen.getByRole('radio', { name: 'Rychlá registrace' }));
-    await userEvent.type(screen.getByLabelText('Jméno a příjmení'), 'Nový Pacient');
-    await userEvent.type(screen.getByLabelText('Telefon'), '+421 908 123 456');
-    await userEvent.type(screen.getByLabelText('E-mail'), 'novy@example.cz');
-    fireEvent.change(screen.getByLabelText('Datum narození'), { target: { value: '1990-05-05' } });
-    expect(screen.getByText(/Víc teď nepotřebujeme/)).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Vytvořit a pokračovat' }));
-
-    await waitFor(() =>
-      expect(preRegister).toHaveBeenCalledWith({
-        firstName: 'Nový',
-        lastName: 'Pacient',
-        dateOfBirth: '1990-05-05',
-        email: 'novy@example.cz',
-        phone: '+421908123456',
-      }),
-    );
-    expect(await screen.findByText('Krok 2 ze 2 — co se bude dělat')).toBeInTheDocument();
-    expect(screen.getByLabelText('Vybraný pacient Nový Pacient')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: /Poslat odkaz/ })).toBeChecked();
-    /* Nothing is issued before the booking: the e-mail is to name the appointment. */
+    /* What the patient will find prefilled. */
+    const prefilled = screen.getByText('Pacient už má vyplněno').parentElement as HTMLElement;
+    expect(within(prefilled).getByText('Nový Pacient')).toBeInTheDocument();
+    expect(within(prefilled).getByText('+420773539001')).toBeInTheDocument();
+    expect(within(prefilled).getByText('novy@example.cz')).toBeInTheDocument();
+    expect(within(prefilled).getByText(/Prohlídka — 1.600.Kč · 30 min/)).toBeInTheDocument();
+    /* Nothing was sent - and the page says so. */
+    expect(screen.getByText('Odkaz zatím odešlete sami — odesílání zpráv se připravuje.')).toBeInTheDocument();
     expect(issueLink).not.toHaveBeenCalled();
-
-    await pickActivity();
-    await screen.findByText('Slot je volný. Nekoliduje s žádnou rezervací ani s obědem.');
-    await userEvent.click(screen.getByRole('button', { name: 'Objednat termín' }));
-
-    await waitFor(() =>
-      expect(create).toHaveBeenCalledWith(expect.objectContaining({ patientId: 'np1' })),
-    );
-    await waitFor(() => expect(issueLink).toHaveBeenCalledWith('np1'));
-    expect(await screen.findByText('https://sportmedical.test/r/abc')).toBeInTheDocument();
-    expect(screen.getByText(/E-mail s odkazem je ve frontě/)).toBeInTheDocument();
   });
 
-  it('shows the server\'s own refusal at the box it names instead of "něco se pokazilo"', async () => {
-    window.localStorage.setItem(
-      'permissions',
-      JSON.stringify(['bookings.create', 'patients.view', 'patients.register']),
+  it('copies the link with the big Kopírovat button and says so in a toast', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    renderDialog();
+    await fillQuick();
+    await userEvent.click(await screen.findByRole('button', { name: 'Vytvořit rezervaci' }));
+    await screen.findByRole('heading', { name: 'Rezervace vytvořena' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Kopírovat' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://sportmedical.test/dokonceni/tok123'));
+    expect(await screen.findByText('Odkaz zkopírován do schránky')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zkopírováno' })).toBeInTheDocument();
+  });
+
+  it('builds the link from the token when the server knows no public address', async () => {
+    createQuick.mockResolvedValue({
+      appointment: { id: 'q1', startUtc: '2026-09-24T07:00:00Z', endUtc: '2026-09-24T07:30:00Z', activityName: 'Prohlídka' },
+      patientId: 'np1',
+      completionLink: { url: null, token: 'tok123', expiresAtUtc: '2026-09-25T07:00:00Z' },
+      registrationDeadlineUtc: '2026-09-25T07:00:00Z',
+    });
+    renderDialog();
+    await fillQuick();
+    await userEvent.click(await screen.findByRole('button', { name: 'Vytvořit rezervaci' }));
+    expect(await screen.findByTestId('quick-completion-link')).toHaveTextContent(
+      `${window.location.origin}/dokonceni/tok123`,
     );
-    const { AxiosError, AxiosHeaders } = await import('axios');
-    const config = { headers: new AxiosHeaders() };
-    preRegister.mockRejectedValue(
-      new AxiosError('Request failed', '400', config as never, undefined, {
-        status: 400,
-        statusText: '',
-        headers: {},
-        config: config as never,
-        data: {
-          code: 'intake.registration.phone_unusable',
-          message: 'Telefon není platné číslo. Zadejte ho s předvolbou, nebo ho vynechte.',
-          errors: { field: ['phone'] },
-        },
+  });
+
+  it('"Objednat další" starts over at the mode cards', async () => {
+    renderDialog();
+    await fillQuick();
+    await userEvent.click(await screen.findByRole('button', { name: 'Vytvořit rezervaci' }));
+    await screen.findByRole('heading', { name: 'Rezervace vytvořena' });
+    await userEvent.click(screen.getByRole('button', { name: 'Objednat další' }));
+    expect(await screen.findByRole('radiogroup', { name: 'Kdo se objednává' })).toBeInTheDocument();
+  });
+
+  it('keeps the button off until all four are filled, and says what is wrong with the obvious', async () => {
+    renderDialog();
+    await fillQuick({ name: 'Filip', email: 'x@', activity: null });
+    await userEvent.click(screen.getByLabelText('Jméno a příjmení'));
+    await userEvent.tab();
+    expect(screen.getByRole('button', { name: 'Vytvořit rezervaci' })).toBeDisabled();
+    expect(screen.getByText('Zadejte jméno i příjmení.')).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText('E-mail'));
+    await userEvent.tab();
+    expect(screen.getByText('E-mail nevypadá správně.')).toBeInTheDocument();
+  });
+
+  it('shows the server refusal at the box it names, keeping the form as typed', async () => {
+    createQuick.mockRejectedValue(
+      await refusal(400, {
+        code: 'appointments.quick.phone_unusable',
+        message: 'Telefon není platné číslo. Zadejte ho s předvolbou.',
+        errors: { field: ['phone'] },
       }),
     );
     renderDialog();
-    await userEvent.click(screen.getByRole('radio', { name: 'Rychlá registrace' }));
-    await userEvent.type(screen.getByLabelText('Jméno a příjmení'), 'Nový Pacient');
-    await userEvent.type(screen.getByLabelText('E-mail'), 'novy@example.cz');
-    fireEvent.change(screen.getByLabelText('Datum narození'), { target: { value: '1990-05-05' } });
-    await userEvent.click(screen.getByRole('button', { name: 'Vytvořit a pokračovat' }));
+    await fillQuick();
+    await userEvent.click(await screen.findByRole('button', { name: 'Vytvořit rezervaci' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Telefon není platné číslo. Zadejte ho s předvolbou, nebo ho vynechte.',
-    );
+    expect(await screen.findByText('Telefon není platné číslo. Zadejte ho s předvolbou.')).toBeInTheDocument();
     expect(screen.getByLabelText('Telefon')).toHaveAttribute('aria-invalid', 'true');
-    /* Still on step 1, the form intact, nothing booked. */
-    expect(screen.getByText('Krok 1 ze 2 — nový pacient')).toBeInTheDocument();
     expect(screen.getByLabelText('Jméno a příjmení')).toHaveValue('Nový Pacient');
-    expect(create).not.toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: 'Rezervace vytvořena' })).not.toBeInTheDocument();
   });
 
-  it('does not book against a patient the register did not create (a namesake needs review)', async () => {
-    window.localStorage.setItem(
-      'permissions',
-      JSON.stringify(['bookings.create', 'patients.view', 'patients.register']),
-    );
-    const { AxiosError, AxiosHeaders } = await import('axios');
-    const config = { headers: new AxiosHeaders() };
-    getById.mockRejectedValue(
-      new AxiosError('Not found', '404', config as never, undefined, {
-        status: 404, statusText: '', headers: {}, config: config as never, data: {},
-      }),
+  it('points a refused e-mail and a refused činnost at their own boxes', async () => {
+    createQuick.mockRejectedValueOnce(
+      await refusal(422, { code: 'appointments.quick.email_invalid', message: 'E-mail je neplatný.', errors: { field: ['email'] } }),
     );
     renderDialog();
-    await userEvent.click(screen.getByRole('radio', { name: 'Rychlá registrace' }));
-    await userEvent.type(screen.getByLabelText('Jméno a příjmení'), 'Nový Pacient');
-    await userEvent.type(screen.getByLabelText('E-mail'), 'novy@example.cz');
-    fireEvent.change(screen.getByLabelText('Datum narození'), { target: { value: '1990-05-05' } });
-    await userEvent.click(screen.getByRole('button', { name: 'Vytvořit a pokračovat' }));
+    await fillQuick();
+    await userEvent.click(await screen.findByRole('button', { name: 'Vytvořit rezervaci' }));
+    expect(await screen.findByText('E-mail je neplatný.')).toBeInTheDocument();
+    expect(screen.getByLabelText('E-mail')).toHaveAttribute('aria-invalid', 'true');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/Pacient nebyl založen/);
-    expect(screen.getByText('Krok 1 ze 2 — nový pacient')).toBeInTheDocument();
-    expect(screen.queryByText('Krok 2 ze 2 — co se bude dělat')).not.toBeInTheDocument();
+    /* Typing again clears the refusal; the next one lands on the činnost. */
+    createQuick.mockRejectedValueOnce(
+      await refusal(422, { code: 'appointments.quick.activity_not_offered', errors: { field: ['activityId'] } }),
+    );
+    await userEvent.type(screen.getByLabelText('E-mail'), 'x');
+    await waitFor(() => expect(screen.queryByText('E-mail je neplatný.')).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'Vytvořit rezervaci' }));
+    expect(
+      await screen.findByText('Tuto prohlídku v daný čas nelze nabídnout. Vyberte jinou, nebo jiný čas.'),
+    ).toBeInTheDocument();
   });
 
-  it('types the telephone with the country picker and sends one +420 string', async () => {
-    window.localStorage.setItem(
-      'permissions',
-      JSON.stringify(['bookings.create', 'patients.view', 'patients.register']),
+  it('takes a slot somebody else got first calmly: the offer reloads and the form stays', async () => {
+    createQuick.mockRejectedValue(await refusal(409, { message: 'Termín mezitím někdo obsadil.' }));
+    renderDialog();
+    await fillQuick();
+    await screen.findByText('Slot je volný. Nekoliduje s žádnou rezervací ani s obědem.');
+    const offers = getAvailability.mock.calls.length;
+    await userEvent.click(screen.getByRole('button', { name: 'Vytvořit rezervaci' }));
+
+    expect(await screen.findByText('Termín mezitím někdo obsadil.')).toBeInTheDocument();
+    await waitFor(() => expect(getAvailability.mock.calls.length).toBeGreaterThan(offers));
+    expect(screen.getByLabelText('Jméno a příjmení')).toHaveValue('Nový Pacient');
+  });
+
+  it('shows a refusal that names no box as one plain message', async () => {
+    createQuick.mockRejectedValue(await refusal(500, {}));
+    renderDialog();
+    await fillQuick();
+    await userEvent.click(await screen.findByRole('button', { name: 'Vytvořit rezervaci' }));
+    expect(await screen.findByText('Pacienta se nepodařilo založit. Zkuste to prosím znovu.')).toBeInTheDocument();
+  });
+
+  it('books past the offer only for bookings.edit, with a typed reason', async () => {
+    window.localStorage.setItem('permissions', JSON.stringify([...QUICK_PERMISSIONS, 'bookings.edit']));
+    renderDialog({ initialStart: '2026-09-24T08:00', initialEnd: undefined });
+    await fillQuick();
+
+    expect(await screen.findByText(/V 08:00 tuto činnost nabídnout nelze/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vytvořit rezervaci' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Objednat mimo nabídku' }));
+    const go = screen.getByRole('button', { name: 'Přetlačit a objednat' });
+    expect(go).toBeDisabled();
+    await userEvent.type(screen.getByLabelText('Důvod přetlačení'), 'Pacient přijede z Brna');
+    await userEvent.click(go);
+    await waitFor(() =>
+      expect(createQuick).toHaveBeenCalledWith(
+        'c1',
+        expect.objectContaining({ startUtc: '2026-09-24T06:00:00.000Z', overrideReason: 'Pacient přijede z Brna' }),
+      ),
     );
+  });
+
+  it('types the telephone with the country picker and sends one dialling-code string', async () => {
     renderDialog();
     await userEvent.click(screen.getByRole('radio', { name: 'Rychlá registrace' }));
     expect(screen.getByTestId('phone-country-note')).toHaveTextContent('Česko');
@@ -508,18 +625,18 @@ describe('rychlá registrace', () => {
     await userEvent.type(screen.getByLabelText('Hledat zemi nebo předvolbu'), '421');
     await userEvent.click(screen.getByRole('menuitem', { name: /Slovensko/ }));
     expect(screen.getByTestId('phone-country-note')).toHaveTextContent('Slovensko');
+
     await userEvent.type(screen.getByLabelText('Jméno a příjmení'), 'Nový Pacient');
     await userEvent.type(screen.getByLabelText('E-mail'), 'novy@example.cz');
-    fireEvent.change(screen.getByLabelText('Datum narození'), { target: { value: '1990-05-05' } });
-    await userEvent.click(screen.getByRole('button', { name: 'Vytvořit a pokračovat' }));
-    await waitFor(() => expect(preRegister).toHaveBeenCalledWith(expect.objectContaining({ phone: '+421773539001' })));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Prohlídka, na kterou volal' }));
+    await userEvent.click(await screen.findByRole('option', { name: /^Prohlídka —/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Vytvořit rezervaci' }));
+    await waitFor(() =>
+      expect(createQuick).toHaveBeenCalledWith('c1', expect.objectContaining({ phone: '+421773539001' })),
+    );
   });
 
   it('is offered from an empty search with the typed name carried over', async () => {
-    window.localStorage.setItem(
-      'permissions',
-      JSON.stringify(['bookings.create', 'patients.view', 'patients.register']),
-    );
     listPatients.mockResolvedValue({ items: [], totalCount: 0 });
     renderDialog();
 
@@ -532,46 +649,120 @@ describe('rychlá registrace', () => {
 });
 
 describe('klub', () => {
-  it('hands the club and the slot over to the reservation screen', async () => {
-    renderDialog();
+  async function clubState() {
+    return JSON.parse((await screen.findByTestId('clubs-state')).textContent ?? '{}');
+  }
 
+  it('lists clubs from real data only: contact, athlete count and "Sleva −N %"', async () => {
+    renderDialog();
     await userEvent.click(screen.getByRole('radio', { name: 'Klub' }));
     expect(screen.getByRole('heading', { name: 'Hromadná rezervace pro klub' })).toBeInTheDocument();
     expect(screen.getByText('Krok 1 ze 2 — který klub')).toBeInTheDocument();
 
     const club = await screen.findByRole('radio', { name: 'FK Slaný' });
-    expect(club).toHaveTextContent('Jan Novák · +420 606 112 884');
+    expect(club).toHaveTextContent('62 sportovců · Jan Novák · +420 606 112 884');
+    expect(club).toHaveTextContent('Sleva −10 %');
     expect(screen.getByText('1 klub')).toBeInTheDocument();
-    await userEvent.click(club);
-    await userEvent.click(screen.getByRole('button', { name: 'Pokračovat' }));
-
-    const state = JSON.parse((await screen.findByTestId('vyhrazeni-state')).textContent ?? '{}');
-    expect(state).toEqual({
-      calendarId: 'c1',
-      startUtc: '2026-09-24T07:00:00.000Z',
-      endUtc: '2026-09-24T08:00:00.000Z',
-      clubId: 'k1',
-    });
   });
 
-  it('carries a club founded on the spot as newClub', async () => {
+  it('leaves out the athlete count and the discount when the server carries none', async () => {
+    getAllClubs.mockResolvedValue([
+      { id: 'k2', name: 'HC Kladno', ico: '1', contactPerson: 'Eva', paymentTermsDays: 14, isActive: true, createdAt: '2026-01-01T00:00:00Z' },
+    ]);
+    renderDialog();
+    await userEvent.click(screen.getByRole('radio', { name: 'Klub' }));
+    const club = await screen.findByRole('radio', { name: 'HC Kladno' });
+    expect(club).toHaveTextContent('Eva');
+    expect(club).not.toHaveTextContent('sportovců');
+    expect(club).not.toHaveTextContent('Sleva');
+  });
+
+  it('hands the club, the calendar and the days over to the clubs screen as newBlock', async () => {
+    renderDialog();
+    await userEvent.click(screen.getByRole('radio', { name: 'Klub' }));
+    await userEvent.click(await screen.findByRole('radio', { name: 'FK Slaný' }));
+    expect(screen.getByLabelText('Od')).toHaveValue('2026-09-24');
+    expect(screen.getByLabelText('Do')).toHaveValue('2026-09-24');
+    fireEvent.change(screen.getByLabelText('Do'), { target: { value: '2026-09-25' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Pokračovat' }));
+
+    expect(await clubState()).toEqual({
+      newBlock: {
+        clubId: 'k1',
+        calendarIds: ['c1'],
+        fromDate: '2026-09-24',
+        toDate: '2026-09-25',
+        dailyFrom: '09:00',
+        dailyTo: '10:00',
+      },
+    });
+    expect(createClub).not.toHaveBeenCalled();
+  });
+
+  it('founds a club with an IČO on the spot and hands over its id', async () => {
     renderDialog();
     await userEvent.click(screen.getByRole('radio', { name: 'Klub' }));
     await screen.findByRole('radio', { name: 'FK Slaný' });
 
     await userEvent.click(screen.getByRole('button', { name: 'Nový klub — není v seznamu' }));
     await userEvent.type(screen.getByLabelText('Název klubu'), 'TJ Sokol Slaný');
+    await userEvent.type(screen.getByLabelText('Kontaktní osoba'), 'Eva Nová');
+    await userEvent.type(screen.getByLabelText('Počet sportovců'), '12');
+    await userEvent.type(screen.getByLabelText('IČO'), '12345678');
+    await userEvent.click(screen.getByRole('button', { name: 'Pokračovat' }));
+
+    const state = await clubState();
+    expect(createClub).toHaveBeenCalledWith({
+      name: 'TJ Sokol Slaný',
+      ico: '12345678',
+      contactPerson: 'Eva Nová',
+      contactPhone: undefined,
+      contactEmail: undefined,
+    });
+    expect(state.newBlock).toMatchObject({ clubId: 'k9', headcount: 12, calendarIds: ['c1'] });
+    expect(state.newBlock.newClub).toBeUndefined();
+  });
+
+  it('hands what was typed along as newClub when there is no IČO yet', async () => {
+    renderDialog();
+    await userEvent.click(screen.getByRole('radio', { name: 'Klub' }));
+    await screen.findByRole('radio', { name: 'FK Slaný' });
+    await userEvent.click(screen.getByRole('button', { name: 'Nový klub — není v seznamu' }));
+    await userEvent.type(screen.getByLabelText('Název klubu'), 'TJ Sokol Slaný');
     await userEvent.type(screen.getByLabelText('Počet sportovců'), '12');
     await userEvent.click(screen.getByRole('button', { name: 'Pokračovat' }));
 
-    const state = JSON.parse((await screen.findByTestId('vyhrazeni-state')).textContent ?? '{}');
-    expect(state.clubId).toBeUndefined();
-    /* The shape /vyhrazeni reads (ReservationHandoff.newClub): nothing typed is
-       left out as undefined, so the reservation form starts with what was given. */
-    expect(state.newClub).toEqual({
-      name: 'TJ Sokol Slaný',
-      headcount: 12,
-    });
+    const state = await clubState();
+    expect(createClub).not.toHaveBeenCalled();
+    expect(state.newBlock.clubId).toBeUndefined();
+    /* Nothing typed is left out as undefined, so the block dialog starts with what was given. */
+    expect(state.newBlock.newClub).toEqual({ name: 'TJ Sokol Slaný', headcount: 12 });
+  });
+
+  it('refuses an IČO that is not eight digits and stays put', async () => {
+    renderDialog();
+    await userEvent.click(screen.getByRole('radio', { name: 'Klub' }));
+    await screen.findByRole('radio', { name: 'FK Slaný' });
+    await userEvent.click(screen.getByRole('button', { name: 'Nový klub — není v seznamu' }));
+    await userEvent.type(screen.getByLabelText('Název klubu'), 'TJ Sokol');
+    await userEvent.type(screen.getByLabelText('IČO'), '123');
+    await userEvent.click(screen.getByRole('button', { name: 'Pokračovat' }));
+    expect(await screen.findByText('IČO musí mít přesně 8 číslic.')).toBeInTheDocument();
+    expect(createClub).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('clubs-state')).not.toBeInTheDocument();
+  });
+
+  it('shows the server sentence when founding the club fails, and does not leave the drawer', async () => {
+    createClub.mockRejectedValue(await refusal(409, { message: 'Klub s IČO 12345678 již existuje.' }));
+    renderDialog();
+    await userEvent.click(screen.getByRole('radio', { name: 'Klub' }));
+    await screen.findByRole('radio', { name: 'FK Slaný' });
+    await userEvent.click(screen.getByRole('button', { name: 'Nový klub — není v seznamu' }));
+    await userEvent.type(screen.getByLabelText('Název klubu'), 'TJ Sokol');
+    await userEvent.type(screen.getByLabelText('IČO'), '12345678');
+    await userEvent.click(screen.getByRole('button', { name: 'Pokračovat' }));
+    expect(await screen.findByText('Klub s IČO 12345678 již existuje.')).toBeInTheDocument();
+    expect(screen.queryByTestId('clubs-state')).not.toBeInTheDocument();
   });
 });
 

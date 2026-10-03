@@ -18,15 +18,54 @@ import type { QuickPatientDraft } from '../NewAppointmentDialog.logic';
 
 export type QuickDraftField = keyof QuickPatientDraft;
 
-/** The registry's field names → the drawer's four boxes. */
+/**
+ * The server's field names → the form's four boxes. A date of birth is not one
+ * of them: quick registration never asks for it, so a refusal that mentions it
+ * is shown as a plain message rather than pinned to a box that does not exist.
+ */
 const DRAFT_FIELD_BY_DOMAIN: Record<string, QuickDraftField> = {
   firstName: 'name',
   lastName: 'name',
-  dateOfBirth: 'dateOfBirth',
+  name: 'name',
   email: 'email',
   phone: 'phone',
   regionCode: 'phone',
+  activityId: 'activityId',
+  activity: 'activityId',
 };
+
+/**
+ * Etapa 2 (contract C2): `POST …/appointments/quick` refuses in the same
+ * problem shape - a `code`, a Czech `message`, the `errors.field`. When the
+ * server names no field, or no sentence, the code still says which box is
+ * wrong and what to do; the match is on the code's tail, so a renamed prefix
+ * does not silence it.
+ */
+const QUICK_HINTS: { match: RegExp; field: QuickDraftField | null; message: string }[] = [
+  { match: /phone/i, field: 'phone', message: 'Telefon zadejte s předvolbou, například +420 773 539 001.' },
+  { match: /e_?mail/i, field: 'email', message: 'Zadejte platný e-mail pacienta.' },
+  { match: /(first|last)_?name|name_required|full_?name/i, field: 'name', message: 'Zadejte jméno i příjmení.' },
+  { match: /activity.*(offered|available)|not_offered/i, field: 'activityId', message: 'Tuto prohlídku v daný čas nelze nabídnout. Vyberte jinou, nebo jiný čas.' },
+  { match: /activity/i, field: 'activityId', message: 'Vyberte prohlídku, na kterou pacient volal.' },
+  { match: /duplicate|already_exists|exists/i, field: 'email', message: 'V registru už je pacient s těmito údaji. Najděte ho přes „Z databáze“.' },
+];
+
+function hintFor(code: string): { field: QuickDraftField | null; message: string } | null {
+  const hit = QUICK_HINTS.find((h) => h.match.test(code));
+  return hit ? { field: hit.field, message: hit.message } : null;
+}
+
+/** True for the answer that means the slot was taken meanwhile - a calm outcome, not a failure. */
+export function isQuickConflict(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 409;
+}
+
+/** The server's own sentence for a refused quick booking, for the calm 409 line. */
+export function quickConflictText(error: unknown): string {
+  const data = axios.isAxiosError(error) ? (error.response?.data as { message?: unknown } | undefined) : undefined;
+  const sentence = typeof data?.message === 'string' ? data.message.trim() : '';
+  return sentence || 'Termín mezitím obsadil někdo jiný. Nabídka se načetla znovu — vyberte jiný čas.';
+}
 
 const GENERIC = 'Pacienta se nepodařilo založit. Zkuste to prosím znovu.';
 
@@ -80,10 +119,15 @@ export function toQuickRegisterError(error: unknown): QuickRegisterError {
       new PatientRegistryError(serverMessage || GENERIC, status, code, domainField ?? null, payload?.traceId ?? null),
     );
     const mapped = resolved.message.endsWith(`(${code})`) ? null : resolved.message;
+    const hint = hintFor(code);
     const message = status === 403
       ? (serverMessage || 'Zakládat pacienty v registru nemáte oprávnění.')
-      : (serverMessage || mapped || GENERIC);
-    const field = domainField ? (DRAFT_FIELD_BY_DOMAIN[domainField] ?? null) : null;
+      : (serverMessage || mapped || hint?.message || GENERIC);
+    const field = domainField
+      ? (DRAFT_FIELD_BY_DOMAIN[domainField] ?? null)
+      : status === 403
+        ? null
+        : (hint?.field ?? null);
     return new QuickRegisterError(message, field, code);
   }
 

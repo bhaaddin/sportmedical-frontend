@@ -4,19 +4,23 @@ import ContentCopy from "@mui/icons-material/ContentCopy";
 import LinkIcon from "@mui/icons-material/Link";
 import { useMutation } from "@tanstack/react-query";
 import { patientPreRegistrationApi } from "../../../api/patientPreRegistration";
+import { formatDeadline } from "../quick/quickBooking";
 
 /**
  * From the appointment detail: (re)issues the patient's completion link so the
- * desk can copy it and send it again — the same 24 h link a quick registration
+ * desk can copy it and send it again — the same link a quick registration
  * makes, reachable later from the booking that needs it.
  */
 export function CompletionLinkButton({ patientId }: { patientId: string }) {
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  /* How long the link lives is the server's setting; it says so in its answer. */
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
 
   const issue = useMutation({
     mutationFn: async () => {
       const issued = await patientPreRegistrationApi.issueLink(patientId);
+      setExpiresAt(issued.expiresAtUtc ?? null);
       return issued.url ?? `${window.location.origin}${issued.path}`;
     },
     onSuccess: (full) => setLink(full),
@@ -68,7 +72,8 @@ export function CompletionLinkButton({ patientId }: { patientId: string }) {
           </Button>
         </Stack>
         <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
-          Platí 24 hodin. Vygenerování nového odkazu ten předchozí zneplatní.
+          {expiresAt ? `Platí do ${formatDeadline(expiresAt)}. ` : ""}
+          Vygenerování nového odkazu ten předchozí zneplatní.
         </Typography>
       </Alert>
     );

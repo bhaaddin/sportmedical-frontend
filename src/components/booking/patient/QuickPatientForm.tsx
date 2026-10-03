@@ -1,32 +1,35 @@
+import { useState } from "react";
 import { Box, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import InfoOutlined from "@mui/icons-material/InfoOutlined";
+import { useDevice } from "../../../layout/useDevice";
 import { SectionLabel, SoftCard } from "../../ui";
 import { PhoneField } from "../../ui/PhoneField";
 import type { Activity } from "../../../api/bookingContracts";
 import {
   formatCzk,
-  splitFullName,
+  quickDraftProblems,
   type QuickPatientDraft,
-  type QuickPath,
 } from "../NewAppointmentDialog.logic";
 
 export type { QuickPatientDraft };
 
 /**
- * "Rychlá registrace" - the board's card for a new patient: name, telephone,
- * e-mail, the examination they called about, and the note that nothing more
- * is asked over the telephone. The date of birth is the one field the board
- * does not draw and the register insists on (`DateOfBirthRequired`), so it is
- * here, next to the e-mail: with both, a real patient is created and gets the
- * completion link; without them the slot is still booked, under the name and
- * telephone alone, and the info box says so.
+ * "Rychlá registrace" - the board's card for a new patient, and since Etapa 2
+ * the real quick flow (decision 7): the patient phoned, the receptionist found
+ * a slot and chose it, and now four things are typed - name and surname,
+ * telephone (with its dialling code), e-mail, and the examination they called
+ * about. **No date of birth, ever**: the patient gives that and the rest
+ * through the completion link, and the clinic's own setting decides whether
+ * the link asks for it at all.
+ *
+ * What the server refuses comes back at the box it names (`fieldErrors`),
+ * never as a generic line.
  */
 export function QuickPatientForm({
   value,
   onChange,
   activities,
-  path,
-  mayRegister,
+  otherActivities = [],
   disabled = false,
   fieldErrors,
 }: {
@@ -34,24 +37,37 @@ export function QuickPatientForm({
   onChange: (next: QuickPatientDraft) => void;
   /** The činnosti to offer under "Prohlídka, na kterou volal" - the day's first. */
   activities: Activity[];
-  path: QuickPath | null;
-  mayRegister: boolean;
+  /**
+   * The rest of the price list, offered after the day's own and marked as not
+   * on offer today: picking one is possible, but the server will not offer the
+   * time for it, so booking it takes the override like any time off the offer.
+   */
+  otherActivities?: Activity[];
   disabled?: boolean;
   /** The field the server named when it refused the registration, so that box goes red. */
   fieldErrors?: Partial<Record<keyof QuickPatientDraft, string>>;
 }) {
+  const device = useDevice();
+  const phone = device === "phone";
+  const touchDevice = device !== "desktop";
   const set = (field: keyof QuickPatientDraft, next: string) =>
     onChange({ ...value, [field]: next });
-  const errors = fieldErrors ?? {};
-  /* Jméno alone cannot register anybody; the box says so before the button is pressed. */
-  const oneWordName = value.name.trim() !== "" && splitFullName(value.name) === null;
+  /* The obvious is said before the button is pressed; the server's word wins when it has one. */
+  const [touched, setTouched] = useState<ReadonlySet<keyof QuickPatientDraft>>(new Set());
+  const touch = (key: keyof QuickPatientDraft) =>
+    setTouched((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+  const local = quickDraftProblems(value);
+  const errors: Partial<Record<keyof QuickPatientDraft, string>> = { ...(fieldErrors ?? {}) };
+  for (const key of touched) {
+    if (errors[key] === undefined && local[key] !== undefined) errors[key] = local[key];
+  }
 
   const field = (
     label: string,
     key: keyof QuickPatientDraft,
     props: Partial<React.ComponentProps<typeof TextField>> = {},
   ) => (
-    <Box>
+    <Box sx={{ minWidth: 0 }}>
       <SectionLabel component="label" sx={{ mb: 0.5 }}>
         {label}
       </SectionLabel>
@@ -60,26 +76,30 @@ export function QuickPatientForm({
         disabled={disabled}
         value={value[key]}
         onChange={(e) => set(key, e.target.value)}
+        onBlur={() => touch(key)}
         error={errors[key] !== undefined}
         helperText={errors[key]}
-        slotProps={{ htmlInput: { "aria-label": label } }}
+        slotProps={{ htmlInput: { "aria-label": label, style: { minHeight: 24 } } }}
         {...props}
       />
     </Box>
   );
 
   return (
-    <SoftCard sx={{ p: 2.5 }}>
+    <SoftCard sx={{ p: phone ? 2 : 2.5 }}>
       <Stack spacing={2}>
         {field("Jméno a příjmení", "name", {
           placeholder: "Filip Fehér",
-          autoFocus: true,
-          helperText:
-            errors.name ??
-            (oneWordName && mayRegister ? "Pro založení pacienta zadejte jméno i příjmení." : undefined),
+          /* Not on a touch device: the keyboard would cover the panel before it was read. */
+          autoFocus: !touchDevice,
+          autoComplete: "name",
         })}
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
-          <Box>
+        {/* Two fields on a row where there is room, one per row on a phone. */}
+        <Box
+          data-testid="quick-contact-row"
+          sx={{ display: "grid", gridTemplateColumns: phone ? "1fr" : "1fr 1fr", gap: 1.5 }}
+        >
+          <Box sx={{ minWidth: 0 }}>
             <SectionLabel component="label" sx={{ mb: 0.5 }}>
               Telefon
             </SectionLabel>
@@ -88,52 +108,57 @@ export function QuickPatientForm({
               value={value.phone}
               onChange={(next) => set("phone", next)}
               disabled={disabled}
+              onBlur={() => touch("phone")}
               error={errors.phone !== undefined}
               helperText={errors.phone}
             />
           </Box>
-          {field("E-mail", "email", { type: "email", placeholder: "filip@email.cz" })}
-        </Box>
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
-          {field("Datum narození", "dateOfBirth", {
-            type: "date",
-            slotProps: { htmlInput: { "aria-label": "Datum narození" }, inputLabel: { shrink: true } },
+          {field("E-mail", "email", {
+            type: "email",
+            placeholder: "filip@email.cz",
+            autoComplete: "email",
           })}
-          <Box>
-            <SectionLabel component="label" sx={{ mb: 0.5 }}>
-              Prohlídka, na kterou volal
-            </SectionLabel>
-            <TextField
-              select
-              fullWidth
-              disabled={disabled}
-              value={value.activityId}
-              onChange={(e) => set("activityId", e.target.value)}
-              slotProps={{ select: { displayEmpty: true, "aria-label": "Prohlídka, na kterou volal" } }}
-            >
-              <MenuItem value="">
-                <Typography component="span" sx={{ color: "text.secondary" }}>
-                  Vybrat později
-                </Typography>
+        </Box>
+        <Box sx={{ minWidth: 0 }}>
+          <SectionLabel component="label" sx={{ mb: 0.5 }}>
+            Prohlídka, na kterou volal
+          </SectionLabel>
+          <TextField
+            select
+            fullWidth
+            disabled={disabled}
+            value={value.activityId}
+            onChange={(e) => set("activityId", e.target.value)}
+            error={errors.activityId !== undefined}
+            helperText={errors.activityId}
+            slotProps={{
+              select: { displayEmpty: true, "aria-label": "Prohlídka, na kterou volal" },
+            }}
+          >
+            <MenuItem value="" disabled>
+              <Typography component="span" sx={{ color: "text.secondary" }}>
+                Vyberte prohlídku
+              </Typography>
+            </MenuItem>
+            {activities.map((a) => (
+              <MenuItem key={a.id} value={a.id} sx={{ minHeight: 44, whiteSpace: "normal" }}>
+                {a.name} — {formatCzk(a.priceCzk)} · {a.durationMinutes} min
               </MenuItem>
-              {activities.map((a) => (
-                <MenuItem key={a.id} value={a.id}>
-                  {a.name} — {formatCzk(a.priceCzk)} · {a.durationMinutes} min
-                </MenuItem>
-              ))}
-            </TextField>
-          </Box>
+            ))}
+            {otherActivities.map((a) => (
+              <MenuItem key={a.id} value={a.id} sx={{ minHeight: 44, whiteSpace: "normal" }}>
+                {a.name} — {formatCzk(a.priceCzk)} · {a.durationMinutes} min · dnes se nenabízí
+              </MenuItem>
+            ))}
+          </TextField>
         </Box>
 
         <SoftCard tone="muted" sx={{ p: 1.5 }}>
           <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }}>
             <InfoOutlined fontSize="small" sx={{ color: "text.secondary", mt: "2px" }} />
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              {path === "registered"
-                ? "Víc teď nepotřebujeme. Rodné číslo, pojišťovnu a dotazník vyplní pacient sám přes odkaz, který mu odejde hned po objednání."
-                : !mayRegister
-                  ? "Termín se uloží se jménem a telefonem. Zakládat pacienty v registru nemáte oprávnění — registraci doplní kolega nebo pacient na místě."
-                  : "S e-mailem a datem narození založíme pacienta rovnou a pošleme mu odkaz na dokončení registrace. Bez nich se termín uloží jen se jménem a telefonem a registrace se doplní na místě."}
+              Víc teď nepotřebujeme. Rodné číslo, pojišťovnu a dotazník vyplní pacient sám přes
+              odkaz, který po objednání zkopírujete a pošlete.
             </Typography>
           </Stack>
         </SoftCard>

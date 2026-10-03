@@ -35,6 +35,8 @@ export const clinicServiceSchema = z.object({
    */
   activities: z.number().int(),
   calendars: z.number().int(),
+  /* Etapa 2, C1: the služba's colour (#RRGGBB), auto-assigned from the palette on create. */
+  colorHex: z.string().nullish().transform((v) => v ?? null),
 });
 export type ClinicService = z.infer<typeof clinicServiceSchema>;
 export const clinicServiceListSchema = z.array(clinicServiceSchema);
@@ -43,6 +45,8 @@ export interface ClinicServiceInput {
   name: string;
   description: string;
   sortOrder: number;
+  /** Etapa 2, C1: left out on create, the server picks the next colour of the palette. */
+  colorHex?: string;
 }
 
 async function request<T>(run: () => Promise<T>): Promise<T> {

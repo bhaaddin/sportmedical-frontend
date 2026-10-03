@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import type { PartnerOrder } from '../../api/bookingContracts';
 import { StatusChip } from '../ui';
+import { useIsPhone } from '../../layout/useDevice';
 
 /*
  * The club schedule report (plan 9.x, club booking).
@@ -183,6 +184,7 @@ export function ClubScheduleReport({
   open: boolean;
   onClose: () => void;
 }) {
+  const phone = useIsPhone();
   const plan = planSchedule(order);
   const fits = plan.placed >= plan.totalRequested;
 
@@ -194,7 +196,7 @@ export function ClubScheduleReport({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth fullScreen={phone}>
       <DialogTitle>Rozpis vyšetření — {order.partnerName}</DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1.5 }}>

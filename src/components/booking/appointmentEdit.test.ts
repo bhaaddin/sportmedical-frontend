@@ -6,6 +6,8 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  EMPTY_DOCUMENTS_TEXT,
+  LEGAL_CONSENTS_TEXT,
   draftFrom,
   durationMinutes,
   formatCzk,
@@ -133,6 +135,19 @@ describe("podklady k této prohlídce", () => {
     /* The server's verdict wins over the setting: a code present is a gap. */
     const contradicted = paperworkRows({ ...base, questionnaireRequirement: "NotAsked", paperwork: { ready: false, missing: ["questionnaire_expired"] } });
     expect(contradicted[1]).toMatchObject({ state: "missing", detail: "vyplněný dotazník je starší než 2 roky" });
+  });
+
+  it("says nothing is required when the činnost asks for no document (Etapa 2: none by default)", () => {
+    const rows = paperworkRows({ ...base, paperwork: { ready: true, missing: [] } });
+    expect(rows.at(-1)).toMatchObject({
+      key: "documents",
+      state: "notRequired",
+      detail: "Tato činnost nevyžaduje žádné dokumenty.",
+    });
+    expect(EMPTY_DOCUMENTS_TEXT).toBe("Tato činnost nevyžaduje žádné dokumenty.");
+    /* The legal consents are a separate, permanent line - never a document row. */
+    expect(LEGAL_CONSENTS_TEXT).toMatch(/Zákonné souhlasy/);
+    expect(rows.some((r) => /souhlas/i.test(r.label))).toBe(false);
   });
 
   it("never reassures when nobody could look", () => {

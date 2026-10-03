@@ -4,6 +4,7 @@ import {
   activityListResultSchema,
   activitySaveResultSchema,
   parseResponse,
+  type Activity,
   type ActivityInput,
   type ActivityListResult,
   type ActivitySaveResult,
@@ -28,6 +29,35 @@ const toWire = (input: ActivityInput) => ({
   ...input,
   questionnaireRequirement: questionnaireRequirementToWire(input.questionnaireRequirement),
 });
+
+/**
+ * The input that saves a činnost exactly as it was read, with `patch` on top.
+ *
+ * `PUT /api/activities/{id}` is the whole činnost: a field left out is cleared.
+ * Every screen that changes one thing about a činnost (its colour, its
+ * capacity, its required documents) goes through this, so the rest travels back
+ * untouched - including the price-list link and the Etapa 2 fields.
+ */
+export function activityToInput(activity: Activity, patch: Partial<ActivityInput> = {}): ActivityInput {
+  return {
+    name: activity.name,
+    durationMinutes: activity.durationMinutes,
+    color: activity.color,
+    publicNote: activity.publicNote,
+    isPubliclyBookable: activity.isPubliclyBookable,
+    requiresReportByEmail: activity.requiresReportByEmail,
+    requiresClubSharing: activity.requiresClubSharing,
+    questionnaireRequirement: activity.questionnaireRequirement,
+    sortOrder: activity.sortOrder,
+    serviceItemId: activity.serviceItemId,
+    clinicServiceId: activity.clinicServiceId ?? '',
+    questionnaireDefinitionId: activity.questionnaireDefinitionId,
+    colorHex: activity.colorHex ?? null,
+    parallelCapacity: activity.parallelCapacity ?? 1,
+    requiredDocumentTemplateIds: activity.requiredDocumentTemplateIds,
+    ...patch,
+  };
+}
 
 export const activitiesApi = {
   /** 4.3: the read is symmetric with the write, warnings and all. */
