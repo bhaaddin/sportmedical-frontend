@@ -7,6 +7,7 @@ import type { ClubBlockView } from '../../api/clubBlocks';
 import type { PartnerOrderDetail } from '../../api/partnerOrders';
 import type { DateOnly } from '../../utils/time';
 import { clubColorOf } from '../../components/clubs/blockLogic';
+import { blockSeatTotals, sumSeats } from '../../components/clubs/panel/seats';
 import {
   clubDiscountOf, clubStatus, headcountOf, ordersOfClub, primaryOrder,
 } from './clubOrders';
@@ -23,6 +24,8 @@ export interface ClubRow {
   headcount: number | null;
   /** The administrator's number for this club - never derived from the headcount. */
   percent: number | null;
+  /** Places the club holds in its live blocks (all činnosti) and how many athletes took one; null without blocks. */
+  seatTotals: { seats: number; registered: number } | null;
   /** The club's calendar colour, when the server has given one. */
   color: string | null;
 }
@@ -67,6 +70,7 @@ export function buildClubRow(
     order,
     headcount: fromOrder ?? (fromBlocks > 0 ? fromBlocks : null),
     percent: clubDiscountOf(club, order),
+    seatTotals: live.length > 0 ? sumSeats(live.map(blockSeatTotals)) : null,
     color: clubColorOf(club, allBlocks),
   };
 }

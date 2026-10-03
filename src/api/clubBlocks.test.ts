@@ -159,3 +159,37 @@ describe('fetchBlockableActivities', () => {
     expect(list.map((a) => [a.id, a.colorHex, a.parallelCapacity])).toEqual([['a-1', '#112233', 2], ['a-2', '#445566', 1]]);
   });
 });
+
+describe('seats per činnost and the analysis', () => {
+  it('reads activitySeats and an athlete\'s activityId, and leaves both out when the server does not send them', () => {
+    const block = toBlock({
+      id: 'b-1', playerCount: 70,
+      activitySeats: [{ activityId: 'a-1', activityName: 'Základní', seats: 10, registered: 4 }, { seats: 3 }, 'x'],
+      athletes: [{ id: 'p1', name: 'Jan Novák', activityId: 'a-1' }, { id: 'p2', name: 'Petr Malý' }],
+    });
+    expect(block.activitySeats).toEqual([{ activityId: 'a-1', activityName: 'Základní', seats: 10, registered: 4 }]);
+    expect(block.athletes[0].activityId).toBe('a-1');
+    expect(block.athletes[1]).not.toHaveProperty('activityId');
+    expect(toBlock({ id: 'b-2' }).activitySeats).toEqual([]);
+  });
+
+  it('reads the analysis leniently and derives what the server left out', () => {
+    const calc = toCalculation({
+      analysis: {
+        totalSeats: 70, totalNeededMinutes: 2350, availableMinutes: 2000, fits: false, capacityNote: 'Pozor',
+        perActivity: [{ activityId: 'a-1', name: 'Základní', seats: 10, minutesPerSeat: 30, parallelCapacity: 0, neededMinutes: 300, maxSeatsInWindowsAlone: 12.9 }, { name: 'bez id' }],
+        byRange: [{ fromDate: '2026-10-26T00:00:00', toDate: '2026-10-26', dailyFrom: '09:40:00', dailyTo: '10:40', availableMinutes: 60 }],
+      },
+    });
+    expect(calc.analysis).toMatchObject({ totalSeats: 70, remainingMinutes: -350, fits: false, capacityNote: 'Pozor' });
+    expect(calc.analysis?.perActivity).toEqual([
+      { activityId: 'a-1', name: 'Základní', seats: 10, minutesPerSeat: 30, parallelCapacity: 1, neededMinutes: 300, maxSeatsInWindowsAlone: 12 },
+    ]);
+    expect(calc.analysis?.byRange[0]).toEqual({ fromDate: '2026-10-26', toDate: '2026-10-26', dailyFrom: '09:40', dailyTo: '10:40', availableMinutes: 60 });
+  });
+
+  it('reads an answer without an analysis as null, which means "legacy server"', () => {
+    expect(toCalculation({ minutesPerPlayer: 60 }).analysis).toBeNull();
+    expect(toCalculation({ analysis: 'nope' }).analysis).toBeNull();
+  });
+});

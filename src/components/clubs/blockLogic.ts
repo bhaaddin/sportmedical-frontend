@@ -5,7 +5,7 @@
  * Czech typography: a non-breaking space before "min" and "Kč", the thousands
  * separator `Intl` writes for `cs-CZ` (also a non-breaking space).
  */
-import type { Calculation, ClubBlockConflict, ClubBlockView } from '../../api/clubBlocks';
+import type { ActivitySeat, BlockAnalysis, Calculation, ClubBlockConflict, ClubBlockView } from '../../api/clubBlocks';
 import { formatDateRange } from '../../pages/clubs/clubOrders';
 
 const NBSP = ' ';
@@ -75,8 +75,10 @@ export interface BlockDraft {
   toDate: string;
   dailyFrom: string;
   dailyTo: string;
-  /** Text: a half-typed field is allowed. */
+  /** Text: a half-typed field is allowed. The legacy single headcount (a server without `analysis`). */
   playerCount: string;
+  /** Seats per chosen činnost, as typed. When present, it replaces `playerCount`. */
+  seats?: Record<string, string>;
   note: string;
 }
 
@@ -108,7 +110,11 @@ export function validateBlockDraft(draft: BlockDraft, clubReady: boolean, editin
     if (draft.calendarIds.length === 0) errors.calendarIds = 'Vyberte aspoň jeden kalendář.';
     if (draft.activityIds.length === 0) errors.activityIds = 'Vyberte aspoň jednu činnost.';
   }
-  if (parsePlayerCount(draft.playerCount) === null) errors.playerCount = 'Zadejte počet hráčů (celé číslo od 1).';
+  if (draft.seats === undefined) {
+    if (parsePlayerCount(draft.playerCount) === null) errors.playerCount = 'Zadejte počet hráčů (celé číslo od 1).';
+  } else if (draft.activityIds.some((id) => parsePlayerCount(draft.seats?.[id] ?? '') === null)) {
+    errors.playerCount = 'Zadejte počet hráčů (celé číslo od 1) u každé vybrané činnosti.';
+  }
 
   const from = draft.dailyFrom.trim();
   const to = draft.dailyTo.trim();
@@ -265,4 +271,96 @@ export function coveredMinutes(
     }
   });
   return sum;
+}
+
+
+/* ── Seats per činnost: the club as one whole ── */
+
+/** The seats of the chosen činnosti as numbers, in the order of `ids`; `null` while a field is empty or invalid. */
+export function seatsOf(ids: readonly string[], typed: Readonly<Record<string, string>>): (number | null)[] {
+  return ids.map((id) => parsePlayerCount(typed[id] ?? ''));
+}
+
+/** The sum of the valid seats (an empty or invalid field adds nothing). */
+export function sumSeats(ids: readonly string[], typed: Readonly<Record<string, string>>): number {
+  return seatsOf(ids, typed).reduce<number>((n, v) => n + (v ?? 0), 0);
+}
+
+/** Every chosen činnost has valid seats, and there is at least one. */
+export function allSeatsValid(ids: readonly string[], typed: Readonly<Record<string, string>>): boolean {
+  return ids.length > 0 && seatsOf(ids, typed).every((v) => v !== null);
+}
+
+/** The body's `activitySeats` (valid rows only, in the order of `ids`). */
+export function seatsPayload(ids: readonly string[], typed: Readonly<Record<string, string>>): ActivitySeat[] {
+  return ids.flatMap((activityId) => {
+    const seats = parsePlayerCount(typed[activityId] ?? '');
+    return seats === null ? [] : [{ activityId, seats }];
+  });
+}
+
+/** "2 činnosti", "5 činností". */
+export const formatActivities = (n: number): string => `${n} ${plural(n, ['činnost', 'činnosti', 'činností'])}`;
+
+export interface SeatFill {
+  /** Seats per činnost id (0 = nothing of it fits). */
+  seats: Record<string, number>;
+  mode: 'single' | 'proportional' | 'equal';
+  /** The sentence shown beside the button. */
+  message: string;
+}
+
+/**
+ * "Spočítat počet hráčů z vybraného času": the seats from the time the analysis
+ * says is available. One činnost gets what fits alone in the windows
+ * (`maxSeatsInWindowsAlone`). Several share the available minutes: in the
+ * proportion of the seats typed so far when every činnost has some, else
+ * equally. A činnost's share of the minutes, times its parallel capacity,
+ * divided by the minutes one seat takes, rounded down.
+ */
+export function fillSeatsFromWindow(
+  analysis: Pick<BlockAnalysis, 'availableMinutes' | 'perActivity'>,
+  ids: readonly string[],
+  typed: Readonly<Record<string, string>>,
+): SeatFill | null {
+  const rows = ids.flatMap((id) => analysis.perActivity.filter((a) => a.activityId === id));
+  if (rows.length === 0 || rows.length !== ids.length) return null;
+  if (rows.length === 1) {
+    const only = rows[0];
+    return {
+      seats: { [only.activityId]: only.maxSeatsInWindowsAlone },
+      mode: 'single',
+      message: `Nastaveno podle vybraného času: ${formatPlayers(only.maxSeatsInWindowsAlone)}.`,
+    };
+  }
+  const typedSeats = seatsOf(ids, typed);
+  const proportional = typedSeats.every((v) => v !== null);
+  const weights = proportional ? (typedSeats as number[]) : ids.map(() => 1);
+  const total = weights.reduce((n, w) => n + w, 0);
+  const seats: Record<string, number> = {};
+  rows.forEach((row, i) => {
+    const minutes = (analysis.availableMinutes * weights[i]) / total;
+    seats[row.activityId] = row.minutesPerSeat > 0 ? Math.max(0, Math.floor((minutes * row.parallelCapacity) / row.minutesPerSeat)) : 0;
+  });
+  return {
+    seats,
+    mode: proportional ? 'proportional' : 'equal',
+    message: proportional
+      ? `Rozděleno v poměru zadaných míst mezi ${formatActivities(rows.length)} — upravte podle klubu.`
+      : `Rozděleno rovným dílem mezi ${formatActivities(rows.length)} — upravte podle klubu.`,
+  };
+}
+
+/** "09:40–10:40" for a valid daily window, else null. */
+export function windowLabel(row: Pick<RangeRow, 'dailyFrom' | 'dailyTo'>): string | null {
+  const from = row.dailyFrom.trim();
+  const to = row.dailyTo.trim();
+  return TIME.test(from) && TIME.test(to) && to > from ? `${from}–${to}` : null;
+}
+
+/** The sentence under a range row: what the analysis counts. */
+export function countingSentence(row: Pick<RangeRow, 'dailyFrom' | 'dailyTo'>): string {
+  const from = row.dailyFrom.trim();
+  const to = row.dailyTo.trim();
+  return windowLabel(row) !== null ? `Počítá se od ${from} do ${to}` : 'Počítá se celá otevírací doba';
 }

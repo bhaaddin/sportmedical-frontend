@@ -9,7 +9,7 @@
  * what the club had is worth more than a list that forgets.
  */
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Box, Button, LinearProgress, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, LinearProgress, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, Typography } from '@mui/material';
 import { ContentCopy, FileDownloadOutlined } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -20,7 +20,9 @@ import { clubRegistrationLink } from '../../api/publicClub';
 import { useDevice } from '../../layout/useDevice';
 import { formatSlotTime } from '../../pages/clubs/clubOrders';
 import { SectionLabel, SoftCard, StatusChip } from '../ui';
-import { blockFree, blockPercent, blockRange, blockTitle, formatPlayers, inkOn } from './blockLogic';
+import { blockRange, blockTitle, formatPlayers, inkOn } from './blockLogic';
+import { SeatBars } from './panel/SeatBars';
+import { activityLabel, blockActivitySeats, sumSeats } from './panel/seats';
 import { ClubBlockDialog } from './ClubBlockDialog';
 import { ClubBlockRangeDialog } from './ClubBlockRangeDialog';
 import type { RangeMode } from './ClubBlockRangeDialog';
@@ -66,7 +68,7 @@ export function ClubBlockPanel({
   });
   const detail = detailQuery.data ?? block;
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const athletes = sortAthletes(detail.athletes, sortDirection);
+  const [activityFilter, setActivityFilter] = useState<string>('');
 
   const calendarsQuery = useQuery({ queryKey: ['calendars'], queryFn: calendarsApi.list, staleTime: 5 * 60 * 1000 });
   const activitiesQuery = useQuery({ queryKey: ['club-block-activities'], queryFn: fetchBlockableActivities, staleTime: 5 * 60 * 1000 });
@@ -74,7 +76,20 @@ export function ClubBlockPanel({
   const activityNames = block.activityIds.map((id) => (activitiesQuery.data ?? []).find((a) => a.id === id)?.name).filter(Boolean) as string[];
 
   const link = block.registrationUrl ?? (block.registrationToken ? clubRegistrationLink(block.registrationToken) : null);
-  const free = blockFree(block);
+  const seatRows = blockActivitySeats(
+    { ...block, activitySeats: (detail as { activitySeats?: unknown }).activitySeats ?? (block as { activitySeats?: unknown }).activitySeats },
+    (id) => (activitiesQuery.data ?? []).find((a) => a.id === id)?.name ?? '',
+  );
+  const seatTotals = sumSeats(seatRows);
+  const sorted = sortAthletes(detail.athletes, sortDirection);
+  const rowKey = (r: { activityId: string; activityName: string }) => r.activityId || r.activityName;
+  const filterRow = seatRows.find((r) => rowKey(r) === activityFilter);
+  const athletes = filterRow === undefined
+    ? sorted
+    : sorted.filter((a) => {
+        const id = (a as { activityId?: unknown }).activityId;
+        return typeof id === 'string' && id !== '' ? id === filterRow.activityId : a.activityName === activityLabel(filterRow);
+      });
 
   const copy = async () => {
     if (link === null) return;
@@ -166,13 +181,23 @@ export function ClubBlockPanel({
         </>
       ) : null}
 
-      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'baseline', mt: 2.5, mb: 0.75 }}>
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          Obsazeno {block.registered} z {block.seats} míst
-        </Typography>
-        <Typography variant="body2" sx={{ fontWeight: 700 }}>{free} volných</Typography>
-      </Stack>
-      <LinearProgress variant="determinate" value={blockPercent(block)} aria-label={`Obsazenost bloku ${blockTitle(block)}`} />
+      <Box sx={{ mt: 2.5 }}>
+        <Stack direction="row" data-testid="block-seats-summary" sx={{ justifyContent: 'space-between', alignItems: 'baseline', mb: 0.75 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Obsazeno {seatTotals.registered} z {seatTotals.seats} míst
+          </Typography>
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>{seatTotals.free} volných</Typography>
+        </Stack>
+        {seatRows.length > 1 ? (
+          <SeatBars rows={seatRows} label={`Místa bloku ${blockTitle(block)} podle činností`} />
+        ) : (
+          <LinearProgress
+            variant="determinate"
+            value={seatTotals.seats > 0 ? Math.min(100, (seatTotals.registered / seatTotals.seats) * 100) : 0}
+            aria-label={`Obsazenost bloku ${blockTitle(block)}`}
+          />
+        )}
+      </Box>
 
       {active ? (
         <Box sx={{ mt: 2.5 }}>
@@ -190,6 +215,31 @@ export function ClubBlockPanel({
               </Button>
             ) : null}
           </Stack>
+          {seatRows.length > 1 ? (
+            <Stack direction="row" role="group" aria-label="Filtr činnosti" sx={{ flexWrap: 'wrap', gap: 0.75, mb: 1.25 }}>
+              <Chip
+                label="Vše"
+                clickable
+                color={activityFilter === '' ? 'primary' : 'default'}
+                variant={activityFilter === '' ? 'filled' : 'outlined'}
+                aria-pressed={activityFilter === ''}
+                onClick={() => setActivityFilter('')}
+                sx={{ minHeight: 36 }}
+              />
+              {seatRows.map((r) => (
+                <Chip
+                  key={rowKey(r)}
+                  label={activityLabel(r)}
+                  clickable
+                  color={activityFilter === rowKey(r) ? 'primary' : 'default'}
+                  variant={activityFilter === rowKey(r) ? 'filled' : 'outlined'}
+                  aria-pressed={activityFilter === rowKey(r)}
+                  onClick={() => setActivityFilter(rowKey(r))}
+                  sx={{ minHeight: 36 }}
+                />
+              ))}
+            </Stack>
+          ) : null}
           {detailQuery.isError ? (
             <Alert severity="warning" sx={{ mb: 1 }} action={<Button color="inherit" size="small" onClick={() => void detailQuery.refetch()}>Zkusit znovu</Button>}>
               Sportovce bloku se nepodařilo načíst.
@@ -199,7 +249,9 @@ export function ClubBlockPanel({
             <Stack spacing={1}>{[0, 1].map((i) => <Skeleton key={i} variant="rounded" height={44} />)}</Stack>
           ) : athletes.length === 0 ? (
             <Typography variant="body2" data-testid="block-athletes-empty" sx={{ color: 'text.secondary' }}>
-              Zatím se nikdo nezaregistroval. Sportovci se zapisují přes odkaz výše.
+              {filterRow !== undefined && sorted.length > 0
+                ? `Na ${activityLabel(filterRow)} se zatím nikdo nezaregistroval.`
+                : 'Zatím se nikdo nezaregistroval. Sportovci se zapisují přes odkaz výše.'}
             </Typography>
           ) : phone ? (
             <Stack spacing={1} role="list" aria-label="Sportovci v bloku">

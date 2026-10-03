@@ -21,6 +21,7 @@ import { ContentCopy, Delete } from '@mui/icons-material';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { appointmentsApi } from '../../api/appointments';
+import { fetchBlockableActivities } from '../../api/clubBlocks';
 import { partnerOrdersApi } from '../../api/partnerOrders';
 import type { PartnerOrderDetail } from '../../api/partnerOrders';
 import type { ClubBlockView } from '../../api/clubBlocks';
@@ -34,6 +35,8 @@ import type { ChipTone } from '../../components/ui';
 import { ClubAvatar } from '../../components/clubs/ClubAvatar';
 import { ClubBlockPanel } from '../../components/clubs/ClubBlockPanel';
 import { blockRange } from '../../components/clubs/blockLogic';
+import { ClubSeatsCard } from '../../components/clubs/panel/ClubSeatsCard';
+import { clubActivitySeats } from '../../components/clubs/panel/seats';
 import { canBeInvoiced } from './payerForm';
 import {
   describeDiscount, formatCzk, formatDateRange, formatShortRange, orderDateRange, orderTotal, seatRows,
@@ -82,6 +85,10 @@ export function ClubDetail({
   const range = order === null ? null : orderDateRange(order);
   const [reportOpen, setReportOpen] = useState(false);
   const [addingSeats, setAddingSeats] = useState(false);
+
+  const activeBlocks = blocks.filter((b) => b.status === 'Active');
+  const activitiesQuery = useQuery({ queryKey: ['club-block-activities'], queryFn: fetchBlockableActivities, staleTime: 5 * 60 * 1000, enabled: activeBlocks.length > 0 });
+  const clubSeatRows = clubActivitySeats(activeBlocks, (id) => (activitiesQuery.data ?? []).find((a) => a.id === id)?.name ?? '');
 
   const link = order?.token ? clubRegistrationLink(order.token) : null;
   const booked = order?.bookedCount ?? 0;
@@ -159,6 +166,8 @@ export function ClubDetail({
               </Stack>
             </SoftCard>
           ) : null}
+
+          {activeBlocks.length > 0 ? <ClubSeatsCard rows={clubSeatRows} /> : null}
 
           {blocks.length > 0 ? (
             <Stack spacing={2.5} aria-label="Bloky klubu" role="region">

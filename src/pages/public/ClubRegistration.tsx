@@ -22,14 +22,15 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-  Alert, Box, Button, CircularProgress, MenuItem, TextField, Typography,
+  Alert, Box, Button, CircularProgress, TextField, Typography,
 } from '@mui/material';
 import { CheckCircleOutlined } from '@mui/icons-material';
-import { ClubLinkDeadError, claimClubSlot, getClubOffer } from '../../api/publicClub';
+import { ClubClaimError, ClubLinkDeadError, claimClubSlot, getClubOffer } from '../../api/publicClub';
 import type { ClubOffer, ClubSlot } from '../../api/publicClub';
 import { readPublicClinic } from '../../api/clinicSettings';
 import type { PublicClinic } from '../../api/clinicSettings';
 import PublicLayout from './PublicLayout';
+import { ActivityCards, activityRemaining } from './club/ActivityCards';
 import { ARCHIVO, BRAND, clinicDate, clinicTime, telHref } from '../../components/public/brand';
 import {
   FieldLabel, LABEL_COLOR, LoadError, ON_ORANGE, Panel, PanelTitle, PinnedBar, PublicMain, ctaSx, ghostSx, longWhen,
@@ -174,6 +175,8 @@ export default function ClubRegistration() {
   const [clinic, setClinic] = useState<PublicClinic | null>(null);
 
   const [activityId, setActivityId] = useState('');
+  /** Činnosti the server just answered 409 for: shown as full until the page is reloaded. */
+  const [fullIds, setFullIds] = useState<ReadonlySet<string>>(new Set());
   const [slotUtc, setSlotUtc] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
@@ -193,6 +196,7 @@ export default function ClubRegistration() {
       .then((result) => {
         if (!alive) return;
         setOffer(result);
+        setFullIds(new Set());
         if (result.activities.length === 1) setActivityId(result.activities[0].activityId);
       })
       .catch((error) => {
@@ -238,6 +242,10 @@ export default function ClubRegistration() {
       else setComplaint('Rezervaci se nepodařilo dokončit.');
     } catch (error) {
       setComplaint(error instanceof Error ? error.message : 'Rezervaci se nepodařilo dokončit.');
+      if (error instanceof ClubClaimError && error.activityFull) {
+        setFullIds((prev) => new Set(prev).add(activityId));
+        setActivityId('');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -300,7 +308,9 @@ export default function ClubRegistration() {
 
   /* ── Full / expired ── */
   const expired = typeof offer.expiresAtUtc === 'string' && new Date(offer.expiresAtUtc).getTime() < Date.now();
-  if (expired || offer.remaining <= 0) {
+  const everyActivityFull =
+    offer.activities.length > 0 && offer.activities.every((a) => activityRemaining(a, offer.remaining) <= 0);
+  if (expired || offer.remaining <= 0 || everyActivityFull) {
     return frame(
       <Panel>
         <PanelTitle>{expired ? 'Odkaz vypršel' : 'Všechna místa jsou obsazená'}</PanelTitle>
@@ -315,34 +325,32 @@ export default function ClubRegistration() {
   /* ── The offer + the form ── */
   const openWindows = offer.windows.filter((w) => w.places > 0);
   const chosenActivity = offer.activities.find((a) => a.activityId === activityId);
+  const chooseActivity = offer.activities.length > 1;
 
   return frame(
     <>
+      {chooseActivity && (
+        <Panel labelledBy="club-step-activity">
+          <PanelTitle id="club-step-activity">1 · Vyberte činnost</PanelTitle>
+          <ActivityCards
+            activities={offer.activities}
+            blockRemaining={offer.remaining}
+            value={activityId}
+            full={fullIds}
+            onPick={(id) => { setActivityId(id); setComplaint(null); }}
+          />
+        </Panel>
+      )}
+
       <Panel labelledBy="club-step-1">
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <PanelTitle id="club-step-1">1 · Vyberte si termín</PanelTitle>
+          <PanelTitle id="club-step-1">{chooseActivity ? '2' : '1'} · Vyberte si termín</PanelTitle>
           {chosenActivity !== undefined && (
             <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
               {chosenActivity.activityName} · {chosenActivity.durationMinutes}&nbsp;min na sportovce
             </Typography>
           )}
         </Box>
-
-        {offer.activities.length > 1 && (
-          <TextField
-            select
-            label="Vyšetření"
-            value={activityId}
-            onChange={(e) => setActivityId(e.target.value)}
-            slotProps={{ input: { sx: { borderRadius: '11px', minHeight: 48 } } }}
-          >
-            {offer.activities.map((a) => (
-              <MenuItem key={a.activityId} value={a.activityId} sx={{ minHeight: 44 }}>
-                {a.activityName} · {a.durationMinutes}&nbsp;min
-              </MenuItem>
-            ))}
-          </TextField>
-        )}
 
         {choosesTime ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -385,7 +393,7 @@ export default function ClubRegistration() {
       </Panel>
 
       <Panel labelledBy="club-step-2">
-        <PanelTitle id="club-step-2">2 · Vaše údaje</PanelTitle>
+        <PanelTitle id="club-step-2">{chooseActivity ? '3' : '2'} · Vaše údaje</PanelTitle>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '14px' }}>
           <TextField
             required

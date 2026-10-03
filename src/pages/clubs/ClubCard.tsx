@@ -73,6 +73,9 @@ export function ClubCard({ row, ordersLoading, onOpen }: { row: ClubRow; ordersL
       <Divider sx={{ my: 1.75 }} />
       <Stack direction="row" spacing={4}>
         <Figure value={row.headcount === null ? '—' : String(row.headcount)} label="sportovců" />
+        {row.seatTotals !== null ? (
+          <Figure value={`${row.seatTotals.registered} / ${row.seatTotals.seats}`} label="zapsáno / míst" />
+        ) : null}
         <Figure value={formatDiscount(row.percent)} label="sleva" />
       </Stack>
     </SoftCard>

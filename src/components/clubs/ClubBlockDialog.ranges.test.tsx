@@ -10,7 +10,8 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { setViewport, VIEWPORTS } from '../../test/viewport';
-import type { Calculation, ClubBlockView } from '../../api/clubBlocks';
+import type { CalculationInput, ClubBlockView } from '../../api/clubBlocks';
+import { answerFor } from './dialog/calcFixtures';
 
 const calculate = vi.fn();
 const create = vi.fn();
@@ -43,11 +44,7 @@ const { ClubBlockError } = await import('../../api/clubBlocks');
 const club = (id: string, name: string) => ({ id, name, ico: '00000019', paymentTermsDays: 14, isActive: true, createdAt: '2026-01-01T00:00:00Z' });
 const clubs = [club('club-1', 'FK Slaný')];
 
-const calc = (over: Partial<Calculation> = {}): Calculation => ({
-  minutesPerPlayer: 60, parallelCapacity: 2, neededMinutes: 3600, dailyOpenMinutes: 600,
-  suggestedDays: 7, suggestedFrom: '2026-10-26', suggestedTo: '2026-11-03', fitsHorizon: true, minimumPlayers: null, belowMinimum: false,
-  perDay: [{ date: '2026-10-26', openMinutes: 600 }, { date: '2026-10-27', openMinutes: 600 }], ...over,
-});
+const calc = (input: CalculationInput) => answerFor(input);
 
 const made = (over: Partial<ClubBlockView> = {}): ClubBlockView => ({
   id: 'b-1', clubId: 'club-1', clubName: 'FK Slaný', colorHex: '#2E7D6B', name: null, calendarIds: ['c-1'], activityIds: ['a-1'],
@@ -72,8 +69,8 @@ const open = (props: Partial<Parameters<typeof ClubBlockDialog>[0]> = {}) =>
 const prefillRanges = { clubId: 'club-1', calendarIds: ['c-1'], ranges: RANGES };
 
 async function ready(user: ReturnType<typeof userEvent.setup>, players = '20') {
-  await user.type(screen.getByLabelText('Počet hráčů'), players);
   await user.click(await within(await screen.findByRole('group', { name: 'Činnosti' })).findByRole('checkbox', { name: /Základní prohlídka/ }));
+  await user.type(screen.getByLabelText('Počet hráčů, Základní prohlídka'), players);
 }
 const setField = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
 const norm = (el: HTMLElement) => el.textContent?.replace(/\s/g, ' ');
@@ -82,7 +79,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-10-04T10:00:00+02:00'));
   setViewport(VIEWPORTS.desktop);
-  calculate.mockReset().mockResolvedValue(calc());
+  calculate.mockReset().mockImplementation(async (input: CalculationInput) => calc(input));
   create.mockReset().mockResolvedValue(made());
   settingsGet.mockReset().mockResolvedValue({ registrationLinkValidityDays: 14, minimumPlayers: null });
   fetchActivities.mockReset().mockResolvedValue([
@@ -252,35 +249,39 @@ describe('creating several blocks', () => {
   });
 });
 
-describe('the calculator over all rows', () => {
-  const perDayByFrom = (from: string) =>
-    from === '2026-10-26'
-      ? [{ date: '2026-10-26', openMinutes: 600 }, { date: '2026-10-27', openMinutes: 600 }, { date: '2026-10-28', openMinutes: 600 }]
-      : [{ date: '2026-11-02', openMinutes: 600 }, { date: '2026-11-03', openMinutes: 600 }];
+describe('the analysis over all rows', () => {
   const twoRows = { clubId: 'club-1', calendarIds: ['c-1'], ranges: [{ fromDate: '2026-10-26', toDate: '2026-10-27' }, { fromDate: '2026-11-02', toDate: '2026-11-02' }] };
 
-  it('calls once per row and sums the open minutes inside each row against the one need', async () => {
-    calculate.mockImplementation(async (input: { fromDate?: string }) => calc({ neededMinutes: 3600, perDay: perDayByFrom(input.fromDate ?? '') }));
+  it('asks once with every row and its own window, and sums the minutes against the one need', async () => {
     const user = userEvent.setup();
-    open({ prefill: twoRows });
-    await ready(user);
+    open({ prefill: { clubId: 'club-1', calendarIds: ['c-1'], ranges: [
+      { fromDate: '2026-10-26', toDate: '2026-10-27', dailyFrom: '09:40', dailyTo: '10:40' },
+      { fromDate: '2026-11-02', toDate: '2026-11-02' },
+    ] } });
+    await ready(user, '40');
 
-    const box = await screen.findByTestId('coverage');
-    await waitFor(() => expect(norm(box)).toContain('Vybrané termíny pojmou 1 800 min z potřebných 3 600 min'));
+    const box = await screen.findByTestId('analysis-total');
+    /* 2 days x 60 min (window from 09:40) + 1 day x 600 min = 720 min of 20 x 60 / 2 = 1 200 min. */
+    await waitFor(() => expect(norm(box)).toContain('potřebuje 1 200 min, k dispozici ve vybraných termínech 720 min — chybí 480 min'));
     expect(box).toHaveAttribute('data-state', 'short');
-    const froms = calculate.mock.calls.map((c) => c[0].fromDate);
-    expect(froms).toContain('2026-10-26');
-    expect(froms).toContain('2026-11-02');
+    const input = calculate.mock.calls.at(-1)?.[0] as CalculationInput;
+    expect(input.ranges).toEqual([
+      { fromDate: '2026-10-26', toDate: '2026-10-27', dailyFrom: '09:40', dailyTo: '10:40' },
+      { fromDate: '2026-11-02', toDate: '2026-11-02', dailyFrom: null, dailyTo: null },
+    ]);
+    const lines = screen.getAllByTestId('analysis-range').map((li) => norm(li));
+    expect(lines[0]).toContain('09:40–10:40');
+    expect(lines[0]).toContain('120 min');
     /* A warning only: saving is not blocked. */
     expect(screen.getByRole('button', { name: 'Vytvořit bloky (2)' })).toBeEnabled();
   });
 
   it('turns green when the rows together are enough', async () => {
-    calculate.mockImplementation(async (input: { fromDate?: string }) => calc({ neededMinutes: 1800, perDay: perDayByFrom(input.fromDate ?? '') }));
     const user = userEvent.setup();
     open({ prefill: twoRows });
-    await ready(user);
-    await waitFor(() => expect(screen.getByTestId('coverage')).toHaveAttribute('data-state', 'enough'));
+    await ready(user, '10');
+    await waitFor(() => expect(screen.getByTestId('analysis-total')).toHaveAttribute('data-state', 'fits'));
+    expect(norm(screen.getByTestId('analysis-total'))).toContain('zbývá');
   });
 
   it('"Použít návrh" fills the first row only', async () => {

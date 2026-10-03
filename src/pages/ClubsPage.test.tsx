@@ -40,7 +40,10 @@ vi.mock('../api/clubBlocks', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/clubBlocks')>();
   return {
     ...actual,
-    clubBlocksApi: { list: listBlocks, get: getBlock, create: createBlock, update: vi.fn(), cancel: vi.fn(), calculate: vi.fn().mockResolvedValue({}) },
+    clubBlocksApi: { list: listBlocks, get: getBlock, create: createBlock, update: vi.fn(), cancel: vi.fn(), calculate: vi.fn().mockResolvedValue({
+      fitsHorizon: true, perDay: [],
+      analysis: { totalSeats: 0, perActivity: [], totalNeededMinutes: 0, availableMinutes: 0, remainingMinutes: 0, fits: true, byRange: [], capacityNote: null },
+    }) },
     fetchBlockableActivities: fetchActivities,
   };
 });
@@ -450,14 +453,16 @@ describe('ClubsPage with club blocks', () => {
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByLabelText('Klub'));
     await user.click(await screen.findByRole('option', { name: 'HC Kladno' }));
-    await user.type(within(dialog).getByLabelText('Počet hráčů'), '40');
     fireEvent.change(within(dialog).getByLabelText('Od'), { target: { value: day1 } });
     fireEvent.change(within(dialog).getByLabelText('Do'), { target: { value: day2 } });
     await user.click(await within(dialog).findByRole('checkbox', { name: /Prohlídky/ }));
     await user.click(await within(dialog).findByRole('checkbox', { name: /Komplexní prohlídka/ }));
+    await user.type(within(dialog).getByLabelText('Počet hráčů, Komplexní prohlídka'), '40');
     await user.click(within(dialog).getByRole('button', { name: 'Vytvořit blok' }));
 
-    await waitFor(() => expect(createBlock).toHaveBeenCalledWith(expect.objectContaining({ clubId: 'club-2', playerCount: 40, fromDate: day1, toDate: day2 })));
+    await waitFor(() => expect(createBlock).toHaveBeenCalledWith(expect.objectContaining({
+      clubId: 'club-2', activitySeats: [{ activityId: 'a-1', seats: 40 }], fromDate: day1, toDate: day2,
+    })));
     expect(await screen.findByRole('heading', { name: 'HC Kladno', level: 1 })).toBeInTheDocument();
     expect((await screen.findAllByTestId('club-block-panel'))[0]).toHaveAttribute('data-block-id', 'b-new');
   });
@@ -477,12 +482,14 @@ describe('ClubsPage router state', () => {
     expect(within(dialog).getByRole('heading', { name: /Nový blok pro klub/ })).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Název klubu')).toHaveValue('TJ Sokol Slaný');
     expect(within(dialog).getByLabelText('Kontaktní osoba')).toHaveValue('Jan Trenér');
-    expect(within(dialog).getByLabelText('Počet hráčů')).toHaveValue('40');
     expect(within(dialog).getByLabelText('Od')).toHaveValue(day1);
     expect(within(dialog).getByLabelText('Do')).toHaveValue(day2);
     expect(within(dialog).getByLabelText('Denně od')).toHaveValue('08:00');
     expect(within(dialog).getByLabelText('Denně do')).toHaveValue('12:00');
     expect(await within(dialog).findByRole('checkbox', { name: /Prohlídky/ })).toBeChecked();
+    /* The headcount from the drawer starts the seats of the first činnost chosen. */
+    await userEvent.setup().click(await within(dialog).findByRole('checkbox', { name: /Komplexní prohlídka/ }));
+    expect(within(dialog).getByLabelText('Počet hráčů, Komplexní prohlídka')).toHaveValue('40');
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('null'));
   });
 
@@ -517,13 +524,13 @@ describe('ClubsPage router state', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Vytvořit blok' }));
 
     await waitFor(() => expect(createClub).toHaveBeenCalledWith(expect.objectContaining({ name: 'TJ Sokol Slaný', ico: '00000019' })));
-    await waitFor(() => expect(createBlock).toHaveBeenCalledWith(expect.objectContaining({ clubId: 'club-new', playerCount: 40 })));
+    await waitFor(() => expect(createBlock).toHaveBeenCalledWith(expect.objectContaining({ clubId: 'club-new', activitySeats: [{ activityId: 'a-1', seats: 40 }] })));
   });
 
   it('opens an empty dialog for `newBlock: true` and a club-filled one for a club id', async () => {
     const { unmount } = render(<Wrap state={{ newBlock: true }}><ClubsPage /></Wrap>);
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByLabelText('Počet hráčů')).toHaveValue('');
+    expect(within(dialog).getByTestId('seats-table')).toHaveTextContent('Vyberte činnosti');
     unmount();
 
     render(<Wrap state={{ newBlock: { clubId: 'club-1' } }}><ClubsPage /></Wrap>);

@@ -26,6 +26,13 @@ export interface ClubActivity {
   activityId: string;
   activityName: string;
   durationMinutes: number;
+  /*
+   * Places per činnost (newer server): all optional. Absent = the page falls
+   * back to the block's overall `remaining`.
+   */
+  seats?: number | null;
+  registered?: number | null;
+  remaining?: number | null;
 }
 
 /** A day the clinic held for the club, and how many athletes still fit in it. */
@@ -90,6 +97,31 @@ export class ClubLinkDeadError extends Error {}
 export const clubRegistrationLink = (token: string, origin: string = window.location.origin): string =>
   `${origin.replace(/\/+$/, '')}/klub/${encodeURIComponent(token)}`;
 
+const optNum = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/**
+ * The server names a činnost `name`; older code and tests say `activityName`.
+ * Accept both, and read the places per činnost when they are there.
+ */
+export function normaliseOffer(raw: ClubOffer): ClubOffer {
+  const list = Array.isArray(raw.activities) ? (raw.activities as unknown as Record<string, unknown>[]) : [];
+  const activities = list.map((a): ClubActivity => {
+    const name = typeof a.activityName === 'string' && a.activityName !== '' ? a.activityName : typeof a.name === 'string' ? a.name : '';
+    const seats = optNum(a.seats);
+    const registered = optNum(a.registered);
+    const remaining = optNum(a.remaining) ?? (seats !== null ? Math.max(0, seats - (registered ?? 0)) : null);
+    return {
+      activityId: String(a.activityId ?? ''),
+      activityName: name,
+      durationMinutes: optNum(a.durationMinutes) ?? 0,
+      seats,
+      registered,
+      remaining,
+    };
+  });
+  return { ...raw, activities };
+}
+
 /**
  * What the club link offers. `null` is never returned: a dead link throws
  * {@link ClubLinkDeadError} so the page can say "the link is not live" rather
@@ -100,7 +132,7 @@ export const getClubOffer = async (token: string): Promise<ClubOffer> => {
     const { data } = await publicClient.get<ApiResult<ClubOffer>>(
       `/api/public/club/${encodeURIComponent(token)}`,
     );
-    return data.data;
+    return normaliseOffer(data.data);
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {
       throw new ClubLinkDeadError(
@@ -111,6 +143,23 @@ export const getClubOffer = async (token: string): Promise<ClubOffer> => {
     throw error;
   }
 };
+
+/** A refused claim: the server's own Czech message, its status and (when sent) its machine code. */
+export class ClubClaimError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+
+  constructor(message: string, status: number, code: string | null) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+
+  /** The chosen činnost has no place left (409 and not a "time taken" answer). */
+  get activityFull(): boolean {
+    return this.status === 409 && (this.code === null || /full|seat|capacit|obsaz|activity/i.test(this.code));
+  }
+}
 
 export interface ClaimInput {
   activityId: string;
@@ -138,10 +187,9 @@ export const claimClubSlot = async (token: string, input: ClaimInput): Promise<C
     return data.data;
   } catch (error) {
     if (axios.isAxiosError(error) && error.response) {
-      const message =
-        (error.response.data as ApiResult<unknown> | undefined)?.message ??
-        'Rezervaci se nepodařilo dokončit.';
-      throw new Error(message);
+      const body = error.response.data as { message?: unknown; code?: unknown } | undefined;
+      const message = typeof body?.message === 'string' && body.message !== '' ? body.message : 'Rezervaci se nepodařilo dokončit.';
+      throw new ClubClaimError(message, error.response.status, typeof body?.code === 'string' ? body.code : null);
     }
     throw error;
   }

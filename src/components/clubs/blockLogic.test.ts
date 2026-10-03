@@ -5,6 +5,7 @@ import {
   formatWeekdayDayMonth, hasBlockErrors, initialsOf, inkOn, parsePlayerCount, plural, validateBlockDraft,
 } from './blockLogic';
 import { coveredMinutes, moveToToday, nextDay, overlapErrors, sortRows, startsInPast, todayInPrague } from './blockLogic';
+import { allSeatsValid, countingSentence, fillSeatsFromWindow, formatActivities, seatsPayload, sumSeats, windowLabel } from './blockLogic';
 import type { BlockDraft } from './blockLogic';
 
 const calc = (over: Partial<Calculation> = {}): Calculation => ({
@@ -157,5 +158,59 @@ describe('several ranges', () => {
       [{ date: '2026-11-02', openMinutes: 600 }, { date: '2026-11-03', openMinutes: 600 }],
     ];
     expect(coveredMinutes(rows, (i) => per[i])).toBe(1200 + 120);
+  });
+});
+
+describe('seats per činnost', () => {
+  const analysis = {
+    availableMinutes: 300,
+    perActivity: [
+      { activityId: 'a-1', name: 'Základní', seats: 1, minutesPerSeat: 60, parallelCapacity: 2, neededMinutes: 30, maxSeatsInWindowsAlone: 10 },
+      { activityId: 'a-2', name: 'Spiro', seats: 1, minutesPerSeat: 45, parallelCapacity: 1, neededMinutes: 45, maxSeatsInWindowsAlone: 6 },
+    ],
+  };
+
+  it('sums only the valid seats and knows when every činnost has some', () => {
+    expect(sumSeats(['a-1', 'a-2'], { 'a-1': '10', 'a-2': '60' })).toBe(70);
+    expect(sumSeats(['a-1', 'a-2'], { 'a-1': '10', 'a-2': 'x' })).toBe(10);
+    expect(allSeatsValid(['a-1', 'a-2'], { 'a-1': '10', 'a-2': '' })).toBe(false);
+    expect(allSeatsValid([], {})).toBe(false);
+    expect(seatsPayload(['a-2', 'a-1'], { 'a-1': '10', 'a-2': '60' })).toEqual([{ activityId: 'a-2', seats: 60 }, { activityId: 'a-1', seats: 10 }]);
+  });
+
+  it('validates the seats of every chosen činnost instead of the single headcount', () => {
+    expect(validateBlockDraft(draft({ playerCount: '', activityIds: ['a-1', 'a-2'], seats: { 'a-1': '5', 'a-2': '7' } }), true, false).playerCount).toBeUndefined();
+    expect(validateBlockDraft(draft({ playerCount: '', activityIds: ['a-1', 'a-2'], seats: { 'a-1': '5' } }), true, false).playerCount).toMatch(/u každé vybrané činnosti/);
+    expect(validateBlockDraft(draft({ playerCount: 'x' }), true, false).playerCount).toMatch(/Zadejte počet hráčů/);
+  });
+
+  it('fills one činnost with what fits alone in the windows', () => {
+    const fill = fillSeatsFromWindow(analysis, ['a-1'], {});
+    expect(fill).toMatchObject({ mode: 'single', seats: { 'a-1': 10 } });
+  });
+
+  it('shares the minutes equally, rounding down, and says so', () => {
+    const fill = fillSeatsFromWindow(analysis, ['a-1', 'a-2'], {});
+    expect(fill?.mode).toBe('equal');
+    expect(fill?.seats).toEqual({ 'a-1': 5, 'a-2': 3 });
+    expect(fill?.message).toBe('Rozděleno rovným dílem mezi 2 činnosti — upravte podle klubu.');
+  });
+
+  it('shares the minutes in the proportion of the typed seats', () => {
+    const fill = fillSeatsFromWindow(analysis, ['a-1', 'a-2'], { 'a-1': '3', 'a-2': '1' });
+    expect(fill?.mode).toBe('proportional');
+    expect(fill?.seats).toEqual({ 'a-1': 7, 'a-2': 1 });
+  });
+
+  it('falls back to an equal split when only some činnosti have seats, and gives up on a missing činnost', () => {
+    expect(fillSeatsFromWindow(analysis, ['a-1', 'a-2'], { 'a-1': '3' })?.mode).toBe('equal');
+    expect(fillSeatsFromWindow(analysis, ['a-1', 'a-9'], {})).toBeNull();
+    expect(formatActivities(5)).toBe('5 činností');
+  });
+
+  it('says what the analysis counts for a row', () => {
+    expect(countingSentence({ dailyFrom: '09:40', dailyTo: '10:40' })).toBe('Počítá se od 09:40 do 10:40');
+    expect(countingSentence({ dailyFrom: '', dailyTo: '' })).toBe('Počítá se celá otevírací doba');
+    expect(windowLabel({ dailyFrom: '10:40', dailyTo: '09:40' })).toBeNull();
   });
 });

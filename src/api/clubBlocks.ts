@@ -46,6 +46,21 @@ export interface ClubBlockAthlete {
   endUtc: string | null;
   status: ClubBlockAthleteStatus;
   phone: string | null;
+  /** The činnost the athlete is booked on (Etapa 3, seats per činnost). Absent on an older server. */
+  activityId?: string | null;
+}
+
+/** What goes to the server: how many places the club takes on one činnost. */
+export interface ActivitySeat {
+  activityId: string;
+  /** A whole number from 1. */
+  seats: number;
+}
+
+/** What the server answers: the seats of one činnost and how many are taken. */
+export interface ActivitySeatView extends ActivitySeat {
+  activityName: string;
+  registered: number;
 }
 
 export interface ClubBlockView {
@@ -71,18 +86,24 @@ export interface ClubBlockView {
   createdAtUtc: string | null;
   /** Newest registration last. Missing in the answer = no athletes yet = []. */
   athletes: ClubBlockAthlete[];
+  /** Seats per činnost; `[]` (or absent) on a server that only knows the single headcount. */
+  activitySeats?: ActivitySeatView[];
 }
 
 export interface ClubBlockInput {
   clubId: string;
   name?: string | null;
   calendarIds: string[];
-  activityIds: string[];
+  /** Derived by the server from `activitySeats`; sent only by the legacy single-headcount path. */
+  activityIds?: string[];
   fromDate: string;
   toDate: string;
   dailyFrom?: string | null;
   dailyTo?: string | null;
-  playerCount: number;
+  /** The sum of `activitySeats`, derived by the server - not sent together with `activitySeats`. */
+  playerCount?: number;
+  /** Seats per činnost; the club is counted as one whole. */
+  activitySeats?: ActivitySeat[];
   note?: string | null;
 }
 
@@ -91,6 +112,7 @@ export interface ClubBlockUpdate {
   fromDate: string;
   toDate: string;
   playerCount?: number;
+  activitySeats?: ActivitySeat[];
   note?: string | null;
   dailyFrom?: string | null;
   dailyTo?: string | null;
@@ -103,11 +125,54 @@ export interface ClubBlockListParams {
   status?: ClubBlockStatus;
 }
 
+/** One date range of the calculation; the daily window counts from `dailyFrom` to `dailyTo` only. */
+export interface CalculationRange {
+  fromDate: string;
+  toDate: string;
+  dailyFrom?: string | null;
+  dailyTo?: string | null;
+}
+
 export interface CalculationInput {
-  playerCount: number;
-  activityIds: string[];
+  /** Legacy single headcount (an older server); also the sum of `activitySeats`. */
+  playerCount?: number;
+  activityIds?: string[];
+  activitySeats?: ActivitySeat[];
   calendarIds: string[];
   fromDate?: string;
+  ranges?: CalculationRange[];
+}
+
+export interface ActivityAnalysis {
+  activityId: string;
+  name: string;
+  seats: number;
+  minutesPerSeat: number;
+  parallelCapacity: number;
+  neededMinutes: number;
+  /** How many seats of this činnost alone fit into all the chosen windows. */
+  maxSeatsInWindowsAlone: number;
+}
+
+export interface RangeAnalysis {
+  fromDate: string;
+  toDate: string;
+  dailyFrom: string | null;
+  dailyTo: string | null;
+  availableMinutes: number;
+}
+
+/** The club as one whole: seats per činnost against the time inside the chosen windows. */
+export interface BlockAnalysis {
+  totalSeats: number;
+  perActivity: ActivityAnalysis[];
+  totalNeededMinutes: number;
+  availableMinutes: number;
+  /** Negative when the need is bigger than the time available. */
+  remainingMinutes: number;
+  fits: boolean;
+  byRange: RangeAnalysis[];
+  capacityNote: string | null;
 }
 
 export interface DayOpen {
@@ -130,6 +195,8 @@ export interface Calculation {
   /** The server's verdict; false whenever `minimumPlayers` is null. */
   belowMinimum: boolean;
   perDay: DayOpen[];
+  /** Absent/null = the server does not know the per-činnost analysis (legacy answer). */
+  analysis?: BlockAnalysis | null;
 }
 
 /** An athlete a shortening or a cancellation would hit: the same shape as in the block (`affectedAthletes`). */
@@ -154,6 +221,7 @@ const athleteSchema = z.object({
   endUtc: text,
   status: z.enum(ATHLETE_STATUSES).catch('Booked'),
   phone: text,
+  activityId: text,
 });
 
 /** Athletes that cannot be read (no name) are left out; a list that is not a list is empty. */
@@ -162,8 +230,64 @@ export function toAthletes(raw: unknown): ClubBlockAthlete[] {
   return raw.flatMap((item, index): ClubBlockAthlete[] => {
     const withId = isRecord(item) && typeof item.id !== 'string' ? { ...item, id: `athlete-${index}` } : item;
     const parsed = athleteSchema.safeParse(withId);
-    return parsed.success ? [{ ...parsed.data, activityName: parsed.data.activityName ?? '' }] : [];
+    if (!parsed.success) return [];
+    /* `activityId` is only there when the server sent one (seats per činnost). */
+    const { activityId, ...rest } = parsed.data;
+    return [{ ...rest, activityName: rest.activityName ?? '', ...(activityId !== null ? { activityId } : {}) }];
   });
+}
+
+/** Seats per činnost as the server lists them; rows without an id are left out, a missing list is empty. */
+export function toActivitySeats(raw: unknown): ActivitySeatView[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isRecord).flatMap((r): ActivitySeatView[] => {
+    const activityId = str(r.activityId);
+    return activityId === null
+      ? []
+      : [{ activityId, activityName: str(r.activityName) ?? '', seats: num(r.seats), registered: num(r.registered) }];
+  });
+}
+
+/** The server's analysis, read leniently; anything that is not an object means "no analysis". */
+export function toAnalysis(raw: unknown): BlockAnalysis | null {
+  if (!isRecord(raw)) return null;
+  const perActivity = Array.isArray(raw.perActivity)
+    ? raw.perActivity.filter(isRecord).flatMap((a): ActivityAnalysis[] => {
+        const activityId = str(a.activityId);
+        return activityId === null
+          ? []
+          : [{
+              activityId,
+              name: str(a.name) ?? '',
+              seats: num(a.seats),
+              minutesPerSeat: num(a.minutesPerSeat),
+              parallelCapacity: Math.max(1, num(a.parallelCapacity, 1)),
+              neededMinutes: num(a.neededMinutes),
+              maxSeatsInWindowsAlone: Math.max(0, Math.floor(num(a.maxSeatsInWindowsAlone))),
+            }];
+      })
+    : [];
+  const byRange = Array.isArray(raw.byRange)
+    ? raw.byRange.filter(isRecord).map((r) => ({
+        fromDate: dateOnly(r.fromDate),
+        toDate: dateOnly(r.toDate),
+        dailyFrom: hhmm(r.dailyFrom),
+        dailyTo: hhmm(r.dailyTo),
+        availableMinutes: num(r.availableMinutes),
+      }))
+    : [];
+  const availableMinutes = num(raw.availableMinutes);
+  const totalNeededMinutes = num(raw.totalNeededMinutes);
+  return {
+    totalSeats: num(raw.totalSeats, perActivity.reduce((n, a) => n + a.seats, 0)),
+    perActivity,
+    totalNeededMinutes,
+    availableMinutes,
+    remainingMinutes: num(raw.remainingMinutes, availableMinutes - totalNeededMinutes),
+    fits: typeof raw.fits === 'boolean' ? raw.fits : availableMinutes >= totalNeededMinutes,
+    byRange,
+    capacityNote: str(raw.capacityNote),
+  };
 }
 
 export function toBlock(raw: unknown): ClubBlockView {
@@ -190,6 +314,7 @@ export function toBlock(raw: unknown): ClubBlockView {
     note: str(r.note),
     createdAtUtc: str(r.createdAtUtc),
     athletes: toAthletes(r.athletes),
+    activitySeats: toActivitySeats(r.activitySeats),
   };
 }
 
@@ -223,6 +348,7 @@ export function toCalculation(raw: unknown): Calculation {
     minimumPlayers,
     belowMinimum: minimumPlayers !== null && r.belowMinimum === true,
     perDay,
+    analysis: toAnalysis(r.analysis),
   };
 }
 

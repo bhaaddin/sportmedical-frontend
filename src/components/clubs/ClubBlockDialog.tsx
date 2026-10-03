@@ -12,6 +12,12 @@
  *   tablet         two columns - the form, then the calculator and the preview
  *   desktop        the same, with a wider calculator
  *
+ * The club is counted as one whole: the činnosti of the ticked calendars' services
+ * are listed (nothing pre-selected), and every CHOSEN činnost gets its own seats in
+ * "Místa pro klub" with the sum underneath. The analysis beside the form counts
+ * the time only inside each range's daily window - a window from 09:40 counts
+ * from 09:40 - and "Spočítat počet hráčů z vybraného času" fills the seats from it.
+ *
  * Opened from the router (`/clubs` + `state.newBlock`) the dialog may start with
  * a head start: the calendars and days the operator dragged, a club on file, or
  * a club that does not exist yet - then the "Nový klub" fields are open and
@@ -38,6 +44,7 @@ import toast from 'react-hot-toast';
 import { calendarsApi } from '../../api/calendars';
 import { clubsApi } from '../../api/clubs';
 import type { Club } from '../../api/clubs';
+import { clinicServicesApi } from '../../api/clinicServices';
 import { clubBlocksApi, ClubBlockError, fetchBlockableActivities, toClubBlockError } from '../../api/clubBlocks';
 import { clubRegistrationLink } from '../../api/publicClub';
 import type { ClubBlockConflict, ClubBlockView } from '../../api/clubBlocks';
@@ -45,10 +52,15 @@ import { useDevice } from '../../layout/useDevice';
 import { EMPTY_PAYER, isValidIco, toPayerRequest } from '../../pages/clubs/payerForm';
 import { DESIGN, SectionLabel, SoftCard } from '../ui';
 import { BlockCalculator } from './BlockCalculator';
+import { ActivityPicker, activityGroups } from './dialog/ActivityPicker';
+import type { PickerService } from './dialog/ActivityPicker';
+import { SeatsTable } from './dialog/SeatsTable';
+import type { SeatRow } from './dialog/SeatsTable';
+import { useBlockCalculation } from './dialog/useBlockCalculation';
 import { ConflictList } from './ConflictList';
 import {
-  blockRange, clubColorOf, formatPlayers, formatShortSpan, hasBlockErrors, inkOn, nextDay, overlapErrors, parsePlayerCount,
-  moveToToday, sortRows, startsInPast, todayInPrague, validateBlockDraft, validateRow,
+  blockRange, clubColorOf, countingSentence, fillSeatsFromWindow, formatPlayers, formatShortSpan, hasBlockErrors, inkOn, nextDay,
+  overlapErrors, parsePlayerCount, seatsOf, seatsPayload, sumSeats, moveToToday, sortRows, startsInPast, todayInPrague, validateBlockDraft, validateRow,
 } from './blockLogic';
 import type { BlockDraft, BlockErrors, RangeRow, RowErrors } from './blockLogic';
 
@@ -166,8 +178,20 @@ export function ClubBlockDialog({
   const calendarsQuery = useQuery({ queryKey: ['calendars'], queryFn: calendarsApi.list, staleTime: 5 * 60 * 1000 });
   const activitiesQuery = useQuery({ queryKey: ['club-block-activities'], queryFn: fetchBlockableActivities, staleTime: 5 * 60 * 1000 });
 
+  /* Only the names and colours of the services; a failure just leaves the groups named after their calendars. */
+  const servicesQuery = useQuery({
+    queryKey: ['club-block-services'],
+    queryFn: () => clinicServicesApi.list().catch(() => []),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
   const calendars = useMemo(() => (calendarsQuery.data ?? []).filter((c) => c.isActive), [calendarsQuery.data]);
-  const activities = activitiesQuery.data ?? [];
+  const activities = useMemo(() => activitiesQuery.data ?? [], [activitiesQuery.data]);
+  const services = useMemo(
+    () => new Map<string, PickerService>((servicesQuery.data ?? []).map((sv) => [sv.id, { name: sv.name, colorHex: sv.colorHex }])),
+    [servicesQuery.data],
+  );
   const [createdClub, setCreatedClub] = useState<Club | null>(null);
   const activeClubs = useMemo(
     () => [...clubs.filter((c) => c.isActive), ...(createdClub !== null && !clubs.some((c) => c.id === createdClub.id) ? [createdClub] : [])],
@@ -189,14 +213,18 @@ export function ClubBlockDialog({
     name: block?.name ?? '',
     calendarIds: block?.calendarIds ?? prefill?.calendarIds ?? [],
     activityIds: block?.activityIds ?? [],
+    seats: Object.fromEntries((block?.activitySeats ?? []).map((a) => [a.activityId, String(a.seats)])),
     /* The days live in `rows`; these stay empty. */
     fromDate: '',
     toDate: '',
     dailyFrom: '',
     dailyTo: '',
-    playerCount: block !== null ? String(block.playerCount) : headcountHint,
+    playerCount: '',
     note: block?.note ?? '',
   });
+  /* The legacy single headcount; null until the operator types one (then it defaults to the sum of the seats). */
+  const [legacyText, setLegacyText] = useState<string | null>(null);
+  const [fillMessage, setFillMessage] = useState<string | null>(null);
   const [rows, setRows] = useState<RangeRow[]>(() => initialRows(block, prefill));
   /* Blocks of this run that exist already, by row key - a retry never sends them again. */
   const [created, setCreated] = useState<Record<string, ClubBlockView>>({});
@@ -213,21 +241,37 @@ export function ClubBlockDialog({
     setConflicts(null);
   };
 
-  const toggle = (key: 'calendarIds' | 'activityIds', id: string) => {
+  const toggleCalendar = (id: string) => {
     setDraft((d) => {
-      const has = d[key].includes(id);
-      const next = has ? d[key].filter((x) => x !== id) : [...d[key], id];
-      const patch: Partial<BlockDraft> = { [key]: next };
-      /* First calendar ticked and no činnost yet: offer that calendar's own činnosti. */
-      if (key === 'calendarIds' && !has && d.activityIds.length === 0) {
-        const service = calendars.find((c) => c.id === id)?.clinicServiceId ?? null;
-        if (service !== null) {
-          const own = activities.filter((a) => a.clinicServiceId === service).map((a) => a.id);
-          if (own.length > 0) patch.activityIds = own;
-        }
-      }
-      return { ...d, ...patch };
+      const next = d.calendarIds.includes(id) ? d.calendarIds.filter((x) => x !== id) : [...d.calendarIds, id];
+      /* A činnost whose service no ticked calendar runs any more is not shown - and not kept. */
+      const shown = new Set(
+        activityGroups(calendars.filter((c) => next.includes(c.id)), activities, services).flatMap((g) => g.items.map((a) => a.id)),
+      );
+      const keep = d.activityIds.filter((a) => shown.has(a) || activities.length === 0);
+      const seats = Object.fromEntries(Object.entries(d.seats ?? {}).filter(([a]) => keep.includes(a)));
+      return { ...d, calendarIds: next, activityIds: keep, seats };
     });
+    setConflicts(null);
+  };
+
+  const toggleActivity = (id: string) => {
+    setDraft((d) => {
+      if (d.activityIds.includes(id)) {
+        const { [id]: _gone, ...seats } = d.seats ?? {};
+        return { ...d, activityIds: d.activityIds.filter((x) => x !== id), seats };
+      }
+      /* The headcount of a club typed into the booking drawer is the start for its first činnost. */
+      const start = d.activityIds.length === 0 ? headcountHint : '';
+      return { ...d, activityIds: [...d.activityIds, id], seats: { ...(d.seats ?? {}), [id]: start } };
+    });
+    setFillMessage(null);
+    setConflicts(null);
+  };
+
+  const changeSeats = (id: string, text: string) => {
+    setDraft((d) => ({ ...d, seats: { ...(d.seats ?? {}), [id]: text } }));
+    setFillMessage(null);
     setConflicts(null);
   };
 
@@ -245,12 +289,51 @@ export function ClubBlockDialog({
     clubMode === 'new' && createdClub === null
       ? newClub.name.trim() !== ''
       : (createdClub?.id ?? clubId) !== '';
+  /* Seats per činnost, the club as one whole - or the single headcount against a server without an analysis. */
+  const sum = sumSeats(draft.activityIds, draft.seats ?? {});
+  const legacyForced = editing && (block?.activitySeats ?? []).length === 0;
+  const defaultLegacy = editing ? String(block?.playerCount ?? '') : sum > 0 ? String(sum) : '';
+  const legacyValue = legacyText ?? defaultLegacy;
+  const legacyCount = parsePlayerCount(legacyValue);
+  const seatMap = useMemo(
+    () => Object.fromEntries(draft.activityIds.map((id, i) => [id, seatsOf(draft.activityIds, draft.seats ?? {})[i]])),
+    [draft.activityIds, draft.seats],
+  );
+  const calculation = useBlockCalculation({
+    activityIds: draft.activityIds,
+    seats: seatMap,
+    legacyCount: legacyText !== null || legacyForced ? legacyCount : null,
+    calendarIds: draft.calendarIds,
+    rows,
+  });
+  const legacy = legacyForced || calculation.legacy;
+  const analysis = calculation.calc?.analysis ?? null;
+
   /* The days are checked per row; the rest of the draft gets a day that always passes. */
   const errors: BlockErrors = validateBlockDraft(
-    { ...draft, clubId: createdClub?.id ?? clubId, fromDate: '2000-01-01', toDate: '2000-01-01', dailyFrom: '', dailyTo: '' },
+    {
+      ...draft, clubId: createdClub?.id ?? clubId, fromDate: '2000-01-01', toDate: '2000-01-01', dailyFrom: '', dailyTo: '',
+      seats: legacy ? undefined : draft.seats ?? {},
+      playerCount: legacyValue,
+    },
     clubReady,
     editing,
   );
+  /* Editing: a činnost cannot hold fewer seats than are registered on it already. */
+  const registeredOf = (id: string): number | null => {
+    const found = block?.activitySeats?.find((a) => a.activityId === id);
+    return found === undefined ? null : found.registered;
+  };
+  const seatErrors: Record<string, string> = {};
+  if (editing && !legacy) {
+    for (const id of draft.activityIds) {
+      const typed = parsePlayerCount(draft.seats?.[id] ?? '');
+      const taken = registeredOf(id);
+      if (typed !== null && taken !== null && typed < taken) seatErrors[id] = `nejméně ${taken}`;
+    }
+  }
+  const hasSeatErrors = Object.keys(seatErrors).length > 0;
+  const totalPlayers = legacy ? legacyCount : sum > 0 ? sum : null;
   const today = todayInPrague();
   const overlaps = overlapErrors(rows);
   const rowErrors: RowErrors[] = rows.map((row, i) => {
@@ -277,11 +360,27 @@ export function ClubBlockDialog({
   const addRow = () =>
     setRows((list) => [...list, { key: newRowKey(), fromDate: nextDay(list[list.length - 1]?.toDate ?? ''), toDate: '', dailyFrom: '', dailyTo: '' }]);
   const removeRow = (key: string) => setRows((list) => (list.length > 1 ? list.filter((r) => r.key !== key) : list));
-  const playerCount = parsePlayerCount(draft.playerCount);
+
+  const fillFromWindow = () => {
+    if (analysis === null) return;
+    const fill = fillSeatsFromWindow(analysis, draft.activityIds, draft.seats ?? {});
+    if (fill === null) return;
+    setDraft((d) => ({
+      ...d,
+      seats: { ...(d.seats ?? {}), ...Object.fromEntries(Object.entries(fill.seats).map(([id, n]) => [id, n >= 1 ? String(n) : ''])) },
+    }));
+    setFillMessage(
+      Object.values(fill.seats).some((n) => n < 1) ? `${fill.message} Do vybraného času se nevejde ani jedno místo některé z činností.` : fill.message,
+    );
+    setConflicts(null);
+  };
 
   const save = useMutation({
     mutationFn: async ({ confirmed, send }: { confirmed: boolean; send: RangeRow[] }): Promise<ClubBlockView[]> => {
-      const count = playerCount as number;
+      /* The club's seats: per činnost, or the single headcount against a legacy server. */
+      const sizing = legacy
+        ? { playerCount: legacyCount as number }
+        : { activitySeats: seatsPayload(draft.activityIds, draft.seats ?? {}) };
       const windowOf = (row: RangeRow) => ({
         dailyFrom: row.dailyFrom.trim() === '' ? null : row.dailyFrom.trim(),
         dailyTo: row.dailyTo.trim() === '' ? null : row.dailyTo.trim(),
@@ -293,7 +392,7 @@ export function ClubBlockDialog({
         return [
           await clubBlocksApi.update(
             block.id,
-            { fromDate: only.fromDate, toDate: only.toDate, playerCount: count, note, ...windowOf(only) },
+            { fromDate: only.fromDate, toDate: only.toDate, ...sizing, note, ...windowOf(only) },
             { cancelAthletes: confirmed },
           ),
         ];
@@ -322,11 +421,11 @@ export function ClubBlockDialog({
             clubId: targetClubId,
             name: draft.name.trim() === '' ? null : draft.name.trim(),
             calendarIds: draft.calendarIds,
-            activityIds: draft.activityIds,
+            ...(legacy ? { activityIds: draft.activityIds } : {}),
             fromDate: row.fromDate,
             toDate: row.toDate,
             ...windowOf(row),
-            playerCount: count,
+            ...sizing,
             note,
           });
           createdRef.current = { ...createdRef.current, [row.key]: made };
@@ -384,7 +483,7 @@ export function ClubBlockDialog({
     setShowErrors(true);
     setFailure(null);
     setRowFailures({});
-    let ok = !hasBlockErrors(errors) && !hasRowErrors;
+    let ok = !hasBlockErrors(errors) && !hasRowErrors && !hasSeatErrors;
     if (!editing && clubMode === 'new' && createdClub === null) {
       const found = validateNewClub(newClub);
       setNewClubErrors(found);
@@ -491,6 +590,23 @@ export function ClubBlockDialog({
     </Box>
   );
 
+  const ticked = calendars.filter((c) => draft.calendarIds.includes(c.id));
+  const groups = activityGroups(ticked, activities, services);
+  const chosenRows: SeatRow[] = draft.activityIds.map((id) => {
+    const info = activities.find((a) => a.id === id);
+    const fromServer = block?.activitySeats?.find((a) => a.activityId === id);
+    return {
+      id,
+      name: info?.name ?? (fromServer?.activityName || id),
+      durationMinutes: info?.durationMinutes ?? null,
+      color: info?.colorHex ?? null,
+      text: draft.seats?.[id] ?? '',
+      max: analysis?.perActivity.find((a) => a.activityId === id)?.maxSeatsInWindowsAlone ?? null,
+      registered: editing ? registeredOf(id) : null,
+      error: seatErrors[id],
+    };
+  });
+
   const listSection = (
     <>
       <Box>
@@ -506,7 +622,7 @@ export function ClubBlockDialog({
             disabled={editing}
             items={calendars.map((c) => ({ id: c.id, label: c.name, color: c.color }))}
             checked={draft.calendarIds}
-            onToggle={(id) => toggle('calendarIds', id)}
+            onToggle={toggleCalendar}
             error={shown('calendarIds')}
           />
         )}
@@ -518,13 +634,13 @@ export function ClubBlockDialog({
             Činnosti se nepodařilo načíst.
           </Alert>
         ) : (
-          <CheckList
-            ariaLabel="Činnosti"
-            loading={activitiesQuery.isLoading}
-            disabled={editing}
-            items={activities.map((a) => ({ id: a.id, label: a.name, hint: `${a.durationMinutes} min`, color: a.colorHex }))}
+          <ActivityPicker
+            groups={groups}
             checked={draft.activityIds}
-            onToggle={(id) => toggle('activityIds', id)}
+            onToggle={toggleActivity}
+            disabled={editing}
+            loading={activitiesQuery.isLoading}
+            hint={ticked.length === 0 ? 'Nejdřív zaškrtněte kalendář — zobrazí se činnosti jeho služby.' : null}
             error={shown('activityIds')}
           />
         )}
@@ -532,6 +648,17 @@ export function ClubBlockDialog({
           Zbytek vybraných kalendářů zůstává volný pro ostatní objednávky.
         </Typography>
       </Box>
+      <SeatsTable
+        rows={chosenRows}
+        total={sum}
+        onChange={changeSeats}
+        legacy={legacy && draft.activityIds.length > 0 ? { text: legacyValue, onChange: setLegacyText, error: shown('playerCount') } : null}
+        fill={legacy ? null : { onClick: fillFromWindow, disabled: analysis === null || calculation.busy || draft.activityIds.length === 0 }}
+        fillMessage={fillMessage}
+        fieldSize={fieldSize}
+        showErrors={showErrors}
+        listError={errors.playerCount}
+      />
     </>
   );
 
@@ -574,17 +701,6 @@ export function ClubBlockDialog({
   const fields = (
     <Stack spacing={2.5}>
       {clubSection}
-
-      <TextField
-        size={fieldSize}
-        label="Počet hráčů"
-        value={draft.playerCount}
-        onChange={(e) => set('playerCount', e.target.value)}
-        error={shown('playerCount') !== undefined}
-        helperText={shown('playerCount') ?? 'Kolik sportovců klub přivede. Strop nemáme — může jich být 20 i 2 000.'}
-        slotProps={{ htmlInput: { inputMode: 'numeric' } }}
-        fullWidth
-      />
 
       {listSection}
 
@@ -679,10 +795,8 @@ export function ClubBlockDialog({
   const side = (
     <Stack spacing={2} sx={{ minWidth: 0 }}>
       <BlockCalculator
-        playerCount={playerCount}
-        activityIds={draft.activityIds}
-        calendarIds={draft.calendarIds}
-        ranges={rows}
+        state={calculation}
+        legacyPlayers={legacyCount}
         onApply={(from, to) => {
           const first = rows[0];
           if (first !== undefined) changeRow(first.key, { fromDate: from, toDate: to });
@@ -692,7 +806,7 @@ export function ClubBlockDialog({
         clubName={previewClubName}
         color={previewColor}
         range={previewRange}
-        players={playerCount}
+        players={totalPlayers}
       />
     </Stack>
   );
@@ -891,6 +1005,9 @@ function RangeRowEditor({
           />
         </Stack>
       </Stack>
+      <Typography variant="caption" data-testid="row-window" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
+        {countingSentence(row)}
+      </Typography>
       {errors.past !== undefined ? (
         <Alert
           severity="warning"
