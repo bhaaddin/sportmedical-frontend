@@ -1,26 +1,20 @@
 /*
- * "Poslat formulář klubu": the desk picks a club (and maybe a service and a note), the order is created as
- * Invited and its form link is shown big, to copy. Nothing is e-mailed - the desk sends the link itself.
+ * "Poslat odkaz klubu": the desk picks a club (and maybe a service and a note), the order is created as
+ * Invited and its form link is shown short and big, with a one-click "Zkopírovat". Nothing is e-mailed - the desk
+ * sends the link itself. The address is built by `absoluteLink` (the admin-set public address, never the long
+ * preview address of the staff app).
  */
 import { useState } from 'react';
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField, Typography } from '@mui/material';
-import { ContentCopy } from '@mui/icons-material';
+import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
 import { clubsApi } from '../../../api/clubs';
 import { clinicServicesApi } from '../../../api/clinicServices';
 import { clubOrdersApi } from '../../../api/clubOrders';
 import type { ClubOrderView } from '../../../api/clubOrders';
 import { useIsPhone } from '../../../layout/useDevice';
+import { LinkCopyRow } from './LinkCopyRow';
 
-export async function copyText(text: string, ok = 'Odkaz zkopírován'): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast.success(ok);
-  } catch {
-    toast.error('Odkaz se nepodařilo zkopírovat');
-  }
-}
+export { copyText } from './LinkCopyRow';
 
 export function InviteClubDialog({ open, onClose, defaultClubId, onInvited }: {
   open: boolean;
@@ -65,7 +59,7 @@ export function InviteClubDialog({ open, onClose, defaultClubId, onInvited }: {
 
   return (
     <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="sm" fullScreen={phone}>
-      <DialogTitle>Poslat formulář klubu</DialogTitle>
+      <DialogTitle>Poslat odkaz klubu</DialogTitle>
       <DialogContent>
         {created === null ? (
           <Stack spacing={2} sx={{ mt: 1 }}>
@@ -78,22 +72,17 @@ export function InviteClubDialog({ open, onClose, defaultClubId, onInvited }: {
             </TextField>
             <TextField size="small" label="Poznámka (nepovinné)" value={note} onChange={(e) => setNote(e.target.value)} multiline minRows={2} />
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              Nic se neodesílá e-mailem — odkaz na formulář vám zobrazíme a pošlete ho klubu sami.
+              Nic se neodesílá e-mailem — odkaz vám zobrazíme a pošlete ho klubu sami.
             </Typography>
             {error !== null ? <Alert severity="error">{error}</Alert> : null}
           </Stack>
         ) : (
           <Stack spacing={1.5} sx={{ mt: 1 }}>
-            <Typography sx={{ fontWeight: 600 }}>Formulář pro {created.clubName} je připravený.</Typography>
-            <Box
-              data-testid="invite-link"
-              sx={{ p: 1.75, borderRadius: 2.5, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default', fontFamily: 'monospace', fontSize: 15, wordBreak: 'break-all' }}
-            >
-              {created.formUrl || 'Odkaz zatím není k dispozici.'}
-            </Box>
-            <Button variant="contained" startIcon={<ContentCopy />} disabled={created.formUrl === ''} onClick={() => void copyText(created.formUrl)} sx={{ minHeight: 44 }}>
-              Kopírovat
-            </Button>
+            <Typography sx={{ fontWeight: 600 }}>Odkaz pro {created.clubName} je připravený.</Typography>
+            <LinkCopyRow label="Odkaz na formulář pro klub" path={created.formUrl} testId="invite-link" big />
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              Klub vyplní, co potřebuje, a objednávka vám přijde ke zpracování.
+            </Typography>
           </Stack>
         )}
       </DialogContent>
@@ -101,10 +90,10 @@ export function InviteClubDialog({ open, onClose, defaultClubId, onInvited }: {
         {created === null ? (
           <>
             <Button variant="outlined" onClick={onClose} disabled={busy}>Zavřít</Button>
-            <Button variant="contained" disabled={clubId === '' || busy} onClick={() => void submit()}>Vytvořit formulář</Button>
+            <Button variant="contained" disabled={clubId === '' || busy} onClick={() => void submit()}>Vytvořit odkaz</Button>
           </>
         ) : (
-          <Button variant="contained" onClick={onClose}>Hotovo</Button>
+          <Button variant="outlined" onClick={onClose}>Hotovo</Button>
         )}
       </DialogActions>
     </Dialog>

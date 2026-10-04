@@ -1,8 +1,9 @@
 /* ══════════════════════════════════════════════════════════════
    OBJEDNÁVKA PRO KLUB  (route: /klub-objednavka/:token)
 
-   The link the clinic sends a club. The club (or a worker for it) states ONE service,
-   the činnosti with the number of players, one or more terms, the payment method and a
+   The link the clinic sends a club. Order of the screen: (1) who pays (required), (2) service (only when
+   more than one), činnosti + players, (3) term, (4) contact, (5) note. The club states ONE service,
+   the činnosti with the number of players, one wanted term (od–do) and a
    contact. It is a REQUEST: nothing is reserved until the clinic processes it, and the
    club cannot change it afterwards (409 → "call us").
 
@@ -27,19 +28,23 @@ import PublicLayout from './PublicLayout';
 import { PageTitle, PinnedBar, PublicMain, LoadError, ctaSx } from '../../components/public/kit';
 import { telHref } from '../../components/public/brand';
 import {
-  ActivitySection, ContactSection, PaymentSection, ServiceSection, TermsSection,
+  ActivitySection, ContactSection, NoteSection, PaymentSection, ServiceSection, TermSection,
 } from './clubOrder/Sections';
 import { SummaryCard } from './clubOrder/SummaryCard';
 import type { SummaryLine } from './clubOrder/SummaryCard';
 import { Confirmation, Loading, NoticePage } from './clubOrder/Screens';
 import {
-  MAX_SEATS, activitySeatsOf, emptyState, isValid, newTerm, sortFieldErrors, stateFromDraft, submitPayload, todayPrague,
+  MAX_SEATS, activitySeatsOf, czk, emptyState, isValid, sortFieldErrors, stateFromDraft, submitPayload, termProblem, termText, todayPrague,
 } from './clubOrder/model';
 import type { FieldKey, OrderState } from './clubOrder/model';
 
 const QUOTE_DELAY_MS = 350;
 
 const SLOT_KEYS = [
+  'formulare.club-order.pay.club.title',
+  'formulare.club-order.pay.club.sub',
+  'formulare.club-order.pay.person.title',
+  'formulare.club-order.pay.person.sub',
   'formulare.club-order.next',
   'formulare.club-order.terms.hint',
   'formulare.club-order.price.note',
@@ -138,6 +143,11 @@ export default function ClubOrderForm() {
     <PublicLayout><NoticePage title={title} text={text} phone={phone} /></PublicLayout>
   );
 
+  const payTexts = {
+    ClubInvoice: { title: t['formulare.club-order.pay.club.title'], sub: t['formulare.club-order.pay.club.sub'] },
+    PerPerson: { title: t['formulare.club-order.pay.person.title'], sub: t['formulare.club-order.pay.person.sub'] },
+  } as const;
+
   if (load.kind === 'loading') return <PublicLayout><Loading /></PublicLayout>;
   if (load.kind === 'error') {
     return (
@@ -165,9 +175,10 @@ export default function ClubOrderForm() {
           reference={done.reference}
           serviceName={svc?.serviceName ?? ''}
           lines={(svc?.activities ?? []).filter((a) => (done.snapshot.seats[a.activityId] ?? 0) > 0).map((a) => ({ name: a.name, seats: done.snapshot.seats[a.activityId] }))}
-          terms={done.snapshot.terms}
+          termText={termText(done.snapshot.term)}
           quote={done.quote}
-          paymentLabel={done.snapshot.payment === 'PerPerson' ? 'Platí jednotlivé osoby' : 'Faktura klubu'}
+          paymentLabel={done.snapshot.payment === 'PerPerson' ? payTexts.PerPerson.title : payTexts.ClubInvoice.title}
+          perPerson={done.snapshot.payment === 'PerPerson'}
           phone={phone}
         />
       </PublicLayout>
@@ -199,50 +210,70 @@ export default function ClubOrderForm() {
     }
   };
 
+  const perPerson = state.payment === 'PerPerson';
+  const multiService = offer.services.length > 1;
+  const stepOf = (key: 'service' | 'activity' | 'term' | 'contact' | 'note'): number =>
+    ({ service: 2, activity: multiService ? 3 : 2, term: multiService ? 4 : 3, contact: multiService ? 5 : 4, note: multiService ? 6 : 5 })[key];
+
   const sections = (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, minWidth: 0 }}>
-      <ServiceSection
-        services={offer.services}
-        value={state.serviceId}
-        errors={serverErrors.serviceId}
-        onChange={(id) => {
-          if (id !== state.serviceId) patch({ serviceId: id, seats: {} });
-          clearErrors('serviceId');
-        }}
-      />
-      <ActivitySection
-        service={service}
-        seats={state.seats}
-        errors={serverErrors.activitySeats}
-        onChange={(id, n) => { patch({ seats: { ...state.seats, [id]: Math.max(0, Math.min(MAX_SEATS, n)) } }); clearErrors('activitySeats'); }}
-      />
-      <TermsSection
-        terms={state.terms}
-        today={today}
-        hint={t['formulare.club-order.terms.hint']}
-        showProblems={showProblems}
-        errors={serverErrors.ranges}
-        onChange={(id, p) => { patch({ terms: state.terms.map((r) => (r.id === id ? { ...r, ...p } : r)) }); clearErrors('ranges'); }}
-        onAdd={() => patch({ terms: [...state.terms, newTerm()] })}
-        onRemove={(id) => patch({ terms: state.terms.filter((r) => r.id !== id) })}
-      />
       <PaymentSection
-        methods={offer.paymentMethods}
+        n={1}
+        texts={payTexts}
         value={state.payment}
         showRequired={showProblems}
         errors={serverErrors.paymentMethod}
         onChange={(m) => { patch({ payment: m }); clearErrors('paymentMethod'); }}
       />
-      <ContactSection
-        value={state.contact}
-        note={state.note}
-        showProblems={showProblems}
-        errors={{ name: serverErrors.name, phone: serverErrors.phone, email: serverErrors.email, note: serverErrors.note }}
-        onChange={(p) => patch({ contact: { ...state.contact, ...p } })}
-        onNote={(note) => patch({ note })}
+      {multiService && (
+        <ServiceSection
+          n={stepOf('service')}
+          services={offer.services}
+          value={state.serviceId}
+          errors={serverErrors.serviceId}
+          onChange={(id) => {
+            if (id !== state.serviceId) patch({ serviceId: id, seats: {} });
+            clearErrors('serviceId');
+          }}
+        />
+      )}
+      <ActivitySection
+        n={stepOf('activity')}
+        perPerson={perPerson}
+        service={service}
+        seats={state.seats}
+        errors={serverErrors.activitySeats}
+        onChange={(id, n) => { patch({ seats: { ...state.seats, [id]: Math.max(0, Math.min(MAX_SEATS, n)) } }); clearErrors('activitySeats'); }}
       />
+      <TermSection
+        n={stepOf('term')}
+        term={state.term}
+        today={today}
+        hint={t['formulare.club-order.terms.hint']}
+        showProblems={showProblems}
+        errors={serverErrors.ranges}
+        onChange={(p) => { patch({ term: { ...state.term, ...p } }); clearErrors('ranges'); }}
+      />
+      <ContactSection
+        n={stepOf('contact')}
+        value={state.contact}
+        showProblems={showProblems}
+        errors={{ name: serverErrors.name, phone: serverErrors.phone, email: serverErrors.email }}
+        onChange={(p) => patch({ contact: { ...state.contact, ...p } })}
+      />
+      <NoteSection n={stepOf('note')} note={state.note} errors={serverErrors.note} onNote={(note) => patch({ note })} />
     </Box>
   );
+
+  const totalPlayers = quote?.totalSeats ?? lines.reduce((n, l) => n + l.seats, 0);
+  const sentence = lines.length === 0
+    ? null
+    : [
+      `Objednáváte ${totalPlayers} hráčů (${lines.map((l) => `${l.activity.name} ${l.seats}×`).join(', ')})`,
+      termProblem(state.term, today) === null ? `, termín ${termText(state.term)}` : '',
+      quote !== null ? `. ${perPerson ? 'Orientační cena celkem' : 'Celkem'} ${czk(quote.totalCzk)}` : '',
+      state.payment === null ? '. Vyberte, kdo platí.' : `, ${perPerson ? 'platí rodiče / hráči sami, každý za sebe' : 'platí klub'}.`,
+    ].join('');
 
   const summary = (
     <SummaryCard
@@ -253,6 +284,8 @@ export default function ClubOrderForm() {
       minimumHint={minimumHint}
       priceNote={t['formulare.club-order.price.note']}
       sticky={device !== 'phone'}
+      perPerson={perPerson}
+      sentence={sentence}
     />
   );
 

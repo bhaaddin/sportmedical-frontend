@@ -22,7 +22,8 @@ import { formatCzk } from '../../../pages/clubs/clubOrders';
 import { formatPragueDateTime } from '../../../utils/time';
 import { SectionLabel, SoftCard, StatusChip } from '../../ui';
 import { ClubOrderDialog } from '../order/ClubOrderDialog';
-import { copyText } from './InviteClubDialog';
+import { copyText } from './LinkCopyRow';
+import { absoluteLink, usePublicSiteBase } from './absoluteLink';
 import { rangeText, seatPercent, STATUS_TONE } from './orderLogic';
 
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
@@ -42,6 +43,7 @@ export function ClubOrderDetailPanel({ orderId, initialOrder, onClose, onChanged
   onChanged?: () => void;
 }) {
   const phone = useIsPhone();
+  const publicBase = usePublicSiteBase();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [dialog, setDialog] = useState<'process' | 'edit' | null>(null);
@@ -213,7 +215,7 @@ export function ClubOrderDetailPanel({ orderId, initialOrder, onClose, onChanged
       case 'Invited':
         return (
           <>
-            <Button variant="contained" startIcon={<ContentCopy />} disabled={order.formUrl === ''} onClick={() => void copyText(order.formUrl)} {...btn}>Zkopírovat odkaz na formulář</Button>
+            <Button variant="contained" startIcon={<ContentCopy />} disabled={order.formUrl === ''} onClick={() => void copyText(absoluteLink(order.formUrl, publicBase))} {...btn}>Zkopírovat odkaz na formulář</Button>
             <Button variant="outlined" color="error" onClick={() => setCancelOpen(true)} {...btn}>Zrušit</Button>
           </>
         );
@@ -229,7 +231,7 @@ export function ClubOrderDetailPanel({ orderId, initialOrder, onClose, onChanged
         return (
           <>
             <Button variant="contained" onClick={() => setDialog('edit')} {...btn}>Upravit</Button>
-            <Button variant="outlined" startIcon={<ContentCopy />} disabled={order.registrationUrl === ''} onClick={() => void copyText(order.registrationUrl)} {...btn}>Zkopírovat odkaz pro sportovce</Button>
+            <Button variant="outlined" startIcon={<ContentCopy />} disabled={order.registrationUrl === ''} onClick={() => void copyText(absoluteLink(order.registrationUrl, publicBase))} {...btn}>Zkopírovat odkaz pro sportovce</Button>
             {order.paymentMethod === 'ClubInvoice' ? (
               <Button
                 variant="outlined"

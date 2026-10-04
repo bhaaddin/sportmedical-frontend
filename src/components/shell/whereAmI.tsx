@@ -1,7 +1,7 @@
 /*
  * "Where am I" - one quiet line at the top of every screen, so a click never
  * costs the sense of place: the sidebar's entry, then the screen inside it
- * (Pacienti › Karta pacienta › Termíny; Výsledky › Zranění). The browser tab
+ * (Pacienti › Karta pacienta › Termíny; Kluby a týmy › Hráči). The browser tab
  * says the same, so ten open tabs are tellable apart.
  *
  * The trail is computed once here and drawn twice: as the line over the page
@@ -62,7 +62,7 @@ export function computeCrumbs({
   return crumbs;
 }
 
-/** The browser tab says where you are: "Zranění · SportMedical". */
+/** The browser tab says where you are: "Hráči · SportMedical". */
 export function useDocumentTitle(crumbs: Crumb[]): void {
   const trail = crumbs.map((c) => c.label).join(' › ');
   useEffect(() => {

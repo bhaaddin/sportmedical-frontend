@@ -28,6 +28,7 @@ vi.mock('../../../api/clubs', async (importOriginal) => {
 vi.mock('../../../api/clinicServices', () => ({
   clinicServicesApi: { list: vi.fn().mockResolvedValue([{ id: 's-1', name: 'Sportovní prohlídky', isActive: true }]) },
 }));
+vi.mock('../../../api/clinicSettings', () => ({ readSettings: vi.fn().mockResolvedValue({}) }));
 vi.mock('../../../components/clubs/order/ClubOrderDialog', () => ({
   ClubOrderDialog: (props: { open: boolean }) => {
     dialogProps(props);
@@ -129,7 +130,7 @@ describe.each([
       expect(first).toHaveTextContent('Základní ×20 · Diagnostika ×10');
       expect(first).toHaveTextContent('+2');
       expect(first).toHaveTextContent('5 / 30');
-      expect(first).toHaveTextContent('Faktura klubu');
+      expect(first).toHaveTextContent('Platí klub (jedna faktura)');
       expect(first).toHaveTextContent('36');
       expect(first).toHaveTextContent('Odesláno klubem');
     } else {
@@ -192,7 +193,7 @@ describe('detail and actions', () => {
     expect(within(detail).getByTestId('requested-ranges').querySelectorAll('li')).toHaveLength(3);
     expect(within(detail).getAllByTestId('order-activity-row')).toHaveLength(2);
     expect(within(detail).getByTestId('price-quote')).toHaveTextContent('Sleva klubu (10 %)');
-    expect(within(detail).getByText('Faktura klubu')).toBeInTheDocument();
+    expect(within(detail).getByText('Platí klub (jedna faktura)')).toBeInTheDocument();
     expect(within(detail).getByRole('link', { name: '+420 603 221 004' })).toHaveAttribute('href', 'tel:+420603221004');
     expect(within(detail).getByRole('link', { name: 'jan@fkslany.cz' })).toHaveAttribute('href', 'mailto:jan@fkslany.cz');
     expect(within(detail).getByText('Formulář odeslán')).toBeInTheDocument();
@@ -274,32 +275,46 @@ describe('detail and actions', () => {
   });
 });
 
-describe('invitation', () => {
-  it('creates an Invited order and shows the form link big, saying nothing is e-mailed', async () => {
-    invite.mockResolvedValue(make({ id: 'o-9', status: 'Invited', clubName: 'HC Kladno', formUrl: 'https://app.test/klub-objednavka/zz' }));
+describe('new order: two ways in', () => {
+  it('"Nová objednávka" asks the two-way question', async () => {
     const user = setupUser();
     render(<Wrap><ClubOrdersPage /></Wrap>);
     await screen.findAllByTestId('order-row');
-    await user.click(screen.getByRole('button', { name: 'Poslat formulář klubu' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Poslat formulář klubu' });
-    expect(within(dialog).getByText(/Nic se neodesílá e-mailem/)).toBeInTheDocument();
-    await user.click(within(dialog).getByLabelText('Klub'));
-    await user.click(await screen.findByRole('option', { name: 'HC Kladno' }));
-    await user.type(within(dialog).getByLabelText('Poznámka (nepovinné)'), 'Podzim');
-    await user.click(within(dialog).getByRole('button', { name: 'Vytvořit formulář' }));
-    expect(invite).toHaveBeenCalledWith({ clubId: 'club-2', note: 'Podzim' });
-    expect(await within(dialog).findByTestId('invite-link')).toHaveTextContent('https://app.test/klub-objednavka/zz');
-    await user.click(within(dialog).getByRole('button', { name: 'Kopírovat' }));
-    expect(clipboard).toHaveBeenCalledWith('https://app.test/klub-objednavka/zz');
+    expect(screen.queryByRole('button', { name: 'Poslat formulář klubu' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Nová objednávka' }));
+    const entry = await screen.findByTestId('club-order-entry');
+    expect(within(entry).getByRole('button', { name: /Vyplním sám \(telefonická objednávka\)/ })).toBeInTheDocument();
+    expect(within(entry).getByRole('button', { name: /Poslat odkaz klubu/ })).toBeInTheDocument();
   });
 
-  it('"Nová objednávka" opens the dialog empty', async () => {
+  it('"Vyplním sám" goes straight to the calendar picking mode', async () => {
     const user = setupUser();
     render(<Wrap><ClubOrdersPage /></Wrap>);
     await screen.findAllByTestId('order-row');
     await user.click(screen.getByRole('button', { name: 'Nová objednávka' }));
-    expect(lastDialog().open).toBe(true);
-    expect(lastDialog().initial).toEqual({});
+    await user.click(await screen.findByTestId('entry-phone'));
+    expect(await screen.findByTestId('state')).toHaveTextContent('/planovani {"pickOrder":true}');
+  });
+
+  it('"Poslat odkaz klubu" creates an Invited order and shows the short link with one-click Zkopírovat', async () => {
+    invite.mockResolvedValue(make({ id: 'o-9', status: 'Invited', clubName: 'HC Kladno', formUrl: 'https://app.test/klub-objednavka/zz' }));
+    const user = setupUser();
+    render(<Wrap><ClubOrdersPage /></Wrap>);
+    await screen.findAllByTestId('order-row');
+    await user.click(screen.getByRole('button', { name: 'Nová objednávka' }));
+    await user.click(await screen.findByTestId('entry-link'));
+    const dialog = await screen.findByRole('dialog', { name: 'Poslat odkaz klubu' });
+    expect(within(dialog).getByText(/Nic se neodesílá e-mailem/)).toBeInTheDocument();
+    await user.click(within(dialog).getByLabelText('Klub'));
+    await user.click(await screen.findByRole('option', { name: 'HC Kladno' }));
+    await user.type(within(dialog).getByLabelText('Poznámka (nepovinné)'), 'Podzim');
+    await user.click(within(dialog).getByRole('button', { name: 'Vytvořit odkaz' }));
+    expect(invite).toHaveBeenCalledWith({ clubId: 'club-2', note: 'Podzim' });
+    const link = await within(dialog).findByTestId('invite-link');
+    expect(link).toHaveTextContent('app.test/klub-objednavka/zz');
+    expect(link).not.toHaveTextContent('https://');
+    await user.click(within(dialog).getByRole('button', { name: /Zkopírovat/ }));
+    expect(clipboard).toHaveBeenCalledWith('https://app.test/klub-objednavka/zz');
   });
 });
 

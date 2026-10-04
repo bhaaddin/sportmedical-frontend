@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline, Box, Typography, CircularProgress, Button } from '@mui/material';
-import { Science, Dashboard, People, Settings, CalendarMonth, Receipt, AttachMoney, Today, ArrowBack, Assessment, Groups, EventBusy, RateReview, FactCheck, HealthAndSafety, Psychology, MonitorHeart, Spa, EventAvailable, PersonAdd, BarChart, ListAlt, EventNote, SportsSoccer, Insights, Event } from '@mui/icons-material';
+import { Dashboard, People, Settings, CalendarMonth, Receipt, ReceiptLong, AttachMoney, Today, ArrowBack, Assessment, Groups, EventBusy, RateReview, FactCheck, PersonAdd, ListAlt, EventNote, SportsSoccer, Insights, Event } from '@mui/icons-material';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { usePermissions, type Permission } from './auth/usePermission';
 import { useAccountRefresh } from './auth/accountRefresh';
@@ -63,12 +63,7 @@ const AdminPage = lazy(() => import('./pages/Admin'));
 const CenikPage = lazy(() => import('./pages/Cenik'));
 const PatientFormPage = lazy(() => import('./pages/PatientForm'));
 const PatientRegistrationPage = lazy(() => import('./pages/PatientRegistration'));
-const InjuriesPage = lazy(() => import('./pages/Injuries'));
-const WellnessPage = lazy(() => import('./pages/Wellness'));
-const RtpPage = lazy(() => import('./pages/Rtp'));
-const ConcussionPage = lazy(() => import('./pages/Concussion'));
 const AvailabilityPage = lazy(() => import('./pages/Availability'));
-const TrainingLoadPage = lazy(() => import('./pages/TrainingLoad'));
 const SystemHealthPage = lazy(() => import('./pages/SystemHealth'));
 const StaffManagementPage = lazy(() => import('./pages/StaffManagement'));
 const AuditLogPage = lazy(() => import('./pages/AuditLog'));
@@ -118,8 +113,9 @@ const ClubPlayersPage = lazy(() => import('./pages/clubs/ClubPlayersPage'));
 const ClubStatsPage = lazy(() => import('./pages/clubs/ClubStatsPage'));
 const ClubBillingPage = lazy(() => import('./pages/clubs/ClubBillingPage'));
 const AccountingExportPage = lazy(() => import('./pages/AccountingExportPage'));
-/* "Statistics for everything in one place" - under Výsledky in the rail. */
-const StatisticsPage = lazy(() => import('./pages/Statistics'));
+
+/** Screens of the removed "Výsledky" rail section (Matko, 4. 10. 2026): bookmarks go to the overview. */
+const RETIRED_PATHS = ['/injuries', '/rtp', '/concussion', '/training-load', '/wellness', '/statistiky'];
 
 /* ── Loading spinner for Suspense ── */
 function PageLoader() {
@@ -154,10 +150,11 @@ function PageLoader() {
  * file's text (`catalogue.test.ts`, `patientRoutes.test.ts`).
  */
 const CHILD_ICONS: Record<string, React.ReactNode> = {
-  'Dnešní přehled': <Today />, 'Přehled podle služeb': <Assessment />, 'Dostupnost': <EventBusy />,
+  'Kalendář': <CalendarMonth />, 'Dnešní přehled': <Today />, 'Přehled podle služeb': <Assessment />, 'Dostupnost': <EventBusy />,
   'Klubová objednávka': <Groups />, 'Přehled pacientů': <People />, 'Nový pacient': <PersonAdd />,
   'Kontrola registrací': <RateReview />, 'Přehled klubů': <Groups />, 'Objednávky klubů': <ListAlt />,
   'Rezervace': <Event />, 'Hráči': <SportsSoccer />, 'Statistiky': <Insights />, 'Fakturace': <Receipt />,
+  'Faktury': <ReceiptLong />, 'Pokladna': <AttachMoney />, 'Účetní export': <FactCheck />,
 };
 const withIcons = (parent: ContextualParent): MenuEntry[] =>
   SECTION_CHILDREN[parent].map((c) => ({ ...c, icon: CHILD_ICONS[c.text] ?? <EventNote /> }));
@@ -174,27 +171,15 @@ const MENU_CHILDREN: Record<string, MenuEntry[]> = {
   '/planovani': withIcons('/planovani'),
   '/patients': withIcons('/patients'),
   '/clubs': withIcons('/clubs'),
-  '/diagnostics/new': [
-    { text: 'Diagnostika a měření', icon: <Science />, path: '/diagnostics/new' },
-    { text: 'Zranění', icon: <HealthAndSafety />, path: '/injuries' },
-    { text: 'Návrat do hry', icon: <EventAvailable />, path: '/rtp' },
-    { text: 'Otřes mozku', icon: <Psychology />, path: '/concussion' },
-    { text: 'Tréninková zátěž', icon: <MonitorHeart />, path: '/training-load' },
-    { text: 'Wellness', icon: <Spa />, path: '/wellness' },
-    /* "Statistics for everything in one place." */
-    { text: 'Statistiky', icon: <BarChart />, path: '/statistiky' },
-  ],
-  '/billing': [
-    { text: 'Pokladna', icon: <AttachMoney />, path: '/cashier', requires: 'billing.manage' },
-    { text: 'Účetní export', icon: <FactCheck />, path: '/accounting-export', requires: 'billing.manage' },
-  ],
+  '/billing': withIcons('/billing'),
 };
 
 /*
- * The six screens of the working day, in the order the design board lists
- * them (3. 10. 2026): the calendar, the people, the clubs, the results, the
- * money, the settings - with Přehled, small, above them, because the brand
- * also lands there and a home needs a name.
+ * The screens of the working day (3. 10. 2026): the calendar, the people, the
+ * clubs, the money, the settings - with Přehled, small, above them, because
+ * the brand also lands there and a home needs a name. The "Výsledky" section
+ * was removed on 4. 10. 2026. Choosing a section replaces the whole sidebar
+ * with that section's own items (components/shell/shellModel.ts, sectionOf).
  *
  * Everything anybody sets up once - calendars, activities, working hours,
  * exceptions, the team, the public site, the audit log - lives behind
@@ -206,7 +191,6 @@ const menuItems: MenuEntry[] = ([
   { text: 'Kalendář', icon: <CalendarMonth />, path: '/planovani' },
   { text: 'Pacienti', icon: <People />, path: '/patients', requires: 'patients.view' },
   { text: 'Kluby a týmy', icon: <Groups />, path: '/clubs' },
-  { text: 'Výsledky', icon: <Science />, path: '/diagnostics/new' },
   { text: 'Fakturace', icon: <Receipt />, path: '/billing', requires: 'billing.manage' },
   { text: 'Nastavení', icon: <Settings />, path: '/settings' },
 ] as MenuEntry[]).map((entry) => ({ ...entry, children: MENU_CHILDREN[entry.path] }));
@@ -486,13 +470,13 @@ export default function App() {
                       <Route path="vysledky" element={<PatientResultsPage />} />
                       <Route path="faktury" element={<RequirePermission of="billing.manage"><PatientInvoicesPage /></RequirePermission>} />
                     </Route>
+                    {/* Opened from the patient's card (Výsledky tab, Přehled); not a rail section any more. */}
                     <Route path="/diagnostics/new" element={<DiagnosticForm />} />
+                    {/* The retired Výsledky section: its screens are gone, old links land on the overview. */}
+                    {RETIRED_PATHS.map((path) => <Route key={path} path={path} element={<Navigate to="/prehled" replace />} />)}
                     <Route path="/billing" element={<RequirePermission of="billing.manage"><BillingPage /></RequirePermission>} />
                     {/* The staff price list. /cenik is the PUBLIC price list now (the other bundle). */}
                     <Route path="/nastaveni/cenik" element={<CenikPage />} />
-                    <Route path="/injuries" element={<InjuriesPage />} />
-                    <Route path="/rtp" element={<RtpPage />} />
-                    <Route path="/concussion" element={<ConcussionPage />} />
                     <Route path="/availability" element={<AvailabilityPage />} />
                     <Route path="/svatky" element={<RequirePermission of="settings.clinic.manage"><HolidaysPage /></RequirePermission>} />
                     <Route path="/dotaznik-nastaveni" element={<RequirePermission of="questionnaires.manage"><QuestionnairePage /></RequirePermission>} />
@@ -511,9 +495,6 @@ export default function App() {
                     <Route path="/hodnoceni-pacientu" element={<FeedbackReviewPage />} />
                     <Route path="/nastaveni/pripominky" element={<RequirePermission of="settings.clinic.manage"><RemindersPage /></RequirePermission>} />
                     <Route path="/nastaveni/souhlasy" element={<RequirePermission of="settings.clinic.manage"><ConsentSettingsPage /></RequirePermission>} />
-                    <Route path="/training-load" element={<TrainingLoadPage />} />
-                    <Route path="/wellness" element={<WellnessPage />} />
-                    <Route path="/statistiky" element={<StatisticsPage />} />
                     <Route path="/cashier" element={<RequirePermission of="billing.manage"><CashierPage /></RequirePermission>} />
                     <Route path="/clubs" element={<ClubsPage />} />
                     <Route path="/clubs/objednavky" element={<ClubOrdersPage />} />
@@ -537,6 +518,7 @@ export default function App() {
                     />
                     {/* /sluzby is the public Služby page; the staff list of services sits under /nastaveni. */}
                     <Route path="/nastaveni/sluzby" element={<RequirePermission of="settings.clinic.manage"><ClinicServicesPage /></RequirePermission>} />
+                    <Route path="/nastaveni/sluzby/:serviceId" element={<RequirePermission of="settings.clinic.manage"><ClinicServicesPage /></RequirePermission>} />
                     <Route path="/pravidla-dokumentu" element={<RequirePermission of="settings.clinic.manage"><DocumentRequirementsPage /></RequirePermission>} />
                     <Route path="/dokumenty-sablony" element={<RequirePermission of="settings.clinic.manage"><DocumentTemplatesPage /></RequirePermission>} />
                     <Route path="/nastaveni/sablony-emailu" element={<RequirePermission of="communication.manage"><EmailTemplatesPage /></RequirePermission>} />

@@ -1,5 +1,5 @@
 /*
- * /klub-objednavka/:token — the club's order form: service → činnosti → counts, terms, payment, contact,
+ * /klub-objednavka/:token — the club's order form: who pays → service → činnosti → counts, term, contact, note,
  * a live server-side price, a REQUEST that the clinic processes. Rendered at the three widths.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -76,16 +76,16 @@ const renderPage = () =>
 
 const loaded = async () => { await screen.findByRole('heading', { level: 1, name: /Objednávka pro klub FK Slaný/ }); };
 const plus = (name: string) => screen.getByRole('button', { name: `Přidat hráče: ${name}` });
+const CLUB = { name: 'Platí klub (jedna faktura klubu)' };
+const PERSON = { name: 'Platí rodiče / hráči sami (každý za sebe)' };
 const submitBtn = () => screen.getByRole('button', { name: 'Odeslat objednávku' });
 
 async function fillValid(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('radio', CLUB));
   await user.click(screen.getByRole('radio', { name: 'Diagnostika' }));
   await user.click(plus('Spiroergometrie'));
   await user.click(plus('Spiroergometrie'));
-  fireEvent.change(screen.getByLabelText('Datum termínu 1'), { target: { value: FUTURE } });
-  fireEvent.change(screen.getByLabelText('Čas od, termín 1'), { target: { value: '09:00' } });
-  fireEvent.change(screen.getByLabelText('Čas do, termín 1'), { target: { value: '12:00' } });
-  await user.click(screen.getByRole('radio', { name: 'Faktura klubu' }));
+  fireEvent.change(screen.getByLabelText('Termín od'), { target: { value: FUTURE } });
   await user.type(screen.getByLabelText(/Jméno a příjmení/), 'Petr Trenér');
   await user.type(screen.getByRole('textbox', { name: /^Telefon/ }), '773539001');
   await user.type(screen.getByLabelText(/E-mail/), 'petr@klub.cz');
@@ -167,17 +167,107 @@ describe.each([['phone', VIEWPORTS.phone], ['tablet', VIEWPORTS.tablet], ['deskt
     expect(screen.queryByText(/Nejmenší počet hráčů/)).not.toBeInTheDocument();
   });
 
-  it('adds and removes terms and refuses a past date inline', async () => {
+  it('asks first who pays, as a required two-card choice with a sentence each', async () => {
+    renderPage();
+    await loaded();
+    const radios = screen.getAllByRole('radio');
+    expect(radios[0]).toHaveAccessibleName(CLUB.name);
+    expect(radios[1]).toHaveAccessibleName(PERSON.name);
+    expect(screen.getByRole('radiogroup', { name: /Kdo platí/ })).toHaveAttribute('aria-required', 'true');
+    expect(screen.getByText(/Klub dostane jednu fakturu/)).toBeInTheDocument();
+    expect(screen.getByText(/zaplatí svou prohlídku na místě/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Přidat další termín/ })).not.toBeInTheDocument();
+  });
+
+  it('validates the term per field: past date and end before start, in Czech', async () => {
+    renderPage();
+    await loaded();
+    fireEvent.change(screen.getByLabelText('Termín od'), { target: { value: PAST } });
+    expect(screen.getByText('Datum už je v minulosti.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Termín od'), { target: { value: FUTURE } });
+    fireEvent.change(screen.getByLabelText('Termín do'), { target: { value: '2099-03-01' } });
+    expect(screen.getByText('Konec termínu musí být po začátku.')).toBeInTheDocument();
+    expect(submitBtn()).toBeDisabled();
+  });
+
+  it('keeps submit disabled while the contact is invalid', async () => {
     const user = userEvent.setup();
     renderPage();
     await loaded();
-    expect(screen.queryByRole('button', { name: /Odebrat termín/ })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Přidat další termín/ }));
-    expect(screen.getByRole('group', { name: 'Termín 2' })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Datum termínu 2'), { target: { value: PAST } });
-    expect(screen.getByText('Datum už je v minulosti.')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Odebrat termín 2' }));
-    expect(screen.queryByRole('group', { name: 'Termín 2' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('radio', CLUB));
+    await user.click(screen.getByRole('radio', { name: 'Diagnostika' }));
+    await user.click(plus('Spiroergometrie'));
+    fireEvent.change(screen.getByLabelText('Termín od'), { target: { value: FUTURE } });
+    await user.type(screen.getByLabelText(/Jméno a příjmení/), 'Petr');
+    await user.type(screen.getByRole('textbox', { name: /^Telefon/ }), '773539001');
+    await user.type(screen.getByLabelText(/E-mail/), 'nonsense');
+    expect(submitBtn()).toBeDisabled();
+    await user.clear(screen.getByLabelText(/E-mail/));
+    await user.type(screen.getByLabelText(/E-mail/), 'petr@klub.cz');
+    expect(submitBtn()).toBeEnabled();
+  });
+
+  it('writes the plain sentence for "klub platí" and keeps the total as a price', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await loaded();
+    await user.click(screen.getByRole('radio', CLUB));
+    await user.click(screen.getByRole('radio', { name: 'Diagnostika' }));
+    await user.click(plus('Spiroergometrie'));
+    fireEvent.change(screen.getByLabelText('Termín od'), { target: { value: FUTURE } });
+    fireEvent.change(screen.getByLabelText('Termín do'), { target: { value: '2099-03-06' } });
+    const sentence = await screen.findByTestId('order-sentence');
+    await waitFor(() => expect(sentence.textContent).toMatch(/Celkem 4\s500 Kč, platí klub\./));
+    expect(sentence).toHaveTextContent(/Objednáváte 5 hráčů \(Spiroergometrie 1×\)/);
+    expect(sentence).toHaveTextContent('termín 4. 3. 2099 – 6. 3. 2099');
+    expect(screen.getByText('Cena celkem')).toBeInTheDocument();
+    expect(screen.getAllByText(/za hráče/).length).toBeGreaterThan(0);
+  });
+
+  it('writes the sentence for "platí rodiče" with "cena za osobu" and an informational total', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await loaded();
+    await user.click(screen.getByRole('radio', PERSON));
+    await user.click(screen.getByRole('radio', { name: 'Diagnostika' }));
+    await user.click(plus('Spiroergometrie'));
+    const sentence = await screen.findByTestId('order-sentence');
+    await waitFor(() => expect(sentence.textContent).toMatch(/Orientační cena celkem 4\s500 Kč, platí rodiče \/ hráči sami, každý za sebe\./));
+    expect(screen.getByText('Orientační cena celkem')).toBeInTheDocument();
+    expect(screen.getAllByText(/cena za osobu/).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Cena celkem')).not.toBeInTheDocument();
+  });
+
+  it('asks to choose who pays in the sentence while that is still open', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await loaded();
+    await user.click(screen.getByRole('radio', { name: 'Diagnostika' }));
+    await user.click(plus('Spiroergometrie'));
+    expect(await screen.findByTestId('order-sentence')).toHaveTextContent('Vyberte, kdo platí.');
+  });
+
+  it('puts the preferred time at the head of the note and keeps the typed note', async () => {
+    const user = userEvent.setup();
+    submitOrder.mockResolvedValue({ status: 'Requested', reference: 'KO-1' });
+    renderPage();
+    await loaded();
+    await fillValid(user);
+    await user.type(screen.getByLabelText('Preferovaný čas'), 'dopoledne');
+    await user.type(screen.getByRole('textbox', { name: /^Poznámka$/ }), 'Přijedeme autobusem');
+    await user.click(submitBtn());
+    await waitFor(() => expect(submitOrder).toHaveBeenCalledTimes(1));
+    expect(submitOrder.mock.calls[0][1].note).toBe('Preferovaný čas: dopoledne\nPřijedeme autobusem');
+  });
+
+  it('hides the service step when the clinic offers one service and selects it', async () => {
+    const user = userEvent.setup();
+    getOrderForm.mockResolvedValue(offer({ services: [offer().services[0]] }));
+    renderPage();
+    await loaded();
+    expect(screen.queryByRole('radiogroup', { name: /Služba/ })).not.toBeInTheDocument();
+    await user.click(plus('Spiroergometrie'));
+    await waitFor(() => expect(quoteOrder.mock.calls[0][1].serviceId).toBe('s1'));
   });
 
   it('keeps the button disabled without a payment method, then submits the exact payload and shows the confirmation', async () => {
@@ -195,7 +285,8 @@ describe.each([['phone', VIEWPORTS.phone], ['tablet', VIEWPORTS.tablet], ['deskt
     const body = submitOrder.mock.calls[0][1];
     expect(body.serviceId).toBe('s1');
     expect(body.activitySeats).toEqual([{ activityId: 'a1', seats: 2 }]);
-    expect(body.ranges).toEqual([{ fromDate: FUTURE, toDate: FUTURE, dailyFrom: '09:00', dailyTo: '12:00' }]);
+    expect(body.ranges).toEqual([{ fromDate: FUTURE, toDate: FUTURE }]);
+    expect(body.note).toBeUndefined();
     expect(body.paymentMethod).toBe('ClubInvoice');
     expect(body.contact.name).toBe('Petr Trenér');
     expect(body.contact.email).toBe('petr@klub.cz');
@@ -211,14 +302,12 @@ describe.each([['phone', VIEWPORTS.phone], ['tablet', VIEWPORTS.tablet], ['deskt
     await loaded();
     await user.click(screen.getByRole('radio', { name: 'Diagnostika' }));
     await user.click(plus('Spiroergometrie'));
-    fireEvent.change(screen.getByLabelText('Datum termínu 1'), { target: { value: FUTURE } });
-    fireEvent.change(screen.getByLabelText('Čas od, termín 1'), { target: { value: '09:00' } });
-    fireEvent.change(screen.getByLabelText('Čas do, termín 1'), { target: { value: '12:00' } });
+    fireEvent.change(screen.getByLabelText('Termín od'), { target: { value: FUTURE } });
     await user.type(screen.getByLabelText(/Jméno a příjmení/), 'Petr');
     await user.type(screen.getByRole('textbox', { name: /^Telefon/ }), '773539001');
     await user.type(screen.getByLabelText(/E-mail/), 'petr@klub.cz');
     expect(submitBtn()).toBeDisabled();
-    await user.click(screen.getByRole('radio', { name: 'Platí jednotlivé osoby' }));
+    await user.click(screen.getByRole('radio', PERSON));
     expect(submitBtn()).toBeEnabled();
   });
 
@@ -282,8 +371,8 @@ describe('ClubOrderForm link states and draft', () => {
     await loaded();
     expect(screen.getByRole('radio', { name: 'Fyzioterapie' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByLabelText('Počet hráčů: Masáž')).toHaveValue('4');
-    expect(screen.getByLabelText('Datum termínu 1')).toHaveValue(FUTURE);
-    expect(screen.getByRole('radio', { name: 'Platí jednotlivé osoby' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByLabelText('Termín od')).toHaveValue(FUTURE);
+    expect(screen.getByRole('radio', PERSON)).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByLabelText(/Jméno a příjmení/)).toHaveValue('Jana');
     expect(screen.getByText('Nejmenší počet hráčů v objednávce je 8.')).toBeInTheDocument();
     await waitFor(() => expect(quoteOrder).toHaveBeenCalled());

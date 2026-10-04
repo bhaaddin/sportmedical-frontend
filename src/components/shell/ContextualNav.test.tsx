@@ -56,7 +56,7 @@ function renderShell(path: string, width: number) {
 
 const path = () => screen.getByTestId('path').textContent;
 const mainNav = () =>
-  screen.getAllByRole('navigation').filter((n) => within(n).queryByRole('link', { name: 'Kalendář' }) !== null)[0];
+  screen.getAllByRole('navigation').filter((n) => /^(Hlavní navigace|Sekce )/.test(n.getAttribute('aria-label') ?? ''))[0];
 
 beforeEach(() => {
   localStorage.clear();
@@ -180,5 +180,95 @@ describe('settings sidebar groups', () => {
     await userEvent.type(within(nav).getByLabelText('Hledat v nastavení'), 'oběd');
     expect(within(nav).getByRole('link', { name: 'Otevírací doba' })).toBeInTheDocument();
     expect(within(nav).getByRole('button', { name: 'Provoz' })).toHaveAttribute('aria-expanded', 'true');
+  });
+});
+
+/*
+ * Choosing a section replaces the WHOLE navigation with that section's own
+ * items - at every width - with a way back to all sections and the title.
+ */
+const SECTIONS: Array<{ path: string; title: string; items: Array<[string, string]>; foreign: string[] }> = [
+  {
+    path: '/planovani',
+    title: 'Kalendář',
+    items: [['Kalendář', '/planovani'], ['Dnešní přehled', '/dnes'], ['Přehled podle služeb', '/prehled-sluzeb'], ['Dostupnost', '/availability'], ['Klubová objednávka', '/planovani']],
+    foreign: ['Nový pacient', 'Objednávky klubů', 'Pokladna'],
+  },
+  {
+    path: '/patients',
+    title: 'Pacienti',
+    items: [['Přehled pacientů', '/patients'], ['Nový pacient', '/patients/register'], ['Kontrola registrací', '/intake-review']],
+    foreign: ['Dnešní přehled', 'Objednávky klubů', 'Pokladna'],
+  },
+  {
+    path: '/clubs',
+    title: 'Kluby a týmy',
+    items: [['Přehled klubů', '/clubs'], ['Objednávky klubů', '/clubs/objednavky'], ['Rezervace', '/clubs/rezervace'], ['Hráči', '/clubs/hraci'], ['Statistiky', '/clubs/statistiky'], ['Fakturace', '/clubs/fakturace']],
+    foreign: ['Dnešní přehled', 'Nový pacient', 'Pokladna'],
+  },
+  {
+    path: '/billing',
+    title: 'Fakturace',
+    items: [['Faktury', '/billing'], ['Pokladna', '/cashier'], ['Účetní export', '/accounting-export']],
+    foreign: ['Dnešní přehled', 'Nový pacient', 'Objednávky klubů'],
+  },
+];
+
+describe.each(SECTIONS)('section $title replaces the whole navigation', ({ path: start, title, items, foreign }) => {
+  it('desktop (1440): title, way back, own items, nothing of the others', () => {
+    renderShell(start, VIEWPORTS.desktop);
+    expect(screen.getByTestId('section-title')).toHaveTextContent(title);
+    expect(screen.getByRole('link', { name: 'Všechny sekce' })).toHaveAttribute('href', '/prehled');
+    const nav = mainNav();
+    for (const [name, href] of items) expect(within(nav).getByRole('link', { name })).toHaveAttribute('href', href);
+    for (const name of foreign) expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
+    for (const other of ['Nastavení', 'Pacienti', 'Kluby a týmy']) {
+      if (other !== title) expect(screen.queryByRole('link', { name: other })).not.toBeInTheDocument();
+    }
+  });
+
+  it('tablet (834): the rail and the overlay both hold only this section', async () => {
+    renderShell(start, VIEWPORTS.tablet);
+    const rail = mainNav();
+    expect(within(rail).getByRole('link', { name: 'Všechny sekce' })).toHaveAttribute('href', '/prehled');
+    for (const [name, href] of items) expect(within(rail).getByRole('link', { name })).toHaveAttribute('href', href);
+    for (const name of foreign) expect(within(rail).queryByRole('link', { name })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Otevřít menu' }));
+    const overlay = await screen.findByRole('dialog', { name: 'Menu' });
+    expect(within(overlay).getByRole('heading', { name: title })).toBeInTheDocument();
+    expect(within(overlay).getByRole('link', { name: 'Všechny sekce' })).toHaveAttribute('href', '/prehled');
+    for (const [name, href] of items) expect(within(overlay).getByRole('link', { name })).toHaveAttribute('href', href);
+    for (const name of foreign) expect(within(overlay).queryByRole('link', { name })).not.toBeInTheDocument();
+  });
+
+  it('phone (390): the Více sheet holds the way back, the title and only this section', async () => {
+    renderShell(start, VIEWPORTS.phone);
+    await userEvent.click(screen.getByRole('button', { name: 'Více' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Více' });
+    expect(within(sheet).getByRole('link', { name: /Všechny sekce/ })).toHaveAttribute('href', '/prehled');
+    expect(within(sheet).getByRole('heading', { name: title })).toBeInTheDocument();
+    for (const [name, href] of items) expect(within(sheet).getByRole('link', { name })).toHaveAttribute('href', href);
+    for (const name of foreign) expect(within(sheet).queryByRole('link', { name })).not.toBeInTheDocument();
+  });
+});
+
+describe('Přehled is the home: every section is one tap away, none is open', () => {
+  it.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet]] as const)('%s', (_name, width) => {
+    renderShell('/prehled', width);
+    const nav = mainNav();
+    for (const name of ['Kalendář', 'Pacienti', 'Kluby a týmy', 'Fakturace', 'Nastavení']) {
+      expect(within(nav).getByRole('link', { name })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole('link', { name: 'Všechny sekce' })).not.toBeInTheDocument();
+  });
+
+  it('desktop: every entry leads to its section and the sidebar changes', async () => {
+    renderShell('/prehled', VIEWPORTS.desktop);
+    await userEvent.click(within(mainNav()).getByRole('link', { name: 'Kluby a týmy' }));
+    expect(path()).toBe('/clubs');
+    expect(screen.getByTestId('section-title')).toHaveTextContent('Kluby a týmy');
+    await userEvent.click(screen.getByRole('link', { name: 'Všechny sekce' }));
+    expect(path()).toBe('/prehled');
+    expect(screen.queryByTestId('section-title')).not.toBeInTheDocument();
   });
 });

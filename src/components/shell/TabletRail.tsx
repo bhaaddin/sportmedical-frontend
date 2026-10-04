@@ -16,7 +16,8 @@ import NotificationCenter from '../NotificationCenter';
 import { openUniversalSearch } from '../UniversalSearch';
 import { NewOrderChooser } from '../booking/NewOrderChooser';
 import { SidebarBody } from './Sidebar';
-import { entryState, mainEntries, shortLabel } from './shellModel';
+import { STAFF_HOME_PATH } from '../../web/sitePaths';
+import { childIsActive, entryState, mainEntries, sectionGroups, sectionOf, shortLabel } from './shellModel';
 import { RAIL_WIDTH, SIDEBAR_WIDTH, activeBg, focusRing } from './shellStyles';
 import type { ShellNav } from './shellTypes';
 
@@ -28,6 +29,7 @@ function RailItem({
   icon,
   active,
   inSection = false,
+  state,
 }: {
   to: string;
   label: string;
@@ -35,12 +37,14 @@ function RailItem({
   icon: React.ReactNode;
   active: boolean;
   inSection?: boolean;
+  state?: unknown;
 }) {
   const lit = active || inSection;
   return (
     <ButtonBase
       component={Link}
       to={to}
+      state={state}
       aria-label={fullLabel ?? label}
       aria-current={active ? 'page' : undefined}
       sx={{
@@ -81,6 +85,7 @@ export function TabletRail({ nav }: { nav: ShellNav }) {
   const [open, setOpen] = useState(false);
   const [chooser, setChooser] = useState(false);
   const close = () => setOpen(false);
+  const section = sectionOf(nav);
 
   /* Opening is a tap; every navigation closes it again. */
   useEffect(() => { setOpen(false); }, [nav.pathname, nav.settingsMode]);
@@ -89,7 +94,7 @@ export function TabletRail({ nav }: { nav: ShellNav }) {
     <>
       <Box
         component="nav"
-        aria-label={nav.settingsMode ? 'Nastavení' : 'Hlavní navigace'}
+        aria-label={nav.settingsMode ? 'Nastavení' : section ? `Sekce ${section.text}` : 'Hlavní navigace'}
         data-shell="rail"
         sx={{
           position: 'fixed',
@@ -155,6 +160,23 @@ export function TabletRail({ nav }: { nav: ShellNav }) {
             <>
               <RailItem to={nav.backToAppPath} label="Zpět" fullLabel="Zpět do aplikace" icon={<ArrowBack />} active={false} />
               <RailItem to="/settings" label="Nastavení" icon={<Settings />} active />
+            </>
+          ) : section ? (
+            <>
+              <RailItem to={STAFF_HOME_PATH} label="Sekce" fullLabel="Všechny sekce" icon={<ArrowBack />} active={false} />
+              {sectionGroups(nav, section).flatMap((group) =>
+                group.items.map((child) => (
+                  <RailItem
+                    key={child.path + child.text}
+                    to={child.path}
+                    state={child.state}
+                    label={child.text}
+                    fullLabel={child.text}
+                    icon={child.icon}
+                    active={childIsActive(nav, child, group.items, group.exact)}
+                  />
+                )),
+              )}
             </>
           ) : (
             mainEntries(nav.menu).map((entry) => {

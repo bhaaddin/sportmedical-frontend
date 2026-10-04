@@ -30,10 +30,11 @@ export interface ChildSpec {
   shortcut?: boolean;
 }
 
-export type ContextualParent = '/planovani' | '/patients' | '/clubs';
+export type ContextualParent = '/planovani' | '/patients' | '/clubs' | '/billing';
 
 export const SECTION_CHILDREN: Record<ContextualParent, ChildSpec[]> = {
   '/planovani': [
+    { text: 'Kalendář', path: '/planovani' },
     { text: 'Dnešní přehled', path: '/dnes' },
     { text: 'Přehled podle služeb', path: '/prehled-sluzeb' },
     { text: 'Dostupnost', path: '/availability' },
@@ -52,6 +53,11 @@ export const SECTION_CHILDREN: Record<ContextualParent, ChildSpec[]> = {
     { text: 'Statistiky', path: '/clubs/statistiky' },
     { text: 'Fakturace', path: '/clubs/fakturace' },
   ],
+  '/billing': [
+    { text: 'Faktury', path: '/billing', requires: 'billing.manage' },
+    { text: 'Pokladna', path: '/cashier', requires: 'billing.manage' },
+    { text: 'Účetní export', path: '/accounting-export', requires: 'billing.manage' },
+  ],
 };
 
 /**
@@ -65,6 +71,8 @@ export function childrenFor(pathname: string): { parent: ContextualParent; items
     const own =
       isActivePath(pathname, parent) ||
       (parent === '/planovani' && pathname.startsWith('/kalendar/')) ||
+      /* The doctor's diagnostic form is opened from the patient's card. */
+      (parent === '/patients' && pathname === '/diagnostics/new') ||
       items.some((c) => !c.shortcut && isActivePath(pathname, c.path));
     if (own) return { parent, items };
   }
@@ -124,6 +132,41 @@ export function entryState(nav: ShellNav, entry: MenuEntry): EntryState {
 
 export function childIsActive(nav: ShellNav, child: MenuEntry, siblings: MenuEntry[], exact: boolean): boolean {
   return !child.shortcut && activeChildPath(nav.pathname, siblings, exact) === child.path;
+}
+
+/**
+ * The section the screen belongs to - the entry whose own items replace the
+ * whole sidebar - or null on the home screen (Přehled), on a screen outside
+ * every section and in settings (which has its own sidebar).
+ */
+export function sectionOf(nav: ShellNav): MenuEntry | null {
+  if (nav.settingsMode) return null;
+  for (const entry of mainEntries(nav.menu)) {
+    if (entry.path === '/settings') continue;
+    if (entryState(nav, entry).inSection) return entry;
+  }
+  return null;
+}
+
+export interface SectionGroup {
+  heading?: string;
+  items: MenuEntry[];
+  exact: boolean;
+}
+
+/**
+ * The items of a section: its screens and, inside a patient's file, the
+ * file's own sections under a "Karta pacienta" heading.
+ */
+export function sectionGroups(nav: ShellNav, entry: MenuEntry): SectionGroup[] {
+  if (entry.path === '/patients' && nav.patientId !== null) {
+    return [
+      { items: entry.children ?? [], exact: true },
+      { heading: 'Karta pacienta', ...childrenOf(nav, entry) },
+    ];
+  }
+  const { items, exact } = childrenOf(nav, entry);
+  return [{ items, exact }];
 }
 
 /** The six entries of the working day: the menu without "Přehled" (the brand is its way in). */

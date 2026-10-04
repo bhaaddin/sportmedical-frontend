@@ -74,7 +74,7 @@ function renderShell(path: string, width: number, permissions: string[] = EVERYT
 const path = () => screen.getByTestId('path').textContent;
 /** The visible `nav` landmarks that carry the six main entries. */
 const mainNavs = () =>
-  screen.queryAllByRole('navigation').filter((n) => within(n).queryByRole('link', { name: 'Kalendář' }) !== null);
+  screen.queryAllByRole('navigation').filter((n) => /^(Hlavní navigace|Sekce )/.test(n.getAttribute('aria-label') ?? '') && n.querySelector('a') !== null);
 
 beforeEach(() => {
   localStorage.clear();
@@ -99,10 +99,10 @@ describe('desktop (1440): the full sidebar', () => {
     expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '258px' });
   });
 
-  it('shows the brand, the big button and the six entries with text', () => {
-    renderShell('/planovani', VIEWPORTS.desktop);
+  it('shows the brand, the big button and the five entries with text on the overview', () => {
+    renderShell('/prehled', VIEWPORTS.desktop);
     const nav = mainNavs()[0];
-    for (const name of ['Kalendář', 'Pacienti', 'Kluby a týmy', 'Výsledky', 'Fakturace', 'Nastavení']) {
+    for (const name of ['Kalendář', 'Pacienti', 'Kluby a týmy', 'Fakturace', 'Nastavení']) {
       const link = within(nav).getByRole('link', { name });
       expect(getComputedStyle(link).minHeight).toBe('44px');
     }
@@ -111,43 +111,46 @@ describe('desktop (1440): the full sidebar', () => {
     expect(screen.getByRole('button', { name: 'Nová objednávka' })).toBeInTheDocument();
   });
 
-  it('marks the open entry and lists its children under it - and only under it', () => {
+  it('has no Výsledky section anywhere in the navigation', () => {
+    renderShell('/prehled', VIEWPORTS.desktop);
+    expect(screen.queryByRole('link', { name: 'Výsledky' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Zranění' })).not.toBeInTheDocument();
+  });
+
+  it('inside a section the whole sidebar is that section: title, way back, its own items only', () => {
     renderShell('/planovani', VIEWPORTS.desktop);
     const nav = mainNavs()[0];
+    expect(screen.getByTestId('section-title')).toHaveTextContent('Kalendář');
+    expect(screen.getByRole('link', { name: 'Všechny sekce' })).toHaveAttribute('href', '/prehled');
     expect(within(nav).getByRole('link', { name: 'Kalendář' })).toHaveAttribute('aria-current', 'page');
     for (const name of ['Dnešní přehled', 'Přehled podle služeb', 'Dostupnost']) {
       expect(within(nav).getByRole('link', { name })).toBeInTheDocument();
     }
-    expect(within(nav).queryByRole('link', { name: 'Nový pacient' })).not.toBeInTheDocument();
-    expect(within(nav).queryByRole('link', { name: 'Zranění' })).not.toBeInTheDocument();
-    expect(within(nav).queryByRole('link', { name: 'Pokladna' })).not.toBeInTheDocument();
+    for (const name of ['Pacienti', 'Kluby a týmy', 'Fakturace', 'Nastavení', 'Nový pacient', 'Pokladna']) {
+      expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
+    }
   });
 
-  it('shows Výsledky and its screens when one of them is open', () => {
-    renderShell('/injuries', VIEWPORTS.desktop);
-    const nav = mainNavs()[0];
-    for (const name of ['Diagnostika a měření', 'Zranění', 'Návrat do hry', 'Otřes mozku', 'Tréninková zátěž', 'Wellness', 'Statistiky']) {
-      expect(within(nav).getByRole('link', { name })).toBeInTheDocument();
-    }
-    expect(within(nav).getByRole('link', { name: 'Zranění' })).toHaveAttribute('aria-current', 'page');
-    expect(within(nav).getByRole('link', { name: 'Výsledky' })).not.toHaveAttribute('aria-current');
-    expect(within(nav).queryByRole('link', { name: 'Dnešní přehled' })).not.toBeInTheDocument();
+  it('keeps the diagnostic form inside the Pacienti section', () => {
+    renderShell('/diagnostics/new', VIEWPORTS.desktop);
+    expect(screen.getByTestId('section-title')).toHaveTextContent('Pacienti');
   });
 
   it('shows a patient file\'s sections under Pacienti', () => {
     renderShell('/patients/p-1/terminy', VIEWPORTS.desktop);
     const nav = mainNavs()[0];
+    expect(screen.getByTestId('section-title')).toHaveTextContent('Pacienti');
     for (const name of ['Přehled', 'Termíny', 'Faktury', 'Dokumenty', 'Historie']) {
       expect(within(nav).getByRole('link', { name })).toBeInTheDocument();
     }
     expect(within(nav).getByRole('link', { name: 'Termíny' })).toHaveAttribute('href', '/patients/p-1/terminy');
     expect(within(nav).getByRole('link', { name: 'Termíny' })).toHaveAttribute('aria-current', 'page');
-    /* Inside a file the application's own sub-list steps aside. */
-    expect(within(nav).queryByRole('link', { name: 'Nový pacient' })).not.toBeInTheDocument();
+    /* The patient list's own screens stay above the file's sections, never lit on a file. */
+    expect(within(nav).getByRole('link', { name: 'Přehled pacientů' })).not.toHaveAttribute('aria-current');
   });
 
   it('hides what this person may not open', () => {
-    renderShell('/planovani', VIEWPORTS.desktop, []);
+    renderShell('/prehled', VIEWPORTS.desktop, []);
     const nav = mainNavs()[0];
     expect(within(nav).queryByRole('link', { name: 'Pacienti' })).not.toBeInTheDocument();
     expect(within(nav).queryByRole('link', { name: 'Fakturace' })).not.toBeInTheDocument();
@@ -184,11 +187,11 @@ describe('desktop (1440): the full sidebar', () => {
   });
 
   it('draws the crumb line and names the tab', () => {
-    renderShell('/injuries', VIEWPORTS.desktop);
+    renderShell('/clubs/hraci', VIEWPORTS.desktop);
     const crumbs = screen.getByLabelText('Kde jsem');
-    expect(crumbs).toHaveTextContent('Výsledky');
-    expect(crumbs).toHaveTextContent('Zranění');
-    expect(document.title).toBe('Zranění · SportMedical');
+    expect(crumbs).toHaveTextContent('Kluby a týmy');
+    expect(crumbs).toHaveTextContent('Hráči');
+    expect(document.title).toBe('Hráči · SportMedical');
   });
 });
 
@@ -245,7 +248,7 @@ describe('settings replace the navigation', () => {
 
 describe('tablet (834): the rail', () => {
   it('has the rail only: icons with labels, no children, content offset by 72px', () => {
-    renderShell('/planovani', VIEWPORTS.tablet);
+    renderShell('/prehled', VIEWPORTS.tablet);
     expect(document.querySelector('[data-shell="rail"]')).toBeInTheDocument();
     expect(document.querySelector('[data-shell="sidebar"]')).not.toBeInTheDocument();
     expect(document.querySelector('[data-shell="bottombar"]')).not.toBeInTheDocument();
@@ -260,6 +263,17 @@ describe('tablet (834): the rail', () => {
     expect(screen.getByRole('button', { name: 'Oznámení' })).toBeInTheDocument();
     expect(screen.getByTestId('has-slot')).toHaveTextContent('false');
     expect(screen.queryByText('mini kalendář')).not.toBeInTheDocument();
+  });
+
+  it('inside a section the rail holds "Všechny sekce" and that section own screens', () => {
+    renderShell('/planovani', VIEWPORTS.tablet);
+    const rail = mainNavs()[0];
+    expect(within(rail).getByRole('link', { name: 'Všechny sekce' })).toHaveAttribute('href', '/prehled');
+    for (const name of ['Kalendář', 'Dnešní přehled', 'Přehled podle služeb', 'Dostupnost']) {
+      expect(within(rail).getByRole('link', { name })).toBeInTheDocument();
+    }
+    expect(within(rail).queryByRole('link', { name: 'Pacienti' })).not.toBeInTheDocument();
+    expect(within(rail).queryByRole('link', { name: 'Kluby a týmy' })).not.toBeInTheDocument();
   });
 
   it('opens the full sidebar as an overlay: still one navigation, children shown', async () => {
@@ -343,30 +357,45 @@ describe('phone (390): the bottom bar', () => {
   });
 
   it('shows where I am in the top bar, once', () => {
-    renderShell('/injuries', VIEWPORTS.phone);
+    renderShell('/clubs/hraci', VIEWPORTS.phone);
     const where = screen.getAllByLabelText('Kde jsem');
     expect(where).toHaveLength(1);
     expect(where[0].closest('[data-shell="topbar"]')).not.toBeNull();
-    expect(where[0]).toHaveTextContent('Výsledky');
-    expect(where[0]).toHaveTextContent('Zranění');
+    expect(where[0]).toHaveTextContent('Kluby a týmy');
+    expect(where[0]).toHaveTextContent('Hráči');
+  });
+
+  it('inside a section the Více sheet is that section: way back, title, its own screens only', async () => {
+    renderShell('/planovani', VIEWPORTS.phone);
+    await userEvent.click(screen.getByRole('button', { name: 'Více' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Více' });
+    expect(within(sheet).getByRole('link', { name: /Všechny sekce/ })).toHaveAttribute('href', '/prehled');
+    expect(within(sheet).getByRole('heading', { name: 'Kalendář' })).toBeInTheDocument();
+    for (const name of ['Dnešní přehled', 'Přehled podle služeb', 'Dostupnost']) {
+      expect(within(sheet).getByRole('link', { name })).toBeInTheDocument();
+    }
+    for (const name of ['Nový pacient', 'Pokladna', 'Hráči', 'Nastavení']) {
+      expect(within(sheet).queryByRole('link', { name })).not.toBeInTheDocument();
+    }
   });
 
   it('opens the Více sheet and goes where a row says, closing the sheet', async () => {
-    renderShell('/planovani', VIEWPORTS.phone);
+    renderShell('/prehled', VIEWPORTS.phone);
     expect(screen.queryByRole('dialog', { name: 'Více' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Více' }));
     const sheet = await screen.findByRole('dialog', { name: 'Více' });
     expect(within(sheet).getByRole('button', { name: 'Nová objednávka' })).toBeInTheDocument();
-    for (const name of ['Výsledky', 'Zranění', 'Návrat do hry', 'Přehled', 'Nastavení', 'Pokladna', 'Dnešní přehled', 'Nový pacient']) {
+    for (const name of ['Přehled', 'Nastavení', 'Pokladna', 'Dnešní přehled', 'Nový pacient']) {
       expect(within(sheet).getByRole('link', { name })).toBeInTheDocument();
     }
+    expect(within(sheet).queryByRole('link', { name: 'Výsledky' })).not.toBeInTheDocument();
     expect(within(sheet).getByRole('button', { name: 'Odhlásit se' })).toBeInTheDocument();
     expect(within(sheet).getByRole('button', { name: 'Tmavý režim' })).toBeInTheDocument();
     /* The sheet is not a second navigation landmark. */
     expect(mainNavs()).toHaveLength(0);
 
-    await userEvent.click(within(sheet).getByRole('link', { name: 'Zranění' }));
-    expect(path()).toBe('/injuries');
+    await userEvent.click(within(sheet).getByRole('link', { name: 'Dnešní přehled' }));
+    expect(path()).toBe('/dnes');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Více' })).not.toBeInTheDocument());
     expect(mainNavs()).toHaveLength(1);
   });

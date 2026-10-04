@@ -5,7 +5,7 @@ import type { OrderQuote } from '../../../api/publicClubOrder';
 import { ARCHIVO, BRAND, telHref } from '../../../components/public/brand';
 import { FieldLabel, Panel, PanelTitle, PublicMain, SOFT_TEXT, ctaSx } from '../../../components/public/kit';
 import { czk, hhmm } from './model';
-import type { TermRow } from './model';
+
 
 export function Centered({ children }: { children: ReactNode }) {
   return <PublicMain maxWidth={640}>{children}</PublicMain>;
@@ -45,7 +45,8 @@ export interface ConfirmationProps {
   reference: string;
   serviceName: string;
   lines: { name: string; seats: number }[];
-  terms: TermRow[];
+  termText: string;
+  perPerson: boolean;
   quote: OrderQuote | null;
   paymentLabel: string;
   phone: string;
@@ -65,10 +66,10 @@ export function Confirmation(p: ConfirmationProps) {
         <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 0.5, fontSize: 15 }}>
           <li>Služba: {p.serviceName}</li>
           {p.lines.map((l) => <li key={l.name}>{l.name}: {l.seats} hráčů</li>)}
-          {p.terms.map((t) => <li key={t.id}>Termín: {t.date}, {t.from}–{t.to}</li>)}
+          <li>Termín: {p.termText}</li>
           <li>Platba: {p.paymentLabel}</li>
           {p.quote !== null && <li>Potřebný čas: {hhmm(p.quote.neededMinutes)}</li>}
-          {p.quote !== null && <li>Cena celkem: {czk(p.quote.totalCzk)}</li>}
+          {p.quote !== null && <li>{p.perPerson ? 'Orientační cena celkem (každý platí za sebe)' : 'Cena celkem'}: {czk(p.quote.totalCzk)}</li>}
         </Box>
         <Typography sx={{ fontSize: 15.5, color: SOFT_TEXT, lineHeight: 1.55 }}>{p.next}</Typography>
         <Typography sx={{ fontSize: 15.5, color: SOFT_TEXT, lineHeight: 1.55 }}>

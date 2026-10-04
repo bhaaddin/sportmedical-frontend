@@ -373,7 +373,7 @@ describe('ClubsPage in three layouts', () => {
 
   it.each([
     ['phone', VIEWPORTS.phone, '1'],
-    ['tablet', VIEWPORTS.tablet, '2'],
+    ['tablet', VIEWPORTS.tablet, '1'],
     ['desktop', VIEWPORTS.desktop, '2'],
   ])('draws the %s detail in %s column(s)', async (device, width, columns) => {
     setViewport(width);
@@ -426,7 +426,7 @@ describe('ClubsPage with club blocks', () => {
     expect(screen.getByText(/^Blok /)).toBeInTheDocument();
 
     expect(screen.queryByRole('button', { name: 'Nový blok' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Nová objednávka pro tento klub' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Nová objednávka klubu' })[0]).toBeInTheDocument();
   });
 
   it('tells a club without anything to make an order or the older reservation', async () => {
@@ -435,7 +435,7 @@ describe('ClubsPage with club blocks', () => {
     const cards = await screen.findAllByRole('listitem');
     await user.click(cards[1]);
     expect(await screen.findByText('Tento klub zatím nemá hromadnou rezervaci.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Založit objednávku' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Nová objednávka klubu' }).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Vytvořit rezervaci' })).toBeInTheDocument();
   });
 

@@ -47,6 +47,7 @@ import type { Club } from '../../api/clubs';
 import { clinicServicesApi } from '../../api/clinicServices';
 import { clubBlocksApi, ClubBlockError, fetchBlockableActivities, toClubBlockError } from '../../api/clubBlocks';
 import { clubRegistrationLink } from '../../api/publicClub';
+import { absoluteLink, usePublicSiteBase } from './orders/absoluteLink';
 import type { ClubBlockConflict, ClubBlockView } from '../../api/clubBlocks';
 import { useDevice } from '../../layout/useDevice';
 import { EMPTY_PAYER, isValidIco, toPayerRequest } from '../../pages/clubs/payerForm';
@@ -733,7 +734,11 @@ export function ClubBlockDialog({
       ? null
       : `${blockRange(firstRange)}${rows.length > 1 ? ` + ${rows.length - 1} další` : ''}`;
 
-  const linkOf = (b: ClubBlockView): string | null => b.registrationUrl ?? (b.registrationToken ? clubRegistrationLink(b.registrationToken) : null);
+  const publicBase = usePublicSiteBase();
+  const linkOf = (b: ClubBlockView): string | null => {
+    const raw = b.registrationUrl ?? (b.registrationToken ? clubRegistrationLink(b.registrationToken) : null);
+    return raw === null ? null : absoluteLink(raw, publicBase);
+  };
   const copyText = async (text: string, ok: string) => {
     try {
       await navigator.clipboard.writeText(text);

@@ -3,7 +3,7 @@
  * (phone: cards in one column and the actions pinned to the bottom; tablet: two
  * columns; desktop: the board's three).
  *
- * One screen, two views. The list is a grid of cards: the club, whether it has
+ * One screen, two views (the opened club is a presentation page, components/clubs/detail).
  * a reservation or a block running, who to call, how many athletes it brings and
  * the discount the administrator gave it. Opening a card shows the club's
  * blocks and bulk reservation - the athletes' registration link, how many of the
@@ -52,7 +52,7 @@ import type { ClubFilter } from './clubs/clubOrders';
 import { buildClubRow } from './clubs/clubRow';
 import type { ClubRow } from './clubs/clubRow';
 import { ClubCard } from './clubs/ClubCard';
-import { ClubDetail } from './clubs/ClubDetail';
+import { ClubPresentation } from '../components/clubs/detail/ClubPresentation';
 import { PayerDialog } from './clubs/PayerDialog';
 import { PinnedActions } from './clubs/PinnedActions';
 import { ClubOrderDialog } from '../components/clubs/order/ClubOrderDialog';
@@ -295,12 +295,13 @@ export default function ClubsPage() {
   if (selected !== null) {
     return (
       <Box>
-        <ClubDetail
+        <ClubPresentation
           row={selected}
           clubs={clubsQuery.data ?? []}
           allBlocks={allBlocks}
           priceOf={priceOf}
           pricesReady={activitiesQuery.isSuccess || activitiesQuery.isError}
+          today={today}
           focusBlockId={focusBlockId}
           onBack={() => { setSelectedId(null); setFocusBlockId(null); }}
           onEdit={() => setEditing(selected.club)}

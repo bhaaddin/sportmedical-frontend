@@ -5,9 +5,10 @@
  *               appointment (the main action, always one tap away);
  *   bottom bar  Kalendář · Pacienti · Kluby · Fakturace and "Více", fixed,
  *               safe-area aware, every target at least 56px tall;
- *   "Více"      a bottom sheet: Nová objednávka (primary), Výsledky with its
- *               screens, Statistiky, Přehled, Nastavení, the other screens of
- *               the entries above, then the account, appearance and sign out.
+ *   "Více"      a bottom sheet: Nová objednávka (primary), then - inside a
+ *               section - "Všechny sekce", the section's title and ONLY its
+ *               own screens; elsewhere Přehled, Nastavení and the screens of
+ *               the entries above; then the account, appearance and sign out.
  *
  * In settings the bars stay; "Více → Nastavení" opens the settings hub.
  */
@@ -21,7 +22,7 @@ import { signOut } from '../../auth/signOut';
 import { NewOrderChooser } from '../booking/NewOrderChooser';
 import { AppearanceControls } from './AccountMenu';
 import { Trail, type Crumb } from './whereAmI';
-import { isActivePath, shortLabel } from './shellModel';
+import { childIsActive, isActivePath, sectionGroups, sectionOf, shortLabel } from './shellModel';
 import { STAFF_HOME_PATH } from '../../web/sitePaths';
 import { BAR_HEIGHT, activeBg, focusRing } from './shellStyles';
 import type { MenuEntry, ShellNav } from './shellTypes';
@@ -176,9 +177,7 @@ export function PhoneBottomBar({ nav }: { nav: ShellNav }) {
   const anyBarActive = !nav.settingsMode && bar.some(barActive);
 
   const entry = (path: string) => nav.menu.find((e) => e.path === path);
-  const results = entry('/diagnostics/new');
-  const resultKids = (results?.children ?? []).filter((c) => c.path !== '/statistiky');
-  const statistics = results?.children?.find((c) => c.path === '/statistiky');
+  const section = sectionOf(nav);
   const overview = entry(STAFF_HOME_PATH);
   const settings = entry('/settings');
   /* The screens that belong under the bar's entries - there is no sidebar to show them. */
@@ -291,15 +290,30 @@ export function PhoneBottomBar({ nav }: { nav: ShellNav }) {
           Nová objednávka
         </Box>
 
-        {results && (
-          <>
-            <SheetLink to={results.path} active={here(results.path)} onClick={close}>{results.text}</SheetLink>
-            {resultKids.map((c) => (
-              <SheetLink key={c.path} to={c.path} indent active={here(c.path)} onClick={close}>{c.text}</SheetLink>
+        {nav.settingsMode && <SheetLink to={STAFF_HOME_PATH} active={false} onClick={close}>← Všechny sekce</SheetLink>}
+        {section ? (
+          <Box component="nav" aria-label={`Sekce ${section.text}`}>
+            <SheetLink to={STAFF_HOME_PATH} active={false} onClick={close}>← Všechny sekce</SheetLink>
+            <SheetHeading>{section.text}</SheetHeading>
+            {sectionGroups(nav, section).map((group, gi) => (
+              <Box key={gi}>
+                {group.heading && <SheetHeading>{group.heading}</SheetHeading>}
+                {group.items.map((c) => (
+                  <SheetLink
+                    key={c.path + c.text}
+                    to={c.path}
+                    state={c.state}
+                    active={childIsActive(nav, c, group.items, group.exact)}
+                    onClick={close}
+                  >
+                    {c.text}
+                  </SheetLink>
+                ))}
+              </Box>
             ))}
-          </>
-        )}
-        {statistics && <SheetLink to={statistics.path} active={here(statistics.path)} onClick={close}>{statistics.text}</SheetLink>}
+          </Box>
+        ) : (
+          <>
         {overview && <SheetLink to={overview.path} active={here(overview.path)} onClick={close}>{overview.text}</SheetLink>}
         {settings && <SheetLink to={settings.path} active={nav.settingsMode} onClick={close}>{settings.text}</SheetLink>}
 
@@ -311,6 +325,8 @@ export function PhoneBottomBar({ nav }: { nav: ShellNav }) {
             ))}
           </Box>
         ))}
+          </>
+        )}
 
         <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1.5, mb: 1.5 }}>

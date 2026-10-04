@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════════════════════════
    UNIVERSAL SEARCH — Command palette style search
-   Searches across patients, appointments, injuries, invoices,
+   Searches across patients, appointments, invoices,
    staff, documents. Keyboard shortcut: Ctrl+K / Cmd+K.
    ══════════════════════════════════════════════════════════════ */
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -9,12 +9,11 @@ import {
   ListItemIcon, ListItemText, InputAdornment, CircularProgress,
 } from '@mui/material';
 import {
-  Search, People, CalendarMonth, Warning, Receipt,
-  Person, Science, Settings, Home,
+  Search, People, CalendarMonth, Receipt,
+  Person, Settings, Home,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { patientsApi, type Patient } from '../api/patients';
-import { injuriesApi, type Injury } from '../api/injuries';
 import { billingApi, type Invoice } from '../api/billing';
 import { calendarApi, type Appointment } from '../api/calendar';
 import { usePermission, usePermissions } from '../auth/usePermission';
@@ -40,18 +39,18 @@ interface SearchResult {
   id: string;
   title: string;
   subtitle: string;
-  type: 'patient' | 'appointment' | 'injury' | 'invoice' | 'staff' | 'page' | 'settings';
+  type: 'patient' | 'appointment' | 'invoice' | 'staff' | 'page' | 'settings';
   icon: React.ReactNode;
   path: string;
 }
 
 /* What kind of thing a row is, said with the board's tones rather than a colour per type. */
 const TYPE_LABEL: Record<SearchResult['type'], string> = {
-  patient: 'Pacient', appointment: 'Termín', injury: 'Poranění',
+  patient: 'Pacient', appointment: 'Termín',
   invoice: 'Faktura', staff: 'Tým', page: 'Stránka', settings: 'Nastavení',
 };
 const TYPE_TONE: Record<SearchResult['type'], ChipTone> = {
-  patient: 'green', appointment: 'blue', injury: 'red',
+  patient: 'green', appointment: 'blue',
   invoice: 'beige', staff: 'grey', page: 'grey', settings: 'grey',
 };
 
@@ -111,9 +110,6 @@ export default function UniversalSearch() {
       : []),
     { id: 'p-today', title: 'Dnešní přehled', subtitle: 'Dnešní den na jeden pohled', type: 'page', icon: <CalendarMonth />, path: '/dnes' },
     { id: 'p-clubs', title: 'Kluby a týmy', subtitle: 'Hromadné objednávky a odkazy pro sportovce', type: 'page', icon: <People />, path: '/clubs' },
-    { id: 'p-injuries', title: 'Poranění', subtitle: 'Evidence poranění', type: 'page', icon: <Warning />, path: '/injuries' },
-    { id: 'p-diagnostics', title: 'Výsledky', subtitle: 'Diagnostika a měření', type: 'page', icon: <Science />, path: '/diagnostics/new' },
-    { id: 'p-statistics', title: 'Statistiky', subtitle: 'Statistiky pro všechno na jednom místě', type: 'page', icon: <Science />, path: '/statistiky' },
     { id: 'p-settings', title: 'Nastavení', subtitle: 'Konfigurace', type: 'page', icon: <Settings />, path: '/settings' },
   ], [canBill, canSeePatients]);
 
@@ -125,9 +121,8 @@ export default function UniversalSearch() {
     const plain = normalizeText(q);
 
     try {
-      const [patients, injuries, invoices, appointments] = await Promise.allSettled([
+      const [patients, invoices, appointments] = await Promise.allSettled([
         canSeePatients ? patientsApi.search(q).catch(() => []) : Promise.resolve([] as Patient[]),
-        injuriesApi.getAll().catch(() => []),
         canBill ? billingApi.getInvoices().catch(() => []) : Promise.resolve([] as Invoice[]),
         calendarApi.getAppointments().catch(() => []),
       ]);
@@ -144,24 +139,6 @@ export default function UniversalSearch() {
             type: 'patient',
             icon: <Person />,
             path: `/patients/${p.id}`,
-          });
-        }
-      }
-
-      /* Injuries */
-      if (injuries.status === 'fulfilled') {
-        for (const i of (injuries.value as Injury[]).filter(
-          x => x.bodyRegion?.toLowerCase().includes(lower) ||
-               x.diagnosis?.toLowerCase().includes(lower) ||
-               x.patientId?.toLowerCase().includes(lower)
-        ).slice(0, 3)) {
-          found.push({
-            id: `injury-${i.id}`,
-            title: `Poranění: ${i.bodyRegion}`,
-            subtitle: `${i.diagnosis || 'Bez diagnózy'} · ${i.practitioner}`,
-            type: 'injury',
-            icon: <Warning />,
-            path: '/injuries',
           });
         }
       }
@@ -275,7 +252,7 @@ export default function UniversalSearch() {
         <TextField
           inputRef={inputRef}
           fullWidth
-          placeholder="Hledat pacienty, termíny, faktury, poranění nebo stránky…"
+          placeholder="Hledat pacienty, termíny, faktury nebo stránky…"
           value={query}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}

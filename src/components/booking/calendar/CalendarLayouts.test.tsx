@@ -294,11 +294,13 @@ describe('desktop · 1440', () => {
     expect(initial.ranges[0].dailyTo).toMatch(/^\d\d:\d\d$/);
   });
 
-  it('the toolbar button "Klubová objednávka" opens the club order dialog without a head start', async () => {
+  it('the toolbar button "Klubová objednávka" asks the two-way question (fill in myself / send the link)', async () => {
     renderPage(VIEWPORTS.desktop, 'week');
     fireEvent.click(await screen.findByRole('button', { name: 'Klubová objednávka' }));
-    const initial = JSON.parse((await screen.findByTestId('club-order-initial')).textContent ?? 'null');
-    expect(initial).toEqual({});
+    const entry = await screen.findByTestId('club-order-entry');
+    expect(within(entry).getAllByRole('button')).toHaveLength(2);
+    expect(within(entry).getByRole('button', { name: /Vyplním sám/ })).toBeInTheDocument();
+    expect(within(entry).getByRole('button', { name: /Poslat odkaz klubu/ })).toBeInTheDocument();
   });
 
   it('month: dragging across days picks a range, pills it, and "Rezervovat pro klub" hands it on', async () => {

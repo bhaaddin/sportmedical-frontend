@@ -326,6 +326,6 @@ export const ORDER_STATUS_LABEL: Record<ClubOrderStatus, string> = {
 };
 
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
-  ClubInvoice: 'Faktura klubu',
-  PerPerson: 'Platí jednotlivé osoby',
+  ClubInvoice: 'Platí klub (jedna faktura)',
+  PerPerson: 'Platí rodiče / hráči sami',
 };

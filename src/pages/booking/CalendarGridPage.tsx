@@ -7,6 +7,10 @@ import {
   ButtonBase,
   Chip,
   Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Drawer,
   IconButton,
   MenuItem,
@@ -108,6 +112,12 @@ import { MultiBlockDialog } from "../../components/booking/calendar/MultiBlockDi
 import { SelectionTray } from "../../components/booking/calendar/SelectionTray";
 import { clubRanges } from "../../components/booking/calendar/multiSelect";
 import { ClubOrderDialog } from "../../components/clubs/order/ClubOrderDialog";
+import { ClubOrderEntry } from "../../components/clubs/order/ClubOrderEntry";
+import { PickOrderSetup } from "../../components/clubs/order/PickOrderSetup";
+import { OrderSuccess } from "../../components/clubs/order/OrderSuccess";
+import { readPickOrderState } from "../../components/clubs/order/pickSession";
+import { PickOrderPanel } from "../../components/booking/calendar/PickOrderPanel";
+import { usePickOrder } from "../../components/booking/calendar/usePickOrder";
 import type { OrderRange } from "../../api/clubOrders";
 import { SidebarPortal, useHasSidebarSlot } from "../../components/shell/SidebarSlot";
 import { PinnedActionBar } from "../../components/ui/PinnedActionBar";
@@ -310,6 +320,9 @@ export default function CalendarGridPage() {
   const [clubOrder, setClubOrder] = useState<{ key: number; ranges?: OrderRange[]; calendarIds?: string[] } | null>(null);
   const openClubOrder = (ranges?: OrderRange[], calendarIds?: string[]) =>
     setClubOrder({ key: Date.now(), ...(ranges !== undefined ? { ranges } : {}), ...(calendarIds !== undefined ? { calendarIds } : {}) });
+  /* "Nová klubová objednávka": the two-way chooser, then (phone order) the small setup form, then picking in the grid. */
+  const [entryOpen, setEntryOpen] = useState(false);
+  const [setupFor, setSetupFor] = useState<{ clubId?: string } | null>(null);
   const [rangeBlock, setRangeBlock] = useState<{ from: string; to: string } | null>(null);
   const [moveProposal, setMoveProposal] = useState<GridMoveRequest | null>(null);
   /* Several different places at once: marked with Ctrl/⌘/Shift (or the touch toggle), acted on from the tray. */
@@ -319,10 +332,12 @@ export default function CalendarGridPage() {
   /* Escape drops every marked place, wherever the focus is (a dialog keeps its own Escape). */
   const multiCount = multi.items.length;
   const clearMulti = multi.clear;
+  const pickingRef = useRef(false);
   useEffect(() => {
     if (multiCount === 0 || multiBlock) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") clearMulti();
+      /* The picks of a phone order are dropped only by its own "Zrušit". */
+      if (event.key === "Escape" && !pickingRef.current) clearMulti();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -387,6 +402,32 @@ export default function CalendarGridPage() {
       ),
     [servicesQuery.data, calendars],
   );
+
+  /* "Výběr termínů": a phone order picked in the grid. While it runs, the grid shows only that služba's calendars. */
+  const savedFilters = useRef<{ serviceSet: Set<string> | null; ticked: Set<string> | null } | null>(null);
+  const pick = usePickOrder({
+    multi,
+    calendars,
+    todayKey: pragueDateKey(now),
+    onStarted: (session) => {
+      savedFilters.current ??= { serviceSet, ticked };
+      setServiceSet(new Set([session.serviceId]));
+      setTicked(null);
+      rangeSelect.clear();
+      setView((current) => (current === "month" ? (isPhone ? "day" : "week") : current));
+    },
+    onEnded: () => {
+      const saved = savedFilters.current;
+      savedFilters.current = null;
+      if (saved !== null) {
+        setServiceSet(saved.serviceSet);
+        setTicked(saved.ticked);
+      }
+    },
+    onCreated: () => void appointmentsQuery.refetch(),
+  });
+  const pickActive = pick.active;
+  pickingRef.current = pickActive;
   const legendServices = useMemo<LegendService[]>(
     () =>
       services.map((s) => ({
@@ -511,7 +552,7 @@ export default function CalendarGridPage() {
     queries: shown.map((calendar) => ({
       queryKey: ["blocks", calendar.id, from, to],
       queryFn: () => appointmentsApi.blocks(calendar.id, from, to),
-      enabled: !isPhone,
+      enabled: !isPhone || pickActive,
       placeholderData: (previous: TimeBlock[] | undefined) => previous,
     })),
     combine: dataOfEach,
@@ -960,10 +1001,16 @@ export default function CalendarGridPage() {
   useEffect(() => {
     if (!wantsClubOrder || !mayBook || handledClubOrderKey.current === location.key) return;
     handledClubOrderKey.current = location.key;
-    openClubOrder();
-    // openClubOrder only sets local state
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setEntryOpen(true);
   }, [wantsClubOrder, mayBook, location.key]);
+  /* `state.pickOrder` (a club's card, Kluby -> Objednávky "Vyplním sám"): straight to the small setup form. */
+  const wantsPick = readPickOrderState(location.state);
+  const handledPickKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (wantsPick === null || !mayBook || handledPickKey.current === location.key) return;
+    handledPickKey.current = location.key;
+    setSetupFor(wantsPick.clubId !== undefined ? { clubId: wantsPick.clubId } : {});
+  }, [wantsPick, mayBook, location.key]);
   useEffect(() => {
     if (landingDate === undefined || handledDateKey.current === location.key) return;
     handledDateKey.current = location.key;
@@ -979,7 +1026,7 @@ export default function CalendarGridPage() {
     if (event.key === "Escape") {
       setOpenId(null);
       rangeSelect.clear();
-      multi.clear();
+      if (!pickActive) multi.clear();
       return;
     }
     if (event.key === "PageUp") {
@@ -1117,10 +1164,10 @@ export default function CalendarGridPage() {
           >
             <ToggleButton value="day">{GRID_TEXT.dayView}</ToggleButton>
             <ToggleButton value="week">{GRID_TEXT.weekView}</ToggleButton>
-            <ToggleButton value="month">{GRID_TEXT.monthView}</ToggleButton>
+            <ToggleButton value="month" disabled={pickActive}>{GRID_TEXT.monthView}</ToggleButton>
           </ToggleButtonGroup>
           {mayBook && !isPhone ? (
-            <Button variant="outlined" onClick={() => openClubOrder()} sx={{ minHeight: 44, px: 2.25 }}>
+            <Button variant="outlined" disabled={pickActive} onClick={() => setEntryOpen(true)} sx={{ minHeight: 44, px: 2.25 }}>
               Klubová objednávka
             </Button>
           ) : null}
@@ -1285,8 +1332,13 @@ export default function CalendarGridPage() {
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns:
-            device === "desktop" && !inSidebar ? "248px minmax(0, 1fr)" : "minmax(0, 1fr)",
+          gridTemplateColumns: [
+            device === "desktop" && !inSidebar ? "248px" : null,
+            "minmax(0, 1fr)",
+            pickActive && device === "desktop" ? "340px" : null,
+          ]
+            .filter(Boolean)
+            .join(" "),
           gap: 3,
           alignItems: "start",
         }}
@@ -1294,6 +1346,11 @@ export default function CalendarGridPage() {
         {device === "desktop" && !inSidebar ? <Box>{sideContent(false)}</Box> : null}
 
         <Box sx={{ minWidth: 0 }}>
+          {pick.panel !== null && device !== "desktop" ? (
+            <Alert severity="info" data-testid="pick-hint" sx={{ mb: 1.5 }}>
+              Výběr termínů pro {pick.panel.clubName}: podržte prst na volném čase a tažením označte rozsah.
+            </Alert>
+          ) : null}
           <AsyncSection
             isLoading={calendarsQuery.isLoading}
             isSettled={calendarsQuery.isSuccess}
@@ -1341,8 +1398,8 @@ export default function CalendarGridPage() {
                 <Alert severity="info" data-testid="nothing-shown">
                   {CAL_TEXT.nothingToShow}
                 </Alert>
-              ) : isPhone ? (
-                /* 7.2: on a phone the day is a list, not a shrunken grid. */
+              ) : isPhone && !pickActive ? (
+                /* 7.2: on a phone the day is a list, not a shrunken grid (picking terms needs the grid). */
                 <PhoneCalendar
                   view={view}
                   anchor={anchor}
@@ -1404,11 +1461,12 @@ export default function CalendarGridPage() {
                   onBook={bookFromGrid}
                   onClub={clubFromGrid}
                   onPickDay={pickDay}
-                  columns={columns}
+                  columns={pickActive ? undefined : columns}
                   catalogue={catalogue}
-                  device={isTablet ? "tablet" : "desktop"}
-                  rangeSelect={rangeSelect}
+                  device={isTablet || (isPhone && pickActive) ? "tablet" : "desktop"}
+                  rangeSelect={pickActive ? undefined : rangeSelect}
                   multi={multi}
+                  pick={pick.gridPick}
                   onOpenClubBlock={setClubPick}
                   onMove={setMoveProposal}
                 />
@@ -1416,15 +1474,24 @@ export default function CalendarGridPage() {
             </AsyncSection>
           </AsyncSection>
         </Box>
+        {pick.panel !== null && device === "desktop" ? <PickOrderPanel device="desktop" {...pick.panel} /> : null}
       </Box>
 
+      {/* The calculator of a phone order: beside the grid on a desktop (inside the grid layout above), a bar at the bottom elsewhere. */}
+      {pick.panel !== null && device !== "desktop" ? (
+        <>
+          <Box aria-hidden sx={{ height: 150 }} />
+          <PickOrderPanel device={device} {...pick.panel} />
+        </>
+      ) : null}
+
       {/* Phone: "Nová objednávka" pinned above the bottom bar. */}
-      {isPhone && mayBook ? (
+      {isPhone && mayBook && !pickActive ? (
         <PinnedActionBar label={CAL_TEXT.newAppointment}>
           <Button variant="contained" onClick={() => void bookNextFree()} sx={{ minHeight: 44 }}>
             {GRID_TEXT.newAppointment}
           </Button>
-          <Button variant="outlined" onClick={() => openClubOrder()} sx={{ minHeight: 44 }}>
+          <Button variant="outlined" onClick={() => setEntryOpen(true)} sx={{ minHeight: 44 }}>
             Klubová objednávka
           </Button>
         </PinnedActionBar>
@@ -1497,7 +1564,7 @@ export default function CalendarGridPage() {
 
       {/* Several marked places: the tray, and its block dialog. */}
       <SelectionTray
-        items={multi.items}
+        items={pickActive ? [] : multi.items}
         today={todayKey}
         phone={isPhone}
         mayBook={mayBook}
@@ -1541,7 +1608,32 @@ export default function CalendarGridPage() {
 
       <ClubBlockPopover pick={clubPick} onOpen={openClubBlock} onClose={() => setClubPick(null)} />
 
-      {/* The club order dialog: new key per opening, so the head start is read afresh. */}
+      {/* "Nová klubová objednávka": the two ways in. A starts picking in this calendar, B shows the club's link. */}
+      <ClubOrderEntry
+        open={entryOpen && mayBook}
+        onClose={() => setEntryOpen(false)}
+        onPhone={(clubId) => setSetupFor(clubId !== undefined ? { clubId } : {})}
+      />
+      {setupFor !== null && mayBook ? (
+        <PickOrderSetup
+          open
+          defaultClubId={setupFor.clubId}
+          onClose={() => setSetupFor(null)}
+          onStart={(session) => {
+            setSetupFor(null);
+            pick.start(session);
+          }}
+        />
+      ) : null}
+      <Dialog open={pick.result !== null} onClose={pick.closeResult} fullWidth maxWidth="sm" fullScreen={isPhone}>
+        <DialogTitle>Objednávka potvrzena</DialogTitle>
+        <DialogContent>{pick.result !== null ? <OrderSuccess order={pick.result} /> : null}</DialogContent>
+        <DialogActions>
+          <Button variant="contained" onClick={pick.closeResult}>Hotovo</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* The club order dialog (from the marked places): new key per opening, so the head start is read afresh. */}
       {clubOrder !== null && mayBook ? (
         <ClubOrderDialog
           key={clubOrder.key}

@@ -22,7 +22,7 @@ import { SettingsNav } from '../../pages/settings/SettingsFrame';
 import { NewOrderChooser } from '../booking/NewOrderChooser';
 import { SidebarSlot } from './SidebarSlot';
 import { STAFF_HOME_PATH } from '../../web/sitePaths';
-import { childIsActive, entryState, mainEntries } from './shellModel';
+import { childIsActive, entryState, mainEntries, sectionGroups, sectionOf } from './shellModel';
 import { SIDEBAR_WIDTH, activeBg, focusRing } from './shellStyles';
 import type { MenuEntry, ShellNav } from './shellTypes';
 
@@ -140,6 +140,70 @@ export function MainNav({ nav, onNavigate }: { nav: ShellNav; onNavigate?: () =>
   );
 }
 
+/** "← Všechny sekce": the way from a section back to the home menu. */
+export function AllSectionsLink({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <ButtonBase
+      component={Link}
+      to={STAFF_HOME_PATH}
+      onClick={onNavigate}
+      sx={{
+        alignSelf: 'stretch',
+        justifyContent: 'flex-start',
+        gap: 1,
+        minHeight: 44,
+        px: '13px',
+        borderRadius: '8px',
+        color: 'text.secondary',
+        fontSize: 14,
+        fontWeight: 600,
+        '&:hover': { bgcolor: 'action.hover', color: 'text.primary' },
+        ...focusRing,
+      }}
+    >
+      <ArrowBack sx={{ fontSize: 20 }} />
+      Všechny sekce
+    </ButtonBase>
+  );
+}
+
+/**
+ * One section's own sidebar: its title and ONLY its items - the other
+ * sections are not drawn at all (Matko, 4. 10. 2026: "everything in the
+ * sidebar changes to only calendar").
+ */
+export function SectionNav({ nav, entry, onNavigate }: { nav: ShellNav; entry: MenuEntry; onNavigate?: () => void }) {
+  return (
+    <Box component="nav" aria-label={`Sekce ${entry.text}`} sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      {sectionGroups(nav, entry).map((group, gi) => (
+        <Box key={gi} sx={{ display: 'flex', flexDirection: 'column', gap: '2px', mt: gi > 0 ? 1.5 : 0 }}>
+          {group.heading && (
+            <Box component="h3" sx={{ m: 0, px: '13px', pb: '4px', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'text.secondary' }}>
+              {group.heading}
+            </Box>
+          )}
+          {group.items.map((child: MenuEntry) => {
+            const active = childIsActive(nav, child, group.items, group.exact);
+            return (
+              <Box
+                key={child.path + child.text}
+                component={Link}
+                to={child.path}
+                state={child.state}
+                onClick={onNavigate}
+                aria-current={active ? 'page' : undefined}
+                sx={rowSx(active)}
+              >
+                {child.text}
+              </Box>
+            );
+          })}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 /** The signed-in person, search and the bell: reachable on every width. */
 export function AccountRow({ nav }: { nav: ShellNav }) {
   const name = [nav.user.firstName, nav.user.lastName].filter(Boolean).join(' ') || 'Účet';
@@ -235,7 +299,9 @@ export function SidebarBody({
           <ArrowBack sx={{ fontSize: 20 }} />
           Zpět do aplikace
         </ButtonBase>
-        <Brand onNavigate={onNavigate} />
+        <Box component="h2" data-testid="section-title" sx={{ m: 0, px: '13px', fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: '28px' }}>
+          Nastavení
+        </Box>
         <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', mt: 2.5, mx: '-6px', px: '6px' }}>
           <SettingsNav plain query={nav.settingsQuery} onQueryChange={nav.onSettingsQueryChange} />
         </Box>
@@ -244,14 +310,24 @@ export function SidebarBody({
     );
   }
 
+  const section = sectionOf(nav);
   return (
     <>
-      <Brand onNavigate={onNavigate} />
+      {section ? (
+        <>
+          <AllSectionsLink onNavigate={onNavigate} />
+          <Box component="h2" data-testid="section-title" sx={{ m: 0, mt: 1.5, px: '13px', fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: '28px' }}>
+            {section.text}
+          </Box>
+        </>
+      ) : (
+        <Brand onNavigate={onNavigate} />
+      )}
       <Box sx={{ mt: '22px', flexShrink: 0 }}>
         <NewAppointmentButton onNewOrder={onNewOrder} onNavigate={onNavigate} />
       </Box>
       <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', mt: 2.5, mx: '-6px', px: '6px' }}>
-        <MainNav nav={nav} onNavigate={onNavigate} />
+        {section ? <SectionNav nav={nav} entry={section} onNavigate={onNavigate} /> : <MainNav nav={nav} onNavigate={onNavigate} />}
         {withSlot && <SidebarSlot />}
       </Box>
       <AccountRow nav={nav} />

@@ -51,6 +51,8 @@ import { SelectionPopover } from "../calendar/SelectionPopover";
 import { useDayRangeSurface, type DayRangeApi } from "../calendar/useDayRange";
 import type { MultiSelectApi } from "../calendar/useMultiSelect";
 import type { PickedTime } from "../calendar/multiSelect";
+import { PickedBar } from "../calendar/PickedBar";
+import { adjustPicked, busyIntervals, clampPainted, paintNote, type AdjustMode, type ClampResult } from "../calendar/pickLogic";
 
 /*
  * The day and week grid - contract 5.1, drawn to the board of 3. 10. 2026
@@ -113,6 +115,26 @@ export interface GridMoveRequest {
   endUtc: string;
 }
 
+/**
+ * "Výběr termínů" (a club order picked straight in the grid). While `active`, every drag ADDS a place (no popover);
+ * the painted range is stopped at what is taken and at the minutes still `allowance`d, picked ranges can be
+ * resized, moved and removed, and refusals are reported through `onNote`.
+ */
+export interface GridPickMode {
+  active: boolean;
+  /** How many more minutes may be picked (Infinity = no limit). */
+  allowance: number;
+  /** Only the calendars of the order's service may be picked. */
+  allowedCalendar: (calendarId: string) => boolean;
+  /** The clinic's today: nothing before it can be picked. */
+  today: DateOnly;
+  onNote: (text: string | null) => void;
+  onAdjust: (id: string, range: MinuteRange) => void;
+  onRemove: (id: string) => void;
+  /** Picks the server named in a refusal. */
+  conflictIds?: ReadonlySet<string>;
+}
+
 /** What is being dragged: the booking and how far down its card the pointer took hold. */
 interface Moving {
   appointment: DayAppointment;
@@ -170,6 +192,8 @@ export interface TimeGridProps {
   rangeSelect?: DayRangeApi;
   /** Several places at once: a Ctrl/⌘/Shift drag (or the touch toggle) adds to it instead of replacing. */
   multi?: MultiSelectApi;
+  /** "Výběr termínů": painting adds places for a club order. */
+  pick?: GridPickMode;
   /** A click on a club's block: the page opens its popover. */
   onOpenClubBlock?: (pick: ClubBlockPick) => void;
   /** Drag a booking to another time of its own calendar (mouse); the page confirms and moves it. */
@@ -785,6 +809,7 @@ export function TimeGrid(props: TimeGridProps) {
                             (i): i is PickedTime => i.kind === "time" && i.columnKey === spec.key && i.dayKey === dayKey,
                           )}
                           pickedPast={dayKey < todayKey}
+                          pick={props.pick}
                           onSelect={handleSelect}
                           onOpen={props.onOpen}
                           onOpenBlock={(block) => setOpenBlock({ calendar, block })}
@@ -1112,6 +1137,7 @@ function SubColumn({
   pending,
   picked,
   pickedPast,
+  pick,
   onSelect,
   onOpen,
   onOpenBlock,
@@ -1148,6 +1174,7 @@ function SubColumn({
   picked: PickedTime[];
   /** The day is before today: the marks are drawn muted. */
   pickedPast: boolean;
+  pick?: GridPickMode;
   onSelect: (selection: Selection, additive: boolean) => void;
   onOpen: (id: string) => void;
   onOpenBlock: (block: TimeBlock) => void;
@@ -1181,7 +1208,33 @@ function SubColumn({
   const step = Math.min(calendarStep, gridStep > 0 ? gridStep : calendarStep);
   const bounds = { start: topMinute, end: bottomMinute };
   const canDrag = dragEnabled && open;
-  const liveRange = drag ? dragRange(drag.anchor, drag.current, step, bounds) : pending;
+  const painting = pick?.active === true;
+  /* "Výběr termínů": what a paint from `anchor` to `current` may become here (stopped at what is taken and at the need). */
+  const busyHere = (ignoreId?: string) =>
+    busyIntervals({
+      dayKey,
+      ...(row !== undefined
+        ? { row: { isOpen: row.isOpen, startTime: row.startTime, endTime: row.endTime, breakStart: row.breakStart, breakEnd: row.breakEnd } }
+        : {}),
+      appointments,
+      blocks,
+      picks: picked,
+      ...(ignoreId !== undefined ? { ignoreId } : {}),
+    });
+  const paint = (anchor: number, current: number): ClampResult => {
+    const none = { trimmedBusy: false, trimmedNeed: false };
+    if (pick === undefined) return { range: null, ...none };
+    if (!pick.allowedCalendar(calendar.id)) return { range: null, refused: "service", ...none };
+    if (dayKey < pick.today) return { range: null, refused: "past", ...none };
+    return clampPainted({
+      range: dragRange(anchor, current, step, bounds),
+      direction: Math.floor(current / step) < Math.floor(anchor / step) ? "up" : "down",
+      busy: busyHere(),
+      allowance: pick.allowance,
+    });
+  };
+  const [adjust, setAdjust] = useState<{ id: string; range: MinuteRange } | null>(null);
+  const liveRange = drag ? (painting ? paint(drag.anchor, drag.current).range : dragRange(drag.anchor, drag.current, step, bounds)) : painting ? null : pending;
 
   useEffect(() => {
     const node = nodeRef.current;
@@ -1245,6 +1298,17 @@ function SubColumn({
       },
       additive,
     );
+
+  /* A press ended: a paint in "výběr termínů" (clamped, always one more place), else the ordinary selection. */
+  const commit = (anchor: number, current: number, x: number, y: number, additive: boolean) => {
+    if (painting && pick !== undefined) {
+      const result = paint(anchor, current);
+      pick.onNote(paintNote(result));
+      if (result.range !== null) select(result.range, x, y, true);
+      return;
+    }
+    select(dragRange(anchor, current, step, bounds), x, y, additive);
+  };
 
   /* Moving a booking by dragging it: only within its own calendar and činnost, only while it is still open. */
   const mayDropHere =
@@ -1328,14 +1392,15 @@ function SubColumn({
           window.clearTimeout(press.timer);
           if (!press.dragging) {
             /* A tap on a free slot: that one slot is the selection. */
-            select(dragRange(press.minute, press.minute, step, bounds), event.clientX, event.clientY, additiveKey(event));
+            commit(press.minute, press.minute, event.clientX, event.clientY, additiveKey(event));
             return;
           }
         }
         if (!drag) return;
-        const range = dragRange(drag.anchor, minuteOf(event), step, bounds);
+        const end = minuteOf(event);
+        const anchor = drag.anchor;
         setDrag(null);
-        select(range, event.clientX, event.clientY, additiveKey(event));
+        commit(anchor, end, event.clientX, event.clientY, additiveKey(event));
       }}
       onPointerCancel={() => {
         if (touch.current) window.clearTimeout(touch.current.timer);
@@ -1694,7 +1759,45 @@ function SubColumn({
         </Box>
       ) : null}
 
-      {picked.map((item) => (
+      {painting && pick !== undefined
+        ? picked.map((item) => {
+            const range = adjust?.id === item.id ? adjust.range : item.range;
+            return (
+              <PickedBar
+                key={item.id}
+                id={item.id}
+                range={range}
+                place={place(range)}
+                pxPerMinute={pxPerMinute}
+                step={step}
+                conflict={pick.conflictIds?.has(item.id) === true}
+                onDrag={(mode: AdjustMode, delta: number) =>
+                  setAdjust({
+                    id: item.id,
+                    range: adjustPicked({
+                      original: item.range,
+                      mode,
+                      delta,
+                      step,
+                      bounds,
+                      busy: busyHere(item.id),
+                      allowance: pick.allowance,
+                    }),
+                  })
+                }
+                onEnd={() => {
+                  if (adjust !== null && adjust.id === item.id && (adjust.range.start !== item.range.start || adjust.range.end !== item.range.end)) {
+                    pick.onAdjust(item.id, adjust.range);
+                  }
+                  setAdjust(null);
+                }}
+                onRemove={() => pick.onRemove(item.id)}
+              />
+            );
+          })
+        : null}
+
+      {(painting ? [] : picked).map((item) => (
         <Box
           key={item.id}
           data-testid="picked-range"

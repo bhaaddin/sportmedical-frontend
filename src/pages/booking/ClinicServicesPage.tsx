@@ -15,18 +15,16 @@
  */
 import { useState } from 'react';
 import {
-  Alert, Box, Button, Card, CardContent, Checkbox, Chip, Dialog, DialogActions,
-  Collapse, DialogContent, DialogTitle, IconButton, ListItemText, MenuItem, Stack,
-  TextField, Tooltip, Typography,
+  Alert, Box, Button, Checkbox, Dialog, DialogActions,
+  DialogContent, DialogTitle, ListItemText, MenuItem, Stack,
+  TextField, Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
-import UnarchiveOutlinedIcon from '@mui/icons-material/UnarchiveOutlined';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import EditIcon from '@mui/icons-material/Edit';
-import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useDevice } from '../../layout/useDevice';
+import ServiceList from '../settings/services/ServiceList';
+import ServiceDetail from '../settings/services/ServiceDetail';
 import { useTranslation } from 'react-i18next';
 import { clinicServicesApi } from '../../api/clinicServices';
 import type { ClinicService, ClinicServiceInput } from '../../api/clinicServices';
@@ -37,9 +35,6 @@ import { AsyncSection } from '../../components/booking/AsyncSection';
 import { errorText } from '../../components/booking/errorText';
 import { isDuplicateName } from '../../api/duplicateName';
 import { SettingsScreen } from '../settings/SettingsFrame';
-import {
-  SERVICE_GAP_TEXT, countsText, serviceGap,
-} from './clinicServiceState';
 import {
   movedFrom, offerable, partialFailureText, toAttach, under,
 } from './serviceLinks';
@@ -76,11 +71,12 @@ export default function ClinicServicesPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { serviceId } = useParams<{ serviceId: string }>();
+  const device = useDevice();
 
   const [draft, setDraft] = useState<ClinicServiceInput | null>(null);
   const [editing, setEditing] = useState<ClinicService | null>(null);
   const [confirmArchive, setConfirmArchive] = useState<ClinicService | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
   /* What is ticked in the dialog, before it is saved. */
   const [pickedActivities, setPickedActivities] = useState<string[]>([]);
   const [pickedCalendars, setPickedCalendars] = useState<string[]>([]);
@@ -93,7 +89,7 @@ export default function ClinicServicesPage() {
   });
   const allServices = [...(servicesQuery.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
   const services = allServices.filter((svc) => svc.isActive);
-  const archived = allServices.filter((svc) => !svc.isActive);
+  const selected = serviceId === undefined ? null : allServices.find((svc) => svc.id === serviceId) ?? null;
 
   /*
    * The two lists that can be ticked. Fetched here rather than on the screens
@@ -297,125 +293,52 @@ export default function ClinicServicesPage() {
         onRetry={() => void servicesQuery.refetch()}
         skeletonRows={3}
       >
-        <Stack spacing={2}>
-          {services.map((service) => {
-            const gap = serviceGap(service);
-            return (
-              <Card key={service.id} sx={{ borderRadius: 3 }}>
-                <CardContent>
-                  <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                    <MedicalServicesIcon sx={{ color: service.colorHex ?? 'primary.main', mt: 0.5 }} />
-                    <Box sx={{ minWidth: 160, flex: 1 }}>
-                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700 }}>{service.name}</Typography>
-                      </Stack>
-                      {service.description !== '' && (
-                        <Typography variant="body2" color="text.secondary">
-                          {service.description}
-                        </Typography>
-                      )}
-                      <Typography variant="caption" color="text.secondary">
-                        {countsText(service)}
-                      </Typography>
-                    </Box>
-
-                    <Stack direction="row" spacing={0.5}>
-                      <Tooltip title="Upravit">
-                        <IconButton aria-label={`Upravit službu ${service.name}`} onClick={() => openEdit(service)}>
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title={TEXT.archive}>
-                        <IconButton
-                          aria-label={`${TEXT.archive} službu ${service.name}`}
-                          onClick={() => { archive.reset(); setConfirmArchive(service); }}
-                        >
-                          <ArchiveOutlinedIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
-                  </Stack>
-
-                  {/* Said on the row, because it is invisible everywhere else:
-                      a service with no činnosti or no calendar offers nothing,
-                      and looks exactly like one that works. */}
-                  {/*
-                    * Said on the row, and fixed on the row.
-                    *
-                    * This button used to leave the screen - first to a blank
-                    * form, then to a list to edit one row at a time. Both came
-                    * back. It opens the service now, where the two pickers
-                    * are, and the assignment happens in one place.
-                    *
-                    * "Založit novou" stays inside the dialog for when nothing
-                    * exists to tick, which is the only case where leaving is
-                    * the right answer.
-                    */}
-                  {gap !== 'none' && (
-                    <Alert
-                      severity="warning"
-                      sx={{ mt: 1.5 }}
-                      action={
-                        <Button color="inherit" size="small" onClick={() => openEdit(service)}>
-                          Přiřadit
-                        </Button>
-                      }
-                    >
-                      {SERVICE_GAP_TEXT[gap]}
-                    </Alert>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-
-          {archived.length > 0 && (
-            <Box>
-              <Button
-                color="inherit"
-                aria-expanded={showArchived}
-                aria-controls="archived-services"
-                endIcon={<ExpandMoreIcon sx={{ transform: showArchived ? 'rotate(180deg)' : 'none' }} />}
-                onClick={() => setShowArchived((v) => !v)}
-                sx={{ color: 'text.secondary', fontWeight: 600 }}
-              >
-                {TEXT.archivedHeading(archived.length)}
-              </Button>
-              <Collapse in={showArchived} unmountOnExit>
-                <Stack id="archived-services" spacing={1} sx={{ mt: 1 }}>
-                  {archived.map((service) => (
-                    <Card key={service.id} variant="outlined" sx={{ borderRadius: 3, opacity: 0.85 }}>
-                      <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                        <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                          <MedicalServicesIcon sx={{ color: 'text.disabled' }} />
-                          <Box sx={{ minWidth: 160, flex: 1 }}>
-                            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                              <Typography sx={{ fontWeight: 600 }}>{service.name}</Typography>
-                              <Chip size="small" variant="outlined" label={TEXT.archivedChip} />
-                            </Stack>
-                            <Typography variant="caption" color="text.secondary">
-                              {countsText(service)}
-                            </Typography>
-                          </Box>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<UnarchiveOutlinedIcon />}
-                            aria-label={`${TEXT.restore} službu ${service.name}`}
-                            disabled={restore.isPending}
-                            onClick={() => restore.mutate(service.id)}
-                          >
-                            {TEXT.restore}
-                          </Button>
-                        </Stack>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </Stack>
-              </Collapse>
-            </Box>
+        {/*
+          * Master-detail. A phone shows the list or the opened služba, never
+          * both; a tablet and a desktop show the list beside the detail.
+          */}
+        <Box
+          sx={{
+            display: 'grid',
+            gap: 3,
+            alignItems: 'start',
+            gridTemplateColumns: device === 'phone' ? '1fr' : device === 'tablet' ? '280px 1fr' : '360px 1fr',
+          }}
+          data-layout={device}
+        >
+          {(device !== 'phone' || selected === null) && (
+            <ServiceList
+              services={allServices}
+              selectedId={selected?.id ?? null}
+              onSelect={(svc) => navigate(`/nastaveni/sluzby/${svc.id}`)}
+              onEdit={openEdit}
+              onArchive={(svc) => { archive.reset(); setConfirmArchive(svc); }}
+              onRestore={(svc) => restore.mutate(svc.id)}
+              restoring={restore.isPending}
+            />
           )}
-        </Stack>
+          {selected !== null && (
+            <ServiceDetail
+              key={selected.id}
+              service={selected}
+              busy={archive.isPending || restore.isPending}
+              onEdit={() => openEdit(selected)}
+              onArchive={() => { archive.reset(); setConfirmArchive(selected); }}
+              onRestore={() => restore.mutate(selected.id)}
+              onBack={device === 'phone' ? () => navigate('/nastaveni/sluzby') : undefined}
+            />
+          )}
+          {selected === null && serviceId !== undefined && servicesQuery.isSuccess && (
+            <Alert severity="warning">
+              Tuhle službu se nepodařilo najít. Možná byla odstraněna — vyberte jinou ze seznamu.
+            </Alert>
+          )}
+          {selected === null && serviceId === undefined && device !== 'phone' && (
+            <Typography sx={{ color: 'text.secondary', pt: 2 }}>
+              Vyberte službu vlevo — uvidíte její činnosti, ceny, kalendáře, pravidla a využití.
+            </Typography>
+          )}
+        </Box>
       </AsyncSection>
 
       <Dialog open={draft !== null} onClose={closeDialog} fullWidth maxWidth="sm">

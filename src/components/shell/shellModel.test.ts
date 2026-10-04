@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { SECTION_CHILDREN, activeChildPath, childrenFor } from './shellModel';
-import { SETTINGS_SECTIONS } from '../../pages/settings/catalogue';
+import { SETTINGS_SECTIONS, settingsItemAt } from '../../pages/settings/catalogue';
 import type { MenuEntry } from './shellTypes';
 
 const asMenu = (parent: keyof typeof SECTION_CHILDREN): MenuEntry[] =>
@@ -20,11 +20,15 @@ describe('childrenFor', () => {
     ['/clubs', '/clubs'],
     ['/clubs/objednavky', '/clubs'],
     ['/clubs/abc-123', '/clubs'],
+    ['/billing', '/billing'],
+    ['/cashier', '/billing'],
+    ['/accounting-export', '/billing'],
+    ['/diagnostics/new', '/patients'],
   ])('%s belongs to %s', (pathname, parent) => {
     expect(childrenFor(pathname)?.parent).toBe(parent);
   });
 
-  it.each(['/billing', '/diagnostics/new', '/settings', '/prehled', '/clubsx'])('%s is outside the contextual areas', (pathname) => {
+  it.each(['/settings', '/prehled', '/clubsx'])('%s is outside the contextual areas', (pathname) => {
     expect(childrenFor(pathname)).toBeNull();
   });
 
@@ -37,6 +41,10 @@ describe('childrenFor', () => {
   it('keeps the club-order shortcut on the calendar, with its marker', () => {
     const shortcut = SECTION_CHILDREN['/planovani'].find((c) => c.shortcut);
     expect(shortcut).toMatchObject({ path: '/planovani', state: { openClubOrder: true } });
+  });
+
+  it('gives Fakturace its three screens', () => {
+    expect(childrenFor('/billing')?.items.map((c) => c.text)).toEqual(['Faktury', 'Pokladna', 'Účetní export']);
   });
 
   it('shares no screen with the settings catalogue', () => {
@@ -53,7 +61,13 @@ describe('activeChildPath', () => {
     expect(activeChildPath('/clubs', clubs, false)).toBe('/clubs');
     expect(activeChildPath('/clubs/abc', clubs, false)).toBe('/clubs');
     expect(activeChildPath('/clubs/hraci', clubs, false)).toBe('/clubs/hraci');
-    expect(activeChildPath('/planovani', asMenu('/planovani'), false)).toBeNull();
+    expect(activeChildPath('/planovani', asMenu('/planovani'), false)).toBe('/planovani'); /* the Klubová objednávka shortcut never wins */
     expect(activeChildPath('/patients/register', asMenu('/patients'), false)).toBe('/patients/register');
+  });
+});
+
+describe('settings: a service detail still lights Služby', () => {
+  it('/nastaveni/sluzby/:id belongs to the Služby item', () => {
+    expect(settingsItemAt('/nastaveni/sluzby/abc-123')?.item.to).toBe('/nastaveni/sluzby');
   });
 });

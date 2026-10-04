@@ -1,7 +1,8 @@
 /*
  * Objednávky klubů (Etapa 4): every club order in one list - table on a desktop, three columns of cards on a
  * tablet, one column on a phone. A row opens the detail (ClubOrderDetailPanel); "Nová objednávka" opens
- * ClubOrderDialog and "Poslat formulář klubu" creates an Invited order and shows its link.
+ * ClubOrderDialog (programmatic prefill only); "Nová objednávka" asks the two-way question: "Vyplním sám" goes
+ * to the calendar's fast picking mode, "Poslat odkaz klubu" creates an Invited order and shows its short link.
  *
  * Router state (spent once read): { openOrderId } opens that order; { newOrder: {clubId?, serviceId?,
  * ranges?, calendarIds?} | true } opens the dialog prefilled.
@@ -21,7 +22,7 @@ import { formatCzk } from '../clubOrders';
 import { FilterChips, PageHeader, SoftCard, StatusChip } from '../../../components/ui';
 import { ClubOrderDialog } from '../../../components/clubs/order/ClubOrderDialog';
 import { ClubOrderDetailPanel } from '../../../components/clubs/orders/ClubOrderDetailPanel';
-import { InviteClubDialog } from '../../../components/clubs/orders/InviteClubDialog';
+import { ClubOrderEntry } from '../../../components/clubs/order/ClubOrderEntry';
 import { PinnedActions } from '../PinnedActions';
 import { activitiesLine, filterOrders, seatPercent, statusCounts, STATUS_TONE, termsSummary } from '../../../components/clubs/orders/orderLogic';
 import type { OrderStatusFilter } from '../../../components/clubs/orders/orderLogic';
@@ -59,7 +60,7 @@ export default function ClubOrdersPage() {
   const [dialog, setDialog] = useState<NewOrderPrefill | null>(() =>
     handoff.newOrder === undefined ? null : handoff.newOrder === true ? {} : handoff.newOrder,
   );
-  const [inviteOpen, setInviteOpen] = useState(false);
+  const [entryOpen, setEntryOpen] = useState(false);
 
   /* Spend the handoff once read, so Back does not reopen it. */
   useEffect(() => {
@@ -90,8 +91,7 @@ export default function ClubOrdersPage() {
 
   const actions = (
     <>
-      <Button variant="outlined" onClick={() => setInviteOpen(true)}>Poslat formulář klubu</Button>
-      <Button variant="contained" onClick={() => setDialog({})}>Nová objednávka</Button>
+      <Button variant="contained" onClick={() => setEntryOpen(true)}>Nová objednávka</Button>
     </>
   );
 
@@ -196,13 +196,12 @@ export default function ClubOrdersPage() {
         initial={dialog ?? undefined}
         onSaved={(saved) => { setDialog(null); void ordersQuery.refetch(); setOpenId(saved.id); }}
       />
-      {inviteOpen ? (
-        <InviteClubDialog
-          open
-          onClose={() => setInviteOpen(false)}
-          onInvited={() => void ordersQuery.refetch()}
-        />
-      ) : null}
+      <ClubOrderEntry
+        open={entryOpen}
+        onClose={() => setEntryOpen(false)}
+        onPhone={(startClubId) => navigate('/planovani', { state: { pickOrder: startClubId !== undefined ? { clubId: startClubId } : true } })}
+        onInvited={() => void ordersQuery.refetch()}
+      />
     </Box>
   );
 }

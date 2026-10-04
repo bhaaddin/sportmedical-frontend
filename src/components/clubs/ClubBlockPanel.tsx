@@ -17,6 +17,7 @@ import { calendarsApi } from '../../api/calendars';
 import { clubBlocksApi, fetchBlockableActivities } from '../../api/clubBlocks';
 import type { ClubBlockView } from '../../api/clubBlocks';
 import { clubRegistrationLink } from '../../api/publicClub';
+import { absoluteLink, usePublicSiteBase } from './orders/absoluteLink';
 import { useDevice } from '../../layout/useDevice';
 import { formatSlotTime } from '../../pages/clubs/clubOrders';
 import { SectionLabel, SoftCard, StatusChip } from '../ui';
@@ -75,7 +76,9 @@ export function ClubBlockPanel({
   const calendarNames = block.calendarIds.map((id) => (calendarsQuery.data ?? []).find((c) => c.id === id)?.name).filter(Boolean) as string[];
   const activityNames = block.activityIds.map((id) => (activitiesQuery.data ?? []).find((a) => a.id === id)?.name).filter(Boolean) as string[];
 
-  const link = block.registrationUrl ?? (block.registrationToken ? clubRegistrationLink(block.registrationToken) : null);
+  const publicBase = usePublicSiteBase();
+  const rawLink = block.registrationUrl ?? (block.registrationToken ? clubRegistrationLink(block.registrationToken) : null);
+  const link = rawLink === null ? null : absoluteLink(rawLink, publicBase);
   const seatRows = blockActivitySeats(
     { ...block, activitySeats: (detail as { activitySeats?: unknown }).activitySeats ?? (block as { activitySeats?: unknown }).activitySeats },
     (id) => (activitiesQuery.data ?? []).find((a) => a.id === id)?.name ?? '',

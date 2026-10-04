@@ -116,7 +116,7 @@ async function fillNew(user: User) {
   await pickService(user, 'Sportovní prohlídka');
   await tick(user, /Základní prohlídka/);
   await user.type(screen.getByLabelText('Počet hráčů, Základní prohlídka'), '30');
-  await user.click(screen.getByRole('radio', { name: 'Faktura klubu' }));
+  await user.click(screen.getByRole('radio', { name: 'Platí klub (jedna faktura)' }));
   fillRow();
 }
 /** On tablet and phone the analysis sits in a collapsible dock above the footer. */
@@ -303,12 +303,12 @@ describe.each([
     expect(within(done).getByText('Rezervace je v kalendáři')).toBeInTheDocument();
     expect(within(done).getByText('Základní prohlídka × 30')).toBeInTheDocument();
     expect(within(done).getByText('1. 12. 2026, 09:40–10:40')).toBeInTheDocument();
-    expect(within(done).getByText('Platba: Faktura klubu')).toBeInTheDocument();
+    expect(within(done).getByText('Platba: Platí klub (jedna faktura)')).toBeInTheDocument();
     expect(within(done).getByText('Sleva klubu (10 %): −1 500 Kč')).toBeInTheDocument();
     expect(within(done).getByTestId('quote-total')).toHaveTextContent('Celkem: 13 500 Kč');
-    expect(within(done).getByLabelText('Odkaz pro sportovce (registrace)')).toHaveValue('https://app/klub/rt');
-    expect(within(done).queryByLabelText('Odkaz na formulář objednávky')).not.toBeInTheDocument();
-    await user.click(within(done).getByRole('button', { name: /Kopírovat: Odkaz pro sportovce/ }));
+    expect(within(done).getByTestId('registration-url')).toHaveAttribute('data-url', 'https://app/klub/rt');
+    expect(within(done).queryByTestId('form-url')).not.toBeInTheDocument();
+    await user.click(within(done).getByRole('button', { name: /Zkopírovat: Odkaz pro sportovce/ }));
     await waitFor(async () => expect(await navigator.clipboard.readText()).toBe('https://app/klub/rt'));
     expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 'o-1' }));
   });
@@ -320,7 +320,7 @@ describe.each([
     await fillNew(user);
     await user.click(screen.getByRole('button', { name: 'Uložit jako poptávku' }));
     const done = await screen.findByTestId('order-success');
-    expect(within(done).getByLabelText('Odkaz na formulář objednávky')).toHaveValue('https://app/klub-objednavka/ft');
+    expect(within(done).getByTestId('form-url')).toHaveAttribute('data-url', 'https://app/klub-objednavka/ft');
   });
 
   it('marks the row a 409 names, and keeps the rest editable', async () => {
@@ -396,7 +396,7 @@ describe.each([
     expect(screen.getByTestId('unit-price')).toHaveTextContent('500');
     expect(screen.getByLabelText('Od, termín 1')).toHaveValue('2026-12-01');
     expect(screen.getByLabelText('Denně od, termín 1')).toHaveValue('09:40');
-    expect(screen.getByRole('radio', { name: 'Faktura klubu' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Platí klub (jedna faktura)' })).toBeChecked();
     await user.click(screen.getByRole('button', { name: 'Přidat 10 hráčů, Základní prohlídka' }));
     expect(input).toHaveValue('40');
     expect(screen.getByTestId('order-total-seats')).toHaveTextContent('Celkem 40 míst');
@@ -495,7 +495,7 @@ describe.each([
     expect(within(card).getByTestId('request-contact')).toHaveTextContent('Jana Nováková · 777 111 222 · jana@klub.cz');
     expect(within(card).getByText('Poznámka klubu: Chceme ráno')).toBeInTheDocument();
     expect(screen.getByLabelText('Do, termín 1')).toHaveValue('2026-12-02');
-    expect(screen.getByRole('radio', { name: 'Platí jednotlivé osoby' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Platí rodiče / hráči sami' })).toBeChecked();
 
     /* The worker may change anything: shorten the window by ten minutes. */
     setField('Denně do, termín 1', '10:30');
@@ -512,7 +512,7 @@ describe.each([
   it('saves a changed payment method and headcount before it confirms', async () => {
     const user = userEvent.setup();
     open({ processOrder: requested() });
-    await user.click(await screen.findByRole('radio', { name: 'Faktura klubu' }));
+    await user.click(await screen.findByRole('radio', { name: 'Platí klub (jedna faktura)' }));
     await user.click(screen.getByRole('button', { name: 'Přidat 10 hráčů, Základní prohlídka' }));
     await user.click(screen.getByRole('button', { name: 'Potvrdit objednávku' }));
     await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1));
@@ -543,7 +543,7 @@ describe('a new club', () => {
     await pickService(user, 'Sportovní prohlídka');
     await tick(user, /Základní prohlídka/);
     await user.type(screen.getByLabelText('Počet hráčů, Základní prohlídka'), '30');
-    await user.click(screen.getByRole('radio', { name: 'Faktura klubu' }));
+    await user.click(screen.getByRole('radio', { name: 'Platí klub (jedna faktura)' }));
     fillRow();
     await user.click(screen.getByRole('button', { name: 'Vytvořit rezervaci v kalendáři' }));
     await waitFor(() => expect(createStaff).toHaveBeenCalledTimes(1));

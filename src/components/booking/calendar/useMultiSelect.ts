@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { DateOnly } from "../../../utils/time";
+import type { MinuteRange } from "../grid/timeRange";
 import { isPastPicked, sameSpot, type NewPicked, type PickedRange } from "./multiSelect";
 
 export interface MultiSelectApi {
@@ -9,6 +10,10 @@ export interface MultiSelectApi {
   setTouchMode: (on: boolean) => void;
   add: (item: NewPicked) => void;
   remove: (id: string) => void;
+  /** "Výběr termínů": a picked time range resized or moved in place. */
+  update: (id: string, range: MinuteRange) => void;
+  /** "Výběr termínů": every place replaced at once (the automatic proposal). */
+  replace: (items: NewPicked[]) => void;
   clear: () => void;
   /** A press with Ctrl, ⌘ or Shift held, or any press while the touch toggle is on. */
   isAdditive: (event?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) => boolean;
@@ -30,6 +35,19 @@ export function useMultiSelect(today: DateOnly): MultiSelectApi {
     });
   }, []);
   const remove = useCallback((id: string) => setItems((current) => current.filter((c) => c.id !== id)), []);
+  const update = useCallback(
+    (id: string, range: MinuteRange) =>
+      setItems((current) => current.map((c) => (c.id === id && c.kind === "time" ? { ...c, range } : c))),
+    [],
+  );
+  const replace = useCallback((next: NewPicked[]) => {
+    setItems(
+      next.map((item) => {
+        counter.current += 1;
+        return { ...item, id: `pick-${counter.current}` } as PickedRange;
+      }),
+    );
+  }, []);
   const clear = useCallback(() => setItems((current) => (current.length === 0 ? current : [])), []);
 
   return useMemo(
@@ -39,6 +57,8 @@ export function useMultiSelect(today: DateOnly): MultiSelectApi {
       setTouchMode,
       add,
       remove,
+      update,
+      replace,
       clear,
       isAdditive: (event) => touchMode || Boolean(event?.ctrlKey || event?.metaKey || event?.shiftKey),
       isPast: (item) => isPastPicked(item, today),
@@ -52,6 +72,6 @@ export function useMultiSelect(today: DateOnly): MultiSelectApi {
         return state;
       },
     }),
-    [items, touchMode, add, remove, clear, today],
+    [items, touchMode, add, remove, update, replace, clear, today],
   );
 }
