@@ -277,6 +277,8 @@ export default function ClinicServicesPage() {
       title="Služby"
       subtitle="Co ordinace dělá — každá činnost patří pod jednu službu a kalendář jednu službu provozuje"
       width={1100}
+      aside={false}
+      related={false}
       actions={
         <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
           Nová služba
