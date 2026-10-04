@@ -51,10 +51,10 @@ export function seatPayload(ids: readonly string[], text: SeatsText): { activity
 export const totalSeatsOf = (ids: readonly string[], text: SeatsText): number =>
   ids.reduce((n, id) => n + (parsePlayerCount(text[id] ?? '') ?? 0), 0);
 
-/** "+10" / "-10" on the typed value (an empty or invalid field counts as 0); never below 1. */
+/** "+1" / "-1" on the typed value (an empty or invalid field counts as 0); never below 0. */
 export function stepSeats(text: string, delta: number): string {
   const current = parsePlayerCount(text) ?? 0;
-  return String(Math.max(1, current + delta));
+  return String(Math.max(0, current + delta));
 }
 
 /** The windows of an order for the editor: a confirmed order lives in its blocks, a request in `requestedRanges`. */

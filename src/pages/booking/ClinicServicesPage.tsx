@@ -23,8 +23,12 @@ import AddIcon from '@mui/icons-material/Add';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useDevice } from '../../layout/useDevice';
-import ServiceList from '../settings/services/ServiceList';
 import ServiceDetail from '../settings/services/ServiceDetail';
+import ServiceList, { countsLine } from '../settings/services/ServiceList';
+import DeleteFlow, { type DeleteTarget } from '../settings/services/DeleteFlow';
+import DuplicatesNotice from '../settings/services/DuplicatesNotice';
+import { findDuplicateGroups } from '../settings/services/duplicates';
+import { usePermission } from '../../auth/usePermission';
 import { useTranslation } from 'react-i18next';
 import { clinicServicesApi } from '../../api/clinicServices';
 import type { ClinicService, ClinicServiceInput } from '../../api/clinicServices';
@@ -77,6 +81,8 @@ export default function ClinicServicesPage() {
   const [draft, setDraft] = useState<ClinicServiceInput | null>(null);
   const [editing, setEditing] = useState<ClinicService | null>(null);
   const [confirmArchive, setConfirmArchive] = useState<ClinicService | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const canEdit = usePermission('settings.clinic.manage');
   /* What is ticked in the dialog, before it is saved. */
   const [pickedActivities, setPickedActivities] = useState<string[]>([]);
   const [pickedCalendars, setPickedCalendars] = useState<string[]>([]);
@@ -89,6 +95,7 @@ export default function ClinicServicesPage() {
   });
   const allServices = [...(servicesQuery.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
   const services = allServices.filter((svc) => svc.isActive);
+  const duplicateGroups = findDuplicateGroups(allServices);
   const selected = serviceId === undefined ? null : allServices.find((svc) => svc.id === serviceId) ?? null;
 
   /*
@@ -227,6 +234,12 @@ export default function ClinicServicesPage() {
     onSuccess: async () => { await invalidate(); setConfirmArchive(null); },
   });
 
+  /* Permanent delete: the server refuses (409) while anything references it, and DeleteFlow offers archiving then. */
+  const afterDelete = async (outcome: 'deleted' | 'archived', done: DeleteTarget) => {
+    await invalidate();
+    if (outcome === 'deleted' && serviceId === done.id) navigate('/nastaveni/sluzby');
+  };
+
   const restore = useMutation({
     mutationFn: (id: string) => clinicServicesApi.activate(id),
     onSuccess: invalidate,
@@ -286,6 +299,15 @@ export default function ClinicServicesPage() {
       }
     >
 
+      <DuplicatesNotice
+        groups={duplicateGroups}
+        noun="službu"
+        describe={countsLine}
+        canEdit={canEdit}
+        onDelete={(svc) => setDeleteTarget({ id: svc.id, name: svc.name })}
+        onArchive={(svc) => { archive.reset(); setConfirmArchive(svc); }}
+      />
+
       <AsyncSection
         isLoading={servicesQuery.isLoading}
         isSettled={servicesQuery.isSuccess || servicesQuery.isError}
@@ -316,6 +338,7 @@ export default function ClinicServicesPage() {
               onEdit={openEdit}
               onArchive={(svc) => { archive.reset(); setConfirmArchive(svc); }}
               onRestore={(svc) => restore.mutate(svc.id)}
+              onDelete={(svc) => setDeleteTarget({ id: svc.id, name: svc.name })}
               restoring={restore.isPending}
             />
           )}
@@ -327,6 +350,7 @@ export default function ClinicServicesPage() {
               onEdit={() => openEdit(selected)}
               onArchive={() => { archive.reset(); setConfirmArchive(selected); }}
               onRestore={() => restore.mutate(selected.id)}
+              onDelete={() => setDeleteTarget({ id: selected.id, name: selected.name })}
               onBack={device === 'phone' ? () => navigate('/nastaveni/sluzby') : undefined}
             />
           )}
@@ -553,6 +577,15 @@ export default function ClinicServicesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <DeleteFlow
+        kind="service"
+        target={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        remove={clinicServicesApi.removePermanently}
+        archive={clinicServicesApi.remove}
+        onDone={afterDelete}
+      />
     </SettingsScreen>
   );
 }

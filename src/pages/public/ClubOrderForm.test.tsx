@@ -53,6 +53,8 @@ const offer = (over: Partial<OrderForm> = {}): OrderForm => ({
   paymentMethods: ['ClubInvoice', 'PerPerson'],
   draft: null,
   minimumPlayers: null,
+  registrationUrl: null,
+  registrationOpen: false,
   ...over,
 });
 
@@ -294,6 +296,7 @@ describe.each([['phone', VIEWPORTS.phone], ['tablet', VIEWPORTS.tablet], ['deskt
     expect(await screen.findByText('Děkujeme, objednávku jsme přijali')).toBeInTheDocument();
     expect(screen.getByTestId('order-reference')).toHaveTextContent('KO-2026-0042');
     expect(screen.getByText(/Ozveme se vám na uvedený kontakt/)).toBeInTheDocument();
+    expect(screen.getByTestId('order-link-note')).toHaveTextContent('Odkaz pro hráče a rodiče vám pošleme, jakmile ordinace potvrdí termín.');
   });
 
   it('does not enable submit while the payment method is missing', async () => {
@@ -353,6 +356,32 @@ describe('ClubOrderForm link states and draft', () => {
     getOrderForm.mockResolvedValue(offer({ status: 'Confirmed' }));
     renderPage();
     expect(await screen.findByText('Tuto objednávku už zpracováváme. Zavolejte nám prosím.')).toBeInTheDocument();
+  });
+
+  it.each([['phone', VIEWPORTS.phone], ['tablet', VIEWPORTS.tablet], ['desktop', VIEWPORTS.desktop]])(
+    'a confirmed order shows the absolute link for the players with a copy button (%s)',
+    async (_n, width) => {
+      setViewport(width);
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+      getOrderForm.mockResolvedValue(offer({ status: 'Confirmed', registrationUrl: '/klub/tok-reg', registrationOpen: true }));
+      renderPage();
+
+      expect(await screen.findByRole('heading', { name: 'Odkaz pro hráče a rodiče' })).toBeInTheDocument();
+      expect(screen.getByText('Pošlete tento odkaz rodičům a hráčům — každý si vybere svůj termín.')).toBeInTheDocument();
+      const url = `${window.location.origin}/klub/tok-reg`;
+      expect(screen.getByRole('textbox', { name: 'Odkaz pro hráče a rodiče' })).toHaveValue(url);
+      await userEvent.click(screen.getByRole('button', { name: 'Kopírovat odkaz' }));
+      expect(writeText).toHaveBeenCalledWith(url);
+      expect(await screen.findByRole('button', { name: 'Zkopírováno' })).toBeInTheDocument();
+    },
+  );
+
+  it('a confirmed order without a link falls back to the processed page', async () => {
+    getOrderForm.mockResolvedValue(offer({ status: 'Requested' }));
+    renderPage();
+    expect(await screen.findByText('Tuto objednávku už zpracováváme. Zavolejte nám prosím.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Kopírovat odkaz' })).not.toBeInTheDocument();
   });
 
   it('opens filled from a worker\'s draft and shows the minimum hint when the server has one', async () => {

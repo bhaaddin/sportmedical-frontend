@@ -111,7 +111,7 @@ describe.each([
   it('shows only the činnosti of the ticked service, grouped under its name, and none ticked', async () => {
     const user = userEvent.setup();
     open();
-    expect(await screen.findByTestId('activities-hint')).toHaveTextContent('Nejdřív zaškrtněte kalendář');
+    expect(await screen.findByTestId('activities-hint')).toHaveTextContent('Nejdřív vyberte službu');
 
     await tick(user, 'Kalendáře', /Prohlídky/);
     const acts = await group('Činnosti');

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import client from './client';
 import { toNamedError } from './duplicateName';
+import { toInUseError } from './deleteInUse';
 import { parseResponse } from './bookingContracts';
 
 /*
@@ -86,6 +87,19 @@ export const clinicServicesApi = {
   remove: (id: string): Promise<void> =>
     request(async () => {
       await client.delete(`/api/clinic-services/${id}`);
+    }),
+
+  /**
+   * Physically removes the služba, only when nothing references it; otherwise
+   * rejects with an `InUseError` (409 `service.in_use`) and changes nothing.
+   */
+  removePermanently: (id: string): Promise<void> =>
+    request(async () => {
+      try {
+        await client.delete(`/api/clinic-services/${id}`, { params: { permanent: true } });
+      } catch (error) {
+        throw toInUseError(error) ?? error;
+      }
     }),
 
   /** Stops it being offered. What already hangs off it stays where it is. */

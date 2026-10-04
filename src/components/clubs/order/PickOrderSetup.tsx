@@ -51,7 +51,8 @@ export function PickOrderSetup({ open, onClose, defaultClubId, parent, onStart }
   );
 
   const [clubId, setClubId] = useState(parent?.clubId ?? defaultClubId ?? '');
-  const [serviceId, setServiceId] = useState('');
+  const [serviceState, setServiceState] = useState('');
+  const serviceId = serviceState !== '' ? serviceState : services.length === 1 ? services[0].id : '';
   const [ids, setIds] = useState<string[]>([]);
   const [text, setText] = useState<SeatsText>({});
   const [payment, setPayment] = useState<PaymentMethod>(parent?.paymentMethod ?? 'ClubInvoice');
@@ -74,7 +75,7 @@ export function PickOrderSetup({ open, onClose, defaultClubId, parent, onStart }
   const ready = clubId !== '' && serviceId !== '' && seatsOk;
 
   const changeService = (id: string) => {
-    setServiceId(id);
+    setServiceState(id);
     setIds([]);
     setText({});
   };

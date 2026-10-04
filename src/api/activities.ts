@@ -1,5 +1,6 @@
 import client from './client';
 import { toNamedError } from './duplicateName';
+import { toInUseError } from './deleteInUse';
 import {
   activityListResultSchema,
   activitySaveResultSchema,
@@ -87,6 +88,16 @@ export const activitiesApi = {
   remove: (id: string): Promise<void> =>
     request(async () => {
       await client.delete(`/api/activities/${id}`);
+    }),
+
+  /** Physically removes the činnost, only when nothing references it; otherwise rejects with an `InUseError` (409 `activity.in_use`). */
+  removePermanently: (id: string): Promise<void> =>
+    request(async () => {
+      try {
+        await client.delete(`/api/activities/${id}`, { params: { permanent: true } });
+      } catch (error) {
+        throw toInUseError(error) ?? error;
+      }
     }),
 
   /** ...and this is the way back, which the screen owed the owner. */

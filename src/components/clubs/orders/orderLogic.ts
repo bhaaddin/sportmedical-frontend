@@ -6,6 +6,7 @@
 import { ORDER_STATUSES } from '../../../api/clubOrders';
 import type { ClubOrderStatus, ClubOrderView, ClubSummary, OrderRange } from '../../../api/clubOrders';
 import { formatShortRange } from '../../../pages/clubs/clubOrders';
+import { formatSeats, formatSeatsWithTotal } from '../panel/seats';
 
 export type OrderStatusFilter = 'all' | ClubOrderStatus;
 
@@ -30,9 +31,14 @@ export function termsSummary(order: ClubOrderView): string {
   return terms.length === 1 ? rangeText(terms[0]) : `${rangeText(terms[0])} +${terms.length - 1}`;
 }
 
-/** "Prohlídka ×12 · Diagnostika ×60" */
-export const activitiesLine = (order: ClubOrderView): string =>
-  order.activitySeats.length === 0 ? '—' : order.activitySeats.map((a) => `${a.activityName} ×${a.seats}`).join(' · ');
+/** "Základní 10 · Komplexní 10" */
+export const activitiesLine = (order: ClubOrderView): string => formatSeats(order.activitySeats);
+
+/** "Základní 4/10 · Komplexní 0/10" - the same with the registrations. */
+export const registeredLine = (order: ClubOrderView): string => formatSeats(order.activitySeats.map((a) => ({ activityName: a.activityName, seats: a.seats, registered: a.registered })));
+
+/** "Základní 10 · Komplexní 10 (20 hráčů)" */
+export const seatsWithTotal = (order: ClubOrderView): string => formatSeatsWithTotal(order.activitySeats);
 
 export const seatPercent = (registered: number, seats: number): number => (seats > 0 ? Math.min(100, (registered / seats) * 100) : 0);
 

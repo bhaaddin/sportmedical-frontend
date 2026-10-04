@@ -21,7 +21,7 @@ import { ClubAvatar } from '../ClubAvatar';
 import { ClubBlockPanel } from '../ClubBlockPanel';
 import { blockRange, blockTitle } from '../blockLogic';
 import { useClubSummary } from '../orders/ClubSummaryCard';
-import { STATUS_TONE, termsSummary, seatPercent } from '../orders/orderLogic';
+import { STATUS_TONE, termsSummary, seatPercent, seatsWithTotal } from '../orders/orderLogic';
 import { ClubSeatsCard } from '../panel/ClubSeatsCard';
 import { clubActivitySeats } from '../panel/seats';
 import { canBeInvoiced } from '../../../pages/clubs/payerForm';
@@ -266,7 +266,7 @@ export function ClubPresentation({
                   sx={{ gap: 1.5, alignItems: 'center', minHeight: 44, cursor: 'pointer', justifyContent: 'space-between' }}
                 >
                   <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{o.serviceName || 'Služba nevybrána'} · {o.totalSeats} míst</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{o.serviceName || 'Služba nevybrána'} · {seatsWithTotal(o) === '—' ? `${o.totalSeats} míst` : seatsWithTotal(o)}</Typography>
                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>{termsSummary(o)}</Typography>
                   </Box>
                   <StatusChip tone={STATUS_TONE[o.status]} size="sm">{ORDER_STATUS_LABEL[o.status]}</StatusChip>

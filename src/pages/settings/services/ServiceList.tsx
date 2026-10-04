@@ -10,16 +10,20 @@ import {
 } from '@mui/material';
 import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
 import UnarchiveOutlinedIcon from '@mui/icons-material/UnarchiveOutlined';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import EditIcon from '@mui/icons-material/Edit';
 import SearchIcon from '@mui/icons-material/Search';
 import type { ClinicService } from '../../../api/clinicServices';
 import { SERVICE_GAP_TEXT, serviceGap } from '../../booking/clinicServiceState';
 import { SoftCard } from '../../../components/ui';
+import { usePermission } from '../../../auth/usePermission';
 import { TYPE, settingsHover, settingsSelected } from '../../../components/settings/settingsStyle';
 
 export const SERVICE_LIST_TEXT = {
   archive: 'Archivovat',
+  delete: 'Smazat',
+  noPermission: 'Mazat může jen ten, kdo smí upravovat nastavení ordinace.',
   restore: 'Obnovit',
   archivedHeading: (count: number) => `Archivované (${count})`,
   archivedChip: 'Archivovaná',
@@ -36,7 +40,7 @@ export function countsLine(service: ClinicService): string {
 }
 
 export default function ServiceList({
-  services, selectedId, onSelect, onEdit, onArchive, onRestore, restoring,
+  services, selectedId, onSelect, onEdit, onArchive, onRestore, onDelete, restoring,
 }: {
   services: readonly ClinicService[];
   selectedId: string | null;
@@ -44,8 +48,10 @@ export default function ServiceList({
   onEdit: (service: ClinicService) => void;
   onArchive: (service: ClinicService) => void;
   onRestore: (service: ClinicService) => void;
+  onDelete: (service: ClinicService) => void;
   restoring: boolean;
 }) {
+  const canEdit = usePermission('settings.clinic.manage');
   const [query, setQuery] = useState('');
   const [showArchived, setShowArchived] = useState(false);
 
@@ -114,6 +120,17 @@ export default function ServiceList({
                     <ArchiveOutlinedIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
+                <Tooltip title={canEdit ? SERVICE_LIST_TEXT.delete : SERVICE_LIST_TEXT.noPermission}>
+                  <span>
+                    <IconButton
+                      aria-label={`${SERVICE_LIST_TEXT.delete} službu ${service.name}`}
+                      disabled={!canEdit}
+                      onClick={() => onDelete(service)}
+                    >
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
               </Stack>
             </Stack>
             {/* Said on the row: a služba with no činnost or no calendar offers nothing and looks like one that works. */}
@@ -164,6 +181,19 @@ export default function ServiceList({
                       sx={{ minHeight: 40 }}
                     >
                       {SERVICE_LIST_TEXT.restore}
+                    </Button>
+                    <Button
+                      size="small"
+                      color="error"
+                      variant="outlined"
+                      startIcon={<DeleteOutlineIcon />}
+                      aria-label={`${SERVICE_LIST_TEXT.delete} službu ${service.name}`}
+                      disabled={!canEdit}
+                      title={canEdit ? undefined : SERVICE_LIST_TEXT.noPermission}
+                      onClick={() => onDelete(service)}
+                      sx={{ minHeight: 40 }}
+                    >
+                      {SERVICE_LIST_TEXT.delete}
                     </Button>
                   </Stack>
                 </SoftCard>

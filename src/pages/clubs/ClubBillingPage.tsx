@@ -10,6 +10,7 @@ import { billingApi, type Invoice } from '../../api/billing';
 import { clubOrdersApi, type ClubOrderView } from '../../api/clubOrders';
 import { KpiCard, PageHeader, SectionLabel, SoftCard, StatusChip } from '../../components/ui';
 import { ResponsiveDataList, type DataColumn } from '../../components/ui/ResponsiveDataList';
+import { seatsWithTotal } from '../../components/clubs/orders/orderLogic';
 import { formatCzk, formatLongDate } from './clubOrders';
 import { customerOf, statusOf } from '../billing/invoiceView';
 import { pragueDateKey } from '../../utils/time';
@@ -69,7 +70,7 @@ export default function ClubBillingPage() {
         <Box>
           <Typography sx={{ fontWeight: 700 }}>{o.clubName}</Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            {o.serviceName} · {o.totalSeats} hráčů{o.priceQuote ? ` · ${formatCzk(o.priceQuote.totalCzk)}` : ''}
+            {o.serviceName} · {o.activitySeats.length > 0 ? seatsWithTotal(o) : `${o.totalSeats} hráčů`}{o.priceQuote ? ` · ${formatCzk(o.priceQuote.totalCzk)}` : ''}
           </Typography>
         </Box>
         <Button variant="contained" sx={{ minHeight: 44 }} onClick={() => issue(o)}>Vystavit fakturu</Button>

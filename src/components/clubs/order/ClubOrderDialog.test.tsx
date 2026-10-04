@@ -303,7 +303,7 @@ describe.each([
     });
     const done = await screen.findByTestId('order-success');
     expect(within(done).getByText('Rezervace je v kalendáři')).toBeInTheDocument();
-    expect(within(done).getByText('Základní prohlídka × 30')).toBeInTheDocument();
+    expect(within(done).getByTestId('order-seats-line')).toBeInTheDocument();
     expect(within(done).getByText('1. 12. 2026, 09:40–10:40')).toBeInTheDocument();
     expect(within(done).getByText('Platba: Platí klub (jedna faktura)')).toBeInTheDocument();
     expect(within(done).getByText('Sleva klubu (10 %): −1 500 Kč')).toBeInTheDocument();
@@ -399,22 +399,21 @@ describe.each([
     expect(screen.getByLabelText('Od, termín 1')).toHaveValue('2026-12-01');
     expect(screen.getByLabelText('Denně od, termín 1')).toHaveValue('09:40');
     expect(screen.getByRole('radio', { name: 'Platí klub (jedna faktura)' })).toBeChecked();
-    await user.click(screen.getByRole('button', { name: 'Přidat 10 hráčů, Základní prohlídka' }));
-    expect(input).toHaveValue('40');
-    expect(screen.getByTestId('order-total-seats')).toHaveTextContent('Celkem 40 míst');
-    await user.click(screen.getByRole('button', { name: 'Ubrat 10 hráčů, Základní prohlídka' }));
-    await user.click(screen.getByRole('button', { name: 'Ubrat 10 hráčů, Základní prohlídka' }));
-    expect(input).toHaveValue('20');
+    await user.click(screen.getByRole('button', { name: 'Přidat hráče, Základní prohlídka' }));
+    expect(input).toHaveValue('31');
+    expect(screen.getByTestId('order-total-seats')).toHaveTextContent('Celkem 31 míst');
+    await user.click(screen.getByRole('button', { name: 'Ubrat hráče, Základní prohlídka' }));
+    await user.click(screen.getByRole('button', { name: 'Ubrat hráče, Základní prohlídka' }));
+    expect(input).toHaveValue('29');
+    expect(screen.queryByRole('button', { name: /10 hráčů/ })).toBeNull();
   });
 
   it('refuses a number below the registered players, inline', async () => {
     const user = userEvent.setup();
     open({ order: order() });
     const input = await screen.findByLabelText('Počet hráčů, Základní prohlídka');
-    await user.click(screen.getByRole('button', { name: 'Ubrat 10 hráčů, Základní prohlídka' }));
-    await user.click(screen.getByRole('button', { name: 'Ubrat 10 hráčů, Základní prohlídka' }));
-    await user.click(screen.getByRole('button', { name: 'Ubrat 10 hráčů, Základní prohlídka' }));
-    /* 30 -> 20 -> 10 -> 1 (a step never goes below one player). */
+    await user.clear(input);
+    await user.type(input, '1');
     expect(input).toHaveValue('1');
     expect(screen.getByTestId('seats-registered')).toHaveTextContent('12 / 1 obsazeno — nejméně 12');
     expect(screen.getByRole('button', { name: 'Uložit změny' })).toBeDisabled();
@@ -449,7 +448,7 @@ describe.each([
     const user = userEvent.setup();
     update.mockRejectedValueOnce(new ClubOrderError('Změna se dotkne přihlášených sportovců.', 409, 'order.affected', [{ name: 'Jan Novák', activityName: 'Základní prohlídka' }]));
     const { onClose, onSaved } = open({ order: order() });
-    await user.click(await screen.findByRole('button', { name: 'Ubrat 10 hráčů, Základní prohlídka' }));
+    for (let i = 0; i < 10; i += 1) await user.click(await screen.findByRole('button', { name: 'Ubrat hráče, Základní prohlídka' }));
     await user.click(screen.getByRole('button', { name: 'Uložit změny' }));
 
     const warn = await screen.findByTestId('order-affected');
@@ -515,7 +514,7 @@ describe.each([
     const user = userEvent.setup();
     open({ processOrder: requested() });
     await user.click(await screen.findByRole('radio', { name: 'Platí klub (jedna faktura)' }));
-    await user.click(screen.getByRole('button', { name: 'Přidat 10 hráčů, Základní prohlídka' }));
+    for (let i = 0; i < 10; i += 1) await user.click(screen.getByRole('button', { name: 'Přidat hráče, Základní prohlídka' }));
     await user.click(screen.getByRole('button', { name: 'Potvrdit objednávku' }));
     await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1));
     expect(update).toHaveBeenCalledWith('o-1', { activitySeats: [{ activityId: 'a-1', seats: 40 }], paymentMethod: 'ClubInvoice', note: 'Chceme ráno' });

@@ -7,6 +7,7 @@ import type { Device } from "../../../layout/useDevice";
 import { formatMinutes, formatPlayers, plural } from "../../clubs/blockLogic";
 import type { Coverage } from "../../clubs/order/coverage";
 import { WEEKDAYS } from "../../clubs/order/orderLogic";
+import { formatSeatsWithTotal } from "../../clubs/panel/seats";
 import { pickedLabel, type PickedTime } from "./multiSelect";
 
 /*
@@ -98,6 +99,9 @@ function Details(props: PickOrderPanelProps) {
 
       <Box data-testid="pick-needs">
         <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 0.5 }}>{`Potřeba: ${formatPlayers(coverage.totalSeats)}`}</Typography>
+        <Typography variant="body2" data-testid="pick-seats-breakdown" sx={{ mb: 0.5 }}>
+          {formatSeatsWithTotal(coverage.perActivity.map((a) => ({ activityName: a.name, seats: a.seats })))}
+        </Typography>
         <Stack component="ul" spacing={0.25} sx={{ m: 0, pl: 2, listStyle: "disc" }}>
           {coverage.perActivity.map((a) => (
             <li key={a.activityId} data-testid="pick-activity">

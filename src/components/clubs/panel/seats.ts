@@ -97,3 +97,38 @@ export function seatsSentence(row: ActivitySeats): string {
 export function totalsLine(t: SeatTotals): string {
   return `Celkem ${t.seats} ${placesWord(t.seats)} · ${t.registered} zapsáno · ${t.free} volno`;
 }
+
+/* ── One shared reading of "how many places per činnost" (Etapa 6) ── */
+
+export interface SeatsLine {
+  activityName: string;
+  seats: number;
+  /** null = not known (a form that is still being filled in). */
+  registered?: number | null;
+}
+
+/**
+ * "Základní 10 · Komplexní 10" - or, with the registrations known, "Základní 4/10 · Komplexní 0/10".
+ * Činnosti with no places are left out; an empty list reads "—".
+ */
+export function formatSeats(lines: readonly SeatsLine[]): string {
+  const shown = lines.filter((l) => l.seats > 0);
+  if (shown.length === 0) return '—';
+  return shown
+    .map((l) => `${l.activityName || 'Činnost'} ${typeof l.registered === 'number' ? `${l.registered}/${l.seats}` : l.seats}`)
+    .join(' · ');
+}
+
+const playersWord = (n: number): string => (n === 1 ? 'hráč' : n >= 2 && n <= 4 ? 'hráči' : 'hráčů');
+
+/** "20 hráčů" - the total that goes next to the breakdown. */
+export const formatPlayersTotal = (lines: readonly Pick<SeatsLine, 'seats'>[]): string => {
+  const total = lines.reduce((n, l) => n + Math.max(0, l.seats), 0);
+  return `${total.toLocaleString('cs-CZ')} ${playersWord(total)}`;
+};
+
+/** Both in one: "Základní 10 · Komplexní 10 (20 hráčů)". */
+export const formatSeatsWithTotal = (lines: readonly SeatsLine[]): string => {
+  const body = formatSeats(lines);
+  return body === '—' ? body : `${body} (${formatPlayersTotal(lines)})`;
+};

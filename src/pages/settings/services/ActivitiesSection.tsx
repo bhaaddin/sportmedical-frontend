@@ -16,6 +16,7 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
 import UnarchiveOutlinedIcon from '@mui/icons-material/UnarchiveOutlined';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import TuneIcon from '@mui/icons-material/Tune';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -35,6 +36,7 @@ import { TYPE } from '../../../components/settings/settingsStyle';
 import ActivityExtrasDialog from '../../cenik/ActivityExtrasDialog';
 import { useDevice } from '../../../layout/useDevice';
 import { kc } from './format';
+import DeleteFlow, { type DeleteTarget } from './DeleteFlow';
 
 export const ACTIVITIES_KEY = ['activities'] as const;
 export const PRICE_ITEMS_KEY = ['services'] as const;
@@ -106,7 +108,7 @@ function NumberField({
 }
 
 function ActivityCard({
-  activity, index, count, priceItems, saving, canEdit, onPatch, onMove, onExtras, onArchive, onRestore, onDetail,
+  activity, index, count, priceItems, saving, canEdit, onPatch, onMove, onExtras, onArchive, onRestore, onDelete, onDetail,
 }: {
   activity: Activity;
   index: number;
@@ -119,6 +121,7 @@ function ActivityCard({
   onExtras: () => void;
   onArchive: () => void;
   onRestore: () => void;
+  onDelete: () => void;
   onDetail: () => void;
 }) {
   const device = useDevice();
@@ -258,6 +261,18 @@ function ActivityCard({
             Obnovit
           </Button>
         )}
+        <Button
+          size="small"
+          color="error"
+          startIcon={<DeleteOutlineIcon />}
+          aria-label={`Smazat činnost ${activity.name}`}
+          disabled={!canEdit || saving}
+          title={canEdit ? undefined : 'Mazat může jen ten, kdo smí upravovat nastavení ordinace.'}
+          onClick={onDelete}
+          sx={{ minHeight: 40 }}
+        >
+          Smazat
+        </Button>
       </Stack>
     </SoftCard>
   );
@@ -273,6 +288,7 @@ export default function ActivitiesSection({ service }: { service: ClinicService 
   const patch = useActivityPatch();
   const [showArchived, setShowArchived] = useState(false);
   const [extras, setExtras] = useState<Activity | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
   const templatesQuery = useQuery({
     queryKey: ['cenik', 'document-templates'],
@@ -354,6 +370,7 @@ export default function ActivitiesSection({ service }: { service: ClinicService 
               onExtras={() => setExtras(a)}
               onArchive={() => archive.mutate(a)}
               onRestore={() => restore.mutate(a)}
+              onDelete={() => setDeleteTarget({ id: a.id, name: a.name })}
               onDetail={() => navigate('/activities')}
             />
           ))}
@@ -383,6 +400,7 @@ export default function ActivitiesSection({ service }: { service: ClinicService 
                       onExtras={() => undefined}
                       onArchive={() => archive.mutate(a)}
                       onRestore={() => restore.mutate(a)}
+                      onDelete={() => setDeleteTarget({ id: a.id, name: a.name })}
                       onDetail={() => undefined}
                     />
                   ))}
@@ -392,6 +410,21 @@ export default function ActivitiesSection({ service }: { service: ClinicService 
           )}
         </Stack>
       </AsyncSection>
+
+      <DeleteFlow
+        kind="activity"
+        target={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        remove={activitiesApi.removePermanently}
+        archive={activitiesApi.remove}
+        onDone={async () => {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ACTIVITIES_KEY }),
+            queryClient.invalidateQueries({ queryKey: ['cenik', 'activities'] }),
+            queryClient.invalidateQueries({ queryKey: ['clinic-services'] }),
+          ]);
+        }}
+      />
 
       {extras !== null && (
         <ActivityExtrasDialog

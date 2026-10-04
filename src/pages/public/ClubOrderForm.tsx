@@ -33,6 +33,7 @@ import {
 import { SummaryCard } from './clubOrder/SummaryCard';
 import type { SummaryLine } from './clubOrder/SummaryCard';
 import { Confirmation, Loading, NoticePage } from './clubOrder/Screens';
+import { LinkCard } from './clubOrder/LinkCard';
 import {
   MAX_SEATS, activitySeatsOf, czk, emptyState, isValid, sortFieldErrors, stateFromDraft, submitPayload, termProblem, termText, todayPrague,
 } from './clubOrder/model';
@@ -55,12 +56,17 @@ const SLOT_KEYS = [
   'formulare.club-order.processed',
   'formulare.club-order.gone',
   'formulare.club-order.notfound',
+  'formulare.club-order.link.title',
+  'formulare.club-order.link.text',
+  'formulare.club-order.link.copy',
+  'formulare.club-order.link.copied',
+  'formulare.club-order.thanks.link',
 ] as const;
 
 type Load =
   | { kind: 'loading' }
   | { kind: 'error' }
-  | { kind: 'dead'; reason: 'notFound' | 'gone' | 'processed' }
+  | { kind: 'dead'; reason: 'notFound' | 'gone' | 'processed'; form?: OrderForm }
   | { kind: 'ready'; form: OrderForm };
 
 export default function ClubOrderForm() {
@@ -84,7 +90,7 @@ export default function ClubOrderForm() {
     setLoad({ kind: 'loading' });
     getOrderForm(token).then((form) => {
       if (form.status !== 'Invited') {
-        setLoad({ kind: 'dead', reason: 'processed' });
+        setLoad({ kind: 'dead', reason: 'processed', form });
         return;
       }
       setState(stateFromDraft(form.draft, form));
@@ -157,7 +163,29 @@ export default function ClubOrderForm() {
     );
   }
   if (load.kind === 'dead') {
-    if (load.reason === 'processed') return callPage('Objednávka je u nás', t['formulare.club-order.processed']);
+    if (load.reason === 'processed') {
+      const registrationUrl = load.form?.registrationUrl ?? null;
+      if (registrationUrl !== null) {
+        return (
+          <PublicLayout>
+            <PublicMain maxWidth={640}>
+              <PageTitle sub={t['formulare.club-order.processed']}>Objednávka je potvrzena</PageTitle>
+              <LinkCard
+                path={registrationUrl}
+                t={{
+                  title: t['formulare.club-order.link.title'],
+                  text: t['formulare.club-order.link.text'],
+                  copy: t['formulare.club-order.link.copy'],
+                  copied: t['formulare.club-order.link.copied'],
+                }}
+              />
+              {phone !== '' && <Box sx={{ fontSize: 15 }}>Potřebujete poradit? Zavolejte nám: <a href={telHref(phone)}>{phone}</a></Box>}
+            </PublicMain>
+          </PublicLayout>
+        );
+      }
+      return callPage('Objednávka je u nás', t['formulare.club-order.processed']);
+    }
     if (load.reason === 'gone') return callPage('Objednávka byla zrušena', t['formulare.club-order.gone']);
     return callPage('Odkaz neplatí', t['formulare.club-order.notfound']);
   }
@@ -180,6 +208,7 @@ export default function ClubOrderForm() {
           paymentLabel={done.snapshot.payment === 'PerPerson' ? payTexts.PerPerson.title : payTexts.ClubInvoice.title}
           perPerson={done.snapshot.payment === 'PerPerson'}
           phone={phone}
+          linkNote={t['formulare.club-order.thanks.link']}
         />
       </PublicLayout>
     );

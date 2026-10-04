@@ -5,7 +5,7 @@
  */
 import { Box, Typography } from '@mui/material';
 import type { ClubActivity } from '../../../api/publicClub';
-import { BRAND } from '../../../components/public/brand';
+import { BRAND, czk } from '../../../components/public/brand';
 import { LABEL_COLOR, ON_ORANGE } from '../../../components/public/kit';
 
 /** Places left on one činnost: its own count, else the block's overall one when the server sends no per-činnost numbers. */
@@ -60,6 +60,7 @@ export function ActivityCards({
             </Typography>
             <Typography component="span" sx={{ fontSize: 14, color: selected ? ON_ORANGE : LABEL_COLOR }}>
               {a.durationMinutes > 0 ? `${a.durationMinutes} min na sportovce · ` : ''}
+              {typeof a.unitPriceCzk === 'number' ? `${czk(a.unitPriceCzk)} · ` : ''}
               {isFull ? 'Obsazeno' : places}
             </Typography>
           </Box>

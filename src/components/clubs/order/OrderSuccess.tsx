@@ -8,6 +8,7 @@ import { LinkCopyRow } from '../orders/LinkCopyRow';
 import { PriceLines } from './OrderAnalysisCard';
 import { rangeLine } from './orderFormat';
 import { orderRanges } from './orderLogic';
+import { formatPlayersTotal, formatSeats } from '../panel/seats';
 
 export function OrderSuccess({ order }: { order: ClubOrderView }) {
   const registrationUrl = order.registrationUrl !== '' ? order.registrationUrl : order.registrationToken !== '' ? clubRegistrationLink(order.registrationToken) : '';
@@ -25,12 +26,8 @@ export function OrderSuccess({ order }: { order: ClubOrderView }) {
         <Stack spacing={0.75}>
           <Typography sx={{ fontWeight: 700 }}>{order.clubName}</Typography>
           <Typography variant="body2">{`Služba: ${order.serviceName}`}</Typography>
-          <Box component="ul" sx={{ m: 0, pl: 2.25 }}>
-            {order.activitySeats.map((a) => (
-              <li key={a.activityId}><Typography variant="body2">{`${a.activityName} × ${a.seats}`}</Typography></li>
-            ))}
-          </Box>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>{`Celkem ${order.totalSeats} míst`}</Typography>
+          <Typography variant="body2" data-testid="order-seats-line">{formatSeats(order.activitySeats)}</Typography>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>{`Celkem ${formatPlayersTotal(order.activitySeats)}`}</Typography>
           {ranges.length > 0 ? (
             <Box component="ul" sx={{ m: 0, pl: 2.25 }} aria-label="Termíny">
               {ranges.map((r, i) => (

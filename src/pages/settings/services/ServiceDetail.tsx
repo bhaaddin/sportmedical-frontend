@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Box, Button, Chip, FormControlLabel, Stack, Switch, Tab, Tabs, Typography } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import type { ClinicService } from '../../../api/clinicServices';
 import { usePermission } from '../../../auth/usePermission';
 import { SoftCard } from '../../../components/ui';
@@ -30,12 +31,13 @@ export const TABS = [
 type TabId = (typeof TABS)[number]['id'];
 
 export default function ServiceDetail({
-  service, onEdit, onArchive, onRestore, onBack, busy,
+  service, onEdit, onArchive, onRestore, onDelete, onBack, busy,
 }: {
   service: ClinicService;
   onEdit: () => void;
   onArchive: () => void;
   onRestore: () => void;
+  onDelete: () => void;
   /** Phone only: back to the list. */
   onBack?: () => void;
   busy: boolean;
@@ -82,6 +84,17 @@ export default function ServiceDetail({
             />
             <Button variant="outlined" startIcon={<EditIcon />} onClick={onEdit} disabled={!canEdit} sx={{ minHeight: 44 }}>
               Upravit službu
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteOutlineIcon />}
+              onClick={onDelete}
+              disabled={!canEdit || busy}
+              title={canEdit ? undefined : 'Mazat může jen ten, kdo smí upravovat nastavení ordinace.'}
+              sx={{ minHeight: 44 }}
+            >
+              Smazat službu
             </Button>
           </Stack>
         </Stack>

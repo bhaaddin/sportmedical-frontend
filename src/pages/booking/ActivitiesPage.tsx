@@ -37,6 +37,10 @@ import { usePermission } from "../../auth/usePermission";
 import { useLocation, useNavigate } from "react-router-dom";
 import { assignableCount, handoffAction, handoffFrom } from "./serviceHandoff";
 import UnarchiveOutlinedIcon from "@mui/icons-material/UnarchiveOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
+import DeleteFlow, { type DeleteTarget } from "../settings/services/DeleteFlow";
+import DuplicatesNotice from "../settings/services/DuplicatesNotice";
+import { findDuplicateGroups } from "../settings/services/duplicates";
 import { isDuplicateName } from "../../api/duplicateName";
 import MenuItem from "@mui/material/MenuItem";
 import { warningKey } from "../../api/bookingContracts";
@@ -113,6 +117,8 @@ export default function ActivitiesPage() {
   const [draft, setDraft] = useState<ActivityInput | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Activity | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const canEdit = usePermission("settings.clinic.manage");
   /** Warnings the owner has clicked away this session. */
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
@@ -161,6 +167,17 @@ export default function ActivitiesPage() {
 
   const activeActivities = activities.filter((a) => a.isActive);
   const archivedActivities = activities.filter((a) => !a.isActive);
+  /* The same name in the same služba, ignoring case, diacritics and word order. */
+  const duplicateGroups = findDuplicateGroups(activities, (a) => a.clinicServiceId ?? "");
+  const describeActivity = (a: Activity): string => {
+    const service = (clinicServicesQuery.data ?? []).find((s) => s.id === a.clinicServiceId)?.name;
+    const price = a.priceCzk === null
+      ? t("booking.activities.noPrice")
+      : t("booking.activities.priceValue", { price: a.priceCzk });
+    return [service, t("booking.activities.durationValue", { minutes: a.durationMinutes }), price]
+      .filter((x) => x !== undefined && x !== "")
+      .join(" · ");
+  };
 
   /**
    * 3.1: the read carries the same warnings as the write, so an unsellable
@@ -344,6 +361,15 @@ export default function ActivitiesPage() {
         </Alert>
       )}
 
+      <DuplicatesNotice
+        groups={duplicateGroups}
+        noun="činnost"
+        describe={describeActivity}
+        canEdit={canEdit}
+        onDelete={(a) => setDeleteTarget({ id: a.id, name: a.name })}
+        onArchive={(a) => { remove.reset(); setConfirmDelete(a); }}
+      />
+
       {warnings.map((warning) => (
         <Alert
           key={warningKey(warning)}
@@ -465,6 +491,17 @@ export default function ActivitiesPage() {
                         <ArchiveOutlinedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
+                    <Tooltip title={canEdit ? "Smazat" : "Mazat může jen ten, kdo smí upravovat nastavení ordinace."}>
+                      <span>
+                        <IconButton
+                          aria-label={`Smazat — ${activity.name}`}
+                          disabled={!canEdit}
+                          onClick={() => setDeleteTarget({ id: activity.id, name: activity.name })}
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               ))}
@@ -506,6 +543,18 @@ export default function ActivitiesPage() {
                       onClick={() => restore.mutate(activity.id)}
                     >
                       {TEXT.restore}
+                    </Button>
+                    <Button
+                      size="small"
+                      color="error"
+                      variant="outlined"
+                      startIcon={<DeleteOutlineIcon />}
+                      aria-label={`Smazat — ${activity.name}`}
+                      disabled={!canEdit}
+                      title={canEdit ? undefined : "Mazat může jen ten, kdo smí upravovat nastavení ordinace."}
+                      onClick={() => setDeleteTarget({ id: activity.id, name: activity.name })}
+                    >
+                      Smazat
                     </Button>
                   </Box>
                 ))}
@@ -856,6 +905,17 @@ export default function ActivitiesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <DeleteFlow
+        kind="activity"
+        target={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        remove={activitiesApi.removePermanently}
+        archive={activitiesApi.remove}
+        onDone={async () => {
+          await queryClient.invalidateQueries({ queryKey: ["activities"] });
+        }}
+      />
     </SettingsScreen>
   );
 }

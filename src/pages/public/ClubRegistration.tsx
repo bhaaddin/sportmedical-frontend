@@ -18,19 +18,24 @@
    bottom. iPad and desktop: the same panels in the artboard's 880 px column.
    ══════════════════════════════════════════════════════════════ */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-  Alert, Box, Button, CircularProgress, TextField, Typography,
+  Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, TextField, Typography,
 } from '@mui/material';
-import { CheckCircleOutlined } from '@mui/icons-material';
-import { ClubClaimError, ClubLinkDeadError, claimClubSlot, getClubOffer } from '../../api/publicClub';
-import type { ClubOffer, ClubSlot } from '../../api/publicClub';
+import { ClubClaimError, ClubLinkDeadError, claimClubSlot, getClubOffer, getClubSlots } from '../../api/publicClub';
+import type { ClubFreeSlot, ClubOffer, ClubSlot } from '../../api/publicClub';
+import { useDevice } from '../../layout/useDevice';
 import { readPublicClinic } from '../../api/clinicSettings';
 import type { PublicClinic } from '../../api/clinicSettings';
 import PublicLayout from './PublicLayout';
 import { ActivityCards, activityRemaining } from './club/ActivityCards';
+import { Booked } from './club/Booked';
+import type { BookedInfo } from './club/Booked';
+import { INFO_SLOT_KEYS, InfoPanel } from './club/InfoPanel';
+import { SLOT_PICKER_KEYS, SlotPicker } from './club/SlotPicker';
+import type { SlotsStatus } from './club/SlotPicker';
 import { ARCHIVO, BRAND, clinicDate, clinicTime, telHref } from '../../components/public/brand';
 import {
   FieldLabel, LABEL_COLOR, LoadError, ON_ORANGE, Panel, PanelTitle, PinnedBar, PublicMain, ctaSx, ghostSx, longWhen,
@@ -38,6 +43,25 @@ import {
 import { PhoneField } from '../../components/ui/PhoneField';
 import { LANDING_PATH } from '../../components/public/PublicHeader';
 import { useSlotTexts } from '../../site/useSlotTexts';
+
+const SLOT_KEYS = [
+  'formulare.club.closed',
+  'formulare.club.full',
+  ...INFO_SLOT_KEYS,
+  ...SLOT_PICKER_KEYS,
+  'formulare.club-reg.register.title',
+  'formulare.club-reg.minor.label',
+  'formulare.club-reg.parent.hint',
+  'formulare.club-reg.email.hint',
+  'formulare.club-reg.slots.title',
+  'formulare.club-reg.error.taken',
+  'formulare.club-reg.error.noslot',
+  'formulare.club-reg.error.already',
+  'formulare.club-reg.done.title',
+  'formulare.club-reg.done.next',
+  'formulare.club-reg.done.bring',
+  'formulare.club-reg.done.add',
+] as const;
 
 const hhmm = (time: string): string => time.slice(0, 5);
 
@@ -165,7 +189,8 @@ function TimePill({ slot, selected, onPick }: { slot: ClubSlot; selected: boolea
 }
 
 export default function ClubRegistration() {
-  const txt = useSlotTexts(['formulare.club.closed', 'formulare.club.full'] as const);
+  const txt = useSlotTexts(SLOT_KEYS);
+  const device = useDevice();
   const { token = '' } = useParams();
 
   const [offer, setOffer] = useState<ClubOffer | null>(null);
@@ -184,7 +209,13 @@ export default function ClubRegistration() {
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [complaint, setComplaint] = useState<string | null>(null);
-  const [bookedAt, setBookedAt] = useState<string | null>(null);
+  const [booked, setBooked] = useState<BookedInfo | null>(null);
+  const [minor, setMinor] = useState(false);
+  const [parentName, setParentName] = useState('');
+  const [note, setNote] = useState('');
+  const [freeSlots, setFreeSlots] = useState<ClubFreeSlot[]>([]);
+  const [slotsStatus, setSlotsStatus] = useState<SlotsStatus>('idle');
+  const info = offer?.info ?? null;
 
   useEffect(() => {
     let alive = true;
@@ -209,6 +240,27 @@ export default function ClubRegistration() {
     return () => { alive = false; };
   }, [token, attempt]);
 
+  /** Free slots of the chosen činnost (order links only); the earliest one is preselected. */
+  const loadSlots = useCallback(async (forActivity: string): Promise<void> => {
+    if (forActivity === '') { setFreeSlots([]); setSlotsStatus('idle'); return; }
+    setSlotsStatus('loading');
+    try {
+      const list = await getClubSlots(token, forActivity);
+      setFreeSlots(list);
+      setSlotUtc((current) => (current !== null && list.some((x) => x.startUtc === current) ? current : list[0]?.startUtc ?? null));
+      setSlotsStatus('ready');
+    } catch {
+      setFreeSlots([]);
+      setSlotUtc(null);
+      setSlotsStatus('failed');
+    }
+  }, [token]);
+
+  const infoMode = info !== null;
+  useEffect(() => {
+    if (infoMode) void loadSlots(activityId);
+  }, [infoMode, activityId, loadSlots]);
+
   const slotsByDay = useMemo(() => {
     const groups = new Map<string, ClubSlot[]>();
     for (const slot of offer?.slots ?? []) {
@@ -218,12 +270,14 @@ export default function ClubRegistration() {
     return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [offer]);
 
-  const choosesTime = slotsByDay.length > 0;
+  const choosesTime = infoMode || slotsByDay.length > 0;
   const dobRequired = offer?.requireDateOfBirth === true;
-  const emailOk = email.trim() === '' || /^\S+@\S+\.\S+$/.test(email.trim());
+  const emailLooksOk = /^\S+@\S+\.\S+$/.test(email.trim());
+  const emailOk = email.trim() === '' ? !infoMode : emailLooksOk;
+  const parentOk = !infoMode || !minor || parentName.trim() !== '';
   const canSubmit =
     name.trim() !== '' && activityId !== '' && (!choosesTime || slotUtc !== null)
-    && (!dobRequired || dateOfBirth !== '') && emailOk && !submitting;
+    && (!dobRequired || dateOfBirth !== '') && emailOk && parentOk && !submitting;
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -236,12 +290,35 @@ export default function ClubRegistration() {
         phone: phone.trim() === '' ? undefined : phone.trim(),
         email: email.trim() === '' ? undefined : email.trim(),
         dateOfBirth: dobRequired && dateOfBirth !== '' ? dateOfBirth : undefined,
+        note: infoMode && note.trim() !== '' ? note.trim() : undefined,
+        parentName: infoMode && minor && parentName.trim() !== '' ? parentName.trim() : undefined,
         startUtc: choosesTime && slotUtc !== null ? slotUtc : undefined,
       });
-      if (claim.startUtc) setBookedAt(claim.startUtc);
-      else setComplaint('Rezervaci se nepodařilo dokončit.');
+      if (claim.startUtc) {
+        const chosen = offer?.activities.find((a) => a.activityId === activityId);
+        setBooked({
+          startUtc: claim.startUtc,
+          date: claim.date ?? null,
+          startLocal: claim.startLocal ?? null,
+          endLocal: claim.endLocal ?? null,
+          calendarName: claim.calendarName ?? null,
+          activityName: claim.activityName ?? (infoMode ? chosen?.activityName ?? null : null),
+          bring: chosen?.description ?? null,
+        });
+      } else setComplaint('Rezervaci se nepodařilo dokončit.');
     } catch (error) {
-      setComplaint(error instanceof Error ? error.message : 'Rezervaci se nepodařilo dokončit.');
+      if (error instanceof ClubClaimError && error.timeTaken) {
+        setComplaint(txt['formulare.club-reg.error.taken']);
+        setSlotUtc(null);
+        void loadSlots(activityId);
+      } else if (error instanceof ClubClaimError && error.code !== null && /no.?free.?slot/i.test(error.code)) {
+        setComplaint(txt['formulare.club-reg.error.noslot']);
+        void loadSlots(activityId);
+      } else if (error instanceof ClubClaimError && error.code !== null && /already/i.test(error.code)) {
+        setComplaint(txt['formulare.club-reg.error.already']);
+      } else {
+        setComplaint(error instanceof Error ? error.message : 'Rezervaci se nepodařilo dokončit.');
+      }
       if (error instanceof ClubClaimError && error.activityFull) {
         setFullIds((prev) => new Set(prev).add(activityId));
         setActivityId('');
@@ -291,18 +368,26 @@ export default function ClubRegistration() {
   }
 
   /* ── Confirmed ── */
-  if (bookedAt) {
+  if (booked) {
+    const addAnother = () => {
+      setBooked(null);
+      setName('');
+      setDateOfBirth('');
+      setNote('');
+      setSlotUtc(null);
+      setComplaint(null);
+      void getClubOffer(token).then((fresh) => setOffer(fresh)).catch(() => undefined);
+      if (infoMode) void loadSlots(activityId);
+    };
     return frame(
-      <Panel sx={{ alignItems: 'center', textAlign: 'center', py: 5 }}>
-        <CheckCircleOutlined sx={{ fontSize: 56, color: BRAND.accent }} aria-hidden />
-        <Typography component="h1" sx={{ m: 0, fontFamily: ARCHIVO, fontWeight: 800, fontSize: 30, letterSpacing: '-0.03em' }}>
-          Máte rezervováno
-        </Typography>
-        <Typography sx={{ fontFamily: ARCHIVO, fontWeight: 700, fontSize: 20 }}>{capitalise(longWhen(bookedAt))}</Typography>
-        <Typography sx={{ color: LABEL_COLOR }}>
-          Těšíme se na vás. Dorazte prosím včas; registraci dokončíme na místě.
-        </Typography>
-      </Panel>,
+      <Booked
+        booked={booked}
+        title={txt['formulare.club-reg.done.title']}
+        next={txt['formulare.club-reg.done.next']}
+        bringTitle={txt['formulare.club-reg.done.bring']}
+        addLabel={txt['formulare.club-reg.done.add']}
+        onAdd={infoMode ? addAnother : null}
+      />,
     );
   }
 
@@ -327,24 +412,10 @@ export default function ClubRegistration() {
   const chosenActivity = offer.activities.find((a) => a.activityId === activityId);
   const chooseActivity = offer.activities.length > 1;
 
-  return frame(
-    <>
-      {chooseActivity && (
-        <Panel labelledBy="club-step-activity">
-          <PanelTitle id="club-step-activity">1 · Vyberte činnost</PanelTitle>
-          <ActivityCards
-            activities={offer.activities}
-            blockRemaining={offer.remaining}
-            value={activityId}
-            full={fullIds}
-            onPick={(id) => { setActivityId(id); setComplaint(null); }}
-          />
-        </Panel>
-      )}
-
+  const termPanel = (
       <Panel labelledBy="club-step-1">
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <PanelTitle id="club-step-1">{chooseActivity ? '2' : '1'} · Vyberte si termín</PanelTitle>
+          <PanelTitle id="club-step-1">{chooseActivity ? '2' : '1'} · {infoMode ? txt['formulare.club-reg.slots.title'] : 'Vyberte si termín'}</PanelTitle>
           {chosenActivity !== undefined && (
             <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
               {chosenActivity.activityName} · {chosenActivity.durationMinutes}&nbsp;min na sportovce
@@ -352,7 +423,16 @@ export default function ClubRegistration() {
           )}
         </Box>
 
-        {choosesTime ? (
+        {infoMode ? (
+          <SlotPicker
+            status={slotsStatus}
+            slots={freeSlots}
+            value={slotUtc}
+            onPick={(utc) => { setSlotUtc(utc); setComplaint(null); }}
+            onRefresh={() => { void loadSlots(activityId); }}
+            t={txt}
+          />
+        ) : choosesTime ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {slotsByDay.map(([day, slots]) => (
               <Box key={day} sx={{ display: 'flex', flexDirection: 'column', gap: 1.125 }}>
@@ -391,9 +471,10 @@ export default function ClubRegistration() {
           </Box>
         )}
       </Panel>
-
+  );
+  const detailsPanel = (
       <Panel labelledBy="club-step-2">
-        <PanelTitle id="club-step-2">{chooseActivity ? '3' : '2'} · Vaše údaje</PanelTitle>
+        <PanelTitle id="club-step-2">{chooseActivity ? '3' : '2'} · {infoMode ? txt['formulare.club-reg.register.title'] : 'Vaše údaje'}</PanelTitle>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '14px' }}>
           <TextField
             required
@@ -405,6 +486,24 @@ export default function ClubRegistration() {
             sx={{ flex: '1 1 100%' }}
             slotProps={{ htmlInput: { style: { minHeight: 20 } } }}
           />
+          {infoMode && (
+            <FormControlLabel
+              sx={{ flex: '1 1 100%', m: 0 }}
+              control={<Checkbox checked={minor} onChange={(e) => setMinor(e.target.checked)} />}
+              label={txt['formulare.club-reg.minor.label']}
+            />
+          )}
+          {infoMode && minor && (
+            <TextField
+              required
+              label="Jméno rodiče / zákonného zástupce"
+              autoComplete="name"
+              value={parentName}
+              onChange={(e) => setParentName(e.target.value)}
+              helperText={txt['formulare.club-reg.parent.hint']}
+              sx={{ flex: '1 1 100%' }}
+            />
+          )}
           {dobRequired && (
             <TextField
               required
@@ -428,19 +527,47 @@ export default function ClubRegistration() {
           </Box>
           <TextField
             type="email"
+            required={infoMode}
             label="E-mail"
             placeholder="jan@email.cz"
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            error={!emailOk}
-            helperText={emailOk ? undefined : 'E-mail nevypadá správně.'}
+            error={email.trim() !== '' && !emailLooksOk}
+            helperText={email.trim() !== '' && !emailLooksOk ? 'E-mail nevypadá správně.' : infoMode ? txt['formulare.club-reg.email.hint'] : undefined}
             sx={{ flex: '1 1 100%' }}
           />
+          {infoMode && (
+            <TextField
+              label="Poznámka (nepovinné)"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              multiline
+              minRows={2}
+              sx={{ flex: '1 1 100%' }}
+            />
+          )}
         </Box>
       </Panel>
+  );
 
-      {complaint !== null && (
+  return frame(
+    <>
+      {info !== null && <InfoPanel info={info} activities={offer.activities} t={txt} device={device} />}
+      {chooseActivity && (
+        <Panel labelledBy="club-step-activity">
+          <PanelTitle id="club-step-activity">1 · Vyberte činnost</PanelTitle>
+          <ActivityCards
+            activities={offer.activities}
+            blockRemaining={offer.remaining}
+            value={activityId}
+            full={fullIds}
+            onPick={(id) => { setActivityId(id); setComplaint(null); }}
+          />
+        </Panel>
+      )}
+
+{infoMode ? <>{detailsPanel}{activityId !== '' && termPanel}</> : <>{termPanel}{detailsPanel}</>}      {complaint !== null && (
         <Alert severity="warning" onClose={() => setComplaint(null)} sx={{ borderRadius: 2 }}>
           {complaint}
         </Alert>

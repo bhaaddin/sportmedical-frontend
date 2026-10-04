@@ -122,7 +122,8 @@ function OrderDialogBody({ onClose, initial, order, processOrder, onSaved }: Clu
     const set = new Set(ids.map((id) => calendars.find((c) => c.id === id)?.clinicServiceId ?? null));
     return set.size === 1 ? ([...set][0] ?? null) : null;
   }, [initial?.calendarIds, calendars]);
-  const serviceId = serviceState ?? inferredService ?? '';
+  const onlyService = services.length === 1 && mode === 'new' ? services[0].id : null;
+  const serviceId = serviceState ?? inferredService ?? onlyService ?? '';
 
   const [activityIds, setActivityIds] = useState<string[]>(src?.activitySeats.map((a) => a.activityId) ?? []);
   const [seatsText, setSeatsText] = useState<SeatsText>(Object.fromEntries((src?.activitySeats ?? []).map((a) => [a.activityId, String(a.seats)])));

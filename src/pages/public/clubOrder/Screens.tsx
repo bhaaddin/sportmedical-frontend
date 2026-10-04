@@ -50,6 +50,8 @@ export interface ConfirmationProps {
   quote: OrderQuote | null;
   paymentLabel: string;
   phone: string;
+  /** Where the link for the players comes from (it arrives once the clinic confirms the term). */
+  linkNote?: string;
 }
 
 export function Confirmation(p: ConfirmationProps) {
@@ -72,6 +74,9 @@ export function Confirmation(p: ConfirmationProps) {
           {p.quote !== null && <li>{p.perPerson ? 'Orientační cena celkem (každý platí za sebe)' : 'Cena celkem'}: {czk(p.quote.totalCzk)}</li>}
         </Box>
         <Typography sx={{ fontSize: 15.5, color: SOFT_TEXT, lineHeight: 1.55 }}>{p.next}</Typography>
+        {p.linkNote !== undefined && p.linkNote !== '' && (
+          <Typography data-testid="order-link-note" sx={{ fontSize: 15.5, fontWeight: 600, lineHeight: 1.55 }}>{p.linkNote}</Typography>
+        )}
         <Typography sx={{ fontSize: 15.5, color: SOFT_TEXT, lineHeight: 1.55 }}>
           {p.change}{p.phone !== '' ? <> <a href={telHref(p.phone)}>{p.phone}</a></> : null}
         </Typography>

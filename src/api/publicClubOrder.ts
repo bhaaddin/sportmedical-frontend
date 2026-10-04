@@ -57,6 +57,9 @@ export interface OrderForm {
   paymentMethods: ClubPaymentMethod[];
   draft: OrderDraft | null;
   minimumPlayers: number | null;
+  /** Relative `/klub/{token}` once the order is confirmed; players register through it. */
+  registrationUrl: string | null;
+  registrationOpen: boolean;
 }
 
 export interface QuoteDiscount {
@@ -138,6 +141,8 @@ export async function getOrderForm(token: string): Promise<OrderForm> {
       paymentMethods: Array.isArray(raw.paymentMethods) ? raw.paymentMethods : [],
       draft: raw.draft ?? null,
       minimumPlayers: typeof raw.minimumPlayers === 'number' ? raw.minimumPlayers : null,
+      registrationUrl: typeof raw.registrationUrl === 'string' && raw.registrationUrl.trim() !== '' ? raw.registrationUrl : null,
+      registrationOpen: raw.registrationOpen === true,
     };
   } catch (error) {
     return linkError(error);

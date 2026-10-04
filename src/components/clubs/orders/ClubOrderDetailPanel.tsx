@@ -27,7 +27,8 @@ import { absoluteLink, usePublicSiteBase } from './absoluteLink';
 import { ClubInvoiceDialog } from './ClubInvoiceDialog';
 import { hasGroup, OrderGroupBlock } from './OrderGroupBlock';
 import { orderCode } from '../order/orderFormat';
-import { rangeText, seatPercent, STATUS_TONE } from './orderLogic';
+import { rangeText, registeredLine, seatPercent, STATUS_TONE } from './orderLogic';
+import { formatPlayersTotal } from '../panel/seats';
 
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -118,6 +119,9 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
             <Box><Typography sx={{ fontSize: 22, fontWeight: 700 }}>{Math.max(0, order.totalSeats - order.registered)}</Typography><Typography variant="caption" color="text.secondary">chybí</Typography></Box>
           </Stack>
           <LinearProgress variant="determinate" value={seatPercent(order.registered, order.totalSeats)} aria-label="Obsazenost míst" />
+          <Typography variant="body2" data-testid="order-seats-breakdown" sx={{ fontWeight: 600, mt: 1 }}>
+            {registeredLine(order)}{order.activitySeats.length > 0 ? ` (${formatPlayersTotal(order.activitySeats)})` : ''}
+          </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
             {order.serviceName !== '' ? order.serviceName : 'Služba zatím nevybrána'}
             {order.createdBy === 'Club' ? ' · vyplnil klub' : ' · založil personál'}

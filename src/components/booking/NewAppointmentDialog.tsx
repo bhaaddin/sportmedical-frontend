@@ -22,6 +22,7 @@ import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 import { appointmentsApi } from "../../api/appointments";
 import { activitiesApi } from "../../api/activities";
+import { clinicServicesApi } from "../../api/clinicServices";
 import { workingHoursApi } from "../../api/workingHours";
 import { calendarsApi } from "../../api/calendars";
 import { patientPreRegistrationApi } from "../../api/patientPreRegistration";
@@ -357,6 +358,14 @@ export function NewAppointmentDialog({
     staleTime: 5 * 60 * 1000,
   });
 
+  const servicesQuery = useQuery({
+    queryKey: ["clinic-services"],
+    queryFn: clinicServicesApi.list,
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
   /* 6.5: a calendar the user may not see is simply not in the answer. */
   const calendars = useMemo(
     () => (calendarsQuery.data ?? []).filter((c) => c.isActive),
@@ -389,19 +398,51 @@ export function NewAppointmentDialog({
     queryFn: () => workingHoursApi.preview(effectiveCalendarId, date, date),
     enabled: open && effectiveCalendarId !== "" && isDateOnly(date),
   });
+  /*
+   * Služba first, then činnost: the činnosti offered are those of the chosen service only. A clinic whose činnosti
+   * carry no service (or whose services did not load) is not gated.
+   */
+  const [serviceId, setServiceId] = useState("");
+  const serviceOptions = useMemo(
+    () =>
+      (servicesQuery.data ?? [])
+        .filter((sv) => sv.isActive && activities.some((a) => a.clinicServiceId === sv.id))
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "cs")),
+    [servicesQuery.data, activities],
+  );
+  const serviceGate = serviceOptions.length > 0;
+  const pickedActivityId = mode === "quick" ? quick.activityId : activityId;
+  const effectiveServiceId = !serviceGate
+    ? ""
+    : serviceOptions.some((sv) => sv.id === serviceId)
+      ? serviceId
+      : serviceOptions.length === 1
+        ? serviceOptions[0].id
+        : (activities.find((a) => a.id === pickedActivityId)?.clinicServiceId ?? "");
+  const scopedActivities = useMemo(
+    () => (!serviceGate ? activities : activities.filter((a) => a.clinicServiceId === effectiveServiceId)),
+    [serviceGate, activities, effectiveServiceId],
+  );
   const offeredActivities = useMemo(() => {
     const ids = new Set((previewQuery.data ?? []).flatMap((p) => p.offeredActivityIds ?? []));
-    return activities.filter((a) => ids.has(a.id));
-  }, [previewQuery.data, activities]);
+    return scopedActivities.filter((a) => ids.has(a.id));
+  }, [previewQuery.data, scopedActivities]);
   const otherActivities = useMemo(() => {
     const offered = new Set(offeredActivities.map((a) => a.id));
-    return activities.filter((a) => !offered.has(a.id));
-  }, [activities, offeredActivities]);
+    return scopedActivities.filter((a) => !offered.has(a.id));
+  }, [scopedActivities, offeredActivities]);
+  const changeService = (id: string) => {
+    setServiceId(id);
+    setActivityId("");
+    setQuick((q) => (activities.find((a) => a.id === q.activityId)?.clinicServiceId === id ? q : { ...q, activityId: "" }));
+    setOverriding(false);
+    setConflict(null);
+  };
   const day = dayState(previewQuery.data ?? []);
   const dayWordKey = dayStateLabelKey(day);
   /* In "Rychlá registrace" the činnost is chosen with the four facts; elsewhere on step 2. */
   const chosenActivityId = mode === "quick" ? quick.activityId : activityId;
-  const activity = activities.find((a) => a.id === chosenActivityId) ?? null;
+  const activity = scopedActivities.find((a) => a.id === chosenActivityId) ?? null;
 
   /* Is the chosen start offered for this činnost? Only the server knows. */
   const availabilityQuery = useQuery({
@@ -572,6 +613,26 @@ export function NewAppointmentDialog({
   const submitBooking = (overrideReason?: string) =>
     mode === "quick" ? bookQuick.mutate({ overrideReason }) : book.mutate({ overrideReason });
   const booking = book.isPending || bookQuick.isPending;
+  const serviceField = serviceGate ? (
+    <Box component="section" data-testid="service-first">
+      <SectionLabel component="label" sx={{ mb: 0.5 }}>Služba</SectionLabel>
+      <TextField
+        select
+        fullWidth
+        size="small"
+        value={effectiveServiceId}
+        onChange={(e) => changeService(e.target.value)}
+        disabled={booking}
+        slotProps={{ select: { displayEmpty: true, "aria-label": "Služba" } }}
+        helperText={effectiveServiceId === "" ? "Nejdřív vyberte službu — nabídnou se její činnosti." : undefined}
+      >
+        <MenuItem value="" disabled>Vyberte službu</MenuItem>
+        {serviceOptions.map((sv) => (
+          <MenuItem key={sv.id} value={sv.id} sx={{ minHeight: 44 }}>{sv.name}</MenuItem>
+        ))}
+      </TextField>
+    </Box>
+  ) : null;
 
   /* The link, asked for again from the booked screen when the first try failed. */
   const retryLink = useMutation({
@@ -620,6 +681,7 @@ export function NewAppointmentDialog({
     setQuickBooked(null);
     setQuickRefusal(null);
     setActivityId("");
+    setServiceId("");
     setNote("");
     setSendSms(false);
     setSendLink(false);
@@ -1263,6 +1325,7 @@ export function NewAppointmentDialog({
       {mode === "quick" ? (
         <Box component="section" aria-label={TEXT.newPatient}>
           <SectionLabel>{TEXT.newPatient}</SectionLabel>
+          {serviceField ? <Box sx={{ mb: 1.5 }}>{serviceField}</Box> : null}
           <QuickPatientForm
             value={quick}
             onChange={(next) => {
@@ -1346,8 +1409,15 @@ export function NewAppointmentDialog({
     <Stack spacing={3}>
       {whoCard}
 
+      {serviceField}
+
       <Box component="section">
         <SectionLabel>{TEXT.activity}</SectionLabel>
+        {serviceGate && effectiveServiceId === "" ? (
+          <Typography variant="body2" data-testid="activity-hint" sx={{ color: "text.secondary" }}>
+            Nejdřív vyberte službu.
+          </Typography>
+        ) : (
         <AsyncSection
           isLoading={activitiesQuery.isLoading || previewQuery.isLoading}
           isSettled={
@@ -1380,6 +1450,7 @@ export function NewAppointmentDialog({
             disabled={booking}
           />
         </AsyncSection>
+        )}
       </Box>
 
       <Box

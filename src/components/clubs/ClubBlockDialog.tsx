@@ -36,7 +36,7 @@
 import { useMemo, useRef, useState } from 'react';
 import {
   Alert, Autocomplete, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControlLabel, IconButton, Stack, TextField, Typography,
+  FormControlLabel, IconButton, MenuItem, Stack, TextField, Typography,
 } from '@mui/material';
 import { Close, ContentCopy, DeleteOutlined } from '@mui/icons-material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -225,6 +225,8 @@ export function ClubBlockDialog({
   });
   /* The legacy single headcount; null until the operator types one (then it defaults to the sum of the seats). */
   const [legacyText, setLegacyText] = useState<string | null>(null);
+  /* Služba first (Etapa 6): chosen explicitly, or read from the ticked calendars / the only service there is. */
+  const [serviceChoice, setServiceChoice] = useState('');
   const [fillMessage, setFillMessage] = useState<string | null>(null);
   const [rows, setRows] = useState<RangeRow[]>(() => initialRows(block, prefill));
   /* Blocks of this run that exist already, by row key - a retry never sends them again. */
@@ -592,7 +594,37 @@ export function ClubBlockDialog({
   );
 
   const ticked = calendars.filter((c) => draft.calendarIds.includes(c.id));
-  const groups = activityGroups(ticked, activities, services);
+  const serviceOptions = [...services.entries()]
+    .filter(([id]) => calendars.some((c) => c.clinicServiceId === id))
+    .map(([id, sv]) => ({ id, name: sv.name }));
+  const serviceGate = serviceOptions.length > 0;
+  const tickedServices = new Set(ticked.map((c) => c.clinicServiceId ?? ''));
+  const effectiveService = !serviceGate
+    ? ''
+    : serviceOptions.some((o) => o.id === serviceChoice)
+      ? serviceChoice
+      : tickedServices.size === 1 && serviceOptions.some((o) => o.id === [...tickedServices][0])
+        ? [...tickedServices][0]
+        : serviceOptions.length === 1
+          ? serviceOptions[0].id
+          : '';
+  /* Only an explicit choice narrows the calendars; a calendar ticked first still names the service by itself. */
+  const explicitService = serviceGate && serviceOptions.some((o) => o.id === serviceChoice);
+  const shownCalendars = explicitService ? calendars.filter((c) => c.clinicServiceId === serviceChoice) : calendars;
+  const groups = activityGroups(
+    ticked.length > 0 ? ticked : effectiveService !== '' ? calendars.filter((c) => c.clinicServiceId === effectiveService).slice(0, 1) : [],
+    activities,
+    services,
+  );
+  const changeService = (id: string) => {
+    setServiceChoice(id);
+    setDraft((d) => {
+      const calendarIds = d.calendarIds.filter((cid) => calendars.find((c) => c.id === cid)?.clinicServiceId === id);
+      const keep = d.activityIds.filter((aid) => activities.find((a) => a.id === aid)?.clinicServiceId === id);
+      return { ...d, calendarIds, activityIds: keep, seats: Object.fromEntries(Object.entries(d.seats ?? {}).filter(([a]) => keep.includes(a))) };
+    });
+    setConflicts(null);
+  };
   const chosenRows: SeatRow[] = draft.activityIds.map((id) => {
     const info = activities.find((a) => a.id === id);
     const fromServer = block?.activitySeats?.find((a) => a.activityId === id);
@@ -610,6 +642,24 @@ export function ClubBlockDialog({
 
   const listSection = (
     <>
+      {serviceGate ? (
+        <Box data-testid="block-service">
+          <SectionLabel>Služba</SectionLabel>
+          <TextField
+            select
+            fullWidth
+            size={fieldSize}
+            value={effectiveService}
+            disabled={editing}
+            onChange={(e) => changeService(e.target.value)}
+            slotProps={{ select: { displayEmpty: true, 'aria-label': 'Služba' } }}
+            helperText={effectiveService === '' ? 'Nejdřív vyberte službu — nabídnou se její kalendáře a činnosti.' : undefined}
+          >
+            <MenuItem value="" disabled>Vyberte službu</MenuItem>
+            {serviceOptions.map((o) => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
+          </TextField>
+        </Box>
+      ) : null}
       <Box>
         <SectionLabel>Kalendáře, které blok zablokuje</SectionLabel>
         {calendarsQuery.isError ? (
@@ -621,7 +671,7 @@ export function ClubBlockDialog({
             ariaLabel="Kalendáře"
             loading={calendarsQuery.isLoading}
             disabled={editing}
-            items={calendars.map((c) => ({ id: c.id, label: c.name, color: c.color }))}
+            items={shownCalendars.map((c) => ({ id: c.id, label: c.name, color: c.color }))}
             checked={draft.calendarIds}
             onToggle={toggleCalendar}
             error={shown('calendarIds')}
@@ -641,7 +691,7 @@ export function ClubBlockDialog({
             onToggle={toggleActivity}
             disabled={editing}
             loading={activitiesQuery.isLoading}
-            hint={ticked.length === 0 ? 'Nejdřív zaškrtněte kalendář — zobrazí se činnosti jeho služby.' : null}
+            hint={ticked.length === 0 && effectiveService === '' ? (serviceGate ? 'Nejdřív vyberte službu — nabídnou se její činnosti.' : 'Nejdřív zaškrtněte kalendář — zobrazí se činnosti jeho služby.') : null}
             error={shown('activityIds')}
           />
         )}

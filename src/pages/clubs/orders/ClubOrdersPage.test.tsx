@@ -130,7 +130,7 @@ describe.each([
       expect(screen.queryAllByTestId('order-card')).toHaveLength(0);
       const first = screen.getAllByTestId('order-row')[0];
       expect(first).toHaveTextContent('FK Slaný');
-      expect(first).toHaveTextContent('Základní ×20 · Diagnostika ×10');
+      expect(first).toHaveTextContent('Základní 5/20 · Diagnostika 0/10');
       expect(first).toHaveTextContent('+2');
       expect(first).toHaveTextContent('5 / 30');
       expect(first).toHaveTextContent('Platí klub (jedna faktura)');

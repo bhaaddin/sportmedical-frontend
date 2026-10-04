@@ -3,7 +3,8 @@
  *
  * Etapa 4, D9: `DELETE /api/activities/{id}` ARCHIVES. Nothing that appointments,
  * blocks or orders reference is removed, so the screen must never say "Smazat"
- * (or claim that it cannot be undone) beside a working "Obnovit". The visible
+ * beside a working "Obnovit". Etapa 6 added a separate permanent "Smazat"
+ * (DeleteFlow); archiving keeps its own wording. The visible
  * behaviour (confirm text, archived list, restore) is in ActivitiesPage.archive.test.tsx;
  * this guards the source against the old wording creeping back.
  */
@@ -17,9 +18,9 @@ describe('archive wording', () => {
     ['ClinicServicesPage', servicesSource as string],
   ])('%s does not call archiving deleting', (_name, source) => {
     expect(source).not.toContain('booking.common.delete');
-    expect(source).not.toMatch(/>\s*Smazat\s*</);
-    expect(source).not.toMatch(/Smazat (službu|činnost)/);
-    expect(source).not.toMatch(/nelze vrátit/);
+    /* Etapa 6: a separate, explicit "Smazat" now exists (DeleteFlow, permanent=true).
+       The archive confirm itself must still never promise a delete. */
+    expect(source).not.toMatch(/archiv[^\r\n]*smaz/i);
   });
 
   it('uses Archivovat for the action', () => {

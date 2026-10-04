@@ -33,6 +33,39 @@ export interface ClubActivity {
   seats?: number | null;
   registered?: number | null;
   remaining?: number | null;
+  /** Price per person, CZK (newer server); null/absent = not stated. */
+  unitPriceCzk?: number | null;
+  /** What the činnost is / what to bring (newer server). */
+  description?: string | null;
+}
+
+/** Who pays, as the order says. */
+export type ClubInfoPayment = 'ClubInvoice' | 'PerPerson';
+
+/** A day/hours the club reserved (`info.windows`). */
+export interface ClubInfoWindow {
+  date: string;
+  startLocal: string;
+  endLocal: string;
+}
+
+/** The parents' information block of an order link (absent on a legacy block token). */
+export interface ClubInfo {
+  clubName: string;
+  serviceName: string;
+  paymentMethod: ClubInfoPayment | null;
+  payerText: string;
+  windows: ClubInfoWindow[];
+}
+
+/** One free slot of the order's windows for one činnost. */
+export interface ClubFreeSlot {
+  date: string;
+  startLocal: string;
+  endLocal: string;
+  startUtc: string;
+  endUtc: string;
+  calendarName: string;
 }
 
 /** A day the clinic held for the club, and how many athletes still fit in it. */
@@ -76,6 +109,8 @@ export interface ClubOffer {
   requireDateOfBirth?: boolean | null;
   /** The block's free times, when the athlete may choose one; otherwise the server assigns it. */
   slots?: ClubSlot[] | null;
+  /** Order links only: the information the parents read first. Absent = legacy block token. */
+  info?: ClubInfo | null;
 }
 
 /** The slot an athlete's claim got. */
@@ -84,6 +119,12 @@ export interface ClubClaim {
   startUtc: string | null;
   endUtc: string | null;
   manageToken: string | null;
+  /** Order links: where and when exactly (all optional; a legacy token returns only the above). */
+  date?: string | null;
+  startLocal?: string | null;
+  endLocal?: string | null;
+  calendarName?: string | null;
+  activityName?: string | null;
 }
 
 /** A dead, revoked or expired link, told apart from a network failure. */
@@ -98,6 +139,23 @@ export const clubRegistrationLink = (token: string, origin: string = window.loca
   `${origin.replace(/\/+$/, '')}/klub/${encodeURIComponent(token)}`;
 
 const optNum = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+const text = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+/** The order's information block; null when the server sends none (a legacy block token) or garbage. */
+export function normaliseInfo(raw: unknown): ClubInfo | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const pm = r.paymentMethod === 'ClubInvoice' || r.paymentMethod === 'PerPerson' ? r.paymentMethod : null;
+  const windows = Array.isArray(r.windows) ? (r.windows as Record<string, unknown>[]) : [];
+  return {
+    clubName: text(r.clubName),
+    serviceName: text(r.serviceName),
+    paymentMethod: pm,
+    payerText: text(r.payerText),
+    windows: windows.map((w) => ({ date: text(w.date), startLocal: text(w.startLocal), endLocal: text(w.endLocal) })),
+  };
+}
 
 /**
  * The server names a činnost `name`; older code and tests say `activityName`.
@@ -117,9 +175,11 @@ export function normaliseOffer(raw: ClubOffer): ClubOffer {
       seats,
       registered,
       remaining,
+      unitPriceCzk: optNum(a.unitPriceCzk),
+      description: typeof a.description === 'string' && a.description.trim() !== '' ? a.description : null,
     };
   });
-  return { ...raw, activities };
+  return { ...raw, activities, info: normaliseInfo((raw as { info?: unknown }).info) };
 }
 
 /**
@@ -155,9 +215,14 @@ export class ClubClaimError extends Error {
     this.code = code;
   }
 
+  /** Somebody took the chosen time first (409 `TimeTaken`): fetch the slots again. */
+  get timeTaken(): boolean {
+    return this.status === 409 && this.code !== null && /time.?taken/i.test(this.code);
+  }
+
   /** The chosen činnost has no place left (409 and not a "time taken" answer). */
   get activityFull(): boolean {
-    return this.status === 409 && (this.code === null || /full|seat|capacit|obsaz|activity/i.test(this.code));
+    return this.status === 409 && !this.timeTaken && (this.code === null || /full|seat|capacit|obsaz|activity/i.test(this.code));
   }
 }
 
@@ -169,6 +234,8 @@ export interface ClaimInput {
   email?: string;
   /** yyyy-MM-dd; sent only when the clinic asks for it. */
   dateOfBirth?: string;
+  /** The guardian of a minor player. */
+  parentName?: string;
   /** The free time the athlete chose, when the offer lists times to choose from. */
   startUtc?: string;
 }
@@ -182,7 +249,7 @@ export const claimClubSlot = async (token: string, input: ClaimInput): Promise<C
   try {
     const { data } = await publicClient.post<ApiResult<ClubClaim>>(
       `/api/public/club/${encodeURIComponent(token)}/claim`,
-      input,
+      input.dateOfBirth !== undefined && input.dateOfBirth !== '' ? { ...input, birthDate: input.dateOfBirth } : input,
     );
     return data.data;
   } catch (error) {
@@ -193,4 +260,24 @@ export const claimClubSlot = async (token: string, input: ClaimInput): Promise<C
     }
     throw error;
   }
+};
+
+/**
+ * The free slots of the order's windows for one činnost. Tolerant: a missing
+ * list is an empty one, and every row is read field by field.
+ */
+export const getClubSlots = async (token: string, activityId: string): Promise<ClubFreeSlot[]> => {
+  const { data } = await publicClient.get<ApiResult<{ slots?: unknown }> | { slots?: unknown }>(
+    `/api/public/club/${encodeURIComponent(token)}/slots`,
+    { params: { activityId } },
+  );
+  const body = (data as ApiResult<{ slots?: unknown }>).data ?? (data as { slots?: unknown });
+  const rows = Array.isArray(body?.slots) ? (body.slots as Record<string, unknown>[]) : [];
+  return rows
+    .map((r) => ({
+      date: text(r.date), startLocal: text(r.startLocal), endLocal: text(r.endLocal),
+      startUtc: text(r.startUtc), endUtc: text(r.endUtc), calendarName: text(r.calendarName),
+    }))
+    .filter((s) => s.startUtc !== '')
+    .sort((a, b) => a.startUtc.localeCompare(b.startUtc));
 };
