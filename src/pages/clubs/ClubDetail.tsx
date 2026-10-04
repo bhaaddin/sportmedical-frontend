@@ -36,6 +36,9 @@ import { ClubAvatar } from '../../components/clubs/ClubAvatar';
 import { ClubBlockPanel } from '../../components/clubs/ClubBlockPanel';
 import { blockRange } from '../../components/clubs/blockLogic';
 import { ClubSeatsCard } from '../../components/clubs/panel/ClubSeatsCard';
+import { ClubSummaryCard } from '../../components/clubs/orders/ClubSummaryCard';
+import { clubOrdersApi, ORDER_STATUS_LABEL } from '../../api/clubOrders';
+import { STATUS_TONE, termsSummary } from '../../components/clubs/orders/orderLogic';
 import { clubActivitySeats } from '../../components/clubs/panel/seats';
 import { canBeInvoiced } from './payerForm';
 import {
@@ -62,7 +65,7 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
 }
 
 export function ClubDetail({
-  row, clubs, allBlocks, priceOf, pricesReady, focusBlockId, onBack, onEdit, onDeactivate, onReload, onInvoice, onNewReservation, onNewBlock,
+  row, clubs, allBlocks, priceOf, pricesReady, focusBlockId, onBack, onEdit, onDeactivate, onReload, onInvoice, onNewReservation, onNewOrder, onOpenOrder,
 }: {
   row: ClubRow;
   clubs: Club[];
@@ -77,7 +80,10 @@ export function ClubDetail({
   onReload: () => void;
   onInvoice: () => void;
   onNewReservation: () => void;
-  onNewBlock: () => void;
+  /** Opens the order dialog for this club. */
+  onNewOrder: () => void;
+  /** Opens one of the club's orders in its detail drawer. */
+  onOpenOrder?: (orderId: string) => void;
 }) {
   const device = useDevice();
   const phone = device === 'phone';
@@ -88,6 +94,8 @@ export function ClubDetail({
 
   const activeBlocks = blocks.filter((b) => b.status === 'Active');
   const activitiesQuery = useQuery({ queryKey: ['club-block-activities'], queryFn: fetchBlockableActivities, staleTime: 5 * 60 * 1000, enabled: activeBlocks.length > 0 });
+  const ordersQuery = useQuery({ queryKey: ['club-orders', club.id, '', ''], queryFn: () => clubOrdersApi.list({ clubId: club.id }), retry: false });
+  const clubOrders = ordersQuery.data ?? [];
   const clubSeatRows = clubActivitySeats(activeBlocks, (id) => (activitiesQuery.data ?? []).find((a) => a.id === id)?.name ?? '');
 
   const link = order?.token ? clubRegistrationLink(order.token) : null;
@@ -135,7 +143,7 @@ export function ClubDetail({
           ? 'Hromadná rezervace — termíny zatím nejsou vyhrazené'
           : `Hromadná rezervace ${formatDateRange(range.from, range.to)}`;
 
-  const hasAnything = order !== null || blocks.length > 0;
+  const hasAnything = order !== null || blocks.length > 0 || clubOrders.length > 0;
   const railWidth = device === 'desktop' ? '280px' : '250px';
 
   return (
@@ -146,7 +154,7 @@ export function ClubDetail({
         leading={<ClubAvatar name={club.name} color={row.color} size={44} />}
         actions={
           <>
-            {!phone ? <Button variant="contained" onClick={onNewBlock}>Nový blok</Button> : null}
+            {!phone ? <Button variant="contained" onClick={onNewOrder}>Nová objednávka pro tento klub</Button> : null}
             <Button variant="outlined" onClick={onBack} sx={{ minHeight: phone ? 44 : undefined }}>Zpět na kluby</Button>
           </>
         }
@@ -161,13 +169,39 @@ export function ClubDetail({
                 Vyhraďte klubu termíny v kalendářích a pošlete mu odkaz, přes který se sportovci sami registrují.
               </Typography>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'center' }}>
-                <Button variant="contained" onClick={onNewBlock} sx={{ minHeight: 44 }}>Vytvořit blok</Button>
+                <Button variant="contained" onClick={onNewOrder} sx={{ minHeight: 44 }}>Založit objednávku</Button>
                 <Button variant="outlined" onClick={onNewReservation} sx={{ minHeight: 44 }}>Vytvořit rezervaci</Button>
               </Stack>
             </SoftCard>
           ) : null}
 
-          {activeBlocks.length > 0 ? <ClubSeatsCard rows={clubSeatRows} /> : null}
+          <ClubSummaryCard clubId={club.id} fallback={activeBlocks.length > 0 ? <ClubSeatsCard rows={clubSeatRows} /> : null} />
+
+          {clubOrders.length > 0 ? (
+            <SoftCard data-testid="club-orders-list" role="region" aria-label="Objednávky klubu">
+              <SectionLabel>Objednávky klubu</SectionLabel>
+              <Stack spacing={1}>
+                {clubOrders.map((o) => (
+                  <Stack
+                    key={o.id}
+                    direction="row"
+                    role="button"
+                    tabIndex={0}
+                    data-testid="club-order-link"
+                    onClick={() => onOpenOrder?.(o.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') onOpenOrder?.(o.id); }}
+                    sx={{ gap: 1.5, alignItems: 'center', minHeight: 44, cursor: 'pointer', justifyContent: 'space-between' }}
+                  >
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{o.serviceName || 'Služba nevybrána'} · {o.totalSeats} míst</Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>{termsSummary(o)}</Typography>
+                    </Box>
+                    <StatusChip tone={STATUS_TONE[o.status]} size="sm">{ORDER_STATUS_LABEL[o.status]}</StatusChip>
+                  </Stack>
+                ))}
+              </Stack>
+            </SoftCard>
+          ) : null}
 
           {blocks.length > 0 ? (
             <Stack spacing={2.5} aria-label="Bloky klubu" role="region">
@@ -388,7 +422,7 @@ export function ClubDetail({
       </Box>
 
       <PinnedActions>
-        <Button variant="contained" onClick={onNewBlock}>Nový blok</Button>
+        <Button variant="contained" onClick={onNewOrder}>Nová objednávka</Button>
         <Button variant="outlined" onClick={onEdit}>Upravit klub</Button>
       </PinnedActions>
     </Box>

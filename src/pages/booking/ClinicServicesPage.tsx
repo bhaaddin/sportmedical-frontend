@@ -16,14 +16,14 @@
 import { useState } from 'react';
 import {
   Alert, Box, Button, Card, CardContent, Checkbox, Chip, Dialog, DialogActions,
-  DialogContent, DialogTitle, IconButton, ListItemText, MenuItem, Stack,
+  Collapse, DialogContent, DialogTitle, IconButton, ListItemText, MenuItem, Stack,
   TextField, Tooltip, Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
+import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
+import UnarchiveOutlinedIcon from '@mui/icons-material/UnarchiveOutlined';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import EditIcon from '@mui/icons-material/Edit';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -35,13 +35,33 @@ import { calendarsApi } from '../../api/calendars';
 import type { Activity, Calendar } from '../../api/bookingContracts';
 import { AsyncSection } from '../../components/booking/AsyncSection';
 import { errorText } from '../../components/booking/errorText';
+import { isDuplicateName } from '../../api/duplicateName';
 import { SettingsScreen } from '../settings/SettingsFrame';
 import {
-  SERVICE_GAP_TEXT, countsText, deletionWillBeRefused, serviceGap,
+  SERVICE_GAP_TEXT, countsText, serviceGap,
 } from './clinicServiceState';
 import {
   movedFrom, offerable, partialFailureText, toAttach, under,
 } from './serviceLinks';
+
+/*
+ * Etapa 4, D9: a služba is archived, never deleted. What already hangs off it
+ * (appointments, blocks, orders, history) stays; it only stops being offered.
+ * The wording lives here, not in cs.json, which several teams edit at once.
+ */
+const TEXT = {
+  archive: 'Archivovat',
+  restore: 'Obnovit',
+  archiveTitle: 'Archivovat službu?',
+  archiveBody: (name: string) => `Opravdu archivovat službu „${name}“?`,
+  archiveStays:
+    'Existující termíny, objednávky a historie zůstanou. Služba se přestane nabízet pro nové objednávky.',
+  archivedHeading: (count: number) => `Archivované (${count})`,
+  archivedChip: 'Archivovaná',
+  duplicateFallback:
+    'Služba s tímto názvem už existuje. Zvolte jiný název, nebo obnovte archivovanou službu.',
+  nameHelp: 'Třeba „Sportovní lékařské prohlídky“ nebo „Sportovní diagnostika“.',
+};
 
 const emptyDraft = (sortOrder: number): ClinicServiceInput => ({
   name: '',
@@ -59,7 +79,8 @@ export default function ClinicServicesPage() {
 
   const [draft, setDraft] = useState<ClinicServiceInput | null>(null);
   const [editing, setEditing] = useState<ClinicService | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<ClinicService | null>(null);
+  const [confirmArchive, setConfirmArchive] = useState<ClinicService | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   /* What is ticked in the dialog, before it is saved. */
   const [pickedActivities, setPickedActivities] = useState<string[]>([]);
   const [pickedCalendars, setPickedCalendars] = useState<string[]>([]);
@@ -70,7 +91,9 @@ export default function ClinicServicesPage() {
     queryFn: clinicServicesApi.list,
     staleTime: 5 * 60 * 1000,
   });
-  const services = [...(servicesQuery.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+  const allServices = [...(servicesQuery.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+  const services = allServices.filter((svc) => svc.isActive);
+  const archived = allServices.filter((svc) => !svc.isActive);
 
   /*
    * The two lists that can be ticked. Fetched here rather than on the screens
@@ -102,7 +125,7 @@ export default function ClinicServicesPage() {
     setPartlyFailed([]);
   };
 
-  const serviceNameOf = (id: string) => services.find((svc) => svc.id === id)?.name ?? null;
+  const serviceNameOf = (id: string) => allServices.find((svc) => svc.id === id)?.name ?? null;
 
   /*
    * One button, several writes.
@@ -202,16 +225,14 @@ export default function ClinicServicesPage() {
     },
   });
 
-  const remove = useMutation({
+  /* `DELETE` archives on the server (D9): nothing that references the služba is touched. */
+  const archive = useMutation({
     mutationFn: (id: string) => clinicServicesApi.remove(id),
-    onSuccess: async () => { await invalidate(); setConfirmDelete(null); },
+    onSuccess: async () => { await invalidate(); setConfirmArchive(null); },
   });
 
-  /* Its own button, as with calendars: stopping something being offered and
-     deleting it are different acts with different consequences. */
-  const setActive = useMutation({
-    mutationFn: ({ id, active }: { id: string; active: boolean }) =>
-      active ? clinicServicesApi.activate(id) : clinicServicesApi.deactivate(id),
+  const restore = useMutation({
+    mutationFn: (id: string) => clinicServicesApi.activate(id),
     onSuccess: invalidate,
   });
 
@@ -240,6 +261,8 @@ export default function ClinicServicesPage() {
   };
 
   const nameIsValid = (draft?.name ?? '').trim() !== '';
+  /* The server's duplicate-name refusal belongs to the name box, not to a banner. */
+  const duplicate = isDuplicateName(save.error) ? (save.error.serverMessage ?? TEXT.duplicateFallback) : null;
 
   /*
    * What the dialog offers to tick.
@@ -269,7 +292,7 @@ export default function ClinicServicesPage() {
         isLoading={servicesQuery.isLoading}
         isSettled={servicesQuery.isSuccess || servicesQuery.isError}
         error={servicesQuery.error}
-        isEmpty={services.length === 0}
+        isEmpty={allServices.length === 0}
         emptyText="Zatím tu není žádná služba. Bez ní se nedá objednat nic — začněte tím, co ordinace dělá, třeba „Sportovní lékařské prohlídky“."
         onRetry={() => void servicesQuery.refetch()}
         skeletonRows={3}
@@ -281,13 +304,10 @@ export default function ClinicServicesPage() {
               <Card key={service.id} sx={{ borderRadius: 3 }}>
                 <CardContent>
                   <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                    <MedicalServicesIcon sx={{ color: service.isActive ? (service.colorHex ?? 'primary.main') : 'text.disabled', mt: 0.5 }} />
+                    <MedicalServicesIcon sx={{ color: service.colorHex ?? 'primary.main', mt: 0.5 }} />
                     <Box sx={{ minWidth: 160, flex: 1 }}>
                       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
                         <Typography variant="h6" sx={{ fontWeight: 700 }}>{service.name}</Typography>
-                        {!service.isActive && (
-                          <Chip size="small" label="Neaktivní" />
-                        )}
                       </Stack>
                       {service.description !== '' && (
                         <Typography variant="body2" color="text.secondary">
@@ -305,21 +325,12 @@ export default function ClinicServicesPage() {
                           <EditIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title={service.isActive ? 'Zneaktivnit' : 'Znovu aktivovat'}>
+                      <Tooltip title={TEXT.archive}>
                         <IconButton
-                          aria-label={`${service.isActive ? 'Zneaktivnit' : 'Znovu aktivovat'} službu ${service.name}`}
-                          disabled={setActive.isPending}
-                          onClick={() => setActive.mutate({ id: service.id, active: !service.isActive })}
+                          aria-label={`${TEXT.archive} službu ${service.name}`}
+                          onClick={() => { archive.reset(); setConfirmArchive(service); }}
                         >
-                          {service.isActive ? <VisibilityOffIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Smazat">
-                        <IconButton
-                          aria-label={`Smazat službu ${service.name}`}
-                          onClick={() => { remove.reset(); setConfirmDelete(service); }}
-                        >
-                          <DeleteIcon fontSize="small" />
+                          <ArchiveOutlinedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     </Stack>
@@ -357,6 +368,53 @@ export default function ClinicServicesPage() {
               </Card>
             );
           })}
+
+          {archived.length > 0 && (
+            <Box>
+              <Button
+                color="inherit"
+                aria-expanded={showArchived}
+                aria-controls="archived-services"
+                endIcon={<ExpandMoreIcon sx={{ transform: showArchived ? 'rotate(180deg)' : 'none' }} />}
+                onClick={() => setShowArchived((v) => !v)}
+                sx={{ color: 'text.secondary', fontWeight: 600 }}
+              >
+                {TEXT.archivedHeading(archived.length)}
+              </Button>
+              <Collapse in={showArchived} unmountOnExit>
+                <Stack id="archived-services" spacing={1} sx={{ mt: 1 }}>
+                  {archived.map((service) => (
+                    <Card key={service.id} variant="outlined" sx={{ borderRadius: 3, opacity: 0.85 }}>
+                      <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                        <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                          <MedicalServicesIcon sx={{ color: 'text.disabled' }} />
+                          <Box sx={{ minWidth: 160, flex: 1 }}>
+                            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                              <Typography sx={{ fontWeight: 600 }}>{service.name}</Typography>
+                              <Chip size="small" variant="outlined" label={TEXT.archivedChip} />
+                            </Stack>
+                            <Typography variant="caption" color="text.secondary">
+                              {countsText(service)}
+                            </Typography>
+                          </Box>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<UnarchiveOutlinedIcon />}
+                            aria-label={`${TEXT.restore} službu ${service.name}`}
+                            disabled={restore.isPending}
+                            onClick={() => restore.mutate(service.id)}
+                          >
+                            {TEXT.restore}
+                          </Button>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Stack>
+              </Collapse>
+            </Box>
+          )}
         </Stack>
       </AsyncSection>
 
@@ -370,8 +428,10 @@ export default function ClinicServicesPage() {
               <TextField
                 label="Název"
                 value={draft.name}
-                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                helperText="Třeba „Sportovní lékařské prohlídky“ nebo „Sportovní diagnostika“."
+                onChange={(e) => { if (save.isError) save.reset(); setDraft({ ...draft, name: e.target.value }); }}
+                error={duplicate !== null || (draft.name !== '' && !nameIsValid)}
+                helperText={duplicate ?? TEXT.nameHelp}
+                required
                 fullWidth
               />
               <TextField
@@ -523,6 +583,10 @@ export default function ClinicServicesPage() {
                 </Stack>
               )}
 
+              {save.isError && duplicate === null && (
+                <Alert severity="error">{errorText(save.error, t)}</Alert>
+              )}
+
               {partlyFailed.length > 0 && (
                 <Alert severity="warning">{partialFailureText(partlyFailed)}</Alert>
               )}
@@ -534,47 +598,33 @@ export default function ClinicServicesPage() {
           <Button
             variant="contained"
             disabled={!nameIsValid || save.isPending}
-            onClick={() => draft && save.mutate(draft)}
+            onClick={() => draft && nameIsValid && save.mutate({ ...draft, name: draft.name.trim() })}
           >
             Uložit
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={confirmDelete !== null} onClose={() => setConfirmDelete(null)} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ fontWeight: 700 }}>Smazat službu?</DialogTitle>
+      <Dialog open={confirmArchive !== null} onClose={() => setConfirmArchive(null)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 700 }}>{TEXT.archiveTitle}</DialogTitle>
         <DialogContent>
-          <Typography>
-            Opravdu smazat službu „{confirmDelete?.name}“?
-          </Typography>
+          <Typography>{TEXT.archiveBody(confirmArchive?.name ?? '')}</Typography>
+          <Typography sx={{ mt: 1.5 }} color="text.secondary">{TEXT.archiveStays}</Typography>
 
-          {/*
-            * Said before the click, not after it. The server refuses while
-            * anything hangs off the service - and unlike a calendar that is
-            * never final, so this is a "not yet" rather than a wall.
-            */}
-          {confirmDelete !== null && deletionWillBeRefused(confirmDelete) && (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              Zatím to nepůjde — {countsText(confirmDelete)}. Přesuňte je jinam
-              a pak to zkuste znovu. Nebo ji jen zneaktivněte.
-            </Alert>
-          )}
-
-          {remove.error ? (
+          {archive.error ? (
             <Alert severity="error" sx={{ mt: 2 }}>
-              {errorText(remove.error, t)}
+              {errorText(archive.error, t)}
             </Alert>
           ) : null}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setConfirmDelete(null)}>Zrušit</Button>
+          <Button onClick={() => setConfirmArchive(null)}>Zrušit</Button>
           <Button
-            color="error"
             variant="contained"
-            disabled={remove.isPending}
-            onClick={() => confirmDelete && remove.mutate(confirmDelete.id)}
+            disabled={archive.isPending}
+            onClick={() => confirmArchive && archive.mutate(confirmArchive.id)}
           >
-            Smazat
+            {TEXT.archive}
           </Button>
         </DialogActions>
       </Dialog>

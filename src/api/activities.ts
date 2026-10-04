@@ -1,5 +1,5 @@
 import client from './client';
-import { toBookingError } from './apiError';
+import { toNamedError } from './duplicateName';
 import {
   activityListResultSchema,
   activitySaveResultSchema,
@@ -17,7 +17,7 @@ async function request<T>(run: () => Promise<T>): Promise<T> {
   try {
     return await run();
   } catch (error) {
-    throw toBookingError(error);
+    throw toNamedError(error);
   }
 }
 
@@ -83,7 +83,7 @@ export const activitiesApi = {
       return parseResponse(activitySaveResultSchema, res.data);
     }),
 
-  /** 4.3: this discards. The row stays in the list with `isActive: false`. */
+  /** Etapa 4, D9: this ARCHIVES. The row stays in the list with `isActive: false`; nothing that references it is touched. */
   remove: (id: string): Promise<void> =>
     request(async () => {
       await client.delete(`/api/activities/${id}`);

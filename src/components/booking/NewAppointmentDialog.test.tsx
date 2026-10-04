@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { setViewport, VIEWPORTS } from '../../test/viewport';
 
 /* Typing through MUI is slow on a loaded machine; these are whole-flow tests. */
@@ -21,7 +21,6 @@ const getAvailability = vi.fn();
 const create = vi.fn();
 const createUnregistered = vi.fn();
 const createQuick = vi.fn();
-const createClub = vi.fn();
 const listPatients = vi.fn();
 const getProfile = vi.fn();
 const getById = vi.fn();
@@ -39,15 +38,10 @@ vi.mock('../../api/patients', () => ({ patientsApi: { list: listPatients, getPro
 vi.mock('../../api/patientPreRegistration', () => ({
   patientPreRegistrationApi: { preRegister, issueLink },
 }));
-vi.mock('../../services/clubsApi', () => ({ clubsApi: { getAll: getAllClubs, create: createClub } }));
+/* The drawer books patients only (Etapa 4 D8): the clubs register is never read here. */
+vi.mock('../../services/clubsApi', () => ({ clubsApi: { getAll: getAllClubs } }));
 
 const { NewAppointmentDialog } = await import('./NewAppointmentDialog');
-
-/** Where the club flow lands: the clubs screen reads `location.state.newBlock`. */
-function ClubsStub() {
-  const location = useLocation();
-  return <pre data-testid="clubs-state">{JSON.stringify(location.state)}</pre>;
-}
 
 function renderDialog(props: Partial<Parameters<typeof NewAppointmentDialog>[0]> = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -71,7 +65,6 @@ function renderDialog(props: Partial<Parameters<typeof NewAppointmentDialog>[0]>
               />
             }
           />
-          <Route path="/clubs" element={<ClubsStub />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -133,7 +126,6 @@ beforeEach(() => {
     },
     registrationDeadlineUtc: '2026-09-25T07:00:00Z',
   });
-  createClub.mockReset().mockResolvedValue({ id: 'k9', name: 'TJ Sokol Slaný' });
   listPatients.mockReset().mockResolvedValue({
     items: [
       {
@@ -188,7 +180,8 @@ describe('step 1 — kdo přijde', () => {
     const who = screen.getByRole('radiogroup', { name: 'Kdo se objednává' });
     expect(within(who).getByRole('radio', { name: 'Z databáze' })).toBeChecked();
     expect(within(who).getByRole('radio', { name: 'Rychlá registrace' })).not.toBeChecked();
-    expect(within(who).getByRole('radio', { name: 'Klub' })).not.toBeChecked();
+    expect(within(who).getAllByRole('radio')).toHaveLength(2);
+    expect(within(who).queryByRole('radio', { name: 'Klub' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Pokračovat' })).toBeDisabled();
   });
 
@@ -648,121 +641,14 @@ describe('rychlá registrace — čtyři údaje', () => {
   });
 });
 
-describe('klub', () => {
-  async function clubState() {
-    return JSON.parse((await screen.findByTestId('clubs-state')).textContent ?? '{}');
-  }
-
-  it('lists clubs from real data only: contact, athlete count and "Sleva −N %"', async () => {
+describe('no clubs in the patient drawer (D8)', () => {
+  it('has no club mode, no club search and never reads the clubs register', async () => {
     renderDialog();
-    await userEvent.click(screen.getByRole('radio', { name: 'Klub' }));
-    expect(screen.getByRole('heading', { name: 'Hromadná rezervace pro klub' })).toBeInTheDocument();
-    expect(screen.getByText('Krok 1 ze 2 — který klub')).toBeInTheDocument();
-
-    const club = await screen.findByRole('radio', { name: 'FK Slaný' });
-    expect(club).toHaveTextContent('62 sportovců · Jan Novák · +420 606 112 884');
-    expect(club).toHaveTextContent('Sleva −10 %');
-    expect(screen.getByText('1 klub')).toBeInTheDocument();
-  });
-
-  it('leaves out the athlete count and the discount when the server carries none', async () => {
-    getAllClubs.mockResolvedValue([
-      { id: 'k2', name: 'HC Kladno', ico: '1', contactPerson: 'Eva', paymentTermsDays: 14, isActive: true, createdAt: '2026-01-01T00:00:00Z' },
-    ]);
-    renderDialog();
-    await userEvent.click(screen.getByRole('radio', { name: 'Klub' }));
-    const club = await screen.findByRole('radio', { name: 'HC Kladno' });
-    expect(club).toHaveTextContent('Eva');
-    expect(club).not.toHaveTextContent('sportovců');
-    expect(club).not.toHaveTextContent('Sleva');
-  });
-
-  it('hands the club, the calendar and the days over to the clubs screen as newBlock', async () => {
-    renderDialog();
-    await userEvent.click(screen.getByRole('radio', { name: 'Klub' }));
-    await userEvent.click(await screen.findByRole('radio', { name: 'FK Slaný' }));
-    expect(screen.getByLabelText('Od')).toHaveValue('2026-09-24');
-    expect(screen.getByLabelText('Do')).toHaveValue('2026-09-24');
-    fireEvent.change(screen.getByLabelText('Do'), { target: { value: '2026-09-25' } });
-    await userEvent.click(screen.getByRole('button', { name: 'Pokračovat' }));
-
-    expect(await clubState()).toEqual({
-      newBlock: {
-        clubId: 'k1',
-        calendarIds: ['c1'],
-        fromDate: '2026-09-24',
-        toDate: '2026-09-25',
-        dailyFrom: '09:00',
-        dailyTo: '10:00',
-      },
-    });
-    expect(createClub).not.toHaveBeenCalled();
-  });
-
-  it('founds a club with an IČO on the spot and hands over its id', async () => {
-    renderDialog();
-    await userEvent.click(screen.getByRole('radio', { name: 'Klub' }));
-    await screen.findByRole('radio', { name: 'FK Slaný' });
-
-    await userEvent.click(screen.getByRole('button', { name: 'Nový klub — není v seznamu' }));
-    await userEvent.type(screen.getByLabelText('Název klubu'), 'TJ Sokol Slaný');
-    await userEvent.type(screen.getByLabelText('Kontaktní osoba'), 'Eva Nová');
-    await userEvent.type(screen.getByLabelText('Počet sportovců'), '12');
-    await userEvent.type(screen.getByLabelText('IČO'), '12345678');
-    await userEvent.click(screen.getByRole('button', { name: 'Pokračovat' }));
-
-    const state = await clubState();
-    expect(createClub).toHaveBeenCalledWith({
-      name: 'TJ Sokol Slaný',
-      ico: '12345678',
-      contactPerson: 'Eva Nová',
-      contactPhone: undefined,
-      contactEmail: undefined,
-    });
-    expect(state.newBlock).toMatchObject({ clubId: 'k9', headcount: 12, calendarIds: ['c1'] });
-    expect(state.newBlock.newClub).toBeUndefined();
-  });
-
-  it('hands what was typed along as newClub when there is no IČO yet', async () => {
-    renderDialog();
-    await userEvent.click(screen.getByRole('radio', { name: 'Klub' }));
-    await screen.findByRole('radio', { name: 'FK Slaný' });
-    await userEvent.click(screen.getByRole('button', { name: 'Nový klub — není v seznamu' }));
-    await userEvent.type(screen.getByLabelText('Název klubu'), 'TJ Sokol Slaný');
-    await userEvent.type(screen.getByLabelText('Počet sportovců'), '12');
-    await userEvent.click(screen.getByRole('button', { name: 'Pokračovat' }));
-
-    const state = await clubState();
-    expect(createClub).not.toHaveBeenCalled();
-    expect(state.newBlock.clubId).toBeUndefined();
-    /* Nothing typed is left out as undefined, so the block dialog starts with what was given. */
-    expect(state.newBlock.newClub).toEqual({ name: 'TJ Sokol Slaný', headcount: 12 });
-  });
-
-  it('refuses an IČO that is not eight digits and stays put', async () => {
-    renderDialog();
-    await userEvent.click(screen.getByRole('radio', { name: 'Klub' }));
-    await screen.findByRole('radio', { name: 'FK Slaný' });
-    await userEvent.click(screen.getByRole('button', { name: 'Nový klub — není v seznamu' }));
-    await userEvent.type(screen.getByLabelText('Název klubu'), 'TJ Sokol');
-    await userEvent.type(screen.getByLabelText('IČO'), '123');
-    await userEvent.click(screen.getByRole('button', { name: 'Pokračovat' }));
-    expect(await screen.findByText('IČO musí mít přesně 8 číslic.')).toBeInTheDocument();
-    expect(createClub).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('clubs-state')).not.toBeInTheDocument();
-  });
-
-  it('shows the server sentence when founding the club fails, and does not leave the drawer', async () => {
-    createClub.mockRejectedValue(await refusal(409, { message: 'Klub s IČO 12345678 již existuje.' }));
-    renderDialog();
-    await userEvent.click(screen.getByRole('radio', { name: 'Klub' }));
-    await screen.findByRole('radio', { name: 'FK Slaný' });
-    await userEvent.click(screen.getByRole('button', { name: 'Nový klub — není v seznamu' }));
-    await userEvent.type(screen.getByLabelText('Název klubu'), 'TJ Sokol');
-    await userEvent.type(screen.getByLabelText('IČO'), '12345678');
-    await userEvent.click(screen.getByRole('button', { name: 'Pokračovat' }));
-    expect(await screen.findByText('Klub s IČO 12345678 již existuje.')).toBeInTheDocument();
-    expect(screen.queryByTestId('clubs-state')).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Klub' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/klub/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Hromadná rezervace pro klub/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Nový klub/ })).not.toBeInTheDocument();
+    expect(getAllClubs).not.toHaveBeenCalled();
   });
 });
 

@@ -20,6 +20,12 @@ import { buildTheme } from '../../theme';
 import { ThemePrefsContext } from '../../themePrefs';
 
 vi.mock('../../auth/accountRefresh', () => ({ useAccountRefresh: () => undefined }));
+/* The chooser is another module's job; here it only has to be asked to open. */
+vi.mock('../booking/NewOrderChooser', () => {
+  const NewOrderChooser = ({ open, onClose }: { open: boolean; onClose: () => void }) =>
+    open ? <div data-testid="order-chooser"><button type="button" onClick={onClose}>zavřít výběr</button></div> : null;
+  return { NewOrderChooser, default: NewOrderChooser };
+});
 vi.mock('../NotificationCenter', () => ({
   default: () => <button type="button" aria-label="Oznámení">zvonek</button>,
 }));
@@ -160,11 +166,14 @@ describe('desktop (1440): the full sidebar', () => {
     window.removeEventListener(OPEN_SEARCH_EVENT, opened);
   });
 
-  it('opens the booking drawer through the calendar: Nová objednávka navigates with a marker', async () => {
+  it('Nová objednávka opens the chooser and does not navigate', async () => {
     renderShell('/patients', VIEWPORTS.desktop);
+    expect(screen.queryByTestId('order-chooser')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Nová objednávka' }));
-    expect(path()).toBe('/planovani');
-    expect(JSON.parse(screen.getByTestId('state').textContent ?? 'null').newAppointment).toEqual(expect.any(Number));
+    expect(screen.getByTestId('order-chooser')).toBeInTheDocument();
+    expect(path()).toBe('/patients');
+    await userEvent.click(screen.getByRole('button', { name: 'zavřít výběr' }));
+    expect(screen.queryByTestId('order-chooser')).not.toBeInTheDocument();
   });
 
   it('draws the page\'s slot content in the sidebar', () => {
@@ -329,8 +338,8 @@ describe('phone (390): the bottom bar', () => {
     expect(within(top).getByRole('button', { name: 'Hledat' })).toBeInTheDocument();
     expect(within(top).getByRole('button', { name: 'Oznámení' })).toBeInTheDocument();
     await userEvent.click(within(top).getByRole('button', { name: 'Nová objednávka' }));
+    expect(screen.getByTestId('order-chooser')).toBeInTheDocument();
     expect(path()).toBe('/planovani');
-    expect(screen.getByTestId('state')).toHaveTextContent('newAppointment');
   });
 
   it('shows where I am in the top bar, once', () => {
@@ -348,7 +357,7 @@ describe('phone (390): the bottom bar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Více' }));
     const sheet = await screen.findByRole('dialog', { name: 'Více' });
     expect(within(sheet).getByRole('button', { name: 'Nová objednávka' })).toBeInTheDocument();
-    for (const name of ['Výsledky', 'Zranění', 'Návrat do hry', 'Statistiky', 'Přehled', 'Nastavení', 'Pokladna', 'Dnešní přehled', 'Nový pacient']) {
+    for (const name of ['Výsledky', 'Zranění', 'Návrat do hry', 'Přehled', 'Nastavení', 'Pokladna', 'Dnešní přehled', 'Nový pacient']) {
       expect(within(sheet).getByRole('link', { name })).toBeInTheDocument();
     }
     expect(within(sheet).getByRole('button', { name: 'Odhlásit se' })).toBeInTheDocument();
@@ -362,13 +371,13 @@ describe('phone (390): the bottom bar', () => {
     expect(mainNavs()).toHaveLength(1);
   });
 
-  it('Více → Nová objednávka goes to the calendar with the marker', async () => {
+  it('Více → Nová objednávka opens the chooser', async () => {
     renderShell('/patients', VIEWPORTS.phone);
     await userEvent.click(screen.getByRole('button', { name: 'Více' }));
     const sheet = await screen.findByRole('dialog', { name: 'Více' });
     await userEvent.click(within(sheet).getByRole('button', { name: 'Nová objednávka' }));
-    expect(path()).toBe('/planovani');
-    expect(screen.getByTestId('state')).toHaveTextContent('newAppointment');
+    expect(screen.getByTestId('order-chooser')).toBeInTheDocument();
+    expect(path()).toBe('/patients');
   });
 
   it('shows a patient file\'s sections where the page itself has them, not as a sidebar', () => {

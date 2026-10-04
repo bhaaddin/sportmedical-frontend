@@ -1,23 +1,21 @@
 import { Box, ButtonBase, Typography } from "@mui/material";
 import PersonSearchOutlined from "@mui/icons-material/PersonSearchOutlined";
 import PersonAddAlt1Outlined from "@mui/icons-material/PersonAddAlt1Outlined";
-import GroupsOutlined from "@mui/icons-material/GroupsOutlined";
 import { useDevice } from "../../../layout/useDevice";
 import { DESIGN } from "../../ui";
 import type { DrawerMode } from "../NewAppointmentDialog.logic";
 
-/** The three cards under "KDO SE OBJEDNÁVÁ", in the board's order. */
+/** The two cards under "KDO SE OBJEDNÁVÁ", in the board's order. */
 const CARDS: { mode: DrawerMode; label: string; icon: React.ReactNode }[] = [
   { mode: "database", label: "Z databáze", icon: <PersonSearchOutlined fontSize="small" /> },
   { mode: "quick", label: "Rychlá registrace", icon: <PersonAddAlt1Outlined fontSize="small" /> },
-  { mode: "club", label: "Klub", icon: <GroupsOutlined fontSize="small" /> },
 ];
 
 /**
- * Who the slot is for, as three cards: an icon over a word, the chosen one in
+ * Who the slot is for, as two cards: an icon over a word, the chosen one in
  * the accent with a 2px border and the soft tint. The fourth way - a block of
  * time with nobody behind it - is a small link under the cards, not a card:
- * the board has three, and an event is the exception, not a peer.
+ * the board has two, and an event is the exception, not a peer.
  */
 export function ModeCards({
   value,
@@ -28,13 +26,13 @@ export function ModeCards({
   onChange: (mode: DrawerMode) => void;
   disabled?: boolean;
 }) {
-  /* On a phone the three cards are rows: wide, one under the other, easy to hit. */
+  /* On a phone the cards are rows: wide, one under the other, easy to hit. */
   const phone = useDevice() === "phone";
   return (
     <Box
       role="radiogroup"
       aria-label="Kdo se objednává"
-      sx={{ display: "grid", gridTemplateColumns: phone ? "1fr" : "repeat(3, 1fr)", gap: phone ? 1 : 1.5 }}
+      sx={{ display: "grid", gridTemplateColumns: phone ? "1fr" : "repeat(2, 1fr)", gap: phone ? 1 : 1.5 }}
     >
       {CARDS.map((card) => {
         const selected = value === card.mode;

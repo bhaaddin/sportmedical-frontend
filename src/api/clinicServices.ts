@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import client from './client';
-import { toBookingError } from './apiError';
+import { toNamedError } from './duplicateName';
 import { parseResponse } from './bookingContracts';
 
 /*
@@ -54,7 +54,7 @@ async function request<T>(run: () => Promise<T>): Promise<T> {
     return await run();
   } catch (error) {
     // Deliberately not logged: a response body may carry personal data (6.7).
-    throw toBookingError(error);
+    throw toNamedError(error);
   }
 }
 
@@ -79,10 +79,9 @@ export const clinicServicesApi = {
     }),
 
   /*
-   * `409` when činnosti or calendars still hang off it, and the message says
-   * how many of each. Unlike a calendar this is never final: a service can be
-   * emptied by moving its činnosti elsewhere, so the refusal is a "not yet",
-   * and the screen says so.
+   * Etapa 4, D9: this ARCHIVES (`isActive=false`). Appointments, blocks and orders
+   * that reference the služba stay exactly as they are; it only stops being
+   * offered for new orders. Never a hard delete, never refused for references.
    */
   remove: (id: string): Promise<void> =>
     request(async () => {

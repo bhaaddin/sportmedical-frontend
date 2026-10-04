@@ -47,6 +47,10 @@ vi.mock('../api/clubBlocks', async (importOriginal) => {
     fetchBlockableActivities: fetchActivities,
   };
 });
+vi.mock('../api/clubOrders', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/clubOrders')>();
+  return { ...actual, clubOrdersApi: { ...actual.clubOrdersApi, clubSummary: vi.fn().mockRejectedValue(new Error('500')), list: vi.fn().mockResolvedValue([]), get: vi.fn() } };
+});
 vi.mock('../api/calendars', () => ({
   calendarsApi: {
     list: vi.fn().mockResolvedValue([
@@ -352,18 +356,19 @@ describe('ClubsPage in three layouts', () => {
     render(<Wrap><ClubsPage /></Wrap>);
     await screen.findAllByRole('listitem');
     expect(screen.queryByTestId('pinned-actions')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Nový blok' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nová objednávka' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nový blok' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Nový klub' })).toBeInTheDocument();
   });
 
-  it('pins "Nový blok" and "Nový klub" on a phone, and keeps the header free of them', async () => {
+  it('pins "Nová objednávka" and "Nový klub" on a phone, and keeps the header free of them', async () => {
     setViewport(VIEWPORTS.phone);
     render(<Wrap><ClubsPage /></Wrap>);
     await screen.findAllByRole('listitem');
     const bar = screen.getByTestId('pinned-actions');
-    expect(within(bar).getByRole('button', { name: 'Nový blok' })).toBeInTheDocument();
+    expect(within(bar).getByRole('button', { name: 'Nová objednávka' })).toBeInTheDocument();
     expect(within(bar).getByRole('button', { name: 'Nový klub' })).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Nový blok' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Nová objednávka' })).toHaveLength(1);
   });
 
   it.each([
@@ -404,7 +409,7 @@ describe('ClubsPage with club blocks', () => {
     expect(within(cards[0]).getByTestId('club-avatar')).toHaveAttribute('data-color', '');
   });
 
-  it("shows the club's blocks in the detail, with a link to register and 'Nový blok' for this club", async () => {
+  it("shows the club's blocks in the detail, with a link to register and a 'Nová objednávka' for this club", async () => {
     listBlocks.mockResolvedValue([block(), block({ id: 'b-old', status: 'Cancelled', fromDate: '2026-01-05', toDate: '2026-01-09' })]);
     const user = userEvent.setup();
     render(<Wrap><ClubsPage /></Wrap>);
@@ -420,19 +425,17 @@ describe('ClubsPage with club blocks', () => {
     expect(screen.queryByText('Tento klub zatím nemá hromadnou rezervaci.')).not.toBeInTheDocument();
     expect(screen.getByText(/^Blok /)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Nový blok' }));
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('heading', { name: /Nový blok pro klub/ })).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('Klub')).toHaveValue('HC Kladno');
+    expect(screen.queryByRole('button', { name: 'Nový blok' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nová objednávka pro tento klub' })).toBeInTheDocument();
   });
 
-  it('tells a club without anything to make a block or the older reservation', async () => {
+  it('tells a club without anything to make an order or the older reservation', async () => {
     const user = userEvent.setup();
     render(<Wrap><ClubsPage /></Wrap>);
     const cards = await screen.findAllByRole('listitem');
     await user.click(cards[1]);
     expect(await screen.findByText('Tento klub zatím nemá hromadnou rezervaci.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Vytvořit blok' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Založit objednávku' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Vytvořit rezervaci' })).toBeInTheDocument();
   });
 
@@ -447,9 +450,7 @@ describe('ClubsPage with club blocks', () => {
     createBlock.mockResolvedValue(block({ id: 'b-new', clubId: 'club-2' }));
     listBlocks.mockResolvedValueOnce([]).mockResolvedValue([block({ id: 'b-new', clubId: 'club-2' })]);
     const user = userEvent.setup();
-    render(<Wrap><ClubsPage /></Wrap>);
-    await screen.findAllByRole('listitem');
-    await user.click(screen.getByRole('button', { name: 'Nový blok' }));
+    render(<Wrap state={{ newBlock: true }}><ClubsPage /></Wrap>);
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByLabelText('Klub'));
     await user.click(await screen.findByRole('option', { name: 'HC Kladno' }));
@@ -563,6 +564,22 @@ describe('ClubsPage router state', () => {
   it('still opens a club straight away from the older { clubId } hand-off', async () => {
     render(<Wrap state={{ clubId: 'club-1' }}><ClubsPage /></Wrap>);
     expect(await screen.findByRole('heading', { name: 'FK Slaný', level: 1 })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('null'));
+  });
+});
+
+describe('ClubsPage order router state (Etapa 4)', () => {
+  it('opens the order named by openOrderId in the detail drawer and spends the state', async () => {
+    const { clubOrdersApi, toOrder } = await import('../api/clubOrders');
+    vi.mocked(clubOrdersApi.get).mockResolvedValue(toOrder({ id: 'o-7', clubName: 'FK Slaný', status: 'Requested', totalSeats: 12 }));
+    render(<Wrap state={{ openOrderId: 'o-7' }}><ClubsPage /></Wrap>);
+    expect(await screen.findByTestId('order-detail')).toHaveAttribute('data-status', 'Requested');
+    expect(clubOrdersApi.get).toHaveBeenCalledWith('o-7');
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('null'));
+  });
+
+  it('spends a newOrder handoff', async () => {
+    render(<Wrap state={{ newOrder: { clubId: 'club-1' } }}><ClubsPage /></Wrap>);
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('null'));
   });
 });

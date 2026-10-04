@@ -26,6 +26,10 @@ vi.mock('../../api/clubBlocks', async (importOriginal) => {
     fetchBlockableActivities: fetchActivities,
   };
 });
+vi.mock('../../api/clubOrders', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../api/clubOrders')>();
+  return { ...actual, clubOrdersApi: { ...actual.clubOrdersApi, clubSummary: vi.fn().mockRejectedValue(new Error('500')), list: vi.fn().mockResolvedValue([]) } };
+});
 vi.mock('../../api/calendars', () => ({ calendarsApi: { list: vi.fn().mockResolvedValue([]) } }));
 vi.mock('../../api/clubs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../api/clubs')>();
@@ -74,7 +78,7 @@ const openDetail = () =>
     <Wrap>
       <ClubDetail
         row={rowOf()} clubs={[club]} allBlocks={blocks} priceOf={() => null} pricesReady focusBlockId={null}
-        onBack={vi.fn()} onEdit={vi.fn()} onDeactivate={vi.fn()} onReload={vi.fn()} onInvoice={vi.fn()} onNewReservation={vi.fn()} onNewBlock={vi.fn()}
+        onBack={vi.fn()} onEdit={vi.fn()} onDeactivate={vi.fn()} onReload={vi.fn()} onInvoice={vi.fn()} onNewReservation={vi.fn()} onNewOrder={vi.fn()}
       />
     </Wrap>,
   );

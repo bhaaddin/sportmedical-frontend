@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline, Box, Typography, CircularProgress, Button } from '@mui/material';
-import { Science, Dashboard, People, Settings, CalendarMonth, Receipt, AttachMoney, Today, ArrowBack, Assessment, Groups, EventBusy, RateReview, FactCheck, HealthAndSafety, Psychology, MonitorHeart, Spa, EventAvailable, PersonAdd, BarChart } from '@mui/icons-material';
+import { Science, Dashboard, People, Settings, CalendarMonth, Receipt, AttachMoney, Today, ArrowBack, Assessment, Groups, EventBusy, RateReview, FactCheck, HealthAndSafety, Psychology, MonitorHeart, Spa, EventAvailable, PersonAdd, BarChart, ListAlt, EventNote, SportsSoccer, Insights, Event } from '@mui/icons-material';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { usePermissions, type Permission } from './auth/usePermission';
 import { useAccountRefresh } from './auth/accountRefresh';
@@ -19,6 +19,7 @@ import { WhereAmI, computeCrumbs, useDocumentTitle } from './components/shell/wh
 import { loginUrl } from './components/shell/loginRedirect';
 import { RAIL_WIDTH, SIDEBAR_WIDTH } from './components/shell/shellStyles';
 import type { MenuEntry, ShellNav } from './components/shell/shellTypes';
+import { SECTION_CHILDREN, type ContextualParent } from './components/shell/shellModel';
 import { useDevice } from './layout/useDevice';
 import { buildTheme, type ThemeMode } from './theme';
 import {
@@ -152,24 +153,27 @@ function PageLoader() {
  * below, so the parents stay the one-line literals two tests read from this
  * file's text (`catalogue.test.ts`, `patientRoutes.test.ts`).
  */
+const CHILD_ICONS: Record<string, React.ReactNode> = {
+  'Dnešní přehled': <Today />, 'Přehled podle služeb': <Assessment />, 'Dostupnost': <EventBusy />,
+  'Klubová objednávka': <Groups />, 'Přehled pacientů': <People />, 'Nový pacient': <PersonAdd />,
+  'Kontrola registrací': <RateReview />, 'Přehled klubů': <Groups />, 'Objednávky klubů': <ListAlt />,
+  'Rezervace': <Event />, 'Hráči': <SportsSoccer />, 'Statistiky': <Insights />, 'Fakturace': <Receipt />,
+};
+const withIcons = (parent: ContextualParent): MenuEntry[] =>
+  SECTION_CHILDREN[parent].map((c) => ({ ...c, icon: CHILD_ICONS[c.text] ?? <EventNote /> }));
+
 const MENU_CHILDREN: Record<string, MenuEntry[]> = {
-  '/planovani': [
-    { text: 'Dnešní přehled', icon: <Today />, path: '/dnes' },
-    /*
-     * No `requires`, and that is measured, not forgotten: everything behind
-     * this screen - GET /api/day, …/preview, …/availability, /api/activities,
-     * /api/clinic-services - carries `[Authorize]` and per-calendar
-     * visibility only, no named permission. An employee who sees one
-     * calendar gets the overview of that one calendar, and the server is
-     * what narrows it (6.5).
-     */
-    { text: 'Přehled podle služeb', icon: <Assessment />, path: '/prehled-sluzeb' },
-    { text: 'Dostupnost', icon: <EventBusy />, path: '/availability' },
-  ],
-  '/patients': [
-    { text: 'Nový pacient', icon: <PersonAdd />, path: '/patients/register', requires: 'patients.register' },
-    { text: 'Kontrola registrací', icon: <RateReview />, path: '/intake-review', requires: 'patients.register' },
-  ],
+  /*
+   * Kalendář, Pacienti and Kluby a týmy are CONTEXTUAL (Matko, 4. 10. 2026):
+   * their children are the model in components/shell/shellModel.ts
+   * (SECTION_CHILDREN, with the permission each needs) plus an icon here.
+   * The no-`requires` note that used to sit on "Přehled podle služeb" lives
+   * there: everything behind it carries [Authorize] and per-calendar
+   * visibility only, and the server narrows it (6.5).
+   */
+  '/planovani': withIcons('/planovani'),
+  '/patients': withIcons('/patients'),
+  '/clubs': withIcons('/clubs'),
   '/diagnostics/new': [
     { text: 'Diagnostika a měření', icon: <Science />, path: '/diagnostics/new' },
     { text: 'Zranění', icon: <HealthAndSafety />, path: '/injuries' },

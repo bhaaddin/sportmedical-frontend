@@ -18,6 +18,7 @@ import { Add, Close, Logout, MoreHoriz, Search } from '@mui/icons-material';
 import NotificationCenter from '../NotificationCenter';
 import { openUniversalSearch } from '../UniversalSearch';
 import { signOut } from '../../auth/signOut';
+import { NewOrderChooser } from '../booking/NewOrderChooser';
 import { AppearanceControls } from './AccountMenu';
 import { Trail, type Crumb } from './whereAmI';
 import { isActivePath, shortLabel } from './shellModel';
@@ -32,7 +33,9 @@ export const PHONE_TOP_BAR = `calc(${BAR_HEIGHT}px + env(safe-area-inset-top, 0p
 export const PHONE_BOTTOM_BAR = `calc(${BAR_HEIGHT}px + env(safe-area-inset-bottom, 0px))`;
 
 export function PhoneTopBar({ nav, crumbs }: { nav: ShellNav; crumbs: Crumb[] }) {
+  const [chooser, setChooser] = useState(false);
   return (
+    <>
     <Box
       component="header"
       data-shell="topbar"
@@ -71,7 +74,7 @@ export function PhoneTopBar({ nav, crumbs }: { nav: ShellNav; crumbs: Crumb[] })
       <NotificationCenter buttonSx={{ width: 44, height: 44 }} />
       <IconButton
         aria-label="Nová objednávka"
-        onClick={nav.onNewAppointment}
+        onClick={() => setChooser(true)}
         sx={{
           width: 44,
           height: 44,
@@ -85,6 +88,8 @@ export function PhoneTopBar({ nav, crumbs }: { nav: ShellNav; crumbs: Crumb[] })
         <Add />
       </IconButton>
     </Box>
+    <NewOrderChooser open={chooser} onClose={() => setChooser(false)} />
+    </>
   );
 }
 
@@ -115,11 +120,12 @@ function BarItem({ to, label, fullLabel, icon, active }: { to: string; label: st
 }
 
 /** A row of the "Více" sheet: 48px, a link that closes the sheet. */
-function SheetLink({ to, children, active, indent = false, onClick }: { to: string; children: React.ReactNode; active: boolean; indent?: boolean; onClick: () => void }) {
+function SheetLink({ to, state, children, active, indent = false, onClick }: { to: string; state?: unknown; children: React.ReactNode; active: boolean; indent?: boolean; onClick: () => void }) {
   return (
     <Box
       component={Link}
       to={to}
+      state={state}
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       sx={{
@@ -156,6 +162,7 @@ function SheetHeading({ children }: { children: React.ReactNode }) {
 
 export function PhoneBottomBar({ nav }: { nav: ShellNav }) {
   const [more, setMore] = useState(false);
+  const [chooser, setChooser] = useState(false);
   const close = () => setMore(false);
   useEffect(() => { setMore(false); }, [nav.pathname]);
 
@@ -264,7 +271,7 @@ export function PhoneBottomBar({ nav }: { nav: ShellNav }) {
         <Box
           component="button"
           type="button"
-          onClick={() => { close(); nav.onNewAppointment(); }}
+          onClick={() => { close(); setChooser(true); }}
           sx={{
             height: 48,
             width: '100%',
@@ -300,7 +307,7 @@ export function PhoneBottomBar({ nav }: { nav: ShellNav }) {
           <Box key={e.path}>
             <SheetHeading>{e.text}</SheetHeading>
             {(e.children ?? []).map((c) => (
-              <SheetLink key={c.path} to={c.path} active={here(c.path)} onClick={close}>{c.text}</SheetLink>
+              <SheetLink key={c.path} to={c.path} state={c.state} active={!c.shortcut && here(c.path)} onClick={close}>{c.text}</SheetLink>
             ))}
           </Box>
         ))}
@@ -323,6 +330,7 @@ export function PhoneBottomBar({ nav }: { nav: ShellNav }) {
           </ButtonBase>
         </Box>
       </Drawer>
+      <NewOrderChooser open={chooser} onClose={() => setChooser(false)} />
     </>
   );
 }

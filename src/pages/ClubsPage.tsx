@@ -55,6 +55,10 @@ import { ClubCard } from './clubs/ClubCard';
 import { ClubDetail } from './clubs/ClubDetail';
 import { PayerDialog } from './clubs/PayerDialog';
 import { PinnedActions } from './clubs/PinnedActions';
+import { ClubOrderDialog } from '../components/clubs/order/ClubOrderDialog';
+import { ClubOrderDetailPanel } from '../components/clubs/orders/ClubOrderDetailPanel';
+import { hasOrderState, readOrderState } from '../components/clubs/orders/orderRouteState';
+import type { NewOrderPrefill } from '../components/clubs/orders/orderRouteState';
 
 const FILTERS: { key: ClubFilter; label: string }[] = [
   { key: 'all', label: 'Všechny' },
@@ -80,6 +84,13 @@ export default function ClubsPage() {
   const device = useDevice();
   const phone = device === 'phone';
   const handoff = readState(location.state);
+  const orderHandoff = readOrderState(location.state);
+
+  /* Etapa 4: the order dialog (new, optionally prefilled) and an order's detail drawer. */
+  const [orderDialog, setOrderDialog] = useState<NewOrderPrefill | null>(() =>
+    orderHandoff.newOrder === undefined ? null : orderHandoff.newOrder === true ? {} : orderHandoff.newOrder,
+  );
+  const [openOrderId, setOpenOrderId] = useState<string | null>(orderHandoff.openOrderId ?? null);
 
   const [filter, setFilter] = useState<ClubFilter>('all');
   const [search, setSearch] = useState('');
@@ -187,7 +198,7 @@ export default function ClubsPage() {
   /* Spend the handoff once it has done its job, so Back does not reopen it.
      Mount-only on purpose: everything it carried has been read into state. */
   useEffect(() => {
-    if (handoff !== null && (handoff.clubId !== undefined || handoff.clubBlockId !== undefined || handoff.newBlock !== undefined)) {
+    if (hasOrderState(orderHandoff) || (handoff !== null && (handoff.clubId !== undefined || handoff.clubBlockId !== undefined || handoff.newBlock !== undefined))) {
       navigate(location.pathname, { replace: true, state: null });
     }
   }, []);
@@ -220,6 +231,20 @@ export default function ClubsPage() {
 
   const dialogs = (
     <>
+      <ClubOrderDialog
+        open={orderDialog !== null}
+        onClose={() => setOrderDialog(null)}
+        initial={orderDialog ?? undefined}
+        onSaved={(saved) => {
+          setOrderDialog(null);
+          if (saved.clubId !== '') setSelectedId(saved.clubId);
+          setOpenOrderId(saved.id);
+          reload();
+        }}
+      />
+      {openOrderId !== null ? (
+        <ClubOrderDetailPanel orderId={openOrderId} onClose={() => setOpenOrderId(null)} onChanged={reload} />
+      ) : null}
       {editing !== null ? <PayerDialog editing={editing} onClose={() => setEditing(null)} onSaved={reload} /> : null}
       {blockDialog !== null ? (
         <ClubBlockDialog
@@ -289,7 +314,8 @@ export default function ClubsPage() {
               state: { clubId: selected.club.id, calendarId: selected.order?.calendarId ?? calendars[0]?.id },
             })
           }
-          onNewBlock={() => setBlockDialog({ clubId: selected.club.id })}
+          onNewOrder={() => setOrderDialog({ clubId: selected.club.id })}
+          onOpenOrder={setOpenOrderId}
         />
         {dialogs}
       </Box>
@@ -309,7 +335,7 @@ export default function ClubsPage() {
           phone ? undefined : (
             <>
               <Button variant="outlined" onClick={() => setEditing('new')}>Nový klub</Button>
-              <Button variant="contained" onClick={() => setBlockDialog({})}>Nový blok</Button>
+              <Button variant="contained" onClick={() => setOrderDialog({})}>Nová objednávka</Button>
             </>
           )
         }
@@ -388,7 +414,7 @@ export default function ClubsPage() {
 
       <PinnedActions>
         <Button variant="outlined" onClick={() => setEditing('new')}>Nový klub</Button>
-        <Button variant="contained" onClick={() => setBlockDialog({})}>Nový blok</Button>
+        <Button variant="contained" onClick={() => setOrderDialog({})}>Nová objednávka</Button>
       </PinnedActions>
 
       {dialogs}

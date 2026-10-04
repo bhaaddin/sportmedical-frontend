@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  athletesWord,
-  clubMatches,
-  clubsWord,
   drawerTitle,
   endClock,
   formatCzk,
@@ -10,7 +7,6 @@ import {
   initials,
   isCompleteMoment,
   isQuickDraftComplete,
-  isValidIco,
   isStartOffered,
   minutesWord,
   normalizePhone,
@@ -187,35 +183,15 @@ describe('the drawer\'s words (board 2026-10-03)', () => {
     expect(quickDraftProblems({ name: 'Filip Fehér', phone: '', email: 'f@x.cz', activityId: '' })).toEqual({});
   });
 
-  it('knows an IČO is eight digits', () => {
-    expect(isValidIco('12345678')).toBe(true);
-    expect(isValidIco('123 456 78')).toBe(true);
-    expect(isValidIco('1234567')).toBe(false);
-    expect(isValidIco('1234567a')).toBe(false);
-    expect(athletesWord(1)).toBe('1 sportovec');
-    expect(athletesWord(3)).toBe('3 sportovci');
-    expect(athletesWord(62)).toBe('62 sportovců');
-  });
-
   it('heads each step the way the board words it', () => {
     expect(stepSubtitle(1, 'database')).toBe('Krok 1 ze 2 — kdo přijde');
     /* A new caller has no second step: the four facts book the slot. */
     expect(stepSubtitle(1, 'quick')).toBe('Rychlá registrace — nový pacient');
-    expect(stepSubtitle(1, 'club')).toBe('Krok 1 ze 2 — který klub');
     expect(stepSubtitle(2, 'quick')).toBe('Krok 2 ze 2 — co se bude dělat');
-    expect(drawerTitle('club')).toBe('Hromadná rezervace pro klub');
     expect(drawerTitle('database')).toBe('Objednat termín');
   });
 
-  it('finds a club by name or contact, without diacritics, and counts in Czech', () => {
-    const club = { name: 'FK Slaný', contactPerson: 'Jan Novák' };
-    expect(clubMatches(club, 'slany')).toBe(true);
-    expect(clubMatches(club, 'novák')).toBe(true);
-    expect(clubMatches(club, '')).toBe(true);
-    expect(clubMatches(club, 'kladno')).toBe(false);
-    expect(clubsWord(1)).toBe('1 klub');
-    expect(clubsWord(4)).toBe('4 kluby');
-    expect(clubsWord(5)).toBe('5 klubů');
+  it('counts found patients in Czech', () => {
     expect(foundPatientsWord(1)).toBe('1 nalezen');
     expect(foundPatientsWord(3)).toBe('3 nalezeni');
   });

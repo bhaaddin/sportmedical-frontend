@@ -137,10 +137,17 @@ describe('SettingsNav', () => {
   const renderNav = (path: string, props: React.ComponentProps<typeof SettingsNav> = {}) =>
     render(<MemoryRouter initialEntries={[path]}><SettingsNav {...props} /></MemoryRouter>);
 
-  it('makes each group heading a link to its page, so clicking "Systém" opens something', () => {
+  it('makes each group heading a disclosure button: the current group open, the others closed', async () => {
     renderNav('/working-hours');
+    expect(screen.getByRole('button', { name: 'Provoz' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Systém' })).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Systém' }));
+    expect(screen.getByRole('button', { name: 'Systém' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('keeps the compact (phone) nav as links to the group pages', () => {
+    render(<MemoryRouter initialEntries={['/settings']}><SettingsNav compact /></MemoryRouter>);
     expect(screen.getByRole('link', { name: 'Systém' })).toHaveAttribute('href', '/settings/system');
-    expect(screen.getByRole('link', { name: 'Provoz' })).toHaveAttribute('href', '/settings/provoz');
   });
 
   it('marks the item you are on', () => {

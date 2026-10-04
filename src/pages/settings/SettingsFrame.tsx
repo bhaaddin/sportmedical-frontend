@@ -21,10 +21,10 @@
  * A screen rendered outside a router - the unit tests do that - gets the
  * header and the content: the breadcrumb is a link, and links need a router.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link as RouterLink, useInRouterContext, useLocation } from 'react-router-dom';
 import { Alert, Box, Button, InputAdornment, Skeleton, Stack, TextField, Typography } from '@mui/material';
-import { ArrowBack, ChevronRight, Refresh as RefreshIcon, Search as SearchIcon } from '@mui/icons-material';
+import { ArrowBack, ChevronRight, ExpandMore, Refresh as RefreshIcon, Search as SearchIcon } from '@mui/icons-material';
 import { usePermissions } from '../../auth/usePermission';
 import { useIsPhone } from '../../layout/useDevice';
 import { RecentChanges } from '../../components/settings/RecentChanges';
@@ -71,6 +71,17 @@ export function SettingsNav({
   const sections = searchSections(visibleSections(usePermissions()), q);
   const here = settingsItemAt(location.pathname);
   const hereGroup = /^\/settings\/([a-z0-9-]+)$/.exec(location.pathname)?.[1];
+  /*
+   * The groups fold (Matko, 4. 10. 2026: "Provoz must not be permanently
+   * expanded"): every heading is a disclosure button, all closed except the
+   * group of the page you are on. One at a time - opening another closes the
+   * open one - and while a search is typed the matching groups are all shown
+   * open. Per visit only; nothing is stored.
+   */
+  const currentGroup = here?.section.id ?? hereGroup ?? null;
+  const [openId, setOpenId] = useState<string | null>(currentGroup);
+  useEffect(() => { setOpenId(currentGroup); }, [currentGroup]);
+  const searching = q.trim() !== '';
 
   return (
     <Box
@@ -121,30 +132,61 @@ export function SettingsNav({
         </Typography>
       )}
 
-      {sections.map((section) => (
-        <Box key={section.id} sx={compact ? { mt: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.5 } : { mt: 2.5 }}>
+      {sections.map((section) => {
+        const expanded = compact || searching || openId === section.id;
+        return (
+        <Box key={section.id} sx={compact ? { mt: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.5 } : { mt: 0.5 }}>
           <Box
-            component={RouterLink}
-            to={groupPath(section.id)}
-            aria-current={hereGroup === section.id ? 'page' : undefined}
+            {...(compact
+              ? { component: RouterLink, to: groupPath(section.id), 'aria-current': hereGroup === section.id ? ('page' as const) : undefined }
+              : {
+                  component: 'button',
+                  type: 'button',
+                  id: `settings-group-${section.id}`,
+                  'aria-expanded': expanded,
+                  'aria-controls': `settings-group-${section.id}-items`,
+                  onClick: () => setOpenId((id) => (id === section.id ? null : section.id)),
+                })}
             sx={[
               TYPE.label,
               {
-                display: 'block',
+                display: compact ? 'block' : 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                minHeight: compact ? undefined : 44,
                 px: 1.5,
                 py: 0.75,
                 mb: 0.25,
                 textDecoration: 'none',
+                textAlign: 'left',
+                fontFamily: 'inherit',
+                border: 0,
+                bgcolor: 'transparent',
+                cursor: 'pointer',
                 color: 'text.primary',
                 borderRadius: 1,
-                ...(compact ? { width: '100%', px: 0 } : {}),
+                ...(compact ? { px: 0 } : {}),
                 '&:hover': { bgcolor: settingsHover },
                 ...focusRing,
               },
             ]}
           >
             {section.label}
+            {!compact && (
+              <ExpandMore
+                aria-hidden
+                sx={{ fontSize: 20, color: settingsGrey, transition: 'transform 120ms', transform: expanded ? 'rotate(180deg)' : 'none' }}
+              />
+            )}
           </Box>
+          {expanded && (
+          <Box
+            id={compact ? undefined : `settings-group-${section.id}-items`}
+            role={compact ? undefined : 'group'}
+            aria-labelledby={compact ? undefined : `settings-group-${section.id}`}
+            sx={compact ? { display: 'contents' } : undefined}
+          >
           {section.items.map((item) => {
             const active = here?.item.id === item.id && here?.section.id === section.id;
             return (
@@ -194,8 +236,11 @@ export function SettingsNav({
               </Box>
             );
           })}
+          </Box>
+          )}
         </Box>
-      ))}
+        );
+      })}
     </Box>
   );
 }

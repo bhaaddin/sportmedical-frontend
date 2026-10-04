@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Chip,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
@@ -22,7 +23,8 @@ import {
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import DeleteIcon from "@mui/icons-material/Delete";
+import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import EditIcon from "@mui/icons-material/Edit";
 import PublicIcon from "@mui/icons-material/Public";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -34,7 +36,8 @@ import { questionnaireEditorApi } from "../../api/questionnaireEditor";
 import { usePermission } from "../../auth/usePermission";
 import { useLocation, useNavigate } from "react-router-dom";
 import { assignableCount, handoffAction, handoffFrom } from "./serviceHandoff";
-import RestoreIcon from "@mui/icons-material/Restore";
+import UnarchiveOutlinedIcon from "@mui/icons-material/UnarchiveOutlined";
+import { isDuplicateName } from "../../api/duplicateName";
 import MenuItem from "@mui/material/MenuItem";
 import { warningKey } from "../../api/bookingContracts";
 import type {
@@ -60,6 +63,24 @@ import {
  */
 
 const CODEBOOK_STALE_MS = 5 * 60 * 1000;
+
+/*
+ * Etapa 4, D9: a činnost is archived, never deleted. Appointments, blocks and
+ * orders that reference it stay; it only stops being offered. The wording lives
+ * here, not in cs.json, which several teams edit at once.
+ */
+const TEXT = {
+  archive: "Archivovat",
+  restore: "Obnovit",
+  archiveTitle: "Archivovat činnost?",
+  archiveBody: (name: string) => `Opravdu archivovat činnost „${name}“?`,
+  archiveStays:
+    "Existující termíny, objednávky a historie zůstanou. Činnost se přestane nabízet pro nové objednávky.",
+  archivedHeading: (count: number) => `Archivované (${count})`,
+  archivedChip: "archivováno",
+  duplicateFallback:
+    "Činnost s tímto názvem už v této službě existuje. Zvolte jiný název, nebo obnovte archivovanou činnost.",
+};
 
 function emptyDraft(sortOrder: number): ActivityInput {
   return {
@@ -91,6 +112,7 @@ export default function ActivitiesPage() {
   const [editing, setEditing] = useState<Activity | null>(null);
   const [draft, setDraft] = useState<ActivityInput | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Activity | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   /** Warnings the owner has clicked away this session. */
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
@@ -136,6 +158,9 @@ export default function ActivitiesPage() {
       ),
     [activitiesQuery.data],
   );
+
+  const activeActivities = activities.filter((a) => a.isActive);
+  const archivedActivities = activities.filter((a) => !a.isActive);
 
   /**
    * 3.1: the read carries the same warnings as the write, so an unsellable
@@ -271,6 +296,10 @@ export default function ActivitiesPage() {
   const showHandoffNotice = handoffAsks === 'assign' && handedOver !== handoffTaken;
 
   const nameIsValid = (draft?.name ?? "").trim().length > 0;
+  /* The server's duplicate-name refusal belongs to the name box, not to a banner. */
+  const duplicate = isDuplicateName(save.error)
+    ? (save.error.serverMessage ?? TEXT.duplicateFallback)
+    : null;
 
   /* A činnost belongs to exactly one služba and the server refuses it without
      one, so the save waits rather than failing after the fact. */
@@ -357,11 +386,10 @@ export default function ActivitiesPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {activities.map((activity) => (
+              {activeActivities.map((activity) => (
                 <TableRow
                   key={activity.id}
                   hover
-                  sx={{ opacity: activity.isActive ? 1 : 0.55 }}
                 >
                   <TableCell>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -378,15 +406,6 @@ export default function ActivitiesPage() {
                       <Typography sx={{ fontWeight: 600 }}>
                         {activity.name}
                       </Typography>
-                      {/* 4.3: a discard keeps the row and its slug. Say so in
-                          words - the dimming alone is not the message (7.1). */}
-                      {activity.isActive ? null : (
-                        <Chip
-                          size="small"
-                          variant="outlined"
-                          label={t("booking.activities.discarded")}
-                        />
-                      )}
                     </Box>
                   </TableCell>
                   <TableCell>
@@ -438,45 +457,62 @@ export default function ActivitiesPage() {
                         <EditIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    {activity.isActive ? (
-                      /*
-                        * Not "Smazat". `DELETE /api/activities/{id}` retires:
-                        * the row stays, keeps its slug, is marked "vyřazeno",
-                        * and the button that undoes it sits two columns along
-                        * this very row. The dialog said "Tuto akci nelze
-                        * vrátit zpět" while the undo was on screen beside it.
-                        *
-                        * Wording only. Činnosti may yet get the split the
-                        * calendars got (a real DELETE, a 409 with a count, and
-                        * deactivate/activate of their own); building that now
-                        * would be work thrown away. A sentence that is false
-                        * today is false whatever the contract becomes.
-                        */
-                      <Tooltip title={t("booking.activities.retireAction")}>
-                        <IconButton
-                          aria-label={`${t("booking.activities.retireAction")} — ${activity.name}`}
-                          onClick={() => setConfirmDelete(activity)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    ) : (
-                      <Tooltip title={t("booking.activities.restore")}>
-                        <IconButton
-                          aria-label={t("booking.activities.restore")}
-                          disabled={restore.isPending}
-                          onClick={() => restore.mutate(activity.id)}
-                        >
-                          <RestoreIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
+                    <Tooltip title={TEXT.archive}>
+                      <IconButton
+                        aria-label={`${TEXT.archive} — ${activity.name}`}
+                        onClick={() => { remove.reset(); setConfirmDelete(activity); }}
+                      >
+                        <ArchiveOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </Box>
+
+        {archivedActivities.length > 0 && (
+          <Box sx={{ mt: 2 }}>
+            <Button
+              color="inherit"
+              aria-expanded={showArchived}
+              aria-controls="archived-activities"
+              endIcon={<ExpandMoreIcon sx={{ transform: showArchived ? "rotate(180deg)" : "none" }} />}
+              onClick={() => setShowArchived((v) => !v)}
+              sx={{ color: "text.secondary", fontWeight: 600 }}
+            >
+              {TEXT.archivedHeading(archivedActivities.length)}
+            </Button>
+            <Collapse in={showArchived} unmountOnExit>
+              <Stack id="archived-activities" spacing={0.5} sx={{ mt: 1 }}>
+                {archivedActivities.map((activity) => (
+                  <Box
+                    key={activity.id}
+                    sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", py: 0.5 }}
+                  >
+                    <Box
+                      aria-hidden
+                      sx={{ width: 14, height: 14, borderRadius: "3px", backgroundColor: activity.color, flexShrink: 0, opacity: 0.5 }}
+                    />
+                    <Typography sx={{ fontWeight: 600, flex: 1, minWidth: 140 }}>{activity.name}</Typography>
+                    <Chip size="small" variant="outlined" label={TEXT.archivedChip} />
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<UnarchiveOutlinedIcon />}
+                      aria-label={`${TEXT.restore} — ${activity.name}`}
+                      disabled={restore.isPending}
+                      onClick={() => restore.mutate(activity.id)}
+                    >
+                      {TEXT.restore}
+                    </Button>
+                  </Box>
+                ))}
+              </Stack>
+            </Collapse>
+          </Box>
+        )}
       </AsyncSection>
 
       <Dialog
@@ -499,8 +535,12 @@ export default function ActivitiesPage() {
                 fullWidth
                 label={t("booking.activities.column.name")}
                 value={draft.name}
-                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                error={draft.name !== "" && !nameIsValid}
+                onChange={(e) => {
+                  if (save.isError) save.reset();
+                  setDraft({ ...draft, name: e.target.value });
+                }}
+                error={duplicate !== null || (draft.name !== "" && !nameIsValid)}
+                helperText={duplicate ?? undefined}
               />
               <TextField
                 required
@@ -767,7 +807,7 @@ export default function ActivitiesPage() {
                 </Box>
               ) : null}
               {/* 422 keeps the form filled in, so the message sits inside the dialog. */}
-              {save.error ? (
+              {save.error && duplicate === null ? (
                 <Alert severity="error">{errorText(save.error, t)}</Alert>
               ) : null}
             </Stack>
@@ -778,7 +818,7 @@ export default function ActivitiesPage() {
           <Button
             variant="contained"
             disabled={!nameIsValid || !durationIsValid || !serviceIsValid || save.isPending}
-            onClick={() => draft && save.mutate(draft)}
+            onClick={() => draft && nameIsValid && save.mutate({ ...draft, name: draft.name.trim() })}
           >
             {t("booking.common.save")}
           </Button>
@@ -789,12 +829,11 @@ export default function ActivitiesPage() {
         open={confirmDelete !== null}
         onClose={() => setConfirmDelete(null)}
       >
-        <DialogTitle>{t("booking.activities.deleteTitle")}</DialogTitle>
+        <DialogTitle>{TEXT.archiveTitle}</DialogTitle>
         <DialogContent>
-          <Typography>
-            {t("booking.activities.deleteBody", {
-              name: confirmDelete?.name ?? "",
-            })}
+          <Typography>{TEXT.archiveBody(confirmDelete?.name ?? "")}</Typography>
+          <Typography sx={{ mt: 1.5 }} color="text.secondary">
+            {TEXT.archiveStays}
           </Typography>
           {remove.error ? (
             <Alert severity="error" sx={{ mt: 2 }}>
@@ -813,7 +852,7 @@ export default function ActivitiesPage() {
             disabled={remove.isPending}
             onClick={() => confirmDelete && remove.mutate(confirmDelete.id)}
           >
-            {t("booking.activities.retireAction")}
+            {TEXT.archive}
           </Button>
         </DialogActions>
       </Dialog>

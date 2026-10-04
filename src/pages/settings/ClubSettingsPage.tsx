@@ -5,6 +5,11 @@
 
      registrationLinkValidityDays   how long a club's registration link stays
                                     valid
+     releaseUnusedDaysBefore        optional (Etapa 4). Empty = never. N days before
+                                    a club order's window starts, the capacity the
+                                    order does not need is opened to the public
+     allowMultiServiceOrders        switch, off by default: one club order may
+                                    hold more than one služba
      minimumPlayers                 optional. Empty = no minimum (saved as
                                     null). When set, the calculator warns
                                     below it and the public Kluby page names it
@@ -20,7 +25,7 @@
 
 import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import { Alert, Box, InputAdornment, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, FormControlLabel, InputAdornment, Stack, Switch, TextField, Typography } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { clubSettingsApi, CLUB_SETTINGS_QUERY_KEY } from '../../api/clubs';
@@ -33,11 +38,15 @@ import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 interface Draft {
   registrationLinkValidityDays: string;
   minimumPlayers: string;
+  releaseUnusedDaysBefore: string;
+  allowMultiServiceOrders: boolean;
 }
 
 const toDraft = (s: ClubSettings): Draft => ({
   registrationLinkValidityDays: String(s.registrationLinkValidityDays),
   minimumPlayers: s.minimumPlayers === null ? '' : String(s.minimumPlayers),
+  releaseUnusedDaysBefore: s.releaseUnusedDaysBefore == null ? '' : String(s.releaseUnusedDaysBefore),
+  allowMultiServiceOrders: s.allowMultiServiceOrders === true,
 });
 
 const wholeNumber = (text: string): number | null => {
@@ -48,6 +57,12 @@ const wholeNumber = (text: string): number | null => {
 /** What stops the draft being sent - the server has the last word, this spares the round trip. */
 export function validateClubSettings(draft: Draft): Partial<Record<keyof Draft, string>> {
   const errors: Partial<Record<keyof Draft, string>> = {};
+  /* Empty is a valid answer: never release. 0 = on the day itself. */
+  if (draft.releaseUnusedDaysBefore.trim() !== '') {
+    const release = wholeNumber(draft.releaseUnusedDaysBefore);
+    if (release === null) errors.releaseUnusedDaysBefore = 'Zadejte celý počet dní (0 a víc), nebo pole nechte prázdné.';
+    else if (release > 3650) errors.releaseUnusedDaysBefore = 'Víc než deset let je nejspíš překlep.';
+  }
   const days = wholeNumber(draft.registrationLinkValidityDays);
   if (days === null) errors.registrationLinkValidityDays = 'Zadejte celý počet dní.';
   else if (days < 1) errors.registrationLinkValidityDays = 'Odkaz musí platit aspoň jeden den.';
@@ -105,6 +120,9 @@ export default function ClubSettingsPage() {
       ...saved,
       registrationLinkValidityDays: wholeNumber(draft.registrationLinkValidityDays) as number,
       minimumPlayers: draft.minimumPlayers.trim() === '' ? null : (wholeNumber(draft.minimumPlayers) as number),
+      releaseUnusedDaysBefore:
+        draft.releaseUnusedDaysBefore.trim() === '' ? null : (wholeNumber(draft.releaseUnusedDaysBefore) as number),
+      allowMultiServiceOrders: draft.allowMultiServiceOrders,
     });
   };
 
@@ -115,8 +133,11 @@ export default function ClubSettingsPage() {
     setAttempted(false);
   };
 
-  const edit = (field: keyof Draft, value: string) => {
-    setEdits((e) => ({ ...(e ?? (saved !== undefined ? toDraft(saved) : { registrationLinkValidityDays: '', minimumPlayers: '' })), [field]: value }));
+  const edit = <K extends keyof Draft>(field: K, value: Draft[K]) => {
+    setEdits((e) => ({
+      ...(e ?? (saved !== undefined ? toDraft(saved) : { registrationLinkValidityDays: '', minimumPlayers: '', releaseUnusedDaysBefore: '', allowMultiServiceOrders: false })),
+      [field]: value,
+    }));
     setServerErrors((e) => ({ ...e, [field]: '', [field.charAt(0).toUpperCase() + field.slice(1)]: '' }));
   };
 
@@ -129,7 +150,7 @@ export default function ClubSettingsPage() {
   return (
     <SettingsScreen
       title="Nastavení klubů"
-      subtitle="Platnost registračních odkazů a nepovinné minimum sportovců v bloku."
+      subtitle="Platnost registračních odkazů, minimum sportovců v bloku a pravidla klubových objednávek."
       width={760}
       scope="clubs"
       save={{ dirty, saving: save.isPending, onSave: submit, onDiscard: discard }}
@@ -173,6 +194,43 @@ export default function ClubSettingsPage() {
                 input: { endAdornment: <InputAdornment position="end">sportovců</InputAdornment> },
               }}
             />
+          </SoftCard>
+
+          <SoftCard>
+            <SectionLabel>Klubové objednávky</SectionLabel>
+            <Stack spacing={2}>
+              <TextField
+                label="Otevřít nevyužitou kapacitu veřejnosti X dní před termínem"
+                value={draft.releaseUnusedDaysBefore}
+                onChange={(e) => edit('releaseUnusedDaysBefore', e.target.value)}
+                error={fieldError('releaseUnusedDaysBefore') !== undefined}
+                helperText={
+                  fieldError('releaseUnusedDaysBefore') ??
+                  'Prázdné pole = nikdy. Tolik dní před začátkem termínu se čas, který objednávka klubu nepotřebuje pro ještě neobsazená místa, vrátí do veřejné nabídky. Už zapsaní sportovci se nikdy nemění.'
+                }
+                size={phone ? 'medium' : 'small'}
+                fullWidth
+                slotProps={{
+                  htmlInput: { inputMode: 'numeric' },
+                  input: { endAdornment: <InputAdornment position="end">dní</InputAdornment> },
+                }}
+              />
+              <Box>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={draft.allowMultiServiceOrders}
+                      onChange={(e) => edit('allowMultiServiceOrders', e.target.checked)}
+                    />
+                  }
+                  label="Povolit v jedné objednávce více služeb"
+                />
+                <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', ml: 6 }}>
+                  {fieldError('allowMultiServiceOrders') ??
+                    'Vypnuto: objednávka klubu patří vždy jedné službě. Zapnuto: klub může v jedné objednávce kombinovat činnosti více služeb.'}
+                </Typography>
+              </Box>
+            </Stack>
           </SoftCard>
 
           <SoftCard tone="muted">

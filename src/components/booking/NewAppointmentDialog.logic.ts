@@ -110,8 +110,8 @@ export function isStartOffered(
 
 /* ── The drawer's words and small decisions (design board 2026-10-03, screens 8–11) ── */
 
-/** The four ways to fill one slot, as the drawer's mode cards name them. */
-export type DrawerMode = 'database' | 'quick' | 'club' | 'event';
+/** The three ways to fill one slot, as the drawer's mode cards name them. */
+export type DrawerMode = 'database' | 'quick' | 'event';
 
 /** Which of the two steps the drawer is on: who comes, then what is done. */
 export type DrawerStep = 1 | 2;
@@ -254,47 +254,6 @@ export function isQuickDraftComplete(draft: QuickPatientDraft): boolean {
   );
 }
 
-/** A club the desk is founding from the drawer, handed on to the reservation screen. */
-export interface NewClubDraft {
-  name: string;
-  contactPerson: string;
-  phone: string;
-  email: string;
-  /** Typed as text; parsed where it is used. */
-  athleteCount: string;
-  /**
-   * Optional here, but the clubs register will not hold a club without one: with
-   * eight digits the club is created on the spot, without them the reservation
-   * screen is handed the rest of the facts and asks for it there.
-   */
-  ico: string;
-}
-
-export const EMPTY_CLUB_DRAFT: NewClubDraft = {
-  name: '',
-  contactPerson: '',
-  phone: '',
-  email: '',
-  athleteCount: '',
-  ico: '',
-};
-
-/** An IČO is exactly eight digits; spaces typed between them are ignored. */
-export function normalizeIco(value: string): string {
-  return value.replace(/\s+/g, '');
-}
-
-export function isValidIco(value: string): boolean {
-  return /^\d{8}$/.test(normalizeIco(value));
-}
-
-/** `1 sportovec`, `3 sportovci`, `62 sportovců` - the Czech plural, counted. */
-export function athletesWord(count: number): string {
-  const abs = Math.abs(count);
-  const word = abs === 1 ? 'sportovec' : abs >= 2 && abs <= 4 ? 'sportovci' : 'sportovců';
-  return `${count} ${word}`;
-}
-
 /** The header's second line, the way the board words each step. */
 export function stepSubtitle(step: DrawerStep, mode: DrawerMode): string {
   if (step === 2) return 'Krok 2 ze 2 — co se bude dělat';
@@ -302,8 +261,6 @@ export function stepSubtitle(step: DrawerStep, mode: DrawerMode): string {
     case 'quick':
       /* No second step: the slot is chosen, so the four facts book it. */
       return 'Rychlá registrace — nový pacient';
-    case 'club':
-      return 'Krok 1 ze 2 — který klub';
     case 'event':
       return 'Krok 1 ze 2 — bez pacienta';
     default:
@@ -311,38 +268,12 @@ export function stepSubtitle(step: DrawerStep, mode: DrawerMode): string {
   }
 }
 
-/** The header's title: the club flow has its own name on the board. */
-export function drawerTitle(mode: DrawerMode): string {
-  return mode === 'club' ? 'Hromadná rezervace pro klub' : 'Objednat termín';
+/** The header's title. */
+export function drawerTitle(_mode: DrawerMode): string {
+  return 'Objednat termín';
 }
 
-/** Lower case, no diacritics - so `Slany` finds `FK Slaný`. */
-export function foldText(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/** Whether a club row answers the search box: by name or by contact person. */
-export function clubMatches(
-  club: { name: string; contactPerson?: string | null },
-  query: string,
-): boolean {
-  const q = foldText(query);
-  if (q === '') return true;
-  return foldText(club.name).includes(q) || foldText(club.contactPerson ?? '').includes(q);
-}
-
-/** `3 nalezeni` / `1 nalezen` / `4 kluby` - the count in the search box. */
+/** `3 nalezeni` / `1 nalezen` - the count in the search box. */
 export function foundPatientsWord(count: number): string {
   return count === 1 ? '1 nalezen' : `${count} nalezeni`;
-}
-
-export function clubsWord(count: number): string {
-  if (count === 1) return '1 klub';
-  if (count >= 2 && count <= 4) return `${count} kluby`;
-  return `${count} klubů`;
 }

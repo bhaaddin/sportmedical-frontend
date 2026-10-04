@@ -10,6 +10,7 @@ import { Box, Divider, Skeleton, Stack, Typography } from '@mui/material';
 import { SoftCard, StatusChip } from '../../components/ui';
 import type { ChipTone } from '../../components/ui';
 import { ClubAvatar } from '../../components/clubs/ClubAvatar';
+import { useClubSummary } from '../../components/clubs/orders/ClubSummaryCard';
 import { formatDiscount } from './clubOrders';
 import type { ClubStatus } from './clubOrders';
 import type { ClubRow } from './clubRow';
@@ -36,6 +37,11 @@ export function Figure({ value, label }: { value: string; label: string }) {
 
 export function ClubCard({ row, ordersLoading, onOpen }: { row: ClubRow; ordersLoading: boolean; onOpen: () => void }) {
   const chip = STATUS_CHIP[row.status];
+  /* The club as one whole from the server; the block totals stand in when that call fails or says nothing. */
+  const summary = useClubSummary(row.club.id).data;
+  const seats = summary !== undefined && summary.totalSeats > 0
+    ? { seats: summary.totalSeats, registered: summary.registered, remaining: summary.remaining }
+    : row.seatTotals !== null ? { seats: row.seatTotals.seats, registered: row.seatTotals.registered, remaining: Math.max(0, row.seatTotals.seats - row.seatTotals.registered) } : null;
   return (
     <SoftCard
       role="listitem"
@@ -73,9 +79,10 @@ export function ClubCard({ row, ordersLoading, onOpen }: { row: ClubRow; ordersL
       <Divider sx={{ my: 1.75 }} />
       <Stack direction="row" spacing={4}>
         <Figure value={row.headcount === null ? '—' : String(row.headcount)} label="sportovců" />
-        {row.seatTotals !== null ? (
-          <Figure value={`${row.seatTotals.registered} / ${row.seatTotals.seats}`} label="zapsáno / míst" />
+        {seats !== null ? (
+          <Figure value={`${seats.registered} / ${seats.seats}`} label="zapsáno / míst" />
         ) : null}
+        {summary !== undefined && summary.totalSeats > 0 ? <Figure value={String(seats?.remaining ?? 0)} label="ještě chybí" /> : null}
         <Figure value={formatDiscount(row.percent)} label="sleva" />
       </Stack>
     </SoftCard>

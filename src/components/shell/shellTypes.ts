@@ -19,6 +19,10 @@ export interface MenuEntry {
   requires?: Permission;
   /** The screens that belong under this one; shown under the entry that is open. */
   children?: MenuEntry[];
+  /** Router state handed to the target (a shortcut such as "Klubová objednávka"). */
+  state?: unknown;
+  /** Starts something on its target: never drawn as the screen you are on. */
+  shortcut?: boolean;
 }
 
 export interface ShellUser {

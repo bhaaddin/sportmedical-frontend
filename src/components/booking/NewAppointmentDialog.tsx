@@ -19,13 +19,12 @@ import ContentCopy from "@mui/icons-material/ContentCopy";
 import EventBusyOutlined from "@mui/icons-material/EventBusyOutlined";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { Link as RouterLink } from "react-router-dom";
 import { appointmentsApi } from "../../api/appointments";
 import { activitiesApi } from "../../api/activities";
 import { workingHoursApi } from "../../api/workingHours";
 import { calendarsApi } from "../../api/calendars";
 import { patientPreRegistrationApi } from "../../api/patientPreRegistration";
-import { clubsApi } from "../../services/clubsApi";
 import { useDevice } from "../../layout/useDevice";
 import { BookingApiError } from "../../api/apiError";
 import { isKnownPaperworkReason } from "../../api/bookingContracts";
@@ -41,7 +40,6 @@ import { dayState, dayStateLabelKey } from "../../pages/booking/dayState";
 import { AsyncSection } from "./AsyncSection";
 import { errorText } from "./errorText";
 import { ActivityCards } from "./drawer/ActivityCards";
-import { ClubPicker } from "./drawer/ClubPicker";
 import { DrawerFrame } from "./drawer/DrawerFrame";
 import { ModeCards } from "./drawer/ModeCards";
 import { PatientSearch } from "./patient/PatientSearch";
@@ -59,7 +57,6 @@ import { usePatientCard } from "./patient/patientCard";
 import { toHit, type PatientHit } from "./patient/patientTypeahead";
 import { patientsApi } from "../../api/patients";
 import {
-  EMPTY_CLUB_DRAFT,
   EMPTY_QUICK_DRAFT,
   drawerTitle,
   endClock,
@@ -68,8 +65,6 @@ import {
   isDateOnly,
   isQuickDraftComplete,
   isStartOffered,
-  isValidIco,
-  normalizeIco,
   normalizePhone,
   normalizeTime,
   parseLocalDateTime,
@@ -83,7 +78,6 @@ import {
   type DrawerMode,
   type DrawerStep,
   type LocalMoment,
-  type NewClubDraft,
   type QuickPatientDraft,
 } from "./NewAppointmentDialog.logic";
 
@@ -96,7 +90,7 @@ import {
  *
  * This is the only screen in the application that creates an appointment.
  *
- * Step 1 - "kdo přijde" - has three cards and one small link:
+ * Step 1 - "kdo přijde" - has two cards and one small link (clubs are not booked here, Etapa 4 D8):
  *   - **Z databáze**: search the register, pick the row.
  *   - **Rychlá registrace** (Etapa 2, decision 7, contract C2): the caller is
  *     new, the slot is already chosen, so four things are typed - name and
@@ -105,9 +99,6 @@ import {
  *     of birth, ever; no second step. The panel that follows shows the
  *     deadline the server set, the link to copy, and what is prefilled.
  *     Nothing is sent: there is no mail or SMS provider yet.
- *   - **Klub**: pick or found the club and the days, then hand over to the
- *     clubs screen (`/clubs`, `location.state.newBlock`), which opens the block
- *     dialog with it.
  *   - *Jen zablokovat čas bez pacienta*: the old "Událost bez vazby" - a
  *     slot with nobody behind it, for training or a service visit.
  *
@@ -189,9 +180,6 @@ const TEXT = {
   linkSent: "E-mail s odkazem je ve frontě k odeslání.",
   linkValidUntil: (when: string) =>
     `Platí do ${when}. Když pacient do té doby registraci nedokončí, rezervace se uvolní.`,
-  foundingClub: "Zakládám klub…",
-  clubIcoInvalid: "IČO musí mít přesně 8 číslic.",
-  clubCreateFailed: "Klub se nepodařilo založit. Zkuste to prosím znovu.",
   linkFailed: "Odkaz se nepodařilo vygenerovat.",
   linkRetry: "Zkusit znovu",
 };
@@ -227,6 +215,12 @@ interface NewAppointmentDialogProps {
    * patient already chosen, so the desk goes straight to the činnost.
    */
   initialPatientId?: string;
+  /**
+   * Opened from "Nová objednávka → Rychlá registrace": the drawer starts in the
+   * quick-registration mode, with the činnost already chosen when one is given.
+   */
+  initialQuick?: boolean;
+  initialActivityId?: string;
 }
 
 interface IssuedLinkView {
@@ -254,11 +248,12 @@ export function NewAppointmentDialog({
   initialStart,
   initialEnd,
   initialPatientId,
+  initialQuick = false,
+  initialActivityId,
   onFindNextFree,
 }: NewAppointmentDialogProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   /*
    * Booking past the offer: the person who may change an appointment is the
    * person who may book one outside what the server offered.
@@ -292,16 +287,13 @@ export function NewAppointmentDialog({
 
   /* ── The two steps and who the slot is for ── */
   const [step, setStep] = useState<DrawerStep>(1);
-  const [mode, setMode] = useState<DrawerMode>("database");
+  const [mode, setMode] = useState<DrawerMode>(initialQuick ? "quick" : "database");
   const [patient, setPatient] = useState<PatientHit | null>(null);
-  const [quick, setQuick] = useState<QuickPatientDraft>(EMPTY_QUICK_DRAFT);
+  const [quick, setQuick] = useState<QuickPatientDraft>(() => ({
+    ...EMPTY_QUICK_DRAFT,
+    activityId: initialActivityId ?? "",
+  }));
   const [eventName, setEventName] = useState("");
-  const [clubId, setClubId] = useState<string | null>(null);
-  const [clubDraft, setClubDraft] = useState<NewClubDraft>(EMPTY_CLUB_DRAFT);
-  /* The days a club block covers; empty means "the day of the slot". */
-  const [clubRange, setClubRange] = useState({ from: "", to: "" });
-  const [clubError, setClubError] = useState<string | null>(null);
-  const [foundingClub, setFoundingClub] = useState(false);
   /* What the desk sees once a quick registration went through. */
   const [quickBooked, setQuickBooked] = useState<QuickBookedView | null>(null);
   /* The server's refusal of the four facts, pinned to the box it named. */
@@ -606,10 +598,6 @@ export function NewAppointmentDialog({
     setPatient(null);
     setQuick(EMPTY_QUICK_DRAFT);
     setEventName("");
-    setClubId(null);
-    setClubDraft(EMPTY_CLUB_DRAFT);
-    setClubRange({ from: "", to: "" });
-    setClubError(null);
     setQuickBooked(null);
     setQuickRefusal(null);
     setActivityId("");
@@ -636,7 +624,6 @@ export function NewAppointmentDialog({
     setSendLink(false);
     setConflict(null);
     setQuickRefusal(null);
-    setClubError(null);
   };
 
   /* From the empty search result straight to the new-patient card, name carried over. */
@@ -706,105 +693,15 @@ export function NewAppointmentDialog({
 
   const goToStep2 = () => setStep(2);
 
-  /* Who the slot is for is ready when: a patient is picked; a club is picked or
-     named (club); or nothing is needed (event). A new caller (quick) never
-     continues to step 2 - the four facts book the slot straight away. */
-  const whoReady =
-    patient !== null ||
-    (mode === "club"
-      ? clubId !== null || clubDraft.name.trim().length > 0
-      : mode === "event");
+  /* Who the slot is for is ready when a patient is picked or nothing is needed
+     (event). A new caller (quick) never continues to step 2 - the four facts book
+     the slot straight away. */
+  const whoReady = patient !== null || mode === "event";
 
-  const rangeFrom = clubRange.from || date;
-  const rangeTo = clubRange.to || clubRange.from || date;
-  const rangeOk = isDateOnly(rangeFrom) && isDateOnly(rangeTo) && rangeTo >= rangeFrom;
-
-  const canContinue =
-    whoReady && whenComplete && !foundingClub && (mode !== "club" || rangeOk);
-
-  /*
-   * Klub: the block itself is the clubs screen's. A club that is not in the list
-   * is founded here when it has an IČO (the register will not hold one without);
-   * without an IČO what was typed goes along as `newClub` and the block dialog
-   * asks for the rest. Either way the days, the calendar and the club arrive in
-   * `location.state.newBlock`.
-   */
-  const continueClub = async () => {
-    setClubError(null);
-    const typedName = clubDraft.name.trim();
-    const headcount = Number.parseInt(clubDraft.athleteCount, 10) || undefined;
-    let resolvedClubId: string | undefined = clubId ?? undefined;
-    let newClub:
-      | {
-          name: string;
-          contactPerson?: string;
-          contactPhone?: string;
-          contactEmail?: string;
-          headcount?: number;
-        }
-      | undefined;
-
-    if (clubId === null && typedName !== "") {
-      const contact = {
-        contactPerson: clubDraft.contactPerson.trim() || undefined,
-        contactPhone: normalizePhone(clubDraft.phone) || undefined,
-        contactEmail: clubDraft.email.trim() || undefined,
-      };
-      if (clubDraft.ico.trim() !== "") {
-        if (!isValidIco(clubDraft.ico)) {
-          setClubError(TEXT.clubIcoInvalid);
-          return;
-        }
-        setFoundingClub(true);
-        try {
-          const created = await clubsApi.create({
-            name: typedName,
-            ico: normalizeIco(clubDraft.ico),
-            ...contact,
-          });
-          resolvedClubId = created.id;
-          void queryClient.invalidateQueries({ queryKey: ["clubs"] });
-        } catch (error) {
-          const data = (error as { response?: { data?: { message?: unknown } } })?.response?.data;
-          setClubError(
-            typeof data?.message === "string" && data.message.trim() !== ""
-              ? data.message
-              : TEXT.clubCreateFailed,
-          );
-          return;
-        } finally {
-          setFoundingClub(false);
-        }
-      } else {
-        newClub = { name: typedName, ...contact, headcount };
-      }
-    }
-
-    navigate("/clubs", {
-      state: {
-        newBlock: {
-          clubId: resolvedClubId,
-          newClub,
-          /* A club founded just now carries its headcount here - the register has no such field. */
-          headcount: resolvedClubId !== undefined && clubId === null ? headcount : undefined,
-          calendarIds: [effectiveCalendarId],
-          fromDate: rangeFrom,
-          toDate: rangeTo,
-          /* The dragged hours, when there were any - the block dialog may use them as its daily window. */
-          dailyFrom: selectionEnd ? normalizeTime(time) : undefined,
-          dailyTo: selectionEnd ?? undefined,
-        },
-      },
-    });
-    close();
-  };
+  const canContinue = whoReady && whenComplete;
 
   const continueStep1 = () => {
     if (!canContinue) return;
-    if (mode === "club") {
-      void continueClub();
-      return;
-    }
     goToStep2();
   };
 
@@ -1268,7 +1165,7 @@ export function NewAppointmentDialog({
       ) : (
         <Box component="section" aria-label={TEXT.who}>
           <SectionLabel>{TEXT.who}</SectionLabel>
-          <ModeCards value={mode} onChange={changeMode} disabled={booking || foundingClub} />
+          <ModeCards value={mode} onChange={changeMode} disabled={booking} />
           <Link
             component="button"
             type="button"
@@ -1335,21 +1232,6 @@ export function NewAppointmentDialog({
         </Box>
       ) : null}
 
-      {mode === "club" ? (
-        <ClubPicker
-          selectedId={clubId}
-          onSelect={setClubId}
-          draft={clubDraft}
-          onDraft={(next) => {
-            setClubDraft(next);
-            setClubError(null);
-          }}
-          range={{ from: rangeFrom, to: rangeTo }}
-          onRange={setClubRange}
-          error={clubError}
-          disabled={foundingClub}
-        />
-      ) : null}
     </Stack>
   );
 
@@ -1593,7 +1475,7 @@ export function NewAppointmentDialog({
               () => submitBooking(),
             )
           : primary(
-              foundingClub ? TEXT.foundingClub : TEXT.continue,
+              TEXT.continue,
               !canContinue,
               continueStep1,
             )}

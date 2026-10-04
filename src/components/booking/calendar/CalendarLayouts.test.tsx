@@ -16,6 +16,10 @@ import { SidebarSlot, SidebarSlotProvider } from '../../shell/SidebarSlot';
  */
 
 vi.mock('../../../api/calendars', () => ({ calendarsApi: { list: vi.fn() } }));
+/* The club order dialog has its own tests; here only what the calendar hands it matters. */
+vi.mock('../../clubs/order/ClubOrderDialog', () => ({
+  ClubOrderDialog: (props: { initial?: unknown }) => <pre data-testid="club-order-initial">{JSON.stringify(props.initial)}</pre>,
+}));
 vi.mock('../../../api/clinicServices', () => ({ clinicServicesApi: { list: vi.fn() } }));
 vi.mock('../../../api/holidays', () => ({ holidaysApi: { year: vi.fn() } }));
 vi.mock('../../../api/clinicSettings', () => ({ readPublicClinic: vi.fn(), readSettings: vi.fn() }));
@@ -282,10 +286,19 @@ describe('desktop · 1440', () => {
     fireEvent.pointerDown(column, { button: 0, clientY: 100, clientX: 100, pointerId: 1 });
     fireEvent.pointerUp(column, { clientY: 100, clientX: 100, pointerId: 1 });
     fireEvent.click(screen.getByRole('menuitem', { name: /Rezervovat pro klub/ }));
-    const state = JSON.parse((await screen.findByTestId('clubs-state')).textContent ?? '{}');
-    expect(state.newBlock).toMatchObject({ calendarIds: ['c2'], fromDate: DAY, toDate: DAY });
-    expect(state.newBlock.dailyFrom).toMatch(/^\d\d:\d\d$/);
-    expect(state.newBlock.dailyTo).toMatch(/^\d\d:\d\d$/);
+    const initial = JSON.parse((await screen.findByTestId('club-order-initial')).textContent ?? '{}');
+    expect(initial.calendarIds).toEqual(['c2']);
+    expect(initial.ranges).toHaveLength(1);
+    expect(initial.ranges[0]).toMatchObject({ fromDate: DAY, toDate: DAY });
+    expect(initial.ranges[0].dailyFrom).toMatch(/^\d\d:\d\d$/);
+    expect(initial.ranges[0].dailyTo).toMatch(/^\d\d:\d\d$/);
+  });
+
+  it('the toolbar button "Klubová objednávka" opens the club order dialog without a head start', async () => {
+    renderPage(VIEWPORTS.desktop, 'week');
+    fireEvent.click(await screen.findByRole('button', { name: 'Klubová objednávka' }));
+    const initial = JSON.parse((await screen.findByTestId('club-order-initial')).textContent ?? 'null');
+    expect(initial).toEqual({});
   });
 
   it('month: dragging across days picks a range, pills it, and "Rezervovat pro klub" hands it on', async () => {
@@ -303,9 +316,10 @@ describe('desktop · 1440', () => {
     expect(await screen.findByText('12. 10. – 25. 10.')).toBeInTheDocument();
     expect(screen.getByText('14 dní')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: /Rezervovat pro klub/ }));
-    const state = JSON.parse((await screen.findByTestId('clubs-state')).textContent ?? '{}');
-    expect(state).toEqual({
-      newBlock: { calendarIds: ['c1', 'c2', 'c3'], fromDate: '2026-10-12', toDate: '2026-10-25' },
+    const initial = JSON.parse((await screen.findByTestId('club-order-initial')).textContent ?? '{}');
+    expect(initial).toEqual({
+      calendarIds: ['c1', 'c2', 'c3'],
+      ranges: [{ fromDate: '2026-10-12', toDate: '2026-10-25' }],
     });
   });
 
@@ -463,8 +477,8 @@ describe('tablet · 834', () => {
     fireEvent.click(screen.getByTestId('month-day-2026-10-25'), { clientX: 200, clientY: 200 });
     expect(await screen.findByText('12. 10. – 25. 10.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: /Rezervovat pro klub/ }));
-    const state = JSON.parse((await screen.findByTestId('clubs-state')).textContent ?? '{}');
-    expect(state.newBlock).toMatchObject({ fromDate: '2026-10-12', toDate: '2026-10-25' });
+    const initial = JSON.parse((await screen.findByTestId('club-order-initial')).textContent ?? '{}');
+    expect(initial.ranges[0]).toMatchObject({ fromDate: '2026-10-12', toDate: '2026-10-25' });
   });
 });
 

@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { setViewport, VIEWPORTS, type ViewportName } from '../../test/viewport';
 
 vi.setConfig({ testTimeout: 20000 });
@@ -38,14 +38,9 @@ vi.mock('../../api/patients', () => ({ patientsApi: { list: listPatients, getPro
 vi.mock('../../api/patientPreRegistration', () => ({
   patientPreRegistrationApi: { issueLink: vi.fn() },
 }));
-vi.mock('../../services/clubsApi', () => ({ clubsApi: { getAll: getAllClubs, create: vi.fn() } }));
+vi.mock('../../services/clubsApi', () => ({ clubsApi: { getAll: getAllClubs } }));
 
 const { NewAppointmentDialog } = await import('./NewAppointmentDialog');
-
-function ClubsStub() {
-  const location = useLocation();
-  return <pre data-testid="clubs-state">{JSON.stringify(location.state)}</pre>;
-}
 
 function renderDialog() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -67,7 +62,6 @@ function renderDialog() {
               />
             }
           />
-          <Route path="/clubs" element={<ClubsStub />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -246,11 +240,11 @@ describe('what a finger has to hit', () => {
     expect(getComputedStyle(change).minHeight).toBe('44px');
   });
 
-  it('desktop keeps the board\'s three cards in a row and its 46 px footer buttons', () => {
+  it('desktop keeps the board\'s two cards in a row and its 46 px footer buttons', () => {
     viewportFor('desktop');
     renderDialog();
     expect(screen.getByRole('radiogroup', { name: 'Kdo se objednává' })).toHaveStyle({
-      gridTemplateColumns: 'repeat(3, 1fr)',
+      gridTemplateColumns: 'repeat(2, 1fr)',
     });
     const footer = within(panel()).getByTestId('panel-footer');
     for (const button of within(footer).getAllByRole('button')) {
@@ -259,19 +253,16 @@ describe('what a finger has to hit', () => {
   });
 });
 
-describe('the club hand-off, on every device', () => {
-  it.each(['phone', 'tablet', 'desktop'] as ViewportName[])('emits newBlock at %s width', async (name) => {
+describe('no clubs in the drawer, on every device', () => {
+  it.each(['phone', 'tablet', 'desktop'] as ViewportName[])('offers only database and quick registration at %s width', async (name) => {
     viewportFor(name);
     renderDialog();
-    await userEvent.click(screen.getByRole('radio', { name: 'Klub' }));
-    await userEvent.click(await screen.findByRole('radio', { name: 'FK Slaný' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Pokračovat' }));
-    const state = JSON.parse((await screen.findByTestId('clubs-state')).textContent ?? '{}');
-    expect(state.newBlock).toMatchObject({
-      clubId: 'k1',
-      calendarIds: ['c1'],
-      fromDate: '2026-09-24',
-      toDate: '2026-09-24',
-    });
+    const who = await screen.findByRole('radiogroup', { name: 'Kdo se objednává' });
+    expect(within(who).getAllByRole('radio').map((r) => r.textContent)).toEqual(['Z databáze', 'Rychlá registrace']);
+    expect(screen.queryByLabelText(/klub/i)).not.toBeInTheDocument();
+    await userEvent.click(within(who).getByRole('radio', { name: 'Rychlá registrace' }));
+    expect(screen.getByLabelText('Jméno a příjmení')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/klub/i)).not.toBeInTheDocument();
+    expect(getAllClubs).not.toHaveBeenCalled();
   });
 });

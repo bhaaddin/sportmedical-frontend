@@ -12,12 +12,14 @@
  * On a settings route the whole content is replaced - never two sidebars:
  * "← Zpět do aplikace", the brand, the settings search and its groups.
  */
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Avatar, Box, Button, ButtonBase, IconButton } from '@mui/material';
 import { ArrowBack, Search } from '@mui/icons-material';
 import NotificationCenter from '../NotificationCenter';
 import { openUniversalSearch } from '../UniversalSearch';
 import { SettingsNav } from '../../pages/settings/SettingsFrame';
+import { NewOrderChooser } from '../booking/NewOrderChooser';
 import { SidebarSlot } from './SidebarSlot';
 import { STAFF_HOME_PATH } from '../../web/sitePaths';
 import { childIsActive, entryState, mainEntries } from './shellModel';
@@ -68,12 +70,13 @@ export function Brand({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function NewAppointmentButton({ nav, onNavigate }: { nav: ShellNav; onNavigate?: () => void }) {
+/** "Nová objednávka": opens the chooser (the shell variant owns its state). */
+export function NewAppointmentButton({ onNewOrder, onNavigate }: { onNewOrder: () => void; onNavigate?: () => void }) {
   return (
     <Button
       variant="contained"
       fullWidth
-      onClick={() => { onNavigate?.(); nav.onNewAppointment(); }}
+      onClick={() => { onNavigate?.(); onNewOrder(); }}
       sx={{ height: 44, minHeight: 44, flexShrink: 0, fontSize: 14 }}
     >
       Nová objednávka
@@ -113,12 +116,13 @@ export function MainNav({ nav, onNavigate }: { nav: ShellNav; onNavigate?: () =>
                 }}
               >
                 {state.items.map((child: MenuEntry) => {
-                  const active = childIsActive(nav, child, state.exact);
+                  const active = childIsActive(nav, child, state.items, state.exact);
                   return (
                     <Box
                       key={child.path}
                       component={Link}
                       to={child.path}
+                      state={child.state}
                       onClick={onNavigate}
                       aria-current={active ? 'page' : undefined}
                       sx={rowSx(active, false, true)}
@@ -196,10 +200,13 @@ export function AccountRow({ nav }: { nav: ShellNav }) {
 export function SidebarBody({
   nav,
   onNavigate,
+  onNewOrder,
   withSlot,
 }: {
   nav: ShellNav;
   onNavigate?: () => void;
+  /** Opens the "Nová objednávka" chooser. */
+  onNewOrder: () => void;
   /** Draw the page's slot (desktop only; tablet and phone pages show that content themselves). */
   withSlot: boolean;
 }) {
@@ -241,7 +248,7 @@ export function SidebarBody({
     <>
       <Brand onNavigate={onNavigate} />
       <Box sx={{ mt: '22px', flexShrink: 0 }}>
-        <NewAppointmentButton nav={nav} onNavigate={onNavigate} />
+        <NewAppointmentButton onNewOrder={onNewOrder} onNavigate={onNavigate} />
       </Box>
       <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', mt: 2.5, mx: '-6px', px: '6px' }}>
         <MainNav nav={nav} onNavigate={onNavigate} />
@@ -254,7 +261,9 @@ export function SidebarBody({
 
 /** The desktop sidebar: fixed to the left edge, 258px, full height. */
 export function DesktopSidebar({ nav }: { nav: ShellNav }) {
+  const [chooser, setChooser] = useState(false);
   return (
+    <>
     <Box
       component="aside"
       aria-label={nav.settingsMode ? 'Nastavení' : 'Postranní panel'}
@@ -277,7 +286,9 @@ export function DesktopSidebar({ nav }: { nav: ShellNav }) {
         zIndex: (t) => t.zIndex.drawer,
       }}
     >
-      <SidebarBody nav={nav} withSlot />
+      <SidebarBody nav={nav} withSlot onNewOrder={() => setChooser(true)} />
     </Box>
+    <NewOrderChooser open={chooser} onClose={() => setChooser(false)} />
+    </>
   );
 }

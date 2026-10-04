@@ -22,6 +22,7 @@ const FINISH = 'Formuláře › Dokončení registrace';
 const BOOKING = 'Formuláře › Online objednání';
 const LINKS = 'Formuláře › Odkazy a klubová registrace';
 const PORTAL = 'Formuláře › Portál pacienta';
+const ORDER = 'Formuláře › Klubová objednávka';
 
 export const formulareSlots: SlotDef[] = [
   /* ── The notice about what the law already covers ── */
@@ -130,4 +131,28 @@ export const formulareSlots: SlotDef[] = [
   textSlot('formulare.portal.help', 'Portál — „Potřebujete pomoc?“ (věta nad kontakty)', PORTAL,
     'Co tu nejde vyřídit — jiný termín, dotaz k vyšetření — domluvíte přímo s ordinací.',
     { multiline: true }),
+
+  /* ── The club order form (/klub-objednavka/:token) ── */
+  textSlot('formulare.club-order.next', 'Klubová objednávka — co se stane po odeslání (věta pod nadpisem)', ORDER,
+    'Vyplňte, co si klub objednává. Je to žádost: ordinace ji zpracuje a ozve se vám s potvrzeným termínem. Rezervace vznikne až po potvrzení.',
+    { multiline: true }),
+  textSlot('formulare.club-order.terms.hint', 'Klubová objednávka — poznámka u termínů', ORDER,
+    'Uveďte, kdy se vám to hodí. Přesné časy vám potvrdí ordinace.'),
+  textSlot('formulare.club-order.price.note', 'Klubová objednávka — věta pod cenou', ORDER,
+    'Cena je informativní. Konečnou cenu a termíny potvrdí ordinace.'),
+  textSlot('formulare.club-order.minimum', 'Klubová objednávka — nejmenší počet hráčů ({count})', ORDER,
+    'Nejmenší počet hráčů v objednávce je {count}.'),
+  textSlot('formulare.club-order.thanks.title', 'Klubová objednávka — nadpis po odeslání', ORDER,
+    'Děkujeme, objednávku jsme přijali'),
+  textSlot('formulare.club-order.thanks.next', 'Klubová objednávka — co bude dál po odeslání', ORDER,
+    'Ozveme se vám na uvedený kontakt s potvrzením termínu a ceny. Po potvrzení dostanete odkaz, přes který se hráči zaregistrují.',
+    { multiline: true }),
+  textSlot('formulare.club-order.thanks.change', 'Klubová objednávka — jak změnit odeslanou objednávku', ORDER,
+    'Odeslanou objednávku už klub nemění. Potřebujete-li něco upravit, zavolejte nám.'),
+  textSlot('formulare.club-order.processed', 'Klubová objednávka — už zpracovaná', ORDER,
+    'Tuto objednávku už zpracováváme. Zavolejte nám prosím.'),
+  textSlot('formulare.club-order.gone', 'Klubová objednávka — odkaz zrušen', ORDER,
+    'Tato objednávka byla zrušena. Ozvěte se nám prosím, pokud ji chcete obnovit.'),
+  textSlot('formulare.club-order.notfound', 'Klubová objednávka — odkaz neexistuje', ORDER,
+    'Tento odkaz neplatí. Zkontrolujte, že jste ho zkopírovali celý, nebo se nám ozvěte.'),
 ];

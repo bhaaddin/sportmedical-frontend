@@ -94,8 +94,6 @@ import { SelectionPopover } from "../../components/booking/calendar/SelectionPop
 import {
   buildColumns,
   clubBlockDates,
-  clubStateForRange,
-  clubStateForSlot,
   dayCount,
   daysWord,
   passesService,
@@ -108,7 +106,9 @@ import { useDayRange } from "../../components/booking/calendar/useDayRange";
 import { useMultiSelect } from "../../components/booking/calendar/useMultiSelect";
 import { MultiBlockDialog } from "../../components/booking/calendar/MultiBlockDialog";
 import { SelectionTray } from "../../components/booking/calendar/SelectionTray";
-import { clubRanges, clubStateForRanges } from "../../components/booking/calendar/multiSelect";
+import { clubRanges } from "../../components/booking/calendar/multiSelect";
+import { ClubOrderDialog } from "../../components/clubs/order/ClubOrderDialog";
+import type { OrderRange } from "../../api/clubOrders";
 import { SidebarPortal, useHasSidebarSlot } from "../../components/shell/SidebarSlot";
 import { PinnedActionBar } from "../../components/ui/PinnedActionBar";
 import { useDevice } from "../../layout/useDevice";
@@ -306,6 +306,10 @@ export default function CalendarGridPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterMenu, setFilterMenu] = useState<HTMLElement | null>(null);
   const [clubPick, setClubPick] = useState<ClubBlockPick | null>(null);
+  /* "Klubová objednávka" (chytrá zkratka): the order dialog, with the marked places as its head start. */
+  const [clubOrder, setClubOrder] = useState<{ key: number; ranges?: OrderRange[]; calendarIds?: string[] } | null>(null);
+  const openClubOrder = (ranges?: OrderRange[], calendarIds?: string[]) =>
+    setClubOrder({ key: Date.now(), ...(ranges !== undefined ? { ranges } : {}), ...(calendarIds !== undefined ? { calendarIds } : {}) });
   const [rangeBlock, setRangeBlock] = useState<{ from: string; to: string } | null>(null);
   const [moveProposal, setMoveProposal] = useState<GridMoveRequest | null>(null);
   /* Several different places at once: marked with Ctrl/⌘/Shift (or the touch toggle), acted on from the tray. */
@@ -743,15 +747,16 @@ export default function CalendarGridPage() {
     });
 
   /*
-   * "Rezervovat pro klub": the clubs screen opens its block dialog from this
-   * router state (contract C4) - the calendar, the day and the daily window.
+   * "Rezervovat pro klub": opens the club order dialog (no navigation) with the
+   * calendar, the day and the daily window that was marked.
    */
   const clubFromGrid = (request: GridBookingRequest) => {
     const dailyFrom = request.start.slice(11, 16);
     const rawTo = request.end.slice(11, 16);
-    navigate("/clubs", {
-      state: clubStateForSlot(request.calendarId, request.dayKey, dailyFrom, rawTo === "00:00" ? "23:59" : rawTo),
-    });
+    openClubOrder(
+      [{ fromDate: request.dayKey, toDate: request.dayKey, dailyFrom, dailyTo: rawTo === "00:00" ? "23:59" : rawTo }],
+      [request.calendarId],
+    );
   };
 
   /* A click on a club's block, then "Otevřít blok". */
@@ -928,6 +933,43 @@ export default function CalendarGridPage() {
     void bookNextFree(landingPatientId ? { initialPatientId: landingPatientId } : {});
   }, [newAppointmentKey, landingPatientId, mayBook, shown.length, bookingsKnown, bookNextFree]);
 
+  /*
+   * "Nová objednávka → Vybrat v kalendáři" lands here with `state.serviceId`:
+   * the grid then shows only that služba. Applied once per navigation (the
+   * history entry's key), so the desk can still change the filter afterwards.
+   */
+  const landingServiceId = (location.state as { serviceId?: unknown } | null)?.serviceId;
+  const handledServiceKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (typeof landingServiceId !== "string" || handledServiceKey.current === location.key) return;
+    if (!services.some((s) => s.id === landingServiceId)) return;
+    handledServiceKey.current = location.key;
+    setServiceSet(services.length === 1 ? null : new Set([landingServiceId]));
+  }, [landingServiceId, location.key, services]);
+
+  /*
+   * Two more hand-overs by router state, each applied once per navigation:
+   *  - `state.openClubOrder` (the sidebar's and the chooser's "Klubová objednávka") opens the club order dialog;
+   *  - `state.date` (yyyy-MM-dd; "Zobrazit v kalendáři" from the club reservations) moves the grid to that day.
+   */
+  const handoff = location.state as { openClubOrder?: unknown; date?: unknown } | null;
+  const wantsClubOrder = handoff?.openClubOrder === true;
+  const landingDate = typeof handoff?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(handoff.date) ? handoff.date : undefined;
+  const handledClubOrderKey = useRef<string | null>(null);
+  const handledDateKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (!wantsClubOrder || !mayBook || handledClubOrderKey.current === location.key) return;
+    handledClubOrderKey.current = location.key;
+    openClubOrder();
+    // openClubOrder only sets local state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsClubOrder, mayBook, location.key]);
+  useEffect(() => {
+    if (landingDate === undefined || handledDateKey.current === location.key) return;
+    handledDateKey.current = location.key;
+    setAnchor(landingDate);
+  }, [landingDate, location.key]);
+
   /**
    * 7.1: the grid steps with the keyboard and is not a focus trap.
    * `PageUp`/`PageDown` rather than Alt+Arrow, which the browser takes for its
@@ -1077,6 +1119,11 @@ export default function CalendarGridPage() {
             <ToggleButton value="week">{GRID_TEXT.weekView}</ToggleButton>
             <ToggleButton value="month">{GRID_TEXT.monthView}</ToggleButton>
           </ToggleButtonGroup>
+          {mayBook && !isPhone ? (
+            <Button variant="outlined" onClick={() => openClubOrder()} sx={{ minHeight: 44, px: 2.25 }}>
+              Klubová objednávka
+            </Button>
+          ) : null}
           {mayBook && !isPhone ? (
             <Button variant="contained" onClick={() => void bookNextFree()} sx={{ minHeight: 44, px: 2.25 }}>
               {GRID_TEXT.newAppointment}
@@ -1377,6 +1424,9 @@ export default function CalendarGridPage() {
           <Button variant="contained" onClick={() => void bookNextFree()} sx={{ minHeight: 44 }}>
             {GRID_TEXT.newAppointment}
           </Button>
+          <Button variant="outlined" onClick={() => openClubOrder()} sx={{ minHeight: 44 }}>
+            Klubová objednávka
+          </Button>
         </PinnedActionBar>
       ) : null}
 
@@ -1440,7 +1490,7 @@ export default function CalendarGridPage() {
           if (!chosenRange) return;
           const range = { from: chosenRange.from, to: chosenRange.to };
           rangeSelect.clear();
-          navigate("/clubs", { state: clubStateForRange(chosenCalendarIds, range) });
+          openClubOrder([{ fromDate: range.from, toDate: range.to }], chosenCalendarIds);
         }}
         onClose={rangeSelect.clear}
       />
@@ -1465,7 +1515,10 @@ export default function CalendarGridPage() {
           const ranges = clubRanges(multi.items, todayKey);
           if (ranges.length === 0) return;
           multi.clear();
-          navigate("/clubs", { state: clubStateForRanges(chosenCalendarIds, ranges) });
+          openClubOrder(
+            ranges.map((r) => ({ fromDate: r.fromDate, toDate: r.toDate, dailyFrom: r.dailyFrom ?? null, dailyTo: r.dailyTo ?? null })),
+            chosenCalendarIds,
+          );
         }}
       />
       {multiBlock ? (
@@ -1487,6 +1540,17 @@ export default function CalendarGridPage() {
       {moveProposal ? <MoveConfirmDialog move={moveProposal} onClose={() => setMoveProposal(null)} /> : null}
 
       <ClubBlockPopover pick={clubPick} onOpen={openClubBlock} onClose={() => setClubPick(null)} />
+
+      {/* The club order dialog: new key per opening, so the head start is read afresh. */}
+      {clubOrder !== null && mayBook ? (
+        <ClubOrderDialog
+          key={clubOrder.key}
+          open
+          onClose={() => setClubOrder(null)}
+          initial={{ ranges: clubOrder.ranges, calendarIds: clubOrder.calendarIds }}
+          onSaved={() => void appointmentsQuery.refetch()}
+        />
+      ) : null}
 
       {/* 5.8. The row is gone from the answer once it is cancelled, so the
           dialog closes itself rather than showing a stale copy. */}

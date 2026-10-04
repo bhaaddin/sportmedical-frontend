@@ -14,6 +14,7 @@ import { Avatar, Box, ButtonBase, Drawer, IconButton } from '@mui/material';
 import { Add, ArrowBack, Menu as MenuIcon, Search, Settings } from '@mui/icons-material';
 import NotificationCenter from '../NotificationCenter';
 import { openUniversalSearch } from '../UniversalSearch';
+import { NewOrderChooser } from '../booking/NewOrderChooser';
 import { SidebarBody } from './Sidebar';
 import { entryState, mainEntries, shortLabel } from './shellModel';
 import { RAIL_WIDTH, SIDEBAR_WIDTH, activeBg, focusRing } from './shellStyles';
@@ -78,6 +79,7 @@ function RailItem({
 
 export function TabletRail({ nav }: { nav: ShellNav }) {
   const [open, setOpen] = useState(false);
+  const [chooser, setChooser] = useState(false);
   const close = () => setOpen(false);
 
   /* Opening is a tap; every navigation closes it again. */
@@ -121,7 +123,7 @@ export function TabletRail({ nav }: { nav: ShellNav }) {
         {!nav.settingsMode && (
           <IconButton
             aria-label="Nová objednávka"
-            onClick={nav.onNewAppointment}
+            onClick={() => setChooser(true)}
             sx={{
               width: 48,
               height: 48,
@@ -211,8 +213,9 @@ export function TabletRail({ nav }: { nav: ShellNav }) {
           },
         }}
       >
-        <SidebarBody nav={nav} onNavigate={close} withSlot={false} />
+        <SidebarBody nav={nav} onNavigate={close} withSlot={false} onNewOrder={() => setChooser(true)} />
       </Drawer>
+      <NewOrderChooser open={chooser} onClose={() => setChooser(false)} />
     </>
   );
 }

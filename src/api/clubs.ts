@@ -110,6 +110,13 @@ export interface ClubSettings {
    * `null` = no minimum (the default); there is no number in code.
    */
   minimumPlayers: number | null;
+  /**
+   * Etapa 4 (D4): how many days before a club order's window starts the part of it
+   * that the order does not need is opened to the public. `null` = never (default).
+   */
+  releaseUnusedDaysBefore: number | null;
+  /** Etapa 4 (D2): one club order may hold more than one služba. Off by default. */
+  allowMultiServiceOrders: boolean;
   /** Owned by the palette settings; carried through untouched so a save here cannot wipe it. */
   blockPalette?: unknown;
 }
@@ -122,6 +129,9 @@ function toClubSettings(data: unknown): ClubSettings {
   return {
     registrationLinkValidityDays: num(r.registrationLinkValidityDays, 14),
     minimumPlayers: typeof r.minimumPlayers === 'number' && Number.isFinite(r.minimumPlayers) ? r.minimumPlayers : null,
+    releaseUnusedDaysBefore:
+      typeof r.releaseUnusedDaysBefore === 'number' && Number.isFinite(r.releaseUnusedDaysBefore) ? r.releaseUnusedDaysBefore : null,
+    allowMultiServiceOrders: r.allowMultiServiceOrders === true,
     ...(r.blockPalette !== undefined ? { blockPalette: r.blockPalette } : {}),
   };
 }
