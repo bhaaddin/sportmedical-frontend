@@ -81,6 +81,12 @@ import {
 } from '../services/patientRegistration/progress';
 import { PageHeader, SectionLabel, SoftCard, StatusChip } from '../components/ui';
 import { PhoneField } from '../components/ui/PhoneField';
+import {
+  EMPTY_ON_SITE_CONSENTS,
+  OnSiteConsentsField,
+  recordOnSiteConsents,
+  type OnSiteConsentSelection,
+} from '../components/booking/patient/OnSiteConsentsField';
 import MapyAddressPicker from '../components/registration/MapyAddressPicker';
 import CandidateReviewDialog from '../components/registration/CandidateReviewDialog';
 import FormField from '../components/registration/FormField';
@@ -175,6 +181,8 @@ interface IssuedRegistration {
   link: string;
   activityName: string;
   issued: IssuedLink;
+  /** What became of the paper consents, when any were ticked. */
+  consentNote?: { severity: 'success' | 'warning'; text: string } | null;
 }
 
 /** "Komplexní prohlídka · 45 min · 2 200 Kč" - the price from the ceník, never typed here. */
@@ -223,6 +231,8 @@ export default function PatientRegistration() {
 
   /** The completion link after a quick registration — the success state. */
   const [issued, setIssued] = useState<IssuedRegistration | null>(null);
+  /* Ticked by a person with the signed paper in hand; never preselected. */
+  const [consents, setConsents] = useState<OnSiteConsentSelection>(EMPTY_ON_SITE_CONSENTS);
 
   /** What the identifier itself says, when it has been asked. */
   const [inspection, setInspection] = useState<IdentityInspection | null>(null);
@@ -591,6 +601,22 @@ export default function PatientRegistration() {
         );
         identifiers.current = mintIdentifiers();
 
+        /* The patient exists now: record the consents signed on paper. A failure
+           here never undoes the registration - it is a warning, repeatable. */
+        const recorded = await recordOnSiteConsents(
+          result.patientId,
+          form.mode === 'Quick' ? form.activityId || null : null,
+          consents,
+        );
+        const consentNote: IssuedRegistration['consentNote'] =
+          recorded.status === 'recorded'
+            ? { severity: 'success', text: 'Souhlasy podepsané na místě byly zapsány.' }
+            : recorded.status === 'failed'
+              ? { severity: 'warning', text: recorded.message }
+              : null;
+        if (consentNote?.severity === 'success') toast.success(consentNote.text);
+        if (consentNote?.severity === 'warning') toast.error(consentNote.text);
+
         /*
          * Rychlá registrace is a pre-registration: the record has no address
          * yet, and the patient fills the rest in through their own link. The
@@ -609,6 +635,7 @@ export default function PatientRegistration() {
               link: link.url ?? `${window.location.origin}${link.path}`,
               activityName: activities.find((activity) => activity.id === form.activityId)?.name ?? '',
               issued: link,
+              consentNote,
             });
             return;
           } catch {
@@ -639,7 +666,7 @@ export default function PatientRegistration() {
         setSubmitting(false);
       }
     },
-    [buildRequest, navigate, form.mode, form.firstName, form.lastName, form.email, form.activityId, activities],
+    [buildRequest, navigate, form.mode, form.firstName, form.lastName, form.email, form.activityId, activities, consents],
   );
 
   /*
@@ -689,6 +716,7 @@ export default function PatientRegistration() {
     setEmailLook(null);
     setEmailAskedFor('');
     setIssued(null);
+    setConsents(EMPTY_ON_SITE_CONSENTS);
     identifiers.current = mintIdentifiers();
   };
 
@@ -785,6 +813,12 @@ export default function PatientRegistration() {
             </Box>
             <StatusChip tone="beige" sx={{ ml: 'auto' }}>Registrace není dokončena</StatusChip>
           </Stack>
+
+          {issued.consentNote ? (
+            <Alert severity={issued.consentNote.severity} sx={{ mb: 2 }}>
+              {issued.consentNote.text}
+            </Alert>
+          ) : null}
 
           <IssuedLinkCard
             label="Registrační odkaz pro pacienta"
@@ -1128,6 +1162,16 @@ export default function PatientRegistration() {
               )}
             </SoftCard>
           )}
+
+          {/* ── Souhlasy podepsané na místě: both modes, the server's list for the činnost ── */}
+          <SoftCard data-field="onSiteConsents">
+            <OnSiteConsentsField
+              activityId={quick ? form.activityId || null : null}
+              value={consents}
+              onChange={setConsents}
+              disabled={submitting}
+            />
+          </SoftCard>
 
           {/* The patient gives insurance and address through the link in a quick registration. */}
           {!quick && (

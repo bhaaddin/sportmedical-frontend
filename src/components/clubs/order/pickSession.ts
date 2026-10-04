@@ -2,7 +2,7 @@
  * What the desk tells the calendar before it starts picking times for a phone order: which club, which služba,
  * which činnosti with how many players. The calendar's "výběr termínů" works from this and nothing else.
  */
-import type { PaymentMethod } from '../../../api/clubOrders';
+import type { OrderRange, PaymentMethod } from '../../../api/clubOrders';
 import type { CoverageActivity } from './coverage';
 
 export interface PickSession {
@@ -15,7 +15,29 @@ export interface PickSession {
   note: string;
   /** Etapa 5: set when this order is an addendum to another one (same group, same invoice). */
   parentOrderId?: string;
+  /** Set when the terms of an EXISTING order are edited ('edit') or a club's request is processed ('process'). */
+  editOrder?: EditOrderRef;
 }
+
+export interface EditOrderRef {
+  mode: 'edit' | 'process';
+  orderId: string;
+  /** Process only: the seats, payment or note were changed in the dialog, so they are saved before confirming. */
+  dirty: boolean;
+  /** Process only: what the club asked for, shown as a hint ("Klub žádá: ..."). */
+  requested: string[];
+  /** Edit only: the order's live blocks; the picks start as these windows and they do not collide with themselves. */
+  blocks: EditBlockRef[];
+  /** The first day of the hint, so the calendar opens there. */
+  firstDate: string | null;
+}
+
+export interface EditBlockRef {
+  id: string;
+  calendarId: string;
+  range: OrderRange;
+}
+
 
 /** The order an addendum is added to; the setup form locks the club and the payment to it. */
 export interface PickParent {
@@ -29,6 +51,8 @@ export interface PickParent {
 export interface PickOrderRouteState {
   clubId?: string;
   parent?: PickParent;
+  /** Edit / process an existing order: straight to picking, no setup form. */
+  start?: PickSession;
 }
 
 export function readPickOrderState(state: unknown): PickOrderRouteState | null {
@@ -39,6 +63,10 @@ export function readPickOrderState(state: unknown): PickOrderRouteState | null {
   const r = raw as Record<string, unknown>;
   const out: PickOrderRouteState = {};
   if (typeof r.clubId === 'string' && r.clubId !== '') out.clubId = r.clubId;
+  const st = r.start;
+  if (st !== null && typeof st === 'object' && typeof (st as Record<string, unknown>).clubId === 'string' && Array.isArray((st as Record<string, unknown>).activities)) {
+    out.start = st as PickSession;
+  }
   const p = r.parent;
   if (p !== null && typeof p === 'object') {
     const x = p as Record<string, unknown>;

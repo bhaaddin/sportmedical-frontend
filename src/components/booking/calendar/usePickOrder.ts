@@ -4,24 +4,22 @@ import toast from "react-hot-toast";
 import type { Calendar } from "../../../api/bookingContracts";
 import { ClubOrderError, clubOrdersApi } from "../../../api/clubOrders";
 import type { ClubOrderView } from "../../../api/clubOrders";
-import { dayOfWeekOf, type DateOnly } from "../../../utils/time";
-import { useBlockCalculation } from "../../clubs/dialog/useBlockCalculation";
+import type { DateOnly } from "../../../utils/time";
 import { computeCoverage, pickAllowance } from "../../clubs/order/coverage";
 import { rangeLine } from "../../clubs/order/orderFormat";
 import { rowFromRange, rowIndexForError } from "../../clubs/order/orderLogic";
 import type { PickSession } from "../../clubs/order/pickSession";
-import { formatDayMonth } from "../../clubs/blockLogic";
 import type { GridPickMode } from "../grid/TimeGrid";
 import type { NewPicked } from "./multiSelect";
+import { takeWithinAllowance, type FreeBlock } from "./pickDays";
 import {
-  earliestPick,
   ordersRangesOf,
   pickedCalendarIds,
   pickedMinutesOf,
+  paintNote,
   pickInRange,
   picksFromRanges,
   timePicks,
-  withoutIds,
 } from "./pickLogic";
 import type { PickOrderPanelProps } from "./PickOrderPanel";
 import type { MultiSelectApi } from "./useMultiSelect";
@@ -30,16 +28,16 @@ import type { MultiSelectApi } from "./useMultiSelect";
  * "Výběr termínů" - the whole state machine of a phone order picked straight in the calendar.
  *
  * The session (club, služba, činnosti with players) is given at the start; the places painted in the grid live in
- * the calendar's `multi` selection; everything else - the live coverage, the stop at "enough", the automatic
- * proposal, the final `createStaff` with its 409 - is here, so the page only wires it to the grid and the panel.
+ * the calendar's `multi` selection; everything else - the live coverage (slots still missing), the stop at "enough",
+ * the final `createStaff` / `update` / `confirm` with its 409 - is here, so the page only wires it to the grid and the
+ * panel. Picking is MANUAL only: nothing proposes terms.
  */
-
-const WEEKDAY_SHOWN = ["ne", "po", "út", "st", "čt", "pá", "so"];
 
 export interface PickOrderApi {
   session: PickSession | null;
   active: boolean;
-  start: (session: PickSession) => void;
+  /** `seed`: places already marked in the grid (clicked before the order was set up) that become the first picks. */
+  start: (session: PickSession, seed?: readonly NewPicked[]) => void;
   cancel: () => void;
   /** Passed to the grid. */
   gridPick: GridPickMode | undefined;
@@ -47,6 +45,16 @@ export interface PickOrderApi {
   panel: Omit<PickOrderPanelProps, "device"> | null;
   /** The confirmed order, until the page has shown it. */
   result: ClubOrderView | null;
+  /** "Objednávka potvrzena" (new, processed) or "Termíny uloženy" (edited). */
+  resultTitle: string;
+  /** How many more minutes may be picked (Infinity = no limit). */
+  allowance: number;
+  /** "Celý den" / a free block: the blocks of one day become picks, stopped at the minutes still needed. */
+  pickBlocks: (day: DateOnly, blocks: readonly FreeBlock[]) => boolean;
+  /** Every pick of one day is dropped. */
+  removeDay: (day: DateOnly) => void;
+  /** A sentence under the calculator (null clears it). */
+  setNote: (text: string | null) => void;
   closeResult: () => void;
 }
 
@@ -54,22 +62,22 @@ export function usePickOrder(input: {
   multi: MultiSelectApi;
   calendars: readonly Calendar[];
   todayKey: DateOnly;
+  /** The current minute of the clinic's day: today's past time cannot be picked. */
+  nowMinute?: number;
   /** The grid is about to show only this služba's calendars (the page narrows its filters). */
   onStarted?: (session: PickSession) => void;
   onEnded?: () => void;
   onCreated?: (order: ClubOrderView) => void;
 }): PickOrderApi {
-  const { multi, calendars, todayKey, onStarted, onEnded, onCreated } = input;
+  const { multi, calendars, todayKey, nowMinute, onStarted, onEnded, onCreated } = input;
   const queryClient = useQueryClient();
   const [session, setSession] = useState<PickSession | null>(null);
   const [allowReserve, setAllowReserve] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  const [weekdays, setWeekdays] = useState<number[]>([]);
-  const [proposing, setProposing] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [failure, setFailure] = useState<{ message: string; conflict: string | null; ids: string[] } | null>(null);
-  const [undo, setUndo] = useState<NewPicked[] | null>(null);
+  const [failure, setFailure] = useState<{ message: string; conflict: string | null; ids: string[]; athletes: number } | null>(null);
   const [result, setResult] = useState<ClubOrderView | null>(null);
+  const [resultTitle, setResultTitle] = useState("Objednávka potvrzena");
 
   const picks = useMemo(() => timePicks(multi.items), [multi.items]);
   const pickedMinutes = pickedMinutesOf(multi.items);
@@ -83,35 +91,22 @@ export function usePickOrder(input: {
   );
   const calendarName = useCallback((id: string) => calendars.find((c) => c.id === id)?.name ?? "", [calendars]);
 
-  /* The server's own count of the same picks, shown only when it says something else. */
-  const orderRanges = useMemo(() => ordersRangesOf(multi.items, todayKey), [multi.items, todayKey]);
-  const usedCalendars = useMemo(() => pickedCalendarIds(multi.items), [multi.items]);
-  const seatsMap = useMemo(() => Object.fromEntries(activities.map((a) => [a.activityId, a.seats])), [activities]);
-  const calc = useBlockCalculation({
-    activityIds: activities.map((a) => a.activityId),
-    seats: seatsMap,
-    legacyCount: null,
-    calendarIds: usedCalendars,
-    rows: useMemo(() => orderRanges.map(rowFromRange), [orderRanges]),
-  });
-  const analysis = calc.calc?.analysis ?? null;
-  const serverNote =
-    session !== null && picks.length > 0 && !calc.busy && analysis !== null &&
-    (Math.abs(analysis.totalNeededMinutes - coverage.neededMinutes) >= 1 || Math.abs(analysis.availableMinutes - coverage.pickedMinutes) >= 1)
-      ? { neededMinutes: Math.round(analysis.totalNeededMinutes), availableMinutes: Math.round(analysis.availableMinutes) }
-      : null;
 
   const clearFailure = useCallback(() => setFailure((f) => (f === null ? f : null)), []);
 
   const start = useCallback(
-    (next: PickSession) => {
+    (next: PickSession, seed?: readonly NewPicked[]) => {
       multi.clear();
       setSession(next);
       setAllowReserve(false);
       setNote(null);
       setFailure(null);
-      setUndo(null);
       setResult(null);
+      /* Editing an order: its windows are the first picks (so the numbers start where the order is). */
+      const own = next.editOrder?.mode === "edit" ? next.editOrder.blocks : [];
+      const fromBlocks = own.flatMap((block) => picksFromRanges([block.range], block.calendarId, (id) => id));
+      const first = [...fromBlocks, ...(seed ?? [])];
+      if (first.length > 0) multi.replace(first);
       onStarted?.(next);
     },
     [multi, onStarted],
@@ -122,93 +117,74 @@ export function usePickOrder(input: {
     setSession(null);
     setNote(null);
     setFailure(null);
-    setUndo(null);
     setAllowReserve(false);
     onEnded?.();
   }, [multi, onEnded]);
 
-  const earliest = earliestPick(multi.items);
-  const proposalFrom = earliest === null ? null : `${formatDayMonth(earliest.date)} (${WEEKDAY_SHOWN[dayOfWeekOf(earliest.date)]}) v ${earliest.time}`;
-
-  const propose = useCallback(async () => {
-    if (session === null || earliest === null) return;
-    setProposing(true);
-    setFailure(null);
-    try {
-      const answer = await clubOrdersApi.proposal({
-        serviceId: session.serviceId,
-        activitySeats: session.activities.map((a) => ({ activityId: a.activityId, seats: a.seats })),
-        calendarIds: [earliest.calendarId],
-        startDate: earliest.date,
-        startTime: earliest.time,
-        ...(weekdays.length > 0 ? { daysOfWeek: weekdays } : {}),
-      });
-      if (answer.ranges.length === 0) {
-        setNote("Server nenašel žádný volný termín od tohoto místa. Zkuste jiný začátek nebo jiné dny.");
-        return;
-      }
-      setUndo(withoutIds(multi.items));
-      multi.replace(picksFromRanges(answer.ranges, earliest.calendarId, (id) => id));
-      setNote("Návrh je rozložen od vybraného místa — upravte ho podle potřeby (tažením, ×).");
-    } catch (error) {
-      setNote(error instanceof Error ? error.message : "Automatický návrh se nepodařilo získat.");
-    } finally {
-      setProposing(false);
-    }
-  }, [session, earliest, weekdays, multi]);
-
-  const undoProposal = useCallback(() => {
-    if (undo === null) return;
-    multi.replace(undo);
-    setUndo(null);
-    setNote(null);
-  }, [undo, multi]);
-
-  const confirm = useCallback(async () => {
+  const confirm = useCallback(async (cancelAthletes = false) => {
     if (session === null || picks.length === 0 || confirming) return;
     const ranges = ordersRangesOf(multi.items, todayKey);
     const calendarIds = pickedCalendarIds(multi.items);
     setConfirming(true);
     setFailure(null);
     try {
-      const order = await clubOrdersApi.createStaff({
-        clubId: session.clubId,
-        serviceId: session.serviceId,
-        activitySeats: session.activities.map((a) => ({ activityId: a.activityId, seats: a.seats })),
-        paymentMethod: session.paymentMethod,
-        ranges,
-        calendarIds,
-        status: "Confirmed",
-        ...(session.note.trim() !== "" ? { note: session.note.trim() } : {}),
-        ...(session.parentOrderId !== undefined ? { parentOrderId: session.parentOrderId } : {}),
-      });
+      const activitySeats = session.activities.map((a) => ({ activityId: a.activityId, seats: a.seats }));
+      const editing = session.editOrder;
+      let order: ClubOrderView;
+      if (editing?.mode === "edit") {
+        order = await clubOrdersApi.update(
+          editing.orderId,
+          { activitySeats, paymentMethod: session.paymentMethod, ranges, calendarIds, note: session.note.trim() },
+          cancelAthletes,
+        );
+      } else if (editing?.mode === "process") {
+        if (editing.dirty) {
+          await clubOrdersApi.update(editing.orderId, { activitySeats, paymentMethod: session.paymentMethod, note: session.note.trim() });
+        }
+        order = await clubOrdersApi.confirm(editing.orderId, { calendarIds, ranges });
+      } else {
+        order = await clubOrdersApi.createStaff({
+          clubId: session.clubId,
+          serviceId: session.serviceId,
+          activitySeats,
+          paymentMethod: session.paymentMethod,
+          ranges,
+          calendarIds,
+          status: "Confirmed",
+          ...(session.note.trim() !== "" ? { note: session.note.trim() } : {}),
+          ...(session.parentOrderId !== undefined ? { parentOrderId: session.parentOrderId } : {}),
+        });
+      }
       void queryClient.invalidateQueries({ queryKey: ["day-range"] });
       void queryClient.invalidateQueries({ queryKey: ["club-orders"] });
+      setResultTitle(editing?.mode === "edit" ? "Termíny uloženy" : "Objednávka potvrzena");
       setResult(order);
       onCreated?.(order);
-      toast.success("Objednávka je potvrzená a termíny jsou v kalendáři.");
+      toast.success(editing?.mode === "edit" ? "Termíny objednávky jsou uložené." : "Objednávka je potvrzená a termíny jsou v kalendáři.");
       multi.clear();
       setSession(null);
-      setUndo(null);
       onEnded?.();
     } catch (error) {
       if (error instanceof ClubOrderError) {
         const index = rowIndexForError(error, ranges.map(rowFromRange));
         const range = index === null ? null : ranges[index];
         const ids = range === null ? [] : picks.filter((p) => pickInRange(p, range)).map((p) => p.id);
+        const athletes = session.editOrder?.mode === "edit" && error.status === 409 ? error.affectedAthletes.length : 0;
         setFailure({
           message: error.message,
           conflict: range === null ? null : rangeLine(range),
           ids,
+          athletes,
         });
       } else {
-        setFailure({ message: "Objednávku se nepodařilo uložit. Výběr zůstal — zkuste to znovu.", conflict: null, ids: [] });
+        setFailure({ message: "Objednávku se nepodařilo uložit. Výběr zůstal — zkuste to znovu.", conflict: null, ids: [], athletes: 0 });
       }
     } finally {
       setConfirming(false);
     }
   }, [session, picks, confirming, multi, todayKey, queryClient, onCreated, onEnded]);
 
+  const ownBlockIds = useMemo(() => new Set((session?.editOrder?.blocks ?? []).map((b) => b.id)), [session]);
   const conflictIds = useMemo(() => new Set(failure?.ids ?? []), [failure]);
   const removeConflict = useCallback(() => {
     for (const id of failure?.ids ?? []) multi.remove(id);
@@ -227,11 +203,12 @@ export function usePickOrder(input: {
             allowance,
             allowedCalendar: (id: string) => serviceCalendarIds.has(id),
             today: todayKey,
+            ...(nowMinute !== undefined ? { nowMinute } : {}),
             onNote: (text) => noteRef.current(text),
+            ignoreClubBlockIds: ownBlockIds,
             onAdjust: (id, range) => {
               multi.update(id, range);
               clearFailure();
-              setUndo(null);
             },
             onRemove: (id) => {
               multi.remove(id);
@@ -239,7 +216,36 @@ export function usePickOrder(input: {
             },
             conflictIds,
           },
-    [session, allowance, serviceCalendarIds, todayKey, multi, conflictIds, clearFailure],
+    [session, allowance, serviceCalendarIds, todayKey, nowMinute, multi, conflictIds, ownBlockIds, clearFailure],
+  );
+
+  const pickBlocks = useCallback(
+    (day: DateOnly, blocks: readonly FreeBlock[]): boolean => {
+      if (blocks.length === 0) {
+        setNote("V tento den už není volný čas.");
+        return false;
+      }
+      const { taken, trimmedNeed } = takeWithinAllowance(blocks, allowance);
+      if (taken.length === 0) {
+        setNote(paintNote({ range: null, refused: "covered", trimmedBusy: false, trimmedNeed: false }));
+        return false;
+      }
+      for (const t of taken) {
+        multi.add({ kind: "time", columnKey: t.calendarId, calendarId: t.calendarId, activityId: null, dayKey: day, range: t.range });
+      }
+      clearFailure();
+      setNote(trimmedNeed ? "Výběr zastaven — hráči jsou pokryti." : null);
+      return true;
+    },
+    [allowance, multi, clearFailure],
+  );
+  const removeDay = useCallback(
+    (day: DateOnly) => {
+      for (const p of timePicks(multi.items)) if (p.dayKey === day) multi.remove(p.id);
+      clearFailure();
+      setNote(null);
+    },
+    [multi, clearFailure],
   );
 
   const panel: PickOrderApi["panel"] =
@@ -254,17 +260,14 @@ export function usePickOrder(input: {
           allowReserve,
           onReserve: setAllowReserve,
           note,
-          serverNote,
-          proposalFrom,
-          weekdays,
-          onWeekdays: setWeekdays,
-          proposing,
+          requested: session.editOrder?.requested ?? [],
+          editing: session.editOrder?.mode === "edit",
           confirming,
           failure: failure === null ? null : { message: failure.message, conflict: failure.conflict },
           onRemoveConflict: failure !== null && failure.ids.length > 0 ? removeConflict : null,
-          onUndoProposal: undo !== null ? undoProposal : null,
-          onPropose: () => void propose(),
+          athletesAffected: failure !== null && failure.athletes > 0 ? failure.athletes : null,
           onConfirm: () => void confirm(),
+          onConfirmCancelling: () => void confirm(true),
           onClearPicks: () => {
             multi.clear();
             clearFailure();
@@ -276,5 +279,5 @@ export function usePickOrder(input: {
           onCancel: end,
         };
 
-  return { session, active: session !== null, start, cancel: end, gridPick, panel, result, closeResult: () => setResult(null) };
+  return { session, active: session !== null, start, cancel: end, gridPick, panel, result, resultTitle, closeResult: () => setResult(null), allowance, pickBlocks, removeDay, setNote };
 }

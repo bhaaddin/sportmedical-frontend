@@ -55,20 +55,45 @@ describe('computeCoverage', () => {
     expect(c.neededMinutes).toBe(34);
   });
 
-  it('pools two činnosti and shares the picked time in proportion to need', () => {
+  it('hands the picked time to the činnosti in the order listed (slots of one visit each)', () => {
     const list = [
-      act({ activityId: 'a', name: 'A', seats: 10, minutesPerSeat: 30 }),
-      act({ activityId: 'b', name: 'B', seats: 10, minutesPerSeat: 60, parallelCapacity: 2 }),
+      act({ activityId: 'a', name: 'Základní', seats: 12, minutesPerSeat: 30 }),
+      act({ activityId: 'b', name: 'Komplexní', seats: 10, minutesPerSeat: 60 }),
     ];
-    const c = computeCoverage(list, 300);
-    expect(c.neededMinutes).toBe(600);
-    expect(c.perActivity[0].neededMinutes).toBe(300);
-    expect(c.perActivity[1].neededMinutes).toBe(300);
-    expect(c.perActivity[0].coveredSeats).toBe(5);
-    expect(c.perActivity[1].coveredSeats).toBe(5);
-    expect(c.coveredSeats).toBe(10);
-    expect(c.remainingSeats).toBe(10);
-    expect(computeCoverage(list, 600).covered).toBe(true);
+    const none = computeCoverage(list, 0);
+    expect(none.neededMinutes).toBe(960);
+    expect(none.neededSlots).toBe(22);
+    expect(none.remainingSlots).toBe(22);
+    const some = computeCoverage(list, 330);
+    expect(some.perActivity[0].coveredSlots).toBe(11);
+    expect(some.perActivity[0].remainingSlots).toBe(1);
+    expect(some.perActivity[1].coveredSlots).toBe(0);
+    expect(some.remainingSlots).toBe(11);
+    const more = computeCoverage(list, 360 + 120);
+    expect(more.perActivity[0].remainingSlots).toBe(0);
+    expect(more.perActivity[1].coveredSlots).toBe(2);
+    expect(more.remainingSlots).toBe(8);
+    expect(more.remainingSeats).toBe(8);
+    const all = computeCoverage(list, 960);
+    expect(all.covered).toBe(true);
+    expect(all.remainingSlots).toBe(0);
+    expect(all.coveredSlots).toBe(22);
+  });
+
+  it('a rest shorter than the next slot stays unspent and the slots fall one by one', () => {
+    const list = [act({ activityId: 'a', seats: 4, minutesPerSeat: 30 }), act({ activityId: 'b', seats: 2, minutesPerSeat: 60 })];
+    const c = computeCoverage(list, 45);
+    expect(c.perActivity[0].coveredSlots).toBe(1);
+    expect(c.perActivity[1].coveredSlots).toBe(0);
+    expect(c.remainingSlots).toBe(5);
+    expect(computeCoverage(list, 120).remainingSlots).toBe(2);
+  });
+
+  it('a slot of a činnost with parallel capacity carries that many players', () => {
+    const a = act({ seats: 5, minutesPerSeat: 30, parallelCapacity: 2 });
+    expect(computeCoverage([a], 0).neededSlots).toBe(3);
+    expect(computeCoverage([a], 75).covered).toBe(true);
+    expect(computeCoverage([a], 75).remainingSlots).toBe(0);
   });
 
   it('tracks the surplus past the need', () => {

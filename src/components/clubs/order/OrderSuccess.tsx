@@ -1,12 +1,11 @@
 /* The screen after a save: what was booked, what it costs, and the athletes' link with "Kopírovat". */
 import { Box, Stack, Typography } from '@mui/material';
-import type { ClubOrderView } from '../../../api/clubOrders';
+import type { ClubOrderView, OrderPriceQuote } from '../../../api/clubOrders';
 import { ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL } from '../../../api/clubOrders';
 import { clubRegistrationLink } from '../../../api/publicClub';
 import { SoftCard } from '../../ui';
 import { LinkCopyRow } from '../orders/LinkCopyRow';
-import { PriceLines } from './OrderAnalysisCard';
-import { rangeLine } from './orderFormat';
+import { formatCzk, rangeLine } from './orderFormat';
 import { orderRanges } from './orderLogic';
 import { formatPlayersTotal, formatSeats } from '../panel/seats';
 
@@ -41,6 +40,20 @@ export function OrderSuccess({ order }: { order: ClubOrderView }) {
       </SoftCard>
       {registrationUrl !== '' ? <LinkCopyRow label="Odkaz pro sportovce (registrace)" path={registrationUrl} testId="registration-url" /> : null}
       {showForm ? <LinkCopyRow label="Odkaz na formulář objednávky" path={order.formUrl} testId="form-url" /> : null}
+    </Stack>
+  );
+}
+
+export function PriceLines({ quote }: { quote: OrderPriceQuote }) {
+  return (
+    <Stack spacing={0.25}>
+      <Typography variant="body2">{`Ceník: ${formatCzk(quote.listTotalCzk)}`}</Typography>
+      {quote.discounts.map((d, i) => (
+        <Typography key={`${d.kind}-${i}`} variant="body2" sx={{ color: 'text.secondary' }}>
+          {`${d.label}${d.percent ? ` (${d.percent} %)` : ''}: −${formatCzk(Math.abs(d.amountCzk))}`}
+        </Typography>
+      ))}
+      <Typography sx={{ fontSize: 15, fontWeight: 700 }} data-testid="quote-total">{`Celkem: ${formatCzk(quote.totalCzk)}`}</Typography>
     </Stack>
   );
 }

@@ -21,6 +21,8 @@ interface PickedBarProps {
   step: number;
   /** The server named this range in a refusal. */
   conflict?: boolean;
+  /** Touch: bigger handles and cross (about 44 px to hit). */
+  touch?: boolean;
   onDrag: (mode: AdjustMode, deltaMinutes: number) => void;
   onEnd: () => void;
   onRemove: () => void;
@@ -28,7 +30,7 @@ interface PickedBarProps {
 
 const HANDLE = 10;
 
-export function PickedBar({ id, range, place, pxPerMinute, step, conflict = false, onDrag, onEnd, onRemove }: PickedBarProps) {
+export function PickedBar({ id, range, place, pxPerMinute, step, conflict = false, touch = false, onDrag, onEnd, onRemove }: PickedBarProps) {
   const press = useRef<{ mode: AdjustMode; y: number } | null>(null);
   const line = conflict ? "#C62828" : DESIGN.selection.line;
 
@@ -72,8 +74,8 @@ export function PickedBar({ id, range, place, pxPerMinute, step, conflict = fals
         position: "absolute",
         left: 0,
         right: 0,
-        [mode === "start" ? "top" : "bottom"]: -HANDLE / 2,
-        height: HANDLE + 4,
+        [mode === "start" ? "top" : "bottom"]: touch ? -20 : -HANDLE / 2,
+        height: touch ? 40 : HANDLE + 4,
         cursor: "ns-resize",
         touchAction: "none",
         zIndex: 2,
@@ -143,10 +145,10 @@ export function PickedBar({ id, range, place, pxPerMinute, step, conflict = fals
         }}
         sx={{
           position: "absolute",
-          top: 2,
-          right: 2,
-          width: 24,
-          height: 24,
+          top: touch ? 4 : 2,
+          right: touch ? 4 : 2,
+          width: touch ? 36 : 24,
+          height: touch ? 36 : 24,
           p: 0,
           border: 0,
           borderRadius: "50%",

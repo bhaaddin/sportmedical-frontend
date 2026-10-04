@@ -16,9 +16,9 @@ import { SidebarSlot, SidebarSlotProvider } from '../../shell/SidebarSlot';
  */
 
 vi.mock('../../../api/calendars', () => ({ calendarsApi: { list: vi.fn() } }));
-/* The club order dialog has its own tests; here only what the calendar hands it matters. */
-vi.mock('../../clubs/order/ClubOrderDialog', () => ({
-  ClubOrderDialog: (props: { initial?: unknown }) => <pre data-testid="club-order-initial">{JSON.stringify(props.initial)}</pre>,
+/* The setup form has its own tests; here only that a marked place leads into it matters. */
+vi.mock('../../clubs/order/PickOrderSetup', () => ({
+  PickOrderSetup: () => <div data-testid="pick-setup" />,
 }));
 vi.mock('../../../api/clinicServices', () => ({ clinicServicesApi: { list: vi.fn() } }));
 vi.mock('../../../api/holidays', () => ({ holidaysApi: { year: vi.fn() } }));
@@ -280,18 +280,13 @@ describe('desktop · 1440', () => {
     });
   });
 
-  it('a drag in a činnost column hands the club the calendar, the day and the daily window', async () => {
+  it('a drag in a činnost column opens the club setup form (the marked place becomes the first pick)', async () => {
     renderPage(VIEWPORTS.desktop, 'day');
     const column = await screen.findByTestId('sub-column-c2:a3-2026-10-26');
     fireEvent.pointerDown(column, { button: 0, clientY: 100, clientX: 100, pointerId: 1 });
     fireEvent.pointerUp(column, { clientY: 100, clientX: 100, pointerId: 1 });
     fireEvent.click(screen.getByRole('menuitem', { name: /Rezervovat pro klub/ }));
-    const initial = JSON.parse((await screen.findByTestId('club-order-initial')).textContent ?? '{}');
-    expect(initial.calendarIds).toEqual(['c2']);
-    expect(initial.ranges).toHaveLength(1);
-    expect(initial.ranges[0]).toMatchObject({ fromDate: DAY, toDate: DAY });
-    expect(initial.ranges[0].dailyFrom).toMatch(/^\d\d:\d\d$/);
-    expect(initial.ranges[0].dailyTo).toMatch(/^\d\d:\d\d$/);
+    expect(await screen.findByTestId('pick-setup')).toBeInTheDocument();
   });
 
   it('the toolbar button "Klubová objednávka" asks the two-way question (fill in myself / send the link)', async () => {
@@ -303,7 +298,7 @@ describe('desktop · 1440', () => {
     expect(within(entry).getByRole('button', { name: /Poslat odkaz klubu/ })).toBeInTheDocument();
   });
 
-  it('month: dragging across days picks a range, pills it, and "Rezervovat pro klub" hands it on', async () => {
+  it('month: dragging across days picks a range, pills it, and "Rezervovat pro klub" opens the setup form', async () => {
     renderPage(VIEWPORTS.desktop, 'month');
     const first = await screen.findByTestId('month-day-2026-10-12');
     pointerOf(first);
@@ -318,11 +313,7 @@ describe('desktop · 1440', () => {
     expect(await screen.findByText('12. 10. – 25. 10.')).toBeInTheDocument();
     expect(screen.getByText('14 dní')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: /Rezervovat pro klub/ }));
-    const initial = JSON.parse((await screen.findByTestId('club-order-initial')).textContent ?? '{}');
-    expect(initial).toEqual({
-      calendarIds: ['c1', 'c2', 'c3'],
-      ranges: [{ fromDate: '2026-10-12', toDate: '2026-10-25' }],
-    });
+    expect(await screen.findByTestId('pick-setup')).toBeInTheDocument();
   });
 
   it('month: "Zablokovat čas" on a range blocks whole days in the calendars ticked', async () => {
@@ -479,8 +470,7 @@ describe('tablet · 834', () => {
     fireEvent.click(screen.getByTestId('month-day-2026-10-25'), { clientX: 200, clientY: 200 });
     expect(await screen.findByText('12. 10. – 25. 10.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: /Rezervovat pro klub/ }));
-    const initial = JSON.parse((await screen.findByTestId('club-order-initial')).textContent ?? '{}');
-    expect(initial.ranges[0]).toMatchObject({ fromDate: '2026-10-12', toDate: '2026-10-25' });
+    expect(await screen.findByTestId('pick-setup')).toBeInTheDocument();
   });
 });
 

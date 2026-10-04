@@ -92,7 +92,7 @@ export interface ClubOrderView {
   addenda: OrderAddendumSummary[];
   /** Identical on every order of the group: live orders only. */
   groupTotals: OrderGroupTotals;
-  /** The group's one invoice once made. */
+  /** The invoice that billed THIS order (every billed order of a group carries its own); null until invoiced. */
   invoiceId: string | null;
 }
 
@@ -132,7 +132,18 @@ export interface InvoiceDraft {
   listTotalCzk: number;
   totalCzk: number;
   note: string;
+  /** Only when nothing is left to bill: the group's latest invoice. Null while there are lines to invoice. */
   invoiceId: string | null;
+  /** Other orders of the group are already invoiced: this is a "dodatečná faktura". */
+  supplementary: boolean;
+  /** The billable orders an invoice already covers, with that invoice. */
+  alreadyInvoiced: AlreadyInvoiced[];
+}
+
+export interface AlreadyInvoiced {
+  orderId: string;
+  invoiceId: string;
+  invoiceNumber: string;
 }
 
 export interface CreatedInvoice {
@@ -144,6 +155,8 @@ export interface CreatedInvoice {
   groupId: string;
   /** false when the group already had its invoice (HTTP 200). */
   created: boolean;
+  /** The group has other invoices: this one billed orders added after an earlier one. */
+  supplementary: boolean;
 }
 
 /** What the desk sends to create an order directly (phone order, "chytrá zkratka"). */
@@ -285,6 +298,11 @@ export function toInvoiceDraft(raw: unknown): InvoiceDraft {
     totalCzk: num(d.totalCzk),
     note: str(d.note),
     invoiceId: typeof d.invoiceId === 'string' && d.invoiceId !== '' ? d.invoiceId : null,
+    supplementary: d.supplementary === true,
+    alreadyInvoiced: arr<unknown>(d.alreadyInvoiced).map((a) => {
+      const x = rec(a);
+      return { orderId: str(x.orderId), invoiceId: str(x.invoiceId), invoiceNumber: str(x.invoiceNumber) };
+    }),
   };
 }
 
@@ -298,6 +316,7 @@ export function toCreatedInvoice(raw: unknown, status?: number): CreatedInvoice 
     clubId: str(d.clubId),
     groupId: str(d.groupId),
     created: typeof d.created === 'boolean' ? d.created : status === 201,
+    supplementary: d.supplementary === true,
   };
 }
 

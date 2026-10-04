@@ -110,8 +110,7 @@ import { useDayRange } from "../../components/booking/calendar/useDayRange";
 import { useMultiSelect } from "../../components/booking/calendar/useMultiSelect";
 import { MultiBlockDialog } from "../../components/booking/calendar/MultiBlockDialog";
 import { SelectionTray } from "../../components/booking/calendar/SelectionTray";
-import { clubRanges } from "../../components/booking/calendar/multiSelect";
-import { ClubOrderDialog } from "../../components/clubs/order/ClubOrderDialog";
+import type { NewPicked } from "../../components/booking/calendar/multiSelect";
 import { ClubOrderEntry } from "../../components/clubs/order/ClubOrderEntry";
 import { PickOrderSetup } from "../../components/clubs/order/PickOrderSetup";
 import { OrderSuccess } from "../../components/clubs/order/OrderSuccess";
@@ -119,7 +118,11 @@ import { readPickOrderState } from "../../components/clubs/order/pickSession";
 import type { PickParent } from "../../components/clubs/order/pickSession";
 import { PickOrderPanel } from "../../components/booking/calendar/PickOrderPanel";
 import { usePickOrder } from "../../components/booking/calendar/usePickOrder";
-import type { OrderRange } from "../../api/clubOrders";
+import { usePickJump } from "../../components/booking/calendar/usePickJump";
+import { PickMonthView } from "../../components/booking/calendar/PickMonthView";
+import { FreeBlocksList } from "../../components/booking/calendar/FreeBlocksList";
+import { freeBlocksOfDay, minutesOfBlocks, type FreeBlock } from "../../components/booking/calendar/pickDays";
+import { timePicks, withoutIds } from "../../components/booking/calendar/pickLogic";
 import { SidebarPortal, useHasSidebarSlot } from "../../components/shell/SidebarSlot";
 import { PinnedActionBar } from "../../components/ui/PinnedActionBar";
 import { useDevice } from "../../layout/useDevice";
@@ -317,13 +320,10 @@ export default function CalendarGridPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterMenu, setFilterMenu] = useState<HTMLElement | null>(null);
   const [clubPick, setClubPick] = useState<ClubBlockPick | null>(null);
-  /* "Klubová objednávka" (chytrá zkratka): the order dialog, with the marked places as its head start. */
-  const [clubOrder, setClubOrder] = useState<{ key: number; ranges?: OrderRange[]; calendarIds?: string[] } | null>(null);
-  const openClubOrder = (ranges?: OrderRange[], calendarIds?: string[]) =>
-    setClubOrder({ key: Date.now(), ...(ranges !== undefined ? { ranges } : {}), ...(calendarIds !== undefined ? { calendarIds } : {}) });
-  /* "Nová klubová objednávka": the two-way chooser, then (phone order) the small setup form, then picking in the grid. */
+  /* "Nová klubová objednávka": the two-way chooser, then the small setup form, then picking in the grid.
+     `seed`: places already marked in the grid, which become the first picks. */
   const [entryOpen, setEntryOpen] = useState(false);
-  const [setupFor, setSetupFor] = useState<{ clubId?: string; parent?: PickParent } | null>(null);
+  const [setupFor, setSetupFor] = useState<{ clubId?: string; parent?: PickParent; seed?: NewPicked[]; day?: string } | null>(null);
   const [rangeBlock, setRangeBlock] = useState<{ from: string; to: string } | null>(null);
   const [moveProposal, setMoveProposal] = useState<GridMoveRequest | null>(null);
   /* Several different places at once: marked with Ctrl/⌘/Shift (or the touch toggle), acted on from the tray. */
@@ -405,17 +405,30 @@ export default function CalendarGridPage() {
   );
 
   /* "Výběr termínů": a phone order picked in the grid. While it runs, the grid shows only that služba's calendars. */
+  /* A touch screen (a phone, a tablet, or a mouse-less laptop) picks by tapping; a mouse paints by dragging. */
+  const coarsePointer =
+    typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+  const touchPick = isPhone || isTablet || coarsePointer;
+  const [jumpToken, setJumpToken] = useState<number | null>(null);
   const savedFilters = useRef<{ serviceSet: Set<string> | null; ticked: Set<string> | null } | null>(null);
   const pick = usePickOrder({
     multi,
     calendars,
     todayKey: pragueDateKey(now),
+    nowMinute: pragueMinuteOfDay(now),
     onStarted: (session) => {
       savedFilters.current ??= { serviceSet, ticked };
       setServiceSet(new Set([session.serviceId]));
       setTicked(null);
       rangeSelect.clear();
-      setView((current) => (current === "month" ? (isPhone ? "day" : "week") : current));
+      /* A phone starts on the day (three narrow columns are too small to aim at); the calendar opens on today and
+         then jumps to the first day that can still be booked. */
+      viewChosenByHand.current = true;
+      setView((current) => (isPhone ? "day" : current));
+      /* Editing an order opens on its first day; a new one on the first day that can still be booked. */
+      const first = session.editOrder?.firstDate ?? null;
+      setAnchor(first ?? pragueDateKey(new Date()));
+      setJumpToken(first === null ? Date.now() : null);
     },
     onEnded: () => {
       const saved = savedFilters.current;
@@ -429,6 +442,22 @@ export default function CalendarGridPage() {
   });
   const pickActive = pick.active;
   pickingRef.current = pickActive;
+  const pickRef = useRef(pick);
+  pickRef.current = pick;
+  const pickCalendars = useMemo(
+    () => calendars.filter((c) => pick.session !== null && c.clinicServiceId === pick.session.serviceId),
+    [calendars, pick.session],
+  );
+  usePickJump({
+    token: pick.active ? jumpToken : null,
+    calendars: pickCalendars,
+    now,
+    onFound: useCallback((day: string | null) => {
+      setJumpToken(null);
+      if (day !== null) setAnchor(day);
+      else pickRef.current.setNote("V nejbližších 14 dnech není volný čas. Zkuste další týdny nebo jiný měsíc.");
+    }, []),
+  });
   const legendServices = useMemo<LegendService[]>(
     () =>
       services.map((s) => ({
@@ -793,12 +822,15 @@ export default function CalendarGridPage() {
    * calendar, the day and the daily window that was marked.
    */
   const clubFromGrid = (request: GridBookingRequest) => {
-    const dailyFrom = request.start.slice(11, 16);
-    const rawTo = request.end.slice(11, 16);
-    openClubOrder(
-      [{ fromDate: request.dayKey, toDate: request.dayKey, dailyFrom, dailyTo: rawTo === "00:00" ? "23:59" : rawTo }],
-      [request.calendarId],
-    );
+    const from = parseTimeOfDay(request.start.slice(11, 16));
+    const rawTo = parseTimeOfDay(request.end.slice(11, 16));
+    const to = rawTo === null || rawTo === 0 ? 24 * 60 : rawTo;
+    setSetupFor({
+      day: request.dayKey,
+      ...(from !== null && to > from
+        ? { seed: [{ kind: "time", columnKey: request.calendarId, calendarId: request.calendarId, activityId: null, dayKey: request.dayKey, range: { start: from, end: to } }] }
+        : {}),
+    });
   };
 
   /* A click on a club's block, then "Otevřít blok". */
@@ -1010,6 +1042,10 @@ export default function CalendarGridPage() {
   useEffect(() => {
     if (wantsPick === null || !mayBook || handledPickKey.current === location.key) return;
     handledPickKey.current = location.key;
+    if (wantsPick.start !== undefined) {
+      pickRef.current.start(wantsPick.start);
+      return;
+    }
     setSetupFor({
       ...(wantsPick.clubId !== undefined ? { clubId: wantsPick.clubId } : {}),
       ...(wantsPick.parent !== undefined ? { parent: wantsPick.parent } : {}),
@@ -1042,6 +1078,42 @@ export default function CalendarGridPage() {
       event.preventDefault();
     }
   };
+
+  /* Moving to another day, week or month is not a pick: the sentence about the last paint ("Termín v minulosti…") goes. */
+  const lastNav = useRef(`${view}|${anchor}`);
+  useEffect(() => {
+    const key = `${view}|${anchor}`;
+    if (lastNav.current === key) return;
+    lastNav.current = key;
+    if (pickActive) pickRef.current.setNote(null);
+  }, [view, anchor, pickActive]);
+
+  /* The free time of the služba's calendars, day by day: the month's numbers, "Celý den" and the phone's block list. */
+  const nowMinuteOfDay = pragueMinuteOfDay(now);
+  const dayData = useMemo(
+    () => ({
+      calendars: shown.filter((c) => pick.session !== null && c.clinicServiceId === pick.session.serviceId),
+      previewByCalendar,
+      appointmentsByDay: byDay,
+      blocksByCalendar,
+      picks: multi.items,
+      today: todayKey,
+      nowMinute: nowMinuteOfDay,
+    }),
+    [shown, pick.session, previewByCalendar, byDay, blocksByCalendar, multi.items, todayKey, nowMinuteOfDay],
+  );
+  const freeBlocksOn = useCallback((day: string): FreeBlock[] => freeBlocksOfDay(day, dayData), [dayData]);
+  const freeByDay = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!pickActive || view !== "month") return map;
+    for (const day of days) map.set(day, minutesOfBlocks(freeBlocksOn(day)));
+    return map;
+  }, [pickActive, view, days, freeBlocksOn]);
+  const pickedByDay = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of timePicks(multi.items)) map.set(p.dayKey, (map.get(p.dayKey) ?? 0) + (p.range.end - p.range.start));
+    return map;
+  }, [multi.items]);
 
   const title = periodTitle(view, days, anchor);
   const outlinedSelect = { minWidth: 180, "& .MuiInputBase-root": { bgcolor: "background.paper" } };
@@ -1168,7 +1240,7 @@ export default function CalendarGridPage() {
           >
             <ToggleButton value="day">{GRID_TEXT.dayView}</ToggleButton>
             <ToggleButton value="week">{GRID_TEXT.weekView}</ToggleButton>
-            <ToggleButton value="month" disabled={pickActive}>{GRID_TEXT.monthView}</ToggleButton>
+            <ToggleButton value="month">{GRID_TEXT.monthView}</ToggleButton>
           </ToggleButtonGroup>
           {mayBook && !isPhone ? (
             <Button variant="outlined" disabled={pickActive} onClick={() => setEntryOpen(true)} sx={{ minHeight: 44, px: 2.25 }}>
@@ -1350,10 +1422,22 @@ export default function CalendarGridPage() {
         {device === "desktop" && !inSidebar ? <Box>{sideContent(false)}</Box> : null}
 
         <Box sx={{ minWidth: 0 }}>
-          {pick.panel !== null && device !== "desktop" ? (
+          {pick.panel !== null ? (
             <Alert severity="info" data-testid="pick-hint" sx={{ mb: 1.5 }}>
-              Výběr termínů pro {pick.panel.clubName}: podržte prst na volném čase a tažením označte rozsah.
+              {touchPick
+                ? `Klepněte na začátek, potom na konec (výběr pro ${pick.panel.clubName}). Nebo vezměte celý volný blok či celý den.`
+                : `Výběr pro ${pick.panel.clubName}: tažením myší po volném čase označte sloty. Termín odeberete křížkem, upravíte tažením za okraj.`}
             </Alert>
+          ) : null}
+          {pickActive && view === "day" && isPhone && pick.panel !== null ? (
+            <FreeBlocksList
+              blocks={freeBlocksOn(anchor)}
+              calendarName={pick.panel.calendarName}
+              showCalendar={dayData.calendars.length > 1}
+              covered={!(pick.allowance > 0)}
+              onPick={(block) => pick.pickBlocks(anchor, [block])}
+              onNextDay={() => stepBy(1)}
+            />
           ) : null}
           <AsyncSection
             isLoading={calendarsQuery.isLoading}
@@ -1420,6 +1504,24 @@ export default function CalendarGridPage() {
                   onAnchor={setAnchor}
                   onStep={stepBy}
                 />
+              ) : view === "month" && pickActive ? (
+                <PickMonthView
+                  days={days}
+                  anchorMonth={anchorMonth}
+                  todayKey={todayKey}
+                  marks={marks}
+                  holidayColor={holidayColor}
+                  freeMinutes={(day) => freeByDay.get(day) ?? 0}
+                  pickedMinutes={(day) => pickedByDay.get(day) ?? 0}
+                  covered={!(pick.allowance > 0)}
+                  onWholeDay={(day) => pick.pickBlocks(day, freeBlocksOn(day))}
+                  onChooseTime={(day) => {
+                    setAnchor(day);
+                    changeView("day");
+                  }}
+                  onRemoveDay={pick.removeDay}
+                  onNote={pick.setNote}
+                />
               ) : view === "month" ? (
                 <MonthView
                   days={days}
@@ -1471,6 +1573,7 @@ export default function CalendarGridPage() {
                   rangeSelect={pickActive ? undefined : rangeSelect}
                   multi={multi}
                   pick={pick.gridPick}
+                  touchPick={pickActive && touchPick}
                   onOpenClubBlock={setClubPick}
                   onMove={setMoveProposal}
                 />
@@ -1561,7 +1664,7 @@ export default function CalendarGridPage() {
           if (!chosenRange) return;
           const range = { from: chosenRange.from, to: chosenRange.to };
           rangeSelect.clear();
-          openClubOrder([{ fromDate: range.from, toDate: range.to }], chosenCalendarIds);
+          setSetupFor({ day: range.from });
         }}
         onClose={rangeSelect.clear}
       />
@@ -1583,13 +1686,12 @@ export default function CalendarGridPage() {
         }}
         onBlock={() => setMultiBlock(true)}
         onClub={() => {
-          const ranges = clubRanges(multi.items, todayKey);
-          if (ranges.length === 0) return;
+          /* Whole-day runs cannot be picked as time; they only say where the calendar should open. */
+          const seed = withoutIds(multi.items);
+          const days = multi.items.map((i) => (i.kind === "time" ? i.dayKey : i.from)).sort();
+          if (days.length === 0) return;
           multi.clear();
-          openClubOrder(
-            ranges.map((r) => ({ fromDate: r.fromDate, toDate: r.toDate, dailyFrom: r.dailyFrom ?? null, dailyTo: r.dailyTo ?? null })),
-            chosenCalendarIds,
-          );
+          setSetupFor({ ...(seed.length > 0 ? { seed } : {}), day: days[0] });
         }}
       />
       {multiBlock ? (
@@ -1625,29 +1727,24 @@ export default function CalendarGridPage() {
           parent={setupFor.parent}
           onClose={() => setSetupFor(null)}
           onStart={(session) => {
+            const { seed, day } = setupFor;
             setSetupFor(null);
-            pick.start(session);
+            pick.start(session, seed);
+            /* Marked places stay where they were: the calendar does not jump away from them. */
+            if (day !== undefined) {
+              setAnchor(day);
+              setJumpToken(null);
+            }
           }}
         />
       ) : null}
       <Dialog open={pick.result !== null} onClose={pick.closeResult} fullWidth maxWidth="sm" fullScreen={isPhone}>
-        <DialogTitle>Objednávka potvrzena</DialogTitle>
+        <DialogTitle>{pick.resultTitle}</DialogTitle>
         <DialogContent>{pick.result !== null ? <OrderSuccess order={pick.result} /> : null}</DialogContent>
         <DialogActions>
           <Button variant="contained" onClick={pick.closeResult}>Hotovo</Button>
         </DialogActions>
       </Dialog>
-
-      {/* The club order dialog (from the marked places): new key per opening, so the head start is read afresh. */}
-      {clubOrder !== null && mayBook ? (
-        <ClubOrderDialog
-          key={clubOrder.key}
-          open
-          onClose={() => setClubOrder(null)}
-          initial={{ ranges: clubOrder.ranges, calendarIds: clubOrder.calendarIds }}
-          onSaved={() => void appointmentsQuery.refetch()}
-        />
-      ) : null}
 
       {/* 5.8. The row is gone from the answer once it is cancelled, so the
           dialog closes itself rather than showing a stale copy. */}

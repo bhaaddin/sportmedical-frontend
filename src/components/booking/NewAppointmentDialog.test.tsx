@@ -27,7 +27,10 @@ const getById = vi.fn();
 const preRegister = vi.fn();
 const issueLink = vi.fn();
 const getAllClubs = vi.fn();
+const getOnSiteOptions = vi.fn();
+const recordOnSite = vi.fn();
 
+vi.mock('../../api/onSiteConsents', () => ({ onSiteConsentsApi: { getOptions: getOnSiteOptions, record: recordOnSite }, default: { getOptions: getOnSiteOptions, record: recordOnSite } }));
 vi.mock('../../api/calendars', () => ({ calendarsApi: { list: listCalendars } }));
 vi.mock('../../api/activities', () => ({ activitiesApi: { list: listActivities } }));
 vi.mock('../../api/workingHours', () => ({ workingHoursApi: { preview } }));
@@ -108,6 +111,8 @@ beforeEach(() => {
     appointment: { startUtc: '2026-09-24T07:00:00Z' },
     warnings: [],
   });
+  getOnSiteOptions.mockReset().mockResolvedValue({ activityId: 'a1', options: [{ code: 'treatment', label: 'Souhlas s poskytnutím služeb', required: true }] });
+  recordOnSite.mockReset().mockResolvedValue({ patientId: 'np1', recorded: [], alreadyOnFile: [], missingConsents: [], paperwork: null });
   createUnregistered.mockReset().mockResolvedValue({ startUtc: '2026-09-24T07:00:00Z' });
   createQuick.mockReset().mockResolvedValue({
     appointment: {
@@ -207,7 +212,7 @@ describe('step 1 — kdo přijde', () => {
     const menu = screen.getByRole('menu', { name: 'Změnit termín' });
     expect(within(menu).getByRole('menuitem', { name: 'Zítra' })).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: 'Příští týden' })).toBeInTheDocument();
-    expect(within(menu).getByRole('menuitem', { name: 'Jiný datum a čas' })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: 'Jiné datum a čas' })).toBeInTheDocument();
     /* Nobody answers "next free" here, so it is not offered. */
     expect(within(menu).queryByRole('menuitem', { name: 'Příští volný termín' })).not.toBeInTheDocument();
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'Vybrat v kalendáři' }));
@@ -245,10 +250,10 @@ describe('step 1 — kdo přijde', () => {
     expect(screen.getByText('Čtvrtek 24. 9. 2026 · 09:00 — 10:00')).toBeInTheDocument();
   });
 
-  it('"Jiný datum a čas" shows the fields', async () => {
+  it('"Jiné datum a čas" shows the fields', async () => {
     renderDialog();
     await userEvent.click(await screen.findByRole('button', { name: 'Změnit' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Jiný datum a čas' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Jiné datum a čas' }));
     expect(screen.getByLabelText('Datum')).toHaveValue('2026-09-24');
     expect(screen.getByLabelText('Čas od')).toHaveValue('09:00');
   });
@@ -430,6 +435,25 @@ describe('rychlá registrace — čtyři údaje', () => {
     expect(await screen.findByRole('option', { name: /^Prohlídka — 1.600.Kč · 30 min$/ })).toBeInTheDocument();
     /* The rest of the price list follows, marked as not offered today. */
     expect(screen.getByRole('option', { name: /^Diagnostika — .* · 90 min · dnes se nenabízí$/ })).toBeInTheDocument();
+  });
+
+  it('records the consents signed on paper for the new patient once the quick booking succeeds', async () => {
+    renderDialog();
+    await fillQuick();
+    await screen.findByText('Slot je volný. Nekoliduje s žádnou rezervací ani s obědem.');
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Souhlas s poskytnutím služeb' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Vytvořit rezervaci' }));
+    await waitFor(() => expect(createQuick).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(recordOnSite).toHaveBeenCalledWith('np1', { activityId: 'a1', consents: ['treatment'], note: null }));
+  });
+
+  it('records nothing when no paper consent is ticked', async () => {
+    renderDialog();
+    await fillQuick();
+    await screen.findByText('Slot je volný. Nekoliduje s žádnou rezervací ani s obědem.');
+    await userEvent.click(screen.getByRole('button', { name: 'Vytvořit rezervaci' }));
+    await waitFor(() => expect(createQuick).toHaveBeenCalledTimes(1));
+    expect(recordOnSite).not.toHaveBeenCalled();
   });
 
   it('books the chosen slot with one call and shows the deadline, the link and what is prefilled', async () => {

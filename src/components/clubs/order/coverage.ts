@@ -19,8 +19,12 @@ export interface CoverageActivity {
 export interface ActivityCoverage extends CoverageActivity {
   /** seats x minutesPerSeat / parallelCapacity (not rounded). */
   neededMinutes: number;
-  /** The share of the picked minutes this činnost gets (in proportion to its need). */
+  /** The picked minutes this činnost got: činnosti are filled in the order they are listed (see `computeCoverage`). */
   allocatedMinutes: number;
+  /** One slot = one visit of the činnost (`minutesPerSeat` long), carrying `parallelCapacity` players. */
+  neededSlots: number;
+  coveredSlots: number;
+  remainingSlots: number;
   coveredSeats: number;
   remainingSeats: number;
 }
@@ -37,6 +41,10 @@ export interface Coverage {
   coveredSeats: number;
   /** The players the picked time does not cover yet. */
   remainingSeats: number;
+  /** All slots the order needs, covered so far and still missing - the one number the desk watches. */
+  neededSlots: number;
+  coveredSlots: number;
+  remainingSlots: number;
   /** Everything is covered: there is something to cover and nothing is missing. */
   covered: boolean;
   /** 0-100, whole percent of the need. */
@@ -53,6 +61,16 @@ export const capacityOf = (a: Pick<CoverageActivity, 'parallelCapacity'>): numbe
 export const activityNeed = (a: CoverageActivity): number =>
   a.seats > 0 && a.minutesPerSeat > 0 ? (a.seats * a.minutesPerSeat) / capacityOf(a) : 0;
 
+/** The slots one činnost needs: a slot is one visit (its length) and holds `parallelCapacity` players. */
+export const activitySlots = (a: CoverageActivity): number =>
+  a.seats > 0 && a.minutesPerSeat > 0 ? Math.ceil(a.seats / capacityOf(a) - EPS) : 0;
+
+/**
+ * Picked time is one pool of minutes. It is handed to the činnosti IN THE ORDER THEY ARE LISTED: the first one
+ * takes whole slots (its length each) until it is covered, what is left goes to the next one, and so on. A rest
+ * shorter than the next slot stays unspent (it counts as picked, but not as a slot). So the numbers fall as the
+ * desk paints: 12 x 30 min + 10 x 60 min, 330 picked = 11 slots of the first one covered, 1 + 10 still missing.
+ */
 export function computeCoverage(activities: readonly CoverageActivity[], pickedMinutes: number): Coverage {
   const picked = Math.max(0, Math.floor(Number.isFinite(pickedMinutes) ? pickedMinutes : 0));
   const needs = activities.map(activityNeed);
@@ -61,28 +79,42 @@ export function computeCoverage(activities: readonly CoverageActivity[], pickedM
   const totalSeats = activities.reduce((n, a) => n + Math.max(0, a.seats), 0);
   const covered = totalSeats > 0 && needed > 0 && picked >= needed;
 
+  let pool = picked;
   const perActivity: ActivityCoverage[] = activities.map((a, i) => {
-    const allocated = rawNeed > 0 ? (picked * needs[i]) / rawNeed : 0;
     const seats = Math.max(0, a.seats);
-    const coveredSeats = covered
-      ? seats
-      : a.minutesPerSeat > 0
-        ? Math.min(seats, Math.floor((allocated * capacityOf(a)) / a.minutesPerSeat + EPS))
-        : 0;
-    return { ...a, neededMinutes: needs[i], allocatedMinutes: allocated, coveredSeats, remainingSeats: seats - coveredSeats };
+    const neededSlots = activitySlots(a);
+    const slotMinutes = a.minutesPerSeat > 0 ? a.minutesPerSeat : 0;
+    /* Everything is covered once the pooled minutes reach the need, even when the slot rounding says otherwise. */
+    const coveredSlots = covered ? neededSlots : slotMinutes > 0 ? Math.min(neededSlots, Math.floor(pool / slotMinutes + EPS)) : 0;
+    const used = coveredSlots * slotMinutes;
+    pool = Math.max(0, pool - used);
+    const coveredSeats = covered ? seats : Math.min(seats, coveredSlots * capacityOf(a));
+    return {
+      ...a,
+      neededMinutes: needs[i],
+      allocatedMinutes: used,
+      neededSlots,
+      coveredSlots,
+      remainingSlots: neededSlots - coveredSlots,
+      coveredSeats,
+      remainingSeats: seats - coveredSeats,
+    };
   });
 
-  const coveredSeats = perActivity.reduce((n, a) => n + a.coveredSeats, 0);
+  const sum = (pick: (a: ActivityCoverage) => number) => perActivity.reduce((n, a) => n + pick(a), 0);
   return {
     totalSeats,
     neededMinutes: needed,
     pickedMinutes: picked,
     remainingMinutes: Math.max(0, needed - picked),
     surplusMinutes: Math.max(0, picked - needed),
-    coveredSeats,
-    remainingSeats: totalSeats - coveredSeats,
+    coveredSeats: sum((a) => a.coveredSeats),
+    remainingSeats: totalSeats - sum((a) => a.coveredSeats),
+    neededSlots: sum((a) => a.neededSlots),
+    coveredSlots: sum((a) => a.coveredSlots),
+    remainingSlots: sum((a) => a.remainingSlots),
     covered,
-    percent: needed > 0 ? Math.min(100, Math.floor((picked / needed) * 100 + EPS)) : 0,
+    percent: needed > 0 ? Math.min(100, Math.floor((picked / needed) * 100 + 1e-9)) : 0,
     perActivity,
   };
 }

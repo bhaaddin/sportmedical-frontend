@@ -1,17 +1,13 @@
 /* Router state that /clubs and /clubs/objednavky accept from the calendar and other screens. */
-import type { OrderRange } from '../../../api/clubOrders';
 
 export interface NewOrderPrefill {
   clubId?: string;
-  serviceId?: string;
-  ranges?: OrderRange[];
-  calendarIds?: string[];
 }
 
 export interface OrderRouteState {
   /** Open that order's detail. */
   openOrderId?: string;
-  /** Open the order dialog, prefilled; `true` = empty. */
+  /** Open the "Nová klubová objednávka" chooser (phone order in the calendar / link for the club); `true` = no club yet. */
   newOrder?: NewOrderPrefill | true;
 }
 

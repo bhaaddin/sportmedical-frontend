@@ -1,29 +1,22 @@
 import { useState } from "react";
-import { Alert, Box, Button, Chip, IconButton, LinearProgress, Paper, Stack, Switch, Typography } from "@mui/material";
+import { Alert, Box, Button, IconButton, LinearProgress, Paper, Stack, Switch, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import type { Device } from "../../../layout/useDevice";
-import { formatMinutes, formatPlayers, plural } from "../../clubs/blockLogic";
-import type { Coverage } from "../../clubs/order/coverage";
-import { WEEKDAYS } from "../../clubs/order/orderLogic";
-import { formatSeatsWithTotal } from "../../clubs/panel/seats";
+import { formatMinutes, plural } from "../../clubs/blockLogic";
+import type { ActivityCoverage, Coverage } from "../../clubs/order/coverage";
 import { pickedLabel, type PickedTime } from "./multiSelect";
 
 /*
  * The live calculator of "výběr termínů", beside the calendar while a club order is being picked.
  *
  *   desktop         a sticky panel on the right of the grid
- *   tablet / phone  a bar at the bottom: the one-line state (progress, what is missing) and a button that opens the rest
+ *   tablet / phone  a bar at the bottom: "Zbývá N slotů" and a button that opens the rest
  *
- * It only shows numbers and reports clicks. Every number comes from `computeCoverage`; the server's own analysis is
- * shown beside it when it says something else.
+ * The one thing it shows, big: how many SLOTS (one visit of a činnost, its length) are still missing, per činnost
+ * and in total. It only shows numbers and reports clicks; every number comes from `computeCoverage`.
  */
-
-export interface PickServerNote {
-  neededMinutes: number;
-  availableMinutes: number;
-}
 
 export interface PickOrderPanelProps {
   device: Device;
@@ -36,52 +29,84 @@ export interface PickOrderPanelProps {
   onReserve: (on: boolean) => void;
   /** A sentence about the last paint (trimmed, refused), or null. */
   note: string | null;
-  /** The server's numbers when they differ from ours. */
-  serverNote: PickServerNote | null;
-  /** Where the automatic proposal would start ("po 26. 10. od 09:40"), or null when nothing is picked. */
-  proposalFrom: string | null;
-  weekdays: number[];
-  onWeekdays: (days: number[]) => void;
-  proposing: boolean;
+  /** Processing a request: what the club asked for (a hint only - the picks are the desk's own). */
+  requested: readonly string[];
+  /** Editing an existing order: the button saves the changes instead of confirming a new order. */
+  editing: boolean;
   confirming: boolean;
   /** A refusal from the server (409/400) - the picks stay. */
   failure: { message: string; conflict: string | null } | null;
   onRemoveConflict?: (() => void) | null;
-  onUndoProposal: (() => void) | null;
-  onPropose: () => void;
+  /** The 409 names athletes whose bookings the change would cancel (editing only), or null. */
+  athletesAffected?: number | null;
   onConfirm: () => void;
+  onConfirmCancelling?: () => void;
   onClearPicks: () => void;
   onRemovePick: (id: string) => void;
   onCancel: () => void;
 }
 
-const hoursOf = (minutes: number): string => {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return h > 0 ? `${h} h${m > 0 ? ` ${m} min` : ""}` : `${m} min`;
-};
+const slotsWord = (n: number): string => plural(n, ["slot", "sloty", "slotů"]);
 
-function Metric({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" }) {
-  return (
-    <Box>
-      <Typography sx={{ fontSize: 11, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</Typography>
-      <Typography sx={{ fontSize: 17, fontWeight: 700, color: tone === "ok" ? "success.main" : tone === "warn" ? "warning.main" : "text.primary" }}>{value}</Typography>
-    </Box>
-  );
-}
+/** "12 × Základní (30 min) · 10 × Komplexní (60 min)" - only the činnosti that still miss slots. */
+export const remainingLine = (coverage: Coverage): string =>
+  coverage.perActivity
+    .filter((a) => a.remainingSlots > 0)
+    .map((a) => `${a.remainingSlots} × ${a.name} (${a.minutesPerSeat} min)`)
+    .join(" · ");
 
 function Progress({ coverage }: { coverage: Coverage }) {
   return (
-    <Box>
-      <LinearProgress
-        variant="determinate"
-        value={coverage.percent}
-        color={coverage.covered ? "success" : "primary"}
-        aria-label="Pokrytí hráčů"
-        aria-valuenow={coverage.percent}
-        data-testid="pick-progress"
-        sx={{ height: 10, borderRadius: 5 }}
-      />
+    <LinearProgress
+      variant="determinate"
+      value={coverage.percent}
+      color={coverage.covered ? "success" : "primary"}
+      aria-label="Pokrytí objednávky"
+      aria-valuenow={coverage.percent}
+      data-testid="pick-progress"
+      sx={{ height: 10, borderRadius: 5 }}
+    />
+  );
+}
+
+function ActivityRow({ a }: { a: ActivityCoverage }) {
+  const done = a.remainingSlots === 0;
+  return (
+    <Stack direction="row" data-testid="pick-activity" data-done={done ? "true" : "false"} sx={{ alignItems: "baseline", justifyContent: "space-between", gap: 1 }}>
+      <Typography variant="body2" sx={{ minWidth: 0, color: done ? "text.secondary" : "text.primary" }}>
+        {`${a.name} (${a.minutesPerSeat} min) · ${a.seats} ${plural(a.seats, ["hráč", "hráči", "hráčů"])}`}
+      </Typography>
+      <Typography variant="body2" sx={{ fontWeight: 700, whiteSpace: "nowrap", color: done ? "success.main" : "warning.main" }}>
+        {done ? "hotovo" : `zbývá ${a.remainingSlots} ${slotsWord(a.remainingSlots)}`}
+      </Typography>
+    </Stack>
+  );
+}
+
+/** The big number (or "Hotovo"), per činnost and the progress: the heart of the panel. */
+function Remaining({ coverage, compact }: { coverage: Coverage; compact?: boolean }) {
+  if (coverage.covered) {
+    return (
+      <Box data-testid="pick-summary">
+        <Typography data-testid="pick-covered" sx={{ fontSize: compact ? 17 : 22, fontWeight: 800, color: "success.main", lineHeight: 1.2 }}>
+          Hotovo — všechny sloty pokryty
+          {coverage.surplusMinutes > 0 ? (
+            <Typography component="span" sx={{ display: "block", fontSize: 13, fontWeight: 500, color: "text.secondary" }}>
+              {`Rezerva ${formatMinutes(coverage.surplusMinutes)}`}
+            </Typography>
+          ) : null}
+        </Typography>
+      </Box>
+    );
+  }
+  return (
+    <Box data-testid="pick-summary">
+      <Typography data-testid="pick-slots" sx={{ fontSize: compact ? 20 : 30, fontWeight: 800, lineHeight: 1.1 }}>
+        {`Zbývá ${coverage.remainingSlots} ${slotsWord(coverage.remainingSlots)}`}
+      </Typography>
+      <Typography data-testid="pick-remaining" variant="body2" sx={{ color: "text.secondary", mt: 0.25 }}>
+        {coverage.totalSeats === 0 ? "Nejsou zadaní žádní hráči." : `Zbývá: ${remainingLine(coverage)}`}
+      </Typography>
     </Box>
   );
 }
@@ -89,7 +114,7 @@ function Progress({ coverage }: { coverage: Coverage }) {
 function Details(props: PickOrderPanelProps) {
   const { coverage, picks } = props;
   const sorted = [...picks].sort((a, b) => a.dayKey.localeCompare(b.dayKey) || a.range.start - b.range.start);
-  const busy = props.proposing || props.confirming;
+  const busy = props.confirming;
   return (
     <Stack spacing={1.75}>
       <Box>
@@ -97,41 +122,19 @@ function Details(props: PickOrderPanelProps) {
         <Typography variant="caption" sx={{ color: "text.secondary" }}>{props.serviceName}</Typography>
       </Box>
 
-      <Box data-testid="pick-needs">
-        <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 0.5 }}>{`Potřeba: ${formatPlayers(coverage.totalSeats)}`}</Typography>
-        <Typography variant="body2" data-testid="pick-seats-breakdown" sx={{ mb: 0.5 }}>
-          {formatSeatsWithTotal(coverage.perActivity.map((a) => ({ activityName: a.name, seats: a.seats })))}
+      <Stack spacing={0.5} data-testid="pick-needs">
+        {coverage.perActivity.map((a) => <ActivityRow key={a.activityId} a={a} />)}
+        <Typography variant="caption" data-testid="pick-minutes" sx={{ color: "text.secondary" }}>
+          {`Vybráno ${formatMinutes(coverage.pickedMinutes)} z ${formatMinutes(coverage.neededMinutes)}`}
         </Typography>
-        <Stack component="ul" spacing={0.25} sx={{ m: 0, pl: 2, listStyle: "disc" }}>
-          {coverage.perActivity.map((a) => (
-            <li key={a.activityId} data-testid="pick-activity">
-              <Typography variant="body2">
-                {`${a.name}: ${a.seats} × ${a.minutesPerSeat} min${a.parallelCapacity > 1 ? ` ÷ ${a.parallelCapacity}` : ""} = ${formatMinutes(Math.ceil(a.neededMinutes - 1e-9))}`}
-              </Typography>
-            </li>
-          ))}
-        </Stack>
-      </Box>
+      </Stack>
 
-      <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.25 }} data-testid="pick-metrics">
-        <Metric label="Potřeba celkem" value={formatMinutes(coverage.neededMinutes)} />
-        <Metric label="Vybráno" value={formatMinutes(coverage.pickedMinutes)} />
-        <Metric label="Zbývá vybrat" value={formatMinutes(coverage.remainingMinutes)} tone={coverage.remainingMinutes > 0 ? "warn" : "ok"} />
-        <Metric label="Nepokryto" value={formatPlayers(coverage.remainingSeats)} tone={coverage.remainingSeats > 0 ? "warn" : "ok"} />
-      </Box>
-
-      <Progress coverage={coverage} />
-
-      {coverage.covered ? (
-        <Alert severity="success" data-testid="pick-covered" sx={{ py: 0.25 }}>
-          {`Pokryto — všech ${formatPlayers(coverage.totalSeats)} má čas.`}
-          {coverage.surplusMinutes > 0 ? ` Rezerva ${formatMinutes(coverage.surplusMinutes)}.` : ""}
+      {props.requested.length > 0 ? (
+        <Alert severity="info" data-testid="pick-requested" sx={{ py: 0.25 }}>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>Klub žádá:</Typography>
+          {props.requested.map((line) => <Typography key={line} variant="body2">{line}</Typography>)}
         </Alert>
-      ) : (
-        <Typography variant="body2" data-testid="pick-missing" sx={{ color: "text.secondary" }}>
-          {`Chybí ${hoursOf(coverage.remainingMinutes)} (${formatPlayers(coverage.remainingSeats)}). Táhněte myší přes volný čas v kalendáři.`}
-        </Typography>
-      )}
+      ) : null}
 
       <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
         <Typography id="pick-reserve-label" sx={{ fontSize: 13, fontWeight: 600 }}>Přidat rezervu</Typography>
@@ -144,12 +147,6 @@ function Details(props: PickOrderPanelProps) {
 
       {props.note !== null ? <Alert severity="info" data-testid="pick-note" sx={{ py: 0.25 }}>{props.note}</Alert> : null}
 
-      {props.serverNote !== null ? (
-        <Alert severity="warning" data-testid="pick-server" sx={{ py: 0.25 }}>
-          {`Server počítá jinak: potřeba ${formatMinutes(props.serverNote.neededMinutes)}, k dispozici ${formatMinutes(props.serverNote.availableMinutes)} (otevírací doba, svátky).`}
-        </Alert>
-      ) : null}
-
       <Box>
         <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
           <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{`Vybrané termíny (${sorted.length})`}</Typography>
@@ -158,7 +155,9 @@ function Details(props: PickOrderPanelProps) {
           ) : null}
         </Stack>
         {sorted.length === 0 ? (
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>Zatím nic. Stiskněte v kalendáři a tažením označte čas.</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Zatím nic. {props.device === "desktop" ? "Stiskněte v kalendáři a tažením označte čas." : "Klepněte v kalendáři na začátek a potom na konec."}
+          </Typography>
         ) : (
           <Stack spacing={0.5} sx={{ maxHeight: 180, overflowY: "auto" }} data-testid="pick-list">
             {sorted.map((p) => (
@@ -180,44 +179,6 @@ function Details(props: PickOrderPanelProps) {
         )}
       </Box>
 
-      <Box>
-        <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 0.5 }}>Navrhnout automaticky</Typography>
-        <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mb: 0.75 }} role="group" aria-label="Dny pro automatický návrh">
-          {WEEKDAYS.map((d) => {
-            const on = props.weekdays.includes(d.value);
-            return (
-              <Chip
-                key={d.value}
-                label={d.label}
-                size="small"
-                color={on ? "primary" : "default"}
-                variant={on ? "filled" : "outlined"}
-                aria-pressed={on}
-                onClick={() => props.onWeekdays(on ? props.weekdays.filter((x) => x !== d.value) : [...props.weekdays, d.value])}
-                sx={{ minHeight: 32 }}
-              />
-            );
-          })}
-        </Stack>
-        <Button
-          variant="outlined"
-          fullWidth
-          disabled={props.proposalFrom === null || busy || coverage.totalSeats === 0}
-          onClick={props.onPropose}
-          sx={{ minHeight: 44 }}
-        >
-          {props.proposalFrom === null ? "Navrhnout automaticky od…" : `Navrhnout automaticky od ${props.proposalFrom}`}
-        </Button>
-        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
-          {props.proposalFrom === null
-            ? "Nejdřív označte v kalendáři začátek — počítá se přesně od něj."
-            : "Návrh rozloží čas od prvního označeného místa; potom ho upravíte ručně."}
-        </Typography>
-        {props.onUndoProposal !== null ? (
-          <Button size="small" onClick={props.onUndoProposal} sx={{ mt: 0.5 }}>Vrátit můj výběr před návrhem</Button>
-        ) : null}
-      </Box>
-
       {props.failure !== null ? (
         <Alert
           severity="error"
@@ -230,6 +191,11 @@ function Details(props: PickOrderPanelProps) {
         >
           {props.failure.message}
           {props.failure.conflict !== null ? <Box component="div" sx={{ fontWeight: 700 }}>{`Kolize: ${props.failure.conflict}`}</Box> : null}
+          {props.athletesAffected != null && props.onConfirmCancelling ? (
+            <Button color="error" variant="outlined" size="small" onClick={props.onConfirmCancelling} disabled={busy} sx={{ mt: 1 }}>
+              {`Potvrdit a zrušit rezervace sportovců (${props.athletesAffected})`}
+            </Button>
+          ) : null}
         </Alert>
       ) : null}
     </Stack>
@@ -241,23 +207,12 @@ function ConfirmRow(props: PickOrderPanelProps) {
   return (
     <Stack direction="row" spacing={1}>
       <Button variant="outlined" onClick={props.onCancel} disabled={props.confirming} sx={{ minHeight: 44 }}>Zrušit</Button>
-      <Button
-        variant="contained"
-        fullWidth
-        disabled={picks.length === 0 || props.confirming || props.proposing}
-        onClick={props.onConfirm}
-        sx={{ minHeight: 44 }}
-      >
-        {props.confirming ? "Potvrzuji…" : "Potvrdit objednávku"}
+      <Button variant="contained" fullWidth disabled={picks.length === 0 || props.confirming} onClick={props.onConfirm} sx={{ minHeight: 44 }}>
+        {props.confirming ? (props.editing ? "Ukládám…" : "Potvrzuji…") : props.editing ? "Uložit změny" : "Potvrdit objednávku"}
       </Button>
     </Stack>
   );
 }
-
-const summaryOf = (coverage: Coverage): string =>
-  coverage.covered
-    ? "Pokryto"
-    : `Zbývá ${formatMinutes(coverage.remainingMinutes)} · ${coverage.remainingSeats} ${plural(coverage.remainingSeats, ["hráč", "hráči", "hráčů"])}`;
 
 export function PickOrderPanel(props: PickOrderPanelProps) {
   const [open, setOpen] = useState(false);
@@ -285,7 +240,9 @@ export function PickOrderPanel(props: PickOrderPanelProps) {
         }}
       >
         <Stack spacing={1.5}>
-          <Typography sx={{ fontSize: 16, fontWeight: 700 }}>Výběr termínů</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 700, color: "text.secondary" }}>Výběr termínů</Typography>
+          <Remaining coverage={coverage} />
+          <Progress coverage={coverage} />
           <Details {...props} />
           <ConfirmRow {...props} />
         </Stack>
@@ -320,9 +277,7 @@ export function PickOrderPanel(props: PickOrderPanelProps) {
       <Stack spacing={1}>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography data-testid="pick-summary" sx={{ fontSize: 14, fontWeight: 700, color: coverage.covered ? "success.main" : "text.primary" }}>
-              {summaryOf(coverage)}
-            </Typography>
+            <Remaining coverage={coverage} compact />
             <Typography variant="caption" sx={{ color: "text.secondary" }}>
               {`${formatMinutes(coverage.pickedMinutes)} z ${formatMinutes(coverage.neededMinutes)}`}
             </Typography>
@@ -337,7 +292,7 @@ export function PickOrderPanel(props: PickOrderPanelProps) {
           </IconButton>
         </Stack>
         <Progress coverage={coverage} />
-        {open ? (
+        {open || props.failure !== null ? (
           <Box sx={{ maxHeight: phone ? "50vh" : "55vh", overflowY: "auto", py: 0.5 }}>
             <Details {...props} />
           </Box>

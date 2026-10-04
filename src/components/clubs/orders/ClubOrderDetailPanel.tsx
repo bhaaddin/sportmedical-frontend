@@ -70,6 +70,16 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
     queryFn: () => clubOrdersApi.get(rootId ?? ''),
     enabled: rootId !== null,
   });
+  /* Which orders of the group an invoice covers, and which still wait for one (the same read the invoice dialog opens on). */
+  const invoiceBillable = order !== undefined && order.paymentMethod !== 'PerPerson'
+    && (order.status === 'Requested' || order.status === 'Confirmed' || order.status === 'Completed');
+  const invoiceDraftQuery = useQuery({
+    queryKey: ['club-order-invoice-draft', orderId],
+    queryFn: () => clubOrdersApi.invoiceDraft(orderId),
+    enabled: invoiceBillable,
+    retry: false,
+  });
+  const invoiceDraft = invoiceDraftQuery.data;
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['club-order', orderId] });
@@ -131,6 +141,38 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
 
         {hasGroup(order) ? (
           <OrderGroupBlock order={order} root={rootQuery.data} onOpen={setOrderId} />
+        ) : null}
+
+        {order.invoiceId !== null || invoiceDraft !== undefined ? (
+          <Block title="Faktura">
+            <Stack spacing={0.75} data-testid="order-invoices">
+              {order.invoiceId !== null ? (
+                <Stack direction="row" data-testid="order-invoice" sx={{ alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  <Typography variant="body2">Tato objednávka je na faktuře:</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }} data-testid="order-invoice-number">
+                    {invoiceDraft?.alreadyInvoiced.find((x) => x.orderId === order.id)?.invoiceNumber || 'vystavena'}
+                  </Typography>
+                  <Button size="small" onClick={() => navigate('/billing', { state: { invoiceId: order.invoiceId } })} sx={{ minHeight: 36 }}>Otevřít</Button>
+                </Stack>
+              ) : (
+                <Typography variant="body2" color="text.secondary" data-testid="order-invoice-pending">Tato objednávka zatím není vyfakturovaná.</Typography>
+              )}
+              {invoiceDraft !== undefined && hasGroup(order) ? (
+                <>
+                  {invoiceDraft.alreadyInvoiced.map((x) => (
+                    <Typography key={x.orderId} variant="body2" color="text.secondary" data-testid="group-invoice-row">
+                      {orderCode(x.orderId)} · faktura {x.invoiceNumber !== '' ? x.invoiceNumber : 'vystavena'}
+                    </Typography>
+                  ))}
+                  {[...new Set(invoiceDraft.lines.map((l) => l.orderId))].map((id) => (
+                    <Typography key={id} variant="body2" color="warning.main" data-testid="group-invoice-pending">
+                      {orderCode(id)} · čeká na {invoiceDraft.supplementary ? 'dodatečnou ' : ''}fakturu
+                    </Typography>
+                  ))}
+                </>
+              ) : null}
+            </Stack>
+          </Block>
         ) : null}
 
         <Block title="Termíny">
@@ -261,7 +303,9 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
           data-testid="club-invoice"
           {...btn}
         >
-          {order.invoiceId !== null ? 'Faktura klubu' : 'Vystavit jednu fakturu klubu'}
+          {invoiceDraft !== undefined
+            ? (invoiceDraft.lines.length === 0 ? 'Faktura klubu' : invoiceDraft.supplementary ? 'Vystavit dodatečnou fakturu' : 'Vystavit jednu fakturu klubu')
+            : (order.invoiceId !== null ? 'Faktura klubu' : 'Vystavit jednu fakturu klubu')}
         </Button>
         {perPerson ? (
           <Typography id="invoice-per-person-hint" variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }} data-testid="invoice-per-person-hint">
@@ -379,6 +423,10 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
           onClose={() => setDialog(null)}
           order={dialog === 'edit' ? order : undefined}
           processOrder={dialog === 'process' ? order : undefined}
+          onEditTerms={(session) => {
+            setDialog(null);
+            navigate('/planovani', { state: { pickOrder: { start: session } } });
+          }}
           onSaved={() => { setDialog(null); refresh(); }}
         />
       ) : null}

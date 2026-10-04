@@ -55,11 +55,9 @@ import { ClubCard } from './clubs/ClubCard';
 import { ClubPresentation } from '../components/clubs/detail/ClubPresentation';
 import { PayerDialog } from './clubs/PayerDialog';
 import { PinnedActions } from './clubs/PinnedActions';
-import { ClubOrderDialog } from '../components/clubs/order/ClubOrderDialog';
 import { ClubOrderEntry } from '../components/clubs/order/ClubOrderEntry';
 import { ClubOrderDetailPanel } from '../components/clubs/orders/ClubOrderDetailPanel';
 import { hasOrderState, readOrderState } from '../components/clubs/orders/orderRouteState';
-import type { NewOrderPrefill } from '../components/clubs/orders/orderRouteState';
 
 const FILTERS: { key: ClubFilter; label: string }[] = [
   { key: 'all', label: 'Všechny' },
@@ -87,10 +85,8 @@ export default function ClubsPage() {
   const handoff = readState(location.state);
   const orderHandoff = readOrderState(location.state);
 
-  /* Etapa 4: the order dialog (new, optionally prefilled) and an order's detail drawer. */
-  /* The club page's "Nová objednávka klubu": the two-way chooser (phone order in the calendar / link for the club). */
-  const [entryFor, setEntryFor] = useState<string | null>(null);
-  const [orderDialog, setOrderDialog] = useState<NewOrderPrefill | null>(() =>
+  /* "Nová objednávka": the two-way chooser (phone order in the calendar / link for the club); `clubId` may be empty. */
+  const [entry, setEntry] = useState<{ clubId?: string } | null>(() =>
     orderHandoff.newOrder === undefined ? null : orderHandoff.newOrder === true ? {} : orderHandoff.newOrder,
   );
   const [openOrderId, setOpenOrderId] = useState<string | null>(orderHandoff.openOrderId ?? null);
@@ -235,22 +231,11 @@ export default function ClubsPage() {
   const dialogs = (
     <>
       <ClubOrderEntry
-        open={entryFor !== null}
-        defaultClubId={entryFor ?? undefined}
-        onClose={() => setEntryFor(null)}
+        open={entry !== null}
+        defaultClubId={entry?.clubId}
+        onClose={() => setEntry(null)}
         onPhone={(startClubId) => navigate('/planovani', { state: { pickOrder: startClubId !== undefined ? { clubId: startClubId } : true } })}
         onInvited={(invited) => { reload(); setOpenOrderId(invited.id); }}
-      />
-      <ClubOrderDialog
-        open={orderDialog !== null}
-        onClose={() => setOrderDialog(null)}
-        initial={orderDialog ?? undefined}
-        onSaved={(saved) => {
-          setOrderDialog(null);
-          if (saved.clubId !== '') setSelectedId(saved.clubId);
-          setOpenOrderId(saved.id);
-          reload();
-        }}
       />
       {openOrderId !== null ? (
         <ClubOrderDetailPanel orderId={openOrderId} onClose={() => setOpenOrderId(null)} onChanged={reload} />
@@ -320,12 +305,8 @@ export default function ClubsPage() {
           onInvoice={() =>
             navigate('/billing', { state: { clubId: selected.club.id, partnerOrderId: selected.order?.id ?? null } })
           }
-          onNewReservation={() =>
-            navigate('/vyhrazeni', {
-              state: { clubId: selected.club.id, calendarId: selected.order?.calendarId ?? calendars[0]?.id },
-            })
-          }
-          onNewOrder={() => setEntryFor(selected.club.id)}
+          onNewReservation={() => navigate('/planovani', { state: { pickOrder: { clubId: selected.club.id } } })}
+          onNewOrder={() => setEntry({ clubId: selected.club.id })}
           onOpenOrder={setOpenOrderId}
         />
         {dialogs}
@@ -346,7 +327,7 @@ export default function ClubsPage() {
           phone ? undefined : (
             <>
               <Button variant="outlined" onClick={() => setEditing('new')}>Nový klub</Button>
-              <Button variant="contained" onClick={() => setOrderDialog({})}>Nová objednávka</Button>
+              <Button variant="contained" onClick={() => setEntry({})}>Nová objednávka</Button>
             </>
           )
         }
@@ -425,7 +406,7 @@ export default function ClubsPage() {
 
       <PinnedActions>
         <Button variant="outlined" onClick={() => setEditing('new')}>Nový klub</Button>
-        <Button variant="contained" onClick={() => setOrderDialog({})}>Nová objednávka</Button>
+        <Button variant="contained" onClick={() => setEntry({})}>Nová objednávka</Button>
       </PinnedActions>
 
       {dialogs}

@@ -1,9 +1,9 @@
 import { statusTally } from "../../../api/bookingContracts";
 import type { OrderRange } from "../../../api/clubOrders";
 import { addDaysToDateOnly, type DateOnly } from "../../../utils/time";
-import { formatMinutes, parseTimeOfDay, spanOnDay, type MinuteRange } from "../grid/timeRange";
+import { parseTimeOfDay, spanOnDay, type MinuteRange } from "../grid/timeRange";
 import { clubRanges } from "./multiSelect";
-import type { NewPicked, PickedRange, PickedTime } from "./multiSelect";
+import type { PickedRange, PickedTime } from "./multiSelect";
 
 /*
  * "Výběr termínů": the pure rules of picking time for a club order straight in the calendar.
@@ -64,6 +64,18 @@ export function busyIntervals(input: BusyInput): MinuteRange[] {
   const sorted = out.filter((r) => r.end > r.start).sort((a, b) => a.start - b.start || a.end - b.end);
   const merged: MinuteRange[] = [];
   for (const r of sorted) {
+    const last = merged[merged.length - 1];
+    if (last !== undefined && r.start <= last.end) last.end = Math.max(last.end, r.end);
+    else merged.push({ ...r });
+  }
+  return merged;
+}
+
+/** Today's time already gone (0 to `nowMinute`) added to the taken intervals, kept sorted and merged. */
+export function withPastTime(busy: readonly MinuteRange[], nowMinute: number): MinuteRange[] {
+  if (!(nowMinute > 0)) return [...busy];
+  const merged: MinuteRange[] = [];
+  for (const r of [{ start: 0, end: nowMinute }, ...busy].sort((a, b) => a.start - b.start || a.end - b.end)) {
     const last = merged[merged.length - 1];
     if (last !== undefined && r.start <= last.end) last.end = Math.max(last.end, r.end);
     else merged.push({ ...r });
@@ -208,7 +220,7 @@ export const timePicks = (items: readonly PickedRange[]): PickedTime[] =>
   items.filter((i): i is PickedTime => i.kind === "time");
 
 /** The time picks without their ids - a snapshot that can be put back with `replace`. */
-export const withoutIds = (items: readonly PickedRange[]): NewPicked[] =>
+export const withoutIds = (items: readonly PickedRange[]): Omit<PickedTime, "id">[] =>
   timePicks(items).map(({ id: _id, ...rest }) => {
     void _id;
     return rest;
@@ -232,12 +244,6 @@ export function pickedCalendarIds(items: readonly PickedRange[]): string[] {
   return [...new Set(timePicks(items).map((p) => p.calendarId))];
 }
 
-/** Where the automatic proposal starts: the earliest pick (day, then time). `null` = nothing is picked. */
-export function earliestPick(items: readonly PickedRange[]): { date: DateOnly; time: string; calendarId: string } | null {
-  const picks = [...timePicks(items)].sort((a, b) => a.dayKey.localeCompare(b.dayKey) || a.range.start - b.range.start);
-  const first = picks[0];
-  return first === undefined ? null : { date: first.dayKey, time: formatMinutes(first.range.start), calendarId: first.calendarId };
-}
 
 /** The server's proposal as picks on one calendar: a pick per day of every range, inside its daily window. */
 export function picksFromRanges(

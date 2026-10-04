@@ -412,10 +412,14 @@ export default function ClubRegistration() {
   const chosenActivity = offer.activities.find((a) => a.activityId === activityId);
   const chooseActivity = offer.activities.length > 1;
 
+  // Number sections by what is shown: info mode lists the details before the term.
+  const firstNo = chooseActivity ? 2 : 1;
+  const detailsNo = infoMode ? firstNo : firstNo + 1;
+  const termNo = infoMode ? firstNo + 1 : firstNo;
   const termPanel = (
       <Panel labelledBy="club-step-1">
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <PanelTitle id="club-step-1">{chooseActivity ? '2' : '1'} · {infoMode ? txt['formulare.club-reg.slots.title'] : 'Vyberte si termín'}</PanelTitle>
+          <PanelTitle id="club-step-1">{termNo} · {infoMode ? txt['formulare.club-reg.slots.title'] : 'Vyberte si termín'}</PanelTitle>
           {chosenActivity !== undefined && (
             <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
               {chosenActivity.activityName} · {chosenActivity.durationMinutes}&nbsp;min na sportovce
@@ -474,7 +478,7 @@ export default function ClubRegistration() {
   );
   const detailsPanel = (
       <Panel labelledBy="club-step-2">
-        <PanelTitle id="club-step-2">{chooseActivity ? '3' : '2'} · {infoMode ? txt['formulare.club-reg.register.title'] : 'Vaše údaje'}</PanelTitle>
+        <PanelTitle id="club-step-2">{detailsNo} · {infoMode ? txt['formulare.club-reg.register.title'] : 'Vaše údaje'}</PanelTitle>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '14px' }}>
           <TextField
             required

@@ -46,6 +46,8 @@ import { ModeCards } from "./drawer/ModeCards";
 import { PatientSearch } from "./patient/PatientSearch";
 import { PatientFilled } from "./patient/PatientFilled";
 import { QuickPatientForm } from "./patient/QuickPatientForm";
+import { EMPTY_ON_SITE_CONSENTS, recordOnSiteConsents, type OnSiteConsentSelection } from "./patient/OnSiteConsentsField";
+import toast from "react-hot-toast";
 import {
   QuickRegisterError,
   isQuickConflict,
@@ -155,7 +157,7 @@ const TEXT = {
   nextFree: "Příští volný termín",
   tomorrow: "Zítra",
   nextWeek: "Příští týden",
-  otherWhen: "Jiný datum a čas",
+  otherWhen: "Jiné datum a čas",
   pickInGrid: "Vybrat v kalendáři",
   noneFree: "V příštích 31 dnech kalendář nenabízí žádný volný termín.",
   seeking: "Hledám volný termín…",
@@ -298,6 +300,7 @@ export function NewAppointmentDialog({
   const [step, setStep] = useState<DrawerStep>(1);
   const [mode, setMode] = useState<DrawerMode>(initialQuick ? "quick" : "database");
   const [patient, setPatient] = useState<PatientHit | null>(null);
+  const [onSiteConsents, setOnSiteConsents] = useState<OnSiteConsentSelection>(EMPTY_ON_SITE_CONSENTS);
   const [quick, setQuick] = useState<QuickPatientDraft>(() => ({
     ...EMPTY_QUICK_DRAFT,
     activityId: initialActivityId ?? "",
@@ -571,6 +574,11 @@ export function NewAppointmentDialog({
         email: quick.email.trim(),
         overrideReason: input.overrideReason,
       });
+      /* The patient exists now: record the consents signed on paper. A failure never
+         undoes the booking; it is a warning the desk can repeat from the registration. */
+      const recorded = await recordOnSiteConsents(result.patientId, activity.id, onSiteConsents);
+      if (recorded.status === "recorded") toast.success("Souhlasy podepsané na místě byly zapsány.");
+      if (recorded.status === "failed") toast.error(recorded.message);
       return {
         startUtc: result.appointment.startUtc,
         endUtc: result.appointment.endUtc ?? null,
@@ -677,6 +685,7 @@ export function NewAppointmentDialog({
     setMode("database");
     setPatient(null);
     setQuick(EMPTY_QUICK_DRAFT);
+    setOnSiteConsents(EMPTY_ON_SITE_CONSENTS);
     setEventName("");
     setQuickBooked(null);
     setQuickRefusal(null);
@@ -1327,6 +1336,8 @@ export function NewAppointmentDialog({
           <SectionLabel>{TEXT.newPatient}</SectionLabel>
           {serviceField ? <Box sx={{ mb: 1.5 }}>{serviceField}</Box> : null}
           <QuickPatientForm
+            onSiteConsents={onSiteConsents}
+            onOnSiteConsentsChange={setOnSiteConsents}
             value={quick}
             onChange={(next) => {
               setQuick(next);

@@ -161,7 +161,9 @@ export function PickOrderSetup({ open, onClose, defaultClubId, parent, onStart }
             </RadioGroup>
           </div>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            Termíny vyberete hned potom přímo v kalendáři — tažením myší přes volný čas.
+            {device === 'desktop'
+              ? 'Termíny vyberete hned potom přímo v kalendáři — tažením myší přes volný čas.'
+              : 'Termíny vyberete hned potom přímo v kalendáři — klepnutím na začátek a konec volného času.'}
           </Typography>
         </Stack>
       </DialogContent>

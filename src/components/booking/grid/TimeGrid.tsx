@@ -52,7 +52,7 @@ import { useDayRangeSurface, type DayRangeApi } from "../calendar/useDayRange";
 import type { MultiSelectApi } from "../calendar/useMultiSelect";
 import type { PickedTime } from "../calendar/multiSelect";
 import { PickedBar } from "../calendar/PickedBar";
-import { adjustPicked, busyIntervals, clampPainted, paintNote, type AdjustMode, type ClampResult } from "../calendar/pickLogic";
+import { adjustPicked, busyIntervals, clampPainted, paintNote, withPastTime, type AdjustMode, type ClampResult } from "../calendar/pickLogic";
 
 /*
  * The day and week grid - contract 5.1, drawn to the board of 3. 10. 2026
@@ -83,6 +83,8 @@ const GUTTER = 56;
 /** Narrowest a činnost column may get before the grid scrolls sideways. */
 const SUB_COLUMN_MIN = 170;
 const LONG_PRESS_MS = 380;
+/** The smallest tap target (px) of a slot when picking by touch. */
+const TOUCH_TARGET_PX = 44;
 /** A card shorter than this (px) is drawn as one line. */
 const DENSE_BELOW = 40;
 
@@ -128,11 +130,15 @@ export interface GridPickMode {
   allowedCalendar: (calendarId: string) => boolean;
   /** The clinic's today: nothing before it can be picked. */
   today: DateOnly;
+  /** The clinic's current minute of today: time already gone cannot be picked. */
+  nowMinute?: number;
   onNote: (text: string | null) => void;
   onAdjust: (id: string, range: MinuteRange) => void;
   onRemove: (id: string) => void;
   /** Picks the server named in a refusal. */
   conflictIds?: ReadonlySet<string>;
+  /** Editing an order: its own club blocks do not count as taken (the picks start on top of them). */
+  ignoreClubBlockIds?: ReadonlySet<string>;
 }
 
 /** What is being dragged: the booking and how far down its card the pointer took hold. */
@@ -194,6 +200,11 @@ export interface TimeGridProps {
   multi?: MultiSelectApi;
   /** "Výběr termínů": painting adds places for a club order. */
   pick?: GridPickMode;
+  /**
+   * Touch picking in "výběr termínů": taps instead of long-press drags (tap the start, then the end), and a grid
+   * tall enough that a slot is at least 44 px; on a narrow screen three day columns fit.
+   */
+  touchPick?: boolean;
   /** A click on a club's block: the page opens its popover. */
   onOpenClubBlock?: (pick: ClubBlockPick) => void;
   /** Drag a booking to another time of its own calendar (mouse); the page confirms and moves it. */
@@ -269,7 +280,14 @@ export function TimeGrid(props: TimeGridProps) {
 
   /* Zoom scales the whole vertical scale: the hour's height (46 / 52 / 78 px at
      the board's three levels) and, with it, every minute→pixel placement below. */
-  const pxPerMinute = pxPerMinuteOf(zoom);
+  const touchPick = props.touchPick === true && props.pick?.active === true;
+  const pxPerMinute = touchPick ? Math.max(pxPerMinuteOf(zoom), TOUCH_TARGET_PX / SLOT_MINUTES) : pxPerMinuteOf(zoom);
+  /* Touch picking: the first tap of a range waits here for the second. */
+  const [tapAnchor, setTapAnchor] = useState<{ columnKey: string; dayKey: DateOnly; minute: number } | null>(null);
+  const pickRunning = props.pick?.active === true;
+  useEffect(() => {
+    if (!pickRunning) setTapAnchor(null);
+  }, [pickRunning]);
 
   const [pending, setPending] = useState<Selection | null>(null);
   const [moving, setMoving] = useState<Moving | null>(null);
@@ -311,8 +329,10 @@ export function TimeGrid(props: TimeGridProps) {
   }, []);
 
   let dayMin: number;
-  if (view === "day") dayMin = Math.max(SUB_COLUMN_MIN, subSpecs.length * SUB_COLUMN_MIN);
-  else if (device === "tablet" && viewportWidth > 0) dayMin = Math.max(Math.floor((viewportWidth - GUTTER) / 3), 140);
+  const narrowPick = touchPick && viewportWidth > 0 && viewportWidth < 600;
+  const subMin = narrowPick ? 110 : SUB_COLUMN_MIN;
+  if (view === "day") dayMin = Math.max(subMin, subSpecs.length * subMin);
+  else if (device === "tablet" && viewportWidth > 0) dayMin = Math.max(Math.floor((viewportWidth - GUTTER) / 3), narrowPick ? 100 : 140);
   else dayMin = Math.max(150, calendars.length * 120);
   const template = `${GUTTER}px repeat(${days.length}, minmax(${dayMin}px, 1fr))`;
   const minWidth = GUTTER + days.length * dayMin;
@@ -810,6 +830,9 @@ export function TimeGrid(props: TimeGridProps) {
                           )}
                           pickedPast={dayKey < todayKey}
                           pick={props.pick}
+                          touchPick={touchPick}
+                          tapAnchor={tapAnchor?.columnKey === spec.key && tapAnchor.dayKey === dayKey ? tapAnchor.minute : null}
+                          onTapAnchor={(minute) => setTapAnchor(minute === null ? null : { columnKey: spec.key, dayKey, minute })}
                           onSelect={handleSelect}
                           onOpen={props.onOpen}
                           onOpenBlock={(block) => setOpenBlock({ calendar, block })}
@@ -1138,6 +1161,9 @@ function SubColumn({
   picked,
   pickedPast,
   pick,
+  touchPick,
+  tapAnchor,
+  onTapAnchor,
   onSelect,
   onOpen,
   onOpenBlock,
@@ -1175,6 +1201,10 @@ function SubColumn({
   /** The day is before today: the marks are drawn muted. */
   pickedPast: boolean;
   pick?: GridPickMode;
+  touchPick: boolean;
+  /** Touch picking: the minute of the first tap in this column and day, waiting for the end. */
+  tapAnchor: number | null;
+  onTapAnchor: (minute: number | null) => void;
   onSelect: (selection: Selection, additive: boolean) => void;
   onOpen: (id: string) => void;
   onOpenBlock: (block: TimeBlock) => void;
@@ -1211,24 +1241,32 @@ function SubColumn({
   const painting = pick?.active === true;
   /* "Výběr termínů": what a paint from `anchor` to `current` may become here (stopped at what is taken and at the need). */
   const busyHere = (ignoreId?: string) =>
-    busyIntervals({
+    withPastTime(
+      busyIntervals({
       dayKey,
       ...(row !== undefined
         ? { row: { isOpen: row.isOpen, startTime: row.startTime, endTime: row.endTime, breakStart: row.breakStart, breakEnd: row.breakEnd } }
         : {}),
       appointments,
-      blocks,
+      blocks: pick?.ignoreClubBlockIds === undefined ? blocks : blocks.filter((b) => b.clubBlockId == null || !pick.ignoreClubBlockIds?.has(b.clubBlockId)),
       picks: picked,
       ...(ignoreId !== undefined ? { ignoreId } : {}),
-    });
+      }),
+      pick !== undefined && dayKey === pick.today ? (pick.nowMinute ?? 0) : 0,
+    );
   const paint = (anchor: number, current: number): ClampResult => {
     const none = { trimmedBusy: false, trimmedNeed: false };
     if (pick === undefined) return { range: null, ...none };
     if (!pick.allowedCalendar(calendar.id)) return { range: null, refused: "service", ...none };
     if (dayKey < pick.today) return { range: null, refused: "past", ...none };
+    const wanted = dragRange(anchor, current, step, bounds);
+    const direction = Math.floor(current / step) < Math.floor(anchor / step) ? "up" : "down";
+    if (dayKey === pick.today && pick.nowMinute !== undefined && (direction === "down" ? wanted.start : wanted.end - 1) < pick.nowMinute) {
+      return { range: null, refused: "past", ...none };
+    }
     return clampPainted({
-      range: dragRange(anchor, current, step, bounds),
-      direction: Math.floor(current / step) < Math.floor(anchor / step) ? "up" : "down",
+      range: wanted,
+      direction,
       busy: busyHere(),
       allowance: pick.allowance,
     });
@@ -1391,6 +1429,22 @@ function SubColumn({
           touch.current = null;
           window.clearTimeout(press.timer);
           if (!press.dragging) {
+            if (painting && touchPick && pick !== undefined) {
+              /* Tap the start, then tap the end: the range between them (the same slot twice = that one slot). */
+              if (tapAnchor === null) {
+                const first = paint(press.minute, press.minute);
+                if (first.range === null) {
+                  pick.onNote(paintNote(first));
+                  return;
+                }
+                onTapAnchor(Math.floor(press.minute / step) * step);
+                pick.onNote(`Začátek ${formatMinutes(Math.floor(press.minute / step) * step)} — klepněte na konec.`);
+                return;
+              }
+              onTapAnchor(null);
+              commit(tapAnchor, press.minute, event.clientX, event.clientY, true);
+              return;
+            }
             /* A tap on a free slot: that one slot is the selection. */
             commit(press.minute, press.minute, event.clientX, event.clientY, additiveKey(event));
             return;
@@ -1759,6 +1813,32 @@ function SubColumn({
         </Box>
       ) : null}
 
+      {painting && tapAnchor !== null ? (
+        <Box
+          data-testid="tap-anchor"
+          aria-hidden
+          sx={{
+            position: "absolute",
+            left: 4,
+            right: 4,
+            ...place({ start: tapAnchor, end: tapAnchor + step }),
+            zIndex: 4,
+            pointerEvents: "none",
+            border: `2px dashed ${DESIGN.selection.line}`,
+            borderRadius: `${DESIGN.radius.md}px`,
+            bgcolor: alpha(DESIGN.selection.line, 0.12),
+            color: DESIGN.selection.line,
+            fontSize: 11,
+            fontWeight: 700,
+            px: 0.75,
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          {`Začátek ${formatMinutes(tapAnchor)}`}
+        </Box>
+      ) : null}
+
       {painting && pick !== undefined
         ? picked.map((item) => {
             const range = adjust?.id === item.id ? adjust.range : item.range;
@@ -1771,6 +1851,7 @@ function SubColumn({
                 pxPerMinute={pxPerMinute}
                 step={step}
                 conflict={pick.conflictIds?.has(item.id) === true}
+                touch={touchPick}
                 onDrag={(mode: AdjustMode, delta: number) =>
                   setAdjust({
                     id: item.id,

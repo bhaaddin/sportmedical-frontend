@@ -4,6 +4,7 @@ import InfoOutlined from "@mui/icons-material/InfoOutlined";
 import { useDevice } from "../../../layout/useDevice";
 import { SectionLabel, SoftCard } from "../../ui";
 import { PhoneField } from "../../ui/PhoneField";
+import { OnSiteConsentsField, type OnSiteConsentSelection } from "./OnSiteConsentsField";
 import type { Activity } from "../../../api/bookingContracts";
 import {
   formatCzk,
@@ -32,6 +33,8 @@ export function QuickPatientForm({
   otherActivities = [],
   disabled = false,
   fieldErrors,
+  onSiteConsents,
+  onOnSiteConsentsChange,
 }: {
   value: QuickPatientDraft;
   onChange: (next: QuickPatientDraft) => void;
@@ -46,6 +49,13 @@ export function QuickPatientForm({
   disabled?: boolean;
   /** The field the server named when it refused the registration, so that box goes red. */
   fieldErrors?: Partial<Record<keyof QuickPatientDraft, string>>;
+  /**
+   * "Souhlasy podepsány na místě (papírově)": shown when the owner of the
+   * registration call passes the selection and its setter. The owner records
+   * them (`recordOnSiteConsents`) once the patient exists.
+   */
+  onSiteConsents?: OnSiteConsentSelection;
+  onOnSiteConsentsChange?: (next: OnSiteConsentSelection) => void;
 }) {
   const device = useDevice();
   const phone = device === "phone";
@@ -152,6 +162,15 @@ export function QuickPatientForm({
             ))}
           </TextField>
         </Box>
+
+        {onSiteConsents && onOnSiteConsentsChange ? (
+          <OnSiteConsentsField
+            activityId={value.activityId || null}
+            value={onSiteConsents}
+            onChange={onOnSiteConsentsChange}
+            disabled={disabled}
+          />
+        ) : null}
 
         <SoftCard tone="muted" sx={{ p: 1.5 }}>
           <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }}>

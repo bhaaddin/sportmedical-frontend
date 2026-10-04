@@ -77,7 +77,7 @@ const DRAFT = {
     { orderId: ADD_ID, serviceName: 'Fyzioterapie', activityName: 'Masáž', quantity: 4, unitPriceCzk: 700, totalCzk: 2800 },
   ],
   discounts: [{ kind: 'Tier', label: 'Skupinová sleva (od 6 osob)', percent: 10, amountCzk: 780 }],
-  listTotalCzk: 7800, totalCzk: 7020, note: 'Klubová objednávka KO-00000001.', invoiceId: null,
+  listTotalCzk: 7800, totalCzk: 7020, note: 'Klubová objednávka KO-00000001.', invoiceId: null, supplementary: false, alreadyInvoiced: [],
 };
 
 beforeEach(() => {
@@ -250,8 +250,12 @@ describe('Vystavit jednu fakturu klubu', () => {
   });
 
   it('a group that already has its invoice offers the link instead of the button', async () => {
-    invoiceDraft.mockResolvedValue({ ...DRAFT, invoiceId: 'inv-9' });
-    const { dialog } = await openDraft();
+    invoiceDraft.mockResolvedValue({ ...DRAFT, lines: [], listTotalCzk: 0, totalCzk: 0, discounts: [], note: '', invoiceId: 'inv-9', supplementary: true, alreadyInvoiced: [{ orderId: ROOT_ID, invoiceId: 'inv-9', invoiceNumber: 'INV-9' }] });
+    const user = userEvent.setup();
+    mount(ROOT_ID);
+    await screen.findByTestId('order-detail');
+    await user.click(await screen.findByRole('button', { name: 'Faktura klubu' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Jedna faktura klubu' });
     expect(await within(dialog).findByTestId('invoice-exists')).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Vystavit fakturu' })).toBeNull();
   });

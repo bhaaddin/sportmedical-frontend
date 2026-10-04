@@ -13,9 +13,9 @@ import { addDaysToDateOnly } from '../../../utils/time';
  */
 
 vi.mock('../../../api/calendars', () => ({ calendarsApi: { list: vi.fn() } }));
-/* The club order dialog has its own tests; here only what the calendar hands it matters. */
-vi.mock('../../clubs/order/ClubOrderDialog', () => ({
-  ClubOrderDialog: (props: { initial?: unknown }) => <pre data-testid="club-order-initial">{JSON.stringify(props.initial)}</pre>,
+/* The setup form has its own tests; here only that the marked places lead into it matters. */
+vi.mock('../../clubs/order/PickOrderSetup', () => ({
+  PickOrderSetup: () => <div data-testid="pick-setup" />,
 }));
 vi.mock('../../../api/clinicServices', () => ({ clinicServicesApi: { list: vi.fn() } }));
 vi.mock('../../../api/holidays', () => ({ holidaysApi: { year: vi.fn() } }));
@@ -186,8 +186,8 @@ function mark(day: string, from: number, to: number, opts: { ctrl?: boolean } = 
 }
 
 const chips = () => screen.queryAllByTestId('tray-chip').map((c) => c.textContent);
-/* What "Rezervovat pro klub" hands the club order dialog (no navigation any more). */
-const clubInitial = (): { calendarIds: string[]; ranges: unknown[] } => JSON.parse(screen.getByTestId('club-order-initial').textContent ?? 'null');
+/* "Rezervovat pro klub" opens the small setup form (no navigation); the marked places become the first picks once it starts. */
+const setupOpen = () => screen.getByTestId('pick-setup');
 
 async function ready() {
   renderPage();
@@ -238,42 +238,14 @@ describe('several places at once on the desktop', () => {
     expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 
-  it('hands 3 places to the club order dialog, sorted', async () => {
+  it('"Rezervovat pro klub" opens the small setup form and clears the tray', async () => {
     await ready();
     mark('2026-09-24', 10 * 60, 10 * 60 + 30, { ctrl: true });
     mark('2026-09-23', 14 * 60, 14 * 60 + 30, { ctrl: true });
     mark('2026-09-23', 8 * 60, 8 * 60 + 30, { ctrl: true });
     fireEvent.click(screen.getByRole('button', { name: 'Rezervovat pro klub' }));
-    const initial = clubInitial();
-    expect(initial.calendarIds).toEqual(['c1', 'c2']);
-    expect(initial.ranges).toEqual([
-      { fromDate: '2026-09-23', toDate: '2026-09-23', dailyFrom: '08:00', dailyTo: '09:00' },
-      { fromDate: '2026-09-23', toDate: '2026-09-23', dailyFrom: '14:00', dailyTo: '15:00' },
-      { fromDate: '2026-09-24', toDate: '2026-09-24', dailyFrom: '10:00', dailyTo: '11:00' },
-    ]);
-  });
-
-  it('merges places that touch on the same daily window', async () => {
-    await ready();
-    mark('2026-09-23', 8 * 60, 8 * 60 + 30, { ctrl: true });
-    mark('2026-09-23', 9 * 60, 9 * 60 + 30, { ctrl: true });
-    mark('2026-09-24', 8 * 60, 8 * 60 + 30, { ctrl: true });
-    fireEvent.click(screen.getByRole('button', { name: 'Rezervovat pro klub' }));
-    /* 08:00-09:00 and 09:00-10:00 join on Wednesday; Thursday repeats the 08:00-09:00 window and stays apart. */
-    expect(clubInitial().ranges).toEqual([
-      { fromDate: '2026-09-23', toDate: '2026-09-23', dailyFrom: '08:00', dailyTo: '10:00' },
-      { fromDate: '2026-09-24', toDate: '2026-09-24', dailyFrom: '08:00', dailyTo: '09:00' },
-    ]);
-  });
-
-  it('one place is a one-item ranges list with the calendars on screen', async () => {
-    await ready();
-    mark('2026-09-24', 10 * 60, 10 * 60 + 30, { ctrl: true });
-    fireEvent.click(screen.getByRole('button', { name: 'Rezervovat pro klub' }));
-    expect(clubInitial()).toEqual({
-      calendarIds: ['c1', 'c2'],
-      ranges: [{ fromDate: '2026-09-24', toDate: '2026-09-24', dailyFrom: '10:00', dailyTo: '11:00' }],
-    });
+    expect(setupOpen()).toBeInTheDocument();
+    expect(screen.queryByTestId('selection-tray')).not.toBeInTheDocument();
   });
 
   it('a place in the past is muted, struck through and left out of the club hand-off', async () => {
@@ -288,9 +260,7 @@ describe('several places at once on the desktop', () => {
     mark('2026-09-24', 10 * 60, 10 * 60 + 30, { ctrl: true });
     expect(screen.getByRole('button', { name: 'Rezervovat pro klub' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Rezervovat pro klub' }));
-    expect(clubInitial().ranges).toEqual([
-      { fromDate: '2026-09-24', toDate: '2026-09-24', dailyFrom: '10:00', dailyTo: '11:00' },
-    ]);
+    expect(setupOpen()).toBeInTheDocument();
   });
 
   it('offers Objednat pacienta only for exactly one time range', async () => {
@@ -320,7 +290,7 @@ describe('several places at once on the desktop', () => {
 describe('several runs of days in the month', () => {
   beforeEach(() => setViewport(VIEWPORTS.desktop));
 
-  it('Ctrl drags add whole-day runs; the club hand-off carries them without a daily window', async () => {
+  it('Ctrl drags add whole-day runs; "Rezervovat pro klub" opens the setup form for them', async () => {
     await ready();
     fireEvent.click(screen.getByRole('button', { name: 'Měsíc' }));
     await screen.findByTestId('month-day-2026-09-23');
@@ -335,10 +305,7 @@ describe('several runs of days in the month', () => {
     expect(chips()).toEqual(['28. 9. – 30. 9.', '23. 9. – 24. 9.']);
     expect(screen.getByTestId('month-day-2026-09-29')).toHaveAttribute('data-picked', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Rezervovat pro klub' }));
-    expect(clubInitial().ranges).toEqual([
-      { fromDate: '2026-09-23', toDate: '2026-09-24', dailyFrom: null, dailyTo: null },
-      { fromDate: '2026-09-28', toDate: '2026-09-30', dailyFrom: null, dailyTo: null },
-    ]);
+    expect(setupOpen()).toBeInTheDocument();
   });
 });
 

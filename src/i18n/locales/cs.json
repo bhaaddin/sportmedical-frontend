@@ -380,6 +380,7 @@
       "questionnaire_missing": "Chybí dotazník",
       "questionnaire_expired": "Dotazník je starší než 2 roky",
       "report_missing": "Chybí výpis od předchozího lékaře",
+      "consent_missing": "Chybí souhlasy",
       "unknown": "Neznámý požadavek ({{code}})",
       "line": "Podklady",
       "nobodyMissing": "Nikomu nic nechybí."

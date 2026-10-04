@@ -605,6 +605,28 @@ describe('club detail: "Nová objednávka klubu" (Etapa 5)', () => {
     expect(where).toHaveTextContent('{"pickOrder":{"clubId":"club-2"}}');
   });
 
+  it('"Nová objednávka" in the list opens the same chooser (one flow, no term form)', async () => {
+    const user = userEvent.setup();
+    render(<Wrap><ClubsPage /></Wrap>);
+    await user.click(await screen.findByRole('button', { name: 'Nová objednávka' }));
+    const entry = await screen.findByTestId('club-order-entry');
+    expect(within(entry).getByTestId('entry-phone')).toBeInTheDocument();
+    expect(within(entry).getByTestId('entry-link')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Denně od/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Automatický návrh/)).not.toBeInTheDocument();
+  });
+
+  it('"Vytvořit rezervaci" of a club goes straight to the calendar setup for this club', async () => {
+    const user = userEvent.setup();
+    render(<Wrap><ClubsPage /></Wrap>);
+    const cards = await screen.findAllByRole('listitem');
+    await user.click(cards[1]);
+    await user.click((await screen.findAllByRole('button', { name: 'Vytvořit rezervaci' }))[0]);
+    const where = await screen.findByTestId('elsewhere');
+    expect(where).toHaveTextContent('/planovani');
+    expect(where).toHaveTextContent('{"pickOrder":{"clubId":"club-2"}}');
+  });
+
   it('"Všechny objednávky" opens the orders page filtered to this club', async () => {
     const user = userEvent.setup();
     render(<Wrap><ClubsPage /></Wrap>);

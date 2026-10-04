@@ -60,6 +60,7 @@ import { PortalLinkButton } from "./patient/PortalLinkButton";
 import { usePermission } from "../../auth/usePermission";
 import { useCompletionLink } from "./quick/useCompletionLink";
 import { QuickPendingCard } from "./quick/QuickPendingCard";
+import { missingConsentsLine } from "./patient/consentNames";
 import { formatDeadline } from "./quick/quickBooking";
 import {
   DockedBar,
@@ -772,10 +773,15 @@ function DetailBody({
               patientId={appointment.patientId}
               email={email}
               reasons={appointment.paperwork.missing.map((code) =>
-                isKnownPaperworkReason(code)
-                  ? t(`booking.paperwork.${code}`)
-                  : /* An unknown reason is shown as unknown, never dropped. */
-                    t("booking.paperwork.unknown", { code }),
+                code === "consent_missing"
+                  ? /* The consent line: the missing consents, named in Czech. */
+                    missingConsentsLine(
+                      (appointment.paperwork as { missingConsents?: string[] | null }).missingConsents,
+                    )
+                  : isKnownPaperworkReason(code)
+                    ? t(`booking.paperwork.${code}`)
+                    : /* An unknown reason is shown as unknown, never dropped. */
+                      t("booking.paperwork.unknown", { code }),
               )}
             />
           ) : null}

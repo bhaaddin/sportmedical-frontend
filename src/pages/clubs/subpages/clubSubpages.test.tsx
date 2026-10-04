@@ -120,7 +120,7 @@ beforeEach(() => {
   blocksList.mockResolvedValue(blocks);
   ordersList.mockResolvedValue([order({})]);
   ordersStats.mockResolvedValue(stats);
-  invoiceDraft.mockResolvedValue({ clubId: 'c1', groupId: 'o1', paymentMethod: 'ClubInvoice', headcount: 12, lines: [], discounts: [], listTotalCzk: 6000, totalCzk: 6000, note: '', invoiceId: null });
+  invoiceDraft.mockResolvedValue({ clubId: 'c1', groupId: 'o1', paymentMethod: 'ClubInvoice', headcount: 12, lines: [{ orderId: 'o1', serviceName: 'Prohlídky', activityName: 'VO2max', quantity: 12, unitPriceCzk: 500, totalCzk: 6000 }], discounts: [], listTotalCzk: 6000, totalCzk: 6000, note: '', invoiceId: null, supplementary: false, alreadyInvoiced: [] });
   calendarsList.mockResolvedValue([{ id: 'cal1', name: 'Ambulance 1' }]);
   getInvoices.mockResolvedValue([invoice({}), invoice({ id: 'i2', invoiceNumber: '2026-002', recipientType: 'Person', clubId: null, clubName: null, patientName: 'Pacient' })]);
 });

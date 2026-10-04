@@ -283,3 +283,26 @@ describe('legacy block token', () => {
     expect(screen.queryByRole('button', { name: 'Přidat další hráče' })).not.toBeInTheDocument();
   });
 });
+
+describe('section numbering follows what is visible', () => {
+  const TWO_ACTIVITIES = [
+    { activityId: 'a-1', activityName: 'Komplexní prohlídka', durationMinutes: 15, seats: 30, registered: 4, remaining: 26 },
+    { activityId: 'a-2', activityName: 'Diagnostika', durationMinutes: 60, seats: 30, registered: 4, remaining: 26 },
+  ];
+  const numbers = () => screen.getAllByRole('heading').map((h) => h.textContent ?? '').filter((t) => /^\d · /.test(t)).map((t) => t.slice(0, 1));
+
+  it('two činnosti: 1 then 2 (details) until one is chosen, then 3 for the term', async () => {
+    getClubOffer.mockResolvedValue(offer({ activities: TWO_ACTIVITIES as never }));
+    renderClub();
+    await screen.findByRole('heading', { name: '1 · Vyberte činnost' });
+    expect(numbers()).toEqual(['1', '2']);
+    await userEvent.click((await screen.findAllByTestId('club-activity-card'))[0]);
+    await waitFor(() => expect(numbers()).toEqual(['1', '2', '3']));
+  });
+
+  it('a single činnost hides the step and starts at 1', async () => {
+    renderClub();
+    await screen.findByRole('textbox', { name: /Jméno a příjmení sportovce/ });
+    expect(numbers()).toEqual(['1', '2']);
+  });
+});

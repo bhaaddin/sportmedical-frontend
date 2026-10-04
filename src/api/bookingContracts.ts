@@ -407,6 +407,7 @@ export const PAPERWORK_REASONS = [
   'questionnaire_missing',
   'questionnaire_expired',
   'report_missing',
+  'consent_missing',
 ] as const;
 export type PaperworkReason = (typeof PAPERWORK_REASONS)[number];
 
@@ -414,6 +415,7 @@ export const paperworkSchema = z
   .object({
     ready: z.boolean(),
     missing: z.array(z.string()).nullish().transform((v) => v ?? []),
+    missingConsents: z.array(z.string()).nullish(),
   })
   .nullish()
   .transform((v) => v ?? null);
@@ -871,6 +873,7 @@ export const daySummarySchema = z.object({
             activityName: z.string(),
             startUtc: isoUtc,
             missing: z.array(z.string()).nullish().transform((v) => v ?? []),
+    missingConsents: z.array(z.string()).nullish(),
           }),
         )
         .nullish()

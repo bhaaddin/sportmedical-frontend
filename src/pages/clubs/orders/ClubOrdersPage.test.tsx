@@ -100,7 +100,7 @@ beforeEach(() => {
   invite.mockReset();
   cancel.mockReset().mockResolvedValue(orders[0]);
   invoiceDraft.mockReset().mockResolvedValue({
-    clubId: 'club-1', groupId: 'o-3', paymentMethod: 'ClubInvoice', headcount: 30, lines: [], discounts: [], listTotalCzk: 36000, totalCzk: 36000, note: '', invoiceId: null,
+    clubId: 'club-1', groupId: 'o-3', paymentMethod: 'ClubInvoice', headcount: 30, lines: [{ orderId: 'o-3', serviceName: 'Prohlídky', activityName: 'VO2max', quantity: 30, unitPriceCzk: 1200, totalCzk: 36000 }], discounts: [], listTotalCzk: 36000, totalCzk: 36000, note: '', invoiceId: null, supplementary: false, alreadyInvoiced: [],
   });
   dialogProps.mockClear();
   toastSuccess.mockClear();
@@ -331,11 +331,12 @@ describe('router state', () => {
     expect(get).toHaveBeenCalledWith('o-3');
   });
 
-  it('opens the dialog prefilled for newOrder', async () => {
-    const prefill = { clubId: 'club-1', serviceId: 's-1', ranges: [{ fromDate: '2026-11-02', toDate: '2026-11-02' }], calendarIds: ['c-1'] };
-    render(<Wrap state={{ newOrder: prefill }}><ClubOrdersPage /></Wrap>);
-    await waitFor(() => expect(lastDialog().open).toBe(true));
-    expect(lastDialog().initial).toEqual(prefill);
+  it('opens the two-way chooser (never a form with terms) for newOrder', async () => {
+    render(<Wrap state={{ newOrder: { clubId: 'club-1' } }}><ClubOrdersPage /></Wrap>);
+    const entry = await screen.findByTestId('club-order-entry');
+    expect(within(entry).getAllByRole('button')).toHaveLength(2);
+    expect(screen.queryByText(/Přidat termín/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Automatický návrh/)).not.toBeInTheDocument();
   });
 });
 

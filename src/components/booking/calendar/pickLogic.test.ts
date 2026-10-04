@@ -3,7 +3,6 @@ import {
   adjustPicked,
   busyIntervals,
   clampPainted,
-  earliestPick,
   ordersRangesOf,
   paintNote,
   pickedCalendarIds,
@@ -143,13 +142,7 @@ describe("picks to ranges", () => {
     ]);
   });
 
-  it("the proposal starts exactly at the earliest pick", () => {
-    const items = [pick("1", "2026-12-15", t(8), t(9)), pick("2", "2026-12-14", t(9, 40), t(10, 40))];
-    expect(earliestPick(items)).toEqual({ date: "2026-12-14", time: "09:40", calendarId: "c1" });
-    expect(earliestPick([])).toBeNull();
-  });
-
-  it("lays a proposal's ranges out as one pick per day", () => {
+  it("lays an order's ranges out as one pick per day (editing starts from them)", () => {
     const picks = picksFromRanges([{ fromDate: "2026-12-14", toDate: "2026-12-16", dailyFrom: "09:40", dailyTo: "15:00" }], "c1", (id) => id);
     expect(picks.map((p) => p.dayKey)).toEqual(["2026-12-14", "2026-12-15", "2026-12-16"]);
     expect(picks[0].range).toEqual({ start: t(9, 40), end: t(15) });

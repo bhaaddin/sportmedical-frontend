@@ -1,11 +1,10 @@
 /*
  * Objednávky klubů (Etapa 4): every club order in one list - table on a desktop, three columns of cards on a
- * tablet, one column on a phone. A row opens the detail (ClubOrderDetailPanel); "Nová objednávka" opens
- * ClubOrderDialog (programmatic prefill only); "Nová objednávka" asks the two-way question: "Vyplním sám" goes
- * to the calendar's fast picking mode, "Poslat odkaz klubu" creates an Invited order and shows its short link.
+ * tablet, one column on a phone. A row opens the detail (ClubOrderDetailPanel); "Nová objednávka" asks the two-way
+ * question: "Vyplním sám" goes to the calendar's manual picking mode (small setup form, then the calendar),
+ * "Poslat odkaz klubu" creates an Invited order and shows its short link.
  *
- * Router state (spent once read): { openOrderId } opens that order; { newOrder: {clubId?, serviceId?,
- * ranges?, calendarIds?} | true } opens the dialog prefilled.
+ * Router state (spent once read): { openOrderId } opens that order; { newOrder: {clubId?} | true } opens the chooser.
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -20,14 +19,12 @@ import type { ClubOrderView } from '../../../api/clubOrders';
 import { useDevice } from '../../../layout/useDevice';
 import { formatCzk } from '../clubOrders';
 import { FilterChips, PageHeader, SoftCard, StatusChip } from '../../../components/ui';
-import { ClubOrderDialog } from '../../../components/clubs/order/ClubOrderDialog';
 import { ClubOrderDetailPanel } from '../../../components/clubs/orders/ClubOrderDetailPanel';
 import { ClubOrderEntry } from '../../../components/clubs/order/ClubOrderEntry';
 import { PinnedActions } from '../PinnedActions';
 import { activitiesLine, filterOrders, groupChip, seatPercent, statusCounts, STATUS_TONE, termsSummary } from '../../../components/clubs/orders/orderLogic';
 import type { OrderStatusFilter } from '../../../components/clubs/orders/orderLogic';
 import { hasOrderState, readOrderState } from '../../../components/clubs/orders/orderRouteState';
-import type { NewOrderPrefill } from '../../../components/clubs/orders/orderRouteState';
 
 const Dot = ({ color }: { color: string | null }) => (
   <Box aria-hidden data-testid="club-dot" data-color={color ?? ''} sx={{ width: 10, height: 10, borderRadius: '50%', flex: '0 0 10px', bgcolor: color ?? 'divider' }} />
@@ -58,10 +55,8 @@ export default function ClubOrdersPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [openId, setOpenId] = useState<string | null>(handoff.openOrderId ?? null);
-  const [dialog, setDialog] = useState<NewOrderPrefill | null>(() =>
-    handoff.newOrder === undefined ? null : handoff.newOrder === true ? {} : handoff.newOrder,
-  );
-  const [entryOpen, setEntryOpen] = useState(false);
+  const [entryOpen, setEntryOpen] = useState(handoff.newOrder !== undefined);
+  const [entryClubId] = useState<string | undefined>(() => (handoff.newOrder === undefined || handoff.newOrder === true ? undefined : handoff.newOrder.clubId));
 
   /* Spend the handoff once read, so Back does not reopen it. */
   useEffect(() => {
@@ -197,14 +192,9 @@ export default function ClubOrdersPage() {
         <ClubOrderDetailPanel orderId={openId} initialOrder={openOrder} onClose={() => setOpenId(null)} />
       ) : null}
 
-      <ClubOrderDialog
-        open={dialog !== null}
-        onClose={() => setDialog(null)}
-        initial={dialog ?? undefined}
-        onSaved={(saved) => { setDialog(null); void ordersQuery.refetch(); setOpenId(saved.id); }}
-      />
       <ClubOrderEntry
         open={entryOpen}
+        defaultClubId={entryClubId}
         onClose={() => setEntryOpen(false)}
         onPhone={(startClubId) => navigate('/planovani', { state: { pickOrder: startClubId !== undefined ? { clubId: startClubId } : true } })}
         onInvited={() => void ordersQuery.refetch()}

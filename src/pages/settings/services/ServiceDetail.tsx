@@ -47,7 +47,7 @@ export default function ServiceDetail({
   const [tab, setTab] = useState<TabId>('cinnosti');
 
   return (
-    <Stack spacing={2} data-testid="service-detail">
+    <Stack spacing={2} data-testid="service-detail" sx={{ minWidth: 0, maxWidth: "100%" }}>
       {onBack !== undefined && (
         <Box>
           <Button startIcon={<ArrowBackIcon />} onClick={onBack} sx={{ minHeight: 44 }}>Všechny služby</Button>
