@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Box, Button, IconButton, LinearProgress, Paper, Stack, Switch, Typography } from "@mui/material";
+import { Alert, Box, Button, IconButton, LinearProgress, Paper, Stack, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -25,9 +25,7 @@ export interface PickOrderPanelProps {
   coverage: Coverage;
   picks: readonly PickedTime[];
   calendarName: (calendarId: string) => string;
-  allowReserve: boolean;
-  onReserve: (on: boolean) => void;
-  /** A sentence about the last paint (trimmed, refused), or null. */
+  /** A sentence about the last paint (cut at a booking, refused), or null. */
   note: string | null;
   /** Processing a request: what the club asked for (a hint only - the picks are the desk's own). */
   requested: readonly string[];
@@ -83,6 +81,16 @@ function ActivityRow({ a }: { a: ActivityCoverage }) {
   );
 }
 
+/** "Navíc 4 h 30 min / 9 slotů": what is picked beyond the need. Information only - nothing is ever trimmed. */
+export const surplusLine = (coverage: Coverage): string => {
+  const lengths = coverage.perActivity.filter((x) => x.seats > 0 && x.minutesPerSeat > 0).map((x) => x.minutesPerSeat);
+  const shortest = lengths.length > 0 ? Math.min(...lengths) : 0;
+  const slots = shortest > 0 ? Math.floor(coverage.surplusMinutes / shortest) : 0;
+  return slots > 0
+    ? `Navíc ${formatMinutes(coverage.surplusMinutes)} / ${slots} ${slotsWord(slots)}`
+    : `Navíc ${formatMinutes(coverage.surplusMinutes)}`;
+};
+
 /** The big number (or "Hotovo"), per činnost and the progress: the heart of the panel. */
 function Remaining({ coverage, compact }: { coverage: Coverage; compact?: boolean }) {
   if (coverage.covered) {
@@ -92,7 +100,7 @@ function Remaining({ coverage, compact }: { coverage: Coverage; compact?: boolea
           Hotovo — všechny sloty pokryty
           {coverage.surplusMinutes > 0 ? (
             <Typography component="span" sx={{ display: "block", fontSize: 13, fontWeight: 500, color: "text.secondary" }}>
-              {`Rezerva ${formatMinutes(coverage.surplusMinutes)}`}
+              {surplusLine(coverage)}
             </Typography>
           ) : null}
         </Typography>
@@ -135,15 +143,6 @@ function Details(props: PickOrderPanelProps) {
           {props.requested.map((line) => <Typography key={line} variant="body2">{line}</Typography>)}
         </Alert>
       ) : null}
-
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
-        <Typography id="pick-reserve-label" sx={{ fontSize: 13, fontWeight: 600 }}>Přidat rezervu</Typography>
-        <Switch
-          checked={props.allowReserve}
-          onChange={(_, on) => props.onReserve(on)}
-          slotProps={{ input: { "aria-labelledby": "pick-reserve-label" } }}
-        />
-      </Stack>
 
       {props.note !== null ? <Alert severity="info" data-testid="pick-note" sx={{ py: 0.25 }}>{props.note}</Alert> : null}
 

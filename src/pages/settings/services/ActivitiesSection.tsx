@@ -128,7 +128,7 @@ function ActivityCard({
   const price = priceItems.find((p) => p.id === activity.serviceItemId) ?? null;
   const colour = activity.effectiveColorHex ?? activity.colorHex ?? activity.color;
   const disabled = saving || !canEdit || !activity.isActive;
-  const columns = device === 'phone' ? '1fr' : device === 'tablet' ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)';
+  const columns = device === 'desktop' ? 'repeat(4, 1fr)' : '1fr';
 
   return (
     <SoftCard sx={{ opacity: activity.isActive ? 1 : 0.8 }} data-testid={`activity-${activity.id}`}>
@@ -199,7 +199,7 @@ function ActivityCard({
           select
           size="small"
           label="Dotazník"
-          value={activity.questionnaireRequirement}
+          value={activity.questionnaireRequirement in QUESTIONNAIRE_LABEL ? activity.questionnaireRequirement : ''}
           disabled={disabled}
           onChange={(e) => onPatch({ questionnaireRequirement: e.target.value as Activity['questionnaireRequirement'] })}
           fullWidth

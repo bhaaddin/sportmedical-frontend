@@ -174,7 +174,7 @@ describe('desktop · 1440', () => {
     expect(screen.queryByTestId('sub-column-c2-' + DAY)).not.toBeInTheDocument();
   });
 
-  it('every painted range adds its minutes at once, and painting stops when all players are covered', async () => {
+  it('every painted range adds its minutes at once, and painting is never stopped or cut by the need', async () => {
     renderPage(VIEWPORTS.desktop);
     await startPicking();
     paint(9 * 60, 10 * 60);
@@ -185,25 +185,19 @@ describe('desktop · 1440', () => {
     expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Zbývá 7 slotů');
     expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: 7 × Základní prohlídka (30 min)');
 
-    /* 11:00-16:30 would be 330 min; only 210 are missing, so the range is cut at 14:30. */
+    /* 11:00-16:00 is 300 min, only 210 are missing - and it is booked whole, exactly as marked. */
     paint(11 * 60, 16 * 60);
     await waitFor(() => expect(rows()).toHaveLength(2));
-    expect(rows()[1]).toMatch(/11:00–14:30 · 210 min/);
+    expect(rows()[1]).toMatch(/11:00–16:00 · 300 min/);
     expect(within(panel).getByTestId('pick-covered')).toHaveTextContent('Hotovo — všechny sloty pokryty');
     expect(within(panel).getByTestId('pick-progress')).toHaveAttribute('aria-valuenow', '100');
     expect(within(panel).queryByTestId('pick-slots')).not.toBeInTheDocument();
     expect(within(panel).getByRole('button', { name: 'Potvrdit objednávku' })).toBeEnabled();
 
-    /* Nothing more is allowed ... */
-    paint(15 * 60, 15 * 60);
-    expect(rows()).toHaveLength(2);
-    expect(within(panel).getByTestId('pick-note')).toHaveTextContent(/pokryti/);
-
-    /* ... until the reserve is switched on. */
-    fireEvent.click(within(panel).getByRole('switch', { name: 'Přidat rezervu' }));
-    paint(15 * 60, 15 * 60);
-    await waitFor(() => expect(rows()).toHaveLength(3));
-    expect(within(panel).getByTestId('pick-covered')).toHaveTextContent(/Rezerva 30\smin/);
+    /* The surplus is information only: 390 picked of 300 = 90 more (3 slots), and no note, no switch. */
+    expect(within(panel).getByTestId('pick-covered')).toHaveTextContent(/Navíc 90 min \/ 3 sloty/);
+    expect(within(panel).queryByRole('switch', { name: 'Přidat rezervu' })).not.toBeInTheDocument();
+    expect(panel.textContent ?? '').not.toMatch(/zastaven|rezerv/i);
   });
 
   it('a range removed with its cross gives its minutes back', async () => {
@@ -235,12 +229,12 @@ describe('desktop · 1440', () => {
     fireEvent.pointerUp(bar, { ...init, clientY: 300 + 26 });
     await waitFor(() => expect(rows()[0]).toMatch(/09:30–12:00 · 150 min/));
 
-    /* Stretching never goes past what is still needed: 150 min are missing, 300 is the most the range can be. */
+    /* Stretching is not limited by the need either: it goes as far as the grid allows. */
     const edge2 = within(screen.getByTestId('picked-range')).getByTestId('pick-handle-end');
     fireEvent.pointerDown(edge2, { ...init, clientY: 400 });
     fireEvent.pointerMove(edge2, { ...init, clientY: 400 + 52 * 5 });
     fireEvent.pointerUp(edge2, { ...init, clientY: 400 + 52 * 5 });
-    await waitFor(() => expect(rows()[0]).toMatch(/09:30–14:30 · 300 min/));
+    await waitFor(() => expect(rows()[0]).toMatch(/09:30–16:00 · 390 min/));
     expect(within(screen.getByTestId('pick-panel')).getByTestId('pick-covered')).toBeInTheDocument();
   });
 
@@ -274,7 +268,7 @@ describe('desktop · 1440', () => {
       paymentMethod: 'ClubInvoice',
       ranges: [
         { fromDate: DAY, toDate: DAY, dailyFrom: '09:00', dailyTo: '10:30' },
-        { fromDate: DAY, toDate: DAY, dailyFrom: '11:00', dailyTo: '14:30' },
+        { fromDate: DAY, toDate: DAY, dailyFrom: '11:00', dailyTo: '16:00' },
       ],
       calendarIds: ['c1'],
       status: 'Confirmed',
@@ -417,19 +411,30 @@ describe.each([
     expect(monthDay('2026-09-23')).toHaveAttribute('data-free', '330');
   });
 
-  it('"Celý den" picks the free working time of the day, cut at the need; tapping the day again removes it', async () => {
+  it('"Celý den" books the whole free working time of the day, never cut at the need; tapping the day again removes it', async () => {
     renderPage(width);
     const user = await startPicking();
     await goMonth(user);
     await user.click(monthDay('2026-09-25'));
     await user.click(await screen.findByTestId('pick-month-whole'));
-    /* 10 players x 30 min = 300 min, the day has 480. */
-    await waitFor(() => expect(within(monthDay('2026-09-25')).getByTestId('pick-month-chip')).toHaveTextContent('5:00 h'));
+    /* 10 players x 30 min = 300 min, the day has 480: the whole day is booked. */
+    await waitFor(() => expect(within(monthDay('2026-09-25')).getByTestId('pick-month-chip')).toHaveTextContent('8:00 h'));
     expect(progress()).toHaveAttribute('aria-valuenow', '100');
     await user.click(monthDay('2026-09-25'));
     await user.click(await screen.findByTestId('pick-month-remove'));
     await waitFor(() => expect(within(monthDay('2026-09-25')).queryByTestId('pick-month-chip')).not.toBeInTheDocument());
     expect(progress()).toHaveAttribute('aria-valuenow', '0');
+  });
+
+  it('a 60-minute need and a whole-day tap: the whole day is booked, with the surplus shown as information', async () => {
+    renderPage(width);
+    const user = await startPicking('2');
+    await goMonth(user);
+    await user.click(monthDay('2026-09-25'));
+    await user.click(await screen.findByTestId('pick-month-whole'));
+    await waitFor(() => expect(within(monthDay('2026-09-25')).getByTestId('pick-month-chip')).toHaveTextContent('8:00 h'));
+    expect(summary()).toHaveTextContent(/Hotovo/);
+    expect(summary()).toHaveTextContent(/Navíc 420 min \/ 14 slotů/);
   });
 
   it('"Vybrat čas…" opens the day, and the pick of the month survives the trip', async () => {
@@ -460,14 +465,14 @@ describe.each([
 });
 
 describe('month pick · several days in a row', () => {
-  it('"Klepnutí = celý den" picks a day per tap until everybody is covered', async () => {
+  it('"Klepnutí = celý den" books a whole day per tap, even when everybody is already covered', async () => {
     renderPage(VIEWPORTS.phone);
     const user = await startPicking('28'); // 28 x 30 = 840 min
     await goMonth(user);
     await user.click(screen.getByRole('switch', { name: 'Klepnutí = celý den' }));
     await user.click(monthDay('2026-09-24'));
     await user.click(monthDay('2026-09-25'));
-    await waitFor(() => expect(within(monthDay('2026-09-25')).getByTestId('pick-month-chip')).toHaveTextContent('6:00 h'));
+    await waitFor(() => expect(within(monthDay('2026-09-25')).getByTestId('pick-month-chip')).toHaveTextContent('8:00 h'));
     expect(within(monthDay('2026-09-24')).getByTestId('pick-month-chip')).toHaveTextContent('8:00 h');
     expect(summary()).toHaveTextContent(/Hotovo/);
   });
@@ -517,9 +522,9 @@ describe('phone · day view of free blocks', () => {
     expect(blocks[0]).toHaveTextContent('10:30–16:00');
     expect(blocks[0]).toHaveTextContent('volno 5 h 30 min');
     await user.click(blocks[0]);
-    /* The whole block is more than the 300 minutes needed: cut at the need, 10:30-15:30. */
+    /* The whole block is more than the 300 minutes needed: it is still booked whole, 10:30-16:00. */
     await waitFor(() => expect(screen.getAllByTestId('picked-range')).toHaveLength(1));
-    expect(screen.getByTestId('picked-range')).toHaveTextContent('10:30 – 15:30');
+    expect(screen.getByTestId('picked-range')).toHaveTextContent('10:30 – 16:00');
     expect(summary()).toHaveTextContent(/Hotovo/);
   });
 
@@ -673,6 +678,6 @@ describe('marked places and editing an existing order', () => {
     fireEvent.click(within(panel).getByRole('button', { name: 'Potvrdit objednávku' }));
     await waitFor(() => expect(confirmOrder).toHaveBeenCalledTimes(1));
     expect(update).toHaveBeenCalledWith('o-9', { activitySeats: [{ activityId: 'a1', seats: 10 }], paymentMethod: 'ClubInvoice', note: 'Pozn.' });
-    expect(confirmOrder).toHaveBeenCalledWith('o-9', { calendarIds: ['c1'], ranges: [{ fromDate: DAY, toDate: DAY, dailyFrom: '09:00', dailyTo: '14:00' }] });
+    expect(confirmOrder).toHaveBeenCalledWith('o-9', { calendarIds: ['c1'], ranges: [{ fromDate: DAY, toDate: DAY, dailyFrom: '09:00', dailyTo: '14:30' }] });
   });
 });

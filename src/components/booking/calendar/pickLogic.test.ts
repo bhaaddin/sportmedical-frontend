@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   adjustPicked,
+  tapBandStart,
+  touchBandMinutes,
   busyIntervals,
   clampPainted,
   ordersRangesOf,
@@ -21,44 +23,36 @@ describe("clampPainted", () => {
   const none: { start: number; end: number }[] = [];
 
   it("lets a free range through whole", () => {
-    const r = clampPainted({ range: { start: t(9), end: t(11) }, direction: "down", busy: none, allowance: Infinity });
+    const r = clampPainted({ range: { start: t(9), end: t(11) }, direction: "down", busy: none });
     expect(r.range).toEqual({ start: t(9), end: t(11) });
     expect(paintNote(r)).toBeNull();
   });
 
-  it("stops at the minutes still needed - counting from the pressed time", () => {
-    const r = clampPainted({ range: { start: t(9, 40), end: t(13) }, direction: "down", busy: none, allowance: 90 });
-    expect(r.range).toEqual({ start: t(9, 40), end: t(11, 10) });
-    expect(r.trimmedNeed).toBe(true);
-    expect(paintNote(r)).toMatch(/pokryti/);
+  it("is NEVER cut to the minutes the order needs - what is marked is booked as marked", () => {
+    const r = clampPainted({ range: { start: t(9, 40), end: t(19) }, direction: "down", busy: none });
+    expect(r.range).toEqual({ start: t(9, 40), end: t(19) });
+    expect(paintNote(r)).toBeNull();
   });
 
-  it("dragging upward keeps the end where the press began and cuts the far side", () => {
-    const r = clampPainted({ range: { start: t(9), end: t(12) }, direction: "up", busy: none, allowance: 60 });
-    expect(r.range).toEqual({ start: t(11), end: t(12) });
-  });
-
-  it("refuses when everybody is covered, and explains the reserve toggle", () => {
-    const r = clampPainted({ range: { start: t(9), end: t(10) }, direction: "down", busy: none, allowance: 0 });
-    expect(r.range).toBeNull();
-    expect(r.refused).toBe("covered");
-    expect(paintNote(r)).toMatch(/rezervu/);
+  it("dragging upward keeps the whole marked range too", () => {
+    const r = clampPainted({ range: { start: t(9), end: t(12) }, direction: "up", busy: none });
+    expect(r.range).toEqual({ start: t(9), end: t(12) });
   });
 
   it("is cut at the first booking in the way", () => {
-    const r = clampPainted({ range: { start: t(9), end: t(12) }, direction: "down", busy: [{ start: t(10, 30), end: t(11) }], allowance: Infinity });
+    const r = clampPainted({ range: { start: t(9), end: t(12) }, direction: "down", busy: [{ start: t(10, 30), end: t(11) }] });
     expect(r.range).toEqual({ start: t(9), end: t(10, 30) });
     expect(r.trimmedBusy).toBe(true);
     expect(paintNote(r)).toMatch(/obsazeno/);
   });
 
   it("dragging upward is cut at the booking above", () => {
-    const r = clampPainted({ range: { start: t(9), end: t(12) }, direction: "up", busy: [{ start: t(9, 30), end: t(10) }], allowance: Infinity });
+    const r = clampPainted({ range: { start: t(9), end: t(12) }, direction: "up", busy: [{ start: t(9, 30), end: t(10) }] });
     expect(r.range).toEqual({ start: t(10), end: t(12) });
   });
 
   it("refuses a range that starts on something taken", () => {
-    const r = clampPainted({ range: { start: t(10), end: t(11) }, direction: "down", busy: [{ start: t(9), end: t(10, 30) }], allowance: Infinity });
+    const r = clampPainted({ range: { start: t(10), end: t(11) }, direction: "down", busy: [{ start: t(9), end: t(10, 30) }] });
     expect(r.range).toBeNull();
     expect(r.refused).toBe("busy");
     expect(paintNote(r)).toMatch(/obsazeno/);
@@ -98,7 +92,7 @@ describe("busyIntervals", () => {
 });
 
 describe("adjustPicked", () => {
-  const base = { original: { start: t(9), end: t(10) }, step: 10, bounds: { start: t(7), end: t(19) }, busy: [{ start: t(12), end: t(13) }], allowance: Infinity };
+  const base = { original: { start: t(9), end: t(10) }, step: 10, bounds: { start: t(7), end: t(19) }, busy: [{ start: t(12), end: t(13) }] };
 
   it("resizes the end", () => {
     expect(adjustPicked({ ...base, mode: "end", delta: 60 })).toEqual({ start: t(9), end: t(11) });
@@ -108,8 +102,8 @@ describe("adjustPicked", () => {
     expect(adjustPicked({ ...base, mode: "end", delta: 300 })).toEqual({ start: t(9), end: t(12) });
   });
 
-  it("the end cannot grow past the minutes still needed", () => {
-    expect(adjustPicked({ ...base, mode: "end", delta: 120, allowance: 30 })).toEqual({ start: t(9), end: t(10, 30) });
+  it("the end can grow beyond the minutes the order needs", () => {
+    expect(adjustPicked({ ...base, mode: "end", delta: 120 })).toEqual({ start: t(9), end: t(12) });
   });
 
   it("never shrinks below one step", () => {
@@ -153,5 +147,21 @@ describe("picks to ranges", () => {
     expect(pickInRange(pick("1", "2026-12-15", t(9, 30), t(11)), range)).toBe(true);
     expect(pickInRange(pick("2", "2026-12-16", t(9), t(10)), range)).toBe(false);
     expect(pickInRange(pick("3", "2026-12-14", t(10), t(11)), range)).toBe(false);
+  });
+});
+
+describe("touch tap bands", () => {
+  it("a slot at least 44 px tall is tapped one slot at a time", () => {
+    expect(touchBandMinutes(30, 44 / 30)).toBe(30);
+  });
+  it("a 15-minute step drawn 22 px tall is tapped in 30-minute bands (44 px)", () => {
+    expect(touchBandMinutes(15, 44 / 30)).toBe(30);
+  });
+  it("a 10-minute step drawn 14.7 px tall needs 3 slots", () => {
+    expect(touchBandMinutes(10, 44 / 30)).toBe(30);
+  });
+  it("a tap lands in the band by position", () => {
+    expect(tapBandStart(t(9, 20), 30)).toBe(t(9));
+    expect(tapBandStart(t(9, 40), 30)).toBe(t(9, 30));
   });
 });

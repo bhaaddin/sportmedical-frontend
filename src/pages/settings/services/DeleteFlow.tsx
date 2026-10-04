@@ -95,7 +95,14 @@ export default function DeleteFlow({
 
   return (
     <>
-      <Dialog open={target !== null} onClose={busy ? undefined : close} fullWidth maxWidth="xs" fullScreen={device === 'phone'}>
+      <Dialog
+        open={target !== null}
+        onClose={busy ? undefined : close}
+        fullWidth
+        maxWidth="xs"
+        /* A compact sheet at the bottom of a phone, never a full-screen page for one question. */
+        sx={device === 'phone' ? { '& .MuiDialog-container': { alignItems: 'flex-end' }, '& .MuiDialog-paper': { m: 1, width: 'calc(100% - 16px)', maxHeight: '80dvh' } } : undefined}
+      >
         <DialogTitle sx={{ fontWeight: 700 }}>{DELETE_TEXT.title(kind)}</DialogTitle>
         <DialogContent>
           <Typography>{DELETE_TEXT.body(target?.name ?? '')}</Typography>

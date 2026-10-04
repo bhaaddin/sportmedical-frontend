@@ -5,18 +5,17 @@ import type { Calendar } from "../../../api/bookingContracts";
 import { ClubOrderError, clubOrdersApi } from "../../../api/clubOrders";
 import type { ClubOrderView } from "../../../api/clubOrders";
 import type { DateOnly } from "../../../utils/time";
-import { computeCoverage, pickAllowance } from "../../clubs/order/coverage";
+import { computeCoverage } from "../../clubs/order/coverage";
 import { rangeLine } from "../../clubs/order/orderFormat";
 import { rowFromRange, rowIndexForError } from "../../clubs/order/orderLogic";
 import type { PickSession } from "../../clubs/order/pickSession";
 import type { GridPickMode } from "../grid/TimeGrid";
 import type { NewPicked } from "./multiSelect";
-import { takeWithinAllowance, type FreeBlock } from "./pickDays";
+import type { FreeBlock } from "./pickDays";
 import {
   ordersRangesOf,
   pickedCalendarIds,
   pickedMinutesOf,
-  paintNote,
   pickInRange,
   picksFromRanges,
   timePicks,
@@ -47,9 +46,7 @@ export interface PickOrderApi {
   result: ClubOrderView | null;
   /** "Objednávka potvrzena" (new, processed) or "Termíny uloženy" (edited). */
   resultTitle: string;
-  /** How many more minutes may be picked (Infinity = no limit). */
-  allowance: number;
-  /** "Celý den" / a free block: the blocks of one day become picks, stopped at the minutes still needed. */
+  /** "Celý den" / a free block: the blocks of one day become picks, exactly as they are (never cut to the need). */
   pickBlocks: (day: DateOnly, blocks: readonly FreeBlock[]) => boolean;
   /** Every pick of one day is dropped. */
   removeDay: (day: DateOnly) => void;
@@ -72,7 +69,6 @@ export function usePickOrder(input: {
   const { multi, calendars, todayKey, nowMinute, onStarted, onEnded, onCreated } = input;
   const queryClient = useQueryClient();
   const [session, setSession] = useState<PickSession | null>(null);
-  const [allowReserve, setAllowReserve] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [failure, setFailure] = useState<{ message: string; conflict: string | null; ids: string[]; athletes: number } | null>(null);
@@ -83,7 +79,6 @@ export function usePickOrder(input: {
   const pickedMinutes = pickedMinutesOf(multi.items);
   const activities = useMemo(() => session?.activities ?? [], [session]);
   const coverage = useMemo(() => computeCoverage(activities, pickedMinutes), [activities, pickedMinutes]);
-  const allowance = pickAllowance(coverage, allowReserve);
 
   const serviceCalendarIds = useMemo(
     () => new Set(calendars.filter((c) => session !== null && c.clinicServiceId === session.serviceId).map((c) => c.id)),
@@ -98,7 +93,6 @@ export function usePickOrder(input: {
     (next: PickSession, seed?: readonly NewPicked[]) => {
       multi.clear();
       setSession(next);
-      setAllowReserve(false);
       setNote(null);
       setFailure(null);
       setResult(null);
@@ -117,7 +111,6 @@ export function usePickOrder(input: {
     setSession(null);
     setNote(null);
     setFailure(null);
-    setAllowReserve(false);
     onEnded?.();
   }, [multi, onEnded]);
 
@@ -200,7 +193,6 @@ export function usePickOrder(input: {
         ? undefined
         : {
             active: true,
-            allowance,
             allowedCalendar: (id: string) => serviceCalendarIds.has(id),
             today: todayKey,
             ...(nowMinute !== undefined ? { nowMinute } : {}),
@@ -216,7 +208,7 @@ export function usePickOrder(input: {
             },
             conflictIds,
           },
-    [session, allowance, serviceCalendarIds, todayKey, nowMinute, multi, conflictIds, ownBlockIds, clearFailure],
+    [session, serviceCalendarIds, todayKey, nowMinute, multi, conflictIds, ownBlockIds, clearFailure],
   );
 
   const pickBlocks = useCallback(
@@ -225,19 +217,14 @@ export function usePickOrder(input: {
         setNote("V tento den už není volný čas.");
         return false;
       }
-      const { taken, trimmedNeed } = takeWithinAllowance(blocks, allowance);
-      if (taken.length === 0) {
-        setNote(paintNote({ range: null, refused: "covered", trimmedBusy: false, trimmedNeed: false }));
-        return false;
-      }
-      for (const t of taken) {
+      for (const t of blocks) {
         multi.add({ kind: "time", columnKey: t.calendarId, calendarId: t.calendarId, activityId: null, dayKey: day, range: t.range });
       }
       clearFailure();
-      setNote(trimmedNeed ? "Výběr zastaven — hráči jsou pokryti." : null);
+      setNote(null);
       return true;
     },
-    [allowance, multi, clearFailure],
+    [multi, clearFailure],
   );
   const removeDay = useCallback(
     (day: DateOnly) => {
@@ -257,8 +244,6 @@ export function usePickOrder(input: {
           coverage,
           picks,
           calendarName,
-          allowReserve,
-          onReserve: setAllowReserve,
           note,
           requested: session.editOrder?.requested ?? [],
           editing: session.editOrder?.mode === "edit",
@@ -279,5 +264,5 @@ export function usePickOrder(input: {
           onCancel: end,
         };
 
-  return { session, active: session !== null, start, cancel: end, gridPick, panel, result, resultTitle, closeResult: () => setResult(null), allowance, pickBlocks, removeDay, setNote };
+  return { session, active: session !== null, start, cancel: end, gridPick, panel, result, resultTitle, closeResult: () => setResult(null), pickBlocks, removeDay, setNote };
 }

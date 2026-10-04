@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, createEvent, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import CalendarGridPage from '../../../pages/booking/CalendarGridPage';
@@ -484,10 +484,28 @@ describe('phone · 390', () => {
     expect(k4).toHaveTextContent('Karel Zeman');
     expect(k4).toHaveTextContent('Spiroergometrie');
     expect(k4).toHaveTextContent(/09:00 – 10:00/);
-    /* Sorted by time: 08:00 Jan Novák first, the club's 11:00 last. */
+    /* Sorted by time: 08:00 Jan Novák first, the club's window (13:00-15:00 in Prague) last, as its own card. */
     const times = within(list).getAllByRole('button').map((b) => b.textContent ?? '');
     expect(times[0]).toContain('08:00');
-    expect(times[times.length - 1]).toContain('11:00');
+    expect(times[times.length - 1]).toContain('FK Dukla · 13:00–15:00');
+  });
+
+  it('a day with only a club window shows its card, never "Žádné rezervace"', async () => {
+    vi.mocked(appointmentsApi.range).mockResolvedValue([]);
+    renderPage(VIEWPORTS.phone, 'day');
+    const list = await screen.findByTestId('phone-day-list');
+    const card = await within(list).findByTestId('club-window-card');
+    expect(card).toHaveTextContent('FK Dukla · 13:00–15:00');
+    expect(within(list).queryByText('Žádné rezervace')).not.toBeInTheDocument();
+    expect(within(list).getByTestId('club-only-line')).toHaveTextContent(/Klub FK Dukla/);
+  });
+
+  it('the week strip counts a club window and shows a dot in the club colour', async () => {
+    vi.mocked(appointmentsApi.range).mockResolvedValue([]);
+    renderPage(VIEWPORTS.phone, 'week');
+    const strip = await screen.findByTestId('week-strip-2026-10-26');
+    await waitFor(() => expect(within(strip).getByTestId('club-dots')).toBeInTheDocument());
+    expect(strip).toHaveTextContent('1');
   });
 
   it('week: one day at a time, a seven-day strip on top, the top bar steps a day', async () => {

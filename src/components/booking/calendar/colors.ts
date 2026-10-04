@@ -40,10 +40,3 @@ export function cardTones(colorHex: string, surface: string): CardTones {
     edge: colorHex,
   };
 }
-
-/** Whether a colour reads as light (for choosing ink on top of it). */
-export function isLight(hex: string): boolean {
-  const c = parse(hex);
-  if (!c) return true;
-  return (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) / 255 > 0.62;
-}

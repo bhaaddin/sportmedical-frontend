@@ -86,6 +86,7 @@ describe('contextual sidebar (1440)', () => {
     expect(within(nav).getByRole('link', { name: 'Přehled pacientů' })).toHaveAttribute('aria-current', 'page');
     expect(within(nav).getByRole('link', { name: 'Nový pacient' })).toHaveAttribute('href', '/patients/register');
     expect(within(nav).getByRole('link', { name: 'Kontrola registrací' })).toHaveAttribute('href', '/intake-review');
+    expect(within(nav).getByRole('link', { name: 'Rychlá registrace' })).toHaveAttribute('href', '/patients/register?mode=quick');
     expect(within(nav).queryByRole('link', { name: 'Objednávky klubů' })).not.toBeInTheDocument();
   });
 

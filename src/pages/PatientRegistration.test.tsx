@@ -106,9 +106,9 @@ beforeEach(() => {
   });
 });
 
-const renderPage = () =>
+const renderPage = (entry = '/patients/register') =>
   render(
-    <MemoryRouter initialEntries={['/patients/register']}>
+    <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route path="/patients/register" element={<PatientRegistration />} />
         <Route path="/patients/:id" element={<div>karta-pacienta</div>} />
@@ -142,6 +142,11 @@ const fillTheFour = async (user: ReturnType<typeof userEvent.setup>) => {
 };
 
 describe('the header', () => {
+  it('opens in Rychlá registrace from the sidebar link ?mode=quick', async () => {
+    renderPage('/patients/register?mode=quick');
+    expect(await screen.findByText('Rychlá registrace — 0 z 5 údajů')).toBeInTheDocument();
+  });
+
   it('counts the fields the chosen mode requires', async () => {
     const user = userEvent.setup();
     renderPage();

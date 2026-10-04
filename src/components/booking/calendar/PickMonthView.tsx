@@ -5,6 +5,8 @@ import { DESIGN } from "../../../theme";
 import type { DateOnly } from "../../../utils/time";
 import type { DayMark } from "../grid/dayMarks";
 import { WEEKDAY_ABBREVIATION, shortDate } from "../grid/periodTitle";
+import { InquiryChip } from "./InquiryChip";
+import type { InquiryRef } from "./inquiries";
 import { formatFree } from "./pickDays";
 
 /*
@@ -33,16 +35,16 @@ export interface PickMonthViewProps {
   freeMinutes: (day: DateOnly) => number;
   /** Minutes picked on a day. */
   pickedMinutes: (day: DateOnly) => number;
-  /** Everybody is covered: no more can be picked unless the reserve is switched on. */
-  covered: boolean;
   onWholeDay: (day: DateOnly) => void;
   onChooseTime: (day: DateOnly) => void;
   onRemoveDay: (day: DateOnly) => void;
+  /** Open club orders: their days carry a dashed chip (the order being processed reads "Klub žádá"). */
+  inquiriesByDay?: Map<string, InquiryRef[]>;
   onNote: (text: string | null) => void;
 }
 
 export function PickMonthView(props: PickMonthViewProps) {
-  const { days, anchorMonth, todayKey, marks, freeMinutes, pickedMinutes, covered } = props;
+  const { days, anchorMonth, todayKey, marks, freeMinutes, pickedMinutes } = props;
   const [quick, setQuick] = useState(false);
   const [menu, setMenu] = useState<{ day: DateOnly; el: HTMLElement } | null>(null);
 
@@ -127,6 +129,9 @@ export function PickMonthView(props: PickMonthViewProps) {
                   bgcolor: picked > 0 ? DESIGN.selection.bg : shut ? alpha("#000", 0.04) : "background.paper",
                   opacity: outside && picked === 0 ? 0.55 : 1,
                   boxShadow: day === todayKey ? `inset 0 0 0 2px ${DESIGN.ink}` : "none",
+                  outline: (props.inquiriesByDay?.get(day) ?? []).some((i) => i.current) ? "2px dashed" : "none",
+                  outlineColor: "primary.main",
+                  outlineOffset: -3,
                   cursor: shut && picked === 0 ? "default" : "pointer",
                 }}
               >
@@ -141,6 +146,9 @@ export function PickMonthView(props: PickMonthViewProps) {
                 >
                   {Number(day.slice(8, 10))}
                 </Typography>
+                {(props.inquiriesByDay?.get(day) ?? []).slice(0, 1).map((inquiry) => (
+                  <InquiryChip key={inquiry.orderId} inquiry={inquiry} />
+                ))}
                 {picked > 0 ? (
                   <Chip
                     size="small"
@@ -179,7 +187,7 @@ export function PickMonthView(props: PickMonthViewProps) {
               {shortDate(menuDay)}
               {menuPicked > 0 ? ` · vybráno ${menuPicked} min` : ""}
             </Typography>
-            {menuFree > 0 && !covered ? (
+            {menuFree > 0 ? (
               <Button
                 variant="contained"
                 data-testid="pick-month-whole"

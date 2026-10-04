@@ -14,13 +14,12 @@ export interface FreeBlocksListProps {
   calendarName: (calendarId: string) => string;
   /** More than one calendar of the služba: the name is shown on every block. */
   showCalendar: boolean;
-  covered: boolean;
   onPick: (block: FreeBlock) => void;
   /** No free time today: the way forward. */
   onNextDay: () => void;
 }
 
-export function FreeBlocksList({ blocks, calendarName, showCalendar, covered, onPick, onNextDay }: FreeBlocksListProps) {
+export function FreeBlocksList({ blocks, calendarName, showCalendar, onPick, onNextDay }: FreeBlocksListProps) {
   return (
     <Paper variant="outlined" data-testid="free-blocks" sx={{ p: 1.25, mb: 1.5, borderRadius: `${DESIGN.radius.lg}px` }}>
       <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 0.75 }}>Volný čas dne — klepnutím vyberete celý blok</Typography>
@@ -37,7 +36,6 @@ export function FreeBlocksList({ blocks, calendarName, showCalendar, covered, on
             <ButtonBase
               key={`${block.calendarId}-${block.range.start}`}
               data-testid="free-block"
-              disabled={covered}
               onClick={() => onPick(block)}
               sx={{
                 minHeight: 52,

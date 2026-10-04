@@ -47,12 +47,14 @@ import {
   type Catalogue,
   type ColumnSpec,
 } from "../calendar/model";
+import { InquiryChip } from "../calendar/InquiryChip";
+import type { InquiryRef } from "../calendar/inquiries";
 import { SelectionPopover } from "../calendar/SelectionPopover";
 import { useDayRangeSurface, type DayRangeApi } from "../calendar/useDayRange";
 import type { MultiSelectApi } from "../calendar/useMultiSelect";
 import type { PickedTime } from "../calendar/multiSelect";
 import { PickedBar } from "../calendar/PickedBar";
-import { adjustPicked, busyIntervals, clampPainted, paintNote, withPastTime, type AdjustMode, type ClampResult } from "../calendar/pickLogic";
+import { adjustPicked, busyIntervals, clampPainted, paintNote, tapBandStart, touchBandMinutes, withPastTime, type AdjustMode, type ClampResult } from "../calendar/pickLogic";
 
 /*
  * The day and week grid - contract 5.1, drawn to the board of 3. 10. 2026
@@ -119,13 +121,11 @@ export interface GridMoveRequest {
 
 /**
  * "Výběr termínů" (a club order picked straight in the grid). While `active`, every drag ADDS a place (no popover);
- * the painted range is stopped at what is taken and at the minutes still `allowance`d, picked ranges can be
+ * the painted range is stopped only at what is taken (never at the minutes the order needs), picked ranges can be
  * resized, moved and removed, and refusals are reported through `onNote`.
  */
 export interface GridPickMode {
   active: boolean;
-  /** How many more minutes may be picked (Infinity = no limit). */
-  allowance: number;
   /** Only the calendars of the order's service may be picked. */
   allowedCalendar: (calendarId: string) => boolean;
   /** The clinic's today: nothing before it can be picked. */
@@ -182,6 +182,9 @@ export interface TimeGridProps {
   /** "Rezervovat pro klub" - hands the range to the clubs screen. Not offered when absent. */
   onClub?: (request: GridBookingRequest) => void;
   onPickDay: (day: DateOnly) => void;
+  /** Club orders that do not block time yet: a dashed chip under the header of their days. */
+  inquiriesByDay?: Map<string, InquiryRef[]>;
+  onOpenInquiry?: (orderId: string) => void;
   /** Vertical zoom multiplier for row height; 1 is the default density. */
   zoom?: number;
   /** Zoom by a step (±0.1), from ctrl/⌘+wheel over the grid. */
@@ -254,6 +257,7 @@ export function TimeGrid(props: TimeGridProps) {
     device = "desktop",
     rangeSelect,
     multi,
+    inquiriesByDay,
   } = props;
   const light = theme.palette.mode === "light";
 
@@ -508,6 +512,9 @@ export function TimeGrid(props: TimeGridProps) {
                     minWidth: 0,
                     borderLeft: "1px solid",
                     borderColor: "divider",
+                    ...((inquiriesByDay?.get(dayKey) ?? []).some((i) => i.current)
+                      ? { outline: "2px dashed", outlineColor: "primary.main", outlineOffset: -3 }
+                      : {}),
                     bgcolor: picked
                       ? DESIGN.selection.bg
                       : pickedPast
@@ -587,6 +594,14 @@ export function TimeGrid(props: TimeGridProps) {
                         {shortDate(dayKey)}
                       </Typography>
                     </ButtonBase>
+                  ) : null}
+
+                  {(inquiriesByDay?.get(dayKey) ?? []).length > 0 ? (
+                    <Box data-testid={`inquiries-${dayKey}`} sx={{ display: "flex", flexDirection: "column", gap: 0.375, px: 1.25, pb: 0.5 }}>
+                      {(inquiriesByDay?.get(dayKey) ?? []).slice(0, 2).map((inquiry) => (
+                        <InquiryChip key={inquiry.orderId} inquiry={inquiry} {...(props.onOpenInquiry ? { onOpen: props.onOpenInquiry } : {})} />
+                      ))}
+                    </Box>
                   ) : null}
 
                   {picked && highlight && dayKey === firstHighlighted ? (
@@ -1255,7 +1270,7 @@ function SubColumn({
       pick !== undefined && dayKey === pick.today ? (pick.nowMinute ?? 0) : 0,
     );
   const paint = (anchor: number, current: number): ClampResult => {
-    const none = { trimmedBusy: false, trimmedNeed: false };
+    const none = { trimmedBusy: false };
     if (pick === undefined) return { range: null, ...none };
     if (!pick.allowedCalendar(calendar.id)) return { range: null, refused: "service", ...none };
     if (dayKey < pick.today) return { range: null, refused: "past", ...none };
@@ -1268,7 +1283,6 @@ function SubColumn({
       range: wanted,
       direction,
       busy: busyHere(),
-      allowance: pick.allowance,
     });
   };
   const [adjust, setAdjust] = useState<{ id: string; range: MinuteRange } | null>(null);
@@ -1431,18 +1445,21 @@ function SubColumn({
           if (!press.dragging) {
             if (painting && touchPick && pick !== undefined) {
               /* Tap the start, then tap the end: the range between them (the same slot twice = that one slot). */
+              /* A slot drawn shorter than 44 px is tapped by position in a taller band (the nearest whole slots). */
+              const band = touchBandMinutes(step, pxPerMinute);
+              const bandStart = tapBandStart(press.minute, band);
               if (tapAnchor === null) {
-                const first = paint(press.minute, press.minute);
+                const first = paint(bandStart, bandStart);
                 if (first.range === null) {
                   pick.onNote(paintNote(first));
                   return;
                 }
-                onTapAnchor(Math.floor(press.minute / step) * step);
-                pick.onNote(`Začátek ${formatMinutes(Math.floor(press.minute / step) * step)} — klepněte na konec.`);
+                onTapAnchor(bandStart);
+                pick.onNote(`Začátek ${formatMinutes(bandStart)} — klepněte na konec.`);
                 return;
               }
               onTapAnchor(null);
-              commit(tapAnchor, press.minute, event.clientX, event.clientY, true);
+              commit(tapAnchor, bandStart >= tapAnchor ? bandStart + band - step : bandStart, event.clientX, event.clientY, true);
               return;
             }
             /* A tap on a free slot: that one slot is the selection. */
@@ -1598,6 +1615,8 @@ function SubColumn({
         const club = block.kind === "club";
         const colour = cleanHex(block.colorHex) ?? DESIGN.faint;
         const label = club ? (block.clubName ?? GRID_TEXT.clubBlock) : block.reason || GRID_TEXT.blocked;
+        const blockSpan = spanOnDay(block.startUtc, block.endUtc, dayKey);
+        const blockTime = `${formatMinutes(blockSpan.start)}–${formatMinutes(blockSpan.end)}`;
         return (
           <Box
             key={block.id}
@@ -1605,7 +1624,7 @@ function SubColumn({
             type="button"
             data-grid-item="block"
             data-kind={club ? "club" : "manual"}
-            title={club ? `${GRID_TEXT.clubBlock} · ${label}` : undefined}
+            title={club ? `${GRID_TEXT.clubBlock} · ${label} · ${blockTime}` : undefined}
             onClick={(event: React.MouseEvent) => {
               if (club) {
                 const dates = clubBlockDates(allBlocks, block.clubBlockId, block);
@@ -1631,6 +1650,7 @@ function SubColumn({
               zIndex: 2,
               overflow: "hidden",
               display: "flex",
+              flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
               textAlign: "center",
@@ -1647,9 +1667,14 @@ function SubColumn({
               "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main" },
             }}
           >
-            <Box component="span" sx={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <Box component="span" sx={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
               {label}
             </Box>
+            {club ? (
+              <Box component="span" aria-hidden="true" data-testid="club-block-time" sx={{ fontSize: 10, fontWeight: 500, whiteSpace: "nowrap", opacity: 0.85 }}>
+                {blockTime}
+              </Box>
+            ) : null}
           </Box>
         );
       })}
@@ -1821,7 +1846,7 @@ function SubColumn({
             position: "absolute",
             left: 4,
             right: 4,
-            ...place({ start: tapAnchor, end: tapAnchor + step }),
+            ...place({ start: tapAnchor, end: tapAnchor + touchBandMinutes(step, pxPerMinute) }),
             zIndex: 4,
             pointerEvents: "none",
             border: `2px dashed ${DESIGN.selection.line}`,
@@ -1862,7 +1887,6 @@ function SubColumn({
                       step,
                       bounds,
                       busy: busyHere(item.id),
-                      allowance: pick.allowance,
                     }),
                   })
                 }

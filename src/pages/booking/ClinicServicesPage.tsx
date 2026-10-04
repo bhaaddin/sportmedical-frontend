@@ -326,7 +326,7 @@ export default function ClinicServicesPage() {
             display: 'grid',
             gap: 3,
             alignItems: 'start',
-            gridTemplateColumns: device === 'phone' ? '1fr' : device === 'tablet' ? '280px 1fr' : '360px 1fr',
+            gridTemplateColumns: device === 'phone' ? '1fr' : device === 'tablet' ? '280px minmax(0, 1fr)' : '360px 1fr',
           }}
           data-layout={device}
         >

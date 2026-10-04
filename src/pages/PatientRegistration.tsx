@@ -30,7 +30,7 @@
  * completion link the moment the record exists, and shows it with Kopírovat.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Alert, AlertTitle, Autocomplete, Box, Button, Checkbox, CircularProgress,
   Divider, FormControlLabel, LinearProgress, MenuItem, Stack, TextField,
@@ -206,7 +206,13 @@ export default function PatientRegistration() {
   const device = useDevice();
   const phoneLayout = device === 'phone';
 
-  const [form, setForm] = useState<RegistrationFormState>(createEmptyForm);
+  /* The sidebar's "Rychlá registrace" opens this page with ?mode=quick. */
+  const [searchParams] = useSearchParams();
+  const wantsQuick = searchParams.get('mode') === 'quick';
+  const [form, setForm] = useState<RegistrationFormState>(() => ({ ...createEmptyForm(), ...(wantsQuick ? { mode: 'Quick' as const } : {}) }));
+  useEffect(() => {
+    if (wantsQuick) setForm((current) => (current.mode === 'Quick' ? current : { ...current, mode: 'Quick' }));
+  }, [wantsQuick]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [banner, setBanner] = useState<{ severity: 'error' | 'warning'; text: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);

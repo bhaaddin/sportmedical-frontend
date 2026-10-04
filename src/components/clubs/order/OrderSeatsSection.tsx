@@ -66,7 +66,7 @@ export function OrderSeatsSection({
                     }
                   />
                   {on ? (
-                    <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', pl: { xs: 0, sm: 4 }, flexWrap: 'wrap', rowGap: 1 }}>
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', pl: { xs: 0, sm: 4 }, pt: 1, flexWrap: 'wrap', rowGap: 1 }}>
                       <Stack direction="row" data-testid="seats-stepper" sx={{ alignItems: 'flex-start', gap: 0.5 }}>
                         <IconButton
                           disabled={disabled || (parsePlayerCount(typed) ?? 0) <= 0}

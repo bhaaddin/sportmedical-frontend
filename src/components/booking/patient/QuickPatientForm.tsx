@@ -141,6 +141,8 @@ export function QuickPatientForm({
             onChange={(e) => set("activityId", e.target.value)}
             error={errors.activityId !== undefined}
             helperText={errors.activityId}
+            title={activities.find((x) => x.id === value.activityId)?.name}
+            sx={{ "& .MuiSelect-select": { whiteSpace: "normal", lineHeight: 1.3, py: 1.25 } }}
             slotProps={{
               select: { displayEmpty: true, "aria-label": "Prohlídka, na kterou volal" },
             }}

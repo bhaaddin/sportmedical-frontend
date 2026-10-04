@@ -43,6 +43,7 @@ export const SECTION_CHILDREN: Record<ContextualParent, ChildSpec[]> = {
   '/patients': [
     { text: 'Přehled pacientů', path: '/patients' },
     { text: 'Nový pacient', path: '/patients/register', requires: 'patients.register' },
+    { text: 'Rychlá registrace', path: '/patients/register?mode=quick', requires: 'patients.register', shortcut: true },
     { text: 'Kontrola registrací', path: '/intake-review', requires: 'patients.register' },
   ],
   '/clubs': [

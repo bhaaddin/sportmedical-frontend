@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activityNeed, computeCoverage, pickAllowance } from './coverage';
+import { activityNeed, computeCoverage } from './coverage';
 import type { CoverageActivity } from './coverage';
 
 const act = (over: Partial<CoverageActivity> = {}): CoverageActivity => ({
@@ -116,17 +116,3 @@ describe('computeCoverage', () => {
   });
 });
 
-describe('pickAllowance', () => {
-  it('allows only what is missing, so painting stops when everybody is covered', () => {
-    expect(pickAllowance(computeCoverage([act()], 600), false)).toBe(300);
-    expect(pickAllowance(computeCoverage([act()], 900), false)).toBe(0);
-  });
-
-  it('allows any amount with the reserve toggle', () => {
-    expect(pickAllowance(computeCoverage([act()], 900), true)).toBe(Number.POSITIVE_INFINITY);
-  });
-
-  it('allows nothing while there is nothing to cover', () => {
-    expect(pickAllowance(computeCoverage([], 0), true)).toBe(0);
-  });
-});

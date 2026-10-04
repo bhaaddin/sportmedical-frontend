@@ -55,35 +55,6 @@ export interface FreeBlock {
 export const minutesOfBlocks = (blocks: readonly FreeBlock[]): number => blocks.reduce((n, b) => n + (b.range.end - b.range.start), 0);
 
 /**
- * "Celý den": takes the free blocks in order (calendar after calendar, early to late) until `allowance` more minutes
- * are taken; the last block is cut. `trimmedNeed` = something was left because everybody is covered.
- */
-export function takeWithinAllowance(
-  blocks: readonly FreeBlock[],
-  allowance: number,
-): { taken: FreeBlock[]; trimmedNeed: boolean } {
-  const taken: FreeBlock[] = [];
-  let left = Number.isFinite(allowance) ? Math.max(0, Math.floor(allowance)) : Number.POSITIVE_INFINITY;
-  let trimmedNeed = false;
-  for (const block of blocks) {
-    if (left <= 0) {
-      trimmedNeed = true;
-      break;
-    }
-    const length = block.range.end - block.range.start;
-    if (length <= left) {
-      taken.push(block);
-      left -= length;
-    } else {
-      taken.push({ calendarId: block.calendarId, range: { start: block.range.start, end: block.range.start + left } });
-      left = 0;
-      trimmedNeed = true;
-    }
-  }
-  return { taken, trimmedNeed };
-}
-
-/**
  * The first day from `from` (up to `maxDays` ahead) with some free time, or null when there is none.
  * `freeMinutesOf` is asked for every day in order.
  */

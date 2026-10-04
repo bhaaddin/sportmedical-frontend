@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Calendar, PreviewDay } from '../../../api/bookingContracts';
-import { ceilToStep, firstBookableDay, formatFree, freeBlocksOfCalendar, freeBlocksOfDay, minutesOfBlocks, takeWithinAllowance } from './pickDays';
+import { ceilToStep, firstBookableDay, formatFree, freeBlocksOfCalendar, freeBlocksOfDay, minutesOfBlocks } from './pickDays';
 import { withPastTime } from './pickLogic';
 import type { PickedRange } from './multiSelect';
 
@@ -48,27 +48,6 @@ describe('freeBlocksOfCalendar', () => {
       appointments: [{ startUtc: '2026-09-24T06:15:00Z', endUtc: '2026-09-24T14:00:00Z', status: 0 }], // 08:15-16:00
     });
     expect(free).toEqual([]);
-  });
-});
-
-describe('takeWithinAllowance (whole-day pick)', () => {
-  const blocks = [
-    { calendarId: 'c1', range: { start: h(8), end: h(12) } },
-    { calendarId: 'c1', range: { start: h(12, 30), end: h(16) } },
-  ];
-  it('takes everything when the need is larger', () => {
-    const { taken, trimmedNeed } = takeWithinAllowance(blocks, 600);
-    expect(minutesOfBlocks(taken)).toBe(450);
-    expect(trimmedNeed).toBe(false);
-  });
-  it('is cut at the minutes still needed - inside a block', () => {
-    const { taken, trimmedNeed } = takeWithinAllowance(blocks, 300);
-    expect(taken).toEqual([blocks[0], { calendarId: 'c1', range: { start: h(12, 30), end: h(13, 30) } }]);
-    expect(trimmedNeed).toBe(true);
-  });
-  it('takes nothing when everybody is covered; Infinity = no limit', () => {
-    expect(takeWithinAllowance(blocks, 0).taken).toEqual([]);
-    expect(takeWithinAllowance(blocks, Number.POSITIVE_INFINITY).taken).toHaveLength(2);
   });
 });
 

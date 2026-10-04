@@ -13,6 +13,9 @@ import { GRID_TEXT } from "../grid/gridText";
 import { WEEKDAY_ABBREVIATION, shortDate } from "../grid/periodTitle";
 import { CAL_TEXT } from "./calendarText";
 import type { ClubBlockRef } from "./ClubBlockPopover";
+import { InquiryChip } from "./InquiryChip";
+import type { ClubWindow } from "./clubWindows";
+import type { InquiryRef } from "./inquiries";
 import { mixOver } from "./colors";
 import { DayCountsPanel } from "./DayCountsPanel";
 import {
@@ -66,6 +69,11 @@ export interface MonthViewProps {
   /** Club blocks per day (deduplicated by block), from the calendars' block lists. */
   clubBlocksByDay: Map<string, ClubBlockRef[]>;
   onOpenClubBlock: (block: ClubBlockRef, point: { x: number; y: number }) => void;
+  /** Club orders that do not block time yet (a request, an offer): a dashed chip on their days. */
+  /** The club windows of each day: the row says its time and "3/22" players. */
+  clubWindowsByDay?: Map<string, ClubWindow[]>;
+  inquiriesByDay?: Map<string, InquiryRef[]>;
+  onOpenInquiry?: (orderId: string) => void;
   onOpen: (id: string) => void;
   onPickDay: (day: DateOnly) => void;
 }
@@ -401,6 +409,7 @@ export function MonthView(props: MonthViewProps) {
                       type="button"
                       data-grid-item="club-block"
                       data-testid={`month-club-block-${block.clubBlockId}-${dayKey}`}
+                      title={`${CAL_TEXT.clubBlockLabel(block.clubName)}${clubTail(props.clubWindowsByDay?.get(dayKey)?.find((w) => w.clubBlockId === block.clubBlockId))}`}
                       onClick={(event: React.MouseEvent) => {
                         event.stopPropagation();
                         props.onOpenClubBlock(block, { x: event.clientX, y: event.clientY });
@@ -421,15 +430,19 @@ export function MonthView(props: MonthViewProps) {
                         borderLeft: `2px solid ${colour}`,
                         borderRadius: "3px",
                         bgcolor: alpha(colour, 0.2),
-                        whiteSpace: "nowrap",
+                        whiteSpace: "normal",
                         overflow: "hidden",
-                        textOverflow: "ellipsis",
+                        lineHeight: 1.25,
                       }}
                     >
                       {CAL_TEXT.clubBlockLabel(block.clubName)}
+                      {clubTail(props.clubWindowsByDay?.get(dayKey)?.find((w) => w.clubBlockId === block.clubBlockId))}
                     </Box>
                   );
                 })}
+                {(props.inquiriesByDay?.get(dayKey) ?? []).slice(0, 2).map((inquiry) => (
+                  <InquiryChip key={inquiry.orderId} inquiry={inquiry} {...(props.onOpenInquiry ? { onOpen: props.onOpenInquiry } : {})} />
+                ))}
               </Box>
 
               {showPanel ? (
@@ -511,4 +524,11 @@ export function MonthView(props: MonthViewProps) {
       </Popover>
     </Box>
   );
+}
+
+/** " · 08:00–18:00 · 1/8" - when the club holds the day and how many players are in. */
+function clubTail(window: ClubWindow | undefined): string {
+  if (!window) return "";
+  const time = window.wholeDay ? "celý den" : window.timeLabel;
+  return ` · ${time}${window.registered !== null && window.seats !== null ? ` · ${window.registered}/${window.seats}` : ""}`;
 }

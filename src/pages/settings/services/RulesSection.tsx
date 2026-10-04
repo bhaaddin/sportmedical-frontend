@@ -87,7 +87,7 @@ export default function RulesSection({ service }: { service: ClinicService }) {
                   select
                   size="small"
                   label={`Dotazník — ${a.name}`}
-                  value={a.questionnaireRequirement}
+                  value={a.questionnaireRequirement in QUESTIONNAIRE_LABEL ? a.questionnaireRequirement : ''}
                   disabled={!canEdit || patch.isPending}
                   onChange={(e) => set(a, { questionnaireRequirement: e.target.value as Activity['questionnaireRequirement'] })}
                   fullWidth

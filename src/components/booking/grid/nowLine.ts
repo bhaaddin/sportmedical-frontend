@@ -89,6 +89,3 @@ export function resolveNowLineColor(raw: string | null | undefined, fallback: st
   if (/^(?:rgb|rgba|hsl|hsla)\(\s*[\d.,%\s/]+\)$/i.test(value)) return value;
   return fallback;
 }
-
-/** The settings key the colour lives under. */
-export const NOW_LINE_COLOR_KEY = 'calendar.nowLineColor';

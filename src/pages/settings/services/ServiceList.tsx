@@ -90,13 +90,13 @@ export default function ServiceList({
             key={service.id}
             sx={{ p: 0, overflow: 'hidden', borderColor: selected ? 'primary.main' : undefined, borderWidth: selected ? 2 : 1 }}
           >
-            <Stack direction="row" sx={{ alignItems: 'stretch' }}>
+            <Stack direction="row" sx={{ alignItems: 'stretch', flexWrap: 'wrap' }}>
               <ButtonBase
                 onClick={() => onSelect(service)}
                 aria-label={`Otevřít službu ${service.name}`}
                 aria-current={selected ? 'true' : undefined}
                 sx={{
-                  flex: 1, minWidth: 0, minHeight: 64, p: 2, gap: 1.5, justifyContent: 'flex-start', textAlign: 'left',
+                  flex: '1 1 200px', minWidth: 0, minHeight: 64, p: 2, gap: 1.5, justifyContent: 'flex-start', textAlign: 'left',
                   bgcolor: selected ? settingsSelected : undefined, '&:hover': { bgcolor: settingsHover },
                 }}
               >
@@ -109,7 +109,7 @@ export default function ServiceList({
                   <Typography sx={TYPE.caption}>{countsLine(service)}</Typography>
                 </Box>
               </ButtonBase>
-              <Stack direction="row" sx={{ alignItems: 'center', pr: 0.5 }}>
+              <Stack direction="row" sx={{ alignItems: 'center', pr: 0.5, pl: 1.5, pb: 0.5, ml: 'auto' }}>
                 <Tooltip title="Upravit">
                   <IconButton aria-label={`Upravit službu ${service.name}`} onClick={() => onEdit(service)}>
                     <EditIcon fontSize="small" />

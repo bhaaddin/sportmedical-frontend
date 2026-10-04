@@ -47,6 +47,3 @@ export function ordersAwaitingInvoice(orders: readonly ClubOrderView[], invoices
   /* Etapa 5: an addendum is invoiced with its group's root, and a group whose invoice exists does not wait. */
   return orders.filter((o) => o.status === 'Confirmed' && o.paymentMethod === 'ClubInvoice' && o.parentOrderId === null && o.invoiceId === null && !done.has(o.id));
 }
-
-/** What /billing receives; its reader ignores keys it does not know yet, so this is safe before it learns clubOrderId. */
-export const invoiceNavState = (o: ClubOrderView) => ({ clubId: o.clubId, clubOrderId: o.id, headcount: Math.max(1, o.totalSeats) });

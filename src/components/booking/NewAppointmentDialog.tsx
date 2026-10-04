@@ -1140,7 +1140,7 @@ export function NewAppointmentDialog({
                   <Typography variant="body2" sx={{ color: "text.secondary", mb: 0.5 }}>
                     {TEXT.pickOffered}
                   </Typography>
-                  <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5 }}>
+                  <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, alignItems: "flex-start" }}>
                     {alternatives.map((slot) => (
                       <Stack key={slot.startUtc} sx={{ alignItems: "center" }}>
                         <Button
@@ -1152,7 +1152,7 @@ export function NewAppointmentDialog({
                           {pragueClock(slot.startUtc)}
                         </Button>
                         {slot.kinds?.includes("chained") ? (
-                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10 }} data-testid="chained-label">
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11, lineHeight: 1.2, mt: 0.25 }} data-testid="chained-label">
                             {TEXT.chained}
                           </Typography>
                         ) : null}

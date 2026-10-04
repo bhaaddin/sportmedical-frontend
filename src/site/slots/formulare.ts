@@ -214,8 +214,6 @@ export const formulareSlots: SlotDef[] = [
   textSlot('formulare.club-reg.done.calendar', 'Klubová registrace — Hotovo — řádek o kalendáři', CLUBREG,
     'Váš termín uvidí i ordinace v kalendáři.'),
   textSlot('formulare.club-reg.done.ics', 'Klubová registrace — Hotovo — tlačítko do kalendáře', CLUBREG, 'Přidat do kalendáře'),
-  textSlot('formulare.club-reg.days.title', 'Klubová registrace — Rezervované dny — nadpis', CLUBREG,
-    'Dny a hodiny, které klub rezervoval'),
   textSlot('formulare.club-reg.steps.title', 'Klubová registrace — Jak to funguje — nadpis', CLUBREG,
     'Jak to funguje'),
   textSlot('formulare.club-reg.steps.1', 'Klubová registrace — Jak to funguje — krok 1', CLUBREG,

@@ -289,8 +289,3 @@ export function longWhen(utc: string): string {
   const time = when.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Prague' });
   return `${day} v ${time}`;
 }
-
-/** "10:00" in the clinic's clock. */
-export function hhmmPrague(utc: string): string {
-  return new Date(utc).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Prague' });
-}

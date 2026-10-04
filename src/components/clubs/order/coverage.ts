@@ -118,12 +118,3 @@ export function computeCoverage(activities: readonly CoverageActivity[], pickedM
     perActivity,
   };
 }
-
-/**
- * How many more minutes may be picked: what is missing, or without limit when the reserve is allowed.
- * Before anything is typed (nothing to cover) nothing may be picked.
- */
-export function pickAllowance(coverage: Coverage, allowReserve: boolean): number {
-  if (coverage.neededMinutes <= 0) return 0;
-  return allowReserve ? Number.POSITIVE_INFINITY : coverage.remainingMinutes;
-}

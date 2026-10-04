@@ -92,6 +92,8 @@ import { CAL_TEXT } from "../../components/booking/calendar/calendarText";
 import { ClubBlockPopover, type ClubBlockPick, type ClubBlockRef } from "../../components/booking/calendar/ClubBlockPopover";
 import { MonthView } from "../../components/booking/calendar/MonthView";
 import { MoveConfirmDialog } from "../../components/booking/calendar/MoveConfirmDialog";
+import { clubWindowsByDay as clubWindowsByDay_, type ClubWindow } from "../../components/booking/calendar/clubWindows";
+import { clubBlocksApi } from "../../api/clubBlocks";
 import { PhoneCalendar } from "../../components/booking/calendar/PhoneCalendar";
 import { RangeBlockDialog } from "../../components/booking/calendar/RangeBlockDialog";
 import { SelectionPopover } from "../../components/booking/calendar/SelectionPopover";
@@ -119,6 +121,7 @@ import type { PickParent } from "../../components/clubs/order/pickSession";
 import { PickOrderPanel } from "../../components/booking/calendar/PickOrderPanel";
 import { usePickOrder } from "../../components/booking/calendar/usePickOrder";
 import { usePickJump } from "../../components/booking/calendar/usePickJump";
+import { useInquiries } from "../../components/booking/calendar/inquiries";
 import { PickMonthView } from "../../components/booking/calendar/PickMonthView";
 import { FreeBlocksList } from "../../components/booking/calendar/FreeBlocksList";
 import { freeBlocksOfDay, minutesOfBlocks, type FreeBlock } from "../../components/booking/calendar/pickDays";
@@ -577,12 +580,12 @@ export default function CalendarGridPage() {
 
   const timeGridShown = !isPhone && view !== "month";
 
-  /* Blocks: on the time axis, and as club rows in the month. Not on a phone. */
+  /* Blocks: on the time axis, as club rows in the month, and as club cards in the phone lists. */
   const blockLists = useQueries({
     queries: shown.map((calendar) => ({
       queryKey: ["blocks", calendar.id, from, to],
       queryFn: () => appointmentsApi.blocks(calendar.id, from, to),
-      enabled: !isPhone || pickActive,
+      enabled: true,
       placeholderData: (previous: TimeBlock[] | undefined) => previous,
     })),
     combine: dataOfEach,
@@ -750,6 +753,36 @@ export default function CalendarGridPage() {
     }
     return visibleHours(working, items);
   }, [days, shown, previewByCalendar, byDay, blocksByCalendar]);
+
+  /* Club orders that do not block time yet (an offer, a request): a dashed "Poptávka" chip on their days. */
+  const inquiriesByDay = useInquiries(pick.session?.editOrder?.mode === "process" ? pick.session.editOrder.orderId : null);
+  const openInquiry = (orderId: string) => navigate("/clubs/objednavky", { state: { openOrderId: orderId } });
+
+  /* The club windows of each day (a card on a phone list, a dot in its week strip and month list). */
+  const clubDetailsQuery = useQuery({
+    queryKey: ["club-blocks", "details", from, to],
+    queryFn: () => clubBlocksApi.list({ from, to }),
+    enabled: !pickActive,
+    retry: false,
+    staleTime: 30_000,
+  });
+  const clubWindowsByDay = useMemo(() => {
+    const details = new Map((clubDetailsQuery.data ?? []).map((b) => [b.id, b]));
+    const all = [...blocksByCalendar.values()].flat();
+    return clubWindowsByDay_(
+      blocksByCalendar,
+      days,
+      details,
+      (calendarId, day) => {
+        const row = previewByCalendar.get(calendarId)?.get(day);
+        if (!row || !row.isOpen) return null;
+        const start = parseTimeOfDay(row.startTime);
+        const end = parseTimeOfDay(row.endTime);
+        return start === null || end === null ? null : { start, end };
+      },
+      (id, block) => clubBlockDates(all, id, block),
+    );
+  }, [clubDetailsQuery.data, blocksByCalendar, days, previewByCalendar]);
 
   /* The club blocks of the month, one row per club per day. */
   const clubBlocksByDay = useMemo(() => {
@@ -1434,7 +1467,6 @@ export default function CalendarGridPage() {
               blocks={freeBlocksOn(anchor)}
               calendarName={pick.panel.calendarName}
               showCalendar={dayData.calendars.length > 1}
-              covered={!(pick.allowance > 0)}
               onPick={(block) => pick.pickBlocks(anchor, [block])}
               onNextDay={() => stepBy(1)}
             />
@@ -1500,6 +1532,10 @@ export default function CalendarGridPage() {
                   todayKey={todayKey}
                   holidayColor={holidayColor}
                   onOpen={setOpenId}
+                  clubWindowsByDay={clubWindowsByDay}
+                  inquiriesByDay={inquiriesByDay}
+                  onOpenInquiry={openInquiry}
+                  onOpenClubWindow={(block, point) => setClubPick({ ...block, ...point })}
                   onPickDay={pickDay}
                   onAnchor={setAnchor}
                   onStep={stepBy}
@@ -1513,13 +1549,13 @@ export default function CalendarGridPage() {
                   holidayColor={holidayColor}
                   freeMinutes={(day) => freeByDay.get(day) ?? 0}
                   pickedMinutes={(day) => pickedByDay.get(day) ?? 0}
-                  covered={!(pick.allowance > 0)}
-                  onWholeDay={(day) => pick.pickBlocks(day, freeBlocksOn(day))}
+                      onWholeDay={(day) => pick.pickBlocks(day, freeBlocksOn(day))}
                   onChooseTime={(day) => {
                     setAnchor(day);
                     changeView("day");
                   }}
                   onRemoveDay={pick.removeDay}
+                  inquiriesByDay={inquiriesByDay}
                   onNote={pick.setNote}
                 />
               ) : view === "month" ? (
@@ -1538,7 +1574,10 @@ export default function CalendarGridPage() {
                   rangeSelect={rangeSelect}
                   canSelectRange={canSelectRange}
                   clubBlocksByDay={clubBlocksByDay}
+                  clubWindowsByDay={clubWindowsByDay}
                   onOpenClubBlock={(block, point) => setClubPick({ ...block, ...point })}
+                  inquiriesByDay={inquiriesByDay}
+                  onOpenInquiry={openInquiry}
                   onOpen={setOpenId}
                   onPickDay={pickDay}
                 />
@@ -1567,6 +1606,8 @@ export default function CalendarGridPage() {
                   onBook={bookFromGrid}
                   onClub={clubFromGrid}
                   onPickDay={pickDay}
+                  inquiriesByDay={inquiriesByDay}
+                  onOpenInquiry={pickActive ? undefined : openInquiry}
                   columns={pickActive ? undefined : columns}
                   catalogue={catalogue}
                   device={isTablet || (isPhone && pickActive) ? "tablet" : "desktop"}

@@ -187,35 +187,6 @@ export interface OrderUpdateInput {
   releaseDaysBefore?: number | null;
 }
 
-export interface ProposalInput {
-  serviceId: string;
-  activitySeats: { activityId: string; seats: number }[];
-  calendarIds: string[];
-  startDate: string;
-  startTime?: string;
-  daysOfWeek?: number[];
-  weeks?: number;
-}
-
-export interface OrderAnalysis {
-  totalSeats: number;
-  totalNeededMinutes: number;
-  availableMinutes: number;
-  remainingMinutes: number;
-  fits: boolean;
-  capacityNote: string | null;
-  perActivity: {
-    activityId: string;
-    name: string;
-    seats: number;
-    minutesPerSeat: number;
-    parallelCapacity: number;
-    neededMinutes: number;
-    maxSeatsInWindowsAlone: number;
-  }[];
-  byRange: { fromDate: string; toDate: string; dailyFrom: string | null; dailyTo: string | null; availableMinutes: number }[];
-}
-
 export interface ClubSummary {
   clubId: string;
   clubName?: string;
@@ -471,13 +442,6 @@ export const clubOrdersApi = {
     call(async () => {
       const response = await client.post(`${BASE}/${id}/invoice`, null);
       return toCreatedInvoice(response.data, response.status);
-    }),
-
-  /** The automatic suggestion; the user edits the ranges afterwards. */
-  proposal: (input: ProposalInput): Promise<{ ranges: OrderRange[]; analysis: OrderAnalysis | null }> =>
-    call(async () => {
-      const body = rec(unwrap((await client.post(`${BASE}/proposal`, input)).data));
-      return { ranges: arr<unknown>(body.ranges).map(toRange), analysis: body.analysis ? (body.analysis as OrderAnalysis) : null };
     }),
 
   clubSummary: (clubId: string): Promise<ClubSummary> =>

@@ -87,7 +87,7 @@ const takenAt = (busy: readonly MinuteRange[], minute: number): boolean => busy.
 
 /* ── Painting ── */
 
-export type PickRefusal = "busy" | "covered" | "past" | "service";
+export type PickRefusal = "busy" | "past" | "service";
 
 export interface ClampResult {
   /** The range that will be picked; null = refused (see `refused`). */
@@ -95,29 +95,24 @@ export interface ClampResult {
   refused?: PickRefusal;
   /** The painted range was cut short at something taken. */
   trimmedBusy: boolean;
-  /** The painted range was cut short because everybody is covered. */
-  trimmedNeed: boolean;
 }
 
 /**
  * A painted range: it holds where the press began (`direction` down = the start is fixed, up = the end is fixed),
- * grows from there, and stops at the first thing taken and at the minutes still needed.
+ * grows from there, and stops only at the first thing taken. What is marked is booked exactly as marked: the
+ * minutes the order needs never trim it (the manager phoned and agreed it).
  */
 export function clampPainted(input: {
   range: MinuteRange;
   direction: "down" | "up";
   busy: readonly MinuteRange[];
-  /** How many more minutes may be picked (Infinity = no limit). */
-  allowance: number;
 }): ClampResult {
-  const { range, direction, busy, allowance } = input;
+  const { range, direction, busy } = input;
   const fixed = direction === "down" ? range.start : range.end - 1;
-  if (takenAt(busy, fixed)) return { range: null, refused: "busy", trimmedBusy: false, trimmedNeed: false };
-  if (!(allowance > 0)) return { range: null, refused: "covered", trimmedBusy: false, trimmedNeed: false };
+  if (takenAt(busy, fixed)) return { range: null, refused: "busy", trimmedBusy: false };
 
   let { start, end } = range;
   let trimmedBusy = false;
-  let trimmedNeed = false;
   if (direction === "down") {
     for (const b of busy) {
       if (b.start > start && b.start < end) {
@@ -125,10 +120,6 @@ export function clampPainted(input: {
         trimmedBusy = true;
         break;
       }
-    }
-    if (Number.isFinite(allowance) && end - start > allowance) {
-      end = start + Math.floor(allowance);
-      trimmedNeed = true;
     }
   } else {
     for (let i = busy.length - 1; i >= 0; i -= 1) {
@@ -139,13 +130,9 @@ export function clampPainted(input: {
         break;
       }
     }
-    if (Number.isFinite(allowance) && end - start > allowance) {
-      start = end - Math.floor(allowance);
-      trimmedNeed = true;
-    }
   }
-  if (end - start < 1) return { range: null, refused: trimmedNeed ? "covered" : "busy", trimmedBusy, trimmedNeed };
-  return { range: { start, end }, trimmedBusy, trimmedNeed };
+  if (end - start < 1) return { range: null, refused: "busy", trimmedBusy };
+  return { range: { start, end }, trimmedBusy };
 }
 
 /** The sentence under a trimmed or refused paint, or null when it went through whole. */
@@ -154,8 +141,6 @@ export function paintNote(result: ClampResult): string | null {
     switch (result.refused) {
       case "busy":
         return "Tady je už obsazeno — vyberte volné místo.";
-      case "covered":
-        return "Všichni hráči jsou už pokryti — další čas nelze vybrat. Zapněte „Přidat rezervu“.";
       case "past":
         return "Termín v minulosti nelze objednat.";
       case "service":
@@ -164,11 +149,27 @@ export function paintNote(result: ClampResult): string | null {
         return null;
     }
   }
-  if (result.trimmedBusy && result.trimmedNeed) return "Výběr zkrácen: narazil na obsazený čas a hráči jsou pokryti.";
   if (result.trimmedBusy) return "Výběr zkrácen — dál je obsazeno.";
-  if (result.trimmedNeed) return "Výběr zastaven — hráči jsou pokryti.";
   return null;
 }
+
+/* ── Taps on a touch screen ── */
+
+/** The smallest comfortable tap target, in px. */
+export const TOUCH_TAP_PX = 44;
+
+/**
+ * How many minutes one tap covers on a touch screen: one slot of `step` minutes when it is tall enough (>= 44 px),
+ * otherwise the smallest whole number of slots that is. A 15-minute step drawn 22 px tall is tapped in 30-minute bands.
+ */
+export function touchBandMinutes(step: number, pxPerMinute: number): number {
+  const slotPx = step * pxPerMinute;
+  if (!(slotPx > 0) || slotPx >= TOUCH_TAP_PX) return step;
+  return step * Math.ceil(TOUCH_TAP_PX / slotPx - 1e-9);
+}
+
+/** A tapped minute as the first slot of the tap band it lies in. */
+export const tapBandStart = (minute: number, band: number): number => Math.floor(minute / band) * band;
 
 /* ── Resizing and moving a picked range ── */
 
@@ -176,8 +177,7 @@ export type AdjustMode = "start" | "end" | "move";
 
 /**
  * A picked range dragged by `delta` minutes (already snapped to the grid): the new range, or the original
- * when the change is not allowed. `allowance` is what may be ADDED to the original length (Infinity = no limit);
- * `busy` must not include the range itself.
+ * when the change is not allowed. `busy` must not include the range itself.
  */
 export function adjustPicked(input: {
   original: MinuteRange;
@@ -186,12 +186,10 @@ export function adjustPicked(input: {
   step: number;
   bounds: MinuteRange;
   busy: readonly MinuteRange[];
-  allowance: number;
 }): MinuteRange {
-  const { original, mode, delta, step, bounds, busy, allowance } = input;
+  const { original, mode, delta, step, bounds, busy } = input;
   const minLength = Math.max(1, step);
   const length = original.end - original.start;
-  const grow = Number.isFinite(allowance) ? Math.max(0, Math.floor(allowance)) : Number.POSITIVE_INFINITY;
 
   if (mode === "move") {
     const start = Math.min(Math.max(bounds.start, original.start + delta), Math.max(bounds.start, bounds.end - length));
@@ -203,14 +201,12 @@ export function adjustPicked(input: {
     start = Math.max(start, bounds.start);
     const wall = Math.max(-1, ...busy.filter((b) => b.end <= original.start).map((b) => b.end));
     if (wall >= 0) start = Math.max(start, wall);
-    if (Number.isFinite(grow)) start = Math.max(start, original.start - grow);
     return { start, end: original.end };
   }
   let end = Math.max(original.end + delta, original.start + minLength);
   end = Math.min(end, bounds.end);
   const wall = Math.min(Number.POSITIVE_INFINITY, ...busy.filter((b) => b.start >= original.end).map((b) => b.start));
   if (Number.isFinite(wall)) end = Math.min(end, wall);
-  if (Number.isFinite(grow)) end = Math.min(end, original.end + grow);
   return { start: original.start, end };
 }
 

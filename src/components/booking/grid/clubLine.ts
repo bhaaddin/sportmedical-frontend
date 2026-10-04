@@ -25,9 +25,3 @@ export function clubLine(
     .filter((part): part is string => part !== null)
     .join(' · ');
 }
-
-/** `Sleva −10 %` on a club row of the picker; null when the club has none. */
-export function clubDiscountLine(discountPercent: number | null | undefined): string | null {
-  const label = discountLabel(discountPercent);
-  return label === null ? null : `Sleva ${label}`;
-}
