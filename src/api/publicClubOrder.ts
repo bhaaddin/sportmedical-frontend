@@ -60,6 +60,8 @@ export interface OrderForm {
   /** Relative `/klub/{token}` once the order is confirmed; players register through it. */
   registrationUrl: string | null;
   registrationOpen: boolean;
+  /** Etapa 8: the days the clinic offers to choose from (yyyy-MM-dd, sorted). Empty = the club picks a free term. */
+  offeredDates: string[];
 }
 
 export interface QuoteDiscount {
@@ -143,6 +145,7 @@ export async function getOrderForm(token: string): Promise<OrderForm> {
       minimumPlayers: typeof raw.minimumPlayers === 'number' ? raw.minimumPlayers : null,
       registrationUrl: typeof raw.registrationUrl === 'string' && raw.registrationUrl.trim() !== '' ? raw.registrationUrl : null,
       registrationOpen: raw.registrationOpen === true,
+      offeredDates: [...new Set((Array.isArray(raw.offeredDates) ? raw.offeredDates : []).filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d)).map((d) => d.slice(0, 10)))].sort(),
     };
   } catch (error) {
     return linkError(error);

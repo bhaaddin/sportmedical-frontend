@@ -70,6 +70,10 @@ export interface ClubOrderView {
   registered: number;
   priceQuote: OrderPriceQuote | null;
   requestedRanges: OrderRange[];
+  /** Etapa 8: the days the desk offered the club to choose from (sorted, yyyy-MM-dd); empty = the club chooses freely. */
+  offeredDates?: string[];
+  /** Etapa 8: the single days the club chose (sorted); empty until it submitted. */
+  requestedDates?: string[];
   blocks: ClubBlockView[];
   note: string;
   contact: OrderContact | null;
@@ -320,6 +324,11 @@ export function toCreatedInvoice(raw: unknown, status?: number): CreatedInvoice 
   };
 }
 
+/** Tolerant: only well-formed yyyy-MM-dd strings, sorted and unique. */
+function dates(v: unknown): string[] {
+  return [...new Set(arr<unknown>(v).filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d)).map((d) => d.slice(0, 10)))].sort();
+}
+
 export function toOrder(raw: unknown): ClubOrderView {
   const o = rec(raw);
   const totals = rec(o.groupTotals);
@@ -358,6 +367,8 @@ export function toOrder(raw: unknown): ClubOrderView {
           totalCzk: num(quote.totalCzk),
         },
     requestedRanges: arr<unknown>(o.requestedRanges).map(toRange),
+    offeredDates: dates(o.offeredDates),
+    requestedDates: dates(o.requestedDates),
     blocks: arr<ClubBlockView>(o.blocks),
     note: str(o.note),
     contact: contact === null ? null : { name: str(contact.name), phone: str(contact.phone), email: str(contact.email) },
@@ -423,8 +434,12 @@ const BASE = '/api/v1/club-orders';
 
 export const clubOrdersApi = {
   /** Creates an order in status Invited and returns it with its form link (nothing is e-mailed). */
-  invite: (input: { clubId: string; serviceId?: string; note?: string }): Promise<ClubOrderView> =>
+  invite: (input: { clubId: string; serviceId?: string; note?: string; offeredDates?: string[] }): Promise<ClubOrderView> =>
     call(async () => toOrder(unwrap((await client.post(BASE, input)).data))),
+
+  /** Etapa 8: replaces the offered days while the order is Invited or Requested (empty list = free term). */
+  setOfferedDates: (id: string, dates: string[]): Promise<ClubOrderView> =>
+    call(async () => toOrder(unwrap((await client.put(`${BASE}/${id}/offered-dates`, { dates })).data))),
 
   /** A phone order or the calendar shortcut: Confirmed creates the blocks atomically. */
   createStaff: (input: StaffOrderInput): Promise<ClubOrderView> =>

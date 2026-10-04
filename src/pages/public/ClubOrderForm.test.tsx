@@ -55,6 +55,7 @@ const offer = (over: Partial<OrderForm> = {}): OrderForm => ({
   minimumPlayers: null,
   registrationUrl: null,
   registrationOpen: false,
+  offeredDates: [],
   ...over,
 });
 

@@ -5,7 +5,7 @@
  * preview address of the staff app).
  */
 import { useState } from 'react';
-import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { clubsApi } from '../../../api/clubs';
 import { clinicServicesApi } from '../../../api/clinicServices';
@@ -13,6 +13,8 @@ import { clubOrdersApi } from '../../../api/clubOrders';
 import type { ClubOrderView } from '../../../api/clubOrders';
 import { useIsPhone } from '../../../layout/useDevice';
 import { LinkCopyRow } from './LinkCopyRow';
+import { OfferedDaysEditor } from './OfferedDaysEditor';
+import { daysText } from './dayOffer';
 
 export { copyText } from './LinkCopyRow';
 
@@ -26,6 +28,8 @@ export function InviteClubDialog({ open, onClose, defaultClubId, onInvited }: {
   const [clubId, setClubId] = useState(defaultClubId ?? '');
   const [serviceId, setServiceId] = useState('');
   const [note, setNote] = useState('');
+  const [offered, setOffered] = useState<string[]>([]);
+  const [offerOpen, setOfferOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<ClubOrderView | null>(null);
@@ -47,6 +51,7 @@ export function InviteClubDialog({ open, onClose, defaultClubId, onInvited }: {
         clubId,
         ...(serviceId !== '' ? { serviceId } : {}),
         ...(note.trim() !== '' ? { note: note.trim() } : {}),
+        ...(offered.length > 0 ? { offeredDates: offered } : {}),
       });
       setCreated(order);
       onInvited?.(order);
@@ -71,6 +76,15 @@ export function InviteClubDialog({ open, onClose, defaultClubId, onInvited }: {
               {services.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
             </TextField>
             <TextField size="small" label="Poznámka (nepovinné)" value={note} onChange={(e) => setNote(e.target.value)} multiline minRows={2} />
+            <Box>
+              <Button variant="outlined" size="small" aria-expanded={offerOpen} onClick={() => setOfferOpen((v) => !v)} sx={{ minHeight: 44 }} data-testid="offer-toggle">
+                Nabídnout klubu dny k výběru{offered.length > 0 ? ` (${offered.length})` : ''}
+              </Button>
+              <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mt: 0.5 }}>
+                Nepovinné. Když nic nenabídnete, klub si termín zvolí sám.
+              </Typography>
+            </Box>
+            {offerOpen ? <OfferedDaysEditor value={offered} onChange={setOffered} /> : null}
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
               Nic se neodesílá e-mailem — odkaz vám zobrazíme a pošlete ho klubu sami.
             </Typography>
@@ -80,6 +94,11 @@ export function InviteClubDialog({ open, onClose, defaultClubId, onInvited }: {
           <Stack spacing={1.5} sx={{ mt: 1 }}>
             <Typography sx={{ fontWeight: 600 }}>Odkaz pro {created.clubName} je připravený.</Typography>
             <LinkCopyRow label="Odkaz na formulář pro klub" path={created.formUrl} testId="invite-link" big />
+            {(created.offeredDates ?? []).length > 0 ? (
+              <Typography variant="body2" data-testid="invite-offered">
+                Nabídnuto klubu: {(created.offeredDates ?? []).length} dní ({daysText(created.offeredDates ?? [])})
+              </Typography>
+            ) : null}
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
               Klub vyplní, co potřebuje, a objednávka vám přijde ke zpracování.
             </Typography>

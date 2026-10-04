@@ -28,16 +28,17 @@ import PublicLayout from './PublicLayout';
 import { PageTitle, PinnedBar, PublicMain, LoadError, ctaSx } from '../../components/public/kit';
 import { telHref } from '../../components/public/brand';
 import {
-  ActivitySection, ContactSection, NoteSection, PaymentSection, ServiceSection, TermSection,
+  ActivitySection, ContactSection, DaysSection, NoteSection, PaymentSection, ServiceSection, TermSection,
 } from './clubOrder/Sections';
 import { SummaryCard } from './clubOrder/SummaryCard';
 import type { SummaryLine } from './clubOrder/SummaryCard';
 import { Confirmation, Loading, NoticePage } from './clubOrder/Screens';
 import { LinkCard } from './clubOrder/LinkCard';
 import {
-  MAX_SEATS, activitySeatsOf, czk, emptyState, isValid, sortFieldErrors, stateFromDraft, submitPayload, termProblem, termText, todayPrague,
+  MAX_SEATS, activitySeatsOf, czk, emptyState, isValid, sortFieldErrors, stateFromDraft, submitPayload, termProblem, termSummary, todayPrague,
 } from './clubOrder/model';
 import type { FieldKey, OrderState } from './clubOrder/model';
+import { toggleDate } from '../../components/clubs/orders/dayOffer';
 
 const QUOTE_DELAY_MS = 350;
 
@@ -48,6 +49,11 @@ const SLOT_KEYS = [
   'formulare.club-order.pay.person.sub',
   'formulare.club-order.next',
   'formulare.club-order.terms.hint',
+  'formulare.club-order.days.title',
+  'formulare.club-order.days.hint',
+  'formulare.club-order.days.count',
+  'formulare.club-order.days.empty',
+  'formulare.club-order.days.required',
   'formulare.club-order.price.note',
   'formulare.club-order.minimum',
   'formulare.club-order.thanks.title',
@@ -203,7 +209,7 @@ export default function ClubOrderForm() {
           reference={done.reference}
           serviceName={svc?.serviceName ?? ''}
           lines={(svc?.activities ?? []).filter((a) => (done.snapshot.seats[a.activityId] ?? 0) > 0).map((a) => ({ name: a.name, seats: done.snapshot.seats[a.activityId] }))}
-          termText={termText(done.snapshot.term)}
+          termText={termSummary(done.snapshot, offer.offeredDates)}
           quote={done.quote}
           paymentLabel={done.snapshot.payment === 'PerPerson' ? payTexts.PerPerson.title : payTexts.ClubInvoice.title}
           perPerson={done.snapshot.payment === 'PerPerson'}
@@ -214,7 +220,9 @@ export default function ClubOrderForm() {
     );
   }
 
-  const valid = isValid(state, today);
+  const offeredDays = offer.offeredDates;
+  const hasOffer = offeredDays.length > 0;
+  const valid = isValid(state, today, offeredDays);
   const lines: SummaryLine[] = (service?.activities ?? [])
     .filter((a) => (state.seats[a.activityId] ?? 0) > 0)
     .map((a) => ({ activity: a, seats: state.seats[a.activityId] }));
@@ -228,7 +236,7 @@ export default function ClubOrderForm() {
     setSubmitting(true);
     setServerErrors({});
     try {
-      const result = await submitOrder(token, submitPayload(state));
+      const result = await submitOrder(token, submitPayload(state, offeredDays));
       setDone({ reference: result.reference, snapshot: state, quote });
     } catch (error) {
       if (error instanceof ClubOrderValidationError) setServerErrors(sortFieldErrors(error.errors));
@@ -274,15 +282,33 @@ export default function ClubOrderForm() {
         errors={serverErrors.activitySeats}
         onChange={(id, n) => { patch({ seats: { ...state.seats, [id]: Math.max(0, Math.min(MAX_SEATS, n)) } }); clearErrors('activitySeats'); }}
       />
-      <TermSection
-        n={stepOf('term')}
-        term={state.term}
-        today={today}
-        hint={t['formulare.club-order.terms.hint']}
-        showProblems={showProblems}
-        errors={serverErrors.ranges}
-        onChange={(p) => { patch({ term: { ...state.term, ...p } }); clearErrors('ranges'); }}
-      />
+      {hasOffer ? (
+        <DaysSection
+          n={stepOf('term')}
+          offered={offeredDays}
+          selected={state.days}
+          onToggle={(d) => { patch({ days: toggleDate(state.days, d) }); clearErrors('ranges'); }}
+          texts={{
+            title: t['formulare.club-order.days.title'],
+            hint: t['formulare.club-order.days.hint'],
+            empty: t['formulare.club-order.days.empty'],
+            required: t['formulare.club-order.days.required'],
+            count: t['formulare.club-order.days.count'],
+          }}
+          showProblems={showProblems}
+          errors={serverErrors.ranges}
+        />
+      ) : (
+        <TermSection
+          n={stepOf('term')}
+          term={state.term}
+          today={today}
+          hint={t['formulare.club-order.terms.hint']}
+          showProblems={showProblems}
+          errors={serverErrors.ranges}
+          onChange={(p) => { patch({ term: { ...state.term, ...p } }); clearErrors('ranges'); }}
+        />
+      )}
       <ContactSection
         n={stepOf('contact')}
         value={state.contact}
@@ -299,7 +325,7 @@ export default function ClubOrderForm() {
     ? null
     : [
       `Objednáváte ${totalPlayers} hráčů (${lines.map((l) => `${l.activity.name} ${l.seats}×`).join(', ')})`,
-      termProblem(state.term, today) === null ? `, termín ${termText(state.term)}` : '',
+      (hasOffer ? state.days.length > 0 : termProblem(state.term, today) === null) ? `, ${hasOffer ? 'vybrané dny' : 'termín'} ${termSummary(state, offeredDays)}` : '',
       quote !== null ? `. ${perPerson ? 'Orientační cena celkem' : 'Celkem'} ${czk(quote.totalCzk)}` : '',
       state.payment === null ? '. Vyberte, kdo platí.' : `, ${perPerson ? 'platí rodiče / hráči sami, každý za sebe' : 'platí klub'}.`,
     ].join('');

@@ -1,12 +1,20 @@
+import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { Box, ButtonBase, IconButton, TextField, Typography } from '@mui/material';
 import { AddRounded, RemoveRounded } from '@mui/icons-material';
 import type { ClubPaymentMethod, OrderActivity, OrderService } from '../../../api/publicClubOrder';
 import { ARCHIVO, BRAND } from '../../../components/public/brand';
 import { Panel, PanelTitle, SOFT_TEXT } from '../../../components/public/kit';
+import { DayCalendar } from '../../../components/clubs/orders/DayCalendar';
+import type { DayCalendarColors } from '../../../components/clubs/orders/DayCalendar';
+import { daysText, todayIso } from '../../../components/clubs/orders/dayOffer';
 import { PhoneField } from '../../../components/ui/PhoneField';
 import { MAX_SEATS, contactProblems, czk, termProblem } from './model';
 import type { ContactState, TermState } from './model';
+
+const PUBLIC_CALENDAR: DayCalendarColors = {
+  accent: BRAND.accent, onAccent: BRAND.ink, wash: BRAND.accentWash, edge: BRAND.accentEdge, text: BRAND.text, muted: BRAND.faint, line: BRAND.line,
+};
 
 export function FieldErrors({ messages, id }: { messages?: string[]; id?: string }) {
   if (messages === undefined || messages.length === 0) return null;
@@ -223,6 +231,46 @@ export function NoteSection({ note, onNote, errors, n }: { note: string; onNote:
     <Panel labelledBy="co-note">
       <PanelTitle id="co-note">{n}. Poznámka (nepovinná)</PanelTitle>
       <TextField label="Poznámka" value={note} onChange={(e) => onNote(e.target.value)} multiline minRows={2} fullWidth />
+      <FieldErrors messages={errors} />
+    </Panel>
+  );
+}
+
+/** Etapa 8: instead of the free term, the club ticks days among the ones the clinic offered. */
+export function DaysSection({
+  offered, selected, onToggle, texts, showProblems, errors, n,
+}: {
+  offered: string[]; selected: string[]; onToggle: (date: string) => void;
+  texts: { title: string; hint: string; empty: string; required: string; count: string };
+  showProblems: boolean; errors?: string[]; n: number;
+}) {
+  const offeredSet = useMemo(() => new Set(offered), [offered]);
+  const today = useMemo(todayIso, []);
+  const first = offered.find((d) => d >= today) ?? offered[0] ?? today;
+  const missing = showProblems && selected.length === 0;
+  return (
+    <Panel labelledBy="co-days">
+      <PanelTitle id="co-days">{n}. {texts.title}</PanelTitle>
+      <Typography sx={{ fontSize: 14.5, color: SOFT_TEXT }}>{texts.hint}</Typography>
+      <DayCalendar
+        selected={selected}
+        onToggle={onToggle}
+        isDisabled={(d) => !offeredSet.has(d) || d < today}
+        marked={offeredSet}
+        initialMonth={first}
+        colors={PUBLIC_CALENDAR}
+        testId="club-days-calendar"
+        label="Nabízené dny"
+      />
+      <Typography sx={{ fontSize: 15, fontWeight: 600 }} data-testid="club-days-count" aria-live="polite">
+        {texts.count.replace('{n}', String(selected.length))}
+      </Typography>
+      {selected.length === 0 ? (
+        <Typography sx={{ fontSize: 14, color: SOFT_TEXT }}>{texts.empty}</Typography>
+      ) : (
+        <Typography sx={{ fontSize: 15 }} data-testid="club-days-list">{daysText(selected)}</Typography>
+      )}
+      <FieldErrors messages={missing ? [texts.required] : undefined} />
       <FieldErrors messages={errors} />
     </Panel>
   );

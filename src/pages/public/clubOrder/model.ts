@@ -1,3 +1,4 @@
+import { daysText, daysToRanges } from '../../../components/clubs/orders/dayOffer';
 import type {
   ActivitySeat, ClubPaymentMethod, OrderDraft, OrderForm, OrderRange, SubmitInput,
 } from '../../../api/publicClubOrder';
@@ -22,6 +23,8 @@ export interface OrderState {
   serviceId: string | null;
   seats: Record<string, number>;
   term: TermState;
+  /** Etapa 8: the days chosen among the offered ones (only used when the clinic offered days). */
+  days: string[];
   payment: ClubPaymentMethod | null;
   contact: ContactState;
   note: string;
@@ -33,7 +36,7 @@ export const todayPrague = (): string => new Date().toLocaleDateString('sv-SE', 
 export const MAX_SEATS = 999;
 
 export function emptyState(): OrderState {
-  return { serviceId: null, seats: {}, term: { from: '', to: '', preferred: '' }, payment: null, contact: { name: '', phone: '', email: '' }, note: '' };
+  return { serviceId: null, seats: {}, term: { from: '', to: '', preferred: '' }, days: [], payment: null, contact: { name: '', phone: '', email: '' }, note: '' };
 }
 
 /** A worker's prefill: only what still exists in the offer is kept. A single service is chosen for the club. */
@@ -50,7 +53,7 @@ export function stateFromDraft(draft: OrderDraft | null, form: OrderForm): Order
     }
   }
   const range = (draft.ranges ?? [])[0];
-  if (range !== undefined) {
+  if (range !== undefined && form.offeredDates.length === 0) {
     const window = range.dailyFrom && range.dailyTo ? `${range.dailyFrom.slice(0, 5)}–${range.dailyTo.slice(0, 5)}` : '';
     state.term = { from: range.fromDate ?? '', to: range.toDate && range.toDate !== range.fromDate ? range.toDate : '', preferred: window };
   }
@@ -82,10 +85,10 @@ export function contactProblems(c: ContactState): { name: string | null; phone: 
   };
 }
 
-export function isValid(state: OrderState, today: string): boolean {
+export function isValid(state: OrderState, today: string, offered: string[] = []): boolean {
   if (state.payment === null) return false;
   if (state.serviceId === null || activitySeatsOf(state.seats).length === 0) return false;
-  if (termProblem(state.term, today) !== null) return false;
+  if (offered.length > 0 ? state.days.length === 0 : termProblem(state.term, today) !== null) return false;
   const c = contactProblems(state.contact);
   return c.name === null && c.phone === null && c.email === null;
 }
@@ -106,18 +109,25 @@ export function termText(term: TermState): string {
 }
 
 /** The preferred time of day has no field in the contract, so it travels at the head of the note. */
-export function noteOf(state: OrderState): string {
-  const pref = state.term.preferred.trim();
+export function noteOf(state: OrderState, offered: string[] = []): string {
+  const pref = offered.length > 0 ? '' : state.term.preferred.trim();
   const note = state.note.trim();
   return [pref === '' ? '' : `Preferovaný čas: ${pref}`, note].filter((x) => x !== '').join('\n');
 }
 
-export function submitPayload(state: OrderState): SubmitInput {
-  const note = noteOf(state);
+/** The term as one phrase: the chosen days when the clinic offered days, else the free term. */
+export const termSummary = (state: OrderState, offered: string[]): string => (offered.length > 0 ? daysText(state.days) : termText(state.term));
+
+/*
+ * With offered days the club's choice goes out as ranges: consecutive days merge into ONE range (Mon–Wed), a lone day is a
+ * one-day range. Every day of every range was chosen, so each stays inside the offer.
+ */
+export function submitPayload(state: OrderState, offered: string[] = []): SubmitInput {
+  const note = noteOf(state, offered);
   return {
     serviceId: state.serviceId ?? '',
     activitySeats: activitySeatsOf(state.seats),
-    ranges: rangesOf(state.term),
+    ranges: offered.length > 0 ? daysToRanges(state.days) : rangesOf(state.term),
     paymentMethod: state.payment ?? 'ClubInvoice',
     contact: { name: state.contact.name.trim(), phone: state.contact.phone.trim(), email: state.contact.email.trim() },
     ...(note !== '' ? { note } : {}),

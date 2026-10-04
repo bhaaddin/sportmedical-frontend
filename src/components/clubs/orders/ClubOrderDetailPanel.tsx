@@ -24,6 +24,7 @@ import { SectionLabel, SoftCard, StatusChip } from '../../ui';
 import { ClubOrderDialog } from '../order/ClubOrderDialog';
 import { copyText } from './LinkCopyRow';
 import { absoluteLink, usePublicSiteBase } from './absoluteLink';
+import { OfferedDaysBlock } from './OfferedDaysBlock';
 import { ClubInvoiceDialog } from './ClubInvoiceDialog';
 import { hasGroup, OrderGroupBlock } from './OrderGroupBlock';
 import { orderCode } from '../order/orderFormat';
@@ -174,6 +175,8 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
             </Stack>
           </Block>
         ) : null}
+
+        <OfferedDaysBlock order={order} onChanged={refresh} />
 
         <Block title="Termíny">
           <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>Požadované termíny</Typography>
