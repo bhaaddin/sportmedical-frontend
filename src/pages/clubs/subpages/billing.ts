@@ -44,7 +44,8 @@ export const invoiceOrderId = (i: Invoice): string | null => {
 /** Confirmed orders paid by a club invoice for which no invoice exists yet. */
 export function ordersAwaitingInvoice(orders: readonly ClubOrderView[], invoices: readonly Invoice[]): ClubOrderView[] {
   const done = new Set(invoices.map(invoiceOrderId).filter((v): v is string => v !== null));
-  return orders.filter((o) => o.status === 'Confirmed' && o.paymentMethod === 'ClubInvoice' && !done.has(o.id));
+  /* Etapa 5: an addendum is invoiced with its group's root, and a group whose invoice exists does not wait. */
+  return orders.filter((o) => o.status === 'Confirmed' && o.paymentMethod === 'ClubInvoice' && o.parentOrderId === null && o.invoiceId === null && !done.has(o.id));
 }
 
 /** What /billing receives; its reader ignores keys it does not know yet, so this is safe before it learns clubOrderId. */

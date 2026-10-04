@@ -14,6 +14,7 @@ export function StatusChip({
   size = 'md',
   dot = false,
   sx,
+  testId,
 }: {
   tone?: ChipTone;
   children: React.ReactNode;
@@ -21,6 +22,7 @@ export function StatusChip({
   /** A small leading dot, as on the appointment detail's "Objednán". */
   dot?: boolean;
   sx?: SxProps<Theme>;
+  testId?: string;
 }) {
   const palette =
     tone === 'primary'
@@ -30,6 +32,7 @@ export function StatusChip({
   return (
     <Box
       component="span"
+      data-testid={testId}
       sx={[
         {
           display: 'inline-flex',

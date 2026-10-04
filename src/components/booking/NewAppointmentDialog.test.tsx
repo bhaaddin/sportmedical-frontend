@@ -293,7 +293,7 @@ describe('step 2 — co se bude dělat', () => {
     expect(screen.getByLabelText('Trvání')).toHaveValue('30 min');
     expect(screen.getByLabelText('Čas do')).toHaveValue('09:30');
     expect(screen.getByText('Celkem k úhradě').nextSibling).toHaveTextContent('1 600 Kč');
-    expect(getAvailability).toHaveBeenCalledWith('c1', 'a1', '2026-09-24', '2026-09-24');
+    expect(getAvailability).toHaveBeenCalledWith('c1', 'a1', '2026-09-24', '2026-09-24', { staffStarts: true });
 
     await userEvent.type(screen.getByLabelText('Poznámka'), 'Přijde dřív');
     await userEvent.click(screen.getByRole('button', { name: 'Objednat termín' }));
@@ -438,7 +438,7 @@ describe('rychlá registrace — čtyři údaje', () => {
     expect(
       await screen.findByText('Slot je volný. Nekoliduje s žádnou rezervací ani s obědem.'),
     ).toBeInTheDocument();
-    expect(getAvailability).toHaveBeenCalledWith('c1', 'a1', '2026-09-24', '2026-09-24');
+    expect(getAvailability).toHaveBeenCalledWith('c1', 'a1', '2026-09-24', '2026-09-24', { staffStarts: true });
 
     await userEvent.click(screen.getByRole('button', { name: 'Vytvořit rezervaci' }));
 
@@ -683,5 +683,104 @@ describe('booking without a time chosen', () => {
     expect(screen.getByRole('combobox', { name: 'Kalendář' })).toBeInTheDocument();
     expect(screen.getByText('Nejprve vyberte kalendář, datum a čas.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Pokračovat' })).toBeDisabled();
+  });
+});
+
+/* ── Etapa 5: the desk's own starts and "Jiný čas" ── */
+describe('staff starts and "Jiný čas"', () => {
+  /* 07:40Z is 09:40 in Prague: the next start 10 minutes after a 30-minute booking that ended at 09:30. */
+  const withChained = () =>
+    getAvailability.mockResolvedValue([
+      { startUtc: '2026-09-24T07:30:00Z', endUtc: '2026-09-24T08:00:00Z', kinds: ['blockStart', 'step'] },
+      { startUtc: '2026-09-24T07:40:00Z', endUtc: '2026-09-24T08:10:00Z', kinds: ['chained'] },
+    ]);
+
+  it('asks for the staff list and labels a chained start "po předchozí rezervaci"', async () => {
+    withChained();
+    renderDialog({ initialStart: '2026-09-24T08:00', initialEnd: '2026-09-24T08:30' });
+    await pickPatient();
+    await pickActivity();
+
+    expect(await screen.findByText(/V 08:00 tuto činnost nabídnout nelze/)).toBeInTheDocument();
+    expect(getAvailability).toHaveBeenCalledWith('c1', 'a1', '2026-09-24', '2026-09-24', { staffStarts: true });
+    expect(screen.getByRole('button', { name: '09:40' })).toBeInTheDocument();
+    const labels = screen.getAllByTestId('chained-label');
+    expect(labels).toHaveLength(1);
+    expect(labels[0]).toHaveTextContent('po předchozí rezervaci');
+  });
+
+  it('books a chained start straight away, as an offered one', async () => {
+    withChained();
+    renderDialog({ initialStart: '2026-09-24T09:40', initialEnd: '2026-09-24T10:10' });
+    await pickPatient();
+    await pickActivity();
+
+    expect(await screen.findByText('Slot je volný. Nekoliduje s žádnou rezervací ani s obědem.')).toBeInTheDocument();
+    expect(screen.getByTestId('chained-note')).toHaveTextContent('Začíná hned po předchozí rezervaci');
+    await userEvent.click(screen.getByRole('button', { name: 'Objednat termín' }));
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ startUtc: '2026-09-24T07:40:00.000Z', overrideReason: undefined })),
+    );
+  });
+
+  it('"Jiný čas": any minute typed is booked without an override reason', async () => {
+    withChained();
+    renderDialog({ initialStart: '2026-09-24T08:00', initialEnd: '2026-09-24T08:30' });
+    await pickPatient();
+    await pickActivity();
+    await screen.findByText(/V 08:00 tuto činnost nabídnout nelze/);
+    expect(screen.getByRole('button', { name: 'Objednat termín' })).toBeDisabled();
+
+    const free = screen.getByTestId('free-time');
+    await userEvent.type(within(free).getByLabelText('Jiný čas'), '10:05');
+    await userEvent.click(within(free).getByRole('button', { name: 'Použít tento čas' }));
+
+    expect(await screen.findByText(/Čas 10:05 je mimo nabídku/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Objednat termín' }));
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ startUtc: '2026-09-24T08:05:00.000Z', overrideReason: undefined })),
+    );
+  });
+
+  it('"Jiný čas": refuses text that is not HH:mm and books nothing', async () => {
+    withChained();
+    renderDialog({ initialStart: '2026-09-24T08:00', initialEnd: '2026-09-24T08:30' });
+    await pickPatient();
+    await pickActivity();
+    const free = await screen.findByTestId('free-time');
+    await userEvent.type(within(free).getByLabelText('Jiný čas'), '25:99');
+    expect(within(free).getByText('Zadejte čas ve tvaru HH:mm, například 09:40.')).toBeInTheDocument();
+    expect(within(free).getByRole('button', { name: 'Použít tento čas' })).toBeDisabled();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('"Jiný čas": shows the server\'s own text when the whole length does not fit (422)', async () => {
+    withChained();
+    const { BookingApiError } = await import('../../api/apiError');
+    create.mockRejectedValue(new BookingApiError('domainRule', 422, 'Do tohoto času se celá délka činnosti nevejde.'));
+    renderDialog({ initialStart: '2026-09-24T08:00', initialEnd: '2026-09-24T08:30' });
+    await pickPatient();
+    await pickActivity();
+    const free = await screen.findByTestId('free-time');
+    await userEvent.type(within(free).getByLabelText('Jiný čas'), '15:50');
+    await userEvent.click(within(free).getByRole('button', { name: 'Použít tento čas' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Objednat termín' }));
+    expect(await screen.findByText('Do tohoto času se celá délka činnosti nevejde.')).toBeInTheDocument();
+  });
+
+  it('"Jiný čas": a 409 from the server is shown as the usual conflict and the offer reloads', async () => {
+    withChained();
+    const { BookingApiError } = await import('../../api/apiError');
+    create.mockRejectedValue(new BookingApiError('conflict', 409, 'Tento čas už obsadila jiná rezervace.'));
+    renderDialog({ initialStart: '2026-09-24T08:00', initialEnd: '2026-09-24T08:30' });
+    await pickPatient();
+    await pickActivity();
+    const free = await screen.findByTestId('free-time');
+    await userEvent.type(within(free).getByLabelText('Jiný čas'), '10:05');
+    await userEvent.click(within(free).getByRole('button', { name: 'Použít tento čas' }));
+    const calls = getAvailability.mock.calls.length;
+    await userEvent.click(await screen.findByRole('button', { name: 'Objednat termín' }));
+    expect(await screen.findByText('Tento čas už obsadila jiná rezervace.')).toBeInTheDocument();
+    await waitFor(() => expect(getAvailability.mock.calls.length).toBeGreaterThan(calls));
   });
 });

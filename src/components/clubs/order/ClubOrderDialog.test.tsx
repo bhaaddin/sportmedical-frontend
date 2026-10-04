@@ -72,6 +72,8 @@ const order = (over: Partial<ClubOrderView> = {}): ClubOrderView => ({
   formToken: 'ft', formUrl: 'https://app/klub-objednavka/ft', registrationToken: 'rt', registrationUrl: 'https://app/klub/rt',
   releaseDaysBefore: null, effectiveReleaseDaysBefore: null, createdBy: 'Staff', createdAtUtc: '2026-10-04T08:00:00Z',
   submittedAtUtc: null, confirmedAtUtc: null, history: [],
+  parentOrderId: null, groupId: 'o-1', addenda: [], invoiceId: null,
+  groupTotals: { totalSeats: 30, registered: 12, listTotalCzk: 15000, discountCzk: 1500, totalCzk: 13500 },
   blocks: [{
     id: 'b-1', clubId: 'club-1', clubName: 'FK Slaný', colorHex: '#2E7D6B', name: null, calendarIds: ['c-1'], activityIds: ['a-1'],
     fromDate: RANGE.fromDate, toDate: RANGE.toDate, dailyFrom: RANGE.dailyFrom, dailyTo: RANGE.dailyTo, playerCount: 30, seats: 30, registered: 12,

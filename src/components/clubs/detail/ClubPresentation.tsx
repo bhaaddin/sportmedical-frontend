@@ -242,7 +242,7 @@ export function ClubPresentation({
         <SoftCard data-testid="club-orders-list" role="region" aria-label="Objednávky klubu" sx={span}>
           <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
             <SectionLabel>Objednávky klubu</SectionLabel>
-            <Button size="small" variant="text" onClick={() => navigate('/clubs/objednavky')} sx={{ minHeight: 44 }}>Všechny objednávky</Button>
+            <Button size="small" variant="text" onClick={() => navigate(`/clubs/objednavky?clubId=${club.id}`)} sx={{ minHeight: 44 }}>Všechny objednávky</Button>
           </Stack>
           {ordersQuery.isLoading ? (
             <Stack spacing={1}>{[0, 1].map((i) => <Skeleton key={i} variant="rounded" height={44} />)}</Stack>

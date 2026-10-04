@@ -56,6 +56,7 @@ import { ClubPresentation } from '../components/clubs/detail/ClubPresentation';
 import { PayerDialog } from './clubs/PayerDialog';
 import { PinnedActions } from './clubs/PinnedActions';
 import { ClubOrderDialog } from '../components/clubs/order/ClubOrderDialog';
+import { ClubOrderEntry } from '../components/clubs/order/ClubOrderEntry';
 import { ClubOrderDetailPanel } from '../components/clubs/orders/ClubOrderDetailPanel';
 import { hasOrderState, readOrderState } from '../components/clubs/orders/orderRouteState';
 import type { NewOrderPrefill } from '../components/clubs/orders/orderRouteState';
@@ -87,6 +88,8 @@ export default function ClubsPage() {
   const orderHandoff = readOrderState(location.state);
 
   /* Etapa 4: the order dialog (new, optionally prefilled) and an order's detail drawer. */
+  /* The club page's "Nová objednávka klubu": the two-way chooser (phone order in the calendar / link for the club). */
+  const [entryFor, setEntryFor] = useState<string | null>(null);
   const [orderDialog, setOrderDialog] = useState<NewOrderPrefill | null>(() =>
     orderHandoff.newOrder === undefined ? null : orderHandoff.newOrder === true ? {} : orderHandoff.newOrder,
   );
@@ -231,6 +234,13 @@ export default function ClubsPage() {
 
   const dialogs = (
     <>
+      <ClubOrderEntry
+        open={entryFor !== null}
+        defaultClubId={entryFor ?? undefined}
+        onClose={() => setEntryFor(null)}
+        onPhone={(startClubId) => navigate('/planovani', { state: { pickOrder: startClubId !== undefined ? { clubId: startClubId } : true } })}
+        onInvited={(invited) => { reload(); setOpenOrderId(invited.id); }}
+      />
       <ClubOrderDialog
         open={orderDialog !== null}
         onClose={() => setOrderDialog(null)}
@@ -315,7 +325,7 @@ export default function ClubsPage() {
               state: { clubId: selected.club.id, calendarId: selected.order?.calendarId ?? calendars[0]?.id },
             })
           }
-          onNewOrder={() => setOrderDialog({ clubId: selected.club.id })}
+          onNewOrder={() => setEntryFor(selected.club.id)}
           onOpenOrder={setOpenOrderId}
         />
         {dialogs}

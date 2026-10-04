@@ -180,6 +180,7 @@ export function usePickOrder(input: {
         calendarIds,
         status: "Confirmed",
         ...(session.note.trim() !== "" ? { note: session.note.trim() } : {}),
+        ...(session.parentOrderId !== undefined ? { parentOrderId: session.parentOrderId } : {}),
       });
       void queryClient.invalidateQueries({ queryKey: ["day-range"] });
       void queryClient.invalidateQueries({ queryKey: ["club-orders"] });

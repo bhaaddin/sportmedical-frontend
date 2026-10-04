@@ -14,7 +14,8 @@ import type { ClubOrderStats, ClubOrderView } from '../../../api/clubOrders';
 import type { Invoice } from '../../../api/billing';
 import { statsKpis } from '../../../components/clubs/stats/statsMath';
 
-const { blocksList, ordersList, ordersStats, calendarsList, getInvoices, navigate, downloadCsv } = vi.hoisted(() => ({
+const { blocksList, ordersList, ordersStats, invoiceDraft, calendarsList, getInvoices, navigate, downloadCsv } = vi.hoisted(() => ({
+  invoiceDraft: vi.fn(),
   blocksList: vi.fn(),
   ordersList: vi.fn(),
   ordersStats: vi.fn(),
@@ -30,7 +31,7 @@ vi.mock('../../../api/clubBlocks', async (importOriginal) => {
 });
 vi.mock('../../../api/clubOrders', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../api/clubOrders')>();
-  return { ...actual, clubOrdersApi: { list: ordersList, stats: ordersStats } };
+  return { ...actual, clubOrdersApi: { list: ordersList, stats: ordersStats, invoiceDraft } };
 });
 vi.mock('../../../api/calendars', () => ({ calendarsApi: { list: calendarsList } }));
 vi.mock('../../../api/billing', () => ({ billingApi: { getInvoices } }));
@@ -76,7 +77,8 @@ const order = (over: Partial<ClubOrderView>): ClubOrderView => ({
   paymentMethod: 'ClubInvoice', activitySeats: [{ activityId: 'a1', activityName: 'Diagnostika', durationMinutes: 30, seats: 10, registered: 4, unitPriceCzk: 500 }],
   totalSeats: 12, registered: 4, priceQuote: { listTotalCzk: 6000, discounts: [], totalCzk: 6000 }, requestedRanges: [], blocks: [blocks[0]], note: '', contact: null,
   formToken: '', formUrl: '', registrationToken: '', registrationUrl: '', releaseDaysBefore: null, effectiveReleaseDaysBefore: null,
-  createdBy: 'Staff', createdAtUtc: '', submittedAtUtc: null, confirmedAtUtc: null, history: [], ...over,
+  createdBy: 'Staff', createdAtUtc: '', submittedAtUtc: null, confirmedAtUtc: null, history: [],
+  parentOrderId: null, groupId: 'o1', addenda: [], invoiceId: null, groupTotals: { totalSeats: 12, registered: 4, listTotalCzk: 6000, discountCzk: 0, totalCzk: 6000 }, ...over,
 });
 
 const invoice = (over: Partial<Invoice>): Invoice => ({
@@ -118,6 +120,7 @@ beforeEach(() => {
   blocksList.mockResolvedValue(blocks);
   ordersList.mockResolvedValue([order({})]);
   ordersStats.mockResolvedValue(stats);
+  invoiceDraft.mockResolvedValue({ clubId: 'c1', groupId: 'o1', paymentMethod: 'ClubInvoice', headcount: 12, lines: [], discounts: [], listTotalCzk: 6000, totalCzk: 6000, note: '', invoiceId: null });
   calendarsList.mockResolvedValue([{ id: 'cal1', name: 'Ambulance 1' }]);
   getInvoices.mockResolvedValue([invoice({}), invoice({ id: 'i2', invoiceNumber: '2026-002', recipientType: 'Person', clubId: null, clubName: null, patientName: 'Pacient' })]);
 });
@@ -289,14 +292,16 @@ describe('Fakturace', () => {
     expect(row.textContent).toMatch(/6\s000\sKč/);
   });
 
-  it('offers "Vystavit fakturu" for a confirmed ClubInvoice order without an invoice and passes the state', async () => {
+  it('offers "Vystavit fakturu" for a confirmed ClubInvoice order without an invoice and opens the one-invoice dialog', async () => {
     const user = userEvent.setup();
     ordersList.mockResolvedValue([order({}), order({ id: 'o2', paymentMethod: 'PerPerson' }), order({ id: 'o3', status: 'Requested' })]);
     mount(<BillingPage />);
     const buttons = await screen.findAllByRole('button', { name: 'Vystavit fakturu' });
     expect(buttons).toHaveLength(1);
     await user.click(buttons[0]);
-    expect(navigate).toHaveBeenCalledWith('/billing', { state: { clubId: 'c1', clubOrderId: 'o1', headcount: 12 } });
+    expect(await screen.findByRole('dialog', { name: 'Jedna faktura klubu' })).toBeInTheDocument();
+    expect(invoiceDraft).toHaveBeenCalledWith('o1');
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it('hides the action once an invoice carries the order id, and opens an invoice in /billing', async () => {

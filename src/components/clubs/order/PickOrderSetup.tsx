@@ -4,7 +4,7 @@
  */
 import { useMemo, useState } from 'react';
 import {
-  Autocomplete, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Radio, RadioGroup, Stack, TextField, Typography,
+  Alert, Autocomplete, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Radio, RadioGroup, Stack, TextField, Typography,
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { clubsApi } from '../../../api/clubs';
@@ -20,14 +20,17 @@ import type { OrderActivityItem } from './OrderSeatsSection';
 import { stepSeats, totalSeatsOf } from './orderLogic';
 import type { SeatsText } from './orderLogic';
 import { parsePlayerCount } from '../blockLogic';
-import type { PickSession } from './pickSession';
+import type { PickParent, PickSession } from './pickSession';
+import { orderCode } from './orderFormat';
 
 const STALE = 5 * 60 * 1000;
 
-export function PickOrderSetup({ open, onClose, defaultClubId, onStart }: {
+export function PickOrderSetup({ open, onClose, defaultClubId, parent, onStart }: {
   open: boolean;
   onClose: () => void;
   defaultClubId?: string;
+  /** Etapa 5: an addendum to this order - the club and the payment are the parent's and cannot be changed. */
+  parent?: PickParent;
   onStart: (session: PickSession) => void;
 }) {
   const device = useDevice();
@@ -47,11 +50,12 @@ export function PickOrderSetup({ open, onClose, defaultClubId, onStart }: {
     [servicesQuery.data],
   );
 
-  const [clubId, setClubId] = useState(defaultClubId ?? '');
+  const [clubId, setClubId] = useState(parent?.clubId ?? defaultClubId ?? '');
   const [serviceId, setServiceId] = useState('');
   const [ids, setIds] = useState<string[]>([]);
   const [text, setText] = useState<SeatsText>({});
-  const [payment, setPayment] = useState<PaymentMethod>('ClubInvoice');
+  const [payment, setPayment] = useState<PaymentMethod>(parent?.paymentMethod ?? 'ClubInvoice');
+  const paymentLocked = parent !== undefined && parent.paymentMethod !== null;
   const [showErrors, setShowErrors] = useState(false);
 
   const club: Club | null = clubs.find((c) => c.id === clubId) ?? null;
@@ -92,20 +96,28 @@ export function PickOrderSetup({ open, onClose, defaultClubId, onStart }: {
           ? []
           : [{ activityId: id, name: a.name, seats, minutesPerSeat: a.durationMinutes, parallelCapacity: Math.max(1, a.parallelCapacity) }];
       }),
-      paymentMethod: payment,
+      paymentMethod: paymentLocked ? (parent?.paymentMethod ?? payment) : payment,
       note: '',
+      ...(parent !== undefined ? { parentOrderId: parent.orderId } : {}),
     });
   };
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm" fullScreen={device === 'phone'} aria-labelledby="pick-setup-title">
-      <DialogTitle id="pick-setup-title">Telefonická objednávka</DialogTitle>
+      <DialogTitle id="pick-setup-title">{parent !== undefined ? 'Dodatek k objednávce' : 'Telefonická objednávka'}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }} data-testid="pick-setup">
+          {parent !== undefined ? (
+            <Alert severity="info" data-testid="pick-setup-parent">
+              {`Dodatek k objednávce ${orderCode(parent.orderId)}`}
+              {parent.clubName !== '' ? ` (${parent.clubName})` : ''}. Půjde na stejnou fakturu; klub a způsob platby se přebírají z původní objednávky.
+            </Alert>
+          ) : null}
           <Autocomplete
             options={clubs}
             loading={clubsQuery.isLoading}
             value={club}
+            disabled={parent !== undefined}
             getOptionLabel={(c) => c.name}
             isOptionEqualToValue={(a, b) => a.id === b.id}
             noOptionsText="Žádný takový klub — založte ho v sekci Kluby."
@@ -141,9 +153,9 @@ export function PickOrderSetup({ open, onClose, defaultClubId, onStart }: {
           />
           <div>
             <SectionLabel>Způsob platby</SectionLabel>
-            <RadioGroup row value={payment} onChange={(e) => setPayment(e.target.value as PaymentMethod)} aria-label="Způsob platby">
+            <RadioGroup row value={paymentLocked ? (parent?.paymentMethod ?? payment) : payment} onChange={(e) => setPayment(e.target.value as PaymentMethod)} aria-label="Způsob platby">
               {(Object.keys(PAYMENT_METHOD_LABEL) as PaymentMethod[]).map((m) => (
-                <FormControlLabel key={m} value={m} control={<Radio />} label={PAYMENT_METHOD_LABEL[m]} />
+                <FormControlLabel key={m} value={m} control={<Radio />} disabled={paymentLocked} label={PAYMENT_METHOD_LABEL[m]} />
               ))}
             </RadioGroup>
           </div>

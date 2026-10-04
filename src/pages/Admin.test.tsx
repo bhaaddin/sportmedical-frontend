@@ -25,6 +25,7 @@ vi.mock('../api/clinicSettings', () => ({
     address: 'pub.contactAddress',
     bookingEnabled: 'pub.bookingEnabled',
     openingHours: 'pub.openingHours',
+    siteUrl: 'pub.siteUrl',
   },
   OPENING_HOURS_MAX_LENGTH: 200,
 }));
@@ -66,6 +67,36 @@ describe('saving the public contacts', () => {
     await user.click(saveButton());
 
     expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ 'pub.openingHours': 'Po–So 7–19' }));
+  });
+
+  it('reads and saves the public address of the web (pub.siteUrl) as an origin', async () => {
+    readSettings.mockResolvedValue({ 'pub.siteName': 'SportMedical', 'pub.siteUrl': 'https://www.sportmedical.cz' });
+    const user = userEvent.setup();
+    render(<Admin />);
+
+    const field = await screen.findByLabelText('Veřejná adresa webu');
+    expect(field).toHaveValue('https://www.sportmedical.cz');
+    await user.clear(field);
+    await user.type(field, 'klub.priklad.cz/cesta/');
+    await user.click(saveButton());
+
+    expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ 'pub.siteUrl': 'https://klub.priklad.cz' }));
+  });
+
+  it('an empty public address is saved empty; an unusable one is refused and nothing is saved', async () => {
+    readSettings.mockResolvedValue({ 'pub.siteName': 'SportMedical' });
+    const user = userEvent.setup();
+    render(<Admin />);
+
+    const field = await screen.findByLabelText('Veřejná adresa webu');
+    await user.click(saveButton());
+    expect(saveSettings).toHaveBeenLastCalledWith(expect.objectContaining({ 'pub.siteUrl': '' }));
+
+    saveSettings.mockClear();
+    await user.type(field, 'ne platná adresa');
+    expect(await screen.findByText('Zadejte adresu ve tvaru https://www.priklad.cz.')).toBeInTheDocument();
+    await user.click(saveButton());
+    expect(saveSettings).not.toHaveBeenCalled();
   });
 
   it('is not possible while the stored values have not been read', () => {

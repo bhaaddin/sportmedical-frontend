@@ -71,6 +71,13 @@ describe('availability', () => {
     });
   });
 
+  it('asks for the desk starts only when told to (never for the public list)', async () => {
+    await appointmentsApi.getAvailability('cal-1', 'act-1', '2026-09-29', '2026-09-29');
+    expect(paramsOf()).not.toHaveProperty('staffStarts');
+    await appointmentsApi.getAvailability('cal-1', 'act-1', '2026-09-29', '2026-09-29', { staffStarts: true });
+    expect(paramsOf(1)).toMatchObject({ forPublic: false, staffStarts: true });
+  });
+
   it('refuses to ask without an activityId, instead of sending a request that 404s misleadingly', async () => {
     await expect(
       appointmentsApi.getAvailability('cal-1', '', '2026-09-29', '2026-09-29'),

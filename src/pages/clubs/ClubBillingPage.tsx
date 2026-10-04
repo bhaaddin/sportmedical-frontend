@@ -2,7 +2,7 @@
  * Kluby > Fakturace (Etapa 4): the invoices made out to clubs (recipient type Tým), totals per club, and the
  * confirmed orders paid "Faktura klubu" that still wait for their invoice ("Vystavit fakturu" opens /billing prefilled).
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Box, Button, Skeleton, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +14,8 @@ import { formatCzk, formatLongDate } from './clubOrders';
 import { customerOf, statusOf } from '../billing/invoiceView';
 import { pragueDateKey } from '../../utils/time';
 import { LoadError } from './subpages/common';
-import { clubTotals, invoiceNavState, ordersAwaitingInvoice, teamInvoices, type ClubTotals } from './subpages/billing';
+import { ClubInvoiceDialog } from '../../components/clubs/orders/ClubInvoiceDialog';
+import { clubTotals, ordersAwaitingInvoice, teamInvoices, type ClubTotals } from './subpages/billing';
 
 export default function ClubBillingPage() {
   const navigate = useNavigate();
@@ -29,7 +30,9 @@ export default function ClubBillingPage() {
   const sum = totals.reduce((a, t) => ({ issued: a.issued + t.issuedCzk, paid: a.paid + t.paidCzk, unpaid: a.unpaid + t.unpaidCzk }), { issued: 0, paid: 0, unpaid: 0 });
 
   const openInvoice = (inv: Invoice) => navigate('/billing', { state: { invoiceId: inv.id } });
-  const issue = (o: ClubOrderView) => navigate('/billing', { state: invoiceNavState(o) });
+  /* Etapa 5: the club order -> invoice path is the server's one-invoice-per-group endpoint, not a prefilled form. */
+  const [invoiceFor, setInvoiceFor] = useState<string | null>(null);
+  const issue = (o: ClubOrderView) => setInvoiceFor(o.id);
 
   const invoiceColumns: DataColumn<Invoice>[] = [
     { key: 'number', header: 'Číslo', tablet: true, cell: (i) => <Typography sx={{ fontWeight: 600 }}>{i.invoiceNumber || '—'}</Typography> },
@@ -127,6 +130,13 @@ export default function ClubBillingPage() {
           />
         </>
       )}
+      {invoiceFor !== null ? (
+        <ClubInvoiceDialog
+          orderId={invoiceFor}
+          onClose={() => setInvoiceFor(null)}
+          onChanged={() => { void ordersQuery.refetch(); void invoicesQuery.refetch(); }}
+        />
+      ) : null}
     </Box>
   );
 }

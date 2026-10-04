@@ -12,14 +12,14 @@ import { setViewport, VIEWPORTS } from '../../../test/viewport';
 import { toOrder } from '../../../api/clubOrders';
 import type { ClubOrderView } from '../../../api/clubOrders';
 
-const { list, get, invite, cancel, getAllClubs, dialogProps, toastSuccess, toastError } = vi.hoisted(() => ({
-  list: vi.fn(), get: vi.fn(), invite: vi.fn(), cancel: vi.fn(), getAllClubs: vi.fn(), dialogProps: vi.fn(), toastSuccess: vi.fn(), toastError: vi.fn(),
+const { list, get, invite, cancel, invoiceDraft, getAllClubs, dialogProps, toastSuccess, toastError } = vi.hoisted(() => ({
+  list: vi.fn(), get: vi.fn(), invite: vi.fn(), cancel: vi.fn(), invoiceDraft: vi.fn(), getAllClubs: vi.fn(), dialogProps: vi.fn(), toastSuccess: vi.fn(), toastError: vi.fn(),
 }));
 
 vi.mock('react-hot-toast', () => ({ default: { success: toastSuccess, error: toastError } }));
 vi.mock('../../../api/clubOrders', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../api/clubOrders')>();
-  return { ...actual, clubOrdersApi: { ...actual.clubOrdersApi, list, get, invite, cancel } };
+  return { ...actual, clubOrdersApi: { ...actual.clubOrdersApi, list, get, invite, cancel, invoiceDraft } };
 });
 vi.mock('../../../api/clubs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../api/clubs')>();
@@ -99,6 +99,9 @@ beforeEach(() => {
   get.mockReset().mockImplementation(async (id: string) => orders.find((o) => o.id === id));
   invite.mockReset();
   cancel.mockReset().mockResolvedValue(orders[0]);
+  invoiceDraft.mockReset().mockResolvedValue({
+    clubId: 'club-1', groupId: 'o-3', paymentMethod: 'ClubInvoice', headcount: 30, lines: [], discounts: [], listTotalCzk: 36000, totalCzk: 36000, note: '', invoiceId: null,
+  });
   dialogProps.mockClear();
   toastSuccess.mockClear();
   toastError.mockClear();
@@ -231,15 +234,17 @@ describe('detail and actions', () => {
     expect((lastDialog().order as ClubOrderView).id).toBe('o-3');
     await user.click(within(actions).getByRole('button', { name: 'Zkopírovat odkaz pro sportovce' }));
     expect(clipboard).toHaveBeenCalledWith('https://app.test/klub/rt');
-    await user.click(within(actions).getByRole('button', { name: 'Vystavit fakturu' }));
-    const probe = await screen.findByTestId('state');
-    expect(probe).toHaveTextContent('/billing');
-    expect(probe).toHaveTextContent('{"clubId":"club-1","clubOrderId":"o-3","headcount":30}');
+    await user.click(within(actions).getByRole('button', { name: 'Vystavit jednu fakturu klubu' }));
+    /* Etapa 5: the one-invoice endpoint (draft first), not a prefilled /billing form. */
+    expect(await screen.findByRole('dialog', { name: 'Jedna faktura klubu' })).toBeInTheDocument();
+    expect(invoiceDraft).toHaveBeenCalledWith('o-3');
   });
 
-  it('Confirmed per person: no invoice button', async () => {
+  it('Confirmed per person: the invoice button is disabled and says why', async () => {
     await openRow(3);
-    expect(within(screen.getByTestId('order-actions')).queryByRole('button', { name: 'Vystavit fakturu' })).toBeNull();
+    const invoice = within(screen.getByTestId('order-actions')).getByRole('button', { name: 'Vystavit jednu fakturu klubu' });
+    expect(invoice).toBeDisabled();
+    expect(screen.getByTestId('invoice-per-person-hint')).toBeInTheDocument();
   });
 
   it('Confirmed with athletes: cancelling offers to cancel their reservations', async () => {
@@ -248,7 +253,7 @@ describe('detail and actions', () => {
     const confirm = await screen.findByRole('dialog', { name: 'Zrušit objednávku?' });
     await user.click(within(confirm).getByRole('checkbox', { name: 'Zrušit i jejich rezervace (12)' }));
     await user.click(within(confirm).getByRole('button', { name: 'Ano, zrušit' }));
-    await waitFor(() => expect(cancel).toHaveBeenCalledWith('o-3', true));
+    await waitFor(() => expect(cancel).toHaveBeenCalledWith('o-3', true, false));
   });
 
   it('Confirmed without athletes: no checkbox, cancels without athletes', async () => {
@@ -257,7 +262,7 @@ describe('detail and actions', () => {
     const confirm = await screen.findByRole('dialog', { name: 'Zrušit objednávku?' });
     expect(within(confirm).queryByRole('checkbox')).toBeNull();
     await user.click(within(confirm).getByRole('button', { name: 'Ano, zrušit' }));
-    await waitFor(() => expect(cancel).toHaveBeenCalledWith('o-4', false));
+    await waitFor(() => expect(cancel).toHaveBeenCalledWith('o-4', false, false));
   });
 
   it('Cancelled has no actions', async () => {

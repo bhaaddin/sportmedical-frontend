@@ -351,3 +351,43 @@ describe('phone · 390', () => {
   });
 });
 
+
+describe('addendum to an existing order (Etapa 5)', () => {
+  it('opens the setup locked to the parent and confirms through createStaff with parentOrderId', async () => {
+    createStaff.mockResolvedValue(toOrder({
+      id: 'o-2', parentOrderId: 'root-1', groupId: 'root-1', clubId: 'club-1', clubName: 'FK Slaný', serviceId: 's1', serviceName: 'Diagnostika',
+      status: 'Confirmed', paymentMethod: 'ClubInvoice', activitySeats: [], totalSeats: 10, registrationUrl: 'https://app.test/klub/rt',
+    }));
+    setViewport(VIEWPORTS.desktop);
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter
+          initialEntries={[{
+            pathname: '/planovani',
+            state: { pickOrder: { clubId: 'club-1', parent: { orderId: 'root-1', clubId: 'club-1', clubName: 'FK Slaný', paymentMethod: 'ClubInvoice' } } },
+          }]}
+        >
+          <Routes>
+            <Route path="/planovani" element={<CalendarGridPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const user = userEvent.setup();
+    const setup = await screen.findByTestId('pick-setup');
+    expect(within(setup).getByTestId('pick-setup-parent')).toHaveTextContent('Dodatek k objednávce KO-ROOT1');
+    expect(within(setup).getByLabelText('Klub')).toBeDisabled();
+    await user.click(within(setup).getByLabelText('Služba'));
+    await user.click(await screen.findByRole('option', { name: 'Diagnostika' }));
+    await user.click(await within(setup).findByRole('checkbox', { name: /Základní prohlídka/ }));
+    await user.type(within(setup).getByRole('textbox', { name: 'Počet hráčů, Základní prohlídka' }), '10');
+    await user.click(screen.getByRole('button', { name: 'Vybrat termíny v kalendáři' }));
+    await screen.findByTestId('pick-panel');
+    await screen.findByTestId('sub-column-c1-' + DAY);
+    paint(9 * 60, 16 * 60);
+    await waitFor(() => expect(rows().length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole('button', { name: 'Potvrdit objednávku' }));
+    await waitFor(() => expect(createStaff).toHaveBeenCalledTimes(1));
+    expect(createStaff.mock.calls[0][0]).toMatchObject({ clubId: 'club-1', serviceId: 's1', paymentMethod: 'ClubInvoice', parentOrderId: 'root-1', status: 'Confirmed' });
+  });
+});

@@ -111,6 +111,8 @@ export const PUBLIC_CLINIC_KEYS = {
   address: 'pub.contactAddress',
   bookingEnabled: 'pub.bookingEnabled',
   openingHours: 'pub.openingHours',
+  /** The public address of the web (an origin such as https://www.example.cz): club links are made from it. */
+  siteUrl: 'pub.siteUrl',
 } as const;
 
 /** The server refuses a longer text with a 400. */

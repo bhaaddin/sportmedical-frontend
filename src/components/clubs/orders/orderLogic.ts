@@ -84,3 +84,12 @@ export function normalizeSummary(raw: ClubSummary): ClubSummary {
     usedMinutes: raw.usedMinutes ?? 0,
   };
 }
+
+/** "+1 dodatek" / "+2 dodatky" / "+5 dodatků": the small chip on a group's root in the lists; '' when there is none. */
+export function addendaLabel(count: number): string {
+  if (count <= 0) return '';
+  return `+${count} ${count === 1 ? 'dodatek' : count < 5 ? 'dodatky' : 'dodatků'}`;
+}
+
+/** The chip an order row carries: its addenda count on a root, "Dodatek" on an addendum, '' on a lone order. */
+export const groupChip = (o: ClubOrderView): string => (o.parentOrderId !== null ? 'Dodatek' : addendaLabel(o.addenda.length));

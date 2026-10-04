@@ -311,6 +311,8 @@ export const appointmentsApi = {
     activityId: string,
     from: DateOnly,
     to: DateOnly,
+    /** The desk's list: every start that fits, with the reason it is offered (never for the public page). */
+    options?: { staffStarts?: boolean },
   ): Promise<AvailabilitySlot[]> =>
     request(async () => {
       const res = await client.get(`/api/calendars/${calendarId}/availability`, {
@@ -318,6 +320,7 @@ export const appointmentsApi = {
           activityId: requireId(activityId, 'activityId'),
           from: requireDate(from, 'from'),
           to: requireDate(to, 'to'),
+          ...(options?.staffStarts ? { forPublic: false, staffStarts: true } : {}),
         },
       });
       return parseResponse(availabilityListSchema, res.data);

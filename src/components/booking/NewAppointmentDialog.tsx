@@ -170,6 +170,14 @@ const TEXT = {
   notOffered: (time: string) =>
     `V ${time} tuto činnost nabídnout nelze — čas je obsazený nebo mimo pracovní dobu.`,
   pickOffered: "Volné začátky v tento den:",
+  chained: "po předchozí rezervaci",
+  chainedNow: "Začíná hned po předchozí rezervaci (s pauzou, kterou ordinace nastavila).",
+  freeTime: "Jiný čas",
+  freeTimeHelp: "Napište přesný začátek (HH:mm). Rezervace se uloží, pokud se do něj vejde celá délka činnosti; jinak vám server napíše proč.",
+  freeTimeUse: "Použít tento čas",
+  freeTimeBad: "Zadejte čas ve tvaru HH:mm, například 09:40.",
+  freeTimeActive: (time: string) =>
+    `Čas ${time} je mimo nabídku. Rezervace se přesto pokusí uložit — server ověří, že se vejde celá délka činnosti.`,
   noneThatDay: "V tento den už pro tuto činnost není volný čas. Zkuste jiné datum.",
   overrideTimeIs: (when: string) => `Objedná se na ${when}, mimo nabídku.`,
   sms: (phone: string | null) => `Poslat SMS s potvrzením${phone ? ` na ${phone}` : ""}`,
@@ -397,12 +405,19 @@ export function NewAppointmentDialog({
 
   /* Is the chosen start offered for this činnost? Only the server knows. */
   const availabilityQuery = useQuery({
-    queryKey: ["availability", effectiveCalendarId, activity?.id ?? "", date, date],
+    queryKey: ["availability", effectiveCalendarId, activity?.id ?? "", date, date, "staff"],
     queryFn: () =>
-      appointmentsApi.getAvailability(effectiveCalendarId, activity?.id ?? "", date, date),
+      appointmentsApi.getAvailability(effectiveCalendarId, activity?.id ?? "", date, date, { staffStarts: true }),
     enabled: open && startUtc !== null && activity !== null,
   });
-  const offered = isStartOffered(availabilityQuery.data, startUtc);
+  /* "Jiný čas": the desk typed a minute that is not on the list; the server decides whether the whole length fits. */
+  const [freeStart, setFreeStart] = useState(false);
+  const [freeDraft, setFreeDraft] = useState("");
+  const listed = isStartOffered(availabilityQuery.data, startUtc);
+  const offered = listed || (freeStart && startUtc !== null);
+  const currentSlot = (availabilityQuery.data ?? []).find(
+    (s) => startUtc !== null && Date.parse(s.startUtc) === Date.parse(startUtc),
+  );
   const alternatives = (availabilityQuery.data ?? []).filter(
     (s) => !isStartOffered([s], startUtc),
   );
@@ -578,6 +593,7 @@ export function NewAppointmentDialog({
 
   /* Any change to the time drops the dragged end: it no longer describes it. */
   const changeTime = (next: string) => {
+    setFreeStart(false);
     setTime(next);
     setSelectionEnd(null);
     setOverriding(false);
@@ -586,6 +602,7 @@ export function NewAppointmentDialog({
 
   const changeDate = (next: string) => {
     if (!next) return;
+    setFreeStart(false);
     setDate(next);
     setSelectionEnd(null);
     setOverriding(false);
@@ -593,6 +610,8 @@ export function NewAppointmentDialog({
   };
 
   const resetBooking = () => {
+    setFreeStart(false);
+    setFreeDraft('');
     setStep(1);
     setMode("database");
     setPatient(null);
@@ -1018,6 +1037,7 @@ export function NewAppointmentDialog({
           skeletonRows={1}
         >
           {offered ? (
+            <Stack spacing={0.75}>
             <Stack
               direction="row"
               spacing={1}
@@ -1033,7 +1053,13 @@ export function NewAppointmentDialog({
               }}
             >
               <CheckCircleOutline fontSize="small" />
-              <Typography variant="body2">{TEXT.free}</Typography>
+              <Typography variant="body2">{listed ? TEXT.free : TEXT.freeTimeActive(time)}</Typography>
+            </Stack>
+            {listed && currentSlot?.kinds?.includes("chained") ? (
+              <Typography variant="caption" sx={{ color: "text.secondary" }} data-testid="chained-note">
+                {TEXT.chainedNow}
+              </Typography>
+            ) : null}
             </Stack>
           ) : (
             <Stack spacing={1}>
@@ -1045,15 +1071,21 @@ export function NewAppointmentDialog({
                   </Typography>
                   <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5 }}>
                     {alternatives.map((slot) => (
-                      <Button
-                        key={slot.startUtc}
-                        size="small"
-                        variant="outlined"
-                        disabled={booking}
-                        onClick={() => changeTime(pragueClock(slot.startUtc))}
-                      >
-                        {pragueClock(slot.startUtc)}
-                      </Button>
+                      <Stack key={slot.startUtc} sx={{ alignItems: "center" }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          disabled={booking}
+                          onClick={() => changeTime(pragueClock(slot.startUtc))}
+                        >
+                          {pragueClock(slot.startUtc)}
+                        </Button>
+                        {slot.kinds?.includes("chained") ? (
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10 }} data-testid="chained-label">
+                            {TEXT.chained}
+                          </Typography>
+                        ) : null}
+                      </Stack>
                     ))}
                   </Stack>
                 </Box>
@@ -1062,6 +1094,38 @@ export function NewAppointmentDialog({
                   {TEXT.noneThatDay}
                 </Typography>
               )}
+
+              {/* "Jiný čas": any minute the desk types; the server accepts it when the whole length fits. */}
+              <Stack spacing={0.75} data-testid="free-time">
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{TEXT.freeTime}</Typography>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }}>
+                  <TextField
+                    size="small"
+                    label={TEXT.freeTime}
+                    placeholder="HH:mm"
+                    value={freeDraft}
+                    onChange={(e) => setFreeDraft(e.target.value)}
+                    error={freeDraft !== "" && normalizeTime(freeDraft.trim().padStart(5, "0")) === ""}
+                    helperText={freeDraft !== "" && normalizeTime(freeDraft.trim().padStart(5, "0")) === "" ? TEXT.freeTimeBad : TEXT.freeTimeHelp}
+                    slotProps={{ htmlInput: { inputMode: "numeric", maxLength: 5 } }}
+                    sx={{ flex: 1 }}
+                  />
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    disabled={booking || normalizeTime(freeDraft.trim().padStart(5, "0")) === ""}
+                    onClick={() => {
+                      const typed = normalizeTime(freeDraft.trim().padStart(5, "0"));
+                      if (typed === "") return;
+                      changeTime(typed);
+                      setFreeStart(true);
+                    }}
+                    sx={{ minHeight: 40 }}
+                  >
+                    {TEXT.freeTimeUse}
+                  </Button>
+                </Stack>
+              </Stack>
 
               {/*
                 6.4. Not an ordinary action: only a role that may override

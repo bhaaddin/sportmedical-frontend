@@ -84,6 +84,66 @@ export interface ClubOrderView {
   submittedAtUtc: string | null;
   confirmedAtUtc: string | null;
   history: OrderHistoryItem[];
+  /** Etapa 5: an addendum points at the ROOT of its group; null on a root and on a lone order. */
+  parentOrderId: string | null;
+  /** The root's id (equals `id` on a root). */
+  groupId: string;
+  /** Filled on the root only: every addendum, cancelled ones too. */
+  addenda: OrderAddendumSummary[];
+  /** Identical on every order of the group: live orders only. */
+  groupTotals: OrderGroupTotals;
+  /** The group's one invoice once made. */
+  invoiceId: string | null;
+}
+
+export interface OrderAddendumSummary {
+  id: string;
+  serviceName: string;
+  status: ClubOrderStatus;
+  totalSeats: number;
+  registered: number;
+  totalCzk: number | null;
+}
+
+export interface OrderGroupTotals {
+  totalSeats: number;
+  registered: number;
+  listTotalCzk: number;
+  discountCzk: number;
+  totalCzk: number;
+}
+
+export interface InvoiceDraftLine {
+  orderId: string;
+  serviceName: string;
+  activityName: string;
+  quantity: number;
+  unitPriceCzk: number;
+  totalCzk: number;
+}
+
+export interface InvoiceDraft {
+  clubId: string;
+  groupId: string;
+  paymentMethod: PaymentMethod | null;
+  headcount: number;
+  lines: InvoiceDraftLine[];
+  discounts: OrderDiscount[];
+  listTotalCzk: number;
+  totalCzk: number;
+  note: string;
+  invoiceId: string | null;
+}
+
+export interface CreatedInvoice {
+  invoiceId: string;
+  invoiceNumber: string;
+  status: string;
+  totalCzk: number;
+  clubId: string;
+  groupId: string;
+  /** false when the group already had its invoice (HTTP 200). */
+  created: boolean;
 }
 
 /** What the desk sends to create an order directly (phone order, "chytrá zkratka"). */
@@ -97,6 +157,8 @@ export interface StaffOrderInput {
   status: 'Confirmed' | 'Requested';
   note?: string;
   releaseDaysBefore?: number | null;
+  /** Etapa 5: add this order to the group of that order (one invoice). */
+  parentOrderId?: string;
 }
 
 export interface OrderUpdateInput {
@@ -163,6 +225,8 @@ export class ClubOrderError extends Error {
   readonly code: string | undefined;
   readonly affectedAthletes: { id?: string; name: string; activityName?: string; startUtc?: string }[];
   readonly fieldErrors: Record<string, string[]>;
+  /** 409 `club_order.addenda_live`: the addenda that still hold places. */
+  addenda: OrderAddendumSummary[] = [];
   constructor(message: string, status?: number, code?: string, affected: ClubOrderError['affectedAthletes'] = [], fields: Record<string, string[]> = {}) {
     super(message);
     this.name = 'ClubOrderError';
@@ -190,8 +254,56 @@ export function toRange(raw: unknown): OrderRange {
   };
 }
 
+export function toAddendum(raw: unknown): OrderAddendumSummary {
+  const x = rec(raw);
+  return {
+    id: str(x.id),
+    serviceName: str(x.serviceName),
+    status: statusOf(x.status),
+    totalSeats: num(x.totalSeats),
+    registered: num(x.registered),
+    totalCzk: typeof x.totalCzk === 'number' ? x.totalCzk : null,
+  };
+}
+
+export function toInvoiceDraft(raw: unknown): InvoiceDraft {
+  const d = rec(raw);
+  return {
+    clubId: str(d.clubId),
+    groupId: str(d.groupId),
+    paymentMethod: d.paymentMethod === 'ClubInvoice' || d.paymentMethod === 'PerPerson' ? d.paymentMethod : null,
+    headcount: num(d.headcount),
+    lines: arr<unknown>(d.lines).map((l) => {
+      const x = rec(l);
+      return { orderId: str(x.orderId), serviceName: str(x.serviceName), activityName: str(x.activityName), quantity: num(x.quantity), unitPriceCzk: num(x.unitPriceCzk), totalCzk: num(x.totalCzk) };
+    }),
+    discounts: arr<unknown>(d.discounts).map((d0) => {
+      const x = rec(d0);
+      return { kind: str(x.kind), label: str(x.label), percent: num(x.percent), amountCzk: num(x.amountCzk) };
+    }),
+    listTotalCzk: num(d.listTotalCzk),
+    totalCzk: num(d.totalCzk),
+    note: str(d.note),
+    invoiceId: typeof d.invoiceId === 'string' && d.invoiceId !== '' ? d.invoiceId : null,
+  };
+}
+
+export function toCreatedInvoice(raw: unknown, status?: number): CreatedInvoice {
+  const d = rec(raw);
+  return {
+    invoiceId: str(d.invoiceId),
+    invoiceNumber: str(d.invoiceNumber),
+    status: str(d.status),
+    totalCzk: num(d.totalCzk),
+    clubId: str(d.clubId),
+    groupId: str(d.groupId),
+    created: typeof d.created === 'boolean' ? d.created : status === 201,
+  };
+}
+
 export function toOrder(raw: unknown): ClubOrderView {
   const o = rec(raw);
+  const totals = rec(o.groupTotals);
   const quote = o.priceQuote === null || o.priceQuote === undefined ? null : rec(o.priceQuote);
   const contact = o.contact === null || o.contact === undefined ? null : rec(o.contact);
   return {
@@ -244,6 +356,17 @@ export function toOrder(raw: unknown): ClubOrderView {
       const x = rec(h);
       return { atUtc: str(x.atUtc), user: str(x.user), text: str(x.text) };
     }),
+    parentOrderId: typeof o.parentOrderId === 'string' && o.parentOrderId !== '' ? o.parentOrderId : null,
+    groupId: str(o.groupId, str(o.parentOrderId, str(o.id))),
+    addenda: arr<unknown>(o.addenda).map(toAddendum),
+    groupTotals: {
+      totalSeats: num(totals.totalSeats, num(o.totalSeats)),
+      registered: num(totals.registered, num(o.registered)),
+      listTotalCzk: num(totals.listTotalCzk, quote === null ? 0 : num(quote.listTotalCzk)),
+      discountCzk: num(totals.discountCzk),
+      totalCzk: num(totals.totalCzk, quote === null ? 0 : num(quote.totalCzk)),
+    },
+    invoiceId: typeof o.invoiceId === 'string' && o.invoiceId !== '' ? o.invoiceId : null,
   };
 }
 
@@ -264,7 +387,9 @@ function toError(error: unknown): ClubOrderError {
   const errors = rec(data.errors);
   const fields: Record<string, string[]> = {};
   for (const [k, v] of Object.entries(errors)) fields[k] = arr<string>(v).filter((s) => typeof s === 'string');
-  return new ClubOrderError(message, response?.status, typeof data.code === 'string' ? data.code : undefined, affected, fields);
+  const err = new ClubOrderError(message, response?.status, typeof data.code === 'string' ? data.code : undefined, affected, fields);
+  err.addenda = arr<unknown>(data.addenda).map(toAddendum);
+  return err;
 }
 
 async function call<T>(run: () => Promise<T>): Promise<T> {
@@ -286,7 +411,7 @@ export const clubOrdersApi = {
   createStaff: (input: StaffOrderInput): Promise<ClubOrderView> =>
     call(async () => toOrder(unwrap((await client.post(`${BASE}/staff`, input)).data))),
 
-  list: (filter: { clubId?: string; status?: ClubOrderStatus; from?: string; to?: string } = {}): Promise<ClubOrderView[]> =>
+  list: (filter: { clubId?: string; status?: ClubOrderStatus; from?: string; to?: string; groupId?: string } = {}): Promise<ClubOrderView[]> =>
     call(async () => {
       const body = unwrap((await client.get(BASE, { params: filter })).data);
       return arr<unknown>(body).map(toOrder);
@@ -300,8 +425,19 @@ export const clubOrdersApi = {
   confirm: (id: string, input: { calendarIds: string[]; ranges: OrderRange[] }): Promise<ClubOrderView> =>
     call(async () => toOrder(unwrap((await client.post(`${BASE}/${id}/confirm`, input)).data))),
 
-  cancel: (id: string, cancelAthletes = false): Promise<ClubOrderView> =>
-    call(async () => toOrder(unwrap((await client.post(`${BASE}/${id}/cancel`, null, { params: { cancelAthletes } })).data))),
+  cancel: (id: string, cancelAthletes = false, cancelAddenda = false): Promise<ClubOrderView> =>
+    call(async () => toOrder(unwrap((await client.post(`${BASE}/${id}/cancel`, null, { params: cancelAddenda ? { cancelAthletes, cancelAddenda: true } : { cancelAthletes } })).data))),
+
+  /** What the group's one invoice would hold (a read; works for PerPerson too, the invoice itself is refused). */
+  invoiceDraft: (id: string): Promise<InvoiceDraft> =>
+    call(async () => toInvoiceDraft((await client.get(`${BASE}/${id}/invoice-draft`)).data)),
+
+  /** Creates the group's one invoice (201) or returns the existing one (200, `created: false`). */
+  createInvoice: (id: string): Promise<CreatedInvoice> =>
+    call(async () => {
+      const response = await client.post(`${BASE}/${id}/invoice`, null);
+      return toCreatedInvoice(response.data, response.status);
+    }),
 
   /** The automatic suggestion; the user edits the ranges afterwards. */
   proposal: (input: ProposalInput): Promise<{ ranges: OrderRange[]; analysis: OrderAnalysis | null }> =>

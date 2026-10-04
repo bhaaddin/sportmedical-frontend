@@ -24,7 +24,7 @@ import { ClubOrderDialog } from '../../../components/clubs/order/ClubOrderDialog
 import { ClubOrderDetailPanel } from '../../../components/clubs/orders/ClubOrderDetailPanel';
 import { ClubOrderEntry } from '../../../components/clubs/order/ClubOrderEntry';
 import { PinnedActions } from '../PinnedActions';
-import { activitiesLine, filterOrders, seatPercent, statusCounts, STATUS_TONE, termsSummary } from '../../../components/clubs/orders/orderLogic';
+import { activitiesLine, filterOrders, groupChip, seatPercent, statusCounts, STATUS_TONE, termsSummary } from '../../../components/clubs/orders/orderLogic';
 import type { OrderStatusFilter } from '../../../components/clubs/orders/orderLogic';
 import { hasOrderState, readOrderState } from '../../../components/clubs/orders/orderRouteState';
 import type { NewOrderPrefill } from '../../../components/clubs/orders/orderRouteState';
@@ -53,7 +53,8 @@ export default function ClubOrdersPage() {
   const handoff = readOrderState(location.state);
 
   const [status, setStatus] = useState<OrderStatusFilter>('all');
-  const [clubId, setClubId] = useState('');
+  /* `?clubId=` (the club page's "Všechny objednávky") pre-filters the list to that club. */
+  const [clubId, setClubId] = useState(() => new URLSearchParams(location.search).get('clubId') ?? '');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [openId, setOpenId] = useState<string | null>(handoff.openOrderId ?? null);
@@ -137,6 +138,7 @@ export default function ClubOrdersPage() {
               <Stack direction="row" sx={{ alignItems: 'center', gap: 1, mb: 0.75 }}>
                 <Dot color={o.clubColorHex} />
                 <Typography sx={{ fontWeight: 700, flex: 1, minWidth: 0 }} noWrap>{o.clubName}</Typography>
+                {groupChip(o) !== '' ? <StatusChip tone="blue" size="sm" testId="group-chip">{groupChip(o)}</StatusChip> : null}
                 <StatusChip tone={STATUS_TONE[o.status]} size="sm">{ORDER_STATUS_LABEL[o.status]}</StatusChip>
               </Stack>
               <Typography variant="body2" color="text.secondary">{o.serviceName || 'Služba nevybrána'}</Typography>
@@ -176,7 +178,12 @@ export default function ClubOrdersPage() {
                   <TableCell><SeatsBar order={o} /></TableCell>
                   <TableCell>{paymentOf(o)}</TableCell>
                   <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{priceOf(o)}</TableCell>
-                  <TableCell><StatusChip tone={STATUS_TONE[o.status]}>{ORDER_STATUS_LABEL[o.status]}</StatusChip></TableCell>
+                  <TableCell>
+                    <Stack direction="row" sx={{ gap: 0.75, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <StatusChip tone={STATUS_TONE[o.status]}>{ORDER_STATUS_LABEL[o.status]}</StatusChip>
+                      {groupChip(o) !== '' ? <StatusChip tone="blue" testId="group-chip">{groupChip(o)}</StatusChip> : null}
+                    </Stack>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

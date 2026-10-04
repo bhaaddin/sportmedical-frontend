@@ -372,6 +372,11 @@ export type ActivityListResult = z.infer<typeof activityListResultSchema>;
 export const availabilitySlotSchema = z.object({
   startUtc: isoUtc,
   endUtc: isoUtc,
+  /**
+   * Why a start is offered (only with `staffStarts=true`): `blockStart`, `endAligned`, `step` or `chained`
+   * (right after the previous booking and the clinic's pause). Absent on the public list.
+   */
+  kinds: z.array(z.string()).optional(),
 });
 export type AvailabilitySlot = z.infer<typeof availabilitySlotSchema>;
 

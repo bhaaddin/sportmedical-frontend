@@ -15,8 +15,8 @@ import { Close, ContentCopy } from '@mui/icons-material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { clubOrdersApi, ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL } from '../../../api/clubOrders';
-import type { ClubOrderView } from '../../../api/clubOrders';
+import { ClubOrderError, clubOrdersApi, ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL } from '../../../api/clubOrders';
+import type { ClubOrderView, OrderAddendumSummary } from '../../../api/clubOrders';
 import { useIsPhone } from '../../../layout/useDevice';
 import { formatCzk } from '../../../pages/clubs/clubOrders';
 import { formatPragueDateTime } from '../../../utils/time';
@@ -24,6 +24,9 @@ import { SectionLabel, SoftCard, StatusChip } from '../../ui';
 import { ClubOrderDialog } from '../order/ClubOrderDialog';
 import { copyText } from './LinkCopyRow';
 import { absoluteLink, usePublicSiteBase } from './absoluteLink';
+import { ClubInvoiceDialog } from './ClubInvoiceDialog';
+import { hasGroup, OrderGroupBlock } from './OrderGroupBlock';
+import { orderCode } from '../order/orderFormat';
 import { rangeText, seatPercent, STATUS_TONE } from './orderLogic';
 
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
@@ -35,7 +38,7 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-export function ClubOrderDetailPanel({ orderId, initialOrder, onClose, onChanged }: {
+export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose, onChanged }: {
   orderId: string;
   /** The row the list already holds: shown at once while the full order loads. */
   initialOrder?: ClubOrderView;
@@ -49,13 +52,23 @@ export function ClubOrderDetailPanel({ orderId, initialOrder, onClose, onChanged
   const [dialog, setDialog] = useState<'process' | 'edit' | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelAthletes, setCancelAthletes] = useState(false);
+  /* Etapa 5: a row of the group opens that order in the same drawer. */
+  const [orderId, setOrderId] = useState(initialId);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [liveAddenda, setLiveAddenda] = useState<OrderAddendumSummary[] | null>(null);
 
   const query = useQuery({
     queryKey: ['club-order', orderId],
     queryFn: () => clubOrdersApi.get(orderId),
-    placeholderData: initialOrder,
+    placeholderData: orderId === initialId ? initialOrder : undefined,
   });
   const order = query.data;
+  const rootId = order?.parentOrderId ?? null;
+  const rootQuery = useQuery({
+    queryKey: ['club-order', rootId],
+    queryFn: () => clubOrdersApi.get(rootId ?? ''),
+    enabled: rootId !== null,
+  });
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['club-order', orderId] });
@@ -66,13 +79,22 @@ export function ClubOrderDetailPanel({ orderId, initialOrder, onClose, onChanged
   };
 
   const cancel = useMutation({
-    mutationFn: () => clubOrdersApi.cancel(orderId, cancelAthletes),
+    mutationFn: (withAddenda: boolean) => clubOrdersApi.cancel(orderId, cancelAthletes, withAddenda),
     onSuccess: () => {
       toast.success('Objednávka zrušena');
       setCancelOpen(false);
+      setLiveAddenda(null);
       refresh();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : 'Objednávku se nepodařilo zrušit'),
+    onError: (e) => {
+      /* 409 club_order.addenda_live: nothing was cancelled; list the addenda and let the desk confirm explicitly. */
+      if (e instanceof ClubOrderError && e.code === 'club_order.addenda_live') {
+        setCancelOpen(false);
+        setLiveAddenda(e.addenda);
+        return;
+      }
+      toast.error(e instanceof Error ? e.message : 'Objednávku se nepodařilo zrušit');
+    },
   });
 
   const body = () => {
@@ -102,6 +124,10 @@ export function ClubOrderDetailPanel({ orderId, initialOrder, onClose, onChanged
           </Typography>
           {order.note !== '' ? <Typography variant="body2" sx={{ mt: 1 }}>{order.note}</Typography> : null}
         </Block>
+
+        {hasGroup(order) ? (
+          <OrderGroupBlock order={order} root={rootQuery.data} onOpen={setOrderId} />
+        ) : null}
 
         <Block title="Termíny">
           <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>Požadované termíny</Typography>
@@ -208,9 +234,38 @@ export function ClubOrderDetailPanel({ orderId, initialOrder, onClose, onChanged
     );
   };
 
+  const addAddendum = (o: ClubOrderView) =>
+    navigate('/planovani', {
+      state: { pickOrder: { clubId: o.clubId, parent: { orderId: o.groupId, clubId: o.clubId, clubName: o.clubName, paymentMethod: o.paymentMethod } } },
+    });
+
   const actions = () => {
     if (order === undefined) return null;
     const btn = { sx: { minHeight: 44 } } as const;
+    const takesAddendum = order.status === 'Requested' || order.status === 'Confirmed' || order.status === 'Completed';
+    const perPerson = order.paymentMethod === 'PerPerson';
+    const addendumButton = takesAddendum ? (
+      <Button key="addendum" variant="contained" onClick={() => addAddendum(order)} data-testid="add-addendum" {...btn}>Přidat další službu / další hráče</Button>
+    ) : null;
+    const invoiceButton = takesAddendum ? (
+      <Box key="invoice" sx={{ display: 'contents' }}>
+        <Button
+          variant="outlined"
+          disabled={perPerson}
+          aria-describedby={perPerson ? 'invoice-per-person-hint' : undefined}
+          onClick={() => setInvoiceOpen(true)}
+          data-testid="club-invoice"
+          {...btn}
+        >
+          {order.invoiceId !== null ? 'Faktura klubu' : 'Vystavit jednu fakturu klubu'}
+        </Button>
+        {perPerson ? (
+          <Typography id="invoice-per-person-hint" variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }} data-testid="invoice-per-person-hint">
+            Skupina platí po osobách — jedna faktura klubu se nevystavuje.
+          </Typography>
+        ) : null}
+      </Box>
+    ) : null;
     switch (order.status) {
       case 'Invited':
         return (
@@ -222,26 +277,28 @@ export function ClubOrderDetailPanel({ orderId, initialOrder, onClose, onChanged
       case 'Requested':
         return (
           <>
-            <Button variant="contained" onClick={() => setDialog('process')} {...btn}>Zpracovat</Button>
+            {addendumButton}
+            <Button variant="outlined" onClick={() => setDialog('process')} {...btn}>Zpracovat</Button>
             <Button variant="outlined" onClick={() => setDialog('edit')} {...btn}>Upravit</Button>
+            {invoiceButton}
             <Button variant="outlined" color="error" onClick={() => setCancelOpen(true)} {...btn}>Zrušit</Button>
           </>
         );
       case 'Confirmed':
         return (
           <>
-            <Button variant="contained" onClick={() => setDialog('edit')} {...btn}>Upravit</Button>
+            {addendumButton}
+            <Button variant="outlined" onClick={() => setDialog('edit')} {...btn}>Upravit</Button>
             <Button variant="outlined" startIcon={<ContentCopy />} disabled={order.registrationUrl === ''} onClick={() => void copyText(absoluteLink(order.registrationUrl, publicBase))} {...btn}>Zkopírovat odkaz pro sportovce</Button>
-            {order.paymentMethod === 'ClubInvoice' ? (
-              <Button
-                variant="outlined"
-                onClick={() => navigate('/billing', { state: { clubId: order.clubId, clubOrderId: order.id, headcount: order.totalSeats } })}
-                {...btn}
-              >
-                Vystavit fakturu
-              </Button>
-            ) : null}
+            {invoiceButton}
             <Button variant="outlined" color="error" onClick={() => setCancelOpen(true)} {...btn}>Zrušit objednávku</Button>
+          </>
+        );
+      case 'Completed':
+        return (
+          <>
+            {addendumButton}
+            {invoiceButton}
           </>
         );
       default:
@@ -289,9 +346,28 @@ export function ClubOrderDetailPanel({ orderId, initialOrder, onClose, onChanged
         </DialogContent>
         <DialogActions>
           <Button variant="outlined" onClick={() => setCancelOpen(false)} disabled={cancel.isPending}>Ponechat</Button>
-          <Button variant="contained" color="error" onClick={() => cancel.mutate()} disabled={cancel.isPending}>Ano, zrušit</Button>
+          <Button variant="contained" color="error" onClick={() => cancel.mutate(false)} disabled={cancel.isPending}>Ano, zrušit</Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog open={liveAddenda !== null} onClose={cancel.isPending ? undefined : () => setLiveAddenda(null)} maxWidth="xs" fullWidth data-testid="addenda-live-dialog">
+        <DialogTitle>Objednávka má platné dodatky</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1 }}>Nic nebylo zrušeno. Tyto dodatky stále platí:</Typography>
+          <Stack component="ul" sx={{ m: 0, pl: 2.5 }} data-testid="addenda-live-list">
+            {(liveAddenda ?? []).map((a) => (
+              <li key={a.id}><Typography variant="body2">{`${orderCode(a.id)} · ${a.serviceName} · ${a.totalSeats} míst · ${ORDER_STATUS_LABEL[a.status]}`}</Typography></li>
+            ))}
+          </Stack>
+          <Typography variant="body2" sx={{ mt: 1 }}>Zrušte je zvlášť, nebo potvrďte zrušení celé objednávky i s dodatky.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button variant="outlined" onClick={() => setLiveAddenda(null)} disabled={cancel.isPending}>Ponechat</Button>
+          <Button variant="contained" color="error" onClick={() => cancel.mutate(true)} disabled={cancel.isPending}>Zrušit i dodatky</Button>
+        </DialogActions>
+      </Dialog>
+
+      {invoiceOpen ? <ClubInvoiceDialog orderId={orderId} onClose={() => setInvoiceOpen(false)} onChanged={onChanged} /> : null}
 
       {order !== undefined ? (
         <ClubOrderDialog

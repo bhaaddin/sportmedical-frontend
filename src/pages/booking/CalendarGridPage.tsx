@@ -116,6 +116,7 @@ import { ClubOrderEntry } from "../../components/clubs/order/ClubOrderEntry";
 import { PickOrderSetup } from "../../components/clubs/order/PickOrderSetup";
 import { OrderSuccess } from "../../components/clubs/order/OrderSuccess";
 import { readPickOrderState } from "../../components/clubs/order/pickSession";
+import type { PickParent } from "../../components/clubs/order/pickSession";
 import { PickOrderPanel } from "../../components/booking/calendar/PickOrderPanel";
 import { usePickOrder } from "../../components/booking/calendar/usePickOrder";
 import type { OrderRange } from "../../api/clubOrders";
@@ -322,7 +323,7 @@ export default function CalendarGridPage() {
     setClubOrder({ key: Date.now(), ...(ranges !== undefined ? { ranges } : {}), ...(calendarIds !== undefined ? { calendarIds } : {}) });
   /* "Nová klubová objednávka": the two-way chooser, then (phone order) the small setup form, then picking in the grid. */
   const [entryOpen, setEntryOpen] = useState(false);
-  const [setupFor, setSetupFor] = useState<{ clubId?: string } | null>(null);
+  const [setupFor, setSetupFor] = useState<{ clubId?: string; parent?: PickParent } | null>(null);
   const [rangeBlock, setRangeBlock] = useState<{ from: string; to: string } | null>(null);
   const [moveProposal, setMoveProposal] = useState<GridMoveRequest | null>(null);
   /* Several different places at once: marked with Ctrl/⌘/Shift (or the touch toggle), acted on from the tray. */
@@ -1009,7 +1010,10 @@ export default function CalendarGridPage() {
   useEffect(() => {
     if (wantsPick === null || !mayBook || handledPickKey.current === location.key) return;
     handledPickKey.current = location.key;
-    setSetupFor(wantsPick.clubId !== undefined ? { clubId: wantsPick.clubId } : {});
+    setSetupFor({
+      ...(wantsPick.clubId !== undefined ? { clubId: wantsPick.clubId } : {}),
+      ...(wantsPick.parent !== undefined ? { parent: wantsPick.parent } : {}),
+    });
   }, [wantsPick, mayBook, location.key]);
   useEffect(() => {
     if (landingDate === undefined || handledDateKey.current === location.key) return;
@@ -1618,6 +1622,7 @@ export default function CalendarGridPage() {
         <PickOrderSetup
           open
           defaultClubId={setupFor.clubId}
+          parent={setupFor.parent}
           onClose={() => setSetupFor(null)}
           onStart={(session) => {
             setSetupFor(null);

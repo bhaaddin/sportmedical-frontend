@@ -114,6 +114,11 @@ function StateProbe() {
   return <div data-testid="state">{JSON.stringify(location.state)}</div>;
 }
 
+function PathProbe() {
+  const location = useLocation();
+  return <div data-testid="elsewhere">{location.pathname}{location.search} {JSON.stringify(location.state)}</div>;
+}
+
 function Wrap({ children, state = null }: { children: ReactNode; state?: unknown }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
@@ -121,6 +126,7 @@ function Wrap({ children, state = null }: { children: ReactNode; state?: unknown
       <MemoryRouter initialEntries={[{ pathname: '/clubs', state }]}>
         <Routes>
           <Route path="/clubs" element={<>{children}<StateProbe /></>} />
+          <Route path="*" element={<PathProbe />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -581,5 +587,30 @@ describe('ClubsPage order router state (Etapa 4)', () => {
   it('spends a newOrder handoff', async () => {
     render(<Wrap state={{ newOrder: { clubId: 'club-1' } }}><ClubsPage /></Wrap>);
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('null'));
+  });
+});
+
+describe('club detail: "Nová objednávka klubu" (Etapa 5)', () => {
+  it('opens the two-way chooser, not the old dialog, and the phone choice goes to the calendar for this club', async () => {
+    const user = userEvent.setup();
+    render(<Wrap><ClubsPage /></Wrap>);
+    const cards = await screen.findAllByRole('listitem');
+    await user.click(cards[1]);
+    await user.click((await screen.findAllByRole('button', { name: 'Nová objednávka klubu' }))[0]);
+    const entry = await screen.findByTestId('club-order-entry');
+    expect(within(entry).getAllByRole('button')).toHaveLength(2);
+    await user.click(within(entry).getByTestId('entry-phone'));
+    const where = await screen.findByTestId('elsewhere');
+    expect(where).toHaveTextContent('/planovani');
+    expect(where).toHaveTextContent('{"pickOrder":{"clubId":"club-2"}}');
+  });
+
+  it('"Všechny objednávky" opens the orders page filtered to this club', async () => {
+    const user = userEvent.setup();
+    render(<Wrap><ClubsPage /></Wrap>);
+    const cards = await screen.findAllByRole('listitem');
+    await user.click(cards[1]);
+    await user.click(await screen.findByRole('button', { name: 'Všechny objednávky' }));
+    expect(await screen.findByTestId('elsewhere')).toHaveTextContent('/clubs/objednavky?clubId=club-2');
   });
 });

@@ -34,6 +34,7 @@ import {
 } from '../../api/displaySettings';
 import type { CalendarDisplaySettings, CalendarView } from '../../api/displaySettings';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
+import { BookingSlotsCard } from './BookingSlotsCard';
 
 const VIEW_LABELS: Record<CalendarView, string> = {
   day: 'Den',
@@ -284,6 +285,7 @@ export default function CalendarDisplayPage() {
             </Box>
           </Stack>
       </SoftCard>
+      <BookingSlotsCard />
     </SettingsScreen>
   );
 }

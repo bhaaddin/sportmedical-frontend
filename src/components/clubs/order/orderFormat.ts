@@ -13,3 +13,6 @@ export function rangeLine(r: { fromDate: string; toDate: string; dailyFrom?: str
   const window = r.dailyFrom && r.dailyTo ? `, ${r.dailyFrom}–${r.dailyTo}` : '';
   return `${days}${window}`;
 }
+
+/** The short code the desk reads out for an order, as the server writes it: "KO-" and the last eight hex digits of its id. */
+export const orderCode = (id: string): string => `KO-${id.replace(/-/g, '').slice(-8).toUpperCase()}`;

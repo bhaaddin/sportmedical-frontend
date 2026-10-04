@@ -12,6 +12,7 @@ import { Email, ContactPhone, LocationOn } from '@mui/icons-material';
 import CompanySettingsCard from '../components/CompanySettingsCard';
 import { OPENING_HOURS_MAX_LENGTH, PUBLIC_CLINIC_KEYS, readSettings, saveSettings } from '../api/clinicSettings';
 import { SectionLabel, SoftCard } from '../components/ui';
+import { normalizeBase, resetPublicSiteBase } from '../components/clubs/orders/absoluteLink';
 import { SettingsScreen } from './settings/SettingsFrame';
 
 /* ─────────────────────────────────────────── */
@@ -54,6 +55,7 @@ export default function Admin() {
     contactPhone: '',
     contactAddress: '',
     openingHours: '',
+    siteUrl: '',
     enableBooking: true,
   });
 
@@ -90,6 +92,7 @@ export default function Admin() {
           contactPhone: stored[PUBLIC_CLINIC_KEYS.phone] ?? previous.contactPhone,
           contactAddress: stored[PUBLIC_CLINIC_KEYS.address] ?? previous.contactAddress,
           openingHours: stored[PUBLIC_CLINIC_KEYS.openingHours] ?? previous.openingHours,
+          siteUrl: stored[PUBLIC_CLINIC_KEYS.siteUrl] ?? previous.siteUrl,
           enableBooking: (stored[PUBLIC_CLINIC_KEYS.bookingEnabled] ?? 'true') !== 'false',
         }));
         setLoaded(true);
@@ -104,7 +107,14 @@ export default function Admin() {
   const [saveFailed, setSaveFailed] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  /* Empty is allowed (club links then use this app's own address); anything else must read as a web address. */
+  const siteUrlInvalid = pub.siteUrl.trim() !== '' && normalizeBase(pub.siteUrl) === '';
+
   const handleSave = async () => {
+    if (siteUrlInvalid) {
+      setSaveFailed('Veřejná adresa webu není platná. Zadejte ji například ve tvaru https://www.priklad.cz.');
+      return;
+    }
     setSaving(true);
     setSaveFailed(null);
 
@@ -115,9 +125,11 @@ export default function Admin() {
         [PUBLIC_CLINIC_KEYS.phone]: pub.contactPhone.trim(),
         [PUBLIC_CLINIC_KEYS.address]: pub.contactAddress.trim(),
         [PUBLIC_CLINIC_KEYS.openingHours]: pub.openingHours.trim(),
+        [PUBLIC_CLINIC_KEYS.siteUrl]: normalizeBase(pub.siteUrl),
         [PUBLIC_CLINIC_KEYS.bookingEnabled]: pub.enableBooking ? 'true' : 'false',
       });
 
+      resetPublicSiteBase();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch {
@@ -203,6 +215,16 @@ export default function Admin() {
               placeholder="Po–Pá 8:00–18:00 · So 8:00–12:00"
               helperText={`Zobrazí se v patičce a na stránkách objednání. ${pub.openingHours.length}/${OPENING_HOURS_MAX_LENGTH}`}
               slotProps={{ htmlInput: { maxLength: OPENING_HOURS_MAX_LENGTH } }} />
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <TextField fullWidth label="Veřejná adresa webu" value={pub.siteUrl}
+              onChange={e => updatePub('siteUrl', e.target.value)}
+              placeholder="https://www.priklad.cz"
+              error={siteUrlInvalid}
+              helperText={siteUrlInvalid
+                ? 'Zadejte adresu ve tvaru https://www.priklad.cz.'
+                : 'Z této adresy se tvoří odkazy pro kluby a sportovce (formulář objednávky, registrace). Prázdné = adresa tohoto programu.'}
+              slotProps={{ htmlInput: { inputMode: 'url', autoCapitalize: 'none' } }} />
           </Grid>
         </Grid>
       </SoftCard>
