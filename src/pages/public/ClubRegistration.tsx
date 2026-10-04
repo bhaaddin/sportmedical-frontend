@@ -34,7 +34,10 @@ import { ActivityCards, activityRemaining } from './club/ActivityCards';
 import { Booked } from './club/Booked';
 import type { BookedInfo } from './club/Booked';
 import { INFO_SLOT_KEYS, InfoPanel } from './club/InfoPanel';
-import { SLOT_PICKER_KEYS, SlotPicker } from './club/SlotPicker';
+import { SLOT_PICKER_KEYS } from './club/SlotPicker';
+import { TermCalendar } from './club/TermCalendar';
+import { CAL_KEYS, withCalDefaults } from './club/texts';
+import { downloadIcs } from './club/ics';
 import type { SlotsStatus } from './club/SlotPicker';
 import { ARCHIVO, BRAND, clinicDate, clinicTime, telHref } from '../../components/public/brand';
 import {
@@ -49,6 +52,7 @@ const SLOT_KEYS = [
   'formulare.club.full',
   ...INFO_SLOT_KEYS,
   ...SLOT_PICKER_KEYS,
+  ...CAL_KEYS,
   'formulare.club-reg.register.title',
   'formulare.club-reg.minor.label',
   'formulare.club-reg.parent.hint',
@@ -190,6 +194,7 @@ function TimePill({ slot, selected, onPick }: { slot: ClubSlot; selected: boolea
 
 export default function ClubRegistration() {
   const txt = useSlotTexts(SLOT_KEYS);
+  const cal = withCalDefaults(txt);
   const device = useDevice();
   const { token = '' } = useParams();
 
@@ -215,6 +220,8 @@ export default function ClubRegistration() {
   const [note, setNote] = useState('');
   const [freeSlots, setFreeSlots] = useState<ClubFreeSlot[]>([]);
   const [slotsStatus, setSlotsStatus] = useState<SlotsStatus>('idle');
+  /** The day tapped in the calendar; kept when the slots are refreshed. */
+  const [day, setDay] = useState<string | null>(null);
   const info = offer?.info ?? null;
 
   useEffect(() => {
@@ -241,17 +248,20 @@ export default function ClubRegistration() {
   }, [token, attempt]);
 
   /** Free slots of the chosen činnost (order links only); the earliest one is preselected. */
-  const loadSlots = useCallback(async (forActivity: string): Promise<void> => {
+  const loadSlots = useCallback(async (forActivity: string, preselect = true): Promise<void> => {
     if (forActivity === '') { setFreeSlots([]); setSlotsStatus('idle'); return; }
     setSlotsStatus('loading');
     try {
       const list = await getClubSlots(token, forActivity);
       setFreeSlots(list);
-      setSlotUtc((current) => (current !== null && list.some((x) => x.startUtc === current) ? current : list[0]?.startUtc ?? null));
+      // The nearest slot is offered only while the person has not chosen; a chosen one that is still free stays.
+      setSlotUtc((current) => (current !== null && list.some((x) => x.startUtc === current) ? current : preselect ? list[0]?.startUtc ?? null : null));
+      setDay((current) => (current !== null && list.some((x) => x.date === current) ? current : preselect ? list[0]?.date ?? null : null));
       setSlotsStatus('ready');
     } catch {
       setFreeSlots([]);
       setSlotUtc(null);
+      setDay(null);
       setSlotsStatus('failed');
     }
   }, [token]);
@@ -298,6 +308,7 @@ export default function ClubRegistration() {
         const chosen = offer?.activities.find((a) => a.activityId === activityId);
         setBooked({
           startUtc: claim.startUtc,
+          endUtc: claim.endUtc || null,
           date: claim.date ?? null,
           startLocal: claim.startLocal ?? null,
           endLocal: claim.endLocal ?? null,
@@ -310,7 +321,7 @@ export default function ClubRegistration() {
       if (error instanceof ClubClaimError && error.timeTaken) {
         setComplaint(txt['formulare.club-reg.error.taken']);
         setSlotUtc(null);
-        void loadSlots(activityId);
+        void loadSlots(activityId, false);
       } else if (error instanceof ClubClaimError && error.code !== null && /no.?free.?slot/i.test(error.code)) {
         setComplaint(txt['formulare.club-reg.error.noslot']);
         void loadSlots(activityId);
@@ -329,6 +340,20 @@ export default function ClubRegistration() {
   };
 
   const phoneOfClinic = clinic?.phone.trim() ?? '';
+
+  /** The booking as an .ics download, built here from date, time, činnost and place. */
+  const saveToCalendar = (b: BookedInfo) => {
+    const minutes = offer?.activities.find((x) => x.activityId === activityId)?.durationMinutes ?? 0;
+    const endUtc = b.endUtc ?? new Date(new Date(b.startUtc).getTime() + Math.max(minutes, 15) * 60_000).toISOString();
+    const place = [b.calendarName, clinic?.address].map((x) => (x ?? '').trim()).filter((x) => x !== '').join(', ');
+    downloadIcs({
+      startUtc: b.startUtc,
+      endUtc,
+      title: [b.activityName ?? 'Prohlídka', clinic?.name].map((x) => (x ?? '').trim()).filter((x) => x !== '').join(' · '),
+      location: place === '' ? null : place,
+      description: b.bring,
+    }, 'termin-prohlidky.ics');
+  };
 
   const frame = (children: ReactNode, hero?: ReactNode) => (
     <PublicLayout clinic={clinic}>
@@ -375,6 +400,7 @@ export default function ClubRegistration() {
       setDateOfBirth('');
       setNote('');
       setSlotUtc(null);
+      setDay(null);
       setComplaint(null);
       void getClubOffer(token).then((fresh) => setOffer(fresh)).catch(() => undefined);
       if (infoMode) void loadSlots(activityId);
@@ -387,6 +413,9 @@ export default function ClubRegistration() {
         bringTitle={txt['formulare.club-reg.done.bring']}
         addLabel={txt['formulare.club-reg.done.add']}
         onAdd={infoMode ? addAnother : null}
+        calendarLine={cal['formulare.club-reg.done.calendar']}
+        icsLabel={cal['formulare.club-reg.done.ics']}
+        onIcs={() => saveToCalendar(booked)}
       />,
     );
   }
@@ -428,13 +457,22 @@ export default function ClubRegistration() {
         </Box>
 
         {infoMode ? (
-          <SlotPicker
+          <TermCalendar
             status={slotsStatus}
             slots={freeSlots}
+            reservedDays={info?.windows.map((w) => w.date) ?? []}
+            day={day}
             value={slotUtc}
+            onDay={(date) => {
+              setDay(date);
+              setComplaint(null);
+              setSlotUtc((current) => (current !== null && freeSlots.some((x) => x.startUtc === current && x.date === date) ? current : null));
+            }}
             onPick={(utc) => { setSlotUtc(utc); setComplaint(null); }}
             onRefresh={() => { void loadSlots(activityId); }}
+            device={device}
             t={txt}
+            texts={cal}
           />
         ) : choosesTime ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -557,7 +595,7 @@ export default function ClubRegistration() {
 
   return frame(
     <>
-      {info !== null && <InfoPanel info={info} activities={offer.activities} t={txt} device={device} />}
+      {info !== null && <InfoPanel info={info} activities={offer.activities} t={txt} device={device} cal={cal} />}
       {chooseActivity && (
         <Panel labelledBy="club-step-activity">
           <PanelTitle id="club-step-activity">1 · Vyberte činnost</PanelTitle>

@@ -8,8 +8,9 @@
 import { Box, Typography } from '@mui/material';
 import type { ClubActivity, ClubInfo } from '../../../api/publicClub';
 import type { Device } from '../../../layout/useDevice';
-import { ARCHIVO, BRAND, clinicDate, czk } from '../../../components/public/brand';
+import { ARCHIVO, BRAND, czk } from '../../../components/public/brand';
 import { LABEL_COLOR, Panel, PanelTitle, SOFT_TEXT } from '../../../components/public/kit';
+import type { CalTexts } from './texts';
 
 export const INFO_SLOT_KEYS = [
   'formulare.club-reg.info.title',
@@ -18,7 +19,6 @@ export const INFO_SLOT_KEYS = [
   'formulare.club-reg.pay.person',
   'formulare.club-reg.pay.person.noprice',
   'formulare.club-reg.pay.unknown',
-  'formulare.club-reg.days.title',
   'formulare.club-reg.steps.title',
   'formulare.club-reg.steps.1',
   'formulare.club-reg.steps.2',
@@ -27,8 +27,16 @@ export const INFO_SLOT_KEYS = [
 
 export type InfoTexts = Record<(typeof INFO_SLOT_KEYS)[number], string>;
 
-const hhmm = (time: string): string => time.slice(0, 5);
-const capitalise = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+/** "9., 13., 15. října; 2., 3. listopadu" for yyyy-MM-dd dates: day numbers, the month name once per month. */
+export function reservedDaysText(dates: readonly string[]): string {
+  const byMonth = new Map<string, number[]>();
+  for (const d of [...new Set(dates)].sort()) byMonth.set(d.slice(0, 7), [...(byMonth.get(d.slice(0, 7)) ?? []), Number(d.slice(8))]);
+  return [...byMonth.entries()].map(([month, days]) => {
+    const [y, m] = month.split('-').map(Number);
+    const name = new Date(y, m - 1, 1).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long' }).replace(/^\d+\.\s*/, '');
+    return `${days.map((d) => `${d}.`).join(', ')} ${name}`;
+  }).join('; ');
+}
 
 /** The price a person pays: the one price, else "od <lowest>"; null when no činnost states one. */
 export function pricePerPerson(activities: readonly ClubActivity[]): string | null {
@@ -51,8 +59,8 @@ export function payerSentence(info: ClubInfo, activities: readonly ClubActivity[
 }
 
 export function InfoPanel({
-  info, activities, t, device,
-}: { info: ClubInfo; activities: readonly ClubActivity[]; t: InfoTexts; device: Device }) {
+  info, activities, t, device, cal,
+}: { info: ClubInfo; activities: readonly ClubActivity[]; t: InfoTexts; device: Device; cal: CalTexts }) {
   const intro = t['formulare.club-reg.info.intro']
     .replace('{club}', info.clubName)
     .replace('{service}', info.serviceName);
@@ -93,20 +101,9 @@ export function InfoPanel({
       </Box>
 
       {info.windows.length > 0 && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Typography component="h3" sx={{ m: 0, fontSize: 14, fontWeight: 700 }}>{t['formulare.club-reg.days.title']}</Typography>
-          <Box component="ul" aria-label="Rezervované dny klubu" sx={{ listStyle: 'none', m: 0, p: 0, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            {info.windows.map((w) => (
-              <Box
-                component="li"
-                key={`${w.date}-${w.startLocal}`}
-                sx={{ minHeight: 40, px: 1.75, display: 'flex', alignItems: 'center', border: `1px solid ${BRAND.line}`, borderRadius: '20px', fontSize: 14.5, fontWeight: 600 }}
-              >
-                {capitalise(clinicDate(w.date))} · {hhmm(w.startLocal)}–{hhmm(w.endLocal)}
-              </Box>
-            ))}
-          </Box>
-        </Box>
+        <Typography data-testid="club-reserved" sx={{ fontSize: 15, fontWeight: 600 }}>
+          {cal['formulare.club-reg.cal.reserved'].replace('{days}', reservedDaysText(info.windows.map((w) => w.date)))}
+        </Typography>
       )}
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>

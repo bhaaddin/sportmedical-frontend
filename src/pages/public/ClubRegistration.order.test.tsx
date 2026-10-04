@@ -92,9 +92,8 @@ describe('information first', () => {
       expect(within(activities).getByText('Komplexní prohlídka')).toBeInTheDocument();
       expect(within(activities).getByText(/15 min · 450/)).toBeInTheDocument();
       expect(within(activities).getByText(/kartičku pojištěnce/)).toBeInTheDocument();
-      const days = screen.getByRole('list', { name: 'Rezervované dny klubu' });
-      expect(within(days).getAllByRole('listitem')).toHaveLength(2);
-      expect(within(days).getByText(/09:00–13:00/)).toBeInTheDocument();
+      expect(screen.getByTestId('club-reserved')).toHaveTextContent('Klub rezervoval: 26., 27. října');
+      expect(screen.queryByText('Dny a hodiny, které klub rezervoval')).not.toBeInTheDocument();
       const steps = screen.getByTestId('club-steps');
       expect(within(steps).getAllByRole('listitem')).toHaveLength(3);
       expect(steps).toHaveAttribute('data-layout', name);
@@ -127,19 +126,22 @@ describe('choosing a term', () => {
     await waitFor(() => expect(getClubSlots).toHaveBeenCalledWith('tok-1', 'a-1'));
     const first = await screen.findByRole('button', { name: /09:00 — Nejbližší volný/ });
     expect(first).toHaveAttribute('aria-pressed', 'true');
-    const monday = screen.getByRole('group', { name: /26\. října/ });
-    expect(within(monday).getAllByTestId('club-slot')).toHaveLength(2);
-    const tuesday = screen.getByRole('group', { name: /27\. října/ });
-    expect(within(tuesday).getAllByTestId('club-slot')).toHaveLength(1);
+    expect(screen.getByRole('group', { name: /26\. října/ })).toBeInTheDocument();
+    expect(screen.getAllByTestId('club-slot')).toHaveLength(2);
 
-    await userEvent.click(within(tuesday).getByRole('button', { name: '10:00' }));
-    expect(within(tuesday).getByRole('button', { name: '10:00' })).toHaveAttribute('aria-pressed', 'true');
-    expect(first).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(screen.getByRole('button', { name: /27\. října, 1 volný/ }));
+    expect(screen.getAllByTestId('club-slot')).toHaveLength(1);
+    expect(first).not.toBeInTheDocument();
+    // Moving to another day does not keep the time from the first one.
+    expect(screen.getByRole('button', { name: '10:00' })).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(screen.getByRole('button', { name: '10:00' }));
+    expect(screen.getByRole('button', { name: '10:00' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('the claim carries the chosen startUtc and the success screen shows when, činnost, place and what to bring', async () => {
     renderClub();
     await fillPlayer();
+    await userEvent.click(await screen.findByRole('button', { name: /27\. října, 1 volný/ }));
     await userEvent.click(await screen.findByRole('button', { name: '10:00' }));
     await userEvent.click(confirmBtn());
 
@@ -166,8 +168,13 @@ describe('choosing a term', () => {
 
     expect(await screen.findByText(/Tento termín mezi tím někdo obsadil/)).toBeInTheDocument();
     await waitFor(() => expect(getClubSlots).toHaveBeenCalledTimes(2));
-    expect(await screen.findByRole('button', { name: /09:15 — Nejbližší volný/ })).toHaveAttribute('aria-pressed', 'true');
+    // The day stays selected; the time must be chosen again (nothing is preselected after a clash).
+    const again = await screen.findByRole('button', { name: /09:15 — Nejbližší volný/ });
+    expect(again).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /26\. října/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('button', { name: /^09:00/ })).not.toBeInTheDocument();
+    expect(confirmBtn()).toBeDisabled();
+    await userEvent.click(again);
     expect(confirmBtn()).toBeEnabled();
   });
 

@@ -1,11 +1,12 @@
 /* The success screen: when, which činnost, where, what to bring - and one click for the next player. */
 import { Box, Button, Typography } from '@mui/material';
-import { CheckCircleOutlined } from '@mui/icons-material';
+import { CheckCircleOutlined, EventOutlined } from '@mui/icons-material';
 import { ARCHIVO, BRAND, clinicDate } from '../../../components/public/brand';
-import { LABEL_COLOR, Panel, SOFT_TEXT, ctaSx, longWhen } from '../../../components/public/kit';
+import { LABEL_COLOR, Panel, SOFT_TEXT, ctaSx, ghostSx, longWhen } from '../../../components/public/kit';
 
 export interface BookedInfo {
   startUtc: string;
+  endUtc: string | null;
   date: string | null;
   startLocal: string | null;
   endLocal: string | null;
@@ -19,8 +20,11 @@ const capitalise = (text: string): string => text.charAt(0).toUpperCase() + text
 const hhmm = (time: string): string => time.slice(0, 5);
 
 export function Booked({
-  booked, title, next, bringTitle, addLabel, onAdd,
-}: { booked: BookedInfo; title: string; next: string; bringTitle: string; addLabel: string; onAdd: (() => void) | null }) {
+  booked, title, next, bringTitle, addLabel, onAdd, calendarLine, icsLabel, onIcs,
+}: {
+  booked: BookedInfo; title: string; next: string; bringTitle: string; addLabel: string; onAdd: (() => void) | null;
+  calendarLine: string; icsLabel: string; onIcs: () => void;
+}) {
   const when = booked.date !== null && booked.startLocal !== null
     ? `${capitalise(clinicDate(booked.date))} v ${hhmm(booked.startLocal)}${booked.endLocal !== null ? `–${hhmm(booked.endLocal)}` : ''}`
     : capitalise(longWhen(booked.startUtc));
@@ -42,6 +46,8 @@ export function Booked({
         </Box>
       )}
       <Typography sx={{ color: LABEL_COLOR }}>{next}</Typography>
+      <Typography data-testid="booked-calendar-line" sx={{ color: SOFT_TEXT, fontSize: 15 }}>{calendarLine}</Typography>
+      <Button variant="outlined" startIcon={<EventOutlined />} onClick={onIcs} sx={ghostSx(50)}>{icsLabel}</Button>
       {onAdd !== null && (
         <Button variant="contained" onClick={onAdd} sx={ctaSx(50)}>{addLabel}</Button>
       )}
