@@ -187,7 +187,7 @@ export function ClubBlockPanel({
       <Box sx={{ mt: 2.5 }}>
         <Stack direction="row" data-testid="block-seats-summary" sx={{ justifyContent: 'space-between', alignItems: 'baseline', mb: 0.75 }}>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Obsazeno {seatTotals.registered} z {seatTotals.seats} míst
+            Zapsáno {seatTotals.registered} z {seatTotals.seats} objednaných míst
           </Typography>
           <Typography variant="body2" sx={{ fontWeight: 700 }}>{seatTotals.free} volných</Typography>
         </Stack>

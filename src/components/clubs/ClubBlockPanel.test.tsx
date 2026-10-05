@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { setViewport, VIEWPORTS } from '../../test/viewport';
@@ -61,7 +62,7 @@ const block = (over: Partial<ClubBlockView> = {}): ClubBlockView => ({
 
 function Wrap({ children }: { children: ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return <MemoryRouter><QueryClientProvider client={client}>{children}</QueryClientProvider></MemoryRouter>;
 }
 
 const open = (b: ClubBlockView = block(), extra: Record<string, unknown> = {}) =>
@@ -83,7 +84,7 @@ describe('what a block shows', () => {
     expect(screen.getByRole('heading', { name: 'FK Slaný', level: 3 })).toBeInTheDocument();
     expect(screen.getByText('Aktivní blok')).toBeInTheDocument();
     expect(screen.getByText(/26\.\s?—\s?3\. listopadu 2026|26\. října — 3\. listopadu 2026/)).toBeInTheDocument();
-    expect(screen.getByText('Obsazeno 4 z 120 míst')).toBeInTheDocument();
+    expect(screen.getByText('Zapsáno 4 z 120 objednaných míst')).toBeInTheDocument();
     expect(screen.getByText('116 volných')).toBeInTheDocument();
     expect(Number(screen.getByRole('progressbar', { name: /Obsazenost bloku FK Slaný/ }).getAttribute('aria-valuenow'))).toBeCloseTo(3.33, 1);
     expect(screen.getByTestId('block-link')).toHaveTextContent('https://app.test/klub/tok');
@@ -337,6 +338,33 @@ describe('Zrušit blok', () => {
     expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Zrušit blok' }));
     await waitFor(() => expect(cancel).toHaveBeenCalledWith('b-1', false));
+  });
+
+  it('a block that belongs to a club order is not cancelled here: it explains and offers the order, never the athletes wording', async () => {
+    getBlock.mockResolvedValue(block({ registered: 0, athletes: [], clubOrderId: 'o-1' }));
+    const user = userEvent.setup();
+    open(block({ registered: 0, athletes: [], clubOrderId: 'o-1' }));
+    await user.click(screen.getByRole('button', { name: 'Zrušit blok' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByTestId('block-owned-by-order')).toHaveTextContent('termínů klubové objednávky');
+    expect(within(dialog).queryByText(/registrovaní sportovci/)).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Otevřít objednávku' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Zrušit blok' })).not.toBeInTheDocument();
+  });
+
+  it('a 409 owned_by_order from the server switches the dialog to the order message, not the athletes warning', async () => {
+    const owned = new ClubBlockError('Blokace je součástí klubové objednávky.', 409);
+    owned.code = 'club_block.owned_by_order';
+    cancel.mockRejectedValueOnce(owned);
+    getBlock.mockResolvedValue(block({ registered: 0, athletes: [] }));
+    const user = userEvent.setup();
+    open(block({ registered: 0, athletes: [] }));
+    await user.click(screen.getByRole('button', { name: 'Zrušit blok' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Zrušit blok' }));
+    expect(await within(dialog).findByTestId('block-owned-by-order')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/registrovaní sportovci/)).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Otevřít objednávku' })).toBeInTheDocument();
   });
 
   it('turns a 409 from a registration that happened meanwhile into the same confirmation', async () => {

@@ -64,6 +64,8 @@ export interface ActivitySeatView extends ActivitySeat {
 }
 
 export interface ClubBlockView {
+  /** The club order this window belongs to; null for a block made on its own. */
+  clubOrderId?: string | null;
   id: string;
   clubId: string;
   clubName: string;
@@ -298,6 +300,7 @@ export function toBlock(raw: unknown): ClubBlockView {
     clubId: str(r.clubId) ?? '',
     clubName: str(r.clubName) ?? '',
     colorHex: str(r.colorHex),
+    clubOrderId: str(r.clubOrderId) ?? null,
     name: str(r.name),
     calendarIds: strings(r.calendarIds),
     activityIds: strings(r.activityIds),
@@ -362,6 +365,8 @@ export class ClubBlockError extends Error {
   readonly status: number | undefined;
   readonly conflicts: ClubBlockConflict[];
   readonly fields: Record<string, string>;
+  /** The server's machine code, e.g. `club_block.owned_by_order`. */
+  code: string | undefined;
 
   constructor(message: string, status: number | undefined, conflicts: ClubBlockConflict[] = [], fields: Record<string, string> = {}) {
     super(message);
@@ -369,10 +374,16 @@ export class ClubBlockError extends Error {
     this.status = status;
     this.conflicts = conflicts;
     this.fields = fields;
+    this.code = undefined;
+  }
+
+  /** 409 `club_block.owned_by_order`: the window is part of a club order; the order is cancelled, not the window. */
+  get isOwnedByOrder(): boolean {
+    return this.code === 'club_block.owned_by_order';
   }
 
   get isConflict(): boolean {
-    return this.status === 409;
+    return this.status === 409 && !this.isOwnedByOrder && this.code !== 'club_block.not_active';
   }
 }
 
@@ -406,7 +417,9 @@ export function toClubBlockError(error: unknown): ClubBlockError {
       isRecord(data) && typeof data.message === 'string' && data.message.trim() !== ''
         ? data.message
         : (FALLBACK_BY_STATUS[status] ?? 'Požadavek se nepodařilo dokončit.');
-    return new ClubBlockError(message, status, conflictsOf(data), fieldsOf(data));
+    const built = new ClubBlockError(message, status, conflictsOf(data), fieldsOf(data));
+    built.code = isRecord(data) && typeof data.code === 'string' ? data.code : undefined;
+    return built;
   }
   return new ClubBlockError('Požadavek se nepodařilo dokončit.', undefined);
 }

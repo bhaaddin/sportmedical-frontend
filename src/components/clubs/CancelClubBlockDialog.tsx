@@ -6,6 +6,7 @@
  * is off, so the dialog does not let that button be pressed.
  */
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Alert, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Stack, Typography } from '@mui/material';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -25,11 +26,14 @@ export function CancelClubBlockDialog({
   onCancelled?: () => void;
 }) {
   const phone = useIsPhone();
+  const navigate = useNavigate();
+  const [ownedByOrderId, setOwnedByOrderId] = useState<string | null>(block.clubOrderId ?? null);
   const queryClient = useQueryClient();
   const [cancelAthletes, setCancelAthletes] = useState(false);
   const [conflicts, setConflicts] = useState<{ message: string; list: ClubBlockConflict[] } | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const hasAthletes = block.registered > 0 || conflicts !== null;
+  const ownedByOrder = ownedByOrderId !== null;
 
   const cancel = useMutation({
     mutationFn: () => clubBlocksApi.cancel(block.id, cancelAthletes),
@@ -42,7 +46,11 @@ export function CancelClubBlockDialog({
     },
     onError: (error) => {
       const e = error instanceof ClubBlockError ? error : new ClubBlockError('Blok se nepodařilo zrušit.', undefined);
-      if (e.isConflict) {
+      if (e.isOwnedByOrder) {
+        setFailure(null);
+        setConflicts(null);
+        setOwnedByOrderId(block.clubOrderId ?? '');
+      } else if (e.isConflict) {
         setFailure(null);
         setConflicts({ message: e.message, list: e.conflicts });
         setCancelAthletes(false);
@@ -67,8 +75,13 @@ export function CancelClubBlockDialog({
           <Typography variant="body2">
             Všechny časy, které blok držel, se vrátí do nabídky kalendářů a budou znovu k dispozici pro ostatní objednávky.
           </Typography>
+          {ownedByOrder ? (
+            <Alert severity="info" data-testid="block-owned-by-order">
+              Tento blok je jeden z termínů klubové objednávky. Jednotlivý termín se ruší v objednávce: upravte její termíny, nebo zrušte celou objednávku.
+            </Alert>
+          ) : null}
 
-          {hasAthletes ? (
+          {hasAthletes && !ownedByOrder ? (
             <>
               <Alert severity="warning">
                 {block.registered > 0
@@ -90,9 +103,19 @@ export function CancelClubBlockDialog({
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2, gap: 1, flexWrap: 'wrap' }}>
         <Button variant="outlined" onClick={onClose} disabled={cancel.isPending} sx={{ minHeight: 44 }}>Ponechat blok</Button>
+        {ownedByOrder ? (
+          <Button
+            variant="contained"
+            onClick={() => navigate('/clubs/objednavky', { state: ownedByOrderId ? { openOrderId: ownedByOrderId } : undefined })}
+            sx={{ minHeight: 44 }}
+          >
+            Otevřít objednávku
+          </Button>
+        ) : (
         <Button variant="contained" color="error" disabled={blocked || cancel.isPending} onClick={() => cancel.mutate()} sx={{ minHeight: 44 }}>
           {cancel.isPending ? 'Ruším…' : 'Zrušit blok'}
         </Button>
+        )}
       </DialogActions>
     </Dialog>
   );
