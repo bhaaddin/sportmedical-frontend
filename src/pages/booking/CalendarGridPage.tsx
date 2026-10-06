@@ -113,6 +113,8 @@ import { useDayRange } from "../../components/booking/calendar/useDayRange";
 import { useMultiSelect } from "../../components/booking/calendar/useMultiSelect";
 import { MultiBlockDialog } from "../../components/booking/calendar/MultiBlockDialog";
 import { SelectionTray } from "../../components/booking/calendar/SelectionTray";
+import { AddToClubOrderDialog } from "../../components/booking/calendar/AddToClubOrderDialog";
+import type { PickedRange } from "../../components/booking/calendar/multiSelect";
 import { ClubOrderEntry } from "../../components/clubs/order/ClubOrderEntry";
 import { PickOrderSetup } from "../../components/clubs/order/PickOrderSetup";
 import { OrderSuccess } from "../../components/clubs/order/OrderSuccess";
@@ -327,7 +329,9 @@ export default function CalendarGridPage() {
   const [filterMenu, setFilterMenu] = useState<HTMLElement | null>(null);
   const [clubPick, setClubPick] = useState<ClubBlockPick | null>(null);
   /* "Nová klubová objednávka": the two-way chooser, then the small setup form, then picking in the grid.
-     A club order is never started from places marked in the grid - those only book a patient. */
+     A club order is never STARTED from places marked in the grid - those only book a patient or block time.
+     Etapa 12: a place marked the plain way CAN be attached to a club order that already exists (`addToClub`
+     below) - that is an edit of that order, never a new one. */
   const [entryOpen, setEntryOpen] = useState(false);
   const [setupFor, setSetupFor] = useState<{ clubId?: string; parent?: PickParent } | null>(null);
   const [rangeBlock, setRangeBlock] = useState<{ from: string; to: string } | null>(null);
@@ -336,6 +340,12 @@ export default function CalendarGridPage() {
   const multi = useMultiSelect(pragueDateKey(now));
   const rangeSelect = useDayRange(multi);
   const [multiBlock, setMultiBlock] = useState(false);
+  /*
+   * Etapa 12: "Přidat do objednávky klubu" from a plain mark (popover or tray). The underlying selection is kept
+   * (not cleared) while this is open, only hidden, so "Zrušit výběr" still works if the desk backs out; `source`
+   * says which one to clear once the merge is actually saved.
+   */
+  const [addToClub, setAddToClub] = useState<{ marked: PickedRange; source: "popover" | "tray" | "pending" } | null>(null);
   /* Escape drops every marked place, wherever the focus is (a dialog keeps its own Escape). */
   const multiCount = multi.items.length;
   const clearMulti = multi.clear;
@@ -574,6 +584,11 @@ export default function CalendarGridPage() {
         return false;
       }),
     [ticksApply, serviceSet, days, previewByCalendar, catalogue],
+  );
+  /* Etapa 12: the calendar's visible service filter narrowed to exactly one služba, or null (every live order shown). */
+  const singleServiceId = useMemo(
+    () => (serviceSet !== null && serviceSet.size === 1 ? [...serviceSet][0] : null),
+    [serviceSet],
   );
   /* The employee list follows the service, not the ticked calendars. */
   const serviceCalendars = useMemo(
@@ -1612,6 +1627,23 @@ export default function CalendarGridPage() {
                   mayBlock={mayBlock}
                   onOpen={setOpenId}
                   onBook={bookFromGrid}
+                  onAddToClubOrder={
+                    pickActive
+                      ? undefined
+                      : (selection) =>
+                          setAddToClub({
+                            marked: {
+                              id: "pending-range",
+                              kind: "time",
+                              columnKey: selection.columnKey,
+                              calendarId: selection.calendarId,
+                              activityId: selection.activityId,
+                              dayKey: selection.dayKey,
+                              range: selection.range,
+                            },
+                            source: "pending",
+                          })
+                  }
                   onPickDay={pickDay}
                   inquiriesByDay={inquiriesByDay}
                   onOpenInquiry={pickActive ? undefined : openInquiry}
@@ -1689,7 +1721,7 @@ export default function CalendarGridPage() {
 
       {/* The range popover (N-Slot, for days): book from the first day, block whole days, or hand it to a club. */}
       <SelectionPopover
-        anchor={chosenRange ? { x: chosenRange.x, y: chosenRange.y } : null}
+        anchor={addToClub ? null : chosenRange ? { x: chosenRange.x, y: chosenRange.y } : null}
         title={chosenRange ? rangeDates(chosenRange) : ""}
         subtitle={chosenRange ? daysWord(dayCount(chosenRange)) : ""}
         caption={shown.length > 1 ? `${GRID_TEXT.calendars}: ${shown.map((c) => c.name).join(", ")}` : shown[0]?.name}
@@ -1708,12 +1740,16 @@ export default function CalendarGridPage() {
           rangeSelect.clear();
           setRangeBlock(range);
         }}
+        onAddToClubOrder={() => {
+          if (!chosenRange) return;
+          setAddToClub({ marked: { id: "popover-range", kind: "days", from: chosenRange.from, to: chosenRange.to }, source: "popover" });
+        }}
         onClose={rangeSelect.clear}
       />
 
       {/* Several marked places: the tray, and its block dialog. */}
       <SelectionTray
-        items={pickActive ? [] : multi.items}
+        items={pickActive || addToClub ? [] : multi.items}
         today={todayKey}
         phone={isPhone}
         mayBook={mayBook}
@@ -1727,6 +1763,11 @@ export default function CalendarGridPage() {
           bookFromGrid(toRequest(only.calendarId, only.activityId, only.dayKey, only.range));
         }}
         onBlock={() => setMultiBlock(true)}
+        onAddToClubOrder={() => {
+          const only = multi.items[0];
+          if (!only) return;
+          setAddToClub({ marked: only, source: "tray" });
+        }}
       />
       {multiBlock ? (
         <MultiBlockDialog
@@ -1742,6 +1783,22 @@ export default function CalendarGridPage() {
 
       {rangeBlock ? (
         <RangeBlockDialog range={rangeBlock} calendars={shown} onClose={() => setRangeBlock(null)} />
+      ) : null}
+
+      {addToClub && mayBook ? (
+        <AddToClubOrderDialog
+          marked={addToClub.marked}
+          calendars={shown}
+          serviceId={singleServiceId}
+          today={todayKey}
+          onClose={() => setAddToClub(null)}
+          onAdded={() => {
+            /* "pending" (a single dragged range) was already cleared by the grid itself when the dialog opened. */
+            if (addToClub.source === "tray") multi.remove(addToClub.marked.id);
+            else if (addToClub.source === "popover") rangeSelect.clear();
+            setAddToClub(null);
+          }}
+        />
       ) : null}
 
       {moveProposal ? <MoveConfirmDialog move={moveProposal} onClose={() => setMoveProposal(null)} /> : null}

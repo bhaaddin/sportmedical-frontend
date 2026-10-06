@@ -84,11 +84,14 @@ describe('the tray on a phone', () => {
     expect(onRemove).toHaveBeenCalledWith('a');
     fireEvent.click(screen.getByRole('button', { name: 'Zrušit výběr' }));
     expect(onClear).toHaveBeenCalled();
-    /* A club order is never started from marked places: the tray only books a patient or blocks time. */
+    /*
+     * A club order is never STARTED from marked places - several places never offer it either, "Přidat do
+     * objednávky klubu" needs exactly one (the dialog attaches ONE range to ONE order).
+     */
     expect(screen.queryByRole('button', { name: /klub/i })).not.toBeInTheDocument();
   });
 
-  it('never offers a club action, not even for places from today on', () => {
+  it('offers no club action for a past single place, even with the callback wired', () => {
     render(
       <SelectionTray
         items={[time('b', '2026-10-19', 8 * 60, 9 * 60)]}
@@ -98,8 +101,60 @@ describe('the tray on a phone', () => {
         mayBlock
         onRemove={vi.fn()}
         onClear={vi.fn()}
+        onAddToClubOrder={vi.fn()}
       />,
     );
     expect(screen.queryByRole('button', { name: /klub/i })).not.toBeInTheDocument();
+  });
+
+  it('"Přidat do objednávky klubu" (Etapa 12) offers for exactly one future place, never a path to a new order', () => {
+    const onAddToClubOrder = vi.fn();
+    render(
+      <SelectionTray
+        items={[time('a', '2026-10-26', 8 * 60, 9 * 60)]}
+        today={TODAY}
+        phone={false}
+        mayBook
+        mayBlock
+        onRemove={vi.fn()}
+        onClear={vi.fn()}
+        onBlock={vi.fn()}
+        onAddToClubOrder={onAddToClubOrder}
+      />,
+    );
+    const button = screen.getByTestId('tray-add-to-club-order');
+    expect(button).toHaveTextContent('Přidat do objednávky klubu');
+    fireEvent.click(button);
+    expect(onAddToClubOrder).toHaveBeenCalled();
+    /* Never an entry to create a new order from here. */
+    expect(screen.queryByRole('button', { name: /telefonická objednávka/i })).not.toBeInTheDocument();
+  });
+
+  it('no club action without `mayBook`, and none without the callback', () => {
+    const { rerender } = render(
+      <SelectionTray
+        items={[time('a', '2026-10-26', 8 * 60, 9 * 60)]}
+        today={TODAY}
+        phone={false}
+        mayBook={false}
+        mayBlock
+        onRemove={vi.fn()}
+        onClear={vi.fn()}
+        onAddToClubOrder={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId('tray-add-to-club-order')).not.toBeInTheDocument();
+    rerender(
+      <SelectionTray
+        items={[time('a', '2026-10-26', 8 * 60, 9 * 60)]}
+        today={TODAY}
+        phone={false}
+        mayBook
+        mayBlock
+        onRemove={vi.fn()}
+        onClear={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId('tray-add-to-club-order')).not.toBeInTheDocument();
   });
 });

@@ -362,7 +362,7 @@ describe('desktop · 1440', () => {
     expect(within(entry).getByRole('button', { name: /Poslat odkaz klubu/ })).toBeInTheDocument();
   });
 
-  it('month: dragging across days picks a range, pills it, and the popover has no club entry', async () => {
+  it('month: dragging across days picks a range, pills it, and the popover offers "Přidat do objednávky klubu" (never a way to CREATE one)', async () => {
     renderPage(VIEWPORTS.desktop, 'month');
     const first = await screen.findByTestId('month-day-2026-10-12');
     pointerOf(first);
@@ -376,7 +376,9 @@ describe('desktop · 1440', () => {
     });
     expect(await screen.findByText('12. 10. – 25. 10.')).toBeInTheDocument();
     expect(screen.getByText('14 dní')).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: /klub/i })).not.toBeInTheDocument();
+    /* Etapa 12: attaching the range to an order that already exists is offered; creating one is still not. */
+    expect(screen.getByRole('menuitem', { name: /Přidat do objednávky klubu/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Vyplním sám/ })).not.toBeInTheDocument();
   });
 
   it('month: "Zablokovat čas" on a range blocks whole days in the calendars ticked', async () => {
@@ -532,7 +534,8 @@ describe('tablet · 834', () => {
     expect(screen.getByTestId('range-hint')).toHaveTextContent('Klepněte na poslední den výběru.');
     fireEvent.click(screen.getByTestId('month-day-2026-10-25'), { clientX: 200, clientY: 200 });
     expect(await screen.findByText('12. 10. – 25. 10.')).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: /klub/i })).not.toBeInTheDocument();
+    /* Etapa 12: attaching to an existing order is offered here too; still never a way to create a new one. */
+    expect(screen.getByRole('menuitem', { name: /Přidat do objednávky klubu/ })).toBeInTheDocument();
   });
 });
 

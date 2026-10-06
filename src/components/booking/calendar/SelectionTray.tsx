@@ -27,6 +27,12 @@ export interface SelectionTrayProps {
   /** Offered when exactly one time range is marked. */
   onBook?: () => void;
   onBlock?: () => void;
+  /**
+   * Etapa 12: "Přidat do objednávky klubu" - exactly one marked place, not past, same `mayBook` as `onBook`. Never
+   * a path to a NEW order (Etapa 9 keeps that only in "Klubová objednávka"); this attaches the mark to one that
+   * already exists.
+   */
+  onAddToClubOrder?: () => void;
 }
 
 function PlaceChip({
@@ -91,11 +97,14 @@ export function SelectionTray({
   onClear,
   onBook,
   onBlock,
+  onAddToClubOrder,
 }: SelectionTrayProps) {
   const [open, setOpen] = useState(false);
   if (items.length === 0) return null;
 
   const showBook = mayBook && onBook && items.length === 1 && items[0].kind === "time";
+  const showAddToClubOrder =
+    mayBook && onAddToClubOrder && items.length === 1 && !isPastPicked(items[0], today);
   const chips = (
     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }} data-testid="tray-chips">
       {items.map((item) => (
@@ -114,6 +123,11 @@ export function SelectionTray({
       {mayBlock && onBlock ? (
         <Button variant="outlined" onClick={onBlock} sx={{ minHeight: 44 }}>
           {GRID_TEXT.blockTime}
+        </Button>
+      ) : null}
+      {showAddToClubOrder ? (
+        <Button variant="outlined" onClick={onAddToClubOrder} sx={{ minHeight: 44 }} data-testid="tray-add-to-club-order">
+          {GRID_TEXT.addToClubOrder}
         </Button>
       ) : null}
       <Button onClick={onClear} sx={{ minHeight: 44, color: "text.secondary" }}>

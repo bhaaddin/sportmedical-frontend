@@ -181,6 +181,8 @@ export interface TimeGridProps {
   mayBlock: boolean;
   onOpen: (id: string) => void;
   onBook: (request: GridBookingRequest) => void;
+  /** Etapa 12: "Přidat do objednávky klubu" on the popover of a single dragged range - the page opens the picker. */
+  onAddToClubOrder?: (selection: Selection) => void;
   onPickDay: (day: DateOnly) => void;
   /** Club orders that do not block time yet: a dashed chip under the header of their days. */
   inquiriesByDay?: Map<string, InquiryRef[]>;
@@ -405,6 +407,12 @@ export function TimeGrid(props: TimeGridProps) {
         range: pending.range,
       });
     }
+    setPending(null);
+  };
+
+  const addToClubOrder = () => {
+    if (!pending) return;
+    props.onAddToClubOrder?.(pending);
     setPending(null);
   };
 
@@ -988,6 +996,7 @@ export function TimeGrid(props: TimeGridProps) {
         mayBlock={mayBlock}
         onBook={() => choose("book")}
         onBlock={() => choose("block")}
+        onAddToClubOrder={props.onAddToClubOrder ? addToClubOrder : undefined}
         onClose={() => setPending(null)}
       />
 
