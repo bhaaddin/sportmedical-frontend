@@ -28,6 +28,8 @@ export interface PickOrderPanelProps {
   calendarName: (calendarId: string) => string;
   /** A sentence about the last paint (cut at a booking, refused), or null. */
   note: string | null;
+  /** One small action under the note ("Vzít celý den" after a shortcut took only the needed time). */
+  noteAction?: { label: string; onClick: () => void } | null;
   /** Processing a request: what the club asked for (a hint only - the picks are the desk's own). */
   requested: readonly string[];
   /** Editing an existing order: the button saves the changes instead of confirming a new order. */
@@ -141,7 +143,7 @@ function ActivityChips({ pick, activities, touch, onToggle, onAll, disabled }: {
   );
 }
 
-/** "Navíc 4 h 30 min / 9 slotů": what is picked beyond the need. Information only - nothing is ever trimmed. */
+/** "Navíc 4 h 30 min / 9 slotů": what is picked beyond the need. Information only - nothing marked by hand is ever trimmed. */
 export const surplusLine = (coverage: Coverage): string => {
   const lengths = coverage.perActivity.filter((x) => x.seats > 0 && x.minutesPerSeat > 0).map((x) => x.minutesPerSeat);
   const shortest = lengths.length > 0 ? Math.min(...lengths) : 0;
@@ -150,6 +152,21 @@ export const surplusLine = (coverage: Coverage): string => {
     ? `Navíc ${formatMinutes(coverage.surplusMinutes)} / ${slots} ${slotsWord(slots)}`
     : `Navíc ${formatMinutes(coverage.surplusMinutes)}`;
 };
+
+/** The small link under a note ("Vzít celý den"); nothing when the note has no action. */
+function NoteActionButton({ action, touch }: { action?: { label: string; onClick: () => void } | null; touch: boolean }) {
+  if (action === null || action === undefined) return null;
+  return (
+    <Button
+      size="small"
+      data-testid="pick-note-action"
+      onClick={action.onClick}
+      sx={{ display: "inline-flex", ml: 0.5, minHeight: touch ? 36 : 24, minWidth: 0, px: 0.75, py: 0, textTransform: "none", fontWeight: 700, textDecoration: "underline", verticalAlign: "baseline" }}
+    >
+      {action.label}
+    </Button>
+  );
+}
 
 /** The big number (or "Hotovo"), per činnost and the progress: the heart of the panel. */
 function Remaining({ coverage, compact }: { coverage: Coverage; compact?: boolean }) {
@@ -220,7 +237,12 @@ function Details(props: PickOrderPanelProps) {
         </Stack>
       ) : null}
 
-      {props.note !== null ? <Alert severity="info" data-testid="pick-note" sx={{ py: 0.25 }}>{props.note}</Alert> : null}
+      {props.note !== null ? (
+        <Alert severity="info" data-testid="pick-note" sx={{ py: 0.25 }}>
+          {props.note}
+          <NoteActionButton action={props.noteAction} touch={props.device !== "desktop"} />
+        </Alert>
+      ) : null}
 
       <Box>
         <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
@@ -390,7 +412,10 @@ export function PickOrderPanel(props: PickOrderPanelProps) {
               </Typography>
             ) : null}
             {props.note !== null ? (
-              <Typography variant="caption" data-testid="pick-note-inline" sx={{ color: "text.secondary" }}>{props.note}</Typography>
+              <Typography variant="caption" data-testid="pick-note-inline" sx={{ color: "text.secondary" }}>
+                {props.note}
+                <NoteActionButton action={props.noteAction} touch />
+              </Typography>
             ) : null}
           </>
         )}

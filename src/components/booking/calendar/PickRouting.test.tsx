@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { setViewport, VIEWPORTS } from '../../../test/viewport';
@@ -331,5 +332,29 @@ describe('enlarging an order · desktop', () => {
       ranges: [{ fromDate: DAY, toDate: DAY, dailyFrom: '09:00', dailyTo: '09:30' }, { fromDate: DAY, toDate: DAY, dailyFrom: '13:00', dailyTo: '14:30' }],
     });
     expect(confirmOrder).not.toHaveBeenCalled();
+  });
+});
+
+describe.each([['phone', VIEWPORTS.phone], ['tablet', VIEWPORTS.tablet], ['desktop', VIEWPORTS.desktop]] as const)('the day shortcut and per-window činnosti · %s', (_n, width) => {
+  it('takes what the činnosti still miss, not just need minus picked: a Základní-only window of 480 min leaves 300 min of Spiroergometrie', async () => {
+    /* 12 x 30 (Základní) + 5 x 60 (Spiro) = 660 min. The saved window 08-16 is for Základní only: it covers its 360 min, the other 120 are lost to it. */
+    const acts = [
+      { activityId: 'a1', name: 'Základní prohlídka', seats: 12, minutesPerSeat: 30, parallelCapacity: 1 },
+      { activityId: 'a2', name: 'Spiroergometrie', seats: 5, minutesPerSeat: 60, parallelCapacity: 1 },
+    ];
+    renderWith(width, sessionOf({ dailyFrom: '08:00', dailyTo: '16:00', activityIds: ['a1'] }, acts));
+    const user = userEvent.setup();
+    await screen.findByTestId('pick-panel');
+    await user.click(await screen.findByRole('button', { name: 'Měsíc' }));
+    const day = await screen.findByTestId('pick-month-day-2026-09-25');
+    await user.click(day);
+    /* Need minus picked would be 180; the činnosti miss 300 (5 x 60). */
+    expect(await screen.findByTestId('pick-month-whole')).toHaveTextContent('Potřebný čas (5 h)');
+    await user.click(screen.getByTestId('pick-month-whole'));
+    await waitFor(() => expect(within(day).getByTestId('pick-month-chip')).toHaveTextContent('5:00 h'));
+    const panel = screen.getByTestId('pick-panel');
+    expect(within(panel).getByTestId('pick-covered')).toHaveTextContent('Hotovo');
+    /* Only the 120 min the Základní-only window could not use show as "Navíc" (picked 780 of 660); the new day adds no surplus. */
+    expect(within(panel).getByTestId('pick-covered')).toHaveTextContent(/Navíc 120 min/);
   });
 });

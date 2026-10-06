@@ -62,6 +62,30 @@ export const CAL_TEXT = {
     hint: "Čas drží klub – běžné objednávky sem nejdou. Sportovci se do něj registrují přes odkaz klubu.",
   },
 
+  /* "výběr termínů": the one-tap shortcuts take only the time that is still needed */
+  pick: {
+    alreadyCovered: "Objednávka je už pokryta. Další čas označte ručně.",
+    trimmed: (taken: string, unit: "day" | "block") =>
+      `Vzali jsme jen potřebný čas (${taken}); zbytek ${unit === "day" ? "dne" : "bloku"} zůstává volný pro běžné objednávky.`,
+    takeWholeDay: "Vzít celý den",
+    takeWholeBlock: "Vzít celý blok",
+    /* hints */
+    hintTouch: (club: string) =>
+      `Klepněte na začátek, potom na konec (výběr pro ${club}). Nebo klepnutím na volný blok vezmete potřebný čas z bloku.`,
+    hintMouse: (club: string) =>
+      `Výběr pro ${club}: tažením myší po volném čase označte sloty. Termín odeberete křížkem, upravíte tažením za okraj.`,
+    monthHint: "Číslo dole = volný čas · zelený štítek = vybráno. Klepnutím na den vezmete potřebný čas z dne.",
+    quickMode: "Klepnutí = potřebný čas z dne",
+    blocksTitle: "Volný čas dne — klepnutím vezmete potřebný čas z bloku",
+    needTime: "Potřebný čas",
+    wholeDay: "Celý den",
+    wholeDayExplicit: (free: string) => `Celý den (${free})`,
+    /* what stays free on a day with a pick (month cell) */
+    restPhone: (free: string) => `zbývá ${free}`,
+    rest: (free: string) => `zbývá ${free} pro běžné objednávky`,
+    willTake: (taken: string) => `vezmete ${taken}`,
+  },
+
   /* moving a booking by dragging it */
   moveTitle: "Přesunout rezervaci",
   moveFrom: "Z",

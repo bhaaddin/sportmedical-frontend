@@ -7,14 +7,15 @@ import { ClubOrderError, clubOrdersApi, REASON_ACTIVITY_REMOVED } from "../../..
 import type { ClubOrderView } from "../../../api/clubOrders";
 import type { DateOnly } from "../../../utils/time";
 import { invalidateClubWorld } from "../../clubs/clubWorld";
-import { computeAdditionalCoverage, computeCoverage } from "../../clubs/order/coverage";
 import { mergeSessionInto } from "../../clubs/order/editSession";
 import { orderCode, rangeLine } from "../../clubs/order/orderFormat";
 import { rowFromRange, rowIndexForError } from "../../clubs/order/orderLogic";
 import { allowedNames, normalizeAllowed, toggleAllowed } from "../../clubs/order/routing";
 import type { PickSession } from "../../clubs/order/pickSession";
 import type { GridPickMode } from "../grid/TimeGrid";
-import type { FreeBlock } from "./pickDays";
+import { formatFree, type FreeBlock } from "./pickDays";
+import { CAL_TEXT } from "./calendarText";
+import { coverageOf, subtractRanges, takeNeeded } from "./pickTake";
 import {
   ordersRangesOf,
   pickedCalendarIds,
@@ -37,6 +38,11 @@ import type { MultiSelectApi } from "./useMultiSelect";
  * panel. Picking is MANUAL only: nothing proposes terms.
  */
 
+export interface NoteAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface PickOrderApi {
   session: PickSession | null;
   active: boolean;
@@ -56,12 +62,18 @@ export interface PickOrderApi {
   resolveDuplicate: (choice: "add" | "separate" | "dismiss") => void;
   /** "Objednávka potvrzena" (new, processed) or "Termíny uloženy" (edited). */
   resultTitle: string;
-  /** "Celý den" / a free block: the blocks of one day become picks, exactly as they are (never cut to the need). */
-  pickBlocks: (day: DateOnly, blocks: readonly FreeBlock[]) => boolean;
+  /**
+   * The one-tap shortcut ("Celý den" in the month, a free block on the phone): the free time of the day or block is
+   * picked ONLY UP TO what the order still misses (rounded up to a whole slot); the rest stays free for ordinary
+   * bookings. `whole: true` is the explicit override and books the blocks exactly as they are.
+   */
+  pickBlocks: (day: DateOnly, blocks: readonly FreeBlock[], options?: { whole?: boolean; unit?: "day" | "block" }) => boolean;
+  /** What the shortcut would take from these blocks right now (minutes), and whether the order is already covered. */
+  previewTake: (blocks: readonly FreeBlock[]) => { minutes: number; covered: boolean };
   /** Every pick of one day is dropped. */
   removeDay: (day: DateOnly) => void;
-  /** A sentence under the calculator (null clears it). */
-  setNote: (text: string | null) => void;
+  /** A sentence under the calculator (null clears it), optionally with one small action ("Vzít celý den"). */
+  setNote: (text: string | null, action?: NoteAction | null) => void;
   closeResult: () => void;
 }
 
@@ -79,7 +91,12 @@ export function usePickOrder(input: {
   const { multi, calendars, todayKey, nowMinute, onStarted, onEnded, onCreated } = input;
   const queryClient = useQueryClient();
   const [session, setSession] = useState<PickSession | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const [note, setNoteText] = useState<string | null>(null);
+  const [noteAction, setNoteAction] = useState<NoteAction | null>(null);
+  const setNote = useCallback((text: string | null, action: NoteAction | null = null) => {
+    setNoteText(text);
+    setNoteAction(action);
+  }, []);
   const [confirming, setConfirming] = useState(false);
   const [failure, setFailure] = useState<{
     message: string;
@@ -101,11 +118,14 @@ export function usePickOrder(input: {
   const routableIds = useMemo(() => routable.map((a) => a.activityId), [routable]);
   const windows = useMemo(() => pickedWindowsOf(multi.items), [multi.items]);
   const baseline = session?.editOrder?.baseline;
-  const coverage = useMemo(() => {
-    /* Enlarging an order: only what the added players cost is missing. */
-    const extra = baseline === undefined ? null : computeAdditionalCoverage(activities, baseline, pickedMinutes, windows);
-    return extra ?? computeCoverage(activities, pickedMinutes, windows);
-  }, [activities, pickedMinutes, windows, baseline]);
+  /* Enlarging an order: only what the added players cost is missing (see `coverageOf`). */
+  const takeState = useMemo(
+    () => ({ activities, ...(baseline !== undefined ? { baseline } : {}), pickedMinutes, windows }),
+    [activities, baseline, pickedMinutes, windows],
+  );
+  const coverage = useMemo(() => coverageOf(takeState), [takeState]);
+  const itemsRef = useRef(multi.items);
+  itemsRef.current = multi.items;
 
   const serviceCalendarIds = useMemo(
     () => new Set(calendars.filter((c) => session !== null && c.clinicServiceId === session.serviceId).map((c) => c.id)),
@@ -285,19 +305,63 @@ export function usePickOrder(input: {
   );
 
   const pickBlocks = useCallback(
-    (day: DateOnly, blocks: readonly FreeBlock[]): boolean => {
+    (day: DateOnly, blocks: readonly FreeBlock[], options?: { whole?: boolean; unit?: "day" | "block" }): boolean => {
       if (blocks.length === 0) {
         setNote("V tento den už není volný čas.");
         return false;
       }
-      for (const t of blocks) {
-        multi.add({ kind: "time", columnKey: t.calendarId, calendarId: t.calendarId, activityId: null, dayKey: day, range: t.range });
+      const unit = options?.unit ?? "day";
+      const add = (list: readonly FreeBlock[]) => {
+        for (const t of list) {
+          multi.add({ kind: "time", columnKey: t.calendarId, calendarId: t.calendarId, activityId: null, dayKey: day, range: t.range });
+        }
+      };
+      /* The explicit "whole" is booked exactly as it is. */
+      if (options?.whole === true) {
+        add(blocks);
+        clearFailure();
+        setNote(null);
+        return true;
       }
+      const take = takeNeeded(takeState, blocks);
+      if (take.covered) {
+        clearFailure();
+        setNote(CAL_TEXT.pick.alreadyCovered);
+        return false;
+      }
+      add(take.blocks);
       clearFailure();
-      setNote(null);
+      if (!take.trimmed) {
+        setNote(null);
+        return true;
+      }
+      /* Trimmed: say so once, and offer the whole day (or block) as an explicit, exact pick. */
+      const created = take.blocks;
+      setNote(CAL_TEXT.pick.trimmed(formatFree(take.minutes), unit), {
+        label: unit === "day" ? CAL_TEXT.pick.takeWholeDay : CAL_TEXT.pick.takeWholeBlock,
+        onClick: () => {
+          const current = timePicks(itemsRef.current);
+          const mine = current.filter((p) => p.dayKey === day && created.some((c) => c.calendarId === p.calendarId && c.range.start === p.range.start && c.range.end === p.range.end));
+          for (const p of mine) multi.remove(p.id);
+          const gone = new Set(mine.map((p) => p.id));
+          for (const b of blocks) {
+            const cuts = current.filter((p) => !gone.has(p.id) && p.dayKey === day && p.calendarId === b.calendarId).map((p) => p.range);
+            add(subtractRanges(b.range, cuts).map((range) => ({ calendarId: b.calendarId, range })));
+          }
+          clearFailure();
+          setNote(null);
+        },
+      });
       return true;
     },
-    [multi, clearFailure],
+    [multi, clearFailure, takeState, setNote],
+  );
+  const previewTake = useCallback(
+    (blocks: readonly FreeBlock[]) => {
+      const take = takeNeeded(takeState, blocks);
+      return { minutes: take.minutes, covered: take.covered };
+    },
+    [takeState],
   );
   const removeDay = useCallback(
     (day: DateOnly) => {
@@ -318,6 +382,7 @@ export function usePickOrder(input: {
           picks,
           calendarName,
           note,
+          noteAction,
           requested: session.editOrder?.requested ?? [],
           editing: session.editOrder?.mode === "edit",
           confirming,
@@ -350,7 +415,7 @@ export function usePickOrder(input: {
           onCancel: end,
         };
 
-  return { session, active: session !== null, start, cancel: end, gridPick, panel, result, duplicate, resolveDuplicate, resultTitle, closeResult: () => setResult(null), pickBlocks, removeDay, setNote };
+  return { session, active: session !== null, start, cancel: end, gridPick, panel, result, duplicate, resolveDuplicate, resultTitle, closeResult: () => setResult(null), pickBlocks, previewTake, removeDay, setNote };
 }
 
 /** The club's newest Requested or Confirmed order of this služba, or null (also when the list cannot be read). */

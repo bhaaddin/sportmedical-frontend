@@ -5,16 +5,19 @@ import { DESIGN } from "../../../theme";
 import type { DateOnly } from "../../../utils/time";
 import type { DayMark } from "../grid/dayMarks";
 import { WEEKDAY_ABBREVIATION, shortDate } from "../grid/periodTitle";
+import { useDevice } from "../../../layout/useDevice";
+import { CAL_TEXT } from "./calendarText";
 import { InquiryChip } from "./InquiryChip";
 import type { InquiryRef } from "./inquiries";
 import { formatFree } from "./pickDays";
 
 /*
  * The month in "výběr termínů": every day shows how much free time the služba's calendars still have, a picked day
- * carries a chip with its minutes, closed / holiday / past days are greyed. A tap on a day offers "Celý den" (all of
- * its free time, up to what is still needed) or "Vybrat čas…" (the day view, to pick hours); a tap on a picked day
- * edits or removes its pick. "Klepnutí = celý den" turns the tap into the whole-day pick straight away, so several
- * days in a row are one tap each.
+ * carries a chip with its minutes, closed / holiday / past days are greyed. A tap on a day offers the shortcut (the
+ * free time of the day ONLY UP TO what the order still needs - "Celý den" when the day is not longer than that), the
+ * explicit "Celý den" (exact, nothing trimmed) or "Vybrat čas…" (the day view, to pick hours); a tap on a picked day
+ * edits or removes its pick. "Klepnutí = potřebný čas z dne" turns the tap into the shortcut straight away, so several
+ * days in a row are one tap each. A day with a pick shows how much of it stays free ("zbývá 3 h").
  */
 
 const WEEKDAY_HEADS = [1, 2, 3, 4, 5, 6, 0];
@@ -35,7 +38,12 @@ export interface PickMonthViewProps {
   freeMinutes: (day: DateOnly) => number;
   /** Minutes picked on a day. */
   pickedMinutes: (day: DateOnly) => number;
+  /** The shortcut: the free time of the day up to what is still needed (the page trims it). */
   onWholeDay: (day: DateOnly) => void;
+  /** The explicit override: the whole free time of the day, exactly. */
+  onExactDay?: (day: DateOnly) => void;
+  /** What the shortcut would take on a day, and whether the order is already covered. */
+  takeFor?: (day: DateOnly) => { minutes: number; covered: boolean };
   onChooseTime: (day: DateOnly) => void;
   onRemoveDay: (day: DateOnly) => void;
   /** Open club orders: their days carry a dashed chip (the order being processed reads "Klub žádá"). */
@@ -45,6 +53,7 @@ export interface PickMonthViewProps {
 
 export function PickMonthView(props: PickMonthViewProps) {
   const { days, anchorMonth, todayKey, marks, freeMinutes, pickedMinutes } = props;
+  const phone = useDevice() === "phone";
   const [quick, setQuick] = useState(false);
   const [menu, setMenu] = useState<{ day: DateOnly; el: HTMLElement } | null>(null);
 
@@ -72,18 +81,20 @@ export function PickMonthView(props: PickMonthViewProps) {
   const menuDay = menu?.day ?? null;
   const menuFree = menuDay === null ? 0 : freeMinutes(menuDay);
   const menuPicked = menuDay === null ? 0 : pickedMinutes(menuDay);
+  const menuTake = menuDay === null ? null : (props.takeFor?.(menuDay) ?? null);
+  const menuTrimmed = menuTake !== null && !menuTake.covered && menuTake.minutes < menuFree;
   const close = () => setMenu(null);
 
   return (
     <Box data-testid="pick-month" sx={{ minWidth: 0 }}>
       <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 0.5, mb: 1 }}>
         <Typography variant="caption" sx={{ color: "text.secondary" }}>
-          Číslo dole = volný čas · zelený štítek = vybráno. Klepněte na den.
+          {CAL_TEXT.pick.monthHint}
         </Typography>
         <FormControlLabel
           sx={{ m: 0, minHeight: 44 }}
           control={<Switch checked={quick} onChange={(_, on) => setQuick(on)} />}
-          label={<Typography sx={{ fontSize: 13, fontWeight: 600 }}>Klepnutí = celý den</Typography>}
+          label={<Typography sx={{ fontSize: 13, fontWeight: 600 }}>{CAL_TEXT.pick.quickMode}</Typography>}
         />
       </Stack>
       <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: `${DESIGN.radius.lg}px`, bgcolor: "background.paper", overflow: "hidden" }}>
@@ -102,7 +113,7 @@ export function PickMonthView(props: PickMonthViewProps) {
             const picked = pickedMinutes(day);
             const outside = day.slice(0, 7) !== anchorMonth;
             const shut = past || mark.closed || (free <= 0 && picked === 0);
-            const label = `${shortDate(day)}, ${past ? "minulost" : mark.closed ? "zavřeno" : free > 0 ? `volno ${formatFree(free)}` : "bez volného času"}${picked > 0 ? `, vybráno ${picked} min` : ""}`;
+            const label = `${shortDate(day)}, ${past ? "minulost" : mark.closed ? "zavřeno" : free > 0 ? `volno ${formatFree(free)}` : "bez volného času"}${picked > 0 ? `, vybráno ${picked} min` : ""}${picked > 0 && free > 0 ? `, ${CAL_TEXT.pick.rest(formatFree(free))}` : ""}`;
             return (
               <ButtonBase
                 key={day}
@@ -163,9 +174,20 @@ export function PickMonthView(props: PickMonthViewProps) {
                     <Box component="span" sx={{ display: "block", height: 4, borderRadius: 2, bgcolor: alpha(DESIGN.selection.line, 0.18), overflow: "hidden" }}>
                       <Box component="span" sx={{ display: "block", height: "100%", width: `${Math.min(100, (free / BAR_FULL) * 100)}%`, bgcolor: DESIGN.selection.line }} />
                     </Box>
-                    <Typography component="span" sx={{ display: "block", fontSize: 10, lineHeight: 1.3, color: "text.secondary", whiteSpace: "nowrap" }}>
-                      {free > 0 ? formatFree(free) : "—"}
-                    </Typography>
+                    {picked > 0 && free > 0 ? (
+                      <Typography
+                        component="span"
+                        data-testid="pick-month-rest"
+                        title={CAL_TEXT.pick.rest(formatFree(free))}
+                        sx={{ display: "block", fontSize: 10, lineHeight: 1.25, color: "text.secondary", whiteSpace: "normal", overflowWrap: "anywhere" }}
+                      >
+                        {phone ? CAL_TEXT.pick.restPhone(formatFree(free)) : CAL_TEXT.pick.rest(formatFree(free))}
+                      </Typography>
+                    ) : (
+                      <Typography component="span" sx={{ display: "block", fontSize: 10, lineHeight: 1.3, color: "text.secondary", whiteSpace: "nowrap" }}>
+                        {free > 0 ? formatFree(free) : "—"}
+                      </Typography>
+                    )}
                   </Box>
                 ) : null}
               </ButtonBase>
@@ -197,7 +219,24 @@ export function PickMonthView(props: PickMonthViewProps) {
                   close();
                 }}
               >
-                {`Celý den (${formatFree(menuFree)})`}
+                {menuTrimmed && menuTake !== null
+                  ? `${CAL_TEXT.pick.needTime} (${formatFree(menuTake.minutes)})`
+                  : menuTake?.covered === true
+                    ? CAL_TEXT.pick.needTime
+                    : CAL_TEXT.pick.wholeDayExplicit(formatFree(menuFree))}
+              </Button>
+            ) : null}
+            {menuFree > 0 && menuTrimmed && props.onExactDay !== undefined ? (
+              <Button
+                variant="outlined"
+                data-testid="pick-month-whole-exact"
+                sx={{ minHeight: 44 }}
+                onClick={() => {
+                  props.onExactDay?.(menuDay);
+                  close();
+                }}
+              >
+                {CAL_TEXT.pick.wholeDayExplicit(formatFree(menuFree))}
               </Button>
             ) : null}
             <Button

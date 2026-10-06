@@ -3,10 +3,12 @@ import { DESIGN } from "../../../theme";
 import { formatMinutes } from "../grid/timeRange";
 import type { FreeBlock } from "./pickDays";
 import { formatFree } from "./pickDays";
+import { CAL_TEXT } from "./calendarText";
 
 /*
  * The free time of the day in "výběr termínů", as big blocks on a phone: one tap takes the whole block
- * ("08:30–12:00 volno"), cut at what is still needed. The grid below stays for picking part of a block.
+ * ("08:30–12:00 volno") takes the time the order still needs from it (never more than the block; the rest of the block
+ * stays free for ordinary bookings). The grid below stays for marking an exact part of a block.
  */
 
 export interface FreeBlocksListProps {
@@ -15,14 +17,16 @@ export interface FreeBlocksListProps {
   /** More than one calendar of the služba: the name is shown on every block. */
   showCalendar: boolean;
   onPick: (block: FreeBlock) => void;
+  /** What a tap would take from the block (minutes) and whether the order is already covered. */
+  takeOf?: (block: FreeBlock) => { minutes: number; covered: boolean };
   /** No free time today: the way forward. */
   onNextDay: () => void;
 }
 
-export function FreeBlocksList({ blocks, calendarName, showCalendar, onPick, onNextDay }: FreeBlocksListProps) {
+export function FreeBlocksList({ blocks, calendarName, showCalendar, onPick, takeOf, onNextDay }: FreeBlocksListProps) {
   return (
     <Paper variant="outlined" data-testid="free-blocks" sx={{ p: 1.25, mb: 1.5, borderRadius: `${DESIGN.radius.lg}px` }}>
-      <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 0.75 }}>Volný čas dne — klepnutím vyberete celý blok</Typography>
+      <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 0.75 }}>{CAL_TEXT.pick.blocksTitle}</Typography>
       {blocks.length === 0 ? (
         <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>V tento den už není volný čas.</Typography>
@@ -59,9 +63,22 @@ export function FreeBlocksList({ blocks, calendarName, showCalendar, onPick, onN
                   <Typography variant="caption" sx={{ color: "text.secondary" }}>{calendarName(block.calendarId)}</Typography>
                 ) : null}
               </Box>
-              <Typography sx={{ fontSize: 13, fontWeight: 600, color: DESIGN.selection.line }}>
-                {`volno ${formatFree(block.range.end - block.range.start)}`}
-              </Typography>
+              <Box sx={{ textAlign: "right" }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: DESIGN.selection.line }}>
+                  {`volno ${formatFree(block.range.end - block.range.start)}`}
+                </Typography>
+                {(() => {
+                  const take = takeOf?.(block);
+                  if (take === undefined) return null;
+                  if (take.covered) return null;
+                  if (take.minutes >= block.range.end - block.range.start) return null;
+                  return (
+                    <Typography data-testid="free-block-take" sx={{ fontSize: 12, color: "text.secondary" }}>
+                      {CAL_TEXT.pick.willTake(formatFree(take.minutes))}
+                    </Typography>
+                  );
+                })()}
+              </Box>
             </ButtonBase>
           ))}
         </Box>

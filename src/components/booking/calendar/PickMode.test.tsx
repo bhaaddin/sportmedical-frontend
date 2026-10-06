@@ -412,30 +412,81 @@ describe.each([
     expect(monthDay('2026-09-23')).toHaveAttribute('data-free', '330');
   });
 
-  it('"Celý den" books the whole free working time of the day, never cut at the need; tapping the day again removes it', async () => {
+  it('the day shortcut takes only the time the order still needs; tapping the day again removes it', async () => {
     renderPage(width);
     const user = await startPicking();
     await goMonth(user);
     await user.click(monthDay('2026-09-25'));
-    await user.click(await screen.findByTestId('pick-month-whole'));
-    /* 10 players x 30 min = 300 min, the day has 480: the whole day is booked. */
-    await waitFor(() => expect(within(monthDay('2026-09-25')).getByTestId('pick-month-chip')).toHaveTextContent('8:00 h'));
+    /* The menu says what the tap takes: 300 of the 480 minutes. */
+    expect(await screen.findByTestId('pick-month-whole')).toHaveTextContent('Potřebný čas (5 h)');
+    await user.click(screen.getByTestId('pick-month-whole'));
+    /* 10 players x 30 min = 300 min, the day has 480: 300 are taken, 180 stay free. */
+    await waitFor(() => expect(within(monthDay('2026-09-25')).getByTestId('pick-month-chip')).toHaveTextContent('5:00 h'));
     expect(progress()).toHaveAttribute('aria-valuenow', '100');
+    expect(summary()).toHaveTextContent(/Hotovo/);
+    expect(summary()).not.toHaveTextContent(/Navíc/);
+    expect(monthDay('2026-09-25')).toHaveAttribute('data-free', '180');
+    expect(within(monthDay('2026-09-25')).getByTestId('pick-month-rest')).toHaveAttribute('title', 'zbývá 3 h pro běžné objednávky');
+    expect(monthDay('2026-09-25')).toHaveAccessibleName(/zbývá 3 h pro běžné objednávky/);
+    expect(within(monthDay('2026-09-25')).getByTestId('pick-month-rest')).toHaveTextContent(width < 600 ? /^zbývá 3 h$/ : 'zbývá 3 h pro běžné objednávky');
     await user.click(monthDay('2026-09-25'));
     await user.click(await screen.findByTestId('pick-month-remove'));
     await waitFor(() => expect(within(monthDay('2026-09-25')).queryByTestId('pick-month-chip')).not.toBeInTheDocument());
     expect(progress()).toHaveAttribute('aria-valuenow', '0');
   });
 
-  it('a 60-minute need and a whole-day tap: the whole day is booked, with the surplus shown as information', async () => {
+  it('a 60-minute need and the day shortcut: exactly 60 minutes are taken, no surplus', async () => {
     renderPage(width);
     const user = await startPicking('2');
     await goMonth(user);
     await user.click(monthDay('2026-09-25'));
     await user.click(await screen.findByTestId('pick-month-whole'));
-    await waitFor(() => expect(within(monthDay('2026-09-25')).getByTestId('pick-month-chip')).toHaveTextContent('8:00 h'));
+    await waitFor(() => expect(within(monthDay('2026-09-25')).getByTestId('pick-month-chip')).toHaveTextContent('1:00 h'));
     expect(summary()).toHaveTextContent(/Hotovo/);
-    expect(summary()).toHaveTextContent(/Navíc 420 min \/ 14 slotů/);
+    expect(summary()).not.toHaveTextContent(/Navíc/);
+  });
+
+  it('after a trimmed tap one note says so; "Vzít celý den" replaces the pick by the whole day, exactly', async () => {
+    renderPage(width);
+    const user = await startPicking();
+    await goMonth(user);
+    await user.click(monthDay('2026-09-25'));
+    await user.click(await screen.findByTestId('pick-month-whole'));
+    await waitFor(() => expect(within(monthDay('2026-09-25')).getByTestId('pick-month-chip')).toHaveTextContent('5:00 h'));
+    expect((await screen.findAllByText(/Vzali jsme jen potřebný čas/))[0]).toHaveTextContent(
+      'Vzali jsme jen potřebný čas (5 h); zbytek dne zůstává volný pro běžné objednávky.',
+    );
+    await user.click(screen.getByTestId('pick-note-action'));
+    await waitFor(() => expect(within(monthDay('2026-09-25')).getByTestId('pick-month-chip')).toHaveTextContent('8:00 h'));
+    /* Exactly as marked: the surplus is shown, nothing is trimmed, the note is gone. */
+    expect(summary()).toHaveTextContent(/Navíc 180 min \/ 6 slotů/);
+    expect(screen.queryByText(/Vzali jsme jen potřebný čas/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('pick-note-action')).not.toBeInTheDocument();
+    expect(monthDay('2026-09-25')).toHaveAttribute('data-free', '0');
+  });
+
+  it('the explicit whole day is one more button in the day menu, booked exactly', async () => {
+    renderPage(width);
+    const user = await startPicking();
+    await goMonth(user);
+    await user.click(monthDay('2026-09-25'));
+    await user.click(await screen.findByTestId('pick-month-whole-exact'));
+    await waitFor(() => expect(within(monthDay('2026-09-25')).getByTestId('pick-month-chip')).toHaveTextContent('8:00 h'));
+    expect(summary()).toHaveTextContent(/Navíc 180 min/);
+  });
+
+  it('a need that is already covered: the tap adds nothing and says so', async () => {
+    renderPage(width);
+    const user = await startPicking();
+    await goMonth(user);
+    await user.click(monthDay('2026-09-24'));
+    await user.click(await screen.findByTestId('pick-month-whole')); // 300 min: covered
+    await waitFor(() => expect(within(monthDay('2026-09-24')).getByTestId('pick-month-chip')).toBeInTheDocument());
+    await user.click(monthDay('2026-09-25'));
+    await user.click(await screen.findByTestId('pick-month-whole'));
+    expect((await screen.findAllByText('Objednávka je už pokryta. Další čas označte ručně.')).length).toBeGreaterThan(0);
+    expect(within(monthDay('2026-09-25')).queryByTestId('pick-month-chip')).not.toBeInTheDocument();
+    expect(summary()).not.toHaveTextContent(/Navíc/);
   });
 
   it('"Vybrat čas…" opens the day, and the pick of the month survives the trip', async () => {
@@ -466,16 +517,41 @@ describe.each([
 });
 
 describe('month pick · several days in a row', () => {
-  it('"Klepnutí = celý den" books a whole day per tap, even when everybody is already covered', async () => {
+  it.each([
+    ['phone · 390', VIEWPORTS.phone],
+    ['tablet · 834', VIEWPORTS.tablet],
+    ['desktop · 1440', VIEWPORTS.desktop],
+  ])('%s: "Klepnutí = potřebný čas z dne" - 480 + 480 + 60 over three days, the last one trimmed, no surplus', async (_n, width) => {
+    renderPage(width);
+    const user = await startPicking('34'); // 34 x 30 = 1 020 min
+    await goMonth(user);
+    await user.click(screen.getByRole('switch', { name: 'Klepnutí = potřebný čas z dne' }));
+    await user.click(monthDay('2026-09-24'));
+    await user.click(monthDay('2026-09-25'));
+    await user.click(monthDay('2026-09-26'));
+    await waitFor(() => expect(within(monthDay('2026-09-26')).getByTestId('pick-month-chip')).toHaveTextContent('1:00 h'));
+    expect(within(monthDay('2026-09-25')).getByTestId('pick-month-chip')).toHaveTextContent('8:00 h');
+    expect(within(monthDay('2026-09-24')).getByTestId('pick-month-chip')).toHaveTextContent('8:00 h');
+    expect(summary()).toHaveTextContent(/Hotovo/);
+    expect(summary()).not.toHaveTextContent(/Navíc/);
+    expect(monthDay('2026-09-26')).toHaveAttribute('data-free', '420'); // the rest of the last day stays free
+    expect(within(monthDay('2026-09-26')).getByTestId('pick-month-rest')).toHaveTextContent(/zbývá 7 h/);
+    /* One more tap: everybody is covered, so nothing is added. */
+    await user.click(monthDay('2026-09-27'));
+    expect((await screen.findAllByText('Objednávka je už pokryta. Další čas označte ručně.')).length).toBeGreaterThan(0);
+    expect(within(monthDay('2026-09-27')).queryByTestId('pick-month-chip')).not.toBeInTheDocument();
+  });
+
+  it('a whole day is still booked whole when the need is at least the day (the 30 Oct case)', async () => {
     renderPage(VIEWPORTS.phone);
     const user = await startPicking('28'); // 28 x 30 = 840 min
     await goMonth(user);
-    await user.click(screen.getByRole('switch', { name: 'Klepnutí = celý den' }));
+    await user.click(screen.getByRole('switch', { name: 'Klepnutí = potřebný čas z dne' }));
     await user.click(monthDay('2026-09-24'));
-    await user.click(monthDay('2026-09-25'));
-    await waitFor(() => expect(within(monthDay('2026-09-25')).getByTestId('pick-month-chip')).toHaveTextContent('8:00 h'));
-    expect(within(monthDay('2026-09-24')).getByTestId('pick-month-chip')).toHaveTextContent('8:00 h');
-    expect(summary()).toHaveTextContent(/Hotovo/);
+    await waitFor(() => expect(within(monthDay('2026-09-24')).getByTestId('pick-month-chip')).toHaveTextContent('8:00 h'));
+    expect(summary()).toHaveTextContent('Zbývá 12 slotů');
+    expect(screen.queryByTestId('pick-note-action')).not.toBeInTheDocument();
+    expect(within(monthDay('2026-09-24')).queryByTestId('pick-month-rest')).not.toBeInTheDocument();
   });
 });
 
@@ -522,11 +598,33 @@ describe('phone · day view of free blocks', () => {
     expect(blocks).toHaveLength(1);
     expect(blocks[0]).toHaveTextContent('10:30–16:00');
     expect(blocks[0]).toHaveTextContent('volno 5 h 30 min');
+    /* The block says what a tap takes: 300 of its 330 minutes. */
+    expect(within(blocks[0]).getByTestId('free-block-take')).toHaveTextContent('vezmete 5 h');
+    expect(screen.getByTestId('free-blocks')).toHaveTextContent('klepnutím vezmete potřebný čas z bloku');
     await user.click(blocks[0]);
-    /* The whole block is more than the 300 minutes needed: it is still booked whole, 10:30-16:00. */
+    /* Only the 300 minutes the order needs are taken, from the start of the block: 10:30-15:30. */
     await waitFor(() => expect(screen.getAllByTestId('picked-range')).toHaveLength(1));
-    expect(screen.getByTestId('picked-range')).toHaveTextContent('10:30 – 16:00');
+    expect(screen.getByTestId('picked-range')).toHaveTextContent('10:30 – 15:30 · 300 min');
     expect(summary()).toHaveTextContent(/Hotovo/);
+    expect(summary()).not.toHaveTextContent(/Navíc/);
+    /* The rest of the block stays free, and the note offers the whole block. */
+    expect(screen.getByTestId('free-blocks')).toHaveTextContent('15:30–16:00');
+    expect((await screen.findAllByText(/zbytek bloku zůstává volný/)).length).toBeGreaterThan(0);
+    await user.click(screen.getByTestId('pick-note-action'));
+    await waitFor(() => expect(screen.getByTestId('picked-range')).toHaveTextContent('10:30 – 16:00 · 330 min'));
+    expect(summary()).toHaveTextContent(/Navíc 30 min/);
+  });
+
+  it('a tap-start / tap-end by hand is booked exactly as marked, beyond the need, and the panel shows the surplus', async () => {
+    renderPage(VIEWPORTS.phone);
+    await startPicking('2'); // 60 min
+    tap(11 * 60);
+    tap(15 * 60 + 30);
+    await waitFor(() => expect(screen.getAllByTestId('picked-range')).toHaveLength(1));
+    expect(screen.getByTestId('picked-range')).toHaveTextContent('11:00 – 16:00 · 300 min');
+    expect(summary()).toHaveTextContent(/Hotovo/);
+    expect(summary()).toHaveTextContent(/Navíc 240 min/);
+    expect(screen.queryByTestId('pick-note-action')).not.toBeInTheDocument();
   });
 
   it('a day with nothing left says so and offers the next day', async () => {

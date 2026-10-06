@@ -1463,8 +1463,8 @@ export default function CalendarGridPage() {
           {pick.panel !== null ? (
             <Alert severity="info" data-testid="pick-hint" sx={{ mb: 1.5 }}>
               {touchPick
-                ? `Klepněte na začátek, potom na konec (výběr pro ${pick.panel.clubName}). Nebo vezměte celý volný blok či celý den.`
-                : `Výběr pro ${pick.panel.clubName}: tažením myší po volném čase označte sloty. Termín odeberete křížkem, upravíte tažením za okraj.`}
+                ? CAL_TEXT.pick.hintTouch(pick.panel.clubName)
+                : CAL_TEXT.pick.hintMouse(pick.panel.clubName)}
             </Alert>
           ) : null}
           {pickActive && view === "day" && isPhone && pick.panel !== null ? (
@@ -1472,7 +1472,8 @@ export default function CalendarGridPage() {
               blocks={freeBlocksOn(anchor)}
               calendarName={pick.panel.calendarName}
               showCalendar={dayData.calendars.length > 1}
-              onPick={(block) => pick.pickBlocks(anchor, [block])}
+              onPick={(block) => pick.pickBlocks(anchor, [block], { unit: "block" })}
+              takeOf={(block) => pick.previewTake([block])}
               onNextDay={() => stepBy(1)}
             />
           ) : null}
@@ -1554,7 +1555,9 @@ export default function CalendarGridPage() {
                   holidayColor={holidayColor}
                   freeMinutes={(day) => freeByDay.get(day) ?? 0}
                   pickedMinutes={(day) => pickedByDay.get(day) ?? 0}
-                      onWholeDay={(day) => pick.pickBlocks(day, freeBlocksOn(day))}
+                  onWholeDay={(day) => pick.pickBlocks(day, freeBlocksOn(day))}
+                  onExactDay={(day) => pick.pickBlocks(day, freeBlocksOn(day), { whole: true })}
+                  takeFor={(day) => pick.previewTake(freeBlocksOn(day))}
                   onChooseTime={(day) => {
                     setAnchor(day);
                     changeView("day");
