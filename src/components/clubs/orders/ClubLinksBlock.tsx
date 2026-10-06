@@ -1,5 +1,5 @@
 /*
- * "Odkazy": the two links of one club order, each shown ONCE - the club's portal link (`formUrl`; the form while the
+ * "Odkazy": the two links of one club order, each shown ONCE - the club's portal link (`portalUrl`, else `formUrl`; the form while the
  * order is an invitation, the portal afterwards) and the players' / parents' link (`registrationUrl`, once the order
  * is confirmed). "Vygenerovat nový odkaz" issues new ones (`rotate-links`); the old ones stop working, so it asks first.
  */
@@ -52,12 +52,18 @@ export function RotateLinksDialog({ order, onClose, onRotated }: {
 export function ClubLinksBlock({ order }: { order: ClubOrderView }) {
   const [confirming, setConfirming] = useState(false);
   const players = order.registrationUrl !== '' && (order.status === 'Confirmed' || order.status === 'Completed');
-  const canRotate = order.status !== 'Cancelled' && order.formUrl !== '';
+  const clubPath = (order.portalUrl ?? '') !== '' ? (order.portalUrl as string) : order.formUrl;
+  const canRotate = order.status !== 'Cancelled';
   return (
     <Stack spacing={1.5} data-testid="club-links">
+      {order.linksStale === true ? (
+        <Alert severity="warning" data-testid="links-stale">
+          Odkazy této objednávky nelze zobrazit (změnil se podpisový klíč serveru). Odkazy, které klub už má, fungují dál; pro zobrazení vygenerujte nové.
+        </Alert>
+      ) : null}
       <LinkCopyRow
         label={order.status === 'Invited' ? 'Odkaz pro klub (formulář objednávky)' : 'Odkaz pro klub (portál klubu)'}
-        path={order.formUrl}
+        path={clubPath}
         testId="club-portal-url"
       />
       {players ? <LinkCopyRow label="Odkaz pro hráče a rodiče (registrace)" path={order.registrationUrl} testId="players-url" /> : null}

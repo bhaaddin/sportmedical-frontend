@@ -20,7 +20,7 @@ import { formatPlayersTotal, formatSeats } from '../panel/seats';
 export function OrderSuccess({ order }: { order: ClubOrderView }) {
   const registrationUrl = order.registrationUrl !== '' ? order.registrationUrl : order.registrationToken !== '' ? clubRegistrationLink(order.registrationToken) : '';
   const ranges = orderRanges(order, order.status !== 'Confirmed');
-  const showForm = order.formUrl !== '' && (order.status === 'Invited' || order.status === 'Requested');
+  const showForm = ((order.portalUrl ?? '') !== '' ? order.portalUrl : order.formUrl) !== '' && (order.status === 'Invited' || order.status === 'Requested');
   return (
     <Stack spacing={2.5} data-testid="order-success">
       <Box>

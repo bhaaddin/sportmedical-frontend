@@ -88,6 +88,10 @@ export interface ClubOrderView {
   contact: OrderContact | null;
   formToken: string;
   formUrl: string;
+  /** The club's ONE link (form while Invited, portal afterwards); also present for orders the desk made as Confirmed. Blank when `linksStale`. */
+  portalUrl?: string;
+  /** The signing key changed: the server can no longer show this order's links until they are rotated. */
+  linksStale?: boolean;
   registrationToken: string;
   registrationUrl: string;
   releaseDaysBefore: number | null;
@@ -365,6 +369,8 @@ export function toOrder(raw: unknown): ClubOrderView {
     contact: contact === null ? null : { name: str(contact.name), phone: str(contact.phone), email: str(contact.email) },
     formToken: str(o.formToken),
     formUrl: str(o.formUrl),
+    portalUrl: str(o.portalUrl),
+    linksStale: o.linksStale === true,
     registrationToken: str(o.registrationToken),
     registrationUrl: str(o.registrationUrl),
     releaseDaysBefore: typeof o.releaseDaysBefore === 'number' ? o.releaseDaysBefore : null,
