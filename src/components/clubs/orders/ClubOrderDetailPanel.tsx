@@ -8,20 +8,29 @@
  */
 import { useState } from 'react';
 import {
-  Alert, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, Drawer, FormControlLabel,
+  Alert, Box, Button, Drawer,
   IconButton, LinearProgress, Link, Skeleton, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography,
 } from '@mui/material';
 import { Close, ContentCopy } from '@mui/icons-material';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
-import { ClubOrderError, clubOrdersApi, ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL } from '../../../api/clubOrders';
-import type { ClubOrderView, OrderAddendumSummary } from '../../../api/clubOrders';
+import { fetchBlockableActivities } from '../../../api/clubBlocks';
+import type { ClubBlockView } from '../../../api/clubBlocks';
+import { clubOrdersApi, ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL } from '../../../api/clubOrders';
+import type { ClubOrderView } from '../../../api/clubOrders';
 import { useIsPhone } from '../../../layout/useDevice';
 import { formatCzk } from '../../../pages/clubs/clubOrders';
 import { formatPragueDateTime } from '../../../utils/time';
 import { SectionLabel, SoftCard, StatusChip } from '../../ui';
+import { todayInPrague } from '../blockLogic';
 import { ClubOrderDialog } from '../order/ClubOrderDialog';
+import { editSessionFor } from '../order/editSession';
+import type { CoverageActivity } from '../order/coverage';
+import { CancelOrderDialog } from './CancelOrderDialog';
+import { ChangePlayersDialog } from './ChangePlayersDialog';
+import { WindowPills } from './WindowPills';
+import { RemoveWindowDialog } from './RemoveWindowDialog';
+import { orderWindows, termsWord } from './orderWindows';
 import { copyText } from './LinkCopyRow';
 import { absoluteLink, usePublicSiteBase } from './absoluteLink';
 import { OfferedDaysBlock } from './OfferedDaysBlock';
@@ -53,11 +62,12 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
   const queryClient = useQueryClient();
   const [dialog, setDialog] = useState<'process' | 'edit' | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [cancelAthletes, setCancelAthletes] = useState(false);
+  const [playersOpen, setPlayersOpen] = useState(false);
+  const [removing, setRemoving] = useState<ClubBlockView | null>(null);
   /* Etapa 5: a row of the group opens that order in the same drawer. */
   const [orderId, setOrderId] = useState(initialId);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
-  const [liveAddenda, setLiveAddenda] = useState<OrderAddendumSummary[] | null>(null);
+  const activitiesQuery = useQuery({ queryKey: ['club-block-activities'], queryFn: fetchBlockableActivities, staleTime: 5 * 60 * 1000 });
 
   const query = useQuery({
     queryKey: ['club-order', orderId],
@@ -90,24 +100,11 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
     onChanged?.();
   };
 
-  const cancel = useMutation({
-    mutationFn: (withAddenda: boolean) => clubOrdersApi.cancel(orderId, cancelAthletes, withAddenda),
-    onSuccess: () => {
-      toast.success('Objednávka zrušena');
-      setCancelOpen(false);
-      setLiveAddenda(null);
-      refresh();
-    },
-    onError: (e) => {
-      /* 409 club_order.addenda_live: nothing was cancelled; list the addenda and let the desk confirm explicitly. */
-      if (e instanceof ClubOrderError && e.code === 'club_order.addenda_live') {
-        setCancelOpen(false);
-        setLiveAddenda(e.addenda);
-        return;
-      }
-      toast.error(e instanceof Error ? e.message : 'Objednávku se nepodařilo zrušit');
-    },
-  });
+  /* "Upravit termíny": the calendar in pick mode, prefilled with every window of this order (and, from "Změnit hráče", the new numbers). */
+  const editTerms = (o: ClubOrderView, activities?: CoverageActivity[]) => {
+    setPlayersOpen(false);
+    navigate('/planovani', { state: { pickOrder: { start: editSessionFor(o, activitiesQuery.data ?? [], todayInPrague(), activities) } } });
+  };
 
   const body = () => {
     if (order === undefined) {
@@ -119,7 +116,8 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
         <Stack spacing={1.5}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={90} />)}</Stack>
       );
     }
-    const confirmedBlocks = order.blocks.filter((b) => b.status === 'Active');
+    const windows = orderWindows(order);
+    const today = todayInPrague();
     const lineTotal = (seats: number, unit: number | null) => (unit === null ? '—' : formatCzk(seats * unit));
     return (
       <Stack spacing={2} data-testid="order-detail" data-status={order.status}>
@@ -138,6 +136,14 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
             {order.createdBy === 'Club' ? ' · vyplnil klub' : ' · založil personál'}
           </Typography>
           {order.note !== '' ? <Typography variant="body2" sx={{ mt: 1 }}>{order.note}</Typography> : null}
+          {order.status === 'Requested' || order.status === 'Confirmed' ? (
+            <Stack direction={phone ? 'column' : 'row'} data-testid="order-edit-buttons" sx={{ gap: 1, mt: 2 }}>
+              <Button variant="contained" onClick={() => setPlayersOpen(true)} data-testid="change-players" sx={{ minHeight: 48, flex: 1 }}>Změnit hráče</Button>
+              {order.status === 'Confirmed' ? (
+                <Button variant="contained" color="secondary" onClick={() => editTerms(order)} disabled={activitiesQuery.isLoading} data-testid="edit-terms" sx={{ minHeight: 48, flex: 1 }}>Upravit termíny</Button>
+              ) : null}
+            </Stack>
+          ) : null}
         </Block>
 
         {hasGroup(order) ? (
@@ -178,26 +184,32 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
 
         <OfferedDaysBlock order={order} onChanged={refresh} />
 
-        <Block title="Termíny">
-          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>Požadované termíny</Typography>
-          {order.requestedRanges.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">Klub žádné termíny neuvedl.</Typography>
+        <Block title="Termíny objednávky">
+          {windows.length > 0 ? (
+            <>
+              <WindowPills
+                order={order}
+                today={today}
+                testId="confirmed-windows"
+                {...(order.status === 'Confirmed'
+                  ? { onRemove: setRemoving, removeBlockedReason: windows.length <= 1 ? 'Poslední termín nelze odebrat — zrušte celou objednávku.' : null }
+                  : {})}
+              />
+              {order.status === 'Confirmed' ? (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+                  {`${windows.length} ${termsWord(windows.length)} v kalendáři. Křížek odebere jen ten termín; objednávka zůstane jedna.`}
+                </Typography>
+              ) : null}
+            </>
+          ) : order.requestedRanges.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">{order.status === 'Confirmed' ? 'Objednávka nemá žádný termín.' : 'Klub žádné termíny neuvedl.'}</Typography>
           ) : (
-            <Stack component="ul" sx={{ m: 0, pl: 2.5 }} data-testid="requested-ranges">
-              {order.requestedRanges.map((r, i) => <li key={i}><Typography variant="body2">{rangeText(r)}</Typography></li>)}
-            </Stack>
-          )}
-          <Typography variant="body2" sx={{ fontWeight: 600, mt: 1.5, mb: 0.5 }}>Potvrzená okna v kalendáři</Typography>
-          {confirmedBlocks.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">Zatím nic nepotvrzeno.</Typography>
-          ) : (
-            <Stack component="ul" sx={{ m: 0, pl: 2.5 }} data-testid="confirmed-windows">
-              {confirmedBlocks.map((b) => (
-                <li key={b.id}>
-                  <Typography variant="body2">{rangeText({ fromDate: b.fromDate, toDate: b.toDate, dailyFrom: b.dailyFrom, dailyTo: b.dailyTo })}</Typography>
-                </li>
-              ))}
-            </Stack>
+            <>
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>Požadované termíny</Typography>
+              <Stack component="ul" sx={{ m: 0, pl: 2.5 }} data-testid="requested-ranges">
+                {order.requestedRanges.map((r, i) => <li key={i}><Typography variant="body2">{rangeText(r)}</Typography></li>)}
+              </Stack>
+            </>
           )}
         </Block>
 
@@ -383,40 +395,22 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
         ) : null}
       </Drawer>
 
-      <Dialog open={cancelOpen} onClose={cancel.isPending ? undefined : () => setCancelOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Zrušit objednávku?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">Objednávka klubu {order?.clubName ?? ''} bude zrušena a uvolní se její okna v kalendáři.</Typography>
-          {order !== undefined && order.registered > 0 ? (
-            <FormControlLabel
-              sx={{ mt: 1 }}
-              control={<Checkbox checked={cancelAthletes} onChange={(e) => setCancelAthletes(e.target.checked)} />}
-              label={`Zrušit i jejich rezervace (${order.registered})`}
-            />
-          ) : null}
-        </DialogContent>
-        <DialogActions>
-          <Button variant="outlined" onClick={() => setCancelOpen(false)} disabled={cancel.isPending}>Ponechat</Button>
-          <Button variant="contained" color="error" onClick={() => cancel.mutate(false)} disabled={cancel.isPending}>Ano, zrušit</Button>
-        </DialogActions>
-      </Dialog>
+      {cancelOpen && order !== undefined ? (
+        <CancelOrderDialog order={order} onClose={() => setCancelOpen(false)} onCancelled={() => { setCancelOpen(false); refresh(); }} />
+      ) : null}
 
-      <Dialog open={liveAddenda !== null} onClose={cancel.isPending ? undefined : () => setLiveAddenda(null)} maxWidth="xs" fullWidth data-testid="addenda-live-dialog">
-        <DialogTitle>Objednávka má platné dodatky</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ mb: 1 }}>Nic nebylo zrušeno. Tyto dodatky stále platí:</Typography>
-          <Stack component="ul" sx={{ m: 0, pl: 2.5 }} data-testid="addenda-live-list">
-            {(liveAddenda ?? []).map((a) => (
-              <li key={a.id}><Typography variant="body2">{`${orderCode(a.id)} · ${a.serviceName} · ${a.totalSeats} míst · ${ORDER_STATUS_LABEL[a.status]}`}</Typography></li>
-            ))}
-          </Stack>
-          <Typography variant="body2" sx={{ mt: 1 }}>Zrušte je zvlášť, nebo potvrďte zrušení celé objednávky i s dodatky.</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button variant="outlined" onClick={() => setLiveAddenda(null)} disabled={cancel.isPending}>Ponechat</Button>
-          <Button variant="contained" color="error" onClick={() => cancel.mutate(true)} disabled={cancel.isPending}>Zrušit i dodatky</Button>
-        </DialogActions>
-      </Dialog>
+      {playersOpen && order !== undefined ? (
+        <ChangePlayersDialog
+          order={order}
+          onClose={() => setPlayersOpen(false)}
+          onSaved={() => { setPlayersOpen(false); refresh(); }}
+          onEditTerms={order.status === 'Confirmed' ? (activities) => editTerms(order, activities) : undefined}
+        />
+      ) : null}
+
+      {removing !== null && order !== undefined ? (
+        <RemoveWindowDialog order={order} block={removing} onClose={() => setRemoving(null)} onRemoved={() => { setRemoving(null); refresh(); }} />
+      ) : null}
 
       {invoiceOpen ? <ClubInvoiceDialog orderId={orderId} onClose={() => setInvoiceOpen(false)} onChanged={onChanged} /> : null}
 

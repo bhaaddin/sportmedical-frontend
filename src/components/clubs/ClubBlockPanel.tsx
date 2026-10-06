@@ -30,21 +30,16 @@ import type { RangeMode } from './ClubBlockRangeDialog';
 import { CancelClubBlockDialog } from './CancelClubBlockDialog';
 import { ATHLETE_STATUS_LABEL, ATHLETE_STATUS_TONE, downloadAthletesCsv, sortAthletes } from './athleteList';
 import type { SortDirection } from './athleteList';
-import type { Club } from '../../api/clubs';
 
 const mono = '"JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace';
 
 export function ClubBlockPanel({
   block,
-  clubs,
-  allBlocks,
   highlighted = false,
   contactEmail,
   clubName,
 }: {
   block: ClubBlockView;
-  clubs: Club[];
-  allBlocks: ClubBlockView[];
   /** Opened straight from the router: scrolled to and outlined. */
   highlighted?: boolean;
   contactEmail?: string | null;
@@ -327,7 +322,7 @@ export function ClubBlockPanel({
         <ClubBlockRangeDialog block={detail} mode={dialog} onClose={() => setDialog(null)} />
       ) : null}
       {dialog === 'cancel' ? <CancelClubBlockDialog block={detail} onClose={() => setDialog(null)} /> : null}
-      {dialog === 'edit' ? <ClubBlockDialog clubs={clubs} block={detail} blocks={allBlocks} onClose={() => setDialog(null)} /> : null}
+      {dialog === 'edit' ? <ClubBlockDialog block={detail} onClose={() => setDialog(null)} /> : null}
     </SoftCard>
   );
 }

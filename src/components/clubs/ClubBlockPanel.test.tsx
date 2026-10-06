@@ -66,7 +66,7 @@ function Wrap({ children }: { children: ReactNode }) {
 }
 
 const open = (b: ClubBlockView = block(), extra: Record<string, unknown> = {}) =>
-  render(<Wrap><ClubBlockPanel block={b} clubs={[]} allBlocks={[b]} clubName="FK Slaný" contactEmail="klub@fkslany.cz" {...extra} /></Wrap>);
+  render(<Wrap><ClubBlockPanel block={b} clubName="FK Slaný" contactEmail="klub@fkslany.cz" {...extra} /></Wrap>);
 
 const setDate = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
 

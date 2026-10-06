@@ -11,7 +11,6 @@ import { Alert, Box, Button, LinearProgress, Skeleton, Stack, Typography } from 
 import { ArrowBack } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import type { Club } from '../../../api/clubs';
 import type { ClubBlockView } from '../../../api/clubBlocks';
 import { fetchBlockableActivities } from '../../../api/clubBlocks';
 import { clubOrdersApi, ORDER_STATUSES, ORDER_STATUS_LABEL } from '../../../api/clubOrders';
@@ -19,9 +18,12 @@ import { useDevice } from '../../../layout/useDevice';
 import { SectionLabel, SoftCard, StatusChip } from '../../ui';
 import { ClubAvatar } from '../ClubAvatar';
 import { ClubBlockPanel } from '../ClubBlockPanel';
-import { blockRange, blockTitle } from '../blockLogic';
+import { blockTitle, plural } from '../blockLogic';
 import { useClubSummary } from '../orders/ClubSummaryCard';
 import { STATUS_TONE, termsSummary, seatPercent, seatsWithTotal } from '../orders/orderLogic';
+import { orderWindows, windowLabel } from '../orders/orderWindows';
+import { orderCode } from '../order/orderFormat';
+import { ClubOrderCard } from './ClubOrderCard';
 import { ClubSeatsCard } from '../panel/ClubSeatsCard';
 import { clubActivitySeats } from '../panel/seats';
 import { canBeInvoiced } from '../../../pages/clubs/payerForm';
@@ -67,11 +69,9 @@ function ProgressRow({ name, seats, registered, remaining }: { name: string; sea
 }
 
 export function ClubPresentation({
-  row, clubs, allBlocks, priceOf, pricesReady, focusBlockId, today, onBack, onEdit, onDeactivate, onReload, onInvoice, onNewReservation, onNewOrder, onOpenOrder,
+  row, priceOf, pricesReady, focusBlockId, today, onBack, onEdit, onDeactivate, onReload, onInvoice, onNewReservation, onNewOrder, onOpenOrder,
 }: {
   row: ClubRow;
-  clubs: Club[];
-  allBlocks: ClubBlockView[];
   priceOf: (activityId: string) => number | null;
   pricesReady: boolean;
   focusBlockId: string | null;
@@ -100,14 +100,36 @@ export function ClubPresentation({
   const activitiesQuery = useQuery({ queryKey: ['club-block-activities'], queryFn: fetchBlockableActivities, staleTime: 5 * 60 * 1000, enabled: activeBlocks.length > 0 });
   const blockSeatRows = clubActivitySeats(activeBlocks, (id) => (activitiesQuery.data ?? []).find((a) => a.id === id)?.name ?? '');
 
+  const orders = ordersQuery.data ?? [];
+  const orderById = new Map(orders.map((o) => [o.id, o]));
+  const upcomingByOrder = new Map<string, ClubBlockView[]>();
+  for (const b of upcoming) if (b.clubOrderId) upcomingByOrder.set(b.clubOrderId, [...(upcomingByOrder.get(b.clubOrderId) ?? []), b]);
+  const upcomingOrders = [...upcomingByOrder.entries()]
+    .map(([id, bs]) => ({ id, blocks: [...bs].sort((a, b) => a.fromDate.localeCompare(b.fromDate)) }))
+    .sort((a, b) => a.blocks[0].fromDate.localeCompare(b.blocks[0].fromDate));
+  const upcomingLegacy = upcoming.filter((b) => !b.clubOrderId);
+  const cancelledOrders = orders.filter((o) => o.status === 'Cancelled');
+  const firstDate = (o: (typeof orders)[number]) => orderWindows(o)[0]?.fromDate ?? '9999-12-31';
+  const RANK: Record<string, number> = { Confirmed: 0, Requested: 1, Invited: 2, Completed: 3 };
+  const shownOrders = orders
+    .filter((o) => o.status !== 'Cancelled')
+    .sort((a, b) => (RANK[a.status] ?? 9) - (RANK[b.status] ?? 9) || firstDate(a).localeCompare(firstDate(b)));
+
   const location = [club.address, [club.postalCode, club.city].filter(Boolean).join(' ')].filter((p) => p && p.trim() !== '').join(', ');
   const bank = [club.bankAccount ? `${club.bankAccount}${club.bankCode ? `/${club.bankCode}` : ''}` : '', club.iban ?? ''].filter((p) => p !== '');
   const s = summary.data;
 
-  const firstBlock = activeBlocks[0] ?? null;
+  /* One order is one thing: the windows an order owns are counted under it, never as separate blocks. */
+  const legacyBlocks = blocks.filter((b) => !b.clubOrderId);
+  const activeLegacy = activeBlocks.filter((b) => !b.clubOrderId);
+  const ordersHolding = new Set(activeBlocks.flatMap((b) => (b.clubOrderId ? [b.clubOrderId] : []))).size;
   const range = order === null ? null : orderDateRange(order);
-  const subtitle = firstBlock !== null
-    ? `Blok ${blockRange(firstBlock)}${activeBlocks.length > 1 ? ` a další (${activeBlocks.length})` : ''}`
+  const holding = [
+    ordersHolding > 0 ? `${ordersHolding} ${plural(ordersHolding, ['objednávka', 'objednávky', 'objednávek'])} v kalendáři` : '',
+    activeLegacy.length > 0 ? `${activeLegacy.length} ${plural(activeLegacy.length, ['starší rezervace', 'starší rezervace', 'starších rezervací'])}` : '',
+  ].filter((p) => p !== '').join(' + ');
+  const subtitle = activeBlocks.length > 0
+    ? `${holding} · ${formatDateRange(activeBlocks.map((b) => b.fromDate).sort()[0], activeBlocks.map((b) => b.toDate).sort().reverse()[0])}`
     : order === null
       ? 'Zatím bez hromadné rezervace'
       : range === null
@@ -223,13 +245,23 @@ export function ClubPresentation({
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>Klub nemá žádné nadcházející okno.</Typography>
           ) : (
             <Stack spacing={1.25} role="list">
-              {upcoming.map((b) => (
+              {upcomingOrders.map((g) => {
+                const o = orderById.get(g.id);
+                return (
+                  <Stack key={g.id} role="listitem" direction="row" data-testid="club-window" data-order-id={g.id} sx={{ gap: 1.5, alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{`Objednávka ${orderCode(g.id)}${o?.serviceName ? ` · ${o.serviceName}` : ''}`}</Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', overflowWrap: 'anywhere' }}>{g.blocks.map(windowLabel).join(' · ')}</Typography>
+                    </Box>
+                    {o !== undefined ? <StatusChip tone="green" size="sm">{o.registered} / {o.totalSeats}</StatusChip> : null}
+                  </Stack>
+                );
+              })}
+              {upcomingLegacy.map((b) => (
                 <Stack key={b.id} role="listitem" direction="row" data-testid="club-window" sx={{ gap: 1.5, alignItems: 'center', justifyContent: 'space-between' }}>
                   <Box sx={{ minWidth: 0 }}>
                     <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{blockTitle(b)}</Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      {blockRange(b)}{b.dailyFrom && b.dailyTo ? ` · ${b.dailyFrom}–${b.dailyTo}` : ''}
-                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>{windowLabel(b)}</Typography>
                   </Box>
                   <StatusChip tone="green" size="sm">{b.registered} / {b.seats}</StatusChip>
                 </Stack>
@@ -250,28 +282,33 @@ export function ClubPresentation({
             <Alert severity="warning" action={<Button color="inherit" size="small" onClick={() => void ordersQuery.refetch()}>Zkusit znovu</Button>}>
               Objednávky klubu se nepodařilo načíst.
             </Alert>
-          ) : (ordersQuery.data ?? []).length === 0 ? (
+          ) : orders.length === 0 ? (
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>Zatím žádná objednávka</Typography>
           ) : (
-            <Stack spacing={1}>
-              {(ordersQuery.data ?? []).map((o) => (
-                <Stack
-                  key={o.id}
-                  direction="row"
-                  role="button"
-                  tabIndex={0}
-                  data-testid="club-order-link"
-                  onClick={() => onOpenOrder?.(o.id)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') onOpenOrder?.(o.id); }}
-                  sx={{ gap: 1.5, alignItems: 'center', minHeight: 44, cursor: 'pointer', justifyContent: 'space-between' }}
-                >
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{o.serviceName || 'Služba nevybrána'} · {seatsWithTotal(o) === '—' ? `${o.totalSeats} míst` : seatsWithTotal(o)}</Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>{termsSummary(o)}</Typography>
-                  </Box>
-                  <StatusChip tone={STATUS_TONE[o.status]} size="sm">{ORDER_STATUS_LABEL[o.status]}</StatusChip>
-                </Stack>
+            <Stack spacing={1.5}>
+              {shownOrders.map((o) => (
+                <ClubOrderCard key={o.id} order={o} today={today} onOpen={(id) => onOpenOrder?.(id)} onChanged={onReload} />
               ))}
+              {cancelledOrders.length > 0 ? (
+                <Box data-testid="club-orders-cancelled">
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Zrušené objednávky</Typography>
+                  {cancelledOrders.map((o) => (
+                    <Stack
+                      key={o.id}
+                      direction="row"
+                      role="button"
+                      tabIndex={0}
+                      data-testid="club-order-cancelled"
+                      onClick={() => onOpenOrder?.(o.id)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') onOpenOrder?.(o.id); }}
+                      sx={{ gap: 1.5, alignItems: 'center', minHeight: 44, cursor: 'pointer', justifyContent: 'space-between' }}
+                    >
+                      <Typography variant="body2" sx={{ color: 'text.secondary', overflowWrap: 'anywhere' }}>{`${orderCode(o.id)} · ${o.serviceName || 'Služba nevybrána'} · ${seatsWithTotal(o) === '—' ? `${o.totalSeats} míst` : seatsWithTotal(o)} · ${termsSummary(o)}`}</Typography>
+                      <StatusChip tone={STATUS_TONE[o.status]} size="sm">{ORDER_STATUS_LABEL[o.status]}</StatusChip>
+                    </Stack>
+                  ))}
+                </Box>
+              ) : null}
             </Stack>
           )}
         </SoftCard>
@@ -310,15 +347,14 @@ export function ClubPresentation({
           )}
         </Box>
 
-        {/* ── Správa oken (bloků) ── */}
-        {blocks.length > 0 ? (
-          <Stack spacing={2.5} aria-label="Bloky klubu" role="region" sx={{ ...span, minWidth: 0 }}>
-            {blocks.map((b) => (
+        {/* ── Starší rezervace: bloky bez objednávky (the windows of an order live in its card above) ── */}
+        {legacyBlocks.length > 0 ? (
+          <Stack spacing={2.5} aria-label="Starší rezervace (bez objednávky)" role="region" data-testid="club-legacy-blocks" sx={{ ...span, minWidth: 0 }}>
+            <SectionLabel sx={{ mb: 0 }}>Starší rezervace (bez objednávky)</SectionLabel>
+            {legacyBlocks.map((b) => (
               <ClubBlockPanel
                 key={b.id}
                 block={b}
-                clubs={clubs}
-                allBlocks={allBlocks}
                 highlighted={focusBlockId === b.id}
                 contactEmail={club.contactEmail}
                 clubName={club.name}

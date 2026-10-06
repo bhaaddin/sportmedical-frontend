@@ -93,7 +93,8 @@ import { ClubBlockPopover, type ClubBlockPick, type ClubBlockRef } from "../../c
 import { MonthView } from "../../components/booking/calendar/MonthView";
 import { MoveConfirmDialog } from "../../components/booking/calendar/MoveConfirmDialog";
 import { clubWindowsByDay as clubWindowsByDay_, type ClubWindow } from "../../components/booking/calendar/clubWindows";
-import { clubBlocksApi } from "../../api/clubBlocks";
+import { clubBlocksApi, fetchBlockableActivities } from "../../api/clubBlocks";
+import type { ClubOrderView } from "../../api/clubOrders";
 import { PhoneCalendar } from "../../components/booking/calendar/PhoneCalendar";
 import { RangeBlockDialog } from "../../components/booking/calendar/RangeBlockDialog";
 import { SelectionPopover } from "../../components/booking/calendar/SelectionPopover";
@@ -116,10 +117,12 @@ import type { NewPicked } from "../../components/booking/calendar/multiSelect";
 import { ClubOrderEntry } from "../../components/clubs/order/ClubOrderEntry";
 import { PickOrderSetup } from "../../components/clubs/order/PickOrderSetup";
 import { OrderSuccess } from "../../components/clubs/order/OrderSuccess";
+import { editSessionFor } from "../../components/clubs/order/editSession";
 import { readPickOrderState } from "../../components/clubs/order/pickSession";
 import type { PickParent } from "../../components/clubs/order/pickSession";
 import { PickOrderPanel } from "../../components/booking/calendar/PickOrderPanel";
 import { usePickOrder } from "../../components/booking/calendar/usePickOrder";
+import { PickDuplicateDialog } from "../../components/booking/calendar/PickDuplicateDialog";
 import { usePickJump } from "../../components/booking/calendar/usePickJump";
 import { useInquiries } from "../../components/booking/calendar/inquiries";
 import { PickMonthView } from "../../components/booking/calendar/PickMonthView";
@@ -866,11 +869,27 @@ export default function CalendarGridPage() {
     });
   };
 
-  /* A click on a club's block, then "Otevřít blok". */
-  const openClubBlock = (pick: ClubBlockPick) => {
-    const state: OpenClubBlockState = { clubBlockId: pick.clubBlockId, ...(pick.clubId ? { clubId: pick.clubId } : {}) };
+  /* A click on a club's window: a window of an order opens the ORDER ("Otevřít objednávku", "Upravit termíny"),
+     only a legacy block without an order still says "Otevřít blok". */
+  const openClubBlock = (picked: ClubBlockPick) => {
+    const state: OpenClubBlockState = { clubBlockId: picked.clubBlockId, ...(picked.clubId ? { clubId: picked.clubId } : {}) };
     setClubPick(null);
     navigate("/clubs", { state });
+  };
+  const openClubOrder = (orderId: string) => {
+    setClubPick(null);
+    navigate("/clubs/objednavky", { state: { openOrderId: orderId } });
+  };
+  const catalogueActivitiesQuery = useQuery({
+    queryKey: ["club-block-activities"],
+    queryFn: fetchBlockableActivities,
+    staleTime: 5 * 60 * 1000,
+    enabled: clubPick !== null,
+  });
+  /* "Upravit termíny" on a window: pick mode opens on that order with every window of it already painted. */
+  const editClubOrderTerms = (order: ClubOrderView) => {
+    setClubPick(null);
+    pick.start(editSessionFor(order, catalogueActivitiesQuery.data ?? [], pragueDateKey(new Date())));
   };
 
   /* The days marked by dragging across them, and what the popover does with them. */
@@ -1753,7 +1772,14 @@ export default function CalendarGridPage() {
 
       {moveProposal ? <MoveConfirmDialog move={moveProposal} onClose={() => setMoveProposal(null)} /> : null}
 
-      <ClubBlockPopover pick={clubPick} onOpen={openClubBlock} onClose={() => setClubPick(null)} />
+      <ClubBlockPopover
+        pick={clubPick}
+        today={todayKey}
+        onOpen={openClubBlock}
+        onOpenOrder={openClubOrder}
+        {...(mayBook && !pickActive ? { onEditTerms: editClubOrderTerms } : {})}
+        onClose={() => setClubPick(null)}
+      />
 
       {/* "Nová klubová objednávka": the two ways in. A starts picking in this calendar, B shows the club's link. */}
       <ClubOrderEntry
@@ -1779,6 +1805,7 @@ export default function CalendarGridPage() {
           }}
         />
       ) : null}
+      <PickDuplicateDialog order={pick.duplicate} onChoose={pick.resolveDuplicate} />
       <Dialog open={pick.result !== null} onClose={pick.closeResult} fullWidth maxWidth="sm" fullScreen={isPhone}>
         <DialogTitle>{pick.resultTitle}</DialogTitle>
         <DialogContent>{pick.result !== null ? <OrderSuccess order={pick.result} /> : null}</DialogContent>

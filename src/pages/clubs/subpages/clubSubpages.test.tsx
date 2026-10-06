@@ -167,7 +167,7 @@ describe('Rezervace', () => {
     await user.selectOptions(screen.getByLabelText('Klub'), 'c1');
     expect(shown('SK Kladno')).toHaveLength(0);
 
-    await user.click(screen.getByRole('button', { name: 'Objednávka' }));
+    await user.click(screen.getByRole('button', { name: /^Objednávka KO-/ }));
     expect(navigate).toHaveBeenCalledWith('/clubs/objednavky', { state: { openOrderId: 'o1' } });
     await user.click(screen.getByRole('button', { name: 'Zobrazit v kalendáři' }));
     expect(navigate).toHaveBeenCalledWith('/planovani', { state: { date: day(0) } });

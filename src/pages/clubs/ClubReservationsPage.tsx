@@ -12,6 +12,7 @@ import { calendarsApi } from '../../api/calendars';
 import { PageHeader, SoftCard, StatusChip } from '../../components/ui';
 import { ResponsiveDataList, type DataColumn } from '../../components/ui/ResponsiveDataList';
 import { pragueDateKey } from '../../utils/time';
+import { orderCode } from '../../components/clubs/order/orderFormat';
 import { formatDateRange } from './clubOrders';
 import { ClubDot, LoadError, RangeFilter, SeatsBar, SelectFilter } from './subpages/common';
 import { rangeFor, type DateRange, type RangeKey } from './subpages/range';
@@ -53,7 +54,7 @@ export default function ClubReservationsPage() {
       <Typography variant="body2" sx={{ color: 'text.secondary' }}>Bez objednávky</Typography>
     ) : (
       <Link component="button" type="button" onClick={(e) => { e.stopPropagation(); openOrder(row.orderId!); }} sx={{ fontWeight: 600 }}>
-        Objednávka
+        {`Objednávka ${orderCode(row.orderId)}`}
       </Link>
     );
 

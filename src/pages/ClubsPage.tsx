@@ -22,8 +22,7 @@
  *   { clubId }                       open that club's detail
  *   { clubId, clubBlockId }          ... and land on that block
  *   { clubBlockId }                  the same, the club is found from the block
- *   { newBlock: NewBlockPrefill }    open the new-block dialog; a club that does
- *                                    not exist yet (`newClub`) is created with it
+ *   { openOrderId } / { newOrder }   open an order's detail / the new-order chooser
  *
  * The payer record itself - IČO, fakturační adresa, bankovní spojení - is still
  * edited here ("Upravit klub", "Nový klub"), because an invoice to a club
@@ -45,8 +44,6 @@ import { partnerOrdersApi } from '../api/partnerOrders';
 import { useDevice } from '../layout/useDevice';
 import { toDateOnly } from '../utils/time';
 import { FilterChips, PageHeader, SoftCard } from '../components/ui';
-import { ClubBlockDialog, isNewBlockPrefill } from '../components/clubs/ClubBlockDialog';
-import type { NewBlockPrefill } from '../components/clubs/ClubBlockDialog';
 import { matchesFilter, matchesSearch } from './clubs/clubOrders';
 import type { ClubFilter } from './clubs/clubOrders';
 import { buildClubRow } from './clubs/clubRow';
@@ -69,8 +66,6 @@ const FILTERS: { key: ClubFilter; label: string }[] = [
 export interface ClubsRouteState {
   clubId?: string;
   clubBlockId?: string;
-  /** `true` opens an empty dialog; an object pre-fills it. */
-  newBlock?: NewBlockPrefill | true;
 }
 
 const readState = (state: unknown): ClubsRouteState | null =>
@@ -98,10 +93,6 @@ export default function ClubsPage() {
 
   /* `null` closed; a club to change it; `'new'` to add one. */
   const [editing, setEditing] = useState<Club | 'new' | null>(null);
-  /* `null` closed; otherwise the head start of the new-block dialog. */
-  const [blockDialog, setBlockDialog] = useState<NewBlockPrefill | null>(() =>
-    handoff?.newBlock === undefined ? null : isNewBlockPrefill(handoff.newBlock) ? handoff.newBlock : {},
-  );
 
   const clubsQuery = useQuery({
     queryKey: ['clubs'],
@@ -197,7 +188,7 @@ export default function ClubsPage() {
   /* Spend the handoff once it has done its job, so Back does not reopen it.
      Mount-only on purpose: everything it carried has been read into state. */
   useEffect(() => {
-    if (hasOrderState(orderHandoff) || (handoff !== null && (handoff.clubId !== undefined || handoff.clubBlockId !== undefined || handoff.newBlock !== undefined))) {
+    if (hasOrderState(orderHandoff) || (handoff !== null && (handoff.clubId !== undefined || handoff.clubBlockId !== undefined))) {
       navigate(location.pathname, { replace: true, state: null });
     }
   }, []);
@@ -241,18 +232,6 @@ export default function ClubsPage() {
         <ClubOrderDetailPanel orderId={openOrderId} onClose={() => setOpenOrderId(null)} onChanged={reload} />
       ) : null}
       {editing !== null ? <PayerDialog editing={editing} onClose={() => setEditing(null)} onSaved={reload} /> : null}
-      {blockDialog !== null ? (
-        <ClubBlockDialog
-          clubs={clubsQuery.data ?? []}
-          prefill={blockDialog}
-          blocks={allBlocks}
-          onClose={() => setBlockDialog(null)}
-          onSaved={(saved) => {
-            if (saved.clubId !== '') setSelectedId(saved.clubId);
-            setFocusBlockId(saved.id);
-          }}
-        />
-      ) : null}
     </>
   );
 
@@ -292,8 +271,6 @@ export default function ClubsPage() {
       <Box>
         <ClubPresentation
           row={selected}
-          clubs={clubsQuery.data ?? []}
-          allBlocks={allBlocks}
           priceOf={priceOf}
           pricesReady={activitiesQuery.isSuccess || activitiesQuery.isError}
           today={today}

@@ -7,6 +7,7 @@ import type { Activity, Calendar, DayAppointment, PreviewDay, TimeBlock } from '
 import { addDaysToDateOnly } from '../../../utils/time';
 import { setViewport, VIEWPORTS } from '../../../test/viewport';
 import { SidebarSlot, SidebarSlotProvider } from '../../shell/SidebarSlot';
+import client from '../../../api/client';
 
 /*
  * The calendar at its three widths - 390 (phone), 834 (tablet), 1440 (desktop) -
@@ -164,6 +165,7 @@ function renderPage(width: number, view?: 'day' | 'week' | 'month') {
         <Routes>
           <Route path="/planovani" element={<CalendarGridPage />} />
           <Route path="/clubs" element={<LocationProbe />} />
+          <Route path="/clubs/objednavky" element={<LocationProbe />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -277,6 +279,67 @@ describe('desktop · 1440', () => {
     expect(JSON.parse((await screen.findByTestId('clubs-state')).textContent ?? '{}')).toEqual({
       clubId: 'club1',
       clubBlockId: 'cb1',
+    });
+  });
+
+  describe('a window that belongs to a club order', () => {
+    const ORDER = '80e74a6c-0000-4000-8000-0000000000bb';
+    const winOf = (id: string, from: string, to: string) => ({
+      id, clubId: 'club1', clubName: 'FK Dukla', colorHex: '#7B1FA2', calendarIds: ['c1'], activityIds: [], fromDate: from, toDate: to,
+      dailyFrom: '14:00', dailyTo: '16:00', status: 'Active', athletes: [], clubOrderId: ORDER,
+    });
+    const orderBody = {
+      id: ORDER, groupId: ORDER, clubId: 'club1', clubName: 'FK Dukla', serviceId: 's1', serviceName: 'Prohlídky', status: 'Confirmed', paymentMethod: 'ClubInvoice',
+      totalSeats: 22, registered: 7,
+      activitySeats: [
+        { activityId: 'a1', activityName: 'Základní prohlídka', durationMinutes: 30, seats: 12, registered: 4, unitPriceCzk: null },
+        { activityId: 'a2', activityName: 'Komplexní prohlídka', durationMinutes: 60, seats: 10, registered: 3, unitPriceCzk: null },
+      ],
+      blocks: [winOf('cb1', '2026-10-26', '2026-10-26'), winOf('cb2', '2026-10-30', '2026-10-30'), winOf('cb3', '2026-11-11', '2026-11-11')],
+    };
+    beforeEach(() => {
+      vi.mocked(client.get).mockImplementation(async (url: string) => {
+        if (url.includes('/club-orders/')) return { data: orderBody } as never;
+        if (url.includes('/club-blocks/')) return { data: winOf(url.split('/').pop() ?? 'cb1', '2026-10-26', '2026-10-26') } as never;
+        throw new Error('offline');
+      });
+    });
+    afterEach(() => {
+      vi.mocked(client.get).mockReset().mockRejectedValue(new Error('offline'));
+    });
+
+    it('a click opens the ORDER, not the block, and "Otevřít objednávku" leads to it', async () => {
+      renderPage(VIEWPORTS.desktop, 'day');
+      const block = (await screen.findAllByRole('button', { name: 'FK Dukla' }))[0];
+      fireEvent.click(block, { clientX: 300, clientY: 300 });
+      const popover = await screen.findByRole('dialog', { name: 'Objednávka KO-000000BB · FK Dukla' });
+      expect(await within(popover).findByTestId('club-popover-summary')).toHaveTextContent('3 termíny · Základní 12 · Komplexní 10 · 7/22 zapsáno');
+      expect(within(popover).getAllByTestId('order-window').map((w) => w.getAttribute('data-clicked'))).toEqual(['true', 'false', 'false']);
+      expect(screen.queryByText(/Blok pro FK Dukla/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Otevřít blok' })).not.toBeInTheDocument();
+      fireEvent.click(within(popover).getByRole('button', { name: 'Otevřít objednávku' }));
+      expect(JSON.parse((await screen.findByTestId('clubs-state')).textContent ?? '{}')).toEqual({ openOrderId: ORDER });
+    });
+
+    it('on a phone a tap on the window card opens the same order popover', async () => {
+      renderPage(VIEWPORTS.phone, 'day');
+      const list = await screen.findByTestId('phone-day-list');
+      fireEvent.click(await within(list).findByTestId('club-window-card'));
+      const popover = await screen.findByRole('dialog', { name: 'Objednávka KO-000000BB · FK Dukla' });
+      expect(await within(popover).findByRole('button', { name: 'Otevřít objednávku' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Otevřít blok' })).not.toBeInTheDocument();
+    });
+
+    it('"Upravit termíny" starts pick mode on that order with its windows already painted', async () => {
+      renderPage(VIEWPORTS.desktop, 'day');
+      const block = (await screen.findAllByRole('button', { name: 'FK Dukla' }))[0];
+      fireEvent.click(block, { clientX: 300, clientY: 300 });
+      const popover = await screen.findByRole('dialog', { name: 'Objednávka KO-000000BB · FK Dukla' });
+      fireEvent.click(await within(popover).findByRole('button', { name: 'Upravit termíny' }));
+      const panel = await screen.findByTestId('pick-panel');
+      expect(within(panel).getByRole('button', { name: 'Uložit změny' })).toBeInTheDocument();
+      expect(within(panel).queryByRole('button', { name: 'Potvrdit objednávku' })).not.toBeInTheDocument();
+      await waitFor(() => expect(within(panel).getAllByTestId('pick-row').length).toBeGreaterThan(0));
     });
   });
 

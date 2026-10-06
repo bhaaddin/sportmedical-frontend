@@ -14,8 +14,8 @@ import { addDaysToDateOnly } from '../../../utils/time';
  * and "Potvrdit objednávku".
  */
 
-const { createStaff, update, confirmOrder, getAllClubs, listActivities, calculate } = vi.hoisted(() => ({
-  createStaff: vi.fn(), update: vi.fn(), confirmOrder: vi.fn(), getAllClubs: vi.fn(), listActivities: vi.fn(), calculate: vi.fn(),
+const { createStaff, update, confirmOrder, listOrders, getAllClubs, listActivities, calculate } = vi.hoisted(() => ({
+  createStaff: vi.fn(), update: vi.fn(), confirmOrder: vi.fn(), listOrders: vi.fn(), getAllClubs: vi.fn(), listActivities: vi.fn(), calculate: vi.fn(),
 }));
 
 vi.mock('../../../api/calendars', () => ({ calendarsApi: { list: vi.fn() } }));
@@ -36,7 +36,7 @@ vi.mock('../../../api/clubBlocks', async (importOriginal) => {
 });
 vi.mock('../../../api/clubOrders', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../api/clubOrders')>();
-  return { ...actual, clubOrdersApi: { ...actual.clubOrdersApi, createStaff, update, confirm: confirmOrder } };
+  return { ...actual, clubOrdersApi: { ...actual.clubOrdersApi, createStaff, update, confirm: confirmOrder, list: listOrders } };
 });
 vi.mock('../../../components/booking/NewAppointmentDialog', () => ({ NewAppointmentDialog: () => null }));
 vi.mock('../../../api/displaySettings', async (importActual) => {
@@ -95,6 +95,7 @@ beforeEach(() => {
   createStaff.mockReset();
   update.mockReset();
   confirmOrder.mockReset();
+  listOrders.mockReset().mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -679,5 +680,123 @@ describe('marked places and editing an existing order', () => {
     await waitFor(() => expect(confirmOrder).toHaveBeenCalledTimes(1));
     expect(update).toHaveBeenCalledWith('o-9', { activitySeats: [{ activityId: 'a1', seats: 10 }], paymentMethod: 'ClubInvoice', note: 'Pozn.' });
     expect(confirmOrder).toHaveBeenCalledWith('o-9', { calendarIds: ['c1'], ranges: [{ fromDate: DAY, toDate: DAY, dailyFrom: '09:00', dailyTo: '14:30' }] });
+  });
+});
+
+/* ── Etapa 10: never silently a second order of the same služba ── */
+
+describe('a club that already has a live order of this služba', () => {
+  const EXISTING = 'o-7777-aaaa-bbbb-cccc-000000000007';
+  const existing = (over: Record<string, unknown> = {}) => toOrder({
+    id: EXISTING, clubId: 'club-1', clubName: 'FK Slaný', serviceId: 's1', serviceName: 'Diagnostika', status: 'Confirmed', paymentMethod: 'ClubInvoice',
+    activitySeats: [{ activityId: 'a1', activityName: 'Základní prohlídka', durationMinutes: 30, seats: 10, registered: 0, unitPriceCzk: null }],
+    totalSeats: 10, note: 'Stará pozn.', createdAtUtc: '2026-09-01T10:00:00Z',
+    blocks: [
+      { id: 'b-1', clubId: 'club-1', clubName: 'FK Slaný', calendarIds: ['c1'], activityIds: [], fromDate: DAY, toDate: DAY, dailyFrom: '09:00', dailyTo: '12:00', status: 'Active', athletes: [], clubOrderId: EXISTING },
+      { id: 'b-2', clubId: 'club-1', clubName: 'FK Slaný', calendarIds: ['c1'], activityIds: [], fromDate: '2026-09-25', toDate: '2026-09-25', dailyFrom: '09:00', dailyTo: '12:00', status: 'Active', athletes: [], clubOrderId: EXISTING },
+    ],
+    ...over,
+  });
+
+  beforeEach(() => setViewport(VIEWPORTS.desktop));
+
+  const pickAndConfirm = async () => {
+    renderPage(VIEWPORTS.desktop);
+    const user = await startPicking();
+    paint(13 * 60, 15 * 60);
+    await waitFor(() => expect(rows()).toHaveLength(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Potvrdit objednávku' }));
+    return user;
+  };
+
+  it('asks first - nothing is created until the desk chooses', async () => {
+    listOrders.mockResolvedValue([existing()]);
+    await pickAndConfirm();
+    const dialog = await screen.findByTestId('pick-duplicate');
+    expect(within(dialog).getByTestId('pick-duplicate-line')).toHaveTextContent('Klub už má objednávku KO-00000007 na tuto službu (2 termíny, 10 hráčů).');
+    expect(within(dialog).getByRole('button', { name: 'Přidat do té objednávky' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Vytvořit samostatnou objednávku' })).toBeInTheDocument();
+    expect(createStaff).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(listOrders).toHaveBeenCalledWith({ clubId: 'club-1' });
+  });
+
+  it('"Vytvořit samostatnou objednávku" goes on as before', async () => {
+    listOrders.mockResolvedValue([existing()]);
+    createStaff.mockResolvedValue(toOrder({ id: 'o-new', clubName: 'FK Slaný', serviceId: 's1', status: 'Confirmed', paymentMethod: 'ClubInvoice', registrationUrl: 'https://app.test/klub/rt' }));
+    const user = await pickAndConfirm();
+    await user.click(await screen.findByRole('button', { name: 'Vytvořit samostatnou objednávku' }));
+    await waitFor(() => expect(createStaff).toHaveBeenCalledTimes(1));
+    expect(createStaff.mock.calls[0][0]).toMatchObject({ clubId: 'club-1', serviceId: 's1', activitySeats: [{ activityId: 'a1', seats: 10 }], status: 'Confirmed' });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('"Přidat do té objednávky" turns the pick into an edit of that order: its windows stay, the new ones and the new players are added', async () => {
+    listOrders.mockResolvedValue([existing()]);
+    update.mockResolvedValue(existing());
+    const user = await pickAndConfirm();
+    await user.click(await screen.findByRole('button', { name: 'Přidat do té objednávky' }));
+
+    /* Edit mode of the existing order: its two windows plus the new pick, "Uložit změny", no "Potvrdit objednávku". */
+    const panel = await screen.findByTestId('pick-panel');
+    await within(panel).findByRole('button', { name: 'Uložit změny' });
+    expect(screen.queryByRole('button', { name: 'Potvrdit objednávku' })).not.toBeInTheDocument();
+    await waitFor(() => expect(rows()).toHaveLength(3));
+    expect(rows().join(' ')).toMatch(/09:00–12:00 · 180 min/);
+    expect(rows().join(' ')).toMatch(/13:00–15:30 · 150 min/);
+    expect(within(panel).getByTestId('pick-note')).toHaveTextContent('Přidáno do objednávky KO-00000007');
+    expect(createStaff).not.toHaveBeenCalled();
+
+    /* The new player counts are ADDED to the old: the same činnost, 10 + 10. */
+    expect(within(panel).getByTestId('pick-needs')).toHaveTextContent('20 hráčů');
+  });
+
+  it('saving after "Přidat" sends ONE update: summed players, every window, the order own payment and note', async () => {
+    listOrders.mockResolvedValue([existing()]);
+    update.mockResolvedValue(existing());
+    const user = await pickAndConfirm();
+    await user.click(await screen.findByRole('button', { name: 'Přidat do té objednávky' }));
+    const panel = await screen.findByTestId('pick-panel');
+    await waitFor(() => expect(rows()).toHaveLength(3));
+    fireEvent.click(within(panel).getByRole('button', { name: 'Uložit změny' }));
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    expect(update.mock.calls[0][0]).toBe(EXISTING);
+    expect(update.mock.calls[0][1]).toMatchObject({
+      activitySeats: [{ activityId: 'a1', seats: 20 }], paymentMethod: 'ClubInvoice', note: 'Stará pozn.', calendarIds: ['c1'],
+      ranges: [
+        /* The same daily window on two consecutive days is one range, as pick mode always sends it. */
+        { fromDate: DAY, toDate: '2026-09-25', dailyFrom: '09:00', dailyTo: '12:00' },
+        { fromDate: DAY, toDate: DAY, dailyFrom: '13:00', dailyTo: '15:30' },
+      ],
+    });
+    expect(createStaff).not.toHaveBeenCalled();
+  });
+
+  it('"Zpět" keeps the picks and creates nothing', async () => {
+    listOrders.mockResolvedValue([existing()]);
+    const user = await pickAndConfirm();
+    await user.click(await screen.findByRole('button', { name: 'Zpět' }));
+    await waitFor(() => expect(screen.queryByTestId('pick-duplicate')).toBeNull());
+    expect(rows()).toHaveLength(1);
+    expect(createStaff).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['another služba', { serviceId: 's2' }],
+    ['a cancelled order', { status: 'Cancelled' }],
+    ['a completed order', { status: 'Completed' }],
+  ])('%s is no reason to ask', async (_label, over) => {
+    listOrders.mockResolvedValue([existing(over)]);
+    createStaff.mockResolvedValue(toOrder({ id: 'o-new', clubName: 'FK Slaný', serviceId: 's1', status: 'Confirmed', paymentMethod: 'ClubInvoice', registrationUrl: 'https://app.test/klub/rt' }));
+    await pickAndConfirm();
+    await waitFor(() => expect(createStaff).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('pick-duplicate')).toBeNull();
+  });
+
+  it('a list that cannot be read never blocks the order', async () => {
+    listOrders.mockRejectedValue(new Error('offline'));
+    createStaff.mockResolvedValue(toOrder({ id: 'o-new', clubName: 'FK Slaný', serviceId: 's1', status: 'Confirmed', paymentMethod: 'ClubInvoice', registrationUrl: 'https://app.test/klub/rt' }));
+    await pickAndConfirm();
+    await waitFor(() => expect(createStaff).toHaveBeenCalledTimes(1));
   });
 });

@@ -55,6 +55,12 @@ export const CAL_TEXT = {
     title: (club: string) => `Blok pro ${club}`,
     open: "Otevřít blok",
     close: "Zavřít",
+    /* A window that belongs to a club order opens the ORDER, never the block. */
+    orderTitle: (code: string, club: string) => `Objednávka ${code} · ${club}`,
+    openOrder: "Otevřít objednávku",
+    editTerms: "Upravit termíny",
+    loading: "Načítám objednávku…",
+    orderHint: "Čas drží klub – běžné objednávky sem nejdou. Označený je termín, na který jste klepli.",
     hint: "Čas drží klub – běžné objednávky sem nejdou. Sportovci se do něj registrují přes odkaz klubu.",
   },
 

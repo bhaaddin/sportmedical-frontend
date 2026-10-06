@@ -2,7 +2,7 @@ import type { DateOnly } from "../../../utils/time";
 import { addDaysToDateOnly } from "../../../utils/time";
 import { shortDate, weekdayShort } from "../grid/periodTitle";
 import { formatMinutes, type MinuteRange } from "../grid/timeRange";
-import { rangeDates, type ClubRange, type NewClubBlockState } from "./model";
+import { rangeDates, type ClubRange } from "./model";
 
 /*
  * Several different places marked in the calendar at once (Monday morning,
@@ -113,18 +113,4 @@ export function clubRanges(items: readonly PickedRange[], today: DateOnly): Club
     }
   }
   return out.sort(byStart);
-}
-
-/** The router state for `/clubs`: the new `ranges`, and the old single fields from the first one. */
-export function clubStateForRanges(calendarIds: string[], ranges: readonly ClubRange[]): NewClubBlockState {
-  const first = ranges[0];
-  return {
-    newBlock: {
-      calendarIds,
-      fromDate: first.fromDate,
-      toDate: first.toDate,
-      ...(first.dailyFrom !== undefined ? { dailyFrom: first.dailyFrom, dailyTo: first.dailyTo } : {}),
-      ranges: ranges.map((r) => ({ ...r })),
-    },
-  };
 }

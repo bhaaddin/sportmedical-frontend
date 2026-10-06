@@ -24,6 +24,7 @@ import { parsePlayerCount, todayInPrague } from '../blockLogic';
 import { OrderSeatsSection } from './OrderSeatsSection';
 import type { OrderActivityItem } from './OrderSeatsSection';
 import { OrderSuccess } from './OrderSuccess';
+import { editBlockRefs } from './editSession';
 import { rangeLine } from './orderFormat';
 import { fieldMessage, orderRanges, seatPayload, stepSeats, totalSeatsOf } from './orderLogic';
 import type { SeatsText } from './orderLogic';
@@ -170,14 +171,7 @@ function OrderDialogBody({ onClose, order, processOrder, onEditTerms, onSaved }:
   const openCalendar = () => {
     setShowErrors(true);
     if (invalid || onEditTerms === undefined) return;
-    const live = src.blocks.filter((b) => b.status !== 'Cancelled');
-    const blocks: EditBlockRef[] = mode === 'edit'
-      ? live.flatMap((b) => (b.calendarIds[0] === undefined ? [] : [{
-          id: b.id,
-          calendarId: b.calendarIds[0],
-          range: { fromDate: b.fromDate, toDate: b.toDate, dailyFrom: b.dailyFrom, dailyTo: b.dailyTo },
-        }]))
-      : [];
+    const blocks: EditBlockRef[] = mode === 'edit' ? editBlockRefs(src) : [];
     const today = todayInPrague();
     const dates = (mode === 'edit' ? blocks.map((b) => b.range.fromDate) : src.requestedRanges.map((r) => r.fromDate)).filter((d) => d !== '').sort();
     const upcoming = dates.find((d) => d >= today) ?? (mode === 'edit' ? dates[0] : undefined);

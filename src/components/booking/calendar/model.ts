@@ -430,37 +430,12 @@ export function isWeekend(day: DateOnly): boolean {
 
 /* ── What the clubs screen is told (router state) ── */
 
-/** One place in the calendar handed to the clubs screen: whole days, or a daily window on those days. */
+/** One place in the calendar: whole days, or a daily window on those days. */
 export interface ClubRange {
   fromDate: DateOnly;
   toDate: DateOnly;
   dailyFrom?: string;
   dailyTo?: string;
-}
-
-export interface NewClubBlockState {
-  newBlock: {
-    calendarIds: string[];
-    fromDate: DateOnly;
-    toDate: DateOnly;
-    dailyFrom?: string;
-    dailyTo?: string;
-    /** Several different places at once; the single fields above repeat the first. */
-    ranges?: ClubRange[];
-  };
-}
-
-export function clubStateForRange(calendarIds: string[], range: DayRange): NewClubBlockState {
-  return { newBlock: { calendarIds, fromDate: range.from, toDate: range.to } };
-}
-
-export function clubStateForSlot(
-  calendarId: string,
-  day: DateOnly,
-  dailyFrom: string,
-  dailyTo: string,
-): NewClubBlockState {
-  return { newBlock: { calendarIds: [calendarId], fromDate: day, toDate: day, dailyFrom, dailyTo } };
 }
 
 export interface OpenClubBlockState {

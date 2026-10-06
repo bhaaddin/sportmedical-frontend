@@ -33,6 +33,7 @@ vi.mock('../../../api/appointments', () => ({ appointmentsApi: { range: vi.fn().
 
 const { ClubPresentation } = await import('./ClubPresentation');
 const { buildClubRow } = await import('../../../pages/clubs/clubRow');
+const { toOrder } = await import('../../../api/clubOrders');
 
 const club = {
   id: 'club-1', name: 'Dukla Jižní Město', ico: '12345678', dic: 'CZ12345678', city: 'Praha', address: 'Sportovní 1', postalCode: '14900',
@@ -63,7 +64,7 @@ function open(blocks: ClubBlockView[] = [block], c: Club = club) {
   return render(
     <Wrap>
       <ClubPresentation
-        row={buildClubRow(c, [], blocks, '2099-10-01')} clubs={[c]} allBlocks={blocks} priceOf={() => null} pricesReady focusBlockId={null} today="2099-10-01"
+        row={buildClubRow(c, [], blocks, '2099-10-01')} priceOf={() => null} pricesReady focusBlockId={null} today="2099-10-01"
         onReload={vi.fn()} onInvoice={vi.fn()} onNewReservation={vi.fn()} {...handlers}
       />
     </Wrap>,
@@ -74,7 +75,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   summaryMock.mockResolvedValue(summary);
   listMock.mockResolvedValue([
-    { id: 'o1', clubId: 'club-1', serviceName: 'Prohlídka', totalSeats: 20, status: 'Confirmed', requestedRanges: [], blocks: [], activitySeats: [] },
+    toOrder({ id: 'o1', clubId: 'club-1', serviceName: 'Prohlídka', totalSeats: 20, status: 'Confirmed', requestedRanges: [], blocks: [], activitySeats: [] }),
   ]);
 });
 
@@ -97,7 +98,8 @@ describe.each([
     expect(screen.getByRole('region', { name: 'Nadcházející okna v kalendáři' })).toBeInTheDocument();
     expect(await screen.findByTestId('club-order-link')).toBeInTheDocument();
     expect(await screen.findAllByTestId('breakdown-row')).toHaveLength(2);
-    expect(screen.getByRole('region', { name: 'Bloky klubu' })).toBeInTheDocument();
+    /* The block has no order: it is a legacy reservation and keeps its own panel under its own heading. */
+    expect(screen.getByRole('region', { name: 'Starší rezervace (bez objednávky)' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Deaktivovat klub/ })).toBeInTheDocument();
   });
 
@@ -153,5 +155,113 @@ describe('ClubPresentation behaviour', () => {
     summaryMock.mockReturnValue(new Promise(() => undefined));
     open();
     expect(screen.getByTestId('figures-loading')).toBeInTheDocument();
+  });
+});
+
+/* ── Etapa 10: one order = one card ── */
+
+const ORDER_ID = 'o1-1111-2222-3333-444455556666';
+const win = (id: string, from: string, to: string, over: Partial<ClubBlockView> = {}): ClubBlockView => ({
+  ...block, id, clubOrderId: ORDER_ID, fromDate: from, toDate: to, dailyFrom: '08:00', dailyTo: '12:00', calendarIds: ['cal-1'], ...over,
+});
+const orderBlocks = [win('w1', '2099-10-26', '2099-10-27'), win('w2', '2099-10-29', '2099-10-29'), win('w3', '2099-11-10', '2099-11-10')];
+const fullOrder = toOrder({
+  id: ORDER_ID, clubId: 'club-1', clubName: 'Dukla Jižní Město', serviceId: 's1', serviceName: 'Prohlídka', status: 'Confirmed',
+  paymentMethod: 'ClubInvoice', totalSeats: 22, registered: 7, requestedRanges: [], parentOrderId: null, addenda: [], note: '', createdAtUtc: '2099-10-01T10:00:00Z',
+  priceQuote: { listTotalCzk: 4000, discounts: [], totalCzk: 3600 },
+  activitySeats: [
+    { activityId: 'a1', activityName: 'Základní prohlídka', durationMinutes: 30, seats: 12, registered: 4, unitPriceCzk: 200 },
+    { activityId: 'a2', activityName: 'Komplexní prohlídka', durationMinutes: 60, seats: 10, registered: 3, unitPriceCzk: 400 },
+  ],
+  blocks: orderBlocks,
+});
+
+describe.each([['phone'], ['tablet'], ['desktop']] as const)('one order, one card at %s', (name) => {
+  beforeEach(() => {
+    listMock.mockResolvedValue([fullOrder]);
+  });
+
+  it('shows the order once with all its windows and no block panels for them; the legacy block keeps its panel', async () => {
+    setViewport(VIEWPORTS[name]);
+    const legacy = { ...block, id: 'legacy-1', clubOrderId: null };
+    open([...orderBlocks, legacy]);
+
+    const cards = await screen.findAllByTestId('club-order-card');
+    expect(cards).toHaveLength(1);
+    const card = cards[0];
+    expect(card).toHaveTextContent('Objednávka KO-55556666');
+    expect(card).toHaveTextContent('Potvrzeno');
+    expect(card).toHaveTextContent('Základní prohlídka 4/12 · Komplexní prohlídka 3/10 (22 hráčů)');
+    expect(card).toHaveTextContent('3 600');
+    expect(within(card).getAllByTestId('order-window')).toHaveLength(3);
+    expect(within(card).getByText('Termíny (3 termíny)')).toBeInTheDocument();
+    /* ONE button row for the whole order. */
+    for (const label of ['Změnit hráče', 'Upravit termíny', 'Zrušit objednávku', 'Otevřít']) {
+      expect(within(card).getByRole('button', { name: label })).toBeInTheDocument();
+    }
+
+    /* Only the legacy block (no order) has a block panel; the order's three windows have none. */
+    const legacyRegion = screen.getByRole('region', { name: 'Starší rezervace (bez objednávky)' });
+    expect(within(legacyRegion).getAllByRole('button', { name: 'Zrušit blok' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Zrušit blok' })).toHaveLength(1);
+  });
+
+  it('lists the upcoming windows once per order, with its dates, not once per window', async () => {
+    setViewport(VIEWPORTS[name]);
+    open([...orderBlocks, { ...block, id: 'legacy-1', clubOrderId: null }]);
+    const rows = await screen.findAllByTestId('club-window');
+    /* one row for the order, one for the legacy block */
+    expect(rows).toHaveLength(2);
+    const orderRow = rows.find((r) => r.getAttribute('data-order-id') === ORDER_ID) as HTMLElement;
+    expect(orderRow).toHaveTextContent('26.–27. 10. · 08:00–12:00');
+    expect(orderRow).toHaveTextContent('Čt 29. 10. · 08:00–12:00');
+    expect(orderRow).toHaveTextContent('Út 10. 11. · 08:00–12:00');
+    await waitFor(() => expect(orderRow).toHaveTextContent('7 / 22'));
+  });
+
+  it('has no legacy heading when every window belongs to an order', async () => {
+    setViewport(VIEWPORTS[name]);
+    open(orderBlocks);
+    await screen.findByTestId('club-order-card');
+    expect(screen.queryByRole('region', { name: 'Starší rezervace (bez objednávky)' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Zrušit blok' })).toBeNull();
+  });
+
+  it('opens the order from its card', async () => {
+    setViewport(VIEWPORTS[name]);
+    const user = userEvent.setup();
+    open(orderBlocks);
+    const card = await screen.findByTestId('club-order-card');
+    await user.click(within(card).getByRole('button', { name: 'Otevřít' }));
+    expect(handlers.onOpenOrder).toHaveBeenCalledWith(ORDER_ID);
+  });
+
+  it('opens "Změnit hráče" from the card', async () => {
+    setViewport(VIEWPORTS[name]);
+    const user = userEvent.setup();
+    open(orderBlocks);
+    const card = await screen.findByTestId('club-order-card');
+    await user.click(within(card).getByRole('button', { name: 'Změnit hráče' }));
+    expect(await screen.findByTestId('change-players-dialog')).toBeInTheDocument();
+  });
+
+  it('asks before cancelling the whole order from the card', async () => {
+    setViewport(VIEWPORTS[name]);
+    const user = userEvent.setup();
+    open(orderBlocks);
+    const card = await screen.findByTestId('club-order-card');
+    await user.click(within(card).getByRole('button', { name: 'Zrušit objednávku' }));
+    expect(await screen.findByRole('dialog', { name: 'Zrušit objednávku?' })).toBeInTheDocument();
+  });
+});
+
+describe('cancelled orders', () => {
+  it('stay a compact row, not a card with buttons', async () => {
+    setViewport(VIEWPORTS.desktop);
+    listMock.mockResolvedValue([fullOrder, toOrder({ ...fullOrder, id: 'o2-aaaa-bbbb-cccc-ddddeeeeffff', status: 'Cancelled', blocks: [] })]);
+    open(orderBlocks);
+    await screen.findByTestId('club-order-card');
+    expect(await screen.findAllByTestId('club-order-card')).toHaveLength(1);
+    expect(screen.getAllByTestId('club-order-cancelled')).toHaveLength(1);
   });
 });

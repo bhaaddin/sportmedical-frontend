@@ -5,8 +5,6 @@ import {
   afternoonFree,
   buildColumns,
   clubBlockDates,
-  clubStateForRange,
-  clubStateForSlot,
   colourOfActivity,
   countByService,
   dayCount,
@@ -297,15 +295,6 @@ describe('a run of days', () => {
     expect(rangePill({ from: '2026-10-26', to: '2026-11-09' })).toBe('26. 10. – 9. 11. · 15 dní');
     expect(daysOf({ from: '2026-10-30', to: '2026-11-02' })).toEqual(['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02']);
     expect([1, 3, 14].map(daysWord)).toEqual(['1 den', '3 dny', '14 dní']);
-  });
-
-  it('is what the clubs screen is told, in the contract C4 shape', () => {
-    expect(clubStateForRange(['c1', 'c2'], range)).toEqual({
-      newBlock: { calendarIds: ['c1', 'c2'], fromDate: '2026-10-26', toDate: '2026-11-08' },
-    });
-    expect(clubStateForSlot('c1', '2026-10-26', '10:00', '11:00')).toEqual({
-      newBlock: { calendarIds: ['c1'], fromDate: '2026-10-26', toDate: '2026-10-26', dailyFrom: '10:00', dailyTo: '11:00' },
-    });
   });
 
   it('a club block reaches from its first piece to its last, midnight belonging to the day before', () => {

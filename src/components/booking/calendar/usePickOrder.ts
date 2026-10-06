@@ -2,11 +2,13 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import type { Calendar } from "../../../api/bookingContracts";
+import { fetchBlockableActivities } from "../../../api/clubBlocks";
 import { ClubOrderError, clubOrdersApi } from "../../../api/clubOrders";
 import type { ClubOrderView } from "../../../api/clubOrders";
 import type { DateOnly } from "../../../utils/time";
 import { computeCoverage } from "../../clubs/order/coverage";
-import { rangeLine } from "../../clubs/order/orderFormat";
+import { mergeSessionInto } from "../../clubs/order/editSession";
+import { orderCode, rangeLine } from "../../clubs/order/orderFormat";
 import { rowFromRange, rowIndexForError } from "../../clubs/order/orderLogic";
 import type { PickSession } from "../../clubs/order/pickSession";
 import type { GridPickMode } from "../grid/TimeGrid";
@@ -19,6 +21,7 @@ import {
   pickInRange,
   picksFromRanges,
   timePicks,
+  withoutIds,
 } from "./pickLogic";
 import type { PickOrderPanelProps } from "./PickOrderPanel";
 import type { MultiSelectApi } from "./useMultiSelect";
@@ -44,6 +47,12 @@ export interface PickOrderApi {
   panel: Omit<PickOrderPanelProps, "device"> | null;
   /** The confirmed order, until the page has shown it. */
   result: ClubOrderView | null;
+  /**
+   * The club already has a live order of the same služba: the new order is NOT created until the desk chooses
+   * ("Přidat do té objednávky" or "Vytvořit samostatnou objednávku"). Null when there is nothing to decide.
+   */
+  duplicate: ClubOrderView | null;
+  resolveDuplicate: (choice: "add" | "separate" | "dismiss") => void;
   /** "Objednávka potvrzena" (new, processed) or "Termíny uloženy" (edited). */
   resultTitle: string;
   /** "Celý den" / a free block: the blocks of one day become picks, exactly as they are (never cut to the need). */
@@ -73,6 +82,7 @@ export function usePickOrder(input: {
   const [confirming, setConfirming] = useState(false);
   const [failure, setFailure] = useState<{ message: string; conflict: string | null; ids: string[]; athletes: number } | null>(null);
   const [result, setResult] = useState<ClubOrderView | null>(null);
+  const [duplicate, setDuplicate] = useState<ClubOrderView | null>(null);
   const [resultTitle, setResultTitle] = useState("Objednávka potvrzena");
 
   const picks = useMemo(() => timePicks(multi.items), [multi.items]);
@@ -114,7 +124,7 @@ export function usePickOrder(input: {
     onEnded?.();
   }, [multi, onEnded]);
 
-  const confirm = useCallback(async (cancelAthletes = false) => {
+  const confirm = useCallback(async (cancelAthletes = false, skipDuplicateCheck = false) => {
     if (session === null || picks.length === 0 || confirming) return;
     const ranges = ordersRangesOf(multi.items, todayKey);
     const calendarIds = pickedCalendarIds(multi.items);
@@ -136,6 +146,14 @@ export function usePickOrder(input: {
         }
         order = await clubOrdersApi.confirm(editing.orderId, { calendarIds, ranges });
       } else {
+        /* Never silently a second order: a club that already holds a live order of this služba chooses first. */
+        if (editing === undefined && session.parentOrderId === undefined && !skipDuplicateCheck) {
+          const existing = await findLiveOrder(queryClient, session.clubId, session.serviceId);
+          if (existing !== null) {
+            setDuplicate(existing);
+            return;
+          }
+        }
         order = await clubOrdersApi.createStaff({
           clubId: session.clubId,
           serviceId: session.serviceId,
@@ -176,6 +194,32 @@ export function usePickOrder(input: {
       setConfirming(false);
     }
   }, [session, picks, confirming, multi, todayKey, queryClient, onCreated, onEnded]);
+
+  const resolveDuplicate = useCallback(
+    (choice: "add" | "separate" | "dismiss") => {
+      const existing = duplicate;
+      setDuplicate(null);
+      if (existing === null || session === null) return;
+      if (choice === "separate") {
+        void confirm(false, true);
+        return;
+      }
+      if (choice === "dismiss") return;
+      /* The new picks and players join the existing order: its windows are painted again, the new ones stay on top. */
+      void (async () => {
+        const catalogue = await queryClient
+          .fetchQuery({ queryKey: ["club-block-activities"], queryFn: fetchBlockableActivities, staleTime: 5 * 60 * 1000 })
+          .catch(() => []);
+        const merged = mergeSessionInto(existing, session, catalogue, todayKey);
+        const own = (merged.editOrder?.blocks ?? []).flatMap((block) => picksFromRanges([block.range], block.calendarId, (id) => id));
+        multi.replace([...own, ...withoutIds(multi.items)]);
+        setSession(merged);
+        setFailure(null);
+        setNote(`Přidáno do objednávky ${orderCode(existing.id)}. Zkontrolujte termíny a uložte změny.`);
+      })();
+    },
+    [duplicate, session, confirm, queryClient, todayKey, multi],
+  );
 
   const ownBlockIds = useMemo(() => new Set((session?.editOrder?.blocks ?? []).map((b) => b.id)), [session]);
   const conflictIds = useMemo(() => new Set(failure?.ids ?? []), [failure]);
@@ -264,5 +308,22 @@ export function usePickOrder(input: {
           onCancel: end,
         };
 
-  return { session, active: session !== null, start, cancel: end, gridPick, panel, result, resultTitle, closeResult: () => setResult(null), pickBlocks, removeDay, setNote };
+  return { session, active: session !== null, start, cancel: end, gridPick, panel, result, duplicate, resolveDuplicate, resultTitle, closeResult: () => setResult(null), pickBlocks, removeDay, setNote };
+}
+
+/** The club's newest Requested or Confirmed order of this služba, or null (also when the list cannot be read). */
+async function findLiveOrder(queryClient: ReturnType<typeof useQueryClient>, clubId: string, serviceId: string): Promise<ClubOrderView | null> {
+  try {
+    const orders = await queryClient.fetchQuery({
+      queryKey: ["club-orders", "pick-duplicate", clubId],
+      queryFn: () => clubOrdersApi.list({ clubId }),
+      staleTime: 0,
+    });
+    const live = orders
+      .filter((o) => (o.status === "Requested" || o.status === "Confirmed") && o.serviceId === serviceId)
+      .sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc));
+    return live[0] ?? null;
+  } catch {
+    return null;
+  }
 }

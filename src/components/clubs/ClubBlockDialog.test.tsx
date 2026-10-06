@@ -1,15 +1,11 @@
 /*
- * The club-block dialog and its calculator, clicked through at the three widths.
- *
- * What only the screen can show: that the calculator asks while the operator
- * types and says the same sentence the board draws; that it warns (never
- * blocks) below the minimum and when the need does not fit; that a block is
- * created with exactly the body the contract names; that a club which does not
- * exist yet is created together with the block; and that an edit that would hit
- * registered athletes lists them and waits for a second, explicit confirmation.
- *
- * Seats per činnost, the service -> činnosti list and the fill-from-time button
- * have their own file: ClubBlockDialog.seats.test.tsx.
+ * The club-block dialog is EDIT ONLY (Etapa 10): a club's reservation is created as a club order in the calendar,
+ * never as a loose block, so there is no "Nový blok pro klub" any more. What only the screen can show, at the three
+ * widths: that the dialog opens on the block with the club, the calendars and the činnosti locked; that the
+ * calculator asks about it and says the same sentence the board draws; that it warns (never blocks) below the
+ * minimum; that seats per činnost show the registered count and refuse to go below it; that the update carries
+ * exactly the body the contract names; and that an edit that would hit registered athletes lists them and waits
+ * for a second, explicit confirmation.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -21,11 +17,9 @@ import type { Calculation, CalculationInput, ClubBlockView } from '../../api/clu
 import { answerFor, legacyAnswer } from './dialog/calcFixtures';
 
 const calculate = vi.fn();
-const create = vi.fn();
 const update = vi.fn();
+const create = vi.fn();
 const fetchActivities = vi.fn();
-const settingsGet = vi.fn();
-const createClub = vi.fn();
 
 vi.mock('../../api/clubBlocks', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../api/clubBlocks')>();
@@ -40,28 +34,30 @@ vi.mock('../../api/calendars', () => ({
     list: vi.fn().mockResolvedValue([
       { id: 'c-1', name: 'Prohlídky', color: '#0D5C52', location: '', displayStepMinutes: 15, isActive: true, sortOrder: 0, clinicServiceId: 's-1' },
       { id: 'c-2', name: 'Spiroergometrie', color: '#2B5C9B', location: '', displayStepMinutes: 15, isActive: true, sortOrder: 1, clinicServiceId: 's-2' },
-      { id: 'c-off', name: 'Starý', color: '#000000', location: '', displayStepMinutes: 15, isActive: false, sortOrder: 2, clinicServiceId: null },
     ]),
   },
 }));
-vi.mock('../../api/clubs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../api/clubs')>();
-  return { ...actual, clubsApi: { create: createClub, getAll: vi.fn(), update: vi.fn(), deactivate: vi.fn() }, clubSettingsApi: { get: settingsGet, put: vi.fn() } };
-});
+vi.mock('../../api/clinicServices', () => ({
+  clinicServicesApi: {
+    list: vi.fn().mockResolvedValue([
+      { id: 's-1', name: 'Sportovní prohlídky', description: '', sortOrder: 0, isActive: true, activities: 2, calendars: 1, colorHex: '#2E7D6B' },
+      { id: 's-2', name: 'Diagnostika', description: '', sortOrder: 1, isActive: true, activities: 1, calendars: 1, colorHex: '#3B6EA8' },
+    ]),
+  },
+}));
 
 const { ClubBlockDialog } = await import('./ClubBlockDialog');
 const { ClubBlockError } = await import('../../api/clubBlocks');
 
-const club = (id: string, name: string) => ({ id, name, ico: '00000019', paymentTermsDays: 14, isActive: true, createdAt: '2026-01-01T00:00:00Z' });
-const clubs = [club('club-1', 'FK Slaný'), club('club-2', 'SK Kladno')];
-
-const calc = (input: CalculationInput, over: Partial<Calculation> = {}) => answerFor(input, over);
-
 const saved = (over: Partial<ClubBlockView> = {}): ClubBlockView => ({
-  id: 'b-1', clubId: 'club-1', clubName: 'FK Slaný', colorHex: '#2E7D6B', name: null, calendarIds: ['c-1'], activityIds: ['a-1'],
-  fromDate: '2026-10-26', toDate: '2026-11-03', dailyFrom: null, dailyTo: null, playerCount: 120, seats: 120, registered: 0,
+  id: 'b-1', clubId: 'club-1', clubName: 'FK Slaný', colorHex: '#2E7D6B', name: null, calendarIds: ['c-1'], activityIds: ['a-1', 'a-3'],
+  fromDate: '2026-10-26', toDate: '2026-10-28', dailyFrom: null, dailyTo: null, playerCount: 40, seats: 40, registered: 15,
   status: 'Active', registrationToken: 'tok', registrationUrl: 'https://app/klub/tok', note: null, createdAtUtc: null, athletes: [],
-  activitySeats: [{ activityId: 'a-1', activityName: 'Základní prohlídka', seats: 120, registered: 0 }], ...over,
+  activitySeats: [
+    { activityId: 'a-1', activityName: 'Základní prohlídka', seats: 30, registered: 12 },
+    { activityId: 'a-3', activityName: 'Komplexní prohlídka', seats: 10, registered: 3 },
+  ],
+  ...over,
 });
 
 function Wrap({ children }: { children: ReactNode }) {
@@ -70,31 +66,23 @@ function Wrap({ children }: { children: ReactNode }) {
 }
 
 const open = (props: Partial<Parameters<typeof ClubBlockDialog>[0]> = {}) =>
-  render(<Wrap><ClubBlockDialog clubs={clubs} onClose={vi.fn()} {...props} /></Wrap>);
+  render(<Wrap><ClubBlockDialog block={saved()} onClose={vi.fn()} {...props} /></Wrap>);
 
 const group = async (name: string) => within(await screen.findByRole('group', { name }));
 const setDate = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
-
-/** Tick the calendar, choose the činnost and type its seats. */
-async function fillCalculatorInputs(user: ReturnType<typeof userEvent.setup>, players: string) {
-  await user.click(await (await group('Kalendáře')).findByRole('checkbox', { name: /Prohlídky/ }));
-  await user.click(await (await group('Činnosti')).findByRole('checkbox', { name: /Základní prohlídka/ }));
-  await user.type(screen.getByLabelText('Počet hráčů, Základní prohlídka'), players);
-}
+const norm = (el: HTMLElement) => el.textContent?.replace(/\s/g, ' ') ?? '';
+const seatsField = (activity: string) => screen.getByLabelText(`Počet hráčů, ${activity}`);
 
 beforeEach(() => {
-  /* The fixtures use days in late October 2026: pin 'today' so they are never in the past. */
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-10-04T10:00:00+02:00'));
   setViewport(VIEWPORTS.desktop);
-  calculate.mockReset().mockImplementation(async (input: CalculationInput) => calc(input));
-  create.mockReset().mockResolvedValue(saved());
+  calculate.mockReset().mockImplementation(async (input: CalculationInput) => answerFor(input));
   update.mockReset().mockResolvedValue(saved());
-  createClub.mockReset().mockResolvedValue(club('club-new', 'TJ Sokol Slaný'));
-  settingsGet.mockReset().mockResolvedValue({ registrationLinkValidityDays: 14, minimumPlayers: null });
+  create.mockReset();
   fetchActivities.mockReset().mockResolvedValue([
     { id: 'a-1', name: 'Základní prohlídka', durationMinutes: 60, clinicServiceId: 's-1', colorHex: '#2E7D6B', parallelCapacity: 2 },
-    { id: 'a-2', name: 'Spiroergometrie', durationMinutes: 45, clinicServiceId: 's-2', colorHex: '#3B6EA8', parallelCapacity: 1 },
+    { id: 'a-3', name: 'Komplexní prohlídka', durationMinutes: 60, clinicServiceId: 's-1', colorHex: '#3B6EA8', parallelCapacity: 1 },
   ]);
 });
 
@@ -111,8 +99,7 @@ describe('layouts', () => {
     const form = await screen.findByTestId('club-block-form');
     expect(form).toHaveAttribute('data-layout', device);
     expect(form).toHaveAttribute('data-columns', columns);
-    /* The buttons are always in the dialog's own footer - at the bottom of a full-screen phone sheet. */
-    expect(screen.getByRole('button', { name: 'Vytvořit blok' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Uložit změny' })).toBeInTheDocument();
     expect(screen.getByTestId('block-calculator')).toBeInTheDocument();
     expect(screen.getByTestId('block-preview')).toBeInTheDocument();
   });
@@ -125,271 +112,61 @@ describe('layouts', () => {
   });
 });
 
-describe('the calculator', () => {
-  it('asks while the operator types and draws the analysis of the club as one whole', async () => {
-    const user = userEvent.setup();
+describe('a block can no longer be created here', () => {
+  it('has no new-block title, no club picker, no create button and no extra-term button', async () => {
     open();
-    expect(screen.getByTestId('block-calculator')).toHaveTextContent('Vyberte kalendář a činnosti');
-
-    await fillCalculatorInputs(user, '120');
-    const line = await screen.findByTestId('analysis-activity');
-    expect(line.textContent?.replace(/\s/g, ' ')).toBe('Základní prohlídka · 120 hráčů × 60 min ÷ 2 stanoviště = 3 600 min');
-    const total = await screen.findByTestId('analysis-total');
-    expect(total.textContent?.replace(/\s/g, ' ')).toContain('Klub celkem: 120 míst, potřebuje 3 600 min, k dispozici ve vybraných termínech 1 200 min — chybí 2 400 min');
-    expect(total).toHaveAttribute('data-state', 'short');
-
-    /* Nothing was pre-selected: the činnost was ticked by hand; the call carries the club as one whole. */
-    expect((await group('Činnosti')).getByRole('checkbox', { name: /Základní prohlídka/ })).toBeChecked();
-    await waitFor(() =>
-      expect(calculate).toHaveBeenLastCalledWith(expect.objectContaining({ activitySeats: [{ activityId: 'a-1', seats: 120 }], calendarIds: ['c-1'] })),
-    );
-
-    const perDay = screen.getByRole('list', { name: 'Otevřeno po dnech' });
-    expect(within(perDay).getAllByRole('listitem')).toHaveLength(2);
-    expect(within(perDay).getByText('po 26. 10.')).toBeInTheDocument();
-  });
-
-  it('fills the days when "Použít návrh" is pressed', async () => {
-    const user = userEvent.setup();
-    open();
-    await fillCalculatorInputs(user, '120');
-    await user.click(await screen.findByRole('button', { name: 'Použít návrh' }));
-    expect(screen.getByLabelText('Od')).toHaveValue('2026-10-26');
-    expect(screen.getByLabelText('Do')).toHaveValue('2026-11-03');
-  });
-
-  it('warns below the minimum only when the answer says so, and does not block', async () => {
-    calculate.mockImplementation(async (i: CalculationInput) => calc(i, { minimumPlayers: 25, belowMinimum: true }));
-    const user = userEvent.setup();
-    open();
-    await fillCalculatorInputs(user, '20');
-    const warning = await screen.findByRole('status');
-    expect(warning).toHaveTextContent('Méně než minimum 25 hráčů');
-    expect(screen.getByRole('button', { name: 'Použít návrh' })).toBeEnabled();
-  });
-
-  it('shows no warning when no minimum is set, however few players', async () => {
-    calculate.mockImplementation(async (i: CalculationInput) => calc(i, { minimumPlayers: null, belowMinimum: false }));
-    const user = userEvent.setup();
-    open();
-    await fillCalculatorInputs(user, '2');
-    await screen.findByRole('button', { name: 'Použít návrh' });
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-  });
-
-  it('shows no warning from a number alone: without belowMinimum the answer is not a warning', async () => {
-    calculate.mockImplementation(async (i: CalculationInput) => calc(i, { minimumPlayers: 25, belowMinimum: false }));
-    const user = userEvent.setup();
-    open();
-    await fillCalculatorInputs(user, '2');
-    await screen.findByRole('button', { name: 'Použít návrh' });
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-  });
-
-  it('says "nevejde se" when the need does not fit the horizon', async () => {
-    calculate.mockImplementation(async (i: CalculationInput) => calc(i, { fitsHorizon: false, suggestedDays: 90, suggestedTo: '2027-01-30' }));
-    const user = userEvent.setup();
-    open();
-    await fillCalculatorInputs(user, '5000');
-    const alert = await screen.findByText(/Nevejde se do období/);
-    expect(alert).toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-  });
-
-  it('says what failed and offers a retry', async () => {
-    calculate.mockRejectedValueOnce(new ClubBlockError('Kalkulace selhala.', 500));
-    const user = userEvent.setup();
-    open();
-    await fillCalculatorInputs(user, '120');
-    expect(await screen.findByText(/Kalkulačku se nepodařilo načíst/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Zkusit znovu' }));
-    expect(await screen.findByTestId('analysis-total')).toBeInTheDocument();
-  });
-
-  it('falls back to one headcount field when the server answers without an analysis', async () => {
-    calculate.mockResolvedValue(legacyAnswer());
-    const user = userEvent.setup();
-    open({ prefill: { clubId: 'club-1', calendarIds: ['c-1'], fromDate: '2026-10-26', toDate: '2026-10-30' } });
-    await user.click(await (await group('Činnosti')).findByRole('checkbox', { name: /Základní prohlídka/ }));
-    await user.type(screen.getByLabelText('Počet hráčů, Základní prohlídka'), '120');
-
-    /* The old calculator body, and the single field that replaces the per-činnost ones. */
-    const sentence = await screen.findByTestId('calculation-sentence');
-    expect(sentence.textContent?.replace(/\s/g, ' ')).toBe('120 hráčů × 60 min ÷ 2 stanoviště = 3 600 min → 7 dní, 26. 10. – 3. 11.');
-    const field = await screen.findByLabelText('Počet hráčů');
-    expect(field).toHaveValue('120');
-    expect(screen.queryByLabelText('Počet hráčů, Základní prohlídka')).not.toBeInTheDocument();
-
-    await user.clear(field);
-    await user.type(field, '90');
-    await user.click(screen.getByRole('button', { name: 'Vytvořit blok' }));
-    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
-    expect(create.mock.calls[0][0]).toMatchObject({ playerCount: 90, activityIds: ['a-1'] });
-    expect(create.mock.calls[0][0]).not.toHaveProperty('activitySeats');
-  });
-});
-
-describe('the preview', () => {
-  it("draws the block in the club's colour once the club is known", async () => {
-    open({ prefill: { clubId: 'club-1' }, blocks: [saved({ colorHex: '#2E7D6B' })] });
-    await screen.findByTestId('club-block-form');
-    const chip = screen.getByTestId('block-preview-chip');
-    expect(chip).toHaveAttribute('data-color', '#2E7D6B');
-    expect(chip).toHaveTextContent('FK Slaný');
-  });
-
-  it('is honest that a new club has no colour yet', async () => {
-    open({ prefill: { newClub: { name: 'TJ Sokol Slaný' } } });
-    await screen.findByTestId('club-block-form');
-    expect(screen.getByTestId('block-preview-chip')).toHaveAttribute('data-color', '');
-    expect(screen.getByTestId('block-preview')).toHaveTextContent('Barvu klubu přidělí systém');
-  });
-
-  it('shows each calendar and činnost with its colour', async () => {
-    open();
-    await userEvent.setup().click(await (await group('Kalendáře')).findByRole('checkbox', { name: /Prohlídky/ }));
-    const acts = await (await group('Činnosti')).findByRole('checkbox', { name: /Základní prohlídka/ });
-    expect(acts.closest('label')?.querySelector('[data-swatch="#2E7D6B"]')).not.toBeNull();
-    expect((await group('Kalendáře')).getByRole('checkbox', { name: /Prohlídky/ }).closest('label')?.querySelector('[data-swatch="#0D5C52"]')).not.toBeNull();
-    expect((await group('Kalendáře')).queryByText('Starý')).not.toBeInTheDocument();
-  });
-});
-
-describe('creating a block', () => {
-  it('sends the contract body for a club picked from the list', async () => {
-    const user = userEvent.setup();
-    const onSaved = vi.fn();
-    const onClose = vi.fn();
-    open({ onSaved, onClose });
-
-    await user.click(screen.getByLabelText('Klub'));
-    await user.click(await screen.findByRole('option', { name: 'FK Slaný' }));
-    setDate('Od', '2026-10-26');
-    setDate('Do', '2026-10-30');
-    await user.click(await (await group('Kalendáře')).findByRole('checkbox', { name: /Prohlídky/ }));
-    await user.click(await (await group('Činnosti')).findByRole('checkbox', { name: /Základní prohlídka/ }));
-    await user.type(screen.getByLabelText('Počet hráčů, Základní prohlídka'), '120');
-    fireEvent.change(screen.getByLabelText('Denně od'), { target: { value: '08:00' } });
-    fireEvent.change(screen.getByLabelText('Denně do'), { target: { value: '12:00' } });
-    await user.type(screen.getByLabelText('Poznámka'), 'Jarní příprava');
-    await user.click(screen.getByRole('button', { name: 'Vytvořit blok' }));
-
-    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
-    expect(create).toHaveBeenCalledWith({
-      clubId: 'club-1', name: null, calendarIds: ['c-1'], fromDate: '2026-10-26', toDate: '2026-10-30',
-      dailyFrom: '08:00', dailyTo: '12:00', activitySeats: [{ activityId: 'a-1', seats: 120 }], note: 'Jarní příprava',
-    });
-    /* The server derives the činnosti and the sum: neither is sent next to the seats. */
-    expect(create.mock.calls[0][0]).not.toHaveProperty('playerCount');
-    expect(create.mock.calls[0][0]).not.toHaveProperty('activityIds');
-    expect(createClub).not.toHaveBeenCalled();
-    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 'b-1' })));
-    expect(onClose).toHaveBeenCalled();
-  });
-
-  it('refuses an incomplete form with a sentence under each field and sends nothing', async () => {
-    const user = userEvent.setup();
-    open();
-    await user.click(screen.getByRole('button', { name: 'Vytvořit blok' }));
-    expect(await screen.findByText('Vyberte klub nebo založte nový.')).toBeInTheDocument();
-    expect(screen.getByText('Zadejte první den bloku.')).toBeInTheDocument();
-    expect(screen.getByText('Vyberte aspoň jeden kalendář.')).toBeInTheDocument();
-    expect(screen.getByText('Vyberte aspoň jednu činnost.')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Upravit blok/ })).toBeInTheDocument();
+    expect(screen.queryByText('Nový blok pro klub')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Klub')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Vytvořit blok/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Přidat další termín/ })).not.toBeInTheDocument();
     expect(create).not.toHaveBeenCalled();
-  });
-
-  it('shows the server\'s refusal and keeps the form filled', async () => {
-    create.mockRejectedValue(new ClubBlockError('V tom termínu už je jiný blok.', 409));
-    const user = userEvent.setup();
-    open({ prefill: { clubId: 'club-1', calendarIds: ['c-1'], fromDate: '2026-10-26', toDate: '2026-10-27' } });
-    await user.click(await (await group('Činnosti')).findByRole('checkbox', { name: /Základní prohlídka/ }));
-    await user.type(screen.getByLabelText('Počet hráčů, Základní prohlídka'), '50');
-    await user.click(screen.getByRole('button', { name: 'Vytvořit blok' }));
-    expect(await screen.findByText('V tom termínu už je jiný blok.')).toBeInTheDocument();
-    expect(screen.getByLabelText('Počet hráčů, Základní prohlídka')).toHaveValue('50');
-  });
-
-  it('has no ceiling on the headcount', async () => {
-    const user = userEvent.setup();
-    open({ prefill: { clubId: 'club-1', calendarIds: ['c-1'], fromDate: '2026-10-26', toDate: '2026-12-31' } });
-    await user.click(await (await group('Činnosti')).findByRole('checkbox', { name: /Základní prohlídka/ }));
-    await user.type(screen.getByLabelText('Počet hráčů, Základní prohlídka'), '10000');
-    await user.click(screen.getByRole('button', { name: 'Vytvořit blok' }));
-    await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ activitySeats: [{ activityId: 'a-1', seats: 10000 }] })));
-  });
-});
-
-describe('a club that does not exist yet', () => {
-  it('opens with the new-club fields filled from the prefill, and creates the club with the block', async () => {
-    const user = userEvent.setup();
-    open({
-      prefill: {
-        newClub: { name: 'TJ Sokol Slaný', contactPerson: 'Jan Trenér', contactPhone: '+420 603 221 004', contactEmail: 'trener@sokol.cz', headcount: 40 },
-        calendarIds: ['c-1'], fromDate: '2026-10-26', toDate: '2026-10-28',
-      },
-    });
-
-    expect(screen.getByLabelText('Název klubu')).toHaveValue('TJ Sokol Slaný');
-    expect(screen.getByLabelText('Kontaktní osoba')).toHaveValue('Jan Trenér');
-    expect(screen.getByLabelText('Telefon')).toHaveValue('+420 603 221 004');
-    expect(screen.getByLabelText('E-mail')).toHaveValue('trener@sokol.cz');
-    expect(screen.getByLabelText('Od')).toHaveValue('2026-10-26');
-    expect((await group('Kalendáře')).getByRole('checkbox', { name: /Prohlídky/ })).toBeChecked();
-
-    /* The headcount typed into the drawer starts the first činnost's seats. */
-    await user.click(await (await group('Činnosti')).findByRole('checkbox', { name: /Základní prohlídka/ }));
-    expect(screen.getByLabelText('Počet hráčů, Základní prohlídka')).toHaveValue('40');
-    /* The server needs an IČO to make a club - the dialog asks for it and checks the digit. */
-    await user.click(screen.getByRole('button', { name: 'Vytvořit blok' }));
-    expect(await screen.findByText(/IČO je povinné/)).toBeInTheDocument();
-    expect(createClub).not.toHaveBeenCalled();
-
-    await user.type(screen.getByLabelText('IČO'), '12345678');
-    await user.click(screen.getByRole('button', { name: 'Vytvořit blok' }));
-    expect(await screen.findByText(/Tohle IČO neexistuje/)).toBeInTheDocument();
-
-    await user.clear(screen.getByLabelText('IČO'));
-    await user.type(screen.getByLabelText('IČO'), '00000019');
-    await user.click(screen.getByRole('button', { name: 'Vytvořit blok' }));
-
-    await waitFor(() => expect(createClub).toHaveBeenCalledTimes(1));
-    expect(createClub).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'TJ Sokol Slaný', ico: '00000019', contactPerson: 'Jan Trenér', contactPhone: '+420 603 221 004', contactEmail: 'trener@sokol.cz', paymentTermsDays: 14,
-    }));
-    await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ clubId: 'club-new', activitySeats: [{ activityId: 'a-1', seats: 40 }], calendarIds: ['c-1'] })));
-  });
-
-  it('does not create the club twice when the block save has to be retried', async () => {
-    create.mockRejectedValueOnce(new ClubBlockError('V tom termínu už je jiný blok.', 409)).mockResolvedValue(saved({ clubId: 'club-new' }));
-    const user = userEvent.setup();
-    open({ prefill: { newClub: { name: 'TJ Sokol Slaný', headcount: 40 }, calendarIds: ['c-1'], fromDate: '2026-10-26', toDate: '2026-10-28' } });
-    await user.type(screen.getByLabelText('IČO'), '00000019');
-    await user.click(await (await group('Činnosti')).findByRole('checkbox', { name: /Základní prohlídka/ }));
-    await user.click(screen.getByRole('button', { name: 'Vytvořit blok' }));
-    expect(await screen.findByText('V tom termínu už je jiný blok.')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Vytvořit blok' }));
-    await waitFor(() => expect(create).toHaveBeenCalledTimes(2));
-    expect(createClub).toHaveBeenCalledTimes(1);
-    expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ clubId: 'club-new' }));
   });
 });
 
 describe('editing a block', () => {
   it('locks the club, the calendars and the činnosti and saves the days and the headcount', async () => {
     const user = userEvent.setup();
-    open({ block: saved() });
-    expect(await screen.findByRole('heading', { name: /Upravit blok/ })).toBeInTheDocument();
-    expect(screen.queryByLabelText('Klub')).not.toBeInTheDocument();
+    open();
     expect(await (await group('Kalendáře')).findByRole('checkbox', { name: /Prohlídky/ })).toBeDisabled();
+    expect(screen.getAllByText('FK Slaný').length).toBeGreaterThan(0);
 
     setDate('Do', '2026-10-30');
     await user.click(screen.getByRole('button', { name: 'Uložit změny' }));
     await waitFor(() => expect(update).toHaveBeenCalledWith(
       'b-1',
-      { fromDate: '2026-10-26', toDate: '2026-10-30', activitySeats: [{ activityId: 'a-1', seats: 120 }], note: null, dailyFrom: null, dailyTo: null },
+      { fromDate: '2026-10-26', toDate: '2026-10-30', activitySeats: [{ activityId: 'a-1', seats: 30 }, { activityId: 'a-3', seats: 10 }], note: null, dailyFrom: null, dailyTo: null },
       { cancelAthletes: false },
     ));
+  });
+
+  it('shows the seats per činnost with the registered count, and refuses to go below it', async () => {
+    const user = userEvent.setup();
+    open();
+    expect(await screen.findAllByTestId('seats-row')).toHaveLength(2);
+    expect(screen.getAllByTestId('seats-registered').map((el) => norm(el))).toEqual(['12 / 30 obsazeno', '3 / 10 obsazeno']);
+    expect(screen.getByTestId('seats-total')).toHaveTextContent('Celkem: 40 míst');
+
+    fireEvent.change(seatsField('Základní prohlídka'), { target: { value: '10' } });
+    expect(screen.getAllByTestId('seats-registered').map((el) => norm(el))[0]).toBe('12 / 10 obsazeno — nejméně 12');
+    await user.click(screen.getByRole('button', { name: 'Uložit změny' }));
+    expect(update).not.toHaveBeenCalled();
+
+    fireEvent.change(seatsField('Základní prohlídka'), { target: { value: '12' } });
+    await user.click(screen.getByRole('button', { name: 'Uložit změny' }));
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    expect(update.mock.calls[0][1]).toMatchObject({ activitySeats: [{ activityId: 'a-1', seats: 12 }, { activityId: 'a-3', seats: 10 }] });
+  });
+
+  it('keeps the single headcount of a block the server holds without seats per činnost', async () => {
+    update.mockResolvedValue(saved({ activitySeats: [] }));
+    const user = userEvent.setup();
+    open({ block: saved({ activitySeats: [], playerCount: 40, activityIds: ['a-1'] }) });
+    expect(await screen.findByLabelText('Počet hráčů')).toHaveValue('40');
+    await user.click(screen.getByRole('button', { name: 'Uložit změny' }));
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    expect(update.mock.calls[0][1]).toMatchObject({ playerCount: 40 });
+    expect(update.mock.calls[0][1]).not.toHaveProperty('activitySeats');
   });
 
   it('lists the athletes a 409 names and sends the confirmation only when asked twice', async () => {
@@ -400,7 +177,7 @@ describe('editing a block', () => {
       ]))
       .mockResolvedValue(saved({ toDate: '2026-10-30' }));
     const user = userEvent.setup();
-    open({ block: saved() });
+    open();
     setDate('Do', '2026-10-30');
     await user.click(await screen.findByRole('button', { name: 'Uložit změny' }));
 
@@ -413,5 +190,87 @@ describe('editing a block', () => {
     await user.click(screen.getByRole('button', { name: 'Potvrdit a zrušit rezervace' }));
     await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
     expect(update.mock.calls[1][2]).toEqual({ cancelAthletes: true });
+  });
+
+  it('shows the server\'s refusal and keeps the form filled', async () => {
+    update.mockRejectedValue(new ClubBlockError('V tom termínu už je jiný blok.', 400));
+    const user = userEvent.setup();
+    open();
+    setDate('Do', '2026-10-30');
+    await user.click(await screen.findByRole('button', { name: 'Uložit změny' }));
+    expect(await screen.findByText('V tom termínu už je jiný blok.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Do')).toHaveValue('2026-10-30');
+  });
+});
+
+describe('the calculator', () => {
+  it('asks about the block and draws the analysis of the club as one whole', async () => {
+    open();
+    const line = (await screen.findAllByTestId('analysis-activity'))[0];
+    expect(norm(line)).toContain('Základní prohlídka · 30 hráčů × 60 min ÷ 2 stanoviště');
+    expect(await screen.findByTestId('analysis-total')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(calculate).toHaveBeenLastCalledWith(expect.objectContaining({
+        activitySeats: [{ activityId: 'a-1', seats: 30 }, { activityId: 'a-3', seats: 10 }], calendarIds: ['c-1'],
+      })),
+    );
+  });
+
+  it('fills the days when "Použít návrh" is pressed', async () => {
+    open({ block: saved({ fromDate: '2026-11-10', toDate: '2026-11-10' }) });
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Použít návrh' }));
+    expect(screen.getByLabelText('Od')).toHaveValue('2026-10-26');
+    expect(screen.getByLabelText('Do')).toHaveValue('2026-11-03');
+  });
+
+  it('warns below the minimum only when the answer says so, and does not block', async () => {
+    calculate.mockImplementation(async (i: CalculationInput) => answerFor(i, { minimumPlayers: 25, belowMinimum: true } as Partial<Calculation>));
+    open();
+    expect(await screen.findByRole('status')).toHaveTextContent('Méně než minimum 25 hráčů');
+    expect(screen.getByRole('button', { name: 'Použít návrh' })).toBeEnabled();
+  });
+
+  it('shows no warning when no minimum is set', async () => {
+    calculate.mockImplementation(async (i: CalculationInput) => answerFor(i, { minimumPlayers: null, belowMinimum: false } as Partial<Calculation>));
+    open();
+    await screen.findByRole('button', { name: 'Použít návrh' });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('says "nevejde se" when the need does not fit the horizon', async () => {
+    calculate.mockImplementation(async (i: CalculationInput) => answerFor(i, { fitsHorizon: false, suggestedDays: 90, suggestedTo: '2027-01-30' } as Partial<Calculation>));
+    open();
+    expect(await screen.findByText(/Nevejde se do období/)).toBeInTheDocument();
+  });
+
+  it('says what failed and offers a retry', async () => {
+    calculate.mockRejectedValueOnce(new ClubBlockError('Kalkulace selhala.', 500));
+    open();
+    expect(await screen.findByText(/Kalkulačku se nepodařilo načíst/)).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Zkusit znovu' }));
+    expect(await screen.findByTestId('analysis-total')).toBeInTheDocument();
+  });
+
+  it('falls back to the old calculator when the server answers without an analysis', async () => {
+    calculate.mockResolvedValue(legacyAnswer());
+    open({ block: saved({ activitySeats: [], playerCount: 120, activityIds: ['a-1'] }) });
+    const sentence = await screen.findByTestId('calculation-sentence');
+    expect(norm(sentence)).toContain('120 hráčů × 60 min ÷ 2 stanoviště = 3 600 min');
+  });
+});
+
+describe('the preview', () => {
+  it("draws the block in the club's colour", async () => {
+    open();
+    await screen.findByTestId('club-block-form');
+    const chip = screen.getByTestId('block-preview-chip');
+    expect(chip).toHaveAttribute('data-color', '#2E7D6B');
+    expect(chip).toHaveTextContent('FK Slaný');
+  });
+
+  it('shows each calendar with its colour', async () => {
+    open();
+    const box = (await group('Kalendáře')).getByRole('checkbox', { name: /Prohlídky/ });
+    expect(box.closest('label')?.querySelector('[data-swatch="#0D5C52"]')).not.toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { clubRanges, clubStateForRanges, pickedLabel, type PickedRange } from './multiSelect';
+import { clubRanges, pickedLabel, type PickedRange } from './multiSelect';
 import { SelectionTray } from './SelectionTray';
 import { setViewport, VIEWPORTS } from '../../../test/viewport';
 
@@ -50,17 +50,10 @@ describe('the club hand-off', () => {
     expect(clubRanges([time('a', TODAY, 8 * 60, 9 * 60)], TODAY)).toHaveLength(1);
   });
 
-  it('writes the end of the day as 23:59 and repeats the first range in the old fields', () => {
+  it('writes the end of the day as 23:59', () => {
     const ranges = clubRanges([time('a', '2026-10-26', 20 * 60, 24 * 60), days('b', '2026-11-02', '2026-11-03')], TODAY);
-    const state = clubStateForRanges(['c1'], ranges);
-    expect(state.newBlock).toEqual({
-      calendarIds: ['c1'],
-      fromDate: '2026-10-26',
-      toDate: '2026-10-26',
-      dailyFrom: '20:00',
-      dailyTo: '23:59',
-      ranges,
-    });
+    expect(ranges[0]).toEqual({ fromDate: '2026-10-26', toDate: '2026-10-26', dailyFrom: '20:00', dailyTo: '23:59' });
+    expect(ranges[1]).toEqual({ fromDate: '2026-11-02', toDate: '2026-11-03' });
   });
 });
 
