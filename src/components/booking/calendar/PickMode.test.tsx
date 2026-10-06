@@ -166,7 +166,7 @@ describe('desktop · 1440', () => {
     const panel = screen.getByTestId('pick-panel');
     expect(panel).toHaveAttribute('data-layout', 'side');
     /* The one thing the desk watches: how many slots are still missing, per činnost and in total. */
-    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Zbývá 3 sloty');
+    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Zbývá 10 slotů');
     expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: 10 × Základní prohlídka (30 min)');
     expect(within(panel).getByTestId('pick-minutes')).toHaveTextContent(/Vybráno 0\smin z 300\smin/);
     expect(within(panel).getByTestId('pick-activity')).toHaveTextContent(/Základní prohlídka \(30 min\) · 10 hráčů.*zbývá 10 slotů/);
@@ -208,7 +208,7 @@ describe('desktop · 1440', () => {
     await waitFor(() => expect(rows()).toHaveLength(1));
     fireEvent.click(within(screen.getByTestId('pick-panel')).getByRole('button', { name: /Odebrat termín/ }));
     expect(rows()).toHaveLength(0);
-    expect(within(screen.getByTestId('pick-panel')).getByTestId('pick-slots')).toHaveTextContent('Zbývá 3 sloty');
+    expect(within(screen.getByTestId('pick-panel')).getByTestId('pick-slots')).toHaveTextContent('Zbývá 10 slotů');
   });
 
   it('a picked range is stretched by its edge, moved by its body, and the calculator follows', async () => {
@@ -312,7 +312,7 @@ describe('tablet · 834', () => {
     await startPicking();
     const panel = screen.getByTestId('pick-panel');
     expect(panel).toHaveAttribute('data-layout', 'bottom-bar');
-    expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Zbývá 3 sloty');
+    expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Zbývá 10 slotů');
     expect(within(panel).queryByTestId('pick-list')).not.toBeInTheDocument();
     paint(9 * 60, 10 * 60);
     await waitFor(() => expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Zbývá 7 slotů'));
@@ -329,7 +329,7 @@ describe('phone · 390', () => {
     expect(screen.queryByTestId('phone-calendar')).not.toBeInTheDocument();
     const panel = screen.getByTestId('pick-panel');
     expect(panel).toHaveAttribute('data-layout', 'bottom-bar');
-    expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Zbývá 3 sloty');
+    expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Zbývá 10 slotů');
     expect(within(panel).getByTestId('pick-progress')).toBeInTheDocument();
     fireEvent.click(within(panel).getByRole('button', { name: 'Zrušit' }));
     expect(screen.queryByTestId('pick-panel')).not.toBeInTheDocument();
