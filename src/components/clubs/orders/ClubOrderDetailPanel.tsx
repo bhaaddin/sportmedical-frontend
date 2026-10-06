@@ -12,7 +12,7 @@ import {
   Alert, Box, Button, Drawer,
   IconButton, LinearProgress, Link, Skeleton, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography,
 } from '@mui/material';
-import { Close, ContentCopy } from '@mui/icons-material';
+import { Close } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { fetchBlockableActivities } from '../../../api/clubBlocks';
@@ -33,8 +33,9 @@ import { WindowPills } from './WindowPills';
 import { UncoveredNotice } from './UncoveredNotice';
 import { RemoveWindowDialog } from './RemoveWindowDialog';
 import { orderWindows, termsWord } from './orderWindows';
-import { copyText } from './LinkCopyRow';
-import { absoluteLink, usePublicSiteBase } from './absoluteLink';
+import { ClubLinksBlock } from './ClubLinksBlock';
+import { ClubVisibleHistory } from './ClubVisibleHistory';
+import { WriteToClubDialog } from './WriteToClubDialog';
 import { OfferedDaysBlock } from './OfferedDaysBlock';
 import { ClubInvoiceDialog } from './ClubInvoiceDialog';
 import { hasGroup, OrderGroupBlock } from './OrderGroupBlock';
@@ -59,11 +60,11 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
   onChanged?: () => void;
 }) {
   const phone = useIsPhone();
-  const publicBase = usePublicSiteBase();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [dialog, setDialog] = useState<'process' | 'edit' | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [writeOpen, setWriteOpen] = useState(false);
   const [playersOpen, setPlayersOpen] = useState<'add' | 'remove' | null>(null);
   const [removing, setRemoving] = useState<ClubBlockView | null>(null);
   /* Etapa 5: a row of the group opens that order in the same drawer. */
@@ -144,6 +145,10 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
               ) : null}
             </Stack>
           ) : null}
+        </Block>
+
+        <Block title="Odkazy pro klub">
+          <ClubLinksBlock order={order} />
         </Block>
 
         {hasGroup(order) ? (
@@ -278,6 +283,12 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
           )}
         </Block>
 
+        {order.status !== 'Invited' ? (
+          <Block title="Co vidí klub">
+            <ClubVisibleHistory history={order.history} />
+          </Block>
+        ) : null}
+
         <Block title="Historie">
           {order.history.length === 0 ? (
             <Typography variant="body2" color="text.secondary">Bez záznamů.</Typography>
@@ -330,19 +341,20 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
         ) : null}
       </Box>
     ) : null;
+    const writeButton = (
+      <Button key="write" variant="outlined" onClick={() => setWriteOpen(true)} data-testid="write-to-club" {...btn}>Napsat klubu</Button>
+    );
     switch (order.status) {
       case 'Invited':
         return (
-          <>
-            <Button variant="contained" startIcon={<ContentCopy />} disabled={order.formUrl === ''} onClick={() => void copyText(absoluteLink(order.formUrl, publicBase))} {...btn}>Zkopírovat odkaz na formulář</Button>
-            <Button variant="outlined" color="error" onClick={() => setCancelOpen(true)} {...btn}>Zrušit</Button>
-          </>
+          <Button variant="outlined" color="error" onClick={() => setCancelOpen(true)} {...btn}>Zrušit</Button>
         );
       case 'Requested':
         return (
           <>
             {addendumButton}
             <Button variant="outlined" onClick={() => setDialog('process')} {...btn}>Zpracovat</Button>
+            {writeButton}
             <Button variant="outlined" onClick={() => setDialog('edit')} {...btn}>Upravit</Button>
             {invoiceButton}
             <Button variant="outlined" color="error" onClick={() => setCancelOpen(true)} {...btn}>Zrušit</Button>
@@ -353,7 +365,7 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
           <>
             {addendumButton}
             <Button variant="outlined" onClick={() => setDialog('edit')} {...btn}>Upravit</Button>
-            <Button variant="outlined" startIcon={<ContentCopy />} disabled={order.registrationUrl === ''} onClick={() => void copyText(absoluteLink(order.registrationUrl, publicBase))} {...btn}>Zkopírovat odkaz pro sportovce</Button>
+            {writeButton}
             {invoiceButton}
             <Button variant="outlined" color="error" onClick={() => setCancelOpen(true)} {...btn}>Zrušit objednávku</Button>
           </>
@@ -362,9 +374,12 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
         return (
           <>
             {addendumButton}
+            {writeButton}
             {invoiceButton}
           </>
         );
+      case 'Cancelled':
+        return writeButton;
       default:
         return null;
     }
@@ -408,6 +423,10 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
           onSaved={() => { setPlayersOpen(null); refresh(); }}
           onEditTerms={order.status === 'Confirmed' ? (activities) => editTerms(order, activities) : undefined}
         />
+      ) : null}
+
+      {writeOpen && order !== undefined ? (
+        <WriteToClubDialog order={order} onClose={() => setWriteOpen(false)} onSent={() => { setWriteOpen(false); refresh(); }} />
       ) : null}
 
       {removing !== null && order !== undefined ? (

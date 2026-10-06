@@ -1,6 +1,10 @@
 /* ══════════════════════════════════════════════════════════════
    OBJEDNÁVKA PRO KLUB  (route: /klub-objednavka/:token)
 
+   Etapa 11: the same link is the club's PORTAL once the order is no longer `Invited`. The portal endpoint is read
+   first (and re-read every 60 s while the tab is visible): any other status than Invited shows the read-only portal
+   (clubOrder/ClubPortalPage); Invited - or a portal call that fails - falls through to the order form below.
+
    The link the clinic sends a club. Order of the screen: (1) who pays (required), (2) service (only when
    more than one), činnosti + players, (3) term, (4) contact, (5) note. The club states ONE service,
    the činnosti with the number of players, one wanted term (od–do) and a
@@ -16,9 +20,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Alert, Box, Button, CircularProgress } from '@mui/material';
 import {
-  ClubOrderLinkError, ClubOrderValidationError, getOrderForm, quoteOrder, submitOrder,
+  ClubOrderLinkError, ClubOrderValidationError, getClubPortal, getOrderForm, quoteOrder, submitOrder,
 } from '../../api/publicClubOrder';
 import type { OrderForm, OrderQuote } from '../../api/publicClubOrder';
 import { usePublicClinic } from '../../web/data';
@@ -34,6 +39,9 @@ import { SummaryCard } from './clubOrder/SummaryCard';
 import type { SummaryLine } from './clubOrder/SummaryCard';
 import { Confirmation, Loading, NoticePage } from './clubOrder/Screens';
 import { LinkCard } from './clubOrder/LinkCard';
+import { ClubPortalPage } from './clubOrder/ClubPortalPage';
+import { PORTAL_SLOT_KEYS } from './clubOrder/PortalSections';
+import { useNoIndex } from './clubOrder/useNoIndex';
 import {
   MAX_SEATS, activitySeatsOf, czk, emptyState, isValid, sortFieldErrors, stateFromDraft, submitPayload, termProblem, termSummary, todayPrague,
 } from './clubOrder/model';
@@ -75,7 +83,40 @@ type Load =
   | { kind: 'dead'; reason: 'notFound' | 'gone' | 'processed'; form?: OrderForm }
   | { kind: 'ready'; form: OrderForm };
 
+/** How often the open portal re-reads the order (only while the tab is visible). */
+export const PORTAL_REFRESH_MS = 60_000;
+
 export default function ClubOrderForm() {
+  const { token = '' } = useParams<{ token: string }>();
+  const clinic = usePublicClinic();
+  const t = useSlotTexts(PORTAL_SLOT_KEYS);
+  useNoIndex();
+
+  const portal = useQuery({
+    queryKey: ['club-portal', token],
+    queryFn: ({ signal }) => getClubPortal(token, signal),
+    retry: false,
+    placeholderData: keepPreviousData,
+    refetchInterval: (query) => (query.state.data !== undefined && query.state.data.status !== 'Invited' ? PORTAL_REFRESH_MS : false),
+    refetchIntervalInBackground: false,
+  });
+
+  if (portal.isPending) return <PublicLayout><Loading /></PublicLayout>;
+  const data = portal.data;
+  if (data !== undefined && data.status !== 'Invited') {
+    const phone = data.clinic.phone !== '' ? data.clinic.phone : clinic.phone.trim();
+    const email = data.clinic.email !== '' ? data.clinic.email : clinic.email.trim();
+    return (
+      <PublicLayout>
+        <ClubPortalPage portal={{ ...data, clinic: { phone, email } }} t={t} stale={portal.isError} />
+      </PublicLayout>
+    );
+  }
+  /* Invited, or the portal could not be read (404 / network): the order form decides what to show. */
+  return <OrderForm />;
+}
+
+function OrderForm() {
   const { token = '' } = useParams<{ token: string }>();
   const clinic = usePublicClinic();
   const device = useDevice();

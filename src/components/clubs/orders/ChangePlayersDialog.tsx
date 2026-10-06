@@ -26,6 +26,7 @@ import type { OrderActivityItem } from '../order/OrderSeatsSection';
 import { seatPayload, stepSeats, totalSeatsOf } from '../order/orderLogic';
 import type { SeatsText } from '../order/orderLogic';
 import { allowsActivity } from '../order/routing';
+import { ClubMessageField, clubMessageOf } from './ClubMessageField';
 import { heldMinutes, orderWindows, windowActivityIds } from './orderWindows';
 
 const STALE = 5 * 60 * 1000;
@@ -52,6 +53,7 @@ export function ChangePlayersDialog({ order, intent = 'add', onClose, onSaved, o
   const [text, setText] = useState<SeatsText>(Object.fromEntries(order.activitySeats.map((a) => [a.activityId, String(a.seats)])));
   const [showErrors, setShowErrors] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
   const [affected, setAffected] = useState<{ message: string; list: ClubOrderError['affectedAthletes'] } | null>(null);
   /** Saved with windows that now hold clearly more than needed: the dialog says so before it closes. */
   const [surplus, setSurplus] = useState<{ order: ClubOrderView; slots: number; minutes: number } | null>(null);
@@ -113,7 +115,10 @@ export function ChangePlayersDialog({ order, intent = 'add', onClose, onSaved, o
   const shortOf = held === null ? null : computeCoverage(newActivities, held);
 
   const save = useMutation({
-    mutationFn: (cancelAffected: boolean) => clubOrdersApi.update(order.id, { activitySeats }, cancelAffected),
+    mutationFn: (cancelAffected: boolean) => {
+      const clubMessage = clubMessageOf(message);
+      return clubOrdersApi.update(order.id, clubMessage === undefined ? { activitySeats } : { activitySeats, clubMessage }, cancelAffected);
+    },
     onSuccess: (saved) => {
       void invalidateClubWorld(queryClient);
       toast.success('Hráči objednávky změněni');
@@ -254,6 +259,8 @@ export function ChangePlayersDialog({ order, intent = 'add', onClose, onSaved, o
               )
             ) : null}
           </Box>
+
+          <ClubMessageField value={message} onChange={setMessage} disabled={pending} />
         </Stack>
         )}
       </DialogContent>

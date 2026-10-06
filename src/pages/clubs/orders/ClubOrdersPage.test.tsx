@@ -217,11 +217,13 @@ describe('detail and actions', () => {
     expect(lastDialog().processOrder).toBeUndefined();
   });
 
-  it('Invited: copies the form link and can be cancelled, nothing else', async () => {
-    const { user } = await openRow(1);
+  it('Invited: the form link is copied from the links block (once) and the order can be cancelled, nothing else', async () => {
+    const { user, detail } = await openRow(1);
     const actions = screen.getByTestId('order-actions');
     expect(within(actions).queryByRole('button', { name: 'Zpracovat' })).toBeNull();
-    await user.click(within(actions).getByRole('button', { name: 'Zkopírovat odkaz na formulář' }));
+    expect(within(actions).queryByRole('button', { name: /Zkopírovat/ })).toBeNull();
+    expect(within(actions).queryByRole('button', { name: 'Napsat klubu' })).toBeNull();
+    await user.click(within(detail).getByRole('button', { name: 'Zkopírovat: Odkaz pro klub (formulář objednávky)' }));
     await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Odkaz zkopírován'));
     expect(within(actions).getByRole('button', { name: 'Zrušit' })).toBeInTheDocument();
   });
@@ -232,7 +234,8 @@ describe('detail and actions', () => {
     const actions = screen.getByTestId('order-actions');
     await user.click(within(actions).getByRole('button', { name: 'Upravit' }));
     expect((lastDialog().order as ClubOrderView).id).toBe('o-3');
-    await user.click(within(actions).getByRole('button', { name: 'Zkopírovat odkaz pro sportovce' }));
+    expect(within(actions).queryByRole('button', { name: /Zkopírovat/ })).toBeNull();
+    await user.click(within(detail).getByRole('button', { name: 'Zkopírovat: Odkaz pro hráče a rodiče (registrace)' }));
     expect(clipboard).toHaveBeenCalledWith('https://app.test/klub/rt');
     await user.click(within(actions).getByRole('button', { name: 'Vystavit jednu fakturu klubu' }));
     /* Etapa 5: the one-invoice endpoint (draft first), not a prefilled /billing form. */
@@ -265,9 +268,9 @@ describe('detail and actions', () => {
     await waitFor(() => expect(cancel).toHaveBeenCalledWith('o-4', false, false));
   });
 
-  it('Cancelled has no actions', async () => {
+  it('Cancelled keeps one action: write to the club (its portal shows the notices)', async () => {
     await openRow(4);
-    expect(screen.queryByTestId('order-actions')).toBeNull();
+    expect(within(screen.getByTestId('order-actions')).getAllByRole('button').map((b) => b.textContent)).toEqual(['Napsat klubu']);
   });
 
   it('uses a full-screen drawer on a phone', async () => {

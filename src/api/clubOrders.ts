@@ -59,6 +59,8 @@ export interface OrderHistoryItem {
   atUtc: string;
   user: string;
   text: string;
+  /** Etapa 11: this entry is shown to the club in its portal. The reader always fills it (absent = false). */
+  visibleToClub?: boolean;
 }
 
 export interface ClubOrderView {
@@ -192,6 +194,8 @@ export interface OrderUpdateInput {
   calendarIds?: string[];
   note?: string;
   releaseDaysBefore?: number | null;
+  /** Etapa 11: an optional message for the club's portal (max 500), sent only when the desk typed one. */
+  clubMessage?: string;
 }
 
 export interface ClubSummary {
@@ -371,7 +375,7 @@ export function toOrder(raw: unknown): ClubOrderView {
     confirmedAtUtc: typeof o.confirmedAtUtc === 'string' ? o.confirmedAtUtc : null,
     history: arr<unknown>(o.history).map((h) => {
       const x = rec(h);
-      return { atUtc: str(x.atUtc), user: str(x.user), text: str(x.text) };
+      return { atUtc: str(x.atUtc), user: str(x.user), text: str(x.text), visibleToClub: x.visibleToClub === true };
     }),
     parentOrderId: typeof o.parentOrderId === 'string' && o.parentOrderId !== '' ? o.parentOrderId : null,
     groupId: str(o.groupId, str(o.parentOrderId, str(o.id))),
@@ -446,8 +450,22 @@ export const clubOrdersApi = {
   confirm: (id: string, input: { calendarIds: string[]; ranges: OrderRange[] }): Promise<ClubOrderView> =>
     call(async () => toOrder(unwrap((await client.post(`${BASE}/${id}/confirm`, input)).data))),
 
-  cancel: (id: string, cancelAthletes = false, cancelAddenda = false): Promise<ClubOrderView> =>
-    call(async () => toOrder(unwrap((await client.post(`${BASE}/${id}/cancel`, null, { params: cancelAddenda ? { cancelAthletes, cancelAddenda: true } : { cancelAthletes } })).data))),
+  /** `clubMessage` (Etapa 11, max 500) goes in the body and shows in the club's portal; no message = no body. */
+  cancel: (id: string, cancelAthletes = false, cancelAddenda = false, clubMessage?: string): Promise<ClubOrderView> =>
+    call(async () => {
+      const message = (clubMessage ?? '').trim();
+      const body = message === '' ? null : { clubMessage: message };
+      const params = cancelAddenda ? { cancelAthletes, cancelAddenda: true } : { cancelAthletes };
+      return toOrder(unwrap((await client.post(`${BASE}/${id}/cancel`, body, { params })).data));
+    }),
+
+  /** Etapa 11: "Napsat klubu" — a note the club sees in its portal (max 500). Returns the order with the new history. */
+  notice: (id: string, text: string): Promise<ClubOrderView> =>
+    call(async () => toOrder(unwrap((await client.post(`${BASE}/${id}/notice`, { text: text.trim() })).data))),
+
+  /** Etapa 11: issues new club/player links; the old ones stop working. Returns the order with the new `formUrl`/`registrationUrl`. */
+  rotateLinks: (id: string): Promise<ClubOrderView> =>
+    call(async () => toOrder(unwrap((await client.post(`${BASE}/${id}/rotate-links`, null)).data))),
 
   /** What the group's one invoice would hold (a read; works for PerPerson too, the invoice itself is refused). */
   invoiceDraft: (id: string): Promise<InvoiceDraft> =>

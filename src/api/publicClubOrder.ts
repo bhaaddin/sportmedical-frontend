@@ -178,3 +178,119 @@ export async function submitOrder(token: string, body: SubmitInput): Promise<Sub
     return linkError(error);
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   THE CLUB'S PORTAL (Etapa 11) — GET /api/public/club-portal/{token}
+
+   The same link the club already has. Once the order is no longer `Invited` the page is a read-only portal:
+   the windows the clinic confirmed, who is booked in them, the changes the desk announced. Tolerant reader:
+   a missing field reads as empty, an unknown status as `Requested`.
+   ══════════════════════════════════════════════════════════════ */
+
+export type PortalStatus = 'Invited' | 'Requested' | 'Confirmed' | 'Completed' | 'Cancelled';
+
+export interface PortalActivity {
+  activityId: string;
+  name: string;
+  durationMinutes: number;
+  seats: number;
+  registered: number;
+}
+
+/** One window the clinic confirmed: a day with its hours and the činnosti it allows (empty = all of them). */
+export interface PortalWindow {
+  date: string;
+  startLocal: string;
+  endLocal: string;
+  activityIds: string[];
+  calendarName: string;
+}
+
+export interface PortalAthlete {
+  name: string;
+  activityName: string;
+  date: string;
+  startLocal: string;
+  endLocal: string;
+  status: 'Booked' | 'Cancelled';
+}
+
+export interface PortalNotice {
+  atUtc: string;
+  text: string;
+}
+
+export interface ClubPortal {
+  reference: string;
+  clubName: string;
+  serviceName: string;
+  status: PortalStatus;
+  paymentMethod: ClubPaymentMethod | null;
+  activities: PortalActivity[];
+  windows: PortalWindow[];
+  athletes: PortalAthlete[];
+  /** Newest first. */
+  notices: PortalNotice[];
+  /** Relative `/klub/{token}`, only when the order is confirmed. */
+  registrationUrl: string | null;
+  clinic: { phone: string; email: string };
+}
+
+const PORTAL_STATUSES: readonly PortalStatus[] = ['Invited', 'Requested', 'Confirmed', 'Completed', 'Cancelled'];
+const list = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+const obj = (v: unknown): Record<string, unknown> => (v !== null && typeof v === 'object' ? (v as Record<string, unknown>) : {});
+const day = (v: unknown): string => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : '');
+const clock = (v: unknown): string => (typeof v === 'string' ? v.slice(0, 5) : '');
+
+export function toPortal(raw: unknown): ClubPortal {
+  const r = obj(raw);
+  const clinic = obj(r.clinic);
+  return {
+    reference: str(r.reference),
+    clubName: str(r.clubName),
+    serviceName: str(r.serviceName),
+    status: PORTAL_STATUSES.includes(r.status as PortalStatus) ? (r.status as PortalStatus) : 'Requested',
+    paymentMethod: r.paymentMethod === 'ClubInvoice' || r.paymentMethod === 'PerPerson' ? r.paymentMethod : null,
+    activities: list<unknown>(r.activities).map((a) => {
+      const x = obj(a);
+      return { activityId: str(x.activityId), name: str(x.name), durationMinutes: num(x.durationMinutes), seats: num(x.seats), registered: num(x.registered) };
+    }),
+    windows: list<unknown>(r.windows).map((w) => {
+      const x = obj(w);
+      return {
+        date: day(x.date),
+        startLocal: clock(x.startLocal),
+        endLocal: clock(x.endLocal),
+        activityIds: list<unknown>(x.activityIds).filter((id): id is string => typeof id === 'string' && id !== ''),
+        calendarName: str(x.calendarName),
+      };
+    }).filter((w) => w.date !== ''),
+    athletes: list<unknown>(r.athletes).map((a) => {
+      const x = obj(a);
+      return {
+        name: str(x.name),
+        activityName: str(x.activityName),
+        date: day(x.date),
+        startLocal: clock(x.startLocal),
+        endLocal: clock(x.endLocal),
+        status: x.status === 'Cancelled' ? 'Cancelled' as const : 'Booked' as const,
+      };
+    }).filter((a) => a.date !== ''),
+    notices: list<unknown>(r.notices).map((n) => {
+      const x = obj(n);
+      return { atUtc: str(x.atUtc), text: str(x.text) };
+    }).filter((n) => n.text.trim() !== ''),
+    registrationUrl: typeof r.registrationUrl === 'string' && r.registrationUrl.trim() !== '' ? r.registrationUrl : null,
+    clinic: { phone: str(clinic.phone), email: str(clinic.email) },
+  };
+}
+
+/** The club's portal. A 404 is `ClubOrderLinkError('notFound')`; a cancelled order answers 200 with status Cancelled. */
+export async function getClubPortal(token: string, signal?: AbortSignal): Promise<ClubPortal> {
+  try {
+    const { data } = await webHttp.get<unknown>(`/api/public/club-portal/${encodeURIComponent(token)}`, { signal });
+    return toPortal(unwrapEnvelope(data));
+  } catch (error) {
+    return linkError(error);
+  }
+}

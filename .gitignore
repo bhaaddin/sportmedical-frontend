@@ -25,3 +25,6 @@ dist-ssr
 
 # Agent scratch notes (zadanie.local.md, status.local.md)
 *.local.md
+
+# Browser-check snapshots written by the Playwright tool
+.playwright-mcp/

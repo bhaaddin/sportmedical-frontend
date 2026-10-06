@@ -2,6 +2,7 @@
  * "×" on one window of an order: the order stays ONE order and loses exactly that window (an `update` with the
  * remaining range set; the server diffs the blocks). If athletes are booked in the window the server answers 409
  * with them; the desk then confirms explicitly that their reservations are cancelled.
+ * Etapa 11: an optional "Zpráva pro klub" is sent as `clubMessage` and shows in the club's portal.
  */
 import { useState } from 'react';
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
@@ -12,6 +13,7 @@ import { ClubOrderError, clubOrdersApi } from '../../../api/clubOrders';
 import type { ClubOrderView } from '../../../api/clubOrders';
 import { invalidateClubWorld } from '../clubWorld';
 import { rangesWithout, windowLabel } from './orderWindows';
+import { ClubMessageField, clubMessageOf } from './ClubMessageField';
 
 export function RemoveWindowDialog({ order, block, onClose, onRemoved }: {
   order: ClubOrderView;
@@ -22,12 +24,14 @@ export function RemoveWindowDialog({ order, block, onClose, onRemoved }: {
   const queryClient = useQueryClient();
   const [failure, setFailure] = useState<string | null>(null);
   const [affected, setAffected] = useState<{ message: string; list: ClubOrderError['affectedAthletes'] } | null>(null);
+  const [message, setMessage] = useState('');
   const label = windowLabel(block, order);
 
   const remove = useMutation({
     mutationFn: (cancelAffected: boolean) => {
       const { ranges, calendarIds } = rangesWithout(order, block.id);
-      return clubOrdersApi.update(order.id, { ranges, calendarIds }, cancelAffected);
+      const clubMessage = clubMessageOf(message);
+      return clubOrdersApi.update(order.id, clubMessage === undefined ? { ranges, calendarIds } : { ranges, calendarIds, clubMessage }, cancelAffected);
     },
     onSuccess: (saved) => {
       void invalidateClubWorld(queryClient);
@@ -52,6 +56,9 @@ export function RemoveWindowDialog({ order, block, onClose, onRemoved }: {
       <DialogContent>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>{label}</Typography>
         <Typography variant="body2" sx={{ mt: 0.5 }}>Objednávka zůstane jedna — jen přijde o tento termín a čas se vrátí do nabídky.</Typography>
+        <Box sx={{ mt: 2 }}>
+          <ClubMessageField value={message} onChange={setMessage} disabled={remove.isPending} />
+        </Box>
         {failure !== null ? <Alert severity="error" sx={{ mt: 1.5 }} data-testid="remove-window-failure">{failure}</Alert> : null}
         {affected !== null ? (
           <Alert severity="warning" role="alert" sx={{ mt: 1.5, alignItems: 'flex-start' }} data-testid="remove-window-affected">

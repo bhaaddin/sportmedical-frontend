@@ -2,15 +2,17 @@
  * "Zrušit objednávku?" - the one way to drop a whole club order (all its windows). Optionally cancels the athletes'
  * bookings too. The server's 409 `club_order.addenda_live` lists the addenda that still hold places; the desk then
  * confirms cancelling them together. Used by the order detail and by the club page's order card.
+ * Etapa 11: an optional "Zpráva pro klub" travels with the cancellation (`clubMessage`) into the club's portal.
  */
 import { useState } from 'react';
 import { invalidateClubWorld } from '../clubWorld';
-import { Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Stack, Typography } from '@mui/material';
+import { Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Stack, Typography } from '@mui/material';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { ClubOrderError, clubOrdersApi, ORDER_STATUS_LABEL } from '../../../api/clubOrders';
 import type { ClubOrderView, OrderAddendumSummary } from '../../../api/clubOrders';
 import { orderCode } from '../order/orderFormat';
+import { ClubMessageField, clubMessageOf } from './ClubMessageField';
 
 export function CancelOrderDialog({ order, onClose, onCancelled }: {
   order: Pick<ClubOrderView, 'id' | 'clubName' | 'registered'>;
@@ -20,9 +22,15 @@ export function CancelOrderDialog({ order, onClose, onCancelled }: {
   const queryClient = useQueryClient();
   const [cancelAthletes, setCancelAthletes] = useState(false);
   const [liveAddenda, setLiveAddenda] = useState<OrderAddendumSummary[] | null>(null);
+  const [message, setMessage] = useState('');
 
   const cancel = useMutation({
-    mutationFn: (withAddenda: boolean) => clubOrdersApi.cancel(order.id, cancelAthletes, withAddenda),
+    mutationFn: (withAddenda: boolean) => {
+      const clubMessage = clubMessageOf(message);
+      return clubMessage === undefined
+        ? clubOrdersApi.cancel(order.id, cancelAthletes, withAddenda)
+        : clubOrdersApi.cancel(order.id, cancelAthletes, withAddenda, clubMessage);
+    },
     onSuccess: () => {
       void invalidateClubWorld(queryClient);
       toast.success('Objednávka zrušena');
@@ -50,6 +58,9 @@ export function CancelOrderDialog({ order, onClose, onCancelled }: {
             label={`Zrušit i jejich rezervace (${order.registered})`}
           />
         ) : null}
+        <Box sx={{ mt: 2 }}>
+          <ClubMessageField value={message} onChange={setMessage} disabled={cancel.isPending} />
+        </Box>
       </DialogContent>
       <DialogActions>
         <Button variant="outlined" onClick={onClose} disabled={cancel.isPending}>Ponechat</Button>
@@ -67,6 +78,9 @@ export function CancelOrderDialog({ order, onClose, onCancelled }: {
           ))}
         </Stack>
         <Typography variant="body2" sx={{ mt: 1 }}>Zrušte je zvlášť, nebo potvrďte zrušení celé objednávky i s dodatky.</Typography>
+        <Box sx={{ mt: 2 }}>
+          <ClubMessageField value={message} onChange={setMessage} disabled={cancel.isPending} />
+        </Box>
       </DialogContent>
       <DialogActions>
         <Button variant="outlined" onClick={onClose} disabled={cancel.isPending}>Ponechat</Button>
