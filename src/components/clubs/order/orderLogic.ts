@@ -4,6 +4,7 @@
  */
 import type { ClubOrderView, OrderRange } from '../../../api/clubOrders';
 import { ClubOrderError } from '../../../api/clubOrders';
+import { windowRange } from '../orders/orderWindows';
 import { parsePlayerCount } from '../blockLogic';
 import type { RangeRow } from '../blockLogic';
 
@@ -44,7 +45,7 @@ export function orderRanges(order: ClubOrderView, preferRequested: boolean): Ord
       const key = `${b.fromDate}|${b.toDate}|${b.dailyFrom ?? ''}|${b.dailyTo ?? ''}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ fromDate: b.fromDate, toDate: b.toDate, dailyFrom: b.dailyFrom, dailyTo: b.dailyTo });
+      out.push(windowRange(b, order));
     }
     return out;
   }

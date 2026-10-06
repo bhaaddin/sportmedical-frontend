@@ -25,13 +25,11 @@ export const CAL_TEXT = {
   trayCount: (n: number) => (n === 1 ? "1 termín" : n >= 2 && n <= 4 ? `${n} termíny` : `${n} termínů`),
   trayRemove: (label: string) => `Odebrat termín ${label}`,
   trayPast: "v minulosti",
-  trayClubFromToday: "Vyberte termíny od dneška",
   trayExpand: "Zobrazit termíny",
   trayCollapse: "Skrýt termíny",
   multiHint: "Další termín přidáte tažením s klávesou Ctrl, ⌘ nebo Shift.",
   rangeBookHint: "Od prvního dne výběru",
   rangeBlockHint: "Celé dny, pauza, dovolená, školení",
-  rangeClubHint: "Blok míst s odkazem pro sportovce",
   clubBlockLabel: (club: string) => `Blok · ${club}`,
 
   /* tablet / phone chrome */

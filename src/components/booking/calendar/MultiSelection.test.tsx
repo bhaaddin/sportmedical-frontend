@@ -186,8 +186,8 @@ function mark(day: string, from: number, to: number, opts: { ctrl?: boolean } = 
 }
 
 const chips = () => screen.queryAllByTestId('tray-chip').map((c) => c.textContent);
-/* "Rezervovat pro klub" opens the small setup form (no navigation); the marked places become the first picks once it starts. */
-const setupOpen = () => screen.getByTestId('pick-setup');
+/* Marked places never start a club order: there is no club entry in the tray or the popover. */
+const noClubEntry = () => expect(within(screen.getByTestId('selection-tray')).queryByRole('button', { name: /klub/i })).not.toBeInTheDocument();
 
 async function ready() {
   renderPage();
@@ -238,29 +238,24 @@ describe('several places at once on the desktop', () => {
     expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 
-  it('"Rezervovat pro klub" opens the small setup form and clears the tray', async () => {
+  it('the tray has no club entry: a club order is started only from its own entries', async () => {
     await ready();
     mark('2026-09-24', 10 * 60, 10 * 60 + 30, { ctrl: true });
     mark('2026-09-23', 14 * 60, 14 * 60 + 30, { ctrl: true });
     mark('2026-09-23', 8 * 60, 8 * 60 + 30, { ctrl: true });
-    fireEvent.click(screen.getByRole('button', { name: 'Rezervovat pro klub' }));
-    expect(setupOpen()).toBeInTheDocument();
-    expect(screen.queryByTestId('selection-tray')).not.toBeInTheDocument();
+    noClubEntry();
+    expect(screen.queryByTestId('pick-setup')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zablokovat čas' })).toBeEnabled();
   });
 
-  it('a place in the past is muted, struck through and left out of the club hand-off', async () => {
+  it('a place in the past is muted and struck through', async () => {
     await ready();
     mark('2026-09-21', 8 * 60, 8 * 60 + 30, { ctrl: true });
-    expect(screen.getByRole('button', { name: 'Rezervovat pro klub' })).toBeDisabled();
     expect(screen.getByText('v minulosti')).toBeInTheDocument();
     expect(screen.getByTestId('picked-range')).toHaveAttribute('data-past', 'true');
     /* The block action still works for it. */
     expect(screen.getByRole('button', { name: 'Zablokovat čas' })).toBeEnabled();
 
-    mark('2026-09-24', 10 * 60, 10 * 60 + 30, { ctrl: true });
-    expect(screen.getByRole('button', { name: 'Rezervovat pro klub' })).toBeEnabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Rezervovat pro klub' }));
-    expect(setupOpen()).toBeInTheDocument();
   });
 
   it('offers Objednat pacienta only for exactly one time range', async () => {
@@ -290,7 +285,7 @@ describe('several places at once on the desktop', () => {
 describe('several runs of days in the month', () => {
   beforeEach(() => setViewport(VIEWPORTS.desktop));
 
-  it('Ctrl drags add whole-day runs; "Rezervovat pro klub" opens the setup form for them', async () => {
+  it('Ctrl drags add whole-day runs; there is no club entry for them either', async () => {
     await ready();
     fireEvent.click(screen.getByRole('button', { name: 'Měsíc' }));
     await screen.findByTestId('month-day-2026-09-23');
@@ -304,8 +299,7 @@ describe('several runs of days in the month', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(chips()).toEqual(['28. 9. – 30. 9.', '23. 9. – 24. 9.']);
     expect(screen.getByTestId('month-day-2026-09-29')).toHaveAttribute('data-picked', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Rezervovat pro klub' }));
-    expect(setupOpen()).toBeInTheDocument();
+    noClubEntry();
   });
 });
 

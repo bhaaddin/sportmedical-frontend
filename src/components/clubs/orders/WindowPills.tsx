@@ -7,10 +7,10 @@ import { Box, IconButton, Stack, Typography } from '@mui/material';
 import { Close } from '@mui/icons-material';
 import type { ClubBlockView } from '../../../api/clubBlocks';
 import type { ClubOrderView } from '../../../api/clubOrders';
-import { orderWindows, windowIsUpcoming, windowLabel } from './orderWindows';
+import { orderWindows, windowIsUpcoming, windowLabel, type RoutedOrder } from './orderWindows';
 
 export function WindowPills({ order, today, highlightBlockId, onRemove, removeBlockedReason, testId = 'order-windows' }: {
-  order: Pick<ClubOrderView, 'blocks'>;
+  order: Pick<ClubOrderView, 'blocks'> & RoutedOrder;
   /** yyyy-MM-dd; windows already over cannot be removed. */
   today: string;
   highlightBlockId?: string | null;
@@ -25,7 +25,7 @@ export function WindowPills({ order, today, highlightBlockId, onRemove, removeBl
   return (
     <Stack direction="row" component="ul" data-testid={testId} sx={{ m: 0, p: 0, listStyle: 'none', gap: 0.75, flexWrap: 'wrap' }}>
       {windows.map((b) => {
-        const label = windowLabel(b);
+        const label = windowLabel(b, order);
         const clicked = highlightBlockId === b.id;
         const removable = onRemove !== undefined && windowIsUpcoming(b, today);
         return (

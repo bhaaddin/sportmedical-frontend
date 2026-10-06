@@ -47,6 +47,8 @@ export interface ClubInfoWindow {
   date: string;
   startLocal: string;
   endLocal: string;
+  /** Etapa 10: the činnosti this day is for (explicit ids). Absent = every činnost of the order. */
+  activityIds?: string[];
 }
 
 /** The parents' information block of an order link (absent on a legacy block token). */
@@ -74,6 +76,8 @@ export interface ClubWindow {
   startTime: string;
   endTime: string;
   places: number;
+  /** Etapa 10: the činnosti this window allows. Absent = every činnost of the order. */
+  activityIds?: string[];
 }
 
 /** One free time inside the club's block, when the server offers a choice of them. */
@@ -142,6 +146,13 @@ const optNum = (v: unknown): number | null => (typeof v === 'number' && Number.i
 
 const text = (v: unknown): string => (typeof v === 'string' ? v : '');
 
+/** A non-empty list of ids, or undefined (absent / empty / garbage = all). */
+const idList = (v: unknown): string[] | undefined => {
+  if (!Array.isArray(v)) return undefined;
+  const ids = v.filter((x): x is string => typeof x === 'string' && x !== '');
+  return ids.length > 0 ? ids : undefined;
+};
+
 /** The order's information block; null when the server sends none (a legacy block token) or garbage. */
 export function normaliseInfo(raw: unknown): ClubInfo | null {
   if (typeof raw !== 'object' || raw === null) return null;
@@ -153,7 +164,10 @@ export function normaliseInfo(raw: unknown): ClubInfo | null {
     serviceName: text(r.serviceName),
     paymentMethod: pm,
     payerText: text(r.payerText),
-    windows: windows.map((w) => ({ date: text(w.date), startLocal: text(w.startLocal), endLocal: text(w.endLocal) })),
+    windows: windows.map((w) => {
+      const activityIds = idList(w.activityIds);
+      return { date: text(w.date), startLocal: text(w.startLocal), endLocal: text(w.endLocal), ...(activityIds !== undefined ? { activityIds } : {}) };
+    }),
   };
 }
 
@@ -179,7 +193,12 @@ export function normaliseOffer(raw: ClubOffer): ClubOffer {
       description: typeof a.description === 'string' && a.description.trim() !== '' ? a.description : null,
     };
   });
-  return { ...raw, activities, info: normaliseInfo((raw as { info?: unknown }).info) };
+  const rawWindows = Array.isArray(raw.windows) ? (raw.windows as unknown as Record<string, unknown>[]) : [];
+  const windows = rawWindows.map((w) => {
+    const activityIds = idList(w.activityIds);
+    return (activityIds !== undefined ? { ...w, activityIds } : w) as unknown as ClubWindow;
+  });
+  return { ...raw, windows, activities, info: normaliseInfo((raw as { info?: unknown }).info) };
 }
 
 /**

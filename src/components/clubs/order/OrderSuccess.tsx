@@ -7,6 +7,14 @@ import { SoftCard } from '../../ui';
 import { LinkCopyRow } from '../orders/LinkCopyRow';
 import { formatCzk, rangeLine } from './orderFormat';
 import { orderRanges } from './orderLogic';
+import { routedActivities, type RoutedOrder } from '../orders/orderWindows';
+import { allowedNames } from './routing';
+
+/** "5. 11. 2026, 08:00–10:15 · Spiroergometrie" - the činnosti only when the window allows just some of them. */
+function withActivities(line: string, range: { activityIds?: string[] | null }, order: RoutedOrder): string {
+  const only = allowedNames(range.activityIds, routedActivities(order));
+  return only === null ? line : `${line} · ${only}`;
+}
 import { formatPlayersTotal, formatSeats } from '../panel/seats';
 
 export function OrderSuccess({ order }: { order: ClubOrderView }) {
@@ -30,7 +38,7 @@ export function OrderSuccess({ order }: { order: ClubOrderView }) {
           {ranges.length > 0 ? (
             <Box component="ul" sx={{ m: 0, pl: 2.25 }} aria-label="Termíny">
               {ranges.map((r, i) => (
-                <li key={i}><Typography variant="body2">{rangeLine(r)}</Typography></li>
+                <li key={i}><Typography variant="body2">{withActivities(rangeLine(r), r, order)}</Typography></li>
               ))}
             </Box>
           ) : null}

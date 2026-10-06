@@ -26,6 +26,12 @@ export interface EditOrderRef {
   dirty: boolean;
   /** Process only: what the club asked for, shown as a hint ("Klub žádá: ..."). */
   requested: string[];
+  /**
+   * Edit only: the činnosti the order has RIGHT NOW (saved), set when the caller changed the numbers (`Přidat hráče`).
+   * The calculator then shows only the additional need: the added players' slots against the time picked beyond
+   * what the saved order needed.
+   */
+  baseline?: CoverageActivity[];
   /** Edit only: the order's live blocks; the picks start as these windows and they do not collide with themselves. */
   blocks: EditBlockRef[];
   /** The first day of the hint, so the calendar opens there. */

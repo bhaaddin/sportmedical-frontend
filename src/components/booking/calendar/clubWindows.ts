@@ -28,6 +28,8 @@ export interface ClubWindow {
   seats: number | null;
   /** The block's whole date range (for the popover). */
   range: { from: DateOnly; to: DateOnly };
+  /** Etapa 10: the činnosti this window is restricted to ("Spiroergometrie"); null = it allows all of the order's. */
+  only: string | null;
 }
 
 const firstWord = (name: string): string => name.trim().split(/\s+/)[0] ?? name;
@@ -38,6 +40,8 @@ export function clubWindowsByDay(
   details: ReadonlyMap<string, ClubBlockView>,
   openRange: (calendarId: string, day: DateOnly) => MinuteRange | null,
   rangeOf: (blockId: string | null | undefined, block: TimeBlock) => { from: DateOnly; to: DateOnly },
+  /** Block id -> restricted činnosti of its window (see `windowRestrictions`). */
+  restricted?: ReadonlyMap<string, string>,
 ): Map<string, ClubWindow[]> {
   const out = new Map<string, ClubWindow[]>();
   for (const day of days) {
@@ -82,6 +86,7 @@ export function clubWindowsByDay(
             registered: detail ? detail.registered : null,
             seats: detail ? detail.seats : null,
             range: rangeOf(block.clubBlockId, block),
+            only: restricted?.get(id) ?? null,
           });
         }
         const open = openRange(calendarId, day);

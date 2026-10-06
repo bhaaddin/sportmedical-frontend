@@ -6,6 +6,7 @@
  * is off, so the dialog does not let that button be pressed.
  */
 import { useState } from 'react';
+import { invalidateClubWorld } from './clubWorld';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Stack, Typography } from '@mui/material';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -39,8 +40,7 @@ export function CancelClubBlockDialog({
     mutationFn: () => clubBlocksApi.cancel(block.id, cancelAthletes),
     onSuccess: () => {
       toast.success('Blok zrušen. Uvolněné časy se vrátily do nabídky.');
-      void queryClient.invalidateQueries({ queryKey: ['club-blocks'] });
-      void queryClient.invalidateQueries({ queryKey: ['blocks'] });
+      void invalidateClubWorld(queryClient);
       onCancelled?.();
       onClose();
     },

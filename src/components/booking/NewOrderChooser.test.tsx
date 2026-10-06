@@ -3,7 +3,7 @@
  * next free slot of that služba) or Vybrat v kalendáři. At the three widths.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
@@ -89,13 +89,13 @@ beforeEach(() => {
 describe.each(['phone', 'tablet', 'desktop'] as ViewportName[])('NewOrderChooser at %s width', (name) => {
   beforeEach(() => setViewport(VIEWPORTS[name]));
 
-  it('lists the active services with their colour and a link to the club order', async () => {
+  it('lists the active services with their colour and no club entry (a club order has its own entry)', async () => {
     renderChooser();
     const list = await screen.findByRole('group', { name: 'Služby' });
-    expect(within(list).getAllByRole('button').filter((b) => b.textContent !== 'Klubová objednávka').map((i) => i.textContent)).toEqual(['Sportovní prohlídky', 'Diagnostika']);
+    expect(within(list).getAllByRole('button').map((i) => i.textContent)).toEqual(['Sportovní prohlídky', 'Diagnostika']);
     expect(within(list).getAllByTestId('service-colour')).toHaveLength(2);
     expect(screen.queryByText('Vyřazená')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Klubová objednávka' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Klubová objednávka' })).not.toBeInTheDocument();
     expect(screen.getByRole('dialog')).toHaveAttribute('aria-labelledby');
   });
 
@@ -148,16 +148,6 @@ describe.each(['phone', 'tablet', 'desktop'] as ViewportName[])('NewOrderChooser
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('Klubová objednávka navigates to /planovani with openClubOrder', async () => {
-    renderChooser();
-    await userEvent.click(await screen.findByRole('button', { name: 'Klubová objednávka' }));
-    await waitFor(async () =>
-      expect(JSON.parse((await screen.findByTestId('where')).textContent ?? '{}')).toEqual({
-        path: '/planovani',
-        state: { openClubOrder: true },
-      }),
-    );
-  });
 });
 
 describe('NewOrderChooser states', () => {

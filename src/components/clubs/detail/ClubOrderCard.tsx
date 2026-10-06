@@ -1,7 +1,7 @@
 /*
  * ONE club order on the club's page (Etapa 10): status, služba, the činnosti with registered/total, payment and
  * price, and under it "Termíny" - the order's windows as read-only pills. One button row for the whole order:
- * Změnit hráče, Upravit termíny, Zrušit objednávku, Otevřít. The windows are never separate cards with their own
+ * Přidat hráče / rozšířit, Odebrat hráče, Upravit termíny, Zrušit objednávku, Otevřít. The windows are never separate cards with their own
  * cancel - an order that holds several windows is still one thing.
  */
 import { useState } from 'react';
@@ -21,6 +21,7 @@ import { rangeText, registeredLine, STATUS_TONE } from '../orders/orderLogic';
 import { formatPlayersTotal } from '../panel/seats';
 import { orderWindows, termsWord } from '../orders/orderWindows';
 import { WindowPills } from '../orders/WindowPills';
+import { UncoveredNotice } from '../orders/UncoveredNotice';
 import type { CoverageActivity } from '../order/coverage';
 
 export function ClubOrderCard({ order, today, onOpen, onChanged }: {
@@ -31,14 +32,14 @@ export function ClubOrderCard({ order, today, onOpen, onChanged }: {
   onChanged: () => void;
 }) {
   const navigate = useNavigate();
-  const [players, setPlayers] = useState(false);
+  const [players, setPlayers] = useState<'add' | 'remove' | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const activitiesQuery = useQuery({ queryKey: ['club-block-activities'], queryFn: fetchBlockableActivities, staleTime: 5 * 60 * 1000 });
 
   const windows = orderWindows(order);
   const live = order.status === 'Requested' || order.status === 'Confirmed';
   const editTerms = (activities?: CoverageActivity[]) => {
-    setPlayers(false);
+    setPlayers(null);
     navigate('/planovani', { state: { pickOrder: { start: editSessionFor(order, activitiesQuery.data ?? [], todayInPrague(), activities) } } });
   };
   const btn = { size: 'small', sx: { minHeight: 44 } } as const;
@@ -76,14 +77,16 @@ export function ClubOrderCard({ order, today, onOpen, onChanged }: {
         {windows.length > 0 ? (
           <WindowPills order={order} today={today} testId="order-card-windows" />
         ) : order.requestedRanges.length > 0 ? (
-          <Typography variant="body2" data-testid="order-card-requested">{`Požadováno: ${order.requestedRanges.map(rangeText).join(' · ')}`}</Typography>
+          <Typography variant="body2" data-testid="order-card-requested">{`Požadováno: ${order.requestedRanges.map((r) => rangeText(r, order)).join(' · ')}`}</Typography>
         ) : (
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>Zatím žádný termín.</Typography>
         )}
+        <UncoveredNotice order={order} compact />
       </Box>
 
       <Stack direction="row" data-testid="order-card-actions" sx={{ gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
-        {live ? <Button variant="outlined" onClick={() => setPlayers(true)} {...btn}>Změnit hráče</Button> : null}
+        {live ? <Button variant="outlined" onClick={() => setPlayers('add')} data-testid="order-card-add-players" {...btn}>Přidat hráče / rozšířit</Button> : null}
+        {live ? <Button variant="outlined" onClick={() => setPlayers('remove')} data-testid="order-card-remove-players" {...btn}>Odebrat hráče</Button> : null}
         {order.status === 'Confirmed' ? <Button variant="outlined" onClick={() => editTerms()} disabled={activitiesQuery.isLoading} {...btn}>Upravit termíny</Button> : null}
         {order.status !== 'Cancelled' && order.status !== 'Completed' ? (
           <Button variant="outlined" color="error" onClick={() => setCancelling(true)} {...btn}>Zrušit objednávku</Button>
@@ -91,11 +94,12 @@ export function ClubOrderCard({ order, today, onOpen, onChanged }: {
         <Button variant="contained" onClick={() => onOpen(order.id)} data-testid="club-order-link" {...btn}>Otevřít</Button>
       </Stack>
 
-      {players ? (
+      {players !== null ? (
         <ChangePlayersDialog
           order={order}
-          onClose={() => setPlayers(false)}
-          onSaved={() => { setPlayers(false); onChanged(); }}
+          intent={players}
+          onClose={() => setPlayers(null)}
+          onSaved={() => { setPlayers(null); onChanged(); }}
           onEditTerms={order.status === 'Confirmed' ? editTerms : undefined}
         />
       ) : null}

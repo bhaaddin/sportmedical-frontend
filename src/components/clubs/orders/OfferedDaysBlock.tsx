@@ -5,9 +5,10 @@
  */
 import { useState } from 'react';
 import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { clubOrdersApi } from '../../../api/clubOrders';
+import { invalidateClubWorld } from '../clubWorld';
 import type { ClubOrderView } from '../../../api/clubOrders';
 import { useIsPhone } from '../../../layout/useDevice';
 import { SectionLabel, SoftCard } from '../../ui';
@@ -16,6 +17,7 @@ import { dayText, daysText } from './dayOffer';
 
 export function OfferedDaysBlock({ order, onChanged }: { order: ClubOrderView; onChanged: () => void }) {
   const phone = useIsPhone();
+  const queryClient = useQueryClient();
   const offered = order.offeredDates ?? [];
   const chosen = order.requestedDates ?? [];
   const [editing, setEditing] = useState(false);
@@ -26,6 +28,7 @@ export function OfferedDaysBlock({ order, onChanged }: { order: ClubOrderView; o
   const save = useMutation({
     mutationFn: () => clubOrdersApi.setOfferedDates(order.id, draft),
     onSuccess: () => {
+      void invalidateClubWorld(queryClient);
       toast.success(draft.length === 0 ? 'Nabídka dnů zrušena' : 'Nabídka dnů uložena');
       setEditing(false);
       onChanged();

@@ -9,7 +9,7 @@
  */
 import { Alert, Box, Button, LinearProgress, Skeleton, Stack, Typography } from '@mui/material';
 import { ArrowBack } from '@mui/icons-material';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type { ClubBlockView } from '../../../api/clubBlocks';
 import { fetchBlockableActivities } from '../../../api/clubBlocks';
@@ -94,7 +94,8 @@ export function ClubPresentation({
   const accent = row.color;
 
   const summary = useClubSummary(club.id);
-  const ordersQuery = useQuery({ queryKey: ['club-orders', club.id, '', ''], queryFn: () => clubOrdersApi.list({ clubId: club.id }), retry: false });
+  /* keepPreviousData: a refetch after any order change never swaps the cards for a skeleton. */
+  const ordersQuery = useQuery({ queryKey: ['club-orders', club.id, '', ''], queryFn: () => clubOrdersApi.list({ clubId: club.id }), retry: false, placeholderData: keepPreviousData });
   const activeBlocks = blocks.filter((b) => b.status === 'Active');
   const upcoming = activeBlocks.filter((b) => b.toDate >= today);
   const activitiesQuery = useQuery({ queryKey: ['club-block-activities'], queryFn: fetchBlockableActivities, staleTime: 5 * 60 * 1000, enabled: activeBlocks.length > 0 });
@@ -251,7 +252,7 @@ export function ClubPresentation({
                   <Stack key={g.id} role="listitem" direction="row" data-testid="club-window" data-order-id={g.id} sx={{ gap: 1.5, alignItems: 'center', justifyContent: 'space-between' }}>
                     <Box sx={{ minWidth: 0 }}>
                       <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{`Objednávka ${orderCode(g.id)}${o?.serviceName ? ` · ${o.serviceName}` : ''}`}</Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', overflowWrap: 'anywhere' }}>{g.blocks.map(windowLabel).join(' · ')}</Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', overflowWrap: 'anywhere' }}>{g.blocks.map((b) => windowLabel(b, o)).join(' · ')}</Typography>
                     </Box>
                     {o !== undefined ? <StatusChip tone="green" size="sm">{o.registered} / {o.totalSeats}</StatusChip> : null}
                   </Stack>

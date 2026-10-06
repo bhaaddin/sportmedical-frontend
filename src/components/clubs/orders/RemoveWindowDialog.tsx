@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import type { ClubBlockView } from '../../../api/clubBlocks';
 import { ClubOrderError, clubOrdersApi } from '../../../api/clubOrders';
 import type { ClubOrderView } from '../../../api/clubOrders';
+import { invalidateClubWorld } from '../clubWorld';
 import { rangesWithout, windowLabel } from './orderWindows';
 
 export function RemoveWindowDialog({ order, block, onClose, onRemoved }: {
@@ -21,7 +22,7 @@ export function RemoveWindowDialog({ order, block, onClose, onRemoved }: {
   const queryClient = useQueryClient();
   const [failure, setFailure] = useState<string | null>(null);
   const [affected, setAffected] = useState<{ message: string; list: ClubOrderError['affectedAthletes'] } | null>(null);
-  const label = windowLabel(block);
+  const label = windowLabel(block, order);
 
   const remove = useMutation({
     mutationFn: (cancelAffected: boolean) => {
@@ -29,9 +30,7 @@ export function RemoveWindowDialog({ order, block, onClose, onRemoved }: {
       return clubOrdersApi.update(order.id, { ranges, calendarIds }, cancelAffected);
     },
     onSuccess: (saved) => {
-      for (const key of ['club-order', 'club-orders', 'club-summary', 'club-blocks', 'day-range', 'grid-preview']) {
-        void queryClient.invalidateQueries({ queryKey: [key] });
-      }
+      void invalidateClubWorld(queryClient);
       toast.success('Termín odebrán z objednávky');
       onRemoved(saved);
     },

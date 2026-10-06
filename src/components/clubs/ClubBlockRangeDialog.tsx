@@ -8,6 +8,7 @@
  * with something else booked on the new days, which comes back the same way.
  */
 import { useState } from 'react';
+import { invalidateClubWorld } from './clubWorld';
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Typography } from '@mui/material';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -63,8 +64,7 @@ export function ClubBlockRangeDialog({
           ? `Blok zkrácen. Uvolněné časy se vrátily do nabídky${confirmed ? ' a rezervace dotčených sportovců se zrušily' : ''}.`
           : 'Blok prodloužen.',
       );
-      void queryClient.invalidateQueries({ queryKey: ['club-blocks'] });
-      void queryClient.invalidateQueries({ queryKey: ['blocks'] });
+      void invalidateClubWorld(queryClient);
       onSaved?.(updated);
       onClose();
     },

@@ -7,6 +7,7 @@ import { DESIGN } from "../../../theme";
 import { orderCode } from "../../clubs/order/orderFormat";
 import { orderWindows, shortSplit, termsWord } from "../../clubs/orders/orderWindows";
 import { WindowPills } from "../../clubs/orders/WindowPills";
+import { UncoveredNotice } from "../../clubs/orders/UncoveredNotice";
 import { CAL_TEXT } from "./calendarText";
 import { cleanHex, rangeDates, type DayRange } from "./model";
 
@@ -119,6 +120,7 @@ export function ClubBlockPopover({
                   </Typography>
                   <Box sx={{ mt: 0.75 }}>
                     <WindowPills order={order} today={today} highlightBlockId={pick.clubBlockId} testId="club-popover-windows" />
+                    <UncoveredNotice order={order} compact />
                   </Box>
                   <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.75 }}>{CAL_TEXT.clubPopover.orderHint}</Typography>
                 </Box>

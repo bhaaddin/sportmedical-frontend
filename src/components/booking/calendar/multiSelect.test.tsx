@@ -72,7 +72,6 @@ describe('the tray on a phone', () => {
         onRemove={onRemove}
         onClear={onClear}
         onBlock={vi.fn()}
-        onClub={vi.fn()}
       />,
     );
     expect(screen.getByTestId('selection-tray')).toHaveAttribute('data-variant', 'bar');
@@ -85,10 +84,11 @@ describe('the tray on a phone', () => {
     expect(onRemove).toHaveBeenCalledWith('a');
     fireEvent.click(screen.getByRole('button', { name: 'Zrušit výběr' }));
     expect(onClear).toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Rezervovat pro klub' })).toBeEnabled();
+    /* A club order is never started from marked places: the tray only books a patient or blocks time. */
+    expect(screen.queryByRole('button', { name: /klub/i })).not.toBeInTheDocument();
   });
 
-  it('disables the club action with only past places', () => {
+  it('never offers a club action, not even for places from today on', () => {
     render(
       <SelectionTray
         items={[time('b', '2026-10-19', 8 * 60, 9 * 60)]}
@@ -98,9 +98,8 @@ describe('the tray on a phone', () => {
         mayBlock
         onRemove={vi.fn()}
         onClear={vi.fn()}
-        onClub={vi.fn()}
       />,
     );
-    expect(screen.getByRole('button', { name: 'Rezervovat pro klub' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /klub/i })).not.toBeInTheDocument();
   });
 });

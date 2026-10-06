@@ -137,6 +137,8 @@ export interface GridPickMode {
   onRemove: (id: string) => void;
   /** Picks the server named in a refusal. */
   conflictIds?: ReadonlySet<string>;
+  /** Etapa 10: a short label of the činnosti a picked window is restricted to ("Spiroergometrie"); null = all. */
+  tagOf?: (id: string) => string | null;
   /** Editing an order: its own club blocks do not count as taken (the picks start on top of them). */
   ignoreClubBlockIds?: ReadonlySet<string>;
 }
@@ -179,8 +181,6 @@ export interface TimeGridProps {
   mayBlock: boolean;
   onOpen: (id: string) => void;
   onBook: (request: GridBookingRequest) => void;
-  /** "Rezervovat pro klub" - hands the range to the clubs screen. Not offered when absent. */
-  onClub?: (request: GridBookingRequest) => void;
   onPickDay: (day: DateOnly) => void;
   /** Club orders that do not block time yet: a dashed chip under the header of their days. */
   inquiriesByDay?: Map<string, InquiryRef[]>;
@@ -251,7 +251,6 @@ export function TimeGrid(props: TimeGridProps) {
     mayBook,
     mayBlock,
     zoom = 1,
-    onClub,
     resolutionStep = SLOT_MINUTES,
     catalogue = EMPTY_CATALOGUE,
     device = "desktop",
@@ -394,11 +393,10 @@ export function TimeGrid(props: TimeGridProps) {
     setPending(selection);
   };
 
-  const choose = (action: "book" | "block" | "club") => {
+  const choose = (action: "book" | "block") => {
     if (!pending) return;
     const request = toRequest(pending.calendarId, pending.activityId, pending.dayKey, pending.range);
     if (action === "book") props.onBook(request);
-    if (action === "club") onClub?.(request);
     if (action === "block") {
       setBlockTarget({
         calendarId: pending.calendarId,
@@ -990,7 +988,6 @@ export function TimeGrid(props: TimeGridProps) {
         mayBlock={mayBlock}
         onBook={() => choose("book")}
         onBlock={() => choose("block")}
-        onClub={onClub ? () => choose("club") : undefined}
         onClose={() => setPending(null)}
       />
 
@@ -1876,6 +1873,7 @@ function SubColumn({
                 pxPerMinute={pxPerMinute}
                 step={step}
                 conflict={pick.conflictIds?.has(item.id) === true}
+                tag={pick.tagOf?.(item.id) ?? null}
                 touch={touchPick}
                 onDrag={(mode: AdjustMode, delta: number) =>
                   setAdjust({

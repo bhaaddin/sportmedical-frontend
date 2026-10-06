@@ -196,7 +196,7 @@ describe.each([['phone'], ['tablet'], ['desktop']] as const)('one order, one car
     expect(within(card).getAllByTestId('order-window')).toHaveLength(3);
     expect(within(card).getByText('Termíny (3 termíny)')).toBeInTheDocument();
     /* ONE button row for the whole order. */
-    for (const label of ['Změnit hráče', 'Upravit termíny', 'Zrušit objednávku', 'Otevřít']) {
+    for (const label of ['Přidat hráče / rozšířit', 'Odebrat hráče', 'Upravit termíny', 'Zrušit objednávku', 'Otevřít']) {
       expect(within(card).getByRole('button', { name: label })).toBeInTheDocument();
     }
 
@@ -236,12 +236,12 @@ describe.each([['phone'], ['tablet'], ['desktop']] as const)('one order, one car
     expect(handlers.onOpenOrder).toHaveBeenCalledWith(ORDER_ID);
   });
 
-  it('opens "Změnit hráče" from the card', async () => {
+  it('opens "Přidat hráče / rozšířit" from the card', async () => {
     setViewport(VIEWPORTS[name]);
     const user = userEvent.setup();
     open(orderBlocks);
     const card = await screen.findByTestId('club-order-card');
-    await user.click(within(card).getByRole('button', { name: 'Změnit hráče' }));
+    await user.click(within(card).getByRole('button', { name: 'Přidat hráče / rozšířit' }));
     expect(await screen.findByTestId('change-players-dialog')).toBeInTheDocument();
   });
 

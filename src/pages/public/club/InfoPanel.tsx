@@ -6,11 +6,12 @@
  * the server's `payerText` wins over the default sentence for who pays.
  */
 import { Box, Typography } from '@mui/material';
-import type { ClubActivity, ClubInfo } from '../../../api/publicClub';
+import type { ClubActivity, ClubInfo, ClubInfoWindow } from '../../../api/publicClub';
 import type { Device } from '../../../layout/useDevice';
 import { ARCHIVO, BRAND, czk } from '../../../components/public/brand';
 import { LABEL_COLOR, Panel, PanelTitle, SOFT_TEXT } from '../../../components/public/kit';
 import type { CalTexts } from './texts';
+import { allowsActivity, normalizeAllowed } from '../../../components/clubs/order/routing';
 
 export const INFO_SLOT_KEYS = [
   'formulare.club-reg.info.title',
@@ -36,6 +37,36 @@ export function reservedDaysText(dates: readonly string[]): string {
     const name = new Date(y, m - 1, 1).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long' }).replace(/^\d+\.\s*/, '');
     return `${days.map((d) => `${d}.`).join(', ')} ${name}`;
   }).join('; ');
+}
+
+/** "Pondělí 26. 10." for a yyyy-MM-dd date. */
+export function weekdayDay(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const weekday = new Date(y, m - 1, d).toLocaleDateString('cs-CZ', { weekday: 'long' });
+  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)} ${d}. ${m}.`;
+}
+
+/** Etapa 10: the days of the windows that allow `activityId` (all of them while no činnost is chosen). */
+export const reservedDaysFor = (windows: readonly ClubInfoWindow[], activityId: string): string[] =>
+  windows.filter((w) => activityId === '' || allowsActivity(w.activityIds, activityId)).map((w) => w.date);
+
+/**
+ * One line per reserved day, with the činnosti it is for when the day is restricted ("Pondělí 26. 10. · Spiroergometrie");
+ * null when no day is restricted (the plain sentence is then enough).
+ */
+export function reservedDayLines(windows: readonly ClubInfoWindow[], activities: readonly ClubActivity[]): string[] | null {
+  const all = activities.map((a) => a.activityId);
+  const names = (w: ClubInfoWindow): string | null => {
+    const allowed = normalizeAllowed(w.activityIds, all);
+    return allowed === null ? null : activities.filter((a) => allowed.includes(a.activityId)).map((a) => a.activityName).join(' + ');
+  };
+  if (all.length < 2 || !windows.some((w) => names(w) !== null)) return null;
+  return [...windows]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((w) => {
+      const only = names(w);
+      return only === null ? weekdayDay(w.date) : `${weekdayDay(w.date)} · ${only}`;
+    });
 }
 
 /** The price a person pays: the one price, else "od <lowest>"; null when no činnost states one. */
@@ -64,6 +95,7 @@ export function InfoPanel({
   const intro = t['formulare.club-reg.info.intro']
     .replace('{club}', info.clubName)
     .replace('{service}', info.serviceName);
+  const dayLines = reservedDayLines(info.windows, activities);
   const steps = [t['formulare.club-reg.steps.1'], t['formulare.club-reg.steps.2'], t['formulare.club-reg.steps.3']];
 
   return (
@@ -101,9 +133,18 @@ export function InfoPanel({
       </Box>
 
       {info.windows.length > 0 && (
-        <Typography data-testid="club-reserved" sx={{ fontSize: 15, fontWeight: 600 }}>
-          {cal['formulare.club-reg.cal.reserved'].replace('{days}', reservedDaysText(info.windows.map((w) => w.date)))}
-        </Typography>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          <Typography data-testid="club-reserved" sx={{ fontSize: 15, fontWeight: 600 }}>
+            {dayLines === null
+              ? cal['formulare.club-reg.cal.reserved'].replace('{days}', reservedDaysText(info.windows.map((w) => w.date)))
+              : cal['formulare.club-reg.cal.reserved'].replace('{days}', '').trim()}
+          </Typography>
+          {dayLines !== null && (
+            <Box component="ul" data-testid="club-reserved-days" sx={{ m: 0, pl: 2.5, fontSize: 15, lineHeight: 1.5 }}>
+              {dayLines.map((line) => <li key={line}>{line}</li>)}
+            </Box>
+          )}
+        </Box>
       )}
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>

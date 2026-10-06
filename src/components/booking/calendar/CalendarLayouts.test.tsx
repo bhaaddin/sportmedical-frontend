@@ -343,13 +343,14 @@ describe('desktop · 1440', () => {
     });
   });
 
-  it('a drag in a činnost column opens the club setup form (the marked place becomes the first pick)', async () => {
+  it('a drag in a činnost column offers only the patient choices, never a club', async () => {
     renderPage(VIEWPORTS.desktop, 'day');
     const column = await screen.findByTestId('sub-column-c2:a3-2026-10-26');
     fireEvent.pointerDown(column, { button: 0, clientY: 100, clientX: 100, pointerId: 1 });
     fireEvent.pointerUp(column, { clientY: 100, clientX: 100, pointerId: 1 });
-    fireEvent.click(screen.getByRole('menuitem', { name: /Rezervovat pro klub/ }));
-    expect(await screen.findByTestId('pick-setup')).toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name: /Objednat pacienta/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /klub/i })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('pick-setup')).not.toBeInTheDocument();
   });
 
   it('the toolbar button "Klubová objednávka" asks the two-way question (fill in myself / send the link)', async () => {
@@ -361,7 +362,7 @@ describe('desktop · 1440', () => {
     expect(within(entry).getByRole('button', { name: /Poslat odkaz klubu/ })).toBeInTheDocument();
   });
 
-  it('month: dragging across days picks a range, pills it, and "Rezervovat pro klub" opens the setup form', async () => {
+  it('month: dragging across days picks a range, pills it, and the popover has no club entry', async () => {
     renderPage(VIEWPORTS.desktop, 'month');
     const first = await screen.findByTestId('month-day-2026-10-12');
     pointerOf(first);
@@ -375,8 +376,7 @@ describe('desktop · 1440', () => {
     });
     expect(await screen.findByText('12. 10. – 25. 10.')).toBeInTheDocument();
     expect(screen.getByText('14 dní')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('menuitem', { name: /Rezervovat pro klub/ }));
-    expect(await screen.findByTestId('pick-setup')).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /klub/i })).not.toBeInTheDocument();
   });
 
   it('month: "Zablokovat čas" on a range blocks whole days in the calendars ticked', async () => {
@@ -532,8 +532,7 @@ describe('tablet · 834', () => {
     expect(screen.getByTestId('range-hint')).toHaveTextContent('Klepněte na poslední den výběru.');
     fireEvent.click(screen.getByTestId('month-day-2026-10-25'), { clientX: 200, clientY: 200 });
     expect(await screen.findByText('12. 10. – 25. 10.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('menuitem', { name: /Rezervovat pro klub/ }));
-    expect(await screen.findByTestId('pick-setup')).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /klub/i })).not.toBeInTheDocument();
   });
 });
 
@@ -670,4 +669,52 @@ describe('inside the shell', () => {
     expect(await within(page).findByRole('region', { name: 'Služby' })).toBeInTheDocument();
     expect(within(screen.getByTestId('shell-sidebar')).queryByRole('region', { name: 'Služby' })).not.toBeInTheDocument();
   });
+});
+
+/* ── Etapa 10: a window that allows only some činnosti of its order says so ── */
+describe.each([['phone', VIEWPORTS.phone], ['tablet', VIEWPORTS.tablet], ['desktop', VIEWPORTS.desktop]] as const)('restricted window of an order · %s', (name, width) => {
+  const ORDER = '80e74a6c-0000-4000-8000-0000000000cc';
+  const win = {
+    id: 'cb1', clubId: 'club1', clubName: 'FK Dukla', colorHex: '#7B1FA2', calendarIds: ['c1'], activityIds: ['a2'], fromDate: '2026-10-26', toDate: '2026-10-26',
+    dailyFrom: '14:00', dailyTo: '16:00', status: 'Active', athletes: [], clubOrderId: ORDER,
+  };
+  const orderBody = {
+    id: ORDER, groupId: ORDER, clubId: 'club1', clubName: 'FK Dukla', serviceId: 's1', serviceName: 'Prohlídky', status: 'Confirmed', paymentMethod: 'ClubInvoice',
+    totalSeats: 22, registered: 0,
+    activitySeats: [
+      { activityId: 'a1', activityName: 'Základní prohlídka', durationMinutes: 30, seats: 12, registered: 0, unitPriceCzk: null },
+      { activityId: 'a2', activityName: 'Komplexní prohlídka', durationMinutes: 60, seats: 10, registered: 0, unitPriceCzk: null },
+    ],
+    blocks: [win],
+    requestedRanges: [{ fromDate: '2026-10-26', toDate: '2026-10-26', dailyFrom: '14:00', dailyTo: '16:00', activityIds: ['a2'] }],
+    uncoveredActivityIds: ['a1'],
+  };
+  beforeEach(() => {
+    vi.mocked(client.get).mockImplementation(async (url: string) => {
+      if (url === '/api/v1/club-orders') return { data: [orderBody] } as never;
+      if (url.includes('/club-orders/')) return { data: orderBody } as never;
+      if (url.includes('/club-blocks')) return { data: url.endsWith('/club-blocks') ? [win] : win } as never;
+      throw new Error('offline');
+    });
+  });
+  afterEach(() => {
+    vi.mocked(client.get).mockReset().mockRejectedValue(new Error('offline'));
+  });
+
+  it('the popover lists the window with its činnost and warns about the činnost without a window', async () => {
+    renderPage(width, 'day');
+    const target = name === 'phone' ? await within(await screen.findByTestId('phone-day-list')).findByTestId('club-window-card') : (await screen.findAllByRole('button', { name: 'FK Dukla' }))[0];
+    fireEvent.click(target, { clientX: 300, clientY: 300 });
+    const popover = await screen.findByRole('dialog', { name: 'Objednávka KO-000000CC · FK Dukla' });
+    expect((await within(popover).findAllByTestId('order-window'))[0]).toHaveTextContent('Po 26. 10. · 14:00–16:00 · Komplexní prohlídka');
+    expect(within(popover).getByTestId('order-uncovered')).toHaveTextContent('Bez termínu: Základní prohlídka');
+  });
+
+  if (name === 'phone') {
+    it('the phone window card names the činnost the window is for', async () => {
+      renderPage(width, 'day');
+      const card = await within(await screen.findByTestId('phone-day-list')).findByTestId('club-window-card');
+      await waitFor(() => expect(within(card).getByTestId('club-window-title')).toHaveTextContent('FK Dukla · 13:00–15:00 · Komplexní prohlídka'));
+    });
+  }
 });

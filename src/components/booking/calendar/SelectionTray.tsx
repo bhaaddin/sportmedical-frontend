@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Box, Button, IconButton, Paper, Tooltip, Typography } from "@mui/material";
+import { Box, Button, IconButton, Paper, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -8,7 +8,7 @@ import type { DateOnly } from "../../../utils/time";
 import { DESIGN } from "../../../theme";
 import { GRID_TEXT } from "../grid/gridText";
 import { CAL_TEXT } from "./calendarText";
-import { clubRanges, isPastPicked, pickedLabel, type PickedRange } from "./multiSelect";
+import { isPastPicked, pickedLabel, type PickedRange } from "./multiSelect";
 
 /*
  * The tray for several marked places: chips with an x each, the count, and what
@@ -27,7 +27,6 @@ export interface SelectionTrayProps {
   /** Offered when exactly one time range is marked. */
   onBook?: () => void;
   onBlock?: () => void;
-  onClub?: () => void;
 }
 
 function PlaceChip({
@@ -92,12 +91,10 @@ export function SelectionTray({
   onClear,
   onBook,
   onBlock,
-  onClub,
 }: SelectionTrayProps) {
   const [open, setOpen] = useState(false);
   if (items.length === 0) return null;
 
-  const usable = clubRanges(items, today).length;
   const showBook = mayBook && onBook && items.length === 1 && items[0].kind === "time";
   const chips = (
     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }} data-testid="tray-chips">
@@ -118,15 +115,6 @@ export function SelectionTray({
         <Button variant="outlined" onClick={onBlock} sx={{ minHeight: 44 }}>
           {GRID_TEXT.blockTime}
         </Button>
-      ) : null}
-      {mayBook && onClub ? (
-        <Tooltip title={usable === 0 ? CAL_TEXT.trayClubFromToday : ""}>
-          <span>
-            <Button variant="outlined" disabled={usable === 0} onClick={onClub} sx={{ minHeight: 44 }}>
-              {GRID_TEXT.bookClub}
-            </Button>
-          </span>
-        </Tooltip>
       ) : null}
       <Button onClick={onClear} sx={{ minHeight: 44, color: "text.secondary" }}>
         {GRID_TEXT.cancelSelection}

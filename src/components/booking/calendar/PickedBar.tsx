@@ -21,6 +21,8 @@ interface PickedBarProps {
   step: number;
   /** The server named this range in a refusal. */
   conflict?: boolean;
+  /** Etapa 10: the činnosti this window is restricted to ("Spiroergometrie"), or null when it allows all. */
+  tag?: string | null;
   /** Touch: bigger handles and cross (about 44 px to hit). */
   touch?: boolean;
   onDrag: (mode: AdjustMode, deltaMinutes: number) => void;
@@ -30,7 +32,7 @@ interface PickedBarProps {
 
 const HANDLE = 10;
 
-export function PickedBar({ id, range, place, pxPerMinute, step, conflict = false, touch = false, onDrag, onEnd, onRemove }: PickedBarProps) {
+export function PickedBar({ id, range, place, pxPerMinute, step, conflict = false, tag = null, touch = false, onDrag, onEnd, onRemove }: PickedBarProps) {
   const press = useRef<{ mode: AdjustMode; y: number } | null>(null);
   const line = conflict ? "#C62828" : DESIGN.selection.line;
 
@@ -132,6 +134,33 @@ export function PickedBar({ id, range, place, pxPerMinute, step, conflict = fals
       >
         {selectionLabel(range)}
       </Typography>
+      {tag !== null ? (
+        <Typography
+          data-testid="picked-range-tag"
+          sx={{
+            position: "absolute",
+            top: 8,
+            left: 4,
+            right: touch ? 44 : 32,
+            px: 0.75,
+            py: "1px",
+            fontSize: 11,
+            fontWeight: 700,
+            lineHeight: 1.3,
+            borderRadius: "5px",
+            backgroundColor: "rgba(255,255,255,0.85)",
+            color: line,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            pointerEvents: "none",
+            width: "fit-content",
+            maxWidth: "calc(100% - 8px)",
+          }}
+        >
+          {tag}
+        </Typography>
+      ) : null}
       <Box
         component="button"
         type="button"

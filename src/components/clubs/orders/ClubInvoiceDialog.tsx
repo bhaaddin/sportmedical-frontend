@@ -12,6 +12,7 @@
  * `invoice_refused`.
  */
 import { useState } from 'react';
+import { invalidateClubWorld } from '../clubWorld';
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Skeleton, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -55,10 +56,7 @@ export function ClubInvoiceDialog({ orderId, onClose, onChanged }: {
   const nothingLeft = draft !== undefined && draft.lines.length === 0;
 
   const refreshAll = () => {
-    void queryClient.invalidateQueries({ queryKey: ['club-order'] });
-    void queryClient.invalidateQueries({ queryKey: ['club-orders'] });
-    void queryClient.invalidateQueries({ queryKey: ['club-billing'] });
-    void queryClient.invalidateQueries({ queryKey: ['club-order-invoice-draft'] });
+    void invalidateClubWorld(queryClient);
   };
 
   const create = async () => {

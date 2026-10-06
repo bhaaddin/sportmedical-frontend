@@ -232,8 +232,14 @@ export function ordersRangesOf(items: readonly PickedRange[], today: DateOnly): 
     toDate: r.toDate,
     dailyFrom: r.dailyFrom ?? null,
     dailyTo: r.dailyTo ?? null,
+    /* Etapa 10: only a strict subset is sent; null / absent means every činnost of the order. */
+    ...(r.activityIds !== undefined && r.activityIds.length > 0 ? { activityIds: r.activityIds } : {}),
   }));
 }
+
+/** The picked windows as the calculator reads them: how many minutes each holds and which činnosti it allows. */
+export const pickedWindowsOf = (items: readonly PickedRange[]): { minutes: number; activityIds: string[] | null }[] =>
+  timePicks(items).map((p) => ({ minutes: p.range.end - p.range.start, activityIds: p.activityIds != null && p.activityIds.length > 0 ? p.activityIds : null }));
 
 /** The calendars the picks lie in, in the order they were first picked. */
 export function pickedCalendarIds(items: readonly PickedRange[]): string[] {
@@ -254,7 +260,15 @@ export function picksFromRanges(
     const to = rawTo === null ? DAY : rawTo === "23:59" ? DAY : parseTimeOfDay(rawTo);
     if (from === null || to === null || to <= from || r.fromDate === "" || r.toDate < r.fromDate) continue;
     for (let day = r.fromDate; day <= r.toDate; day = addDaysToDateOnly(day, 1)) {
-      out.push({ kind: "time", columnKey: keyOf(calendarId), calendarId, activityId: null, dayKey: day, range: { start: from, end: to } });
+      out.push({
+        kind: "time",
+        columnKey: keyOf(calendarId),
+        calendarId,
+        activityId: null,
+        dayKey: day,
+        range: { start: from, end: to },
+        ...(r.activityIds != null && r.activityIds.length > 0 ? { activityIds: [...r.activityIds] } : {}),
+      });
     }
   }
   return out;

@@ -2,6 +2,7 @@ import type { DateOnly } from "../../../utils/time";
 import { addDaysToDateOnly } from "../../../utils/time";
 import { shortDate, weekdayShort } from "../grid/periodTitle";
 import { formatMinutes, type MinuteRange } from "../grid/timeRange";
+import { allowedKey } from "../../clubs/order/routing";
 import { rangeDates, type ClubRange } from "./model";
 
 /*
@@ -20,6 +21,11 @@ export interface PickedTime {
   activityId: string | null;
   dayKey: DateOnly;
   range: MinuteRange;
+  /**
+   * Etapa 10 (club order picks): the činnosti of the order this window allows - a strict subset, in the order's
+   * listed order. null / absent = all of them.
+   */
+  activityIds?: string[] | null;
 }
 
 export interface PickedDays {
@@ -69,10 +75,13 @@ function toClubRange(item: PickedRange): ClubRange {
     toDate: item.dayKey,
     dailyFrom: formatMinutes(item.range.start),
     dailyTo: clockEnd(item.range.end),
+    ...(item.activityIds != null && item.activityIds.length > 0 ? { activityIds: [...item.activityIds] } : {}),
   };
 }
 
-const windowOf = (r: ClubRange) => (r.dailyFrom === undefined ? "" : `${r.dailyFrom}-${r.dailyTo}`);
+/** Where and for which činnosti: ranges with a different set are never joined. */
+const windowOf = (r: ClubRange) => (r.dailyFrom === undefined ? "" : `${r.dailyFrom}-${r.dailyTo}`) + "|" + allowedKey(r.activityIds);
+const sameActivities = (a: ClubRange, b: ClubRange) => allowedKey(a.activityIds) === allowedKey(b.activityIds);
 
 const byStart = (a: ClubRange, b: ClubRange) =>
   a.fromDate.localeCompare(b.fromDate) ||
@@ -92,8 +101,8 @@ export function clubRanges(items: readonly PickedRange[], today: DateOnly): Club
   const dayWindows = ranges.filter((r) => r.dailyFrom !== undefined && r.fromDate === r.toDate).sort(byStart);
   const joined: ClubRange[] = [];
   for (const r of dayWindows) {
-    const last = joined[joined.length - 1];
-    if (last && last.fromDate === r.fromDate && (r.dailyFrom as string) <= (last.dailyTo as string)) {
+    const last = [...joined].reverse().find((j) => j.fromDate === r.fromDate && sameActivities(j, r));
+    if (last && (r.dailyFrom as string) <= (last.dailyTo as string)) {
       if ((r.dailyTo as string) > (last.dailyTo as string)) last.dailyTo = r.dailyTo;
     } else {
       joined.push({ ...r });

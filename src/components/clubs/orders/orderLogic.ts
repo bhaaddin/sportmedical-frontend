@@ -7,6 +7,8 @@ import { ORDER_STATUSES } from '../../../api/clubOrders';
 import type { ClubOrderStatus, ClubOrderView, ClubSummary, OrderRange } from '../../../api/clubOrders';
 import { formatShortRange } from '../../../pages/clubs/clubOrders';
 import { formatSeats, formatSeatsWithTotal } from '../panel/seats';
+import { allowedNames } from '../order/routing';
+import { routedActivities, type RoutedOrder } from './orderWindows';
 
 export type OrderStatusFilter = 'all' | ClubOrderStatus;
 
@@ -19,9 +21,12 @@ export function orderTerms(order: ClubOrderView): OrderRange[] {
   return order.requestedRanges;
 }
 
-export const rangeText = (r: OrderRange): string => {
+/** "26. 10. 2026, 08:00–12:00", and " · Spiroergometrie" when the period allows only some činnosti of `order`. */
+export const rangeText = (r: OrderRange, order?: RoutedOrder): string => {
   const days = r.fromDate === '' ? '—' : formatShortRange(r.fromDate, r.toDate === '' ? r.fromDate : r.toDate);
-  return r.dailyFrom && r.dailyTo ? `${days}, ${r.dailyFrom}–${r.dailyTo}` : days;
+  const base = r.dailyFrom && r.dailyTo ? `${days}, ${r.dailyFrom}–${r.dailyTo}` : days;
+  const only = order === undefined ? null : allowedNames(r.activityIds, routedActivities(order));
+  return only === null ? base : `${base} · ${only}`;
 };
 
 /** The first term and how many more there are: "26. 10. 2026 +2". */

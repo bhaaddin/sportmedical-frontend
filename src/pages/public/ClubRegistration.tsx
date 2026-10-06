@@ -33,7 +33,8 @@ import PublicLayout from './PublicLayout';
 import { ActivityCards, activityRemaining } from './club/ActivityCards';
 import { Booked } from './club/Booked';
 import type { BookedInfo } from './club/Booked';
-import { INFO_SLOT_KEYS, InfoPanel } from './club/InfoPanel';
+import { INFO_SLOT_KEYS, InfoPanel, reservedDaysFor } from './club/InfoPanel';
+import { allowsActivity } from '../../components/clubs/order/routing';
 import { SLOT_PICKER_KEYS } from './club/SlotPicker';
 import { TermCalendar } from './club/TermCalendar';
 import { CAL_KEYS, withCalDefaults } from './club/texts';
@@ -437,7 +438,8 @@ export default function ClubRegistration() {
   }
 
   /* ── The offer + the form ── */
-  const openWindows = offer.windows.filter((w) => w.places > 0);
+  /* Etapa 10: only the windows that allow the chosen činnost (absent `activityIds` = all). */
+  const openWindows = offer.windows.filter((w) => w.places > 0 && (activityId === '' || allowsActivity(w.activityIds, activityId)));
   const chosenActivity = offer.activities.find((a) => a.activityId === activityId);
   const chooseActivity = offer.activities.length > 1;
 
@@ -460,7 +462,7 @@ export default function ClubRegistration() {
           <TermCalendar
             status={slotsStatus}
             slots={freeSlots}
-            reservedDays={info?.windows.map((w) => w.date) ?? []}
+            reservedDays={info !== null ? reservedDaysFor(info.windows, activityId) : []}
             day={day}
             value={slotUtc}
             onDay={(date) => {

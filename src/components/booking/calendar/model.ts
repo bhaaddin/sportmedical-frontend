@@ -436,6 +436,8 @@ export interface ClubRange {
   toDate: DateOnly;
   dailyFrom?: string;
   dailyTo?: string;
+  /** Etapa 10: the činnosti this window allows (a strict subset); absent = all. */
+  activityIds?: string[];
 }
 
 export interface OpenClubBlockState {

@@ -102,7 +102,7 @@ beforeEach(() => {
 describe.each([['phone'], ['tablet'], ['desktop']] as const)('order detail · %s', (name) => {
   beforeEach(() => setViewport(VIEWPORTS[name]));
 
-  it('lists all windows once as "Termíny objednávky", with the two edit buttons up front', async () => {
+  it('lists all windows once as "Termíny objednávky", with the three edit buttons up front', async () => {
     mount(make());
     const windows = await screen.findByTestId('confirmed-windows');
     expect(within(windows).getAllByTestId('order-window')).toHaveLength(3);
@@ -110,7 +110,8 @@ describe.each([['phone'], ['tablet'], ['desktop']] as const)('order detail · %s
     expect(screen.getByText('Termíny objednávky')).toBeInTheDocument();
     expect(screen.queryByText('Potvrzená okna v kalendáři')).toBeNull();
     const buttons = screen.getByTestId('order-edit-buttons');
-    expect(within(buttons).getByRole('button', { name: 'Změnit hráče' })).toBeInTheDocument();
+    expect(within(buttons).getByRole('button', { name: 'Přidat hráče / rozšířit' })).toBeInTheDocument();
+    expect(within(buttons).getByRole('button', { name: 'Odebrat hráče' })).toBeInTheDocument();
     expect(within(buttons).getByRole('button', { name: 'Upravit termíny' })).toBeInTheDocument();
     /* No "cancel block" for an order-owned window anywhere. */
     expect(screen.queryByRole('button', { name: /Zrušit blok/ })).toBeNull();
@@ -180,15 +181,42 @@ describe.each([['phone'], ['tablet'], ['desktop']] as const)('order detail · %s
   });
 });
 
-describe('Změnit hráče', () => {
+describe('Přidat hráče / rozšířit and Odebrat hráče', () => {
   const openDialog = async (order = make()) => {
     const user = userEvent.setup();
     mount(order);
-    await user.click(await screen.findByRole('button', { name: 'Změnit hráče' }));
+    await user.click(await screen.findByRole('button', { name: 'Přidat hráče / rozšířit' }));
     const dialog = await screen.findByTestId('change-players-dialog');
     await within(dialog).findByLabelText('Počet hráčů, Základní prohlídka');
     return { user, dialog };
   };
+
+  it('"Odebrat hráče" opens the same dialog with its own title', async () => {
+    const user = userEvent.setup();
+    mount(make());
+    await user.click(await screen.findByRole('button', { name: 'Odebrat hráče' }));
+    const dialog = await screen.findByTestId('change-players-dialog');
+    expect(within(dialog).getByText('Odebrat hráče')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Přidat hráče / rozšířit')).toBeNull();
+  });
+
+  it('fewer players than the windows hold: saved at once, then "Navíc N slotů" with a one-click "Upravit termíny" (not forced)', async () => {
+    const { user, dialog } = await openDialog();
+    const field = within(dialog).getByLabelText('Počet hráčů, Základní prohlídka');
+    await user.clear(field);
+    await user.type(field, '5');
+    await user.click(within(dialog).getByRole('button', { name: 'Uložit' }));
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    const surplus = await within(dialog).findByTestId('change-players-surplus');
+    /* 960 min held - (5 x 30 + 4 x 60 = 390 min) = 570 min = 19 slots of the shortest činnost (30 min) */
+    expect(within(surplus).getByTestId('change-players-surplus-text')).toHaveTextContent('Navíc 19 slotů');
+    expect(within(dialog).queryByRole('button', { name: 'Uložit' })).toBeNull();
+    await user.click(within(dialog).getByTestId('change-players-edit-terms'));
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('/planovani'));
+    const start = (navigated as { pickOrder: { start: { activities: { activityId: string; seats: number }[] } } }).pickOrder.start;
+    expect(start.activities.map((a) => [a.activityId, a.seats])).toEqual([['a-1', 5], ['a-2', 4]]);
+    expect(update).toHaveBeenCalledTimes(1);
+  });
 
   it('steps a činnost, shows the live total and what happens to time, and saves ONE update', async () => {
     const { user, dialog } = await openDialog();
@@ -218,18 +246,23 @@ describe('Změnit hráče', () => {
     expect(update.mock.calls[0][1]).toEqual({ activitySeats: [{ activityId: 'a-1', seats: 10 }, { activityId: 'a-3', seats: 6 }] });
   });
 
-  it('says how many more slots to add when the windows hold less than needed, and offers "Upravit termíny" with the new numbers', async () => {
+  it('enlarging past what the windows hold: says how many slots are missing and "Pokračovat" opens the calendar with the new numbers, saving nothing yet', async () => {
     const { user, dialog } = await openDialog();
     const field = within(dialog).getByLabelText('Počet hráčů, Základní prohlídka');
     await user.clear(field);
     await user.type(field, '40');
     const short = await within(dialog).findByTestId('change-players-short');
     expect(short).toHaveTextContent('Termíny objednávky drží 960 min — chybí ještě 12 slotů');
-    await user.click(within(short).getByRole('button', { name: 'Upravit termíny' }));
+    expect(within(dialog).getByTestId('change-players-enlarge')).toBeInTheDocument();
+    expect(within(short).queryByRole('button', { name: 'Upravit termíny' })).toBeNull();
+    await user.click(within(dialog).getByRole('button', { name: 'Pokračovat: vybrat termíny' }));
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('/planovani'));
     const start = (navigated as { pickOrder: { start: { activities: { activityId: string; seats: number }[]; editOrder: { mode: string } } } }).pickOrder.start;
     expect(start.editOrder.mode).toBe('edit');
     expect(start.activities.map((a) => [a.activityId, a.seats])).toEqual([['a-1', 40], ['a-2', 4]]);
+    /* The saved numbers travel along, so the calendar shows only the ADDITIONAL need. */
+    const baseline = (navigated as { pickOrder: { start: { editOrder: { baseline?: { activityId: string; seats: number }[] } } } }).pickOrder.start.editOrder.baseline;
+    expect(baseline?.map((a) => [a.activityId, a.seats])).toEqual([['a-1', 10], ['a-2', 4]]);
     /* Nothing was saved by opening the calendar. */
     expect(update).not.toHaveBeenCalled();
   });
@@ -286,7 +319,7 @@ describe('Změnit hráče', () => {
 describe('what each status offers', () => {
   it('a Requested order can change players but has no "Upravit termíny" (it is processed instead)', async () => {
     mount(make({ status: 'Requested', blocks: [], requestedRanges: [{ fromDate: '2099-10-26', toDate: '2099-10-26', dailyFrom: '08:00', dailyTo: '12:00' }] }));
-    expect(await screen.findByRole('button', { name: 'Změnit hráče' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Přidat hráče / rozšířit' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Upravit termíny' })).toBeNull();
     expect(screen.getByText('Požadované termíny')).toBeInTheDocument();
   });
@@ -294,7 +327,7 @@ describe('what each status offers', () => {
   it('a Completed order offers neither', async () => {
     mount(make({ status: 'Completed' }));
     await screen.findByTestId('order-detail');
-    expect(screen.queryByRole('button', { name: 'Změnit hráče' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Přidat hráče / rozšířit' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Upravit termíny' })).toBeNull();
   });
 });

@@ -6,10 +6,11 @@
  */
 import { useState } from 'react';
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField, Typography } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { clubsApi } from '../../../api/clubs';
 import { clinicServicesApi } from '../../../api/clinicServices';
 import { clubOrdersApi } from '../../../api/clubOrders';
+import { invalidateClubWorld } from '../clubWorld';
 import type { ClubOrderView } from '../../../api/clubOrders';
 import { useIsPhone } from '../../../layout/useDevice';
 import { LinkCopyRow } from './LinkCopyRow';
@@ -25,6 +26,7 @@ export function InviteClubDialog({ open, onClose, defaultClubId, onInvited }: {
   onInvited?: (order: ClubOrderView) => void;
 }) {
   const phone = useIsPhone();
+  const queryClient = useQueryClient();
   const [clubId, setClubId] = useState(defaultClubId ?? '');
   const [serviceId, setServiceId] = useState('');
   const [note, setNote] = useState('');
@@ -54,6 +56,7 @@ export function InviteClubDialog({ open, onClose, defaultClubId, onInvited }: {
         ...(offered.length > 0 ? { offeredDates: offered } : {}),
       });
       setCreated(order);
+      void invalidateClubWorld(queryClient);
       onInvited?.(order);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Formulář se nepodařilo vytvořit.');

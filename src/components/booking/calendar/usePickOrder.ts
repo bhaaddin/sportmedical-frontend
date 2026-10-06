@@ -3,21 +3,23 @@ import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import type { Calendar } from "../../../api/bookingContracts";
 import { fetchBlockableActivities } from "../../../api/clubBlocks";
-import { ClubOrderError, clubOrdersApi } from "../../../api/clubOrders";
+import { ClubOrderError, clubOrdersApi, REASON_ACTIVITY_REMOVED } from "../../../api/clubOrders";
 import type { ClubOrderView } from "../../../api/clubOrders";
 import type { DateOnly } from "../../../utils/time";
-import { computeCoverage } from "../../clubs/order/coverage";
+import { invalidateClubWorld } from "../../clubs/clubWorld";
+import { computeAdditionalCoverage, computeCoverage } from "../../clubs/order/coverage";
 import { mergeSessionInto } from "../../clubs/order/editSession";
 import { orderCode, rangeLine } from "../../clubs/order/orderFormat";
 import { rowFromRange, rowIndexForError } from "../../clubs/order/orderLogic";
+import { allowedNames, normalizeAllowed, toggleAllowed } from "../../clubs/order/routing";
 import type { PickSession } from "../../clubs/order/pickSession";
 import type { GridPickMode } from "../grid/TimeGrid";
-import type { NewPicked } from "./multiSelect";
 import type { FreeBlock } from "./pickDays";
 import {
   ordersRangesOf,
   pickedCalendarIds,
   pickedMinutesOf,
+  pickedWindowsOf,
   pickInRange,
   picksFromRanges,
   timePicks,
@@ -38,8 +40,7 @@ import type { MultiSelectApi } from "./useMultiSelect";
 export interface PickOrderApi {
   session: PickSession | null;
   active: boolean;
-  /** `seed`: places already marked in the grid (clicked before the order was set up) that become the first picks. */
-  start: (session: PickSession, seed?: readonly NewPicked[]) => void;
+  start: (session: PickSession) => void;
   cancel: () => void;
   /** Passed to the grid. */
   gridPick: GridPickMode | undefined;
@@ -80,7 +81,14 @@ export function usePickOrder(input: {
   const [session, setSession] = useState<PickSession | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const [failure, setFailure] = useState<{ message: string; conflict: string | null; ids: string[]; athletes: number } | null>(null);
+  const [failure, setFailure] = useState<{
+    message: string;
+    conflict: string | null;
+    ids: string[];
+    athletes: number;
+    athleteNames: string[];
+    removedFromWindow: boolean;
+  } | null>(null);
   const [result, setResult] = useState<ClubOrderView | null>(null);
   const [duplicate, setDuplicate] = useState<ClubOrderView | null>(null);
   const [resultTitle, setResultTitle] = useState("Objednávka potvrzena");
@@ -88,7 +96,16 @@ export function usePickOrder(input: {
   const picks = useMemo(() => timePicks(multi.items), [multi.items]);
   const pickedMinutes = pickedMinutesOf(multi.items);
   const activities = useMemo(() => session?.activities ?? [], [session]);
-  const coverage = useMemo(() => computeCoverage(activities, pickedMinutes), [activities, pickedMinutes]);
+  /* Etapa 10: the činnosti that can be routed (players expected), and each picked window's allowed set. */
+  const routable = useMemo(() => activities.filter((a) => a.seats > 0).map((a) => ({ activityId: a.activityId, name: a.name })), [activities]);
+  const routableIds = useMemo(() => routable.map((a) => a.activityId), [routable]);
+  const windows = useMemo(() => pickedWindowsOf(multi.items), [multi.items]);
+  const baseline = session?.editOrder?.baseline;
+  const coverage = useMemo(() => {
+    /* Enlarging an order: only what the added players cost is missing. */
+    const extra = baseline === undefined ? null : computeAdditionalCoverage(activities, baseline, pickedMinutes, windows);
+    return extra ?? computeCoverage(activities, pickedMinutes, windows);
+  }, [activities, pickedMinutes, windows, baseline]);
 
   const serviceCalendarIds = useMemo(
     () => new Set(calendars.filter((c) => session !== null && c.clinicServiceId === session.serviceId).map((c) => c.id)),
@@ -100,7 +117,7 @@ export function usePickOrder(input: {
   const clearFailure = useCallback(() => setFailure((f) => (f === null ? f : null)), []);
 
   const start = useCallback(
-    (next: PickSession, seed?: readonly NewPicked[]) => {
+    (next: PickSession) => {
       multi.clear();
       setSession(next);
       setNote(null);
@@ -108,8 +125,11 @@ export function usePickOrder(input: {
       setResult(null);
       /* Editing an order: its windows are the first picks (so the numbers start where the order is). */
       const own = next.editOrder?.mode === "edit" ? next.editOrder.blocks : [];
-      const fromBlocks = own.flatMap((block) => picksFromRanges([block.range], block.calendarId, (id) => id));
-      const first = [...fromBlocks, ...(seed ?? [])];
+      const sessionIds = next.activities.filter((a) => a.seats > 0).map((a) => a.activityId);
+      const fromBlocks = own.flatMap((block) =>
+        picksFromRanges([{ ...block.range, activityIds: normalizeAllowed(block.range.activityIds, sessionIds) }], block.calendarId, (id) => id),
+      );
+      const first = fromBlocks;
       if (first.length > 0) multi.replace(first);
       onStarted?.(next);
     },
@@ -166,8 +186,7 @@ export function usePickOrder(input: {
           ...(session.parentOrderId !== undefined ? { parentOrderId: session.parentOrderId } : {}),
         });
       }
-      void queryClient.invalidateQueries({ queryKey: ["day-range"] });
-      void queryClient.invalidateQueries({ queryKey: ["club-orders"] });
+      void invalidateClubWorld(queryClient);
       setResultTitle(editing?.mode === "edit" ? "Termíny uloženy" : "Objednávka potvrzena");
       setResult(order);
       onCreated?.(order);
@@ -186,9 +205,11 @@ export function usePickOrder(input: {
           conflict: range === null ? null : rangeLine(range),
           ids,
           athletes,
+          athleteNames: athletes > 0 ? error.affectedAthletes.map((a) => (a.activityName ? `${a.name} (${a.activityName})` : a.name)) : [],
+          removedFromWindow: athletes > 0 && error.affectedAthletes.some((a) => a.reason === REASON_ACTIVITY_REMOVED),
         });
       } else {
-        setFailure({ message: "Objednávku se nepodařilo uložit. Výběr zůstal — zkuste to znovu.", conflict: null, ids: [], athletes: 0 });
+        setFailure({ message: "Objednávku se nepodařilo uložit. Výběr zůstal — zkuste to znovu.", conflict: null, ids: [], athletes: 0, athleteNames: [], removedFromWindow: false });
       }
     } finally {
       setConfirming(false);
@@ -211,7 +232,10 @@ export function usePickOrder(input: {
           .fetchQuery({ queryKey: ["club-block-activities"], queryFn: fetchBlockableActivities, staleTime: 5 * 60 * 1000 })
           .catch(() => []);
         const merged = mergeSessionInto(existing, session, catalogue, todayKey);
-        const own = (merged.editOrder?.blocks ?? []).flatMap((block) => picksFromRanges([block.range], block.calendarId, (id) => id));
+        const mergedIds = merged.activities.filter((a) => a.seats > 0).map((a) => a.activityId);
+        const own = (merged.editOrder?.blocks ?? []).flatMap((block) =>
+          picksFromRanges([{ ...block.range, activityIds: normalizeAllowed(block.range.activityIds, mergedIds) }], block.calendarId, (id) => id),
+        );
         multi.replace([...own, ...withoutIds(multi.items)]);
         setSession(merged);
         setFailure(null);
@@ -251,8 +275,13 @@ export function usePickOrder(input: {
               clearFailure();
             },
             conflictIds,
+            /* A window that allows only some činnosti says which ("Spiroergometrie") on its bar. */
+            tagOf: (id) => {
+              const item = multi.items.find((i) => i.id === id);
+              return item?.kind === "time" ? allowedNames(item.activityIds, routable, "short") : null;
+            },
           },
-    [session, serviceCalendarIds, todayKey, nowMinute, multi, conflictIds, ownBlockIds, clearFailure],
+    [session, serviceCalendarIds, todayKey, nowMinute, multi, conflictIds, ownBlockIds, clearFailure, routable],
   );
 
   const pickBlocks = useCallback(
@@ -295,6 +324,19 @@ export function usePickOrder(input: {
           failure: failure === null ? null : { message: failure.message, conflict: failure.conflict },
           onRemoveConflict: failure !== null && failure.ids.length > 0 ? removeConflict : null,
           athletesAffected: failure !== null && failure.athletes > 0 ? failure.athletes : null,
+          athleteNames: failure?.athleteNames ?? [],
+          athletesRemovedFromWindow: failure?.removedFromWindow ?? false,
+          activities: routable,
+          onToggleActivity: (id, activityId) => {
+            const item = multi.items.find((i) => i.id === id);
+            if (item?.kind !== "time") return;
+            multi.setActivities(id, toggleAllowed(item.activityIds, activityId, routableIds));
+            clearFailure();
+          },
+          onAllActivities: (id) => {
+            multi.setActivities(id, null);
+            clearFailure();
+          },
           onConfirm: () => void confirm(),
           onConfirmCancelling: () => void confirm(true),
           onClearPicks: () => {

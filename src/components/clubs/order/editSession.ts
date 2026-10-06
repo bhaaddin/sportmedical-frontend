@@ -5,16 +5,14 @@
  */
 import type { BlockableActivity } from '../../../api/clubBlocks';
 import type { ClubOrderView, OrderActivitySeats } from '../../../api/clubOrders';
-import { orderWindows } from '../orders/orderWindows';
+import { orderWindows, windowRange } from '../orders/orderWindows';
 import type { CoverageActivity } from './coverage';
 import type { EditBlockRef, PickSession } from './pickSession';
 
 /** The order's live windows as the calendar knows them (one calendar each). */
-export function editBlockRefs(order: Pick<ClubOrderView, 'blocks'>): EditBlockRef[] {
+export function editBlockRefs(order: Pick<ClubOrderView, 'blocks'> & Partial<Pick<ClubOrderView, 'activitySeats' | 'requestedRanges'>>): EditBlockRef[] {
   return orderWindows(order).flatMap((b) =>
-    b.calendarIds[0] === undefined
-      ? []
-      : [{ id: b.id, calendarId: b.calendarIds[0], range: { fromDate: b.fromDate, toDate: b.toDate, dailyFrom: b.dailyFrom, dailyTo: b.dailyTo } }],
+    b.calendarIds[0] === undefined ? [] : [{ id: b.id, calendarId: b.calendarIds[0], range: windowRange(b, order) }],
   );
 }
 
@@ -47,6 +45,8 @@ export function editSessionFor(
   activities?: CoverageActivity[],
 ): PickSession {
   const blocks = editBlockRefs(order);
+  const saved = order.activitySeats.map((s) => coverageActivity(s, catalogue));
+  const changed = activities !== undefined && JSON.stringify(activities.map((a) => [a.activityId, a.seats])) !== JSON.stringify(saved.map((a) => [a.activityId, a.seats]));
   return {
     clubId: order.clubId,
     clubName: order.clubName,
@@ -55,7 +55,10 @@ export function editSessionFor(
     activities: activities ?? order.activitySeats.map((s) => coverageActivity(s, catalogue)),
     paymentMethod: order.paymentMethod ?? 'ClubInvoice',
     note: order.note,
-    editOrder: { mode: 'edit', orderId: order.id, dirty: false, requested: [], blocks, firstDate: firstWindowDate(blocks, today) },
+    editOrder: {
+      mode: 'edit', orderId: order.id, dirty: false, requested: [], blocks, firstDate: firstWindowDate(blocks, today),
+      ...(changed ? { baseline: saved } : {}),
+    },
   };
 }
 

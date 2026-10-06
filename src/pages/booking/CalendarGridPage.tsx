@@ -113,7 +113,6 @@ import { useDayRange } from "../../components/booking/calendar/useDayRange";
 import { useMultiSelect } from "../../components/booking/calendar/useMultiSelect";
 import { MultiBlockDialog } from "../../components/booking/calendar/MultiBlockDialog";
 import { SelectionTray } from "../../components/booking/calendar/SelectionTray";
-import type { NewPicked } from "../../components/booking/calendar/multiSelect";
 import { ClubOrderEntry } from "../../components/clubs/order/ClubOrderEntry";
 import { PickOrderSetup } from "../../components/clubs/order/PickOrderSetup";
 import { OrderSuccess } from "../../components/clubs/order/OrderSuccess";
@@ -125,10 +124,11 @@ import { usePickOrder } from "../../components/booking/calendar/usePickOrder";
 import { PickDuplicateDialog } from "../../components/booking/calendar/PickDuplicateDialog";
 import { usePickJump } from "../../components/booking/calendar/usePickJump";
 import { useInquiries } from "../../components/booking/calendar/inquiries";
+import { useWindowRestrictions } from "../../components/booking/calendar/windowRestrictions";
 import { PickMonthView } from "../../components/booking/calendar/PickMonthView";
 import { FreeBlocksList } from "../../components/booking/calendar/FreeBlocksList";
 import { freeBlocksOfDay, minutesOfBlocks, type FreeBlock } from "../../components/booking/calendar/pickDays";
-import { timePicks, withoutIds } from "../../components/booking/calendar/pickLogic";
+import { timePicks } from "../../components/booking/calendar/pickLogic";
 import { SidebarPortal, useHasSidebarSlot } from "../../components/shell/SidebarSlot";
 import { PinnedActionBar } from "../../components/ui/PinnedActionBar";
 import { useDevice } from "../../layout/useDevice";
@@ -327,9 +327,9 @@ export default function CalendarGridPage() {
   const [filterMenu, setFilterMenu] = useState<HTMLElement | null>(null);
   const [clubPick, setClubPick] = useState<ClubBlockPick | null>(null);
   /* "Nová klubová objednávka": the two-way chooser, then the small setup form, then picking in the grid.
-     `seed`: places already marked in the grid, which become the first picks. */
+     A club order is never started from places marked in the grid - those only book a patient. */
   const [entryOpen, setEntryOpen] = useState(false);
-  const [setupFor, setSetupFor] = useState<{ clubId?: string; parent?: PickParent; seed?: NewPicked[]; day?: string } | null>(null);
+  const [setupFor, setSetupFor] = useState<{ clubId?: string; parent?: PickParent } | null>(null);
   const [rangeBlock, setRangeBlock] = useState<{ from: string; to: string } | null>(null);
   const [moveProposal, setMoveProposal] = useState<GridMoveRequest | null>(null);
   /* Several different places at once: marked with Ctrl/⌘/Shift (or the touch toggle), acted on from the tray. */
@@ -769,6 +769,7 @@ export default function CalendarGridPage() {
     retry: false,
     staleTime: 30_000,
   });
+  const restrictedWindows = useWindowRestrictions(!pickActive);
   const clubWindowsByDay = useMemo(() => {
     const details = new Map((clubDetailsQuery.data ?? []).map((b) => [b.id, b]));
     const all = [...blocksByCalendar.values()].flat();
@@ -784,8 +785,9 @@ export default function CalendarGridPage() {
         return start === null || end === null ? null : { start, end };
       },
       (id, block) => clubBlockDates(all, id, block),
+      restrictedWindows,
     );
-  }, [clubDetailsQuery.data, blocksByCalendar, days, previewByCalendar]);
+  }, [clubDetailsQuery.data, blocksByCalendar, days, previewByCalendar, restrictedWindows]);
 
   /* The club blocks of the month, one row per club per day. */
   const clubBlocksByDay = useMemo(() => {
@@ -852,22 +854,6 @@ export default function CalendarGridPage() {
       initialStart: request.start,
       initialEnd: request.end,
     });
-
-  /*
-   * "Rezervovat pro klub": opens the club order dialog (no navigation) with the
-   * calendar, the day and the daily window that was marked.
-   */
-  const clubFromGrid = (request: GridBookingRequest) => {
-    const from = parseTimeOfDay(request.start.slice(11, 16));
-    const rawTo = parseTimeOfDay(request.end.slice(11, 16));
-    const to = rawTo === null || rawTo === 0 ? 24 * 60 : rawTo;
-    setSetupFor({
-      day: request.dayKey,
-      ...(from !== null && to > from
-        ? { seed: [{ kind: "time", columnKey: request.calendarId, calendarId: request.calendarId, activityId: null, dayKey: request.dayKey, range: { start: from, end: to } }] }
-        : {}),
-    });
-  };
 
   /* A click on a club's window: a window of an order opens the ORDER ("Otevřít objednávku", "Upravit termíny"),
      only a legacy block without an order still says "Otevřít blok". */
@@ -1075,7 +1061,7 @@ export default function CalendarGridPage() {
 
   /*
    * Two more hand-overs by router state, each applied once per navigation:
-   *  - `state.openClubOrder` (the sidebar's and the chooser's "Klubová objednávka") opens the club order dialog;
+   *  - `state.openClubOrder` (the sidebar's and the toolbar's "Klubová objednávka") opens the club order dialog;
    *  - `state.date` (yyyy-MM-dd; "Zobrazit v kalendáři" from the club reservations) moves the grid to that day.
    */
   const handoff = location.state as { openClubOrder?: unknown; date?: unknown } | null;
@@ -1623,7 +1609,6 @@ export default function CalendarGridPage() {
                   mayBlock={mayBlock}
                   onOpen={setOpenId}
                   onBook={bookFromGrid}
-                  onClub={clubFromGrid}
                   onPickDay={pickDay}
                   inquiriesByDay={inquiriesByDay}
                   onOpenInquiry={pickActive ? undefined : openInquiry}
@@ -1707,7 +1692,7 @@ export default function CalendarGridPage() {
         caption={shown.length > 1 ? `${GRID_TEXT.calendars}: ${shown.map((c) => c.name).join(", ")}` : shown[0]?.name}
         mayBook={mayBook}
         mayBlock={mayBlock}
-        hints={{ book: CAL_TEXT.rangeBookHint, block: CAL_TEXT.rangeBlockHint, club: CAL_TEXT.rangeClubHint }}
+        hints={{ book: CAL_TEXT.rangeBookHint, block: CAL_TEXT.rangeBlockHint }}
         onBook={() => {
           if (!chosenRange) return;
           const first = chosenRange.from;
@@ -1719,12 +1704,6 @@ export default function CalendarGridPage() {
           const range = { from: chosenRange.from, to: chosenRange.to };
           rangeSelect.clear();
           setRangeBlock(range);
-        }}
-        onClub={() => {
-          if (!chosenRange) return;
-          const range = { from: chosenRange.from, to: chosenRange.to };
-          rangeSelect.clear();
-          setSetupFor({ day: range.from });
         }}
         onClose={rangeSelect.clear}
       />
@@ -1745,14 +1724,6 @@ export default function CalendarGridPage() {
           bookFromGrid(toRequest(only.calendarId, only.activityId, only.dayKey, only.range));
         }}
         onBlock={() => setMultiBlock(true)}
-        onClub={() => {
-          /* Whole-day runs cannot be picked as time; they only say where the calendar should open. */
-          const seed = withoutIds(multi.items);
-          const days = multi.items.map((i) => (i.kind === "time" ? i.dayKey : i.from)).sort();
-          if (days.length === 0) return;
-          multi.clear();
-          setSetupFor({ ...(seed.length > 0 ? { seed } : {}), day: days[0] });
-        }}
       />
       {multiBlock ? (
         <MultiBlockDialog
@@ -1794,14 +1765,8 @@ export default function CalendarGridPage() {
           parent={setupFor.parent}
           onClose={() => setSetupFor(null)}
           onStart={(session) => {
-            const { seed, day } = setupFor;
             setSetupFor(null);
-            pick.start(session, seed);
-            /* Marked places stay where they were: the calendar does not jump away from them. */
-            if (day !== undefined) {
-              setAnchor(day);
-              setJumpToken(null);
-            }
+            pick.start(session);
           }}
         />
       ) : null}

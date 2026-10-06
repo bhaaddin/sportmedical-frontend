@@ -7,6 +7,7 @@
  * and the club overview open it the same way.
  */
 import { useState } from 'react';
+import { invalidateClubWorld } from '../clubWorld';
 import {
   Alert, Box, Button, Drawer,
   IconButton, LinearProgress, Link, Skeleton, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography,
@@ -29,6 +30,7 @@ import type { CoverageActivity } from '../order/coverage';
 import { CancelOrderDialog } from './CancelOrderDialog';
 import { ChangePlayersDialog } from './ChangePlayersDialog';
 import { WindowPills } from './WindowPills';
+import { UncoveredNotice } from './UncoveredNotice';
 import { RemoveWindowDialog } from './RemoveWindowDialog';
 import { orderWindows, termsWord } from './orderWindows';
 import { copyText } from './LinkCopyRow';
@@ -62,7 +64,7 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
   const queryClient = useQueryClient();
   const [dialog, setDialog] = useState<'process' | 'edit' | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [playersOpen, setPlayersOpen] = useState(false);
+  const [playersOpen, setPlayersOpen] = useState<'add' | 'remove' | null>(null);
   const [removing, setRemoving] = useState<ClubBlockView | null>(null);
   /* Etapa 5: a row of the group opens that order in the same drawer. */
   const [orderId, setOrderId] = useState(initialId);
@@ -93,16 +95,13 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
   const invoiceDraft = invoiceDraftQuery.data;
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ['club-order', orderId] });
-    void queryClient.invalidateQueries({ queryKey: ['club-orders'] });
-    void queryClient.invalidateQueries({ queryKey: ['club-summary'] });
-    void queryClient.invalidateQueries({ queryKey: ['club-blocks'] });
+    void invalidateClubWorld(queryClient);
     onChanged?.();
   };
 
-  /* "Upravit termíny": the calendar in pick mode, prefilled with every window of this order (and, from "Změnit hráče", the new numbers). */
+  /* "Upravit termíny": the calendar in pick mode, prefilled with every window of this order (and, from "Přidat hráče / rozšířit", the new numbers). */
   const editTerms = (o: ClubOrderView, activities?: CoverageActivity[]) => {
-    setPlayersOpen(false);
+    setPlayersOpen(null);
     navigate('/planovani', { state: { pickOrder: { start: editSessionFor(o, activitiesQuery.data ?? [], todayInPrague(), activities) } } });
   };
 
@@ -137,10 +136,11 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
           </Typography>
           {order.note !== '' ? <Typography variant="body2" sx={{ mt: 1 }}>{order.note}</Typography> : null}
           {order.status === 'Requested' || order.status === 'Confirmed' ? (
-            <Stack direction={phone ? 'column' : 'row'} data-testid="order-edit-buttons" sx={{ gap: 1, mt: 2 }}>
-              <Button variant="contained" onClick={() => setPlayersOpen(true)} data-testid="change-players" sx={{ minHeight: 48, flex: 1 }}>Změnit hráče</Button>
+            <Stack direction={phone ? 'column' : 'row'} data-testid="order-edit-buttons" sx={{ gap: 1, mt: 2, flexWrap: 'wrap' }}>
+              <Button variant="contained" onClick={() => setPlayersOpen('add')} data-testid="change-players" sx={{ minHeight: 48, flex: '1 1 150px' }}>Přidat hráče / rozšířit</Button>
+              <Button variant="outlined" onClick={() => setPlayersOpen('remove')} data-testid="remove-players" sx={{ minHeight: 48, flex: '1 1 150px' }}>Odebrat hráče</Button>
               {order.status === 'Confirmed' ? (
-                <Button variant="contained" color="secondary" onClick={() => editTerms(order)} disabled={activitiesQuery.isLoading} data-testid="edit-terms" sx={{ minHeight: 48, flex: 1 }}>Upravit termíny</Button>
+                <Button variant="contained" color="secondary" onClick={() => editTerms(order)} disabled={activitiesQuery.isLoading} data-testid="edit-terms" sx={{ minHeight: 48, flex: '1 1 150px' }}>Upravit termíny</Button>
               ) : null}
             </Stack>
           ) : null}
@@ -207,10 +207,11 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
             <>
               <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>Požadované termíny</Typography>
               <Stack component="ul" sx={{ m: 0, pl: 2.5 }} data-testid="requested-ranges">
-                {order.requestedRanges.map((r, i) => <li key={i}><Typography variant="body2">{rangeText(r)}</Typography></li>)}
+                {order.requestedRanges.map((r, i) => <li key={i}><Typography variant="body2">{rangeText(r, order)}</Typography></li>)}
               </Stack>
             </>
           )}
+          <UncoveredNotice order={order} />
         </Block>
 
         <Block title="Činnosti">
@@ -399,11 +400,12 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
         <CancelOrderDialog order={order} onClose={() => setCancelOpen(false)} onCancelled={() => { setCancelOpen(false); refresh(); }} />
       ) : null}
 
-      {playersOpen && order !== undefined ? (
+      {playersOpen !== null && order !== undefined ? (
         <ChangePlayersDialog
           order={order}
-          onClose={() => setPlayersOpen(false)}
-          onSaved={() => { setPlayersOpen(false); refresh(); }}
+          intent={playersOpen}
+          onClose={() => setPlayersOpen(null)}
+          onSaved={() => { setPlayersOpen(null); refresh(); }}
           onEditTerms={order.status === 'Confirmed' ? (activities) => editTerms(order, activities) : undefined}
         />
       ) : null}

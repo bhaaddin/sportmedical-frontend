@@ -20,6 +20,11 @@ export interface OrderRange {
   toDate: string;
   dailyFrom?: string | null;
   dailyTo?: string | null;
+  /**
+   * Etapa 10: the činnosti of the order this window allows. null / absent = all of them. Sent only as a strict
+   * subset; two ranges that differ only in this are two windows and are never merged.
+   */
+  activityIds?: string[] | null;
 }
 
 export interface OrderActivitySeats {
@@ -75,6 +80,8 @@ export interface ClubOrderView {
   /** Etapa 8: the single days the club chose (sorted); empty until it submitted. */
   requestedDates?: string[];
   blocks: ClubBlockView[];
+  /** Etapa 10: činnosti with seats that no window allows (read from the live blocks, or the requested periods). */
+  uncoveredActivityIds?: string[];
   note: string;
   contact: OrderContact | null;
   formToken: string;
@@ -211,7 +218,7 @@ export interface ClubOrderStats {
 export class ClubOrderError extends Error {
   readonly status: number | undefined;
   readonly code: string | undefined;
-  readonly affectedAthletes: { id?: string; name: string; activityName?: string; startUtc?: string }[];
+  readonly affectedAthletes: { id?: string; name: string; activityName?: string; startUtc?: string; reason?: string }[];
   readonly fieldErrors: Record<string, string[]>;
   /** 409 `club_order.addenda_live`: the addenda that still hold places. */
   addenda: OrderAddendumSummary[] = [];
@@ -232,6 +239,13 @@ const rec = (v: unknown): Record<string, unknown> => (v !== null && typeof v ===
 
 const statusOf = (v: unknown): ClubOrderStatus => (ORDER_STATUSES.includes(v as ClubOrderStatus) ? (v as ClubOrderStatus) : 'Requested');
 
+/** Tolerant: a list of non-empty ids, or null (absent, empty or garbage = all činnosti). */
+export function toActivityIds(v: unknown): string[] | null {
+  if (!Array.isArray(v)) return null;
+  const ids = [...new Set(v.filter((x): x is string => typeof x === 'string' && x !== ''))];
+  return ids.length > 0 ? ids : null;
+}
+
 export function toRange(raw: unknown): OrderRange {
   const r = rec(raw);
   return {
@@ -239,6 +253,7 @@ export function toRange(raw: unknown): OrderRange {
     toDate: str(r.toDate, str(r.fromDate)),
     dailyFrom: typeof r.dailyFrom === 'string' && r.dailyFrom !== '' ? r.dailyFrom : null,
     dailyTo: typeof r.dailyTo === 'string' && r.dailyTo !== '' ? r.dailyTo : null,
+    activityIds: toActivityIds(r.activityIds),
   };
 }
 
@@ -341,6 +356,7 @@ export function toOrder(raw: unknown): ClubOrderView {
     offeredDates: dates(o.offeredDates),
     requestedDates: dates(o.requestedDates),
     blocks: arr<ClubBlockView>(o.blocks),
+    uncoveredActivityIds: toActivityIds(o.uncoveredActivityIds) ?? [],
     note: str(o.note),
     contact: contact === null ? null : { name: str(contact.name), phone: str(contact.phone), email: str(contact.email) },
     formToken: str(o.formToken),
@@ -383,7 +399,7 @@ function toError(error: unknown): ClubOrderError {
   const message = typeof data.message === 'string' && data.message.trim() !== '' ? data.message.trim() : 'Požadavek se nepodařilo dokončit.';
   const affected = arr<unknown>(data.affectedAthletes).map((a) => {
     const x = rec(a);
-    return { id: typeof x.id === 'string' ? x.id : undefined, name: str(x.name), activityName: typeof x.activityName === 'string' ? x.activityName : undefined, startUtc: typeof x.startUtc === 'string' ? x.startUtc : undefined };
+    return { id: typeof x.id === 'string' ? x.id : undefined, name: str(x.name), activityName: typeof x.activityName === 'string' ? x.activityName : undefined, startUtc: typeof x.startUtc === 'string' ? x.startUtc : undefined, reason: typeof x.reason === 'string' ? x.reason : undefined };
   });
   const errors = rec(data.errors);
   const fields: Record<string, string[]> = {};
@@ -450,6 +466,9 @@ export const clubOrdersApi = {
   stats: (range: { from?: string; to?: string } = {}): Promise<ClubOrderStats> =>
     call(async () => unwrap((await client.get(`${BASE}/stats`, { params: range })).data) as ClubOrderStats),
 };
+
+/** 409 `club_order.athletes_affected`, reason of an athlete: the window no longer allows the činnost they registered for. */
+export const REASON_ACTIVITY_REMOVED = 'activity_removed_from_window';
 
 export const ORDER_STATUS_LABEL: Record<ClubOrderStatus, string> = {
   Invited: 'Čeká na formulář',

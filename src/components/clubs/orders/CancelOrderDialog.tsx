@@ -4,6 +4,7 @@
  * confirms cancelling them together. Used by the order detail and by the club page's order card.
  */
 import { useState } from 'react';
+import { invalidateClubWorld } from '../clubWorld';
 import { Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Stack, Typography } from '@mui/material';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -23,9 +24,7 @@ export function CancelOrderDialog({ order, onClose, onCancelled }: {
   const cancel = useMutation({
     mutationFn: (withAddenda: boolean) => clubOrdersApi.cancel(order.id, cancelAthletes, withAddenda),
     onSuccess: () => {
-      for (const key of ['club-order', 'club-orders', 'club-summary', 'club-blocks', 'day-range']) {
-        void queryClient.invalidateQueries({ queryKey: [key] });
-      }
+      void invalidateClubWorld(queryClient);
       toast.success('Objednávka zrušena');
       onCancelled();
     },

@@ -41,7 +41,7 @@ import { NewAppointmentDialog } from "./NewAppointmentDialog";
  *    availability API the drawer itself trusts, 6.1).
  *  - **Vybrat v kalendáři** - the calendar, filtered to that služba.
  *
- * A small link leads on to the club order (the calendar opens it).
+ * A club order is not started here: it has its own entry (the calendar's "Klubová objednávka", Kluby).
  *
  * A small dialog on a desktop or a tablet, a bottom sheet on a phone. Nothing
  * here is a price or a clinic's own text: services, colours and the slot all
@@ -57,7 +57,6 @@ const TEXT = {
   quickHint: "Nejbližší volný termín, nový pacient se zapíše rovnou.",
   calendar: "Vybrat v kalendáři",
   calendarHint: "Otevře kalendář jen s touto službou.",
-  clubOrder: "Klubová objednávka",
   searching: "Hledám nejbližší volný termín…",
   none: (name: string, days: number) =>
     `Pro službu „${name}“ není v následujících ${days} dnech volný termín. Zkuste kalendář.`,
@@ -183,11 +182,6 @@ export function NewOrderChooser({ open, onClose }: NewOrderChooserProps) {
   const inCalendar = () => {
     if (service === null) return;
     navigate("/planovani", { state: { serviceId: service.id } });
-    finish();
-  };
-
-  const clubOrder = () => {
-    navigate("/planovani", { state: { openClubOrder: true } });
     finish();
   };
 
@@ -348,18 +342,6 @@ export function NewOrderChooser({ open, onClose }: NewOrderChooserProps) {
         </>
       )}
 
-      <Box sx={{ pt: 0.5 }}>
-        <Link
-          component="button"
-          type="button"
-          underline="hover"
-          disabled={seeking}
-          onClick={clubOrder}
-          sx={{ fontSize: 14, fontWeight: 600 }}
-        >
-          {TEXT.clubOrder}
-        </Link>
-      </Box>
     </Stack>
   );
 

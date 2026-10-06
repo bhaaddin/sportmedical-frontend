@@ -20,6 +20,7 @@ import { ClubOrderError, clubOrdersApi, PAYMENT_METHOD_LABEL } from '../../../ap
 import type { ClubOrderView, PaymentMethod } from '../../../api/clubOrders';
 import { useDevice } from '../../../layout/useDevice';
 import { SectionLabel, SoftCard } from '../../ui';
+import { invalidateClubWorld } from '../clubWorld';
 import { parsePlayerCount, todayInPrague } from '../blockLogic';
 import { OrderSeatsSection } from './OrderSeatsSection';
 import type { OrderActivityItem } from './OrderSeatsSection';
@@ -135,9 +136,7 @@ function OrderDialogBody({ onClose, order, processOrder, onEditTerms, onSaved }:
       return clubOrdersApi.confirm(src.id, { calendarIds: serviceCalendarIds, ranges: src.requestedRanges });
     },
     onSuccess: (saved) => {
-      for (const key of ['clubs', 'club-orders', 'club-blocks', 'club-summary', 'blocks', 'day-range', 'grid-preview']) {
-        void queryClient.invalidateQueries({ queryKey: [key] });
-      }
+      void invalidateClubWorld(queryClient);
       toast.success(mode === 'edit' ? 'Objednávka uložena' : 'Objednávka potvrzena');
       onSaved?.(saved);
       if (mode === 'edit') {

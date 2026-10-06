@@ -67,8 +67,6 @@ export const GRID_TEXT = {
   bookPatientHint: 'Vyhledat nebo rychle založit',
   blockTime: 'Zablokovat čas',
   blockTimeHint: 'Pauza, dovolená, školení',
-  bookClub: 'Rezervovat pro klub',
-  bookClubHint: 'Blok míst s odkazem pro sportovce',
   cancelSelection: 'Zrušit výběr',
   escape: 'Esc',
   legendSelecting: 'Právě vybíráte',

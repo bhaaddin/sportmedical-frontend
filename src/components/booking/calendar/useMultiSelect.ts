@@ -12,6 +12,8 @@ export interface MultiSelectApi {
   remove: (id: string) => void;
   /** "Výběr termínů": a picked time range resized or moved in place. */
   update: (id: string, range: MinuteRange) => void;
+  /** Etapa 10: the činnosti a picked time range allows (null = all of the order's). */
+  setActivities: (id: string, activityIds: string[] | null) => void;
   /** "Výběr termínů": every place replaced at once (the automatic proposal). */
   replace: (items: NewPicked[]) => void;
   clear: () => void;
@@ -40,6 +42,11 @@ export function useMultiSelect(today: DateOnly): MultiSelectApi {
       setItems((current) => current.map((c) => (c.id === id && c.kind === "time" ? { ...c, range } : c))),
     [],
   );
+  const setActivities = useCallback(
+    (id: string, activityIds: string[] | null) =>
+      setItems((current) => current.map((c) => (c.id === id && c.kind === "time" ? { ...c, activityIds } : c))),
+    [],
+  );
   const replace = useCallback((next: NewPicked[]) => {
     setItems(
       next.map((item) => {
@@ -58,6 +65,7 @@ export function useMultiSelect(today: DateOnly): MultiSelectApi {
       add,
       remove,
       update,
+      setActivities,
       replace,
       clear,
       isAdditive: (event) => touchMode || Boolean(event?.ctrlKey || event?.metaKey || event?.shiftKey),
@@ -72,6 +80,6 @@ export function useMultiSelect(today: DateOnly): MultiSelectApi {
         return state;
       },
     }),
-    [items, touchMode, add, remove, update, replace, clear, today],
+    [items, touchMode, add, remove, update, setActivities, replace, clear, today],
   );
 }

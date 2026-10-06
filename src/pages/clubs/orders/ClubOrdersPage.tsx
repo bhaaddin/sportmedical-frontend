@@ -11,7 +11,7 @@ import {
   Alert, Box, Button, LinearProgress, MenuItem, Skeleton, Stack, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, TextField, Typography,
 } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { clubsApi } from '../../../api/clubs';
 import { clubOrdersApi, ORDER_STATUSES, ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL } from '../../../api/clubOrders';
@@ -71,6 +71,7 @@ export default function ClubOrdersPage() {
   const ordersQuery = useQuery({
     queryKey: ['club-orders', clubId, from, to],
     queryFn: () => clubOrdersApi.list({ ...(clubId !== '' ? { clubId } : {}), ...(from !== '' ? { from } : {}), ...(to !== '' ? { to } : {}) }),
+    placeholderData: keepPreviousData,
   });
 
   const all = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);

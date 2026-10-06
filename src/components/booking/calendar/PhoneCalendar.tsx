@@ -363,7 +363,9 @@ function ClubWindowCard({ window, onOpen }: { window: ClubWindow; onOpen: PhoneC
     >
       <Box sx={{ width: 5, borderRadius: 3, bgcolor: colour, flexShrink: 0 }} />
       <Box sx={{ minWidth: 0, flex: 1 }}>
-        <Typography sx={{ fontSize: 14, fontWeight: 700, lineHeight: 1.3 }}>{`${window.clubName} · ${window.timeLabel}`}</Typography>
+        <Typography data-testid="club-window-title" sx={{ fontSize: 14, fontWeight: 700, lineHeight: 1.3, overflowWrap: "anywhere" }}>
+          {`${window.clubName} · ${window.timeLabel}${window.only !== null ? ` · ${window.only}` : ""}`}
+        </Typography>
         {window.wholeDay ? <Typography sx={{ fontSize: 12, color: "text.secondary" }}>Celý den</Typography> : null}
         {window.breakdown ? <Typography sx={{ fontSize: 12, color: "text.secondary" }}>{window.breakdown}</Typography> : null}
         {window.registered !== null && window.seats !== null ? (

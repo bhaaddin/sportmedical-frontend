@@ -12,6 +12,7 @@
  * once more.
  */
 import { useMemo, useState } from 'react';
+import { invalidateClubWorld } from './clubWorld';
 import {
   Alert, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle,
   FormControlLabel, IconButton, MenuItem, Stack, TextField, Typography,
@@ -198,9 +199,7 @@ export function ClubBlockDialog({
       );
     },
     onSuccess: (saved) => {
-      void queryClient.invalidateQueries({ queryKey: ['clubs'] });
-      void queryClient.invalidateQueries({ queryKey: ['club-blocks'] });
-      void queryClient.invalidateQueries({ queryKey: ['blocks'] });
+      void invalidateClubWorld(queryClient);
       toast.success('Blok uložen');
       onSaved?.(saved);
       onClose();

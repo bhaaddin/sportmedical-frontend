@@ -9,6 +9,7 @@ import { formatWeekdayDate } from '../../../pages/clubs/clubOrders';
 import { ordersRangesOf, pickedCalendarIds, picksFromRanges } from '../../booking/calendar/pickLogic';
 import type { PickedTime } from '../../booking/calendar/multiSelect';
 import { plural } from '../blockLogic';
+import { allowedNames, normalizeAllowed, type RoutedActivity } from '../order/routing';
 import { formatSeats } from '../panel/seats';
 
 /** A date before any club window: used so that "keep the other windows" never drops a past one. */
@@ -24,7 +25,38 @@ export function orderWindows(order: Pick<ClubOrderView, 'blocks'>): ClubBlockVie
     .sort((a, b) => a.fromDate.localeCompare(b.fromDate) || (a.dailyFrom ?? '').localeCompare(b.dailyFrom ?? ''));
 }
 
-export const windowRange = (b: ClubBlockView): OrderRange => ({ fromDate: b.fromDate, toDate: b.toDate, dailyFrom: b.dailyFrom, dailyTo: b.dailyTo });
+/** What an order needs to know about its činnosti and periods to read a window's routing. */
+export type RoutedOrder = Partial<Pick<ClubOrderView, 'activitySeats' | 'requestedRanges'>>;
+
+/** The order's činnosti that have players: the ones a window can be restricted to, in the order's listed order. */
+export const routedActivities = (order: RoutedOrder | undefined): RoutedActivity[] =>
+  (order?.activitySeats ?? []).filter((s) => s.seats > 0).map((s) => ({ activityId: s.activityId, name: s.activityName }));
+
+const hh = (t: string | null | undefined): string => (t ?? '').slice(0, 5);
+
+/**
+ * The činnosti a window allows: a strict subset of the order's, or null when it allows all. The order's own period
+ * (same dates and hours) is the authority - it remembers what the desk chose; a block without a period falls back to
+ * the činnosti it carries. Tolerant: nothing known = all.
+ */
+export function windowActivityIds(b: Pick<ClubBlockView, 'fromDate' | 'toDate' | 'dailyFrom' | 'dailyTo' | 'activityIds'>, order?: RoutedOrder): string[] | null {
+  const all = routedActivities(order).map((a) => a.activityId);
+  if (all.length < 2) return null;
+  const period = (order?.requestedRanges ?? []).find(
+    (r) => r.fromDate === b.fromDate && (r.toDate || r.fromDate) === (b.toDate || b.fromDate) && hh(r.dailyFrom) === hh(b.dailyFrom) && hh(r.dailyTo) === hh(b.dailyTo),
+  );
+  if (period !== undefined) return normalizeAllowed(period.activityIds, all);
+  return normalizeAllowed(Array.isArray(b.activityIds) ? b.activityIds : null, all);
+}
+
+/** "Spiroergometrie" for a restricted window of the order, null when it allows everything. */
+export const windowActivityNames = (b: Parameters<typeof windowActivityIds>[0], order?: RoutedOrder): string | null =>
+  allowedNames(windowActivityIds(b, order), routedActivities(order));
+
+export const windowRange = (b: ClubBlockView, order?: RoutedOrder): OrderRange => {
+  const activityIds = windowActivityIds(b, order);
+  return { fromDate: b.fromDate, toDate: b.toDate, dailyFrom: b.dailyFrom, dailyTo: b.dailyTo, ...(activityIds !== null ? { activityIds } : {}) };
+};
 
 /** "Po 26. 10." for one day, "26.–27. 10." within a month, "30. 10. – 2. 11." across months. */
 export function windowDates(from: string, to: string): string {
@@ -34,10 +66,12 @@ export function windowDates(from: string, to: string): string {
   return fm === tm ? `${fd}.–${td}. ${fm}.` : `${fd}. ${fm}. – ${td}. ${tm}.`;
 }
 
-/** "Po 26. 10. · 08:00–12:00" - the date and the hours of one window. */
-export function windowLabel(b: Pick<ClubBlockView, 'fromDate' | 'toDate' | 'dailyFrom' | 'dailyTo'>): string {
-  const dates = windowDates(b.fromDate, b.toDate);
-  return b.dailyFrom && b.dailyTo ? `${dates} · ${b.dailyFrom}–${b.dailyTo}` : dates;
+/** "Po 26. 10. · 08:00–12:00", and "· Spiroergometrie" when the window allows only some činnosti of the order. */
+export function windowLabel(b: Pick<ClubBlockView, 'fromDate' | 'toDate' | 'dailyFrom' | 'dailyTo'> & { activityIds?: string[] }, order?: RoutedOrder): string {
+  const only = windowActivityNames({ activityIds: [], ...b }, order);
+  const base = windowDates(b.fromDate, b.toDate);
+  const withHours = b.dailyFrom && b.dailyTo ? `${base} · ${b.dailyFrom}–${b.dailyTo}` : base;
+  return only === null ? withHours : `${withHours} · ${only}`;
 }
 
 export const termsWord = (n: number): string => plural(n, ['termín', 'termíny', 'termínů']);
@@ -84,12 +118,12 @@ export function heldMinutes(order: Pick<ClubOrderView, 'blocks'>): number | null
 }
 
 /** The windows as one day-pick each, the same way pick mode shows an order being edited. */
-function windowPicks(windows: readonly ClubBlockView[]): PickedTime[] {
+function windowPicks(windows: readonly ClubBlockView[], order?: RoutedOrder): PickedTime[] {
   let n = 0;
   return windows.flatMap((b) =>
     b.calendarIds[0] === undefined
       ? []
-      : picksFromRanges([windowRange(b)], b.calendarIds[0], (id) => id).map((p) => ({ ...p, id: `w${n++}` })),
+      : picksFromRanges([windowRange(b, order)], b.calendarIds[0], (id) => id).map((p) => ({ ...p, id: `w${n++}` })),
   );
 }
 
@@ -97,9 +131,9 @@ function windowPicks(windows: readonly ClubBlockView[]): PickedTime[] {
  * The range set and the calendars an `update` sends so that the order keeps every window but `removeBlockId`.
  * Built exactly as pick mode builds them (same merging), but past windows are kept.
  */
-export function rangesWithout(order: Pick<ClubOrderView, 'blocks'>, removeBlockId: string | null): { ranges: OrderRange[]; calendarIds: string[] } {
+export function rangesWithout(order: Pick<ClubOrderView, 'blocks'> & RoutedOrder, removeBlockId: string | null): { ranges: OrderRange[]; calendarIds: string[] } {
   const keep = orderWindows(order).filter((b) => b.id !== removeBlockId);
-  const picks = windowPicks(keep);
+  const picks = windowPicks(keep, order);
   return { ranges: ordersRangesOf(picks, LONG_AGO), calendarIds: pickedCalendarIds(picks) };
 }
 

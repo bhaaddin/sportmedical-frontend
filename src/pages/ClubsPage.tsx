@@ -29,10 +29,11 @@
  * needs all of that and the day it is due is the wrong day to find it missing.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { invalidateClubWorld } from '../components/clubs/clubWorld';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Alert, Box, Button, InputAdornment, Skeleton, Stack, TextField, Typography } from '@mui/material';
 import { Search } from '@mui/icons-material';
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { clubsApi } from '../api/clubs';
 import type { Club } from '../api/clubs';
@@ -105,6 +106,7 @@ export default function ClubsPage() {
   const blocksQuery = useQuery({
     queryKey: ['club-blocks', 'list'],
     queryFn: () => clubBlocksApi.list(),
+    placeholderData: keepPreviousData,
   });
   const allBlocks = useMemo<ClubBlockView[]>(() => blocksQuery.data ?? [], [blocksQuery.data]);
 
@@ -202,9 +204,7 @@ export default function ClubsPage() {
   }, [selectedId, focusBlockId, blocksQuery.data]);
 
   const reload = () => {
-    void queryClient.invalidateQueries({ queryKey: ['clubs'] });
-    void queryClient.invalidateQueries({ queryKey: ['partner-orders'] });
-    void queryClient.invalidateQueries({ queryKey: ['club-blocks'] });
+    void invalidateClubWorld(queryClient);
   };
 
   const remove = async (id: string, name: string) => {

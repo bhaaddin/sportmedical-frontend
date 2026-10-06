@@ -166,7 +166,7 @@ describe('desktop · 1440', () => {
     const panel = screen.getByTestId('pick-panel');
     expect(panel).toHaveAttribute('data-layout', 'side');
     /* The one thing the desk watches: how many slots are still missing, per činnost and in total. */
-    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Zbývá 10 slotů');
+    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Zbývá 3 sloty');
     expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: 10 × Základní prohlídka (30 min)');
     expect(within(panel).getByTestId('pick-minutes')).toHaveTextContent(/Vybráno 0\smin z 300\smin/);
     expect(within(panel).getByTestId('pick-activity')).toHaveTextContent(/Základní prohlídka \(30 min\) · 10 hráčů.*zbývá 10 slotů/);
@@ -208,7 +208,7 @@ describe('desktop · 1440', () => {
     await waitFor(() => expect(rows()).toHaveLength(1));
     fireEvent.click(within(screen.getByTestId('pick-panel')).getByRole('button', { name: /Odebrat termín/ }));
     expect(rows()).toHaveLength(0);
-    expect(within(screen.getByTestId('pick-panel')).getByTestId('pick-slots')).toHaveTextContent('Zbývá 10 slotů');
+    expect(within(screen.getByTestId('pick-panel')).getByTestId('pick-slots')).toHaveTextContent('Zbývá 3 sloty');
   });
 
   it('a picked range is stretched by its edge, moved by its body, and the calculator follows', async () => {
@@ -312,7 +312,7 @@ describe('tablet · 834', () => {
     await startPicking();
     const panel = screen.getByTestId('pick-panel');
     expect(panel).toHaveAttribute('data-layout', 'bottom-bar');
-    expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Zbývá 10 slotů');
+    expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Zbývá 3 sloty');
     expect(within(panel).queryByTestId('pick-list')).not.toBeInTheDocument();
     paint(9 * 60, 10 * 60);
     await waitFor(() => expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Zbývá 7 slotů'));
@@ -329,7 +329,7 @@ describe('phone · 390', () => {
     expect(screen.queryByTestId('phone-calendar')).not.toBeInTheDocument();
     const panel = screen.getByTestId('pick-panel');
     expect(panel).toHaveAttribute('data-layout', 'bottom-bar');
-    expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Zbývá 10 slotů');
+    expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Zbývá 3 sloty');
     expect(within(panel).getByTestId('pick-progress')).toBeInTheDocument();
     fireEvent.click(within(panel).getByRole('button', { name: 'Zrušit' }));
     expect(screen.queryByTestId('pick-panel')).not.toBeInTheDocument();
@@ -600,27 +600,15 @@ describe('two activities: the slots fall in the order the činnosti are listed',
 });
 
 describe('marked places and editing an existing order', () => {
-  it('places marked before the order was set up become its first picks', async () => {
+  it('places marked in the grid offer no club entry (they only book a patient or block time)', async () => {
     renderPage(VIEWPORTS.desktop);
-    const user = userEvent.setup();
     const col = await screen.findByTestId('sub-column-c1-' + DAY);
     const init = { button: 0, clientX: 100, pointerId: 1, ctrlKey: true };
     fireEvent.pointerDown(col, { ...init, clientY: yAt(11 * 60) });
     fireEvent.pointerMove(col, { ...init, clientY: yAt(11 * 60 + 30) });
     fireEvent.pointerUp(col, { ...init, clientY: yAt(11 * 60 + 30) });
-    fireEvent.click(await screen.findByRole('button', { name: 'Rezervovat pro klub' }));
-    const setup = await screen.findByTestId('pick-setup');
-    await user.click(within(setup).getByLabelText('Klub'));
-    await user.click(await screen.findByRole('option', { name: 'FK Slaný' }));
-    await user.click(within(setup).getByLabelText('Služba'));
-    await user.click(await screen.findByRole('option', { name: 'Diagnostika' }));
-    await user.click(await within(setup).findByRole('checkbox', { name: /Základní prohlídka/ }));
-    await user.type(within(setup).getByRole('textbox', { name: 'Počet hráčů, Základní prohlídka' }), '10');
-    await user.click(screen.getByRole('button', { name: 'Vybrat termíny v kalendáři' }));
-    await screen.findByTestId('pick-panel');
-    await waitFor(() => expect(rows()).toHaveLength(1));
-    expect(rows()[0]).toMatch(/11:00–12:00 · 60 min/);
-    expect(within(screen.getByTestId('pick-panel')).getByTestId('pick-slots')).toHaveTextContent('Zbývá 8 slotů');
+    await screen.findByTestId('selection-tray');
+    expect(screen.queryByRole('button', { name: 'Rezervovat pro klub' })).not.toBeInTheDocument();
   });
 
   const editSession = {
@@ -747,8 +735,10 @@ describe('a club that already has a live order of this služba', () => {
     expect(within(panel).getByTestId('pick-note')).toHaveTextContent('Přidáno do objednávky KO-00000007');
     expect(createStaff).not.toHaveBeenCalled();
 
-    /* The new player counts are ADDED to the old: the same činnost, 10 + 10. */
-    expect(within(panel).getByTestId('pick-needs')).toHaveTextContent('20 hráčů');
+    /* The new player counts are ADDED to the old (10 + 10); the panel shows only the ADDITIONAL need: 10 players. */
+    expect(within(panel).getByTestId('pick-additional')).toHaveTextContent('Navíc k původní objednávce');
+    expect(within(panel).getByTestId('pick-needs')).toHaveTextContent('10 hráčů');
+    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Zbývá 3 sloty');
   });
 
   it('saving after "Přidat" sends ONE update: summed players, every window, the order own payment and note', async () => {

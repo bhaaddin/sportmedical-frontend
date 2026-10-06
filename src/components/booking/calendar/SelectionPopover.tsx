@@ -1,6 +1,5 @@
 import { Box, ButtonBase, MenuItem, MenuList, Popover, Typography } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { DESIGN } from "../../../theme";
 import { GRID_TEXT } from "../grid/gridText";
@@ -24,13 +23,11 @@ export interface SelectionPopoverProps {
   caption?: string;
   mayBook: boolean;
   mayBlock: boolean;
-  /** Without a handler "Rezervovat pro klub" is not offered. */
-  onClub?: () => void;
   onBook?: () => void;
   onBlock?: () => void;
   onClose: () => void;
   /** Overrides for the hint lines (a day range reads differently from a time). */
-  hints?: Partial<{ book: string; block: string; club: string }>;
+  hints?: Partial<{ book: string; block: string }>;
 }
 
 function Action({
@@ -80,7 +77,6 @@ export function SelectionPopover({
   caption,
   mayBook,
   mayBlock,
-  onClub,
   onBook,
   onBlock,
   onClose,
@@ -129,14 +125,6 @@ export function SelectionPopover({
               primary={GRID_TEXT.blockTime}
               secondary={hints?.block ?? GRID_TEXT.blockTimeHint}
               onClick={onBlock}
-            />
-          ) : null}
-          {mayBook && onClub ? (
-            <Action
-              icon={<GroupsOutlinedIcon fontSize="small" />}
-              primary={GRID_TEXT.bookClub}
-              secondary={hints?.club ?? GRID_TEXT.bookClubHint}
-              onClick={onClub}
             />
           ) : null}
         </MenuList>

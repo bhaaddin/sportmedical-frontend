@@ -122,22 +122,7 @@ describe('dragging on the grid', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('hands a club reservation on with the range as instants', () => {
-    const onClub = vi.fn();
-    renderGrid({ onClub });
-    const column = drag(10 * 60, 10 * 60 + 40);
-    release(column, 10 * 60 + 40);
-    fireEvent.click(screen.getByRole('menuitem', { name: /Rezervovat pro klub/ }));
-    expect(onClub).toHaveBeenCalledWith(
-      expect.objectContaining({
-        calendarId: 'c1',
-        startUtc: '2026-09-23T08:00:00.000Z',
-        endUtc: '2026-09-23T09:00:00.000Z',
-      }),
-    );
-  });
-
-  it('does not offer the club when nobody takes it', () => {
+  it('never offers a club reservation: marked time books a patient or blocks time', () => {
     renderGrid();
     const column = drag(10 * 60, 10 * 60);
     release(column, 10 * 60);

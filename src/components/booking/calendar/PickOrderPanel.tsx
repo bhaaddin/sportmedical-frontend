@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Alert, Box, Button, IconButton, LinearProgress, Paper, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, IconButton, LinearProgress, Paper, Stack, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import type { Device } from "../../../layout/useDevice";
 import { formatMinutes, plural } from "../../clubs/blockLogic";
 import type { ActivityCoverage, Coverage } from "../../clubs/order/coverage";
+import { allowedKey, firstWord, normalizeAllowed, type RoutedActivity } from "../../clubs/order/routing";
 import { pickedLabel, type PickedTime } from "./multiSelect";
 
 /*
@@ -37,6 +38,13 @@ export interface PickOrderPanelProps {
   onRemoveConflict?: (() => void) | null;
   /** The 409 names athletes whose bookings the change would cancel (editing only), or null. */
   athletesAffected?: number | null;
+  /** Who they are ("Jan Novák (Spiroergometrie)") and whether the cause is a činnost taken out of a window. */
+  athleteNames?: readonly string[];
+  athletesRemovedFromWindow?: boolean;
+  /** Etapa 10: the order's činnosti (with players) a picked window can be restricted to; fewer than two = no chips. */
+  activities?: readonly RoutedActivity[];
+  onToggleActivity?: (pickId: string, activityId: string) => void;
+  onAllActivities?: (pickId: string) => void;
   onConfirm: () => void;
   onConfirmCancelling?: () => void;
   onClearPicks: () => void;
@@ -81,6 +89,58 @@ function ActivityRow({ a }: { a: ActivityCoverage }) {
   );
 }
 
+/** The toggle chips of ONE picked window: each činnost of the order (all on by default), "Vše" puts everything back. */
+function ActivityChips({ pick, activities, touch, onToggle, onAll, disabled }: {
+  pick: PickedTime;
+  activities: readonly RoutedActivity[];
+  touch: boolean;
+  onToggle: (pickId: string, activityId: string) => void;
+  onAll: (pickId: string) => void;
+  disabled: boolean;
+}) {
+  const all = activities.map((a) => a.activityId);
+  const allowed = normalizeAllowed(pick.activityIds, all);
+  const height = touch ? 40 : 30;
+  return (
+    <Box data-testid="pick-chips" data-restricted={allowed === null ? "false" : "true"} sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, pb: 0.75, pr: 1 }}>
+      <Chip
+        label="Vše"
+        size="small"
+        clickable
+        disabled={disabled}
+        data-testid="pick-chip-all"
+        aria-pressed={allowed === null}
+        aria-label={`${pickedLabel(pick)}: povolit všechny činnosti`}
+        color={allowed === null ? "primary" : "default"}
+        variant={allowed === null ? "filled" : "outlined"}
+        onClick={() => onAll(pick.id)}
+        sx={{ height, borderRadius: 4, fontWeight: 700 }}
+      />
+      {activities.map((a) => {
+        const on = allowed === null || allowed.includes(a.activityId);
+        return (
+          <Chip
+            key={a.activityId}
+            label={firstWord(a.name)}
+            title={a.name}
+            size="small"
+            clickable
+            disabled={disabled}
+            data-testid="pick-chip"
+            data-on={on ? "true" : "false"}
+            aria-pressed={on}
+            aria-label={`${pickedLabel(pick)}: ${a.name}`}
+            color={on ? "primary" : "default"}
+            variant={on ? "filled" : "outlined"}
+            onClick={() => onToggle(pick.id, a.activityId)}
+            sx={{ height, borderRadius: 4, maxWidth: "100%", opacity: on ? 1 : 0.7, "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" } }}
+          />
+        );
+      })}
+    </Box>
+  );
+}
+
 /** "Navíc 4 h 30 min / 9 slotů": what is picked beyond the need. Information only - nothing is ever trimmed. */
 export const surplusLine = (coverage: Coverage): string => {
   const lengths = coverage.perActivity.filter((x) => x.seats > 0 && x.minutesPerSeat > 0).map((x) => x.minutesPerSeat);
@@ -109,6 +169,11 @@ function Remaining({ coverage, compact }: { coverage: Coverage; compact?: boolea
   }
   return (
     <Box data-testid="pick-summary">
+      {coverage.additional === true ? (
+        <Typography data-testid="pick-additional" variant="caption" sx={{ display: "block", color: "text.secondary", fontWeight: 600 }}>
+          Navíc k původní objednávce
+        </Typography>
+      ) : null}
       <Typography data-testid="pick-slots" sx={{ fontSize: compact ? 20 : 30, fontWeight: 800, lineHeight: 1.1 }}>
         {`Zbývá ${coverage.remainingSlots} ${slotsWord(coverage.remainingSlots)}`}
       </Typography>
@@ -123,6 +188,9 @@ function Details(props: PickOrderPanelProps) {
   const { coverage, picks } = props;
   const sorted = [...picks].sort((a, b) => a.dayKey.localeCompare(b.dayKey) || a.range.start - b.range.start);
   const busy = props.confirming;
+  const routable = props.activities ?? [];
+  /* A činnost with players that no picked window allows (only once something is picked). */
+  const noWindow = picks.length > 0 ? coverage.perActivity.filter((a) => a.noWindow) : [];
   return (
     <Stack spacing={1.75}>
       <Box>
@@ -133,7 +201,7 @@ function Details(props: PickOrderPanelProps) {
       <Stack spacing={0.5} data-testid="pick-needs">
         {coverage.perActivity.map((a) => <ActivityRow key={a.activityId} a={a} />)}
         <Typography variant="caption" data-testid="pick-minutes" sx={{ color: "text.secondary" }}>
-          {`Vybráno ${formatMinutes(coverage.pickedMinutes)} z ${formatMinutes(coverage.neededMinutes)}`}
+          {`${coverage.additional === true ? "Navíc vybráno" : "Vybráno"} ${formatMinutes(coverage.pickedMinutes)} z ${formatMinutes(coverage.neededMinutes)}`}
         </Typography>
       </Stack>
 
@@ -142,6 +210,14 @@ function Details(props: PickOrderPanelProps) {
           <Typography variant="body2" sx={{ fontWeight: 600 }}>Klub žádá:</Typography>
           {props.requested.map((line) => <Typography key={line} variant="body2">{line}</Typography>)}
         </Alert>
+      ) : null}
+
+      {noWindow.length > 0 ? (
+        <Stack spacing={0.5} data-testid="pick-no-window">
+          {noWindow.map((a) => (
+            <Alert key={a.activityId} severity="warning" sx={{ py: 0.25 }}>{`Pro ${a.name} zatím není žádný termín`}</Alert>
+          ))}
+        </Stack>
       ) : null}
 
       {props.note !== null ? <Alert severity="info" data-testid="pick-note" sx={{ py: 0.25 }}>{props.note}</Alert> : null}
@@ -163,15 +239,21 @@ function Details(props: PickOrderPanelProps) {
               <Box
                 key={p.id}
                 data-testid="pick-row"
-                sx={{ display: "flex", alignItems: "center", gap: 0.5, pl: 1.25, borderRadius: 2, bgcolor: "action.hover" }}
+                data-activities={allowedKey(normalizeAllowed(p.activityIds, routable.map((a) => a.activityId)))}
+                sx={{ pl: 1.25, borderRadius: 2, bgcolor: "action.hover" }}
               >
-                <Typography variant="body2" sx={{ flex: 1, minWidth: 0, fontVariantNumeric: "tabular-nums" }}>
-                  {`${pickedLabel(p)} · ${p.range.end - p.range.start} min`}
-                  <Typography component="span" variant="caption" sx={{ color: "text.secondary", ml: 0.75 }}>{props.calendarName(p.calendarId)}</Typography>
-                </Typography>
-                <IconButton size="small" aria-label={`Odebrat termín ${pickedLabel(p)}`} onClick={() => props.onRemovePick(p.id)} disabled={busy} sx={{ width: 36, height: 36 }}>
-                  <CloseIcon fontSize="small" />
-                </IconButton>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Typography variant="body2" sx={{ flex: 1, minWidth: 0, fontVariantNumeric: "tabular-nums" }}>
+                    {`${pickedLabel(p)} · ${p.range.end - p.range.start} min`}
+                    <Typography component="span" variant="caption" sx={{ color: "text.secondary", ml: 0.75 }}>{props.calendarName(p.calendarId)}</Typography>
+                  </Typography>
+                  <IconButton size="small" aria-label={`Odebrat termín ${pickedLabel(p)}`} onClick={() => props.onRemovePick(p.id)} disabled={busy} sx={{ width: 36, height: 36 }}>
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+                {routable.length > 1 && props.onToggleActivity !== undefined && props.onAllActivities !== undefined ? (
+                  <ActivityChips pick={p} activities={routable} touch={props.device !== "desktop"} onToggle={props.onToggleActivity} onAll={props.onAllActivities} disabled={busy} />
+                ) : null}
               </Box>
             ))}
           </Stack>
@@ -189,6 +271,11 @@ function Details(props: PickOrderPanelProps) {
           }
         >
           {props.failure.message}
+          {props.athletesRemovedFromWindow === true ? (
+            <Box component="div" data-testid="pick-removed-from-window" sx={{ mt: 0.5 }}>
+              {`Činnost už v termínu nebude povolena. Rezervace by se zrušily: ${(props.athleteNames ?? []).join(", ")}`}
+            </Box>
+          ) : null}
           {props.failure.conflict !== null ? <Box component="div" sx={{ fontWeight: 700 }}>{`Kolize: ${props.failure.conflict}`}</Box> : null}
           {props.athletesAffected != null && props.onConfirmCancelling ? (
             <Button color="error" variant="outlined" size="small" onClick={props.onConfirmCancelling} disabled={busy} sx={{ mt: 1 }}>
@@ -295,9 +382,18 @@ export function PickOrderPanel(props: PickOrderPanelProps) {
           <Box sx={{ maxHeight: phone ? "50vh" : "55vh", overflowY: "auto", py: 0.5 }}>
             <Details {...props} />
           </Box>
-        ) : props.note !== null ? (
-          <Typography variant="caption" data-testid="pick-note-inline" sx={{ color: "text.secondary" }}>{props.note}</Typography>
-        ) : null}
+        ) : (
+          <>
+            {props.picks.length > 0 && coverage.perActivity.some((a) => a.noWindow) ? (
+              <Typography variant="caption" data-testid="pick-no-window-inline" sx={{ color: "warning.main", fontWeight: 600 }}>
+                {coverage.perActivity.filter((a) => a.noWindow).map((a) => `Pro ${a.name} zatím není žádný termín`).join(" · ")}
+              </Typography>
+            ) : null}
+            {props.note !== null ? (
+              <Typography variant="caption" data-testid="pick-note-inline" sx={{ color: "text.secondary" }}>{props.note}</Typography>
+            ) : null}
+          </>
+        )}
         <ConfirmRow {...props} />
       </Stack>
     </Paper>
