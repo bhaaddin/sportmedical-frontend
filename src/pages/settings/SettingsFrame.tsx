@@ -132,10 +132,22 @@ export function SettingsNav({
         </Typography>
       )}
 
-      {sections.map((section) => {
+      {sections.map((section, sectionIndex) => {
         const expanded = compact || searching || openId === section.id;
         return (
-        <Box key={section.id} sx={compact ? { mt: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.5 } : { mt: 0.5 }}>
+        <Box
+          key={section.id}
+          sx={
+            compact
+              ? { mt: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.5 }
+              : {
+                  mt: sectionIndex === 0 ? 0 : 1.25,
+                  pt: sectionIndex === 0 ? 0 : 1.25,
+                  borderTop: sectionIndex === 0 ? 0 : '1px solid',
+                  borderColor: settingsLine,
+                }
+          }
+        >
           <Box
             {...(compact
               ? { component: RouterLink, to: groupPath(section.id), 'aria-current': hereGroup === section.id ? ('page' as const) : undefined }
@@ -148,7 +160,19 @@ export function SettingsNav({
                   onClick: () => setOpenId((id) => (id === section.id ? null : section.id)),
                 })}
             sx={[
-              TYPE.label,
+              compact
+                ? TYPE.label
+                : {
+                    // A nav heading must clearly outrank the items under it: bolder, darker
+                    // and larger than the field-label caption style used elsewhere, never
+                    // the same muted caption an item or a hint uses.
+                    fontSize: 13,
+                    fontWeight: 800,
+                    lineHeight: 1.4,
+                    letterSpacing: '0.07em',
+                    textTransform: 'uppercase' as const,
+                    color: 'text.primary',
+                  },
               {
                 display: compact ? 'block' : 'flex',
                 alignItems: 'center',
@@ -164,7 +188,6 @@ export function SettingsNav({
                 border: 0,
                 bgcolor: 'transparent',
                 cursor: 'pointer',
-                color: 'text.primary',
                 borderRadius: 1,
                 ...(compact ? { px: 0 } : {}),
                 '&:hover': { bgcolor: settingsHover },
@@ -176,7 +199,7 @@ export function SettingsNav({
             {!compact && (
               <ExpandMore
                 aria-hidden
-                sx={{ fontSize: 20, color: settingsGrey, transition: 'transform 120ms', transform: expanded ? 'rotate(180deg)' : 'none' }}
+                sx={{ fontSize: 22, color: 'text.primary', transition: 'transform 120ms', transform: expanded ? 'rotate(180deg)' : 'none' }}
               />
             )}
           </Box>
@@ -185,7 +208,18 @@ export function SettingsNav({
             id={compact ? undefined : `settings-group-${section.id}-items`}
             role={compact ? undefined : 'group'}
             aria-labelledby={compact ? undefined : `settings-group-${section.id}`}
-            sx={compact ? { display: 'contents' } : undefined}
+            sx={
+              compact
+                ? { display: 'contents' }
+                : {
+                    // A rule down the left ties the items back to their heading, so a group
+                    // reads as one nested list rather than a second row of headings.
+                    ml: 1.75,
+                    pl: 1.25,
+                    borderLeft: '1px solid',
+                    borderColor: settingsLine,
+                  }
+            }
           >
           {section.items.map((item) => {
             const active = here?.item.id === item.id && here?.section.id === section.id;
@@ -218,16 +252,19 @@ export function SettingsNav({
                         minHeight: 40,
                         px: 1.5,
                         py: 0.75,
-                        fontSize: 14.5,
+                        fontSize: 14,
                         lineHeight: 1.35,
                         textDecoration: 'none',
                         borderLeft: '3px solid',
                         borderColor: active ? 'primary.main' : 'transparent',
                         borderRadius: '0 8px 8px 0',
-                        color: 'text.primary',
-                        fontWeight: active ? 700 : 500,
+                        // A row that is not where you are reads as a plain, muted option; only
+                        // the one you are on earns full ink, bold weight and the forest bar, so
+                        // no item ever looks as heavy as the group heading above it.
+                        color: active ? 'text.primary' : settingsGrey,
+                        fontWeight: active ? 700 : 400,
                         bgcolor: active ? settingsSelected : 'transparent',
-                        '&:hover': { bgcolor: active ? settingsSelected : settingsHover },
+                        '&:hover': { bgcolor: active ? settingsSelected : settingsHover, color: 'text.primary' },
                         '&:focus-visible': { outline: '3px solid', outlineColor: 'primary.main', outlineOffset: -3 },
                       }
                 }
