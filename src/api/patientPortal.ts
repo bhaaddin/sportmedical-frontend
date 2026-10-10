@@ -40,6 +40,13 @@ export interface PortalAppointment {
    * worked out by the server); null when they no longer can, or it is over.
    */
   cancelUntilUtc: string | null;
+  /**
+   * Etapa 12: what the visit costs. `agreedPriceCzk` is the price the clinic
+   * agreed with this patient (null when the price list applies); `listPriceCzk`
+   * is the list's figure. Both absent on an older API - read as "no price".
+   */
+  agreedPriceCzk?: number | null;
+  listPriceCzk?: number | null;
 }
 
 export interface PortalDocument {

@@ -19,9 +19,12 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Alert, Box, Button, CircularProgress, Stack, Typography,
 } from '@mui/material';
+import { activitiesApi } from '../../api/activities';
+import { shownPrice } from '../../components/booking/grid/appointmentPrice';
 import { SectionLabel, StatusChip } from '../../components/ui';
 import type { ChipTone } from '../../components/ui';
 import { ResponsiveDataList } from '../../components/ui/ResponsiveDataList';
@@ -114,7 +117,23 @@ function WhatCell({ appointment }: { appointment: PatientAppointment }) {
   );
 }
 
-const COLUMNS: DataColumn<PatientAppointment>[] = [
+/*
+ * Etapa 12, "ceny všude": the clinic-wide list carries the činnost's name and
+ * nothing about money, so the price is the catalogue's figure for that name -
+ * the same fallback the overview's visit history uses. A name the catalogue
+ * does not know reads "bez ceny" rather than a guess.
+ */
+type PriceOf = (appointment: PatientAppointment) => ReturnType<typeof shownPrice>;
+
+function PriceCell({ appointment, priceOf }: { appointment: PatientAppointment; priceOf: PriceOf }) {
+  return (
+    <Box data-testid="row-price" sx={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+      {priceOf(appointment).text}
+    </Box>
+  );
+}
+
+const columnsWith = (priceOf: PriceOf): DataColumn<PatientAppointment>[] => [
   {
     key: 'date',
     header: 'Datum',
@@ -138,6 +157,7 @@ const COLUMNS: DataColumn<PatientAppointment>[] = [
     ),
   },
   { key: 'what', header: 'Činnost', tablet: true, cell: (a) => <WhatCell appointment={a} /> },
+  { key: 'price', header: 'Cena', align: 'right', tablet: true, cell: (a) => <PriceCell appointment={a} priceOf={priceOf} /> },
   {
     key: 'status',
     header: 'Stav',
@@ -147,12 +167,15 @@ const COLUMNS: DataColumn<PatientAppointment>[] = [
   },
 ];
 
-function AppointmentRows({ appointments, label }: { appointments: PatientAppointment[]; label: string }) {
+function AppointmentRows({
+  appointments, label, priceOf,
+}: { appointments: PatientAppointment[]; label: string; priceOf: PriceOf }) {
+  const columns = useMemo(() => columnsWith(priceOf), [priceOf]);
   return (
     <ResponsiveDataList
       rows={appointments}
       rowKey={(a) => a.id}
-      columns={COLUMNS}
+      columns={columns}
       ariaLabel={label}
       renderCard={(a) => (
         <Stack spacing={0.5}>
@@ -166,6 +189,10 @@ function AppointmentRows({ appointments, label }: { appointments: PatientAppoint
             {formatPragueTime(a.startTime)} – {formatPragueTime(a.endTime)}
           </Typography>
           <WhatCell appointment={a} />
+          {/* The phone's card: the price as its own line under the činnost. */}
+          <Typography variant="body2" component="div" sx={{ fontWeight: 600 }}>
+            <PriceCell appointment={a} priceOf={priceOf} />
+          </Typography>
         </Stack>
       )}
     />
@@ -209,6 +236,18 @@ export default function PatientAppointmentsPage() {
 
   const { upcoming, past } = useMemo(() => splitAppointments(mine), [mine]);
 
+  /* The catalogue, for the price of each činnost by name (this route sends no money). */
+  const activitiesQuery = useQuery({
+    queryKey: ['activities'],
+    queryFn: () => activitiesApi.list(),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const priceOf = useMemo<PriceOf>(() => {
+    const byName = new Map((activitiesQuery.data?.activities ?? []).map((a) => [a.name, a.priceCzk]));
+    return (a) => shownPrice(null, byName.get(a.eventName) ?? null);
+  }, [activitiesQuery.data]);
+
   if (failed) {
     return <Alert severity="warning">Termíny se nepodařilo načíst. Zkuste to prosím znovu.</Alert>;
   }
@@ -247,7 +286,7 @@ export default function PatientAppointmentsPage() {
             {patient.firstName} nemá objednaný žádný termín.
           </Typography>
         ) : (
-          <AppointmentRows appointments={upcoming} label="Nadcházející termíny" />
+          <AppointmentRows appointments={upcoming} label="Nadcházející termíny" priceOf={priceOf} />
         )}
       </Box>
 
@@ -262,7 +301,7 @@ export default function PatientAppointmentsPage() {
             Zatím tu žádný termín není.
           </Typography>
         ) : (
-          <AppointmentRows appointments={past} label="Historie termínů" />
+          <AppointmentRows appointments={past} label="Historie termínů" priceOf={priceOf} />
         )}
       </Box>
 

@@ -10,6 +10,13 @@ import { VIEWPORTS, setViewport } from '../../test/viewport';
 
 const readBooking = vi.fn();
 const submitFeedback = vi.fn();
+/* The public offer, for the price of the booking's činnost (Etapa 12). */
+const bookableOffer = vi.fn();
+
+vi.mock('../../api/publicBooking', async () => {
+  const actual = await vi.importActual<typeof import('../../api/publicBooking')>('../../api/publicBooking');
+  return { ...actual, bookableOffer };
+});
 
 vi.mock('../../api/publicManage', async () => {
   const actual = await vi.importActual<typeof import('../../api/publicManage')>('../../api/publicManage');
@@ -62,6 +69,9 @@ beforeEach(() => {
   setViewport(VIEWPORTS.desktop);
   readBooking.mockReset().mockResolvedValue(booking);
   submitFeedback.mockReset().mockResolvedValue(undefined);
+  bookableOffer.mockReset().mockResolvedValue([
+    { id: 's1', name: 'Prohlídky', description: '', activities: [{ id: 'act-1', name: 'Základní sportovní prohlídka', priceCzk: 1600 }] },
+  ]);
 });
 
 describe('/rezervace/:token', () => {
@@ -75,6 +85,29 @@ describe('/rezervace/:token', () => {
     expect(screen.getByRole('button', { name: 'Zrušit termín' })).toBeInTheDocument();
     // The old hard-coded document reminder is gone: documents are the činnost's setting now.
     expect(screen.queryByText(/výpis ze zdravotní dokumentace/i)).not.toBeInTheDocument();
+  });
+
+  /* Etapa 12, "ceny všude": the patient sees what they pay - the booking's own
+     price when the server sends one, the public offer's otherwise; an agreed
+     price as the plain amount, never the list it was adjusted from. */
+  it('shows the price from the public offer when the booking carries none', async () => {
+    renderManage();
+    expect(await screen.findByTestId('price-line')).toHaveTextContent('Cena: 1 600 Kč');
+    expect(bookableOffer).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows an agreed price plain, without asking the offer', async () => {
+    readBooking.mockResolvedValue({ ...booking, agreedPriceCzk: 1200, listPriceCzk: 1600 });
+    renderManage();
+    expect(await screen.findByTestId('price-line')).toHaveTextContent('Cena: 1 200 Kč');
+    expect(screen.getByTestId('price-line')).not.toHaveTextContent('upraveno');
+    expect(bookableOffer).not.toHaveBeenCalled();
+  });
+
+  it('says "Cena na dotaz" when nobody knows a price', async () => {
+    bookableOffer.mockResolvedValue([]);
+    renderManage();
+    expect(await screen.findByTestId('price-line')).toHaveTextContent('Cena na dotaz');
   });
 
   it('a link that finds nothing says so, with the clinic\'s number', async () => {

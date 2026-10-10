@@ -24,8 +24,11 @@ const getById = vi.fn();
 const list = vi.fn();
 const search = vi.fn();
 
+const listActivities = vi.fn();
+
 vi.mock('../api/appointments', () => ({ appointmentsApi: { range } }));
 vi.mock('../api/patients', () => ({ patientsApi: { getById, list, search } }));
+vi.mock('../api/activities', () => ({ activitiesApi: { list: listActivities } }));
 
 const PEOPLE: Record<string, { id: string; firstName: string; lastName: string; dateOfBirth: string }> = {
   p1: { id: 'p1', firstName: 'Jana', lastName: 'Marková', dateOfBirth: '1990-01-02' },
@@ -41,6 +44,7 @@ beforeEach(() => {
   list.mockReset().mockResolvedValue({ items: [], totalCount: 137, page: 1, pageSize: 1 });
   search.mockReset().mockResolvedValue([]);
   range.mockReset().mockResolvedValue([]);
+  listActivities.mockReset().mockResolvedValue({ activities: [{ id: 'a1', name: 'Kontrola', priceCzk: 900 }] });
   setViewport(VIEWPORTS.desktop);
 });
 
@@ -317,4 +321,55 @@ describe('three layouts', () => {
     const card = await panelAt('Čekárna');
     expect(await card.findByText('Čekárna je prázdná.')).toBeInTheDocument();
   });
+});
+
+/*
+ * Etapa 12, "ceny všude": the plocha says what the day earns and what each
+ * visit costs - the agreed price first, the row's list price next, the
+ * catalogue last. A cancellation and a no-show earn nothing.
+ */
+describe('the prices on the plocha', () => {
+  const kpi = async (label: string) =>
+    within((await screen.findByText(label)).closest('.MuiPaper-root') as HTMLElement);
+  const panelAt = async (title: string) =>
+    within((await screen.findByText(title, { selector: '.MuiTypography-overline' })).closest('[data-panel]') as HTMLElement);
+
+  it('sums today\'s standing visits into a "Dnes" tile, agreed prices included', async () => {
+    range.mockResolvedValue([
+      { ...at(8, 0, 'a', 'p1'), agreedPriceCzk: null, listPriceCzk: 1600 },  // the list stands
+      { ...at(9, 2, 'b', 'p2'), agreedPriceCzk: 1200, listPriceCzk: 1600 },  // agreed, checked in
+      at(10, 0, 'c', 'p1'),                                                  // no price on the row: the catalogue's 900
+      { ...at(11, 4, 'd', 'p2'), agreedPriceCzk: null, listPriceCzk: 1600 }, // cancelled: nothing
+      { ...at(12, 5, 'e', 'p2'), agreedPriceCzk: null, listPriceCzk: 1600 }, // no-show: nothing
+    ]);
+
+    renderDashboard();
+
+    /* 1 600 + 1 200 + the catalogue's 900, once the catalogue has answered. */
+    expect(await (await kpi('Dnes')).findByText('3 700 Kč')).toBeInTheDocument();
+    expect(listActivities).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks for the catalogue only when some row carries no price', async () => {
+    range.mockResolvedValue([{ ...at(8, 0, 'a', 'p1'), agreedPriceCzk: null, listPriceCzk: 1600 }]);
+    renderDashboard();
+    expect((await kpi('Dnes')).getByText('1 600 Kč')).toBeInTheDocument();
+    expect(listActivities).not.toHaveBeenCalled();
+  });
+
+  it.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet], ['phone', VIEWPORTS.phone]])(
+    '%s: every row in Objednaní and Čekárna carries its price under the činnost',
+    async (_n, width) => {
+      setViewport(width);
+      range.mockResolvedValue([
+        { ...at(8, 0, 'a', 'p1'), agreedPriceCzk: 1200, listPriceCzk: 1600 },
+        { ...at(9, 2, 'b', 'p2'), agreedPriceCzk: null, listPriceCzk: 1600 },
+      ]);
+
+      renderDashboard();
+
+      expect(await (await panelAt('Objednaní')).findByText('Kontrola · 1 200 Kč (upraveno)')).toBeInTheDocument();
+      expect(await (await panelAt('Čekárna')).findByText('Kontrola · 1 600 Kč')).toBeInTheDocument();
+    },
+  );
 });

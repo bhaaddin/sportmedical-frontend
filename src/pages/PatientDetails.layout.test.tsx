@@ -11,7 +11,7 @@
  * with a thumb (44 px).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { setViewport, VIEWPORTS } from '../test/viewport';
@@ -51,7 +51,7 @@ beforeEach(() => {
   ]);
 });
 
-const renderOverview = () =>
+const renderOverview = (upcoming: unknown[] = []) =>
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })}>
       <MemoryRouter initialEntries={['/x']}>
@@ -61,7 +61,7 @@ const renderOverview = () =>
               <Outlet
                 context={{
                   patient: PATIENT, profile: null, documents: [], templates: [], requirements: [],
-                  upcoming: [], displayPhone: '+420 773 539 001', displayEmail: 'bh@example.cz',
+                  upcoming, displayPhone: '+420 773 539 001', displayEmail: 'bh@example.cz',
                   reloadDocuments: vi.fn(),
                 }}
               />
@@ -100,5 +100,48 @@ describe('Přehled on a phone', () => {
 
     const button = await screen.findByRole('button', { name: 'Nové vyšetření' });
     expect(getComputedStyle(button).minHeight).toBe('44px');
+  });
+});
+
+/*
+ * Etapa 12, "ceny všude": the next booking's price is the one the desk agreed
+ * for that visit, before the list price the window carries, before the
+ * catalogue. The visit history's prices come off the catalogue by name (the
+ * clinic-wide list carries no money).
+ */
+describe('prices on the overview', () => {
+  const inWindow = (over: Record<string, unknown> = {}) => ({
+    id: 'w1', calendarId: 'c1', patientId: 'p1', activityId: 'act-1', activityName: 'Kontrola',
+    startUtc: '2099-02-01T08:00:00Z', endUtc: '2099-02-01T08:30:00Z', status: 0,
+    isRunningLate: false, checkedInUtc: null, paperwork: null, ...over,
+  });
+  const nextCard = async () => within((await screen.findByText('Příští termín')).closest('.MuiPaper-root') as HTMLElement);
+
+  it.each([['phone', VIEWPORTS.phone], ['desktop', VIEWPORTS.desktop]])('%s: the next visit shows its agreed price', async (_n, width) => {
+    setViewport(width);
+    listActivities.mockResolvedValue({ activities: [{ id: 'act-1', name: 'Kontrola', priceCzk: 1600 }] });
+    renderOverview([inWindow({ agreedPriceCzk: 1200, listPriceCzk: 1600 })]);
+
+    expect(await (await nextCard()).findByText(/Kontrola · 30 min · 1 200 Kč/)).toBeInTheDocument();
+  });
+
+  it("falls back to the window's list price, then the catalogue", async () => {
+    setViewport(VIEWPORTS.desktop);
+    listActivities.mockResolvedValue({ activities: [{ id: 'act-1', name: 'Kontrola', priceCzk: 900 }] });
+    const { unmount } = renderOverview([inWindow({ agreedPriceCzk: null, listPriceCzk: 1600 })]);
+    expect(await (await nextCard()).findByText(/1 600 Kč/)).toBeInTheDocument();
+    unmount();
+
+    renderOverview([inWindow()]);
+    expect(await (await nextCard()).findByText(/900 Kč/)).toBeInTheDocument();
+  });
+
+  it('prices the visit history off the catalogue by name', async () => {
+    setViewport(VIEWPORTS.desktop);
+    listActivities.mockResolvedValue({ activities: [{ id: 'act-9', name: 'Komplexní prohlídka', priceCzk: 2200 }] });
+    renderOverview();
+
+    const history = await screen.findByRole('list', { name: 'Historie návštěv' });
+    expect(await within(history).findByText(/2 200 Kč/)).toBeInTheDocument();
   });
 });

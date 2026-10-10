@@ -34,6 +34,13 @@ export interface ManagedBooking {
   activityId: string | null;
   /** Until when the patient may still move/cancel it online (clinic setting). */
   canChangeUntilUtc: string | null;
+  /**
+   * Etapa 12: the price, when the server sends it - the agreed figure, or the
+   * list price. Optional because the manage route did not carry money before;
+   * the page falls back to the public offer's price for the činnost.
+   */
+  agreedPriceCzk?: number | null;
+  listPriceCzk?: number | null;
 }
 
 interface ApiResult<T> {

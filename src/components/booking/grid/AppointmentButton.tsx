@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Box, Tooltip, useTheme } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -9,6 +9,8 @@ import {
   type DayAppointment,
 } from "../../../api/bookingContracts";
 import { patientsApi } from "../../../api/patients";
+import { activitiesApi } from "../../../api/activities";
+import { shownPrice } from "./appointmentPrice";
 import { useCalendarDisplay } from "../../../api/displaySettings";
 import { DESIGN } from "../../../theme";
 import { cardTones } from "../calendar/colors";
@@ -17,6 +19,39 @@ import { AppointmentHoverCard } from "./AppointmentHoverCard";
 import { clubLine } from "./clubLine";
 import { DOUBLE_TAP_MS } from "./moveDrag";
 import { shortName } from "./periodTitle";
+
+/*
+ * How many lines of the board's type a grid card can hold (Etapa 12, "ceny
+ * všude"). A line is 11-12 px at line-height 1.25 (~14 px) and the card has
+ * 5 px of padding top and bottom. The price takes a line of its own only
+ * when a fourth line fits; with exactly three it rides on the time line, so
+ * the name and the status·činnost line - what the owner asked to see without
+ * a hover - are never pushed out. Fewer than three: no price on the card,
+ * the hover still has it.
+ */
+const CARD_LINE_PX = 14;
+const CARD_PADDING_PX = 10;
+export function linesThatFit(heightPx: number): number {
+  if (!Number.isFinite(heightPx) || heightPx <= 0) return 0;
+  return Math.floor((heightPx - CARD_PADDING_PX) / CARD_LINE_PX);
+}
+
+/** The card's own height, followed as the grid zooms. 0 until measured (jsdom, first paint). */
+function useMeasuredHeight(enabled: boolean): [React.RefObject<HTMLElement | null>, number] {
+  const ref = useRef<HTMLElement | null>(null);
+  const [height, setHeight] = useState(0);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!enabled || element === null) return undefined;
+    const read = () => setHeight(element.getBoundingClientRect().height);
+    read();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(read);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [enabled]);
+  return [ref, height];
+}
 
 /**
  * One appointment, drawn the board's way (3. 10. 2026): a flat grey card
@@ -155,6 +190,27 @@ export function AppointmentButton({
      a phone's list row is read at arm's length and keeps the larger type. */
   const gridCard = layout === "block";
 
+  /*
+   * The price (Etapa 12): agreed, else the list price the row carries, else the
+   * činnost's catalogue figure. Never on a dense or compact card; on a grid card
+   * only when it is tall enough (see `linesThatFit`); on a list row always.
+   */
+  const fullCard = !compact && !dense;
+  const [cardRef, cardHeight] = useMeasuredHeight(gridCard && fullCard);
+  const lines = gridCard ? linesThatFit(cardHeight) : 99;
+  const showPrice = fullCard && lines >= 3;
+  const priceOwnLine = showPrice && lines >= 4;
+  const rowHasPrice = appointment.agreedPriceCzk != null || appointment.listPriceCzk != null;
+  const activitiesQuery = useQuery({
+    queryKey: ["activities"],
+    queryFn: () => activitiesApi.list(),
+    enabled: showPrice && !rowHasPrice,
+    staleTime: 5 * 60 * 1000,
+  });
+  const cataloguePrice = activitiesQuery.data?.activities.find((a) => a.id === appointment.activityId)?.priceCzk ?? null;
+  const price = shownPrice(appointment, cataloguePrice);
+  const priceText = price.adjusted ? `${price.text} · upraveno` : price.text;
+
   return (
     <Tooltip
       arrow
@@ -190,8 +246,10 @@ export function AppointmentButton({
     <Box
       component="button"
       type="button"
+      ref={cardRef}
       data-grid-item="appointment"
       data-status={tally}
+      data-price-lines={gridCard && fullCard ? lines : undefined}
       onClick={activate}
       aria-haspopup="dialog"
       aria-label={
@@ -283,14 +341,29 @@ export function AppointmentButton({
           <Box
             component="span"
             sx={{
-              display: "block",
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 1,
               fontSize: gridCard ? 11 : 13,
               fontWeight: gridCard ? 600 : 700,
               fontVariantNumeric: "tabular-nums",
               whiteSpace: "nowrap",
             }}
           >
-            {formatPragueTime(appointment.startUtc)} – {formatPragueTime(appointment.endUtc)}
+            <span>
+              {formatPragueTime(appointment.startUtc)} – {formatPragueTime(appointment.endUtc)}
+            </span>
+            {showPrice && !priceOwnLine ? (
+              /* Three lines of room: the price shares the time line, right-aligned, so the
+                 name and the status·činnost line stay whole. */
+              <Box
+                component="span"
+                data-testid="price-line"
+                sx={{ fontWeight: 500, color: DESIGN.muted, overflow: "hidden", textOverflow: "ellipsis" }}
+              >
+                {priceText}
+              </Box>
+            ) : null}
           </Box>
           {patientName ? (
             <Box
@@ -305,6 +378,24 @@ export function AppointmentButton({
               }}
             >
               {patientName}
+            </Box>
+          ) : null}
+          {priceOwnLine ? (
+            /* A fourth line fits: the price is the card's third line, after the name. */
+            <Box
+              component="span"
+              data-testid="price-line"
+              sx={{
+                display: "block",
+                fontSize: 11,
+                fontWeight: 600,
+                fontVariantNumeric: "tabular-nums",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {priceText}
             </Box>
           ) : null}
           {club ? (

@@ -27,7 +27,7 @@ import { calendarsApi } from "../../api/calendars";
 import { patientsApi } from "../../api/patients";
 import { activitiesApi } from "../../api/activities";
 import { BookingApiError } from "../../api/apiError";
-import { isKnownPaperworkReason, isLateStatus, statusName } from "../../api/bookingContracts";
+import { isKnownPaperworkReason, isLateStatus, statusName, statusTally } from "../../api/bookingContracts";
 import type { DayAppointment } from "../../api/bookingContracts";
 import {
   addDaysToDateOnly,
@@ -41,8 +41,10 @@ import { AsyncSection } from "../../components/booking/AsyncSection";
 import { CalendarTogglePills } from "../../components/booking/CalendarTogglePills";
 import { NewAppointmentDialog } from "../../components/booking/NewAppointmentDialog";
 import { errorText } from "../../components/booking/errorText";
-import { formatCzk, formatLongPragueDate, statusTone } from "../../components/booking/appointmentEdit";
+import { formatLongPragueDate, statusTone } from "../../components/booking/appointmentEdit";
+import { dayTotalLine, shownPrice } from "../../components/booking/grid/appointmentPrice";
 import { usePermission } from "../../auth/usePermission";
+import { useIsPhone } from "../../layout/useDevice";
 
 /**
  * The day at a glance — contract 5.12, laid out as `booking.md` part 3 and
@@ -80,6 +82,8 @@ export default function DayOverviewPage() {
   const mayBook = usePermission("bookings.create");
   const mayEdit = usePermission("bookings.edit");
   const queryClient = useQueryClient();
+  /* A phone has no room for a Cena column: the price goes under the name. */
+  const phone = useIsPhone();
 
   const [date, setDate] = useState<string>(toDateOnly(new Date()));
   const [selected, setSelected] = useState<Set<string> | null>(null);
@@ -171,6 +175,17 @@ export default function DayOverviewPage() {
   const priceById = useMemo(
     () => new Map((activitiesQuery.data?.activities ?? []).map((a) => [a.id, a.priceCzk])),
     [activitiesQuery.data],
+  );
+  /* Etapa 12, "ceny všude": agreed, else the row's list price, else the catalogue. */
+  const priceOf = (row: DayAppointment) => shownPrice(row, priceById.get(row.activityId) ?? null);
+  /* The day's money: every row that still stands (a cancelled visit or a no-show earns nothing). */
+  const dayTotal = useMemo(
+    () => dayTotalLine(
+      (dayQuery.data ?? [])
+        .filter((a) => { const tally = statusTally(a.status); return tally !== "cancelled" && tally !== "noShow"; })
+        .map((a) => shownPrice(a, priceById.get(a.activityId) ?? null)),
+    ),
+    [dayQuery.data, priceById],
   );
 
   const patientNameById = useMemo(() => {
@@ -360,8 +375,15 @@ export default function DayOverviewPage() {
 
               {/* ── Who is late, with the one button that fixes it ── */}
               <SoftCard sx={{ p: 0, overflow: "hidden" }}>
-                <Box sx={{ px: 2.5, pt: 2.5, pb: 1.5 }}>
-                  <SectionLabel sx={{ mb: 0 }}>{t("booking.day.lateList")}</SectionLabel>
+                <Box sx={{ px: 2.5, pt: 2.5, pb: 1.5, display: "flex", alignItems: "baseline", gap: 1.5, flexWrap: "wrap" }}>
+                  <SectionLabel sx={{ mb: 0, flex: 1 }}>{t("booking.day.lateList")}</SectionLabel>
+                  {/* The day's money at the top of the list (Etapa 12): what the
+                      non-cancelled visits of this day add up to, agreed prices included. */}
+                  {dayQuery.data ? (
+                    <Typography variant="body2" data-testid="day-total" sx={{ fontWeight: 700, whiteSpace: "nowrap" }}>
+                      {dayTotal}
+                    </Typography>
+                  ) : null}
                 </Box>
                 {arrive.error ? (
                   <Alert
@@ -390,15 +412,34 @@ export default function DayOverviewPage() {
                             <TableCell sx={{ width: 80 }}>Čas</TableCell>
                             <TableCell>Pacient</TableCell>
                             <TableCell>Činnost</TableCell>
-                            <TableCell align="right">Cena</TableCell>
+                            {phone ? null : <TableCell align="right">Cena</TableCell>}
                             {mayEdit ? <TableCell align="right" sx={{ width: 220 }}>Příchod</TableCell> : null}
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {lateRows.map((row) => (
+                          {lateRows.map((row) => {
+                            const price = priceOf(row);
+                            const priceCell = (
+                              <>
+                                {price.text}
+                                {price.caption ? (
+                                  <Box component="span" sx={{ display: "block", fontSize: 12, color: "text.secondary" }}>
+                                    {price.caption}
+                                  </Box>
+                                ) : null}
+                              </>
+                            );
+                            return (
                             <TableRow key={row.id} hover>
                               <TableCell sx={{ fontWeight: 700 }}>{formatPragueTime(row.startUtc)}</TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>{nameOf(row)}</TableCell>
+                              <TableCell sx={{ fontWeight: 600 }}>
+                                {nameOf(row)}
+                                {phone ? (
+                                  <Box component="span" data-testid="row-price" sx={{ display: "block", fontWeight: 500, whiteSpace: "nowrap" }}>
+                                    {priceCell}
+                                  </Box>
+                                ) : null}
+                              </TableCell>
                               <TableCell>
                                 {row.activityName}
                                 {calendarById.get(row.calendarId ?? "") ? (
@@ -408,11 +449,11 @@ export default function DayOverviewPage() {
                                   </Box>
                                 ) : null}
                               </TableCell>
-                              <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                                {row.activityId && priceById.get(row.activityId) != null
-                                  ? formatCzk(priceById.get(row.activityId)!)
-                                  : "—"}
-                              </TableCell>
+                              {phone ? null : (
+                                <TableCell align="right" data-testid="row-price" sx={{ whiteSpace: "nowrap" }}>
+                                  {priceCell}
+                                </TableCell>
+                              )}
                               {mayEdit ? (
                                 <TableCell align="right">
                                   <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
@@ -460,7 +501,8 @@ export default function DayOverviewPage() {
                                 </TableCell>
                               ) : null}
                             </TableRow>
-                          ))}
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </TableContainer>

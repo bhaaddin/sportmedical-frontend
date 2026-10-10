@@ -10,8 +10,10 @@ import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
 import { usePermission } from '../auth/usePermission';
 import { appointmentsApi } from '../api/appointments';
+import { activitiesApi } from '../api/activities';
 import type { DayAppointment } from '../api/bookingContracts';
 import { statusName, statusTally } from '../api/bookingContracts';
+import { formatCzk, shownPrice, sumPrices } from '../components/booking/grid/appointmentPrice';
 import DayOverviewPage from './booking/DayOverviewPage';
 import { toDateOnly, formatPragueTime } from '../utils/time';
 import { DashboardSkeleton } from '../components/SkeletonLoader';
@@ -310,6 +312,29 @@ function OwnerDashboard() {
   const patientName = (patientId: string): string =>
     patientNames[patientId] ?? patientId.slice(0, 8);
 
+  /* Etapa 12, "ceny všude": agreed, else the row's list price, else the
+     činnost's catalogue price - the one cached list, asked only when some row
+     carries no price of its own. */
+  const needsCatalogue = todayAppointments.some((a) => a.agreedPriceCzk == null && a.listPriceCzk == null);
+  const activities = useQuery({
+    queryKey: ['activities'],
+    queryFn: () => activitiesApi.list(),
+    enabled: needsCatalogue,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const priceOf = (a: DayAppointment) =>
+    shownPrice(a, activities.data?.activities.find((x) => x.id === a.activityId)?.priceCzk ?? null);
+  /* The day's money: every visit that still stands or has happened, never a cancellation or a no-show. */
+  const todayCzk = useMemo(
+    () => sumPrices(
+      todayAppointments
+        .filter((a) => { const tally = statusTally(a.status); return tally !== 'cancelled' && tally !== 'noShow'; })
+        .map((a) => shownPrice(a, activities.data?.activities.find((x) => x.id === a.activityId)?.priceCzk ?? null)),
+    ),
+    [todayAppointments, activities.data],
+  );
+
   /* Split today's work the way the plocha does. */
   const booked = useMemo(
     () => todayAppointments
@@ -338,12 +363,16 @@ function OwnerDashboard() {
 
   const appointmentRow = (appt: DayAppointment): PanelRow => {
     const status = statusName(appt.status) ?? '';
+    const price = priceOf(appt);
     return {
       id: appt.id,
       onClick: toCalendar,
       lead: timeLead(appt.startUtc),
       title: patientName(appt.patientId),
-      subtitle: appt.activityName,
+      /* The činnost and what it costs, on one line: "Kontrola · 1 600 Kč". */
+      subtitle: [appt.activityName, price.adjusted ? `${price.text} (upraveno)` : price.text]
+        .filter((part) => part !== '')
+        .join(' · '),
       trailing: (
         <StatusChip tone={STATUS_TONES[status] ?? 'grey'} size="sm">
           {STATUS_LABELS[status] ?? `stav ${appt.status}`}
@@ -393,16 +422,20 @@ function OwnerDashboard() {
 
       {/* ── The day's facts: two-up on a phone and a portrait tablet, four across when there is room ── */}
       <Grid container spacing={2} sx={{ mb: 2.5 }} data-layout={phone ? 'kpi-2up' : 'kpi'}>
-        <Grid size={{ xs: 6, md: 3 }}>
+        <Grid size={{ xs: 6, md: 2.4 }}>
           <KpiCard label="Dnes objednáno" value={booked.length} hint="termínů, které ještě stojí" />
         </Grid>
-        <Grid size={{ xs: 6, md: 3 }}>
+        <Grid size={{ xs: 6, md: 2.4 }}>
           <KpiCard label="V čekárně" value={waiting.length} hint="přišli a čekají" tone={waiting.length > 0 ? 'green' : 'ink'} />
         </Grid>
-        <Grid size={{ xs: 6, md: 3 }}>
+        <Grid size={{ xs: 6, md: 2.4 }}>
           <KpiCard label="Chybí podklady" value={alerts.length} hint="dnešních termínů bez dotazníku" tone={alerts.length > 0 ? 'red' : 'ink'} />
         </Grid>
-        <Grid size={{ xs: 6, md: 3 }}>
+        <Grid size={{ xs: 6, md: 2.4 }}>
+          {/* Etapa 12: the day's money - today's visits that stand or happened, at their agreed prices. */}
+          <KpiCard label="Dnes" value={formatCzk(todayCzk)} hint="za dnešní nezrušené termíny" />
+        </Grid>
+        <Grid size={{ xs: 6, md: 2.4 }}>
           <KpiCard
             label="Kartotéka"
             value={patientTotal !== null ? patientTotal : '—'}

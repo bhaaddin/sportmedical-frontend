@@ -8,11 +8,16 @@
  * a receptionist prepares for a patient who is not arriving.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { setViewport, VIEWPORTS } from '../../test/viewport';
 
 const get = vi.fn();
 vi.mock('../../api/client', () => ({ default: { get } }));
+/* The price of each činnost comes off the catalogue, by name (Etapa 12). */
+const listActivities = vi.fn();
+vi.mock('../../api/activities', () => ({ activitiesApi: { list: listActivities } }));
 
 const outletContext = { patient: { id: 'p1', firstName: 'Eva', lastName: 'Adresova' } };
 vi.mock('react-router-dom', async () => {
@@ -37,14 +42,18 @@ const appointment = (over: Record<string, unknown> = {}) => ({
 }) as Parameters<typeof isCancelled>[0];
 
 beforeEach(() => {
+  setViewport(VIEWPORTS.desktop);
   get.mockReset().mockResolvedValue({ data: { data: [] } });
+  listActivities.mockReset().mockResolvedValue({ activities: [{ id: 'act-1', name: 'Kontrola', priceCzk: 900 }] });
 });
 
 const renderPage = () =>
   render(
-    <MemoryRouter>
-      <PatientAppointmentsPage />
-    </MemoryRouter>,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter>
+        <PatientAppointmentsPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 
 describe('splitting at now', () => {
@@ -166,5 +175,42 @@ describe('the page', () => {
     renderPage();
 
     expect(await screen.findByText(/Termíny se nepodařilo načíst/)).toBeInTheDocument();
+  });
+});
+
+/*
+ * Etapa 12, "ceny všude": every row says what it costs. The clinic-wide list
+ * carries no money, so the price is the catalogue's figure for the činnost's
+ * name - and "bez ceny" for a name the catalogue does not know.
+ */
+describe('the price on every row', () => {
+  const rows = () => [
+    appointment({ id: 'next', eventName: 'Kontrola', startTime: '2099-01-01T08:00:00Z', endTime: '2099-01-01T08:30:00Z' }),
+    appointment({ id: 'gone', eventName: 'Neznámá činnost', status: 'Completed', startTime: '2020-01-01T08:00:00Z', endTime: '2020-01-01T08:30:00Z' }),
+  ];
+
+  it.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet]])('%s: a Cena column', async (_n, width) => {
+    setViewport(width);
+    get.mockResolvedValue({ data: { data: rows() } });
+
+    renderPage();
+
+    const upcoming = await screen.findByRole('table', { name: 'Nadcházející termíny' });
+    expect(within(upcoming).getByRole('columnheader', { name: 'Cena' })).toBeInTheDocument();
+    expect(within(upcoming).getByTestId('row-price')).toHaveTextContent('900 Kč');
+    const history = await screen.findByRole('table', { name: 'Historie termínů' });
+    expect(within(history).getByTestId('row-price')).toHaveTextContent('bez ceny');
+  });
+
+  it('phone: the price is a line of the card', async () => {
+    setViewport(VIEWPORTS.phone);
+    get.mockResolvedValue({ data: { data: rows() } });
+
+    renderPage();
+
+    expect(await screen.findByText('Kontrola')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
+    const prices = await screen.findAllByTestId('row-price');
+    expect(prices.map((p) => p.textContent?.replace(/ /g, ' '))).toEqual(['900 Kč', 'bez ceny']);
   });
 });

@@ -396,3 +396,37 @@ describe.each([
     expect(screen.queryByText('Maximální výkon')).not.toBeInTheDocument();
   });
 });
+
+/*
+ * Etapa 12, "ceny všude": the patient's appointments say what they cost. An
+ * agreed price is shown as the plain amount - the patient sees their price,
+ * never the list it was adjusted from.
+ */
+describe('prices in the patient portal', () => {
+  it.each([['phone', VIEWPORTS.phone], ['iPad', VIEWPORTS.tablet], ['desktop', VIEWPORTS.desktop]])(
+    '%s: the next visit, the other upcoming ones and the past ones each carry "Cena"',
+    async (_n, width) => {
+      setViewport(width);
+      openPortal.mockResolvedValue(
+        dashboard({
+          appointments: [
+            upcoming({ id: 'next', agreedPriceCzk: 1200, listPriceCzk: 1600 }),
+            upcoming({ id: 'later', agreedPriceCzk: null, listPriceCzk: 1600 }),
+          ],
+          pastAppointments: [
+            upcoming({ id: 'was', startUtc: '2026-01-05T09:00:00Z', endUtc: '2026-01-05T09:30:00Z', status: 'Completed', cancelUntilUtc: null }),
+          ],
+        }),
+      );
+      renderPortal();
+
+      const lines = await screen.findAllByTestId('price-line');
+      expect(lines.map((l) => l.textContent?.replace(/\u00a0/g, ' '))).toEqual([
+        'Cena: 1 200 Kč',
+        'Cena: 1 600 Kč',
+        'Cena na dotaz',
+      ]);
+      expect(screen.queryByText(/upraveno/)).not.toBeInTheDocument();
+    },
+  );
+});

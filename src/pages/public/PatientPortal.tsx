@@ -43,6 +43,17 @@ import {
   FieldLabel, LABEL_COLOR, LoadError, Panel, PanelTitle, PinnedBar, PageTitle, PublicMain, ctaSx, ghostSx, NoticeBox,
 } from '../../components/public/kit';
 import { LANDING_PATH, PORTAL_SIGN_IN_PATH } from '../../components/public/PublicHeader';
+import { shownPrice } from '../../components/booking/grid/appointmentPrice';
+
+/**
+ * "Cena: 1 600 Kč" - what the patient pays (Etapa 12, "ceny všude"). The agreed
+ * price is shown as the plain amount: the patient sees their price, never the
+ * list it was adjusted from. Without a figure the public site's own words.
+ */
+export function patientPriceLine(appointment: PortalAppointment): string {
+  const price = shownPrice(appointment);
+  return price.amountCzk === null ? 'Cena na dotaz' : `Cena: ${price.text}`;
+}
 
 const STATUS_LABELS: Record<string, string> = {
   Scheduled: 'Naplánováno',
@@ -152,6 +163,7 @@ function NextAppointmentCard({
       </Typography>
       <Typography sx={{ fontSize: 16, fontWeight: 600 }}>{appointment.activityName || 'Termín'}</Typography>
       {where !== '' && <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>{where}</Typography>}
+      <Typography data-testid="price-line" sx={{ fontSize: 15, fontWeight: 700 }}>{patientPriceLine(appointment)}</Typography>
 
       <Box sx={{ display: 'flex', gap: 1.25, flexWrap: 'wrap', mt: 1 }}>
         <Button variant="contained" startIcon={<CalendarMonthOutlined />} onClick={() => addToCalendar(appointment)} sx={ctaSx(46)}>
@@ -188,6 +200,7 @@ function AppointmentRow({
           {clinicMoment(appointment.startUtc)}
           {STATUS_LABELS[appointment.status] !== undefined ? ` · ${STATUS_LABELS[appointment.status].toLowerCase()}` : ''}
         </Typography>
+        <Typography data-testid="price-line" sx={{ fontSize: 14, fontWeight: 600 }}>{patientPriceLine(appointment)}</Typography>
         {!past && (
           <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.25 }}>
             <Button

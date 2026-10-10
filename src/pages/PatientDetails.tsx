@@ -26,7 +26,8 @@ import { SENSITIVE_IDENTITY, shownFields, usePatientFields } from '../api/displa
 import { usePermission } from '../auth/usePermission';
 import { KpiCard, SectionLabel, SoftCard, StatusChip } from '../components/ui';
 import { LabelValue } from '../components/patients/LabelValue';
-import { NextAppointmentCard } from '../components/patients/NextAppointmentCard';
+import { NextAppointmentCard, nextInWindow } from '../components/patients/NextAppointmentCard';
+import { shownPrice } from '../components/booking/grid/appointmentPrice';
 import { AlertsCard } from '../components/patients/AlertsCard';
 import { VisitHistoryTable } from '../components/patients/VisitHistoryTable';
 import { ALL_APPOINTMENTS_KEY, fetchAllAppointments } from '../components/patients/appointmentsSource';
@@ -103,8 +104,19 @@ export default function PatientDetails() {
   const activities = activitiesQuery.data?.activities ?? [];
   const priceByName = (name: string): number | null =>
     activities.find((a) => a.name === name)?.priceCzk ?? null;
-  const priceOf = (activityId: string | null, activityName: string): number | null =>
-    activities.find((a) => a.id === activityId)?.priceCzk ?? priceByName(activityName);
+  /*
+   * The next booking's price (Etapa 12, "ceny všude"): the price the desk
+   * agreed for that visit comes first, then the list price the booking window
+   * carries, then the catalogue. The card asks by činnost, so the booking it
+   * is about - the patient's next one in the window - is looked up here.
+   */
+  const priceOf = (activityId: string | null, activityName: string): number | null => {
+    const catalogue = activities.find((a) => a.id === activityId)?.priceCzk ?? priceByName(activityName);
+    const next = upcoming === null ? null : nextInWindow(patient.id, upcoming);
+    return next !== null && next.activityId === activityId
+      ? shownPrice(next, catalogue).amountCzk
+      : catalogue;
+  };
   const questionnaireIsMissing = upcoming !== null && questionnaireMissing(patient.id, upcoming);
 
   /* How each field in the clinic's catalogue is read off this patient. */

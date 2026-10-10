@@ -7,6 +7,7 @@ import { statusName, type DayAppointment } from "../../../api/bookingContracts";
 import { formatPragueTime, formatPragueDate } from "../../../utils/time";
 import { clubLine } from "./clubLine";
 import { GRID_TEXT } from "./gridText";
+import { shownPrice } from "./appointmentPrice";
 
 /** What the card shows when the server sent no hover-field choice of its own. */
 const DEFAULT_HOVER_FIELDS = [
@@ -36,11 +37,6 @@ const questionnaireStatus = (
   if (paperwork.missing.includes("questionnaire_missing")) return "chybí";
   return "vyplněn";
 };
-
-/** The činnost's price in Czech koruna, from the price list it is linked to. */
-function formatPrice(czk: number): string {
-  return `${new Intl.NumberFormat("cs-CZ").format(czk)} Kč`;
-}
 
 /** The patient's registration standing, in words rather than the raw code. */
 const REGISTRATION_STATUS_LABELS: Record<string, string> = {
@@ -76,7 +72,10 @@ export function AppointmentHoverCard({
 }) {
   const { t } = useTranslation();
 
-  const activeFields = fields && fields.length > 0 ? fields : DEFAULT_HOVER_FIELDS;
+  const chosenFields = fields && fields.length > 0 ? fields : DEFAULT_HOVER_FIELDS;
+  /* The price is on every card whatever the owner picked (10. 10. 2026: "ceny
+     doplnit všude") - in the owner's place when they chose it, last otherwise. */
+  const activeFields = chosenFields.includes("price") ? chosenFields : [...chosenFields, "price"];
 
   /* A walk-in or event has no patient on the books — its name and phone ride on
      the row, so there is nothing to fetch and the empty id must not be queried. */
@@ -96,18 +95,21 @@ export function AppointmentHoverCard({
     staleTime: 5 * 60 * 1000,
   });
 
-  /* The price lives on the price list the činnost is linked to, not on the
-     appointment; one cached list answers it for every booking on screen. */
-  const needsPrice = activeFields.includes("price");
+  /* The price (Etapa 12, "ceny všude"): the agreed figure on the row, else the
+     list price the row carries, else the činnost's catalogue price - the one
+     cached list answers that for every booking on screen. The catalogue is
+     fetched only when the row brings no price of its own. */
+  const rowHasPrice = appointment.agreedPriceCzk != null || appointment.listPriceCzk != null;
   const activitiesQuery = useQuery({
     queryKey: ["activities"],
     queryFn: () => activitiesApi.list(),
-    enabled: needsPrice,
+    enabled: !rowHasPrice,
     staleTime: 5 * 60 * 1000,
   });
   const activityPrice = activitiesQuery.data?.activities.find(
     (a) => a.id === appointment.activityId,
   )?.priceCzk ?? null;
+  const price = shownPrice(appointment, activityPrice);
 
   const patient = patientQuery.data;
   const statusLabel = (() => {
@@ -143,7 +145,9 @@ export function AppointmentHoverCard({
       case "activity":
         return appointment.activityName || null;
       case "price":
-        return activityPrice !== null ? formatPrice(activityPrice) : null;
+        /* Always a line, "bez ceny" included: a missing figure is a fact the desk
+           acts on (fill the price list), not a blank to overlook. */
+        return price.text;
       case "service":
         return calendarName || null;
       case "status":
@@ -181,11 +185,17 @@ export function AppointmentHoverCard({
   };
 
   const rows = activeFields
-    .map((key) => ({ key, label: labelFor(key), val: value(key) }))
+    .map((key) => ({
+      key,
+      label: labelFor(key),
+      val: value(key),
+      /* The one line under the price when the desk changed it: "upraveno (ceník 1 600 Kč)". */
+      note: key === "price" ? price.caption : null,
+    }))
     .filter((r) => r.val !== null);
   /* A club booking says so whatever fields the owner picked: the partner and its discount. */
   const club = clubLine(appointment.partnerName, appointment.clubDiscountPercent);
-  if (club !== null) rows.unshift({ key: "club", label: GRID_TEXT.clubLine, val: club });
+  if (club !== null) rows.unshift({ key: "club", label: GRID_TEXT.clubLine, val: club, note: null });
 
   return (
     <Box sx={{ p: 0.5, minWidth: 180, maxWidth: 280 }}>
@@ -206,9 +216,20 @@ export function AppointmentHoverCard({
               <Typography component="span" sx={{ fontSize: 12, opacity: 0.7, minWidth: 74 }}>
                 {r.label}
               </Typography>
-              <Typography component="span" sx={{ fontSize: 12, fontWeight: 600 }}>
-                {r.val}
-              </Typography>
+              <Box component="span" sx={{ minWidth: 0 }}>
+                <Typography component="span" sx={{ fontSize: 12, fontWeight: 600 }}>
+                  {r.val}
+                </Typography>
+                {r.note ? (
+                  <Typography
+                    component="span"
+                    data-testid="price-caption"
+                    sx={{ display: "block", fontSize: 11, opacity: 0.7 }}
+                  >
+                    {r.note}
+                  </Typography>
+                ) : null}
+              </Box>
             </Box>
           ))}
         </Stack>

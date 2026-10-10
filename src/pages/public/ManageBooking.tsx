@@ -51,8 +51,9 @@ import {
   rescheduleBooking,
 } from '../../api/publicManage';
 import type { ManagedBooking } from '../../api/publicManage';
-import { freeDays, freeSlots } from '../../api/publicBooking';
+import { bookableOffer, freeDays, freeSlots } from '../../api/publicBooking';
 import type { BookableSlot } from '../../api/publicBooking';
+import { shownPrice } from '../../components/booking/grid/appointmentPrice';
 import { readPublicClinic } from '../../api/clinicSettings';
 import type { PublicClinic } from '../../api/clinicSettings';
 import PublicLayout from './PublicLayout';
@@ -103,6 +104,17 @@ const slotTime = (utc: string): string =>
     hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Prague',
   });
 
+/**
+ * "Cena: 1 600 Kč" - what the patient pays (Etapa 12, "ceny všude"): the price
+ * the booking carries, else the public offer's price for its činnost. The
+ * agreed amount is shown plain, never the list it was adjusted from. Without
+ * a figure the public site's own words.
+ */
+export function bookingPriceLine(booking: ManagedBooking, offerPriceCzk: number | null): string {
+  const price = shownPrice(booking, offerPriceCzk);
+  return price.amountCzk === null ? 'Cena na dotaz' : `Cena: ${price.text}`;
+}
+
 export default function ManageBooking() {
   const { token = '' } = useParams();
 
@@ -114,6 +126,8 @@ export default function ManageBooking() {
 
   /** The clinic's own number, from settings. Empty when nobody has set one. */
   const [clinic, setClinic] = useState<PublicClinic | null>(null);
+  /** The offer's price for this booking's činnost; null until read, or when the offer has none. */
+  const [offerPrice, setOfferPrice] = useState<number | null>(null);
 
   /* Reschedule: a dialog that fetches free days, then times, then moves. */
   const [moving, setMoving] = useState(false);
@@ -151,6 +165,23 @@ export default function ManageBooking() {
 
     return () => { abandoned = true; };
   }, [token]);
+
+  /* The manage route carries no price of its own yet; the public offer names
+     the činnost's price, so it is asked once the booking says which činnost. */
+  const activityId = booking?.activityId ?? null;
+  const bookingHasPrice = booking !== null && (booking.agreedPriceCzk != null || booking.listPriceCzk != null);
+  useEffect(() => {
+    if (activityId === null || bookingHasPrice) return undefined;
+    let abandoned = false;
+    bookableOffer()
+      .then((services) => {
+        if (abandoned) return;
+        const activity = services.flatMap((s) => s.activities).find((a) => a.id === activityId);
+        setOfferPrice(activity?.priceCzk ?? null);
+      })
+      .catch(() => { /* no price rather than no page */ });
+    return () => { abandoned = true; };
+  }, [activityId, bookingHasPrice]);
 
   const confirmCancel = async (): Promise<void> => {
     setCancelling(true);
@@ -281,9 +312,12 @@ export default function ManageBooking() {
                   <Typography sx={{ fontWeight: 800, fontSize: 21, mb: 0.25 }}>
                     {clinicMoment(booking.startUtc)}
                   </Typography>
-                  <Typography variant="body2" sx={{ color: BRAND.muted, mb: 2.5 }}>
+                  <Typography variant="body2" sx={{ color: BRAND.muted, mb: 0.5 }}>
                     {booking.activityName}
                     {booking.serviceName !== '' && ` — ${booking.serviceName}`}
+                  </Typography>
+                  <Typography data-testid="price-line" sx={{ fontWeight: 700, mb: 2.5 }}>
+                    {bookingPriceLine(booking, offerPrice)}
                   </Typography>
 
                   {complaint !== null && (
