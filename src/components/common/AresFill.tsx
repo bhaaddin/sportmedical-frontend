@@ -30,7 +30,8 @@ export function applyAresFill<F extends string>(
   for (const key of Object.keys(mapping) as F[]) {
     const incoming = mapping[key];
     if (typeof incoming !== 'string' || incoming.trim() === '') continue;
-    const value = incoming.trim();
+    /* ARES keeps the register's spacing ("Firma  s.r.o."); the form shows one space. */
+    const value = incoming.trim().replace(/\s+/g, ' ');
     const before = current[key] ?? '';
     if (before.trim() !== '' && before.trim() !== value) overridden[key] = before;
     next[key] = value;
