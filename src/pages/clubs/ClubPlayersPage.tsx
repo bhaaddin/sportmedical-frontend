@@ -7,7 +7,7 @@ import { Box, Button, Link, Skeleton, Stack, TextField, Typography } from '@mui/
 import { useQuery } from '@tanstack/react-query';
 import { ATHLETE_STATUSES, clubBlocksApi, type ClubBlockAthleteStatus } from '../../api/clubBlocks';
 import { clubOrdersApi } from '../../api/clubOrders';
-import { ATHLETE_STATUS_LABEL, ATHLETE_STATUS_TONE } from '../../components/clubs/athleteList';
+import { ATHLETE_STATUS_LABEL, ATHLETE_STATUS_TONE, athletePriceText } from '../../components/clubs/athleteList';
 import { PageHeader, SoftCard, StatusChip } from '../../components/ui';
 import { ResponsiveDataList, type DataColumn } from '../../components/ui/ResponsiveDataList';
 import { downloadCsv } from '../statistics/csv';
@@ -42,6 +42,8 @@ export default function ClubPlayersPage() {
     );
   const chip = (p: PlayerRow) => <StatusChip tone={ATHLETE_STATUS_TONE[p.status]}>{ATHLETE_STATUS_LABEL[p.status]}</StatusChip>;
   const term = (p: PlayerRow) => (p.startUtc === null ? '—' : formatSlotTime(p.startUtc));
+  /* Etapa 12: every player with the price of the visit - agreed or list, "(upraveno)" when the desk changed it. */
+  const price = (p: PlayerRow) => <Typography variant="body2" data-testid="player-price" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{athletePriceText(p)}</Typography>;
 
   const columns: DataColumn<PlayerRow>[] = [
     { key: 'name', header: 'Jméno', tablet: true, cell: (p) => <Typography sx={{ fontWeight: 600 }}>{p.name}</Typography> },
@@ -54,10 +56,11 @@ export default function ClubPlayersPage() {
         </Stack>
       ),
     },
-    { key: 'status', header: 'Stav', tablet: true, cell: chip },
+    { key: 'status', header: 'Stav', cell: chip },
     { key: 'activity', header: 'Činnost', cell: (p) => p.activityName || '—' },
     { key: 'term', header: 'Termín', cell: term },
     { key: 'phone', header: 'Telefon', cell: phoneLink },
+    { key: 'price', header: 'Cena', tablet: true, align: 'right', cell: price },
   ];
 
   const card = (p: PlayerRow) => (
@@ -71,6 +74,7 @@ export default function ClubPlayersPage() {
         <Typography variant="body2">{p.clubName}</Typography>
       </Stack>
       <Typography variant="body2" sx={{ color: 'text.secondary' }}>{[p.activityName, term(p)].filter((s) => s !== '' && s !== '—').join(' · ')}</Typography>
+      {price(p)}
       {phoneLink(p)}
     </Stack>
   );

@@ -11,6 +11,7 @@ import type { ClubBlockAthlete, ClubBlockAthleteStatus } from '../../api/clubBlo
 import type { ChipTone } from '../ui';
 import { pragueHHMM } from '../../pages/clubs/clubOrders';
 import { pragueDateKey } from '../../utils/time';
+import { formatCzk } from './order/orderFormat';
 
 export const ATHLETE_STATUS_LABEL: Record<ClubBlockAthleteStatus, string> = {
   Booked: 'Zaregistrován',
@@ -44,9 +45,38 @@ export function sortAthletes(athletes: readonly ClubBlockAthlete[], direction: S
     .map((entry) => entry.athlete);
 }
 
+/* ── Price (Etapa 12: "ceny všude") ── */
+
+export interface AthletePrice {
+  /** What this athlete's visit costs: the agreed price when the desk set one, else the list price; null when neither is known. */
+  czk: number | null;
+  /** The desk agreed a price different from the list's ("upraveno"). */
+  adjusted: boolean;
+}
+
+/** Tolerant: an older server sends neither field, and that reads as "no price" - never as zero. */
+export function athletePrice(a: Pick<ClubBlockAthlete, 'agreedPriceCzk' | 'listPriceCzk'>): AthletePrice {
+  const agreed = typeof a.agreedPriceCzk === 'number' && Number.isFinite(a.agreedPriceCzk) ? a.agreedPriceCzk : null;
+  const list = typeof a.listPriceCzk === 'number' && Number.isFinite(a.listPriceCzk) ? a.listPriceCzk : null;
+  return { czk: agreed ?? list, adjusted: agreed !== null && agreed !== list };
+}
+
+/** "1 600 Kč", "1 200 Kč (upraveno)" or "bez ceny" - the one wording every player list uses. */
+export function athletePriceText(a: Pick<ClubBlockAthlete, 'agreedPriceCzk' | 'listPriceCzk'>): string {
+  const p = athletePrice(a);
+  if (p.czk === null) return 'bez ceny';
+  return p.adjusted ? `${formatCzk(p.czk)} (upraveno)` : formatCzk(p.czk);
+}
+
 /* ── CSV ── */
 
-export const CSV_HEADERS = ['Jméno', 'Činnost', 'Začátek', 'Konec', 'Stav', 'Telefon'] as const;
+export const CSV_HEADERS = ['Jméno', 'Činnost', 'Začátek', 'Konec', 'Stav', 'Telefon', 'Cena', 'Cena upravena'] as const;
+
+/** The two price cells of a CSV row: the amount as a plain number (empty when unknown) and "Ano" when the desk changed it. */
+export const csvPriceCells = (a: Pick<ClubBlockAthlete, 'agreedPriceCzk' | 'listPriceCzk'>): [string, string] => {
+  const p = athletePrice(a);
+  return [p.czk === null ? '' : String(Math.round(p.czk)), p.adjusted ? 'Ano' : ''];
+};
 
 /** "26. 10. 2026 11:00" in the clinic's time zone. */
 export function csvTime(instantUtc: string | null): string {
@@ -66,7 +96,7 @@ export function csvCell(value: string): string {
 
 export function athletesToCsv(athletes: readonly ClubBlockAthlete[]): string {
   const rows = sortAthletes(athletes).map((a) =>
-    [a.name, a.activityName, csvTime(a.startUtc), csvTime(a.endUtc), ATHLETE_STATUS_LABEL[a.status], a.phone ?? ''].map(csvCell).join(';'),
+    [a.name, a.activityName, csvTime(a.startUtc), csvTime(a.endUtc), ATHLETE_STATUS_LABEL[a.status], a.phone ?? '', ...csvPriceCells(a)].map(csvCell).join(';'),
   );
   return [CSV_HEADERS.join(';'), ...rows].join('\r\n') + '\r\n';
 }

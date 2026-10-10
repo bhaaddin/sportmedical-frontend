@@ -28,7 +28,7 @@ import { ClubBlockDialog } from './ClubBlockDialog';
 import { ClubBlockRangeDialog } from './ClubBlockRangeDialog';
 import type { RangeMode } from './ClubBlockRangeDialog';
 import { CancelClubBlockDialog } from './CancelClubBlockDialog';
-import { ATHLETE_STATUS_LABEL, ATHLETE_STATUS_TONE, downloadAthletesCsv, sortAthletes } from './athleteList';
+import { ATHLETE_STATUS_LABEL, ATHLETE_STATUS_TONE, athletePriceText, downloadAthletesCsv, sortAthletes } from './athleteList';
 import type { SortDirection } from './athleteList';
 
 const mono = '"JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace';
@@ -262,6 +262,7 @@ export function ClubBlockPanel({
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                     {[a.activityName, a.startUtc ? formatSlotTime(a.startUtc) : null].filter(Boolean).join(' · ')}
                   </Typography>
+                  <Typography variant="body2" data-testid="block-athlete-price" sx={{ fontWeight: 600 }}>{athletePriceText(a)}</Typography>
                   {a.phone ? (
                     <Typography variant="body2" component="a" href={`tel:${a.phone.replace(/\s/g, '')}`} sx={{ color: 'primary.main', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>
                       {a.phone}
@@ -284,6 +285,7 @@ export function ClubBlockPanel({
                     </TableCell>
                     <TableCell>Stav</TableCell>
                     <TableCell>Telefon</TableCell>
+                    <TableCell align="right">Cena</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -298,6 +300,7 @@ export function ClubBlockPanel({
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>
                         {a.phone ? <Box component="a" href={`tel:${a.phone.replace(/\s/g, '')}`} sx={{ color: 'primary.main' }}>{a.phone}</Box> : '—'}
                       </TableCell>
+                      <TableCell align="right" sx={{ whiteSpace: 'nowrap' }} data-testid="block-athlete-price">{athletePriceText(a)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

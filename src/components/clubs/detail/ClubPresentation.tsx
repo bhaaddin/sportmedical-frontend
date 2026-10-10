@@ -23,7 +23,8 @@ import { blockTitle, plural } from '../blockLogic';
 import { useClubSummary } from '../orders/ClubSummaryCard';
 import { STATUS_TONE, termsSummary, seatPercent, seatsWithTotal } from '../orders/orderLogic';
 import { windowLabel } from '../orders/orderWindows';
-import { orderCode } from '../order/orderFormat';
+import { formatCzk, orderCode } from '../order/orderFormat';
+import { lineValueCzk, liveOrdersTotalCzk, priceText } from '../orders/orderMoney';
 import { ClubOrderCard } from './ClubOrderCard';
 import { MergeOrdersDialog } from './MergeOrdersDialog';
 import { groupOrders, mergeableRoots } from './orderGroups';
@@ -57,15 +58,24 @@ function Figure({ value, label }: { value: number | string; label: string }) {
   );
 }
 
-function ProgressRow({ name, seats, registered, remaining }: { name: string; seats: number; registered: number; remaining: number }) {
+/**
+ * One row of the breakdown. `unitCzk` is the price of one seat (a činnost row); `valueCzk` the row's worth, seats × price
+ * (a služba row adds its činnosti up). Either reads "bez ceny" when the price list does not know it (Etapa 12).
+ */
+function ProgressRow({ name, seats, registered, remaining, unitCzk, valueCzk }: {
+  name: string; seats: number; registered: number; remaining: number; unitCzk?: number | null; valueCzk: number | null;
+}) {
+  /* "1 600 Kč/místo · celkem 96 000 Kč" - the price list's value of the seats (the orders' discounted totals stand on their cards) */
+  const price = [unitCzk === undefined ? '' : `${priceText(unitCzk)}/místo`, `celkem ${priceText(valueCzk)}`].filter((p) => p !== '').join(' · ');
   return (
     <Box data-testid="breakdown-row">
-      <Stack direction="row" sx={{ justifyContent: 'space-between', gap: 1, alignItems: 'baseline' }}>
+      <Stack direction="row" sx={{ justifyContent: 'space-between', gap: 1, alignItems: 'baseline', flexWrap: 'wrap' }}>
         <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere' }}>{name}</Typography>
         <Typography variant="caption" sx={{ color: 'text.secondary', flex: '0 0 auto' }}>
           {registered} / {seats} zapsáno · zbývá {remaining}
         </Typography>
       </Stack>
+      <Typography variant="caption" data-testid="breakdown-price" sx={{ color: 'text.secondary', display: 'block' }}>{price}</Typography>
       <LinearProgress variant="determinate" value={seatPercent(registered, seats)} aria-label={`Obsazenost: ${name}`} sx={{ mt: 0.5 }} />
     </Box>
   );
@@ -123,6 +133,24 @@ export function ClubPresentation({
   const management = Array.isArray(club.management) ? club.management.filter((m) => m.fullName.trim() !== '') : [];
   const bank = [club.bankAccount ? `${club.bankAccount}${club.bankCode ? `/${club.bankCode}` : ''}` : '', club.iban ?? ''].filter((p) => p !== '');
   const s = summary.data;
+
+  /* Etapa 12, prices everywhere: a seat's price is the price list's (`priceOf`), else the price an order of this club was quoted. */
+  const unitPriceOf = (activityId: string): number | null => {
+    const listed = priceOf(activityId);
+    if (listed !== null) return listed;
+    const quoted = orders.flatMap((o) => o.activitySeats).find((a) => a.activityId === activityId && a.unitPriceCzk !== null);
+    return quoted?.unitPriceCzk ?? null;
+  };
+  const activityValueOf = (x: { activityId: string; seats: number }): number | null => lineValueCzk(x.seats, unitPriceOf(x.activityId));
+  /** A služba's worth: its činnosti added up; "bez ceny" as soon as one of them has no price (a partial sum would mislead). */
+  const serviceValueOf = (serviceName: string): number | null => {
+    const own = (s?.byActivity ?? []).filter((a) => a.serviceName === serviceName);
+    if (own.length === 0) return null;
+    const values = own.map(activityValueOf);
+    return values.some((v) => v === null) ? null : values.reduce<number>((sum, v) => sum + (v ?? 0), 0);
+  };
+  /** The club's live orders' totals - what is still to be invoiced; null without a priced live order. */
+  const billableCzk = liveOrdersTotalCzk(orders);
 
   /* One order is one thing: the windows an order owns are counted under it, never as separate blocks. */
   const legacyBlocks = blocks.filter((b) => !b.clubOrderId);
@@ -191,10 +219,13 @@ export function ClubPresentation({
           </Alert>
         ) : (
           <>
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 1.5 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: phone ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: 1.5 }}>
               <Figure value={s.totalSeats} label="hráčů / míst" />
               <Figure value={s.registered} label="zapsáno" />
               <Figure value={s.remaining} label="zbývá" />
+              <Box data-testid="club-figure-billable">
+                <Figure value={billableCzk === null ? (ordersQuery.isLoading ? '…' : '—') : formatCzk(billableCzk)} label="k fakturaci" />
+              </Box>
             </Box>
             <Stack direction="row" data-testid="summary-statuses" sx={{ gap: 1, flexWrap: 'wrap', justifyContent: 'center', mt: 2 }}>
               {ORDER_STATUSES.map((st) => (
@@ -357,13 +388,18 @@ export function ClubPresentation({
                 <Stack spacing={1.5}>
                   <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Služby</Typography>
                   {s.byService.length === 0 ? <Typography variant="body2" sx={{ color: 'text.secondary' }}>—</Typography> : s.byService.map((x) => (
-                    <ProgressRow key={x.serviceId || x.serviceName} name={x.serviceName} seats={x.seats} registered={x.registered} remaining={Math.max(0, x.seats - x.registered)} />
+                    <ProgressRow key={x.serviceId || x.serviceName} name={x.serviceName} seats={x.seats} registered={x.registered} remaining={Math.max(0, x.seats - x.registered)} valueCzk={serviceValueOf(x.serviceName)} />
                   ))}
                 </Stack>
                 <Stack spacing={1.5}>
                   <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>Činnosti</Typography>
                   {s.byActivity.length === 0 ? <Typography variant="body2" sx={{ color: 'text.secondary' }}>—</Typography> : s.byActivity.map((x) => (
-                    <ProgressRow key={x.activityId || x.activityName} name={x.serviceName !== '' ? `${x.activityName} (${x.serviceName})` : x.activityName} seats={x.seats} registered={x.registered} remaining={x.remaining} />
+                    <ProgressRow
+                      key={x.activityId || x.activityName}
+                      name={x.serviceName !== '' ? `${x.activityName} (${x.serviceName})` : x.activityName}
+                      seats={x.seats} registered={x.registered} remaining={x.remaining}
+                      unitCzk={unitPriceOf(x.activityId)} valueCzk={activityValueOf(x)}
+                    />
                   ))}
                 </Stack>
               </Box>

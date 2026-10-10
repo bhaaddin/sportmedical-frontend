@@ -10,7 +10,8 @@ import { billingApi, type Invoice } from '../../api/billing';
 import { clubOrdersApi, type ClubOrderView } from '../../api/clubOrders';
 import { KpiCard, PageHeader, SectionLabel, SoftCard, StatusChip } from '../../components/ui';
 import { ResponsiveDataList, type DataColumn } from '../../components/ui/ResponsiveDataList';
-import { seatsWithTotal } from '../../components/clubs/orders/orderLogic';
+import { formatPricedSeats, orderTotalCzk, priceText } from '../../components/clubs/orders/orderMoney';
+import { formatPlayersTotal } from '../../components/clubs/panel/seats';
 import { formatCzk, formatLongDate } from './clubOrders';
 import { customerOf, statusOf } from '../billing/invoiceView';
 import { pragueDateKey } from '../../utils/time';
@@ -69,8 +70,8 @@ export default function ClubBillingPage() {
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
         <Box>
           <Typography sx={{ fontWeight: 700 }}>{o.clubName}</Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            {o.serviceName} · {o.activitySeats.length > 0 ? seatsWithTotal(o) : `${o.totalSeats} hráčů`}{o.priceQuote ? ` · ${formatCzk(o.priceQuote.totalCzk)}` : ''}
+          <Typography variant="body2" sx={{ color: 'text.secondary', overflowWrap: 'anywhere' }} data-testid="awaiting-order-line">
+            {o.serviceName} · {o.activitySeats.length > 0 ? `${formatPricedSeats(o.activitySeats)} (${formatPlayersTotal(o.activitySeats)})` : `${o.totalSeats} hráčů`} · {priceText(orderTotalCzk(o))}
           </Typography>
         </Box>
         <Button variant="contained" sx={{ minHeight: 44 }} onClick={() => issue(o)}>Vystavit fakturu</Button>

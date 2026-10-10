@@ -123,11 +123,13 @@ describe.each(['phone', 'tablet', 'desktop'] as const)('one group, one card at %
     expect(within(card).getByText('Objednávka KO-FB9C0686')).toBeInTheDocument();
     expect(card).toHaveTextContent('Potvrzeno');
     const services = within(card).getAllByTestId('order-card-service');
-    expect(services.map((s) => s.textContent)).toEqual([
-      'Sportovní lékařské prohlídky · Základní 0/9 · Komplexní 0/7 · Spiroergometrie 0/11 (27 hráčů)',
-      'Sportovní diagnostika · Diagnostika 0/16 (16 hráčů)',
+    /* Etapa 12: every činnost with its unit price, every služba line with its order's total */
+    expect(services.map((s) => (s.textContent ?? '').replace(/ /g, ' '))).toEqual([
+      'Sportovní lékařské prohlídky · Základní 0/9 · 500 Kč · Komplexní 0/7 · 1 000 Kč · Spiroergometrie 0/11 · 1 000 Kč (27 hráčů) · 18 000 Kč',
+      'Sportovní diagnostika · Diagnostika 0/16 · 500 Kč (16 hráčů) · 8 000 Kč',
     ]);
-    expect(within(card).getByTestId('order-card-payment')).toHaveTextContent('Platba: Platí klub (jedna faktura) · 26 000 Kč');
+    /* the group's total, with the list price and the discount it got (20 000 + 9 000 list, 18 000 + 8 000 paid) */
+    expect(within(card).getByTestId('order-card-payment')).toHaveTextContent('Platba: Platí klub (jedna faktura) · Celkem 26 000 Kč · ceník 29 000 Kč · sleva 3 000 Kč');
     expect(within(card).getByText('Termíny (4 termíny)')).toBeInTheDocument();
     const pills = within(card).getAllByTestId('order-window').map((p) => p.textContent);
     expect(pills).toEqual(['Čt 5. 11. · 08:00–12:00', 'Út 10. 11. · 08:00–12:00', 'Ne 15. 11. · 08:00–12:00', 'Pá 20. 11. · 08:00–12:00']);
@@ -138,7 +140,7 @@ describe.each(['phone', 'tablet', 'desktop'] as const)('one group, one card at %
 
     /* the lone order keeps the single-order card */
     expect(cards[1]).toHaveAttribute('data-addenda', '0');
-    expect(within(cards[1]).getByTestId('order-card-seats')).toHaveTextContent('Základní 0/6 (6 hráčů)');
+    expect((within(cards[1]).getByTestId('order-card-seats').textContent ?? '').replace(/ /g, ' ')).toBe('Základní 0/6 · 500 Kč (6 hráčů) · 3 000 Kč');
   });
 
   it('hides "Sloučit do jedné objednávky" with a single live group and shows it from two', async () => {

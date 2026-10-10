@@ -2,8 +2,9 @@
  * Statistiky klubů - the arithmetic on the `GET /club-orders/stats` answer. Pure and tolerant: an absent field
  * reads as 0 / empty so an older server never white-screens the page.
  */
-import type { ClubOrderStats, ClubOrderStatus, ClubSummary } from '../../../api/clubOrders';
+import type { ClubOrderStats, ClubOrderStatus, ClubOrderView, ClubSummary } from '../../../api/clubOrders';
 import { ORDER_STATUSES } from '../../../api/clubOrders';
+import { liveTotalsByClub } from '../orders/orderMoney';
 
 export interface NormalSummary extends Omit<ClubSummary, 'ordersByStatus'> {
   ordersByStatus: Record<ClubOrderStatus, number>;
@@ -93,3 +94,22 @@ export function activityRows(stats: ClubOrderStats): ActivityRow[] {
 
 export const isEmptyStats = (stats: ClubOrderStats): boolean =>
   (stats.byClub ?? []).length === 0 && normalizeSummary(stats.totals).totalSeats === 0;
+
+/* ── Etapa 12: the money next to the counts ── */
+
+export interface ClubRevenue {
+  /** Every club's live (Requested / Confirmed) orders' totals added up. */
+  totalCzk: number;
+  /** The same per club id; a club with no priced live order is absent. */
+  byClub: Map<string, number>;
+}
+
+/**
+ * The orders' value, from the orders list of the same period: the live orders' quoted totals, per club and in all.
+ * null when the list did not load (the counts stand on their own; the money is an enrichment).
+ */
+export function clubRevenue(orders: readonly Pick<ClubOrderView, 'clubId' | 'status' | 'priceQuote'>[] | undefined): ClubRevenue | null {
+  if (orders === undefined) return null;
+  const byClub = liveTotalsByClub(orders);
+  return { totalCzk: [...byClub.values()].reduce((sum, v) => sum + v, 0), byClub };
+}

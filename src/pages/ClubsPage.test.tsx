@@ -175,7 +175,9 @@ describe('ClubsPage', () => {
 
     const second = within(cards[1]);
     await waitFor(() => expect(second.getByText('Bez objednávky')).toBeInTheDocument());
-    expect(second.getAllByText('—')).toHaveLength(2);
+    /* sportovců, sleva and (Etapa 12) k fakturaci - nothing is known about a club without an order */
+    expect(second.getAllByText('—')).toHaveLength(3);
+    expect(second.getByTestId('club-card-billable')).toHaveTextContent('k fakturaci');
 
     /* Only the active calendar's orders were asked for. */
     expect(listOrders).toHaveBeenCalledTimes(1);
@@ -277,6 +279,26 @@ describe('ClubsPage', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('Etapa 12: the "k fakturaci" tile is the club\'s live orders\' totals, from ONE orders list for the whole page', async () => {
+    const { clubOrdersApi, toOrder } = await import('../api/clubOrders');
+    vi.mocked(clubOrdersApi.list).mockResolvedValue([
+      toOrder({ id: 'o-live', clubId: 'club-1', status: 'Confirmed', priceQuote: { listTotalCzk: 4000, discounts: [], totalCzk: 3600 } }),
+      toOrder({ id: 'o-req', clubId: 'club-1', status: 'Requested', priceQuote: { listTotalCzk: 1000, discounts: [], totalCzk: 1000 } }),
+      toOrder({ id: 'o-gone', clubId: 'club-1', status: 'Cancelled', priceQuote: { listTotalCzk: 99999, discounts: [], totalCzk: 99999 } }),
+    ]);
+    try {
+      render(<Wrap><ClubsPage /></Wrap>);
+      const cards = await screen.findAllByRole('listitem');
+      await waitFor(() => expect(within(cards[0]).getByTestId('club-card-billable')).toHaveTextContent(/4\s600\sKč/));
+      expect(within(cards[1]).getByTestId('club-card-billable')).toHaveTextContent('—');
+      expect(clubOrdersApi.list).toHaveBeenCalledTimes(1);
+      expect(clubOrdersApi.list).toHaveBeenCalledWith({});
+    } finally {
+      /* the module mock is shared by the whole file: back to "no club orders" for the tests after this one */
+      vi.mocked(clubOrdersApi.list).mockResolvedValue([]);
+    }
+  });
+
   it('shows no discount for a club the administrator gave none, whatever its headcount', async () => {
     getAll.mockResolvedValue([{ ...slany, discountPercent: null }, kladno]);
     listOrders.mockResolvedValue([{ ...slanyOrder, clubDiscountPercent: null }]);
@@ -286,7 +308,8 @@ describe('ClubsPage', () => {
     const cards = await screen.findAllByRole('listitem');
     await waitFor(() => expect(within(cards[0]).getByText('Aktivní rezervace')).toBeInTheDocument());
     expect(within(cards[0]).getByText('12')).toBeInTheDocument();
-    expect(within(cards[0]).getAllByText('—')).toHaveLength(1);
+    /* no discount, and (Etapa 12) nothing to invoice without a club order */
+    expect(within(cards[0]).getAllByText('—')).toHaveLength(2);
 
     await user.click(cards[0]);
     expect(await screen.findByText('Bez slevy')).toBeInTheDocument();

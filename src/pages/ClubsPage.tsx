@@ -41,6 +41,8 @@ import { calendarsApi } from '../api/calendars';
 import { activitiesApi } from '../api/activities';
 import { clubBlocksApi } from '../api/clubBlocks';
 import type { ClubBlockView } from '../api/clubBlocks';
+import { clubOrdersApi } from '../api/clubOrders';
+import { liveTotalsByClub } from '../components/clubs/orders/orderMoney';
 import { partnerOrdersApi } from '../api/partnerOrders';
 import { useDevice } from '../layout/useDevice';
 import { toDateOnly } from '../utils/time';
@@ -136,6 +138,16 @@ export default function ClubsPage() {
     .filter((_c, i) => ordersQueries[i]?.isError)
     .map((c) => c.name);
 
+  /* Etapa 12, prices everywhere: ONE list of every club's orders feeds the "k fakturaci" tile of each card (the same
+     query key the orders page uses, so the cache is shared). The cards draw without it when it fails. */
+  const clubOrdersQuery = useQuery({
+    queryKey: ['club-orders', '', '', ''],
+    queryFn: () => clubOrdersApi.list({}),
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+  const billableByClub = useMemo(() => liveTotalsByClub(clubOrdersQuery.data ?? []), [clubOrdersQuery.data]);
+
   const activitiesQuery = useQuery({
     queryKey: ['activities'],
     queryFn: activitiesApi.list,
@@ -167,6 +179,9 @@ export default function ClubsPage() {
   }
   if (activitiesQuery.isError) {
     missingParts.push({ what: 'ceník činností (částky objednávek se nezobrazí)', retry: () => void activitiesQuery.refetch() });
+  }
+  if (clubOrdersQuery.isError) {
+    missingParts.push({ what: 'objednávky klubů (částky k fakturaci se nezobrazí)', retry: () => void clubOrdersQuery.refetch() });
   }
 
   const today = toDateOnly(new Date());
@@ -375,6 +390,7 @@ export default function ClubsPage() {
               key={row.club.id}
               row={row}
               ordersLoading={ordersLoading}
+              billableCzk={clubOrdersQuery.isLoading ? undefined : (billableByClub.get(row.club.id) ?? null)}
               onOpen={() => setSelectedId(row.club.id)}
             />
           ))}

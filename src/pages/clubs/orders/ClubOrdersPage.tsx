@@ -17,12 +17,12 @@ import { clubsApi } from '../../../api/clubs';
 import { clubOrdersApi, ORDER_STATUSES, ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL } from '../../../api/clubOrders';
 import type { ClubOrderView } from '../../../api/clubOrders';
 import { useDevice } from '../../../layout/useDevice';
-import { formatCzk } from '../clubOrders';
+import { formatPricedSeats, orderTotalCzk, priceText } from '../../../components/clubs/orders/orderMoney';
 import { FilterChips, PageHeader, SoftCard, StatusChip } from '../../../components/ui';
 import { ClubOrderDetailPanel } from '../../../components/clubs/orders/ClubOrderDetailPanel';
 import { ClubOrderEntry } from '../../../components/clubs/order/ClubOrderEntry';
 import { PinnedActions } from '../PinnedActions';
-import { activitiesLine, filterOrders, groupChip, seatPercent, statusCounts, STATUS_TONE, termsSummary } from '../../../components/clubs/orders/orderLogic';
+import { filterOrders, groupChip, seatPercent, statusCounts, STATUS_TONE, termsSummary } from '../../../components/clubs/orders/orderLogic';
 import type { OrderStatusFilter } from '../../../components/clubs/orders/orderLogic';
 import { hasOrderState, readOrderState } from '../../../components/clubs/orders/orderRouteState';
 
@@ -39,7 +39,9 @@ function SeatsBar({ order }: { order: ClubOrderView }) {
   );
 }
 
-const priceOf = (o: ClubOrderView): string => (o.priceQuote === null ? '—' : formatCzk(o.priceQuote.totalCzk));
+/* Etapa 12: every row carries the order's total and every činnost its unit price; "bez ceny" when the server has none. */
+const priceOf = (o: ClubOrderView): string => priceText(orderTotalCzk(o));
+const activitiesOf = (o: ClubOrderView): string => formatPricedSeats(o.activitySeats.map((a) => ({ ...a, registered: a.registered })));
 const paymentOf = (o: ClubOrderView): string => (o.paymentMethod === null ? '—' : PAYMENT_METHOD_LABEL[o.paymentMethod]);
 
 export default function ClubOrdersPage() {
@@ -138,7 +140,7 @@ export default function ClubOrdersPage() {
                 <StatusChip tone={STATUS_TONE[o.status]} size="sm">{ORDER_STATUS_LABEL[o.status]}</StatusChip>
               </Stack>
               <Typography variant="body2" color="text.secondary">{o.serviceName || 'Služba nevybrána'}</Typography>
-              <Typography variant="body2">{activitiesLine(o)}</Typography>
+              <Typography variant="body2" data-testid="order-card-activities" sx={{ overflowWrap: 'anywhere' }}>{activitiesOf(o)}</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{termsSummary(o)}</Typography>
               <SeatsBar order={o} />
               <Stack direction="row" sx={{ justifyContent: 'space-between', mt: 0.75 }}>
@@ -155,7 +157,7 @@ export default function ClubOrdersPage() {
               <TableRow>
                 <TableCell>Klub</TableCell>
                 <TableCell>Služba</TableCell>
-                <TableCell>Činnosti × počty</TableCell>
+                <TableCell>Činnosti × počty · cena za místo</TableCell>
                 <TableCell>Termíny</TableCell>
                 <TableCell>Místa</TableCell>
                 <TableCell>Platba</TableCell>
@@ -169,7 +171,7 @@ export default function ClubOrdersPage() {
                   onKeyDown={(e) => { if (e.key === 'Enter') setOpenId(o.id); }}>
                   <TableCell sx={{ fontWeight: 600 }}><Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}><Dot color={o.clubColorHex} />{o.clubName}</Stack></TableCell>
                   <TableCell>{o.serviceName || '—'}</TableCell>
-                  <TableCell>{activitiesLine(o)}</TableCell>
+                  <TableCell data-testid="order-row-activities">{activitiesOf(o)}</TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>{termsSummary(o)}</TableCell>
                   <TableCell><SeatsBar order={o} /></TableCell>
                   <TableCell>{paymentOf(o)}</TableCell>

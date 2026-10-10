@@ -1,7 +1,7 @@
 /* Hráči: every athlete registered through a club link, across clubs and orders. Pure; the CSV reuses athleteList's cells. */
 import type { ClubBlockAthlete, ClubBlockAthleteStatus, ClubBlockView } from '../../../api/clubBlocks';
 import type { ClubOrderView } from '../../../api/clubOrders';
-import { ATHLETE_STATUS_LABEL, csvCell, csvTime } from '../../../components/clubs/athleteList';
+import { ATHLETE_STATUS_LABEL, athletePrice, csvCell, csvPriceCells, csvTime } from '../../../components/clubs/athleteList';
 
 export interface PlayerRow {
   id: string;
@@ -14,6 +14,13 @@ export interface PlayerRow {
   endUtc: string | null;
   status: ClubBlockAthleteStatus;
   phone: string | null;
+  /** Etapa 12: what the visit costs - the agreed price, else the list price; null when the server knows neither. */
+  priceCzk: number | null;
+  /** The desk agreed a price different from the list's. */
+  priceAdjusted: boolean;
+  /** The server's two fields, kept for the CSV. */
+  agreedPriceCzk: number | null;
+  listPriceCzk: number | null;
 }
 
 export interface PlayerFilters {
@@ -41,6 +48,7 @@ export function collectPlayers(blocks: readonly ClubBlockView[], orders: readonl
       const key = a.id || `${source.clubId}|${a.name}|${a.startUtc}`;
       if (seen.has(key)) continue;
       seen.add(key);
+      const price = athletePrice(a);
       rows.push({
         id: key,
         name: a.name,
@@ -52,6 +60,10 @@ export function collectPlayers(blocks: readonly ClubBlockView[], orders: readonl
         endUtc: a.endUtc ?? null,
         status: a.status ?? 'Booked',
         phone: a.phone ?? null,
+        priceCzk: price.czk,
+        priceAdjusted: price.adjusted,
+        agreedPriceCzk: typeof a.agreedPriceCzk === 'number' ? a.agreedPriceCzk : null,
+        listPriceCzk: typeof a.listPriceCzk === 'number' ? a.listPriceCzk : null,
       });
     }
   };
@@ -81,11 +93,11 @@ export function filterPlayers(rows: readonly PlayerRow[], f: PlayerFilters): Pla
     });
 }
 
-export const PLAYER_CSV_HEADERS = ['Jméno', 'Klub', 'Činnost', 'Začátek', 'Konec', 'Stav', 'Telefon'] as const;
+export const PLAYER_CSV_HEADERS = ['Jméno', 'Klub', 'Činnost', 'Začátek', 'Konec', 'Stav', 'Telefon', 'Cena', 'Cena upravena'] as const;
 
 export function playersToCsv(rows: readonly PlayerRow[]): string {
   const lines = rows.map((r) =>
-    [r.name, r.clubName, r.activityName, csvTime(r.startUtc), csvTime(r.endUtc), ATHLETE_STATUS_LABEL[r.status], r.phone ?? ''].map(csvCell).join(';'),
+    [r.name, r.clubName, r.activityName, csvTime(r.startUtc), csvTime(r.endUtc), ATHLETE_STATUS_LABEL[r.status], r.phone ?? '', ...csvPriceCells(r)].map(csvCell).join(';'),
   );
   return [PLAYER_CSV_HEADERS.join(';'), ...lines].join('\r\n') + '\r\n';
 }

@@ -11,6 +11,7 @@ import { SoftCard, StatusChip } from '../../components/ui';
 import type { ChipTone } from '../../components/ui';
 import { ClubAvatar } from '../../components/clubs/ClubAvatar';
 import { useClubSummary } from '../../components/clubs/orders/ClubSummaryCard';
+import { formatCzk } from '../../components/clubs/order/orderFormat';
 import { formatDiscount } from './clubOrders';
 import type { ClubStatus } from './clubOrders';
 import type { ClubRow } from './clubRow';
@@ -35,7 +36,13 @@ export function Figure({ value, label }: { value: string; label: string }) {
   );
 }
 
-export function ClubCard({ row, ordersLoading, onOpen }: { row: ClubRow; ordersLoading: boolean; onOpen: () => void }) {
+export function ClubCard({ row, ordersLoading, billableCzk, onOpen }: {
+  row: ClubRow;
+  ordersLoading: boolean;
+  /** Etapa 12: the club's live orders' totals ("k fakturaci"); null = no priced live order, undefined = still loading. */
+  billableCzk?: number | null;
+  onOpen: () => void;
+}) {
   const chip = STATUS_CHIP[row.status];
   /* The club as one whole from the server; the block totals stand in when that call fails or says nothing. */
   const summary = useClubSummary(row.club.id).data;
@@ -77,13 +84,16 @@ export function ClubCard({ row, ordersLoading, onOpen }: { row: ClubRow; ordersL
         {contactLine(row.club)}
       </Typography>
       <Divider sx={{ my: 1.75 }} />
-      <Stack direction="row" spacing={4}>
+      <Stack direction="row" sx={{ gap: 3, flexWrap: 'wrap' }}>
         <Figure value={row.headcount === null ? '—' : String(row.headcount)} label="sportovců" />
         {seats !== null ? (
           <Figure value={`${seats.registered} / ${seats.seats}`} label="zapsáno / míst" />
         ) : null}
         {summary !== undefined && summary.totalSeats > 0 ? <Figure value={String(seats?.remaining ?? 0)} label="ještě chybí" /> : null}
         <Figure value={formatDiscount(row.percent)} label="sleva" />
+        <Box data-testid="club-card-billable">
+          <Figure value={billableCzk === undefined ? '…' : billableCzk === null ? '—' : formatCzk(billableCzk)} label="k fakturaci" />
+        </Box>
       </Stack>
     </SoftCard>
   );

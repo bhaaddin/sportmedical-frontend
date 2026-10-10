@@ -21,23 +21,35 @@ import { editSessionFor } from '../order/editSession';
 import { formatCzk, orderCode } from '../order/orderFormat';
 import { CancelOrderDialog } from '../orders/CancelOrderDialog';
 import { ChangePlayersDialog } from '../orders/ChangePlayersDialog';
-import { rangeText, registeredLine, STATUS_TONE } from '../orders/orderLogic';
+import { rangeText, STATUS_TONE } from '../orders/orderLogic';
 import { formatPlayersTotal } from '../panel/seats';
 import { groupWindows, termsWord } from '../orders/orderWindows';
+import { discountText, formatPricedSeats, orderTotalCzk, priceText, sumMoney } from '../orders/orderMoney';
 import { WindowPills } from '../orders/WindowPills';
 import { UncoveredNotice } from '../orders/UncoveredNotice';
 import type { CoverageActivity } from '../order/coverage';
 
 /** The group's price: the sum of the orders' quotes; null when no order has one. */
-export function groupPriceCzk(orders: readonly Pick<ClubOrderView, 'priceQuote'>[]): number | null {
-  const quoted = orders.filter((o) => o.priceQuote !== null);
-  return quoted.length === 0 ? null : quoted.reduce((sum, o) => sum + (o.priceQuote?.totalCzk ?? 0), 0);
+export const groupPriceCzk = (orders: readonly Pick<ClubOrderView, 'priceQuote'>[]): number | null => sumMoney(orders)?.totalCzk ?? null;
+
+/** "Základní 0/9 · 1 600 Kč · Komplexní 0/7 · 2 400 Kč (16 hráčů) · 14 400 Kč" - the činnosti with their unit price, the head count and the order's total. */
+export function pricedSeatsLine(order: ClubOrderView): string {
+  if (order.activitySeats.length === 0) return `— · ${priceText(orderTotalCzk(order))}`;
+  return `${formatPricedSeats(order.activitySeats)} (${formatPlayersTotal(order.activitySeats)}) · ${priceText(orderTotalCzk(order))}`;
 }
 
-/** "Sportovní diagnostika · Základní 0/9 · Komplexní 0/7 (16 hráčů)" - one služba line of a group card. */
+/** "Sportovní diagnostika · Základní 0/9 · 1 600 Kč · Komplexní 0/7 · 2 400 Kč (16 hráčů) · 14 400 Kč" - one služba line of a group card. */
 export function serviceLine(order: ClubOrderView): string {
-  const split = order.activitySeats.length > 0 ? `${registeredLine(order)} (${formatPlayersTotal(order.activitySeats)})` : '—';
-  return `${order.serviceName || 'Služba nevybrána'} · ${split}`;
+  return `${order.serviceName || 'Služba nevybrána'} · ${pricedSeatsLine(order)}`;
+}
+
+/** "Platba: Platí klub (jedna faktura) · Celkem 54 400 Kč · ceník 60 000 Kč · sleva 5 600 Kč" - the discount part only when one applies. */
+export function paymentLine(order: ClubOrderView, group: readonly ClubOrderView[]): string {
+  const money = sumMoney(group);
+  const payment = `Platba: ${order.paymentMethod === null ? 'zatím neurčena' : PAYMENT_METHOD_LABEL[order.paymentMethod]}`;
+  if (money === null) return `${payment} · ${priceText(null)}`;
+  const discount = discountText(money);
+  return `${payment} · Celkem ${formatCzk(money.totalCzk)}${discount !== '' ? ` · ${discount}` : ''}`;
 }
 
 export function ClubOrderCard({ order, addenda = [], today, onOpen, onChanged }: {
@@ -63,8 +75,6 @@ export function ClubOrderCard({ order, addenda = [], today, onOpen, onChanged }:
     navigate('/planovani', { state: { pickOrder: { start: editSessionFor(order, activitiesQuery.data ?? [], todayInPrague(), activities) } } });
   };
   const btn = { size: 'small', sx: { minHeight: 44 } } as const;
-  const split = order.activitySeats.length > 0 ? registeredLine(order) : '—';
-  const price = grouped ? groupPriceCzk(group) : (order.priceQuote?.totalCzk ?? null);
 
   return (
     <Box
@@ -93,12 +103,11 @@ export function ClubOrderCard({ order, addenda = [], today, onOpen, onChanged }:
           ))
         ) : (
           <Typography variant="body2" data-testid="order-card-seats" sx={{ overflowWrap: 'anywhere' }}>
-            {split}{order.activitySeats.length > 0 ? ` (${formatPlayersTotal(order.activitySeats)})` : ''}
+            {pricedSeatsLine(order)}
           </Typography>
         )}
-        <Typography variant="body2" data-testid="order-card-payment" sx={{ color: 'text.secondary' }}>
-          {`Platba: ${order.paymentMethod === null ? 'zatím neurčena' : PAYMENT_METHOD_LABEL[order.paymentMethod]}`}
-          {price !== null ? ` · ${formatCzk(price)}` : ''}
+        <Typography variant="body2" data-testid="order-card-payment" sx={{ color: 'text.secondary', overflowWrap: 'anywhere' }}>
+          {paymentLine(order, group)}
         </Typography>
       </Stack>
 

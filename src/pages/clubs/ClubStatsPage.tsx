@@ -7,7 +7,7 @@ import { Box, Button, Skeleton, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { clubOrdersApi } from '../../api/clubOrders';
 import { ClubStatsView } from '../../components/clubs/stats/ClubStatsView';
-import { activityRows, clubRows, isEmptyStats, occupancyPercent, normalizeSummary, serviceRows } from '../../components/clubs/stats/statsMath';
+import { activityRows, clubRevenue, clubRows, isEmptyStats, occupancyPercent, normalizeSummary, serviceRows } from '../../components/clubs/stats/statsMath';
 import { PageHeader, SoftCard } from '../../components/ui';
 import { pragueDateKey } from '../../utils/time';
 import { buildStatisticsCsv, downloadCsv, statisticsCsvFileName } from '../statistics/csv';
@@ -20,13 +20,21 @@ export default function ClubStatsPage() {
   const today = pragueDateKey(new Date());
   const range = rangeFor(rangeKey, today, custom);
 
+  const periodFilter = { ...(range.from ? { from: range.from } : {}), ...(range.to ? { to: range.to } : {}) };
   const query = useQuery({
     queryKey: ['club-stats', range.from, range.to],
-    queryFn: () => clubOrdersApi.stats({ ...(range.from ? { from: range.from } : {}), ...(range.to ? { to: range.to } : {}) }),
+    queryFn: () => clubOrdersApi.stats(periodFilter),
+  });
+  /* Etapa 12: the money next to the counts comes from the orders of the same period; the counts stand without it. */
+  const ordersQuery = useQuery({
+    queryKey: ['club-orders', '', range.from ?? '', range.to ?? ''],
+    queryFn: () => clubOrdersApi.list(periodFilter),
+    retry: false,
   });
 
   const period = useMemo(() => ({ from: range.from ?? 'od-začátku', to: range.to ?? today }), [range.from, range.to, today]);
   const stats = query.data;
+  const revenue = useMemo(() => clubRevenue(ordersQuery.data), [ordersQuery.data]);
 
   const exportCsv = () => {
     if (!stats) return;
@@ -34,8 +42,8 @@ export default function ClubStatsPage() {
       [
         {
           title: 'Podle klubu',
-          columns: ['Klub', 'Hráčů', 'Zapsáno', 'Chybí', 'Kapacita %'],
-          rows: clubRows(stats).map((c) => [c.clubName ?? '', c.totalSeats, c.registered, c.remaining, occupancyPercent(c) ?? '']),
+          columns: ['Klub', 'Hráčů', 'Zapsáno', 'Chybí', 'Kapacita %', 'Objednáno Kč'],
+          rows: clubRows(stats).map((c) => [c.clubName ?? '', c.totalSeats, c.registered, c.remaining, occupancyPercent(c) ?? '', revenue?.byClub.get(c.clubId) ?? '']),
         },
         { title: 'Podle služby', columns: ['Služba', 'Hráčů', 'Zapsáno', 'Chybí'], rows: serviceRows(stats).map((s) => [s.serviceName, s.seats, s.registered, s.remaining]) },
         {
@@ -43,7 +51,7 @@ export default function ClubStatsPage() {
           columns: ['Činnost', 'Služba', 'Hráčů', 'Zapsáno', 'Chybí'],
           rows: activityRows(stats).map((a) => [a.activityName, a.serviceName, a.seats, a.registered, a.remaining]),
         },
-        { title: 'Celkem', columns: ['Hráčů', 'Zapsáno', 'Chybí'], rows: [[normalizeSummary(stats.totals).totalSeats, normalizeSummary(stats.totals).registered, normalizeSummary(stats.totals).remaining]] },
+        { title: 'Celkem', columns: ['Hráčů', 'Zapsáno', 'Chybí', 'Objednáno Kč'], rows: [[normalizeSummary(stats.totals).totalSeats, normalizeSummary(stats.totals).registered, normalizeSummary(stats.totals).remaining, revenue?.totalCzk ?? '']] },
       ],
       period,
     );
@@ -70,7 +78,7 @@ export default function ClubStatsPage() {
           <Typography sx={{ color: 'text.secondary' }}>V tomto období nejsou žádná data klubů.</Typography>
         </SoftCard>
       ) : stats ? (
-        <ClubStatsView stats={stats} period={period} />
+        <ClubStatsView stats={stats} period={period} revenue={revenue} revenueLoading={ordersQuery.isLoading} />
       ) : null}
     </Box>
   );

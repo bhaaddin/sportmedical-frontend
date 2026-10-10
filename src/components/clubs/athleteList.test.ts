@@ -6,9 +6,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { ClubBlockAthlete } from '../../api/clubBlocks';
 import { pragueWallClockToInstant } from '../../utils/time';
-import { athletesCsvFilename, athletesToCsv, CSV_HEADERS, csvCell, csvTime, downloadAthletesCsv, sortAthletes } from './athleteList';
+import { athletePrice, athletePriceText, athletesCsvFilename, athletesToCsv, CSV_HEADERS, csvCell, csvTime, downloadAthletesCsv, sortAthletes } from './athleteList';
 
 const at = (date: string, time: string) => pragueWallClockToInstant(date, time).toISOString();
+/** Money is written with non-breaking spaces; the assertions read plain ones. */
+const plain = (s: string): string => s.replace(/ /g, ' ');
 
 const athlete = (over: Partial<ClubBlockAthlete> = {}): ClubBlockAthlete => ({
   id: 'p1', name: 'Jan Novák', activityName: 'Základní prohlídka', startUtc: at('2026-10-26', '11:00'), endUtc: at('2026-10-26', '12:00'),
@@ -31,18 +33,44 @@ describe('sortAthletes', () => {
   });
 });
 
+describe('athletePrice (Etapa 12)', () => {
+  it('reads the agreed price first, then the list price, and says "upraveno" only when they differ', () => {
+    expect(athletePrice(athlete())).toEqual({ czk: null, adjusted: false });
+    expect(athletePriceText(athlete())).toBe('bez ceny');
+    expect(athletePrice(athlete({ listPriceCzk: 1600 }))).toEqual({ czk: 1600, adjusted: false });
+    expect(plain(athletePriceText(athlete({ listPriceCzk: 1600 })))).toBe('1 600 Kč');
+    expect(athletePrice(athlete({ listPriceCzk: 1600, agreedPriceCzk: 1200 }))).toEqual({ czk: 1200, adjusted: true });
+    expect(plain(athletePriceText(athlete({ listPriceCzk: 1600, agreedPriceCzk: 1200 })))).toBe('1 200 Kč (upraveno)');
+    /* the same price agreed as the list's is not "upraveno"; an agreed price without a list price is */
+    expect(athletePrice(athlete({ listPriceCzk: 1600, agreedPriceCzk: 1600 }))).toEqual({ czk: 1600, adjusted: false });
+    expect(athletePrice(athlete({ listPriceCzk: null, agreedPriceCzk: 900 }))).toEqual({ czk: 900, adjusted: true });
+  });
+});
+
 describe('the CSV', () => {
   it('has Czech headers, semicolons, CRLF and clinic-time dates', () => {
     const csv = athletesToCsv([athlete()]);
-    expect(csv).toBe(`${CSV_HEADERS.join(';')}\r\nJan Novák;Základní prohlídka;26. 10. 2026 11:00;26. 10. 2026 12:00;Zaregistrován;+420 777 123 456\r\n`);
-    expect(CSV_HEADERS).toEqual(['Jméno', 'Činnost', 'Začátek', 'Konec', 'Stav', 'Telefon']);
+    expect(csv).toBe(`${CSV_HEADERS.join(';')}\r\nJan Novák;Základní prohlídka;26. 10. 2026 11:00;26. 10. 2026 12:00;Zaregistrován;+420 777 123 456;;\r\n`);
+    expect(CSV_HEADERS).toEqual(['Jméno', 'Činnost', 'Začátek', 'Konec', 'Stav', 'Telefon', 'Cena', 'Cena upravena']);
   });
 
-  it('carries nothing but those six columns - no birth number, no id', () => {
+  it('carries nothing but those eight columns - no birth number, no id', () => {
     const csv = athletesToCsv([{ ...athlete(), birthNumber: '9001011234', id: 'secret-id' } as ClubBlockAthlete]);
     expect(csv).not.toContain('9001011234');
     expect(csv).not.toContain('secret-id');
-    for (const line of csv.trim().split('\r\n')) expect(line.split(';')).toHaveLength(6);
+    for (const line of csv.trim().split('\r\n')) expect(line.split(';')).toHaveLength(8);
+  });
+
+  it('writes the price of the visit: the list price, the agreed price with "Ano", nothing when neither is known (Etapa 12)', () => {
+    const csv = athletesToCsv([
+      athlete({ id: '1', name: 'A', listPriceCzk: 1600, agreedPriceCzk: null }),
+      athlete({ id: '2', name: 'B', listPriceCzk: 1600, agreedPriceCzk: 1200 }),
+      athlete({ id: '3', name: 'C' }),
+    ]);
+    const lines = csv.trim().split('\r\n');
+    expect(lines[1]).toMatch(/;1600;$/);
+    expect(lines[2]).toMatch(/;1200;Ano$/);
+    expect(lines[3]).toMatch(/;;$/);
   });
 
   it('writes empty cells for what is not known and a Czech word for every status', () => {
@@ -52,7 +80,7 @@ describe('the CSV', () => {
       athlete({ id: '3', name: 'C', startUtc: null, status: 'Cancelled' }),
     ]);
     const lines = csv.trim().split('\r\n');
-    expect(lines[1]).toBe('A;;;;Dorazil;');
+    expect(lines[1]).toBe('A;;;;Dorazil;;;');
     expect(lines[2]).toContain(';Nedostavil se;');
     expect(lines[3]).toContain(';Zrušeno;');
   });

@@ -41,6 +41,7 @@ import { ClubInvoiceDialog } from './ClubInvoiceDialog';
 import { hasGroup, OrderGroupBlock } from './OrderGroupBlock';
 import { orderCode } from '../order/orderFormat';
 import { rangeText, registeredLine, seatPercent, STATUS_TONE } from './orderLogic';
+import { lineValueCzk, priceText } from './orderMoney';
 import { formatPlayersTotal } from '../panel/seats';
 
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
@@ -150,7 +151,9 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
     }
     const windows = orderWindows(order);
     const today = todayInPrague();
-    const lineTotal = (seats: number, unit: number | null) => (unit === null ? '—' : formatCzk(seats * unit));
+    /* Etapa 12: unit price × seats per činnost, "bez ceny" when the server has no price; the rows' sum under them. */
+    const lineValues = order.activitySeats.map((a) => lineValueCzk(a.seats, a.unitPriceCzk));
+    const linesTotal = lineValues.some((v) => v === null) ? null : lineValues.reduce<number>((sum, v) => sum + (v ?? 0), 0);
     return (
       <Stack spacing={2} data-testid="order-detail" data-status={order.status}>
         <Block title="Souhrn">
@@ -262,18 +265,27 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
                     <TableCell>Činnost</TableCell>
                     <TableCell align="right">Míst</TableCell>
                     <TableCell align="right">Zapsáno</TableCell>
+                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>Cena / místo</TableCell>
                     <TableCell align="right">Cena</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {order.activitySeats.map((a) => (
+                  {order.activitySeats.map((a, i) => (
                     <TableRow key={a.activityId} data-testid="order-activity-row">
                       <TableCell sx={{ fontWeight: 600 }}>{a.activityName}</TableCell>
                       <TableCell align="right">{a.seats}</TableCell>
                       <TableCell align="right">{a.registered}</TableCell>
-                      <TableCell align="right">{lineTotal(a.seats, a.unitPriceCzk)}</TableCell>
+                      <TableCell align="right" sx={{ whiteSpace: 'nowrap' }} data-testid="order-activity-unit">{priceText(a.unitPriceCzk)}</TableCell>
+                      <TableCell align="right" sx={{ whiteSpace: 'nowrap' }} data-testid="order-activity-total">{priceText(lineValues[i])}</TableCell>
                     </TableRow>
                   ))}
+                  <TableRow data-testid="order-activities-sum">
+                    <TableCell sx={{ fontWeight: 700 }}>Celkem</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>{order.activitySeats.reduce((n, a) => n + a.seats, 0)}</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>{order.activitySeats.reduce((n, a) => n + a.registered, 0)}</TableCell>
+                    <TableCell />
+                    <TableCell align="right" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{priceText(linesTotal)}</TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             </Box>
@@ -282,7 +294,7 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
 
         <Block title="Cena a platba">
           {order.priceQuote === null ? (
-            <Typography variant="body2" color="text.secondary">Cena zatím nebyla vypočtena.</Typography>
+            <Typography variant="body2" color="text.secondary" data-testid="price-quote-none">Cena zatím nebyla vypočtena — bez ceny.</Typography>
           ) : (
             <Stack spacing={0.5} data-testid="price-quote">
               <Stack direction="row" sx={{ justifyContent: 'space-between' }}><Typography variant="body2">Ceníková cena</Typography><Typography variant="body2">{formatCzk(order.priceQuote.listTotalCzk)}</Typography></Stack>

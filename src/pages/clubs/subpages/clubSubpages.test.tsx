@@ -62,8 +62,8 @@ const blocks: ClubBlockView[] = [
   block({
     id: 'b1',
     athletes: [
-      { id: 'p1', name: 'Jan Novák', activityName: 'Diagnostika', startUtc: '2026-10-26T09:00:00Z', endUtc: '2026-10-26T09:30:00Z', status: 'Booked', phone: '+420 777 111 222' },
-      { id: 'p2', name: 'Petr Černý', activityName: 'Základní prohlídka', startUtc: '2026-10-26T10:00:00Z', endUtc: null, status: 'NoShow', phone: null },
+      { id: 'p1', name: 'Jan Novák', activityName: 'Diagnostika', startUtc: '2026-10-26T09:00:00Z', endUtc: '2026-10-26T09:30:00Z', status: 'Booked', phone: '+420 777 111 222', agreedPriceCzk: 1200, listPriceCzk: 1600 },
+      { id: 'p2', name: 'Petr Černý', activityName: 'Základní prohlídka', startUtc: '2026-10-26T10:00:00Z', endUtc: null, status: 'NoShow', phone: null, agreedPriceCzk: null, listPriceCzk: 1600 },
     ],
   }),
   block({
@@ -173,6 +173,29 @@ describe('Rezervace', () => {
     expect(navigate).toHaveBeenCalledWith('/planovani', { state: { date: day(0) } });
   });
 
+  it.each(['phone', 'tablet', 'desktop'] as const)('shows the window\'s worth and the order\'s total on every row at %s; "bez ceny" without an order (Etapa 12)', async (name) => {
+    setViewport(VIEWPORTS[name]);
+    ordersList.mockResolvedValue([order({ activitySeats: [{ activityId: 'a1', activityName: 'Diagnostika', durationMinutes: 30, seats: 12, registered: 4, unitPriceCzk: 500 }], priceQuote: { listTotalCzk: 6000, discounts: [], totalCzk: 5400 } })]);
+    blocksList.mockResolvedValue([
+      { ...blocks[0], activitySeats: [{ activityId: 'a1', activityName: 'Diagnostika', seats: 10, registered: 4 }] },
+      blocks[1],
+    ]);
+    mount(<ReservationsPage />);
+    await screen.findByText('Rezervace klubů');
+    await waitFor(() => expect(shown('SK Kladno').length).toBeGreaterThan(0));
+    const prices = screen.queryAllByTestId('reservation-price');
+    /* tablet keeps its three columns (club, term, seats); the phone card and the desktop table carry the price */
+    if (name === 'tablet') {
+      expect(prices).toHaveLength(0);
+      return;
+    }
+    expect(prices).toHaveLength(2);
+    /* b1: the order's 5 400 Kč, under it the window's 10 seats × 500 Kč at the list price; b2 has no order */
+    expect(prices[0]).toHaveTextContent(/objednávka 5\s400\sKč/);
+    expect(prices[0]).toHaveTextContent(/okno 5\s000\sKč v ceníku/);
+    expect(prices[1]).toHaveTextContent('bez ceny');
+  });
+
   it('shows the empty state and the retry on an error', async () => {
     blocksList.mockResolvedValueOnce([]);
     const view = mount(<ReservationsPage />);
@@ -223,10 +246,21 @@ describe('Hráči', () => {
     const [fileName, csv] = downloadCsv.mock.calls[0] as [string, string];
     expect(fileName).toBe('hraci-klubu.csv');
     const lines = csv.replace('﻿', '').trimEnd().split('\r\n');
-    expect(lines[0]).toBe('Jméno;Klub;Činnost;Začátek;Konec;Stav;Telefon');
+    expect(lines[0]).toBe('Jméno;Klub;Činnost;Začátek;Konec;Stav;Telefon;Cena;Cena upravena');
     expect(lines).toHaveLength(3);
-    expect(lines[1]).toBe('Jan Novák;FK Slaný;Diagnostika;26. 10. 2026 10:00;26. 10. 2026 10:30;Zaregistrován;+420 777 111 222');
-    expect(lines[2]).toContain('Petr Černý;FK Slaný;Základní prohlídka;26. 10. 2026 11:00;;Nedostavil se;');
+    expect(lines[1]).toBe('Jan Novák;FK Slaný;Diagnostika;26. 10. 2026 10:00;26. 10. 2026 10:30;Zaregistrován;+420 777 111 222;1200;Ano');
+    expect(lines[2]).toContain('Petr Černý;FK Slaný;Základní prohlídka;26. 10. 2026 11:00;;Nedostavil se;;1600;');
+  });
+
+  it.each(['phone', 'tablet', 'desktop'] as const)('shows every player\'s price at %s - agreed "(upraveno)", list, or "bez ceny" (Etapa 12)', async (name) => {
+    setViewport(VIEWPORTS[name]);
+    mount(<PlayersPage />);
+    await screen.findByText('Jan Novák');
+    const prices = screen.getAllByTestId('player-price').map((p) => (p.textContent ?? '').replace(/ /g, ' '));
+    expect(prices).toContain('1 200 Kč (upraveno)');
+    expect(prices).toContain('1 600 Kč');
+    expect(prices).toContain('bez ceny');
+    expect(prices).toHaveLength(3);
   });
 
   it('shows the empty state', async () => {
@@ -257,8 +291,30 @@ describe('Statistiky', () => {
     expect(within(kpis).getByText('75 %')).toBeInTheDocument();
     await user.click(screen.getAllByRole('button', { name: 'Export CSV' })[0]);
     const csv = downloadCsv.mock.calls[0][1] as string;
-    expect(csv).toContain('FK Slaný;70;38;32;75');
+    expect(csv).toContain('FK Slaný;70;38;32;75;6000');
     expect(csv).toContain('Diagnostika;Prohlídky;60;34;26');
+  });
+
+  it.each(['phone', 'tablet', 'desktop'] as const)('puts the live orders\' money next to the counts at %s (Etapa 12)', async (name) => {
+    setViewport(VIEWPORTS[name]);
+    ordersList.mockResolvedValue([order({}), order({ id: 'o2', status: 'Cancelled', priceQuote: { listTotalCzk: 9000, discounts: [], totalCzk: 9000 } })]);
+    mount(<StatsPage />);
+    await screen.findByTestId('club-kpis');
+    /* the cancelled order does not count; the Confirmed one's 6 000 Kč does */
+    await waitFor(() => expect(screen.getByTestId('revenue-total')).toHaveTextContent(/6\s000\sKč/));
+    /* the per-club money is on the phone card and in the tablet's three columns and the desktop table alike */
+    const rows = screen.getAllByTestId('club-revenue').map((r) => r.textContent ?? '');
+    expect(rows.some((t) => /6\s000\sKč/.test(t))).toBe(true);
+    /* SK Kladno has no priced live order */
+    expect(rows.some((t) => t.includes('bez ceny'))).toBe(true);
+  });
+
+  it('keeps the counts and says "—" for the money when the orders list fails', async () => {
+    ordersList.mockRejectedValue(new Error('boom'));
+    mount(<StatsPage />);
+    await screen.findByTestId('club-kpis');
+    await waitFor(() => expect(screen.getByTestId('revenue-total')).toHaveTextContent('—'));
+    expect(within(screen.getByTestId('club-kpis')).getByText('70')).toBeInTheDocument();
   });
 
   it('asks the server for the chosen range', async () => {

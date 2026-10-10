@@ -101,6 +101,22 @@ describe('what a block shows', () => {
     expect(screen.getByText('Sportovci v bloku (4)')).toBeInTheDocument();
   });
 
+  it.each(['phone', 'tablet', 'desktop'] as const)('shows every athlete\'s price at %s - the agreed one "(upraveno)", the list price, or "bez ceny" (Etapa 12)', async (name) => {
+    setViewport(VIEWPORTS[name]);
+    const priced = block({
+      athletes: [
+        athlete({ id: 'p1', name: 'Se slevou', agreedPriceCzk: 1200, listPriceCzk: 1600 }),
+        athlete({ id: 'p2', name: 'Ceník', agreedPriceCzk: null, listPriceCzk: 1600 }),
+        athlete({ id: 'p3', name: 'Starý server' }),
+      ],
+    });
+    getBlock.mockResolvedValue(priced);
+    open(priced);
+    await screen.findByText('Se slevou');
+    const prices = screen.getAllByTestId('block-athlete-price').map((p) => (p.textContent ?? '').replace(/ /g, ' '));
+    expect(prices).toEqual(['1 200 Kč (upraveno)', '1 600 Kč', 'bez ceny']);
+  });
+
   it('copies the registration link', async () => {
     const user = userEvent.setup();
     const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();

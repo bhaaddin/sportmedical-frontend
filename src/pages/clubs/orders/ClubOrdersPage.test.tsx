@@ -130,7 +130,9 @@ describe.each([
       expect(screen.queryAllByTestId('order-card')).toHaveLength(0);
       const first = screen.getAllByTestId('order-row')[0];
       expect(first).toHaveTextContent('FK Slaný');
-      expect(first).toHaveTextContent('Základní 5/20 · Diagnostika 0/10');
+      /* Etapa 12: every činnost with its unit price, the row with the order's total */
+      expect(first).toHaveTextContent('Základní 5/20 · 1 000 Kč · Diagnostika 0/10 · 2 000 Kč');
+      expect(first).toHaveTextContent('36 000 Kč');
       expect(first).toHaveTextContent('+2');
       expect(first).toHaveTextContent('5 / 30');
       expect(first).toHaveTextContent('Platí klub (jedna faktura)');

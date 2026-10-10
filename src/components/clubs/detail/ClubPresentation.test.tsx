@@ -191,8 +191,9 @@ describe.each([['phone'], ['tablet'], ['desktop']] as const)('one order, one car
     const card = cards[0];
     expect(card).toHaveTextContent('Objednávka KO-55556666');
     expect(card).toHaveTextContent('Potvrzeno');
-    expect(card).toHaveTextContent('Základní prohlídka 4/12 · Komplexní prohlídka 3/10 (22 hráčů)');
-    expect(card).toHaveTextContent('3 600');
+    /* Etapa 12: the činnosti with their unit prices, the order's total, and the discount against the list price */
+    expect(within(card).getByTestId('order-card-seats')).toHaveTextContent('Základní prohlídka 4/12 · 200 Kč · Komplexní prohlídka 3/10 · 400 Kč (22 hráčů) · 3 600 Kč');
+    expect(within(card).getByTestId('order-card-payment')).toHaveTextContent('Platba: Platí klub (jedna faktura) · Celkem 3 600 Kč · ceník 4 000 Kč · sleva 400 Kč');
     expect(within(card).getAllByTestId('order-window')).toHaveLength(3);
     expect(within(card).getByText('Termíny (3 termíny)')).toBeInTheDocument();
     /* ONE button row for the whole order. */
@@ -252,6 +253,42 @@ describe.each([['phone'], ['tablet'], ['desktop']] as const)('one order, one car
     const card = await screen.findByTestId('club-order-card');
     await user.click(within(card).getByRole('button', { name: 'Zrušit objednávku' }));
     expect(await screen.findByRole('dialog', { name: 'Zrušit objednávku?' })).toBeInTheDocument();
+  });
+});
+
+/* ── Etapa 12: prices everywhere on the club page ── */
+describe.each(['phone', 'tablet', 'desktop'] as const)('prices on the club page at %s', (name) => {
+  it('prices every breakdown row (unit price and value) and shows what is to be invoiced', async () => {
+    setViewport(VIEWPORTS[name]);
+    listMock.mockResolvedValue([fullOrder, toOrder({ ...fullOrder, id: 'o2-aaaa-bbbb-cccc-ddddeeeeffff', status: 'Cancelled', blocks: [], priceQuote: { listTotalCzk: 9000, discounts: [], totalCzk: 9000 } })]);
+    summaryMock.mockResolvedValue({
+      ...summary, totalSeats: 22, registered: 7, remaining: 15,
+      byService: [{ serviceId: 's1', serviceName: 'Prohlídka', seats: 22, registered: 7 }],
+      byActivity: [
+        { activityId: 'a1', activityName: 'Základní prohlídka', serviceName: 'Prohlídka', seats: 12, registered: 4, remaining: 8 },
+        { activityId: 'a2', activityName: 'Komplexní prohlídka', serviceName: 'Prohlídka', seats: 10, registered: 3, remaining: 7 },
+        { activityId: 'a9', activityName: 'Bez ceníku', serviceName: 'Jiná', seats: 2, registered: 0, remaining: 2 },
+      ],
+    });
+    render(
+      <Wrap>
+        <ClubPresentation
+          row={buildClubRow(club, [], orderBlocks, '2099-10-01')} priceOf={(id) => (id === 'a1' ? 250 : null)} pricesReady focusBlockId={null} today="2099-10-01"
+          onReload={vi.fn()} onInvoice={vi.fn()} onNewReservation={vi.fn()} {...handlers}
+        />
+      </Wrap>,
+    );
+    /* the live order's 3 600 Kč counts; the cancelled 9 000 Kč does not */
+    await waitFor(() => expect(screen.getByTestId('club-figure-billable')).toHaveTextContent(/3\s600\sKč/));
+    expect(screen.getByTestId('club-figure-billable')).toHaveTextContent('k fakturaci');
+
+    const prices = (await screen.findAllByTestId('breakdown-price')).map((p) => (p.textContent ?? '').replace(/ /g, ' '));
+    /* služba: 12 × 250 (price list) + 10 × 400 (the order's quoted unit) */
+    expect(prices[0]).toBe('celkem 7 000 Kč');
+    /* činnosti: the price list first, else the order's unit price, else "bez ceny" */
+    expect(prices[1]).toBe('250 Kč/místo · celkem 3 000 Kč');
+    expect(prices[2]).toBe('400 Kč/místo · celkem 4 000 Kč');
+    expect(prices[3]).toBe('bez ceny/místo · celkem bez ceny');
   });
 });
 

@@ -13,6 +13,7 @@ import { PageHeader, SoftCard, StatusChip } from '../../components/ui';
 import { ResponsiveDataList, type DataColumn } from '../../components/ui/ResponsiveDataList';
 import { pragueDateKey } from '../../utils/time';
 import { orderCode } from '../../components/clubs/order/orderFormat';
+import { priceText } from '../../components/clubs/orders/orderMoney';
 import { formatDateRange } from './clubOrders';
 import { ClubDot, LoadError, RangeFilter, SeatsBar, SelectFilter } from './subpages/common';
 import { rangeFor, type DateRange, type RangeKey } from './subpages/range';
@@ -58,6 +59,17 @@ export default function ClubReservationsPage() {
       </Link>
     );
 
+  /* Etapa 12: the order's total (what the club pays, after its discount) and, under it, this window's seats at the list price. */
+  const money = (row: ReservationRow) =>
+    row.orderId === null ? (
+      <Typography variant="body2" sx={{ color: 'text.secondary' }} data-testid="reservation-price">bez ceny</Typography>
+    ) : (
+      <Box data-testid="reservation-price">
+        <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{`objednávka ${priceText(row.orderTotalCzk)}`}</Typography>
+        {row.windowValueCzk !== null ? <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'nowrap', display: 'block' }}>{`okno ${priceText(row.windowValueCzk)} v ceníku`}</Typography> : null}
+      </Box>
+    );
+
   const statusChip = (row: ReservationRow) =>
     row.block.status === 'Cancelled' ? <StatusChip tone="grey">Zrušeno</StatusChip> : <StatusChip tone="green">Aktivní</StatusChip>;
 
@@ -89,6 +101,7 @@ export default function ClubReservationsPage() {
     { key: 'seats', header: 'Zapsáno', tablet: true, cell: (r) => <SeatsBar registered={r.registered} seats={r.seats} /> },
     { key: 'order', header: 'Objednávka', cell: orderLink },
     { key: 'what', header: 'Kalendáře a činnosti', cell: (r) => <Typography variant="body2">{[...r.calendars, ...r.activities].join(', ') || '—'}</Typography> },
+    { key: 'price', header: 'Cena', align: 'right', cell: money },
     { key: 'status', header: 'Stav', cell: statusChip },
     { key: 'actions', header: '', align: 'right', cell: calendarButton },
   ];
@@ -105,6 +118,7 @@ export default function ClubReservationsPage() {
       <Typography variant="body2">{formatDateRange(r.block.fromDate, r.block.toDate)} · {dailyWindow(r.block)}</Typography>
       <Typography variant="body2" sx={{ color: 'text.secondary' }}>{[...r.calendars, ...r.activities].join(', ') || '—'}</Typography>
       <SeatsBar registered={r.registered} seats={r.seats} />
+      {money(r)}
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
         {orderLink(r)}
         {calendarButton(r)}

@@ -48,6 +48,10 @@ export interface ClubBlockAthlete {
   phone: string | null;
   /** The činnost the athlete is booked on (Etapa 3, seats per činnost). Absent on an older server. */
   activityId?: string | null;
+  /** Etapa 12: the price the desk agreed for this athlete's visit, in Kč; null when the price list applies. Absent on an older server. */
+  agreedPriceCzk?: number | null;
+  /** Etapa 12: the price list's price for the činnost today; null when it has none. Absent on an older server. */
+  listPriceCzk?: number | null;
 }
 
 /** What goes to the server: how many places the club takes on one činnost. */
@@ -214,6 +218,8 @@ const dateOnly = (v: unknown): string => (typeof v === 'string' ? v.slice(0, 10)
 const hhmm = (v: unknown): string | null => (typeof v === 'string' && v.length >= 5 ? v.slice(0, 5) : null);
 
 const text = z.preprocess((v) => (typeof v === 'string' && v.trim() !== '' ? v : null), z.string().nullable());
+/** A price in Kč, or null for anything that is not a finite number (absent, null, garbage). */
+const money = z.preprocess((v) => (typeof v === 'number' && Number.isFinite(v) ? v : null), z.number().nullable());
 
 const athleteSchema = z.object({
   id: z.string().min(1),
@@ -224,6 +230,8 @@ const athleteSchema = z.object({
   status: z.enum(ATHLETE_STATUSES).catch('Booked'),
   phone: text,
   activityId: text,
+  agreedPriceCzk: money,
+  listPriceCzk: money,
 });
 
 /** Athletes that cannot be read (no name) are left out; a list that is not a list is empty. */

@@ -11,14 +11,21 @@ import { useIsPhone } from '../../../layout/useDevice';
 import { ChartCard, ChartGrid, HorizontalBars, CHART_HEIGHT, type ChartDef } from '../../../pages/statistics/StatisticsCharts';
 import type { Period } from '../../../pages/statistics/aggregate';
 import { SeatsBar } from '../../../pages/clubs/subpages/common';
+import { priceText } from '../orders/orderMoney';
 import {
   activityRows, clubRows, occupancyPercent, percentText, serviceRows, statsKpis,
-  type ActivityRow, type NormalSummary, type ServiceRow,
+  type ActivityRow, type ClubRevenue, type NormalSummary, type ServiceRow,
 } from './statsMath';
 
 const nf = (v: number): string => v.toLocaleString('cs-CZ');
 
-export function ClubStatsView({ stats, period }: { stats: ClubOrderStats; period: Period }) {
+export function ClubStatsView({ stats, period, revenue = null, revenueLoading = false }: {
+  stats: ClubOrderStats;
+  period: Period;
+  /** Etapa 12: the live orders' totals of the same period; null when the orders list did not load. */
+  revenue?: ClubRevenue | null;
+  revenueLoading?: boolean;
+}) {
   const theme = useTheme();
   const phone = useIsPhone();
   const axis = { fontSize: 12, fill: theme.palette.text.secondary };
@@ -26,12 +33,14 @@ export function ClubStatsView({ stats, period }: { stats: ClubOrderStats; period
   const clubs = clubRows(stats);
   const services = serviceRows(stats);
   const activities = activityRows(stats);
+  const clubRevenueText = (c: NormalSummary): string => (revenueLoading ? '…' : revenue === null ? '—' : priceText(revenue.byClub.get(c.clubId) ?? null));
 
   const clubColumns: DataColumn<NormalSummary>[] = [
     { key: 'club', header: 'Klub', tablet: true, cell: (c) => <Typography sx={{ fontWeight: 600 }}>{c.clubName}</Typography> },
-    { key: 'seats', header: 'Hráčů', tablet: true, align: 'right', cell: (c) => nf(c.totalSeats) },
+    { key: 'seats', header: 'Hráčů', align: 'right', cell: (c) => nf(c.totalSeats) },
     { key: 'registered', header: 'Zapsáno', tablet: true, cell: (c) => <SeatsBar registered={c.registered} seats={c.totalSeats} /> },
     { key: 'remaining', header: 'Ještě chybí', align: 'right', cell: (c) => nf(c.remaining) },
+    { key: 'revenue', header: 'Objednáno', tablet: true, align: 'right', cell: (c) => <span data-testid="club-revenue">{clubRevenueText(c)}</span> },
     {
       key: 'orders', header: 'Objednávky',
       cell: (c) => (
@@ -53,6 +62,7 @@ export function ClubStatsView({ stats, period }: { stats: ClubOrderStats; period
     <Box>
       <Typography sx={{ fontWeight: 700, mb: 0.5 }}>{c.clubName}</Typography>
       <SeatsBar registered={c.registered} seats={c.totalSeats} label={`Zapsáno ${c.registered} z ${c.totalSeats} · chybí ${c.remaining}`} />
+      <Typography variant="body2" sx={{ mt: 0.5 }} data-testid="club-revenue">{`Objednáno ${clubRevenueText(c)}`}</Typography>
     </Box>
   );
 
@@ -117,6 +127,11 @@ export function ClubStatsView({ stats, period }: { stats: ClubOrderStats; period
         <KpiCard label="Zapsáno" value={nf(kpi.registered)} tone="green" />
         <KpiCard label="Ještě chybí" value={nf(kpi.remaining)} tone={kpi.remaining > 0 ? 'red' : 'ink'} />
         <KpiCard label="Obsazená kapacita" value={percentText(kpi.occupancy)} tone="primary" hint="hodiny oken využité hráči" />
+        <KpiCard
+          label="Objednáno"
+          value={<span data-testid="revenue-total">{revenueLoading ? '…' : revenue === null ? '—' : priceText(revenue.totalCzk)}</span>}
+          hint={revenue === null && !revenueLoading ? 'objednávky se nenačetly' : 'živé objednávky, po slevě'}
+        />
       </Box>
 
       <SectionLabel component="h2" sx={{ mb: 1.5 }}>Podle klubu</SectionLabel>
