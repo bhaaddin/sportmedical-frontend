@@ -1,13 +1,19 @@
 /*
- * The "ROZLIŠENÍ" toolbar: three named steps over the one continuous zoom the
+ * The "ROZLIŠENÍ" toolbar: four named steps over the one continuous zoom the
  * grid already has (ctrl/⌘ + wheel moves it by 0.1). Each step is a row
  * height and the minute step the grid lines are drawn on; the toggle shows
  * whichever level the current zoom is nearest to, so a wheel zoom and a click
  * never disagree about what is on screen.
+ *
+ * The 15-minute level (Etapa 12): between "30 min" and "10 min" the wheel
+ * passes a zoom where the rows are visibly a quarter hour tall, and the toggle
+ * used to keep saying "30 min" there (owner: "when I zoom to 15 min it shows
+ * in the middle that it is 15, but the label still says 30"). It is a level of
+ * its own now, with its own row height, so the picture and the text agree.
  */
 
 export interface Resolution {
-  key: 'hour' | 'half' | 'ten';
+  key: 'hour' | 'half' | 'quarter' | 'ten';
   /** The toggle's label. */
   label: string;
   /** The word in "Krok mřížky …". */
@@ -21,6 +27,7 @@ export interface Resolution {
 export const RESOLUTIONS: readonly Resolution[] = [
   { key: 'hour', label: 'Hodina', hint: 'hodina', zoom: 0.6, step: 60 },
   { key: 'half', label: '30 min', hint: '30 min', zoom: 1, step: 30 },
+  { key: 'quarter', label: '15 min', hint: '15 min', zoom: 1.5, step: 15 },
   { key: 'ten', label: '10 min', hint: '10 min', zoom: 2, step: 10 },
 ];
 
@@ -42,15 +49,16 @@ export function stepResolution(zoom: number, direction: -1 | 1): Resolution {
 
 /*
  * How tall an hour is, per level, as the board draws them (Z-60 / Z-30 / Z-10):
- * 46 px at "Hodina", 52 px at "30 min", 78 px at "10 min". Between the levels
- * (ctrl/⌘ + wheel moves the zoom by 0.1) the height follows a straight line,
- * so the wheel and the toggle never disagree about what is on screen.
+ * 46 px at "Hodina", 52 px at "30 min", 65 px at "15 min", 78 px at "10 min".
+ * Between the levels (ctrl/⌘ + wheel moves the zoom by 0.1) the height follows
+ * a straight line, so the wheel and the toggle never disagree about what is on
+ * screen. The 15-minute anchor sits exactly on the old 30→10 line, so no zoom
+ * the wheel can reach changed height when the level was added.
  */
-const HOUR_PX: readonly { zoom: number; px: number }[] = [
-  { zoom: 0.6, px: 46 },
-  { zoom: 1, px: 52 },
-  { zoom: 2, px: 78 },
-];
+const HOUR_PX: readonly { zoom: number; px: number }[] = RESOLUTIONS.map((level) => ({
+  zoom: level.zoom,
+  px: { hour: 46, half: 52, quarter: 65, ten: 78 }[level.key],
+}));
 
 export function pxPerHour(zoom: number): number {
   if (zoom <= HOUR_PX[0].zoom) return HOUR_PX[0].px;

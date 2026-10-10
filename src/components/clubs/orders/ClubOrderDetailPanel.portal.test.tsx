@@ -178,6 +178,7 @@ describe.each([['phone'], ['tablet'], ['desktop']] as const)('the club message a
   it('"Napsat klubu": send is disabled until something is typed, then posts the notice and the club sees it under "Co vidí klub"', async () => {
     const user = userEvent.setup();
     mount(make());
+    await user.click(await screen.findByTestId('club-visible-toggle'));
     expect(await screen.findByTestId('club-visible-empty')).toHaveTextContent('Klub zatím nevidí žádné změny.');
     const after = make({ history: [{ atUtc: '2026-10-05T09:00:00Z', user: 'Eva', text: 'Zpráva klubu: Přijďte o 10 minut dřív.', visibleToClub: true }] });
     notice.mockImplementation(async () => {
@@ -211,6 +212,7 @@ describe.each([['phone'], ['tablet'], ['desktop']] as const)('the club message a
   });
 
   it('"Co vidí klub" lists only the history the club sees, newest first', async () => {
+    const user = userEvent.setup();
     mount(make({
       history: [
         { atUtc: '2026-10-01T08:00:00Z', user: 'Eva', text: 'Objednávka potvrzena', visibleToClub: true },
@@ -219,14 +221,55 @@ describe.each([['phone'], ['tablet'], ['desktop']] as const)('the club message a
         { atUtc: '2026-10-04T08:00:00Z', user: 'Eva', text: 'Bez příznaku' },
       ],
     }));
+    await user.click(await screen.findByTestId('club-visible-toggle'));
     const list = await screen.findByTestId('club-visible-list');
     const items = within(list).getAllByRole('listitem');
     expect(items).toHaveLength(2);
     expect(items[0]).toHaveTextContent('Termín 29. 10. odebrán');
     expect(items[1]).toHaveTextContent('Objednávka potvrzena');
     expect(list).not.toHaveTextContent('Interní poznámka');
-    /* the full internal history still shows everything */
-    expect(within(screen.getByTestId('order-history')).getAllByRole('listitem')).toHaveLength(4);
+    /* the full internal history still shows everything, once opened */
+    await user.click(screen.getByTestId('order-history-wrap-toggle'));
+    expect(within(await screen.findByTestId('order-history')).getAllByRole('listitem')).toHaveLength(4);
+  });
+
+  it('both history blocks start collapsed behind a button, and expand/collapse in place', async () => {
+    const user = userEvent.setup();
+    mount(make({
+      history: [
+        { atUtc: '2026-10-01T08:00:00Z', user: 'Eva', text: 'Objednávka potvrzena', visibleToClub: true },
+        { atUtc: '2026-10-02T08:00:00Z', user: 'Eva', text: 'Interní poznámka', visibleToClub: false },
+      ],
+    }));
+    const visibleToggle = await screen.findByTestId('club-visible-toggle');
+    const historyToggle = await screen.findByTestId('order-history-wrap-toggle');
+    /* collapsed by default: the content is not rendered, the button names the count, aria-expanded is false */
+    expect(screen.queryByTestId('club-visible-list')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('order-history')).not.toBeInTheDocument();
+    expect(visibleToggle).toHaveTextContent('Zobrazit, co vidí klub (1)');
+    expect(historyToggle).toHaveTextContent('Zobrazit historii (2)');
+    expect(visibleToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(historyToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(visibleToggle).toHaveAttribute('aria-controls', 'club-visible');
+    expect(historyToggle).toHaveAttribute('aria-controls', 'order-history-wrap');
+
+    await user.click(visibleToggle);
+    expect(await screen.findByTestId('club-visible-list')).toBeInTheDocument();
+    expect(visibleToggle).toHaveAttribute('aria-expanded', 'true');
+    await user.click(visibleToggle);
+    expect(screen.queryByTestId('club-visible-list')).not.toBeInTheDocument();
+    expect(visibleToggle).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(historyToggle);
+    expect(await screen.findByTestId('order-history')).toBeInTheDocument();
+    expect(historyToggle).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('"Co vidí klub" with no visible history yet still shows a plain button, no count', async () => {
+    mount(make({ history: [] }));
+    const visibleToggle = await screen.findByTestId('club-visible-toggle');
+    expect(visibleToggle).toHaveTextContent('Co vidí klub');
+    expect(visibleToggle).not.toHaveTextContent('(0)');
   });
 
   it('shows the club link and the players\' link once each, with copy', async () => {

@@ -14,8 +14,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const get = vi.fn();
+const post = vi.fn();
+const put = vi.fn();
 vi.mock('./client', () => ({
-  default: { get, post: vi.fn(), put: vi.fn(), delete: vi.fn(), patch: vi.fn() },
+  default: { get, post, put, delete: vi.fn(), patch: vi.fn() },
 }));
 
 const { appointmentsApi } = await import('./appointments');
@@ -24,6 +26,8 @@ const { appointmentsApi } = await import('./appointments');
 beforeEach(() => {
   get.mockReset();
   get.mockResolvedValue({ data: [] });
+  post.mockReset();
+  put.mockReset().mockResolvedValue({ data: null });
 });
 
 const paramsOf = (call: number = 0) => get.mock.calls[call][1].params;
@@ -83,5 +87,54 @@ describe('availability', () => {
       appointmentsApi.getAvailability('cal-1', '', '2026-09-29', '2026-09-29'),
     ).rejects.toThrow();
     expect(get).not.toHaveBeenCalled();
+  });
+});
+
+/* Etapa 12: the agreed price travels as `agreedPriceCzk`, and has its own sub-resource on an existing appointment. */
+describe('agreed price', () => {
+  const booked = {
+    appointment: {
+      id: 'ap-1', calendarId: 'cal-1', patientId: 'p-1', activityId: 'act-1', activityName: 'Prohlídka',
+      startUtc: '2026-09-29T07:00:00Z', endUtc: '2026-09-29T07:30:00Z', status: 0, paperwork: null,
+      agreedPriceCzk: 1200, listPriceCzk: 1600,
+    },
+    warnings: [],
+  };
+
+  it('sends agreedPriceCzk on create as typed - a number, or null for the list price', async () => {
+    post.mockResolvedValue({ data: booked });
+    await appointmentsApi.create({
+      patientId: 'p-1', calendarId: 'cal-1', activityId: 'act-1', startUtc: '2026-09-29T07:00:00Z', source: 0,
+      agreedPriceCzk: 1200,
+    });
+    expect(post.mock.calls[0][1]).toMatchObject({ agreedPriceCzk: 1200 });
+    await appointmentsApi.create({
+      patientId: 'p-1', calendarId: 'cal-1', activityId: 'act-1', startUtc: '2026-09-29T07:00:00Z', source: 0,
+      agreedPriceCzk: null,
+    });
+    expect(post.mock.calls[1][1]).toMatchObject({ agreedPriceCzk: null });
+  });
+
+  it('reads agreedPriceCzk and listPriceCzk off the booked appointment, and tolerates a server without them', async () => {
+    post.mockResolvedValue({ data: booked });
+    const result = await appointmentsApi.create({
+      patientId: 'p-1', calendarId: 'cal-1', activityId: 'act-1', startUtc: '2026-09-29T07:00:00Z', source: 0,
+    });
+    expect(result.appointment.agreedPriceCzk).toBe(1200);
+    expect(result.appointment.listPriceCzk).toBe(1600);
+
+    const { agreedPriceCzk: _a, listPriceCzk: _l, ...older } = booked.appointment;
+    post.mockResolvedValue({ data: { appointment: older, warnings: [] } });
+    const old = await appointmentsApi.create({
+      patientId: 'p-1', calendarId: 'cal-1', activityId: 'act-1', startUtc: '2026-09-29T07:00:00Z', source: 0,
+    });
+    expect(old.appointment.agreedPriceCzk).toBeUndefined();
+  });
+
+  it('puts the price on its own sub-resource, null to restore the list price', async () => {
+    await appointmentsApi.setPrice('cal-1', 'ap-1', 1200);
+    expect(put).toHaveBeenCalledWith('/api/calendars/cal-1/appointments/ap-1/price', { agreedPriceCzk: 1200 });
+    await appointmentsApi.setPrice('cal-1', 'ap-1', null);
+    expect(put).toHaveBeenLastCalledWith('/api/calendars/cal-1/appointments/ap-1/price', { agreedPriceCzk: null });
   });
 });

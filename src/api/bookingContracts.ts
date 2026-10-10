@@ -602,6 +602,13 @@ export const dayAppointmentSchema = z.object({
   /** Etapa 2, C2: desk quick registration - the deadline and whether it is still ticking. */
   registrationDeadlineUtc: z.string().nullable().optional(),
   quickRegistrationPending: z.boolean().nullable().optional(),
+  /**
+   * Etapa 12: the price the desk agreed for this visit, and the price list's
+   * figure at the time. `agreedPriceCzk` is `null` when the list price stands;
+   * both are optional so an older server reads as "list price".
+   */
+  agreedPriceCzk: z.number().nullable().optional(),
+  listPriceCzk: z.number().nullable().optional(),
 });
 export type DayAppointment = z.infer<typeof dayAppointmentSchema>;
 export const dayAppointmentListSchema = z.array(dayAppointmentSchema);
@@ -655,6 +662,12 @@ export const createAppointmentInputSchema = z.object({
    * long note never costs somebody their slot.
    */
   note: z.string().nullable().optional(),
+  /**
+   * Etapa 12: the amount the desk agreed, in Kč (whole or two decimals, never
+   * negative). `null` or absent means the price list's figure stands. Sent as a
+   * number whenever the desk typed one, even when it equals the list price.
+   */
+  agreedPriceCzk: z.number().min(0).nullable().optional(),
 });
 export type CreateAppointmentInput = z.infer<typeof createAppointmentInputSchema>;
 
@@ -674,6 +687,8 @@ export const createUnregisteredInputSchema = z.object({
   phone: z.string().nullable().optional(),
   overrideReason: z.string().trim().min(1).optional(),
   note: z.string().nullable().optional(),
+  /** Etapa 12: the agreed price, as on `createAppointmentInputSchema`. */
+  agreedPriceCzk: z.number().min(0).nullable().optional(),
 });
 export type CreateUnregisteredInput = z.infer<typeof createUnregisteredInputSchema>;
 
@@ -718,6 +733,12 @@ export const appointmentSchema = z.object({
   /** Etapa 2, C2: when a desk quick registration must be completed by, and whether it still waits. */
   registrationDeadlineUtc: z.string().nullable().optional(),
   quickRegistrationPending: z.boolean().nullable().optional(),
+  /**
+   * Etapa 12: the agreed price and the list price at booking. `agreedPriceCzk`
+   * is `null` while the price list stands; both optional for an older server.
+   */
+  agreedPriceCzk: z.number().nullable().optional(),
+  listPriceCzk: z.number().nullable().optional(),
 }).passthrough();
 export type Appointment = z.infer<typeof appointmentSchema>;
 

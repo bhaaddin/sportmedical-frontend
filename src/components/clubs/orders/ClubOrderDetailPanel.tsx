@@ -12,7 +12,7 @@ import {
   Alert, Box, Button, Drawer,
   IconButton, LinearProgress, Link, Skeleton, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography,
 } from '@mui/material';
-import { Close } from '@mui/icons-material';
+import { Close, ExpandMore } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { fetchBlockableActivities } from '../../../api/clubBlocks';
@@ -49,6 +49,38 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
       <SectionLabel>{title}</SectionLabel>
       {children}
     </SoftCard>
+  );
+}
+
+/**
+ * A history block collapsed by default: a button opens it in place, showing the same content a test already expects
+ * (the content keeps its own `data-testid`, unchanged). `count === 0` still shows the button, worded plainly with no
+ * number. The button text itself carries the open/closed state; `labelOpen` defaults to "Skrýt".
+ */
+function CollapsibleBlock({ title, count, labelClosed, labelOpen = 'Skrýt', contentTestId, children }: {
+  title: string;
+  count: number;
+  /** Shown collapsed when `count > 0`; when `count === 0` the plain `title` is shown instead (no number). */
+  labelClosed: string;
+  labelOpen?: string;
+  contentTestId: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Block title={title}>
+      <Button
+        data-testid={`${contentTestId}-toggle`}
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-controls={contentTestId}
+        sx={{ minHeight: 44, justifyContent: 'space-between', width: '100%', textAlign: 'left', px: 1 }}
+        endIcon={<ExpandMore sx={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />}
+      >
+        {open ? labelOpen : (count > 0 ? labelClosed : title)}
+      </Button>
+      {open ? <Box id={contentTestId} sx={{ mt: 1.5 }}>{children}</Box> : null}
+    </Block>
   );
 }
 
@@ -284,12 +316,22 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
         </Block>
 
         {order.status !== 'Invited' ? (
-          <Block title="Co vidí klub">
+          <CollapsibleBlock
+            title="Co vidí klub"
+            count={order.history.filter((h) => h.visibleToClub === true).length}
+            labelClosed={`Zobrazit, co vidí klub (${order.history.filter((h) => h.visibleToClub === true).length})`}
+            contentTestId="club-visible"
+          >
             <ClubVisibleHistory history={order.history} />
-          </Block>
+          </CollapsibleBlock>
         ) : null}
 
-        <Block title="Historie">
+        <CollapsibleBlock
+          title="Historie"
+          count={order.history.length}
+          labelClosed={`Zobrazit historii (${order.history.length})`}
+          contentTestId="order-history-wrap"
+        >
           {order.history.length === 0 ? (
             <Typography variant="body2" color="text.secondary">Bez záznamů.</Typography>
           ) : (
@@ -302,7 +344,7 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
               ))}
             </Stack>
           )}
-        </Block>
+        </CollapsibleBlock>
       </Stack>
     );
   };

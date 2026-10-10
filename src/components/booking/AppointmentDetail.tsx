@@ -13,8 +13,6 @@ import {
   Skeleton,
   Stack,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -31,6 +29,7 @@ import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { appointmentsApi } from "../../api/appointments";
 import { patientsApi } from "../../api/patients";
 import { activitiesApi } from "../../api/activities";
+import { clinicServicesApi } from "../../api/clinicServices";
 import { documentsApi } from "../../api/documents";
 import { patientPreRegistrationApi } from "../../api/patientPreRegistration";
 import { BookingApiError } from "../../api/apiError";
@@ -91,6 +90,8 @@ import {
   type EditDraft,
   type PaperworkRow,
 } from "./appointmentEdit";
+import { AgreedPriceField } from "./price/AgreedPriceField";
+import { amountText, priceLine, priceView } from "./price/agreedPrice";
 
 /**
  * One appointment, opened from the grid — contract 5.8, drawn as the board's
@@ -314,7 +315,15 @@ function DetailBody({
     (appointment.quickRegistrationPending ?? dayRowQuery.data?.quickRegistrationPending ?? false) === true;
 
   const activity = activities.find((a) => a.id === appointment.activityId) ?? null;
-  const price = activity?.priceCzk ?? null;
+  /*
+   * Etapa 12: what the visit costs is the agreed price when the desk set one,
+   * else the list price the server recorded, else the činnost's current price.
+   * Tolerant: an older server carries neither new field and reads as before.
+   */
+  const listPrice = appointment.listPriceCzk ?? activity?.priceCzk ?? null;
+  const agreedPrice = appointment.agreedPriceCzk ?? null;
+  const priceAdjusted = agreedPrice !== null && agreedPrice !== listPrice;
+  const price = agreedPrice ?? listPrice;
   const minutes = durationMinutes(appointment.startUtc, appointment.endUtc);
 
   const late = isLate(appointment.startUtc, isLateStatus(appointment.status), new Date());
@@ -377,12 +386,16 @@ function DetailBody({
    * in that order so a move that is refused leaves the status as it was.
    */
   const saveMutation = useMutation({
-    mutationFn: async (plan: { startUtc: string | null; status: number | null }) => {
+    mutationFn: async (plan: { startUtc: string | null; status: number | null; agreedPriceCzk?: number | null }) => {
       if (plan.startUtc) {
         await appointmentsApi.reschedule(calendarId, appointment.id, plan.startUtc);
       }
       if (plan.status !== null) {
         await appointmentsApi.setStatus(calendarId, appointment.id, String(plan.status));
+      }
+      /* Etapa 12: the price is its own call too; `null` puts the list price back. */
+      if (plan.agreedPriceCzk !== undefined) {
+        await appointmentsApi.setPrice(calendarId, appointment.id, plan.agreedPriceCzk);
       }
     },
     onSuccess: () => {
@@ -858,7 +871,10 @@ function DetailBody({
 
           {/* ── CENA · PLATBA · ZDROJ ── */}
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 2 }}>
-            <Fact label="Cena" value={price != null ? formatCzk(price) : "—"} />
+            <Fact
+              label="Cena"
+              value={priceAdjusted ? priceLine(agreedPrice, listPrice) : price != null ? formatCzk(price) : "—"}
+            />
             {/*
               G3 (3. 10. 2026): the day row carries `paymentState` and `invoiceId`;
               the single-appointment view does not, so the row is read from the
@@ -1656,21 +1672,54 @@ function EditMode({
   mayCancel: boolean;
   onBack: () => void;
   onClose: () => void;
-  onSave: (plan: { startUtc: string | null; status: number | null }) => void;
+  onSave: (plan: { startUtc: string | null; status: number | null; agreedPriceCzk?: number | null }) => void;
   onCancelRequest: () => void;
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState<EditDraft>(() => draftFrom(appointment));
+  /*
+   * Etapa 12: the price. `undefined` - untouched, the field shows what is stored;
+   * `null` - "Vrátit ceník" was pressed; a string - what the desk typed.
+   */
+  const [priceTyped, setPriceTyped] = useState<string | null | undefined>(undefined);
 
   /* A write elsewhere refreshed the appointment under the form: start again
      from what it is now rather than from what it was. */
   useEffect(() => {
     setDraft(draftFrom(appointment));
-  }, [appointment.startUtc, appointment.status]); // eslint-disable-line react-hooks/exhaustive-deps
+    setPriceTyped(undefined);
+  }, [appointment.startUtc, appointment.status, appointment.agreedPriceCzk]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const plan = planEdit(appointment, draft);
-  const hasChanges = plan.startUtc !== null || plan.status !== null;
+  const listPrice = appointment.listPriceCzk ?? activity?.priceCzk ?? null;
+  const storedAgreed = appointment.agreedPriceCzk ?? null;
+  const priceState = {
+    listPriceCzk: listPrice,
+    typed:
+      priceTyped === undefined
+        ? storedAgreed !== null && storedAgreed !== listPrice
+          ? amountText(storedAgreed)
+          : null
+        : priceTyped,
+  };
+  const priceNow = priceView(priceState);
+  /* The amount changes when what the visit would cost differs from what it costs now. */
+  const priceChanged = !priceNow.invalid && priceNow.effectiveCzk !== (storedAgreed ?? listPrice);
+
+  const timePlan = planEdit(appointment, draft);
+  const plan = { ...timePlan, agreedPriceCzk: priceChanged ? priceNow.agreedPriceCzk : undefined };
+  const hasChanges = (plan.startUtc !== null || plan.status !== null || priceChanged) && !priceNow.invalid;
   const minutes = activity?.durationMinutes ?? durationMinutes(appointment.startUtc, appointment.endUtc);
+  /* The služba the činnost belongs to, by name - information only; the one cached list. */
+  const servicesQuery = useQuery({
+    queryKey: ["clinic-services"],
+    queryFn: () => clinicServicesApi.list(),
+    staleTime: 5 * 60 * 1000,
+    enabled: activity?.clinicServiceId != null,
+  });
+  const serviceName =
+    activity?.clinicServiceId != null
+      ? (servicesQuery.data?.find((s) => s.id === activity.clinicServiceId)?.name ?? null)
+      : null;
 
   const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(draft.date);
   const timeValid = /^\d{2}:\d{2}$/.test(draft.time);
@@ -1715,18 +1764,6 @@ function EditMode({
       text: `Nový termín ${span} není mezi nabízenými volnými časy. Server ho může odmítnout.`,
     };
   })();
-
-  const pills = activities.filter((a) => a.isActive || a.id === appointment.activityId);
-  if (activity === null && appointment.activityName) {
-    /* The činnost is not in the list (retired, or the list has not arrived):
-       still show the one the appointment has, so the row is never blank. */
-    pills.unshift({
-      id: appointment.activityId,
-      name: appointment.activityName,
-      durationMinutes: minutes,
-      isActive: false,
-    } as Activity);
-  }
 
   const statusOptions = reachableStatuses(appointment.status);
   const statusLabelOf = (code: number) => {
@@ -1786,44 +1823,26 @@ function EditMode({
       {/* The body scrolls; the header above and the buttons below stay where they are. */}
       <Box sx={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto" }}>
       <Stack spacing={2.5} sx={{ p: compact ? 2 : 3 }}>
-        {/* ── SLUŽBA ── */}
-        <Box>
-          <SectionLabel>Služba</SectionLabel>
-          <ToggleButtonGroup
-            exclusive
-            value={appointment.activityId}
-            aria-label="Služba"
-            sx={{ flexWrap: "wrap", gap: 1, bgcolor: "transparent" }}
-          >
-            {pills.map((a) => (
-              <ToggleButton
-                key={a.id}
-                value={a.id}
-                /* No endpoint changes an appointment's činnost; only the one it has is live. */
-                disabled={a.id !== appointment.activityId}
-                sx={{
-                  minHeight: 44,
-                  borderRadius: "10px !important",
-                  border: "1px solid !important",
-                  borderColor: "divider !important",
-                  ml: "0 !important",
-                  px: 2,
-                  bgcolor: "background.paper",
-                  "&.Mui-selected": {
-                    bgcolor: "secondary.main",
-                    borderColor: "secondary.main !important",
-                    color: "#FFFFFF",
-                  },
-                }}
-              >
-                {a.name}
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
-          <Typography variant="body2" sx={{ color: "text.secondary", mt: 1 }}>
-            Změna služby přepíše délku i cenu podle ceníku.
-            {pills.length > 1 ? " Změna služby zatím není v tomto okně dostupná." : ""}
+        {/* ── SLUŽBA · ČINNOST ──
+            Information only (Matko, 10. 10. 2026: "to má být jen informace, co má jen
+            napsat služba a činnost"). No endpoint changes an appointment's činnost, so
+            a grid of every činnost as disabled chips only confused the desk. */}
+        <Box data-testid="appointment-service-line">
+          <SectionLabel>Služba a činnost</SectionLabel>
+          <Typography sx={{ fontSize: 15, fontWeight: 600, lineHeight: 1.4 }}>
+            {serviceName ?? "—"}
           </Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            {appointment.activityName || activity?.name || "—"}
+            {minutes > 0 ? ` · ${minutes} min` : ""}
+          </Typography>
+          {/* Etapa 12: what the visit costs as saved - and, under it, the one field that changes it. */}
+          <Typography variant="body2" data-testid="appointment-price-line" sx={{ mt: 0.5 }}>
+            Cena: {priceLine(storedAgreed, listPrice)}
+          </Typography>
+          <Box sx={{ mt: 1.5 }}>
+            <AgreedPriceField value={priceState} onChange={setPriceTyped} disabled={busy} fullWidth={compact} />
+          </Box>
         </Box>
 
         {/* ── DATUM · ZAČÁTEK · DÉLKA · STAV ── */}

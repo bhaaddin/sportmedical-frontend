@@ -38,6 +38,11 @@ export interface CreateQuickInput {
   email: string;
   overrideReason?: string;
   note?: string | null;
+  /**
+   * Etapa 12: the price the desk agreed, in Kč. `null` means the list price
+   * stands; a number whenever the desk typed one, even if it equals the list.
+   */
+  agreedPriceCzk?: number | null;
 }
 
 export const quickBookedSchema = z.object({
@@ -219,11 +224,30 @@ export const appointmentsApi = {
     id: string,
     startUtc: string | Date,
     overrideReason?: string,
+    options?: { notifyPatient?: boolean },
   ): Promise<void> =>
     request(async () => {
       await client.put(`/api/calendars/${calendarId}/appointments/${id}/time`, null, {
-        params: { startUtc: asUtcInstant(startUtc), overrideReason },
+        params: {
+          startUtc: asUtcInstant(startUtc),
+          overrideReason,
+          /* Etapa 12: the desk decides whether the patient hears about the move; absent = the server's default. */
+          notifyPatient: options?.notifyPatient,
+        },
       });
+    }),
+
+  /**
+   * Etapa 12: the agreed price of an appointment that already exists - a
+   * sub-resource like `/time` and `/status`, so the move and the status are
+   * untouched. `null` puts the price list's figure back.
+   */
+  setPrice: (calendarId: string, id: string, agreedPriceCzk: number | null): Promise<void> =>
+    request(async () => {
+      await client.put(
+        `/api/calendars/${requireId(calendarId, 'calendarId')}/appointments/${id}/price`,
+        { agreedPriceCzk },
+      );
     }),
 
   /** The reason is optional here and goes into the history. Nothing is deleted. */

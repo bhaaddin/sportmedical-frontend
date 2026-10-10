@@ -12,9 +12,10 @@
  * On a settings route the whole content is replaced - never two sidebars:
  * "← Zpět do aplikace", the brand, the settings search and its groups.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Avatar, Box, Button, ButtonBase, IconButton } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { ArrowBack, Search } from '@mui/icons-material';
 import NotificationCenter from '../NotificationCenter';
 import { openUniversalSearch } from '../UniversalSearch';
@@ -204,6 +205,73 @@ export function SectionNav({ nav, entry, onNavigate }: { nav: ShellNav; entry: M
   );
 }
 
+/**
+ * The sidebar's middle: the navigation and the page's slot, scrolling on its
+ * own between the fixed top (brand, button) and the account row below it.
+ *
+ * The account row is a flex footer AFTER this box, never over it - but with a
+ * tall slot (the calendar's mini calendar plus the service legend) the last
+ * rows are clipped exactly at the footer's top border, with no scrollbar to
+ * speak of, so they read as "covered by the account widget" (Etapa 12 bug).
+ * Hence: bottom padding so the last row never sits flush under the divider,
+ * and a fade over the bottom edge for as long as something is hidden below,
+ * which goes away once the list is scrolled to its end.
+ */
+export function SidebarScrollArea({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [moreBelow, setMoreBelow] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (el === null) return undefined;
+    const check = () => setMoreBelow(el.scrollHeight - el.scrollTop - el.clientHeight > 1);
+    check();
+    el.addEventListener('scroll', check, { passive: true });
+    /* The slot fills after mount (a portal) and the legend grows with the services: watch the content, not only the box. */
+    const sizes = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(check);
+    sizes?.observe(el);
+    for (const child of Array.from(el.children)) sizes?.observe(child);
+    const tree = typeof MutationObserver === 'undefined' ? null : new MutationObserver(() => {
+      check();
+      for (const child of Array.from(el.children)) sizes?.observe(child);
+    });
+    tree?.observe(el, { childList: true, subtree: true });
+    return () => {
+      el.removeEventListener('scroll', check);
+      sizes?.disconnect();
+      tree?.disconnect();
+    };
+  }, []);
+
+  return (
+    <Box sx={{ position: 'relative', flex: '1 1 0%', minHeight: 0, display: 'flex', flexDirection: 'column', mt: 2.5 }}>
+      <Box
+        ref={ref}
+        data-shell-scroll=""
+        data-more-below={moreBelow ? '' : undefined}
+        sx={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto', overflowX: 'hidden', mx: '-6px', px: '6px', pb: 1.5 }}
+      >
+        {children}
+      </Box>
+      <Box
+        aria-hidden
+        data-shell-scroll-hint=""
+        sx={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 36,
+          pointerEvents: 'none',
+          opacity: moreBelow ? 1 : 0,
+          transition: 'opacity 120ms',
+          background: (t) => `linear-gradient(to bottom, ${alpha(t.palette.background.paper, 0)}, ${t.palette.background.paper})`,
+        }}
+      />
+    </Box>
+  );
+}
+
 /** The signed-in person, search and the bell: reachable on every width. */
 export function AccountRow({ nav }: { nav: ShellNav }) {
   const name = [nav.user.firstName, nav.user.lastName].filter(Boolean).join(' ') || 'Účet';
@@ -302,9 +370,9 @@ export function SidebarBody({
         <Box component="h2" data-testid="section-title" sx={{ m: 0, px: '13px', fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: '28px' }}>
           Nastavení
         </Box>
-        <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', mt: 2.5, mx: '-6px', px: '6px' }}>
+        <SidebarScrollArea>
           <SettingsNav plain query={nav.settingsQuery} onQueryChange={nav.onSettingsQueryChange} />
-        </Box>
+        </SidebarScrollArea>
         <AccountRow nav={nav} />
       </>
     );
@@ -326,10 +394,10 @@ export function SidebarBody({
       <Box sx={{ mt: '22px', flexShrink: 0 }}>
         <NewAppointmentButton onNewOrder={onNewOrder} onNavigate={onNavigate} />
       </Box>
-      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', mt: 2.5, mx: '-6px', px: '6px' }}>
+      <SidebarScrollArea>
         {section ? <SectionNav nav={nav} entry={section} onNavigate={onNavigate} /> : <MainNav nav={nav} onNavigate={onNavigate} />}
         {withSlot && <SidebarSlot />}
-      </Box>
+      </SidebarScrollArea>
       <AccountRow nav={nav} />
     </>
   );

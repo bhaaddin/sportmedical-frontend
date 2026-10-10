@@ -7,10 +7,10 @@ import { PhoneField } from "../../ui/PhoneField";
 import { OnSiteConsentsField, type OnSiteConsentSelection } from "./OnSiteConsentsField";
 import type { Activity } from "../../../api/bookingContracts";
 import {
-  formatCzk,
   quickDraftProblems,
   type QuickPatientDraft,
 } from "../NewAppointmentDialog.logic";
+import { priceWord } from "../price/agreedPrice";
 
 export type { QuickPatientDraft };
 
@@ -152,14 +152,15 @@ export function QuickPatientForm({
                 Vyberte prohlídku
               </Typography>
             </MenuItem>
+            {/* Etapa 12: the price is read before the click - "bez ceny" when the list has none. */}
             {activities.map((a) => (
               <MenuItem key={a.id} value={a.id} sx={{ minHeight: 44, whiteSpace: "normal" }}>
-                {a.name} — {formatCzk(a.priceCzk)} · {a.durationMinutes} min
+                {a.name} — {priceWord(a.priceCzk)} · {a.durationMinutes} min
               </MenuItem>
             ))}
             {otherActivities.map((a) => (
               <MenuItem key={a.id} value={a.id} sx={{ minHeight: 44, whiteSpace: "normal" }}>
-                {a.name} — {formatCzk(a.priceCzk)} · {a.durationMinutes} min · dnes se nenabízí
+                {a.name} — {priceWord(a.priceCzk)} · {a.durationMinutes} min · dnes se nenabízí
               </MenuItem>
             ))}
           </TextField>

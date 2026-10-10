@@ -2,11 +2,13 @@ import { useState } from "react";
 import { Box, ButtonBase, Link, Radio, Stack, Typography } from "@mui/material";
 import { DESIGN } from "../../ui";
 import type { Activity } from "../../../api/bookingContracts";
-import { formatCzk, minutesWord } from "../NewAppointmentDialog.logic";
+import { priceWord } from "../price/agreedPrice";
 
 /**
- * "ČINNOST" as the board draws it: one radio card per činnost - name, its
- * length under it, its price on the right - the chosen one in the accent.
+ * "ČINNOST" as the board draws it: one radio card per činnost - the name, and
+ * under it "{price} Kč · {minutes}" (Etapa 12: the price is read BEFORE the
+ * click, the same words as the quick-registration select) - the chosen one in
+ * the accent.
  *
  * The day's own činnosti (what `preview.offeredActivityIds` said, rule 6.1)
  * come first and are all that shows at first. "Zobrazit všechny činnosti z
@@ -74,14 +76,11 @@ export function ActivityCards({
               />
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }}>{a.name}</Typography>
-                <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-                  {minutesWord(a.durationMinutes)}
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }} data-testid="activity-card-caption">
+                  {priceWord(a.priceCzk)} · {a.durationMinutes} min
                   {onOffer ? "" : " · dnes se nenabízí"}
                 </Typography>
               </Box>
-              <Typography sx={{ fontWeight: 700, whiteSpace: "nowrap" }}>
-                {formatCzk(a.priceCzk)}
-              </Typography>
             </ButtonBase>
           );
         })}

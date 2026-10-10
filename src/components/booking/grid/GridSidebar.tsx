@@ -61,6 +61,7 @@ export function ServiceLegend({
 }) {
   if (services.length === 0) return null;
   const hiddenSome = services.some((s) => !isShown(s.id));
+  const hiddenAll = services.every((s) => !isShown(s.id));
   return (
     <Box component="section" aria-label={GRID_TEXT.services}>
       <SectionLabel component="h2" sx={{ mb: 0.5 }}>
@@ -131,8 +132,13 @@ export function ServiceLegend({
           );
         })}
       </Box>
+      {hiddenAll ? (
+        <Typography data-testid="legend-empty" variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          {GRID_TEXT.noServicesShown}
+        </Typography>
+      ) : null}
       {hiddenSome ? (
-        <Link component="button" type="button" underline="hover" onClick={onAll} sx={{ fontSize: 13, mt: 0.5, minHeight: 32 }}>
+        <Link component="button" type="button" underline="hover" onClick={onAll} data-testid="legend-all" sx={{ fontSize: 13, mt: 0.5, minHeight: 32 }}>
           {GRID_TEXT.allServices}
         </Link>
       ) : null}

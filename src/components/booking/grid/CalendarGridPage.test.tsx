@@ -196,13 +196,21 @@ describe('the calendar screen', () => {
     expect(await screen.findByTestId('month-day-2026-09-23')).toBeInTheDocument();
   });
 
-  it('the resolution toolbar steps the grid between hour, 30 and 10 minutes', async () => {
+  it('the resolution toolbar steps the grid between hour, 30, 15 and 10 minutes', async () => {
     renderPage();
     await screen.findByRole('button', { name: /Spiroergometrie/ });
+    /* Etapa 12: "15 min" is a level of its own, so the picture and the label never disagree there. */
+    fireEvent.click(screen.getByRole('button', { name: 'Jemnější mřížka' }));
+    expect(screen.getByRole('button', { name: '15 min' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Krok mřížky 15 min · táhněte do stran pro posun v čase')).toBeInTheDocument();
+    expect(window.localStorage.getItem('calendarZoom')).toBe('1.5');
     fireEvent.click(screen.getByRole('button', { name: 'Jemnější mřížka' }));
     expect(screen.getByRole('button', { name: '10 min' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Krok mřížky 10 min · táhněte do stran pro posun v čase')).toBeInTheDocument();
     expect(window.localStorage.getItem('calendarZoom')).toBe('2');
+    expect(screen.getByRole('button', { name: 'Jemnější mřížka' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Hrubší mřížka' }));
+    expect(screen.getByRole('button', { name: '15 min' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Hodina' }));
     expect(screen.getByRole('button', { name: 'Hrubší mřížka' })).toBeDisabled();
     expect(window.localStorage.getItem('calendarZoom')).toBe('0.6');

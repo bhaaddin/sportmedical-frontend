@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Box, ButtonBase, IconButton, Popover, Tooltip, Typography, useTheme } from "@mui/material";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Box, Button, ButtonBase, ClickAwayListener, IconButton, Paper, Popover, Popper, Tooltip, Typography, useTheme } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
@@ -7,14 +7,34 @@ import { useTranslation } from "react-i18next";
 import { isTerminalStatus, statusTally } from "../../../api/bookingContracts";
 import type { Calendar, DayAppointment, PreviewDay, TimeBlock } from "../../../api/bookingContracts";
 import { pragueDateKey, type DateOnly } from "../../../utils/time";
-import { CALENDAR_DISPLAY_OFFLINE } from "../../../api/displaySettings";
+import { CALENDAR_DISPLAY_OFFLINE, useCalendarDisplay } from "../../../api/displaySettings";
 import { DESIGN } from "../../../theme";
 import { StatusChip } from "../../ui/StatusChip";
+import { errorText } from "../errorText";
 import { AppointmentButton } from "./AppointmentButton";
+import { AppointmentHoverCard } from "./AppointmentHoverCard";
 import { BlockDetailDialog, BlockReasonDialog, type BlockTarget } from "./BlockDialogs";
 import { calendarDayOpen, subColumnClosedLabel, type DayMark } from "./dayMarks";
 import { dayBelongsTo, emphasis } from "./filters";
 import { GRID_TEXT } from "./gridText";
+import {
+  columnStep,
+  DRAG_THRESHOLD_PX,
+  ghostLabel,
+  glideFrom,
+  moveRefusal,
+  movedNoticeText,
+  refusalText,
+  rememberedNotify,
+  samePlace,
+  settle,
+  snapMove,
+  subscribeMoveNotice,
+  TOUCH_DRAG_PRESS_MS,
+  TOUCH_SCROLL_SLACK_PX,
+  type MoveNotice,
+  type MoveRefusal,
+} from "./moveDrag";
 import { nowLinePlacement } from "./nowLine";
 import { longDate, minutesFree, reservationsCount, shortDate, weekdayShort } from "./periodTitle";
 import { pxPerMinuteOf } from "./resolution";
@@ -32,6 +52,7 @@ import {
   type MinuteRange,
 } from "./timeRange";
 import type { ClubBlockPick } from "../calendar/ClubBlockPopover";
+import { MoveConfirmDialog } from "../calendar/MoveConfirmDialog";
 import {
   afternoonFree,
   appointmentInColumn,
@@ -105,9 +126,11 @@ export interface GridBookingRequest {
   /** The same range as instants, for whoever needs UTC (the club reservation). */
   startUtc: string;
   endUtc: string;
+  /** Etapa 12: where in the viewport it was marked, so the booking opens as a bubble beside it (absent → the drawer). */
+  anchor?: { x: number; y: number; width: number; height: number };
 }
 
-/** An appointment dropped on a new time - the page asks before it moves anything. */
+/** An appointment dropped on a new time. */
 export interface GridMoveRequest {
   appointment: DayAppointment;
   calendarId: string;
@@ -117,6 +140,60 @@ export interface GridMoveRequest {
   end: string;
   startUtc: string;
   endUtc: string;
+  /**
+   * "Upozornit klienta na změnu" (Etapa 12): the patient gets a notification and
+   * an e-mail about the new time. On by default; the confirm popover's checkbox
+   * carries the desk's choice here for the page and the API to pass on.
+   */
+  notifyPatient: boolean;
+}
+
+/** A card being dragged (Etapa 12): what is held, where it was taken hold of, and where it hovers now. */
+interface Moving {
+  appointment: DayAppointment;
+  /** The calendar it came from (the row's, or its column's when the row names none). */
+  fromCalendarId: string;
+  /** How far (minutes) down the card the pointer took hold. */
+  grabMinutes: number;
+  length: number;
+  pointerType: string;
+  target: MoveTarget | null;
+}
+
+/** The column and snapped slot under the pointer while a card is dragged. */
+export interface MoveTarget {
+  columnKey: string;
+  calendarId: string;
+  activityId: string | null;
+  dayKey: DateOnly;
+  range: MinuteRange;
+  /** `null`: the card may land here. */
+  refusal: MoveRefusal | null;
+}
+
+/** A press on a card that has not become a drag yet. */
+interface CardPress {
+  appointment: DayAppointment;
+  dayKey: DateOnly;
+  spec: ColumnSpec;
+  columnNode: HTMLElement | null;
+  x: number;
+  y: number;
+  pointerId: number;
+  pointerType: string;
+  grabMinutes: number;
+  length: number;
+  timer: number | undefined;
+  started: boolean;
+}
+
+/** A card drawn away from where the server has it: moved optimistically, waiting for the answer. */
+interface Override {
+  appointment: DayAppointment;
+  startUtc: string;
+  endUtc: string;
+  /** The server has said yes; the override goes once the data shows the new time. */
+  settled: boolean;
 }
 
 /**
@@ -141,13 +218,6 @@ export interface GridPickMode {
   tagOf?: (id: string) => string | null;
   /** Editing an order: its own club blocks do not count as taken (the picks start on top of them). */
   ignoreClubBlockIds?: ReadonlySet<string>;
-}
-
-/** What is being dragged: the booking and how far down its card the pointer took hold. */
-interface Moving {
-  appointment: DayAppointment;
-  grabMinutes: number;
-  length: number;
 }
 
 interface Selection {
@@ -212,8 +282,24 @@ export interface TimeGridProps {
   touchPick?: boolean;
   /** A click on a club's block: the page opens its popover. */
   onOpenClubBlock?: (pick: ClubBlockPick) => void;
-  /** Drag a booking to another time of its own calendar (mouse); the page confirms and moves it. */
+  /**
+   * Dragging a booking to another time of its own calendar (Etapa 12: a press
+   * that travels, or a long press on touch; the ghost shows the snapped slot;
+   * Esc snaps back). Without `onMoveCommit` the drop is handed here at once and
+   * the card returns to its place - the page confirms and moves it the old way.
+   */
   onMove?: (request: GridMoveRequest) => void;
+  /**
+   * The grid owns the move: the card stays drawn at the new slot and this
+   * commits it (the page calls the API and refetches; a rejected promise glides
+   * the card back and shows the server's sentence in the grid's own toast).
+   * With `moveCommit: "confirm"` (the default) a small popover anchored to the
+   * moved card asks first - "Přesunutí rezervace", "Upozornit klienta na změnu",
+   * "Přesunout" / "Zrušit" - and `notifyPatient` carries the checkbox.
+   */
+  onMoveCommit?: (request: GridMoveRequest) => Promise<void>;
+  /** `"confirm"` asks beside the card before committing (default); `"direct"` commits on the drop. */
+  moveCommit?: "confirm" | "direct";
 }
 
 const OPEN_MARK: DayMark = { redNumber: false, closed: false, label: null, detail: null };
@@ -295,7 +381,6 @@ export function TimeGrid(props: TimeGridProps) {
   }, [pickRunning]);
 
   const [pending, setPending] = useState<Selection | null>(null);
-  const [moving, setMoving] = useState<Moving | null>(null);
   const [blockTarget, setBlockTarget] = useState<BlockTarget | null>(null);
   const [openBlock, setOpenBlock] = useState<{ calendar: Calendar; block: TimeBlock } | null>(
     null,
@@ -322,6 +407,389 @@ export function TimeGrid(props: TimeGridProps) {
   const dragEnabled = mayBook || mayBlock;
   const pendingCalendar = pending ? calendarOf(pending.calendarId) : undefined;
   const todayKey = pragueDateKey(now);
+
+  /* ------------------------------------------------------------------------
+   * Moving a card (Etapa 12). The press lives in a ref until it has travelled
+   * far enough (or been held long enough on touch) to be a drag; from then on
+   * `moving` holds the card and the snapped slot under the pointer, drawn as a
+   * ghost in the target column. A drop commits: through `onMoveCommit` with the
+   * card kept at its new slot (an override over the server's data), or the old
+   * way through `onMove`. The rest - the summary on a click, the confirm
+   * popover beside the moved card, the toast, the glide back - follows.
+   * ---------------------------------------------------------------------- */
+  const moveEnabled = mayBook && (props.onMove !== undefined || props.onMoveCommit !== undefined);
+  const moveCommit = props.moveCommit ?? "confirm";
+  const [moving, setMoving] = useState<Moving | null>(null);
+  const movingRef = useRef<Moving | null>(null);
+  movingRef.current = moving;
+  const pressRef = useRef<CardPress | null>(null);
+  const pointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  /* A click that follows a drop is the browser's, not the desk's: swallowed once. */
+  const justDraggedRef = useRef(false);
+  const [overrides, setOverrides] = useState<Map<string, Override>>(() => new Map());
+  const [proposal, setProposal] = useState<GridMoveRequest | null>(null);
+  /* `undefined`: the moved card has not been looked up yet (the popover waits a layout pass for it). */
+  const [proposalAnchor, setProposalAnchor] = useState<Element | null | undefined>(undefined);
+  const [selected, setSelected] = useState<{ appointment: DayAppointment; element: HTMLElement; calendarName?: string } | null>(null);
+  const [notice, setNotice] = useState<MoveNotice | null>(null);
+  const noticeTimer = useRef<number | undefined>(undefined);
+  /* The card's rect at the slot it is leaving; the next layout glides it from there. */
+  const flipRef = useRef<{ id: string; from: DOMRect } | null>(null);
+  const { settings: displaySettings } = useCalendarDisplay();
+
+  const showNotice = useCallback((next: MoveNotice) => {
+    window.clearTimeout(noticeTimer.current);
+    setNotice(next);
+    noticeTimer.current = window.setTimeout(() => setNotice(null), next.tone === "error" ? 6000 : 4000);
+  }, []);
+  useEffect(() => subscribeMoveNotice(showNotice), [showNotice]);
+  useEffect(() => () => window.clearTimeout(noticeTimer.current), []);
+
+  /* What the columns draw: the server's bookings, with the moved ones at their new slot. */
+  const shownByDay = useMemo(() => {
+    if (overrides.size === 0) return props.appointmentsByDay;
+    const out = new Map<string, DayAppointment[]>();
+    for (const [day, list] of props.appointmentsByDay) out.set(day, list.filter((a) => !overrides.has(a.id)));
+    for (const [, o] of overrides) {
+      const day = pragueDateKey(o.startUtc);
+      const moved: DayAppointment = { ...o.appointment, startUtc: o.startUtc, endUtc: o.endUtc };
+      out.set(day, [...(out.get(day) ?? []), moved]);
+    }
+    return out;
+  }, [props.appointmentsByDay, overrides]);
+
+  /* A settled override goes once the server's data shows the card at its new time (or no longer at all). */
+  useEffect(() => {
+    if (overrides.size === 0) return;
+    const stale: string[] = [];
+    for (const [id, o] of overrides) {
+      if (!o.settled) continue;
+      let found: DayAppointment | undefined;
+      for (const list of props.appointmentsByDay.values()) {
+        found = list.find((a) => a.id === id);
+        if (found) break;
+      }
+      if (found === undefined || new Date(found.startUtc).getTime() === new Date(o.startUtc).getTime()) stale.push(id);
+    }
+    if (stale.length === 0) return;
+    setOverrides((current) => {
+      const next = new Map(current);
+      for (const id of stale) next.delete(id);
+      return next;
+    });
+  }, [props.appointmentsByDay, overrides]);
+
+  const cardElement = (id: string): HTMLElement | null =>
+    scrollRef.current?.querySelector<HTMLElement>(`[data-testid="appointment-cell-${id}"]`) ?? null;
+
+  const setOverride = (id: string, value: Override | null) =>
+    setOverrides((current) => {
+      const next = new Map(current);
+      if (value === null) next.delete(id);
+      else next.set(id, value);
+      return next;
+    });
+
+  /* The card is drawn back where the server has it: glide it there from where it was. */
+  const releaseOverride = (id: string) => {
+    const element = cardElement(id);
+    if (element) flipRef.current = { id, from: element.getBoundingClientRect() };
+    setOverride(id, null);
+  };
+  useLayoutEffect(() => {
+    const flip = flipRef.current;
+    if (flip === null) return;
+    flipRef.current = null;
+    const element = cardElement(flip.id);
+    if (element) glideFrom(element, flip.from);
+  }, [overrides]);
+
+  /* The confirm popover hangs off the moved card once it is drawn at its new slot. */
+  useLayoutEffect(() => {
+    if (proposal === null) {
+      setProposalAnchor(undefined);
+      return;
+    }
+    setProposalAnchor(cardElement(proposal.appointment.id));
+  }, [proposal, overrides]);
+
+  const targetAt = (press: CardPress, x: number, y: number, fromCalendarId: string): MoveTarget | null => {
+    const under = typeof document.elementFromPoint === "function" ? document.elementFromPoint(x, y) : null;
+    const node = (under?.closest?.("[data-column-key]") as HTMLElement | null) ?? press.columnNode;
+    if (!node) return null;
+    const columnKey = node.dataset.columnKey ?? "";
+    const dayKey = (node.dataset.dayKey ?? press.dayKey) as DateOnly;
+    const spec = subSpecs.find((s) => s.key === columnKey);
+    const calendar = spec ? calendarOf(spec.calendarId) : undefined;
+    if (!spec || !calendar) return null;
+    const row = previewByCalendar.get(calendar.id)?.get(dayKey);
+    const mark = marks.get(dayKey) ?? OPEN_MARK;
+    const open = calendarDayOpen(mark, row) && dayBelongsTo(row, props.employeeId);
+    const rect = node.getBoundingClientRect();
+    const range = snapMove({
+      pointerOffsetPx: y - rect.top,
+      grabMinutes: press.grabMinutes,
+      length: press.length,
+      step: columnStep(calendar, resolutionStep),
+      pxPerMinute,
+      topMinute,
+      bottomMinute,
+    });
+    const refusal = moveRefusal({
+      appointment: press.appointment,
+      range,
+      dayKey,
+      sameColumn: calendar.id === fromCalendarId && (spec.activityId === null || spec.activityId === press.appointment.activityId),
+      open,
+      row,
+      blocks: (props.blocksByCalendar.get(calendar.id) ?? []).filter((b) => touchesDay(b.startUtc, b.endUtc, dayKey)),
+      others: (props.appointmentsByDay.get(dayKey) ?? []).filter((a) => appointmentInColumn(spec, a)),
+      capacity: spec.capacity,
+    });
+    return { columnKey, calendarId: calendar.id, activityId: spec.activityId, dayKey, range, refusal };
+  };
+
+  const toMoveRequest = (appointment: DayAppointment, target: MoveTarget): GridMoveRequest => {
+    const { startUtc, endUtc } = rangeToInstants(target.dayKey, target.range);
+    return {
+      appointment,
+      calendarId: target.calendarId,
+      dayKey: target.dayKey,
+      start: localDateTime(target.dayKey, target.range.start),
+      end: localDateTime(target.dayKey, target.range.end),
+      startUtc: startUtc.toISOString(),
+      endUtc: endUtc.toISOString(),
+      notifyPatient: rememberedNotify(),
+    };
+  };
+
+  /* The commit the grid owns: the card stays put; a refusal glides it back and says why. */
+  const commitMove = (request: GridMoveRequest) => {
+    const commit = props.onMoveCommit;
+    if (!commit) return;
+    const id = request.appointment.id;
+    commit(request).then(
+      () => {
+        setOverrides((current) => {
+          const o = current.get(id);
+          if (!o) return current;
+          const next = new Map(current);
+          next.set(id, { ...o, settled: true });
+          return next;
+        });
+        const element = cardElement(id);
+        if (element) settle(element);
+        showNotice({ text: movedNoticeText(request.notifyPatient), tone: "info" });
+      },
+      (error: unknown) => {
+        releaseOverride(id);
+        showNotice({ text: errorText(error, t), tone: "error" });
+      },
+    );
+  };
+
+  const cancelProposal = () => {
+    if (proposal === null) return;
+    setProposal(null);
+    releaseOverride(proposal.appointment.id);
+  };
+  const confirmProposal = (request: GridMoveRequest) => {
+    setProposal(null);
+    commitMove(request);
+  };
+
+  const endPress = () => {
+    const press = pressRef.current;
+    if (press?.timer !== undefined) window.clearTimeout(press.timer);
+    pressRef.current = null;
+    const w = windowHandlers.current;
+    window.removeEventListener("pointermove", w.move);
+    window.removeEventListener("pointerup", w.up);
+    window.removeEventListener("pointercancel", w.cancel);
+  };
+
+  const startDrag = (press: CardPress) => {
+    press.started = true;
+    if (press.timer !== undefined) window.clearTimeout(press.timer);
+    press.timer = undefined;
+    const fromCalendarId = press.appointment.calendarId ?? press.spec.calendarId;
+    setSelected(null);
+    setPending(null);
+    const { x, y } = pointerRef.current;
+    setMoving({
+      appointment: press.appointment,
+      fromCalendarId,
+      grabMinutes: press.grabMinutes,
+      length: press.length,
+      pointerType: press.pointerType,
+      target: targetAt(press, x, y, fromCalendarId),
+    });
+  };
+
+  const cancelDrag = () => {
+    const press = pressRef.current;
+    if (press?.started) justDraggedRef.current = true;
+    endPress();
+    setMoving(null);
+  };
+
+  const dropCard = () => {
+    const press = pressRef.current;
+    const current = movingRef.current;
+    endPress();
+    setMoving(null);
+    if (!press?.started || current === null) return;
+    justDraggedRef.current = true;
+    window.setTimeout(() => {
+      justDraggedRef.current = false;
+    }, 0);
+    const target = current.target;
+    if (target === null) return;
+    if (samePlace(current.appointment, target.dayKey, target.range, target.calendarId, current.fromCalendarId)) return;
+    if (target.refusal !== null) {
+      showNotice({ text: `${GRID_TEXT.moveRefused} · ${refusalText(target.refusal)}`, tone: "error" });
+      return;
+    }
+    const request = toMoveRequest(current.appointment, target);
+    if (props.onMoveCommit === undefined) {
+      props.onMove?.(request);
+      return;
+    }
+    setOverride(request.appointment.id, {
+      appointment: current.appointment,
+      startUtc: request.startUtc,
+      endUtc: request.endUtc,
+      settled: false,
+    });
+    if (moveCommit === "direct") commitMove(request);
+    else setProposal(request);
+  };
+
+  /* The window listeners live for one press; they read the latest closures through this ref. */
+  const latest = useRef({ startDrag, cancelDrag, dropCard, targetAt });
+  latest.current = { startDrag, cancelDrag, dropCard, targetAt };
+  const windowHandlers = useRef({
+    move: (event: PointerEvent) => {
+      const press = pressRef.current;
+      if (!press || event.pointerId !== press.pointerId) return;
+      pointerRef.current = { x: event.clientX, y: event.clientY };
+      const distance = Math.hypot(event.clientX - press.x, event.clientY - press.y);
+      if (!press.started) {
+        if (press.pointerType === "mouse") {
+          if (distance > DRAG_THRESHOLD_PX) latest.current.startDrag(press);
+        } else if (distance > TOUCH_SCROLL_SLACK_PX) {
+          /* A finger that moves before the long press is scrolling. */
+          latest.current.cancelDrag();
+        }
+        return;
+      }
+      if (event.cancelable) event.preventDefault();
+      const current = movingRef.current;
+      if (current === null) return;
+      const target = latest.current.targetAt(press, event.clientX, event.clientY, current.fromCalendarId);
+      setMoving((m) => {
+        if (m === null) return m;
+        const same =
+          m.target === target ||
+          (m.target !== null &&
+            target !== null &&
+            m.target.columnKey === target.columnKey &&
+            m.target.dayKey === target.dayKey &&
+            m.target.range.start === target.range.start &&
+            m.target.refusal === target.refusal);
+        return same ? m : { ...m, target };
+      });
+    },
+    up: (event: PointerEvent) => {
+      const press = pressRef.current;
+      if (!press || event.pointerId !== press.pointerId) return;
+      pointerRef.current = { x: event.clientX, y: event.clientY };
+      if (press.started) latest.current.dropCard();
+      else latest.current.cancelDrag();
+    },
+    cancel: (event: PointerEvent) => {
+      const press = pressRef.current;
+      if (!press || event.pointerId !== press.pointerId) return;
+      latest.current.cancelDrag();
+    },
+  });
+
+  const cardPress = {
+    onPointerDown: (event: React.PointerEvent<HTMLElement>, appointment: DayAppointment, spec: ColumnSpec, dayKey: DateOnly) => {
+      if (!moveEnabled || event.button !== 0 || isTerminalStatus(appointment.status)) return;
+      if (pressRef.current !== null) return;
+      const element = event.currentTarget;
+      const rect = element.getBoundingClientRect();
+      const span = spanOnDay(appointment.startUtc, appointment.endUtc, dayKey);
+      const press: CardPress = {
+        appointment,
+        dayKey,
+        spec,
+        columnNode: element.closest<HTMLElement>("[data-column-key]"),
+        x: event.clientX,
+        y: event.clientY,
+        pointerId: event.pointerId,
+        pointerType: event.pointerType || "mouse",
+        grabMinutes: Math.max(0, (event.clientY - rect.top) / pxPerMinute),
+        length: Math.max(1, span.end - span.start),
+        timer: undefined,
+        started: false,
+      };
+      pointerRef.current = { x: event.clientX, y: event.clientY };
+      if (press.pointerType !== "mouse") {
+        press.timer = window.setTimeout(() => {
+          if (pressRef.current === press && !press.started) latest.current.startDrag(press);
+        }, TOUCH_DRAG_PRESS_MS);
+      }
+      pressRef.current = press;
+      const w = windowHandlers.current;
+      window.addEventListener("pointermove", w.move, { passive: false });
+      window.addEventListener("pointerup", w.up);
+      window.addEventListener("pointercancel", w.cancel);
+    },
+    onContextMenu: (event: React.MouseEvent) => {
+      /* A long press on touch must become a drag, not the browser's menu. */
+      if (pressRef.current !== null) event.preventDefault();
+    },
+  };
+  /* An unmount mid-press must not leave listeners on the window. */
+  useEffect(() => endPress, []);
+
+  /* Esc drops the drag and snaps back; it also closes the summary. */
+  useEffect(() => {
+    if (moving === null && selected === null) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (movingRef.current !== null) {
+        event.preventDefault();
+        latest.current.cancelDrag();
+      }
+      setSelected(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [moving, selected]);
+
+  /* A dragged card must not also scroll the page under the finger. */
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (node === null) return;
+    const onTouchMove = (event: TouchEvent) => {
+      if (movingRef.current !== null && event.cancelable) event.preventDefault();
+    };
+    node.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => node.removeEventListener("touchmove", onTouchMove);
+  }, []);
+
+  const selectCard = (appointment: DayAppointment, element: HTMLElement, calendarName?: string) => {
+    setSelected((current) => (current?.appointment.id === appointment.id ? null : { appointment, element, calendarName }));
+  };
+  const openSelected = () => {
+    if (selected === null) return;
+    const id = selected.appointment.id;
+    setSelected(null);
+    props.onOpen(id);
+  };
 
   /* How wide the scroll area is, so a tablet week can show exactly three days. */
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -398,7 +866,7 @@ export function TimeGrid(props: TimeGridProps) {
   const choose = (action: "book" | "block") => {
     if (!pending) return;
     const request = toRequest(pending.calendarId, pending.activityId, pending.dayKey, pending.range);
-    if (action === "book") props.onBook(request);
+    if (action === "book") props.onBook({ ...request, anchor: { x: pending.x, y: pending.y, width: 0, height: 0 } });
     if (action === "block") {
       setBlockTarget({
         calendarId: pending.calendarId,
@@ -417,7 +885,7 @@ export function TimeGrid(props: TimeGridProps) {
   };
 
   const live = (dayKey: string) =>
-    (props.appointmentsByDay.get(dayKey) ?? []).filter((a) => statusTally(a.status) !== "cancelled");
+    (shownByDay.get(dayKey) ?? []).filter((a) => statusTally(a.status) !== "cancelled");
   const countIn = (dayKey: string, spec: ColumnSpec) =>
     live(dayKey).filter((a) => appointmentInColumn(spec, a)).length;
   /* The day view's second line: "3 rezervace", plus "· odpoledne volno" when nothing reaches the afternoon. */
@@ -470,13 +938,22 @@ export function TimeGrid(props: TimeGridProps) {
   const firstHighlighted = highlight ? days.find((d) => inRange(d, highlight)) : undefined;
 
   return (
-    <Box>
+    <Box sx={{ position: "relative" }}>
       <Box sx={{ display: "flex", alignItems: "stretch", gap: 0.5 }}>
         {overflow ? <ScrollArrow direction={-1} onClick={() => scrollByColumn(-1)} /> : null}
 
         <Box
           ref={scrollRef}
           data-testid="time-grid-scroll"
+          data-moving={moving !== null ? "true" : undefined}
+          onClickCapture={(event) => {
+            /* The click the browser fires after a drop is not a click on the card. */
+            if (justDraggedRef.current) {
+              justDraggedRef.current = false;
+              event.stopPropagation();
+              event.preventDefault();
+            }
+          }}
           sx={{
             flex: 1,
             minWidth: 0,
@@ -485,6 +962,8 @@ export function TimeGrid(props: TimeGridProps) {
             borderColor: "divider",
             borderRadius: `${DESIGN.radius.lg}px`,
             bgcolor: "background.paper",
+            cursor: moving !== null ? "grabbing" : undefined,
+            "&[data-moving] *": { cursor: "grabbing !important" },
           }}
         >
           {/* Header row: one cell per day, the činnosti / calendars within. */}
@@ -744,7 +1223,8 @@ export function TimeGrid(props: TimeGridProps) {
                     {String(hour).padStart(2, "0")}:00
                   </Typography>
                 ))}
-                {resolutionStep <= 10
+                {/* From the 15-minute level down the rows are tall enough to name the half hours too. */}
+                {resolutionStep <= 15
                   ? hours.map((hour) => (
                       <Typography
                         key={`${hour}-half`}
@@ -794,7 +1274,7 @@ export function TimeGrid(props: TimeGridProps) {
                 const placement = placementOf(dayKey);
                 const today = dayKey === todayKey;
                 const holiday = mark.label === GRID_TEXT.publicHoliday;
-                const appointments = props.appointmentsByDay.get(dayKey) ?? [];
+                const appointments = shownByDay.get(dayKey) ?? [];
                 const picked = inRange(dayKey, highlight);
 
                 return (
@@ -855,12 +1335,23 @@ export function TimeGrid(props: TimeGridProps) {
                           tapAnchor={tapAnchor?.columnKey === spec.key && tapAnchor.dayKey === dayKey ? tapAnchor.minute : null}
                           onTapAnchor={(minute) => setTapAnchor(minute === null ? null : { columnKey: spec.key, dayKey, minute })}
                           onSelect={handleSelect}
-                          onOpen={props.onOpen}
+                          onOpen={(id) => {
+                            setSelected(null);
+                            props.onOpen(id);
+                          }}
                           onOpenBlock={(block) => setOpenBlock({ calendar, block })}
                           onOpenClubBlock={props.onOpenClubBlock}
-                          moving={moving}
-                          onMoving={setMoving}
-                          onMove={mayBook ? props.onMove : undefined}
+                          moveEnabled={moveEnabled}
+                          cardPress={cardPress}
+                          movingId={moving?.appointment.id ?? null}
+                          ghost={
+                            moving !== null && moving.target !== null && moving.target.columnKey === spec.key && moving.target.dayKey === dayKey
+                              ? { appointment: moving.appointment, range: moving.target.range, refusal: moving.target.refusal }
+                              : null
+                          }
+                          proposalId={proposal?.appointment.id ?? null}
+                          selectedId={selected?.appointment.id ?? null}
+                          onSelectCard={(appointment, element) => selectCard(appointment, element, calendar.name)}
                         />
                       );
                     })}
@@ -1012,6 +1503,77 @@ export function TimeGrid(props: TimeGridProps) {
           mayRemove={mayBlock}
           onClose={() => setOpenBlock(null)}
         />
+      ) : null}
+
+      {/* One click on a card: it is highlighted and this summary sits beside it (no backdrop - the next click
+          lands where it was aimed). Double click, Enter or "Otevřít detail" open the appointment itself. */}
+      <Popper
+        open={selected !== null && selected.element.isConnected && moving === null}
+        anchorEl={selected !== null && selected.element.isConnected ? selected.element : null}
+        placement="right-start"
+        modifiers={[{ name: "offset", options: { offset: [0, 8] } }, { name: "flip", enabled: true }, { name: "preventOverflow", options: { padding: 8 } }]}
+        sx={{ zIndex: (th) => th.zIndex.modal - 1 }}
+      >
+        {selected ? (
+          <ClickAwayListener onClickAway={() => setSelected(null)} mouseEvent="onPointerDown" touchEvent="onTouchStart">
+            <Paper
+              role="dialog"
+              aria-label={GRID_TEXT.openDetail}
+              data-testid="appointment-summary"
+              sx={{ p: 1, borderRadius: "10px", boxShadow: DESIGN.shadow.menu, border: "1px solid", borderColor: "divider", maxWidth: 300 }}
+            >
+              <AppointmentHoverCard
+                appointment={selected.appointment}
+                calendarName={selected.calendarName}
+                fields={displaySettings.hoverFields}
+              />
+              <Button size="small" onClick={openSelected} sx={{ mt: 0.5, minHeight: 36, width: "100%" }}>
+                {GRID_TEXT.openDetail}
+              </Button>
+            </Paper>
+          </ClickAwayListener>
+        ) : null}
+      </Popper>
+
+      {/* The drop in "confirm" mode: the card already sits in its new slot, the popover hangs off it. */}
+      {proposal && proposalAnchor !== undefined ? (
+        <MoveConfirmDialog
+          key={proposal.appointment.id}
+          move={proposal}
+          anchorEl={proposalAnchor?.isConnected ? proposalAnchor : null}
+          onClose={cancelProposal}
+          onConfirm={confirmProposal}
+        />
+      ) : null}
+
+      {/* The grid's own toast: a move kept, or why one was refused. Never a modal. */}
+      {notice ? (
+        <Box
+          role="status"
+          data-testid="grid-notice"
+          data-tone={notice.tone}
+          sx={{
+            position: "absolute",
+            left: "50%",
+            bottom: 52,
+            transform: "translateX(-50%)",
+            zIndex: 7,
+            maxWidth: "calc(100% - 32px)",
+            px: 1.75,
+            py: 1,
+            borderRadius: "10px",
+            fontSize: 13,
+            fontWeight: 600,
+            lineHeight: 1.3,
+            bgcolor: notice.tone === "error" ? DESIGN.tone.red.bg : theme.palette.text.primary,
+            color: notice.tone === "error" ? DESIGN.danger : theme.palette.background.paper,
+            border: notice.tone === "error" ? `1px solid ${DESIGN.tone.red.line}` : "none",
+            boxShadow: DESIGN.shadow.menu,
+            pointerEvents: "none",
+          }}
+        >
+          {notice.text}
+        </Box>
       ) : null}
     </Box>
   );
@@ -1189,9 +1751,13 @@ function SubColumn({
   onOpen,
   onOpenBlock,
   onOpenClubBlock,
-  moving,
-  onMoving,
-  onMove,
+  moveEnabled,
+  cardPress,
+  movingId,
+  ghost,
+  proposalId,
+  selectedId,
+  onSelectCard,
   lunchColor,
 }: {
   spec: ColumnSpec;
@@ -1230,13 +1796,24 @@ function SubColumn({
   onOpen: (id: string) => void;
   onOpenBlock: (block: TimeBlock) => void;
   onOpenClubBlock?: (pick: ClubBlockPick) => void;
-  moving: Moving | null;
-  onMoving: (moving: Moving | null) => void;
-  /** Without it, nothing here is draggable. */
-  onMove?: (request: GridMoveRequest) => void;
+  /** Cards may be dragged to another time (bookings.create and a mover on the grid). */
+  moveEnabled: boolean;
+  /** The grid's pointer handling of a card press: the drag, or the click it stays. */
+  cardPress: {
+    onPointerDown: (event: React.PointerEvent<HTMLElement>, appointment: DayAppointment, spec: ColumnSpec, dayKey: DateOnly) => void;
+    onContextMenu: (event: React.MouseEvent) => void;
+  };
+  /** The card being dragged: drawn faded where it still is. */
+  movingId: string | null;
+  /** The dragged card's shadow in this column: the snapped slot, red when it cannot land. */
+  ghost: { appointment: DayAppointment; range: MinuteRange; refusal: MoveRefusal | null } | null;
+  /** The card sitting in its new slot while the confirm popover is open. */
+  proposalId: string | null;
+  /** The card a click picked out. */
+  selectedId: string | null;
+  onSelectCard: (appointment: DayAppointment, element: HTMLElement) => void;
 }) {
   const theme = useTheme();
-  const [dropAt, setDropAt] = useState<MinuteRange | null>(null);
   const nodeRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ anchor: number; current: number } | null>(null);
   const [folded, setFolded] = useState<{ ids: string[]; x: number; y: number } | null>(null);
@@ -1255,8 +1832,7 @@ function SubColumn({
 
   /* A drag snaps to the calendar's own step, or to the finer grid when the
      grid has been zoomed below it - what is drawn is what can be aimed at. */
-  const calendarStep = calendar.displayStepMinutes > 0 ? calendar.displayStepMinutes : SLOT_MINUTES;
-  const step = Math.min(calendarStep, gridStep > 0 ? gridStep : calendarStep);
+  const step = columnStep(calendar, gridStep);
   const bounds = { start: topMinute, end: bottomMinute };
   const canDrag = dragEnabled && open;
   const painting = pick?.active === true;
@@ -1368,24 +1944,6 @@ function SubColumn({
     select(dragRange(anchor, current, step, bounds), x, y, additive);
   };
 
-  /* Moving a booking by dragging it: only within its own calendar and činnost, only while it is still open. */
-  const mayDropHere =
-    moving !== null &&
-    onMove !== undefined &&
-    open &&
-    moving.appointment.calendarId === calendar.id &&
-    (spec.activityId === null || spec.activityId === moving.appointment.activityId);
-  const dropRange = (event: React.DragEvent<HTMLDivElement>): MinuteRange | null => {
-    if (!moving) return null;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const raw = minuteAt(event.clientY - rect.top, pxPerMinute, topMinute) - moving.grabMinutes;
-    const start = Math.min(
-      Math.max(topMinute, Math.round(raw / step) * step),
-      Math.max(topMinute, bottomMinute - moving.length),
-    );
-    return { start, end: start + moving.length };
-  };
-
   /* Simultaneous bookings in lanes. */
   const layout = layoutLanes(appointments.map((a) => laneItemOf(a, dayKey)));
   const byId = new Map(appointments.map((a) => [a.id, a]));
@@ -1399,6 +1957,8 @@ function SubColumn({
     <Box
       ref={nodeRef}
       data-testid={testId}
+      data-column-key={spec.key}
+      data-day-key={dayKey}
       onPointerDown={(event: React.PointerEvent<HTMLDivElement>) => {
         if (!canDrag || event.button !== 0) return;
         if ((event.target as HTMLElement).closest("[data-grid-item]")) return;
@@ -1484,36 +2044,6 @@ function SubColumn({
         touch.current = null;
         setDrag(null);
       }}
-      onDragOver={(event: React.DragEvent<HTMLDivElement>) => {
-        if (!mayDropHere) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
-        const range = dropRange(event);
-        setDropAt((current) => (current && range && current.start === range.start ? current : range));
-      }}
-      onDragLeave={(event: React.DragEvent<HTMLDivElement>) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropAt(null);
-      }}
-      onDrop={(event: React.DragEvent<HTMLDivElement>) => {
-        if (!mayDropHere || !moving || !onMove) return;
-        event.preventDefault();
-        const range = dropRange(event);
-        setDropAt(null);
-        onMoving(null);
-        if (!range) return;
-        const original = spanOnDay(moving.appointment.startUtc, moving.appointment.endUtc, dayKey);
-        if (pragueDateKey(moving.appointment.startUtc) === dayKey && original.start === range.start) return;
-        const { startUtc, endUtc } = rangeToInstants(dayKey, range);
-        onMove({
-          appointment: moving.appointment,
-          calendarId: calendar.id,
-          dayKey,
-          start: localDateTime(dayKey, range.start),
-          end: localDateTime(dayKey, range.end),
-          startUtc: startUtc.toISOString(),
-          endUtc: endUtc.toISOString(),
-        });
-      }}
       sx={{
         position: "relative",
         flex: 1,
@@ -1550,6 +2080,8 @@ function SubColumn({
           so a drag has something to aim at. */}
       <Box
         aria-hidden
+        data-testid="grid-lines"
+        data-step={gridStep}
         sx={{
           position: "absolute",
           inset: 0,
@@ -1669,6 +2201,16 @@ function SubColumn({
               border: `1px dashed ${club ? alpha(colour, 0.8) : DESIGN.hatch.closedLine}`,
               borderLeft: club ? `3px solid ${colour}` : undefined,
               borderRadius: `${DESIGN.radius.sm}px`,
+              /*
+               * One block from its start to its end (owner, Etapa 12: "when a team books,
+               * it gets the whole day WITHOUT the time step dividing the order"). The hatch
+               * is translucent, so on its own the grid's step lines beneath (zIndex 1) showed
+               * through and a whole-day window read as a stack of little slots. An opaque
+               * base under the hatch masks them; the colour runs uninterrupted, one label,
+               * one border. Lunch is never inside a window - the server cuts the windows
+               * from the open stretches - so the band it skips stays a real gap.
+               */
+              backgroundColor: theme.palette.background.paper,
               backgroundImage: club ? hatchOf(colour) : DESIGN.hatch.closed,
               "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main" },
             }}
@@ -1692,29 +2234,21 @@ function SubColumn({
         const cardHeight = Math.max(18, placed.height - 2);
         const accent = colourOfActivity(catalogue, appointment.activityId, spec.colorHex);
         const widthPct = 100 / placement.lanes;
+        const draggable = moveEnabled && !isTerminalStatus(appointment.status);
+        const beingMoved = movingId === appointment.id;
+        const proposed = proposalId === appointment.id;
+        const isSelected = selectedId === appointment.id;
         return (
           <Box
             key={appointment.id}
             data-testid={`appointment-cell-${appointment.id}`}
             data-lane={placement.lane}
             data-lanes={placement.lanes}
-            draggable={onMove !== undefined && !isTerminalStatus(appointment.status) ? true : undefined}
-            onDragStart={(event: React.DragEvent<HTMLDivElement>) => {
-              if (!onMove || isTerminalStatus(appointment.status)) return;
-              event.dataTransfer.setData("text/plain", appointment.id);
-              event.dataTransfer.effectAllowed = "move";
-              const rect = event.currentTarget.getBoundingClientRect();
-              const span = spanOnDay(appointment.startUtc, appointment.endUtc, dayKey);
-              onMoving({
-                appointment,
-                grabMinutes: Math.max(0, (event.clientY - rect.top) / pxPerMinute),
-                length: Math.max(1, span.end - span.start),
-              });
-            }}
-            onDragEnd={() => {
-              onMoving(null);
-              setDropAt(null);
-            }}
+            data-draggable={draggable ? "true" : undefined}
+            data-selected={isSelected ? "true" : undefined}
+            data-proposed={proposed ? "true" : undefined}
+            onPointerDown={draggable ? (event: React.PointerEvent<HTMLDivElement>) => cardPress.onPointerDown(event, appointment, spec, dayKey) : undefined}
+            onContextMenu={draggable ? cardPress.onContextMenu : undefined}
             sx={{
               position: "absolute",
               left: `calc(${placement.lane * widthPct}% + 3px)`,
@@ -1725,9 +2259,23 @@ function SubColumn({
                * A booking on a shut day - the owner took a Saturday patient and
                * could find them only through the hover - sits ABOVE the day's
                * hatched block (zIndex 4), under the now-line (5). Full card,
-               * clickable; the hatch stays visible around it.
+               * clickable; the hatch stays visible around it. A card waiting for
+               * its confirmation or picked by a click comes forward.
                */
-              zIndex: dayClosed ? 5 : 2,
+              zIndex: proposed || isSelected ? 6 : dayClosed ? 5 : 2,
+              borderRadius: `${DESIGN.radius.sm}px`,
+              /* The card still at its old place while its ghost is dragged. */
+              opacity: beingMoved ? 0.35 : 1,
+              transition: "opacity 150ms ease-out, box-shadow 150ms ease-out",
+              /* In its new slot, waiting for "Přesunout": the ghost's dashed edge, so the desk sees it is not settled. */
+              outline: proposed ? `2px dashed ${accent}` : isSelected ? `2px solid ${theme.palette.primary.main}` : "none",
+              outlineOffset: 1,
+              boxShadow: proposed || isSelected ? DESIGN.shadow.menu : "none",
+              cursor: draggable ? "grab" : undefined,
+              touchAction: draggable ? "manipulation" : undefined,
+              WebkitTouchCallout: "none",
+              userSelect: "none",
+              willChange: proposed ? "transform" : undefined,
             }}
           >
             <AppointmentButton
@@ -1735,6 +2283,8 @@ function SubColumn({
               calendar={calendar}
               now={now}
               onOpen={onOpen}
+              onSelect={(_id, element) => onSelectCard(appointment, element)}
+              hover={!isSelected && !proposed && movingId === null}
               layout="block"
               accent={accent}
               dense={cardHeight < DENSE_BELOW || placement.lanes >= 3}
@@ -1742,6 +2292,48 @@ function SubColumn({
           </Box>
         );
       })}
+
+      {/* The dragged card's shadow at the snapped slot it would take: its colour and the new time; red and
+          named when it cannot land there (taken, outside the hours, another calendar). */}
+      {ghost ? (
+        <Box
+          data-testid="move-preview"
+          data-refused={ghost.refusal ?? undefined}
+          aria-hidden
+          sx={{
+            position: "absolute",
+            left: 3,
+            right: 3,
+            ...place(ghost.range),
+            zIndex: 6,
+            pointerEvents: "none",
+            overflow: "hidden",
+            px: "7px",
+            py: "4px",
+            borderRadius: `${DESIGN.radius.sm}px`,
+            borderLeft: `3px solid ${ghost.refusal ? DESIGN.danger : colourOfActivity(catalogue, ghost.appointment.activityId, spec.colorHex)}`,
+            outline: `2px dashed ${ghost.refusal ? DESIGN.danger : colourOfActivity(catalogue, ghost.appointment.activityId, spec.colorHex)}`,
+            outlineOffset: -1,
+            backgroundColor: ghost.refusal
+              ? alpha(DESIGN.danger, 0.16)
+              : alpha(colourOfActivity(catalogue, ghost.appointment.activityId, spec.colorHex), 0.22),
+            color: ghost.refusal ? DESIGN.danger : theme.palette.text.primary,
+            lineHeight: 1.25,
+          }}
+        >
+          <Box component="span" data-testid="move-preview-time" sx={{ display: "block", fontSize: 11, fontWeight: 700, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+            {ghostLabel(ghost.range)}
+          </Box>
+          <Box component="span" sx={{ display: "block", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {ghost.appointment.patientName?.trim() || ghost.appointment.activityName}
+          </Box>
+          {ghost.refusal ? (
+            <Box component="span" sx={{ display: "block", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>
+              {refusalText(ghost.refusal)}
+            </Box>
+          ) : null}
+        </Box>
+      ) : null}
 
       {layout.overflow.map((chip) => {
         const place_ = place({ start: chip.start, end: chip.end });
@@ -1806,43 +2398,6 @@ function SubColumn({
             })
           : null}
       </Popover>
-
-      {dropAt && mayDropHere ? (
-        <Box
-          data-testid="move-preview"
-          sx={{
-            position: "absolute",
-            left: 4,
-            right: 4,
-            ...place(dropAt),
-            zIndex: 4,
-            pointerEvents: "none",
-            border: `2px dashed ${DESIGN.selection.line}`,
-            borderRadius: `${DESIGN.radius.md}px`,
-            backgroundColor: alpha(DESIGN.selection.bg, 0.7),
-          }}
-        >
-          <Typography
-            sx={{
-              position: "absolute",
-              top: -13,
-              left: -2,
-              px: 1.1,
-              py: "3px",
-              fontSize: 11,
-              fontWeight: 700,
-              lineHeight: 1.3,
-              borderRadius: "6px",
-              backgroundColor: DESIGN.selection.line,
-              color: "#FFFFFF",
-              whiteSpace: "nowrap",
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            {spanLabel(dropAt)}
-          </Typography>
-        </Box>
-      ) : null}
 
       {painting && tapAnchor !== null ? (
         <Box

@@ -279,7 +279,8 @@ describe('step 2 — co se bude dělat', () => {
     expect(within(group).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
       'Prohlídka',
     ]);
-    expect(within(group).getByText('1 600 Kč')).toBeInTheDocument();
+    /* Etapa 12: the price is read before the click, with the length beside it. */
+    expect(within(group).getByText('1 600 Kč · 30 min')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Zobrazit všechny činnosti z ceníku' }));
     expect(within(group).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
@@ -312,6 +313,8 @@ describe('step 2 — co se bude dělat', () => {
       source: 0,
       note: 'Přijde dřív',
       overrideReason: undefined,
+      /* Etapa 12: the price was not touched, so the list price stands. */
+      agreedPriceCzk: null,
     });
     expect(onBooked).toHaveBeenCalled();
     expect(await screen.findByText('Termín je objednaný')).toBeInTheDocument();
@@ -476,6 +479,7 @@ describe('rychlá registrace — čtyři údaje', () => {
       phone: '+420773539001',
       email: 'novy@example.cz',
       overrideReason: undefined,
+      agreedPriceCzk: null,
     });
     /* No second booking path, no separate pre-registration, no walk-in. */
     expect(create).not.toHaveBeenCalled();

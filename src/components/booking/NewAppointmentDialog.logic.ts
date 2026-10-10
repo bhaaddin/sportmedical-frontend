@@ -119,8 +119,9 @@ export type DrawerStep = 1 | 2;
 /** `2 200 Kč` - money the way the board writes it; `—` when there is no price. */
 export function formatCzk(amount: number | null | undefined): string {
   if (amount === null || amount === undefined || Number.isNaN(amount)) return '—';
-  /* Thousands are grouped with a no-break space, so "2 200" never wraps. */
-  const grouped = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 })
+  /* Thousands are grouped with a no-break space, so "2 200" never wraps. Haléře
+     show only when an agreed price carries them (Etapa 12). */
+  const grouped = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2 })
     .format(amount)
     .replace(/\s/g, ' ');
   return `${grouped} Kč`;

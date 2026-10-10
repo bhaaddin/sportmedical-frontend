@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, createEvent, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Calendar, DayAppointment, PreviewDay, TimeBlock } from '../../../api/bookingContracts';
 import { TimeGrid, type TimeGridProps } from './TimeGrid';
@@ -273,6 +273,53 @@ describe('a club’s block', () => {
     expect(screen.queryByTestId('drag-selection')).not.toBeInTheDocument();
   });
 
+  /*
+   * Etapa 12 (owner): "when a team books, it gets the whole day WITHOUT the time step
+   * dividing the order". A window held all day is ONE block from the start of the day
+   * to its end at every resolution: one button, one time line, an opaque base under
+   * the hatch so the grid lines beneath cannot chop it into slots.
+   */
+  describe.each([
+    ['Hodina', 60, 0.6, 46],
+    ['30 min', 30, 1, 52],
+    ['15 min', 15, 1.5, 65],
+    ['10 min', 10, 2, 78],
+  ])('a whole-day window at %s', (_label, step, zoom, hourPx) => {
+    const wholeDay: TimeBlock = { ...clubBlock, startUtc: '2026-10-26T07:00:00Z', endUtc: '2026-10-26T15:00:00Z' };
+
+    it('is one uninterrupted block over the lines', () => {
+      renderGrid({ blocksByCalendar: new Map([[calendar.id, [wholeDay]]]), resolutionStep: step, zoom });
+      const column = screen.getByTestId(`sub-column-${calendar.id}:a1-${DAY}`);
+      const blocks = within(column).getAllByRole('button', { name: 'FK Slaný' });
+      expect(blocks).toHaveLength(1);
+      const block = blocks[0];
+      /* 08:00–16:00 local is eight hours of the column, in one piece. */
+      expect(block).toHaveStyle({ height: `${8 * hourPx}px` });
+      expect(within(block).getAllByTestId('club-block-time')).toHaveLength(1);
+      expect(within(block).getByTestId('club-block-time')).toHaveTextContent('08:00–16:00');
+      /* Opaque under the hatch: the step lines drawn beneath (zIndex 1) do not show through. */
+      expect(block).toHaveStyle({ backgroundColor: 'rgb(255, 255, 255)' });
+      expect(getComputedStyle(block).backgroundImage).toContain('repeating-linear-gradient(135deg');
+      expect(within(column).getByTestId('grid-lines')).toHaveAttribute('data-step', String(step));
+      expect(Number(getComputedStyle(block).zIndex)).toBeGreaterThan(Number(getComputedStyle(within(column).getByTestId('grid-lines')).zIndex));
+    });
+  });
+
+  it('a manual block has the same opaque base, and a lunch break stays its own gap beside a window', () => {
+    const morning: TimeBlock = { ...clubBlock, id: 'm1', startUtc: '2026-10-26T07:00:00Z', endUtc: '2026-10-26T11:00:00Z' };
+    const afternoon: TimeBlock = { ...clubBlock, id: 'm2', startUtc: '2026-10-26T11:30:00Z', endUtc: '2026-10-26T15:00:00Z' };
+    const lunchDay = row(DAY, { breakStart: '12:00:00', breakEnd: '12:30:00' });
+    renderGrid({
+      blocksByCalendar: new Map([[calendar.id, [morning, afternoon, manual]]]),
+      previewByCalendar: new Map([[calendar.id, new Map([[DAY, lunchDay]])]]),
+      marks: new Map([[DAY, dayMark(undefined, [lunchDay])]]),
+    });
+    const column = screen.getByTestId(`sub-column-${calendar.id}:a1-${DAY}`);
+    expect(within(column).getAllByRole('button', { name: 'FK Slaný' })).toHaveLength(2);
+    expect(within(column).getByLabelText('Oběd')).toBeInTheDocument();
+    expect(within(column).getByRole('button', { name: 'Porada' })).toHaveStyle({ backgroundColor: 'rgb(255, 255, 255)' });
+  });
+
   it('tells the page which block it is when clicked, with the days it covers', () => {
     const onOpenClubBlock = vi.fn();
     const second: TimeBlock = { ...clubBlock, id: 'b3', startUtc: '2026-11-08T07:00:00Z', endUtc: '2026-11-08T10:00:00Z' };
@@ -384,25 +431,26 @@ describe('touch', () => {
   });
 });
 
-describe('moving a booking by dragging it', () => {
+describe('moving a booking by dragging it (pointer events, Etapa 12)', () => {
   const card = appt('m1', 'a1', '2026-10-26T07:00:00Z', '2026-10-26T07:30:00Z'); // 08:00–08:30 in Prague
-  const dnd = (type: 'dragStart' | 'dragOver' | 'drop', el: Element, clientY: number) => {
-    const event = createEvent[type](el, { dataTransfer: { setData: vi.fn(), effectAllowed: '', dropEffect: '' } });
-    Object.defineProperty(event, 'clientY', { value: clientY });
-    fireEvent(el, event);
-  };
   const at = (minute: number) => (minute - 7 * 60) * PX_PER_MINUTE;
+  /* jsdom draws every rect at 0, so a press at clientY 0 holds the card by its top edge and a pointer at
+     `at(minute)` is that minute of the column. */
+  const grab = (cell: Element) => fireEvent.pointerDown(cell, { button: 0, pointerType: 'mouse', clientX: 50, clientY: 0, pointerId: 1 });
+  const moveTo = (minute: number) => fireEvent.pointerMove(window, { pointerType: 'mouse', clientX: 50, clientY: at(minute), pointerId: 1 });
+  const dropAt = (minute: number) => fireEvent.pointerUp(window, { pointerType: 'mouse', clientX: 50, clientY: at(minute), pointerId: 1 });
 
-  it('previews the new time while over a column of the same činnost, and hands the drop on', () => {
+  it('shows the ghost with the snapped time while dragging, and hands the drop on (the page confirms)', () => {
     const onMove = vi.fn();
     renderGrid({ appointmentsByDay: new Map([[DAY, [card]]]), onMove });
     const cell = screen.getByTestId('appointment-cell-m1');
-    expect(cell).toHaveAttribute('draggable', 'true');
-    dnd('dragStart', cell, 0);
-    const column = screen.getByTestId('sub-column-c1:a1-2026-10-26');
-    dnd('dragOver', column, at(10 * 60));
-    expect(screen.getByTestId('move-preview')).toHaveTextContent('10:00 – 10:30');
-    dnd('drop', column, at(10 * 60));
+    expect(cell).toHaveAttribute('data-draggable', 'true');
+    grab(cell);
+    moveTo(10 * 60 + 5);
+    expect(screen.getByTestId('move-preview')).toHaveTextContent('10:00–10:30');
+    expect(screen.getByTestId('move-preview')).toHaveTextContent('Pacient m1');
+    expect(screen.getByTestId('move-preview')).not.toHaveAttribute('data-refused');
+    dropAt(10 * 60 + 5);
     expect(onMove).toHaveBeenCalledWith(
       expect.objectContaining({
         calendarId: 'c1',
@@ -411,29 +459,44 @@ describe('moving a booking by dragging it', () => {
         end: '2026-10-26T10:30',
         startUtc: '2026-10-26T09:00:00.000Z',
         endUtc: '2026-10-26T09:30:00.000Z',
+        notifyPatient: true,
         appointment: expect.objectContaining({ id: 'm1' }),
       }),
     );
     expect(screen.queryByTestId('move-preview')).not.toBeInTheDocument();
+    /* Without a mover of its own the grid leaves the card where the server has it. */
+    expect(screen.queryByRole('dialog', { name: 'Přesunutí rezervace' })).not.toBeInTheDocument();
   });
 
   it('a drop where it already is changes nothing', () => {
     const onMove = vi.fn();
     renderGrid({ appointmentsByDay: new Map([[DAY, [card]]]), onMove });
-    dnd('dragStart', screen.getByTestId('appointment-cell-m1'), 0);
-    dnd('drop', screen.getByTestId('sub-column-c1:a1-2026-10-26'), at(8 * 60));
+    grab(screen.getByTestId('appointment-cell-m1'));
+    moveTo(8 * 60 + 40);
+    moveTo(8 * 60 + 2);
+    dropAt(8 * 60 + 2);
     expect(onMove).not.toHaveBeenCalled();
   });
 
-  it('does not take a booking to another činnost’s column', () => {
+  it('does not take a booking to another činnost’s column: the ghost goes red and the drop is refused', () => {
     const onMove = vi.fn();
     renderGrid({ appointmentsByDay: new Map([[DAY, [card]]]), onMove });
-    dnd('dragStart', screen.getByTestId('appointment-cell-m1'), 0);
     const other = screen.getByTestId('sub-column-c1:a2-2026-10-26');
-    dnd('dragOver', other, at(10 * 60));
-    expect(screen.queryByTestId('move-preview')).not.toBeInTheDocument();
-    dnd('drop', other, at(10 * 60));
+    const original = document.elementFromPoint;
+    document.elementFromPoint = () => other;
+    try {
+      grab(screen.getByTestId('appointment-cell-m1'));
+      moveTo(10 * 60);
+      const ghost = screen.getByTestId('move-preview');
+      expect(ghost).toHaveAttribute('data-refused', 'calendar');
+      expect(ghost).toHaveTextContent('Jiný kalendář');
+      expect(other.contains(ghost)).toBe(true);
+      dropAt(10 * 60);
+    } finally {
+      document.elementFromPoint = original;
+    }
     expect(onMove).not.toHaveBeenCalled();
+    expect(screen.getByTestId('grid-notice')).toHaveTextContent('Sem termín přesunout nelze · Jiný kalendář');
   });
 
   it('a booking that is over (cancelled, completed) is not draggable, nor is any without a mover', () => {
@@ -441,12 +504,15 @@ describe('moving a booking by dragging it', () => {
       appointmentsByDay: new Map([[DAY, [{ ...card, status: 4 }, appt('m2', 'a1', '2026-10-26T09:00:00Z', '2026-10-26T09:30:00Z')]]]),
       onMove: vi.fn(),
     });
-    expect(screen.getByTestId('appointment-cell-m1')).not.toHaveAttribute('draggable');
-    expect(screen.getByTestId('appointment-cell-m2')).toHaveAttribute('draggable', 'true');
+    expect(screen.getByTestId('appointment-cell-m1')).not.toHaveAttribute('data-draggable');
+    expect(screen.getByTestId('appointment-cell-m2')).toHaveAttribute('data-draggable', 'true');
   });
 
-  it('without bookings.create nothing can be moved', () => {
-    renderGrid({ appointmentsByDay: new Map([[DAY, [card]]]), onMove: vi.fn(), mayBook: false });
-    expect(screen.getByTestId('appointment-cell-m1')).not.toHaveAttribute('draggable');
+  it('without bookings.create, or without any mover, nothing can be moved', () => {
+    const { unmount } = renderGrid({ appointmentsByDay: new Map([[DAY, [card]]]), onMove: vi.fn(), mayBook: false });
+    expect(screen.getByTestId('appointment-cell-m1')).not.toHaveAttribute('data-draggable');
+    unmount();
+    renderGrid({ appointmentsByDay: new Map([[DAY, [card]]]) });
+    expect(screen.getByTestId('appointment-cell-m1')).not.toHaveAttribute('data-draggable');
   });
 });

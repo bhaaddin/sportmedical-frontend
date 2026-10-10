@@ -172,6 +172,32 @@ describe('dragging on the grid', () => {
     );
   });
 
+  it('at the 15-minute level the lines are a quarter hour apart and a drag snaps to them (Etapa 12)', () => {
+    /* Zoom 1.5 is the "15 min" level: an hour is 65 px, so a quarter is 16.25 px and its line sits a pixel above. */
+    const props = renderGrid({ resolutionStep: 15, zoom: 1.5 });
+    const lines = screen.getByTestId('grid-lines');
+    expect(lines).toHaveAttribute('data-step', '15');
+    expect(getComputedStyle(lines).backgroundImage).toContain('transparent 15.25px');
+    /* The gutter names the half hours from this level down. */
+    expect(screen.getByText('08:30')).toBeInTheDocument();
+
+    const y = (minute: number) => (minute - 7 * 60) * (65 / 60) + 1;
+    const column = screen.getByTestId(`sub-column-${calendar.id}-${DAY}`);
+    fireEvent.pointerDown(column, { button: 0, clientY: y(8 * 60 + 20), clientX: 100, pointerId: 1 });
+    fireEvent.pointerMove(column, { clientY: y(9 * 60 + 5), clientX: 100, pointerId: 1 });
+    fireEvent.pointerUp(column, { clientY: y(9 * 60 + 5), clientX: 100, pointerId: 1 });
+    fireEvent.click(screen.getByRole('menuitem', { name: /Objednat pacienta/ }));
+    expect(props.onBook).toHaveBeenCalledWith(
+      expect.objectContaining({ start: '2026-09-23T08:15', end: '2026-09-23T09:15' }),
+    );
+  });
+
+  it('at the 30-minute level the gutter has no half-hour labels', () => {
+    renderGrid({ resolutionStep: 30 });
+    expect(screen.getByTestId('grid-lines')).toHaveAttribute('data-step', '30');
+    expect(screen.queryByText('08:30')).not.toBeInTheDocument();
+  });
+
   it('does not react at all without bookings.create and bookings.edit', () => {
     renderGrid({ mayBook: false, mayBlock: false });
     const column = drag(8 * 60, 9 * 60);
@@ -223,7 +249,7 @@ describe('dragging on the grid', () => {
     expect(screen.queryByTestId('drag-selection')).not.toBeInTheDocument();
   });
 
-  it('opens the appointment rather than starting a drag when one is pressed', () => {
+  it('a press on an appointment never starts a slot drag; a keyboard activation opens it', () => {
     const props = renderGrid({
       appointmentsByDay: new Map([
         [
@@ -253,7 +279,8 @@ describe('dragging on the grid', () => {
     const button = screen.getByRole('button', { name: /Spiroergometrie/ });
     fireEvent.pointerDown(button, { button: 0, clientY: yAt(8 * 60 + 10), pointerId: 1 });
     expect(screen.queryByTestId('drag-selection')).not.toBeInTheDocument();
-    fireEvent.click(button);
+    /* Enter or Space on the focused card reaches it as a click with `detail` 0: straight to the detail. */
+    fireEvent.click(button, { detail: 0 });
     expect(props.onOpen).toHaveBeenCalledWith('ap1');
   });
 });

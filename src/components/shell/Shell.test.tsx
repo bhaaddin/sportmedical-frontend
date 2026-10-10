@@ -195,6 +195,141 @@ describe('desktop (1440): the full sidebar', () => {
   });
 });
 
+/*
+ * A tall slot: twelve legend rows, as the calendar's SLUŽBY legend would draw
+ * them with many services. jsdom lays nothing out, so the bounding boxes are
+ * checked in the browser; here the STRUCTURE that makes them right is pinned:
+ * the slot's rows live inside the one scrolling box, the account row is a
+ * flex footer after that box (never positioned over it), and the "more below"
+ * fade follows the box's scroll state.
+ */
+function TallProbe() {
+  return (
+    <SidebarPortal>
+      <section aria-label="Služby">
+        {Array.from({ length: 12 }, (_, i) => (
+          <label key={i} data-testid="legend-row">
+            <input type="checkbox" defaultChecked /> Služba {i + 1}
+          </label>
+        ))}
+      </section>
+    </SidebarPortal>
+  );
+}
+
+function renderTallSidebar(width: number, height: number) {
+  setViewport(width, height);
+  localStorage.setItem('permissions', JSON.stringify(EVERYTHING));
+  localStorage.setItem('user', JSON.stringify({ firstName: 'Jana', lastName: 'Nováková', role: 'Recepce' }));
+  return render(
+    <ThemePrefsContext.Provider value={{ accent: '#0D5C52', mode: 'light', setAccent: () => undefined, setMode: () => undefined }}>
+      <ThemeProvider theme={buildTheme('#0D5C52', 'light')}>
+        <MemoryRouter initialEntries={['/planovani']}>
+          <Layout><TallProbe /></Layout>
+        </MemoryRouter>
+      </ThemeProvider>
+    </ThemePrefsContext.Provider>,
+  );
+}
+
+const scrollBox = () => document.querySelector('[data-shell="sidebar"] [data-shell-scroll]') as HTMLElement;
+const footer = () => screen.getByRole('button', { name: 'Účet a vzhled' }).parentElement as HTMLElement;
+
+/** Pretend the box is `scrollHeight` tall inside `clientHeight`, scrolled to `scrollTop`. */
+function fakeScroll(el: HTMLElement, scrollHeight: number, clientHeight: number, scrollTop: number) {
+  Object.defineProperty(el, 'scrollHeight', { configurable: true, value: scrollHeight });
+  Object.defineProperty(el, 'clientHeight', { configurable: true, value: clientHeight });
+  Object.defineProperty(el, 'scrollTop', { configurable: true, writable: true, value: scrollTop });
+  fireEvent.scroll(el);
+}
+
+describe('desktop: a tall slot never ends up under the account row', () => {
+  for (const [w, h] of [[1440, 900], [1280, 700]] as const) {
+    it(`${w}×${h}: the rows sit in the scrolling box, the account row is a footer after it`, () => {
+      renderTallSidebar(w, h);
+      const aside = document.querySelector('[data-shell="sidebar"]') as HTMLElement;
+      expect(getComputedStyle(aside).display).toBe('flex');
+      expect(getComputedStyle(aside).flexDirection).toBe('column');
+
+      const rows = screen.getAllByTestId('legend-row');
+      expect(rows).toHaveLength(12);
+      const box = scrollBox();
+      for (const row of rows) expect(box.contains(row)).toBe(true);
+      const boxStyle = getComputedStyle(box);
+      expect(boxStyle.overflowY).toBe('auto');
+      expect(boxStyle.minHeight).toBe('0px');
+      expect(boxStyle.flexGrow).toBe('1');
+      /* Room under the last row, so it never sits flush against the footer's divider. */
+      expect(parseFloat(boxStyle.paddingBottom)).toBeGreaterThanOrEqual(8);
+
+      /* The footer: still there, after the scrolling region in the column, in normal flow and not shrinking. */
+      const foot = footer();
+      expect(foot).toBeInTheDocument();
+      expect(foot.parentElement).toBe(aside);
+      expect(box.compareDocumentPosition(foot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(box.contains(foot)).toBe(false);
+      const footStyle = getComputedStyle(foot);
+      expect(footStyle.position).toBe('static');
+      expect(footStyle.flexShrink).toBe('0');
+      expect(within(foot).getByRole('button', { name: 'Hledat' })).toBeInTheDocument();
+      expect(within(foot).getByRole('button', { name: 'Oznámení' })).toBeInTheDocument();
+    });
+  }
+
+  it('shows the "more below" fade only while rows are hidden under the bottom edge', () => {
+    renderTallSidebar(1280, 700);
+    const box = scrollBox();
+    const hint = document.querySelector('[data-shell="sidebar"] [data-shell-scroll-hint]') as HTMLElement;
+    expect(hint).toBeInTheDocument();
+    expect(getComputedStyle(hint).pointerEvents).toBe('none');
+
+    fakeScroll(box, 722, 437, 0);
+    expect(box).toHaveAttribute('data-more-below');
+    expect(getComputedStyle(hint).opacity).toBe('1');
+
+    fakeScroll(box, 722, 437, 285);
+    expect(box).not.toHaveAttribute('data-more-below');
+    expect(getComputedStyle(hint).opacity).toBe('0');
+
+    fakeScroll(box, 437, 437, 0);
+    expect(box).not.toHaveAttribute('data-more-below');
+  });
+
+  it('the last row can be toggled', async () => {
+    renderTallSidebar(1280, 700);
+    const last = screen.getAllByTestId('legend-row').at(-1) as HTMLElement;
+    const tick = within(last).getByRole('checkbox');
+    expect(tick).toBeChecked();
+    await userEvent.click(tick);
+    expect(tick).not.toBeChecked();
+  });
+
+  it('tablet and phone draw no slot, so nothing can be covered there', () => {
+    renderTallSidebar(VIEWPORTS.tablet, 700);
+    expect(screen.queryAllByTestId('legend-row')).toHaveLength(0);
+    expect(document.querySelector('[data-shell="sidebar"]')).not.toBeInTheDocument();
+  });
+
+  it('phone: no slot either', () => {
+    renderTallSidebar(VIEWPORTS.phone, 700);
+    expect(screen.queryAllByTestId('legend-row')).toHaveLength(0);
+    expect(document.querySelector('[data-shell="sidebar"]')).not.toBeInTheDocument();
+  });
+
+  it('the tablet overlay keeps the same footer-after-scroll-box column', async () => {
+    renderTallSidebar(VIEWPORTS.tablet, 700);
+    await userEvent.click(screen.getByRole('button', { name: 'Otevřít menu' }));
+    const overlay = await screen.findByRole('dialog', { name: 'Menu' });
+    const box = overlay.querySelector('[data-shell-scroll]') as HTMLElement;
+    expect(box).toBeInTheDocument();
+    expect(getComputedStyle(box).overflowY).toBe('auto');
+    const foot = within(overlay).getByRole('button', { name: 'Účet a vzhled' }).parentElement as HTMLElement;
+    expect(box.contains(foot)).toBe(false);
+    expect(box.compareDocumentPosition(foot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(getComputedStyle(foot).position).toBe('static');
+  });
+});
+
 describe('settings replace the navigation', () => {
   it('desktop: the settings sidebar stands where the main one was, never beside it', async () => {
     renderShell('/patients', VIEWPORTS.desktop);

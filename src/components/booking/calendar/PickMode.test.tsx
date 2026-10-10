@@ -870,7 +870,6 @@ describe('a club that already has a live order of this služba', () => {
   });
 
   it.each([
-    ['another služba', { serviceId: 's2' }],
     ['a cancelled order', { status: 'Cancelled' }],
     ['a completed order', { status: 'Completed' }],
   ])('%s is no reason to ask', async (_label, over) => {
@@ -886,5 +885,143 @@ describe('a club that already has a live order of this služba', () => {
     createStaff.mockResolvedValue(toOrder({ id: 'o-new', clubName: 'FK Slaný', serviceId: 's1', status: 'Confirmed', paymentMethod: 'ClubInvoice', registrationUrl: 'https://app.test/klub/rt' }));
     await pickAndConfirm();
     await waitFor(() => expect(createStaff).toHaveBeenCalledTimes(1));
+  });
+});
+
+/* ── Etapa 12: the desk is also asked about a live order of a DIFFERENT služba, offered as an addendum ── */
+
+describe('a club that already has a live order of a DIFFERENT služba', () => {
+  const OTHER = 'o-8888-aaaa-bbbb-cccc-000000000008';
+  const otherService = (over: Record<string, unknown> = {}) => toOrder({
+    id: OTHER, clubId: 'club-1', clubName: 'FK Slaný', serviceId: 's2', serviceName: 'Lékařské prohlídky', status: 'Confirmed', paymentMethod: 'ClubInvoice',
+    activitySeats: [{ activityId: 'a9', activityName: 'Vstupní prohlídka', durationMinutes: 30, seats: 5, registered: 0, unitPriceCzk: null }],
+    totalSeats: 5, createdAtUtc: '2026-09-02T10:00:00Z',
+    blocks: [{ id: 'ob-1', clubId: 'club-1', clubName: 'FK Slaný', calendarIds: ['c2'], activityIds: [], fromDate: DAY, toDate: DAY, dailyFrom: '09:00', dailyTo: '10:00', status: 'Active', athletes: [], clubOrderId: OTHER }],
+    ...over,
+  });
+
+  beforeEach(() => setViewport(VIEWPORTS.desktop));
+
+  const pickAndConfirm = async () => {
+    renderPage(VIEWPORTS.desktop);
+    const user = await startPicking(); // picks 's1' Diagnostika - a DIFFERENT služba than OTHER's 's2'
+    paint(13 * 60, 15 * 60);
+    await waitFor(() => expect(rows()).toHaveLength(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Potvrdit objednávku' }));
+    return user;
+  };
+
+  it('asks first and offers the addendum, never a silent "Přidat do té objednávky" merge', async () => {
+    listOrders.mockResolvedValue([otherService()]);
+    await pickAndConfirm();
+    const dialog = await screen.findByTestId('pick-duplicate');
+    expect(within(dialog).getByTestId('pick-duplicate-line')).toHaveTextContent('Klub už má objednávku KO-00000008 na jinou službu (Lékařské prohlídky, 1 termín, 5 hráčů).');
+    expect(within(dialog).getByRole('button', { name: 'Přidat jako dodatek k objednávce KO-00000008' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Vytvořit samostatnou objednávku' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Přidat do té objednávky' })).toBeNull();
+    expect(createStaff).not.toHaveBeenCalled();
+  });
+
+  it('"Přidat jako dodatek k objednávce ..." ends this pick and opens the setup locked to that order (its own addendum flow)', async () => {
+    listOrders.mockResolvedValue([otherService()]);
+    const user = await pickAndConfirm();
+    await user.click(await screen.findByRole('button', { name: 'Přidat jako dodatek k objednávce KO-00000008' }));
+    await waitFor(() => expect(screen.queryByTestId('pick-panel')).not.toBeInTheDocument());
+    const setup = await screen.findByTestId('pick-setup');
+    expect(within(setup).getByTestId('pick-setup-parent')).toHaveTextContent('Dodatek k objednávce KO-00000008');
+    expect(within(setup).getByLabelText('Klub')).toBeDisabled();
+    expect(createStaff).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('"Vytvořit samostatnou objednávku" still creates a new, separate order', async () => {
+    listOrders.mockResolvedValue([otherService()]);
+    createStaff.mockResolvedValue(toOrder({ id: 'o-new', clubName: 'FK Slaný', serviceId: 's1', status: 'Confirmed', paymentMethod: 'ClubInvoice', registrationUrl: 'https://app.test/klub/rt' }));
+    const user = await pickAndConfirm();
+    await user.click(await screen.findByRole('button', { name: 'Vytvořit samostatnou objednávku' }));
+    await waitFor(() => expect(createStaff).toHaveBeenCalledTimes(1));
+    expect(update).not.toHaveBeenCalled();
+  });
+});
+
+describe('a club with BOTH a same-služba and a different-služba live order (the three-way case)', () => {
+  const SAME = 'o-7777-aaaa-bbbb-cccc-000000000007';
+  const OTHER = 'o-8888-aaaa-bbbb-cccc-000000000008';
+  const sameService = (over: Record<string, unknown> = {}) => toOrder({
+    id: SAME, clubId: 'club-1', clubName: 'FK Slaný', serviceId: 's1', serviceName: 'Diagnostika', status: 'Confirmed', paymentMethod: 'ClubInvoice',
+    activitySeats: [{ activityId: 'a1', activityName: 'Základní prohlídka', durationMinutes: 30, seats: 10, registered: 0, unitPriceCzk: null }],
+    totalSeats: 10, createdAtUtc: '2026-09-01T10:00:00Z',
+    blocks: [{ id: 'b-1', clubId: 'club-1', clubName: 'FK Slaný', calendarIds: ['c1'], activityIds: [], fromDate: DAY, toDate: DAY, dailyFrom: '09:00', dailyTo: '12:00', status: 'Active', athletes: [], clubOrderId: SAME }],
+    ...over,
+  });
+  const otherService = (over: Record<string, unknown> = {}) => toOrder({
+    id: OTHER, clubId: 'club-1', clubName: 'FK Slaný', serviceId: 's2', serviceName: 'Lékařské prohlídky', status: 'Confirmed', paymentMethod: 'ClubInvoice',
+    activitySeats: [{ activityId: 'a9', activityName: 'Vstupní prohlídka', durationMinutes: 30, seats: 5, registered: 0, unitPriceCzk: null }],
+    totalSeats: 5, createdAtUtc: '2026-09-02T10:00:00Z',
+    blocks: [{ id: 'ob-1', clubId: 'club-1', clubName: 'FK Slaný', calendarIds: ['c2'], activityIds: [], fromDate: DAY, toDate: DAY, dailyFrom: '09:00', dailyTo: '10:00', status: 'Active', athletes: [], clubOrderId: OTHER }],
+    ...over,
+  });
+
+  beforeEach(() => setViewport(VIEWPORTS.desktop));
+
+  const pickAndConfirm = async () => {
+    renderPage(VIEWPORTS.desktop);
+    const user = await startPicking();
+    paint(13 * 60, 15 * 60);
+    await waitFor(() => expect(rows()).toHaveLength(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Potvrdit objednávku' }));
+    return user;
+  };
+
+  it('lists both live orders, each with its matching action, and "Vytvořit samostatnou objednávku" once', async () => {
+    listOrders.mockResolvedValue([sameService(), otherService()]);
+    await pickAndConfirm();
+    const dialog = await screen.findByTestId('pick-duplicate');
+    const dialogRows = within(dialog).getAllByTestId('pick-duplicate-row');
+    expect(dialogRows).toHaveLength(2);
+    expect(dialogRows[0]).toHaveTextContent('KO-00000007');
+    expect(dialogRows[0]).toHaveTextContent('Diagnostika');
+    expect(within(dialogRows[0]).getByRole('button', { name: 'Přidat do této objednávky' })).toBeInTheDocument();
+    expect(dialogRows[1]).toHaveTextContent('KO-00000008');
+    expect(dialogRows[1]).toHaveTextContent('Lékařské prohlídky');
+    expect(within(dialogRows[1]).getByRole('button', { name: 'Přidat jako dodatek k této' })).toBeInTheDocument();
+    expect(within(dialog).getAllByRole('button', { name: 'Vytvořit samostatnou objednávku' })).toHaveLength(1);
+    expect(createStaff).not.toHaveBeenCalled();
+  });
+
+  it('merging into the same-služba row behaves exactly as the plain merge case', async () => {
+    listOrders.mockResolvedValue([sameService(), otherService()]);
+    update.mockResolvedValue(sameService());
+    const user = await pickAndConfirm();
+    const dialog = await screen.findByTestId('pick-duplicate');
+    await user.click(within(within(dialog).getAllByTestId('pick-duplicate-row')[0]).getByRole('button', { name: 'Přidat do této objednávky' }));
+    const panel = await screen.findByTestId('pick-panel');
+    await within(panel).findByRole('button', { name: 'Uložit změny' });
+    expect(within(panel).getByTestId('pick-note')).toHaveTextContent('Přidáno do objednávky KO-00000007');
+    expect(createStaff).not.toHaveBeenCalled();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Uložit změny' }));
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    expect(update.mock.calls[0][0]).toBe(SAME);
+  });
+
+  it('picking the addendum row ends this pick and opens the setup locked to that different order', async () => {
+    listOrders.mockResolvedValue([sameService(), otherService()]);
+    const user = await pickAndConfirm();
+    const dialog = await screen.findByTestId('pick-duplicate');
+    await user.click(within(within(dialog).getAllByTestId('pick-duplicate-row')[1]).getByRole('button', { name: 'Přidat jako dodatek k této' }));
+    await waitFor(() => expect(screen.queryByTestId('pick-panel')).not.toBeInTheDocument());
+    const setup = await screen.findByTestId('pick-setup');
+    expect(within(setup).getByTestId('pick-setup-parent')).toHaveTextContent('Dodatek k objednávce KO-00000008');
+    expect(createStaff).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('"Vytvořit samostatnou objednávku" still works from the three-way dialog', async () => {
+    listOrders.mockResolvedValue([sameService(), otherService()]);
+    createStaff.mockResolvedValue(toOrder({ id: 'o-new', clubName: 'FK Slaný', serviceId: 's1', status: 'Confirmed', paymentMethod: 'ClubInvoice', registrationUrl: 'https://app.test/klub/rt' }));
+    const user = await pickAndConfirm();
+    await user.click(await screen.findByRole('button', { name: 'Vytvořit samostatnou objednávku' }));
+    await waitFor(() => expect(createStaff).toHaveBeenCalledTimes(1));
+    expect(update).not.toHaveBeenCalled();
   });
 });

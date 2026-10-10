@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Box, Tooltip, useTheme } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -14,6 +15,7 @@ import { cardTones } from "../calendar/colors";
 import { formatPragueTime, isLate } from "../../../utils/time";
 import { AppointmentHoverCard } from "./AppointmentHoverCard";
 import { clubLine } from "./clubLine";
+import { DOUBLE_TAP_MS } from "./moveDrag";
 import { shortName } from "./periodTitle";
 
 /**
@@ -35,11 +37,23 @@ export function AppointmentButton({
   accent,
   dense = false,
   shortLabel = false,
+  onSelect,
+  hover = true,
 }: {
   appointment: DayAppointment;
   calendar?: { id: string; name: string; color: string };
   now: Date;
   onOpen: (id: string) => void;
+  /**
+   * The grid's click semantics (Etapa 12): with this, one click SELECTS the card
+   * (the caller shows its summary) and only a double click or double tap - or a
+   * keyboard activation, which reaches here as a click with `detail` 0 - opens
+   * the detail through `onOpen`. Without it every click opens, as a list row or
+   * a month cell wants.
+   */
+  onSelect?: (id: string, element: HTMLElement) => void;
+  /** The hover card; off while the card's own summary is open or a card is being dragged, so there is one card, not two. */
+  hover?: boolean;
   layout: "row" | "block" | "compact";
   /** The činnost's colour (contract C1): the card's edge and tint. Without it, the board's grey. */
   accent?: string;
@@ -51,6 +65,24 @@ export function AppointmentButton({
   const { t } = useTranslation();
   const theme = useTheme();
   const { settings } = useCalendarDisplay();
+  /* The last plain click on this card, so a second within DOUBLE_TAP_MS opens it (touch has no dblclick to rely on). */
+  const lastTap = useRef<number | null>(null);
+  const activate = (event: React.MouseEvent<HTMLElement>) => {
+    if (onSelect === undefined || event.detail === 0) {
+      lastTap.current = null;
+      onOpen(appointment.id);
+      return;
+    }
+    const at = Date.now();
+    const twice = event.detail >= 2 || (lastTap.current !== null && at - lastTap.current < DOUBLE_TAP_MS);
+    if (twice) {
+      lastTap.current = null;
+      onOpen(appointment.id);
+      return;
+    }
+    lastTap.current = at;
+    onSelect(appointment.id, event.currentTarget);
+  };
   const tones = accent
     ? cardTones(accent, theme.palette.background.paper)
     : {
@@ -144,7 +176,7 @@ export function AppointmentButton({
       }}
       /* A list row already says everything the card does, and a phone has no hover: no card there. */
       title={
-        layout === "row" ? (
+        layout === "row" || !hover ? (
           ""
         ) : (
           <AppointmentHoverCard
@@ -160,7 +192,7 @@ export function AppointmentButton({
       type="button"
       data-grid-item="appointment"
       data-status={tally}
-      onClick={() => onOpen(appointment.id)}
+      onClick={activate}
       aria-haspopup="dialog"
       aria-label={
         dense && layout === "block"

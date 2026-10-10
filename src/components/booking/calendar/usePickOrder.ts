@@ -43,6 +43,20 @@ export interface NoteAction {
   onClick: () => void;
 }
 
+/** What `findLiveOrders` found for this club and this pick's služba. */
+export interface LiveOrdersFound {
+  /** The club's newest live order of the SAME služba (a merge candidate), null when there is none. */
+  sameService: ClubOrderView | null;
+  /** Every other live order, one per group, of a DIFFERENT služba (an addendum candidate each), newest first. */
+  others: readonly ClubOrderView[];
+}
+
+export type DuplicateChoice =
+  | { kind: "merge" }
+  | { kind: "addendum"; order: ClubOrderView }
+  | { kind: "separate" }
+  | { kind: "dismiss" };
+
 export interface PickOrderApi {
   session: PickSession | null;
   active: boolean;
@@ -55,11 +69,12 @@ export interface PickOrderApi {
   /** The confirmed order, until the page has shown it. */
   result: ClubOrderView | null;
   /**
-   * The club already has a live order of the same služba: the new order is NOT created until the desk chooses
-   * ("Přidat do té objednávky" or "Vytvořit samostatnou objednávku"). Null when there is nothing to decide.
+   * The club already has a live order (Requested or Confirmed) that this one could join: the same služba (merge
+   * candidate) and/or any other live order of a DIFFERENT služba (addendum candidate). The new order is NOT created
+   * until the desk chooses. Null when there is nothing to decide.
    */
-  duplicate: ClubOrderView | null;
-  resolveDuplicate: (choice: "add" | "separate" | "dismiss") => void;
+  duplicate: LiveOrdersFound | null;
+  resolveDuplicate: (choice: DuplicateChoice) => void;
   /** "Objednávka potvrzena" (new, processed) or "Termíny uloženy" (edited). */
   resultTitle: string;
   /**
@@ -87,8 +102,10 @@ export function usePickOrder(input: {
   onStarted?: (session: PickSession) => void;
   onEnded?: () => void;
   onCreated?: (order: ClubOrderView) => void;
+  /** The desk picked "Přidat jako dodatek k ..." for a different-služba live order: start that order's own addendum flow. */
+  onAddendum?: (order: ClubOrderView) => void;
 }): PickOrderApi {
-  const { multi, calendars, todayKey, nowMinute, onStarted, onEnded, onCreated } = input;
+  const { multi, calendars, todayKey, nowMinute, onStarted, onEnded, onCreated, onAddendum } = input;
   const queryClient = useQueryClient();
   const [session, setSession] = useState<PickSession | null>(null);
   const [note, setNoteText] = useState<string | null>(null);
@@ -107,7 +124,7 @@ export function usePickOrder(input: {
     removedFromWindow: boolean;
   } | null>(null);
   const [result, setResult] = useState<ClubOrderView | null>(null);
-  const [duplicate, setDuplicate] = useState<ClubOrderView | null>(null);
+  const [duplicate, setDuplicate] = useState<LiveOrdersFound | null>(null);
   const [resultTitle, setResultTitle] = useState("Objednávka potvrzena");
 
   const picks = useMemo(() => timePicks(multi.items), [multi.items]);
@@ -186,11 +203,12 @@ export function usePickOrder(input: {
         }
         order = await clubOrdersApi.confirm(editing.orderId, { calendarIds, ranges });
       } else {
-        /* Never silently a second order: a club that already holds a live order of this služba chooses first. */
+        /* Never silently a second, disconnected order: a club that already holds ANY live order - same služba
+         * (a merge candidate) or a different one (an addendum candidate) - chooses first. */
         if (editing === undefined && session.parentOrderId === undefined && !skipDuplicateCheck) {
-          const existing = await findLiveOrder(queryClient, session.clubId, session.serviceId);
-          if (existing !== null) {
-            setDuplicate(existing);
+          const found = await findLiveOrders(queryClient, session.clubId, session.serviceId);
+          if (found.sameService !== null || found.others.length > 0) {
+            setDuplicate(found);
             return;
           }
         }
@@ -237,16 +255,29 @@ export function usePickOrder(input: {
   }, [session, picks, confirming, multi, todayKey, queryClient, onCreated, onEnded]);
 
   const resolveDuplicate = useCallback(
-    (choice: "add" | "separate" | "dismiss") => {
-      const existing = duplicate;
+    (choice: DuplicateChoice) => {
+      const found = duplicate;
       setDuplicate(null);
-      if (existing === null || session === null) return;
-      if (choice === "separate") {
+      if (found === null || session === null) return;
+      if (choice.kind === "separate") {
         void confirm(false, true);
         return;
       }
-      if (choice === "dismiss") return;
-      /* The new picks and players join the existing order: its windows are painted again, the new ones stay on top. */
+      if (choice.kind === "dismiss") return;
+      if (choice.kind === "addendum") {
+        /* The desk picks a DIFFERENT live order to extend: leave this pick behind (it is not created) and hand off
+         * to that order's own "Přidat další službu" flow - exactly what its own button does. */
+        multi.clear();
+        setSession(null);
+        setNote(null);
+        setFailure(null);
+        onEnded?.();
+        onAddendum?.(choice.order);
+        return;
+      }
+      /* "merge": the new picks and players join the SAME-služba order; its windows are painted again, the new ones stay on top. */
+      const existing = found.sameService;
+      if (existing === null) return;
       void (async () => {
         const catalogue = await queryClient
           .fetchQuery({ queryKey: ["club-block-activities"], queryFn: fetchBlockableActivities, staleTime: 5 * 60 * 1000 })
@@ -262,7 +293,7 @@ export function usePickOrder(input: {
         setNote(`Přidáno do objednávky ${orderCode(existing.id)}. Zkontrolujte termíny a uložte změny.`);
       })();
     },
-    [duplicate, session, confirm, queryClient, todayKey, multi],
+    [duplicate, session, confirm, queryClient, todayKey, multi, onEnded, onAddendum],
   );
 
   const ownBlockIds = useMemo(() => new Set((session?.editOrder?.blocks ?? []).map((b) => b.id)), [session]);
@@ -418,19 +449,35 @@ export function usePickOrder(input: {
   return { session, active: session !== null, start, cancel: end, gridPick, panel, result, duplicate, resolveDuplicate, resultTitle, closeResult: () => setResult(null), pickBlocks, previewTake, removeDay, setNote };
 }
 
-/** The club's newest Requested or Confirmed order of this služba, or null (also when the list cannot be read). */
-async function findLiveOrder(queryClient: ReturnType<typeof useQueryClient>, clubId: string, serviceId: string): Promise<ClubOrderView | null> {
+/**
+ * The club's live (Requested/Confirmed) orders split against this pick's služba: the newest one of the SAME
+ * služba (a merge candidate), and every other live order of a DIFFERENT služba (one per group, newest first - an
+ * addendum candidate each). Empty/null on both sides when there is nothing to ask, also when the list cannot be read.
+ */
+async function findLiveOrders(queryClient: ReturnType<typeof useQueryClient>, clubId: string, serviceId: string): Promise<LiveOrdersFound> {
   try {
     const orders = await queryClient.fetchQuery({
       queryKey: ["club-orders", "pick-duplicate", clubId],
       queryFn: () => clubOrdersApi.list({ clubId }),
       staleTime: 0,
     });
-    const live = orders
-      .filter((o) => (o.status === "Requested" || o.status === "Confirmed") && o.serviceId === serviceId)
-      .sort((a, b) => b.createdAtUtc.localeCompare(a.createdAtUtc));
-    return live[0] ?? null;
+    const live = orders.filter((o) => o.status === "Requested" || o.status === "Confirmed");
+    const byNewest = (a: ClubOrderView, b: ClubOrderView) => b.createdAtUtc.localeCompare(a.createdAtUtc);
+    const sameService = live.filter((o) => o.serviceId === serviceId).sort(byNewest)[0] ?? null;
+    /* One row per group (an addendum shares its root's groupId): the ROOT order represents the group when it is
+     * itself live, so the code shown here is the same one the addendum flow's own "Dodatek k objednávce" names;
+     * the newest member stands in when the root itself is not live (e.g. already completed or cancelled). */
+    const byGroup = new Map<string, ClubOrderView[]>();
+    for (const o of live.filter((o) => o.serviceId !== serviceId)) {
+      const members = byGroup.get(o.groupId);
+      if (members === undefined) byGroup.set(o.groupId, [o]);
+      else members.push(o);
+    }
+    const others = [...byGroup.values()]
+      .map((members) => members.find((m) => m.id === m.groupId) ?? members.slice().sort(byNewest)[0])
+      .sort(byNewest);
+    return { sameService, others };
   } catch {
-    return null;
+    return { sameService: null, others: [] };
   }
 }

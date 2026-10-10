@@ -200,6 +200,7 @@ export function NewOrderChooser({ open, onClose }: NewOrderChooserProps) {
         initialEnd={`${slot.date}T${slot.end}`}
         initialQuick
         initialActivityId={slot.activityId}
+        initialServiceId={service?.id}
       />
     );
   }

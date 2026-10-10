@@ -22,9 +22,10 @@ const getAvailability = vi.fn();
 const range = vi.fn();
 const checkRequired = vi.fn();
 const issueLink = vi.fn();
+const setPrice = vi.fn();
 
 vi.mock('../../api/appointments', () => ({
-  appointmentsApi: { get, history, setStatus, reschedule, getAvailability, range, cancel: vi.fn() },
+  appointmentsApi: { get, history, setStatus, reschedule, getAvailability, range, setPrice, cancel: vi.fn() },
 }));
 
 vi.mock('../../api/documents', () => ({
@@ -54,6 +55,14 @@ vi.mock('../../api/activities', () => ({
       ],
       warnings: [],
     }),
+  },
+}));
+
+vi.mock('../../api/clinicServices', () => ({
+  clinicServicesApi: {
+    list: vi.fn().mockResolvedValue([
+      { id: 's-exam', name: 'Sportovní lékařské prohlídky', description: '', sortOrder: 1, isActive: true, activities: 1, calendars: 1, colorHex: '#0D5C52' },
+    ]),
   },
 }));
 
@@ -137,6 +146,7 @@ beforeEach(() => {
   ]);
   setStatus.mockReset().mockResolvedValue(undefined);
   reschedule.mockReset().mockResolvedValue(undefined);
+  setPrice.mockReset().mockResolvedValue(undefined);
   getAvailability.mockReset().mockResolvedValue([]);
 });
 
@@ -249,6 +259,20 @@ describe('the appointment detail', () => {
     expect(screen.getByRole('button', { name: 'Vystavit doklad' })).toBeInTheDocument();
   });
 
+
+  it('the edit form states the služba and činnost as plain information, not a grid of every činnost', async () => {
+    renderDetail();
+    await screen.findByText('Základní prohlídka');
+    await userEvent.click(screen.getByRole('button', { name: 'Upravit' }));
+    await screen.findByText('Úprava rezervace');
+    const line = screen.getByTestId('appointment-service-line');
+    expect(line).toHaveTextContent('Služba a činnost');
+    expect(await within(line).findByText('Sportovní lékařské prohlídky')).toBeInTheDocument();
+    expect(line).toHaveTextContent('Základní prohlídka · 30 min');
+    /* No toggle grid any more: the činnost is information here, not a choice. */
+    expect(screen.queryByRole('group', { name: 'Služba' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Změna služby/)).not.toBeInTheDocument();
+  });
   it('opens the edit form from "Upravit" and only enables saving once something changed', async () => {
     renderDetail();
     await screen.findByText('09:30 — 10:00');
@@ -295,6 +319,85 @@ describe('the appointment detail', () => {
     expect(setStatus).not.toHaveBeenCalled();
   });
 });
+
+/* ── Etapa 12: the agreed price, read and corrected ── */
+
+const plain = (s: string | null | undefined) => (s ?? '').replace(/ /g, ' ');
+
+describe.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet], ['phone', VIEWPORTS.phone]] as const)(
+  'the price of the visit · %s',
+  (_name, width) => {
+    beforeEach(() => setViewport(width, width === VIEWPORTS.phone ? 844 : width === VIEWPORTS.tablet ? 1112 : 900));
+
+    it('reads the list price when nothing was agreed, and names the adjustment when something was', async () => {
+      get.mockResolvedValue({ ...appointment, agreedPriceCzk: 1200, listPriceCzk: 1600 });
+      renderDetail();
+      const fact = await screen.findByText(/upraveno/);
+      expect(plain(fact.textContent)).toBe('1 200 Kč (upraveno, ceník 1 600 Kč)');
+    });
+
+    it('the edit form says "Cena: … (ceník)" next to the služba line and sends a typed amount to /price alone', async () => {
+      renderDetail();
+      await screen.findByText('Základní prohlídka');
+      await userEvent.click(screen.getByRole('button', { name: 'Upravit' }));
+      await screen.findByText('Úprava rezervace');
+
+      const line = screen.getByTestId('appointment-service-line');
+      expect(plain(within(line).getByTestId('appointment-price-line').textContent)).toBe('Cena: 1 600 Kč (ceník)');
+
+      const field = within(line).getByLabelText('Cena') as HTMLInputElement;
+      expect(field.value).toBe('1600');
+      expect(within(line).getByTestId('agreed-price-caption')).toHaveTextContent('podle ceníku');
+      /* The field is a touch target. */
+      expect(field.closest('.MuiInputBase-root')).toHaveStyle({ minHeight: '44px' });
+
+      const save = screen.getByRole('button', { name: 'Uložit změny' });
+      expect(save).toBeDisabled();
+      await userEvent.clear(field);
+      await userEvent.type(field, '1200');
+      expect(plain(within(line).getByTestId('agreed-price-caption').textContent)).toBe('upraveno (ceník 1 600 Kč)');
+      expect(within(line).getByRole('button', { name: 'Vrátit ceník' })).toBeInTheDocument();
+      expect(save).toBeEnabled();
+
+      await userEvent.click(save);
+      await waitFor(() => expect(setPrice).toHaveBeenCalledWith('c1', 't1', 1200));
+      expect(reschedule).not.toHaveBeenCalled();
+      expect(setStatus).not.toHaveBeenCalled();
+    });
+
+    it('an adjusted price opens prefilled with the agreed amount, and "Vrátit ceník" sends null', async () => {
+      get.mockResolvedValue({ ...appointment, agreedPriceCzk: 1200, listPriceCzk: 1600 });
+      renderDetail();
+      await screen.findByText('Základní prohlídka');
+      await userEvent.click(screen.getByRole('button', { name: 'Upravit' }));
+      await screen.findByText('Úprava rezervace');
+
+      const line = screen.getByTestId('appointment-service-line');
+      expect(plain(within(line).getByTestId('appointment-price-line').textContent)).toBe('Cena: 1 200 Kč (upraveno, ceník 1 600 Kč)');
+      expect((within(line).getByLabelText('Cena') as HTMLInputElement).value).toBe('1200');
+      expect(screen.getByRole('button', { name: 'Uložit změny' })).toBeDisabled();
+
+      await userEvent.click(within(line).getByRole('button', { name: 'Vrátit ceník' }));
+      expect((within(line).getByLabelText('Cena') as HTMLInputElement).value).toBe('1600');
+      expect(within(line).getByTestId('agreed-price-caption')).toHaveTextContent('podle ceníku');
+      await userEvent.click(screen.getByRole('button', { name: 'Uložit změny' }));
+      await waitFor(() => expect(setPrice).toHaveBeenCalledWith('c1', 't1', null));
+    });
+
+    it('a typed amount that is not money keeps saving off', async () => {
+      renderDetail();
+      await screen.findByText('Základní prohlídka');
+      await userEvent.click(screen.getByRole('button', { name: 'Upravit' }));
+      await screen.findByText('Úprava rezervace');
+      const field = screen.getByLabelText('Cena');
+      await userEvent.clear(field);
+      await userEvent.type(field, '10%');
+      expect(screen.getByTestId('agreed-price-caption')).toHaveTextContent(/Zadejte částku/);
+      expect(screen.getByRole('button', { name: 'Uložit změny' })).toBeDisabled();
+      expect(setPrice).not.toHaveBeenCalled();
+    });
+  },
+);
 
 
 /* ── Etapa 2: a desk quick registration whose deadline is still running ── */

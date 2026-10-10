@@ -29,6 +29,7 @@ vi.mock('./NewAppointmentDialog', () => ({
         end: props.initialEnd,
         quick: props.initialQuick,
         activity: props.initialActivityId,
+        service: props.initialServiceId,
       })}
     </pre>
   ),
@@ -115,7 +116,8 @@ describe.each(['phone', 'tablet', 'desktop'] as ViewportName[])('NewOrderChooser
 
     const drawer = JSON.parse((await screen.findByTestId('drawer')).textContent ?? '{}');
     /* c2 offers 08:00Z = 09:00 Prague (January), earlier than c1. */
-    expect(drawer).toEqual({ calendar: 'c2', start: '2099-01-05T09:00', end: '2099-01-05T09:30', quick: true, activity: 'a1' });
+    /* The calendar, the činnost and the služba handed over all belong together. */
+    expect(drawer).toEqual({ calendar: 'c2', start: '2099-01-05T09:00', end: '2099-01-05T09:30', quick: true, activity: 'a1', service: 's1' });
     /* Only the service's own calendars were asked. */
     expect(getAvailability.mock.calls.map((c) => c[0]).sort()).toEqual(['c1', 'c2']);
   });

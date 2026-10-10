@@ -7,6 +7,7 @@ import {
   Checkbox,
   FormControlLabel,
   Link,
+  ListSubheader,
   Menu,
   MenuItem,
   Stack,
@@ -43,6 +44,10 @@ import { errorText } from "./errorText";
 import { ActivityCards } from "./drawer/ActivityCards";
 import { DrawerFrame } from "./drawer/DrawerFrame";
 import { ModeCards } from "./drawer/ModeCards";
+import { BubbleFrame } from "./NewAppointmentDialog.bubble";
+import type { BubbleAnchor } from "./NewAppointmentDialog.bubble.logic";
+import { AgreedPriceField } from "./price/AgreedPriceField";
+import { priceView } from "./price/agreedPrice";
 import { PatientSearch } from "./patient/PatientSearch";
 import { PatientFilled } from "./patient/PatientFilled";
 import { QuickPatientForm } from "./patient/QuickPatientForm";
@@ -128,6 +133,16 @@ import {
  * only decides what goes in and switches a few layouts (one field per row, the
  * mode cards as rows) on `useDevice()`.
  *
+ * Etapa 12 (the owner, 10. 10. 2026): given an `anchor` - the marked slot's box
+ * in the grid - a desktop or a tablet gets the BUBBLE instead (`BubbleFrame`):
+ * a 440 px card with a caret pointing at the slot. Without an anchor, and always
+ * on a phone, the drawer above is exactly what it was.
+ *
+ * The price (Etapa 12 as well): every činnost reads "{name} · {price} · {minutes}"
+ * BEFORE it is chosen; once chosen, a "Cena" field prefilled from the price list
+ * lets the desk type the amount agreed (`agreedPriceCzk`), "Celkem k úhradě"
+ * follows it, and no percentage appears anywhere.
+ *
  * The Czech wording lives in `TEXT` below rather than in `cs.json`, which
  * several teams edit at the same time; the keys that were already there are
  * still read through `t()`.
@@ -168,6 +183,14 @@ const TEXT = {
   book: "Objednat termín",
   total: "Celkem k úhradě",
   pickWhenFirst: "Nejprve vyberte kalendář, datum a čas.",
+  service: "Služba",
+  pickService: "Vyberte službu",
+  pickServiceFirst: "Nejdřív vyberte službu — nabídnou se její činnosti.",
+  pickCalendar: "Vyberte kalendář",
+  otherServicesCalendars: "Kalendáře jiných služeb",
+  /* The calendar decides the služba; when it overrules what was picked, it says so in one line, and blocks nothing. */
+  calendarBelongsTo: (calendar: string, service: string) => `Kalendář ${calendar} patří službě ${service}.`,
+  serviceHasNoCalendar: "Tuto službu zatím neprovádí žádný kalendář.",
   dayOffersNothing: "V tento den kalendář nenabízí žádnou činnost",
   free: "Slot je volný. Nekoliduje s žádnou rezervací ani s obědem.",
   notOffered: (time: string) =>
@@ -232,6 +255,26 @@ interface NewAppointmentDialogProps {
    */
   initialQuick?: boolean;
   initialActivityId?: string;
+  /**
+   * The služba the caller had chosen ("Nová objednávka" starts with one). The
+   * calendar still has the last word: a calendar of another služba switches it.
+   */
+  initialServiceId?: string;
+  /**
+   * Etapa 12, "rovnou na bublinku". The box of the slot the desk clicked or
+   * marked in the grid, in VIEWPORT pixels - exactly `getBoundingClientRect()`
+   * of the slot element at the moment of opening:
+   *
+   *     anchor={{ x: rect.left, y: rect.top, width: rect.width, height: rect.height }}
+   *
+   * Given one, a desktop and a tablet render the booking as a popover (440 px,
+   * caret pointing at the slot, flips to the side with room, body scrolls
+   * inside, Esc / click outside close it - after "Zahodit?" once something was
+   * typed). Left out, the drawer renders exactly as before. A phone always
+   * keeps the full-screen drawer, anchor or not. The anchor is read on every
+   * render, so a caller that scrolls the grid may pass a fresh one.
+   */
+  anchor?: BubbleAnchor;
 }
 
 interface IssuedLinkView {
@@ -261,7 +304,9 @@ export function NewAppointmentDialog({
   initialPatientId,
   initialQuick = false,
   initialActivityId,
+  initialServiceId,
   onFindNextFree,
+  anchor,
 }: NewAppointmentDialogProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -379,13 +424,54 @@ export function NewAppointmentDialog({
     [activitiesQuery.data],
   );
 
-  /* One calendar needs no choosing; one the list does not hold is no choice. */
+  /*
+   * Služba, kalendář, činnost - and the CALENDAR is the one source of truth
+   * (the owner, 2026-10-10: "when I click the wrong calendar for a služba, the
+   * činnosti of THAT calendar must show up right away"). A calendar runs one
+   * služba (`clinicServiceId`), so the calendar chosen decides the služba shown
+   * and the činnosti offered; picking a služba first only narrows the calendars
+   * to its own and preselects the only one. A calendar made before služby
+   * existed carries none and decides nothing - then the služba picked drives.
+   * A clinic whose činnosti carry no služba (or whose služby did not load) is
+   * not gated at all.
+   */
+  const [serviceId, setServiceId] = useState(initialServiceId ?? "");
+  /* The one line said when the calendar overruled the služba picked before it. */
+  const [serviceSwitchNote, setServiceSwitchNote] = useState<string | null>(null);
+  const serviceOptions = useMemo(
+    () =>
+      (servicesQuery.data ?? [])
+        .filter(
+          (sv) =>
+            sv.isActive &&
+            (activities.some((a) => a.clinicServiceId === sv.id) || calendars.some((c) => c.clinicServiceId === sv.id)),
+        )
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "cs")),
+    [servicesQuery.data, activities, calendars],
+  );
+  const serviceGate = serviceOptions.length > 0;
+  const isKnownService = (id: string | null | undefined): id is string =>
+    id !== null && id !== undefined && serviceOptions.some((sv) => sv.id === id);
+  const serviceName = (id: string) => serviceOptions.find((sv) => sv.id === id)?.name ?? "";
+  const calendarsOf = (id: string) => calendars.filter((c) => c.clinicServiceId === id);
+  /* The služba picked by hand, when it is one the list holds. */
+  const pickedServiceId = serviceGate && isKnownService(serviceId) ? serviceId : "";
+
+  /*
+   * One calendar needs no choosing; one the list does not hold is no choice;
+   * a služba that exactly one calendar runs has its calendar chosen with it.
+   */
   const effectiveCalendarId = calendars.some((c) => c.id === calendarId)
     ? calendarId
     : calendars.length === 1
       ? calendars[0].id
-      : "";
+      : pickedServiceId !== "" && calendarsOf(pickedServiceId).length === 1
+        ? calendarsOf(pickedServiceId)[0].id
+        : "";
   const calendar = calendars.find((c) => c.id === effectiveCalendarId) ?? null;
+  /* The služba the chosen calendar runs - the one that wins - or "" when the calendar does not say. */
+  const calendarServiceId =
+    serviceGate && isKnownService(calendar?.clinicServiceId) ? (calendar?.clinicServiceId ?? "") : "";
 
   const moment = { date, time };
   const whenComplete = effectiveCalendarId !== "" && isCompleteMoment(moment);
@@ -402,30 +488,27 @@ export function NewAppointmentDialog({
     enabled: open && effectiveCalendarId !== "" && isDateOnly(date),
   });
   /*
-   * Služba first, then činnost: the činnosti offered are those of the chosen service only. A clinic whose činnosti
-   * carry no service (or whose services did not load) is not gated.
+   * Which služba the form is on: the calendar's, when it has one; else the one
+   * picked; else the only one there is; else the one of the činnost already chosen.
    */
-  const [serviceId, setServiceId] = useState("");
-  const serviceOptions = useMemo(
-    () =>
-      (servicesQuery.data ?? [])
-        .filter((sv) => sv.isActive && activities.some((a) => a.clinicServiceId === sv.id))
-        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "cs")),
-    [servicesQuery.data, activities],
-  );
-  const serviceGate = serviceOptions.length > 0;
   const pickedActivityId = mode === "quick" ? quick.activityId : activityId;
   const effectiveServiceId = !serviceGate
     ? ""
-    : serviceOptions.some((sv) => sv.id === serviceId)
-      ? serviceId
-      : serviceOptions.length === 1
-        ? serviceOptions[0].id
-        : (activities.find((a) => a.id === pickedActivityId)?.clinicServiceId ?? "");
+    : calendarServiceId !== ""
+      ? calendarServiceId
+      : pickedServiceId !== ""
+        ? pickedServiceId
+        : serviceOptions.length === 1
+          ? serviceOptions[0].id
+          : (activities.find((a) => a.id === pickedActivityId)?.clinicServiceId ?? "");
+  /* Only the služba's own činnosti - never one of another služba, whatever was chosen before. */
   const scopedActivities = useMemo(
     () => (!serviceGate ? activities : activities.filter((a) => a.clinicServiceId === effectiveServiceId)),
     [serviceGate, activities, effectiveServiceId],
   );
+  /* The calendars of the služba on the form come first; the rest are offered under their own heading. */
+  const ownCalendars = effectiveServiceId === "" ? calendars : calendars.filter((c) => c.clinicServiceId === effectiveServiceId);
+  const otherCalendars = effectiveServiceId === "" ? [] : calendars.filter((c) => c.clinicServiceId !== effectiveServiceId);
   const offeredActivities = useMemo(() => {
     const ids = new Set((previewQuery.data ?? []).flatMap((p) => p.offeredActivityIds ?? []));
     return scopedActivities.filter((a) => ids.has(a.id));
@@ -434,18 +517,69 @@ export function NewAppointmentDialog({
     const offered = new Set(offeredActivities.map((a) => a.id));
     return scopedActivities.filter((a) => !offered.has(a.id));
   }, [scopedActivities, offeredActivities]);
+  /* A činnost of another služba does not ride along: it is dropped, and the offer is asked again. */
+  const dropForeignActivity = (serviceOfForm: string) => {
+    const belongs = (id: string) => id === "" || activities.find((a) => a.id === id)?.clinicServiceId === serviceOfForm;
+    if (!belongs(activityId)) setActivityId("");
+    setQuick((q) => (belongs(q.activityId) ? q : { ...q, activityId: "" }));
+  };
+  /*
+   * Služba picked by hand: its own calendars are what is offered next, and the
+   * only one is chosen with it (derived above). A calendar of another služba
+   * cannot stay - it would win straight back - so it is let go, and the fields
+   * to choose another are shown.
+   */
   const changeService = (id: string) => {
     setServiceId(id);
-    setActivityId("");
-    setQuick((q) => (activities.find((a) => a.id === q.activityId)?.clinicServiceId === id ? q : { ...q, activityId: "" }));
+    setServiceSwitchNote(null);
+    if (calendar !== null && calendar.clinicServiceId !== null && calendar.clinicServiceId !== id) {
+      setCalendarId("");
+      if (calendarsOf(id).length !== 1) setEditingWhen(true);
+    }
+    dropForeignActivity(id);
     setOverriding(false);
     setConflict(null);
+  };
+  /*
+   * Calendar picked: it decides. Its služba goes on the form at once - with a
+   * one-line note when that is not the služba picked before - and its činnosti
+   * replace the list; a činnost of another služba is cleared.
+   */
+  const changeCalendar = (id: string) => {
+    const next = calendars.find((c) => c.id === id) ?? null;
+    setCalendarId(id);
+    setOverriding(false);
+    setConflict(null);
+    const nextService = next !== null && isKnownService(next.clinicServiceId) ? next.clinicServiceId : "";
+    if (nextService === "") {
+      setServiceSwitchNote(null);
+      return;
+    }
+    setServiceSwitchNote(
+      effectiveServiceId !== "" && effectiveServiceId !== nextService
+        ? TEXT.calendarBelongsTo(next?.name ?? "", serviceName(nextService))
+        : null,
+    );
+    setServiceId(nextService);
+    dropForeignActivity(nextService);
   };
   const day = dayState(previewQuery.data ?? []);
   const dayWordKey = dayStateLabelKey(day);
   /* In "Rychlá registrace" the činnost is chosen with the four facts; elsewhere on step 2. */
   const chosenActivityId = mode === "quick" ? quick.activityId : activityId;
   const activity = scopedActivities.find((a) => a.id === chosenActivityId) ?? null;
+
+  /*
+   * Etapa 12: the price. The list price is the činnost's; what the desk typed
+   * is `priceTyped` (`null` until touched), and another činnost starts from its
+   * own list price again. What goes on the wire is `price.agreedPriceCzk`.
+   */
+  const [priceTyped, setPriceTyped] = useState<string | null>(null);
+  useEffect(() => {
+    setPriceTyped(null);
+  }, [chosenActivityId]);
+  const listPriceCzk = activity?.priceCzk ?? null;
+  const price = priceView({ listPriceCzk, typed: priceTyped });
 
   /* Is the chosen start offered for this činnost? Only the server knows. */
   const availabilityQuery = useQuery({
@@ -497,6 +631,7 @@ export function NewAppointmentDialog({
           source: SOURCE_STAFF,
           note: noteOrNull,
           overrideReason: input.overrideReason,
+          agreedPriceCzk: price.agreedPriceCzk,
         });
         view = {
           startUtc: result.appointment.startUtc,
@@ -515,6 +650,7 @@ export function NewAppointmentDialog({
           phone: null,
           note: noteOrNull,
           overrideReason: input.overrideReason,
+          agreedPriceCzk: price.agreedPriceCzk,
         });
         view = { startUtc: appointment.startUtc, warnings: [], link: null, linkFailed: false, patientId: null };
       }
@@ -573,6 +709,7 @@ export function NewAppointmentDialog({
         phone,
         email: quick.email.trim(),
         overrideReason: input.overrideReason,
+        agreedPriceCzk: price.agreedPriceCzk,
       });
       /* The patient exists now: record the consents signed on paper. A failure never
          undoes the booking; it is a warning the desk can repeat from the registration. */
@@ -593,7 +730,7 @@ export function NewAppointmentDialog({
           name: `${name.firstName} ${name.lastName}`,
           phone,
           email: quick.email.trim(),
-          activity: `${activity.name} — ${formatCzk(activity.priceCzk)} · ${activity.durationMinutes} min`,
+          activity: `${activity.name} — ${formatCzk(price.effectiveCzk ?? activity.priceCzk)} · ${activity.durationMinutes} min`,
         },
       };
     },
@@ -621,9 +758,14 @@ export function NewAppointmentDialog({
   const submitBooking = (overrideReason?: string) =>
     mode === "quick" ? bookQuick.mutate({ overrideReason }) : book.mutate({ overrideReason });
   const booking = book.isPending || bookQuick.isPending;
+  /* "CENA", shown the moment a činnost is chosen - on step 2 and under the four facts alike. */
+  const priceField =
+    activity !== null ? (
+      <AgreedPriceField value={{ listPriceCzk, typed: priceTyped }} onChange={setPriceTyped} disabled={booking} />
+    ) : null;
   const serviceField = serviceGate ? (
     <Box component="section" data-testid="service-first">
-      <SectionLabel component="label" sx={{ mb: 0.5 }}>Služba</SectionLabel>
+      <SectionLabel component="label" sx={{ mb: 0.5 }}>{TEXT.service}</SectionLabel>
       <TextField
         select
         fullWidth
@@ -631,16 +773,64 @@ export function NewAppointmentDialog({
         value={effectiveServiceId}
         onChange={(e) => changeService(e.target.value)}
         disabled={booking}
-        slotProps={{ select: { displayEmpty: true, "aria-label": "Služba" } }}
-        helperText={effectiveServiceId === "" ? "Nejdřív vyberte službu — nabídnou se její činnosti." : undefined}
+        slotProps={{ select: { displayEmpty: true, "aria-label": TEXT.service } }}
+        helperText={
+          effectiveServiceId === ""
+            ? TEXT.pickServiceFirst
+            : serviceSwitchNote !== null
+              ? serviceSwitchNote
+              : calendarsOf(effectiveServiceId).length === 0
+                ? TEXT.serviceHasNoCalendar
+                : undefined
+        }
       >
-        <MenuItem value="" disabled>Vyberte službu</MenuItem>
+        <MenuItem value="" disabled>{TEXT.pickService}</MenuItem>
         {serviceOptions.map((sv) => (
           <MenuItem key={sv.id} value={sv.id} sx={{ minHeight: 44 }}>{sv.name}</MenuItem>
         ))}
       </TextField>
     </Box>
   ) : null;
+
+  /*
+   * The calendar select, the same on both steps: the služba's own calendars
+   * first, the rest under their own heading - picking one of those switches the
+   * služba (`changeCalendar`). Shown only when there is a choice to make.
+   */
+  const calendarSelect = (labelled: boolean) =>
+    calendars.length > 1 ? (
+      <TextField
+        select
+        fullWidth
+        size="small"
+        label={labelled ? t("booking.new.calendar") : undefined}
+        value={effectiveCalendarId}
+        onChange={(e) => changeCalendar(e.target.value)}
+        disabled={booking}
+        slotProps={{
+          select: { displayEmpty: true, "aria-label": t("booking.new.calendar") },
+          inputLabel: labelled ? { shrink: true } : undefined,
+        }}
+      >
+        <MenuItem value="" disabled>{TEXT.pickCalendar}</MenuItem>
+        {ownCalendars.map((c) => (
+          <MenuItem key={c.id} value={c.id} sx={{ minHeight: 44 }}>
+            {c.name}
+          </MenuItem>
+        ))}
+        {otherCalendars.length > 0 ? <ListSubheader disableSticky>{TEXT.otherServicesCalendars}</ListSubheader> : null}
+        {otherCalendars.map((c) => (
+          <MenuItem key={c.id} value={c.id} sx={{ minHeight: 44 }}>
+            {c.name}
+            {isKnownService(c.clinicServiceId) ? (
+              <Typography component="span" variant="caption" sx={{ color: "text.secondary", ml: 1 }}>
+                {serviceName(c.clinicServiceId)}
+              </Typography>
+            ) : null}
+          </MenuItem>
+        ))}
+      </TextField>
+    ) : null;
 
   /* The link, asked for again from the booked screen when the first try failed. */
   const retryLink = useMutation({
@@ -690,7 +880,9 @@ export function NewAppointmentDialog({
     setQuickBooked(null);
     setQuickRefusal(null);
     setActivityId("");
-    setServiceId("");
+    setPriceTyped(null);
+    setServiceId(initialServiceId ?? "");
+    setServiceSwitchNote(null);
     setNote("");
     setSendSms(false);
     setSendLink(false);
@@ -795,7 +987,8 @@ export function NewAppointmentDialog({
     goToStep2();
   };
 
-  const ready = whoReady && activity !== null && startUtc !== null && !booking;
+  /* A typed price that is not an amount books nothing until it is fixed. */
+  const ready = whoReady && activity !== null && startUtc !== null && !booking && !price.invalid;
   const canBook = ready && availabilityQuery.isSuccess && offered;
   const canBookOverride =
     ready && availabilityQuery.isSuccess && !offered && overrideReason.trim().length > 0;
@@ -806,7 +999,8 @@ export function NewAppointmentDialog({
     isQuickDraftComplete(quick) &&
     activity !== null &&
     startUtc !== null &&
-    !booking;
+    !booking &&
+    !price.invalid;
   const canBookQuick = quickReady && availabilityQuery.isSuccess && offered;
   const canOverrideQuick =
     quickReady && availabilityQuery.isSuccess && !offered && overrideReason.trim().length > 0;
@@ -816,13 +1010,39 @@ export function NewAppointmentDialog({
   /* Buttons in the pinned footer: 46 px as drawn, and every one a full touch target on a phone. */
   const footerButton = { minHeight: device === "phone" ? 48 : 46, px: 3 } as const;
 
+  /*
+   * Etapa 12: with an anchor, a desktop or a tablet gets the bubble; the phone
+   * and an anchorless opening keep the drawer. Esc or a click outside the bubble
+   * asks before throwing away something the desk typed.
+   */
+  const bubble = anchor !== undefined && device !== "phone";
+  const dirty =
+    step === 2 ||
+    patient !== null ||
+    activityId !== "" ||
+    note.trim() !== "" ||
+    eventName.trim() !== "" ||
+    overrideReason.trim() !== "" ||
+    priceTyped !== null ||
+    quick.name.trim() !== "" ||
+    quick.phone.trim() !== "" ||
+    quick.email.trim() !== "" ||
+    quick.activityId !== (initialActivityId ?? "");
+  /* One set of frame props for the three screens below (booked, quick booked, the form). */
+  const frameProps = {
+    open,
+    onClose: close,
+    labelId,
+    anchor: bubble ? anchor : undefined,
+    /* Nothing to lose once the booking went through. */
+    dirty: dirty && !booked && !quickBooked,
+  };
+
   /* ── Rychlá registrace went through: the deadline, the link, what is prefilled ── */
   if (quickBooked) {
     return (
-      <DrawerFrame
-        open={open}
-        onClose={close}
-        labelId={labelId}
+      <BookingFrame
+        {...frameProps}
         title={TEXT.quickBookedTitle}
         subtitle={formatPragueDateTime(quickBooked.startUtc)}
         footer={
@@ -837,17 +1057,15 @@ export function NewAppointmentDialog({
         }
       >
         <QuickBookedPanel view={quickBooked} />
-      </DrawerFrame>
+      </BookingFrame>
     );
   }
 
   /* ── What the drawer looks like once the booking went through ── */
   if (booked) {
     return (
-      <DrawerFrame
-        open={open}
-        onClose={close}
-        labelId={labelId}
+      <BookingFrame
+        {...frameProps}
         title={t("booking.new.bookedTitle")}
         subtitle={formatPragueDateTime(booked.startUtc)}
         footer={
@@ -934,7 +1152,7 @@ export function NewAppointmentDialog({
             </Alert>
           ) : null}
         </Stack>
-      </DrawerFrame>
+      </BookingFrame>
     );
   }
 
@@ -1010,25 +1228,7 @@ export function NewAppointmentDialog({
       <SoftCard tone="soft" sx={{ p: 2 }}>
         <Stack spacing={1.5}>
           <Stack direction={device === "phone" ? "column" : "row"} spacing={1.5}>
-            {calendars.length > 1 ? (
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label={t("booking.new.calendar")}
-                value={effectiveCalendarId}
-                onChange={(e) => {
-                  setCalendarId(e.target.value);
-                  setConflict(null);
-                }}
-              >
-                {calendars.map((c) => (
-                  <MenuItem key={c.id} value={c.id}>
-                    {c.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            ) : null}
+            {calendarSelect(true)}
             <TextField
               type="date"
               size="small"
@@ -1355,6 +1555,8 @@ export function NewAppointmentDialog({
               quickRefusal?.field ? { [quickRefusal.field]: quickRefusal.message } : undefined
             }
           />
+          {/* Etapa 12: the price, the moment the prohlídka is chosen - prefilled from the list, correctable. */}
+          {priceField ? <Box sx={{ mt: 2 }}>{priceField}</Box> : null}
           {/* The server's answer on the chosen time, with the override for whoever may use it. */}
           {availabilityBlock ? <Box sx={{ mt: 2 }}>{availabilityBlock}</Box> : null}
           {conflict ? (
@@ -1462,6 +1664,8 @@ export function NewAppointmentDialog({
           />
         </AsyncSection>
         )}
+        {/* Etapa 12: right under the chosen činnost - the list price, correctable by hand. */}
+        {priceField ? <Box sx={{ mt: 2 }}>{priceField}</Box> : null}
       </Box>
 
       <Box
@@ -1476,23 +1680,7 @@ export function NewAppointmentDialog({
             <SectionLabel component="label" sx={{ mb: 0.5 }}>
               {t("booking.new.calendar")}
             </SectionLabel>
-            <TextField
-              select
-              fullWidth
-              size="small"
-              value={effectiveCalendarId}
-              onChange={(e) => {
-                setCalendarId(e.target.value);
-                setConflict(null);
-              }}
-              slotProps={{ select: { "aria-label": t("booking.new.calendar") } }}
-            >
-              {calendars.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.name}
-                </MenuItem>
-              ))}
-            </TextField>
+            {calendarSelect(false)}
           </Box>
         ) : null}
         <Box>
@@ -1632,8 +1820,9 @@ export function NewAppointmentDialog({
           <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
             {TEXT.total}
           </Typography>
-          <Typography variant="h6" sx={{ lineHeight: 1.2 }}>
-            {formatCzk(activity?.priceCzk ?? null)}
+          {/* Etapa 12: the amount agreed, not the list's - they differ once the desk typed one. */}
+          <Typography variant="h6" sx={{ lineHeight: 1.2 }} data-testid="total-due">
+            {formatCzk(price.effectiveCzk)}
           </Typography>
         </Box>
         <Stack direction="row" spacing={1}>
@@ -1644,18 +1833,41 @@ export function NewAppointmentDialog({
     );
 
   return (
-    <DrawerFrame
-      open={open}
-      onClose={close}
+    <BookingFrame
+      {...frameProps}
       onBack={step === 2 ? () => setStep(1) : undefined}
-      labelId={labelId}
       title={drawerTitle(mode)}
       subtitle={stepSubtitle(step, mode)}
       footer={footer}
     >
       {step === 1 ? step1 : step2}
-    </DrawerFrame>
+    </BookingFrame>
   );
+}
+
+/**
+ * Etapa 12: the bubble when an anchor is given (the caller already ruled the
+ * phone out), the drawer otherwise. A module-level component, so the content
+ * keeps its state across renders - a component made inside the render would
+ * remount every field on every keystroke.
+ */
+function BookingFrame({
+  anchor,
+  dirty,
+  ...rest
+}: {
+  open: boolean;
+  onClose: () => void;
+  onBack?: () => void;
+  labelId: string;
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  footer?: React.ReactNode;
+  anchor: BubbleAnchor | undefined;
+  dirty: boolean;
+  children: React.ReactNode;
+}) {
+  return anchor ? <BubbleFrame {...rest} anchor={anchor} dirty={dirty} /> : <DrawerFrame {...rest} />;
 }
 
 export default NewAppointmentDialog;

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import CalendarGridPage from '../../../pages/booking/CalendarGridPage';
@@ -268,6 +268,69 @@ describe('desktop · 1440', () => {
     expect(screen.getByTestId('column-header-c1:a1')).toBeInTheDocument();
   });
 
+  it('a toggled-off service stays off after stepping to the next day and back', async () => {
+    renderPage(VIEWPORTS.desktop, 'day');
+    await screen.findByTestId('column-header-c2:a3');
+    fireEvent.click(within(screen.getByRole('region', { name: 'Služby' })).getByRole('checkbox', { name: 'Diagnostika' }));
+    expect(screen.queryByTestId('column-header-c2:a3')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Další' }));
+    await screen.findByTestId('column-header-c1:a1');
+    expect(within(screen.getByRole('region', { name: 'Služby' })).getByRole('checkbox', { name: 'Diagnostika' })).not.toBeChecked();
+    expect(screen.queryByTestId('column-header-c2:a3')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Předchozí' }));
+    await screen.findByTestId('column-header-c1:a1');
+    expect(within(screen.getByRole('region', { name: 'Služby' })).getByRole('checkbox', { name: 'Diagnostika' })).not.toBeChecked();
+    expect(screen.queryByTestId('column-header-c2:a3')).not.toBeInTheDocument();
+  });
+
+  it('a toggled-off service stays off across Den/Týden/Měsíc view switches', async () => {
+    renderPage(VIEWPORTS.desktop, 'day');
+    await screen.findByTestId('column-header-c2:a3');
+    fireEvent.click(within(screen.getByRole('region', { name: 'Služby' })).getByRole('checkbox', { name: 'Diagnostika' }));
+    expect(screen.queryByTestId('column-header-c2:a3')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Týden' }));
+    await waitFor(() => expect(within(screen.getByRole('region', { name: 'Služby' })).getByRole('checkbox', { name: 'Diagnostika' })).not.toBeChecked());
+    fireEvent.click(screen.getByRole('button', { name: 'Měsíc' }));
+    await waitFor(() => expect(within(screen.getByRole('region', { name: 'Služby' })).getByRole('checkbox', { name: 'Diagnostika' })).not.toBeChecked());
+    fireEvent.click(screen.getByRole('button', { name: 'Den' }));
+    await screen.findByTestId('column-header-c1:a1');
+    expect(within(screen.getByRole('region', { name: 'Služby' })).getByRole('checkbox', { name: 'Diagnostika' })).not.toBeChecked();
+    expect(screen.queryByTestId('column-header-c2:a3')).not.toBeInTheDocument();
+  });
+
+  it('"jen" shows only that service (others off), and "Všechny služby" restores every one', async () => {
+    renderPage(VIEWPORTS.desktop, 'day');
+    await screen.findByTestId('column-header-c2:a3');
+    const legend = screen.getByRole('region', { name: 'Služby' });
+    fireEvent.click(within(legend).getByRole('button', { name: 'Zobrazit jen tuto službu: Diagnostika' }));
+    expect(within(legend).getByRole('checkbox', { name: 'Prohlídky' })).not.toBeChecked();
+    expect(within(legend).getByRole('checkbox', { name: 'Diagnostika' })).toBeChecked();
+    expect(within(legend).getByRole('checkbox', { name: 'InBody' })).not.toBeChecked();
+    expect(screen.queryByTestId('column-header-c1:a1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('column-header-c2:a3')).toBeInTheDocument();
+    fireEvent.click(within(legend).getByTestId('legend-all'));
+    expect(within(legend).getByRole('checkbox', { name: 'Prohlídky' })).toBeChecked();
+    expect(within(legend).getByRole('checkbox', { name: 'Diagnostika' })).toBeChecked();
+    expect(within(legend).getByRole('checkbox', { name: 'InBody' })).toBeChecked();
+    expect(screen.getByTestId('column-header-c1:a1')).toBeInTheDocument();
+    expect(screen.getByTestId('column-header-c2:a3')).toBeInTheDocument();
+  });
+
+  it('turning off the last visible service shows an empty-state line, never a dead end', async () => {
+    renderPage(VIEWPORTS.desktop, 'day');
+    await screen.findByTestId('column-header-c2:a3');
+    const legend = screen.getByRole('region', { name: 'Služby' });
+    expect(screen.queryByTestId('legend-empty')).not.toBeInTheDocument();
+    for (const name of ['Prohlídky', 'Diagnostika', 'InBody']) {
+      fireEvent.click(within(legend).getByRole('checkbox', { name }));
+    }
+    expect(screen.getByTestId('legend-empty')).toHaveTextContent('Žádná služba není zobrazena.');
+    expect(within(legend).getByTestId('legend-all')).toBeInTheDocument();
+    fireEvent.click(within(legend).getByTestId('legend-all'));
+    expect(screen.queryByTestId('legend-empty')).not.toBeInTheDocument();
+    expect(within(legend).getByRole('checkbox', { name: 'Prohlídky' })).toBeChecked();
+  });
+
   it('draws a club block tinted and named, and its click leads to the club', async () => {
     renderPage(VIEWPORTS.desktop, 'day');
     const block = (await screen.findAllByRole('button', { name: 'FK Dukla' }))[0];
@@ -343,13 +406,15 @@ describe('desktop · 1440', () => {
     });
   });
 
-  it('a drag in a činnost column offers only the patient choices, never a club', async () => {
+  it('a drag in a činnost column offers the patient choices and attaching to an EXISTING club order, never creating one', async () => {
     renderPage(VIEWPORTS.desktop, 'day');
     const column = await screen.findByTestId('sub-column-c2:a3-2026-10-26');
     fireEvent.pointerDown(column, { button: 0, clientY: 100, clientX: 100, pointerId: 1 });
     fireEvent.pointerUp(column, { clientY: 100, clientX: 100, pointerId: 1 });
     expect(await screen.findByRole('menuitem', { name: /Objednat pacienta/ })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: /klub/i })).not.toBeInTheDocument();
+    /* Etapa 12: marked time can be added to an order that already exists; a new club order still starts only from its own button. */
+    expect(screen.getByRole('menuitem', { name: /Přidat do objednávky klubu/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Klubová objednávka|Nová objednávka klubu/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId('pick-setup')).not.toBeInTheDocument();
   });
 
@@ -446,23 +511,20 @@ describe('desktop · 1440', () => {
     vi.mocked(appointmentsApi.reschedule).mockResolvedValue(undefined);
     renderPage(VIEWPORTS.desktop, 'day');
     const cell = await screen.findByTestId('appointment-cell-k4');
-    const dnd = (type: 'dragStart' | 'dragOver' | 'drop', el: Element, clientY: number) => {
-      const event = createEvent[type](el, { dataTransfer: { setData: vi.fn(), effectAllowed: '', dropEffect: '' } });
-      Object.defineProperty(event, 'clientY', { value: clientY });
-      fireEvent(el, event);
-    };
-    dnd('dragStart', cell, 0);
-    /* 52 px an hour: ten hours down from the top of the grid is 10:00 more than where the grid starts. */
-    const column = screen.getByTestId('sub-column-c2:a3-2026-10-26');
-    dnd('dragOver', column, 130);
-    dnd('drop', column, 130);
-    const dialog = await screen.findByRole('dialog', { name: 'Přesunout rezervaci' });
-    expect(within(dialog).getByText('Karel Zeman')).toBeInTheDocument();
+    /* Etapa 12: a pointer drag (6 px threshold), the card lands in its new slot and the anchored popover asks. */
+    const pointer = { button: 0, pointerType: 'mouse', pointerId: 1, clientX: 50 };
+    fireEvent.pointerDown(cell, { ...pointer, clientY: 0 });
+    fireEvent.pointerMove(window, { ...pointer, clientY: 130 });
+    fireEvent.pointerUp(window, { ...pointer, clientY: 130 });
+    const dialog = await screen.findByRole('dialog', { name: 'Přesunutí rezervace' });
+    expect(within(dialog).getByTestId('move-confirm-times')).toHaveTextContent('Karel Zeman');
+    expect(within(dialog).getByRole('checkbox', { name: 'Upozornit klienta na změnu' })).toBeChecked();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Přesunout' }));
     await vi.waitFor(() => expect(appointmentsApi.reschedule).toHaveBeenCalledTimes(1));
-    const [calendarId, id, startUtc] = vi.mocked(appointmentsApi.reschedule).mock.calls[0];
+    const [calendarId, id, startUtc, , options] = vi.mocked(appointmentsApi.reschedule).mock.calls[0];
     expect([calendarId, id]).toEqual(['c2', 'k4']);
     expect(String(startUtc)).toMatch(/^2026-10-26T/);
+    expect(options).toEqual({ notifyPatient: true });
   });
 
   it('week: the holiday column says so, and "Nová objednávka" is in the top bar, not pinned', async () => {
@@ -486,6 +548,21 @@ describe('tablet · 834', () => {
     fireEvent.click(toggle);
     expect(await screen.findByRole('region', { name: 'Služby' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Další měsíc' })).toBeInTheDocument();
+  });
+
+  it('a service toggled off in the collapsed panel stays off after the panel is closed and reopened', async () => {
+    renderPage(VIEWPORTS.tablet, 'day');
+    await screen.findByTestId('column-header-c2:a3');
+    fireEvent.click(screen.getByRole('button', { name: 'Kalendář a filtry' }));
+    const legend = await screen.findByRole('region', { name: 'Služby' });
+    fireEvent.click(within(legend).getByRole('checkbox', { name: 'Diagnostika' }));
+    expect(screen.queryByTestId('column-header-c2:a3')).not.toBeInTheDocument();
+    /* Collapse the panel, then reopen it: the state lives on the page, not the panel. */
+    fireEvent.click(screen.getByRole('button', { name: 'Kalendář a filtry' }));
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Služby' })).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Kalendář a filtry' }));
+    expect(within(await screen.findByRole('region', { name: 'Služby' })).getByRole('checkbox', { name: 'Diagnostika' })).not.toBeChecked();
+    expect(screen.queryByTestId('column-header-c2:a3')).not.toBeInTheDocument();
   });
 
   it('week: seven day columns in a scroller that shows three at a time', async () => {
@@ -625,6 +702,24 @@ describe('phone · 390', () => {
     expect(within(sheet).getByRole('region', { name: 'Kalendáře' })).toBeInTheDocument();
     /* Finger-sized rows. */
     expect(within(sheet).getByRole('checkbox', { name: 'Prohlídky' }).closest('label')).toHaveStyle({ minHeight: '44px' });
+  });
+
+  it('a service toggled off in the "Kalendář a filtry" sheet stays off after it is closed and reopened', async () => {
+    renderPage(VIEWPORTS.phone, 'day');
+    await screen.findByTestId('phone-day-list');
+    fireEvent.click(screen.getByRole('button', { name: 'Kalendář a filtry' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Kalendář a filtry' });
+    /* The sheet also lists calendars, one of which happens to share its name with the služba ("Diagnostika") -
+     * scope to the Služby region so the two same-named checkboxes are never confused. */
+    const legend = within(sheet).getByRole('region', { name: 'Služby' });
+    fireEvent.click(within(legend).getByRole('checkbox', { name: 'Diagnostika' }));
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Zavřít' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Kalendář a filtry' })).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Kalendář a filtry' }));
+    const reopened = await screen.findByRole('dialog', { name: 'Kalendář a filtry' });
+    const reopenedLegend = within(reopened).getByRole('region', { name: 'Služby' });
+    expect(within(reopenedLegend).getByRole('checkbox', { name: 'Diagnostika' })).not.toBeChecked();
+    expect(within(reopenedLegend).getByRole('checkbox', { name: 'Prohlídky' })).toBeChecked();
   });
 
   it('draws the činnost colour on a booking in the list', async () => {

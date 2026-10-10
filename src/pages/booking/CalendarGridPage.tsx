@@ -91,7 +91,6 @@ import {
 import { CAL_TEXT } from "../../components/booking/calendar/calendarText";
 import { ClubBlockPopover, type ClubBlockPick, type ClubBlockRef } from "../../components/booking/calendar/ClubBlockPopover";
 import { MonthView } from "../../components/booking/calendar/MonthView";
-import { MoveConfirmDialog } from "../../components/booking/calendar/MoveConfirmDialog";
 import { clubWindowsByDay as clubWindowsByDay_, type ClubWindow } from "../../components/booking/calendar/clubWindows";
 import { clubBlocksApi, fetchBlockableActivities } from "../../api/clubBlocks";
 import type { ClubOrderView } from "../../api/clubOrders";
@@ -176,6 +175,8 @@ interface BookingPrefill {
   initialEnd?: string;
   /** The patient's card said "Objednat termín": the drawer opens with them chosen. */
   initialPatientId?: string;
+  /** Etapa 12: opened from a marked place in the grid → a bubble beside it; absent (the top bar) → the drawer. */
+  anchor?: { x: number; y: number; width: number; height: number };
 }
 
 /** Shifts by whole calendar months, clamping a day the target month lacks. */
@@ -335,7 +336,21 @@ export default function CalendarGridPage() {
   const [entryOpen, setEntryOpen] = useState(false);
   const [setupFor, setSetupFor] = useState<{ clubId?: string; parent?: PickParent } | null>(null);
   const [rangeBlock, setRangeBlock] = useState<{ from: string; to: string } | null>(null);
-  const [moveProposal, setMoveProposal] = useState<GridMoveRequest | null>(null);
+  /*
+   * Etapa 12: the grid owns a move - the card sits at its new slot, the anchored
+   * popover asks, and this commits it (or the grid glides the card back on a
+   * refusal, with the server's sentence in its toast).
+   */
+  const commitMove = useCallback(
+    async (move: GridMoveRequest) => {
+      await appointmentsApi.reschedule(move.calendarId, move.appointment.id, move.startUtc, undefined, {
+        notifyPatient: move.notifyPatient,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["day-range"] });
+      await queryClient.invalidateQueries({ queryKey: ["blocks"] });
+    },
+    [queryClient],
+  );
   /* Several different places at once: marked with Ctrl/⌘/Shift (or the touch toggle), acted on from the tray. */
   const multi = useMultiSelect(pragueDateKey(now));
   const rangeSelect = useDayRange(multi);
@@ -455,6 +470,11 @@ export default function CalendarGridPage() {
       }
     },
     onCreated: () => void appointmentsQuery.refetch(),
+    /* The desk picked a DIFFERENT live order to extend: exactly what that order's own "Přidat další službu" does. */
+    onAddendum: (order) =>
+      navigate("/planovani", {
+        state: { pickOrder: { clubId: order.clubId, parent: { orderId: order.groupId, clubId: order.clubId, clubName: order.clubName, paymentMethod: order.paymentMethod } } },
+      }),
   });
   const pickActive = pick.active;
   pickingRef.current = pickActive;
@@ -868,6 +888,7 @@ export default function CalendarGridPage() {
       initialCalendarId: request.calendarId,
       initialStart: request.start,
       initialEnd: request.end,
+      anchor: request.anchor,
     });
 
   /* A click on a club's window: a window of an order opens the ORDER ("Otevřít objednávku", "Upravit termíny"),
@@ -1655,7 +1676,7 @@ export default function CalendarGridPage() {
                   pick={pick.gridPick}
                   touchPick={pickActive && touchPick}
                   onOpenClubBlock={setClubPick}
-                  onMove={setMoveProposal}
+                  onMoveCommit={commitMove}
                 />
               )}
             </AsyncSection>
@@ -1731,8 +1752,9 @@ export default function CalendarGridPage() {
         onBook={() => {
           if (!chosenRange) return;
           const first = chosenRange.from;
+          const anchor = { x: chosenRange.x, y: chosenRange.y, width: 0, height: 0 };
           rangeSelect.clear();
-          openBooking({ initialDate: first, initialCalendarId: shown[0]?.id });
+          openBooking({ initialDate: first, initialCalendarId: shown[0]?.id, anchor });
         }}
         onBlock={() => {
           if (!chosenRange) return;
@@ -1801,8 +1823,6 @@ export default function CalendarGridPage() {
         />
       ) : null}
 
-      {moveProposal ? <MoveConfirmDialog move={moveProposal} onClose={() => setMoveProposal(null)} /> : null}
-
       <ClubBlockPopover
         pick={clubPick}
         today={todayKey}
@@ -1830,7 +1850,7 @@ export default function CalendarGridPage() {
           }}
         />
       ) : null}
-      <PickDuplicateDialog order={pick.duplicate} onChoose={pick.resolveDuplicate} />
+      <PickDuplicateDialog duplicate={pick.duplicate} onChoose={pick.resolveDuplicate} />
       <Dialog open={pick.result !== null} onClose={pick.closeResult} fullWidth maxWidth="sm" fullScreen={isPhone}>
         <DialogTitle>{pick.resultTitle}</DialogTitle>
         <DialogContent>{pick.result !== null ? <OrderSuccess order={pick.result} /> : null}</DialogContent>
