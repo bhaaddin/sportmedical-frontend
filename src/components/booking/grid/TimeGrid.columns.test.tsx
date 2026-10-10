@@ -305,7 +305,12 @@ describe('a club’s block', () => {
     });
   });
 
-  it('a manual block has the same opaque base, and a lunch break stays its own gap beside a window', () => {
+  /*
+   * Owner, 10. 10. 2026: "it is still divided into three segments". The server keeps an
+   * order's day as the window before lunch and the one after; the grid draws them as the
+   * ONE block the desk ordered, over the lunch band, with one time line 08:00–16:00.
+   */
+  it('an order held across lunch is one block, not a morning, a gap and an afternoon', () => {
     const morning: TimeBlock = { ...clubBlock, id: 'm1', startUtc: '2026-10-26T07:00:00Z', endUtc: '2026-10-26T11:00:00Z' };
     const afternoon: TimeBlock = { ...clubBlock, id: 'm2', startUtc: '2026-10-26T11:30:00Z', endUtc: '2026-10-26T15:00:00Z' };
     const lunchDay = row(DAY, { breakStart: '12:00:00', breakEnd: '12:30:00' });
@@ -315,9 +320,26 @@ describe('a club’s block', () => {
       marks: new Map([[DAY, dayMark(undefined, [lunchDay])]]),
     });
     const column = screen.getByTestId(`sub-column-${calendar.id}:a1-${DAY}`);
-    expect(within(column).getAllByRole('button', { name: 'FK Slaný' })).toHaveLength(2);
+    const blocks = within(column).getAllByRole('button', { name: 'FK Slaný' });
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toHaveStyle({ height: `${8 * 52}px` });
+    expect(within(blocks[0]).getByTestId('club-block-time')).toHaveTextContent('08:00–16:00');
+    /* The lunch band is still drawn beneath (the block's opaque base covers it); a manual block keeps the same base. */
     expect(within(column).getByLabelText('Oběd')).toBeInTheDocument();
     expect(within(column).getByRole('button', { name: 'Porada' })).toHaveStyle({ backgroundColor: 'rgb(255, 255, 255)' });
+  });
+
+  it('two windows of one order with free time between them stay two blocks', () => {
+    const early: TimeBlock = { ...clubBlock, id: 'e1', startUtc: '2026-10-26T07:00:00Z', endUtc: '2026-10-26T09:00:00Z' };
+    const late: TimeBlock = { ...clubBlock, id: 'e2', startUtc: '2026-10-26T13:00:00Z', endUtc: '2026-10-26T15:00:00Z' };
+    const lunchDay = row(DAY, { breakStart: '12:00:00', breakEnd: '12:30:00' });
+    renderGrid({
+      blocksByCalendar: new Map([[calendar.id, [early, late]]]),
+      previewByCalendar: new Map([[calendar.id, new Map([[DAY, lunchDay]])]]),
+      marks: new Map([[DAY, dayMark(undefined, [lunchDay])]]),
+    });
+    const column = screen.getByTestId(`sub-column-${calendar.id}:a1-${DAY}`);
+    expect(within(column).getAllByRole('button', { name: 'FK Slaný' })).toHaveLength(2);
   });
 
   it('tells the page which block it is when clicked, with the days it covers', () => {

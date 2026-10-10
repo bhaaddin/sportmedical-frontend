@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { isTerminalStatus, statusTally } from "../../../api/bookingContracts";
 import type { Calendar, DayAppointment, PreviewDay, TimeBlock } from "../../../api/bookingContracts";
 import { pragueDateKey, type DateOnly } from "../../../utils/time";
+import { drawnBlocksOfDay } from "./clubWindows";
 import { CALENDAR_DISPLAY_OFFLINE, useCalendarDisplay } from "../../../api/displaySettings";
 import { DESIGN } from "../../../theme";
 import { StatusChip } from "../../ui/StatusChip";
@@ -2149,11 +2150,10 @@ function SubColumn({
         </Box>
       ) : null}
 
-      {blocks.map((block) => {
+      {drawnBlocksOfDay(blocks, dayKey, breakStart !== null && breakEnd !== null ? { start: breakStart, end: breakEnd } : null).map(({ block, span: blockSpan }) => {
         const club = block.kind === "club";
         const colour = cleanHex(block.colorHex) ?? DESIGN.faint;
         const label = club ? (block.clubName ?? GRID_TEXT.clubBlock) : block.reason || GRID_TEXT.blocked;
-        const blockSpan = spanOnDay(block.startUtc, block.endUtc, dayKey);
         const blockTime = `${formatMinutes(blockSpan.start)}–${formatMinutes(blockSpan.end)}`;
         return (
           <Box
@@ -2184,7 +2184,7 @@ function SubColumn({
               position: "absolute",
               left: 3,
               right: 3,
-              ...place(spanOnDay(block.startUtc, block.endUtc, dayKey)),
+              ...place(blockSpan),
               zIndex: 2,
               overflow: "hidden",
               display: "flex",
@@ -2207,8 +2207,9 @@ function SubColumn({
                * is translucent, so on its own the grid's step lines beneath (zIndex 1) showed
                * through and a whole-day window read as a stack of little slots. An opaque
                * base under the hatch masks them; the colour runs uninterrupted, one label,
-               * one border. Lunch is never inside a window - the server cuts the windows
-               * from the open stretches - so the band it skips stays a real gap.
+               * one border. The server cuts an order's day into the open stretches
+               * around lunch; `drawnBlocksOfDay` joins those back into the one block
+               * the desk ordered ("not divided into segments"), lunch band included.
                */
               backgroundColor: theme.palette.background.paper,
               backgroundImage: club ? hatchOf(colour) : DESIGN.hatch.closed,
