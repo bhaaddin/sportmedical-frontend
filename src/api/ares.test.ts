@@ -100,7 +100,10 @@ describe('aresApi.lookup', () => {
   });
 
   it('turns a refusal into an AresError', async () => {
-    get.mockRejectedValue(refused(404, { code: 'ares.not_found', message: 'Nenalezeno.' }));
+    /* Thrown inside the call, not a rejected promise made up front: under a loaded full run the latter once surfaced as an unhandled rejection. */
+    get.mockImplementation(async () => {
+      throw refused(404, { code: 'ares.not_found', message: 'Nenalezeno.' });
+    });
     const thrown = await aresApi.lookup(VALID).then(() => null, (e: unknown) => e);
     expect(thrown).toBeInstanceOf(AresError);
     expect((thrown as InstanceType<typeof AresError>).code).toBe('ares.not_found');
