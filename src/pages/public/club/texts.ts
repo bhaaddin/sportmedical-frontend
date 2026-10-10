@@ -1,3 +1,5 @@
+import { czk } from '../../../components/public/brand';
+
 /*
  * Wording of the term calendar and the success screen's calendar line. Each one is a slot in
  * Média a texty → Formuláře (club-registration section); until the registry lists them (or the
@@ -15,6 +17,10 @@ export const CAL_DEFAULTS = {
   'formulare.club-reg.cal.reserved': 'Klub rezervoval: {days}',
   'formulare.club-reg.done.calendar': 'Váš termín uvidí i ordinace v kalendáři.',
   'formulare.club-reg.done.ics': 'Přidat do kalendáře',
+  /* Etapa 12, "Ceny doplnit všude": the price beside every činnost, and who pays it. */
+  'formulare.club-reg.price.club': 'hradí klub',
+  'formulare.club-reg.price.none': 'bez ceny',
+  'formulare.club-reg.price.label': 'Cena',
 } as const;
 
 export const CAL_KEYS = Object.keys(CAL_DEFAULTS) as (keyof typeof CAL_DEFAULTS)[];
@@ -25,6 +31,15 @@ export function withCalDefaults(texts: Partial<Record<string, string>>): CalText
   const out = {} as CalTexts;
   for (const key of CAL_KEYS) out[key] = (texts[key] ?? '').trim() !== '' ? (texts[key] as string) : CAL_DEFAULTS[key];
   return out;
+}
+
+/**
+ * The price beside a činnost as the athlete reads it: "1 200 Kč", "1 200 Kč · hradí klub" when the
+ * club is invoiced, "bez ceny" when the činnost has none. The number is the server's; nothing is computed.
+ */
+export function priceLabel(unitPriceCzk: number | null | undefined, paysClub: boolean, t: CalTexts): string {
+  const price = czk(unitPriceCzk) ?? t['formulare.club-reg.price.none'];
+  return paysClub ? `${price} · ${t['formulare.club-reg.price.club']}` : price;
 }
 
 /** "1 volný", "3 volné", "12 volných". */

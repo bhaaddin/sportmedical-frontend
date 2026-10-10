@@ -11,10 +11,14 @@ import { describe, it, expect } from 'vitest';
 import type { Activity, DayAppointment, PreviewDay } from '../../api/bookingContracts';
 import type { ClinicService } from '../../api/clinicServices';
 import {
+  NO_PRICE_TEXT,
   buildOverview,
   groupByService,
   offeredPairs,
   overviewTotals,
+  priceRangeText,
+  priceTooltip,
+  servicePriceRange,
   workerIndex,
   workersInRange,
   type CalendarPreview,
@@ -267,5 +271,51 @@ describe('the overview', () => {
     const rows = buildOverview({ activities, services, appointments, previews, offered, filter: everybody });
 
     expect(overviewTotals(rows)).toEqual({ booked: 3, freeStarts: 4, freeDays: 2 });
+  });
+});
+
+/*
+ * "Ceny doplnit všude" (10. 10. 2026): the price beside a služba is the lowest
+ * of its činnosti, read through their price-list links - never a number of
+ * this file's own.
+ */
+describe('the price beside a služba', () => {
+  const priced = (id: string, name: string, serviceId: string, priceCzk: number | null, sortOrder = 0, isActive = true): Activity => ({
+    ...activity(id, name, serviceId, sortOrder),
+    priceCzk,
+    isActive,
+  });
+  /* The formatter's spaces (a non-breaking one inside the number) are its own business; compare the words and digits. */
+  const norm = (text: string): string => text.replace(/\s/g, ' ');
+
+  it('lists the active činnosti of the služba in the owner\'s order with the lowest and highest price', () => {
+    const range = servicePriceRange(
+      [
+        priced('a2', 'Komplexní', 's1', 2500, 1),
+        priced('a1', 'Základní', 's1', 1200, 0),
+        priced('a3', 'Stará', 's1', 100, 2, false),
+        priced('b1', 'Cizí', 's2', 50),
+      ],
+      's1',
+    );
+    expect(range.lines.map((l) => l.activityId)).toEqual(['a1', 'a2']);
+    expect(range.min).toBe(1200);
+    expect(range.max).toBe(2500);
+    expect(norm(priceRangeText(range))).toBe('od 1 200 Kč');
+    expect(norm(priceTooltip(range))).toBe('Základní · 1 200 Kč Komplexní · 2 500 Kč');
+    expect(priceTooltip(range).split('\n')).toHaveLength(2);
+  });
+
+  it('shows the one price when every činnost costs the same, and an unpriced činnost as "bez ceny" in the tooltip', () => {
+    const range = servicePriceRange([priced('a1', 'Základní', 's1', 900), priced('a2', 'Rozšířená', 's1', 900, 1), priced('a3', 'Konzultace', 's1', null, 2)], 's1');
+    expect(norm(priceRangeText(range))).toBe('900 Kč');
+    expect(norm(priceTooltip(range))).toBe(`Základní · 900 Kč Rozšířená · 900 Kč Konzultace · ${NO_PRICE_TEXT}`);
+  });
+
+  it('says "bez ceny" when no činnost of the služba is priced, or the služba has none', () => {
+    expect(priceRangeText(servicePriceRange([priced('a1', 'Základní', 's1', null)], 's1'))).toBe(NO_PRICE_TEXT);
+    const none = servicePriceRange([], 's1');
+    expect(priceRangeText(none)).toBe(NO_PRICE_TEXT);
+    expect(priceTooltip(none)).toBe('');
   });
 });

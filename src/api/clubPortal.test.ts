@@ -52,6 +52,39 @@ describe('the club portal reader', () => {
     expect(toPortal(null).clubName).toBe('');
   });
 
+  /* Etapa 12, "Ceny doplnit všude": the prices the portal shows, read tolerantly. */
+  it('reads the price per činnost (`priceCzk`, or `unitPriceCzk`), the order and group quotes', () => {
+    const p = toPortal({
+      activities: [
+        { activityId: 'a1', name: 'Základní', priceCzk: 1200 },
+        { activityId: 'a2', name: 'Komplexní', unitPriceCzk: 2500 },
+        { activityId: 'a3', name: 'Konzultace' },
+      ],
+      priceQuote: { listTotalCzk: 12000, discounts: [{ label: 'Skupinová sleva', amountCzk: 1200 }, { label: '', amountCzk: 0 }], totalCzk: 10800 },
+      groupPriceQuote: { totalCzk: 27000 },
+    });
+    expect(p.activities.map((a) => a.priceCzk)).toEqual([1200, 2500, null]);
+    expect(p.priceQuote).toEqual({ listTotalCzk: 12000, discounts: [{ label: 'Skupinová sleva', amountCzk: 1200 }], totalCzk: 10800 });
+    expect(p.groupPriceQuote).toEqual({ listTotalCzk: 27000, discounts: [], totalCzk: 27000 });
+  });
+
+  it('reads no price quote as null and no invoicing as None (an older server never breaks the page)', () => {
+    const p = toPortal({ priceQuote: null, groupPriceQuote: { totalCzk: 'x' } });
+    expect(p.priceQuote).toBeNull();
+    expect(p.groupPriceQuote).toBeNull();
+    expect(p.billing).toEqual({ state: 'None', invoiceNumber: null });
+    expect(toPortal({}).billing).toEqual({ state: 'None', invoiceNumber: null });
+  });
+
+  it('reads the invoicing state from whichever field the server uses', () => {
+    expect(toPortal({ billing: { state: 'ToInvoice' } }).billing).toEqual({ state: 'ToInvoice', invoiceNumber: null });
+    expect(toPortal({ invoiceState: 'Pending' }).billing.state).toBe('ToInvoice');
+    expect(toPortal({ billing: { state: 'Invoiced', invoiceNumber: 'FV-1' } }).billing).toEqual({ state: 'Invoiced', invoiceNumber: 'FV-1' });
+    expect(toPortal({ invoice: { number: 'FV-2' } }).billing).toEqual({ state: 'Invoiced', invoiceNumber: 'FV-2' });
+    expect(toPortal({ invoiceNumber: 'FV-3' }).billing).toEqual({ state: 'Invoiced', invoiceNumber: 'FV-3' });
+    expect(toPortal({ invoiceNumber: '  ' }).billing.state).toBe('None');
+  });
+
   it('calls the portal of the token (encoded) and unwraps an envelope', async () => {
     get.mockResolvedValue({ data: { success: true, data: { reference: 'KO-2', status: 'Completed' } } });
     const p = await getClubPortal('a/b c');

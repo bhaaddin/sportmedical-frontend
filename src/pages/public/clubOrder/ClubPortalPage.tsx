@@ -16,7 +16,7 @@ import { ARCHIVO, BRAND } from '../../../components/public/brand';
 import { PageTitle, Panel, PanelTitle, PublicMain, SOFT_TEXT, LABEL_COLOR, NoticeBox } from '../../../components/public/kit';
 import { LinkCard } from './LinkCard';
 import { PortalCalendar } from './PortalCalendar';
-import { PortalContact, PortalDay, PortalNotices, PortalProgress } from './PortalSections';
+import { PortalContact, PortalDay, PortalNotices, PortalPrices, PortalProgress } from './PortalSections';
 import type { PortalTexts } from './PortalSections';
 import { latestNotice, windowsByDate } from './portalModel';
 
@@ -98,6 +98,7 @@ export function ClubPortalPage({ portal, t, stale = false }: {
               )}
             </Panel>
             <PortalProgress portal={portal} t={t} />
+            <PortalPrices portal={portal} t={t} />
           </>
         )}
 

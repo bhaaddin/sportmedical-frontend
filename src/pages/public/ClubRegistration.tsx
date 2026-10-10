@@ -37,7 +37,7 @@ import { INFO_SLOT_KEYS, InfoPanel, reservedDaysFor } from './club/InfoPanel';
 import { allowsActivity } from '../../components/clubs/order/routing';
 import { SLOT_PICKER_KEYS } from './club/SlotPicker';
 import { TermCalendar } from './club/TermCalendar';
-import { CAL_KEYS, withCalDefaults } from './club/texts';
+import { CAL_KEYS, priceLabel, withCalDefaults } from './club/texts';
 import { downloadIcs } from './club/ics';
 import type { SlotsStatus } from './club/SlotPicker';
 import { ARCHIVO, BRAND, clinicDate, clinicTime, telHref } from '../../components/public/brand';
@@ -268,6 +268,8 @@ export default function ClubRegistration() {
   }, [token]);
 
   const infoMode = info !== null;
+  /* Etapa 12: the price stands beside every činnost; "hradí klub" when the order is invoiced to the club. */
+  const paysClub = (offer?.paymentMethod ?? info?.paymentMethod ?? null) === 'ClubInvoice';
   useEffect(() => {
     if (infoMode) void loadSlots(activityId);
   }, [infoMode, activityId, loadSlots]);
@@ -316,6 +318,7 @@ export default function ClubRegistration() {
           calendarName: claim.calendarName ?? null,
           activityName: claim.activityName ?? (infoMode ? chosen?.activityName ?? null : null),
           bring: chosen?.description ?? null,
+          priceLine: chosen === undefined ? null : priceLabel(chosen.unitPriceCzk, paysClub, cal),
         });
       } else setComplaint('Rezervaci se nepodařilo dokončit.');
     } catch (error) {
@@ -415,6 +418,7 @@ export default function ClubRegistration() {
         addLabel={txt['formulare.club-reg.done.add']}
         onAdd={infoMode ? addAnother : null}
         calendarLine={cal['formulare.club-reg.done.calendar']}
+        priceLabel={cal['formulare.club-reg.price.label']}
         icsLabel={cal['formulare.club-reg.done.ics']}
         onIcs={() => saveToCalendar(booked)}
       />,
@@ -607,6 +611,8 @@ export default function ClubRegistration() {
             value={activityId}
             full={fullIds}
             onPick={(id) => { setActivityId(id); setComplaint(null); }}
+            paysClub={paysClub}
+            t={cal}
           />
         </Panel>
       )}
@@ -625,6 +631,12 @@ export default function ClubRegistration() {
               ? capitalise(longWhen(slotUtc))
               : choosesTime ? 'Zatím nevybráno' : 'Přidělíme vám v rezervovaném čase'}
           </Typography>
+          {/* Etapa 12: the chosen činnost and what it costs, and who pays, right where the athlete confirms. */}
+          {chosenActivity !== undefined && (
+            <Typography data-testid="club-chosen-price" sx={{ fontSize: 14, color: LABEL_COLOR, fontVariantNumeric: 'tabular-nums' }}>
+              {chosenActivity.activityName} · {priceLabel(chosenActivity.unitPriceCzk, paysClub, cal)}
+            </Typography>
+          )}
         </Box>
         <Button
           variant="contained"

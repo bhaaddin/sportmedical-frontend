@@ -5,8 +5,9 @@
  */
 import { Box, Typography } from '@mui/material';
 import type { ClubActivity } from '../../../api/publicClub';
-import { BRAND, czk } from '../../../components/public/brand';
+import { BRAND } from '../../../components/public/brand';
 import { LABEL_COLOR, ON_ORANGE } from '../../../components/public/kit';
+import { priceLabel, withCalDefaults, type CalTexts } from './texts';
 
 /** Places left on one činnost: its own count, else the block's overall one when the server sends no per-činnost numbers. */
 export function activityRemaining(activity: ClubActivity, blockRemaining: number): number {
@@ -21,6 +22,8 @@ export function ActivityCards({
   value,
   full,
   onPick,
+  paysClub = false,
+  t,
 }: {
   activities: readonly ClubActivity[];
   blockRemaining: number;
@@ -28,7 +31,13 @@ export function ActivityCards({
   /** Ids the server just refused as full, before a reload says so. */
   full: ReadonlySet<string>;
   onPick: (id: string) => void;
+  /** The order is invoiced to the club: each price reads "· hradí klub" (Etapa 12). */
+  paysClub?: boolean;
+  /** The price wording; absent = the Czech defaults. */
+  t?: CalTexts;
 }) {
+  const texts = t ?? withCalDefaults({});
+  const priceOf = (a: ClubActivity): string => priceLabel(a.unitPriceCzk, paysClub, texts);
   return (
     <Box role="group" aria-label="Činnost" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }, gap: 1.5 }}>
       {activities.map((a) => {
@@ -60,7 +69,8 @@ export function ActivityCards({
             </Typography>
             <Typography component="span" sx={{ fontSize: 14, color: selected ? ON_ORANGE : LABEL_COLOR }}>
               {a.durationMinutes > 0 ? `${a.durationMinutes} min na sportovce · ` : ''}
-              {typeof a.unitPriceCzk === 'number' ? `${czk(a.unitPriceCzk)} · ` : ''}
+              <Box component="span" data-testid="club-activity-price">{priceOf(a)}</Box>
+              {' · '}
               {isFull ? 'Obsazeno' : places}
             </Typography>
           </Box>

@@ -1,4 +1,13 @@
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Box, ButtonBase, Checkbox, Link, List, ListItemButton, ListItemText, Stack, Typography } from "@mui/material";
+import { activitiesApi } from "../../../api/activities";
+import {
+  priceRangeText,
+  priceTooltip,
+  servicePriceRange,
+  type ServicePriceRange,
+} from "../../../pages/booking/serviceOverview";
 import { DESIGN } from "../../../theme";
 import { parseDateOnly, toDateOnly, type DateOnly } from "../../../utils/time";
 import { SectionLabel } from "../../ui/SectionLabel";
@@ -42,9 +51,31 @@ export interface LegendService {
   color: string;
 }
 
-/** "SLUŽBY": a colour square and the name per service; the square ticks the service on and off. */
+/**
+ * "Ceny doplnit všude" (10. 10. 2026): the price beside each služba of the
+ * legend - the lowest `priceCzk` among its činnosti ("od 1 200 Kč"), the one
+ * price when they all agree, "bez ceny" when none is priced. Read from the
+ * shared `["activities"]` query the grid already holds, so it costs nothing;
+ * while it has not answered (or failed) the legend simply shows no price.
+ */
+export function useServicePrices(services: readonly { id: string }[]): ReadonlyMap<string, ServicePriceRange> | null {
+  const activitiesQuery = useQuery({
+    queryKey: ["activities"],
+    queryFn: () => activitiesApi.list(),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const activities = activitiesQuery.data?.activities;
+  return useMemo(() => {
+    if (activities === undefined) return null;
+    return new Map(services.map((s) => [s.id, servicePriceRange(activities, s.id)]));
+  }, [activities, services]);
+}
+
+/** "SLUŽBY": a colour square, the name and the price per service; the square ticks the service on and off. */
 export function ServiceLegend({
   services,
+  prices = null,
   isShown,
   onToggle,
   onOnly,
@@ -52,6 +83,8 @@ export function ServiceLegend({
   touch = false,
 }: {
   services: LegendService[];
+  /** Per service id; `null` while the činnosti have not been read (no price is shown then). */
+  prices?: ReadonlyMap<string, ServicePriceRange> | null;
   isShown: (id: string) => boolean;
   onToggle: (id: string) => void;
   onOnly: (id: string) => void;
@@ -71,6 +104,9 @@ export function ServiceLegend({
         {services.map((service) => {
           const shown = isShown(service.id);
           const colour = cleanHex(service.color) ?? DESIGN.faint;
+          const range = prices?.get(service.id) ?? null;
+          const priceText = range === null ? null : priceRangeText(range);
+          const tooltip = range === null ? undefined : priceTooltip(range) || undefined;
           return (
             <Box
               key={service.id}
@@ -85,6 +121,7 @@ export function ServiceLegend({
             >
               <Box
                 component="label"
+                title={tooltip}
                 sx={{ display: "flex", alignItems: "center", gap: 1.25, flex: 1, minHeight: 44, minWidth: 0, fontSize: 14, cursor: "pointer" }}
               >
                 <Box
@@ -107,8 +144,20 @@ export function ServiceLegend({
                     bgcolor: shown ? colour : "background.paper",
                   }}
                 />
-                <Box component="span" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {service.name}
+                <Box component="span" sx={{ minWidth: 0, display: "flex", flexDirection: "column", lineHeight: 1.25 }}>
+                  <Box component="span" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {service.name}
+                  </Box>
+                  {/* The price under the name, not beside it: the sidebar is narrow and the name must stay readable. */}
+                  {priceText !== null && (
+                    <Box
+                      component="span"
+                      data-testid={`legend-price-${service.id}`}
+                      sx={{ fontSize: 12, color: "text.secondary", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
+                    >
+                      {priceText}
+                    </Box>
+                  )}
                 </Box>
               </Box>
               <ButtonBase
@@ -172,6 +221,7 @@ export function GridSidebar({
   onAllServices: () => void;
   touch?: boolean;
 }) {
+  const prices = useServicePrices(services);
   return (
     <Stack spacing={3} data-testid="calendar-side-panel">
       <MiniCalendar
@@ -184,6 +234,7 @@ export function GridSidebar({
       />
       <ServiceLegend
         services={services}
+        prices={prices}
         isShown={isServiceShown}
         onToggle={onToggleService}
         onOnly={onOnlyService}

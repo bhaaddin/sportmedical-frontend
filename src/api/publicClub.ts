@@ -33,7 +33,10 @@ export interface ClubActivity {
   seats?: number | null;
   registered?: number | null;
   remaining?: number | null;
-  /** Price per person, CZK (newer server); null/absent = not stated. */
+  /**
+   * Price per person, CZK (newer server); null/absent = not stated. Read from
+   * `unitPriceCzk` or, as Etapa 12 names it, `priceCzk` - whichever the server sends.
+   */
   unitPriceCzk?: number | null;
   /** What the činnost is / what to bring (newer server). */
   description?: string | null;
@@ -115,6 +118,12 @@ export interface ClubOffer {
   slots?: ClubSlot[] | null;
   /** Order links only: the information the parents read first. Absent = legacy block token. */
   info?: ClubInfo | null;
+  /**
+   * Etapa 12: who pays, as the order says - the server's own `paymentMethod`, else the one
+   * in `info`. "ClubInvoice" shows "hradí klub" beside each price instead of asking the
+   * athlete to pay; null/absent = the page does not say.
+   */
+  paymentMethod?: ClubInfoPayment | null;
 }
 
 /** The slot an athlete's claim got. */
@@ -189,7 +198,7 @@ export function normaliseOffer(raw: ClubOffer): ClubOffer {
       seats,
       registered,
       remaining,
-      unitPriceCzk: optNum(a.unitPriceCzk),
+      unitPriceCzk: optNum(a.unitPriceCzk) ?? optNum(a.priceCzk),
       description: typeof a.description === 'string' && a.description.trim() !== '' ? a.description : null,
     };
   });
@@ -198,7 +207,11 @@ export function normaliseOffer(raw: ClubOffer): ClubOffer {
     const activityIds = idList(w.activityIds);
     return (activityIds !== undefined ? { ...w, activityIds } : w) as unknown as ClubWindow;
   });
-  return { ...raw, windows, activities, info: normaliseInfo((raw as { info?: unknown }).info) };
+  const info = normaliseInfo((raw as { info?: unknown }).info);
+  const rootPayment = (raw as { paymentMethod?: unknown }).paymentMethod;
+  const paymentMethod: ClubInfoPayment | null =
+    rootPayment === 'ClubInvoice' || rootPayment === 'PerPerson' ? rootPayment : (info?.paymentMethod ?? null);
+  return { ...raw, windows, activities, info, paymentMethod };
 }
 
 /**

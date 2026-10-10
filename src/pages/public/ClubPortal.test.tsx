@@ -46,9 +46,12 @@ const portal = (over: Partial<ClubPortal> = {}): ClubPortal => ({
   status: 'Confirmed',
   paymentMethod: 'ClubInvoice',
   activities: [
-    { activityId: 'a1', name: 'Základní', durationMinutes: 30, seats: 10, registered: 4 },
-    { activityId: 'a2', name: 'Komplexní', durationMinutes: 60, seats: 4, registered: 0 },
+    { activityId: 'a1', name: 'Základní', durationMinutes: 30, seats: 10, registered: 4, priceCzk: 1200 },
+    { activityId: 'a2', name: 'Komplexní', durationMinutes: 60, seats: 4, registered: 0, priceCzk: null },
   ],
+  priceQuote: { listTotalCzk: 12000, discounts: [{ label: 'Skupinová sleva', amountCzk: 1200 }], totalCzk: 10800 },
+  groupPriceQuote: null,
+  billing: { state: 'None', invoiceNumber: null },
   windows: [
     { date: DAY1, startLocal: '08:00', endLocal: '12:00', activityIds: ['a1', 'a2'], calendarName: 'Ambulance' },
     { date: DAY1, startLocal: '13:00', endLocal: '15:00', activityIds: ['a1'], calendarName: 'Ambulance' },

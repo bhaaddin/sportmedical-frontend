@@ -32,6 +32,7 @@ import {
   type PreviewDay,
 } from '../../api/bookingContracts';
 import type { ClinicService } from '../../api/clinicServices';
+import { formatCzk } from '../../components/clubs/order/orderFormat';
 import { dayOfWeekOf, pragueDateKey } from '../../utils/time';
 
 export interface CalendarPreview {
@@ -358,6 +359,67 @@ export function overviewTotals(rows: readonly OverviewRow[]): OverviewTotals {
   }
 
   return { booked, freeStarts, freeDays: dates.size };
+}
+
+/* ── Prices beside a služba ──
+ *
+ * "Ceny doplnit všude" (10. 10. 2026): wherever a služba is named, its price
+ * stands next to it. A služba has no price of its own; its činnosti do, each
+ * through its price-list link (`priceCzk`, null when unlinked). So the služba
+ * shows the lowest of them - "od 1 200 Kč" - or the one price when they all
+ * agree, and "bez ceny" when none of its činnosti is priced. The figure is
+ * read, never computed from anything else; nothing here knows a number.
+ */
+
+export const NO_PRICE_TEXT = 'bez ceny';
+
+export interface ServicePriceLine {
+  activityId: string;
+  activityName: string;
+  /** `null` when the činnost has no price-list link. */
+  priceCzk: number | null;
+}
+
+export interface ServicePriceRange {
+  /** The lowest price among the priced činnosti; `null` when none is priced. */
+  min: number | null;
+  /** The highest; equal to `min` when every priced činnost costs the same. */
+  max: number | null;
+  /** Every active činnost of the služba in the owner's order, priced or not. */
+  lines: ServicePriceLine[];
+}
+
+type PricedActivity = Pick<Activity, 'id' | 'name' | 'clinicServiceId' | 'priceCzk' | 'sortOrder' | 'isActive'>;
+
+/** The prices of one služba's active činnosti, in the owner's order. */
+export function servicePriceRange(activities: readonly PricedActivity[], serviceId: string): ServicePriceRange {
+  const lines = activities
+    .filter((a) => a.isActive && a.clinicServiceId === serviceId)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'cs'))
+    .map((a) => ({
+      activityId: a.id,
+      activityName: a.name,
+      priceCzk: typeof a.priceCzk === 'number' && Number.isFinite(a.priceCzk) ? a.priceCzk : null,
+    }));
+  const prices = lines.map((l) => l.priceCzk).filter((p): p is number => p !== null);
+  return {
+    min: prices.length === 0 ? null : Math.min(...prices),
+    max: prices.length === 0 ? null : Math.max(...prices),
+    lines,
+  };
+}
+
+/** "od 1 200 Kč" when the činnosti differ, "1 200 Kč" when they agree, "bez ceny" when none is priced. */
+export function priceRangeText(range: Pick<ServicePriceRange, 'min' | 'max'>): string {
+  if (range.min === null || range.max === null) return NO_PRICE_TEXT;
+  return range.min === range.max ? formatCzk(range.min) : `od ${formatCzk(range.min)}`;
+}
+
+/** "Základní · 1 200 Kč" per činnost, one per line - the legend's tooltip; empty when the služba has no činnost. */
+export function priceTooltip(range: Pick<ServicePriceRange, 'lines'>): string {
+  return range.lines
+    .map((l) => `${l.activityName} · ${l.priceCzk === null ? NO_PRICE_TEXT : formatCzk(l.priceCzk)}`)
+    .join('\n');
 }
 
 /** Rows under their service heading, in row order; the heading is `null` for činnosti without one. */

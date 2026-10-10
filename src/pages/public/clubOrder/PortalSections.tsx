@@ -7,6 +7,7 @@ import { Box, Typography } from '@mui/material';
 import type { ClubPortal, PortalAthlete } from '../../../api/publicClubOrder';
 import { ARCHIVO, BRAND, clinicDate } from '../../../components/public/brand';
 import { FieldLabel, LABEL_COLOR, Panel, PanelTitle, SOFT_TEXT, longWhen } from '../../../components/public/kit';
+import { czk } from './model';
 import { activityNames, isFresh, percentOf, playersOfDay, timeRange } from './portalModel';
 
 export const PORTAL_SLOT_KEYS = [
@@ -29,6 +30,17 @@ export const PORTAL_SLOT_KEYS = [
   'formulare.club-order.portal.cal.cancelled',
   'formulare.club-order.portal.progress.title',
   'formulare.club-order.portal.progress.line',
+  'formulare.club-order.portal.price.title',
+  'formulare.club-order.portal.price.perplayer',
+  'formulare.club-order.portal.price.none',
+  'formulare.club-order.portal.price.list',
+  'formulare.club-order.portal.price.total',
+  'formulare.club-order.portal.price.group',
+  'formulare.club-order.portal.price.unpriced',
+  'formulare.club-order.portal.price.club',
+  'formulare.club-order.portal.price.toinvoice',
+  'formulare.club-order.portal.price.invoiced',
+  'formulare.club-order.portal.price.person',
   'formulare.club-order.portal.notices.title',
   'formulare.club-order.portal.notices.empty',
   'formulare.club-order.portal.notices.new',
@@ -117,9 +129,16 @@ export function PortalProgress({ portal, t }: { portal: ClubPortal; t: PortalTex
           const line = t['formulare.club-order.portal.progress.line']
             .replace('{name}', a.name).replace('{registered}', String(a.registered)).replace('{seats}', String(a.seats));
           const percent = percentOf(a.registered, a.seats);
+          /* Etapa 12: the price per player beside the činnost; "bez ceny" when the server sends none. */
+          const price = a.priceCzk === null
+            ? t['formulare.club-order.portal.price.none']
+            : t['formulare.club-order.portal.price.perplayer'].replace('{price}', czk(a.priceCzk));
           return (
             <Box component="li" key={a.activityId} data-testid="portal-progress-row" sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <Typography sx={{ fontSize: 15.5, fontWeight: 600 }}>{line}</Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '2px 12px', alignItems: 'baseline' }}>
+                <Typography sx={{ fontSize: 15.5, fontWeight: 600 }}>{line}</Typography>
+                <Typography data-testid="portal-progress-price" sx={{ fontSize: 14, color: LABEL_COLOR, fontVariantNumeric: 'tabular-nums' }}>{price}</Typography>
+              </Box>
               <Box
                 role="progressbar"
                 aria-label={line}
@@ -134,6 +153,63 @@ export function PortalProgress({ portal, t }: { portal: ClubPortal; t: PortalTex
           );
         })}
       </Box>
+    </Panel>
+  );
+}
+
+function PriceRow({ label, value, strong = false, testId }: { label: string; value: string; strong?: boolean; testId?: string }) {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'baseline' }}>
+      <Typography component="span" sx={{ fontSize: strong ? 16 : 15, fontWeight: strong ? 700 : 400, color: strong ? BRAND.text : SOFT_TEXT }}>{label}</Typography>
+      <Typography component="span" data-testid={testId} sx={{ fontFamily: ARCHIVO, fontSize: strong ? 22 : 15, fontWeight: strong ? 800 : 600, color: BRAND.text, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+        {value}
+      </Typography>
+    </Box>
+  );
+}
+
+/**
+ * Etapa 12, "Ceny doplnit všude": what the order costs. The server's list total, its discounts and the total; the
+ * group's total when the order shares an invoice with others; and where the invoicing stands (hradí klub / k
+ * fakturaci / fakturováno), or that each player pays for themselves. Nothing here adds anything up.
+ */
+export function PortalPrices({ portal, t }: { portal: ClubPortal; t: PortalTexts }) {
+  const quote = portal.priceQuote;
+  const perPerson = portal.paymentMethod === 'PerPerson';
+  const billing = portal.billing;
+  const state = perPerson
+    ? t['formulare.club-order.portal.price.person']
+    : billing.state === 'Invoiced'
+      ? t['formulare.club-order.portal.price.invoiced'].replace('{number}', billing.invoiceNumber ?? '').replace(/\s*·\s*$/, '')
+      : billing.state === 'ToInvoice'
+        ? t['formulare.club-order.portal.price.toinvoice']
+        : portal.paymentMethod === 'ClubInvoice' ? t['formulare.club-order.portal.price.club'] : '';
+  return (
+    <Panel labelledBy="portal-price-title">
+      <PanelTitle id="portal-price-title">{t['formulare.club-order.portal.price.title']}</PanelTitle>
+      {quote === null ? (
+        <Typography data-testid="portal-price-empty" sx={{ fontSize: 15, color: LABEL_COLOR }}>{t['formulare.club-order.portal.price.unpriced']}</Typography>
+      ) : (
+        <Box data-testid="portal-price" sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {(quote.discounts.length > 0 || quote.listTotalCzk !== quote.totalCzk) && (
+            <PriceRow label={t['formulare.club-order.portal.price.list']} value={czk(quote.listTotalCzk)} testId="portal-price-list" />
+          )}
+          {quote.discounts.map((d, i) => (
+            <PriceRow key={`${d.label}-${i}`} label={d.label} value={`−${czk(Math.abs(d.amountCzk))}`} />
+          ))}
+          <Box sx={{ borderTop: `1px solid ${BRAND.line}`, pt: 1 }}>
+            <PriceRow label={t['formulare.club-order.portal.price.total']} value={czk(quote.totalCzk)} strong testId="portal-price-total" />
+          </Box>
+          {portal.groupPriceQuote !== null && portal.groupPriceQuote.totalCzk !== quote.totalCzk && (
+            <PriceRow label={t['formulare.club-order.portal.price.group']} value={czk(portal.groupPriceQuote.totalCzk)} testId="portal-price-group" />
+          )}
+        </Box>
+      )}
+      {state !== '' && (
+        <Typography data-testid="portal-billing" data-state={perPerson ? 'PerPerson' : billing.state} sx={{ fontSize: 15, color: SOFT_TEXT, lineHeight: 1.5 }}>
+          {state}
+        </Typography>
+      )}
     </Panel>
   );
 }

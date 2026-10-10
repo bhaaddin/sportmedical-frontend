@@ -42,6 +42,7 @@ import { SettingsScreen } from '../settings/SettingsFrame';
 import {
   movedFrom, offerable, partialFailureText, toAttach, under,
 } from './serviceLinks';
+import { priceRangeText, priceTooltip, servicePriceRange } from './serviceOverview';
 
 /*
  * Etapa 4, D9: a služba is archived, never deleted. What already hangs off it
@@ -60,6 +61,7 @@ const TEXT = {
   duplicateFallback:
     'Služba s tímto názvem už existuje. Zvolte jiný název, nebo obnovte archivovanou službu.',
   nameHelp: 'Třeba „Sportovní lékařské prohlídky“ nebo „Sportovní diagnostika“.',
+  prices: 'Ceny',
 };
 
 const emptyDraft = (sortOrder: number): ClinicServiceInput => ({
@@ -343,16 +345,37 @@ export default function ClinicServicesPage() {
             />
           )}
           {selected !== null && (
-            <ServiceDetail
-              key={selected.id}
-              service={selected}
-              busy={archive.isPending || restore.isPending}
-              onEdit={() => openEdit(selected)}
-              onArchive={() => { archive.reset(); setConfirmArchive(selected); }}
-              onRestore={() => restore.mutate(selected.id)}
-              onDelete={() => setDeleteTarget({ id: selected.id, name: selected.name })}
-              onBack={device === 'phone' ? () => navigate('/nastaveni/sluzby') : undefined}
-            />
+            <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {/*
+                * "Ceny doplnit všude" (10. 10. 2026): the služba's price beside
+                * its name - the lowest of its činnosti ("od 1 200 Kč"), the one
+                * price when they agree, "bez ceny" when none is priced - and
+                * every činnost with its own. Read through the price-list link
+                * each činnost carries; nothing here knows a number.
+                */}
+              {activitiesQuery.isSuccess && (() => {
+                const range = servicePriceRange(allActivities, selected.id);
+                return (
+                  <Typography
+                    data-testid="service-prices"
+                    sx={{ fontSize: 14, color: 'text.secondary', fontVariantNumeric: 'tabular-nums', px: { xs: 0, md: 0.5 } }}
+                  >
+                    <Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>{TEXT.prices}: {priceRangeText(range)}</Box>
+                    {range.lines.length > 0 && ` — ${priceTooltip(range).split('\n').join(', ')}`}
+                  </Typography>
+                );
+              })()}
+              <ServiceDetail
+                key={selected.id}
+                service={selected}
+                busy={archive.isPending || restore.isPending}
+                onEdit={() => openEdit(selected)}
+                onArchive={() => { archive.reset(); setConfirmArchive(selected); }}
+                onRestore={() => restore.mutate(selected.id)}
+                onDelete={() => setDeleteTarget({ id: selected.id, name: selected.name })}
+                onBack={device === 'phone' ? () => navigate('/nastaveni/sluzby') : undefined}
+              />
+            </Box>
           )}
           {selected === null && serviceId !== undefined && servicesQuery.isSuccess && (
             <Alert severity="warning">

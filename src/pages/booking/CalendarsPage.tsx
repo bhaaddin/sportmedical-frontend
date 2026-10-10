@@ -30,8 +30,10 @@ import GroupIcon from "@mui/icons-material/Group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import MenuItem from "@mui/material/MenuItem";
+import { activitiesApi } from "../../api/activities";
 import { calendarsApi } from "../../api/calendars";
 import { clinicServicesApi } from "../../api/clinicServices";
+import { priceRangeText, priceTooltip, servicePriceRange } from "./serviceOverview";
 import { useLocation, useNavigate } from "react-router-dom";
 import { assignableCount, handoffAction, handoffFrom } from "./serviceHandoff";
 import { hiddenCount, offerDeactivateInstead, visibleCalendars } from "./calendarLifecycle";
@@ -127,6 +129,27 @@ export default function CalendarsPage() {
     queryFn: calendarsApi.list,
     staleTime: CODEBOOK_STALE_MS,
   });
+
+  /*
+   * "Ceny doplnit všude" (10. 10. 2026): under the služba a calendar runs,
+   * its činnosti with their prices ("Základní · 1 200 Kč"). The shared
+   * `["activities"]` cache; a server that has not answered yet, or failed,
+   * leaves the line out rather than breaking the table.
+   */
+  const activitiesQuery = useQuery({
+    queryKey: ["activities"],
+    queryFn: () => activitiesApi.list(),
+    staleTime: CODEBOOK_STALE_MS,
+    retry: false,
+  });
+  const allActivities = activitiesQuery.data?.activities;
+  /** "od 1 200 Kč" for the služba, with "Základní · 1 200 Kč" per line for the tooltip; null while the činnosti are not read. */
+  const servicePrices = (serviceId: string | null): { summary: string; lines: string } | null => {
+    if (serviceId === null || allActivities === undefined) return null;
+    const range = servicePriceRange(allActivities, serviceId);
+    if (range.lines.length === 0) return null;
+    return { summary: priceRangeText(range), lines: priceTooltip(range) };
+  };
 
   const allCalendars = useMemo(
     () =>
@@ -371,6 +394,22 @@ export default function CalendarsPage() {
                             {serviceName(calendar.clinicServiceId) ?? "Služba už neexistuje"}
                           </Typography>
                         )}
+                        {(() => {
+                          const prices = servicePrices(calendar.clinicServiceId);
+                          return prices === null ? null : (
+                            /* The summary in the cell; every činnost with its price in the tooltip - a phone's table cell is narrow. */
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              component="div"
+                              data-testid={`calendar-prices-${calendar.id}`}
+                              title={prices.lines}
+                              sx={{ fontVariantNumeric: "tabular-nums" }}
+                            >
+                              {prices.summary}
+                            </Typography>
+                          );
+                        })()}
                       </Box>
                     </Box>
                   </TableCell>

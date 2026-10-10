@@ -195,6 +195,24 @@ export interface PortalActivity {
   durationMinutes: number;
   seats: number;
   registered: number;
+  /** Etapa 12: the price per player, CZK; null when the server sends none (older server, or an unpriced činnost). */
+  priceCzk: number | null;
+}
+
+/** Etapa 12: what the order costs, as the server priced it (the same figures the desk and the invoice use). */
+export interface PortalPriceQuote {
+  listTotalCzk: number;
+  discounts: { label: string; amountCzk: number }[];
+  totalCzk: number;
+}
+
+/**
+ * Etapa 12: where the invoicing stands, when the server says. Read tolerantly from
+ * `billing` / `invoice` / `invoiceNumber` / `invoiceState`; `None` when it says nothing.
+ */
+export interface PortalBilling {
+  state: 'None' | 'ToInvoice' | 'Invoiced';
+  invoiceNumber: string | null;
 }
 
 /** One window the clinic confirmed: a day with its hours and the činnosti it allows (empty = all of them). */
@@ -234,6 +252,40 @@ export interface ClubPortal {
   /** Relative `/klub/{token}`, only when the order is confirmed. */
   registrationUrl: string | null;
   clinic: { phone: string; email: string };
+  /** Etapa 12: the order's price; null when the server has not priced it (the page then says "bez ceny"). */
+  priceQuote: PortalPriceQuote | null;
+  /** Etapa 12: the whole group's price when the order is one of several on one invoice; null otherwise. */
+  groupPriceQuote: PortalPriceQuote | null;
+  billing: PortalBilling;
+}
+
+/** A price quote as the server sends it; null for anything that is not one. */
+function toPriceQuote(raw: unknown): PortalPriceQuote | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  const q = obj(raw);
+  if (typeof q.totalCzk !== 'number' || !Number.isFinite(q.totalCzk)) return null;
+  return {
+    listTotalCzk: typeof q.listTotalCzk === 'number' && Number.isFinite(q.listTotalCzk) ? q.listTotalCzk : q.totalCzk,
+    discounts: list<unknown>(q.discounts)
+      .map((d) => {
+        const x = obj(d);
+        return { label: str(x.label), amountCzk: num(x.amountCzk) };
+      })
+      .filter((d) => d.amountCzk !== 0 || d.label !== ''),
+    totalCzk: q.totalCzk,
+  };
+}
+
+/** The invoicing state from whichever field the server uses; `None` when it names none. */
+function toBilling(r: Record<string, unknown>): PortalBilling {
+  const billing = obj(r.billing);
+  const invoice = obj(r.invoice);
+  const number = [billing.invoiceNumber, invoice.invoiceNumber, invoice.number, r.invoiceNumber]
+    .find((v): v is string => typeof v === 'string' && v.trim() !== '') ?? null;
+  const state = [billing.state, r.invoiceState, r.billingState].find((v): v is string => typeof v === 'string') ?? '';
+  if (number !== null || /^invoiced$/i.test(state)) return { state: 'Invoiced', invoiceNumber: number };
+  if (/^(toinvoice|to_invoice|pending|awaitinginvoice)$/i.test(state)) return { state: 'ToInvoice', invoiceNumber: null };
+  return { state: 'None', invoiceNumber: null };
 }
 
 const PORTAL_STATUSES: readonly PortalStatus[] = ['Invited', 'Requested', 'Confirmed', 'Completed', 'Cancelled'];
@@ -253,7 +305,8 @@ export function toPortal(raw: unknown): ClubPortal {
     paymentMethod: r.paymentMethod === 'ClubInvoice' || r.paymentMethod === 'PerPerson' ? r.paymentMethod : null,
     activities: list<unknown>(r.activities).map((a) => {
       const x = obj(a);
-      return { activityId: str(x.activityId), name: str(x.name), durationMinutes: num(x.durationMinutes), seats: num(x.seats), registered: num(x.registered) };
+      const price = [x.priceCzk, x.unitPriceCzk].find((v): v is number => typeof v === 'number' && Number.isFinite(v)) ?? null;
+      return { activityId: str(x.activityId), name: str(x.name), durationMinutes: num(x.durationMinutes), seats: num(x.seats), registered: num(x.registered), priceCzk: price };
     }),
     windows: list<unknown>(r.windows).map((w) => {
       const x = obj(w);
@@ -282,6 +335,9 @@ export function toPortal(raw: unknown): ClubPortal {
     }).filter((n) => n.text.trim() !== ''),
     registrationUrl: typeof r.registrationUrl === 'string' && r.registrationUrl.trim() !== '' ? r.registrationUrl : null,
     clinic: { phone: str(clinic.phone), email: str(clinic.email) },
+    priceQuote: toPriceQuote(r.priceQuote),
+    groupPriceQuote: toPriceQuote(r.groupPriceQuote),
+    billing: toBilling(r),
   };
 }
 

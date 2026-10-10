@@ -14,17 +14,22 @@ export interface BookedInfo {
   activityName: string | null;
   /** What to bring / what the činnost is, when the činnost carries it. */
   bring: string | null;
+  /** Etapa 12: "1 200 Kč · hradí klub" / "bez ceny" for the chosen činnost; null on a legacy block token. */
+  priceLine?: string | null;
 }
 
 const capitalise = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 const hhmm = (time: string): string => time.slice(0, 5);
 
 export function Booked({
-  booked, title, next, bringTitle, addLabel, onAdd, calendarLine, icsLabel, onIcs,
+  booked, title, next, bringTitle, addLabel, onAdd, calendarLine, icsLabel, onIcs, priceLabel = 'Cena',
 }: {
   booked: BookedInfo; title: string; next: string; bringTitle: string; addLabel: string; onAdd: (() => void) | null;
   calendarLine: string; icsLabel: string; onIcs: () => void;
+  /** The word before the price line ("Cena"); an editable slot. */
+  priceLabel?: string;
 }) {
+  const priceLine = booked.priceLine ?? null;
   const when = booked.date !== null && booked.startLocal !== null
     ? `${capitalise(clinicDate(booked.date))} v ${hhmm(booked.startLocal)}${booked.endLocal !== null ? `–${hhmm(booked.endLocal)}` : ''}`
     : capitalise(longWhen(booked.startUtc));
@@ -33,9 +38,10 @@ export function Booked({
       <CheckCircleOutlined sx={{ fontSize: 56, color: BRAND.accent }} aria-hidden />
       <Typography component="h1" sx={{ m: 0, fontFamily: ARCHIVO, fontWeight: 800, fontSize: 30, letterSpacing: '-0.03em' }}>{title}</Typography>
       <Typography data-testid="booked-when" sx={{ fontFamily: ARCHIVO, fontWeight: 700, fontSize: 20 }}>{when}</Typography>
-      {(booked.activityName !== null || booked.calendarName !== null) && (
+      {(booked.activityName !== null || booked.calendarName !== null || priceLine !== null) && (
         <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, fontSize: 16, color: SOFT_TEXT }}>
           {booked.activityName !== null && <li>Činnost: {booked.activityName}</li>}
+          {priceLine !== null && <li data-testid="booked-price">{priceLabel}: {priceLine}</li>}
           {booked.calendarName !== null && <li>Místo: {booked.calendarName}</li>}
         </Box>
       )}
