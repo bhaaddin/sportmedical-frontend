@@ -28,6 +28,22 @@ export function orderWindows(order: Pick<ClubOrderView, 'blocks'>): ClubBlockVie
 /** What an order needs to know about its činnosti and periods to read a window's routing. */
 export type RoutedOrder = Partial<Pick<ClubOrderView, 'activitySeats' | 'requestedRanges'>>;
 
+/** One window with the order it belongs to (its routing reads from that order, not from the group's root). */
+export interface OwnedWindow<O extends RoutedOrder = RoutedOrder> {
+  block: ClubBlockView;
+  order: O;
+}
+
+/**
+ * Etapa 12: the live windows of a WHOLE group (the root and its addenda), earliest first across all of them. A merged
+ * order shows one "Termíny" list; each pill still reads with its own order's činnosti.
+ */
+export function groupWindows<O extends Pick<ClubOrderView, 'blocks'> & RoutedOrder>(orders: readonly O[]): OwnedWindow<O>[] {
+  return orders
+    .flatMap((order) => orderWindows(order).map((block) => ({ block, order })))
+    .sort((a, b) => a.block.fromDate.localeCompare(b.block.fromDate) || (a.block.dailyFrom ?? '').localeCompare(b.block.dailyFrom ?? ''));
+}
+
 /** The order's činnosti that have players: the ones a window can be restricted to, in the order's listed order. */
 export const routedActivities = (order: RoutedOrder | undefined): RoutedActivity[] =>
   (order?.activitySeats ?? []).filter((s) => s.seats > 0).map((s) => ({ activityId: s.activityId, name: s.activityName }));

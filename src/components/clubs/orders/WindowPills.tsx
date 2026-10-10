@@ -2,15 +2,20 @@
  * The windows ("termíny") of ONE club order, as small read-only pills: date and hours. The same list is the order
  * card's "Termíny", the calendar popover's list (the clicked window highlighted) and, with `onRemove`, the order
  * detail's list where each upcoming window has a "×" that takes exactly that window out of the order.
+ * Etapa 12: with `addenda`, the pills of the whole group (root + dodatky) in one list, in date order.
  */
 import { Box, IconButton, Stack, Typography } from '@mui/material';
 import { Close } from '@mui/icons-material';
 import type { ClubBlockView } from '../../../api/clubBlocks';
 import type { ClubOrderView } from '../../../api/clubOrders';
-import { orderWindows, windowIsUpcoming, windowLabel, type RoutedOrder } from './orderWindows';
+import { groupWindows, windowIsUpcoming, windowLabel, type RoutedOrder } from './orderWindows';
 
-export function WindowPills({ order, today, highlightBlockId, onRemove, removeBlockedReason, testId = 'order-windows' }: {
-  order: Pick<ClubOrderView, 'blocks'> & RoutedOrder;
+type PillOrder = Pick<ClubOrderView, 'blocks'> & RoutedOrder;
+
+export function WindowPills({ order, addenda = [], today, highlightBlockId, onRemove, removeBlockedReason, testId = 'order-windows' }: {
+  order: PillOrder;
+  /** Etapa 12: the other orders of the group; their windows are shown in the same list, sorted by date. */
+  addenda?: readonly PillOrder[];
   /** yyyy-MM-dd; windows already over cannot be removed. */
   today: string;
   highlightBlockId?: string | null;
@@ -20,12 +25,12 @@ export function WindowPills({ order, today, highlightBlockId, onRemove, removeBl
   removeBlockedReason?: string | null;
   testId?: string;
 }) {
-  const windows = orderWindows(order);
+  const windows = groupWindows([order, ...addenda]);
   if (windows.length === 0) return null;
   return (
     <Stack direction="row" component="ul" data-testid={testId} sx={{ m: 0, p: 0, listStyle: 'none', gap: 0.75, flexWrap: 'wrap' }}>
-      {windows.map((b) => {
-        const label = windowLabel(b, order);
+      {windows.map(({ block: b, order: owner }) => {
+        const label = windowLabel(b, owner);
         const clicked = highlightBlockId === b.id;
         const removable = onRemove !== undefined && windowIsUpcoming(b, today);
         return (

@@ -7,6 +7,7 @@
  * Every number is the server's: the summary comes from `clubOrdersApi.clubSummary`, the orders from
  * `clubOrdersApi.list`, the blocks from the page. Every card has its own loading, empty and error state.
  */
+import { useState } from 'react';
 import { Alert, Box, Button, LinearProgress, Skeleton, Stack, Typography } from '@mui/material';
 import { ArrowBack } from '@mui/icons-material';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
@@ -21,9 +22,11 @@ import { ClubBlockPanel } from '../ClubBlockPanel';
 import { blockTitle, plural } from '../blockLogic';
 import { useClubSummary } from '../orders/ClubSummaryCard';
 import { STATUS_TONE, termsSummary, seatPercent, seatsWithTotal } from '../orders/orderLogic';
-import { orderWindows, windowLabel } from '../orders/orderWindows';
+import { windowLabel } from '../orders/orderWindows';
 import { orderCode } from '../order/orderFormat';
 import { ClubOrderCard } from './ClubOrderCard';
+import { MergeOrdersDialog } from './MergeOrdersDialog';
+import { groupOrders, mergeableRoots } from './orderGroups';
 import { ClubSeatsCard } from '../panel/ClubSeatsCard';
 import { clubActivitySeats } from '../panel/seats';
 import { canBeInvoiced } from '../../../pages/clubs/payerForm';
@@ -110,11 +113,10 @@ export function ClubPresentation({
     .sort((a, b) => a.blocks[0].fromDate.localeCompare(b.blocks[0].fromDate));
   const upcomingLegacy = upcoming.filter((b) => !b.clubOrderId);
   const cancelledOrders = orders.filter((o) => o.status === 'Cancelled');
-  const firstDate = (o: (typeof orders)[number]) => orderWindows(o)[0]?.fromDate ?? '9999-12-31';
-  const RANK: Record<string, number> = { Confirmed: 0, Requested: 1, Invited: 2, Completed: 3 };
-  const shownOrders = orders
-    .filter((o) => o.status !== 'Cancelled')
-    .sort((a, b) => (RANK[a.status] ?? 9) - (RANK[b.status] ?? 9) || firstDate(a).localeCompare(firstDate(b)));
+  /* Etapa 12: one card per GROUP - the root with its addenda; an addendum never stands on its own. */
+  const shownGroups = groupOrders(orders);
+  const mergeable = mergeableRoots(shownGroups);
+  const [merging, setMerging] = useState(false);
 
   const location = [club.address, [club.postalCode, club.city].filter(Boolean).join(' ')].filter((p) => p && p.trim() !== '').join(', ');
   /* Vedení klubu (Etapa 12): shown only when somebody is listed; an older server sends nothing here. */
@@ -299,8 +301,14 @@ export function ClubPresentation({
         <SoftCard data-testid="club-orders-list" role="region" aria-label="Objednávky klubu" sx={span}>
           <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
             <SectionLabel>Objednávky klubu</SectionLabel>
-            <Button size="small" variant="text" onClick={() => navigate(`/clubs/objednavky?clubId=${club.id}`)} sx={{ minHeight: 44 }}>Všechny objednávky</Button>
+            <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
+              {mergeable.length >= 2 ? (
+                <Button size="small" variant="outlined" onClick={() => setMerging(true)} sx={{ minHeight: 44 }} data-testid="merge-orders-button">Sloučit do jedné objednávky</Button>
+              ) : null}
+              <Button size="small" variant="text" onClick={() => navigate(`/clubs/objednavky?clubId=${club.id}`)} sx={{ minHeight: 44 }}>Všechny objednávky</Button>
+            </Stack>
           </Stack>
+          {merging ? <MergeOrdersDialog orders={mergeable} onClose={() => setMerging(false)} onMerged={() => { setMerging(false); onReload(); }} /> : null}
           {ordersQuery.isLoading ? (
             <Stack spacing={1}>{[0, 1].map((i) => <Skeleton key={i} variant="rounded" height={44} />)}</Stack>
           ) : ordersQuery.isError ? (
@@ -311,8 +319,8 @@ export function ClubPresentation({
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>Zatím žádná objednávka</Typography>
           ) : (
             <Stack spacing={1.5}>
-              {shownOrders.map((o) => (
-                <ClubOrderCard key={o.id} order={o} today={today} onOpen={(id) => onOpenOrder?.(id)} onChanged={onReload} />
+              {shownGroups.map((g) => (
+                <ClubOrderCard key={g.root.id} order={g.root} addenda={g.addenda} today={today} onOpen={(id) => onOpenOrder?.(id)} onChanged={onReload} />
               ))}
               {cancelledOrders.length > 0 ? (
                 <Box data-testid="club-orders-cancelled">

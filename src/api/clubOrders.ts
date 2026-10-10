@@ -230,6 +230,8 @@ export class ClubOrderError extends Error {
   readonly fieldErrors: Record<string, string[]>;
   /** 409 `club_order.addenda_live`: the addenda that still hold places. */
   addenda: OrderAddendumSummary[] = [];
+  /** Etapa 12 merge: the order the refusal is about, when the server names one (e.g. the one already invoiced). */
+  orderId: string | null = null;
   constructor(message: string, status?: number, code?: string, affected: ClubOrderError['affectedAthletes'] = [], fields: Record<string, string[]> = {}) {
     super(message);
     this.name = 'ClubOrderError';
@@ -416,6 +418,7 @@ function toError(error: unknown): ClubOrderError {
   for (const [k, v] of Object.entries(errors)) fields[k] = arr<string>(v).filter((s) => typeof s === 'string');
   const err = new ClubOrderError(message, response?.status, typeof data.code === 'string' ? data.code : undefined, affected, fields);
   err.addenda = arr<unknown>(data.addenda).map(toAddendum);
+  err.orderId = typeof data.orderId === 'string' && data.orderId !== '' ? data.orderId : null;
   return err;
 }
 
@@ -472,6 +475,14 @@ export const clubOrdersApi = {
   /** Etapa 11: issues new club/player links; the old ones stop working. Returns the order with the new `formUrl`/`registrationUrl`. */
   rotateLinks: (id: string): Promise<ClubOrderView> =>
     call(async () => toOrder(unwrap((await client.post(`${BASE}/${id}/rotate-links`, null)).data))),
+
+  /**
+   * Etapa 12: "Sloučit do jedné objednávky" — the orders become addenda of `rootId` (one order, one invoice); they keep
+   * their windows, players and links. Returns the root with its new `addenda`. 409 `club_order.merge_invoiced`,
+   * `club_order.parent_other_club`, `club_order.addendum_payment_mismatch` carry the server's Czech message.
+   */
+  merge: (rootId: string, orderIds: string[]): Promise<ClubOrderView> =>
+    call(async () => toOrder(unwrap((await client.post(`${BASE}/${rootId}/merge`, { orderIds })).data))),
 
   /** What the group's one invoice would hold (a read; works for PerPerson too, the invoice itself is refused). */
   invoiceDraft: (id: string): Promise<InvoiceDraft> =>
