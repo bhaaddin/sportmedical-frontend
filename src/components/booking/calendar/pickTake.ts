@@ -1,12 +1,7 @@
 import type { MinuteRange } from "../grid/timeRange";
-import {
-  computeAdditionalCoverage,
-  computeCoverage,
-  type Coverage,
-  type CoverageActivity,
-  type CoverageWindow,
-} from "../../clubs/order/coverage";
+import type { CoverageActivity } from "../../clubs/order/coverage";
 import type { FreeBlock } from "./pickDays";
+import { pickCoverage, type PickCoverage, type PlanWindow } from "./pickPlan";
 
 /*
  * The one-tap shortcuts of "výběr termínů" ("Celý den" in the month, a free block on the phone) take the free time of
@@ -14,25 +9,20 @@ import type { FreeBlock } from "./pickDays";
  * ordinary bookings. Everything the desk marks by hand (painting, tap-start/tap-end, resizing) stays exactly as marked;
  * that never passes through here.
  *
- * Pure: the missing need is read from the same calculator the panel uses (`computeCoverage`), so the pooled, per
- * činnost and per window allocation is the one the desk already sees.
+ * Pure: the missing need is read from the same calculator the panel uses (`pickCoverage`, per činnost and per
+ * window), so the allocation is the one the desk already sees.
  */
 
 export interface TakeState {
   activities: readonly CoverageActivity[];
-  /** Enlarging an order: the order as saved (see `computeAdditionalCoverage`). */
+  /** Enlarging an order: the order as saved (see `pickCoverage`). */
   baseline?: readonly CoverageActivity[];
-  pickedMinutes: number;
-  windows: readonly CoverageWindow[];
+  windows: readonly PlanWindow[];
 }
 
 /** The coverage the panel shows for this state - one expression for the panel and for the shortcuts. */
-export function coverageOf(state: TakeState): Coverage {
-  const extra =
-    state.baseline === undefined
-      ? null
-      : computeAdditionalCoverage(state.activities, state.baseline, state.pickedMinutes, state.windows);
-  return extra ?? computeCoverage(state.activities, state.pickedMinutes, state.windows);
+export function coverageOf(state: TakeState): PickCoverage {
+  return pickCoverage(state.activities, state.windows, state.baseline === undefined ? {} : { baseline: state.baseline });
 }
 
 export interface TakeResult {
@@ -64,13 +54,18 @@ export function takeNeeded(state: TakeState, blocks: readonly FreeBlock[]): Take
 
   const lengths = now.perActivity.filter((a) => a.remainingSlots > 0 && a.minutesPerSeat > 0).map((a) => a.minutesPerSeat);
   const slot = lengths.length > 0 ? Math.min(...lengths) : 1;
+  /* The trial window is the first `m` minutes of the blocks, laid out as the blocks are (a "Vše" window per block). */
   let take = freeMinutes;
   for (let m = slot; m < freeMinutes; m += slot) {
-    const next = coverageOf({
-      ...state,
-      pickedMinutes: state.pickedMinutes + m,
-      windows: [...state.windows, { minutes: m, activityIds: null }],
-    });
+    const trial: PlanWindow[] = [];
+    let left = m;
+    for (const b of blocks) {
+      if (left <= 0) break;
+      const len = Math.min(left, lengthOf(b.range));
+      trial.push({ range: { start: b.range.start, end: b.range.start + len }, activityIds: null });
+      left -= len;
+    }
+    const next = coverageOf({ ...state, windows: [...state.windows, ...trial] });
     if (next.covered) {
       take = m;
       break;

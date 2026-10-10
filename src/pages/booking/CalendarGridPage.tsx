@@ -123,6 +123,9 @@ import type { PickParent } from "../../components/clubs/order/pickSession";
 import { PickOrderPanel } from "../../components/booking/calendar/PickOrderPanel";
 import { usePickOrder } from "../../components/booking/calendar/usePickOrder";
 import { PickDuplicateDialog } from "../../components/booking/calendar/PickDuplicateDialog";
+import { PickActivityPopover } from "../../components/booking/calendar/PickActivityPopover";
+import { PickShortfallDialog } from "../../components/booking/calendar/PickShortfallDialog";
+import { openMinutesOf } from "../../components/booking/calendar/pickPlan";
 import { usePickJump } from "../../components/booking/calendar/usePickJump";
 import { useInquiries } from "../../components/booking/calendar/inquiries";
 import { useWindowRestrictions } from "../../components/booking/calendar/windowRestrictions";
@@ -1177,6 +1180,15 @@ export default function CalendarGridPage() {
     [shown, pick.session, previewByCalendar, byDay, blocksByCalendar, multi.items, todayKey, nowMinuteOfDay],
   );
   const freeBlocksOn = useCallback((day: string): FreeBlock[] => freeBlocksOfDay(day, dayData), [dayData]);
+  /* Etapa 12: the length of a working day of the služba (for "≈ 9 celých dní" under a činnost that is still short). */
+  const pickDayMinutes = useMemo(() => {
+    let best = 0;
+    for (const c of dayData.calendars) {
+      for (const row of previewByCalendar.get(c.id)?.values() ?? []) best = Math.max(best, openMinutesOf(row));
+    }
+    return best > 0 ? best : null;
+  }, [dayData.calendars, previewByCalendar]);
+  const pickPanelExtra = { dayMinutes: pickDayMinutes, calendarCount: Math.max(1, dayData.calendars.length) };
   const freeByDay = useMemo(() => {
     const map = new Map<string, number>();
     if (!pickActive || view !== "month") return map;
@@ -1682,14 +1694,14 @@ export default function CalendarGridPage() {
             </AsyncSection>
           </AsyncSection>
         </Box>
-        {pick.panel !== null && device === "desktop" ? <PickOrderPanel device="desktop" {...pick.panel} /> : null}
+        {pick.panel !== null && device === "desktop" ? <PickOrderPanel device="desktop" {...pick.panel} {...pickPanelExtra} /> : null}
       </Box>
 
       {/* The calculator of a phone order: beside the grid on a desktop (inside the grid layout above), a bar at the bottom elsewhere. */}
       {pick.panel !== null && device !== "desktop" ? (
         <>
           <Box aria-hidden sx={{ height: 150 }} />
-          <PickOrderPanel device={device} {...pick.panel} />
+          <PickOrderPanel device={device} {...pick.panel} {...pickPanelExtra} />
         </>
       ) : null}
 
@@ -1851,6 +1863,11 @@ export default function CalendarGridPage() {
         />
       ) : null}
       <PickDuplicateDialog duplicate={pick.duplicate} onChoose={pick.resolveDuplicate} />
+      {/* Etapa 12: the window just picked asks which činnosti it is for; "Potvrdit objednávku" with a shortfall asks first. */}
+      {pick.ask !== null ? (
+        <PickActivityPopover key={pick.ask.windows.map((w) => w.id).join(",")} ask={pick.ask} device={device} onConfirm={pick.resolveAsk} onCancel={pick.cancelAsk} />
+      ) : null}
+      <PickShortfallDialog shortfall={pick.shortfall} device={device} onChoose={pick.resolveShortfall} />
       <Dialog open={pick.result !== null} onClose={pick.closeResult} fullWidth maxWidth="sm" fullScreen={isPhone}>
         <DialogTitle>{pick.resultTitle}</DialogTitle>
         <DialogContent>{pick.result !== null ? <OrderSuccess order={pick.result} /> : null}</DialogContent>

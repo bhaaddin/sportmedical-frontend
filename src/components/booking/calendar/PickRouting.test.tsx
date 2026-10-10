@@ -136,6 +136,18 @@ function paint(from: number, to: number, day = DAY) {
 
 const rows = () => screen.queryAllByTestId('pick-row').map((r) => r.textContent ?? '');
 
+/** Etapa 12: with two činnosti a picked window asks which it is for; "Potvrdit" keeps the preselected "Vše". */
+async function answerAsk() {
+  fireEvent.click(await screen.findByTestId('pick-ask-confirm'));
+  await waitFor(() => expect(screen.queryByTestId('pick-ask')).not.toBeInTheDocument());
+}
+
+/** Save/confirm: players or places beyond them ask the desk first (Etapa 12); this answers "…i tak". */
+async function saveAnyway(panel: HTMLElement, name: RegExp = /^Uložit změny/) {
+  fireEvent.click(within(panel).getByRole('button', { name }));
+  fireEvent.click(await screen.findByTestId('pick-shortfall-create'));
+}
+
 
 /* ── Etapa 10: which činnosti a picked window allows ── */
 
@@ -209,7 +221,7 @@ describe.each([['phone', VIEWPORTS.phone], ['tablet', VIEWPORTS.tablet], ['deskt
     expect(within(panel).queryByTestId('pick-no-window')).not.toBeInTheDocument();
     fireEvent.click(chipOf(panel, /Základní/));
     expect(await within(panel).findByTestId('pick-no-window')).toHaveTextContent('Pro Základní prohlídka zatím není žádný termín');
-    expect(within(panel).getByRole('button', { name: 'Uložit změny' })).toBeEnabled();
+    expect(within(panel).getByRole('button', { name: /^Uložit změny/ })).toBeEnabled();
     fireEvent.click(within(panel).getByTestId('pick-chip-all'));
     await waitFor(() => expect(within(panel).queryByTestId('pick-no-window')).not.toBeInTheDocument());
   });
@@ -227,7 +239,7 @@ describe('činnosti per window · desktop', () => {
   it('the calculator feeds a spiro-only window only to spiro: 480 min = 8 of 10 spiro slots, basic untouched', async () => {
     renderWith(VIEWPORTS.desktop, sessionOf({ dailyFrom: '08:00', dailyTo: '16:00', activityIds: ['a2'] }));
     const panel = await details(VIEWPORTS.desktop);
-    expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: 12 × Základní prohlídka (30 min) · 2 × Spiroergometrie (60 min)');
+    expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: Základní prohlídka 12 hráčů · Spiroergometrie 2 hráči');
     expect(within(panel).getByTestId('pick-no-window')).toHaveTextContent('Pro Základní prohlídka zatím není žádný termín');
   });
 
@@ -244,8 +256,9 @@ describe('činnosti per window · desktop', () => {
     const panel = await details(VIEWPORTS.desktop);
     await screen.findByTestId('sub-column-c1-' + DAY);
     paint(13 * 60, 14 * 60);
+    await answerAsk();
     await waitFor(() => expect(within(panel).getAllByTestId('pick-row')).toHaveLength(2));
-    fireEvent.click(within(panel).getByRole('button', { name: 'Uložit změny' }));
+    await saveAnyway(panel);
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
     const ranges = update.mock.calls[0][1].ranges as Record<string, unknown>[];
     expect(ranges).toEqual([
@@ -261,7 +274,7 @@ describe('činnosti per window · desktop', () => {
     const spy = vi.spyOn(client, 'invalidateQueries');
     renderWith(VIEWPORTS.desktop, sessionOf(), client);
     const panel = await details(VIEWPORTS.desktop);
-    fireEvent.click(within(panel).getByRole('button', { name: 'Uložit změny' }));
+    await saveAnyway(panel);
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
     await waitFor(() => {
       const keys = spy.mock.calls.map((c) => (c[0]?.queryKey as string[])[0]);
@@ -273,7 +286,7 @@ describe('činnosti per window · desktop', () => {
     update.mockResolvedValue(OK);
     renderWith(VIEWPORTS.desktop, sessionOf());
     const panel = await details(VIEWPORTS.desktop);
-    fireEvent.click(within(panel).getByRole('button', { name: 'Uložit změny' }));
+    await saveAnyway(panel);
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
     for (const r of update.mock.calls[0][1].ranges as Record<string, unknown>[]) expect(r).not.toHaveProperty('activityIds');
   });
@@ -285,11 +298,12 @@ describe('činnosti per window · desktop', () => {
     renderWith(VIEWPORTS.desktop, sessionOf());
     const panel = await details(VIEWPORTS.desktop);
     fireEvent.click(chipOf(panel, /Spiro/));
-    fireEvent.click(within(panel).getByRole('button', { name: 'Uložit změny' }));
+    await saveAnyway(panel);
     const reason = await within(panel).findByTestId('pick-removed-from-window');
     expect(reason).toHaveTextContent('Činnost už v termínu nebude povolena');
     expect(reason).toHaveTextContent('Jan Novák (Spiroergometrie)');
     fireEvent.click(within(panel).getByRole('button', { name: /Potvrdit a zrušit rezervace sportovců \(1\)/ }));
+    fireEvent.click(await screen.findByTestId('pick-shortfall-create'));
     await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
     expect(update.mock.calls[1][2]).toBe(true);
     expect((update.mock.calls[1][1].ranges as Record<string, unknown>[])[0]).toMatchObject({ activityIds: ['a1'] });
@@ -313,8 +327,8 @@ describe('enlarging an order · desktop', () => {
     renderWith(VIEWPORTS.desktop, enlarge());
     const panel = await details(VIEWPORTS.desktop);
     expect(within(panel).getByTestId('pick-additional')).toHaveTextContent('Navíc k původní objednávce');
-    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Zbývá 7 slotů');
-    expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: 7 × Základní prohlídka (10 min)');
+    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Vybráno 0 z 7 hráčů');
+    expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: Základní prohlídka 7 hráčů');
     expect(within(panel).getByTestId('pick-minutes')).toHaveTextContent('Navíc vybráno 0 min z 70 min');
   });
 
@@ -325,6 +339,7 @@ describe('enlarging an order · desktop', () => {
     await screen.findByTestId('sub-column-c1-' + DAY);
     paint(13 * 60, 14 * 60);
     await waitFor(() => expect(within(panel).getByTestId('pick-covered')).toBeInTheDocument());
+    /* 30 + 90 min for 10 × 10 min: the second window is used whole (rounded up to the step) - nothing to ask. */
     fireEvent.click(within(panel).getByRole('button', { name: 'Uložit změny' }));
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
     expect(update.mock.calls[0][1]).toMatchObject({

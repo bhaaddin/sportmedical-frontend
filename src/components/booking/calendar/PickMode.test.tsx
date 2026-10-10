@@ -137,6 +137,12 @@ function paint(from: number, to: number, day = DAY) {
 
 const rows = () => screen.queryAllByTestId('pick-row').map((r) => r.textContent ?? '');
 
+/** Etapa 12: with two činnosti a picked window asks which it is for; "Potvrdit" keeps the preselected "Vše". */
+async function answerAsk() {
+  fireEvent.click(await screen.findByTestId('pick-ask-confirm'));
+  await waitFor(() => expect(screen.queryByTestId('pick-ask')).not.toBeInTheDocument());
+}
+
 /** "Klubová objednávka" -> "Vyplním sám" -> the small form (10 players of one činnost = 300 min) -> picking. */
 async function startPicking(players = '10') {
   const user = userEvent.setup();
@@ -166,10 +172,10 @@ describe('desktop · 1440', () => {
     const panel = screen.getByTestId('pick-panel');
     expect(panel).toHaveAttribute('data-layout', 'side');
     /* The one thing the desk watches: how many slots are still missing, per činnost and in total. */
-    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Zbývá 10 slotů');
-    expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: 10 × Základní prohlídka (30 min)');
+    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Vybráno 0 z 10 hráčů');
+    expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: Základní prohlídka 10 hráčů');
     expect(within(panel).getByTestId('pick-minutes')).toHaveTextContent(/Vybráno 0\smin z 300\smin/);
-    expect(within(panel).getByTestId('pick-activity')).toHaveTextContent(/Základní prohlídka \(30 min\) · 10 hráčů.*zbývá 10 slotů/);
+    expect(within(panel).getByTestId('pick-activity')).toHaveTextContent(/Základní prohlídka \(30 min\) · 10 hráčů.*zbývá 10/);
     expect(within(panel).getByTestId('pick-progress')).toHaveAttribute('aria-valuenow', '0');
     /* Only the služba's calendar is in the grid. */
     expect(screen.queryByTestId('sub-column-c2-' + DAY)).not.toBeInTheDocument();
@@ -183,17 +189,18 @@ describe('desktop · 1440', () => {
     await waitFor(() => expect(rows()).toHaveLength(1));
     expect(rows()[0]).toMatch(/09:00–10:30 · 90 min/);
     expect(within(panel).getByTestId('pick-minutes')).toHaveTextContent(/Vybráno 90\smin z 300\smin/);
-    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Zbývá 7 slotů');
-    expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: 7 × Základní prohlídka (30 min)');
+    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Vybráno 3 z 10 hráčů');
+    expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: Základní prohlídka 7 hráčů');
 
     /* 11:00-16:00 is 300 min, only 210 are missing - and it is booked whole, exactly as marked. */
     paint(11 * 60, 16 * 60);
     await waitFor(() => expect(rows()).toHaveLength(2));
     expect(rows()[1]).toMatch(/11:00–16:00 · 300 min/);
-    expect(within(panel).getByTestId('pick-covered')).toHaveTextContent('Hotovo — všechny sloty pokryty');
+    expect(within(panel).getByTestId('pick-covered')).toHaveTextContent('Hotovo ✓ — všichni hráči mají termín');
     expect(within(panel).getByTestId('pick-progress')).toHaveAttribute('aria-valuenow', '100');
     expect(within(panel).queryByTestId('pick-slots')).not.toBeInTheDocument();
-    expect(within(panel).getByRole('button', { name: 'Potvrdit objednávku' })).toBeEnabled();
+    /* Etapa 12: the 3 places beyond the players say so on the button itself. */
+    expect(within(panel).getByRole('button', { name: 'Potvrdit · 3 místa navíc' })).toBeEnabled();
 
     /* The surplus is information only: 390 picked of 300 = 90 more (3 slots), and no note, no switch. */
     expect(within(panel).getByTestId('pick-covered')).toHaveTextContent(/Navíc 90 min \/ 3 sloty/);
@@ -208,7 +215,7 @@ describe('desktop · 1440', () => {
     await waitFor(() => expect(rows()).toHaveLength(1));
     fireEvent.click(within(screen.getByTestId('pick-panel')).getByRole('button', { name: /Odebrat termín/ }));
     expect(rows()).toHaveLength(0);
-    expect(within(screen.getByTestId('pick-panel')).getByTestId('pick-slots')).toHaveTextContent('Zbývá 10 slotů');
+    expect(within(screen.getByTestId('pick-panel')).getByTestId('pick-slots')).toHaveTextContent('Vybráno 0 z 10 hráčů');
   });
 
   it('a picked range is stretched by its edge, moved by its body, and the calculator follows', async () => {
@@ -223,7 +230,7 @@ describe('desktop · 1440', () => {
     fireEvent.pointerMove(edge, { ...init, clientY: 200 + 52 }); // one hour down
     fireEvent.pointerUp(edge, { ...init, clientY: 200 + 52 });
     await waitFor(() => expect(rows()[0]).toMatch(/09:00–11:30 · 150 min/));
-    expect(within(screen.getByTestId('pick-panel')).getByTestId('pick-slots')).toHaveTextContent('Zbývá 5 slotů');
+    expect(within(screen.getByTestId('pick-panel')).getByTestId('pick-slots')).toHaveTextContent('Vybráno 5 z 10 hráčů');
 
     fireEvent.pointerDown(bar, { ...init, clientY: 300 });
     fireEvent.pointerMove(bar, { ...init, clientY: 300 + 26 }); // half an hour down
@@ -260,7 +267,9 @@ describe('desktop · 1440', () => {
     paint(9 * 60, 10 * 60);
     paint(11 * 60, 16 * 60);
     await waitFor(() => expect(rows()).toHaveLength(2));
-    fireEvent.click(screen.getByRole('button', { name: 'Potvrdit objednávku' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Potvrdit/ }));
+    /* 3 places beyond the players: the desk is asked first (Etapa 12) and confirms as it is. */
+    fireEvent.click(await screen.findByTestId('pick-shortfall-create'));
     await waitFor(() => expect(createStaff).toHaveBeenCalledTimes(1));
     expect(createStaff).toHaveBeenCalledWith({
       clubId: 'club-1',
@@ -285,7 +294,8 @@ describe('desktop · 1440', () => {
     paint(9 * 60, 10 * 60);
     paint(11 * 60, 16 * 60);
     await waitFor(() => expect(rows()).toHaveLength(2));
-    fireEvent.click(screen.getByRole('button', { name: 'Potvrdit objednávku' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Potvrdit/ }));
+    fireEvent.click(await screen.findByTestId('pick-shortfall-create'));
     const failure = await screen.findByTestId('pick-failure');
     expect(failure).toHaveTextContent('Termín 24. 9. 2026 je obsazený jiným klubem.');
     expect(failure).toHaveTextContent(/Kolize: 24\. 9\. 2026, 09:00–10:30/);
@@ -312,13 +322,13 @@ describe('tablet · 834', () => {
     await startPicking();
     const panel = screen.getByTestId('pick-panel');
     expect(panel).toHaveAttribute('data-layout', 'bottom-bar');
-    expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Zbývá 10 slotů');
+    expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Vybráno 0 z 10 hráčů');
     expect(within(panel).queryByTestId('pick-list')).not.toBeInTheDocument();
     paint(9 * 60, 10 * 60);
-    await waitFor(() => expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Zbývá 7 slotů'));
+    await waitFor(() => expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Vybráno 3 z 10 hráčů'));
     fireEvent.click(within(panel).getByRole('button', { name: 'Zobrazit podrobnosti výběru' }));
     expect(within(panel).getByTestId('pick-minutes')).toHaveTextContent(/Vybráno 90\smin z 300\smin/);
-    expect(within(panel).getByRole('button', { name: 'Potvrdit objednávku' })).toBeEnabled();
+    expect(within(panel).getByRole('button', { name: 'Potvrdit objednávku · chybí 7 hráčů' })).toBeEnabled();
   });
 });
 
@@ -329,7 +339,7 @@ describe('phone · 390', () => {
     expect(screen.queryByTestId('phone-calendar')).not.toBeInTheDocument();
     const panel = screen.getByTestId('pick-panel');
     expect(panel).toHaveAttribute('data-layout', 'bottom-bar');
-    expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Zbývá 10 slotů');
+    expect(within(panel).getByTestId('pick-summary')).toHaveTextContent('Vybráno 0 z 10 hráčů');
     expect(within(panel).getByTestId('pick-progress')).toBeInTheDocument();
     fireEvent.click(within(panel).getByRole('button', { name: 'Zrušit' }));
     expect(screen.queryByTestId('pick-panel')).not.toBeInTheDocument();
@@ -372,7 +382,8 @@ describe('addendum to an existing order (Etapa 5)', () => {
     await screen.findByTestId('sub-column-c1-' + DAY);
     paint(9 * 60, 16 * 60);
     await waitFor(() => expect(rows().length).toBeGreaterThan(0));
-    fireEvent.click(screen.getByRole('button', { name: 'Potvrdit objednávku' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Potvrdit/ }));
+    fireEvent.click(await screen.findByTestId('pick-shortfall-create'));
     await waitFor(() => expect(createStaff).toHaveBeenCalledTimes(1));
     expect(createStaff.mock.calls[0][0]).toMatchObject({ clubId: 'club-1', serviceId: 's1', paymentMethod: 'ClubInvoice', parentOrderId: 'root-1', status: 'Confirmed' });
   });
@@ -549,7 +560,7 @@ describe('month pick · several days in a row', () => {
     await user.click(screen.getByRole('switch', { name: 'Klepnutí = potřebný čas z dne' }));
     await user.click(monthDay('2026-09-24'));
     await waitFor(() => expect(within(monthDay('2026-09-24')).getByTestId('pick-month-chip')).toHaveTextContent('8:00 h'));
-    expect(summary()).toHaveTextContent('Zbývá 12 slotů');
+    expect(summary()).toHaveTextContent('Vybráno 16 z 28 hráčů');
     expect(screen.queryByTestId('pick-note-action')).not.toBeInTheDocument();
     expect(within(monthDay('2026-09-24')).queryByTestId('pick-month-rest')).not.toBeInTheDocument();
   });
@@ -567,7 +578,7 @@ describe('tap to pick on touch', () => {
     await waitFor(() => expect(screen.getAllByTestId('picked-range')).toHaveLength(1));
     expect(screen.queryByTestId('tap-anchor')).not.toBeInTheDocument();
     expect(screen.getByTestId('picked-range')).toHaveTextContent('11:00 – 12:30');
-    expect(summary()).toHaveTextContent('Zbývá 7 slotů');
+    expect(summary()).toHaveTextContent('Vybráno 3 z 10 hráčů');
   });
 
   it('a slot that is already gone today is refused with the past note, not picked', async () => {
@@ -575,7 +586,7 @@ describe('tap to pick on touch', () => {
     await startPicking();
     tap(9 * 60); // now is 10:15
     expect(screen.queryByTestId('tap-anchor')).not.toBeInTheDocument();
-    expect(summary().textContent).toMatch(/Zbývá 10 slotů/);
+    expect(summary().textContent).toMatch(/Vybráno 0 z 10 hráčů/);
     expect((await screen.findAllByText('Termín v minulosti nelze objednat.')).length).toBeGreaterThan(0);
   });
 
@@ -683,17 +694,20 @@ describe('two activities: the slots fall in the order the činnosti are listed',
     await user.click(screen.getByRole('button', { name: 'Vybrat termíny v kalendáři' }));
     const panel = await screen.findByTestId('pick-panel');
     await screen.findByTestId('sub-column-c1-' + DAY);
-    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Zbývá 22 slotů');
-    expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: 12 × Základní (30 min) · 10 × Komplexní (60 min)');
-    /* 08:00-10:30 = 150 min ... */
+    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Vybráno 0 z 22 hráčů');
+    expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: Základní 12 hráčů · Komplexní 10 hráčů');
+    /* 08:00-10:30 = 150 min, a "Vše" window: the first činnost takes it (5 of 12 Základní) ... */
     paint(8 * 60, 10 * 60);
-    await waitFor(() => expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Zbývá 17 slotů'));
-    expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: 7 × Základní (30 min) · 10 × Komplexní (60 min)');
-    /* 960 min are needed; the rest is painted over two more days. */
+    await answerAsk();
+    await waitFor(() => expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Vybráno 5 z 22 hráčů'));
+    expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: Základní 7 hráčů · Komplexní 10 hráčů');
+    /* ... and the rest is painted over two more days. */
     paint(8 * 60, 15 * 60 + 30, '2026-09-25');
+    await answerAsk();
     paint(8 * 60, 15 * 60 + 30, '2026-09-26');
-    await waitFor(() => expect(within(panel).getByTestId('pick-covered')).toHaveTextContent('Hotovo — všechny sloty pokryty'));
-    expect(within(panel).getByRole('button', { name: 'Potvrdit objednávku' })).toBeEnabled();
+    await answerAsk();
+    await waitFor(() => expect(within(panel).getByTestId('pick-covered')).toHaveTextContent('Hotovo ✓ — všichni hráči mají termín'));
+    expect(within(panel).getByRole('button', { name: /^Potvrdit/ })).toBeEnabled();
   });
 });
 
@@ -738,8 +752,8 @@ describe('marked places and editing an existing order', () => {
     await screen.findByTestId('sub-column-c1-' + DAY);
     await waitFor(() => expect(rows()).toHaveLength(1));
     expect(rows()[0]).toMatch(/09:00–12:00 · 180 min/);
-    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Zbývá 4 sloty');
-    expect(screen.queryByRole('button', { name: 'Potvrdit objednávku' })).not.toBeInTheDocument();
+    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Vybráno 6 z 10 hráčů');
+    expect(screen.queryByRole('button', { name: /^Potvrdit objednávku/ })).not.toBeInTheDocument();
     paint(13 * 60, 14 * 60 + 30);
     await waitFor(() => expect(within(panel).getByTestId('pick-covered')).toBeInTheDocument());
     fireEvent.click(within(panel).getByRole('button', { name: 'Uložit změny' }));
@@ -760,12 +774,12 @@ describe('marked places and editing an existing order', () => {
     await screen.findByTestId('sub-column-c1-' + DAY);
     expect(rows()).toHaveLength(0);
     expect(within(panel).getByTestId('pick-requested')).toHaveTextContent('24. 9. 2026, 09:00–12:00');
-    paint(9 * 60, 14 * 60);
+    paint(9 * 60, 13 * 60 + 30);
     await waitFor(() => expect(within(panel).getByTestId('pick-covered')).toBeInTheDocument());
     fireEvent.click(within(panel).getByRole('button', { name: 'Potvrdit objednávku' }));
     await waitFor(() => expect(confirmOrder).toHaveBeenCalledTimes(1));
     expect(update).toHaveBeenCalledWith('o-9', { activitySeats: [{ activityId: 'a1', seats: 10 }], paymentMethod: 'ClubInvoice', note: 'Pozn.' });
-    expect(confirmOrder).toHaveBeenCalledWith('o-9', { calendarIds: ['c1'], ranges: [{ fromDate: DAY, toDate: DAY, dailyFrom: '09:00', dailyTo: '14:30' }] });
+    expect(confirmOrder).toHaveBeenCalledWith('o-9', { calendarIds: ['c1'], ranges: [{ fromDate: DAY, toDate: DAY, dailyFrom: '09:00', dailyTo: '14:00' }] });
   });
 });
 
@@ -791,7 +805,9 @@ describe('a club that already has a live order of this služba', () => {
     const user = await startPicking();
     paint(13 * 60, 15 * 60);
     await waitFor(() => expect(rows()).toHaveLength(1));
-    fireEvent.click(screen.getByRole('button', { name: 'Potvrdit objednávku' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Potvrdit objednávku/ }));
+    /* 150 of the 300 minutes: the shortfall is the desk's call first (Etapa 12), then the club's other orders. */
+    fireEvent.click(await screen.findByTestId('pick-shortfall-create'));
     return user;
   };
 
@@ -825,8 +841,8 @@ describe('a club that already has a live order of this služba', () => {
 
     /* Edit mode of the existing order: its two windows plus the new pick, "Uložit změny", no "Potvrdit objednávku". */
     const panel = await screen.findByTestId('pick-panel');
-    await within(panel).findByRole('button', { name: 'Uložit změny' });
-    expect(screen.queryByRole('button', { name: 'Potvrdit objednávku' })).not.toBeInTheDocument();
+    await within(panel).findByRole('button', { name: /^Uložit změny/ });
+    expect(screen.queryByRole('button', { name: /^Potvrdit objednávku/ })).not.toBeInTheDocument();
     await waitFor(() => expect(rows()).toHaveLength(3));
     expect(rows().join(' ')).toMatch(/09:00–12:00 · 180 min/);
     expect(rows().join(' ')).toMatch(/13:00–15:30 · 150 min/);
@@ -836,7 +852,8 @@ describe('a club that already has a live order of this služba', () => {
     /* The new player counts are ADDED to the old (10 + 10); the panel shows only the ADDITIONAL need: 10 players. */
     expect(within(panel).getByTestId('pick-additional')).toHaveTextContent('Navíc k původní objednávce');
     expect(within(panel).getByTestId('pick-needs')).toHaveTextContent('10 hráčů');
-    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Zbývá 3 sloty');
+    expect(within(panel).getByTestId('pick-slots')).toHaveTextContent('Vybráno 7 z 10 hráčů');
+    expect(within(panel).getByTestId('pick-remaining')).toHaveTextContent('Zbývá: Základní prohlídka 3 hráči');
   });
 
   it('saving after "Přidat" sends ONE update: summed players, every window, the order own payment and note', async () => {
@@ -846,7 +863,8 @@ describe('a club that already has a live order of this služba', () => {
     await user.click(await screen.findByRole('button', { name: 'Přidat do té objednávky' }));
     const panel = await screen.findByTestId('pick-panel');
     await waitFor(() => expect(rows()).toHaveLength(3));
-    fireEvent.click(within(panel).getByRole('button', { name: 'Uložit změny' }));
+    fireEvent.click(within(panel).getByRole('button', { name: /^Uložit změny/ }));
+    fireEvent.click(await screen.findByTestId('pick-shortfall-create'));
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
     expect(update.mock.calls[0][0]).toBe(EXISTING);
     expect(update.mock.calls[0][1]).toMatchObject({
@@ -907,7 +925,9 @@ describe('a club that already has a live order of a DIFFERENT služba', () => {
     const user = await startPicking(); // picks 's1' Diagnostika - a DIFFERENT služba than OTHER's 's2'
     paint(13 * 60, 15 * 60);
     await waitFor(() => expect(rows()).toHaveLength(1));
-    fireEvent.click(screen.getByRole('button', { name: 'Potvrdit objednávku' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Potvrdit objednávku/ }));
+    /* 150 of the 300 minutes: the shortfall is the desk's call first (Etapa 12), then the club's other orders. */
+    fireEvent.click(await screen.findByTestId('pick-shortfall-create'));
     return user;
   };
 
@@ -969,7 +989,9 @@ describe('a club with BOTH a same-služba and a different-služba live order (th
     const user = await startPicking();
     paint(13 * 60, 15 * 60);
     await waitFor(() => expect(rows()).toHaveLength(1));
-    fireEvent.click(screen.getByRole('button', { name: 'Potvrdit objednávku' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Potvrdit objednávku/ }));
+    /* 150 of the 300 minutes: the shortfall is the desk's call first (Etapa 12), then the club's other orders. */
+    fireEvent.click(await screen.findByTestId('pick-shortfall-create'));
     return user;
   };
 
@@ -996,10 +1018,11 @@ describe('a club with BOTH a same-služba and a different-služba live order (th
     const dialog = await screen.findByTestId('pick-duplicate');
     await user.click(within(within(dialog).getAllByTestId('pick-duplicate-row')[0]).getByRole('button', { name: 'Přidat do této objednávky' }));
     const panel = await screen.findByTestId('pick-panel');
-    await within(panel).findByRole('button', { name: 'Uložit změny' });
+    await within(panel).findByRole('button', { name: /^Uložit změny/ });
     expect(within(panel).getByTestId('pick-note')).toHaveTextContent('Přidáno do objednávky KO-00000007');
     expect(createStaff).not.toHaveBeenCalled();
-    fireEvent.click(within(panel).getByRole('button', { name: 'Uložit změny' }));
+    fireEvent.click(within(panel).getByRole('button', { name: /^Uložit změny/ }));
+    fireEvent.click(await screen.findByTestId('pick-shortfall-create'));
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
     expect(update.mock.calls[0][0]).toBe(SAME);
   });

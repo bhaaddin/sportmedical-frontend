@@ -211,6 +211,10 @@ export interface GridPickMode {
   /** The clinic's current minute of today: time already gone cannot be picked. */
   nowMinute?: number;
   onNote: (text: string | null) => void;
+  /** Etapa 12: a paint or tap is about to add a window (the činnost bubble asks for its činnosti once it exists). */
+  onPicked?: () => void;
+  /** Etapa 12: false once every player has a slot - a new paint or tap is refused ("Hotovo") until one extra is armed. */
+  accepting?: boolean;
   onAdjust: (id: string, range: MinuteRange) => void;
   onRemove: (id: string) => void;
   /** Picks the server named in a refusal. */
@@ -1856,6 +1860,7 @@ function SubColumn({
     const none = { trimmedBusy: false };
     if (pick === undefined) return { range: null, ...none };
     if (!pick.allowedCalendar(calendar.id)) return { range: null, refused: "service", ...none };
+    if (pick.accepting === false) return { range: null, refused: "full", ...none };
     if (dayKey < pick.today) return { range: null, refused: "past", ...none };
     const wanted = dragRange(anchor, current, step, bounds);
     const direction = Math.floor(current / step) < Math.floor(anchor / step) ? "up" : "down";
@@ -1939,7 +1944,10 @@ function SubColumn({
     if (painting && pick !== undefined) {
       const result = paint(anchor, current);
       pick.onNote(paintNote(result));
-      if (result.range !== null) select(result.range, x, y, true);
+      if (result.range !== null) {
+        pick.onPicked?.();
+        select(result.range, x, y, true);
+      }
       return;
     }
     select(dragRange(anchor, current, step, bounds), x, y, additive);

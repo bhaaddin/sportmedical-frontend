@@ -8,7 +8,12 @@ const act = (activityId: string, seats: number, minutesPerSeat: number, parallel
 });
 const h = (hours: number, minutes = 0) => hours * 60 + minutes;
 const day = (from = h(8), to = h(15, 30), calendarId = 'c1'): FreeBlock[] => [{ calendarId, range: { start: from, end: to } }]; // 450 min
-const state = (activities: CoverageActivity[], pickedMinutes = 0, windows: TakeState['windows'] = []): TakeState => ({ activities, pickedMinutes, windows });
+/* A picked window of `minutes` (at the start of a day), for the činnosti given (all when absent). */
+const win = (minutes: number, activityIds?: string[]): TakeState['windows'][number] => ({ range: { start: 0, end: minutes }, activityIds: activityIds ?? null });
+const state = (activities: CoverageActivity[], _pickedMinutes = 0, windows: { minutes: number; activityIds?: string[] }[] = []): TakeState => ({
+  activities,
+  windows: windows.map((w) => win(w.minutes, w.activityIds)),
+});
 
 describe('takeNeeded - the one-tap shortcut takes only the missing time', () => {
   it('three days of 450 min for a 1 020 min need: 450 + 450 + 120 (the last one trimmed to a whole slot)', () => {
@@ -86,7 +91,7 @@ describe('takeNeeded - the one-tap shortcut takes only the missing time', () => 
   it('enlarging an order: only what the added players cost is missing', () => {
     const baseline = [act('a', 10, 30)];
     const grown = [act('a', 14, 30)]; // 4 more players = 120 min on top of the saved 300
-    const r = takeNeeded({ activities: grown, baseline, pickedMinutes: 300, windows: [{ minutes: 300 }] }, day());
+    const r = takeNeeded({ activities: grown, baseline, windows: [win(300)] }, day());
     expect(r.minutes).toBe(120);
     expect(r.trimmed).toBe(true);
   });

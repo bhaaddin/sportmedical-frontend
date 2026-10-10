@@ -87,7 +87,7 @@ const takenAt = (busy: readonly MinuteRange[], minute: number): boolean => busy.
 
 /* ── Painting ── */
 
-export type PickRefusal = "busy" | "past" | "service";
+export type PickRefusal = "busy" | "past" | "service" | "full";
 
 export interface ClampResult {
   /** The range that will be picked; null = refused (see `refused`). */
@@ -135,6 +135,9 @@ export function clampPainted(input: {
   return { range: { start, end }, trimmedBusy };
 }
 
+/** Etapa 12: every player has a slot - a new paint is refused until the desk presses "Přidat termín navíc". */
+export const PICK_FULL_NOTE = "Hotovo – všichni hráči mají termín. Další čas přidáte tlačítkem „Přidat termín navíc“.";
+
 /** The sentence under a trimmed or refused paint, or null when it went through whole. */
 export function paintNote(result: ClampResult): string | null {
   if (result.range === null) {
@@ -145,6 +148,8 @@ export function paintNote(result: ClampResult): string | null {
         return "Termín v minulosti nelze objednat.";
       case "service":
         return "Tento kalendář nepatří k vybrané službě.";
+      case "full":
+        return PICK_FULL_NOTE;
       default:
         return null;
     }

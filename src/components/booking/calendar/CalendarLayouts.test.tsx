@@ -400,8 +400,8 @@ describe('desktop · 1440', () => {
       const popover = await screen.findByRole('dialog', { name: 'Objednávka KO-000000BB · FK Dukla' });
       fireEvent.click(await within(popover).findByRole('button', { name: 'Upravit termíny' }));
       const panel = await screen.findByTestId('pick-panel');
-      expect(within(panel).getByRole('button', { name: 'Uložit změny' })).toBeInTheDocument();
-      expect(within(panel).queryByRole('button', { name: 'Potvrdit objednávku' })).not.toBeInTheDocument();
+      expect(within(panel).getByRole('button', { name: /^Uložit změny/ })).toBeInTheDocument();
+      expect(within(panel).queryByRole('button', { name: /^Potvrdit objednávku/ })).not.toBeInTheDocument();
       await waitFor(() => expect(within(panel).getAllByTestId('pick-row').length).toBeGreaterThan(0));
     });
   });

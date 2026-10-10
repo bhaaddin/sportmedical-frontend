@@ -1,26 +1,30 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
+import { activitiesApi } from "../../../api/activities";
 import type { Calendar } from "../../../api/bookingContracts";
 import { fetchBlockableActivities } from "../../../api/clubBlocks";
 import { ClubOrderError, clubOrdersApi, REASON_ACTIVITY_REMOVED } from "../../../api/clubOrders";
 import type { ClubOrderView } from "../../../api/clubOrders";
-import type { DateOnly } from "../../../utils/time";
+import { addDaysToDateOnly, type DateOnly } from "../../../utils/time";
 import { invalidateClubWorld } from "../../clubs/clubWorld";
+import type { CoverageActivity } from "../../clubs/order/coverage";
 import { mergeSessionInto } from "../../clubs/order/editSession";
 import { orderCode, rangeLine } from "../../clubs/order/orderFormat";
 import { rowFromRange, rowIndexForError } from "../../clubs/order/orderLogic";
 import { allowedNames, normalizeAllowed, toggleAllowed } from "../../clubs/order/routing";
 import type { PickSession } from "../../clubs/order/pickSession";
+import { shortDate, weekdayShort } from "../grid/periodTitle";
 import type { GridPickMode } from "../grid/TimeGrid";
 import { formatFree, type FreeBlock } from "./pickDays";
 import { CAL_TEXT } from "./calendarText";
+import type { PickedTime } from "./multiSelect";
+import { findNextFreeDay } from "./pickNextDay";
+import { moreNeeded, stepFor, takeForActivity, trimToNeed, type AskPart, type PickCoverage, type PlanWindow } from "./pickPlan";
 import { coverageOf, subtractRanges, takeNeeded } from "./pickTake";
 import {
   ordersRangesOf,
   pickedCalendarIds,
-  pickedMinutesOf,
-  pickedWindowsOf,
   pickInRange,
   picksFromRanges,
   timePicks,
@@ -33,9 +37,10 @@ import type { MultiSelectApi } from "./useMultiSelect";
  * "Výběr termínů" - the whole state machine of a phone order picked straight in the calendar.
  *
  * The session (club, služba, činnosti with players) is given at the start; the places painted in the grid live in
- * the calendar's `multi` selection; everything else - the live coverage (slots still missing), the stop at "enough",
- * the final `createStaff` / `update` / `confirm` with its 409 - is here, so the page only wires it to the grid and the
- * panel. Picking is MANUAL only: nothing proposes terms.
+ * the calendar's `multi` selection; everything else - the live coverage (players still missing, per činnost), the
+ * question "for which činnosti is this window" the moment one is picked (Etapa 12), the shortfall confirm, and the
+ * final `createStaff` / `update` / `confirm` with its 409 - is here, so the page only wires it to the grid, the panel
+ * and the bubbles. Picking is MANUAL only: nothing proposes terms.
  */
 
 export interface NoteAction {
@@ -56,6 +61,52 @@ export type DuplicateChoice =
   | { kind: "addendum"; order: ClubOrderView }
   | { kind: "separate" }
   | { kind: "dismiss" };
+
+/**
+ * Etapa 12: a window has just been picked (or the desk pressed "Rozdělit" on one) and the bubble asks which činnosti
+ * it is for. `windows` are the picks in question (several after a day shortcut around the lunch break), `others` the
+ * rest of the pick, so the bubble can count live.
+ */
+export interface PickAsk {
+  /** "new": "Zrušit" removes the windows again. "edit": a window already in the pick, "Zrušit" keeps it as it is. */
+  mode: "new" | "edit";
+  windows: PickedTime[];
+  /** The order's činnosti with players, in the order's order. */
+  activities: CoverageActivity[];
+  others: PlanWindow[];
+  baseline?: CoverageActivity[];
+  /** The grid step the window sits on (its calendar's step, or a finer one that fits). */
+  stepOf: (calendarId: string) => number;
+  calendarName: (calendarId: string) => string;
+  /** The price of a činnost (null = none set); the map itself is null while the catalogue loads. */
+  prices: ReadonlyMap<string, number | null> | null;
+}
+
+/** What the bubble hands back: each window's parts (one part = unchanged window), with the činnosti of each. */
+export interface AskResult {
+  id: string;
+  parts: AskPart[];
+}
+
+/**
+ * Etapa 12: "Potvrdit objednávku" pressed while players are still without a slot, or with places picked beyond the
+ * players (money lost) - the desk decides, nothing is created or trimmed silently.
+ */
+export interface Shortfall {
+  totalSeats: number;
+  remainingSeats: number;
+  perActivity: { activityId: string; name: string; remainingSeats: number }[];
+  /** Calendar minutes the missing players still need (whole slots). */
+  neededMinutes: number;
+  /** Picked minutes no slot uses (information, never a block). */
+  unusedMinutes: number;
+  /** Places picked beyond the players, per činnost, with the money they would earn (null = no price set). */
+  spare: { activityId: string; name: string; seats: number; minutes: number; lostCzk: number | null }[];
+  spareSeats: number;
+  editing: boolean;
+}
+
+export type ShortfallChoice = "fill" | "trim" | "create";
 
 export interface PickOrderApi {
   session: PickSession | null;
@@ -90,6 +141,18 @@ export interface PickOrderApi {
   /** A sentence under the calculator (null clears it), optionally with one small action ("Vzít celý den"). */
   setNote: (text: string | null, action?: NoteAction | null) => void;
   closeResult: () => void;
+  /** Etapa 12: the činnost bubble of a just-picked window (null = nothing to ask). */
+  ask: PickAsk | null;
+  resolveAsk: (results: readonly AskResult[]) => void;
+  cancelAsk: () => void;
+  /** Etapa 12: the confirm before creating ("Doplnit termíny" / "Zkrátit na potřebu" / "Vytvořit i tak"); null = nothing to confirm. */
+  shortfall: Shortfall | null;
+  resolveShortfall: (choice: ShortfallChoice) => void;
+}
+
+interface AskState {
+  ids: string[];
+  mode: "new" | "edit";
 }
 
 export function usePickOrder(input: {
@@ -126,36 +189,97 @@ export function usePickOrder(input: {
   const [result, setResult] = useState<ClubOrderView | null>(null);
   const [duplicate, setDuplicate] = useState<LiveOrdersFound | null>(null);
   const [resultTitle, setResultTitle] = useState("Objednávka potvrzena");
+  const [askState, setAskState] = useState<AskState | null>(null);
+  const [shortfall, setShortfall] = useState<(Shortfall & { cancelAthletes: boolean }) | null>(null);
+  const [focusActivityId, setFocusActivityId] = useState<string | null>(null);
+  const [addingDay, setAddingDay] = useState<string | null>(null);
+  /* Etapa 12: once every player has a slot the grid takes no new pick - "Přidat termín navíc" arms exactly one. */
+  const [extraArmed, setExtraArmed] = useState(false);
 
   const picks = useMemo(() => timePicks(multi.items), [multi.items]);
-  const pickedMinutes = pickedMinutesOf(multi.items);
   const activities = useMemo(() => session?.activities ?? [], [session]);
   /* Etapa 10: the činnosti that can be routed (players expected), and each picked window's allowed set. */
-  const routable = useMemo(() => activities.filter((a) => a.seats > 0).map((a) => ({ activityId: a.activityId, name: a.name })), [activities]);
+  const routableActivities = useMemo(() => activities.filter((a) => a.seats > 0), [activities]);
+  const routable = useMemo(() => routableActivities.map((a) => ({ activityId: a.activityId, name: a.name })), [routableActivities]);
   const routableIds = useMemo(() => routable.map((a) => a.activityId), [routable]);
-  const windows = useMemo(() => pickedWindowsOf(multi.items), [multi.items]);
-  const baseline = session?.editOrder?.baseline;
-  /* Enlarging an order: only what the added players cost is missing (see `coverageOf`). */
-  const takeState = useMemo(
-    () => ({ activities, ...(baseline !== undefined ? { baseline } : {}), pickedMinutes, windows }),
-    [activities, baseline, pickedMinutes, windows],
+  const baseStep = useCallback((calendarId: string) => calendars.find((c) => c.id === calendarId)?.displayStepMinutes ?? 30, [calendars]);
+  const stepOf = useCallback((calendarId: string, range?: { start: number; end: number }) => (range === undefined ? baseStep(calendarId) : stepFor(range, baseStep(calendarId))), [baseStep]);
+  /* Every picked window as the calculator reads it (Etapa 12: counted individually per činnost). */
+  const windows = useMemo<PlanWindow[]>(
+    () =>
+      picks.map((p) => ({
+        id: p.id,
+        range: p.range,
+        dayKey: p.dayKey,
+        activityIds: normalizeAllowed(p.activityIds, routableIds),
+        step: stepFor(p.range, baseStep(p.calendarId)),
+      })),
+    [picks, routableIds, baseStep],
   );
-  const coverage = useMemo(() => coverageOf(takeState), [takeState]);
+  const baseline = session?.editOrder?.baseline;
+  /* Enlarging an order: only what the added players cost is missing (see `pickCoverage`). */
+  const takeState = useMemo(() => ({ activities, ...(baseline !== undefined ? { baseline } : {}), windows }), [activities, baseline, windows]);
+  const coverage: PickCoverage = useMemo(() => coverageOf(takeState), [takeState]);
   const itemsRef = useRef(multi.items);
   itemsRef.current = multi.items;
+  const full = coverage.covered;
+  const accepting = !full || extraArmed;
+  useEffect(() => {
+    if (!full && extraArmed) setExtraArmed(false);
+  }, [full, extraArmed]);
 
-  const serviceCalendarIds = useMemo(
-    () => new Set(calendars.filter((c) => session !== null && c.clinicServiceId === session.serviceId).map((c) => c.id)),
-    [calendars, session],
-  );
+  const serviceCalendars = useMemo(() => calendars.filter((c) => session !== null && c.clinicServiceId === session.serviceId), [calendars, session]);
+  const serviceCalendarIds = useMemo(() => new Set(serviceCalendars.map((c) => c.id)), [serviceCalendars]);
   const calendarName = useCallback((id: string) => calendars.find((c) => c.id === id)?.name ?? "", [calendars]);
 
+  /* The prices of the činnosti for the bubble (the price list, through the activity). Nothing waits for it. */
+  const pricesQuery = useQuery({
+    queryKey: ["activities"],
+    queryFn: () => activitiesApi.list(),
+    enabled: session !== null && routable.length > 1,
+    staleTime: 5 * 60 * 1000,
+  });
+  const prices = useMemo<ReadonlyMap<string, number | null> | null>(
+    () => (pricesQuery.data === undefined ? null : new Map(pricesQuery.data.activities.map((a) => [a.id, a.priceCzk ?? null] as const))),
+    [pricesQuery.data],
+  );
 
   const clearFailure = useCallback(() => setFailure((f) => (f === null ? f : null)), []);
+
+  /*
+   * Etapa 12: the bubble. A pick that comes from the grid or a shortcut "arms" the question with the ids known
+   * before it; the effect below sees the new ids once they exist and opens the bubble for them - synchronously
+   * with the pick, nothing waits for a query. Only when the order has at least two činnosti with players.
+   */
+  const armRef = useRef<Set<string> | null>(null);
+  const arm = useCallback(() => {
+    armRef.current = routable.length > 1 ? new Set(itemsRef.current.map((i) => i.id)) : null;
+  }, [routable.length]);
+  useEffect(() => {
+    const known = armRef.current;
+    if (known === null) return;
+    armRef.current = null;
+    const fresh = timePicks(multi.items).filter((i) => !known.has(i.id)).map((i) => i.id);
+    if (fresh.length > 0) {
+      setAskState({ ids: fresh, mode: "new" });
+      setExtraArmed(false);
+    }
+  }, [multi.items]);
+  /* The one extra pick was added (also when the order has a single činnost and nothing is asked): the guard re-arms. */
+  const pickCountRef = useRef(picks.length);
+  useEffect(() => {
+    if (picks.length > pickCountRef.current && extraArmed) setExtraArmed(false);
+    pickCountRef.current = picks.length;
+  }, [picks.length, extraArmed]);
 
   const start = useCallback(
     (next: PickSession) => {
       multi.clear();
+      armRef.current = null;
+      setAskState(null);
+      setShortfall(null);
+      setFocusActivityId(null);
+      setExtraArmed(false);
       setSession(next);
       setNote(null);
       setFailure(null);
@@ -175,14 +299,39 @@ export function usePickOrder(input: {
 
   const end = useCallback(() => {
     multi.clear();
+    armRef.current = null;
+    setAskState(null);
+    setShortfall(null);
+    setFocusActivityId(null);
     setSession(null);
     setNote(null);
     setFailure(null);
     onEnded?.();
   }, [multi, onEnded]);
 
-  const confirm = useCallback(async (cancelAthletes = false, skipDuplicateCheck = false) => {
+  const confirm = useCallback(async (cancelAthletes = false, skipDuplicateCheck = false, force = false) => {
     if (session === null || picks.length === 0 || confirming) return;
+    /* Etapa 12 (constitution IV): players without a slot, or places picked beyond them, never slip through - the desk is asked first. */
+    if (!force && (coverage.remainingSeats > 0 || coverage.spareSeats > 0)) {
+      const short = coverage.perActivity.filter((a) => a.remainingSeats > 0);
+      setShortfall({
+        totalSeats: coverage.totalSeats,
+        remainingSeats: coverage.remainingSeats,
+        perActivity: short.map((a) => ({ activityId: a.activityId, name: a.name, remainingSeats: a.remainingSeats })),
+        neededMinutes: short.reduce((n, a) => n + moreNeeded(a, null).minutes, 0),
+        unusedMinutes: coverage.unusedMinutes,
+        spare: coverage.perActivity
+          .filter((a) => a.spareSeats > 0)
+          .map((a) => {
+            const price = prices?.get(a.activityId) ?? null;
+            return { activityId: a.activityId, name: a.name, seats: a.spareSeats, minutes: a.spareMinutes, lostCzk: price === null ? null : price * a.spareSeats };
+          }),
+        spareSeats: coverage.spareSeats,
+        editing: session.editOrder?.mode === "edit",
+        cancelAthletes,
+      });
+      return;
+    }
     const ranges = ordersRangesOf(multi.items, todayKey);
     const calendarIds = pickedCalendarIds(multi.items);
     setConfirming(true);
@@ -230,6 +379,7 @@ export function usePickOrder(input: {
       onCreated?.(order);
       toast.success(editing?.mode === "edit" ? "Termíny objednávky jsou uložené." : "Objednávka je potvrzená a termíny jsou v kalendáři.");
       multi.clear();
+      setAskState(null);
       setSession(null);
       onEnded?.();
     } catch (error) {
@@ -252,15 +402,41 @@ export function usePickOrder(input: {
     } finally {
       setConfirming(false);
     }
-  }, [session, picks, confirming, multi, todayKey, queryClient, onCreated, onEnded]);
+  }, [session, picks, confirming, coverage, prices, multi, todayKey, queryClient, onCreated, onEnded]);
 
+  const resolveShortfall = useCallback(
+    (choice: ShortfallChoice) => {
+      const current = shortfall;
+      setShortfall(null);
+      if (current === null) return;
+      if (choice === "fill") {
+        setFocusActivityId(current.perActivity[0]?.activityId ?? null);
+        return;
+      }
+      if (choice === "trim") {
+        /* "Zkrátit na potřebu": only on this click - the spare windows are cut back to what the players use. */
+        for (const change of trimToNeed(activities, windows)) {
+          if (change.range === null) multi.remove(change.id);
+          else multi.update(change.id, change.range);
+        }
+        clearFailure();
+        setNote("Termíny zkráceny na potřebu hráčů.");
+        return;
+      }
+      /* "Vytvořit i tak": the order as it is - the desk decided. The duplicate check still runs. */
+      void confirm(current.cancelAthletes, false, true);
+    },
+    [shortfall, confirm, activities, windows, multi, clearFailure, setNote],
+  );
+
+  /* "Vytvořit samostatnou objednávku" after the duplicate dialog repeats the confirm; the shortfall was already decided. */
   const resolveDuplicate = useCallback(
     (choice: DuplicateChoice) => {
       const found = duplicate;
       setDuplicate(null);
       if (found === null || session === null) return;
       if (choice.kind === "separate") {
-        void confirm(false, true);
+        void confirm(false, true, true);
         return;
       }
       if (choice.kind === "dismiss") return;
@@ -268,6 +444,7 @@ export function usePickOrder(input: {
         /* The desk picks a DIFFERENT live order to extend: leave this pick behind (it is not created) and hand off
          * to that order's own "Přidat další službu" flow - exactly what its own button does. */
         multi.clear();
+        setAskState(null);
         setSession(null);
         setNote(null);
         setFailure(null);
@@ -287,6 +464,7 @@ export function usePickOrder(input: {
         const own = (merged.editOrder?.blocks ?? []).flatMap((block) =>
           picksFromRanges([{ ...block.range, activityIds: normalizeAllowed(block.range.activityIds, mergedIds) }], block.calendarId, (id) => id),
         );
+        armRef.current = null;
         multi.replace([...own, ...withoutIds(multi.items)]);
         setSession(merged);
         setFailure(null);
@@ -305,6 +483,8 @@ export function usePickOrder(input: {
 
   const noteRef = useRef(setNote);
   noteRef.current = setNote;
+  const armRefFn = useRef(arm);
+  armRefFn.current = arm;
 
   const gridPick: GridPickMode | undefined = useMemo(
     () =>
@@ -316,12 +496,18 @@ export function usePickOrder(input: {
             today: todayKey,
             ...(nowMinute !== undefined ? { nowMinute } : {}),
             onNote: (text) => noteRef.current(text),
+            /* Etapa 12: a paint or tap is about to add a window - the bubble asks for its činnosti once it exists. */
+            onPicked: () => armRefFn.current(),
+            /* Etapa 12: every player has a slot - the grid refuses a new pick until "Přidat termín navíc". */
+            accepting,
             ignoreClubBlockIds: ownBlockIds,
             onAdjust: (id, range) => {
+              armRef.current = null;
               multi.update(id, range);
               clearFailure();
             },
             onRemove: (id) => {
+              armRef.current = null;
               multi.remove(id);
               clearFailure();
             },
@@ -332,7 +518,7 @@ export function usePickOrder(input: {
               return item?.kind === "time" ? allowedNames(item.activityIds, routable, "short") : null;
             },
           },
-    [session, serviceCalendarIds, todayKey, nowMinute, multi, conflictIds, ownBlockIds, clearFailure, routable],
+    [session, serviceCalendarIds, todayKey, nowMinute, multi, conflictIds, ownBlockIds, clearFailure, routable, accepting],
   );
 
   const pickBlocks = useCallback(
@@ -342,13 +528,14 @@ export function usePickOrder(input: {
         return false;
       }
       const unit = options?.unit ?? "day";
-      const add = (list: readonly FreeBlock[]) => {
+      const add = (list: readonly FreeBlock[], activityIds: string[] | null = null) => {
         for (const t of list) {
-          multi.add({ kind: "time", columnKey: t.calendarId, calendarId: t.calendarId, activityId: null, dayKey: day, range: t.range });
+          multi.add({ kind: "time", columnKey: t.calendarId, calendarId: t.calendarId, activityId: null, dayKey: day, range: t.range, activityIds });
         }
       };
       /* The explicit "whole" is booked exactly as it is. */
       if (options?.whole === true) {
+        arm();
         add(blocks);
         clearFailure();
         setNote(null);
@@ -357,9 +544,17 @@ export function usePickOrder(input: {
       const take = takeNeeded(takeState, blocks);
       if (take.covered) {
         clearFailure();
+        /* With the one extra pick armed the day is still taken whole - the desk asked for more. */
+        if (extraArmed) {
+          arm();
+          add(blocks);
+          setNote(null);
+          return true;
+        }
         setNote(CAL_TEXT.pick.alreadyCovered);
         return false;
       }
+      arm();
       add(take.blocks);
       clearFailure();
       if (!take.trimmed) {
@@ -373,11 +568,13 @@ export function usePickOrder(input: {
         onClick: () => {
           const current = timePicks(itemsRef.current);
           const mine = current.filter((p) => p.dayKey === day && created.some((c) => c.calendarId === p.calendarId && c.range.start === p.range.start && c.range.end === p.range.end));
+          /* The whole day keeps the činnosti the desk chose for the trimmed pick. */
+          const chosen = mine[0]?.activityIds ?? null;
           for (const p of mine) multi.remove(p.id);
           const gone = new Set(mine.map((p) => p.id));
           for (const b of blocks) {
             const cuts = current.filter((p) => !gone.has(p.id) && p.dayKey === day && p.calendarId === b.calendarId).map((p) => p.range);
-            add(subtractRanges(b.range, cuts).map((range) => ({ calendarId: b.calendarId, range })));
+            add(subtractRanges(b.range, cuts).map((range) => ({ calendarId: b.calendarId, range })), chosen);
           }
           clearFailure();
           setNote(null);
@@ -385,7 +582,7 @@ export function usePickOrder(input: {
       });
       return true;
     },
-    [multi, clearFailure, takeState, setNote],
+    [multi, clearFailure, takeState, setNote, arm, extraArmed],
   );
   const previewTake = useCallback(
     (blocks: readonly FreeBlock[]) => {
@@ -401,6 +598,104 @@ export function usePickOrder(input: {
       setNote(null);
     },
     [multi, clearFailure],
+  );
+
+  /* ── Etapa 12: the činnost bubble ── */
+
+  const ask = useMemo<PickAsk | null>(() => {
+    if (askState === null || session === null) return null;
+    const wanted = new Set(askState.ids);
+    const asked = picks.filter((p) => wanted.has(p.id));
+    if (asked.length === 0) return null;
+    return {
+      mode: askState.mode,
+      windows: asked,
+      activities: routableActivities,
+      others: windows.filter((w) => w.id === undefined || !wanted.has(w.id)),
+      ...(baseline !== undefined ? { baseline } : {}),
+      stepOf: (calendarId: string) => baseStep(calendarId),
+      calendarName,
+      prices,
+    };
+  }, [askState, session, picks, routableActivities, windows, baseline, baseStep, calendarName, prices]);
+  useEffect(() => {
+    if (askState !== null && ask === null) setAskState(null);
+  }, [askState, ask]);
+
+  const resolveAsk = useCallback(
+    (results: readonly AskResult[]) => {
+      for (const r of results) {
+        const item = itemsRef.current.find((i) => i.id === r.id);
+        if (item?.kind !== "time") continue;
+        const [first, ...rest] = r.parts;
+        if (first === undefined) continue;
+        if (first.range.start !== item.range.start || first.range.end !== item.range.end) multi.update(r.id, first.range);
+        multi.setActivities(r.id, normalizeAllowed(first.activityIds, routableIds));
+        for (const p of rest) {
+          multi.add({
+            kind: "time",
+            columnKey: item.columnKey,
+            calendarId: item.calendarId,
+            activityId: item.activityId,
+            dayKey: item.dayKey,
+            range: p.range,
+            activityIds: normalizeAllowed(p.activityIds, routableIds),
+          });
+        }
+      }
+      armRef.current = null;
+      setAskState(null);
+      clearFailure();
+    },
+    [multi, routableIds, clearFailure],
+  );
+  const cancelAsk = useCallback(() => {
+    const current = askState;
+    setAskState(null);
+    if (current === null) return;
+    if (current.mode === "new") {
+      for (const id of current.ids) multi.remove(id);
+      clearFailure();
+      setNote(null);
+    }
+  }, [askState, multi, clearFailure, setNote]);
+
+  /* ── Etapa 12: "Přidat další den" for one činnost that is still short ── */
+
+  const addDayFor = useCallback(
+    async (activityId: string) => {
+      if (session === null || addingDay !== null) return;
+      const activity = activities.find((a) => a.activityId === activityId);
+      const cov = coverage.perActivity.find((a) => a.activityId === activityId);
+      if (activity === undefined || cov === undefined || cov.remainingSeats <= 0) return;
+      setAddingDay(activityId);
+      try {
+        const current = timePicks(itemsRef.current);
+        const last = current.reduce<DateOnly | null>((m, p) => (m === null || p.dayKey > m ? p.dayKey : m), null);
+        const from = last !== null && last >= todayKey ? addDaysToDateOnly(last, 1) : todayKey;
+        const found = await findNextFreeDay({ calendars: serviceCalendars, from, today: todayKey, nowMinute: nowMinute ?? 0, picks: itemsRef.current });
+        if (found === null) {
+          setNote(`Pro ${activity.name} není v nejbližších 14 dnech po posledním termínu volný den.`);
+          return;
+        }
+        const step = found.blocks[0] === undefined ? 5 : baseStep(found.blocks[0].calendarId);
+        const take = takeForActivity(found.blocks, activity, cov.remainingSeats, step);
+        if (take.blocks.length === 0) {
+          setNote(`${weekdayShort(found.day)} ${shortDate(found.day)}: volný čas je kratší než jeden slot ${activity.name}.`);
+          return;
+        }
+        armRef.current = null;
+        for (const b of take.blocks) {
+          multi.add({ kind: "time", columnKey: b.calendarId, calendarId: b.calendarId, activityId: null, dayKey: found.day, range: b.range, activityIds: [activityId] });
+        }
+        clearFailure();
+        const slots = `${take.slots} ${take.slots === 1 ? "slot" : take.slots >= 2 && take.slots <= 4 ? "sloty" : "slotů"}`;
+        setNote(`Přidán ${weekdayShort(found.day)} ${shortDate(found.day)} pro ${activity.name} (${slots}).`);
+      } finally {
+        setAddingDay(null);
+      }
+    },
+    [session, addingDay, activities, coverage, todayKey, serviceCalendars, nowMinute, baseStep, multi, clearFailure, setNote],
   );
 
   const panel: PickOrderApi["panel"] =
@@ -433,6 +728,18 @@ export function usePickOrder(input: {
             multi.setActivities(id, null);
             clearFailure();
           },
+          ...(routable.length > 1 ? { onSplitPick: (id: string) => setAskState({ ids: [id], mode: "edit" }) } : {}),
+          onAddDay: (activityId: string) => void addDayFor(activityId),
+          addingDay,
+          focusActivityId,
+          onFocused: () => setFocusActivityId(null),
+          accepting,
+          extraArmed,
+          onExtraPick: () => {
+            setExtraArmed(true);
+            setNote("Další termín: označte ho v kalendáři (jen jeden, potom se výběr zase uzavře).");
+          },
+          prices,
           onConfirm: () => void confirm(),
           onConfirmCancelling: () => void confirm(true),
           onClearPicks: () => {
@@ -446,7 +753,34 @@ export function usePickOrder(input: {
           onCancel: end,
         };
 
-  return { session, active: session !== null, start, cancel: end, gridPick, panel, result, duplicate, resolveDuplicate, resultTitle, closeResult: () => setResult(null), pickBlocks, previewTake, removeDay, setNote };
+  const shortfallView: Shortfall | null = useMemo(() => {
+    if (shortfall === null) return null;
+    const { cancelAthletes: _cancelAthletes, ...rest } = shortfall;
+    return rest;
+  }, [shortfall]);
+
+  return {
+    session,
+    active: session !== null,
+    start,
+    cancel: end,
+    gridPick,
+    panel,
+    result,
+    duplicate,
+    resolveDuplicate,
+    resultTitle,
+    closeResult: () => setResult(null),
+    pickBlocks,
+    previewTake,
+    removeDay,
+    setNote,
+    ask,
+    resolveAsk,
+    cancelAsk,
+    shortfall: shortfallView,
+    resolveShortfall,
+  };
 }
 
 /**
