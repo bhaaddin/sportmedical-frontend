@@ -117,6 +117,8 @@ export function ClubPresentation({
     .sort((a, b) => (RANK[a.status] ?? 9) - (RANK[b.status] ?? 9) || firstDate(a).localeCompare(firstDate(b)));
 
   const location = [club.address, [club.postalCode, club.city].filter(Boolean).join(' ')].filter((p) => p && p.trim() !== '').join(', ');
+  /* Vedení klubu (Etapa 12): shown only when somebody is listed; an older server sends nothing here. */
+  const management = Array.isArray(club.management) ? club.management.filter((m) => m.fullName.trim() !== '') : [];
   const bank = [club.bankAccount ? `${club.bankAccount}${club.bankCode ? `/${club.bankCode}` : ''}` : '', club.iban ?? ''].filter((p) => p !== '');
   const s = summary.data;
 
@@ -238,6 +240,28 @@ export function ClubPresentation({
             ) : null}
           </Box>
         </SoftCard>
+
+        {/* ── Vedení klubu: the statutory body from ARES and the people added by hand ── */}
+        {management.length > 0 ? (
+          <SoftCard data-testid="club-management" role="region" aria-label="Vedení klubu">
+            <SectionLabel>Vedení klubu</SectionLabel>
+            <Stack spacing={1.25} role="list">
+              {management.map((m, index) => {
+                const contact = [m.phone ?? '', m.email ?? ''].filter((p) => p.trim() !== '').join(' · ');
+                return (
+                  <Stack key={m.id ?? `${m.fullName}-${index}`} role="listitem" direction="row" data-testid="club-manager" data-source={m.source} sx={{ gap: 1.5, alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{m.fullName}</Typography>
+                      {m.role.trim() !== '' ? <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{m.role}</Typography> : null}
+                      {contact !== '' ? <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', overflowWrap: 'anywhere' }}>{contact}</Typography> : null}
+                    </Box>
+                    {m.source === 'ares' ? <StatusChip tone="beige" size="sm">z ARES</StatusChip> : null}
+                  </Stack>
+                );
+              })}
+            </Stack>
+          </SoftCard>
+        ) : null}
 
         {/* ── Nadcházející okna v kalendáři ── */}
         <SoftCard data-testid="club-windows" role="region" aria-label="Nadcházející okna v kalendáři">

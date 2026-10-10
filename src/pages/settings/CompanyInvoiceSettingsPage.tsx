@@ -13,13 +13,15 @@
    the QR payment appears on the PDF only when the bank account is set.
    ══════════════════════════════════════════════════════════════ */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, Box, Button, InputAdornment, Stack, TextField, Typography } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { COMPANY_SETTINGS_QUERY_KEY, companySettingsApi, type CompanySettings } from '../../api/companySettings';
+import type { AresSubject } from '../../api/ares';
 import { useDevice, useIsPhone } from '../../layout/useDevice';
 import { SoftCard, StatusChip } from '../../components/ui';
+import { AresFillButton, AresOverrideCaption, AresStatusLine, applyAresFill, useAresFill } from '../../components/common/AresFill';
 import { TYPE, settingsLine } from '../../components/settings/settingsStyle';
 import { SettingsAsideCard, SettingsScreen } from './SettingsFrame';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
@@ -170,12 +172,44 @@ export default function CompanyInvoiceSettingsPage() {
     if (draft === null || !valid) return;
     save.mutate(toPayload(draft));
   };
-  const discard = () => { setEdits(null); setServerErrors({}); setFailure(null); setAttempted(false); };
+  /* The previous value of every field ARES overwrote, until "Vrátit", a manual edit or Zahodit. */
+  const [overridden, setOverridden] = useState<Partial<Record<Field, string>>>({});
+  const discard = () => { setEdits(null); setServerErrors({}); setFailure(null); setAttempted(false); setOverridden({}); };
+
+  const clearServerError = (e: Record<string, string>, field: Field) => ({ ...e, [field]: '', [field.charAt(0).toUpperCase() + field.slice(1)]: '' });
 
   const edit = (field: Field, value: string) => {
     if (draft === null) return;
     setEdits({ ...draft, [field]: value });
-    setServerErrors((e) => ({ ...e, [field]: '', [field.charAt(0).toUpperCase() + field.slice(1)]: '' }));
+    setServerErrors((e) => clearServerError(e, field));
+    /* Typed over by hand: it is no longer what ARES wrote. */
+    setOverridden((o) => (o[field] === undefined ? o : { ...o, [field]: undefined }));
+  };
+
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+
+  /* ARES (Etapa 12): the clinic's own name, DIČ and seat from the registry, the same way the club form takes them. */
+  const ares = useAresFill({
+    ico: draft?.ico ?? '',
+    initialIco: saved?.ico ?? '',
+    onSubject: (s: AresSubject) => {
+      const current = draftRef.current;
+      if (current === null) return;
+      const { next, overridden: changed } = applyAresFill<Field>(current, {
+        legalName: s.name, dic: s.dic, address: s.street, city: s.city, postalCode: s.postalCode,
+      });
+      setEdits(next);
+      setOverridden(changed);
+      setServerErrors((e) => (['legalName', 'dic', 'address', 'city', 'postalCode'] as Field[]).reduce(clearServerError, e));
+    },
+  });
+
+  const restore = (field: Field) => {
+    const previous = overridden[field];
+    if (previous === undefined || draftRef.current === null) return;
+    setEdits({ ...draftRef.current, [field]: previous });
+    setOverridden((o) => ({ ...o, [field]: undefined }));
   };
 
   const fieldError = (field: Field): string | undefined => {
@@ -191,24 +225,35 @@ export default function CompanyInvoiceSettingsPage() {
     field: Field,
     label: string,
     help: string,
-    opts: { full?: boolean; inputMode?: 'numeric' | 'tel' | 'email' | 'text'; end?: string; required?: boolean } = {},
-  ) => (
-    <TextField
-      key={field}
-      label={label}
-      value={draft === null ? '' : draft[field]}
-      onChange={(e) => edit(field, e.target.value)}
-      error={fieldError(field) !== undefined}
-      helperText={fieldError(field) ?? help}
-      size={phone ? 'medium' : 'small'}
-      fullWidth
-      sx={opts.full === true && !phone ? { gridColumn: '1 / -1' } : undefined}
-      slotProps={{
-        htmlInput: { inputMode: opts.inputMode ?? 'text', 'aria-required': opts.required === true ? true : undefined },
-        input: opts.end !== undefined ? { endAdornment: <InputAdornment position="end">{opts.end}</InputAdornment> } : undefined,
-      }}
-    />
-  );
+    opts: { full?: boolean; inputMode?: 'numeric' | 'tel' | 'email' | 'text'; end?: string; required?: boolean; onBlur?: () => void; bare?: boolean } = {},
+  ) => {
+    const control = (
+      <TextField
+        key={field}
+        label={label}
+        value={draft === null ? '' : draft[field]}
+        onChange={(e) => edit(field, e.target.value)}
+        onBlur={opts.onBlur}
+        error={fieldError(field) !== undefined}
+        helperText={fieldError(field) ?? help}
+        size={phone ? 'medium' : 'small'}
+        fullWidth
+        sx={opts.full === true && !phone && opts.bare === true ? { gridColumn: '1 / -1' } : undefined}
+        slotProps={{
+          htmlInput: { inputMode: opts.inputMode ?? 'text', 'aria-required': opts.required === true ? true : undefined },
+          input: opts.end !== undefined ? { endAdornment: <InputAdornment position="end">{opts.end}</InputAdornment> } : undefined,
+        }}
+      />
+    );
+    /* `bare`: the caller places it (inside its own Stack); otherwise the field and its ARES caption share a cell. */
+    if (opts.bare === true) return control;
+    return (
+      <Box key={field} sx={opts.full === true && !phone ? { gridColumn: '1 / -1' } : undefined}>
+        {control}
+        {overridden[field] !== undefined && <AresOverrideCaption onRestore={() => restore(field)} />}
+      </Box>
+    );
+  };
 
   const card = (id: string, title: string, caption: string, children: React.ReactNode) => (
     <SoftCard component="section" aria-labelledby={id}>
@@ -238,8 +283,15 @@ export default function CompanyInvoiceSettingsPage() {
 
           {card('firma-firma', 'Firma', 'Jak se firma jmenuje a jak ji úřady vedou.', <>
             {input('legalName', 'Obchodní název', 'Celý název včetně právní formy.', { full: true, required: true })}
-            {input('ico', 'IČO', 'Osm číslic.', { inputMode: 'numeric', required: true })}
+            {/* The ARES button sits right of the IČO; on a phone it stacks under it. */}
+            <Stack direction={phone ? 'column' : 'row'} spacing={1} sx={{ alignItems: phone ? 'stretch' : 'flex-start' }}>
+              {input('ico', 'IČO', 'Osm číslic.', { inputMode: 'numeric', required: true, onBlur: ares.onIcoBlur, bare: true })}
+              <AresFillButton fill={ares} fullWidth={phone} />
+            </Stack>
             {input('dic', 'DIČ', 'Vyplňte, je-li firma plátce DPH.')}
+            <Box sx={{ gridColumn: '1 / -1', '&:empty': { display: 'none' } }}>
+              <AresStatusLine fill={ares} />
+            </Box>
           </>)}
 
           {card('firma-sidlo', 'Sídlo', 'Adresa, která se tiskne jako adresa dodavatele.', <>
@@ -257,7 +309,7 @@ export default function CompanyInvoiceSettingsPage() {
           {card('firma-platba', 'Platba', 'Kam odběratel platí a do kdy.', <>
             {input('bankAccount', 'Bankovní účet', 'Ve tvaru číslo/kód banky. Podle něj se na faktuře vytvoří QR platba.', { inputMode: 'text' })}
             <Stack spacing={1}>
-              {input('iban', 'IBAN', 'Mezinárodní číslo účtu; kontroluje se kontrolní součet.')}
+              {input('iban', 'IBAN', 'Mezinárodní číslo účtu; kontroluje se kontrolní součet.', { bare: true })}
               <Button
                 variant="outlined"
                 color="inherit"

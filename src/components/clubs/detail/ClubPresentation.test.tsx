@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -263,5 +263,38 @@ describe('cancelled orders', () => {
     await screen.findByTestId('club-order-card');
     expect(await screen.findAllByTestId('club-order-card')).toHaveLength(1);
     expect(screen.getAllByTestId('club-order-cancelled')).toHaveLength(1);
+  });
+});
+
+/* ── Vedení klubu (Etapa 12): read-only near the contact block, hidden when nobody is listed ── */
+describe.each(['phone', 'tablet', 'desktop'] as const)('Vedení klubu at %s', (name) => {
+  it('lists the people with role and contact, marks the ARES rows, and is absent when the list is empty', () => {
+    setViewport(VIEWPORTS[name]);
+    const withManagement = {
+      ...club,
+      management: [
+        { id: 'm1', fullName: 'Jan Novák', role: 'předseda', phone: '+420 600 000 001', email: null, source: 'ares' as const },
+        { id: 'm2', fullName: 'Petr Ruční', role: 'správce', phone: null, email: 'petr@dukla.cz', source: 'manual' as const },
+      ],
+    };
+    const { unmount } = open([block], withManagement);
+    const region = screen.getByRole('region', { name: 'Vedení klubu' });
+    const rows = within(region).getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('Jan Novák');
+    expect(rows[0]).toHaveTextContent('předseda');
+    expect(rows[0]).toHaveTextContent('+420 600 000 001');
+    expect(rows[0]).toHaveTextContent('z ARES');
+    expect(rows[1]).toHaveTextContent('petr@dukla.cz');
+    expect(rows[1]).not.toHaveTextContent('z ARES');
+    unmount();
+
+    open([block], { ...club, management: [] });
+    expect(screen.queryByRole('region', { name: 'Vedení klubu' })).not.toBeInTheDocument();
+    cleanup();
+
+    /* An older server that sends nothing at all. */
+    open([block], club);
+    expect(screen.queryByRole('region', { name: 'Vedení klubu' })).not.toBeInTheDocument();
   });
 });

@@ -41,10 +41,52 @@ export interface Club {
    * take the colour from the club's blocks, or draw the neutral chip.
    */
   colorHex?: string | null;
+  /**
+   * Vedení klubu (Etapa 12): the statutory body as ARES lists it (`source:
+   * "ares"`) and the people the desk adds by hand (`source: "manual"`). Sent
+   * whole on create/update; the server replaces the list. Absent on a server
+   * that does not send it, which the reader turns into an empty list.
+   */
+  management?: ClubManager[];
   isActive: boolean;
   createdAt: string;
   updatedAt?: string | null;
 }
+
+export type ClubManagerSource = 'ares' | 'manual';
+
+export interface ClubManager {
+  id?: string;
+  fullName: string;
+  role: string;
+  phone: string | null;
+  email: string | null;
+  source: ClubManagerSource;
+}
+
+/** The management list, tolerant: not an array → nobody; a row without a name is skipped; an unknown source is manual. */
+export function readClubManagement(data: unknown): ClubManager[] {
+  if (!Array.isArray(data)) return [];
+  const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+  const out: ClubManager[] = [];
+  for (const row of data) {
+    const m = (row && typeof row === 'object' ? row : {}) as Record<string, unknown>;
+    const fullName = text(m.fullName);
+    if (fullName === null) continue;
+    out.push({
+      ...(typeof m.id === 'string' ? { id: m.id } : {}),
+      fullName,
+      role: text(m.role) ?? '',
+      phone: text(m.phone),
+      email: text(m.email),
+      source: m.source === 'ares' ? 'ares' : 'manual',
+    });
+  }
+  return out;
+}
+
+/** A club as the screens expect it: `management` is always a list. */
+const withManagement = (club: Club): Club => ({ ...club, management: readClubManagement(club.management) });
 
 async function request<T>(run: () => Promise<T>): Promise<T> {
   try {
@@ -60,10 +102,10 @@ async function request<T>(run: () => Promise<T>): Promise<T> {
  * is unwrapped by the client. Anything else is "no clubs", not a crash.
  */
 function asClubList(data: unknown): Club[] {
-  if (Array.isArray(data)) return data as Club[];
+  if (Array.isArray(data)) return (data as Club[]).map(withManagement);
   if (data && typeof data === 'object') {
     const inner = (data as { value?: unknown; items?: unknown }).value ?? (data as { items?: unknown }).items;
-    if (Array.isArray(inner)) return inner as Club[];
+    if (Array.isArray(inner)) return (inner as Club[]).map(withManagement);
   }
   return [];
 }
@@ -78,19 +120,19 @@ export const clubsApi = {
   getById: (id: string): Promise<Club> =>
     request(async () => {
       const res = await client.get(`/api/clubs/${id}`);
-      return res.data as Club;
+      return withManagement(res.data as Club);
     }),
 
   create: (data: Partial<Club>): Promise<Club> =>
     request(async () => {
       const res = await client.post('/api/clubs', data);
-      return res.data as Club;
+      return withManagement(res.data as Club);
     }),
 
   update: (id: string, data: Partial<Club>): Promise<Club> =>
     request(async () => {
       const res = await client.put(`/api/clubs/${id}`, data);
-      return res.data as Club;
+      return withManagement(res.data as Club);
     }),
 
   /** `DELETE` deactivates; the record and its orders stay. */
