@@ -227,14 +227,12 @@ export const appointmentsApi = {
     options?: { notifyPatient?: boolean },
   ): Promise<void> =>
     request(async () => {
-      await client.put(`/api/calendars/${calendarId}/appointments/${id}/time`, null, {
-        params: {
-          startUtc: asUtcInstant(startUtc),
-          overrideReason,
-          /* Etapa 12: the desk decides whether the patient hears about the move; absent = the server's default. */
-          notifyPatient: options?.notifyPatient,
-        },
-      });
+      /* Etapa 12: the desk decides whether the patient hears about the move (JSON body; absent = the server says yes). */
+      await client.put(
+        `/api/calendars/${calendarId}/appointments/${id}/time`,
+        options?.notifyPatient === undefined ? null : { notifyPatient: options.notifyPatient },
+        { params: { startUtc: asUtcInstant(startUtc), overrideReason } },
+      );
     }),
 
   /**

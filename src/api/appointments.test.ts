@@ -137,4 +137,16 @@ describe('agreed price', () => {
     await appointmentsApi.setPrice('cal-1', 'ap-1', null);
     expect(put).toHaveBeenLastCalledWith('/api/calendars/cal-1/appointments/ap-1/price', { agreedPriceCzk: null });
   });
+
+  /* Etapa 12: the move carries the desk's "Upozornit klienta" choice as a JSON body; without it the body stays empty. */
+  it('reschedule sends notifyPatient as the body, startUtc as a param', async () => {
+    await appointmentsApi.reschedule('cal-1', 'ap-1', '2026-10-26T13:00:00.000Z', undefined, { notifyPatient: false });
+    expect(put).toHaveBeenLastCalledWith(
+      '/api/calendars/cal-1/appointments/ap-1/time',
+      { notifyPatient: false },
+      { params: { startUtc: '2026-10-26T13:00:00.000Z', overrideReason: undefined } },
+    );
+    await appointmentsApi.reschedule('cal-1', 'ap-1', '2026-10-26T13:00:00.000Z');
+    expect(put.mock.calls.at(-1)?.[1]).toBeNull();
+  });
 });
