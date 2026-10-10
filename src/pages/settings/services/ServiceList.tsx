@@ -40,9 +40,14 @@ export function countsLine(service: ClinicService): string {
 }
 
 export default function ServiceList({
-  services, selectedId, onSelect, onEdit, onArchive, onRestore, onDelete, restoring,
+  services, selectedId, onSelect, onEdit, onArchive, onRestore, onDelete, restoring, priceOf,
 }: {
   services: readonly ClinicService[];
+  /**
+   * "Ceny doplnit všude" (owner, 10. 10. 2026): the služba's price range ("od 1 600 Kč") and the
+   * tooltip of its činnosti, from whoever holds the catalogue; absent while it is still loading.
+   */
+  priceOf?: (serviceId: string) => { text: string; tooltip: string } | null;
   selectedId: string | null;
   onSelect: (service: ClinicService) => void;
   onEdit: (service: ClinicService) => void;
@@ -106,7 +111,15 @@ export default function ServiceList({
                     <Typography sx={TYPE.itemName}>{service.name}</Typography>
                     <Chip size="small" color="success" variant="outlined" label={SERVICE_LIST_TEXT.activeChip} />
                   </Stack>
-                  <Typography sx={TYPE.caption}>{countsLine(service)}</Typography>
+                  {(() => {
+                    const price = priceOf?.(service.id) ?? null;
+                    return (
+                      <Typography sx={TYPE.caption} title={price?.tooltip || undefined} data-testid="service-row-line">
+                        {countsLine(service)}
+                        {price ? ` · ${price.text}` : ''}
+                      </Typography>
+                    );
+                  })()}
                 </Box>
               </ButtonBase>
               <Stack direction="row" sx={{ alignItems: 'center', pr: 0.5, pl: 1.5, pb: 0.5, ml: 'auto' }}>

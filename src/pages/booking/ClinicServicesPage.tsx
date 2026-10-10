@@ -342,6 +342,14 @@ export default function ClinicServicesPage() {
               onRestore={(svc) => restore.mutate(svc.id)}
               onDelete={(svc) => setDeleteTarget({ id: svc.id, name: svc.name })}
               restoring={restore.isPending}
+              priceOf={
+                activitiesQuery.isSuccess
+                  ? (serviceId) => {
+                      const range = servicePriceRange(allActivities, serviceId);
+                      return { text: priceRangeText(range), tooltip: priceTooltip(range) };
+                    }
+                  : undefined
+              }
             />
           )}
           {selected !== null && (
