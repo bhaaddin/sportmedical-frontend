@@ -1,0 +1,257 @@
+/*
+ * What the planner UI depends on - and nothing else.
+ *
+ * Everything the prototype keeps in `state` / localStorage becomes a READ or a
+ * WRITE here. The UI never imports an API client: it gets a `PlannerDataSource`
+ * through `PlannerDataProvider`. Two implementations exist / are planned:
+ *
+ *   DemoDataSource  in-memory, seeded from the prototype's fixtures (tests, /planner-lab)
+ *   ApiDataSource   (PL-F) the real API: sessions are built from appointments
+ *                   (`src/api/appointments.ts`) + club blocks (`clubBlocks.ts`)
+ *                   grouped by činnost / calendar / time; slot length, colour,
+ *                   price and parallel capacity come from the činnost
+ *                   (`bookingContracts.ts` Activity) and the služba colour
+ *                   (`clinicServices.ts`); hours, lunch and closed days from
+ *                   `workingHours.ts` / `holidays.ts`; colours of closed days
+ *                   and lunch from `displaySettings.ts`; club header from
+ *                   `clubs.ts`; the order from `clubOrders.ts` (seats per činnost).
+ *
+ * Contract:
+ *   - every method is async and may reject; writes reject with `PlannerWriteError`
+ *     carrying a CZECH message the desk can read as-is;
+ *   - reads are cheap to repeat (react-query caches them under `plannerKeys`);
+ *   - after ANY successful write the source calls its subscribers, which makes the
+ *     provider invalidate the reads - a source that cannot push simply never calls them;
+ *   - the model (`../model`) does the planning arithmetic; a source validates again
+ *     on the server side and reports conflicts as `PlannerWriteError('conflict' | 'stale')`.
+ */
+import type {
+  ClockTime,
+  ClubProfile,
+  DayBudget,
+  DayMark,
+  DayMarkColors,
+  IntervalInput,
+  IsoDate,
+  PlannerCategory,
+  PlannerContext,
+  PlannerOrder,
+  PlannerSession,
+  PlanningWindow,
+  SessionId,
+} from '../model';
+import { DEFAULT_WINDOW } from '../model';
+
+/** Inclusive range of days. */
+export interface DateRange {
+  from: IsoDate;
+  to: IsoDate;
+}
+
+/** Slowly changing settings: the catalogue of činnosti and the board's frame. */
+export interface PlannerCatalogue {
+  /** The clinic's own name for e-mails / signatures (setting, never a literal). */
+  clinicName: string;
+  categories: PlannerCategory[];
+  /** Planning window of the board, default 07:00 - 19:00. */
+  window: PlanningWindow;
+  /** Colours of closed days and the lunch break (display settings). */
+  dayMarkColors: DayMarkColors;
+  /** The club's unfilled places open to the public this many days before a term. */
+  releaseDaysBefore: number;
+  /** What this source can do; the UI hides controls for missing capabilities. */
+  capabilities: PlannerCapabilities;
+}
+
+export interface PlannerCapabilities {
+  /** "+ Klub" / "+ Jednotlivec" / "Simulovat uvolnění" in the reservation drawer (demo only). */
+  simulateBookings: boolean;
+  /** The club logo can be changed. */
+  logoUpload: boolean;
+  /** `publishForm` creates a real link. */
+  realPublish: boolean;
+}
+
+export type PlannerWriteErrorCode =
+  | 'validation' // the rule the model also checks (overlap, remaining seats, window)
+  | 'conflict' //   someone else booked / planned the same time
+  | 'stale' //      the term changed since it was read (optimistic concurrency)
+  | 'notFound'
+  | 'forbidden'
+  | 'network'
+  | 'unknown';
+
+/** Rejection of every write. `message` is Czech and shown to the desk. */
+export class PlannerWriteError extends Error {
+  code: PlannerWriteErrorCode;
+  constructor(code: PlannerWriteErrorCode, message: string) {
+    super(message);
+    this.name = 'PlannerWriteError';
+    this.code = code;
+  }
+}
+
+/** Opaque handle for "↶ Vrátit změnu"; null = this write cannot be undone. */
+export type UndoToken = string | null;
+
+export interface CreateIntervalResult {
+  /** The term that now covers the new slots (new or merged). */
+  session: PlannerSession;
+  /** Terms absorbed into `session`. */
+  removedIds: SessionId[];
+  mergedCount: number;
+  /** The činnost is fully planned after this step. */
+  complete: boolean;
+  undoToken: UndoToken;
+}
+
+export interface TermChange {
+  date: IsoDate;
+  start: ClockTime;
+  end: ClockTime;
+}
+
+export interface MoveIntervalInput extends TermChange {
+  id: SessionId;
+  /** `PlannerSession.version` read with the term; rejects with 'stale' when it moved on. */
+  expectedVersion?: string | null;
+}
+
+export interface ResizeIntervalInput {
+  id: SessionId;
+  edge: 'top' | 'bottom';
+  /** New start / end after the edge was pulled. */
+  start: ClockTime;
+  end: ClockTime;
+  /** Slots added. */
+  added: number;
+  expectedVersion?: string | null;
+}
+
+export interface UpdateIntervalInput {
+  id: SessionId;
+  date: IsoDate;
+  categoryId: string;
+  start: ClockTime;
+  end: ClockTime;
+  capacity: number;
+  expectedVersion?: string | null;
+}
+
+export interface TermWriteResult {
+  session: PlannerSession;
+  undoToken: UndoToken;
+  /** How many people the change touches (for the "oznámení" line of the toast). */
+  notified: { clubLinkUpdated: boolean; individuals: number };
+}
+
+export interface FinishPlanResult {
+  /** The plan was marked ready. */
+  ready: boolean;
+}
+
+export interface PublishFormResult {
+  /** Private link of the club form; null when the source only previews. */
+  url: string | null;
+  /** `true` once something was generated (the dialog switches from "Vygenerovat" to "Obnovit"). */
+  generated: boolean;
+}
+
+export interface PlannerDataSource {
+  /** Stable id of the source, part of every query key ('demo' | 'api'). */
+  readonly id: string;
+
+  /* ------------------------------ reads ------------------------------ */
+  getCatalogue(): Promise<PlannerCatalogue>;
+  /** The order being planned: seats per činnost, baseline, display order. */
+  getOrder(): Promise<PlannerOrder>;
+  /** Header strip + profile dialog. */
+  getClubProfile(): Promise<ClubProfile>;
+  /** The SHARED calendar (club + public terms) for a range of days. */
+  listSessions(range: DateRange): Promise<PlannerSession[]>;
+  /** Every club term of the order, on any date (agenda, totals, summary). */
+  listOrderSessions(): Promise<PlannerSession[]>;
+  /** Holiday / closed / lunch / working hours per day of the range. */
+  listDayMarks(range: DateRange): Promise<DayMark[]>;
+  /** Reference day capacity for the mini-calendar fill. */
+  getDayBudget(): Promise<DayBudget>;
+
+  /* ------------------------------ writes ------------------------------ */
+  /** Drop a činnost into the calendar: validate, merge with adjacent safe blocks, store. */
+  createInterval(input: IntervalInput): Promise<CreateIntervalResult>;
+  /** The "Vytvořit termín" dialog: a term from explicit start and end. */
+  createTerm(input: { date: IsoDate; categoryId: string; start: ClockTime; end: ClockTime }): Promise<CreateIntervalResult>;
+  moveInterval(input: MoveIntervalInput): Promise<TermWriteResult>;
+  resizeInterval(input: ResizeIntervalInput): Promise<TermWriteResult>;
+  /** Smart editor: date, činnost, time and capacity at once. */
+  updateInterval(input: UpdateIntervalInput): Promise<TermWriteResult>;
+  deleteInterval(id: SessionId): Promise<{ undoToken: UndoToken }>;
+  /** Revert the write that produced `token` (Ctrl+Z / "↶ Zpět"). */
+  undo(token: string): Promise<void>;
+  /** "Označit plán jako připravený". */
+  finishPlan(): Promise<FinishPlanResult>;
+  /** "Vygenerovat" the private club form link. */
+  publishForm(): Promise<PublishFormResult>;
+  /** Save any subset of the club header / profile. */
+  saveClubProfile(patch: Partial<Omit<ClubProfile, 'logoUrl'>>): Promise<ClubProfile>;
+  /** Upload / replace the club logo; returns the profile with the new `logoUrl`. */
+  saveLogo(file: Blob): Promise<ClubProfile>;
+  /** Settings dialog: reference day capacity in minutes. */
+  saveDayBudget(defaultMinutes: number): Promise<DayBudget>;
+
+  /* ------------------------ demo-only simulation ------------------------ */
+  /** Only when `capabilities.simulateBookings`. */
+  addBooking?(id: SessionId, kind: 'club' | 'public'): Promise<{ message: string }>;
+  releaseDay?(date: IsoDate): Promise<{ message: string }>;
+
+  /** Notify on every change made through this source (own writes, or pushes). Returns unsubscribe. */
+  subscribe?(listener: () => void): () => void;
+}
+
+/* -------------------------------------------------------------------------- */
+/* react-query keys                                                            */
+/* -------------------------------------------------------------------------- */
+
+export const plannerKeys = {
+  all: (sourceId: string) => ['planner', sourceId] as const,
+  catalogue: (sourceId: string) => ['planner', sourceId, 'catalogue'] as const,
+  order: (sourceId: string) => ['planner', sourceId, 'order'] as const,
+  profile: (sourceId: string) => ['planner', sourceId, 'profile'] as const,
+  sessions: (sourceId: string, range: DateRange) => ['planner', sourceId, 'sessions', range.from, range.to] as const,
+  orderSessions: (sourceId: string) => ['planner', sourceId, 'orderSessions'] as const,
+  dayMarks: (sourceId: string, range: DateRange) => ['planner', sourceId, 'dayMarks', range.from, range.to] as const,
+  dayBudget: (sourceId: string) => ['planner', sourceId, 'dayBudget'] as const,
+};
+
+/* -------------------------------------------------------------------------- */
+/* Putting the reads together                                                  */
+/* -------------------------------------------------------------------------- */
+
+/** Merge session lists by id (later lists win), keeping a stable chronological order. */
+export function mergeSessions(...lists: ReadonlyArray<readonly PlannerSession[]>): PlannerSession[] {
+  const byId = new Map<SessionId, PlannerSession>();
+  for (const list of lists) for (const s of list) byId.set(s.id, s);
+  return [...byId.values()].sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start) || a.id.localeCompare(b.id));
+}
+
+/**
+ * The `PlannerContext` the pure model needs, from the reads. `today` is passed in
+ * so tests (and the reservation release rule) never depend on the clock.
+ */
+export function buildPlannerContext(parts: {
+  catalogue: PlannerCatalogue;
+  order: PlannerOrder;
+  sessions: readonly PlannerSession[];
+  dayBudget: DayBudget;
+  today: IsoDate;
+}): PlannerContext {
+  return {
+    sessions: parts.sessions,
+    categories: parts.catalogue.categories,
+    demands: parts.order.demands,
+    baselineSessions: parts.order.baselineSessions,
+    dayBudgetMinutes: parts.dayBudget.defaultMinutes,
+    today: parts.today,
+    window: parts.catalogue.window ?? DEFAULT_WINDOW,
+  };
+}

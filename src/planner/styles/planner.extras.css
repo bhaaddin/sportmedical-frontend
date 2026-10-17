@@ -1,0 +1,62 @@
+/*
+ * Hand-written additions for elements the prototype does not have (loading / error state,
+ * the desktop-only notice, day marks). Everything is scoped under .sm-planner like planner.css.
+ * Generated rules never go here and nothing here edits a generated rule.
+ */
+.sm-planner .planner-state {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: #cfe7f1;
+  font-size: 20px;
+  background: rgba(0, 12, 23, 0.82);
+}
+.sm-planner .planner-state.is-error strong { color: #ff8da7; font-size: 24px; }
+.sm-planner .planner-state-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid #0b4a60;
+  border-top-color: #23f2e7;
+  animation: smp-planner-spin 0.9s linear infinite;
+}
+@keyframes smp-planner-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .sm-planner .planner-state-spinner { animation-duration: 2.4s; }
+}
+.sm-planner-desktop-only {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  padding: 24px;
+  text-align: center;
+  border: 1px solid #06415a;
+  border-radius: 12px;
+  background: #001421;
+  color: #cfe7f1;
+}
+
+/*
+ * The prototype is a whole page: its <body> gets the browser's default text (white in the dark
+ * colour scheme, 16px, normal line height). Inside the application the same element inherits the
+ * app's typography instead, so the planner root states those defaults itself.
+ */
+.sm-planner {
+  color: CanvasText;
+  font-size: 16px;
+  font-weight: 400;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: start;
+  text-transform: none;
+  text-indent: 0;
+  white-space: normal;
+  direction: ltr;
+}

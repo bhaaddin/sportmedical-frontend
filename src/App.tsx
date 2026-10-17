@@ -36,6 +36,7 @@ import UniversalSearch from './components/UniversalSearch';
 
 /* ── Lazy-loaded routes (code-split per page) ── */
 const NotFound = lazy(() => import('./pages/NotFound'));
+const PlannerLabPage = lazy(() => import('./planner/PlannerLabPage'));
 const Login = lazy(() => import('./pages/Login'));
 const IntakeQuestionnaire = lazy(() => import('./pages/public/IntakeQuestionnaire'));
 const PublicBooking = lazy(() => import('./pages/public/PublicBooking'));
@@ -456,6 +457,7 @@ export default function App() {
                   <Suspense fallback={<PageLoader />}>
                   <Routes>
                     <Route path="/prehled" element={<DashboardPage />} />
+                    <Route path="/planner-lab" element={<PlannerLabPage />} />
                     <Route path="/patients" element={<RequirePermission of="patients.view"><PatientList /></RequirePermission>} />
                     <Route path="/patients/register" element={<RequirePermission of="patients.register"><PatientRegistrationPage /></RequirePermission>} />
                     <Route path="/patients/:id/edit" element={<RequirePermission of="patients.edit"><PatientFormPage /></RequirePermission>} />
