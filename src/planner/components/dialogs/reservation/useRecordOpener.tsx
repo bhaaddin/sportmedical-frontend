@@ -29,6 +29,39 @@ function useOptionalNavigate(): NavigateFunction | null {
   return inRouter ? useNavigate() : null;
 }
 
+/**
+ * The appointment detail of one booking, the dialog the calendar grid opens on a click on a card. The calendar the
+ * booking belongs to (name, colour) comes from the source when it can list them. Used by the drawer's rows and by the
+ * planner's term dialogs.
+ */
+export function AppointmentRecord({ appointmentId, calendarId, onClose }: { appointmentId: string; calendarId: string; onClose: () => void }) {
+  const { source } = usePlannerData();
+  const client = useQueryClient();
+  const calendars = useQuery({
+    queryKey: [...plannerKeys.all(source.id), 'calendars'],
+    queryFn: () => (source.getCalendars as NonNullable<typeof source.getCalendars>)(),
+    enabled: typeof source.getCalendars === 'function',
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const calendar = calendars.data?.find((c) => c.id === calendarId);
+  return (
+    <Suspense fallback={null}>
+      <AppointmentDetail
+        appointmentId={appointmentId}
+        calendarId={calendarId}
+        calendar={calendar ? { id: calendar.id, name: calendar.name, color: calendar.color } : undefined}
+        open
+        onClose={onClose}
+        onChanged={() => {
+          void client.invalidateQueries({ queryKey: plannerKeys.all(source.id) });
+          void client.invalidateQueries({ queryKey: ['day-range'] });
+        }}
+      />
+    </Suspense>
+  );
+}
+
 export interface RecordOpener {
   open: (record: DayRecord) => void;
   /** Render this once, next to the rows: the appointment detail while one is open. */
@@ -37,19 +70,9 @@ export interface RecordOpener {
 
 export function useRecordOpener(options: { onBeforeNavigate?: () => void } = {}): RecordOpener {
   const act = usePlannerActions();
-  const { source } = usePlannerData();
-  const client = useQueryClient();
   const navigate = useOptionalNavigate();
   const [appointment, setAppointment] = useState<Extract<DayRecordRef, { type: 'appointment' }> | null>(null);
   const { onBeforeNavigate } = options;
-
-  const calendars = useQuery({
-    queryKey: [...plannerKeys.all(source.id), 'calendars'],
-    queryFn: () => (source.getCalendars as NonNullable<typeof source.getCalendars>)(),
-    enabled: typeof source.getCalendars === 'function' && appointment !== null,
-    staleTime: 5 * 60_000,
-    retry: false,
-  });
 
   const openClub = useCallback(
     async (ref: Extract<DayRecordRef, { type: 'clubWindow' }>) => {
@@ -83,18 +106,8 @@ export function useRecordOpener(options: { onBeforeNavigate?: () => void } = {})
     [openClub],
   );
 
-  const calendar = appointment ? calendars.data?.find((c) => c.id === appointment.calendarId) : undefined;
   const detail: ReactNode = appointment ? (
-    <Suspense fallback={null}>
-      <AppointmentDetail
-        appointmentId={appointment.appointmentId}
-        calendarId={appointment.calendarId}
-        calendar={calendar ? { id: calendar.id, name: calendar.name, color: calendar.color } : undefined}
-        open
-        onClose={() => setAppointment(null)}
-        onChanged={() => void client.invalidateQueries({ queryKey: plannerKeys.all(source.id) })}
-      />
-    </Suspense>
+    <AppointmentRecord appointmentId={appointment.appointmentId} calendarId={appointment.calendarId} onClose={() => setAppointment(null)} />
   ) : null;
 
   return { open, detail };

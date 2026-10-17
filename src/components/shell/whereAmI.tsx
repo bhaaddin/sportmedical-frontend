@@ -10,9 +10,11 @@
  * title still follows it.
  */
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Box } from '@mui/material';
 import { PATIENT_SECTIONS, sectionPath } from '../../pages/patients/sections';
+import { PlannerMenuSlot } from './SidebarSlot';
+import { isPlannerRoute } from './plannerRoutes';
 import type { SettingsItemAt } from './settingsTypes';
 import type { MenuEntry } from './shellTypes';
 
@@ -74,14 +76,21 @@ export function useDocumentTitle(crumbs: Crumb[]): void {
 
 /** The crumb line over the page (tablet and desktop). */
 export function WhereAmI({ crumbs }: { crumbs: Crumb[] }) {
-  if (crumbs.length === 0) return null;
+  /* On the planner routes there is no sidebar: this row also holds the Menu button that opens the navigation. */
+  const planner = isPlannerRoute(useLocation().pathname);
+  if (crumbs.length === 0 && !planner) return null;
   return (
     <Box
       aria-label="Kde jsem"
       sx={(t) => ({ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1.5, fontSize: 13, color: 'text.secondary', flexWrap: 'wrap', ...(t.palette.mode === 'dark' ? { fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase' } : {}) })}
     >
-      <Box component="span" sx={(t) => ({ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, ...(t.palette.mode === 'dark' ? { boxShadow: '0 0 10px #00EDDA' } : {}) })} />
-      <Trail crumbs={crumbs} />
+      {planner && <PlannerMenuSlot />}
+      {crumbs.length > 0 && (
+        <>
+          <Box component="span" sx={(t) => ({ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, ...(t.palette.mode === 'dark' ? { boxShadow: '0 0 10px #00EDDA' } : {}) })} />
+          <Trail crumbs={crumbs} />
+        </>
+      )}
     </Box>
   );
 }

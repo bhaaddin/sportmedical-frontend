@@ -7,9 +7,9 @@ import { rangeDates, type ClubRange } from "./model";
 
 /*
  * Several different places marked in the calendar at once (Monday morning,
- * Wednesday afternoon, a whole week next month), kept until one action is
- * chosen in the selection tray. Pure helpers here; the state is in
- * `useMultiSelect`, the surface in `SelectionTray`.
+ * Wednesday afternoon, a whole week next month): the labels of a picked place and the
+ * hand-off of picked places to a club order. Pure helpers; the planner's board marks free
+ * time with its own selection hook.
  */
 
 export interface PickedTime {

@@ -130,7 +130,7 @@ export const preview = (date: string, patch: Partial<PreviewDay> = {}): PreviewD
   isOpen: true,
   closedBecause: null,
   startTime: '08:00',
-  endTime: '16:00',
+  endTime: '18:00',
   breakStart: '12:00',
   breakEnd: '12:30',
   workerUserId: null,
@@ -330,7 +330,7 @@ export function fakeDeps(state: FakeState = fakeState()): FakeDeps {
     appointment: vi.fn(async (calendarId: string, id: string) => {
       const row = state.appointments.find((a) => a.id === id && a.calendarId === calendarId);
       if (!row) throw new Error('not found');
-      return { ...row, calendarId, patientId: row.patientId, activityName: row.activityName } as unknown as Appointment;
+      return { ...row, calendarId, patientId: row.patientId, activityName: row.activityName, concurrencyToken: `tok-${row.id}` } as unknown as Appointment;
     }),
     reschedule: vi.fn(async () => undefined),
     order: vi.fn(async () => state.order),

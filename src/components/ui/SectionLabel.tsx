@@ -17,7 +17,19 @@ export function SectionLabel({
     <Typography
       variant="overline"
       component={component}
-      sx={[{ color: 'text.primary', opacity: 0.78, fontSize: 12, letterSpacing: '0.1em', display: 'block', mb: 1 }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
+      sx={[
+        (t) => ({
+          color: 'text.primary',
+          opacity: 0.78,
+          fontSize: 12,
+          letterSpacing: '0.1em',
+          display: 'block',
+          mb: 1,
+          /* `.agenda-section-caption`: #89afbe, 750, letter-spacing .22px. */
+          ...(t.palette.mode === 'dark' ? { color: '#89AFBE', opacity: 1, fontWeight: 750, letterSpacing: '0.22px' } : {}),
+        }),
+        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+      ]}
     >
       {children}
     </Typography>

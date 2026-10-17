@@ -68,7 +68,7 @@ function LocationProbe() {
   return <div data-testid="location" data-state={JSON.stringify(location.state)} />;
 }
 
-function mount(entry: { pathname: string; search?: string; state?: unknown } = { pathname: '/planner-lab/page' }, withSlot = false) {
+function mount(entry: { pathname: string; search?: string; state?: unknown } = { pathname: '/planovani' }, withSlot = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -77,7 +77,7 @@ function mount(entry: { pathname: string; search?: string; state?: unknown } = {
           {withSlot ? <SidebarSlot /> : null}
           <LocationProbe />
           <Routes>
-            <Route path="/planner-lab/page" element={<PlannerPage />} />
+            <Route path="/planovani" element={<PlannerPage />} />
           </Routes>
         </SidebarSlotProvider>
       </MemoryRouter>
@@ -126,7 +126,7 @@ describe('PlannerPage', () => {
   });
 
   it('a PickSession in the router state is club planning: the whole planner interface for that order', async () => {
-    mount({ pathname: '/planner-lab/page', state: { pickOrder: { start: SESSION } } });
+    mount({ pathname: '/planovani', state: { pickOrder: { start: SESSION } } });
     const page = await screen.findByTestId('planner-page');
     expect(page).toHaveAttribute('data-mode', 'club');
     expect(apiSource.calls.at(-1)).toMatchObject({ session: SESSION });
@@ -137,7 +137,7 @@ describe('PlannerPage', () => {
   });
 
   it('while a club order is planned only its služba is shown, and the filter comes back afterwards', async () => {
-    const view = mount({ pathname: '/planner-lab/page', state: { pickOrder: { start: SESSION } } });
+    const view = mount({ pathname: '/planovani', state: { pickOrder: { start: SESSION } } });
     await screen.findByTestId('planner-page');
     expect([...(boardSettings.getState().serviceSet ?? [])]).toEqual(['s1']);
     view.unmount();
@@ -145,7 +145,7 @@ describe('PlannerPage', () => {
   });
 
   it('"pickOrder" without a session asks for the small setup form first, then starts planning', async () => {
-    mount({ pathname: '/planner-lab/page', state: { pickOrder: { clubId: 'club7' } } });
+    mount({ pathname: '/planovani', state: { pickOrder: { clubId: 'club7' } } });
     const setup = await screen.findByTestId('pick-setup');
     expect(setup).toHaveAttribute('data-club', 'club7');
     expect(screen.getByTestId('planner-page')).toHaveAttribute('data-mode', 'standard');
@@ -156,7 +156,7 @@ describe('PlannerPage', () => {
   });
 
   it('closing the setup form goes back to the standard calendar', async () => {
-    mount({ pathname: '/planner-lab/page', state: { pickOrder: true } });
+    mount({ pathname: '/planovani', state: { pickOrder: true } });
     fireEvent.click(within(await screen.findByTestId('pick-setup')).getByRole('button', { name: 'Zavřít formulář' }));
     await waitFor(() => expect(screen.queryByTestId('pick-setup')).toBeNull());
     expect(screen.getByTestId('location').dataset.state).toBe('null');
@@ -164,7 +164,7 @@ describe('PlannerPage', () => {
   });
 
   it('keeps the SLUŽBY legend with its prices in the shell\'s sidebar slot - the služba filter nothing else replaces', async () => {
-    mount({ pathname: '/planner-lab/page' }, true);
+    mount({ pathname: '/planovani' }, true);
     const legend = await screen.findByTestId('planner-service-legend');
     expect(legend).toHaveTextContent('Služby');
     expect(within(legend).getByText('Diagnostika')).toBeInTheDocument();
@@ -180,7 +180,7 @@ describe('PlannerPage', () => {
   });
 
   it('has no legend while a club order is planned', async () => {
-    mount({ pathname: '/planner-lab/page', state: { pickOrder: { start: SESSION } } }, true);
+    mount({ pathname: '/planovani', state: { pickOrder: { start: SESSION } } }, true);
     await screen.findByTestId('week-board-panel');
     expect(screen.queryByTestId('planner-service-legend')).toBeNull();
   });

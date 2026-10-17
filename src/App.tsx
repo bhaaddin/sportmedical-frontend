@@ -96,8 +96,6 @@ const BookingActivitiesPage = lazy(() => import('./pages/booking/ActivitiesPage'
 /* Booking phase 1, stage 2: working hours, periods, cycle and exceptions */
 const BookingWorkingHoursPage = lazy(() => import('./pages/booking/WorkingHoursPage'));
 const BookingExceptionsPage = lazy(() => import('./pages/booking/ExceptionsPage'));
-/* Booking phase 1, stage 3: the calendar grid */
-const BookingGridPage = lazy(() => import('./pages/booking/CalendarGridPage'));
 /* Booking phase 1, stage 4: the appointment detail and the day at a glance */
 const BookingDayOverviewPage = lazy(() => import('./pages/booking/DayOverviewPage'));
 /* The owner's "přehled podle služeb": bookings, when, who, free capacity - per činnost, by filters */
@@ -459,7 +457,6 @@ export default function App() {
                   <Routes>
                     <Route path="/prehled" element={<DashboardPage />} />
                     <Route path="/planner-lab" element={<PlannerLabPage />} />
-                    <Route path="/planner-lab/page" element={<PlannerPage />} />
                     <Route path="/patients" element={<RequirePermission of="patients.view"><PatientList /></RequirePermission>} />
                     <Route path="/patients/register" element={<RequirePermission of="patients.register"><PatientRegistrationPage /></RequirePermission>} />
                     <Route path="/patients/:id/edit" element={<RequirePermission of="patients.edit"><PatientFormPage /></RequirePermission>} />
@@ -508,7 +505,7 @@ export default function App() {
                     <Route path="/clubs/fakturace" element={<ClubBillingPage />} />
                     <Route path="/accounting-export" element={<RequirePermission of="billing.manage"><AccountingExportPage /></RequirePermission>} />
                     <Route path="/intake-review" element={<RequirePermission of="patients.register"><IntakeReviewQueue /></RequirePermission>} />
-                    <Route path="/planovani" element={<BookingGridPage />} />
+                    <Route path="/planovani" element={<PlannerPage />} />
                     <Route path="/dnes" element={<BookingDayOverviewPage />} />
                     {/* Unguarded for the reason given at the sidebar entry: the APIs
                         behind it ask for sign-in and calendar visibility, nothing named. */}

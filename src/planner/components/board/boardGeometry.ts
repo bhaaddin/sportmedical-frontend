@@ -46,10 +46,19 @@ export function boardScaleFor(zoom: number): number {
   return Math.max(1, pxPerHour(zoom) / base);
 }
 
-export function boardGeometry(window: PlanningWindow, zoom = 1): BoardGeometry {
+/** Timeline height of the standard-ordering layout: the club deck is gone, the board takes its place (455 + 174). */
+export const STANDARD_TIMELINE_HEIGHT = 629;
+
+export function boardGeometry(
+  window: PlanningWindow,
+  zoom = 1,
+  baseHeight = TIMELINE_HEIGHT,
+  /** The span `baseHeight` is spread over, when `window` was widened beyond it (the minute keeps its height, the board grows). */
+  referenceSpanMinutes?: number,
+): BoardGeometry {
   const spanMinutes = Math.max(60, window.endMinutes - window.startMinutes);
   const scale = boardScaleFor(zoom);
-  const pxPerMinute = (TIMELINE_HEIGHT / spanMinutes) * scale;
+  const pxPerMinute = (baseHeight / Math.max(60, referenceSpanMinutes ?? spanMinutes)) * scale;
   return {
     startMinutes: window.startMinutes,
     endMinutes: window.startMinutes + spanMinutes,
@@ -140,4 +149,19 @@ export function selectionRange(
   const start = Math.max(g.startMinutes, Math.min(a, b));
   const end = Math.min(g.endMinutes, Math.max(a, b) + slot);
   return { start, end: Math.max(end, Math.min(g.endMinutes, start + slot)) };
+}
+
+/**
+ * The hours the board draws when something lies outside the planning window: the window widened to the whole
+ * hours of the spans given (the old grid's `visibleHours` - a booking at 01:00 is still a booking and must not
+ * fall off the top). Never narrower than `window`, never beyond the day.
+ */
+export function widenWindow(window: PlanningWindow, spans: readonly { start: number; end: number }[]): PlanningWindow {
+  let start = window.startMinutes;
+  let end = window.endMinutes;
+  for (const s of spans) {
+    start = Math.min(start, Math.floor(s.start / 60) * 60);
+    end = Math.max(end, Math.ceil(s.end / 60) * 60);
+  }
+  return { startMinutes: Math.max(0, start), endMinutes: Math.min(24 * 60, end) };
 }

@@ -15,8 +15,15 @@
  *     `proposalForMove`) need no correction because numerator and denominator scale alike;
  *   - `stageEl` is the `#dashboard` element, the target for portals of stage-level layers.
  *
- * Desktop (>= 1280 px) is the only layout for now; `compact` is the hook point
- * for the phone / tablet layouts that come later (it only sets a class and a flag).
+ * Three layouts, picked from `useDevice()` (or forced with `layout`):
+ *
+ *   desktop  (>= 1280)  the stage above, exactly as the file draws it
+ *   tablet   (768-1279) no stage: `#dashboard` is an ordinary column the panels reflow in
+ *   phone    (<= 767)   the same, one column, sheets instead of side panels
+ *
+ * Below 1280 the scale is 1 (nothing is drawn in design pixels any more), `#screen-frame` and
+ * `#dashboard` carry no size or transform, and `planner.compact.css` lays the panels out from
+ * `.sm-planner[data-layout="tablet" | "phone"]`.
  */
 import {
   createContext,
@@ -28,9 +35,14 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useDevice } from '../../layout/useDevice';
 import '../styles/planner.css';
 import '../styles/planner.extras.css';
+import '../styles/planner.compact.css';
 import { Icons } from './Icons';
+
+/** What the planner looks like at a width: the file's stage or one of the two reflowed layouts. */
+export type PlannerLayout = 'desktop' | 'tablet' | 'phone';
 
 export const STAGE_WIDTH = 1672;
 export const STAGE_HEIGHT = 941;
@@ -42,9 +54,11 @@ export function fitScale(containerWidth: number, containerHeight: number): numbe
 }
 
 export interface StageContextValue {
-  /** client px per design px */
+  /** client px per design px (always 1 in the tablet / phone layouts) */
   scale: number;
+  /** tablet or phone: no design stage, the panels reflow */
   compact: boolean;
+  layout: PlannerLayout;
   /** The `#dashboard` element (null until mounted). */
   stageEl: HTMLElement | null;
   /** Convert a distance measured in screen pixels to design pixels. */
@@ -64,21 +78,29 @@ export const usePlannerScale = (): number => useStage().scale;
 
 export interface PlannerStageProps {
   children: ReactNode;
-  /** Hook point for the later phone / tablet layouts. */
+  /**
+   * Force the reflowed (tablet) layout on a desktop-wide window. Superseded by `layout`; kept so a caller that
+   * only wants "not the stage" still can.
+   */
   compact?: boolean;
-  /** Fixed scale (tests, screenshots). Default: fit the container. */
+  /** Force a layout (tests, screenshots). Default: `useDevice()`. */
+  layout?: PlannerLayout;
+  /** Fixed scale (tests, screenshots) of the desktop stage. Default: fit the container. */
   scale?: number;
   className?: string;
 }
 
-export function PlannerStage({ children, compact = false, scale: fixedScale, className }: PlannerStageProps) {
+export function PlannerStage({ children, compact = false, layout: forced, scale: fixedScale, className }: PlannerStageProps) {
+  const device = useDevice();
+  const layout: PlannerLayout = forced ?? (compact && device === 'desktop' ? 'tablet' : device);
+  const isCompact = layout !== 'desktop';
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [measured, setMeasured] = useState(1);
   const [stageEl, setStageEl] = useState<HTMLElement | null>(null);
 
   useLayoutEffect(() => {
     const host = hostRef.current;
-    if (!host || fixedScale !== undefined) return undefined;
+    if (!host || isCompact || fixedScale !== undefined) return undefined;
     const measure = () => {
       const rect = host.getBoundingClientRect();
       setMeasured(fitScale(rect.width, rect.height));
@@ -91,20 +113,21 @@ export function PlannerStage({ children, compact = false, scale: fixedScale, cla
     }
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [fixedScale]);
+  }, [fixedScale, isCompact]);
 
-  const scale = fixedScale ?? measured;
+  const scale = isCompact ? 1 : (fixedScale ?? measured);
   const setStage = useCallback((el: HTMLDivElement | null) => setStageEl(el), []);
   const value = useMemo<StageContextValue>(
-    () => ({ scale, compact, stageEl, toDesign: (px: number) => px / scale }),
-    [scale, compact, stageEl],
+    () => ({ scale, compact: isCompact, layout, stageEl, toDesign: (px: number) => px / scale }),
+    [scale, isCompact, layout, stageEl],
   );
 
   return (
     <div
       ref={hostRef}
-      className={`sm-planner${compact ? ' is-compact' : ''}${className ? ` ${className}` : ''}`}
+      className={`sm-planner${isCompact ? ' is-compact' : ''}${className ? ` ${className}` : ''}`}
       data-testid="planner-root"
+      data-layout={layout}
       data-scale={scale.toFixed(4)}
     >
       <Icons />
@@ -112,14 +135,14 @@ export function PlannerStage({ children, compact = false, scale: fixedScale, cla
         id="screen-frame"
         role="main"
         aria-label="SportMedical klubový rezervační systém"
-        style={{ width: STAGE_WIDTH * scale, height: STAGE_HEIGHT * scale }}
+        style={isCompact ? undefined : { width: STAGE_WIDTH * scale, height: STAGE_HEIGHT * scale }}
         data-testid="planner-frame"
       >
         <div
           id="dashboard"
           ref={setStage}
           className="live-mode"
-          style={{ transform: `scale(${scale})` }}
+          style={isCompact ? undefined : { transform: `scale(${scale})` }}
           data-testid="planner-stage"
         >
           <StageContext.Provider value={value}>{children}</StageContext.Provider>

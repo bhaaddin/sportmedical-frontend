@@ -23,7 +23,7 @@ import { editBlockRefs } from '../../components/clubs/order/editSession';
 import type { CoverageActivity } from '../../components/clubs/order/coverage';
 import type { ClubOrderView } from '../../api/clubOrders';
 import type { Activity, PreviewDay } from '../../api/bookingContracts';
-import { rangeToInstants } from '../../components/booking/grid/timeRange';
+import { rangeToInstants, type MinuteRange } from '../../components/booking/grid/timeRange';
 import { pragueDateKey } from '../../utils/time';
 import { defaultApiDeps, type ApiDeps } from '../api/deps';
 import { toWriteError } from '../api/errors';
@@ -31,6 +31,7 @@ import {
   budgetOf,
   categoriesOf,
   clubUpdateOf,
+  cleanHex as cleanHexOf,
   dayBudgetOf,
   dayMarkOf,
   demandsOf,
@@ -38,6 +39,7 @@ import {
   fingerprintOf,
   foreignWindowSessionsOf,
   noOrder,
+  openPiecesOfDay,
   openingOf,
   ownSessionsOf,
   planningWindowOf,
@@ -239,13 +241,13 @@ export class ApiDataSource implements PlannerDataSource {
     const windows = windowsOfOrder(view);
     const calendars = await this.deps.calendars();
     const stepOf = (ids: readonly string[]) => calendars.find((c) => c.id === ids[0])?.displayStepMinutes ?? 30;
-    const isOpenDay = await this.openDayTest(windows);
+    const openPiecesOf = await this.openPiecesTest(windows);
     const own = ownSessionsOf({
       orderId: view.id,
       windows,
       activities: this.activities,
       stepOf,
-      ...(isOpenDay ? { isOpenDay } : {}),
+      ...(openPiecesOf ? { openPiecesOf } : {}),
       clubName: view.clubName,
       clubColorHex: view.clubColorHex,
       clubId: view.clubId,
@@ -258,8 +260,8 @@ export class ApiDataSource implements PlannerDataSource {
     };
   }
 
-  /** Days on which the calendars really work (so a window over a weekend is not laid out). Absent when unknown. */
-  private async openDayTest(windows: readonly OrderWindow[]): Promise<((ids: readonly string[], date: IsoDate) => boolean) | undefined> {
+  /** What the server blocks of a day (open hours without the lunch break) for the calendars of a window; see `openPiecesOf`. */
+  private async openPiecesTest(windows: readonly OrderWindow[]): Promise<((ids: readonly string[], date: IsoDate) => MinuteRange[] | null) | undefined> {
     const dates = windows.flatMap((w) => [w.range.fromDate, w.range.toDate || w.range.fromDate]).filter(Boolean).sort();
     if (dates.length === 0) return undefined;
     const ids = [...new Set(windows.flatMap((w) => w.calendarIds))];
@@ -274,7 +276,7 @@ export class ApiDataSource implements PlannerDataSource {
           rows.set(calendarId, into);
         }
       }
-      return (calendarIds, date) => calendarIds.length === 0 || calendarIds.some((id) => rows.get(id)?.get(date)?.isOpen !== false);
+      return (calendarIds, date) => openPiecesOfDay(calendarIds[0] === undefined ? undefined : rows.get(calendarIds[0])?.get(date));
     } catch {
       return undefined;
     }
@@ -411,7 +413,12 @@ export class ApiDataSource implements PlannerDataSource {
   }
 
   async getClubProfile(): Promise<ClubProfile> {
-    if (this.session) return profileOf(await this.deps.club(this.session.clubId));
+    if (this.session) {
+      await this.ensureLoaded();
+      const profile = profileOf(await this.deps.club(this.session.clubId));
+      /* The club card may carry no colour of its own while its order / windows do (the server colours the blocks). */
+      return profile.colorHex ? profile : { ...profile, colorHex: cleanHexOf(this.orderView?.clubColorHex) };
+    }
     const name = (await this.deps.clinicName()).trim();
     return {
       clubName: name,
@@ -726,11 +733,22 @@ export class ApiDataSource implements PlannerDataSource {
     }
 
     const done: { calendarId: string; id: string; fromStartUtc: string }[] = [];
+    let told = 0;
+    let answered = 0;
     try {
       for (let i = 0; i < people.length; i += 1) {
         const p = people[i]!;
-        await this.deps.reschedule(p.calendarId, p.id, startUtc, input.overrideReason, input.notifyPatient === undefined ? undefined : { notifyPatient: input.notifyPatient });
+        /* The version of the single read just made: a booking changed by somebody else in between is a 412. */
+        const options = {
+          ...(input.notifyPatient === undefined ? {} : { notifyPatient: input.notifyPatient }),
+          ...(currents[i]!.concurrencyToken ? { ifMatch: currents[i]!.concurrencyToken } : {}),
+        };
+        const notice = await this.deps.reschedule(p.calendarId, p.id, startUtc, input.overrideReason, Object.keys(options).length > 0 ? options : undefined);
         done.push({ calendarId: p.calendarId, id: p.id, fromStartUtc: currents[i]!.startUtc });
+        if (notice && typeof notice === 'object') {
+          answered += 1;
+          if (notice.patientNotified) told += 1;
+        }
       }
     } catch (error) {
       /* All or nothing as far as we can: put the ones already moved back (without telling anybody twice). */
@@ -760,7 +778,8 @@ export class ApiDataSource implements PlannerDataSource {
     return {
       session: clone(after),
       undoToken,
-      notified: { clubLinkUpdated: false, individuals: input.notifyPatient === false ? 0 : people.length },
+      /* What the server says (a walk-in has nobody to tell); an answer-less server: as many as were asked to be told. */
+      notified: { clubLinkUpdated: false, individuals: answered > 0 ? told : input.notifyPatient === false ? 0 : people.length },
     };
   }
 

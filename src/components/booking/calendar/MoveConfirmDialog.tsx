@@ -9,7 +9,7 @@ import { formatPragueDate, formatPragueTime } from "../../../utils/time";
 import { errorText } from "../errorText";
 import { GRID_TEXT } from "../grid/gridText";
 import { emitMoveNotice, movedNoticeText, rememberNotify, rememberedNotify } from "../grid/moveDrag";
-import type { GridMoveRequest } from "../grid/TimeGrid";
+import type { GridMoveRequest } from "../grid/moveRequest";
 
 /*
  * A booking dropped on another time (Etapa 12, the owner's picture of 10. 10.

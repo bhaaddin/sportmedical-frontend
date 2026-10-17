@@ -14,7 +14,7 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Avatar, Box, Button, ButtonBase, IconButton } from '@mui/material';
+import { Avatar, Box, Button, ButtonBase, Drawer, IconButton } from '@mui/material';
 import { alpha, type Theme } from '@mui/material/styles';
 import { ArrowBack, Search } from '@mui/icons-material';
 import NotificationCenter from '../NotificationCenter';
@@ -22,6 +22,8 @@ import { openUniversalSearch } from '../UniversalSearch';
 import { SettingsNav } from '../../pages/settings/SettingsFrame';
 import { NewOrderChooser } from '../booking/NewOrderChooser';
 import { SidebarSlot } from './SidebarSlot';
+import { PlannerMenu } from './PlannerMenu';
+import { isPlannerRoute } from './plannerRoutes';
 import { STAFF_HOME_PATH } from '../../web/sitePaths';
 import { childIsActive, entryState, mainEntries, sectionGroups, sectionOf } from './shellModel';
 import { SIDEBAR_WIDTH, activeBg, activeGlow, focusRing, sideGlass } from './shellStyles';
@@ -356,7 +358,7 @@ export function SidebarBody({
             gap: 1,
             minHeight: 44,
             px: '13px',
-            mb: 2,
+            mb: 1.5,
             borderRadius: '8px',
             color: 'text.secondary',
             fontSize: 14,
@@ -407,6 +409,8 @@ export function SidebarBody({
 /** The desktop sidebar: fixed to the left edge, 258px, full height. */
 export function DesktopSidebar({ nav }: { nav: ShellNav }) {
   const [chooser, setChooser] = useState(false);
+  /* The planner's stage is the whole screen: no sidebar, a Menu button in the top row instead. */
+  if (isPlannerRoute(nav.pathname)) return <PlannerMenu nav={nav} />;
   return (
     <>
     <Box
@@ -435,5 +439,50 @@ export function DesktopSidebar({ nav }: { nav: ShellNav }) {
     </Box>
     <NewOrderChooser open={chooser} onClose={() => setChooser(false)} />
     </>
+  );
+}
+
+/**
+ * The full navigation as a slide-over (scrim, Esc and a tap outside close it, focus returns to whatever opened it):
+ * the tablet's menu button and the planner routes' "Menu" button both open this. The drawer's own surface is the
+ * theme's `MuiDrawer` glass, the same tokens as the sidebar.
+ */
+export function NavDrawer({
+  nav,
+  open,
+  onClose,
+  onNewOrder,
+}: {
+  nav: ShellNav;
+  open: boolean;
+  onClose: () => void;
+  onNewOrder: () => void;
+}) {
+  return (
+    <Drawer
+      anchor="left"
+      open={open}
+      onClose={onClose}
+      transitionDuration={{ enter: 150, exit: 120 }}
+      slotProps={{
+        paper: {
+          'aria-label': nav.settingsMode ? 'Nastavení — menu' : 'Menu',
+          role: 'dialog',
+          sx: {
+            width: SIDEBAR_WIDTH,
+            maxWidth: '86vw',
+            boxSizing: 'border-box',
+            borderRadius: 0,
+            px: '20px',
+            pt: '22px',
+            pb: '14px',
+            display: 'flex',
+            flexDirection: 'column',
+          },
+        },
+      }}
+    >
+      <SidebarBody nav={nav} onNavigate={onClose} withSlot={false} onNewOrder={onNewOrder} />
+    </Drawer>
   );
 }

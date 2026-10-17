@@ -13,7 +13,7 @@
  */
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import { activitiesApi } from '../../api/activities';
-import { appointmentsApi } from '../../api/appointments';
+import { appointmentsApi, type MoveNotice } from '../../api/appointments';
 import type {
   Activity,
   ActivityListResult,
@@ -67,8 +67,8 @@ export interface ApiDeps {
     id: string,
     startUtc: string | Date,
     overrideReason?: string,
-    options?: { notifyPatient?: boolean },
-  ): Promise<void>;
+    options?: { notifyPatient?: boolean; ifMatch?: string | null },
+  ): Promise<MoveNotice | null | void>;
   order(id: string): Promise<ClubOrderView>;
   clubOrders(clubId: string): Promise<ClubOrderView[]>;
   createStaffOrder(input: StaffOrderInput): Promise<ClubOrderView>;
@@ -89,16 +89,41 @@ export const READ_STALE_MS = 10_000;
 /** A read that uses the application's cache (same key, same shape as the screens) or just calls through. */
 export type Reader = <T>(key: QueryKey, run: () => Promise<T>, staleMs?: number) => Promise<T>;
 
-export function makeReader(queryClient?: QueryClient | null): Reader {
-  if (!queryClient) return (_key, run) => run();
-  return (key, run, staleMs = READ_STALE_MS) => queryClient.fetchQuery({ queryKey: key, queryFn: run, staleTime: staleMs, retry: false });
+/**
+ * With the application's QueryClient the reads share its cache (and its keys) with the calendar. Without one (a
+ * standalone source, tests) a small per-source cache does the same job: the API allows 100 calls a minute per
+ * session and queues the rest, so a planner that re-reads the catalogue, the hours and the calendars on every
+ * drag would stall itself. `clear` forgets what was read (after a write).
+ */
+export function makeReader(queryClient?: QueryClient | null): { read: Reader; clear: () => void } {
+  if (queryClient) {
+    return {
+      read: (key, run, staleMs = READ_STALE_MS) => queryClient.fetchQuery({ queryKey: key, queryFn: run, staleTime: staleMs, retry: false }),
+      clear: () => undefined,
+    };
+  }
+  const memo = new Map<string, { at: number; value: Promise<unknown> }>();
+  return {
+    read: <T>(key: QueryKey, run: () => Promise<T>, staleMs = READ_STALE_MS): Promise<T> => {
+      const k = JSON.stringify(key);
+      const hit = memo.get(k);
+      if (hit && staleMs > 0 && Date.now() - hit.at < staleMs) return hit.value as Promise<T>;
+      const value = run();
+      memo.set(k, { at: Date.now(), value });
+      value.catch(() => {
+        if (memo.get(k)?.value === value) memo.delete(k);
+      });
+      return value;
+    },
+    clear: () => memo.clear(),
+  };
 }
 
 const FIVE_MIN = 5 * 60 * 1000;
 
 /** The real clients, behind the shared query keys. */
 export function defaultApiDeps(queryClient?: QueryClient | null): ApiDeps {
-  const read = makeReader(queryClient);
+  const { read, clear } = makeReader(queryClient);
   return {
     calendars: () => read(['calendars'], calendarsApi.list, FIVE_MIN),
     activities: () => read(['activities'], () => activitiesApi.list(), FIVE_MIN),
@@ -133,6 +158,7 @@ export function defaultApiDeps(queryClient?: QueryClient | null): ApiDeps {
     updateClub: (id, data) => clubsApi.update(id, data),
     permissions: () => parsePermissions(permissionsSnapshot()),
     invalidate: async () => {
+      clear();
       if (queryClient) await invalidateClubWorld(queryClient);
     },
   };

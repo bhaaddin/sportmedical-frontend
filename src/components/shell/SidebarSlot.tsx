@@ -33,6 +33,9 @@ interface SlotContextValue {
   available: boolean;
   el: HTMLElement | null;
   setEl: (el: HTMLElement | null) => void;
+  /** Where the where-am-I row holds the planner routes' "Menu" button (there is no sidebar there). */
+  menuEl: HTMLElement | null;
+  setMenuEl: (el: HTMLElement | null) => void;
 }
 
 const SlotContext = createContext<SlotContextValue | null>(null);
@@ -40,14 +43,22 @@ const SlotContext = createContext<SlotContextValue | null>(null);
 /** The shell mounts this once around the sidebar and the page; `available` = desktop and not in settings. */
 export function SidebarSlotProvider({ available, children }: { available: boolean; children: ReactNode }) {
   const [el, setEl] = useState<HTMLElement | null>(null);
-  const value = useMemo(() => ({ available, el, setEl }), [available, el]);
+  const [menuEl, setMenuEl] = useState<HTMLElement | null>(null);
+  const value = useMemo(() => ({ available, el, setEl, menuEl, setMenuEl }), [available, el, menuEl]);
   return <SlotContext.Provider value={value}>{children}</SlotContext.Provider>;
 }
 
 /** Where the desktop sidebar shows what a page put there. */
 export function SidebarSlot() {
   const ctx = useContext(SlotContext);
-  return <Box ref={ctx?.setEl} data-sidebar-slot="" sx={{ '&:empty': { display: 'none' } }} />;
+  /* What a page puts here is a second group of the same list: set off from the navigation by the shell's own divider. */
+  return (
+    <Box
+      ref={ctx?.setEl}
+      data-sidebar-slot=""
+      sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider', '&:empty': { display: 'none' } }}
+    />
+  );
 }
 
 /**
@@ -63,4 +74,15 @@ export function SidebarPortal({ children }: { children: ReactNode }) {
   const ctx = useContext(SlotContext);
   if (!ctx || !ctx.available || ctx.el === null) return null;
   return createPortal(children, ctx.el);
+}
+
+/** The where-am-I row's place for the planner routes' Menu button; empty (and no space) until `PlannerMenu` portals into it. */
+export function PlannerMenuSlot() {
+  const ctx = useContext(SlotContext);
+  return <Box ref={ctx?.setMenuEl} data-planner-menu-slot="" sx={{ display: 'contents' }} />;
+}
+
+/** The element `PlannerMenu` draws its button into, or null while the row is not mounted. */
+export function usePlannerMenuEl(): HTMLElement | null {
+  return useContext(SlotContext)?.menuEl ?? null;
 }

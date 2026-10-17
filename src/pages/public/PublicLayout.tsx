@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Box } from '@mui/material';
+import { Box, GlobalStyles } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import { readPublicClinic } from '../../api/clinicSettings';
 import type { PublicClinic } from '../../api/clinicSettings';
@@ -43,6 +43,17 @@ export default function PublicLayout({ children, clinic, noFooter = false, ...he
 
   return (
     <ThemeProvider theme={publicTheme}>
+      {/* The staff app is dark by default and its page-level styles (colour scheme, scrollbars, body gradient) sit on
+          <html>/<body> above this theme; the public surface is its own look and keeps the light page. */}
+      <GlobalStyles
+        styles={{
+          html: { colorScheme: 'light' },
+          body: { backgroundColor: BRAND.page, backgroundImage: 'none', scrollbarColor: 'auto' },
+          '*::-webkit-scrollbar': { width: 'auto', height: 'auto' },
+          '*::-webkit-scrollbar-track': { background: 'initial' },
+          '*::-webkit-scrollbar-thumb': { backgroundColor: 'initial', borderRadius: 'initial', border: 'initial' },
+        }}
+      />
       <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', bgcolor: BRAND.page, color: BRAND.text }}>
         <PublicHeader {...header} />
         <Box component="main" sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>

@@ -27,8 +27,8 @@ import { GRID_TEXT } from '../../../components/booking/grid/gridText';
 import { columnStep } from '../../../components/booking/grid/moveDrag';
 import { longDate, minutesFree } from '../../../components/booking/grid/periodTitle';
 import { resolutionOf } from '../../../components/booking/grid/resolution';
-import { localDateTime, pragueMinuteOfDay, spanLabel, type MinuteRange } from '../../../components/booking/grid/timeRange';
-import type { GridMoveRequest } from '../../../components/booking/grid/TimeGrid';
+import { localDateTime, pragueMinuteOfDay, spanLabel, spanOnDay, touchesDay, type MinuteRange } from '../../../components/booking/grid/timeRange';
+import type { GridMoveRequest } from '../../../components/booking/grid/moveRequest';
 import { MoveConfirmDialog } from '../../../components/booking/calendar/MoveConfirmDialog';
 import { AddToClubOrderDialog } from '../../../components/booking/calendar/AddToClubOrderDialog';
 import { ClubBlockPopover, type ClubBlockPick } from '../../../components/booking/calendar/ClubBlockPopover';
@@ -38,8 +38,9 @@ import { editSessionFor } from '../../../components/clubs/order/editSession';
 import { fetchBlockableActivities } from '../../../api/clubBlocks';
 import type { ClubOrderView } from '../../../api/clubOrders';
 import { DESIGN } from '../../../theme';
+import { pragueDateKey } from '../../../utils/time';
 import { errorText } from '../../../components/booking/errorText';
-import { weekHeadModel, type IsoDate } from '../../model';
+import { addDays, weekHeadModel, type IsoDate } from '../../model';
 import { plannerKeys } from '../../data/PlannerDataSource';
 import { usePlannerData } from '../../data/PlannerDataProvider';
 import { usePlannerActions, usePlannerSelector } from '../../state/PlannerStoreProvider';
@@ -50,7 +51,7 @@ import { BookingCard, SessionCard, WindowBlock } from './BoardCards';
 import { BoardToolbar } from './BoardToolbar';
 import type { BoardCalendarData } from './boardCalendar';
 import { useBoardConfig } from './boardConfig';
-import { boardGeometry, hourLabels, stepLineHeight } from './boardGeometry';
+import { boardGeometry, hourLabels, STANDARD_TIMELINE_HEIGHT, stepLineHeight, widenWindow, yOfMinute } from './boardGeometry';
 import {
   buildBoardModel,
   dayListModel,
@@ -91,7 +92,7 @@ interface PendingSelection extends BoardSelection {
 export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null }) {
   const { t } = useTranslation();
   const ctx = usePlannerCtx();
-  const { dayMarks, catalogue } = usePlannerModelState();
+  const { dayMarks, catalogue, order } = usePlannerModelState();
   const config = useBoardConfig();
   const settings = useBoardSettings();
   const act = usePlannerActions();
@@ -107,18 +108,55 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const armed = usePlannerSelector((s) => s.planning.selectedCategoryId !== null);
   const gesturing = usePlannerSelector((s) => s.planning.drag !== null || s.planning.move !== null || s.planning.resize !== null);
   const planningOwnsPointer = armed || gesturing;
-  /* Club planning's layer listens to every press on an empty board (and says "Nejprve vyberte činnost" when nothing is
-     armed). Standard ordering without an order has nothing to arm, so there the board's presses are the desk's own. */
-  const planningPossible = config.mode === 'club' || ctx.demands.length > 0;
 
   const now = useBoardNow();
   const nowMinute = config.nowMinute ?? pragueMinuteOfDay(now);
-  const geometry = useMemo(() => boardGeometry(ctx.window, settings.zoom), [ctx.window, settings.zoom]);
+  /* Standard ordering (`order.club === false`) has no club deck under the board: the board takes its room. */
+  const standardLayout = order?.club === false;
+  /* In the standard layout the hours widen to what lies outside the planning window that week (a booking at 01:00 is
+     not dropped off the top); club planning keeps the planning window - its overlays are measured against it. */
+  const outside = useMemo(() => {
+    if (!standardLayout || !calendar) return [];
+    const spans: { start: number; end: number }[] = [];
+    const inWeek = (day: string) => day >= weekStart && day <= addDays(weekStart, 6);
+    for (const a of calendar.appointments) {
+      const day = pragueDateKey(a.startUtc);
+      if (inWeek(day)) spans.push(spanOnDay(a.startUtc, a.endUtc, day));
+    }
+    for (const list of calendar.blocksByCalendar.values()) {
+      for (const b of list) {
+        const day = pragueDateKey(b.startUtc);
+        if (inWeek(day) && touchesDay(b.startUtc, b.endUtc, day)) spans.push(spanOnDay(b.startUtc, b.endUtc, day));
+      }
+    }
+    return spans;
+  }, [standardLayout, calendar, weekStart]);
+  const drawnWindow = useMemo(() => widenWindow(ctx.window, outside), [ctx.window, outside]);
+  const geometry = useMemo(
+    () =>
+      boardGeometry(
+        drawnWindow,
+        settings.zoom,
+        standardLayout ? STANDARD_TIMELINE_HEIGHT : undefined,
+        ctx.window.endMinutes - ctx.window.startMinutes,
+      ),
+    [drawnWindow, ctx.window, settings.zoom, standardLayout],
+  );
+  /* Club planning's layer listens to every press on an empty board (and says "Nejprve vyberte činnost" when nothing is
+     armed). Standard ordering without an order has nothing to arm, so there the board's presses are the desk's own. */
+  const planningPossible = !standardLayout && (config.mode === 'club' || ctx.demands.length > 0);
   const resolution = resolutionOf(settings.zoom);
+  /* A board widened above the planning window opens at the planning window, not at the odd hour. */
+  const windowTop = drawnWindow.startMinutes;
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = yOfMinute(geometry, ctx.window.startMinutes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [windowTop, weekStart, standardLayout]);
   const head = useMemo(() => weekHeadModel(weekStart, ctx.window), [weekStart, ctx.window]);
   const days = head.days.map((d) => d.date);
 
   const boardRef = useRef<HTMLDivElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
   const [notice, setNotice] = useState<BoardNotice | null>(null);
   const noticeTimer = useRef<number | undefined>(undefined);
   const showNotice = useCallback((next: BoardNotice) => {
@@ -144,8 +182,9 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   /* ---- moving a booking ---- */
   const commitMove = useCallback(
     async (move: GridMoveRequest) => {
-      await appointmentsApi.reschedule(move.calendarId, move.appointment.id, move.startUtc, undefined, { notifyPatient: move.notifyPatient });
+      const notice = await appointmentsApi.reschedule(move.calendarId, move.appointment.id, move.startUtc, undefined, { notifyPatient: move.notifyPatient });
       await refreshCalendar();
+      return notice;
     },
     [refreshCalendar],
   );
@@ -189,7 +228,9 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   );
 
   /* ---- marking free time ---- */
-  const mayMark = calendar !== null && (calendar.mayBook || calendar.mayBlock);
+  /* Marking free time is the everyday calendar's gesture; while a club order is planned the board belongs to the order
+     (a press on an empty board there is the planning layer's: it asks for a činnost first). */
+  const mayMark = calendar !== null && (calendar.mayBook || calendar.mayBlock) && config.mode === 'standard';
   const step = useMemo(() => {
     const own = calendar?.calendars.map((c) => columnStep(c, resolution.step)) ?? [];
     return own.length ? Math.min(resolution.step, ...own) : resolution.step;
@@ -448,7 +489,13 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   } as CSSProperties;
 
   return (
-    <section className="planner glass-panel" aria-label="Týdenní kalendář" data-testid="week-board-panel" data-real-calendar={calendar ? 'true' : 'false'}>
+    <section
+      className="planner glass-panel"
+      aria-label="Týdenní kalendář"
+      data-testid="week-board-panel"
+      data-real-calendar={calendar ? 'true' : 'false'}
+      data-layout={standardLayout ? 'standard' : 'club'}
+    >
       <BoardToolbar head={head} view={view} filter={filter} categories={ctx.categories} today={ctx.today} act={act} entry={entry} filterActive={filterActive} />
       <div id="week-board" className="week-board">
         <div className="board-head">
@@ -460,7 +507,8 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
               const flag = mark?.closed ? mark.label?.trim() || 'Zavřeno' : null;
               return (
                 <div
-                  className={`day-title${isToday ? ' is-today' : ''}${mark?.closed ? ' is-closed' : ''}${flag ? ' has-flag' : ''}`}
+                  className={`day-title${isToday ? ' is-today' : ''}${mark?.closed ? ' is-closed' : ''}`}
+                  title={flag ?? undefined}
                   key={d.date}
                   data-day={d.date}
                   data-col={i}
@@ -468,13 +516,12 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                 >
                   {d.weekName}
                   <strong>{d.label}</strong>
-                  {flag ? <em className="day-flag" title={flag}>{flag}</em> : null}
                 </div>
               );
             })}
           </div>
         </div>
-        <div className={`board-body${tall ? ' is-tall' : ''}`} id="board-body" data-testid="board-body">
+        <div className={`board-body${tall ? ' is-tall' : ''}`} id="board-body" data-testid="board-body" ref={bodyRef}>
           <div className="hour-column" id="hour-column" style={{ height: `${geometry.height}px` }}>
             {labels.map((h) => <div className="hour-label" key={h.label} style={{ top: `${h.top}px` }}>{h.label}</div>)}
           </div>

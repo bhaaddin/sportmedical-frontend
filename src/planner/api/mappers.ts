@@ -427,13 +427,26 @@ export function windowsOfOrder(order: ClubOrderView): OrderWindow[] {
 
 const DAY_END = 24 * 60;
 
-/** The daily hours of a window in minutes; null when it has none (a whole-day range is not a planner term). */
+/** The daily hours of a window in minutes; a whole-day range (no hours) is the whole day 00:00-24:00. */
 export function dailyRangeOf(range: OrderRange): MinuteRange | null {
   const from = minutesOf(range.dailyFrom ?? '00:00');
   const rawTo = range.dailyTo ?? null;
   const to = rawTo === null || rawTo === '23:59' ? DAY_END : minutesOf(rawTo);
   if (from === null || to === null || to <= from) return null;
   return { start: from, end: to };
+}
+
+/** What the server blocks of one day: the open hours without the lunch break. [] = closed; null = no row for the day. */
+export function openPiecesOfDay(row: PreviewDay | undefined): MinuteRange[] | null {
+  if (!row) return null;
+  if (!row.isOpen) return [];
+  const s = minutesOf(row.startTime);
+  const e = minutesOf(row.endTime);
+  if (s === null || e === null || e <= s) return null;
+  const bs = minutesOf(row.breakStart);
+  const be = minutesOf(row.breakEnd);
+  if (bs !== null && be !== null && be > bs && bs > s && be < e) return [{ start: s, end: bs }, { start: be, end: e }];
+  return [{ start: s, end: e }];
 }
 
 export interface OwnSessionsInput {
@@ -443,8 +456,13 @@ export interface OwnSessionsInput {
   activities: readonly CoverageActivity[];
   /** The grid step of a window's first calendar (the calculator rounds its parts to it). */
   stepOf: (calendarIds: readonly string[]) => number;
-  /** A day on which the window really exists (the calendars work). Absent = every day of the range. */
-  isOpenDay?: (calendarIds: readonly string[], date: IsoDate) => boolean;
+  /**
+   * What the server really blocks of a day: the calendar's open hours without the lunch break, as pieces
+   * ([] = closed day). The server clips every window to them - a whole-day window (no hours) or 08:00-18:00 both
+   * become "08:00-12:00 + 12:30-18:00" - so the planner lays out those pieces, not the raw range.
+   * null = unknown (no hours read): an explicit window is laid out as it is, a whole-day one is skipped.
+   */
+  openPiecesOf?: (calendarIds: readonly string[], date: IsoDate) => MinuteRange[] | null;
   clubName?: string | null;
   clubColorHex?: string | null;
   clubId?: string | null;
@@ -471,20 +489,27 @@ export function ownSessionsOf(input: OwnSessionsInput): OwnSessions {
     const daily = dailyRangeOf(w.range);
     index.set(w.id, { days: [], sessionIds: [] });
     if (!daily) continue;
+    const wholeDay = !w.range.dailyFrom && !w.range.dailyTo;
     const to = w.range.toDate || w.range.fromDate;
     for (const date of eachDay(w.range.fromDate, to)) {
-      if (input.isOpenDay && !input.isOpenDay(w.calendarIds, date)) continue;
-      const id = `${w.id}|${date}`;
-      planWindows.push({
-        id,
-        range: daily,
-        dayKey: date,
-        activityIds: normalizeAllowed(w.range.activityIds, routableIds),
-        calendars: Math.max(1, w.calendarIds.length),
-        step: input.stepOf(w.calendarIds),
+      const open = input.openPiecesOf ? input.openPiecesOf(w.calendarIds, date) : null;
+      const pieces: MinuteRange[] =
+        open === null
+          ? wholeDay ? [] : [daily]
+          : open.map((p) => ({ start: Math.max(p.start, daily.start), end: Math.min(p.end, daily.end) })).filter((p) => p.end > p.start);
+      pieces.forEach((range, i) => {
+        const id = `${w.id}|${date}|${i}`;
+        planWindows.push({
+          id,
+          range,
+          dayKey: date,
+          activityIds: normalizeAllowed(w.range.activityIds, routableIds),
+          calendars: Math.max(1, w.calendarIds.length),
+          step: input.stepOf(w.calendarIds),
+        });
+        meta.set(id, { window: w, date });
       });
-      meta.set(id, { window: w, date });
-      index.get(w.id)!.days.push(date);
+      if (pieces.length > 0) index.get(w.id)!.days.push(date);
     }
   }
   const coverage = pickCoverage(input.activities, planWindows);
@@ -618,23 +643,32 @@ export function rangesOfDraft(args: {
   };
 
   const kept = new Set<string>();
+  const verbatim: OrderRange[] = [];
   let untouched = 0;
   for (const w of origin.windows) {
     for (const id of w.calendarIds) if (!calendars.includes(id)) calendars.push(id);
     const idx = origin.index.get(w.id);
-    const daily = dailyRangeOf(w.range);
-    if (!idx || !daily) continue;
-    const intact = idx.sessionIds.every((id) => {
-      const now = byId.get(id);
-      const was = origin.snapshot.get(id);
-      return now !== undefined && was !== undefined && sameSnapshot(snapshotOf(now), was);
-    });
+    const intact =
+      idx === undefined ||
+      idx.sessionIds.every((id) => {
+        const now = byId.get(id);
+        const was = origin.snapshot.get(id);
+        return now !== undefined && was !== undefined && sameSnapshot(snapshotOf(now), was);
+      });
     if (!intact) continue;
     untouched += 1;
-    idx.sessionIds.forEach((id) => kept.add(id));
+    idx?.sessionIds.forEach((id) => kept.add(id));
+    /* The window the server has, exactly as it has it (a whole-day window stays whole-day). Past windows are not
+       sent, as in the calendar's pick mode. */
+    if ((w.range.toDate || w.range.fromDate) < today) continue;
     const allowed = normalizeAllowed(w.range.activityIds, routableIds);
-    const calendarId = w.calendarIds[0] ?? args.newCalendarIds[0] ?? '';
-    for (const date of idx.days) add(calendarId, date, daily, allowed);
+    verbatim.push({
+      fromDate: w.range.fromDate,
+      toDate: w.range.toDate || w.range.fromDate,
+      dailyFrom: w.range.dailyFrom ?? null,
+      dailyTo: w.range.dailyTo ?? null,
+      ...(allowed !== null ? { activityIds: allowed } : {}),
+    });
   }
 
   const newCalendar = args.newCalendarIds[0] ?? calendars[0] ?? '';
@@ -649,7 +683,9 @@ export function rangesOfDraft(args: {
   }
   for (const id of args.newCalendarIds) if (!calendars.includes(id)) calendars.push(id);
 
-  const ranges = ordersRangesOf(picks, today);
+  const byStart = (x: OrderRange, y: OrderRange) =>
+    x.fromDate.localeCompare(y.fromDate) || (x.dailyFrom ?? '').localeCompare(y.dailyFrom ?? '') || x.toDate.localeCompare(y.toDate);
+  const ranges = [...verbatim, ...ordersRangesOf(picks, today)].sort(byStart);
   return { ranges, calendarIds: calendars.filter((c) => c !== ''), untouchedWindows: untouched };
 }
 

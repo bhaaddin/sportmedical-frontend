@@ -1,7 +1,6 @@
 /*
- * PlannerPage - the planner as a page of the application, the composition that will take the place of
- * `CalendarGridPage` on `/planovani` (a later step switches the route; until then it is mounted at
- * `/planner-lab/page`).
+ * PlannerPage - the planner as a page of the application: the composition behind the `/planovani` route (it
+ * replaced the old `CalendarGridPage`; the router state other screens send there is read by the board and below).
  *
  *   data       `ApiDataSource` over the application's API clients (`useApiDataSource`), standard booking
  *              or - when a club order is being planned - that order. `?source=demo` swaps in the lab's

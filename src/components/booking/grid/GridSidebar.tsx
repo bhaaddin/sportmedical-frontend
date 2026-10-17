@@ -97,9 +97,13 @@ export function ServiceLegend({
   const hiddenAll = services.every((s) => !isShown(s.id));
   return (
     <Box component="section" aria-label={GRID_TEXT.services}>
-      <SectionLabel component="h2" sx={{ mb: 0.5 }}>
+      {/* The shell sidebar's own group heading (Sidebar.tsx `SectionNav`), so SLUŽBY reads as a part of that list. */}
+      <Box
+        component="h2"
+        sx={{ m: 0, px: "13px", pb: "4px", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "text.secondary" }}
+      >
         {GRID_TEXT.services}
-      </SectionLabel>
+      </Box>
       <Box sx={{ display: "flex", flexDirection: "column", gap: "2px" }}>
         {services.map((service) => {
           const shown = isShown(service.id);
@@ -114,15 +118,34 @@ export function ServiceLegend({
                 display: "flex",
                 alignItems: "center",
                 minHeight: 44,
+                position: "relative",
+                borderRadius: "8px",
+                /* The shell's row: radius 8, 13px inset, the same hover wash as the navigation entries. */
+                px: "13px",
+                "&:hover": { bgcolor: "action.hover" },
+                "&:has(input:focus-visible)": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: "-2px" },
                 "& .only": { opacity: 0 },
                 "&:hover .only, &:focus-within .only": { opacity: 1 },
-                "@media (hover: none)": { "& .only": { opacity: 1 } },
+                "@media (hover: none)": { "& .only": { opacity: 1 }, "& label": { pr: "44px" } },
               }}
             >
               <Box
                 component="label"
                 title={tooltip}
-                sx={{ display: "flex", alignItems: "center", gap: 1.25, flex: 1, minHeight: 44, minWidth: 0, fontSize: 14, cursor: "pointer" }}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.25,
+                  flex: 1,
+                  minHeight: 44,
+                  minWidth: 0,
+                  fontSize: 14,
+                  cursor: "pointer",
+                  /* Same ink as the navigation entries (text.secondary); a hidden služba is dimmer still. */
+                  color: "text.secondary",
+                  opacity: shown ? 1 : 0.6,
+                  "&:hover": { color: "text.primary" },
+                }}
               >
                 <Box
                   component="input"
@@ -132,20 +155,25 @@ export function ServiceLegend({
                   aria-label={service.name}
                   sx={{ position: "absolute", opacity: 0, width: '1px', height: '1px' }}
                 />
+                {/* The colour square is the checkbox: filled when the služba is on the board, an outline of its colour when it is off. */}
                 <Box
                   aria-hidden
                   data-testid={`legend-square-${service.id}`}
                   sx={{
-                    width: 15,
-                    height: 15,
-                    flex: "0 0 15px",
+                    width: 16,
+                    height: 16,
+                    flex: "0 0 16px",
                     borderRadius: "4px",
-                    border: `1px solid ${shown ? colour : DESIGN.faint}`,
-                    bgcolor: shown ? colour : "background.paper",
+                    border: `1.5px solid ${colour}`,
+                    bgcolor: shown ? colour : "transparent",
                   }}
                 />
-                <Box component="span" sx={{ minWidth: 0, display: "flex", flexDirection: "column", lineHeight: 1.25 }}>
-                  <Box component="span" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <Box component="span" sx={{ minWidth: 0, display: "flex", flexDirection: "column", lineHeight: 1.3 }}>
+                  {/* Two lines for a long name: the narrow sidebar must not cut "Sportovní lékařské prohlídky" to "Sportovní lék…". */}
+                  <Box
+                    component="span"
+                    sx={{ minWidth: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflowWrap: "anywhere" }}
+                  >
                     {service.name}
                   </Box>
                   {/* The price under the name, not beside it: the sidebar is narrow and the name must stay readable. */}
@@ -153,7 +181,7 @@ export function ServiceLegend({
                     <Box
                       component="span"
                       data-testid={`legend-price-${service.id}`}
-                      sx={{ fontSize: 12, color: "text.secondary", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
+                      sx={{ fontSize: 12, opacity: 0.8, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
                     >
                       {priceText}
                     </Box>
@@ -165,15 +193,23 @@ export function ServiceLegend({
                 onClick={() => onOnly(service.id)}
                 aria-label={`${CAL_TEXT.serviceOnly}: ${service.name}`}
                 title={CAL_TEXT.serviceOnly}
-                sx={{
+                sx={(t) => ({
+                  /* Lies over the row's right edge (never takes width from the name) on the row's own glass. */
+                  position: "absolute",
+                  right: 6,
+                  top: "50%",
+                  transform: "translateY(-50%)",
                   minHeight: touch ? 44 : 32,
                   minWidth: 44,
                   px: 1,
                   fontSize: 12,
                   color: "text.secondary",
+                  bgcolor: "background.paper",
                   borderRadius: 1.5,
                   transition: "opacity 120ms",
-                }}
+                  "&:hover": { color: "text.primary" },
+                  "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: "-2px" },
+                })}
               >
                 jen
               </ButtonBase>
@@ -182,12 +218,12 @@ export function ServiceLegend({
         })}
       </Box>
       {hiddenAll ? (
-        <Typography data-testid="legend-empty" variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+        <Typography data-testid="legend-empty" variant="body2" color="text.secondary" sx={{ mt: 1, px: "13px" }}>
           {GRID_TEXT.noServicesShown}
         </Typography>
       ) : null}
       {hiddenSome ? (
-        <Link component="button" type="button" underline="hover" onClick={onAll} data-testid="legend-all" sx={{ fontSize: 13, mt: 0.5, minHeight: 32 }}>
+        <Link component="button" type="button" underline="hover" onClick={onAll} data-testid="legend-all" sx={{ fontSize: 13, mt: 0.5, ml: "13px", minHeight: 32 }}>
           {GRID_TEXT.allServices}
         </Link>
       ) : null}

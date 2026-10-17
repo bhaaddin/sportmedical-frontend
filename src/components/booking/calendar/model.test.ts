@@ -19,7 +19,6 @@ import {
   serviceIdOfAppointment,
   type Catalogue,
 } from './model';
-import { cardTones, mixOver } from './colors';
 
 const activity = (id: string, name: string, over: Partial<Activity> = {}): Activity =>
   ({
@@ -116,14 +115,6 @@ describe('colours of činnosti', () => {
     expect(a.colorHex).toBe('#123456');
     const b = activityInfoOf(activity('y', 'Y', { effectiveColorHex: 'blue' }));
     expect(b.colorHex).toBeNull();
-  });
-
-  it('mixes a card’s tint from the činnost colour over the surface', () => {
-    expect(mixOver('#000000', '#FFFFFF', 0.5)).toBe('#808080');
-    expect(mixOver('nope', '#FFFFFF', 0.5)).toBe('#FFFFFF');
-    const tones = cardTones('#1565C0', '#FFFFFF');
-    expect(tones.edge).toBe('#1565C0');
-    expect(tones.bg).not.toBe(tones.bgActive);
   });
 
   it('the service of an appointment comes through its činnost, else its calendar', () => {

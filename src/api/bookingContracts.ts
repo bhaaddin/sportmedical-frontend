@@ -739,6 +739,11 @@ export const appointmentSchema = z.object({
    */
   agreedPriceCzk: z.number().nullable().optional(),
   listPriceCzk: z.number().nullable().optional(),
+  /**
+   * The version this row was read at (`pg-xmin-v1.…`) on a single read; `null` on a list row. Sent back as
+   * `If-Match` on a move so a change made by somebody else in between is a 412, not a silent overwrite.
+   */
+  concurrencyToken: z.string().nullish(),
 }).passthrough();
 export type Appointment = z.infer<typeof appointmentSchema>;
 

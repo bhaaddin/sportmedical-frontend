@@ -77,3 +77,5 @@
 .sm-planner .plan-athletes .plan-dialog-note { color: #d9c9a0; }
 .sm-planner .plan-ack { display: flex; gap: 9px; align-items: flex-start; margin: 8px 0 10px; font-size: 12.5px; color: #f1ddab; }
 .sm-planner .plan-ack input { margin-top: 2px; }
+/* the hint strip itself does not catch the pointer (it lies over the board); its button must */
+.sm-planner .active-plan-hint .plan-add-day { pointer-events: auto; position: relative; z-index: 2; }

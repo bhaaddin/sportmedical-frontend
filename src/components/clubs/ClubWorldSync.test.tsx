@@ -31,7 +31,8 @@ vi.mock('./order/ClubOrderDialog', () => ({ ClubOrderDialog: () => null }));
 
 const { ClubOrderCard } = await import('./detail/ClubOrderCard');
 const { ClubOrderDetailPanel } = await import('./orders/ClubOrderDetailPanel');
-const { useWindowRestrictions } = await import('../booking/calendar/windowRestrictions');
+const { orderWindows, windowActivityNames } = await import('./orders/orderWindows');
+const { clubOrdersApi } = await import('../../api/clubOrders');
 const { CLUB_WORLD_KEYS, invalidateClubWorld } = await import('./clubWorld');
 
 const ID = '80e74a6c-0000-4000-8000-0000000000dd';
@@ -58,6 +59,23 @@ const W3 = win('w3', '2099-10-28', ['a-1']);
 
 /* The "server": what the next read answers. */
 let server: ClubOrderView = make([W1, W2, W3]);
+
+/**
+ * What the calendar reads of the club orders: the restricted-window label of a Confirmed order's windows, under the key the
+ * planner's club reads share (`club-orders`, `inquiries`). It stands in for any reader of that cache entry.
+ */
+function useWindowRestrictions(): Map<string, string> {
+  const query = useQuery({ queryKey: ['club-orders', 'inquiries'], queryFn: () => clubOrdersApi.list({}), retry: false, staleTime: 30_000 });
+  const map = new Map<string, string>();
+  for (const order of Array.isArray(query.data) ? query.data : []) {
+    if (order.status !== 'Confirmed') continue;
+    for (const block of orderWindows(order)) {
+      const only = windowActivityNames(block, order);
+      if (only !== null) map.set(block.id, only);
+    }
+  }
+  return map;
+}
 
 /** The club page's order list (the same query as ClubPresentation) and the calendar's reading of the windows. */
 function ClubPageAndCalendar() {

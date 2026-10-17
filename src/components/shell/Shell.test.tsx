@@ -83,7 +83,7 @@ beforeEach(() => {
 
 describe('desktop (1440): the full sidebar', () => {
   it('has the sidebar and nothing else: no rail, no bottom bar, one navigation', () => {
-    renderShell('/planovani', VIEWPORTS.desktop);
+    renderShell('/dnes', VIEWPORTS.desktop);
     expect(document.querySelector('[data-shell="sidebar"]')).toBeInTheDocument();
     expect(document.querySelector('[data-shell="rail"]')).not.toBeInTheDocument();
     expect(document.querySelector('[data-shell="bottombar"]')).not.toBeInTheDocument();
@@ -94,7 +94,7 @@ describe('desktop (1440): the full sidebar', () => {
   });
 
   it('is 258px wide and the content starts at 258px, as a pixel value', () => {
-    renderShell('/planovani', VIEWPORTS.desktop);
+    renderShell('/dnes', VIEWPORTS.desktop);
     expect(document.querySelector('[data-shell="sidebar"]')).toHaveStyle({ width: '258px' });
     expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '258px' });
   });
@@ -118,12 +118,12 @@ describe('desktop (1440): the full sidebar', () => {
   });
 
   it('inside a section the whole sidebar is that section: title, way back, its own items only', () => {
-    renderShell('/planovani', VIEWPORTS.desktop);
+    renderShell('/dnes', VIEWPORTS.desktop);
     const nav = mainNavs()[0];
     expect(screen.getByTestId('section-title')).toHaveTextContent('Kalendář');
     expect(screen.getByRole('link', { name: 'Všechny sekce' })).toHaveAttribute('href', '/prehled');
-    expect(within(nav).getByRole('link', { name: 'Kalendář' })).toHaveAttribute('aria-current', 'page');
-    for (const name of ['Dnešní přehled', 'Přehled podle služeb', 'Dostupnost']) {
+    expect(within(nav).getByRole('link', { name: 'Dnešní přehled' })).toHaveAttribute('aria-current', 'page');
+    for (const name of ['Kalendář', 'Přehled podle služeb', 'Dostupnost']) {
       expect(within(nav).getByRole('link', { name })).toBeInTheDocument();
     }
     for (const name of ['Pacienti', 'Kluby a týmy', 'Fakturace', 'Nastavení', 'Nový pacient', 'Pokladna']) {
@@ -158,7 +158,7 @@ describe('desktop (1440): the full sidebar', () => {
   });
 
   it('has the account row: name, role, search and the bell', async () => {
-    renderShell('/planovani', VIEWPORTS.desktop);
+    renderShell('/dnes', VIEWPORTS.desktop);
     expect(screen.getByRole('button', { name: 'Účet a vzhled' })).toHaveTextContent('Jana Nováková');
     expect(screen.getByRole('button', { name: 'Účet a vzhled' })).toHaveTextContent('Recepce');
     expect(screen.getByRole('button', { name: 'Oznámení' })).toBeInTheDocument();
@@ -180,7 +180,7 @@ describe('desktop (1440): the full sidebar', () => {
   });
 
   it('draws the page\'s slot content in the sidebar', () => {
-    renderShell('/planovani', VIEWPORTS.desktop);
+    renderShell('/dnes', VIEWPORTS.desktop);
     expect(screen.getByTestId('has-slot')).toHaveTextContent('true');
     const slot = document.querySelector('[data-sidebar-slot]') as HTMLElement;
     expect(within(slot).getByText('mini kalendář')).toBeInTheDocument();
@@ -224,7 +224,7 @@ function renderTallSidebar(width: number, height: number) {
   return render(
     <ThemePrefsContext.Provider value={{ accent: '#0D5C52', mode: 'light', setAccent: () => undefined, setMode: () => undefined }}>
       <ThemeProvider theme={buildTheme('#0D5C52', 'light')}>
-        <MemoryRouter initialEntries={['/planovani']}>
+        <MemoryRouter initialEntries={['/dnes']}>
           <Layout><TallProbe /></Layout>
         </MemoryRouter>
       </ThemeProvider>
@@ -401,7 +401,7 @@ describe('tablet (834): the rail', () => {
   });
 
   it('inside a section the rail holds "Všechny sekce" and that section own screens', () => {
-    renderShell('/planovani', VIEWPORTS.tablet);
+    renderShell('/dnes', VIEWPORTS.tablet);
     const rail = mainNavs()[0];
     expect(within(rail).getByRole('link', { name: 'Všechny sekce' })).toHaveAttribute('href', '/prehled');
     for (const name of ['Kalendář', 'Dnešní přehled', 'Přehled podle služeb', 'Dostupnost']) {
@@ -412,7 +412,7 @@ describe('tablet (834): the rail', () => {
   });
 
   it('opens the full sidebar as an overlay: still one navigation, children shown', async () => {
-    renderShell('/planovani', VIEWPORTS.tablet);
+    renderShell('/dnes', VIEWPORTS.tablet);
     expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Otevřít menu' }));
     const overlay = await screen.findByRole('dialog', { name: 'Menu' });
@@ -424,7 +424,7 @@ describe('tablet (834): the rail', () => {
   });
 
   it('closes on navigation', async () => {
-    renderShell('/planovani', VIEWPORTS.tablet);
+    renderShell('/dnes', VIEWPORTS.tablet);
     await userEvent.click(screen.getByRole('button', { name: 'Otevřít menu' }));
     const overlay = await screen.findByRole('dialog', { name: 'Menu' });
     await userEvent.click(within(overlay).getByRole('link', { name: 'Dnešní přehled' }));
@@ -433,7 +433,7 @@ describe('tablet (834): the rail', () => {
   });
 
   it('closes on Esc and on a tap outside it', async () => {
-    renderShell('/planovani', VIEWPORTS.tablet);
+    renderShell('/dnes', VIEWPORTS.tablet);
     await userEvent.click(screen.getByRole('button', { name: 'Otevřít menu' }));
     await screen.findByRole('dialog', { name: 'Menu' });
     await userEvent.keyboard('{Escape}');
@@ -443,7 +443,7 @@ describe('tablet (834): the rail', () => {
     await screen.findByRole('dialog', { name: 'Menu' });
     fireEvent.click(document.querySelector('.MuiBackdrop-root') as Element);
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument());
-    expect(path()).toBe('/planovani');
+    expect(path()).toBe('/dnes');
   });
 
   it('shows the patient file\'s sections in the overlay', async () => {

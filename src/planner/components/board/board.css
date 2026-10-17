@@ -41,7 +41,7 @@
   box-shadow: 0 0 12px rgba(35, 242, 231, 0.45);
 }
 .sm-planner .day-title.is-closed { background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.045) 0 6px, transparent 6px 12px); }
-.sm-planner .day-title .day-flag {
+.sm-planner .day-title .day-flag-unused {
   position: absolute;
   bottom: 2px;
   left: 4px;
@@ -299,4 +299,19 @@
   border-radius: 50%;
   background: #23f2e7;
   box-shadow: 0 0 8px #23f2e7;
+}
+
+/*
+ * Standard ordering (order.club === false): no club order is planned, so the deck under the board - the order
+ * command, the činnost cards with "Celková objednávka", the hints - has nothing to say and is not drawn. The board
+ * takes its room: the timeline grows from 455 to 629 px (the planner panel from 576 to 750), which is the hour height
+ * (52 px) the clinic's calendar has always had at "30 min".
+ */
+.sm-planner:has(.planner[data-layout='standard']) {
+  --v18-planner-height: 750px;
+  --v18-timeline-height: 629px;
+}
+.sm-planner:has(.planner[data-layout='standard']) .planner .week-board { height: 682px; --hour-step: 52.4166667px; }
+.sm-planner:has(.planner[data-layout='standard']) #dashboard.live-mode :is(#planning-cards, #order-command, #active-plan-hint, #corner-return, #planner-feedback, .extra-activities) {
+  display: none !important;
 }

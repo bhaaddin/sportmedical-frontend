@@ -17,7 +17,7 @@ import { usePlannerCommands } from '../../../data/usePlannerCommands';
 import type { AffectedAthlete } from '../../../data/PlannerDataSource';
 import { contactReady, timeLeft } from '../../../model';
 import { PickShortfallDialog } from '../../../../components/booking/calendar/PickShortfallDialog';
-import type { ShortfallChoice } from '../../../../components/booking/calendar/usePickOrder';
+import type { ShortfallChoice } from '../../../../components/booking/calendar/pickTypes';
 import { useDevice } from '../../../../layout/useDevice';
 import { usePlannerActions } from '../../../state/PlannerStoreProvider';
 import { usePlannerCtx, usePlannerModelState, usePlannerProfile } from '../../context';

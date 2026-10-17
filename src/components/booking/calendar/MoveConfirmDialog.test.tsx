@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { DayAppointment } from '../../../api/bookingContracts';
 import { appointmentsApi } from '../../../api/appointments';
 import { subscribeMoveNotice, type MoveNotice } from '../grid/moveDrag';
-import type { GridMoveRequest } from '../grid/TimeGrid';
+import type { GridMoveRequest } from '../grid/moveRequest';
 import { MoveConfirmDialog } from './MoveConfirmDialog';
 
 vi.mock('../../../api/appointments', () => ({

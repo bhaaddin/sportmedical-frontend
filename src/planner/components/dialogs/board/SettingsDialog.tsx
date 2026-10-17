@@ -39,7 +39,7 @@ function ResolutionRow() {
     <div className="settings-row" data-testid="settings-resolution">
       <div>
         <strong>{GRID_TEXT.resolution}</strong>
-        <small>Krok mřížky {level.hint} · jemnější krok zvětší plochu, rolujte v ní kolečkem.</small>
+        <small>Krok mřížky {level.hint}</small>
       </div>
       <div className="resolution-group" role="group" aria-label={GRID_TEXT.resolution}>
         <button type="button" className="app-button" aria-label={GRID_TEXT.coarser} disabled={level.key === RESOLUTIONS[0]!.key} onClick={() => boardSettings.stepResolution(-1)}>−</button>

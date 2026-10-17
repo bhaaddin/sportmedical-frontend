@@ -4,8 +4,8 @@ import type { Device } from "../../../layout/useDevice";
 import { firstWord } from "../../clubs/order/routing";
 import { BubbleButton, BubbleButtons, PickBubble } from "./PickBubble";
 import { formatFree } from "./pickDays";
-import { players, spareLine } from "./PickOrderPanel";
-import type { Shortfall, ShortfallChoice } from "./usePickOrder";
+import { players, spareLine } from "./pickWording";
+import type { Shortfall, ShortfallChoice } from "./pickTypes";
 
 /*
  * Etapa 12 (constitution IV: the desk decides, nothing slips through silently). "Potvrdit objednávku" with players

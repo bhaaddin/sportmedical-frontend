@@ -23,8 +23,8 @@ import {
   type PlanWindow,
   type WindowReport,
 } from "./pickPlan";
-import { players } from "./PickOrderPanel";
-import type { AskResult, PickAsk } from "./usePickOrder";
+import { players } from "./pickWording";
+import type { AskResult, PickAsk } from "./pickTypes";
 
 /*
  * Etapa 12 (the owner, 10. 10. 2026): "When I pick a slot quickly, a small window must pop up for the činnost, and

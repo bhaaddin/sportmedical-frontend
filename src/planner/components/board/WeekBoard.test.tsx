@@ -163,7 +163,7 @@ beforeEach(() => {
   });
   vi.mocked(appointmentsApi.range).mockImplementation(async () => appointments);
   vi.mocked(appointmentsApi.blocks).mockImplementation(async () => blocks);
-  vi.mocked(appointmentsApi.reschedule).mockResolvedValue(undefined);
+  vi.mocked(appointmentsApi.reschedule).mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -545,6 +545,49 @@ describe('marking free time', () => {
     expect(board()).not.toHaveAttribute('data-pickable');
   });
 
+  it("while a club order is planned the board belongs to the order: a press on free time starts no booking", async () => {
+    mount({ config: { mode: 'club' } });
+    await screen.findByTestId('board-booking-b1');
+    expect(board()).not.toHaveAttribute('data-pickable');
+    fireEvent.pointerDown(board(), { button: 0, pointerType: 'mouse', clientX: colX(3), clientY: yOf(9 * 60), pointerId: 1 });
+    expect(screen.queryByTestId('board-selection')).toBeNull();
+    expect(screen.getByTestId('planning-board-layer')).toBeInTheDocument(); // the planning layer owns the board
+    expect(screen.queryByTestId('board-entry-points')).not.toBeNull(); // the toolbar's entry points stay
+  });
+
+  it('standard ordering without an order mounts no planning layer (nothing to arm, no "vyberte činnost" prompt)', async () => {
+    class NoOrder extends DemoDataSource {
+      async getOrder() {
+        const o = await super.getOrder();
+        return { ...o, demands: [], baselineSessions: [] };
+      }
+    }
+    mount({ source: new NoOrder({ today: TODAY }) });
+    await screen.findByTestId('board-booking-b1');
+    expect(screen.queryByTestId('planning-board-layer')).toBeNull();
+    expect(board()).toHaveAttribute('data-board-mode', 'standard');
+    expect(board()).toHaveAttribute('data-pickable', 'true');
+  });
+
+  it("standard layout (order.club === false): the board takes the room of the deck and widens to a booking outside the hours", async () => {
+    class Standard extends DemoDataSource {
+      async getOrder() {
+        const o = await super.getOrder();
+        return { ...o, club: false, demands: [], baselineSessions: [] };
+      }
+    }
+    appointments = [b1, appt('night', '2026-12-08T00:00:00Z', '2026-12-08T00:30:00Z')]; // 01:00-01:30 Prague
+    mount({ source: new Standard({ today: TODAY }) });
+    await screen.findByTestId('board-booking-night');
+    expect(screen.getByTestId('week-board-panel')).toHaveAttribute('data-layout', 'standard');
+    const pxPerHour = 629 / 12;
+    // 01:00 ... 19:00: the planning window (07-19) widened by six hours above it, the hour keeps its height
+    expect(Number.parseFloat(board().style.height)).toBeCloseTo(18 * pxPerHour, 3);
+    expect([...document.querySelectorAll('.hour-label')].map((e) => e.textContent).slice(0, 2)).toEqual(['1:00', '2:00']);
+    expect(topOf(screen.getByTestId('board-booking-night'))).toBeCloseTo(0, 3);
+    expect(screen.getByTestId('board-body')).toHaveClass('is-tall');
+  });
+
   it('Esc drops a drag in progress', async () => {
     mount();
     await screen.findByTestId('board-booking-b1');
@@ -645,6 +688,16 @@ describe('moving a booking', () => {
     await waitFor(() => expect(appointmentsApi.reschedule).toHaveBeenCalled());
     expect(vi.mocked(appointmentsApi.reschedule).mock.calls[0]![4]).toEqual({ notifyPatient: true });
     await waitFor(() => expect(screen.getByTestId('board-notice')).toHaveTextContent('pacientovi odesíláme oznámení'));
+  });
+
+  it('says so when the server did not tell the patient although the desk asked for it', async () => {
+    vi.mocked(appointmentsApi.reschedule).mockResolvedValue({ patientNotified: false, reason: 'no_email' });
+    mount();
+    grab(await screen.findByTestId('board-booking-b1'));
+    moveTo(2, 11 * 60);
+    dropAt(2, 11 * 60);
+    fireEvent.click(within(await screen.findByTestId('move-confirm')).getByRole('button', { name: 'Přesunout' }));
+    await waitFor(() => expect(screen.getByTestId('board-notice')).toHaveTextContent('Termín přesunut · pacient nebyl upozorněn (pacient nemá e-mail)'));
   });
 
   it('"Zrušit" glides the card back to where it was and writes nothing', async () => {

@@ -17,9 +17,10 @@
  * `components/booking/grid/moveDrag.ts`; nothing is re-derived here.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
+import type { MoveNotice } from '../../../api/appointments';
 import { isTerminalStatus, type DayAppointment } from '../../../api/bookingContracts';
 import { appointmentInColumn } from '../../../components/booking/calendar/model';
-import type { GridMoveRequest } from '../../../components/booking/grid/TimeGrid';
+import type { GridMoveRequest } from '../../../components/booking/grid/moveRequest';
 import {
   DRAG_THRESHOLD_PX,
   TOUCH_DRAG_PRESS_MS,
@@ -82,6 +83,26 @@ interface Override {
   settled: boolean;
 }
 
+const NOT_TOLD: Record<string, string> = {
+  no_email: 'pacient nemá e-mail',
+  no_patient: 'rezervace nemá pacienta',
+  no_change: 'čas se nezměnil',
+  patient_initiated: 'změnu provedl pacient sám',
+  queue_failed: 'oznámení se nepodařilo odeslat',
+};
+
+/**
+ * The words after a confirmed move. The server says whether the patient was really told (`MoveNotice`): when the desk
+ * asked for it and it did not happen, the notice says so and why - never "odesíláme oznámení" over a silence.
+ */
+export function movedNoticeFor(notifyPatient: boolean, notice: MoveNotice | null | void): string {
+  if (!notice || typeof notice !== 'object') return movedNoticeText(notifyPatient);
+  if (notice.patientNotified) return movedNoticeText(true);
+  if (!notifyPatient || notice.reason === 'not_requested') return movedNoticeText(false);
+  const why = notice.reason ? NOT_TOLD[notice.reason] ?? notice.reason : null;
+  return `${GRID_TEXT.moved} · pacient nebyl upozorněn${why ? ` (${why})` : ''}`;
+}
+
 export interface BoardNotice {
   text: string;
   tone: 'info' | 'error';
@@ -97,7 +118,7 @@ export interface UseBoardMoveArgs {
   resolutionStep: number;
   /** The planning layer owns the pointer (a činnost is armed). */
   paused: boolean;
-  onCommit: (request: GridMoveRequest) => Promise<void>;
+  onCommit: (request: GridMoveRequest) => Promise<MoveNotice | null | void>;
   onNotice: (notice: BoardNotice) => void;
   /** The server's sentence (Czech) for a rejected move. */
   describeError: (error: unknown) => string;
@@ -245,7 +266,7 @@ export function useBoardMove(args: UseBoardMoveArgs) {
   const commit = (request: GridMoveRequest) => {
     const id = request.appointment.id;
     args.onCommit(request).then(
-      () => {
+      (notice) => {
         setOverrides((current) => {
           const o = current.get(id);
           if (!o) return current;
@@ -255,7 +276,7 @@ export function useBoardMove(args: UseBoardMoveArgs) {
         });
         const element = cardElement(id);
         if (element) settle(element);
-        args.onNotice({ text: movedNoticeText(request.notifyPatient), tone: 'info' });
+        args.onNotice({ text: movedNoticeFor(request.notifyPatient, notice), tone: 'info' });
       },
       (error: unknown) => {
         releaseOverride(id);

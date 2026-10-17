@@ -51,7 +51,7 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
 }
 
 /** The hairline between the header's parts: the prototype's teal in dark, the board's line in light. */
-const headRule = (t: Theme): string => (t.palette.mode === 'dark' ? 'rgba(42, 150, 174, 0.34)' : t.palette.divider);
+const headRule = (t: Theme): string => (t.palette.mode === 'dark' ? 'rgba(72, 156, 179, 0.46)' : t.palette.divider);
 
 /** One column of the club header: a title with its icon in the primary colour (the prototype's cyan caps), then its lines. */
 function HeadColumn({ title, icon, children, last = false, region = false, testId }: {
@@ -72,9 +72,26 @@ function HeadColumn({ title, icon, children, last = false, region = false, testI
         };
       }}
     >
-      <Stack direction="row" sx={{ gap: 1, alignItems: 'center', mb: 1.25, color: 'primary.main', '& svg': { fontSize: 22 } }}>
+      <Stack
+        direction="row"
+        sx={(t) => ({
+          gap: 1,
+          alignItems: 'center',
+          mb: 1.25,
+          /* The prototype's `.club-head-title`: light aqua (#8ff9f2), icon a shade softer, in light the accent. */
+          color: t.palette.mode === 'dark' ? '#8FF9F2' : 'primary.main',
+          '& svg': { fontSize: t.palette.mode === 'dark' ? 20 : 22, ...(t.palette.mode === 'dark' ? { color: '#75F5EF' } : {}) },
+        })}
+      >
         {icon}
-        <Typography component="h2" sx={{ fontSize: 14, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'inherit' }}>{title}</Typography>
+        <Typography component="h2" sx={(t) => ({
+          fontSize: t.palette.mode === 'dark' ? 15 : 14,
+          /* `.club-head-title`: 780 15.1px, letter-spacing .1px, capitals as written in the file. */
+          fontWeight: t.palette.mode === 'dark' ? 780 : 800,
+          letterSpacing: t.palette.mode === 'dark' ? '0.1px' : '0.04em',
+          textTransform: 'uppercase',
+          color: 'inherit',
+        })}>{title}</Typography>
       </Stack>
       <Stack spacing={1}>{children}</Stack>
     </Box>
@@ -108,8 +125,17 @@ function HeadLine({ icon, label, children }: { icon: React.ReactNode; label: str
 function Figure({ value, label }: { value: number | string; label: string }) {
   return (
     <Box sx={{ textAlign: 'center', minWidth: 0 }}>
-      <Typography sx={{ fontSize: { xs: 26, md: 32 }, fontWeight: 700, lineHeight: 1.1 }}>{value}</Typography>
-      <Typography variant="caption" sx={{ color: 'text.secondary' }}>{label}</Typography>
+      <Typography
+        sx={(t) => ({
+          fontSize: { xs: 26, md: 32 },
+          lineHeight: 1.1,
+          /* `.s42-primary-count`: 800, letter-spacing -.8px, white; its caption `.s42-count-caption` #adcada. */
+          ...(t.palette.mode === 'dark' ? { fontWeight: 800, letterSpacing: '-0.8px', color: '#FFFFFF' } : { fontWeight: 700 }),
+        })}
+      >
+        {value}
+      </Typography>
+      <Typography variant="caption" sx={(t) => ({ color: t.palette.mode === 'dark' ? '#ADCADA' : 'text.secondary' })}>{label}</Typography>
     </Box>
   );
 }

@@ -12,6 +12,7 @@ import {
   minuteAtY,
   selectionRange,
   stepLineHeight,
+  widenWindow,
   yOfMinute,
 } from './boardGeometry';
 
@@ -95,5 +96,23 @@ describe('marking free time', () => {
     expect(columnAtFraction(0.5)).toBe(3);
     expect(columnAtFraction(1)).toBe(6);
     expect(columnAtFraction(-1)).toBe(0);
+  });
+});
+
+describe('a board widened above the planning window', () => {
+  it('widens to whole hours of what lies outside, never narrower, never beyond the day', () => {
+    expect(widenWindow(DEFAULT_WINDOW, [])).toEqual(DEFAULT_WINDOW);
+    expect(widenWindow(DEFAULT_WINDOW, [{ start: 9 * 60, end: 10 * 60 }])).toEqual(DEFAULT_WINDOW);
+    expect(widenWindow(DEFAULT_WINDOW, [{ start: 60 + 5, end: 90 }])).toEqual({ startMinutes: 60, endMinutes: 1140 });
+    expect(widenWindow(DEFAULT_WINDOW, [{ start: 18 * 60, end: 21 * 60 + 10 }])).toEqual({ startMinutes: 420, endMinutes: 22 * 60 });
+    expect(widenWindow(DEFAULT_WINDOW, [{ start: 0, end: 24 * 60 }])).toEqual({ startMinutes: 0, endMinutes: 1440 });
+  });
+
+  it('keeps the height of a minute and grows the board', () => {
+    const wide = boardGeometry({ startMinutes: 60, endMinutes: 1140 }, 1, TIMELINE_HEIGHT, 720);
+    const base = boardGeometry(DEFAULT_WINDOW, 1);
+    expect(wide.pxPerMinute).toBeCloseTo(base.pxPerMinute, 9);
+    expect(wide.height).toBeCloseTo(1080 * base.pxPerMinute, 6);
+    expect(yOfMinute(wide, 420)).toBeCloseTo(360 * base.pxPerMinute, 6);
   });
 });

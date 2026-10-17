@@ -83,8 +83,8 @@ export const DARK = {
   fieldLine: '#22546A',
   line: '#06415A',
   lineLight: '#087E97',
-  /** The bright outline of a panel (the prototype's `.glass-panel`), softened for a page of many cards. */
-  panelLine: 'rgba(0, 223, 227, 0.42)',
+  /** The bright outline of a panel: the prototype's `.glass-panel` border, `rgba(0,223,227,.79)`, as the file draws it. */
+  panelLine: 'rgba(0, 223, 227, 0.79)',
   cyan: '#00E6E4',
   aqua: '#23F2E7',
   white: '#F4FAFF',
@@ -102,7 +102,8 @@ export const DARK = {
   /** The panel itself, then a floating surface (dialog, menu). */
   panel: 'linear-gradient(160deg, #001725 0%, #000C1A 74%, #001A25 100%)',
   floating: 'linear-gradient(160deg, #042C3D, #001523 66%, #011B2D)',
-  panelGlow: '0 6px 20px rgba(0, 0, 0, 0.45), 0 0 18px rgba(0, 216, 221, 0.10), inset 0 0 18px rgba(1, 38, 56, 0.38)',
+  /** The prototype's `.glass-panel` shadow, value for value. */
+  panelGlow: '0 0 1px #00EBF7, 0 7px 23px rgba(0, 0, 0, 0.6), 0 0 21px rgba(0, 216, 221, 0.165), inset 0 0 21px rgba(1, 38, 56, 0.38)',
   floatingGlow: '0 28px 90px rgba(0, 0, 0, 0.66), 0 0 35px rgba(0, 226, 228, 0.23), inset 0 0 30px rgba(1, 132, 172, 0.09)',
   /** The primary button, as the prototype's `.oc-create`. */
   primaryFill: 'linear-gradient(105deg, #24F8E0, #06CBBB)',
@@ -231,6 +232,15 @@ export function buildTheme(accentColor: string, mode: ThemeMode): Theme {
           ...(light
             ? {}
             : {
+                /* The planner's host paints the prototype's own page colour (#000c17) around the 1672x941 stage; inside the
+                   application the page is the shell's navy, so no off-colour frame shows around (or edge shows at the rim of) the stage;
+                   the stage's own glow gradients stay. */
+                'body .sm-planner': { backgroundColor: 'transparent' },
+                /* The stage's own page is a vertical navy gradient of its own; inside the application it is the shell's page, with only the file's soft glow at the bottom kept. */
+                'body .sm-planner #dashboard.live-mode': {
+                  backgroundColor: 'transparent',
+                  background: 'radial-gradient(ellipse 62% 28% at 65% 94%, rgba(0, 103, 139, 0.18), transparent 83%)',
+                },
                 '*::-webkit-scrollbar': { width: 10, height: 10 },
                 '*::-webkit-scrollbar-track': { background: 'transparent' },
                 '*::-webkit-scrollbar-thumb': {
@@ -253,7 +263,8 @@ export function buildTheme(accentColor: string, mode: ThemeMode): Theme {
         defaultProps: { disableElevation: true },
         styleOverrides: {
           root: {
-            borderRadius: DESIGN.radius.lg,
+            /* The prototype's buttons are 7px (`.app-button`, `#club-edit-link`); light keeps the board's 10. */
+            borderRadius: light ? DESIGN.radius.lg : 7,
             textTransform: 'none',
             fontWeight: 600,
             paddingInline: 16,
@@ -297,17 +308,28 @@ export function buildTheme(accentColor: string, mode: ThemeMode): Theme {
             borderColor: light ? line : '#306077',
             backgroundColor: light ? paper : '#021C2D',
             color: ink,
+            ...(light
+              ? {}
+              : {
+                  /* The prototype's secondary button (`#club-edit-link`): a teal-to-navy gradient, a lit edge, ink that is nearly white. */
+                  backgroundImage: 'linear-gradient(105deg, #063649, #072A3D)',
+                  borderColor: 'rgba(50, 181, 199, 0.79)',
+                  color: '#DDFFFF',
+                  boxShadow: 'inset 0 1px rgba(255, 255, 255, 0.07), 0 2px 8px rgba(0, 0, 0, 0.4)',
+                }),
             '&:hover': {
               backgroundColor: light ? hover : '#0C384C',
-              borderColor: light ? DESIGN.lineStrong : '#15B3BE',
+              borderColor: light ? DESIGN.lineStrong : '#74FFF4',
+              ...(light ? {} : { backgroundImage: 'linear-gradient(105deg, #07576B, #074154)', boxShadow: '0 0 12px rgba(4, 235, 221, 0.21)' }),
             },
             '&.MuiButton-colorPrimary': {
-              color: primary,
-              borderColor: alpha(primary, light ? 0.35 : 0.55),
+              color: light ? primary : '#DDFFFF',
+              borderColor: light ? alpha(primary, 0.35) : 'rgba(50, 181, 199, 0.79)',
             },
             '&.MuiButton-colorError': {
               color: light ? DESIGN.danger : D.text.red,
               borderColor: toneFor('red').line,
+              ...(light ? {} : { backgroundImage: 'none' }),
             },
           },
           text: { '&:hover': { backgroundColor: hover } },

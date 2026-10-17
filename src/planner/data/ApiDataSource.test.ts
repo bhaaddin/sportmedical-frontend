@@ -286,7 +286,7 @@ describe('the order being planned', () => {
     });
   });
 
-  it('a club window with 20 seats -> a capacity term of 20, booked = the registered athletes', async () => {
+  it('a window is laid out as the server blocks it: the open hours without the lunch break, one term per piece', async () => {
     const order = orderView({
       blocks: [
         clubBlock('block-1', {
@@ -302,14 +302,14 @@ describe('the order being planned', () => {
     });
     const { source } = make(fakeState({ order }), editSession(order));
     const sessions = await source.listOrderSessions();
-    expect(sessions).toHaveLength(1);
+    expect(sessions.map((s) => [s.start, s.end, s.capacity, s.booked])).toEqual([
+      ['08:00', '12:00', 8, 3],
+      ['12:30', '18:00', 11, 0],
+    ]);
     expect(sessions[0]).toMatchObject({
       id: 'own:block-1:2026-11-23:act-medical:08:00',
       date: '2026-11-23',
-      start: '08:00',
-      end: '18:00',
       categoryId: A_MEDICAL,
-      capacity: 20,
       booked: 3,
       clubBooked: 3,
       origin: 'club',
@@ -320,10 +320,25 @@ describe('the order being planned', () => {
     });
     // the shared calendar lists the same term once for its week
     const week = await source.listSessions({ from: '2026-11-23', to: '2026-11-29' });
-    expect(week.filter((s) => s.origin === 'club')).toHaveLength(1);
+    expect(week.filter((s) => s.origin === 'club')).toHaveLength(2);
   });
 
-  it('a window for several činnosti is laid out one after the other, the unused rest stays in the last term', async () => {
+  it('a whole-day window (no hours) is the same two pieces; a closed day or one with no hours read gives none', async () => {
+    const order = orderView({
+      requestedRanges: [{ fromDate: '2026-11-23', toDate: '2026-11-25', dailyFrom: null, dailyTo: null, activityIds: null }],
+      blocks: [clubBlock('block-1', { fromDate: '2026-11-23', toDate: '2026-11-25', dailyFrom: null, dailyTo: null })],
+    });
+    const state = fakeState({ order, previews: (_c, date) => (date === '2026-11-24' ? preview(date, { isOpen: false, closedBecause: 'notAWorkingDay' }) : preview(date)) });
+    const { source } = make(state, editSession(order));
+    expect((await source.listOrderSessions()).map((s) => [s.date, s.start, s.end])).toEqual([
+      ['2026-11-23', '08:00', '12:00'],
+      ['2026-11-23', '12:30', '18:00'],
+      ['2026-11-25', '08:00', '12:00'],
+      ['2026-11-25', '12:30', '18:00'],
+    ]);
+  });
+
+  it('a window for several činnosti is laid out one after the other, piece by piece around the lunch break', async () => {
     const order = orderView({
       activitySeats: [
         { activityId: A_MEDICAL, activityName: 'Základní prohlídka', durationMinutes: 30, seats: 4, registered: 0, unitPriceCzk: 1500 },
@@ -342,7 +357,8 @@ describe('the order being planned', () => {
     const sessions = await source.listOrderSessions();
     expect(sessions.map((s) => [s.categoryId, s.start, s.end, s.capacity])).toEqual([
       [A_MEDICAL, '08:00', '10:00', 4],
-      [A_SPIRO, '10:00', '14:00', 4],
+      [A_SPIRO, '10:00', '12:00', 2],
+      [A_SPIRO, '12:30', '14:00', 1],
     ]);
   });
 
@@ -371,7 +387,7 @@ describe('day marks and day budget', () => {
     });
     const marks = await make(state).source.listDayMarks({ from: '2026-11-16', to: '2026-11-17' });
     expect(marks).toEqual([
-      { date: '2026-11-16', closed: false, label: null, hours: { from: '08:00', to: '16:00' }, lunch: { from: '12:00', to: '12:30' } },
+      { date: '2026-11-16', closed: false, label: null, hours: { from: '08:00', to: '18:00' }, lunch: { from: '12:00', to: '12:30' } },
       { date: '2026-11-17', closed: true, label: 'Den boje za svobodu a demokracii', hours: null, lunch: null },
     ]);
   });
@@ -382,7 +398,7 @@ describe('day marks and day budget', () => {
         calendarId === CAL_A ? preview(date) : preview(date, { startTime: '07:00', endTime: '15:00', breakStart: '12:15', breakEnd: '13:00' }),
     });
     const [mark] = await make(state).source.listDayMarks({ from: '2026-11-16', to: '2026-11-16' });
-    expect(mark).toMatchObject({ hours: { from: '07:00', to: '16:00' }, lunch: { from: '12:15', to: '12:30' } });
+    expect(mark).toMatchObject({ hours: { from: '07:00', to: '18:00' }, lunch: { from: '12:15', to: '12:30' } });
   });
 
   it('the day is closed when every calendar is shut, even without a holiday', async () => {
@@ -392,10 +408,10 @@ describe('day marks and day budget', () => {
     expect(mark!.label).toBe('Nepracovní den');
   });
 
-  it('the day budget is the longest working day of one calendar: 08:00-16:00 less a 30 min break = 450 min', async () => {
+  it('the day budget is the longest working day of one calendar: 08:00-18:00 less a 30 min break = 570 min', async () => {
     const budget = await make().source.getDayBudget();
-    expect(budget.defaultMinutes).toBe(450);
-    expect(budget.byDate?.['2026-11-02']).toBe(450);
+    expect(budget.defaultMinutes).toBe(570);
+    expect(budget.byDate?.['2026-11-02']).toBe(570);
     const saved = await make().source.saveDayBudget(300);
     expect(saved.defaultMinutes).toBe(300);
     await expect(make().source.saveDayBudget(0)).rejects.toMatchObject({ code: 'validation' });
@@ -435,6 +451,15 @@ describe('the club', () => {
     deps.club.mockResolvedValueOnce(club({ management: [] }));
     const none = await new ApiDataSource({ deps, session: editSession(), today: TODAY }).getClubProfile();
     expect(none).toMatchObject({ leaderName: '', leaderEmail: '', leaderPhone: '' });
+  });
+
+  it('a club card without a colour takes the colour of its order (real data: the server colours the blocks)', async () => {
+    const deps = fakeDeps();
+    deps.club.mockResolvedValue(club({ colorHex: null }));
+    const profile = await new ApiDataSource({ deps, session: editSession(), today: TODAY }).getClubProfile();
+    expect(profile.colorHex).toBe('#2a7f62'); // orderView().clubColorHex
+    const none = await new ApiDataSource({ deps, session: newSession(), today: TODAY }).getClubProfile();
+    expect(none.colorHex).toBeNull();
   });
 
   it('standard booking shows the clinic, not a club', async () => {
@@ -499,21 +524,22 @@ describe('the draft of the order\'s windows', () => {
     const { source, deps } = make(fakeState({ order }), session);
     const created = await source.createInterval({ date: '2026-11-24', categoryId: A_MEDICAL, start: '09:00', quantity: 4 });
     expect(created.session).toMatchObject({ date: '2026-11-24', start: '09:00', end: '11:00', capacity: 4, origin: 'club', calendarIds: [CAL_A], clubOrderId: order.id });
-    expect(created.complete).toBe(true);
+    expect(created.complete).toBe(false); // 8 + 11 + 4 = 23 of 24
     expect((await source.listOrderSessions()).map((s) => [s.date, s.capacity])).toEqual([
-      ['2026-11-23', 20],
+      ['2026-11-23', 8],
+      ['2026-11-23', 11],
       ['2026-11-24', 4],
     ]);
     for (const write of [deps.createStaffOrder, deps.updateOrder, deps.confirmOrder, deps.reschedule]) expect(write).not.toHaveBeenCalled();
     await source.undo(created.undoToken!);
-    expect((await source.listOrderSessions()).map((s) => s.date)).toEqual(['2026-11-23']);
+    expect((await source.listOrderSessions()).map((s) => s.date)).toEqual(['2026-11-23', '2026-11-23']);
   });
 
   it('refuses a term over the order\'s seats and over a booking, with the model\'s Czech reason', async () => {
     const { order, session } = seats24();
     const state = fakeState({ order, appointments: [appt('busy', { startUtc: '2026-11-24T08:00:00Z', endUtc: '2026-11-24T08:30:00Z' })] });
     const { source } = make(state, session);
-    await expect(source.createInterval({ date: '2026-11-24', categoryId: A_MEDICAL, start: '10:00', quantity: 5 })).rejects.toMatchObject({ code: 'validation', message: expect.stringContaining('Zbývá pouze 4') });
+    await expect(source.createInterval({ date: '2026-11-24', categoryId: A_MEDICAL, start: '10:00', quantity: 6 })).rejects.toMatchObject({ code: 'validation', message: expect.stringContaining('Zbývá pouze 5') });
     await expect(source.createInterval({ date: '2026-11-24', categoryId: A_MEDICAL, start: '09:00', quantity: 2 })).rejects.toMatchObject({ code: 'validation', message: expect.stringContaining('překrývá') });
   });
 
@@ -565,7 +591,8 @@ describe('finishPlan: ONE real call', () => {
       },
       false,
     );
-    expect(result).toEqual({ ready: true, orderId: orderView().id, orderCode: ORDER_CODE, windows: 1 });
+    // the window gives 8 + 11 = 19 places of the 20 ordered (the lunch break is not bookable): not ready, and said so
+    expect(result).toEqual({ ready: false, orderId: orderView().id, orderCode: ORDER_CODE, windows: 1 });
     expect(deps.invalidate).toHaveBeenCalled();
   });
 
@@ -590,16 +617,45 @@ describe('finishPlan: ONE real call', () => {
       false,
     );
     expect(result.windows).toBe(2);
-    expect(result.ready).toBe(true);
+    expect(result.ready).toBe(false); // 8 + 11 + 4 = 23 of 24
   });
 
-  it('moving the only window changes its range; the draft is the only thing changed before finish', async () => {
+  it('moving one piece of a window rebuilds that window from its pieces; the draft is the only thing changed before finish', async () => {
     const { source, deps } = make(fakeState(), editSession());
     const [term] = await source.listOrderSessions();
-    await source.moveInterval({ id: term!.id, date: '2026-11-24', start: '08:00', end: '18:00' });
+    await source.moveInterval({ id: term!.id, date: '2026-11-24', start: '08:00', end: '12:00' });
     expect(deps.updateOrder).not.toHaveBeenCalled();
     await source.finishPlan();
-    expect(deps.updateOrder.mock.calls[0]![1].ranges).toEqual([{ fromDate: '2026-11-24', toDate: '2026-11-24', dailyFrom: '08:00', dailyTo: '18:00' }]);
+    expect(deps.updateOrder.mock.calls[0]![1].ranges).toEqual([
+      { fromDate: '2026-11-23', toDate: '2026-11-23', dailyFrom: '12:30', dailyTo: '18:00' },
+      { fromDate: '2026-11-24', toDate: '2026-11-24', dailyFrom: '08:00', dailyTo: '12:00' },
+    ]);
+  });
+
+  it('an untouched whole-day window goes back whole-day, never as 00:00-24:00', async () => {
+    const order = orderView({
+      requestedRanges: [{ fromDate: '2026-11-23', toDate: '2026-11-24', dailyFrom: null, dailyTo: null, activityIds: null }],
+      blocks: [clubBlock('block-1', { toDate: '2026-11-24', dailyFrom: null, dailyTo: null })],
+    });
+    const { source, deps } = make(fakeState({ order }), editSession(order));
+    await source.finishPlan();
+    expect(deps.updateOrder.mock.calls[0]![1].ranges).toEqual([{ fromDate: '2026-11-23', toDate: '2026-11-24', dailyFrom: null, dailyTo: null }]);
+  });
+
+  it('windows of days gone by are not sent back, as in the pick mode of the calendar', async () => {
+    const order = orderView({
+      requestedRanges: [
+        { fromDate: '2026-10-26', toDate: '2026-10-26', dailyFrom: '08:00', dailyTo: '12:00', activityIds: null },
+        { fromDate: '2026-11-23', toDate: '2026-11-23', dailyFrom: '08:00', dailyTo: '12:00', activityIds: null },
+      ],
+      blocks: [
+        clubBlock('block-old', { fromDate: '2026-10-26', toDate: '2026-10-26', dailyTo: '12:00' }),
+        clubBlock('block-1', { dailyTo: '12:00' }),
+      ],
+    });
+    const { source, deps } = make(fakeState({ order }), editSession(order));
+    await source.finishPlan();
+    expect(deps.updateOrder.mock.calls[0]![1].ranges).toEqual([{ fromDate: '2026-11-23', toDate: '2026-11-23', dailyFrom: '08:00', dailyTo: '12:00' }]);
   });
 
   it('a window for several činnosti that was touched becomes one window per činnost (activityIds), an untouched one is kept', async () => {
@@ -623,11 +679,12 @@ describe('finishPlan: ONE real call', () => {
 
     const touched = make(fakeState({ order }), session);
     const spiro = (await touched.source.listOrderSessions()).find((s) => s.categoryId === A_SPIRO)!;
-    await touched.source.moveInterval({ id: spiro.id, date: '2026-11-24', start: '10:00', end: '14:00' });
+    await touched.source.moveInterval({ id: spiro.id, date: '2026-11-24', start: '10:00', end: '12:00' });
     await touched.source.finishPlan();
     expect(touched.deps.updateOrder.mock.calls[0]![1].ranges).toEqual([
       { fromDate: '2026-11-23', toDate: '2026-11-23', dailyFrom: '08:00', dailyTo: '10:00', activityIds: [A_MEDICAL] },
-      { fromDate: '2026-11-24', toDate: '2026-11-24', dailyFrom: '10:00', dailyTo: '14:00', activityIds: [A_SPIRO] },
+      { fromDate: '2026-11-23', toDate: '2026-11-23', dailyFrom: '12:30', dailyTo: '14:00', activityIds: [A_SPIRO] },
+      { fromDate: '2026-11-24', toDate: '2026-11-24', dailyFrom: '10:00', dailyTo: '12:00', activityIds: [A_SPIRO] },
     ]);
   });
 
@@ -724,7 +781,7 @@ describe('finishPlan: ONE real call', () => {
     await expect(source.finishPlan()).rejects.toMatchObject({ code: 'conflict', message: 'Čas je obsazen.', affectedAthletes: [] });
     deps.updateOrder.mockRejectedValueOnce(new Error('boom'));
     await expect(source.finishPlan()).rejects.toMatchObject({ code: 'unknown', message: expect.stringContaining('Objednávku se nepodařilo uložit') });
-    expect(await source.listOrderSessions()).toHaveLength(1);
+    expect(await source.listOrderSessions()).toHaveLength(2);
   });
 
   it('publishForm: an existing order gives its link, a new one is invited once and then is the order being edited', async () => {
@@ -749,8 +806,8 @@ describe('moving a booking of a patient', () => {
     const [term] = await source.listSessions(WEEK);
     const moved = await source.moveInterval({ id: term!.id, date: '2026-11-05', start: '10:00', end: '10:30', expectedVersion: term!.version, notifyPatient: false });
     expect(deps.reschedule).toHaveBeenCalledTimes(2);
-    expect(deps.reschedule).toHaveBeenNthCalledWith(1, CAL_A, 'a1', TO, undefined, { notifyPatient: false });
-    expect(deps.reschedule).toHaveBeenNthCalledWith(2, CAL_B, 'a2', TO, undefined, { notifyPatient: false });
+    expect(deps.reschedule).toHaveBeenNthCalledWith(1, CAL_A, 'a1', TO, undefined, { notifyPatient: false, ifMatch: 'tok-a1' });
+    expect(deps.reschedule).toHaveBeenNthCalledWith(2, CAL_B, 'a2', TO, undefined, { notifyPatient: false, ifMatch: 'tok-a2' });
     expect(moved.session).toMatchObject({ date: '2026-11-05', start: '10:00', end: '10:30' });
     expect(moved.notified).toEqual({ clubLinkUpdated: false, individuals: 0 });
     expect(deps.invalidate).toHaveBeenCalled();
@@ -760,8 +817,16 @@ describe('moving a booking of a patient', () => {
     const { source, deps } = make(two());
     const [term] = await source.listSessions(WEEK);
     const moved = await source.moveInterval({ id: term!.id, date: '2026-11-05', start: '10:00', end: '10:30' });
-    expect(deps.reschedule).toHaveBeenNthCalledWith(1, CAL_A, 'a1', TO, undefined, undefined);
+    expect(deps.reschedule).toHaveBeenNthCalledWith(1, CAL_A, 'a1', TO, undefined, { ifMatch: 'tok-a1' });
     expect(moved.notified.individuals).toBe(2);
+  });
+
+  it('the server says who was told: a walk-in has nobody, a patient with an e-mail is told', async () => {
+    const { source, deps } = make(two());
+    const [term] = await source.listSessions(WEEK);
+    deps.reschedule.mockResolvedValueOnce({ patientNotified: true, reason: null }).mockResolvedValueOnce({ patientNotified: false, reason: 'no_patient' });
+    const moved = await source.moveInterval({ id: term!.id, date: '2026-11-05', start: '10:00', end: '10:30' });
+    expect(moved.notified).toEqual({ clubLinkUpdated: false, individuals: 1 });
   });
 
   it('a booking that changed since the desk read it -> stale, nothing is written', async () => {

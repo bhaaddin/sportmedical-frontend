@@ -10,15 +10,17 @@
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Avatar, Box, ButtonBase, Drawer, IconButton } from '@mui/material';
+import { Avatar, Box, ButtonBase, IconButton } from '@mui/material';
 import { Add, ArrowBack, Menu as MenuIcon, Search, Settings } from '@mui/icons-material';
 import NotificationCenter from '../NotificationCenter';
 import { openUniversalSearch } from '../UniversalSearch';
 import { NewOrderChooser } from '../booking/NewOrderChooser';
-import { SidebarBody } from './Sidebar';
+import { NavDrawer } from './Sidebar';
+import { PlannerMenu } from './PlannerMenu';
+import { isPlannerRoute } from './plannerRoutes';
 import { STAFF_HOME_PATH } from '../../web/sitePaths';
 import { childIsActive, entryState, mainEntries, sectionGroups, sectionOf, shortLabel } from './shellModel';
-import { RAIL_WIDTH, SIDEBAR_WIDTH, activeBg, activeGlow, focusRing, primaryIconSx, sideGlass } from './shellStyles';
+import { RAIL_WIDTH, activeBg, activeGlow, focusRing, primaryIconSx, sideGlass } from './shellStyles';
 import type { ShellNav } from './shellTypes';
 
 /** One rail entry: the icon, its label under it, 56px tall. */
@@ -90,6 +92,9 @@ export function TabletRail({ nav }: { nav: ShellNav }) {
 
   /* Opening is a tap; every navigation closes it again. */
   useEffect(() => { setOpen(false); }, [nav.pathname, nav.settingsMode]);
+
+  /* The planner's stage is the whole screen: no rail, a Menu button in the top row instead. */
+  if (isPlannerRoute(nav.pathname)) return <PlannerMenu nav={nav} />;
 
   return (
     <>
@@ -206,31 +211,7 @@ export function TabletRail({ nav }: { nav: ShellNav }) {
         </ButtonBase>
       </Box>
 
-      <Drawer
-        anchor="left"
-        open={open}
-        onClose={close}
-        transitionDuration={{ enter: 150, exit: 120 }}
-        slotProps={{
-          paper: {
-            'aria-label': nav.settingsMode ? 'Nastavení — menu' : 'Menu',
-            role: 'dialog',
-            sx: {
-              width: SIDEBAR_WIDTH,
-              maxWidth: '86vw',
-              boxSizing: 'border-box',
-              borderRadius: 0,
-              px: '20px',
-              pt: '22px',
-              pb: '14px',
-              display: 'flex',
-              flexDirection: 'column',
-            },
-          },
-        }}
-      >
-        <SidebarBody nav={nav} onNavigate={close} withSlot={false} onNewOrder={() => setChooser(true)} />
-      </Drawer>
+      <NavDrawer nav={nav} open={open} onClose={close} onNewOrder={() => setChooser(true)} />
       <NewOrderChooser open={chooser} onClose={() => setChooser(false)} />
     </>
   );

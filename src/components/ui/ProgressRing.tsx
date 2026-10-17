@@ -33,6 +33,9 @@ export function ProgressRing({
         (t: Theme) => {
           const dark = t.palette.mode === 'dark';
           const arc = tone ?? (dark ? t.palette.primary.light : t.palette.primary.main);
+          /* The prototype's `.s42-ring`: a light-aqua to sky arc over a slate track, a hairline halo, a sunk navy disc. */
+          const from = dark && tone === undefined ? 'from -90deg, ' : '';
+          const fill = tone === undefined && dark ? `#9CFFF3 0deg, #78DDFC ${pct * 3.6}deg` : `${arc} 0deg, ${arc} ${pct * 3.6}deg`;
           return {
             position: 'relative',
             flex: 'none',
@@ -41,15 +44,16 @@ export function ProgressRing({
             borderRadius: '50%',
             display: 'grid',
             placeItems: 'center',
-            background: `conic-gradient(${arc} 0deg, ${arc} ${pct * 3.6}deg, ${dark ? '#315D76' : t.palette.divider} ${pct * 3.6}deg 360deg)`,
-            boxShadow: dark ? `0 0 17px ${t.palette.primary.main}33` : 'none',
+            background: `conic-gradient(${from}${fill}, ${dark ? `#273D54 ${pct * 3.6}deg, #263A50 360deg` : `${t.palette.divider} ${pct * 3.6}deg 360deg`})`,
+            boxShadow: dark ? '0 0 0 1px rgba(171, 237, 255, 0.31), 0 0 14px rgba(75, 219, 239, 0.17), inset 0 0 8px rgba(130, 249, 238, 0.1)' : 'none',
             '&::before': {
               content: '""',
               position: 'absolute',
-              inset: Math.max(6, Math.round(size * 0.12)),
+              /* `.s42-ring::before` is inset 12px of 70px. */
+              inset: Math.max(6, Math.round(size * (dark ? 12 / 70 : 0.12))),
               borderRadius: '50%',
-              background: t.palette.background.paper,
-              boxShadow: dark ? 'inset 0 0 8px #102F4C' : 'none',
+              background: dark ? '#031425' : t.palette.background.paper,
+              boxShadow: dark ? 'inset 0 0 12px rgba(0, 0, 0, 0.8), 0 0 5px #061E2D' : 'none',
             },
           };
         },

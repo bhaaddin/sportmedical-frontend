@@ -19,8 +19,10 @@
  *   Toast              #toast-layer
  *   CompletionCallout  #planner-feedback
  *
- * Desktop (>= 1280 px) only for now; narrower widths get a notice. The `compact` flag of the stage
- * is where the later phone / tablet layouts will hook in.
+ * Three layouts (`useDevice()`): desktop (>= 1280 px) is the stage above, exactly as the file draws it; tablet
+ * (768-1279) and phone (<= 767) compose the same panels in `compact/CompactLayers` and let CSS reflow them
+ * (`styles/planner.compact.css`). `forceDesktop` keeps the stage on a narrow window (tests, screenshots);
+ * `layout` forces any of the three.
  */
 import { useDevice } from '../../layout/useDevice';
 import type { PlannerDataSource } from '../data/PlannerDataSource';
@@ -35,12 +37,13 @@ import { MiniDayTooltip } from './MiniDayTooltip';
 import { OrderCommandPanel } from './OrderCommandPanel';
 import { PlannerGate } from './PlannerGate';
 import { PlannerProviders } from './PlannerProviders';
-import { PlannerStage } from './PlannerStage';
+import { PlannerStage, type PlannerLayout } from './PlannerStage';
 import { PlanningCarousel } from './PlanningCarousel';
 import { ReservationDrawer } from './ReservationDrawer';
 import { SummaryExperience } from './SummaryExperience';
 import { Toast } from './Toast';
 import { WeekBoardPanel } from './WeekBoardPanel';
+import { CompactLayers } from './compact/CompactLayers';
 import { usePlannerKeyboard } from './usePlannerKeyboard';
 
 export interface PlannerShellProps {
@@ -53,6 +56,8 @@ export interface PlannerShellProps {
   headerMode?: ClubHeaderMode;
   /** Render the stage even below 1280 px (tests, screenshots). */
   forceDesktop?: boolean;
+  /** Force a layout instead of reading the window (tests, screenshots). Wins over `forceDesktop`. */
+  layout?: PlannerLayout;
 }
 
 /** The panels, in prototype DOM order. Rendered inside the stage once the data is ready. */
@@ -82,21 +87,19 @@ export function PlannerLayers({ user, headerMode }: { user?: ClubHeaderProps['us
   );
 }
 
-export function PlannerShell({ source, today, initialDate, user, headerMode, forceDesktop = false }: PlannerShellProps) {
+export function PlannerShell({ source, today, initialDate, user, headerMode, forceDesktop = false, layout: forcedLayout }: PlannerShellProps) {
   const device = useDevice();
-  if (device !== 'desktop' && !forceDesktop) {
-    return (
-      <div className="sm-planner-desktop-only" role="status" data-testid="planner-desktop-only">
-        Plánovač je zatím dostupný jen na počítači (od šířky okna 1280 px).
-      </div>
-    );
-  }
+  const layout: PlannerLayout = forcedLayout ?? (forceDesktop ? 'desktop' : device);
   return (
     <PlannerProviders source={source} today={today} initialDate={initialDate}>
-      <PlannerStage>
+      <PlannerStage layout={layout}>
         <PlannerGate>
           <PlannerAccountProvider user={user}>
-            <PlannerLayers user={user} headerMode={headerMode} />
+            {layout === 'desktop' ? (
+              <PlannerLayers user={user} headerMode={headerMode} />
+            ) : (
+              <CompactLayers layout={layout} user={user} headerMode={headerMode} />
+            )}
           </PlannerAccountProvider>
         </PlannerGate>
       </PlannerStage>

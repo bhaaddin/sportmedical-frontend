@@ -37,7 +37,16 @@ export interface PlanningBoardLayerProps {
 
 export function PlanningBoardLayer({ board: boardProp }: PlanningBoardLayerProps = {}) {
   const ctx = usePlannerCtx();
-  const { dayMarks, order } = usePlannerModelState();
+  const { dayMarks: rawMarks, order, catalogue } = usePlannerModelState();
+  /* A real source lists every day with its opening hours: a day without any is a non-working day. The lab's demo
+     source draws the file, which plans on any day. */
+  const strictHours = catalogue?.capabilities.simulateBookings === false;
+  const dayMarks = useMemo(() => {
+    if (!strictHours) return rawMarks;
+    return Object.fromEntries(
+      Object.entries(rawMarks).map(([d, m]) => [d, m.closed || m.hours ? m : { ...m, closed: true, label: m.label ?? 'nepracovní den' }]),
+    );
+  }, [rawMarks, strictHours]);
   const { base } = usePlanFigures();
   const commit = usePlanCommit();
   const ask = usePlannerSelector((s) => s.planning.ask);

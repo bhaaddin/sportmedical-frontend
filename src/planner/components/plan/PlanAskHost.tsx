@@ -20,7 +20,7 @@ import { normalizeAllowed } from '../../../components/clubs/order/routing';
 import { PickActivityPopover } from '../../../components/booking/calendar/PickActivityPopover';
 import type { PickedTime } from '../../../components/booking/calendar/multiSelect';
 import { pickCoverage, stepFor, type PlanPart, type PlanWindow } from '../../../components/booking/calendar/pickPlan';
-import type { AskResult, PickAsk } from '../../../components/booking/calendar/usePickOrder';
+import type { AskResult, PickAsk } from '../../../components/booking/calendar/pickTypes';
 import { usePlannerCtx, usePlannerModelState } from '../context';
 import { coverageActivities, orderWindows, PLANNER_CALENDAR_ID, PLAN_STEP } from './orderFigures';
 import { PlanDarkTheme } from './PlanDarkTheme';

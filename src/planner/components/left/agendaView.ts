@@ -11,7 +11,6 @@ import {
   agendaPanelModel,
   agendaRowModel,
   agendaSlotLabel,
-  agendaTermLabel,
   addDays,
   categoryOrFallback,
   dateOf,
@@ -41,6 +40,9 @@ function standardEvents(ctx: PlannerContext): PlannerSession[] {
     .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start) || a.id.localeCompare(b.id));
 }
 
+/** A term of the order being planned: not another club's window and not the booking of an individual. */
+export const isTermOfOrder = (e: PlannerSession): boolean => e.foreign !== true && !(e.appointments && e.appointments.length > 0);
+
 export function agendaView(
   ctx: PlannerContext,
   ui: AgendaUi,
@@ -49,8 +51,8 @@ export function agendaView(
   mode?: 'club' | 'standard',
 ): AgendaView {
   const club = mode ? mode === 'club' : ctx.demands.length > 0;
-  // Other clubs' windows are busy time on the board, not terms of the order being planned.
-  if (club) return { ...agendaPanelModel({ ...ctx, sessions: ctx.sessions.filter((e) => e.foreign !== true) }, ui, view), standard: false };
+  // Other clubs' windows and the clinic's own bookings are busy time on the board, not terms of the order being planned.
+  if (club) return { ...agendaPanelModel({ ...ctx, sessions: ctx.sessions.filter(isTermOfOrder) }, ui, view), standard: false };
 
   const all = standardEvents(ctx);
   const present = ctx.categories.filter((c) => all.some((e) => e.categoryId === c.id));
@@ -87,7 +89,7 @@ export function agendaView(
           planned: typeSlots,
           requested: allSlots,
           fillPercent: allSlots ? Math.min(100, (typeSlots / allSlots) * 100) : 0,
-          termCountLabel: `${typeEvents.length} ${agendaTermLabel(typeEvents.length)}`,
+          termCountLabel: `${typeEvents.length} ${termWord(typeEvents.length)}`,
           remainingLabel: `${share} % všech slotů`,
         }
       : null,
@@ -102,7 +104,7 @@ export function agendaView(
           : 'Zobrazené období',
     allTotals: {
       terms: filtered.length,
-      termsLabel: agendaTermLabel(filtered.length),
+      termsLabel: termWord(filtered.length),
       slots: slotsOf(filtered),
       slotsLabel: `${agendaSlotLabel(slotsOf(filtered))} celkem`,
     },

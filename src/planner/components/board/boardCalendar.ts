@@ -1,13 +1,13 @@
 /*
  * The clinic's REAL calendar as the board needs it: bookings, blocks (club windows and manual),
- * the calendars with their filters and the rota. It is the data side of `CalendarGridPage`,
- * lifted into one hook - same endpoints, same react-query keys (so the two share the cache), same
+ * the calendars with their filters and the rota. It is the data side of the old calendar page
+ * (`CalendarGridPage`, since replaced by the planner), lifted into one hook - same endpoints, same react-query keys (so the two share the cache), same
  * filter rules - and nothing about drawing.
  *
  * Only the real route uses it (`RealBoard` in `WeekBoardPanel`); the lab and the tests that run on
  * `DemoDataSource` never call it, so they never touch the API.
  *
- * Rules kept from the page (do not "improve" them here, change `CalendarGridPage` first):
+ * Rules kept from the old page (they were the calendar's agreed behaviour):
  *   - one request for the whole visible window and every calendar; the ticks, the legend and the
  *     worker narrow it on this side;
  *   - a calendar stays when it is ticked and its služba is shown - through the service it runs or

@@ -4,6 +4,8 @@
  * "Všechny termíny", the činnost chips + KPI + term list, the scope buttons Vše / Den / Týden and
  * the footer.
  *
+ * The wording follows the mode: a club order is "Plánované činnosti", standard ordering "Činnosti" and "Všechny termíny".
+ *
  * Planning a club order: chips are the ordered činnosti, the KPI measures planned seats against the
  * ordered ones, "Vše" lists every term of the order. Standard booking (no order): the same lists over
  * the clinic's own sessions of the loaded range (`left/agendaView.ts`). A term row opens its detail
@@ -58,10 +60,10 @@ export function AgendaPanel() {
     act.openDialog({ kind: 'agendaDetail', id: row.id });
   };
   return (
-    <section className="appointments agenda-panel" id="agenda-panel" aria-label="Přehled plánovaných termínů" data-testid="agenda-panel" data-agenda-standard={m.standard ? 'true' : undefined}>
+    <section className="appointments agenda-panel" id="agenda-panel" aria-label={m.standard ? 'Přehled termínů' : 'Přehled plánovaných termínů'} data-testid="agenda-panel" data-agenda-standard={m.standard ? 'true' : undefined}>
       <div className="agenda-mode-tabs" role="group" aria-label="Režim přehledu termínů">
         <button type="button" data-agenda-mode="activities" className={agenda.mode === 'activities' ? 'is-active' : undefined} aria-pressed={agenda.mode === 'activities'} onClick={() => act.setAgendaMode('activities')}>
-          Plánované činnosti
+          {m.standard ? 'Činnosti' : 'Plánované činnosti'}
         </button>
         <button type="button" data-agenda-mode="all" className={agenda.mode === 'all' ? 'is-active' : undefined} aria-pressed={agenda.mode === 'all'} onClick={() => act.setAgendaMode('all')}>
           Všechny termíny <span className="agenda-tab-count" id="agenda-total-count">{m.totalCount}</span>
@@ -100,8 +102,8 @@ export function AgendaPanel() {
             </>
           ) : null}
         </div>
-        <div className="agenda-section-caption"><span>TERMÍNY VYBRANÉ ČINNOSTI</span><small id="agenda-activity-term-count">{m.termCaption}</small></div>
-        <div id="agenda-activity-list" className="agenda-list" aria-label="Termíny vybrané činnosti">
+        <div className="agenda-section-caption"><span>{m.standard ? 'TERMÍNY ČINNOSTI V KALENDÁŘI' : 'TERMÍNY VYBRANÉ ČINNOSTI'}</span><small id="agenda-activity-term-count">{m.termCaption}</small></div>
+        <div id="agenda-activity-list" className="agenda-list" aria-label={m.standard ? 'Termíny činnosti' : 'Termíny vybrané činnosti'}>
           {m.activityRows.length
             ? m.activityRows.map((row) => <AgendaTermRow key={row.id} row={row} onOpen={openTerm} />)
             : <div className="agenda-empty">{m.activityEmpty}</div>}
@@ -122,7 +124,7 @@ export function AgendaPanel() {
           <span><b>{m.allTotals.terms}</b> {m.allTotals.termsLabel}</span>
           <span><b>{m.allTotals.slots}</b> {m.allTotals.slotsLabel}</span>
         </div>
-        <div id="agenda-all-list" className="agenda-list" aria-label="Všechny vytvořené termíny">
+        <div id="agenda-all-list" className="agenda-list" aria-label={m.standard ? 'Všechny termíny' : 'Všechny vytvořené termíny'}>
           {m.allRows.length
             ? m.allRows.map((row) => <AgendaTermRow key={row.id} row={row} onOpen={openTerm} />)
             : <div className="agenda-empty">{m.allEmpty}</div>}

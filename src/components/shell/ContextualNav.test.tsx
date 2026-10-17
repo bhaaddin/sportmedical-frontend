@@ -98,8 +98,8 @@ describe('contextual sidebar (1440)', () => {
     await userEvent.click(shortcut);
     expect(path()).toBe('/planovani');
     expect(JSON.parse(screen.getByTestId('state').textContent ?? 'null')).toEqual({ openClubOrder: true });
-    expect(within(mainNav()).getByRole('link', { name: 'Kalendář' })).toHaveAttribute('aria-current', 'page');
-    expect(within(mainNav()).getByRole('link', { name: 'Klubová objednávka' })).not.toHaveAttribute('aria-current');
+    /* The calendar is the planner: the stage is the whole screen, so no sidebar is drawn there any more. */
+    expect(document.querySelector('[data-shell="sidebar"]')).not.toBeInTheDocument();
   });
 
   it('draws no children of other areas on a plain page', () => {
@@ -190,7 +190,7 @@ describe('settings sidebar groups', () => {
  */
 const SECTIONS: Array<{ path: string; title: string; items: Array<[string, string]>; foreign: string[] }> = [
   {
-    path: '/planovani',
+    path: '/dnes',
     title: 'Kalendář',
     items: [['Kalendář', '/planovani'], ['Dnešní přehled', '/dnes'], ['Přehled podle služeb', '/prehled-sluzeb'], ['Dostupnost', '/availability'], ['Klubová objednávka', '/planovani']],
     foreign: ['Nový pacient', 'Objednávky klubů', 'Pokladna'],

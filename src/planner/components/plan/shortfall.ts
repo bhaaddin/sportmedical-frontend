@@ -1,7 +1,7 @@
 /*
  * "Potvrdit objednávku" with players still without a slot, or with places planned beyond the players (money
  * lost): the desk decides, nothing is created or trimmed silently (constitution IV). The same rules as the
- * calendar's pick mode (`usePickOrder`), on the planner's figures:
+ * calendar's former pick mode (`usePickOrder`, replaced by this planner), on the planner's figures:
  *
  *   shortfallOf   what is missing / spare, per činnost, with the money the spare places would earn
  *   trimOps       "Zkrátit na potřebu": every term that holds whole slots no player needs is cut back to what its
@@ -9,7 +9,7 @@
  */
 import { moreNeeded, trimToNeed } from '../../../components/booking/calendar/pickPlan';
 import { minutesAsTime, type PlannerContext, type PlannerSession } from '../../model';
-import type { Shortfall } from '../../../components/booking/calendar/usePickOrder';
+import type { Shortfall } from '../../../components/booking/calendar/pickTypes';
 import { coverageActivities, orderWindows, type OrderFigures } from './orderFigures';
 
 export function shortfallOf(figures: OrderFigures, editing: boolean): Shortfall {

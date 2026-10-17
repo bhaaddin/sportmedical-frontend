@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { clubRanges, pickedLabel, type PickedRange } from './multiSelect';
-import { SelectionTray } from './SelectionTray';
 import { setViewport, VIEWPORTS } from '../../../test/viewport';
 
 const time = (id: string, dayKey: string, start: number, end: number): PickedRange => ({
@@ -54,107 +53,5 @@ describe('the club hand-off', () => {
     const ranges = clubRanges([time('a', '2026-10-26', 20 * 60, 24 * 60), days('b', '2026-11-02', '2026-11-03')], TODAY);
     expect(ranges[0]).toEqual({ fromDate: '2026-10-26', toDate: '2026-10-26', dailyFrom: '20:00', dailyTo: '23:59' });
     expect(ranges[1]).toEqual({ fromDate: '2026-11-02', toDate: '2026-11-03' });
-  });
-});
-
-describe('the tray on a phone', () => {
-  it('is a bar above the bottom navigation that opens to the chips', () => {
-    setViewport(VIEWPORTS.phone);
-    const onRemove = vi.fn();
-    const onClear = vi.fn();
-    render(
-      <SelectionTray
-        items={[time('a', '2026-10-26', 8 * 60, 12 * 60), time('b', '2026-10-19', 8 * 60, 9 * 60), days('c', '2026-11-02', '2026-11-06')]}
-        today={TODAY}
-        phone
-        mayBook
-        mayBlock
-        onRemove={onRemove}
-        onClear={onClear}
-        onBlock={vi.fn()}
-      />,
-    );
-    expect(screen.getByTestId('selection-tray')).toHaveAttribute('data-variant', 'bar');
-    expect(screen.getByText('3 termíny')).toBeInTheDocument();
-    expect(screen.queryAllByTestId('tray-chip')).toHaveLength(0);
-    fireEvent.click(screen.getByRole('button', { name: 'Zobrazit termíny' }));
-    expect(screen.getAllByTestId('tray-chip')).toHaveLength(3);
-    expect(screen.getByText('v minulosti')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Odebrat termín Po 26\. 10\./ }));
-    expect(onRemove).toHaveBeenCalledWith('a');
-    fireEvent.click(screen.getByRole('button', { name: 'Zrušit výběr' }));
-    expect(onClear).toHaveBeenCalled();
-    /*
-     * A club order is never STARTED from marked places - several places never offer it either, "Přidat do
-     * objednávky klubu" needs exactly one (the dialog attaches ONE range to ONE order).
-     */
-    expect(screen.queryByRole('button', { name: /klub/i })).not.toBeInTheDocument();
-  });
-
-  it('offers no club action for a past single place, even with the callback wired', () => {
-    render(
-      <SelectionTray
-        items={[time('b', '2026-10-19', 8 * 60, 9 * 60)]}
-        today={TODAY}
-        phone={false}
-        mayBook
-        mayBlock
-        onRemove={vi.fn()}
-        onClear={vi.fn()}
-        onAddToClubOrder={vi.fn()}
-      />,
-    );
-    expect(screen.queryByRole('button', { name: /klub/i })).not.toBeInTheDocument();
-  });
-
-  it('"Přidat do objednávky klubu" (Etapa 12) offers for exactly one future place, never a path to a new order', () => {
-    const onAddToClubOrder = vi.fn();
-    render(
-      <SelectionTray
-        items={[time('a', '2026-10-26', 8 * 60, 9 * 60)]}
-        today={TODAY}
-        phone={false}
-        mayBook
-        mayBlock
-        onRemove={vi.fn()}
-        onClear={vi.fn()}
-        onBlock={vi.fn()}
-        onAddToClubOrder={onAddToClubOrder}
-      />,
-    );
-    const button = screen.getByTestId('tray-add-to-club-order');
-    expect(button).toHaveTextContent('Přidat do objednávky klubu');
-    fireEvent.click(button);
-    expect(onAddToClubOrder).toHaveBeenCalled();
-    /* Never an entry to create a new order from here. */
-    expect(screen.queryByRole('button', { name: /telefonická objednávka/i })).not.toBeInTheDocument();
-  });
-
-  it('no club action without `mayBook`, and none without the callback', () => {
-    const { rerender } = render(
-      <SelectionTray
-        items={[time('a', '2026-10-26', 8 * 60, 9 * 60)]}
-        today={TODAY}
-        phone={false}
-        mayBook={false}
-        mayBlock
-        onRemove={vi.fn()}
-        onClear={vi.fn()}
-        onAddToClubOrder={vi.fn()}
-      />,
-    );
-    expect(screen.queryByTestId('tray-add-to-club-order')).not.toBeInTheDocument();
-    rerender(
-      <SelectionTray
-        items={[time('a', '2026-10-26', 8 * 60, 9 * 60)]}
-        today={TODAY}
-        phone={false}
-        mayBook
-        mayBlock
-        onRemove={vi.fn()}
-        onClear={vi.fn()}
-      />,
-    );
-    expect(screen.queryByTestId('tray-add-to-club-order')).not.toBeInTheDocument();
   });
 });

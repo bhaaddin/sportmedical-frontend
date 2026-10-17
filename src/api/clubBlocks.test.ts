@@ -44,8 +44,8 @@ describe('toBlock', () => {
     expect(block.status).toBe('Cancelled');
     expect(block.seats).toBe(10);
     expect(block.athletes).toEqual([
-      { id: 'p1', name: 'Jan Novák', activityName: 'Prohlídka', startUtc: '2026-10-26T09:00:00Z', endUtc: '2026-10-26T10:00:00Z', status: 'Attended', phone: '+420 777 123 456' },
-      { id: 'p2', name: 'Petr Malý', activityName: '', startUtc: null, endUtc: null, status: 'Booked', phone: null },
+      { id: 'p1', name: 'Jan Novák', activityName: 'Prohlídka', startUtc: '2026-10-26T09:00:00Z', endUtc: '2026-10-26T10:00:00Z', status: 'Attended', agreedPriceCzk: null, listPriceCzk: null, phone: '+420 777 123 456' },
+      { id: 'p2', name: 'Petr Malý', activityName: '', startUtc: null, endUtc: null, status: 'Booked', agreedPriceCzk: null, listPriceCzk: null, phone: null },
     ]);
   });
 
@@ -90,8 +90,8 @@ describe('errors', () => {
     expect(e.isConflict).toBe(true);
     expect(e.message).toBe('Dotkne se 2 sportovců.');
     expect(e.conflicts).toEqual([
-      { id: 'p1', name: 'Jan Novák', activityName: 'Prohlídka', startUtc: '2026-10-26T09:00:00Z', endUtc: '2026-10-26T10:00:00Z', status: 'Booked', phone: '+420 777 123 456' },
-      { id: 'p2', name: 'Petr Malý', activityName: '', startUtc: null, endUtc: null, status: 'Booked', phone: null },
+      { id: 'p1', name: 'Jan Novák', activityName: 'Prohlídka', startUtc: '2026-10-26T09:00:00Z', endUtc: '2026-10-26T10:00:00Z', status: 'Booked', agreedPriceCzk: null, listPriceCzk: null, phone: '+420 777 123 456' },
+      { id: 'p2', name: 'Petr Malý', activityName: '', startUtc: null, endUtc: null, status: 'Booked', agreedPriceCzk: null, listPriceCzk: null, phone: null },
     ]);
   });
 

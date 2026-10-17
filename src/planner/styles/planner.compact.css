@@ -1,0 +1,923 @@
+/*
+ * The planner below 1280 px: tablet (768-1279) and phone (<= 767).
+ *
+ * The file (planner.css) draws one 1672 x 941 stage in design pixels. Below 1280 px the stage is gone
+ * (`PlannerStage` renders no size and no transform, scale 1) and these rules lay the very same panels out as a
+ * column - same dark glass tokens, rings, cards, pills and buttons, reflowed. Nothing here edits a generated rule;
+ * everything is scoped under `.sm-planner.is-compact` (both layouts), `[data-layout="tablet"]` or `[data-layout="phone"]`.
+ *
+ * Specificity: the file's rules are `.sm-planner #dashboard.live-mode .x` (and many with !important), so the compact
+ * rules start from `.sm-planner.is-compact #dashboard.live-mode .x` - one class more - and repeat `!important` only
+ * where the file's rule has it.
+ *
+ * Contents
+ *   1  root, frame, stage
+ *   2  header (one row + expander)
+ *   3  the left column: pinned column / drawer / sheet, mini calendar, agenda
+ *   4  the board: toolbar, strip, one day or the week, alternate views, touch
+ *   5  the činnost deck (horizontal scroll-snap strip)
+ *   6  the bottom dock (hint + order bar + Souhrn)
+ *   7  layers: dialogs, drawer, summary, flyout, toast, callout, drag hud
+ *   8  touch targets (>= 44 px) and the rest of the finger-sized details
+ */
+
+/* ============================== 1 · root, frame, stage ============================== */
+/*
+ * The page that draws the planner gives it a box of the window's height (`calc(100vh - 32px)`) because the stage
+ * fits itself into a box. The reflowed layouts are as tall as their content and the page scrolls, so the box around
+ * them must not cap the height. The one rule that is not scoped under `.sm-planner`: it is about the host.
+ */
+:has(> .sm-planner.is-compact) {
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+.sm-planner.is-compact {
+  --compact-gap: 10px;
+  --compact-bottom-bar: 0px;
+  --compact-sheet-z: 1240;
+  --compact-layer-z: 1260;
+  display: block;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 8px;
+  overflow: visible;
+  background: #00111e;
+  border: 1px solid rgba(0, 223, 227, 0.32);
+  border-radius: 16px;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+.sm-planner[data-layout='phone'] {
+  --compact-bottom-bar: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding: 6px;
+  border-radius: 14px;
+}
+.sm-planner.is-compact #screen-frame {
+  position: relative;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  will-change: auto;
+}
+.sm-planner.is-compact #dashboard,
+.sm-planner.is-compact #dashboard.live-mode {
+  width: auto;
+  height: auto;
+  min-height: 240px;
+  transform: none;
+  overflow: visible;
+  isolation: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--compact-gap);
+  background: none;
+}
+.sm-planner.is-compact #dashboard.live-mode:before { display: none; }
+.sm-planner.is-compact .planner-state { border-radius: 14px; }
+
+/* ============================== 2 · header ============================== */
+.sm-planner.is-compact .compact-header { position: relative; }
+.sm-planner.is-compact #dashboard .club-unified-header {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  width: auto !important;
+  height: auto !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-areas: 'id bar' 'strip strip' !important;
+  align-items: center !important;
+  column-gap: 6px !important;
+  padding: 0 56px 0 0 !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+}
+.sm-planner.is-compact #dashboard .club-top-userbar {
+  position: static !important;
+  grid-area: bar;
+  height: auto !important;
+  z-index: auto !important;
+}
+.sm-planner.is-compact #dashboard .club-user-actions { gap: 2px !important; }
+.sm-planner.is-compact #dashboard .club-user-bell { width: 44px !important; height: 44px !important; position: relative; }
+.sm-planner.is-compact #dashboard .club-user-bell .icon { width: 22px !important; height: 22px !important; }
+.sm-planner.is-compact #dashboard .club-bell-badge { position: absolute; top: 4px; right: 2px; }
+.sm-planner.is-compact #dashboard .club-user-chip { min-height: 44px !important; min-width: 44px !important; justify-content: center !important; }
+.sm-planner.is-compact #dashboard .club-user-chevron { display: none !important; }
+.sm-planner.is-compact #dashboard .club-user-avatar { width: 34px !important; height: 34px !important; font-size: 12px !important; }
+.sm-planner[data-layout='phone'] #dashboard .club-user-name { display: none !important; }
+
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header .club-identity-v45 {
+  grid-area: id;
+  display: grid !important;
+  grid-template-columns: 48px minmax(0, 1fr) !important;
+  gap: 10px !important;
+  height: auto !important;
+  padding: 8px 4px 8px 10px !important;
+  align-items: center !important;
+}
+.sm-planner.is-compact #dashboard .club-logo-slot {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 10px !important;
+}
+.sm-planner.is-compact #dashboard .club-logo-label { padding: 0 !important; gap: 0 !important; }
+.sm-planner.is-compact #dashboard .club-logo-label b,
+.sm-planner.is-compact #dashboard .club-logo-label small,
+.sm-planner.is-compact #dashboard .club-logo-label .sr-only { display: none !important; }
+.sm-planner.is-compact #dashboard .club-logo-label .icon { width: 22px !important; height: 22px !important; }
+.sm-planner.is-compact #dashboard .club-logo-slot .club-logo-label.is-readonly > * { transform: scale(0.62); transform-origin: center; }
+.sm-planner.is-compact #dashboard .club-identity-content { gap: 4px !important; }
+.sm-planner.is-compact #dashboard .club-identity-tag { height: 18px !important; font-size: 9.5px !important; padding: 0 8px !important; }
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header .club-identity-name {
+  font-size: 19px !important;
+  letter-spacing: -0.5px !important;
+  white-space: normal !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden !important;
+  overflow-wrap: anywhere;
+}
+.sm-planner[data-layout='tablet'] #dashboard.live-mode .club-unified-header .club-identity-name { font-size: 24px !important; }
+/* The edit button belongs to the expanded header. */
+.sm-planner.is-compact #dashboard .compact-header[data-open='false'] #club-edit-link { display: none !important; }
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header #club-edit-link {
+  width: auto !important;
+  min-width: 44px !important;
+  height: 44px !important;
+  padding: 0 16px !important;
+  font-size: 13px !important;
+  margin-top: 4px;
+}
+
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header #club-details-strip {
+  grid-area: strip;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 0 !important;
+  height: auto !important;
+  padding: 0 12px 10px !important;
+  border-top: 1px solid rgba(72, 156, 179, 0.4) !important;
+  overflow: visible !important;
+}
+.sm-planner[data-layout='tablet'] #dashboard.live-mode .club-unified-header #club-details-strip { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; padding-top: 4px !important; }
+.sm-planner.is-compact #dashboard .compact-header[data-open='false'] #club-details-strip { display: none !important; }
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header .club-head-info {
+  height: auto !important;
+  padding: 8px 6px 4px 8px !important;
+  border-right: 0 !important;
+  border-bottom: 1px solid rgba(72, 156, 179, 0.28) !important;
+}
+.sm-planner[data-layout='tablet'] #dashboard.live-mode .club-unified-header .club-head-info { border-bottom: 0 !important; border-right: 1px solid rgba(72, 156, 179, 0.46) !important; }
+.sm-planner[data-layout='tablet'] #dashboard.live-mode .club-unified-header .club-head-info:last-child { border-right: 0 !important; }
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header .club-head-info:last-child { border-bottom: 0 !important; }
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header .club-head-title { font-size: 13px !important; height: 24px !important; min-height: 24px !important; margin-bottom: 2px !important; }
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header .club-head-line { grid-template-columns: 18px 54px minmax(0, 1fr) !important; min-height: 28px !important; font-size: 13px !important; }
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header .club-head-line > strong { white-space: normal !important; overflow-wrap: anywhere; }
+
+.sm-planner.is-compact .compact-header-toggle {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 48px;
+  height: 48px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #8ff9f2;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.sm-planner.is-compact .compact-header-toggle:hover { background: #0a3d4e; }
+.sm-planner.is-compact .compact-header-toggle .icon { width: 20px; height: 20px; transition: transform 0.18s; }
+.sm-planner.is-compact .compact-header[data-open='true'] .compact-header-toggle .icon { transform: rotate(180deg); }
+.sm-planner[data-layout='phone'] .compact-header-toggle > span { display: none; }
+.sm-planner[data-layout='phone'] .compact-header-toggle { min-width: 48px; padding: 0; }
+.sm-planner[data-layout='tablet'] .compact-header-toggle { min-width: 96px; top: 4px; }
+.sm-planner[data-layout='tablet'] #dashboard .club-unified-header { padding-right: 104px !important; }
+
+/* ============================== 3 · the left column ============================== */
+.sm-planner.is-compact #dashboard.live-mode #live-ui {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--compact-gap);
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  align-items: start;
+}
+.sm-planner[data-layout='tablet'] #dashboard.live-mode #live-ui[data-pinned='true'] { grid-template-columns: 304px minmax(0, 1fr); }
+.sm-planner.is-compact .compact-main { min-width: 0; display: flex; flex-direction: column; }
+
+/* pinned column */
+.sm-planner.is-compact #dashboard.live-mode .compact-sidebar {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  border-radius: 14px;
+}
+.sm-planner.is-compact #dashboard.live-mode .compact-sidebar[data-compact-sidebar='pinned'] { width: 304px; }
+
+/* drawer (tablet < 1000) and sheet (phone) */
+.sm-planner.is-compact #dashboard.live-mode .compact-sidebar:not([data-compact-sidebar='pinned']) {
+  position: fixed;
+  z-index: var(--compact-sheet-z);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  visibility: hidden;
+  background: linear-gradient(165deg, #001725, #000b19 78%, #001a25);
+  box-shadow: 0 0 40px #000c, 0 0 24px #00d8dd33;
+  transition: transform 0.24s cubic-bezier(0.22, 0.8, 0.26, 1), visibility 0s linear 0.24s;
+}
+.sm-planner.is-compact #dashboard.live-mode .compact-sidebar:not([data-compact-sidebar='pinned'])[data-open='true'] {
+  visibility: visible;
+  transform: none;
+  transition: transform 0.24s cubic-bezier(0.22, 0.8, 0.26, 1), visibility 0s;
+}
+.sm-planner[data-layout='tablet'] #dashboard.live-mode .compact-sidebar[data-compact-sidebar='drawer'] {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(392px, 92vw);
+  height: auto;
+  border-radius: 0 16px 16px 0;
+  transform: translateX(-102%);
+}
+.sm-planner[data-layout='phone'] #dashboard.live-mode .compact-sidebar[data-compact-sidebar='sheet'] {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto;
+  width: auto;
+  max-height: 90dvh;
+  border-radius: 18px 18px 0 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  transform: translateY(102%);
+}
+.sm-planner.is-compact .compact-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--compact-sheet-z) - 1);
+  border: 0;
+  padding: 0;
+  background: rgba(0, 7, 16, 0.66);
+  backdrop-filter: blur(3px);
+  cursor: default;
+}
+.sm-planner.is-compact .compact-sheet-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 56px;
+  padding: 6px 8px 6px 18px;
+  background: #001423;
+  border-bottom: 1px solid rgba(0, 186, 203, 0.35);
+}
+.sm-planner.is-compact .compact-sheet-head strong { font-size: 17px; color: #f1f6ff; }
+.sm-planner.is-compact .compact-grabber {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 40px;
+  height: 4px;
+  border-radius: 4px;
+  background: #1c5a72;
+  transform: translateX(-50%);
+}
+.sm-planner[data-layout='tablet'] .compact-grabber { display: none; }
+.sm-planner.is-compact .compact-sheet-close {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #144962;
+  border-radius: 10px;
+  background: #001d30;
+  color: #def5fa;
+}
+.sm-planner.is-compact .compact-sheet-close:hover { border-color: #00e0e8; }
+.sm-planner.is-compact .compact-sheet-close .icon { width: 22px; height: 22px; }
+
+/* mini calendar + agenda inside */
+.sm-planner.is-compact .mini-calendar { height: auto; padding: 10px 8px 0; }
+.sm-planner.is-compact .mini-month-heading { height: 48px; margin: 0 3px 4px; }
+.sm-planner.is-compact .weekdays { height: 32px; }
+.sm-planner.is-compact .mini-days,
+.sm-planner.is-compact #mini-days.mini-days { grid-template-rows: repeat(6, 48px); grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.sm-planner.is-compact .day-cell.spectrum-day { width: 100%; max-width: 50px; height: 46px; }
+.sm-planner.is-compact .calendar-legend { flex-wrap: wrap; white-space: normal; row-gap: 6px; }
+/* agenda: finger-sized tabs, chips, scopes and term rows; the sheet itself scrolls, the list does not */
+.sm-planner.is-compact #dashboard .sidebar .appointments.agenda-panel {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+.sm-planner.is-compact #dashboard .agenda-mode-tabs { height: auto; min-height: 56px; padding: 6px 10px; gap: 8px; }
+.sm-planner.is-compact #dashboard .agenda-mode-tabs button { height: 44px; font-size: 13px; padding: 0 10px; }
+.sm-planner.is-compact #dashboard .agenda-chips {
+  display: flex;
+  height: auto;
+  min-height: 0;
+  padding: 4px 10px 8px;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+}
+.sm-planner.is-compact #dashboard .agenda-chips::-webkit-scrollbar { display: none; }
+.sm-planner.is-compact #dashboard .agenda-chip { flex: none; min-width: 76px; height: 44px; padding: 0 12px; font-size: 12.5px; border-radius: 8px; scroll-snap-align: start; }
+.sm-planner.is-compact #dashboard .agenda-kpi { height: auto; min-height: 0; padding: 8px 12px 8px; }
+.sm-planner.is-compact #dashboard .agenda-kpi-title { font-size: 15px; }
+.sm-planner.is-compact #dashboard .agenda-kpi-numbers { font-size: 12px; }
+.sm-planner.is-compact #dashboard .agenda-kpi-numbers strong { font-size: 20px; }
+.sm-planner.is-compact #dashboard .agenda-track { height: 5px; margin: 6px 0 7px; }
+.sm-planner.is-compact #dashboard .agenda-kpi-bottom { font-size: 12px; }
+.sm-planner.is-compact #dashboard .agenda-section-caption { height: 28px; min-height: 28px; font-size: 11px; }
+.sm-planner.is-compact #dashboard .agenda-section-caption small { font-size: 11px; }
+.sm-planner.is-compact #dashboard .agenda-list { max-height: none; overflow: visible; }
+.sm-planner.is-compact #dashboard .agenda-term { grid-template-columns: 54px minmax(0, 1fr) 46px 18px; gap: 8px; min-height: 56px; padding: 6px 12px 6px 14px; }
+.sm-planner.is-compact #dashboard .agenda-term .icon { width: 16px; height: 16px; }
+.sm-planner.is-compact #dashboard .agenda-date b { font-size: 13px; }
+.sm-planner.is-compact #dashboard .agenda-date small { font-size: 10.5px; }
+.sm-planner.is-compact #dashboard .agenda-term-copy b { font-size: 13.5px; }
+.sm-planner.is-compact #dashboard .agenda-term-copy small { font-size: 11.5px; }
+.sm-planner.is-compact #dashboard .agenda-term-slots b { font-size: 14px; }
+.sm-planner.is-compact #dashboard .agenda-term-slots small { font-size: 10px; }
+.sm-planner.is-compact #dashboard .agenda-empty { font-size: 13px; min-height: 64px; }
+.sm-planner.is-compact #dashboard .agenda-filter-row { height: auto; min-height: 56px; padding: 6px 12px; flex-wrap: wrap; }
+.sm-planner.is-compact #dashboard .agenda-scopes { gap: 6px; }
+.sm-planner.is-compact #dashboard .agenda-scopes button { height: 44px; min-width: 56px; padding: 0 14px; font-size: 12.5px; border-radius: 8px; }
+.sm-planner.is-compact #dashboard .agenda-scope-note { font-size: 11.5px; white-space: normal; }
+.sm-planner.is-compact #dashboard .agenda-all-totals { height: auto; min-height: 36px; font-size: 12.5px; }
+.sm-planner.is-compact #dashboard .agenda-footer { height: auto; min-height: 48px; padding: 0 12px 0 14px; }
+.sm-planner.is-compact #dashboard .agenda-footer span { font-size: 11.5px; white-space: normal; }
+.sm-planner.is-compact #dashboard .agenda-footer button { min-height: 44px; font-size: 12.5px; padding: 0 4px; }
+.sm-planner.is-compact .sidebar-footer { display: none; }
+
+/* ============================== 4 · the board ============================== */
+.sm-planner.is-compact #dashboard.live-mode .planner {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: auto;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  padding: 0 4px 6px;
+  border-radius: 14px;
+}
+.sm-planner.is-compact .planner-toolbar {
+  order: 1;
+  height: auto;
+  min-height: 56px;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  padding: 6px 2px;
+  gap: 8px;
+}
+.sm-planner.is-compact .planner-arrows { gap: 6px; }
+.sm-planner.is-compact .week-heading { flex: 1 1 140px; gap: 10px; flex-wrap: wrap; row-gap: 0; white-space: normal; }
+.sm-planner.is-compact .week-heading h2 { font-size: 17px; }
+.sm-planner.is-compact .planner-actions { flex: 1 1 auto; }
+.sm-planner.is-compact .planner-filters { flex: 1 1 100%; gap: 8px; flex-wrap: nowrap; min-width: 0; }
+.sm-planner.is-compact .filter-select { flex: 1 1 auto; width: auto; min-width: 0; }
+.sm-planner.is-compact .view-segment { flex: none; }
+.sm-planner[data-layout='phone'] .view-segment button { min-width: 44px !important; padding: 0 9px !important; font-size: 13px !important; }
+.sm-planner.is-compact .settings-control { margin-left: 0; }
+
+/* the strip: calendar button, 1 den / 7 dní, the seven days */
+.sm-planner.is-compact .compact-strip { order: 2; display: flex; flex-direction: column; gap: 6px; padding: 0 2px 8px; }
+.sm-planner.is-compact .compact-strip-row { display: flex; align-items: center; gap: 8px; }
+.sm-planner.is-compact .compact-calendar-button {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid #0c4257;
+  background: #001c31f0;
+  color: #f6faff;
+  font-size: 14px;
+  font-weight: 650;
+  box-shadow: inset 0 1px #15526b40;
+}
+.sm-planner.is-compact .compact-calendar-button:hover { border-color: #00dadb; color: #00f4f1; background: #043146; }
+.sm-planner.is-compact .compact-calendar-button .icon { width: 20px; height: 20px; color: var(--cyan); }
+.sm-planner.is-compact .compact-fit {
+  flex: none;
+  display: flex;
+  border: 1px solid #06415b;
+  background: #001426;
+  border-radius: 8px;
+  overflow: hidden;
+  height: 44px;
+  margin-left: auto;
+}
+.sm-planner.is-compact .compact-fit button { min-width: 64px; height: 100%; border: 0; background: transparent; color: #eef8ff; font-size: 14px; }
+.sm-planner.is-compact .compact-fit button[aria-pressed='true'] {
+  color: #fff;
+  background: linear-gradient(160deg, #026755, #00a89b);
+  box-shadow: 0 0 14px #00a79b99, inset 0 0 10px #14dfce3d;
+}
+.sm-planner.is-compact .compact-fit button:not([aria-pressed='true']):hover { background: #085166; }
+.sm-planner.is-compact .compact-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.sm-planner.is-compact .compact-day {
+  min-width: 0;
+  min-height: 46px;
+  padding: 3px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border-radius: 8px;
+  border: 1px solid #0c4257;
+  background: #001c31f0;
+  color: #cfe3ee;
+  font-size: 12px;
+  line-height: 1.2;
+}
+.sm-planner.is-compact .compact-day b { font-size: 11.5px; font-weight: 650; color: #f6faff; white-space: nowrap; }
+.sm-planner.is-compact .compact-day.is-today b { color: #23f2e7; }
+.sm-planner.is-compact .compact-day.is-closed { background: repeating-linear-gradient(135deg, #ffffff0a 0 6px, transparent 6px 12px), #001c31f0; color: #e7cba9; }
+.sm-planner.is-compact .compact-day.is-selected {
+  color: #fff;
+  border-color: #00fff1;
+  background: linear-gradient(160deg, #026755, #00a89b);
+  box-shadow: 0 0 12px #00a79b88;
+}
+.sm-planner.is-compact .compact-day.is-selected b { color: #fff; }
+
+/* the board panel: auto height, the timeline scrolls inside */
+.sm-planner.is-compact #dashboard.live-mode .planner .week-board,
+.sm-planner.is-compact:has(.planner[data-layout='standard']) #dashboard.live-mode .planner .week-board {
+  order: 3;
+  height: auto;
+  overflow: hidden;
+}
+.sm-planner.is-compact .planner .board-head { height: 48px; }
+.sm-planner.is-compact .planner .board-body {
+  height: auto;
+  max-height: clamp(320px, calc(100dvh - 400px), 640px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.sm-planner[data-layout='tablet'] .planner .board-body { max-height: clamp(360px, calc(100dvh - 520px), 760px); }
+.sm-planner.is-compact:has(.planner[data-layout='standard']) .planner .board-body { max-height: clamp(360px, calc(100dvh - 330px), 900px); }
+.sm-planner.is-compact .planner .day-title { font-size: 12px; }
+.sm-planner.is-compact .planner .day-title strong { font-size: 12.5px; }
+.sm-planner.is-compact .planner .time-head,
+.sm-planner.is-compact .planner .hour-column { width: 48px; }
+.sm-planner.is-compact .planner .day-headings { width: calc(100% - 48px); }
+.sm-planner.is-compact .planner .hour-label { font-size: 12px; right: 6px; }
+
+/* one day at a time: the same seven columns, seven screens wide, scrolled sideways */
+.sm-planner.is-compact .compact-live[data-fit='day'] .planner .board-head { display: none; }
+.sm-planner.is-compact .compact-live[data-fit='day'] .planner .board-body {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sm-planner.is-compact .compact-live[data-fit='day'] .planner .board-body::-webkit-scrollbar { display: none; }
+.sm-planner.is-compact .compact-live[data-fit='day'] .planner .board-body > .hour-column {
+  position: sticky;
+  left: 0;
+  z-index: 20;
+  flex: none;
+}
+.sm-planner.is-compact .compact-live[data-fit='day'] .planner .board-body > .day-board {
+  flex: none;
+  width: calc((100% - 48px) * 7);
+}
+.sm-planner.is-compact .compact-live[data-fit='day'] .planner .day-board .schedule-event .event-contents { font-size: 13px; }
+.sm-planner.is-compact .compact-live[data-fit='day'] .planner .day-board .schedule-event { padding: 0 8px; }
+
+/* alternate views (Den = list, Měsíc = tiles): in the flow, instead of over the board */
+.sm-planner.is-compact .planner .alternate-view {
+  order: 3;
+  position: relative;
+  inset: auto;
+  min-height: 280px;
+  max-height: 64dvh;
+  margin: 0 2px;
+}
+.sm-planner.is-compact .planner:has(.alternate-view:not([hidden])) #week-board,
+.sm-planner.is-compact .planner:has(.alternate-view:not([hidden])) .compact-strip-row .compact-fit { display: none; }
+.sm-planner.is-compact .planner .alt-row { grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; padding: 10px 14px; min-height: 48px; }
+.sm-planner.is-compact .planner .month-matrix { padding: 8px; gap: 4px; }
+.sm-planner.is-compact .planner .month-tile { padding: 6px; min-height: 56px; min-width: 0; overflow: hidden; }
+.sm-planner.is-compact .planner .month-tile .date-num { font-size: 15px; }
+
+/* touch: a drag on the board must not scroll the page, a swipe elsewhere still does */
+.sm-planner.is-compact #dashboard.live-mode .day-board {
+  touch-action: pan-x pan-y;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.sm-planner.is-compact #dashboard.live-mode .day-board .schedule-event { touch-action: manipulation; -webkit-touch-callout: none; }
+/* planned club terms carry their own gestures (move, edge pull): the finger drags them, it does not scroll */
+.sm-planner.is-compact #dashboard.live-mode .day-board[data-board-mode='club'] .schedule-event[data-source='club'] { touch-action: none; }
+/*
+ * Edge handles of a planned club term: 44 px tall and OUTSIDE the term (above its top edge, below its bottom edge), so
+ * the whole body of the term stays free for the move. They would sit on free time that a tap uses to place a window,
+ * so while a činnost is armed they step aside (disarm the card, then pull). Standard ordering has no handles.
+ */
+.sm-planner.is-compact #dashboard.live-mode .schedule-event .term-resize-handle {
+  left: 0;
+  right: 0;
+  height: 44px;
+  touch-action: none;
+  opacity: 0.85;
+  background: none;
+  border-radius: 0;
+}
+.sm-planner.is-compact #dashboard.live-mode .schedule-event .term-resize-handle::before { width: 44px; max-width: none; height: 4px; }
+.sm-planner.is-compact #dashboard.live-mode .schedule-event .term-resize-top { top: -44px; align-items: flex-end; padding-bottom: 5px; }
+.sm-planner.is-compact #dashboard.live-mode .schedule-event .term-resize-bottom { bottom: -44px; align-items: flex-start; padding-top: 5px; }
+.sm-planner.is-compact #dashboard.live-mode .day-board.is-armed .schedule-event .term-resize-handle { pointer-events: none; opacity: 0.25; }
+.sm-planner.is-compact #dashboard.live-mode .day-board[data-board-mode='standard'] .schedule-event .term-resize-handle { display: none; }
+.sm-planner.is-compact #dashboard.live-mode .day-board[data-board-mode='club'] .schedule-event[data-source='club'] { overflow: visible; }
+.sm-planner.is-compact #dashboard.live-mode .day-board[data-board-mode='club'] .schedule-event[data-source='club'] .event-contents { overflow: hidden; }
+.sm-planner.is-compact #dashboard.live-mode .day-board[data-board-mode='club'] .schedule-event:not([data-source='club']) .term-resize-handle { display: none; }
+
+/* ============================== 5 · the deck ============================== */
+/*
+ * The file's deck rules (v19 - v29) are written with !important almost everywhere, so each declaration that
+ * changes here is !important too, on a selector that is one class stronger (`#planning-cards.planning-cards`).
+ */
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  width: auto !important;
+  height: auto !important;
+  display: block;
+  perspective: none !important;
+  overflow: visible !important;
+}
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards[data-standard='true'] { display: none !important; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .adaptive-deck {
+  display: flex !important;
+  flex-direction: column !important;
+  height: auto !important;
+  width: 100% !important;
+  gap: 2px !important;
+  overflow: visible !important;
+  align-items: stretch !important;
+}
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .adaptive-card-stage {
+  display: block !important;
+  position: relative;
+  height: auto !important;
+  width: 100% !important;
+}
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .adaptive-card-viewport {
+  position: relative;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 4px 1px 8px !important;
+  margin: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scroll-snap-type: x mandatory !important;
+  scroll-behavior: auto !important;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y !important;
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+  -webkit-overflow-scrolling: touch;
+  container-type: inline-size;
+}
+.sm-planner.is-compact #planning-cards .adaptive-card-viewport::-webkit-scrollbar { display: none; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .adaptive-card-track {
+  display: flex;
+  align-items: stretch !important;
+  gap: 8px !important;
+  height: auto !important;
+  width: max-content !important;
+  min-width: 100% !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .mode-scroll .adaptive-card-track::after { display: none !important; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .adaptive-card-track > .plan-card {
+  flex: 0 0 calc((100cqw - 2px - 8px) / 2) !important;
+  width: calc((100cqw - 2px - 8px) / 2) !important;
+  min-width: 0 !important;
+  height: 128px !important;
+  min-height: 128px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  scroll-snap-align: start !important;
+  touch-action: pan-x pan-y !important;
+}
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .adaptive-deck .plan-card .fx-surface {
+  inset: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 11px !important;
+}
+.sm-planner.is-compact #dashboard.live-mode #planning-cards .adaptive-deck .plan-card .card-content { padding: 9px 10px 8px 11px !important; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards .adaptive-deck .plan-card-name { font-size: 14px !important; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards .adaptive-deck .plan-card-sub { font-size: 11px !important; margin-top: 1px; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards .adaptive-deck .plan-card-head { min-height: 30px; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards .adaptive-deck .plan-card-titles { padding: 0 6px 0 28px; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards .adaptive-deck .plan-card .plan-card-photo,
+.sm-planner.is-compact #dashboard.live-mode #planning-cards .adaptive-deck .plan-card .plan-bottom .micro-chart,
+.sm-planner.is-compact #dashboard.live-mode #planning-cards .adaptive-deck .plan-card .plan-duration { display: none !important; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards .adaptive-deck .plan-card .plan-card-body { min-height: 0; gap: 9px; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards .adaptive-deck .plan-card .plan-ring { height: 52px !important; width: 52px !important; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards .adaptive-deck .plan-card .plan-ring::before { inset: 7px; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards .adaptive-deck .plan-card .plan-ring b { font-size: 14px !important; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards .adaptive-deck .plan-card .plan-num { font-size: 18px !important; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards .adaptive-deck .plan-card .plan-remaining { font-size: 10.5px !important; margin: 2px 0 0; white-space: normal; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards .adaptive-deck .plan-card .plan-bottom { font-size: 8.6px !important; letter-spacing: 0.4px; }
+.sm-planner.is-compact #planning-cards .adaptive-deck .plan-card.is-selected,
+.sm-planner.is-compact #planning-cards .adaptive-deck .plan-card:hover { transform: none; }
+/* the deck's summary card is the order bar's job here; the arrows are a swipe */
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .adaptive-insight { display: none !important; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .precision-bracket,
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .precision-bracket-placeholder { display: none !important; }
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .adaptive-nav-row {
+  grid-column: auto !important;
+  grid-row: auto !important;
+  justify-self: center !important;
+  align-self: center !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 18px;
+  margin: 0 !important;
+  position: static !important;
+}
+
+/* ============================== 6 · the dock ============================== */
+.sm-planner.is-compact .compact-dock {
+  position: sticky;
+  bottom: var(--compact-bottom-bar);
+  z-index: 30;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px;
+  grid-template-areas: 'hint hint' 'bar sum';
+  gap: 6px;
+  padding: 6px 0 2px;
+  background: linear-gradient(180deg, transparent, #00111e 22%);
+}
+.sm-planner.is-compact .compact-dock[data-standard='true'] { display: none; }
+.sm-planner.is-compact #dashboard.live-mode .compact-dock #order-command {
+  grid-area: bar;
+  display: grid !important;
+  position: relative;
+  top: auto;
+  left: auto;
+  width: auto;
+  height: 66px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  border-radius: 12px;
+}
+.sm-planner.is-compact #dashboard.live-mode .compact-dock #active-plan-hint {
+  grid-area: hint;
+  position: relative;
+  top: auto;
+  left: auto;
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  height: auto;
+  min-height: 40px;
+  flex-wrap: wrap;
+  row-gap: 2px;
+  padding: 4px 12px;
+  pointer-events: auto;
+}
+.sm-planner.is-compact #dashboard.live-mode .compact-dock #active-plan-hint em { display: none; }
+.sm-planner.is-compact #dashboard.live-mode .compact-dock #active-plan-hint .plan-add-day { height: 44px; padding: 0 14px; margin-left: auto; font-size: 12px; }
+.sm-planner.is-compact #dashboard.live-mode .compact-dock #corner-return { display: none !important; }
+.sm-planner.is-compact .compact-dock .oc-overview { padding: 6px 4px 6px 10px; gap: 10px; min-height: 44px; }
+.sm-planner.is-compact .compact-dock .oc-progress { height: 50px; width: 50px; }
+.sm-planner.is-compact .compact-dock .oc-progress:before { inset: 6px; }
+.sm-planner.is-compact .compact-dock .oc-progress > span { font-size: 13px; }
+.sm-planner.is-compact .compact-dock .oc-kicker { display: none; }
+.sm-planner.is-compact .compact-dock .oc-overview-copy { gap: 1px; }
+.sm-planner.is-compact .compact-dock .oc-overview-copy > strong { font-size: 20px; }
+.sm-planner.is-compact .compact-dock .oc-overview-copy > strong > span { font-size: 14px; }
+.sm-planner.is-compact .compact-dock .oc-overview-copy > small { font-size: 10.5px; white-space: normal; line-height: 1.2; }
+.sm-planner.is-compact .compact-dock .oc-right { padding: 6px 6px 6px 8px; gap: 0; justify-content: center; }
+.sm-planner.is-compact .compact-dock .oc-stats { display: none; }
+.sm-planner.is-compact .compact-dock .oc-actions { height: 44px; }
+.sm-planner.is-compact .compact-dock .oc-actions button { height: 44px; min-height: 44px; }
+.sm-planner[data-layout='phone'] .compact-dock .oc-back { min-width: 44px; padding: 0 10px; }
+.sm-planner[data-layout='phone'] .compact-dock .oc-back span { display: none; }
+.sm-planner[data-layout='phone'] .compact-dock .oc-create { font-size: 12px; line-height: 1.1; padding: 0 8px; white-space: normal; text-align: left; }
+.sm-planner[data-layout='phone'] .compact-dock .oc-create .icon { display: none; }
+.sm-planner[data-layout='phone'] .compact-dock .oc-overview-copy > small { display: none; }
+.sm-planner[data-layout='phone'] .compact-dock .oc-overview { flex: none; padding-right: 2px; }
+.sm-planner[data-layout='phone'] .compact-dock #order-command { grid-template-columns: auto minmax(0, 1fr); }
+.sm-planner.is-compact .compact-summary-button {
+  grid-area: sum;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 54px;
+  height: 66px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 213, 227, 0.67);
+  background: linear-gradient(125deg, rgba(0, 34, 48, 0.99), rgba(0, 20, 37, 0.985));
+  color: #d6eaf4;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.sm-planner.is-compact .compact-summary-button:hover { background: #0c384c; border-color: #15b3be; }
+.sm-planner.is-compact .compact-summary-button .icon { width: 22px; height: 22px; color: #9ce8e7; }
+
+/* ============================== 7 · layers ============================== */
+/* The stage's absolute layers become fixed ones: the planner is no longer a box of known size. */
+.sm-planner.is-compact #dashboard #dialog-layer,
+.sm-planner.is-compact #dashboard #reservation-drawer-layer,
+.sm-planner.is-compact #dashboard .s41-layer { position: fixed; inset: 0; }
+.sm-planner.is-compact #dashboard #dialog-layer.open { z-index: var(--compact-layer-z) !important; }
+.sm-planner.is-compact #dashboard #reservation-drawer-layer { z-index: var(--compact-layer-z); }
+.sm-planner.is-compact #dashboard .s41-layer { z-index: calc(var(--compact-layer-z) - 5); overflow-y: auto; overscroll-behavior: contain; }
+
+/* dialogs: a centred card on the tablet, a bottom sheet on the phone */
+.sm-planner[data-layout='tablet'] #dashboard #dialog-layer .modal-card {
+  width: min(760px, calc(100vw - 32px)) !important;
+  max-height: calc(100dvh - 40px);
+}
+.sm-planner[data-layout='phone'] #dashboard #dialog-layer .modal-card {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: auto;
+  bottom: 0;
+  transform: none;
+  width: auto !important;
+  max-width: none;
+  max-height: 92dvh;
+  border-radius: 18px 18px 0 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.sm-planner.is-compact #dialog-layer .modal-header { height: auto; min-height: 64px; padding: 14px 12px 12px 18px; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 2; background: #031f30; }
+.sm-planner.is-compact #dialog-layer .modal-title { font-size: 20px; }
+.sm-planner.is-compact #dialog-layer .modal-x { width: 44px; height: 44px; flex: none; }
+.sm-planner.is-compact #dialog-layer .modal-body { padding: 16px 16px 18px; }
+.sm-planner.is-compact #dialog-layer .modal-footer { padding: 12px 16px 16px; flex-wrap: wrap; gap: 8px; }
+.sm-planner.is-compact #dialog-layer .app-button { min-height: 44px; }
+.sm-planner[data-layout='phone'] #dialog-layer .modal-footer { flex-direction: column-reverse; align-items: stretch; }
+.sm-planner[data-layout='phone'] #dialog-layer .modal-footer .app-button { width: 100%; }
+.sm-planner[data-layout='phone'] #dialog-layer :is(.form-grid, .contact-detail-grid, .ow-form-line, .ow-plan-layout, .info-details, .ow-activities, .smart-edit-sections, .smart-edit-fieldgrid, .agenda-full-tools, .move-review-compare, .pub-shell) {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+.sm-planner.is-compact #dialog-layer .field input,
+.sm-planner.is-compact #dialog-layer .field select { height: 46px; }
+
+/* the day's flyout of the mini calendar: a card at the bottom of the screen */
+.sm-planner.is-compact #dashboard #mini-day-tooltip {
+  position: fixed;
+  z-index: calc(var(--compact-layer-z) - 2);
+  left: 50% !important;
+  top: auto !important;
+  bottom: calc(var(--compact-bottom-bar) + 12px);
+  transform: translateX(-50%);
+  width: min(400px, calc(100vw - 24px));
+  max-height: min(72dvh, 560px);
+  overflow-y: auto;
+}
+.sm-planner.is-compact #mini-day-tooltip button { min-height: 44px; min-width: 44px; }
+
+/* the reservation drawer: full height from the right on the tablet, the whole screen on the phone */
+.sm-planner.is-compact #dashboard .rd-panel { width: min(526px, 100vw); right: 0; top: 0; bottom: 0; border-radius: 0; }
+.sm-planner[data-layout='phone'] #dashboard .rd-panel { left: 0; border-radius: 0; }
+.sm-planner[data-layout='tablet'] #dashboard .rd-panel { border-radius: 17px 0 0 17px; }
+
+/* toast and the completion callout */
+.sm-planner.is-compact #dashboard #toast-layer {
+  position: fixed;
+  z-index: calc(var(--compact-layer-z) + 5);
+  bottom: calc(var(--compact-bottom-bar) + 84px);
+  left: 12px;
+  right: 12px;
+  transform: none;
+}
+.sm-planner.is-compact #dashboard #toast-layer .toast { min-width: 0; max-width: 520px; margin: 0 auto; }
+.sm-planner.is-compact:has(.compact-dock:not([data-standard='true'])) #dashboard #toast-layer,
+.sm-planner.is-compact:has(.compact-dock:not([data-standard='true'])) #dashboard .planner-feedback { bottom: calc(var(--compact-bottom-bar) + 156px); }
+.sm-planner.is-compact #dashboard .planner-feedback {
+  position: fixed;
+  z-index: calc(var(--compact-layer-z) - 3);
+  left: 12px;
+  right: 12px;
+  top: auto;
+  bottom: calc(var(--compact-bottom-bar) + 84px);
+  width: auto;
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+/* the placement preview's HUD sits on the board and would cover it: the dock's hint carries the same numbers */
+.sm-planner[data-layout='phone'] #dashboard .drag-hud,
+.sm-planner[data-layout='phone'] #dashboard .move-hud,
+.sm-planner[data-layout='phone'] #dashboard #term-resize-hud { display: none; }
+
+/* ============================== 8 · touch targets ============================== */
+.sm-planner.is-compact .control { height: 44px; min-width: 44px; }
+.sm-planner.is-compact .control.today { min-width: 64px; }
+.sm-planner.is-compact .view-segment { height: 44px; }
+.sm-planner.is-compact .view-segment button { width: auto; min-width: 66px; padding: 0 12px; font-size: 14px; }
+.sm-planner.is-compact .filter-select { height: 46px; }
+.sm-planner.is-compact .filter-select select { height: 100%; min-height: 44px; }
+.sm-planner.is-compact .filter-select select { font-size: 14px; }
+.sm-planner.is-compact .icon-button { height: 44px; min-width: 44px; }
+.sm-planner.is-compact .month-buttons { gap: 4px; }
+.sm-planner.is-compact .show-all { min-height: 44px; }
+.sm-planner.is-compact .planner-actions .control { padding: 0 14px; font-size: 14px; }
+
+/* ============================== 9 · the order summary (full screen) ============================== */
+.sm-planner.is-compact #dashboard .s41-scene { position: relative; inset: auto; min-height: 100%; padding: 12px 12px 24px; }
+.sm-planner.is-compact #dashboard .s41-topbar { height: auto; flex-wrap: wrap; gap: 8px 12px; padding-bottom: 8px; }
+.sm-planner.is-compact #dashboard .s41-back { height: 48px; min-width: 48px; padding: 0 18px 0 14px; font-size: 16px; gap: 8px; }
+.sm-planner.is-compact #dashboard .s41-back svg { width: 22px; height: 22px; }
+.sm-planner.is-compact #dashboard .s41-brand { min-width: 0; }
+.sm-planner.is-compact #dashboard .s41-brand strong { font-size: 15px; letter-spacing: 2px; white-space: normal; }
+.sm-planner.is-compact #dashboard .s41-brand small { font-size: 8.5px; letter-spacing: 3px; white-space: normal; }
+.sm-planner.is-compact #dashboard .s41-flow { order: 5; width: 100%; overflow-x: auto; gap: 14px; font-size: 11.5px; letter-spacing: 1.2px; scrollbar-width: none; }
+.sm-planner.is-compact #dashboard .s41-flow > button { min-height: 44px; padding: 0 2px; flex: none; }
+.sm-planner.is-compact #dashboard .s41-panel { height: auto; padding: 18px 16px 16px; border-radius: 20px; overflow: visible; }
+.sm-planner.is-compact #dashboard .s41-panel-content { height: auto; gap: 16px; }
+.sm-planner.is-compact #dashboard .s41-wave-art { display: none; }
+.sm-planner.is-compact #dashboard .s41-titlebar { height: auto; flex-wrap: wrap; gap: 10px 16px; }
+.sm-planner.is-compact #dashboard .s41-title-wrap { gap: 14px; }
+.sm-planner.is-compact #dashboard .s41-title-led { flex-basis: 24px; width: 24px; height: 24px; margin-top: 6px; }
+.sm-planner.is-compact #dashboard .s41-title-wrap h2 { font-size: 26px; letter-spacing: 1px; margin-bottom: 4px; }
+.sm-planner.is-compact #dashboard .s41-title-wrap p { font-size: 16px; }
+.sm-planner.is-compact #dashboard .s41-badge { min-width: 0; min-height: 44px; padding: 8px 16px; font-size: 14px; }
+.sm-planner.is-compact #dashboard .s41-badge svg { width: 24px; height: 18px; }
+.sm-planner.is-compact #dashboard .s41-overview { grid-template-columns: minmax(0, 1fr); row-gap: 18px; min-height: 0; margin-top: 0; }
+.sm-planner[data-layout='tablet'] #dashboard .s41-overview { grid-template-columns: auto minmax(0, 1fr); column-gap: 24px; }
+.sm-planner.is-compact #dashboard .s41-ring { width: 210px; height: 210px; }
+.sm-planner[data-layout='tablet'] #dashboard .s41-ring { width: 240px; height: 240px; }
+.sm-planner.is-compact #dashboard .s41-ring::after { inset: 30px; }
+.sm-planner.is-compact #dashboard .s41-ring-percent { font-size: 50px; letter-spacing: -2px; }
+.sm-planner.is-compact #dashboard .s41-ring-caption { font-size: 15px; }
+.sm-planner.is-compact #dashboard .s41-ring-minibar { width: 90px; margin: 6px 0 3px; }
+.sm-planner.is-compact #dashboard .s41-ring-count { font-size: 14px; }
+.sm-planner.is-compact #dashboard .s41-number-column { padding-left: 0; }
+.sm-planner.is-compact #dashboard .s41-count-row { gap: 10px; }
+.sm-planner.is-compact #dashboard .s41-count-primary { font-size: 56px; letter-spacing: -2px; }
+.sm-planner.is-compact #dashboard .s41-count-total { font-size: 32px; }
+.sm-planner.is-compact #dashboard .s41-count-label { font-size: 17px; margin: 2px 0 14px; white-space: normal; }
+.sm-planner.is-compact #dashboard .s41-remaining { font-size: 18px; gap: 8px; margin-bottom: 12px; white-space: normal; flex-wrap: wrap; }
+.sm-planner.is-compact #dashboard .s41-remaining svg { width: 22px; height: 22px; }
+.sm-planner.is-compact #dashboard .s41-small-metrics { font-size: 15px; gap: 14px; flex-wrap: wrap; white-space: normal; }
+.sm-planner.is-compact #dashboard .s41-small-metrics svg { width: 20px; height: 20px; }
+.sm-planner.is-compact #dashboard .s41-bars-column { grid-column: 1 / -1; padding: 14px 0 0; border-left: 0; border-top: 1px solid #31546b; gap: 12px; }
+.sm-planner.is-compact #dashboard .s41-activity-row { grid-template-columns: minmax(0, 1fr) minmax(70px, 1fr) 48px; gap: 10px; height: auto; min-height: 30px; font-size: 14px; }
+.sm-planner.is-compact #dashboard .s41-activity-pct { font-size: 14px; }
+.sm-planner.is-compact #dashboard .s41-drill { height: 56px; font-size: 16px; padding: 0 16px; }
+.sm-planner.is-compact #dashboard .s41-actions { grid-template-columns: minmax(0, 1fr); height: auto; gap: 10px; }
+.sm-planner[data-layout='tablet'] #dashboard .s41-actions { grid-template-columns: 2fr 1fr; }
+.sm-planner.is-compact #dashboard .s41-btn { min-height: 56px; font-size: 18px; gap: 12px; padding: 0 16px; }
+.sm-planner.is-compact #dashboard .s41-btn svg { width: 24px; height: 24px; }
+.sm-planner.is-compact #dashboard .s41-footer { height: auto; flex-direction: column; align-items: flex-start; gap: 8px; font-size: 13px; }
+.sm-planner.is-compact #dashboard .s41-note { white-space: normal; }
+.sm-planner.is-compact #dashboard .s41-readiness { max-width: none; text-align: left; justify-content: flex-start; font-size: 13px; }
+/* the detail sheets over the summary */
+.sm-planner[data-layout='phone'] #dashboard .s41-sheet { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: auto; height: min(88dvh, 680px); border-radius: 18px 18px 0 0; }
+.sm-planner[data-layout='tablet'] #dashboard .s41-sheet { position: fixed; right: 0; left: auto; top: 0; bottom: 0; width: min(620px, 100vw); height: auto; border-radius: 18px 0 0 18px; }
+.sm-planner.is-compact #dashboard .s41-sheet-close { width: 44px; height: 44px; }

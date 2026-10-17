@@ -28,6 +28,13 @@ import { addDaysToDateOnly, type DateOnly } from '../utils/time';
  * chosen, so one call books it, creates the provisional patient and issues the
  * completion link. No date of birth, ever: four facts and a činnost.
  */
+/** What the server says about telling the patient of a move (Etapa 12 BE-N). */
+export interface MoveNotice {
+  patientNotified: boolean;
+  /** null = told; otherwise why not (not_requested, no_email, no_patient, no_change, patient_initiated, queue_failed). */
+  reason: string | null;
+}
+
 export interface CreateQuickInput {
   activityId: string;
   startUtc: string | Date;
@@ -218,21 +225,36 @@ export const appointmentsApi = {
     return parseResponse(quickBookedSchema, inner);
   },
 
-  /** A move is its own operation, not a cancel plus a new booking (4.5). */
+  /**
+   * A move is its own operation, not a cancel plus a new booking (4.5).
+   *
+   * `options.ifMatch` is the `concurrencyToken` of the single read the desk acted on: when the appointment has changed
+   * since, the server answers 412 instead of overwriting. Absent, the move proceeds as before. The answer says whether
+   * the patient was told (`reason`: null | not_requested | no_email | no_patient | no_change | ...), or `null` from a
+   * server that sends no such body.
+   */
   reschedule: (
     calendarId: string,
     id: string,
     startUtc: string | Date,
     overrideReason?: string,
-    options?: { notifyPatient?: boolean },
-  ): Promise<void> =>
+    options?: { notifyPatient?: boolean; ifMatch?: string | null },
+  ): Promise<MoveNotice | null | void> =>
     request(async () => {
       /* Etapa 12: the desk decides whether the patient hears about the move (JSON body; absent = the server says yes). */
-      await client.put(
+      const res = await client.put(
         `/api/calendars/${calendarId}/appointments/${id}/time`,
         options?.notifyPatient === undefined ? null : { notifyPatient: options.notifyPatient },
-        { params: { startUtc: asUtcInstant(startUtc), overrideReason } },
+        {
+          params: { startUtc: asUtcInstant(startUtc), overrideReason },
+          ...(options?.ifMatch ? { headers: { 'If-Match': options.ifMatch } } : {}),
+        },
       );
+      const body: unknown = res.data;
+      const data = body !== null && typeof body === 'object' && 'data' in body ? (body as { data: unknown }).data : body;
+      if (data === null || typeof data !== 'object' || !('patientNotified' in data)) return null;
+      const d = data as { patientNotified?: unknown; reason?: unknown };
+      return { patientNotified: d.patientNotified === true, reason: typeof d.reason === 'string' ? d.reason : null };
     }),
 
   /**

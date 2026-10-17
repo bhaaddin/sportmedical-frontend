@@ -33,6 +33,7 @@ describe('AgendaPanel while planning a club order', () => {
     expect(rows[1]).toHaveTextContent('08:50–12:30');
     expect(text('agenda-footer-status')).toHaveTextContent('Zbývá 24 slotů naplánovat');
     expect(text('agenda-total-count')).toHaveTextContent('18');
+    expect([...document.querySelectorAll('.agenda-mode-tabs button')][0]).toHaveTextContent('Plánované činnosti');
   });
 
   it('switches the činnost with the chips and marks a finished one', async () => {
@@ -129,6 +130,16 @@ describe('AgendaPanel in standard booking (no club order)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Všechny termíny/ }));
     expect(text('agenda-scope-note')).toHaveTextContent('Zobrazené období');
     expect(text('agenda-footer-status')).toHaveTextContent('18 termínů v kalendáři');
+  });
+
+  it("speaks the clinic's words, not the club order's (Činnosti / Všechny termíny, not Plánované činnosti)", async () => {
+    mountPanels(<AgendaPanel />, { source: standardSource() });
+    await screen.findByTestId('agenda-panel');
+    const tabs = [...document.querySelectorAll('.agenda-mode-tabs button')].map((b) => b.textContent);
+    expect(tabs).toEqual(['Činnosti', expect.stringMatching(/^Všechny termíny/)]);
+    expect(screen.getByTestId('agenda-panel')).toHaveAttribute('aria-label', 'Přehled termínů');
+    expect(document.querySelector('.agenda-section-caption span')).toHaveTextContent('TERMÍNY ČINNOSTI V KALENDÁŘI');
+    expect(screen.getByTestId('agenda-panel').textContent).not.toMatch(/Plánované|vytvořen/);
   });
 
   it('says so when the clinic has no session at all', async () => {
