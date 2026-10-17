@@ -1,4 +1,5 @@
 import { Box, ButtonBase } from '@mui/material';
+import { DARK } from '../../theme';
 
 /**
  * The row of round filters next to a search box on the board: "Všichni ·
@@ -38,9 +39,10 @@ export function FilterChips<K extends string>({
               fontSize: 13,
               fontWeight: 600,
               border: '1px solid',
-              borderColor: active ? (t.palette.mode === 'light' ? '#C9D6D3' : t.palette.primary.main) : 'divider',
-              bgcolor: active ? (t.palette.mode === 'light' ? '#F4F8F7' : 'rgba(13,92,82,0.14)') : 'background.paper',
-              color: active ? 'primary.main' : 'text.primary',
+              borderColor: active ? (t.palette.mode === 'light' ? '#C9D6D3' : t.palette.primary.main) : t.palette.mode === 'light' ? 'divider' : DARK.lineLight,
+              bgcolor: active ? (t.palette.mode === 'light' ? '#F4F8F7' : 'rgba(0, 230, 228, 0.14)') : t.palette.mode === 'light' ? 'background.paper' : '#021C2D',
+              color: active ? (t.palette.mode === 'light' ? 'primary.main' : t.palette.primary.light) : 'text.primary',
+              ...(active && t.palette.mode === 'dark' ? { boxShadow: '0 0 12px rgba(0,230,228,0.22)' } : {}),
               gap: 0.75,
               '&:hover': { bgcolor: active ? undefined : 'action.hover' },
             })}

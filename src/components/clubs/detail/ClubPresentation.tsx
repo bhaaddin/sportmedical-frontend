@@ -1,7 +1,7 @@
 /*
- * One club as a presentation page (Etapa 5, Matko's wish): a big centred club name with its colour, a row of key
+ * One club as a presentation page (Etapa 5, Matko's wish): the planner prototype's club header (identity, Identifikační údaje, Vedení klubu, Kontaktní osoba), a row of key
  * figures, and the facts stacked below as cards - one column on phone and tablet, two on desktop, never wider than
- * 960 px. It replaces the old two-column detail with its right rail; everything the old panel could do is still here
+ * 1200 px. It replaces the old two-column detail with its right rail; everything the old panel could do is still here
  * (edit, deactivate, new order, orders list, block panels, the athletes' link, add places, invoice, print).
  *
  * Every number is the server's: the summary comes from `clubOrdersApi.clubSummary`, the orders from
@@ -9,14 +9,15 @@
  */
 import { useState } from 'react';
 import { Alert, Box, Button, LinearProgress, Skeleton, Stack, Typography } from '@mui/material';
-import { ArrowBack } from '@mui/icons-material';
+import { Apartment, ArrowBack, Badge, Description, Groups, MailOutlined, Person, PhoneOutlined, Place } from '@mui/icons-material';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import type { Theme } from '@mui/material/styles';
 import type { ClubBlockView } from '../../../api/clubBlocks';
 import { fetchBlockableActivities } from '../../../api/clubBlocks';
 import { clubOrdersApi, ORDER_STATUSES, ORDER_STATUS_LABEL } from '../../../api/clubOrders';
 import { useDevice } from '../../../layout/useDevice';
-import { SectionLabel, SoftCard, StatusChip } from '../../ui';
+import { ProgressRing, SectionLabel, SoftCard, StatusChip } from '../../ui';
 import { ClubAvatar } from '../ClubAvatar';
 import { ClubBlockPanel } from '../ClubBlockPanel';
 import { blockTitle, plural } from '../blockLogic';
@@ -36,7 +37,7 @@ import type { ClubRow } from '../../../pages/clubs/clubRow';
 import { PinnedActions } from '../../../pages/clubs/PinnedActions';
 import { LegacyReservation } from './LegacyReservation';
 
-const MAX_WIDTH = 960;
+const MAX_WIDTH = 1200;
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -45,6 +46,61 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
       <Typography component="div" sx={{ fontSize: 15, fontWeight: 600, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
         {children}
       </Typography>
+    </Box>
+  );
+}
+
+/** The hairline between the header's parts: the prototype's teal in dark, the board's line in light. */
+const headRule = (t: Theme): string => (t.palette.mode === 'dark' ? 'rgba(42, 150, 174, 0.34)' : t.palette.divider);
+
+/** One column of the club header: a title with its icon in the primary colour (the prototype's cyan caps), then its lines. */
+function HeadColumn({ title, icon, children, last = false, region = false, testId }: {
+  title: string; icon: React.ReactNode; children: React.ReactNode; last?: boolean; region?: boolean; testId?: string;
+}) {
+  return (
+    <Box
+      data-testid={testId}
+      {...(region ? { role: 'region', 'aria-label': title } : {})}
+      sx={(t) => {
+        const rule = `1px solid ${headRule(t)}`;
+        return {
+          minWidth: 0,
+          p: { xs: 2, md: 2.5 },
+          containerType: 'inline-size',
+          borderRight: { xs: 'none', sm: last ? 'none' : rule },
+          borderBottom: { xs: last ? 'none' : rule, sm: 'none' },
+        };
+      }}
+    >
+      <Stack direction="row" sx={{ gap: 1, alignItems: 'center', mb: 1.25, color: 'primary.main', '& svg': { fontSize: 22 } }}>
+        {icon}
+        <Typography component="h2" sx={{ fontSize: 14, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'inherit' }}>{title}</Typography>
+      </Stack>
+      <Stack spacing={1}>{children}</Stack>
+    </Box>
+  );
+}
+
+/** A labelled line of a header column: icon, label, value. */
+function HeadLine({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: '18px minmax(0, 1fr)',
+        gridTemplateAreas: '"icon label" "icon value"',
+        columnGap: 1,
+        alignItems: 'start',
+        /* Room for label and value side by side; a narrow column (tablet) stacks the value under its label. */
+        '@container (min-width: 290px)': {
+          gridTemplateColumns: '18px 64px minmax(0, 1fr)',
+          gridTemplateAreas: '"icon label value"',
+        },
+      }}
+    >
+      <Box aria-hidden="true" sx={{ gridArea: 'icon', color: 'text.secondary', display: 'flex', pt: '2px', '& svg': { fontSize: 18 } }}>{icon}</Box>
+      <Typography variant="body2" sx={{ gridArea: 'label', color: 'text.secondary' }}>{label}</Typography>
+      <Typography component="div" variant="body2" sx={{ gridArea: 'value', fontWeight: 700, overflowWrap: 'anywhere' }}>{children}</Typography>
     </Box>
   );
 }
@@ -174,89 +230,102 @@ export function ClubPresentation({
 
   return (
     <Box data-testid="club-detail" data-layout={device} data-columns={wide ? 2 : 1} sx={{ maxWidth: MAX_WIDTH, mx: 'auto', width: '100%', minWidth: 0 }}>
-      {/* ── Hero ── */}
+      {/* ── Hero: the planner prototype's club header - identity on the left, then Identifikační údaje | Vedení klubu | Kontaktní osoba ── */}
       <Box>
         <Button variant="text" startIcon={<ArrowBack />} onClick={onBack} sx={{ minHeight: 44, mb: 1 }}>Zpět na kluby</Button>
       </Box>
-      <Box
+      <SoftCard
         data-testid="club-hero"
-        sx={{ textAlign: 'center', pb: { xs: 2.5, md: 3.5 }, px: { xs: 0, md: 2 } }}
+        component="section"
+        aria-label="Hlavička klubu"
+        sx={{ p: 0, mb: 2.5, overflow: 'hidden', display: 'grid', gridTemplateColumns: wide ? 'minmax(300px, 0.8fr) minmax(0, 2.2fr)' : 'minmax(0, 1fr)' }}
       >
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1.5 }}>
-          <ClubAvatar name={club.name} color={accent} size={phone ? 64 : 84} />
-        </Box>
-        <Typography
-          component="h1"
-          data-testid="club-hero-name"
-          sx={{ fontSize: { xs: 30, md: 44 }, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.12, overflowWrap: 'anywhere' }}
-        >
-          {club.name}
-        </Typography>
-        <Box
-          aria-hidden="true"
-          data-testid="club-hero-accent"
-          sx={{ width: 72, height: 5, borderRadius: 3, mx: 'auto', my: 1.5, bgcolor: accent ?? 'divider' }}
-        />
-        <Stack direction="row" sx={{ gap: 1, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
-          {club.city ? <Typography variant="body1" sx={{ color: 'text.secondary' }}>{club.city}</Typography> : null}
-          <StatusChip tone={club.isActive ? 'green' : 'grey'}>{club.isActive ? 'Aktivní' : 'Neaktivní'}</StatusChip>
-        </Stack>
-        <Typography data-testid="club-hero-subtitle" variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>{subtitle}</Typography>
-        {!phone ? (
-          <Stack direction="row" sx={{ gap: 1, justifyContent: 'center', mt: 2 }}>
-            <Button variant="contained" onClick={onNewOrder}>Nová objednávka klubu</Button>
-          </Stack>
-        ) : null}
-      </Box>
-
-      {/* ── Key figures ── */}
-      <SoftCard data-testid="club-figures" role="region" aria-label="Klíčové údaje klubu" sx={{ mb: 2.5 }}>
-        {summary.isLoading ? (
-          <Skeleton variant="rounded" height={64} data-testid="figures-loading" />
-        ) : summary.isError || s === undefined ? (
-          <Alert severity="warning" action={<Button color="inherit" size="small" onClick={() => void summary.refetch()}>Zkusit znovu</Button>}>
-            Souhrn klubu se nepodařilo načíst.
-          </Alert>
-        ) : (
-          <>
-            <Box sx={{ display: 'grid', gridTemplateColumns: phone ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: 1.5 }}>
-              <Figure value={s.totalSeats} label="hráčů / míst" />
-              <Figure value={s.registered} label="zapsáno" />
-              <Figure value={s.remaining} label="zbývá" />
-              <Box data-testid="club-figure-billable">
-                <Figure value={billableCzk === null ? (ordersQuery.isLoading ? '…' : '—') : formatCzk(billableCzk)} label="k fakturaci" />
-              </Box>
+        <Box sx={{ p: { xs: 2, md: 3 }, display: 'flex', flexDirection: 'column', gap: 1.25, minWidth: 0, justifyContent: 'center' }}>
+          <Stack direction="row" sx={{ gap: 2, alignItems: 'center' }}>
+            <ClubAvatar name={club.name} color={accent} size={phone ? 56 : 72} />
+            <Box sx={{ minWidth: 0 }}>
+              <Stack direction="row" sx={{ gap: 1, alignItems: 'center', flexWrap: 'wrap', mb: 0.5 }}>
+                {club.city ? <Typography variant="body2" sx={{ color: 'text.secondary' }}>{club.city}</Typography> : null}
+                <StatusChip tone={club.isActive ? 'green' : 'grey'}>{club.isActive ? 'Aktivní' : 'Neaktivní'}</StatusChip>
+              </Stack>
+              <Typography
+                component="h1"
+                data-testid="club-hero-name"
+                sx={{ fontSize: { xs: 26, md: 34 }, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.12, overflowWrap: 'anywhere' }}
+              >
+                {club.name}
+              </Typography>
             </Box>
-            <Stack direction="row" data-testid="summary-statuses" sx={{ gap: 1, flexWrap: 'wrap', justifyContent: 'center', mt: 2 }}>
-              {ORDER_STATUSES.map((st) => (
-                <StatusChip key={st} tone={STATUS_TONE[st]} size="sm">{ORDER_STATUS_LABEL[st]}: {s.ordersByStatus[st]}</StatusChip>
-              ))}
+          </Stack>
+          <Box
+            aria-hidden="true"
+            data-testid="club-hero-accent"
+            sx={{ width: 72, height: 5, borderRadius: 3, bgcolor: accent ?? 'divider' }}
+          />
+          <Typography data-testid="club-hero-subtitle" variant="body2" sx={{ color: 'text.secondary' }}>{subtitle}</Typography>
+          {!phone ? (
+            <Stack direction="row" sx={{ gap: 1, mt: 0.5 }}>
+              <Button variant="contained" onClick={onNewOrder}>Nová objednávka klubu</Button>
             </Stack>
-          </>
-        )}
-      </SoftCard>
+          ) : null}
+        </Box>
 
-      {!hasAnything && !ordersQuery.isLoading ? (
-        <SoftCard data-testid="club-empty" sx={{ textAlign: 'center', py: 3, mb: 2.5 }}>
-          <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Tento klub zatím nemá hromadnou rezervaci.</Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Založte klubu objednávku nebo mu vyhraďte termíny v kalendářích — sportovci se pak registrují přes odkaz.
-          </Typography>
-        </SoftCard>
-      ) : null}
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: wide ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)', gap: 2.5, alignItems: 'start' }} data-testid="club-cards">
-        {/* ── Kontakt a fakturační údaje ── */}
-        <SoftCard data-testid="club-contact" role="region" aria-label="Kontakt a fakturační údaje">
-          <SectionLabel>Kontakt a fakturační údaje</SectionLabel>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' }, gap: 1.5 }}>
-            <Fact label="Kontaktní osoba">{club.contactPerson || '—'}</Fact>
-            <Fact label="E-mail">{club.contactEmail || order?.contactEmail || '—'}</Fact>
-            <Fact label="Telefon">{club.contactPhone || '—'}</Fact>
+        <Box
+          data-testid="club-contact"
+          role="region"
+          aria-label="Kontakt a fakturační údaje"
+          sx={(t) => ({
+            minWidth: 0,
+            borderTop: wide ? 'none' : `1px solid ${headRule(t)}`,
+            borderLeft: wide ? `1px solid ${headRule(t)}` : 'none',
+          })}
+        >
+          <Box sx={{ display: 'grid', gridTemplateColumns: phone ? 'minmax(0, 1fr)' : 'repeat(3, minmax(0, 1fr))' }}>
+            <HeadColumn title="Identifikační údaje" icon={<Apartment />}>
+              <HeadLine icon={<Badge />} label="IČO">{club.ico || '—'}</HeadLine>
+              <HeadLine icon={<Description />} label="DIČ">{club.dic || '—'}</HeadLine>
+              <HeadLine icon={<Place />} label="Adresa">{location || '—'}</HeadLine>
+            </HeadColumn>
+            {management.length > 0 ? (
+              <HeadColumn title="Vedení klubu" icon={<Groups />} testId="club-management" region>
+                <Stack spacing={1.25} role="list">
+                  {management.map((m, index) => {
+                    const contact = [m.phone ?? '', m.email ?? ''].filter((p) => p.trim() !== '').join(' · ');
+                    return (
+                      <Stack key={m.id ?? `${m.fullName}-${index}`} role="listitem" direction="row" data-testid="club-manager" data-source={m.source} sx={{ gap: 1, alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>{m.fullName}</Typography>
+                          {m.role.trim() !== '' ? <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{m.role}</Typography> : null}
+                          {contact !== '' ? <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', overflowWrap: 'anywhere' }}>{contact}</Typography> : null}
+                        </Box>
+                        {m.source === 'ares' ? <StatusChip tone="beige" size="sm">z ARES</StatusChip> : null}
+                      </Stack>
+                    );
+                  })}
+                </Stack>
+              </HeadColumn>
+            ) : (
+              <HeadColumn title="Vedení klubu" icon={<Groups />}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>—</Typography>
+              </HeadColumn>
+            )}
+            <HeadColumn title="Kontaktní osoba" icon={<Person />} last>
+              <HeadLine icon={<Person />} label="Jméno">{club.contactPerson || '—'}</HeadLine>
+              <HeadLine icon={<MailOutlined />} label="E-mail">{club.contactEmail || order?.contactEmail || '—'}</HeadLine>
+              <HeadLine icon={<PhoneOutlined />} label="Telefon">{club.contactPhone || '—'}</HeadLine>
+            </HeadColumn>
+          </Box>
+          <Box
+            sx={(t) => ({
+              display: 'grid',
+              gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))', lg: 'repeat(6, minmax(0, 1fr))' },
+              gap: 1.5,
+              px: { xs: 2, md: 2.5 },
+              py: 1.5,
+              borderTop: `1px solid ${headRule(t)}`,
+            })}
+          >
             <Fact label="Sportovců">{row.headcount ?? '—'}</Fact>
-            <Fact label="IČO">{club.ico || '—'}</Fact>
-            <Fact label="DIČ">{club.dic || '—'}</Fact>
-            <Fact label="Adresa">{location || '—'}</Fact>
             <Fact label="Bankovní spojení">{bank.length > 0 ? bank.join(' · ') : '—'}</Fact>
             <Fact label="Splatnost">{club.paymentTermsDays > 0 ? `${club.paymentTermsDays} dní` : '—'}</Fact>
             <Fact label="Sleva klubu">{describeDiscount(percent)}</Fact>
@@ -272,32 +341,52 @@ export function ClubPresentation({
               </Fact>
             ) : null}
           </Box>
-        </SoftCard>
+        </Box>
+      </SoftCard>
 
-        {/* ── Vedení klubu: the statutory body from ARES and the people added by hand ── */}
-        {management.length > 0 ? (
-          <SoftCard data-testid="club-management" role="region" aria-label="Vedení klubu">
-            <SectionLabel>Vedení klubu</SectionLabel>
-            <Stack spacing={1.25} role="list">
-              {management.map((m, index) => {
-                const contact = [m.phone ?? '', m.email ?? ''].filter((p) => p.trim() !== '').join(' · ');
-                return (
-                  <Stack key={m.id ?? `${m.fullName}-${index}`} role="listitem" direction="row" data-testid="club-manager" data-source={m.source} sx={{ gap: 1.5, alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{m.fullName}</Typography>
-                      {m.role.trim() !== '' ? <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{m.role}</Typography> : null}
-                      {contact !== '' ? <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', overflowWrap: 'anywhere' }}>{contact}</Typography> : null}
-                    </Box>
-                    {m.source === 'ares' ? <StatusChip tone="beige" size="sm">z ARES</StatusChip> : null}
-                  </Stack>
-                );
-              })}
+      {/* ── Key figures: the ring and the KPI numbers ── */}
+      <SoftCard data-testid="club-figures" role="region" aria-label="Klíčové údaje klubu" sx={{ mb: 2.5 }}>
+        {summary.isLoading ? (
+          <Skeleton variant="rounded" height={64} data-testid="figures-loading" />
+        ) : summary.isError || s === undefined ? (
+          <Alert severity="warning" action={<Button color="inherit" size="small" onClick={() => void summary.refetch()}>Zkusit znovu</Button>}>
+            Souhrn klubu se nepodařilo načíst.
+          </Alert>
+        ) : (
+          <>
+            <Stack direction="row" sx={{ gap: { xs: 2, md: 3 }, alignItems: 'center' }}>
+              <ProgressRing value={seatPercent(s.registered, s.totalSeats)} size={phone ? 68 : 84} label="Zapsáno" />
+              <Box sx={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: phone ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: 1.5 }}>
+                <Figure value={s.totalSeats} label="hráčů / míst" />
+                <Figure value={s.registered} label="zapsáno" />
+                <Figure value={s.remaining} label="zbývá" />
+                <Box data-testid="club-figure-billable">
+                  <Figure value={billableCzk === null ? (ordersQuery.isLoading ? '…' : '—') : formatCzk(billableCzk)} label="k fakturaci" />
+                </Box>
+              </Box>
             </Stack>
-          </SoftCard>
-        ) : null}
+            <Stack direction="row" data-testid="summary-statuses" sx={{ gap: 1, flexWrap: 'wrap', justifyContent: 'center', mt: 2 }}>
+              {ORDER_STATUSES.map((st) => (
+                <StatusChip key={st} tone={STATUS_TONE[st]} size="sm">{ORDER_STATUS_LABEL[st]}: {s.ordersByStatus[st]}</StatusChip>
+              ))}
+            </Stack>
+          </>
+        )}
+      </SoftCard>
 
+
+      {!hasAnything && !ordersQuery.isLoading ? (
+        <SoftCard data-testid="club-empty" sx={{ textAlign: 'center', py: 3, mb: 2.5 }}>
+          <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Tento klub zatím nemá hromadnou rezervaci.</Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Založte klubu objednávku nebo mu vyhraďte termíny v kalendářích — sportovci se pak registrují přes odkaz.
+          </Typography>
+        </SoftCard>
+      ) : null}
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: wide ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)', gap: 2.5, alignItems: 'start' }} data-testid="club-cards">
         {/* ── Nadcházející okna v kalendáři ── */}
-        <SoftCard data-testid="club-windows" role="region" aria-label="Nadcházející okna v kalendáři">
+        <SoftCard data-testid="club-windows" role="region" aria-label="Nadcházející okna v kalendáři" sx={span}>
           <SectionLabel>Nadcházející okna v kalendáři</SectionLabel>
           {upcoming.length === 0 ? (
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>Klub nemá žádné nadcházející okno.</Typography>

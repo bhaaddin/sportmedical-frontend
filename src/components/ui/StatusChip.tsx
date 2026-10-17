@@ -1,10 +1,12 @@
 import { Box, type SxProps, type Theme } from '@mui/material';
-import { DESIGN } from '../../theme';
+import { toneColors } from '../../theme';
 
 /**
  * The soft status pill from the design board: "Objednán", "Zaplaceno",
  * "Dotazník chybí", "Nepřišel 2×". Five tones, one shape, so every screen says
- * the same thing the same way.
+ * the same thing the same way. In the dark theme the pill is tinted glass with
+ * a line in its own colour (the planner prototype's pills), in light the
+ * board's pastels exactly as before.
  */
 export type ChipTone = 'green' | 'beige' | 'red' | 'grey' | 'blue' | 'primary';
 
@@ -24,29 +26,28 @@ export function StatusChip({
   sx?: SxProps<Theme>;
   testId?: string;
 }) {
-  const palette =
-    tone === 'primary'
-      ? { bg: 'primary.main', fg: '#FFFFFF' }
-      : { bg: DESIGN.tone[tone].bg, fg: DESIGN.tone[tone].fg };
-
   return (
     <Box
       component="span"
       data-testid={testId}
       sx={[
-        {
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 0.75,
-          borderRadius: 999,
-          px: size === 'sm' ? 1 : 1.25,
-          py: size === 'sm' ? 0.125 : 0.375,
-          fontSize: size === 'sm' ? 11 : 12,
-          fontWeight: 600,
-          lineHeight: 1.4,
-          whiteSpace: 'nowrap',
-          bgcolor: palette.bg,
-          color: palette.fg,
+        (t: Theme) => {
+          const colors = tone === 'primary' ? null : toneColors(t, tone);
+          return {
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 0.75,
+            borderRadius: 999,
+            px: size === 'sm' ? 1 : 1.25,
+            py: size === 'sm' ? 0.125 : 0.375,
+            fontSize: size === 'sm' ? 11 : 12,
+            fontWeight: 600,
+            lineHeight: 1.4,
+            whiteSpace: 'nowrap',
+            bgcolor: colors === null ? 'primary.main' : colors.bg,
+            color: colors === null ? 'primary.contrastText' : colors.fg,
+            ...(t.palette.mode === 'dark' && colors !== null ? { boxShadow: `inset 0 0 0 1px ${colors.line}` } : {}),
+          };
         },
         ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
       ]}

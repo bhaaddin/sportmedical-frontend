@@ -5,7 +5,8 @@
 import { Box, Typography, useTheme } from '@mui/material';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { ClubOrderStats } from '../../../api/clubOrders';
-import { KpiCard, SectionLabel, StatusChip, DESIGN } from '../../ui';
+import { KpiCard, SectionLabel, StatusChip } from '../../ui';
+import { DARK, DESIGN } from '../../../theme';
 import { ResponsiveDataList, type DataColumn } from '../../ui/ResponsiveDataList';
 import { useIsPhone } from '../../../layout/useDevice';
 import { ChartCard, ChartGrid, HorizontalBars, CHART_HEIGHT, type ChartDef } from '../../../pages/statistics/StatisticsCharts';
@@ -29,6 +30,9 @@ export function ClubStatsView({ stats, period, revenue = null, revenueLoading = 
   const theme = useTheme();
   const phone = useIsPhone();
   const axis = { fontSize: 12, fill: theme.palette.text.secondary };
+  const dark = theme.palette.mode === 'dark';
+  const gridLine = dark ? theme.palette.divider : DESIGN.line;
+  const missingFill = dark ? DARK.amber : DESIGN.tone.beige.line;
   const kpi = statsKpis(stats);
   const clubs = clubRows(stats);
   const services = serviceRows(stats);
@@ -90,13 +94,13 @@ export function ClubStatsView({ stats, period, revenue = null, revenueLoading = 
       chart: (
         <ResponsiveContainer width="100%" height={Math.max(CHART_HEIGHT - 20, 44 * clubChartData.length + 60)}>
           <BarChart data={clubChartData} layout="vertical" margin={{ left: 8, right: phone ? 8 : 24 }}>
-            <CartesianGrid stroke={DESIGN.line} horizontal={false} />
-            <XAxis type="number" allowDecimals={false} tick={axis} stroke={DESIGN.line} />
-            <YAxis type="category" dataKey="label" width={phone ? 96 : 140} tick={axis} stroke={DESIGN.line} />
-            <Tooltip />
+            <CartesianGrid stroke={gridLine} horizontal={false} />
+            <XAxis type="number" allowDecimals={false} tick={axis} stroke={gridLine} />
+            <YAxis type="category" dataKey="label" width={phone ? 96 : 140} tick={axis} stroke={gridLine} />
+            <Tooltip {...(dark ? { contentStyle: { background: theme.palette.background.paper, border: '1px solid ' + theme.palette.divider, borderRadius: 8, color: theme.palette.text.primary }, cursor: { fill: 'rgba(0, 230, 228, 0.08)' } } : {})} />
             <Legend />
             <Bar dataKey="Zapsáno" stackId="s" fill={theme.palette.primary.main} />
-            <Bar dataKey="Chybí" stackId="s" fill={DESIGN.tone.beige.line} />
+            <Bar dataKey="Chybí" stackId="s" fill={missingFill} />
           </BarChart>
         </ResponsiveContainer>
       ),

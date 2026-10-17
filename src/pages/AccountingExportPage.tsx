@@ -97,7 +97,7 @@ export default function AccountingExportPage() {
       <Button size="small" variant="text" sx={touch} onClick={() => download(h.id, h.fileName)}>
         Stáhnout
       </Button>
-      <Button size="small" variant="text" sx={{ color: DESIGN.danger, ...touch }} onClick={() => remove(h.id)}>
+      <Button size="small" variant="text" sx={{ color: 'error.main', ...touch }} onClick={() => remove(h.id)}>
         Smazat
       </Button>
     </Stack>

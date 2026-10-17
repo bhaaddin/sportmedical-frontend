@@ -233,7 +233,7 @@ export default function GroupDiscountsPage() {
                     <Button
                       size="small"
                       onClick={() => removeRow(index)}
-                      sx={{ color: DESIGN.danger, fontWeight: 600 }}
+                      sx={{ color: 'error.main', fontWeight: 600 }}
                     >
                       Odebrat
                     </Button>
@@ -304,7 +304,7 @@ export default function GroupDiscountsPage() {
                     ? `${tierName(preview.tierIndex)} −${preview.percent} %`
                     : 'Bez hladiny'}
                 </Typography>
-                <Typography variant="body2" sx={{ color: DESIGN.danger }}>
+                <Typography variant="body2" sx={{ color: 'error.main' }}>
                   {preview.discount > 0 ? `−${formatCzk(preview.discount)}` : formatCzk(0)}
                 </Typography>
               </Stack>

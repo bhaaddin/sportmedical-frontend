@@ -11,3 +11,4 @@ export { SoftCard } from './SoftCard';
 export { FilterChips, type FilterOption } from './FilterChips';
 export { KpiCard } from './KpiCard';
 export { DESIGN } from '../../theme';
+export { ProgressRing } from './ProgressRing';

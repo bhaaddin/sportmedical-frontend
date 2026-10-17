@@ -8,7 +8,8 @@
  *  - `marked`:           days drawn as "on offer" (club form), selected ones are drawn solid
  */
 import { useState } from 'react';
-import { Box, ButtonBase, IconButton, Typography } from '@mui/material';
+import { Box, ButtonBase, IconButton, Typography, useTheme } from '@mui/material';
+import { DARK } from '../../../theme';
 import { ChevronLeftRounded, ChevronRightRounded } from '@mui/icons-material';
 import { addMonths, monthGrid, monthStart, monthTitle, splitIso, WEEKDAYS_CS, dayText } from './dayOffer';
 
@@ -27,8 +28,14 @@ const STAFF: DayCalendarColors = {
   text: '#1B1F1D', muted: 'rgba(27, 31, 29, 0.38)', line: 'rgba(27, 31, 29, 0.14)',
 };
 
+/** The desk's own colours in the dark theme: the prototype's cyan on glass (the light ones above are the board's green). */
+const STAFF_DARK: DayCalendarColors = {
+  accent: DARK.cyan, onAccent: DARK.onCyan, wash: 'rgba(0, 230, 228, 0.12)', edge: 'rgba(0, 230, 228, 0.5)',
+  text: DARK.white, muted: 'rgba(163, 185, 206, 0.74)', line: 'rgba(0, 223, 227, 0.22)',
+};
+
 export function DayCalendar({
-  selected, onToggle, isDisabled, isMuted, marked, initialMonth, colors = STAFF, testId = 'day-calendar', label = 'Kalendář dní',
+  selected, onToggle, isDisabled, isMuted, marked, initialMonth, colors: colorsProp, testId = 'day-calendar', label = 'Kalendář dní',
 }: {
   selected: string[];
   onToggle: (date: string) => void;
@@ -41,6 +48,8 @@ export function DayCalendar({
   testId?: string;
   label?: string;
 }) {
+  const dark = useTheme().palette.mode === 'dark';
+  const colors = colorsProp ?? (dark ? STAFF_DARK : STAFF);
   const [month, setMonth] = useState(monthStart(initialMonth));
   const chosen = new Set(selected);
   const weeks = monthGrid(month);

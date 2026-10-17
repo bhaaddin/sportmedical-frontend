@@ -1,5 +1,5 @@
 import { Box } from '@mui/material';
-import { DESIGN } from '../ui';
+import { toneColors } from '../../theme';
 import { initialsOf, inkOn } from './blockLogic';
 
 /**
@@ -19,8 +19,8 @@ export function ClubAvatar({ name, color, size = 40 }: { name: string; color: st
         width: size,
         height: size,
         borderRadius: '10px',
-        bgcolor: color ?? DESIGN.tone.grey.bg,
-        color: color !== null ? inkOn(color) : DESIGN.tone.grey.fg,
+        bgcolor: (t) => color ?? toneColors(t, 'grey').bg,
+        color: (t) => (color !== null ? inkOn(color) : toneColors(t, 'grey').fg),
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

@@ -169,7 +169,7 @@ export const SlotCard = memo(function SlotCard({
               onUploaded={(asset) => onUploaded(def, asset)}
             />
             {filled && (
-              <Button color="inherit" onClick={() => onReset(def)} disabled={saving} sx={{ minHeight: 44, color: DESIGN.danger, fontWeight: 600 }}>
+              <Button color="inherit" onClick={() => onReset(def)} disabled={saving} sx={{ minHeight: 44, color: 'error.main', fontWeight: 600 }}>
                 Odstranit
               </Button>
             )}
@@ -202,7 +202,7 @@ export const SlotCard = memo(function SlotCard({
                 </Button>
               </>
             )}
-            <Button color="inherit" onClick={() => onReset(def)} disabled={saving || !filled} sx={{ minHeight: 44, color: filled ? DESIGN.danger : undefined, fontWeight: 600 }}>
+            <Button color="inherit" onClick={() => onReset(def)} disabled={saving || !filled} sx={{ minHeight: 44, color: filled ? 'error.main' : undefined, fontWeight: 600 }}>
               Vrátit výchozí
             </Button>
           </Stack>
@@ -221,7 +221,7 @@ export const SlotCard = memo(function SlotCard({
       )}
 
       {error !== undefined && (
-        <Typography role="alert" sx={{ mt: 1, fontSize: 14, fontWeight: 600, color: DESIGN.danger }}>{error}</Typography>
+        <Typography role="alert" sx={{ mt: 1, fontSize: 14, fontWeight: 600, color: 'error.main' }}>{error}</Typography>
       )}
 
       <Stack direction="row" spacing={1.5} useFlexGap sx={{ mt: 1.5, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>

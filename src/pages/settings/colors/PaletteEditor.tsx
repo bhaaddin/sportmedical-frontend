@@ -69,7 +69,7 @@ export function PaletteEditor({
                 aria-label={`Odebrat barvu ${index + 1}`}
                 disabled={!canRemove}
                 onClick={() => onChange(rows.filter((r) => r.key !== row.key))}
-                sx={{ width: 44, height: 44, color: '#9B3B1B' }}
+                sx={{ width: 44, height: 44, color: 'error.main' }}
               >
                 <DeleteIcon />
               </IconButton>

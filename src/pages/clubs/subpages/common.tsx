@@ -96,7 +96,7 @@ export function SelectFilter({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       sx={{ minWidth: 170 }}
-      slotProps={{ select: { native: true } }}
+      slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>{o.label}</option>

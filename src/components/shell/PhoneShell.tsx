@@ -24,7 +24,7 @@ import { AppearanceControls } from './AccountMenu';
 import { Trail, type Crumb } from './whereAmI';
 import { childIsActive, isActivePath, sectionGroups, sectionOf, shortLabel } from './shellModel';
 import { STAFF_HOME_PATH } from '../../web/sitePaths';
-import { BAR_HEIGHT, activeBg, focusRing } from './shellStyles';
+import { BAR_HEIGHT, activeBg, activeGlow, barGlass, focusRing, primaryIconSx } from './shellStyles';
 import type { MenuEntry, ShellNav } from './shellTypes';
 
 /** The four entries that live in the bottom bar, in order. */
@@ -40,7 +40,7 @@ export function PhoneTopBar({ nav, crumbs }: { nav: ShellNav; crumbs: Crumb[] })
     <Box
       component="header"
       data-shell="topbar"
-      sx={{
+      sx={[{
         position: 'fixed',
         top: 0,
         left: 0,
@@ -57,7 +57,7 @@ export function PhoneTopBar({ nav, crumbs }: { nav: ShellNav; crumbs: Crumb[] })
         alignItems: 'center',
         gap: 0.25,
         zIndex: (t) => t.zIndex.appBar,
-      }}
+      }, barGlass]}
     >
       <Box
         aria-label="Kde jsem"
@@ -76,15 +76,7 @@ export function PhoneTopBar({ nav, crumbs }: { nav: ShellNav; crumbs: Crumb[] })
       <IconButton
         aria-label="Nová objednávka"
         onClick={() => setChooser(true)}
-        sx={{
-          width: 44,
-          height: 44,
-          ml: 0.25,
-          mr: 0.5,
-          bgcolor: 'primary.main',
-          color: 'primary.contrastText',
-          '&:hover': { bgcolor: 'primary.dark' },
-        }}
+        sx={[{ width: 44, height: 44, ml: 0.25, mr: 0.5 }, primaryIconSx]}
       >
         <Add />
       </IconButton>
@@ -141,6 +133,7 @@ function SheetLink({ to, state, children, active, indent = false, onClick }: { t
         fontWeight: active ? 600 : 500,
         color: active ? 'primary.main' : 'text.primary',
         bgcolor: active ? activeBg : 'transparent',
+        boxShadow: (t) => activeGlow(t, active),
         '&:hover': { bgcolor: active ? activeBg : 'action.hover' },
         ...focusRing,
       }}
@@ -192,7 +185,7 @@ export function PhoneBottomBar({ nav }: { nav: ShellNav }) {
         component="nav"
         aria-label="Hlavní navigace"
         data-shell="bottombar"
-        sx={{
+        sx={[{
           position: 'fixed',
           left: 0,
           right: 0,
@@ -205,7 +198,7 @@ export function PhoneBottomBar({ nav }: { nav: ShellNav }) {
           borderColor: 'divider',
           display: 'flex',
           zIndex: (t) => t.zIndex.appBar,
-        }}
+        }, barGlass]}
       >
         {bar.map((e) => (
           <BarItem
@@ -271,21 +264,19 @@ export function PhoneBottomBar({ nav }: { nav: ShellNav }) {
           component="button"
           type="button"
           onClick={() => { close(); setChooser(true); }}
-          sx={{
+          sx={[{
             height: 48,
             width: '100%',
             mt: 0.5,
             mb: 1,
             border: 0,
             borderRadius: '10px',
-            bgcolor: 'primary.main',
-            color: 'primary.contrastText',
             fontFamily: 'inherit',
             fontSize: 15,
             fontWeight: 600,
             cursor: 'pointer',
             ...focusRing,
-          }}
+          }, primaryIconSx]}
         >
           Nová objednávka
         </Box>

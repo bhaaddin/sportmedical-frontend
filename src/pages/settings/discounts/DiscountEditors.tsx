@@ -10,6 +10,8 @@
 import { Box, Button, InputAdornment, Stack, TextField, Typography } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import { useState } from 'react';
+import type { Theme } from '@mui/material/styles';
+import { toneColors } from '../../../theme';
 import { useIsPhone } from '../../../layout/useDevice';
 import { SectionLabel, SoftCard } from '../../../components/ui';
 import { ResponsiveDataList, type DataColumn } from '../../../components/ui/ResponsiveDataList';
@@ -32,7 +34,7 @@ export function SectionCard({ id, title, caption, children }: { id: string; titl
   );
 }
 
-const removeSx = { minHeight: 44, minWidth: 44, color: '#9B3B1B', borderColor: '#E3C3BA', fontWeight: 600 } as const;
+const removeSx = { minHeight: 44, minWidth: 44, color: 'error.main', borderColor: (t: Theme) => toneColors(t, 'red').line, fontWeight: 600 } as const;
 
 function useFieldSize(): 'small' | 'medium' {
   return useIsPhone() ? 'medium' : 'small';

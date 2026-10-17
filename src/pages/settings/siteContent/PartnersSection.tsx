@@ -114,7 +114,7 @@ function PartnerDialog({ partner, open, saving, error, onClose, onSave }: {
             onUploaded={(asset) => setLogo(asset)}
           />
           {shownLogo !== undefined && (
-            <Button color="inherit" onClick={() => setLogo(null)} sx={{ minHeight: 44, color: DESIGN.danger, fontWeight: 600 }}>
+            <Button color="inherit" onClick={() => setLogo(null)} sx={{ minHeight: 44, color: 'error.main', fontWeight: 600 }}>
               Odebrat logo
             </Button>
           )}
@@ -249,7 +249,7 @@ export function PartnersSection({ partners, onConfirm }: { partners: AdminPartne
                     confirmLabel: 'Ano, smazat',
                     onConfirm: () => { setError(null); remove.mutate(partner); },
                   })}
-                  sx={{ minHeight: 44, color: DESIGN.danger, fontWeight: 600 }}
+                  sx={{ minHeight: 44, color: 'error.main', fontWeight: 600 }}
                 >
                   Smazat
                 </Button>

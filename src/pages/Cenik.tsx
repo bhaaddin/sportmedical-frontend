@@ -159,7 +159,7 @@ export default function Cenik() {
       <Button size="small" variant="text" aria-label={`Upravit položku ${service.name}`} onClick={() => setEditing(service)} sx={{ minHeight: 44, minWidth: 44 }}>
         Upravit
       </Button>
-      <Button size="small" variant="text" aria-label={`Vyřadit položku ${service.name}`} onClick={() => setArchiving(service)} sx={{ minHeight: 44, minWidth: 44, color: DESIGN.danger }}>
+      <Button size="small" variant="text" aria-label={`Vyřadit položku ${service.name}`} onClick={() => setArchiving(service)} sx={{ minHeight: 44, minWidth: 44, color: 'error.main' }}>
         Vyřadit
       </Button>
     </Stack>

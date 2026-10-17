@@ -160,7 +160,7 @@ export function FaqSection({ items, onConfirm }: { items: AdminFaq[]; onConfirm:
                     confirmLabel: 'Ano, smazat',
                     onConfirm: () => { setError(null); remove.mutate(item); },
                   })}
-                  sx={{ minHeight: 44, color: DESIGN.danger, fontWeight: 600 }}
+                  sx={{ minHeight: 44, color: 'error.main', fontWeight: 600 }}
                 >
                   Smazat
                 </Button>

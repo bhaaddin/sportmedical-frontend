@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Avatar, Box, Button, ButtonBase, IconButton } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, type Theme } from '@mui/material/styles';
 import { ArrowBack, Search } from '@mui/icons-material';
 import NotificationCenter from '../NotificationCenter';
 import { openUniversalSearch } from '../UniversalSearch';
@@ -24,7 +24,7 @@ import { NewOrderChooser } from '../booking/NewOrderChooser';
 import { SidebarSlot } from './SidebarSlot';
 import { STAFF_HOME_PATH } from '../../web/sitePaths';
 import { childIsActive, entryState, mainEntries, sectionGroups, sectionOf } from './shellModel';
-import { SIDEBAR_WIDTH, activeBg, focusRing } from './shellStyles';
+import { SIDEBAR_WIDTH, activeBg, activeGlow, focusRing, sideGlass } from './shellStyles';
 import type { MenuEntry, ShellNav } from './shellTypes';
 
 /** The row every entry shares: 44px, 14px, the open one soft with accent text. */
@@ -41,6 +41,7 @@ const rowSx = (active: boolean, inSection = false, child = false) => ({
   fontWeight: active || inSection ? 600 : 400,
   color: active || inSection ? 'primary.main' : 'text.secondary',
   bgcolor: active ? activeBg : 'transparent',
+  boxShadow: (t: Theme) => activeGlow(t, active),
   '&:hover': {
     bgcolor: active ? activeBg : 'action.hover',
     color: active || inSection ? 'primary.main' : 'text.primary',
@@ -305,7 +306,7 @@ export function AccountRow({ nav }: { nav: ShellNav }) {
           ...focusRing,
         }}
       >
-        <Avatar sx={{ width: 34, height: 34, bgcolor: 'primary.main', color: '#FFF', fontSize: 13, fontWeight: 600 }}>
+        <Avatar sx={{ width: 34, height: 34, bgcolor: 'primary.main', color: 'primary.contrastText', fontSize: 13, fontWeight: 600 }}>
           {nav.user.firstName?.[0]}{nav.user.lastName?.[0]}
         </Avatar>
         <Box sx={{ minWidth: 0 }}>
@@ -412,7 +413,7 @@ export function DesktopSidebar({ nav }: { nav: ShellNav }) {
       component="aside"
       aria-label={nav.settingsMode ? 'Nastavení' : 'Postranní panel'}
       data-shell="sidebar"
-      sx={{
+      sx={[{
         position: 'fixed',
         top: 0,
         bottom: 0,
@@ -428,7 +429,7 @@ export function DesktopSidebar({ nav }: { nav: ShellNav }) {
         display: 'flex',
         flexDirection: 'column',
         zIndex: (t) => t.zIndex.drawer,
-      }}
+      }, sideGlass]}
     >
       <SidebarBody nav={nav} withSlot onNewOrder={() => setChooser(true)} />
     </Box>

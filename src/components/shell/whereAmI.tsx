@@ -78,9 +78,9 @@ export function WhereAmI({ crumbs }: { crumbs: Crumb[] }) {
   return (
     <Box
       aria-label="Kde jsem"
-      sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1.5, fontSize: 13, color: 'text.secondary', flexWrap: 'wrap' }}
+      sx={(t) => ({ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1.5, fontSize: 13, color: 'text.secondary', flexWrap: 'wrap', ...(t.palette.mode === 'dark' ? { fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase' } : {}) })}
     >
-      <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0 }} />
+      <Box component="span" sx={(t) => ({ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, ...(t.palette.mode === 'dark' ? { boxShadow: '0 0 10px #00EDDA' } : {}) })} />
       <Trail crumbs={crumbs} />
     </Box>
   );
@@ -106,7 +106,7 @@ export function Trail({ crumbs, nowrap = false }: { crumbs: Crumb[]; nowrap?: bo
                 component="span"
                 aria-current={last ? 'page' : undefined}
                 sx={{
-                  color: last ? 'text.primary' : 'text.secondary',
+                  color: last ? (t) => (t.palette.mode === 'dark' ? t.palette.primary.light : t.palette.text.primary) : 'text.secondary',
                   fontWeight: last ? 700 : 600,
                   ...(nowrap ? { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } : {}),
                 }}

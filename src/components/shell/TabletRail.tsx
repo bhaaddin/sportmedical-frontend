@@ -18,7 +18,7 @@ import { NewOrderChooser } from '../booking/NewOrderChooser';
 import { SidebarBody } from './Sidebar';
 import { STAFF_HOME_PATH } from '../../web/sitePaths';
 import { childIsActive, entryState, mainEntries, sectionGroups, sectionOf, shortLabel } from './shellModel';
-import { RAIL_WIDTH, SIDEBAR_WIDTH, activeBg, focusRing } from './shellStyles';
+import { RAIL_WIDTH, SIDEBAR_WIDTH, activeBg, activeGlow, focusRing, primaryIconSx, sideGlass } from './shellStyles';
 import type { ShellNav } from './shellTypes';
 
 /** One rail entry: the icon, its label under it, 56px tall. */
@@ -57,6 +57,7 @@ function RailItem({
         borderRadius: '8px',
         color: lit ? 'primary.main' : 'text.secondary',
         bgcolor: active ? activeBg : 'transparent',
+        boxShadow: (t) => activeGlow(t, active),
         '&:hover': { bgcolor: active ? activeBg : 'action.hover' },
         '& svg': { fontSize: 22 },
         ...focusRing,
@@ -96,7 +97,7 @@ export function TabletRail({ nav }: { nav: ShellNav }) {
         component="nav"
         aria-label={nav.settingsMode ? 'Nastavení' : section ? `Sekce ${section.text}` : 'Hlavní navigace'}
         data-shell="rail"
-        sx={{
+        sx={[{
           position: 'fixed',
           top: 0,
           bottom: 0,
@@ -113,7 +114,7 @@ export function TabletRail({ nav }: { nav: ShellNav }) {
           pt: 1.25,
           pb: 1.25,
           zIndex: (t) => t.zIndex.drawer,
-        }}
+        }, sideGlass]}
       >
         <IconButton
           aria-label="Otevřít menu"
@@ -129,14 +130,7 @@ export function TabletRail({ nav }: { nav: ShellNav }) {
           <IconButton
             aria-label="Nová objednávka"
             onClick={() => setChooser(true)}
-            sx={{
-              width: 48,
-              height: 48,
-              flexShrink: 0,
-              bgcolor: 'primary.main',
-              color: 'primary.contrastText',
-              '&:hover': { bgcolor: 'primary.dark' },
-            }}
+            sx={[{ width: 48, height: 48, flexShrink: 0 }, primaryIconSx]}
           >
             <Add />
           </IconButton>
@@ -206,7 +200,7 @@ export function TabletRail({ nav }: { nav: ShellNav }) {
           aria-haspopup="menu"
           sx={{ width: 44, height: 44, borderRadius: '50%', flexShrink: 0, ...focusRing }}
         >
-          <Avatar sx={{ width: 34, height: 34, bgcolor: 'primary.main', color: '#FFF', fontSize: 13, fontWeight: 600 }}>
+          <Avatar sx={{ width: 34, height: 34, bgcolor: 'primary.main', color: 'primary.contrastText', fontSize: 13, fontWeight: 600 }}>
             {nav.user.firstName?.[0]}{nav.user.lastName?.[0]}
           </Avatar>
         </ButtonBase>

@@ -139,7 +139,7 @@ export default function CashierPage() {
       variant={fullWidth ? 'outlined' : 'text'}
       color={fullWidth ? 'error' : 'inherit'}
       fullWidth={fullWidth}
-      sx={{ color: DESIGN.danger, ...touch, ...(fullWidth ? {} : { minWidth: 44 }) }}
+      sx={{ color: 'error.main', ...touch, ...(fullWidth ? {} : { minWidth: 44 }) }}
       onClick={() => handleCancel(t.id)}
     >
       {cancelLabel(t)}

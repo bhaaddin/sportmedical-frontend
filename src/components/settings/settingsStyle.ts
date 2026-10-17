@@ -20,19 +20,19 @@ import type { Theme } from '@mui/material';
 
 /** The caption grey: dark enough to read at a glance, still clearly below the ink. */
 export const settingsGrey = (theme: Theme): string =>
-  theme.palette.mode === 'light' ? '#4A5564' : '#B4BDC8';
+  theme.palette.mode === 'light' ? '#4A5564' : '#BCD0E1';
 
 /** A line harder than the app's hairline, so a row's edge is seen. */
 export const settingsLine = (theme: Theme): string =>
-  theme.palette.mode === 'light' ? '#C9D0D7' : '#3A444F';
+  theme.palette.mode === 'light' ? '#C9D0D7' : '#0F5A73';
 
 /** What a hovered row turns: a visible tint, not a one-percent grey. */
 export const settingsHover = (theme: Theme): string =>
-  theme.palette.mode === 'light' ? '#E4EEEB' : 'rgba(255,255,255,0.08)';
+  theme.palette.mode === 'light' ? '#E4EEEB' : 'rgba(0, 230, 228, 0.09)';
 
 /** What the row you are on (or have selected) rests on. */
 export const settingsSelected = (theme: Theme): string =>
-  theme.palette.mode === 'light' ? '#D7E9E5' : 'rgba(13,148,136,0.22)';
+  theme.palette.mode === 'light' ? '#D7E9E5' : 'rgba(0, 230, 228, 0.16)';
 
 export const TYPE = {
   pageTitle: { fontSize: { xs: 24, md: 28 }, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.015em', color: 'text.primary' },
