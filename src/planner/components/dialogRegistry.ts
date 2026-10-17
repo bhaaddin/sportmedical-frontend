@@ -19,6 +19,7 @@
  */
 import type { ReactNode } from 'react';
 import type { DialogKind, DialogState } from '../model';
+import type { PlannerModel } from '../state/usePlannerModel';
 
 export interface DialogContent {
   body?: ReactNode;
@@ -28,11 +29,18 @@ export interface DialogContent {
   /** Overrides the default title / subtitle of `dialogMeta`. */
   title?: string;
   subtitle?: string;
+  /**
+   * The body brings its own modal (e.g. the application's club editor): the layer renders it
+   * without the planner's scrim / card, and does not block the stage underneath.
+   */
+  frameless?: boolean;
 }
 
 export type DialogRenderer<K extends DialogKind = DialogKind> = (props: {
   dialog: Extract<DialogState, { kind: K }>;
   close: () => void;
+  /** The loaded planner data (profile, catalogue, ctx…): for choices that depend on it. Not a hook. */
+  model: PlannerModel;
 }) => DialogContent;
 
 export type DialogRegistry = { [K in DialogKind]?: DialogRenderer<K> };

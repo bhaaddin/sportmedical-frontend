@@ -65,6 +65,22 @@ export interface PlanningState {
   completed: boolean;
   /** "Požadavek naplněn" card (`#planner-feedback`). */
   completion: CompletionCallout | null;
+  /** "Přidat termín navíc": every player has a place, the board refuses a new drop until this arms exactly one. */
+  extraArmed: boolean;
+  /**
+   * Club orders with several činnosti: a window was just dropped and the bubble asks which činnosti it is for
+   * (Vše / one / several, Rozdělit). Nothing is written until the desk confirms.
+   */
+  ask: PlanAsk | null;
+}
+
+/** A dropped, not yet written window (whole slots of the armed činnost). */
+export interface PlanAsk {
+  date: IsoDate;
+  categoryId: CategoryId;
+  startMinutes: number;
+  /** Whole slots of the armed činnost the window is long. */
+  slots: number;
 }
 
 export interface AgendaState {
@@ -127,6 +143,8 @@ export function createInitialState(opts: InitialStateOptions): PlannerState {
       undoToken: null,
       completed: false,
       completion: null,
+      extraArmed: false,
+      ask: null,
     },
     carousel: { index: 0 },
     toasts: [],
@@ -197,7 +215,11 @@ export type PlannerAction =
   | { type: 'mini'; action: MiniAction }
   /* keyboard / mouse priorities of the prototype */
   | { type: 'escape' }
-  | { type: 'rightClick'; onBoard: boolean };
+  | { type: 'rightClick'; onBoard: boolean }
+  /* club planning (additive): the one extra drop and the činnosti bubble of a dropped window */
+  | { type: 'setExtraArmed'; armed: boolean }
+  | { type: 'openPlanAsk'; ask: PlanAsk }
+  | { type: 'closePlanAsk' };
 
 const DEFAULT_TOAST_MS = 2800;
 const MAX_TOASTS = 3;
@@ -386,6 +408,7 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
     case 'escape': {
       const p = state.planning;
       if (state.summary.open) return plannerReducer(state, { type: 'closeSummary' });
+      if (p.ask) return { ...state, planning: { ...p, ask: null } };
       if (p.move) {
         return withToast({ ...state, planning: { ...p, move: null, movePreview: null } }, { message: 'Přesun zrušen. Původní termín zůstal beze změny.' });
       }
@@ -427,6 +450,14 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
         { message: 'Výběr činnosti zrušen' },
       );
     }
+
+    /* ------------------------------ club planning ------------------------------ */
+    case 'setExtraArmed':
+      return { ...state, planning: { ...state.planning, extraArmed: action.armed } };
+    case 'openPlanAsk':
+      return { ...state, planning: { ...state.planning, ask: action.ask, drag: null, preview: null } };
+    case 'closePlanAsk':
+      return state.planning.ask ? { ...state, planning: { ...state.planning, ask: null } } : state;
   }
 }
 
@@ -484,4 +515,7 @@ export const plannerActions = {
   mini: (action: MiniAction): PlannerAction => ({ type: 'mini', action }),
   escape: (): PlannerAction => ({ type: 'escape' }),
   rightClick: (onBoard: boolean): PlannerAction => ({ type: 'rightClick', onBoard }),
+  setExtraArmed: (armed: boolean): PlannerAction => ({ type: 'setExtraArmed', armed }),
+  openPlanAsk: (ask: PlanAsk): PlannerAction => ({ type: 'openPlanAsk', ask }),
+  closePlanAsk: (): PlannerAction => ({ type: 'closePlanAsk' }),
 } as const;

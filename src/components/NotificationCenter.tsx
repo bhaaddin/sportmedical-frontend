@@ -6,7 +6,7 @@
    - Notification types: appointment, document, system, alert
    - WebSocket real-time updates
    ══════════════════════════════════════════════════════════════ */
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Box, Typography, IconButton, Badge, Popover, List, ListItem, ListItemIcon,
   ListItemText, Button, Divider, Skeleton, Tooltip,
@@ -17,9 +17,8 @@ import {
   Info, Delete, DoneAll, Settings, ExpandMore, ExpandLess,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import client from '../api/client';
 import { DESIGN } from './ui';
-import { useRealtimeSync } from '../hooks/useRealtimeSync';
+import { useNotificationFeed, type FeedNotification } from './notifications/useNotificationFeed';
 import {
   buildNotificationSections,
   exactNotificationTime,
@@ -30,20 +29,9 @@ import {
   splitAppointmentWhen,
 } from './notifications/notificationList';
 import { formatPragueDateTime } from '../utils/time';
-import toast from 'react-hot-toast';
 
 /* ── Types ── */
-export interface Notification {
-  id: string;
-  type: 'appointment' | 'document' | 'system' | 'alert' | 'info';
-  title: string;
-  message: string;
-  timestamp: string;
-  read: boolean;
-  actionUrl?: string;
-  /** Machine-readable event, used for grouping. Absent means "do not group". */
-  kind?: string | null;
-}
+export type Notification = FeedNotification;
 
 /* ── Notification config: an icon and one of the board's tones per kind ── */
 const NOTIFICATION_CONFIG: Record<string, { icon: React.ReactNode; color: string; bgColor: string }> = {
@@ -229,96 +217,15 @@ export default function NotificationCenter({
   buttonSx?: SxProps<Theme>;
 } = {}) {
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    notifications, loading, lastSeenAt, unreadCount,
+    markRead, markAllRead: markAllAsRead, remove: deleteNotification, stampSeen,
+  } = useNotificationFeed();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  /*
-   * When this viewer last opened the panel, straight from the server.
-   *
-   * Null until the server sends it, and then no "new since" line is drawn at
-   * all - a divider in the wrong place is worse than no divider, because it
-   * makes a confident claim about what somebody has already seen.
-   */
-  const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
   const open = Boolean(anchorEl);
   const popoverId = open ? 'notification-popover' : undefined;
 
-  /* ── Fetch notifications ── */
-  const fetchNotifications = useCallback(async () => {
-    try {
-      const res = await client.get('/api/notifications');
-      const data = res.data?.value ?? res.data;
-      setNotifications(Array.isArray(data) ? data : data?.items ?? []);
-    } catch {
-      /* Keep what is on screen; the next poll asks again. */
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  /*
-   * The marker has its own path rather than riding in the list.
-   *
-   * The list answers with a bare array, and wrapping it in an envelope for the
-   * sake of one value would change the shape for every caller. Two requests
-   * cost a round trip; a changed shape costs a working screen.
-   */
-  const fetchLastSeen = useCallback(async () => {
-    try {
-      const res = await client.get('/api/notifications/seen');
-      const at = res.data?.lastSeenAtUtc ?? null;
-      /* null means this viewer has never opened the panel. No line is drawn
-         then: above everything it states a truth that helps nobody, below
-         everything it states a falsehood. */
-      setLastSeenAt(typeof at === 'string' ? at : null);
-    } catch {
-      /* Older servers have no such route. No marker, no line - the rest of the
-         list is unaffected. */
-      setLastSeenAt(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchNotifications();
-    void fetchLastSeen();
-  }, [fetchNotifications, fetchLastSeen]);
-
-  /*
-   * The list from the server is the truth; the socket is only the fast path.
-   *
-   * So the bell also asks on a timer, and keeps asking whether the hub is up or
-   * not. Three days were spent on a bell that did not ring, and for two of them
-   * nobody could tell whether the row was missing or merely undelivered - a
-   * distinction that costs nothing to remove: the worst this may do is show a
-   * notification a minute late, never not at all.
-   *
-   * Sixty seconds, and only while the tab is being looked at. A background tab
-   * polling forever is a cost with no reader.
-   */
-  useEffect(() => {
-    const POLL_MS = 60_000;
-    const tick = () => {
-      if (!document.hidden) void fetchNotifications();
-    };
-    const timer = setInterval(tick, POLL_MS);
-    /* Coming back to the tab is the moment the list is most likely stale. */
-    document.addEventListener('visibilitychange', tick);
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener('visibilitychange', tick);
-    };
-  }, [fetchNotifications]);
-
-  /* ── Real-time sync ── */
-  useRealtimeSync({
-    /* After a gap in the socket, do not assume nothing happened inside it. */
-    onReconnected: () => fetchNotifications(),
-    /* The hub's nudge carries nothing by design - the answer is to ask. */
-    onNotificationsChanged: () => fetchNotifications(),
-  });
-
-  /* ── Handlers ── */
   const handleOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
@@ -336,19 +243,8 @@ export default function NotificationCenter({
    */
   const handleClose = () => {
     setAnchorEl(null);
-    void (async () => {
-      try {
-        const res = await client.post('/api/notifications/seen');
-        const at = res.data?.lastSeenAtUtc ?? null;
-        if (typeof at === 'string') setLastSeenAt(at);
-      } catch {
-        /* Failing to stamp shows the line again next time - a repeat, not a
-           loss. Nothing here is worth interrupting anybody over. */
-      }
-    })();
+    void stampSeen();
   };
-
-  const unreadCount = notifications.filter(n => !n.read).length;
 
   /*
    * Rebuilt only when the rows or the marker change - not on every render, so
@@ -369,53 +265,18 @@ export default function NotificationCenter({
     });
 
   /*
-   * Each of these changes the screen only once the server has agreed.
-   *
-   * They used to change it first and swallow the refusal, so "Vše označeno
-   * jako přečtené" appeared for a request the server had refused and the rows
-   * came back unread on the next poll. And a row with a link navigated with a
-   * full page load before its PATCH was even sent, which could abort it.
+   * Opened either way: the person asked to see what it points at, and a failed
+   * mark leaves the row honestly unread rather than blocking that. A row with a
+   * link navigates only after its PATCH was sent (a full page load before it
+   * could abort it).
    */
   const markAsRead = async (id: string) => {
-    const note = notifications.find(n => n.id === id);
-    if (note === undefined) return;
-
-    if (!note.read) {
-      try {
-        await client.patch(`/api/notifications/${id}/read`);
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-      } catch {
-        toast.error('Oznámení se nepodařilo označit jako přečtené.');
-      }
-    }
-
-    /* Opened either way: the person asked to see what it points at, and a
-       failed mark leaves the row honestly unread rather than blocking that. */
-    if (note.actionUrl) {
+    const note = await markRead(id);
+    if (note?.actionUrl) {
       handleClose();
       navigate(note.actionUrl);
     }
   };
-
-  const markAllAsRead = async () => {
-    try {
-      await client.patch('/api/notifications/read-all');
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      toast.success('Vše označeno jako přečtené');
-    } catch {
-      toast.error('Oznámení se nepodařilo označit jako přečtená. Zkuste to prosím znovu.');
-    }
-  };
-
-  const deleteNotification = async (id: string) => {
-    try {
-      await client.delete(`/api/notifications/${id}`);
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    } catch {
-      toast.error('Oznámení se nepodařilo smazat. Zkuste to prosím znovu.');
-    }
-  };
-
 
   return (
     <>

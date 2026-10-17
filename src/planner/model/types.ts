@@ -89,6 +89,37 @@ export interface PlannerOrder {
   /** Display order of the činnosti in the order (the prototype's `visibleOrderTypes()`). */
   demands: OrderDemand[];
   baselineSessions: BaselineSession[];
+  /* ---- real sources only (PL-F): what the desk reads about the order being planned ---- */
+  /** The planner shows the whole board without an order (standard booking): `false`. Absent = club order. */
+  club?: boolean;
+  clubName?: string;
+  serviceId?: string | null;
+  serviceName?: string;
+  /** "KO-1A2B3C4D" - the code the desk reads out; null while the order does not exist yet. */
+  code?: string | null;
+  /** The server's status (`Invited` | `Requested` | `Confirmed` | ...) or 'New' before the order exists. */
+  status?: string;
+  paymentMethod?: 'ClubInvoice' | 'PerPerson' | null;
+  /** The windows the club asked for / the desk confirmed (`OrderRange`). */
+  requestedRanges?: PlannerOrderRange[];
+  note?: string;
+  /** Players ordered in all činnosti. */
+  totalSeats?: number;
+  /** Players already registered through the club's link. */
+  registered?: number;
+  /** The club's link (form while Invited, portal afterwards) when the order has one. */
+  linkUrl?: string | null;
+  /** The server's price quote of the order (`ClubOrderView.priceQuote`): list total and the total after the discount. */
+  quote?: { listCzk: number; totalCzk: number } | null;
+}
+
+/** An `OrderRange` of the API: dates `yyyy-MM-dd`, times `HH:mm`. */
+export interface PlannerOrderRange {
+  fromDate: string;
+  toDate: string;
+  dailyFrom?: string | null;
+  dailyTo?: string | null;
+  activityIds?: string[] | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -140,6 +171,49 @@ export interface PlannerSession {
    * each other. Absent in the demo.
    */
   version?: string | null;
+  /* ---- real sources only (PL-F, `ApiDataSource`): the records behind the term ---- */
+  /** Ids of the appointments behind a standard term (one per booked person per calendar). */
+  appointmentIds?: string[];
+  /** The people of a standard term: enough to open the detail / move it. */
+  appointments?: SessionAppointment[];
+  /** Ids of the time blocks (one per calendar and part of the day) behind a club window. */
+  blockIds?: string[];
+  /** The calendars the term runs on. */
+  calendarIds?: string[];
+  /** The club block (window) the term is part of. */
+  clubBlockId?: string | null;
+  /** The club order the window belongs to. */
+  clubOrderId?: string | null;
+  clubName?: string | null;
+  /** The club's own colour (`#RRGGBB`) when the term is a club window. */
+  clubColorHex?: string | null;
+  /** Money of the term (`agreedPriceCzk ?? listPriceCzk` per appointment); absent = unknown / not a priced term. */
+  price?: SessionPrice | null;
+  /** The term belongs to ANOTHER club's order than the one being planned: shown as busy, not editable. */
+  foreign?: boolean;
+}
+
+/** One booked person of a standard term (no identity numbers, ever). */
+export interface SessionAppointment {
+  id: string;
+  calendarId: string;
+  patientName: string | null;
+  /** The booking status code of the API (0 scheduled .. 5 no-show). */
+  status: number;
+  /** Heads in a group booking; 1 for one person. */
+  heads: number;
+  /** `agreedPriceCzk ?? listPriceCzk`, null = no price. */
+  priceCzk: number | null;
+}
+
+export interface SessionPrice {
+  /** Sum of the priced appointments, CZK. */
+  totalCzk: number;
+  /** Appointments with / without a price. */
+  priced: number;
+  unpriced: number;
+  /** At least one agreed price differs from the price list. */
+  adjusted: boolean;
 }
 
 /** A session as drawn into the mini-calendar plan: a real term or the live preview. */
@@ -325,9 +399,13 @@ export interface ClubProfile {
   contactPhone: string;
   /** URL / data URI of the club logo, null = empty slot with "Změnit logo". */
   logoUrl?: string | null;
+  /** The club record behind the header (real sources only): the edit dialog opens it. */
+  clubId?: string | null;
+  /** The club's own colour (hex) for the initials avatar; null = the neutral chip. */
+  colorHex?: string | null;
 }
 
-export type ClubProfileField = Exclude<keyof ClubProfile, 'logoUrl'>;
+export type ClubProfileField = Exclude<keyof ClubProfile, 'logoUrl' | 'clubId' | 'colorHex'>;
 
 /** One cell of the header strip: the value or the Czech placeholder "Doplnit". */
 export interface HeaderValue {
@@ -492,7 +570,13 @@ export interface IntervalInput {
   date: IsoDate;
   categoryId: CategoryId;
   start: ClockTime;
+  /** Whole slots of the činnost. */
   quantity: number;
+  /**
+   * "Přidat termín navíc": the desk chose to plan beyond the players still missing (the club planner's one extra
+   * drop). The places beyond are reported as spare and can be trimmed before the order is saved.
+   */
+  allowExtra?: boolean;
 }
 
 export interface AddIntervalResult {

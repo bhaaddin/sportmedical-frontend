@@ -132,7 +132,7 @@ describe('PlannerShell', () => {
     const dialog = await screen.findByTestId('planner-dialog');
     expect(within(dialog).getByRole('heading', { name: 'Nastavení plánování' })).toBeInTheDocument();
     expect(screen.getByTestId('dialog-layer')).toHaveClass('open');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Zavřít', hidden: false, description: '' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Hotovo' })); // the settings dialog's own footer (the file: "Hotovo")
     expect(screen.queryByTestId('planner-dialog')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /Upravit údaje klubu/ }));
     expect(await screen.findByRole('heading', { name: 'Údaje o klubu' })).toBeInTheDocument();

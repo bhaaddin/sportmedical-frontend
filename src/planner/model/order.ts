@@ -160,7 +160,7 @@ export const clubDisplayName = (profile: Pick<ClubProfile, 'clubName'>): string 
 /** True when any contact field other than the name is filled (`hasAnyClubData`). */
 export const hasAnyClubData = (profile: ClubProfile): boolean =>
   (Object.entries(profile) as [string, unknown][]).some(
-    ([k, v]) => k !== 'clubName' && k !== 'logoUrl' && !!String(v ?? '').trim(),
+    ([k, v]) => k !== 'clubName' && k !== 'logoUrl' && k !== 'clubId' && k !== 'colorHex' && !!String(v ?? '').trim(),
   );
 
 export const contactReady = (profile: ClubProfile): boolean =>

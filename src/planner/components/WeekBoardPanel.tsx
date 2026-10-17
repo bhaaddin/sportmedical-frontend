@@ -1,97 +1,44 @@
 /*
- * WeekBoardPanel - `section.planner.glass-panel` (prototype lines 2905-2941): the toolbar
- * (week arrows, "Dnes", heading, Den / Týden / Měsíc, činnost filter, settings) and the
- * 07:00-19:00 board with its overlay layers.
+ * WeekBoardPanel - `section.planner.glass-panel` (prototype lines 2905-2941): the toolbar (week
+ * arrows, "Dnes", heading + week counter, Den / Týden / Měsíc, činnost filter, the gear) and the
+ * 07:00-19:00 board - cards, club windows, day marks, the now-line, the marking of free time, the
+ * moving of a booking - with the day / month alternates.
  *
- * SHELL. Done: toolbar (wired to the store), day headings, hour labels and every
- * overlay element with its prototype id, all `hidden`.
- * TO DO by the owner of this file:
- *   - the cards in `#grid-events` (`renderWeekEvents`) from `weekEventsModel(ctx, weekStart, filter)`;
- *   - the day / month alternates in `#alternate-view` (`renderAlternative`) from
- *     `dayViewModel` / `monthViewModel`;
- *   - the three gestures on `#day-board`: placement drag (`beginPlacement`, `selectionFromPointer`,
- *     `placementOverlay` -> `#drag-preview` + `#drag-hud`), moving a card (`beginMove`,
- *     `proposalForMove`, `moveOverlay` -> `#move-ghost` `#move-lanes` `#move-hud`) and pulling an edge
- *     (`beginResize`, `proposalForTermExpansion`, `resizeOverlay` -> `#term-resize-*`);
- *     pointer maths: divide client distances by `useStage().scale`, ratios of `board.getBoundingClientRect()`
- *     need no correction; commit through `usePlannerCommands()` (createInterval / moveInterval / resizeInterval);
- *   - day marks (holiday / closed / lunch / hours) from `usePlannerModelState().dayMarks` - new, not in the prototype;
- *   - Esc, Ctrl+Z, right click are handled globally by `usePlannerKeyboard`.
- * Store: `view`, `filter`, `weekStart`, `planning.*`.
+ * The work is in `./board/` (BoardSurface draws and wires, `boardModel` decides what is drawn). This
+ * file only chooses the data it is drawn from:
+ *
+ *   - the lab and the shell tests (no `BoardConfig`): the planner's own data source - exactly the file;
+ *   - the real route (`PlannerPage` provides `realCalendar`): the same board over the clinic's real
+ *     calendar - bookings, blocks, the calendars / worker / služba filters - read with the calendar
+ *     page's queries (`useBoardCalendar`), so the lab never touches the API.
+ *
+ * Club planning's three drag layers (placement, moving a term, pulling an edge) are
+ * `PlanningBoardLayer`, mounted by BoardSurface at the end of `#day-board`.
+ * Store: `view`, `filter`, `weekStart`, `selectedDate`, `planning.*`.
  */
-import { weekHeadModel } from '../model';
-import { usePlannerActions, usePlannerSelector } from '../state/PlannerStoreProvider';
-import { Icon } from './Icons';
-import { usePlannerCtx } from './context';
+import { useMemo } from 'react';
+import { addDays, monthCells } from '../model';
+import { usePlannerSelector } from '../state/PlannerStoreProvider';
+import { BoardSurface } from './board/BoardSurface';
+import { useBoardCalendar } from './board/boardCalendar';
+import { useBoardConfig } from './board/boardConfig';
 
-const VIEWS = [
-  { value: 'day', label: 'Den' },
-  { value: 'week', label: 'Týden' },
-  { value: 'month', label: 'Měsíc' },
-] as const;
+/** The real calendar, read for the days the shown view needs. */
+function RealBoard() {
+  const view = usePlannerSelector((s) => s.view);
+  const weekStart = usePlannerSelector((s) => s.weekStart);
+  const selectedDate = usePlannerSelector((s) => s.selectedDate);
+  const calendarMonth = usePlannerSelector((s) => s.calendarMonth);
+  const days = useMemo(() => {
+    if (view === 'day') return [selectedDate];
+    if (view === 'month') return monthCells(calendarMonth);
+    return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  }, [view, weekStart, selectedDate, calendarMonth]);
+  const calendar = useBoardCalendar(days);
+  return <BoardSurface calendar={calendar} />;
+}
 
 export function WeekBoardPanel() {
-  const ctx = usePlannerCtx();
-  const view = usePlannerSelector((s) => s.view);
-  const filter = usePlannerSelector((s) => s.filter);
-  const weekStart = usePlannerSelector((s) => s.weekStart);
-  const act = usePlannerActions();
-  const head = weekHeadModel(weekStart, ctx.window);
-  return (
-    <section className="planner glass-panel" aria-label="Týdenní kalendář" data-testid="week-board-panel">
-      <div className="planner-toolbar">
-        <div className="planner-arrows">
-          <button className="control" data-command="previousWeek" title="Předchozí týden" aria-label="Předchozí týden" onClick={() => act.previousWeek()}><Icon name="chevron-left" /></button>
-          <button className="control" data-command="nextWeek" title="Následující týden" aria-label="Následující týden" onClick={() => act.nextWeek()}><Icon name="chevron-right" /></button>
-          <button className="control today" data-command="today" onClick={() => act.today(ctx.today)}>Dnes</button>
-        </div>
-        <div className="week-heading"><h2 id="week-range">{head.range}</h2><span id="week-number">{head.weekNumber}</span></div>
-        <div className="planner-filters">
-          <div className="view-segment" aria-label="Typ zobrazení">
-            {VIEWS.map((v) => (
-              <button key={v.value} data-view={v.value} className={view === v.value ? 'active' : undefined} onClick={() => act.setView(v.value)}>{v.label}</button>
-            ))}
-          </div>
-          <label className="filter-select">
-            <span className="sr-only">Filtrovat podle činnosti</span>
-            <select id="activity-filter" value={filter} onChange={(e) => act.setFilter(e.target.value)}>
-              <option value="all">Všechny činnosti</option>
-              {ctx.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <Icon name="chevron-down" />
-          </label>
-          <button className="control settings-control" data-command="settings" title="Nastavení" aria-label="Nastavení" onClick={() => act.openDialog({ kind: 'settings' })}><Icon name="settings" /></button>
-        </div>
-      </div>
-      <div id="week-board" className="week-board">
-        <div className="board-head">
-          <div className="time-head" />
-          <div id="day-headings" className="day-headings">
-            {head.days.map((d) => (
-              <div className="day-title" key={d.date}>{d.weekName}<strong>{d.label}</strong></div>
-            ))}
-          </div>
-        </div>
-        <div className="board-body" id="board-body">
-          <div className="hour-column" id="hour-column">
-            {head.hours.map((h) => <div className="hour-label" key={h.label} style={{ top: `${h.top}px` }}>{h.label}</div>)}
-          </div>
-          <div className="day-board" id="day-board" data-testid="day-board">
-            <div className="grid-lines" aria-hidden="true" />
-            <div className="rugby-decoration" aria-hidden="true" />
-            <div id="grid-events" className="grid-events" />
-            <div id="drag-preview" className="drag-preview" hidden />
-            <div id="drag-hud" className="drag-hud" hidden aria-live="off" />
-            <div id="move-lanes" className="move-lanes" hidden aria-hidden="true" />
-            <div id="move-ghost" className="move-ghost" hidden aria-hidden="true" />
-            <div id="move-hud" className="move-hud" hidden aria-live="off" />
-            <div id="term-resize-range" hidden aria-hidden="true" />
-            <div id="term-resize-added" hidden aria-hidden="true" />
-            <div id="term-resize-hud" hidden aria-live="polite" />
-          </div>
-        </div>
-      </div>
-      <div id="alternate-view" className="alternate-view" hidden={view === 'week'} />
-    </section>
-  );
+  const config = useBoardConfig();
+  return config.realCalendar ? <RealBoard /> : <BoardSurface calendar={null} />;
 }

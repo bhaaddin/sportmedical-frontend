@@ -77,7 +77,7 @@ export function makeSlots(start: string, quantity: number, duration: number): Pl
 
 export function validatePlacement(
   ctx: PlannerContext,
-  p: { date: IsoDate; categoryId: CategoryId | null; start: string; end: string; quantity: number; skipId?: string },
+  p: { date: IsoDate; categoryId: CategoryId | null; start: string; end: string; quantity: number; skipId?: string; allowExtra?: boolean },
 ): Validation {
   const { date, categoryId, start, end, quantity, skipId } = p;
   const demand = categoryId ? demandOf(ctx, categoryId) : undefined;
@@ -93,7 +93,7 @@ export function validatePlacement(
   const others = ctx.sessions.filter((e) => e.id !== skipId);
   const baseline = plannedFrom(ctx, others, categoryId);
   const remain = demand.requested - baseline;
-  if (quantity > remain) return { ok: false, reason: `Zbývá pouze ${remain} osob. Zkraťte časový úsek.` };
+  if (quantity > remain && !p.allowExtra) return { ok: false, reason: `Zbývá pouze ${remain} osob. Zkraťte časový úsek.` };
   const sameDay = others.filter((e) => e.date === date);
   if (sameDay.some((e) => st < timeAsMinutes(e.end) && en > timeAsMinutes(e.start))) {
     return { ok: false, reason: 'Čas se překrývá s již vytvořeným termínem.' };
@@ -249,7 +249,7 @@ export function addPlannedInterval(
   if (!d) return none('Vyberte činnost');
   const duration = slotMinutesOf(ctx, categoryId);
   const end = minutesAsTime(timeAsMinutes(start) + quantity * duration);
-  const test = validatePlacement(ctx, { date, categoryId, start, end, quantity });
+  const test = validatePlacement(ctx, { date, categoryId, start, end, quantity, allowExtra: input.allowExtra === true });
   if (!test.ok) return none(test.reason);
   const candidate: PlannerSession = {
     id: newId(), date, start, end, categoryId, capacity: quantity, booked: 0,

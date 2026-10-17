@@ -59,6 +59,8 @@ export interface PlannerCatalogue {
   dayMarkColors: DayMarkColors;
   /** The club's unfilled places open to the public this many days before a term. */
   releaseDaysBefore: number;
+  /** Real sources: the clinic's setting is 'never' (club settings: releaseUnusedDaysBefore = null); `releaseDaysBefore` is then 0. */
+  releaseNever?: boolean;
   /** What this source can do; the UI hides controls for missing capabilities. */
   capabilities: PlannerCapabilities;
 }
@@ -70,6 +72,26 @@ export interface PlannerCapabilities {
   logoUpload: boolean;
   /** `publishForm` creates a real link. */
   realPublish: boolean;
+  /* ---- real sources (PL-F). Absent = not known; the UI treats `undefined` as allowed. ---- */
+  /** The signed-in user may book (`bookings.create`). */
+  canBook?: boolean;
+  /** ... may move / change / block bookings (`bookings.edit`). */
+  canEditBookings?: boolean;
+  /** ... may create / confirm / change club orders (`bookings.create` + `bookings.edit`). */
+  canPlanClubs?: boolean;
+  /** What the board plans: a club order (the order command, the cards) or plain standard booking. */
+  mode?: 'club' | 'standard';
+}
+
+/** A calendar (column of the real grid) the planner works on; the board opens booking dialogs for one of them. */
+export interface PlannerCalendar {
+  id: string;
+  name: string;
+  /** `#RRGGBB` */
+  color: string;
+  clinicServiceId: string | null;
+  /** The step of the calendar's own grid in minutes. */
+  stepMinutes: number;
 }
 
 export type PlannerWriteErrorCode =
@@ -81,13 +103,29 @@ export type PlannerWriteErrorCode =
   | 'network'
   | 'unknown';
 
+/**
+ * An athlete who is already registered in a term that a change would touch (club planning:
+ * the 409 of `clubOrdersApi.update`). `reason` is the server's machine reason, free text here.
+ */
+export interface AffectedAthlete {
+  name: string;
+  activityName?: string | null;
+  reason?: string | null;
+}
+
 /** Rejection of every write. `message` is Czech and shown to the desk. */
 export class PlannerWriteError extends Error {
   code: PlannerWriteErrorCode;
-  constructor(code: PlannerWriteErrorCode, message: string) {
+  /**
+   * Set with code 'conflict' when the change would cancel registered athletes: the desk lists them and may
+   * repeat the same write with `cancelAffectedAthletes: true` - never silently.
+   */
+  affectedAthletes: AffectedAthlete[];
+  constructor(code: PlannerWriteErrorCode, message: string, affectedAthletes: AffectedAthlete[] = []) {
     super(message);
     this.name = 'PlannerWriteError';
     this.code = code;
+    this.affectedAthletes = affectedAthletes;
   }
 }
 
@@ -113,8 +151,14 @@ export interface TermChange {
 
 export interface MoveIntervalInput extends TermChange {
   id: SessionId;
+  /** Real sources, a booking of a patient: tell the patient about the move (absent = the server's own rule, which is yes). */
+  notifyPatient?: boolean;
+  /** Real sources, a booking: the reason the desk typed when moving it outside the working hours. */
+  overrideReason?: string;
   /** `PlannerSession.version` read with the term; rejects with 'stale' when it moved on. */
   expectedVersion?: string | null;
+  /** The desk confirmed that the registered athletes of the term are cancelled (see `PlannerWriteError.affectedAthletes`). */
+  cancelAffectedAthletes?: boolean;
 }
 
 export interface ResizeIntervalInput {
@@ -126,6 +170,7 @@ export interface ResizeIntervalInput {
   /** Slots added. */
   added: number;
   expectedVersion?: string | null;
+  cancelAffectedAthletes?: boolean;
 }
 
 export interface UpdateIntervalInput {
@@ -136,6 +181,7 @@ export interface UpdateIntervalInput {
   end: ClockTime;
   capacity: number;
   expectedVersion?: string | null;
+  cancelAffectedAthletes?: boolean;
 }
 
 export interface TermWriteResult {
@@ -145,9 +191,22 @@ export interface TermWriteResult {
   notified: { clubLinkUpdated: boolean; individuals: number };
 }
 
+export interface FinishPlanOptions {
+  /** The desk confirmed (after the 409 list in `PlannerWriteError.affectedAthletes`) that registered athletes are cancelled. */
+  cancelAffectedAthletes?: boolean;
+  /** The desk saw the club already has a live order and chose to create this one anyway (a separate order). */
+  skipDuplicateCheck?: boolean;
+}
+
 export interface FinishPlanResult {
   /** The plan was marked ready. */
   ready: boolean;
+  /** Real sources: the order that was created / changed / confirmed by this write. */
+  orderId?: string;
+  /** Real sources: the code the desk reads out ("KO-1A2B3C4D"). */
+  orderCode?: string;
+  /** Real sources: how many windows (ranges) the order holds now. */
+  windows?: number;
 }
 
 export interface PublishFormResult {
@@ -175,6 +234,8 @@ export interface PlannerDataSource {
   listDayMarks(range: DateRange): Promise<DayMark[]>;
   /** Reference day capacity for the mini-calendar fill. */
   getDayBudget(): Promise<DayBudget>;
+  /** Real sources: the calendars the board works on (ids for the booking dialogs). Absent = the source has none. */
+  getCalendars?(): Promise<PlannerCalendar[]>;
 
   /* ------------------------------ writes ------------------------------ */
   /** Drop a činnost into the calendar: validate, merge with adjacent safe blocks, store. */
@@ -189,7 +250,7 @@ export interface PlannerDataSource {
   /** Revert the write that produced `token` (Ctrl+Z / "↶ Zpět"). */
   undo(token: string): Promise<void>;
   /** "Označit plán jako připravený". */
-  finishPlan(): Promise<FinishPlanResult>;
+  finishPlan(options?: FinishPlanOptions): Promise<FinishPlanResult>;
   /** "Vygenerovat" the private club form link. */
   publishForm(): Promise<PublishFormResult>;
   /** Save any subset of the club header / profile. */

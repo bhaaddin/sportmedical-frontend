@@ -26,7 +26,8 @@ import { useDevice } from '../../layout/useDevice';
 import type { PlannerDataSource } from '../data/PlannerDataSource';
 import type { IsoDate } from '../model';
 import { AgendaPanel } from './AgendaPanel';
-import { ClubHeader, type ClubHeaderProps } from './ClubHeader';
+import { ClubHeader, type ClubHeaderMode, type ClubHeaderProps } from './ClubHeader';
+import { PlannerAccountProvider } from './dialogs/generic/account';
 import { CompletionCallout } from './CompletionCallout';
 import { DialogLayer } from './DialogLayer';
 import { MiniCalendarPanel } from './MiniCalendarPanel';
@@ -48,12 +49,14 @@ export interface PlannerShellProps {
   /** Day the board opens on (default today). */
   initialDate?: IsoDate;
   user?: ClubHeaderProps['user'];
+  /** `club` (default): a club's order is planned. `clinic`: the standard calendar, the strip shows the clinic's own data. */
+  headerMode?: ClubHeaderMode;
   /** Render the stage even below 1280 px (tests, screenshots). */
   forceDesktop?: boolean;
 }
 
 /** The panels, in prototype DOM order. Rendered inside the stage once the data is ready. */
-export function PlannerLayers({ user }: { user?: ClubHeaderProps['user'] }) {
+export function PlannerLayers({ user, headerMode }: { user?: ClubHeaderProps['user']; headerMode?: ClubHeaderMode }) {
   usePlannerKeyboard();
   return (
     <>
@@ -65,7 +68,7 @@ export function PlannerLayers({ user }: { user?: ClubHeaderProps['user'] }) {
         </section>
         <WeekBoardPanel />
       </div>
-      <ClubHeader user={user} />
+      <ClubHeader user={user} mode={headerMode} />
       <OrderCommandPanel />
       <PlanningCarousel />
       <div id="status-overlay" aria-live="polite" />
@@ -79,7 +82,7 @@ export function PlannerLayers({ user }: { user?: ClubHeaderProps['user'] }) {
   );
 }
 
-export function PlannerShell({ source, today, initialDate, user, forceDesktop = false }: PlannerShellProps) {
+export function PlannerShell({ source, today, initialDate, user, headerMode, forceDesktop = false }: PlannerShellProps) {
   const device = useDevice();
   if (device !== 'desktop' && !forceDesktop) {
     return (
@@ -92,7 +95,9 @@ export function PlannerShell({ source, today, initialDate, user, forceDesktop = 
     <PlannerProviders source={source} today={today} initialDate={initialDate}>
       <PlannerStage>
         <PlannerGate>
-          <PlannerLayers user={user} />
+          <PlannerAccountProvider user={user}>
+            <PlannerLayers user={user} headerMode={headerMode} />
+          </PlannerAccountProvider>
         </PlannerGate>
       </PlannerStage>
     </PlannerProviders>

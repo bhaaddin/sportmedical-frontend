@@ -22,7 +22,7 @@
  * `smartEditViewModel`, `moveConfirmModel`, `expandConfirmModel`, `finishPlanModel`,
  * `publishModel`, `emailDraft`, `formPreviewRows`, `clubOccupancyModel` …).
  */
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import type { DialogState } from '../model';
 import { usePlannerActions, usePlannerSelector } from '../state/PlannerStoreProvider';
 import { Icon } from './Icons';
@@ -76,12 +76,66 @@ export interface DialogFrameProps {
   children?: ReactNode;
 }
 
-/** The prototype's modal markup: `.modal-scrim` + `section.modal-card` with header / body / footer. */
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+const FIRST_FIELD = '[data-autofocus],input:not([disabled]):not([type="hidden"]):not([type="file"]),select:not([disabled]),textarea:not([disabled]),[data-primary]';
+
+/**
+ * The prototype's modal markup: `.modal-scrim` + `section.modal-card` with header / body / footer.
+ *
+ * Keyboard: on opening, focus goes to the first field (`openDialog` focuses `input,select,
+ * [data-primary]`), else the card itself; Tab and Shift+Tab stay inside the card; Esc is the
+ * planner's global rule (`usePlannerKeyboard`). Focus returns to whatever opened the dialog when
+ * the layer closes (see `DialogLayer`).
+ */
 export function DialogFrame({ title, subtitle, wide = false, className, footer, onClose, children }: DialogFrameProps) {
+  const card = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const el = card.current;
+    if (!el) return;
+    const target = el.querySelector<HTMLElement>(FIRST_FIELD) ?? el;
+    target.focus({ preventScroll: true });
+  }, []);
+
+  const trap = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key !== 'Tab') return;
+    const el = card.current;
+    if (!el) return;
+    const items = [...el.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((n) => !n.hidden);
+    if (items.length === 0) {
+      event.preventDefault();
+      el.focus();
+      return;
+    }
+    const first = items[0]!;
+    const last = items[items.length - 1]!;
+    const active = document.activeElement;
+    if (!el.contains(active) || active === el) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+    } else if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <>
       <div className="modal-scrim" data-close="1" onClick={onClose} />
-      <section role="dialog" aria-modal="true" aria-label={title} className={`modal-card${wide ? ' wide' : ''}${className ? ` ${className}` : ''}`} data-testid="planner-dialog">
+      <section
+        ref={card}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        className={`modal-card${wide ? ' wide' : ''}${className ? ` ${className}` : ''}`}
+        data-testid="planner-dialog"
+        onKeyDown={trap}
+      >
         <div className="modal-header">
           <div>
             <h2 className="modal-title">{title}</h2>
@@ -99,15 +153,44 @@ export function DialogFrame({ title, subtitle, wide = false, className, footer, 
 export function DialogLayer() {
   const dialog = usePlannerSelector((s) => s.dialog);
   const act = usePlannerActions();
-  const { profile, catalogue } = usePlannerModelState();
+  const model = usePlannerModelState();
+  const { profile, catalogue } = model;
   const close = () => act.closeDialog();
+
+  /* Whoever opened the dialog gets the focus back when the layer closes. */
+  const opener = useRef<HTMLElement | null>(null);
+  const isOpen = dialog !== null;
+  if (isOpen && opener.current === null && typeof document !== 'undefined') {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body) opener.current = active;
+  }
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (isOpen) {
+      wasOpen.current = true;
+      return;
+    }
+    if (!wasOpen.current) return;
+    wasOpen.current = false;
+    const back = opener.current;
+    opener.current = null;
+    if (back && back.isConnected) back.focus({ preventScroll: true });
+  }, [isOpen]);
+
   let content: ReactNode = null;
+  let frameless = false;
   if (dialog) {
     const meta = dialogMeta(dialog, { clubName: profile?.clubName ?? '', clinicName: catalogue?.clinicName ?? '' });
-    const render = dialogRegistry[dialog.kind] as ((props: { dialog: DialogState; close: () => void }) => { body?: ReactNode; footer?: ReactNode; className?: string; title?: string; subtitle?: string }) | undefined;
-    const filled = render?.({ dialog, close });
-    content = (
+    const render = dialogRegistry[dialog.kind] as
+      | ((props: { dialog: DialogState; close: () => void; model: typeof model }) => { body?: ReactNode; footer?: ReactNode; className?: string; title?: string; subtitle?: string; frameless?: boolean })
+      | undefined;
+    const filled = render?.({ dialog, close, model });
+    frameless = filled?.frameless === true;
+    content = frameless ? (
+      <>{filled?.body ?? null}</>
+    ) : (
       <DialogFrame
+        key={`${dialog.kind}:${'id' in dialog ? dialog.id : ''}`}
         title={filled?.title ?? meta.title}
         subtitle={filled?.subtitle ?? meta.subtitle}
         wide={meta.wide}
@@ -120,7 +203,7 @@ export function DialogLayer() {
     );
   }
   return (
-    <div id="dialog-layer" className={dialog ? 'open' : undefined} aria-live="polite" data-testid="dialog-layer" data-dialog={dialog?.kind ?? ''}>
+    <div id="dialog-layer" className={dialog && !frameless ? 'open' : undefined} aria-live="polite" data-testid="dialog-layer" data-dialog={dialog?.kind ?? ''}>
       {content}
     </div>
   );

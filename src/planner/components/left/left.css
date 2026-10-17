@@ -1,0 +1,68 @@
+/*
+ * Additions of the left column (mini-calendar, flyout, agenda, reservation drawer) that the
+ * prototype's stylesheet does not have. Scoped under .sm-planner like planner.css; nothing here
+ * edits a generated rule.
+ */
+
+/* A closed day (holiday, closure): the number is drawn in the holiday colour, inline. */
+.sm-planner .day-cell.spectrum-day.is-closed .day-number { font-weight: 700; }
+.sm-planner .day-cell.spectrum-day.is-closed.other-month .day-number { opacity: 0.72; }
+
+/* Today: a short cyan bar under the number (the prototype has no marker for it). */
+.sm-planner #mini-days .day-cell.spectrum-day.is-today .day-zoom-visual::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  width: 14px;
+  height: 2px;
+  margin-left: -7px;
+  border-radius: 2px;
+  background: var(--cyan, #23f2e7);
+  box-shadow: 0 0 6px #23f2e7aa;
+  z-index: 5;
+}
+
+.sm-planner .legend-closed {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  border: 1.5px solid currentColor;
+}
+
+/* Day records under a booking card of the reservation drawer. */
+.sm-planner .rd-record-list { display: grid; gap: 6px; margin-top: 10px; }
+.sm-planner .rd-record {
+  display: grid;
+  grid-template-columns: 10px 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #0a4962;
+  border-radius: 8px;
+  background: #031d2e;
+  color: #e9f6ff;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.sm-planner .rd-record:hover { border-color: #17e5d8; background: #06293d; }
+.sm-planner .rd-record-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tone, #6e91a5); }
+.sm-planner .rd-record-copy { display: grid; min-width: 0; }
+.sm-planner .rd-record-copy b { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sm-planner .rd-record-copy small { color: #8fb1c5; font-size: 11.5px; }
+.sm-planner .rd-record-price { color: #cfe7f1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sm-planner .rd-record-price.is-none { color: #7c97a8; }
+.sm-planner .rd-record-open { color: #17e5d8; font-size: 12px; white-space: nowrap; }
+.sm-planner .rd-day-actions { display: flex; gap: 10px; margin-top: 12px; }
+.sm-planner .rd-day-total { color: #8fb1c5; font-size: 12px; margin-top: 8px; }
+
+/*
+ * The application resets `button { padding: 0 }`; the prototype relies on the browser's own 1px 6px for the
+ * month arrows (their box is 41 px wide there, 35 px without it).
+ */
+.sm-planner .month-buttons .icon-button { padding: 1px 6px; }

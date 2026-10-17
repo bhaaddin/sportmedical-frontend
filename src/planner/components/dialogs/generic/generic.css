@@ -1,0 +1,99 @@
+/*
+ * The few rules the generic dialogs and the header need beyond planner.css (generated from the
+ * prototype): the unread badge of the bell, the read-only logo slot, the notification rows, the
+ * toast's undo button (the prototype styled it inline). Scoped under .sm-planner like the rest.
+ */
+.sm-planner .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Bell: the unread count sits on the bell's corner; nothing is drawn at zero (as in the prototype). */
+.sm-planner #dashboard .club-user-bell { position: relative !important; }
+.sm-planner .club-bell-badge {
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #ff4d6d;
+  color: #fff;
+  font: 750 9.5px/15px "Segoe UI", Arial, sans-serif;
+  text-align: center;
+  box-shadow: 0 0 0 1.5px #001421;
+  pointer-events: none;
+}
+
+/* Logo slot without an upload: the club's initials instead of the "Změnit logo" label. */
+.sm-planner #dashboard .club-logo-slot.is-readonly { cursor: default; }
+.sm-planner #dashboard .club-logo-label.is-readonly { cursor: default !important; }
+.sm-planner #dashboard .club-logo-label.is-readonly small { max-width: 88px; }
+
+/* Toast: the "↶ Zpět" button of showPlanToast. */
+.sm-planner #toast-layer #undo-plan-action {
+  pointer-events: auto;
+  background: #15485a;
+  color: #9dfcf1;
+  border: 1px solid #179caa;
+  border-radius: 5px;
+  padding: 6px 10px;
+  margin-left: 10px;
+  cursor: pointer;
+  font: inherit;
+}
+.sm-planner #toast-layer #undo-plan-action:hover { background: #1a5d73; }
+.sm-planner #toast-layer #undo-plan-action:focus-visible { outline: 2px solid #5ff9ed; outline-offset: 2px; }
+
+/* Notifications dialog. */
+.sm-planner .generic-note-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sm-planner .generic-note-head .event-info-note { margin-top: 0; flex: 1; }
+.sm-planner .generic-note-day { margin-top: 14px; }
+.sm-planner .generic-note { display: flex; align-items: stretch; border-left: 3px solid transparent; }
+.sm-planner .generic-note.is-unread { border-left-color: #03ddd8; background: #05303f; }
+.sm-planner .generic-note.is-nested { padding-left: 22px; }
+.sm-planner .generic-note .search-result { flex: 1; min-width: 0; gap: 14px; }
+.sm-planner .generic-note .search-result > span:first-child { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.sm-planner .generic-note .search-result small,
+.sm-planner .generic-note-group small { color: #9cc0d2; font-size: 12.5px; overflow-wrap: anywhere; }
+.sm-planner .generic-note .result-aux { white-space: nowrap; align-self: flex-start; }
+.sm-planner .generic-note-delete {
+  flex: none;
+  width: 34px;
+  border: 0;
+  border-bottom: 1px solid #154558;
+  background: transparent;
+  color: #9cc0d2;
+  font-size: 20px;
+  cursor: pointer;
+}
+.sm-planner .generic-note-delete:hover { color: #ff8da7; background: #07586e; }
+.sm-planner .generic-note-group > span:first-child { display: flex; flex-direction: column; gap: 4px; }
+.sm-planner .generic-note-boundary {
+  margin: 8px 0 4px;
+  color: #03ddd8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sm-planner .generic-note-boundary::before,
+.sm-planner .generic-note-boundary::after { content: ''; flex: 1; height: 1px; background: #03ddd8; opacity: 0.6; }
+.sm-planner .generic-note-occupancy-title { margin-top: 22px; }
+
+/* Profile dialog: the initials badge is text, not an icon. */
+.sm-planner .generic-initials { font-size: 28px; font-weight: 700; }
+.sm-planner .modal-card .settings-row .app-button { flex: none; margin-left: 16px; }
+
+/* The notification list scrolls inside the dialog instead of pushing its footer off the card. */
+.sm-planner .generic-note-scroll { max-height: 300px; overflow: auto; margin-top: 4px; padding-right: 4px; }

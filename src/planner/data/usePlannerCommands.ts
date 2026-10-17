@@ -53,7 +53,7 @@ export function usePlannerCommands(): PlannerCommands {
       updateInterval: (input) => after(source.updateInterval(input)),
       deleteInterval: (id) => after(source.deleteInterval(id)),
       undo: (token) => after(source.undo(token)),
-      finishPlan: () => after(source.finishPlan()),
+      finishPlan: (options) => after(source.finishPlan(options)),
       publishForm: () => after(source.publishForm()),
       saveClubProfile: (patch) => after(source.saveClubProfile(patch)),
       saveLogo: (file) => after(source.saveLogo(file)),

@@ -1,0 +1,302 @@
+/*
+ * The week board's additions to the prototype's CSS (planner.css is generated and never edited).
+ * Everything the file does not have - day marks, club windows, the real bookings, the now-line, the
+ * selection - is drawn here, in the file's palette, scoped under .sm-planner.
+ */
+
+/* ---- the body scrolls when a finer resolution makes the timeline taller than the file's 455 px ---- */
+.sm-planner .planner .board-body {
+  align-items: flex-start;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.sm-planner .planner .board-body.is-tall { overflow-y: auto; }
+.sm-planner .planner .board-body::-webkit-scrollbar { display: none; }
+.sm-planner .planner .board-body > .hour-column { flex: none; align-self: flex-start; }
+.sm-planner .planner .board-body > .day-board { flex: 1; align-self: flex-start; min-width: 0; }
+
+/* ---- finer grid lines of the chosen resolution (the hour lines come from .grid-lines) ---- */
+.sm-planner .board-substeps {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--step-px) - 1px),
+    rgba(20, 79, 105, 0.26) calc(var(--step-px) - 1px),
+    rgba(20, 79, 105, 0.26) var(--step-px)
+  );
+}
+
+/* ---- days: header flags ---- */
+.sm-planner .day-title { position: relative; }
+.sm-planner .day-title.is-today strong {
+  color: #04120f;
+  background: #23f2e7;
+  border-radius: 9px;
+  padding: 0 7px;
+  box-shadow: 0 0 12px rgba(35, 242, 231, 0.45);
+}
+.sm-planner .day-title.is-closed { background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.045) 0 6px, transparent 6px 12px); }
+.sm-planner .day-title .day-flag {
+  position: absolute;
+  bottom: 2px;
+  left: 4px;
+  right: 4px;
+  font-size: 9.5px;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #e7cba9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  line-height: 1;
+}
+.sm-planner .day-title.has-flag { justify-content: flex-start; padding-top: 6px; }
+
+/* ---- day shading: outside working hours, closed days, the lunch band ---- */
+.sm-planner .board-shading {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.sm-planner .board-shade {
+  position: absolute;
+  left: calc(var(--col) * 100% / 7);
+  width: calc(100% / 7);
+}
+.sm-planner .board-shade.is-off { background: rgba(0, 8, 16, 0.38); }
+.sm-planner .board-shade.is-nohours { top: 0; bottom: 0; background: rgba(0, 8, 16, 0.3); }
+.sm-planner .board-shade.is-closed {
+  top: 1px;
+  bottom: 1px;
+  left: calc(var(--col) * 100% / 7 + 3px);
+  width: calc(100% / 7 - 6px);
+  border-radius: 5px;
+  border: 1px dashed var(--shade-line);
+  background-image: var(--shade-hatch);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  color: #f4e6d2;
+  text-shadow: 0 1px 3px #001a2d;
+}
+.sm-planner .board-shade.is-lunch {
+  left: calc(var(--col) * 100% / 7 + 3px);
+  width: calc(100% / 7 - 6px);
+  border-radius: 5px;
+  border: 1px dashed var(--shade-line);
+  background-image: var(--shade-hatch);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #cfe7f1;
+}
+
+/* ---- club windows and manual blocks (one block per day across the lunch) ---- */
+.sm-planner .board-windows {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.sm-planner .board-window {
+  position: absolute;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  overflow: hidden;
+  text-align: center;
+  padding: 0 6px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  color: #e7f4ff;
+  cursor: pointer;
+  border: 1px dashed var(--win-line);
+  border-left-width: 3px;
+  border-left-style: solid;
+  border-radius: 5px;
+  background-color: #002133;
+  background-image: var(--win-hatch);
+}
+.sm-planner .board-window.is-manual { color: #b4cbdc; border-left-style: dashed; border-left-width: 1px; }
+.sm-planner .board-window:hover { filter: brightness(1.25); }
+.sm-planner .board-window:focus-visible { outline: 2px solid #23f2e7; outline-offset: 1px; }
+.sm-planner .board-window .win-label { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sm-planner .board-window .win-time { font-size: 10px; font-weight: 500; opacity: 0.85; white-space: nowrap; }
+
+/* ---- cards ---- */
+.sm-planner .schedule-event.is-cancelled { opacity: 0.5; text-decoration: line-through; }
+.sm-planner .schedule-event.is-selected { outline: 2px solid #23f2e7; outline-offset: 1px; z-index: 12; }
+.sm-planner .schedule-event.is-proposed { outline: 2px dashed var(--ev-border); outline-offset: 1px; z-index: 12; }
+.sm-planner .schedule-event.is-moving-origin { opacity: 0.3; }
+.sm-planner .schedule-event .event-price {
+  display: block;
+  font-size: 11px;
+  font-weight: 650;
+  color: #bff7f1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.sm-planner .schedule-event .event-time-row { display: flex; justify-content: space-between; gap: 6px; }
+.sm-planner .schedule-event .event-time-row .event-price { font-weight: 500; color: #d9e7f8; }
+.sm-planner .schedule-event.board-booking .event-contents strong { font-weight: 650; }
+.sm-planner .board-chip {
+  position: absolute;
+  z-index: 4;
+  border: 1px solid #1c6b82;
+  border-radius: 6px;
+  background: #002a3f;
+  color: #e7f4ff;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 0;
+}
+.sm-planner .board-chip:hover { background: #075368; }
+
+/* ---- now-line, today's column ---- */
+.sm-planner .board-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  z-index: 6;
+  pointer-events: none;
+  border-top: 2px solid var(--now-color);
+}
+.sm-planner .board-now-pill {
+  position: absolute;
+  left: 2px;
+  top: -9px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--now-color);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.sm-planner .board-today-edge {
+  position: absolute;
+  z-index: 5;
+  width: 2px;
+  pointer-events: none;
+  background: var(--now-edge);
+}
+
+/* ---- selection by dragging on a free place ---- */
+.sm-planner .board-selection {
+  left: calc(var(--col) * 100% / 7 + 3px);
+  width: calc(100% / 7 - 6px);
+  z-index: 7;
+  border-style: solid;
+}
+.sm-planner .day-board[data-selecting] { cursor: ns-resize; user-select: none; }
+.sm-planner .day-board[data-pickable] { cursor: cell; }
+.sm-planner .day-board[data-moving] { cursor: grabbing; }
+.sm-planner .day-board[data-moving] * { cursor: grabbing !important; }
+.sm-planner .board-move-lanes {
+  left: calc(var(--col) * 100% / 7);
+  width: calc(100% / 7);
+}
+.sm-planner .board-move-ghost {
+  left: calc(var(--col) * 100% / 7 + 3px);
+  width: calc(100% / 7 - 6px);
+}
+.sm-planner .board-move-ghost .move-ghost-reason { font-size: 10.5px; font-weight: 700; color: #ffd2d7; }
+
+/* ---- toolbar: the two entry points and the status words ---- */
+.sm-planner .planner-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.sm-planner .planner-actions .control { padding: 0 11px; font-size: 13px; font-weight: 650; white-space: nowrap; gap: 6px; }
+.sm-planner .planner-actions .control.primary {
+  background: linear-gradient(160deg, #026755, #00a89b);
+  border-color: #06cacf;
+  box-shadow: 0 0 12px #00a79b66;
+}
+.sm-planner .planner-actions .control .icon { width: 17px; height: 17px; }
+.sm-planner .board-notice {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 15;
+  max-width: 70%;
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 650;
+  background: #052a3c;
+  color: #e7f4ff;
+  border: 1px solid #19708a;
+  box-shadow: 0 8px 24px #000a;
+  pointer-events: none;
+}
+.sm-planner .board-notice[data-tone='error'] { background: #4b1525; border-color: #ec667a; color: #ffd2d7; }
+
+/* ---- day / month alternates ---- */
+.sm-planner .alt-row .alt-sub { color: #9bc2d6; font-size: 12px; margin-left: 8px; font-weight: 500; }
+.sm-planner .alt-row.is-booking > span:first-child { color: #9ee9ff; }
+.sm-planner .alt-row .alt-price { color: #bff7f1; font-size: 12px; margin-left: 8px; }
+.sm-planner .month-tile { text-align: left; color: inherit; font: inherit; }
+
+/* ---- the card summary (hover and click) - a MUI Tooltip / Popper in the file's colours ---- */
+.board-tip {
+  min-width: 190px;
+  max-width: 290px;
+  padding: 2px 4px;
+  color: #eaf7ff;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.board-tip strong { display: block; font-size: 13px; margin-bottom: 2px; }
+.board-tip dl { margin: 4px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 1px 10px; }
+.board-tip dt { color: #8caec3; }
+.board-tip dd { margin: 0; font-weight: 600; }
+
+/* ---- simultaneous cards share the day column: the narrower the lane, the less each card carries ---- */
+.sm-planner .schedule-event[data-lanes='2'],
+.sm-planner .schedule-event[data-lanes='3'] { padding: 0 4px; gap: 4px; }
+.sm-planner .schedule-event[data-lanes='2'] .event-symbol,
+.sm-planner .schedule-event[data-lanes='3'] .event-symbol { display: none; }
+.sm-planner .schedule-event[data-lanes='2'] .event-price { display: none; }
+.sm-planner .schedule-event[data-lanes='3'] .event-title { font-size: 10px; letter-spacing: -0.2px; }
+.sm-planner .schedule-event[data-lanes='3'] .event-contents strong,
+.sm-planner .schedule-event[data-lanes='3'] .event-price { display: none; }
+.sm-planner .schedule-event[data-lanes='3'] .event-time { font-size: 10px; }
+.sm-planner .settings-control.has-filter { position: relative; }
+.sm-planner .settings-control.has-filter::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #23f2e7;
+  box-shadow: 0 0 8px #23f2e7;
+}
