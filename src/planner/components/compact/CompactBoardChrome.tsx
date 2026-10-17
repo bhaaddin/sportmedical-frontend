@@ -151,9 +151,9 @@ export function BoardStrip({ mainRef, fit, onFit, sidebarOpen, sidebarPinned, on
           </button>
         )}
         {view === 'week' ? (
-          <div className="compact-fit" role="group" aria-label="Rozsah kalendáře">
-            <button type="button" aria-pressed={fit === 'day'} data-testid="compact-fit-day" aria-label="Zobrazit jeden den" onClick={() => onFit('day')}>1 den</button>
-            <button type="button" aria-pressed={fit === 'week'} data-testid="compact-fit-week" aria-label="Zobrazit celý týden" onClick={() => onFit('week')}>7 dní</button>
+          <div className="compact-fit view-segment" role="group" aria-label="Rozsah kalendáře">
+            <button type="button" className={fit === 'day' ? 'active' : undefined} aria-pressed={fit === 'day'} data-testid="compact-fit-day" aria-label="Zobrazit jeden den" onClick={() => onFit('day')}>1 den</button>
+            <button type="button" className={fit === 'week' ? 'active' : undefined} aria-pressed={fit === 'week'} data-testid="compact-fit-week" aria-label="Zobrazit celý týden" onClick={() => onFit('week')}>7 dní</button>
           </div>
         ) : null}
       </div>

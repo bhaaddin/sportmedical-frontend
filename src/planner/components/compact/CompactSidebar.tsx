@@ -118,10 +118,9 @@ export function CompactSidebar({ open, pinned, layout, onClose, openerRef, child
         inert={modal && !open ? true : undefined}
       >
         {modal ? (
-          <div className="compact-sheet-head">
-            <span className="compact-grabber" aria-hidden="true" />
-            <strong>Kalendář a termíny</strong>
-            <button type="button" className="compact-sheet-close" data-sheet-close="" aria-label="Zavřít" onClick={onClose}>
+          <div className="compact-sheet-head modal-header">
+            <h2 className="modal-title">Kalendář a termíny</h2>
+            <button type="button" className="modal-x" data-sheet-close="" aria-label="Zavřít" title="Zavřít" onClick={onClose}>
               <Icon name="close" />
             </button>
           </div>

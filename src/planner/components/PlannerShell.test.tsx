@@ -187,13 +187,22 @@ describe('PlannerShell', () => {
 });
 
 describe('PlannerShell on narrower screens', () => {
-  it('shows the desktop-only notice below 1280 px, the stage when forced', async () => {
+  it('draws the reflowed tablet / phone layouts below 1280 px and the stage when forced', async () => {
     setViewport(VIEWPORTS.tablet);
     const { unmount } = mount();
-    expect(screen.getByTestId('planner-desktop-only')).toHaveTextContent('jen na počítači');
-    expect(screen.queryByTestId('planner-stage')).toBeNull();
+    const stage = await screen.findByTestId('planner-stage');
+    expect(screen.getByTestId('planner-root')).toHaveAttribute('data-layout', 'tablet');
+    expect(screen.queryByTestId('planner-desktop-only')).toBeNull();
+    expect(stage.style.transform).toBe(''); // no design stage: the panels reflow
     unmount();
+    setViewport(VIEWPORTS.phone);
+    const phone = mount();
+    await screen.findByTestId('planner-stage');
+    expect(screen.getByTestId('planner-root')).toHaveAttribute('data-layout', 'phone');
+    phone.unmount();
     mount(undefined, { forceDesktop: true });
-    expect(await screen.findByTestId('planner-stage')).toBeInTheDocument();
+    const forced = await screen.findByTestId('planner-stage');
+    expect(screen.getByTestId('planner-root')).toHaveAttribute('data-layout', 'desktop');
+    expect(forced.style.transform).toBe('scale(1)');
   });
 });
