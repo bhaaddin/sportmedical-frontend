@@ -1720,9 +1720,6 @@
 .sm-planner .fx-voltage.is-firing .voltage-svg{opacity:1;animation:smp-voltageFlash calc(.78s * var(--fx-speed)) steps(4,end) 1 both}
 .sm-planner .fx-voltage.is-firing .voltage-svg path{stroke-width:3.2;stroke-dasharray:85 170;animation:smp-electroSurge calc(.74s * var(--fx-speed)) ease-out both}
 .sm-planner .fx-voltage.is-firing .arrow-energy{opacity:1;animation:smp-electricFlash calc(.72s * var(--fx-speed)) ease-out both}
-
-.sm-planner .fx-voltage.is-firing 
-@keyframes electricDrift{.sm-planner from{background-position:100% 0}.sm-planner to{background-position:-110% 0}}
 @keyframes smp-electroTrace{from{stroke-dashoffset:200}to{stroke-dashoffset:-200}}
 @keyframes smp-electroSurge{0%{stroke-dashoffset:170}45%{stroke-dashoffset:-150}100%{stroke-dashoffset:-300}}
 @keyframes smp-electricFlash{0%{opacity:0;filter:brightness(1)}15%{opacity:1;filter:brightness(2.8)}32%{opacity:.25}46%{opacity:1;filter:brightness(3)}70%{opacity:.7}100%{opacity:0}}

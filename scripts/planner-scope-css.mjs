@@ -68,6 +68,16 @@ ast.walkRules((rule) => {
   if (isKeyframes(rule.parent)) return; // from / to / 50%
   const kept = [];
   for (const selector of rule.selectors) {
+    /*
+     * The prototype has a stray ".fx-voltage.is-firing" with no body right in front of "@keyframes electricDrift{…}"
+     * (line ~1759), which the CSS parser reads as ONE rule whose selector contains "@keyframes". A browser throws an
+     * invalid selector away - so in the file as delivered that rule and its keyframes never applied - but the production
+     * minifier (lightningcss) refuses it. Dropping it here reproduces exactly what the file does in a browser.
+     */
+    if (selector.includes('@')) {
+      stats.droppedSelectors++;
+      continue;
+    }
     if (shouldDrop(selector)) {
       stats.droppedSelectors++;
       continue;
