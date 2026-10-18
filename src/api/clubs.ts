@@ -142,6 +142,78 @@ export const clubsApi = {
     }),
 };
 
+/* ── Summaries of many clubs in one call - `GET /api/v1/clubs/summaries?clubIds=a,b,c` ──
+ *
+ * The club list used to ask `/api/v1/clubs/{id}/summary` once per card. The batch route answers an ARRAY of exactly
+ * what the single route answers, in the order asked. A server that does not have it yet answers 404 / 405: that is
+ * detected once, remembered for the rest of the session, and the callers go back to one request per club.
+ */
+
+/** How many ids go into one call (a GUID is 37 characters with its comma; the server takes 500, a URL far fewer). */
+export const CLUB_SUMMARIES_CHUNK = 100;
+
+/** `null` = not asked yet, `true` = the route answered, `false` = the server has no such route. */
+let summariesRoute: boolean | null = null;
+
+/** Test hook. */
+export function resetClubSummariesRouteForTests(): void {
+  summariesRoute = null;
+}
+
+/** Whether this session already learned that the server has no batch route. */
+export const clubSummariesRouteMissing = (): boolean => summariesRoute === false;
+
+const statusOf = (error: unknown): number | undefined =>
+  (error as { response?: { status?: number } } | null)?.response?.status;
+
+/** The answer as a list, whatever envelope it comes in; anything else is "no answer". */
+function asSummaryList(data: unknown): unknown[] | null {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object') {
+    const r = data as { data?: unknown; value?: unknown; items?: unknown };
+    for (const inner of [r.data, r.value, r.items]) if (Array.isArray(inner)) return inner;
+  }
+  return null;
+}
+
+export const clubSummariesApi = {
+  /**
+   * The summaries of these clubs, raw (callers normalize them), one list in the order asked - or `null` when the
+   * server has no batch route (404 / 405; remembered, so the next call answers `null` without a request). Any other
+   * failure is thrown and not remembered.
+   */
+  fetch: async (clubIds: string[]): Promise<unknown[] | null> => {
+    if (summariesRoute === false) return null;
+    if (clubIds.length === 0) return [];
+
+    const chunks: string[][] = [];
+    for (let i = 0; i < clubIds.length; i += CLUB_SUMMARIES_CHUNK) chunks.push(clubIds.slice(i, i + CLUB_SUMMARIES_CHUNK));
+
+    try {
+      const answers = await Promise.all(
+        chunks.map(async (ids) => {
+          const res = await client.get('/api/v1/clubs/summaries', { params: { clubIds: ids.join(',') } });
+          return asSummaryList(res.data);
+        }),
+      );
+      /* A 200 that is not a list (a static fallback page) is not the batch route either. */
+      if (answers.some((a) => a === null)) {
+        summariesRoute = false;
+        return null;
+      }
+      summariesRoute = true;
+      return answers.flatMap((a) => a ?? []);
+    } catch (error) {
+      const status = statusOf(error);
+      if (status === 404 || status === 405) {
+        summariesRoute = false;
+        return null;
+      }
+      throw error;
+    }
+  },
+};
+
 /* ── Settings of the club blocks - `GET/PUT /api/v1/settings/clubs` (C4) ── */
 
 export interface ClubSettings {

@@ -4,24 +4,90 @@
  * `fallback` (the older "Místa klubu" card) is drawn instead, so the screen never goes blank.
  */
 import { Box, LinearProgress, Skeleton, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
+import { clubSummariesApi, clubSummariesRouteMissing } from '../../../api/clubs';
 import { clubOrdersApi, ORDER_STATUSES, ORDER_STATUS_LABEL } from '../../../api/clubOrders';
 import type { ClubSummary } from '../../../api/clubOrders';
 import { SectionLabel, SoftCard, StatusChip } from '../../ui';
 import { minutesText, normalizeSummary, seatPercent, STATUS_TONE } from './orderLogic';
 
+/** How long a summary counts as current (the single call and the batch seeding it). */
+const SUMMARY_STALE_MS = 60 * 1000;
+
+/** The query key of one club's summary: the club screen, its overview and the club list's cards all read this one. */
+export const clubSummaryKey = (clubId: string) => ['club-summary', clubId] as const;
+
 /**
  * `enabled` is false for a club nobody works with (a deactivated one): its card draws from the block totals and no
- * request is made for it.
+ * request is made for it. It is also false on the club list while the batch call is on its way (or has answered):
+ * the list's cards then read what the batch seeded into the cache.
  */
 export function useClubSummary(clubId: string, enabled = true) {
   return useQuery<ClubSummary>({
-    queryKey: ['club-summary', clubId],
+    queryKey: clubSummaryKey(clubId),
     queryFn: async () => normalizeSummary(await clubOrdersApi.clubSummary(clubId)),
-    staleTime: 60 * 1000,
+    staleTime: SUMMARY_STALE_MS,
     retry: false,
     enabled: enabled && clubId !== '',
   });
+}
+
+/**
+ * Writes the batch answer into every club's own summary cache entry (same key as {@link useClubSummary}).
+ * The answer is matched by the `clubId` each row carries, or by position when a row has none (the batch answers in
+ * the order asked). `onlyMissing` leaves an entry that already holds data alone.
+ */
+function seedSummaries(client: QueryClient, ids: string[], rows: unknown[], onlyMissing: boolean): void {
+  rows.forEach((raw, index) => {
+    if (raw === null || typeof raw !== 'object') return;
+    const named = (raw as { clubId?: unknown }).clubId;
+    const id = typeof named === 'string' && named !== '' ? named : rows.length === ids.length ? ids[index] : undefined;
+    if (id === undefined || !ids.includes(id)) return;
+    if (onlyMissing && client.getQueryData(clubSummaryKey(id)) !== undefined) return;
+    client.setQueryData<ClubSummary>(clubSummaryKey(id), normalizeSummary({ ...(raw as ClubSummary), clubId: id }));
+  });
+}
+
+/**
+ * The club list asks for every active club's summary ONCE (`GET /clubs/summaries`) and seeds each club's single
+ * summary entry, so the cards, the club screen and `ClubSummaryCard` read it from the cache.
+ *
+ *   - `pending`  the batch call is on its way: nobody asks per club yet
+ *   - `batch`    answered and seeded: the cards read the cache and ask nothing
+ *   - `single`   the server has no batch route (404 / 405, remembered for the session) or the call failed: the
+ *                cards ask per club, exactly as before
+ *
+ * The batch query sits under the `club-summary` key, so a club-world invalidation refreshes it (one call again)
+ * while the cards, which are disabled in `batch` mode, do not each ask on their own.
+ */
+export function useClubSummaries(clubIds: string[]): 'pending' | 'batch' | 'single' {
+  const client = useQueryClient();
+  const key = clubIds.join(',');
+  const known = clubSummariesRouteMissing();
+  const query = useQuery<unknown[] | null>({
+    queryKey: ['club-summary', 'batch', key],
+    queryFn: async () => {
+      const rows = await clubSummariesApi.fetch(clubIds);
+      if (rows !== null) seedSummaries(client, clubIds, rows, false);
+      return rows;
+    },
+    staleTime: SUMMARY_STALE_MS,
+    retry: false,
+    enabled: clubIds.length > 0 && !known,
+  });
+
+  /* A fresh batch answer that is still cached while the single entries were dropped: put them back. */
+  const rows = query.data;
+  useEffect(() => {
+    if (rows) seedSummaries(client, clubIds, rows, true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` stands for clubIds
+  }, [rows, key, client]);
+
+  if (clubIds.length === 0) return 'batch';
+  if (known || query.isError || query.data === null) return 'single';
+  return query.data === undefined ? 'pending' : 'batch';
 }
 
 function Figure({ value, label }: { value: number; label: string }) {

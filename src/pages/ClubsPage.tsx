@@ -52,6 +52,7 @@ import type { ClubFilter } from './clubs/clubOrders';
 import { buildClubRow } from './clubs/clubRow';
 import type { ClubRow } from './clubs/clubRow';
 import { ClubCard } from './clubs/ClubCard';
+import { useClubSummaries } from '../components/clubs/orders/ClubSummaryCard';
 import { prefetchClubScreen } from '../api/warmReads';
 import { PayerDialog } from './clubs/PayerDialog';
 import { PinnedActions } from './clubs/PinnedActions';
@@ -170,6 +171,11 @@ export default function ClubsPage() {
   if (clubOrdersQuery.isError) {
     missingParts.push({ what: 'objednávky klubů (částky k fakturaci se nezobrazí)', retry: () => void clubOrdersQuery.refetch() });
   }
+
+  /* Every ACTIVE club's summary in ONE call (a deactivated club gets none); the cards ask per club only when the
+     server has no such route yet. */
+  const activeClubIds = useMemo(() => (clubsQuery.data ?? []).filter((c) => c.isActive).map((c) => c.id), [clubsQuery.data]);
+  const summaryMode = useClubSummaries(activeClubIds);
 
   const today = toDateOnly(new Date());
   const rows = useMemo<ClubRow[]>(
@@ -355,6 +361,7 @@ export default function ClubsPage() {
                 key={row.club.id}
                 row={row}
                 ordersLoading={ordersLoading}
+                summaryRequest={summaryMode === 'single'}
                 billableCzk={clubOrdersQuery.isLoading ? undefined : (billableByClub.get(row.club.id) ?? null)}
                 onOpen={() => navigate(`/clubs/${row.club.id}`)}
                 onPrefetch={() => prefetchClubScreen(queryClient, row.club.id)}

@@ -38,11 +38,16 @@ export function Figure({ value, label }: { value: string; label: string }) {
   );
 }
 
-export function ClubCard({ row, ordersLoading, billableCzk, onOpen, onPrefetch }: {
+export function ClubCard({ row, ordersLoading, billableCzk, summaryRequest = true, onOpen, onPrefetch }: {
   row: ClubRow;
   ordersLoading: boolean;
   /** Etapa 12: the club's live orders' totals ("k fakturaci"); null = no priced live order, undefined = still loading. */
   billableCzk?: number | null;
+  /**
+   * Whether the card asks for its own club's summary. The list turns it off while it asks for all summaries at once and
+   * after that call answered; the card then reads the cache the call filled.
+   */
+  summaryRequest?: boolean;
   onOpen: () => void;
   /** The pointer rested on the card (or it got focus): warm what its screen starts from. Never changes what is drawn. */
   onPrefetch?: () => void;
@@ -62,7 +67,7 @@ export function ClubCard({ row, ordersLoading, billableCzk, onOpen, onPrefetch }
   };
   useEffect(() => cancelIntent, []);
   /* The club as one whole from the server; the block totals stand in when that call fails or says nothing. */
-  const summary = useClubSummary(row.club.id, row.club.isActive).data;
+  const summary = useClubSummary(row.club.id, row.club.isActive && summaryRequest).data;
   const seats = summary !== undefined && summary.totalSeats > 0
     ? { seats: summary.totalSeats, registered: summary.registered, remaining: summary.remaining }
     : row.seatTotals !== null ? { seats: row.seatTotals.seats, registered: row.seatTotals.registered, remaining: Math.max(0, row.seatTotals.seats - row.seatTotals.registered) } : null;

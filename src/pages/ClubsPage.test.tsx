@@ -26,12 +26,15 @@ const getBlock = vi.fn();
 const createBlock = vi.fn();
 const createClub = vi.fn();
 const fetchActivities = vi.fn();
+const fetchSummaries = vi.fn();
+const clubSummary = vi.fn();
 
 vi.mock('../api/clubs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/clubs')>();
   return {
     ...actual,
     clubsApi: { getAll, create: createClub, update, deactivate: vi.fn() },
+    clubSummariesApi: { fetch: fetchSummaries },
     clubSettingsApi: { get: vi.fn().mockResolvedValue({ registrationLinkValidityDays: 14, minimumPlayers: null }), put: vi.fn() },
   };
 });
@@ -48,7 +51,7 @@ vi.mock('../api/clubBlocks', async (importOriginal) => {
 });
 vi.mock('../api/clubOrders', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/clubOrders')>();
-  return { ...actual, clubOrdersApi: { ...actual.clubOrdersApi, clubSummary: vi.fn().mockRejectedValue(new Error('500')), list: vi.fn().mockResolvedValue([]), get: vi.fn() } };
+  return { ...actual, clubOrdersApi: { ...actual.clubOrdersApi, clubSummary, list: vi.fn().mockResolvedValue([]), get: vi.fn() } };
 });
 vi.mock('../api/calendars', () => ({
   calendarsApi: {
@@ -144,6 +147,9 @@ beforeEach(() => {
   getBlock.mockReset().mockImplementation(async (id: string) => block({ id }));
   createBlock.mockReset();
   createClub.mockReset();
+  /* An older server: no batch route, the cards ask per club (and that fails here - they draw from the block totals). */
+  fetchSummaries.mockReset().mockResolvedValue(null);
+  clubSummary.mockReset().mockRejectedValue(new Error('500'));
   fetchActivities.mockReset().mockResolvedValue([
     { id: 'a-1', name: 'Komplexní prohlídka', durationMinutes: 15, clinicServiceId: null, colorHex: '#2E7D6B', parallelCapacity: 1 },
   ]);
@@ -438,5 +444,33 @@ describe('"Nová objednávka" in the list (Etapa 5)', () => {
     expect(within(entry).getByTestId('entry-link')).toBeInTheDocument();
     expect(screen.queryByLabelText(/Denně od/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Automatický návrh/)).not.toBeInTheDocument();
+  });
+});
+
+describe('ClubsPage summaries', () => {
+  const summary = (clubId: string, totalSeats: number, registered: number) => ({
+    clubId, totalSeats, registered, remaining: totalSeats - registered, byService: [], byActivity: [], ordersByStatus: {}, bookedMinutes: 0, usedMinutes: 0,
+  });
+
+  it('asks for the summaries of the ACTIVE clubs once and the cards read that, with no per-club request', async () => {
+    getAll.mockResolvedValue([slany, { ...kladno, id: 'club-off', name: 'Starý klub', isActive: false }, kladno]);
+    fetchSummaries.mockResolvedValue([summary('club-1', 30, 12), summary('club-2', 20, 5)]);
+    render(<Wrap><ClubsPage /></Wrap>);
+
+    await screen.findByText('12 / 30');
+    expect(screen.getByText('5 / 20')).toBeInTheDocument();
+    expect(fetchSummaries).toHaveBeenCalledTimes(1);
+    expect(fetchSummaries).toHaveBeenCalledWith(['club-1', 'club-2']);
+    expect(clubSummary).not.toHaveBeenCalled();
+  });
+
+  it('goes back to one request per club when the server has no batch route', async () => {
+    clubSummary.mockImplementation(async (id: string) => summary(id, id === 'club-1' ? 30 : 20, 1));
+    render(<Wrap><ClubsPage /></Wrap>);
+
+    await screen.findByText('1 / 30');
+    expect(screen.getByText('1 / 20')).toBeInTheDocument();
+    expect(fetchSummaries).toHaveBeenCalledTimes(1);
+    expect(clubSummary).toHaveBeenCalledTimes(2);
   });
 });

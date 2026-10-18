@@ -21,10 +21,10 @@ const club = (over: Partial<Club> = {}): Club => ({
   id: 'club-1', name: 'FK Slaný', ico: '00000019', paymentTermsDays: 14, isActive: true, createdAt: '', ...over,
 });
 
-const mount = (c: Club, onPrefetch?: () => void) =>
+const mount = (c: Club, onPrefetch?: () => void, summaryRequest?: boolean) =>
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <ClubCard row={buildClubRow(c, [], [], '2026-10-27')} ordersLoading={false} onOpen={() => undefined} onPrefetch={onPrefetch} />
+      <ClubCard row={buildClubRow(c, [], [], '2026-10-27')} ordersLoading={false} summaryRequest={summaryRequest} onOpen={() => undefined} onPrefetch={onPrefetch} />
     </QueryClientProvider>,
   );
 
@@ -43,6 +43,13 @@ describe('the summary of a club', () => {
 
   it('is not asked for a deactivated club', async () => {
     mount(club({ isActive: false }));
+    await screen.findByText('FK Slaný');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(clubSummary).not.toHaveBeenCalled();
+  });
+
+  it('is not asked per club when the list asks for all of them at once', async () => {
+    mount(club(), undefined, false);
     await screen.findByText('FK Slaný');
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(clubSummary).not.toHaveBeenCalled();
