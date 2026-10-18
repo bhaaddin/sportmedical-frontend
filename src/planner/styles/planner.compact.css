@@ -10,6 +10,14 @@
  * rules start from `.sm-planner.is-compact #dashboard.live-mode .x` - one class more - and repeat `!important` only
  * where the file's rule has it.
  *
+ * Nothing here invents a colour, gradient, border, glow, radius or font: each rule re-arranges (stacks, scrolls,
+ * collapses, resizes) the file's own selector - the ones the new containers copy are named where they are used:
+ *   drawer / sheet + dialog sheets   .modal-card, .modal-scrim, .modal-header, .modal-title, .modal-x
+ *   calendar button, day chips       .control (+ .day-cell.selected, .view-segment button.active)
+ *   "1 den / 7 dní"                  .view-segment (the class is on the element)
+ *   Souhrn button, order bar         .oc-panel, .oc-back, .oc-stat .icon
+ *   header, deck, board, agenda      the file's own classes, unchanged apart from size and position
+ *
  * Contents
  *   1  root, frame, stage
  *   2  header (one row + expander)
@@ -829,6 +837,7 @@
 
 /* ============================== 8 · touch targets ============================== */
 .sm-planner.is-compact .control { height: 44px; min-width: 44px; }
+.sm-planner.is-compact .app-button { min-height: 44px; }
 .sm-planner.is-compact .control.today { min-width: 64px; }
 .sm-planner.is-compact .view-segment { height: 44px; }
 .sm-planner.is-compact .view-segment button { width: auto; min-width: 66px; padding: 0 12px; font-size: 14px; }
