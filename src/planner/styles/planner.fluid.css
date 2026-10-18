@@ -25,7 +25,7 @@
  *     #planning-cards       left 462 top 730 w 1155 h 210         w 1155           W' - 517   (462 left, 55 right)
  *                                                                 top 730          H' - 211   (anchored at the bottom: 941 - 211)
  *       .adaptive-deck      grid minmax(0,1.78fr) minmax(0,1fr)   summary card 1147 / 2.78 = 412.59 px, kept; the cards take the rest
- *       .plan-card          flex-basis calc((100% - 9px) / 2)     calc((100% - (n - 1) * 9px) / n), n = cards that fit (--deck-n)
+ *       .plan-card          flex-basis calc((100% - 9px) / 2)     calc((100% - (n - 1) * 9px) / n), n = min(cards that fit, cards there are) (--deck-n)
  *     .active-plan-hint     left 552 top 677                      top 677          H' - 264   (54 above the board's bottom edge)
  *
  * Only `.sm-planner[data-layout="desktop"]` is fluid; tablet and phone keep planner.compact.css.
@@ -58,12 +58,73 @@
   max-height: none !important;
 }
 
+/*
+ * The činnost chips of the agenda (planner.css `.agenda-chips{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));height:30px}`)
+ * were drawn for six short demo names; the clinic's own names ("Základní sportovní prohlídka") were cut to "Základní sport|".
+ * The chips now take as much as their full name needs and the row wraps, every row stretched over the whole panel width, so a
+ * name is never cut and no row ends in dead space. Chip height, font and colours are the file's.
+ */
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .agenda-chips {
+  display: flex;
+  flex-wrap: wrap;
+  height: auto;
+  max-height: none;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .agenda-chips > .agenda-chip {
+  flex: 1 1 auto;
+  padding: 0 7px;
+}
+
 /* ---------------------------------- header strip ---------------------------------- */
 .sm-planner[data-layout='desktop'] #dashboard.live-mode .club-unified-header {
   width: calc(var(--stage-w, 1672px) - 73px) !important;
 }
 .sm-planner[data-layout='desktop'] #dashboard.live-mode .club-unified-header #club-details-strip {
   grid-template-columns: minmax(0, 310fr) minmax(0, 407fr) minmax(0, 408fr) !important;
+}
+
+/*
+ * The name of the club / clinic (`useFitName`): planner.css `#club-identity-name` is `font:770 25.5px/1.13 ...; white-space:nowrap;
+ * overflow:visible` inside a block that clips at its right edge. A name wider than the block is drawn at `--name-fit` x 25.5 px
+ * (the hook measures it, 1 = the file's size); only a name that does not fit even at the smallest size gets the ellipsis.
+ */
+.sm-planner #dashboard.live-mode .club-unified-header .club-identity-name {
+  font-size: calc(25.5px * var(--name-fit, 1)) !important;
+}
+.sm-planner #dashboard.live-mode .club-unified-header .club-identity-name[data-fit='cut'] {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/*
+ * The toolbar of the board (`.planner-toolbar`, 1170 design px at the file's size). Our order switcher (`.club-switch`, 204 px)
+ * and the "+ Objednávka" button are not in the file, so on the narrowest stage (1672 design px wide, i.e. every window up to
+ * about 1500 px) the week heading ("26. 10. - 1. 11. 2026   44. tyden") had 129 px for 205 px of text and ran under the switcher.
+ * The činnost filter (planner.css `.filter-select{width:193px}`, the text "Všechny činnosti" needs ~135) gives the 58 px back,
+ * the gaps 7 + 5 px; a heading that still does not fit drops the week number to a second, clipped line instead of overlapping.
+ */
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .planner-toolbar .planner-filters {
+  flex: 0 100 auto;
+  min-width: 0;
+  gap: 14px;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .planner-toolbar .filter-select {
+  flex: 0 1 193px;
+  min-width: 132px;
+  width: auto;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .planner-toolbar .filter-select select {
+  padding-right: 24px;
+  text-overflow: ellipsis;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .planner-toolbar .week-heading {
+  flex: 1 0.01 auto;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  height: 26px;
+  row-gap: 30px;
+  overflow: hidden;
 }
 
 /* ---------------------------------- board panel ---------------------------------- */
@@ -109,6 +170,33 @@
 }
 .sm-planner[data-layout='desktop'] #dashboard.live-mode .active-plan-hint {
   top: calc(var(--stage-h, 941px) - 264px);
+}
+
+/*
+ * One činnost has no arrows (`showNavigation` = two or more cards): the two 40 px columns that keep their place are given back
+ * to the card (planner.css: `.adaptive-card-stage{grid-template-columns:40px minmax(0,1fr) 40px}`), the viewport stays column 2.
+ */
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards .adaptive-card-stage.without-navigation {
+  grid-template-columns: 0 minmax(0, 1fr) 0;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards .adaptive-card-stage.without-navigation > .precision-bracket-placeholder {
+  width: 0;
+}
+
+/*
+ * A card that has more room than the file's 309.7 px (one činnost = the whole deck, two cards on a wide stage) must not hang
+ * its ring and numbers on the left with the rest of the card empty (owner: "never leave a piece of a side open"): the group
+ * of ring + numbers is centred in the card. Under 400 px (the file's own card, and every scrolling deck) nothing changes.
+ */
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards .adaptive-deck .adaptive-card-track > .plan-card {
+  container-type: inline-size;
+  container-name: plan-card;
+}
+@container plan-card (min-width: 400px) {
+  .sm-planner #planning-cards .plan-card-body {
+    justify-content: center;
+    gap: 26px;
+  }
 }
 
 /* ============================== the page around the stage ============================== */

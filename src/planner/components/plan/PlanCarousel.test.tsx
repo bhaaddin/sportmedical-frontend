@@ -84,6 +84,18 @@ describe('PlanningCarousel · the owner\'s case, counted per činnost', () => {
     expect(document.querySelector('[data-deck-nav="1"]')).toBeDisabled();
   });
 
+  it('the cards share the deck: --deck-n is the number of cards when fewer than fit, two otherwise', async () => {
+    mountPlanner(ownerSource({ sessions: sessions() }));
+    const deck = await screen.findByTestId('planning-carousel');
+    expect(deck.style.getPropertyValue('--deck-n')).toBe('2');
+    cleanup();
+    mountPlanner(ownerSource({ categories: [{ id: 's', name: 'Spiro', iconKey: 'heart', color: '#00f1dc', slotMinutes: 90, parallelCapacity: 1 }], demands: [{ categoryId: 's', requested: 4, baselinePlanned: 0 }] }));
+    const one = await screen.findByTestId('planning-carousel');
+    expect(document.querySelectorAll('#planning-cards .plan-card')).toHaveLength(1);
+    expect(one.style.getPropertyValue('--deck-n')).toBe('1');
+    expect(document.querySelector('.adaptive-card-stage')).toHaveClass('without-navigation');
+  });
+
   it('clicking a card arms the činnost; clicking it again disarms; the hint follows', async () => {
     mountPlanner(ownerSource({ sessions: sessions() }));
     await screen.findByTestId('planning-carousel');

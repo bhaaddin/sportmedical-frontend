@@ -22,6 +22,7 @@ import {
   DESIGN_BOARD,
   DESIGN_STAGE,
   boardMetricsOf,
+  deckColumns,
   deckVisibleCount,
   fitStage,
 } from './PlannerMetrics';
@@ -272,3 +273,28 @@ describe('overlays at a measured timeline height', () => {
   });
 });
 
+
+describe('deckColumns: the cards share the whole deck (owner: no piece of a side left open)', () => {
+  it('divides the track by the cards there are, never by more columns than cards', () => {
+    expect(deckColumns(2, 0)).toBe(1);
+    expect(deckColumns(2, 1)).toBe(1);
+    expect(deckColumns(2, 2)).toBe(2);
+    expect(deckColumns(3, 2)).toBe(2);
+    expect(deckColumns(4, 3)).toBe(3);
+  });
+
+  it("keeps the file's fixed columns while the cards outnumber the room (the deck scrolls)", () => {
+    expect(deckColumns(2, 4)).toBe(2);
+    expect(deckColumns(2, 6)).toBe(2);
+    expect(deckColumns(3, 9)).toBe(3);
+  });
+
+  it('the card widths plus the 9 px gaps always add up to the track', () => {
+    for (const [visible, quantity] of [[2, 1], [2, 2], [3, 2], [4, 4], [4, 3]] as const) {
+      const n = deckColumns(visible, quantity);
+      const track = 640;
+      const card = (track - (n - 1) * DECK_CARD_GAP) / n;
+      expect(n * card + (n - 1) * DECK_CARD_GAP).toBeCloseTo(track, 9);
+    }
+  });
+});

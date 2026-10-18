@@ -19,7 +19,7 @@
  * Both modes: the bell shows the unread count of the application's notifications and opens them
  * (`notifications` dialog); the profile chip opens the account dialog (`profile`).
  */
-import type { ChangeEvent, ReactNode } from 'react';
+import { useRef, type ChangeEvent, type CSSProperties, type ReactNode } from 'react';
 import { ClubAvatar } from '../../components/clubs/ClubAvatar';
 import { canBeInvoiced } from '../../pages/clubs/payerForm';
 import { useClubPlanner } from '../club/ClubPlannerContext';
@@ -27,6 +27,7 @@ import { usePlannerCommands } from '../data/usePlannerCommands';
 import { clubDisplayName, headerValues, type ClubProfile, type ClubProfileField } from '../model';
 import { usePlannerActions } from '../state/PlannerStoreProvider';
 import { Icon } from './Icons';
+import { useFitName } from './useFitName';
 import { usePlannerCatalogue, usePlannerProfile } from './context';
 import { initialsOf, useAppNavigate, usePlannerUser } from './dialogs/generic/account';
 import { useClinicHeaderProfile } from './dialogs/generic/headerData';
@@ -99,6 +100,8 @@ export function ClubHeader({ user = null, mode = 'club' }: ClubHeaderProps) {
   const displayName = user?.displayName?.trim() || account?.displayName || 'Uživatel';
   const unread = feed.unreadCount;
   const canUploadLogo = !isClinic && catalogue.capabilities.logoUpload;
+  const nameRef = useRef<HTMLElement | null>(null);
+  const nameFit = useFitName(nameRef, name);
 
   const line = (label: string, field: Exclude<ClubProfileField, 'clubName'>, icon: keyof typeof LINE_ICONS) => (
     <div className="club-head-line" key={field}>
@@ -208,7 +211,16 @@ export function ClubHeader({ user = null, mode = 'club' }: ClubHeaderProps) {
         {logoSlot}
         <div className="club-identity-content">
           <div className="club-identity-meta"><span className="club-identity-tag">{isClinic ? 'KLINIKA' : 'KLUB'}</span></div>
-          <strong id="club-identity-name" className="club-identity-name" title={name}>{name}</strong>
+          <strong
+            id="club-identity-name"
+            ref={nameRef}
+            className="club-identity-name"
+            title={nameFit.scale < 1 ? name : undefined}
+            data-fit={nameFit.cut ? 'cut' : nameFit.scale < 1 ? 'shrunk' : undefined}
+            style={nameFit.scale < 1 ? ({ '--name-fit': nameFit.scale } as CSSProperties) : undefined}
+          >
+            {name}
+          </strong>
           {isClinic ? (
             <button type="button" id="club-edit-link" aria-label="Otevřít nastavení firmy" title="Údaje kliniky se upravují v nastavení" onClick={() => navigate(clinic.settingsPath)}>
               <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

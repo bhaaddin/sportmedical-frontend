@@ -96,6 +96,16 @@ export function deckVisibleCount(contentWidth: number): number {
   return Math.max(DECK_MIN_VISIBLE, fit);
 }
 
+/**
+ * Card columns the deck's track is divided into: the cards that fit (`deckVisibleCount`), but never more columns than there
+ * are cards - owner, 18. 10. 2026: "never leave a piece of a side open, it should use it". One činnost takes the whole
+ * deck, two share it, and only a deck with more cards than fit keeps the file's fixed-width cards and scrolls.
+ * `planner.fluid.css`: card width = (100% - (n - 1) x 9px) / n.
+ */
+export function deckColumns(visible: number, quantity: number): number {
+  return Math.max(1, Math.min(Math.max(1, Math.floor(visible)), Math.floor(quantity)));
+}
+
 export interface PlannerMetrics {
   stage: StageFit;
   board: BoardMetrics;

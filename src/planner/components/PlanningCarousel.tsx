@@ -24,7 +24,7 @@ import { S41Icon } from './plan/S41Icon';
 import { useClubPlanningContext } from './plan/useClubPlanningContext';
 import { usePlanActions } from './plan/usePlanActions';
 import { usePlanFigures } from './plan/usePlanFigures';
-import { useDeckVisible } from './PlannerMetrics';
+import { deckColumns, useDeckVisible } from './PlannerMetrics';
 import { ClubDeckEmpty } from '../club/ClubDeckEmpty';
 import './plan/plan.css';
 
@@ -343,7 +343,7 @@ export function PlanningCarousel() {
       ref={hostRef}
       id="planning-cards"
       className={`planning-cards${focusOn ? ' activity-focus-on' : ''}`}
-      style={standard ? { display: 'none' } : ({ '--deck-n': visible } as CSSProperties)}
+      style={standard ? { display: 'none' } : ({ '--deck-n': deckColumns(visible, quantity) } as CSSProperties)}
       data-standard={standard ? 'true' : undefined}
       aria-label="Výběr činnosti pro přetažení do kalendáře"
       data-testid="planning-carousel"
