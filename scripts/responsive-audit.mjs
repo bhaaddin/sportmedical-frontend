@@ -177,6 +177,8 @@ function measureInPage() {
     for (let j = i + 1; j < textBoxes.length; j++) {
       const a = textBoxes[i], b = textBoxes[j];
       if (a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el)) continue;
+      /* siblings of one sentence that wrapped over two lines share a bounding box without touching */
+      if (a.el.parentElement === b.el.parentElement) continue;
       const o = inter(a.r, b.r);
       if (o.width <= 2 || o.height <= 2) continue;
       const area = o.width * o.height;
@@ -277,6 +279,14 @@ async function settle(page) {
     if (!busy) break;
     await page.waitForTimeout(400);
   }
+  /* the page is measured once what it shows has stopped changing */
+  let last = '';
+  for (let i = 0; i < 25; i++) {
+    const sig = await page.evaluate(() => { const m = document.querySelector('#main-content'); return `${m?.innerText.length}|${m?.scrollHeight}|${m?.querySelectorAll('*').length}`; });
+    if (sig === last) break;
+    last = sig;
+    await page.waitForTimeout(350);
+  }
   await page.waitForTimeout(250);
 }
 
@@ -342,6 +352,11 @@ async function worker(id) {
           await page.waitForTimeout(1500);
         }
         Object.assign(r, await page.evaluate(measureInPage));
+        /* a one-sided gap may be a page that is still arriving (a lazy chunk, a slow request): look again before believing it */
+        for (let again = 0; again < 3 && r.gapR !== undefined && r.gapR - r.gapL > 96; again++) {
+          await page.waitForTimeout(2500);
+          Object.assign(r, await page.evaluate(measureInPage));
+        }
         await page.evaluate(() => { const r = document.querySelector('#fit-region'); if (r) r.scrollTo(0, r.scrollHeight); window.scrollTo(0, document.documentElement.scrollHeight); });
         await page.waitForTimeout(120);
         r.covered = await page.evaluate(coveredInPage);

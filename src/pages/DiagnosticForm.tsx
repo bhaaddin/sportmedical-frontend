@@ -250,7 +250,7 @@ export default function DiagnosticForm() {
       ['Svalová hmota', `${result.muscleMassKg} kg`],
     ];
     return (
-      <Box sx={{ maxWidth: 'clamp(900px, 64vw, 1700px)', width: '100%', mx: 'auto' }}>
+      <Box sx={{ maxWidth: 'clamp(900px, 78vw, 1700px)', width: '100%', mx: 'auto' }}>
         <PageHeader
           title="Výsledky"
           subtitle="Diagnostika a měření · uložená relace"
@@ -319,7 +319,7 @@ export default function DiagnosticForm() {
   if (mode === 'manual') {
     const urlPatient = new URLSearchParams(window.location.search).get('patientId') ?? undefined;
     return (
-      <Box sx={{ maxWidth: 'clamp(900px, 64vw, 1700px)', width: '100%', mx: 'auto' }}>
+      <Box sx={{ maxWidth: 'clamp(900px, 78vw, 1700px)', width: '100%', mx: 'auto' }}>
         <PageHeader
           title="Výsledky"
           subtitle="Diagnostika a měření · ruční zápis naměřených hodnot"
@@ -336,7 +336,7 @@ export default function DiagnosticForm() {
 
   /* ── Wizard View ── */
   return (
-    <Box sx={{ maxWidth: 'clamp(900px, 64vw, 1700px)', width: '100%', mx: 'auto' }}>
+    <Box sx={{ maxWidth: 'clamp(900px, 78vw, 1700px)', width: '100%', mx: 'auto' }}>
       <PageHeader
         title="Výsledky"
         subtitle={`Diagnostika a měření · krok ${activeStep + 1} ze ${steps.length} — ${steps[activeStep].label}`}

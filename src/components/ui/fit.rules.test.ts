@@ -38,7 +38,7 @@ describe('data pages take the width that is there', () => {
 
   it('the settings frame is capped only by a width that leaves equal gutters, and a wide-table page not at all', () => {
     const style = read('components/settings/settingsStyle.ts');
-    expect(style).toMatch(/SETTINGS_MAX_WIDTH = 2000/);
+    expect(style).toMatch(/SETTINGS_MAX_WIDTH = 2400/);
     const frame = read('pages/settings/SettingsFrame.tsx');
     /* `aside: false` (the table that wants every pixel) gets no maxWidth, and the others are centred. */
     expect(frame).toMatch(/const maxWidth = wide \? undefined : /);

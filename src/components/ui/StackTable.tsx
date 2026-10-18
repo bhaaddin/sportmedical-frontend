@@ -36,6 +36,8 @@ export const STACK_TABLE_PHONE_SX = {
     '& tbody > tr > td': {
       display: 'flex',
       flexDirection: 'row !important',
+      /* A cell whose content is wider than the room beside its label puts it on the next line instead of sticking out. */
+      flexWrap: 'wrap',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 1.5,
@@ -57,7 +59,7 @@ export const STACK_TABLE_PHONE_SX = {
       letterSpacing: '0.04em',
       color: 'text.secondary',
     },
-    '& tbody > tr > td > *': { minWidth: 0 },
+    '& tbody > tr > td > *': { minWidth: 0, maxWidth: '100%', marginLeft: 'auto' },
   },
 } as const;
 
