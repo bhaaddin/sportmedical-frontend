@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { setViewport, VIEWPORTS } from '../../../test/viewport';
 import { DemoDataSource } from '../../data/DemoDataSource';
+import type { PlannerCatalogue } from '../../data/PlannerDataSource';
 import { plannerActions } from '../../state/plannerState';
 import { AgendaPanel } from '../AgendaPanel';
 import { mountPanels } from './testHarness';
@@ -176,5 +177,48 @@ describe('AgendaPanel and other clubs\' windows', () => {
     await screen.findByTestId('agenda-panel');
     expect(text('agenda-total-count')).toHaveTextContent('2');
     expect(document.querySelectorAll('#agenda-activity-chips .agenda-chip')).toHaveLength(1);
+  });
+});
+
+describe('AgendaPanel prices (the owner rule - a činnost never stands without its price)', () => {
+  /** Standard booking over a price list: Prohlídky 1 600 Kč, Pohyb without a price, the rest as the demo has it. */
+  class Priced extends DemoDataSource {
+    async getCatalogue(): Promise<PlannerCatalogue> {
+      const c = await super.getCatalogue();
+      return {
+        ...c,
+        categories: c.categories.map((x) => (x.id === 'medical' ? { ...x, priceCzk: 1600 } : x.id === 'vo2' ? { ...x, priceCzk: 2400 } : { ...x, priceCzk: null })),
+      };
+    }
+  }
+  const pricedSource = (standard: boolean) => {
+    const source = new Priced({ today: '2026-11-10' });
+    if (standard) {
+      const order = source.getOrder.bind(source);
+      source.getOrder = async () => ({ ...(await order()), demands: [], baselineSessions: [] });
+    }
+    return source;
+  };
+
+  it('writes the price on the činnost card and on every chip (tooltip and name), "bez ceny" without one', async () => {
+    mountPanels(<AgendaPanel />, { source: pricedSource(true) });
+    await screen.findByTestId('agenda-panel');
+    expect(screen.getByTestId('agenda-kpi-price').textContent).toMatch(/^cena 1\s600\sKč$/);
+    const chip = (id: string) => document.querySelector(`[data-agenda-type="${id}"]`)!;
+    expect(chip('medical').getAttribute('title')).toMatch(/^Sportovní prohlídky · 1\s600\sKč$/);
+    expect(chip('medical').getAttribute('aria-label')).toBe(chip('medical').getAttribute('title'));
+    expect(chip('vo2').getAttribute('title')).toMatch(/· 2\s400\sKč$/);
+    expect(chip('movement').getAttribute('title')).toMatch(/· bez ceny$/);
+    fireEvent.click(chip('movement'));
+    expect(screen.getByTestId('agenda-kpi-price')).toHaveTextContent('bez ceny');
+    fireEvent.click(chip('vo2'));
+    expect(screen.getByTestId('agenda-kpi-price').textContent).toMatch(/2\s400\sKč$/);
+  });
+
+  it('leaves the club order card as it is (the order shows its own prices)', async () => {
+    mountPanels(<AgendaPanel />, { source: pricedSource(false) });
+    await screen.findByTestId('agenda-panel');
+    expect(screen.queryByTestId('agenda-kpi-price')).toBeNull();
+    expect(document.querySelector('[data-agenda-type="medical"]')!.hasAttribute('title')).toBe(false);
   });
 });

@@ -125,9 +125,10 @@ export function BoardStrip({ mainRef, fit, onFit, sidebarOpen, sidebarPinned, on
 
   useDaySnap(mainRef, fit, days, view);
 
-  /* The strip lives inside the board panel, which this file does not render. */
+  /* The strip lives inside the board panel, which this file does not render. A passive effect: the wrapper's ref is
+     attached after this component's layout effects, so only here is `mainRef` set on the very first pass. */
   const [target, setTarget] = useState<HTMLElement | null>(null);
-  useLayoutEffect(() => {
+  useEffect(() => {
     const el = mainRef.current?.querySelector<HTMLElement>('section.planner') ?? null;
     if (el !== target) setTarget(el);
   });

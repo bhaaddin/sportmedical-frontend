@@ -7,6 +7,7 @@
 import type { WeekHeadModel, PlannerCategory } from '../../model';
 import type { PlannerView } from '../../state/plannerState';
 import type { BoundPlannerActions } from '../../state/PlannerStoreProvider';
+import { categoryWithPrice } from '../categoryPrice';
 import { Icon } from '../Icons';
 
 const VIEWS = [
@@ -42,6 +43,7 @@ export function BoardToolbar({
   /** Some other board filter (calendars, služby, worker) is narrowing the board: the gear says so. */
   filterActive: boolean;
 }) {
+  const chosen = categories.find((c) => c.id === filter);
   return (
     <div className="planner-toolbar">
       <div className="planner-arrows">
@@ -66,9 +68,9 @@ export function BoardToolbar({
         </div>
         <label className="filter-select">
           <span className="sr-only">Filtrovat podle činnosti</span>
-          <select id="activity-filter" value={filter} onChange={(e) => act.setFilter(e.target.value)}>
+          <select id="activity-filter" value={filter} title={chosen ? categoryWithPrice(chosen) : undefined} onChange={(e) => act.setFilter(e.target.value)}>
             <option value="all">Všechny činnosti</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {categories.map((c) => <option key={c.id} value={c.id} title={categoryWithPrice(c)}>{categoryWithPrice(c)}</option>)}
           </select>
           <Icon name="chevron-down" />
         </label>

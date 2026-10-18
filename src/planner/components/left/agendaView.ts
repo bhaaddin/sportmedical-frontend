@@ -7,6 +7,7 @@
  *    loaded range. Chips are the činnosti that have a session, the KPI has nothing to measure against
  *    (no ordered seats), so it shows the činnost's share of the visible slots instead of "zbývá".
  */
+import { categoryPriceText, categoryWithPrice } from '../categoryPrice';
 import {
   agendaPanelModel,
   agendaRowModel,
@@ -24,9 +25,17 @@ import {
   type PlannerSession,
 } from '../../model';
 
-export interface AgendaView extends AgendaPanelModel {
+/** What a činnost costs, in the words of the price list ("1 600 Kč" / "bez ceny"); only standard booking shows it. */
+export type AgendaChipView = AgendaPanelModel['chips'][number] & {
+  /** Tooltip and accessible name: the full name with the price. */
+  title?: string;
+};
+
+export interface AgendaView extends Omit<AgendaPanelModel, 'chips' | 'kpi'> {
   /** `true` when there is no club order behind the planner (standard booking). */
   standard: boolean;
+  chips: AgendaChipView[];
+  kpi: (NonNullable<AgendaPanelModel['kpi']> & { priceText?: string }) | null;
 }
 
 /**
@@ -81,10 +90,17 @@ export function agendaView(
     scope: ui.scope,
     categoryId: type,
     totalCount: all.length,
-    chips: chipCategories.map((c) => ({ categoryId: c.id, label: c.shortName ?? c.name, tone: c.color, active: c.id === type })),
+    chips: chipCategories.map((c) => ({
+      categoryId: c.id,
+      label: c.shortName ?? c.name,
+      tone: c.color,
+      active: c.id === type,
+      title: categoryWithPrice(c),
+    })),
     kpi: cat
       ? {
           name: cat.name,
+          priceText: categoryPriceText(cat),
           tone: cat.color,
           planned: typeSlots,
           requested: allSlots,

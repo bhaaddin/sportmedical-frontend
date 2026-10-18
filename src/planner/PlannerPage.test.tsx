@@ -163,20 +163,10 @@ describe('PlannerPage', () => {
     expect(screen.getByTestId('planner-page')).toHaveAttribute('data-mode', 'standard');
   });
 
-  it('keeps the SLUŽBY legend with its prices in the shell\'s sidebar slot - the služba filter nothing else replaces', async () => {
+  it('has no SLUŽBY legend of its own in standard ordering: the služba filter is the one in the gear, the prices are next to each činnost', async () => {
     mount({ pathname: '/planovani' }, true);
-    const legend = await screen.findByTestId('planner-service-legend');
-    expect(legend).toHaveTextContent('Služby');
-    expect(within(legend).getByText('Diagnostika')).toBeInTheDocument();
-    // it sits in the sidebar slot, not in the stage
-    expect(legend.closest('[data-sidebar-slot]')).not.toBeNull();
-    expect(legend.closest('[data-testid="planner-stage"]')).toBeNull();
-    // its checkbox is the board's own služba filter
-    const toggles = within(legend).getAllByRole('checkbox');
-    await act(async () => {
-      fireEvent.click(toggles[0]!);
-    });
-    expect(boardSettings.getState().serviceSet?.has('s1')).toBe(false);
+    await screen.findByTestId('week-board-panel');
+    expect(screen.queryByTestId('planner-service-legend')).toBeNull();
   });
 
   it('has no legend while a club order is planned', async () => {

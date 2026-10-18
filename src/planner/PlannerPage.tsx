@@ -12,23 +12,19 @@
  *                nothing             standard ordering: the same board, the header shows the clinic's own data
  *   board      `realCalendar`: the board reads the clinic's real calendar (bookings, blocks, filters) on top of
  *              the planner's data, and offers "Nová objednávka" / "Klubová objednávka".
- *   sidebar    the SLUŽBY legend with prices. The stage replaces the old sidebar's mini calendar (it has its
- *              own), but nothing in it replaces the legend - the služba filter and the prices per služba - so
- *              it keeps living in the shell's sidebar slot (`SidebarPortal`), standard ordering only. It is
- *              the same `boardSettings.serviceSet` filter the gear's "Služby" row edits.
+ *   prices     the old sidebar's SLUŽBY legend is gone; the služba filter is the gear's "Služby" row
+ *              (`boardSettings.serviceSet`) and a činnost's price stands next to its name in the agenda
+ *              (`AgendaPanel`), the činnost filter lists and the board's term bubbles.
  */
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Box } from '@mui/material';
 import { PickOrderSetup } from '../components/clubs/order/PickOrderSetup';
 import { readPickOrderState, type PickSession } from '../components/clubs/order/pickSession';
-import { ServiceLegend, useServicePrices } from '../components/booking/grid/GridSidebar';
-import { SidebarPortal } from '../components/shell/SidebarSlot';
 import { pragueDateKey } from '../utils/time';
 import { useApiDataSource } from './api/useApiDataSource';
 import { PlannerShell } from './components/PlannerShell';
 import { BoardConfigProvider, type BoardConfig } from './components/board/boardConfig';
-import { boardSettings, useBoardSettings } from './components/board/boardSettings';
+import { boardSettings } from './components/board/boardSettings';
 import { DemoDataSource } from './data/DemoDataSource';
 import type { PlannerDataSource } from './data/PlannerDataSource';
 
@@ -42,28 +38,6 @@ function storedUser(): { displayName: string } | null {
   } catch {
     return null;
   }
-}
-
-/** SLUŽBY: a colour square, the name and the price range of each služba; the square filters the board. */
-function ServiceLegendPortal() {
-  const { facets, serviceSet } = useBoardSettings();
-  const prices = useServicePrices(facets.services);
-  const ids = facets.services.map((s) => s.id);
-  if (facets.services.length === 0) return null;
-  return (
-    <SidebarPortal>
-      <Box sx={{ pb: 2 }} data-testid="planner-service-legend">
-        <ServiceLegend
-          services={facets.services}
-          prices={prices}
-          isShown={(id) => serviceSet === null || serviceSet.has(id)}
-          onToggle={(id) => boardSettings.toggleService(id, ids)}
-          onOnly={(id) => boardSettings.onlyService(id)}
-          onAll={() => boardSettings.showAllServices()}
-        />
-      </Box>
-    </SidebarPortal>
-  );
 }
 
 /** The demo source for `?source=demo`, built once. */
@@ -131,7 +105,6 @@ export default function PlannerPage() {
           headerMode={mode === 'club' ? 'club' : 'clinic'}
         />
       </div>
-      {mode === 'standard' ? <ServiceLegendPortal /> : null}
       {needsSetup ? <PickOrderSetup open defaultClubId={pick?.clubId} parent={pick?.parent} onClose={closeSetup} onStart={startWith} /> : null}
     </BoardConfigProvider>
   );

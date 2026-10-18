@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { Calendar, DayAppointment, PreviewDay, TimeBlock } from '../api/bookingContracts';
@@ -256,20 +256,20 @@ describe('/planovani remembers what the desk set', () => {
     expect(board()).toHaveAttribute('data-step', '15');
   });
 
-  it('a služba switched off in the sidebar legend stays off across the week arrows and the Den / Měsíc / Týden switches', async () => {
+  it('a služba switched off (the gear, row Služby) stays off across the week arrows and the Den / Měsíc / Týden switches', async () => {
     appointments = [b1, appt('b9', '2026-12-08T10:00:00Z', '2026-12-08T10:30:00Z', { calendarId: 'c2' })];
     mount();
-    const legend = await screen.findByTestId('planner-service-legend');
-    expect(legend).toHaveTextContent('Diagnostika');
-    const diag = within(legend).getAllByRole('checkbox')[0]!;
-    fireEvent.click(diag);
+    await screen.findByTestId('board-booking-b1');
+    // the old sidebar legend is gone: no stray SLUŽBY block outside the stage
+    expect(screen.queryByTestId('planner-service-legend')).toBeNull();
+    act(() => boardSettings.toggleService('s1', ['s1', 's2']));
     expect(boardSettings.getState().serviceSet?.has('s1')).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: /Další týden|Následující týden/i }));
     fireEvent.click(screen.getByRole('button', { name: /Předchozí týden/i }));
-    expect(within(screen.getByTestId('planner-service-legend')).getAllByRole('checkbox')[0]).not.toBeChecked();
-    for (const view of ['Den', 'Měsíc', 'Týden']) fireEvent.click(screen.getByRole('button', { name: view }));
-    expect(within(screen.getByTestId('planner-service-legend')).getAllByRole('checkbox')[0]).not.toBeChecked();
     expect(boardSettings.getState().serviceSet?.has('s1')).toBe(false);
+    for (const view of ['Den', 'Měsíc', 'Týden']) fireEvent.click(screen.getByRole('button', { name: view }));
+    expect(boardSettings.getState().serviceSet?.has('s1')).toBe(false);
+    expect(boardSettings.getState().serviceSet?.has('s2')).toBe(true);
   });
 });
 

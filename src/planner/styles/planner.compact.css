@@ -497,7 +497,7 @@
 .sm-planner.is-compact .planner:has(.alternate-view:not([hidden])) #week-board,
 .sm-planner.is-compact .planner:has(.alternate-view:not([hidden])) .compact-strip-row .compact-fit { display: none; }
 .sm-planner.is-compact .planner .alt-row { grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; padding: 10px 14px; min-height: 48px; }
-.sm-planner.is-compact .planner .month-matrix { padding: 8px; gap: 4px; }
+.sm-planner.is-compact .planner .month-matrix { padding: 4px; gap: 2px; grid-template-columns: repeat(7, minmax(44px, 1fr)); }
 .sm-planner.is-compact .planner .month-tile { padding: 6px; min-height: 56px; min-width: 0; overflow: hidden; }
 .sm-planner.is-compact .planner .month-tile .date-num { font-size: 15px; }
 .sm-planner.is-compact .planner .month-tile small { margin-top: 4px; font-size: 10px; line-height: 1.15; overflow-wrap: anywhere; }

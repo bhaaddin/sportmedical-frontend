@@ -78,6 +78,8 @@ export function AgendaPanel() {
               data-agenda-type={chip.categoryId}
               className={`agenda-chip${chip.active ? ' is-active' : ''}`}
               style={tone(chip.tone)}
+              title={chip.title}
+              aria-label={chip.title}
               aria-pressed={chip.active}
               onClick={() => act.setAgendaCategory(chip.categoryId)}
             >
@@ -97,6 +99,7 @@ export function AgendaPanel() {
               <div className="agenda-track"><span style={{ '--fill': `${m.kpi.fillPercent}%` } as CSSProperties} /></div>
               <div className="agenda-kpi-bottom">
                 <span><b>{m.kpi.termCountLabel.split(' ')[0]}</b> {m.kpi.termCountLabel.split(' ').slice(1).join(' ')}</span>
+                {m.kpi.priceText ? <span data-testid="agenda-kpi-price">cena <b>{m.kpi.priceText}</b></span> : null}
                 <span className="agenda-remaining">{m.kpi.remainingLabel}</span>
               </div>
             </>
