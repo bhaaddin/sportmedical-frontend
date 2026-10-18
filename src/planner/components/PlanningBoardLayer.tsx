@@ -61,8 +61,10 @@ export function PlanningBoardLayer({ board: boardProp }: PlanningBoardLayerProps
     setBoard(el);
     if (!el) return undefined;
     const measure = () => {
-      const w = el.clientWidth;
-      const h = el.clientHeight;
+      /* Layout px, fractional on the fluid stage (`clientWidth` / `clientHeight` are integers). */
+      const cs = getComputedStyle(el);
+      const w = parseFloat(cs.width) || el.clientWidth;
+      const h = parseFloat(cs.height) || el.clientHeight;
       setSize((prev) => {
         const next = { width: w || FALLBACK.width, height: h || FALLBACK.height };
         return prev.width === next.width && prev.height === next.height ? prev : next;

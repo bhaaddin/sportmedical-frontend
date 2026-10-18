@@ -12,7 +12,7 @@ import { Box, Typography } from '@mui/material';
 import type { PortalResult } from '../../../api/patientPortal';
 import { useDevice } from '../../../layout/useDevice';
 import { ARCHIVO, BRAND } from '../../../components/public/brand';
-import { FieldLabel, LABEL_COLOR, Panel, PanelTitle } from '../../../components/public/kit';
+import { FieldLabel, LABEL_COLOR, NoticeScreen, Pane, Panel, PanelTitle, PublicMain } from '../../../components/public/kit';
 import { MISSING, measurementCountText, toMeasurements } from './resultsModel';
 import type { Measurement } from './resultsModel';
 
@@ -162,42 +162,46 @@ export default function ResultsView({ results }: { results: PortalResult[] | und
   const list = toMeasurements(results);
   const [latest] = list;
 
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }} data-testid="results-view">
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-        <Typography component="h1" sx={{ m: 0, fontFamily: ARCHIVO, fontWeight: 800, fontSize: 'clamp(27px, 3.2vw, 36px)', letterSpacing: '-0.03em', lineHeight: 1.1 }}>
-          Moje výsledky
-        </Typography>
-        <Typography sx={{ fontSize: 16, color: '#5C6067' }}>{measurementCountText(list.length)}</Typography>
-      </Box>
-
-      {latest === undefined ? (
-        <Panel>
-          <PanelTitle>Zatím žádná měření</PanelTitle>
-          <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
-            Jakmile lékař měření zapíše, objeví se tady.
-          </Typography>
-        </Panel>
-      ) : (
-        <>
-          <Panel labelledBy="latest-measurement">
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'baseline', justifyContent: 'space-between' }}>
-              <PanelTitle id="latest-measurement">Poslední měření</PanelTitle>
-              <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
-                {latest.date}{latest.practitioner !== null ? ` · ${latest.practitioner}` : ''}
-              </Typography>
-            </Box>
-            <MeasurementTiles m={latest} />
-            <ZonesList m={latest} />
-            <ExtraFacts m={latest} />
-          </Panel>
-
-          <Panel labelledBy="all-measurements">
-            <PanelTitle id="all-measurements">Všechna měření</PanelTitle>
-            <AllMeasurements list={list} />
-          </Panel>
-        </>
-      )}
+  const heading = (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }} data-testid="results-view">
+      <Typography component="h1" sx={{ m: 0, fontFamily: ARCHIVO, fontWeight: 800, fontSize: 'clamp(27px, 3.2vw, 36px)', letterSpacing: '-0.03em', lineHeight: 1.1 }}>
+        Moje výsledky
+      </Typography>
+      <Typography sx={{ fontSize: 16, color: '#5C6067' }}>{measurementCountText(list.length)}</Typography>
     </Box>
+  );
+
+  if (latest === undefined) {
+    return (
+      <NoticeScreen head={heading}>
+        <PanelTitle>Zatím žádná měření</PanelTitle>
+        <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
+          Jakmile lékař měření zapíše, objeví se tady.
+        </Typography>
+      </NoticeScreen>
+    );
+  }
+
+  /* The latest measurement beside the table of all of them; each scrolls on its own, so the whole history is never a long page. */
+  return (
+    <PublicMain maxWidth="none" workspace columns="minmax(0, 1fr) minmax(0, 1.25fr)" head={heading} gap={2.5}>
+      <Pane
+        labelledBy="latest-measurement"
+        title={<PanelTitle id="latest-measurement">Poslední měření</PanelTitle>}
+        actions={(
+          <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
+            {latest.date}{latest.practitioner !== null ? ` · ${latest.practitioner}` : ''}
+          </Typography>
+        )}
+      >
+        <MeasurementTiles m={latest} />
+        <ZonesList m={latest} />
+        <ExtraFacts m={latest} />
+      </Pane>
+
+      <Pane labelledBy="all-measurements" title={<PanelTitle id="all-measurements">Všechna měření</PanelTitle>}>
+        <AllMeasurements list={list} />
+      </Pane>
+    </PublicMain>
   );
 }

@@ -4,9 +4,8 @@
  * `clubs/clubOrders.test.ts` holds the arithmetic. What only the screen can
  * show: that every club gets a card with its reservation state, its headcount
  * and the band that headcount lands in; that the filters narrow the grid; that
- * opening a card shows the board's detail - the link box, the taken places,
- * the money with the discount applied; and that the payer record is still
- * editable from there.
+ * opening a card goes to the club's own screen (`/clubs/:clubId`, the planner in
+ * club mode - tested in planner/club); the hand-offs other screens send land there.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -200,7 +199,7 @@ describe('ClubsPage', () => {
     expect(screen.getByRole('heading', { name: 'FK Slaný' })).toBeInTheDocument();
   });
 
-  it('opens the club detail with the link, the taken places and the discounted total', async () => {
+  it("opens the club's own screen, `/clubs/:clubId` - the planner in club mode, not a page of stacked cards", async () => {
     const user = userEvent.setup();
     render(<Wrap><ClubsPage /></Wrap>);
     const cards = await screen.findAllByRole('listitem');
@@ -208,51 +207,11 @@ describe('ClubsPage', () => {
 
     await user.click(cards[0]);
 
-    expect(await screen.findByRole('heading', { name: 'FK Slaný', level: 1 })).toBeInTheDocument();
-    expect(screen.getByText(/^Hromadná rezervace /)).toBeInTheDocument();
-    expect(screen.getByText('Registrační odkaz pro sportovce')).toBeInTheDocument();
-    expect(screen.getByTestId('club-link')).toHaveTextContent('/klub/fk-slany-rijen26');
-    expect(screen.getByRole('button', { name: 'Kopírovat' })).toBeEnabled();
-    expect(screen.getByRole('link', { name: 'Poslat klubu' })).toHaveAttribute('href', expect.stringContaining('mailto:klub%40fkslany.cz'));
-    expect(screen.getByText('Obsazeno 4 z 12 míst')).toBeInTheDocument();
-    expect(screen.getByText('8 volných')).toBeInTheDocument();
-    expect(screen.getByText(/^Odkaz platí do /)).toBeInTheDocument();
-
-    const table = await screen.findByRole('table', { name: 'Rezervovaná místa' });
-    const rows = within(table).getAllByRole('row').slice(1);
-    expect(rows).toHaveLength(12);
-    expect(within(rows[0]).getByText('Jan Novák')).toBeInTheDocument();
-    expect(within(rows[0]).getByText('Registrován')).toBeInTheDocument();
-    expect(within(rows[2]).getByText('Adam Říha')).toBeInTheDocument();
-    expect(within(rows[2]).getByText('Chybí dotazník')).toBeInTheDocument();
-    expect(within(rows[4]).getByText('—')).toBeInTheDocument();
-    expect(within(rows[4]).getByText('volné místo')).toBeInTheDocument();
-    expect(within(rows[4]).getByText('Čeká na sportovce')).toBeInTheDocument();
-    expect(range).toHaveBeenCalledWith(day1, day2, ['c-1']);
-
-    /* The rail: the club's facts and the order's money. */
-    expect(screen.getByText('−10 %')).toBeInTheDocument();
-    expect(screen.getByText('Na klub')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText(/23.760 Kč/)).toBeInTheDocument());
-    expect(screen.getByText(/12 × 2.200 Kč se slevou 10 %/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Přidat místa' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Vystavit fakturu' })).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Zpět na kluby' }));
-    expect(await screen.findAllByRole('listitem')).toHaveLength(2);
+    expect(await screen.findByTestId('elsewhere')).toHaveTextContent('/clubs/club-1');
+    /* the list stays where it was: nothing of the old detail page is drawn here any more */
+    expect(screen.queryByTestId('club-detail')).toBeNull();
   });
 
-  it('says when the API does not give the link rather than inventing one', async () => {
-    listOrders.mockResolvedValue([{ ...slanyOrder, token: null }]);
-    const user = userEvent.setup();
-    render(<Wrap><ClubsPage /></Wrap>);
-    const cards = await screen.findAllByRole('listitem');
-    await screen.findByText('Aktivní rezervace');
-    await user.click(cards[0]);
-
-    expect(await screen.findByTestId('club-link')).toHaveTextContent('Odkaz zatím není k dispozici');
-    expect(screen.getByRole('button', { name: 'Kopírovat' })).toBeDisabled();
-  });
 
   /*
    * `/api/clubs` is the one required read. Everything else is an enrichment:
@@ -302,7 +261,6 @@ describe('ClubsPage', () => {
   it('shows no discount for a club the administrator gave none, whatever its headcount', async () => {
     getAll.mockResolvedValue([{ ...slany, discountPercent: null }, kladno]);
     listOrders.mockResolvedValue([{ ...slanyOrder, clubDiscountPercent: null }]);
-    const user = userEvent.setup();
     render(<Wrap><ClubsPage /></Wrap>);
 
     const cards = await screen.findAllByRole('listitem');
@@ -310,19 +268,13 @@ describe('ClubsPage', () => {
     expect(within(cards[0]).getByText('12')).toBeInTheDocument();
     /* no discount, and (Etapa 12) nothing to invoice without a club order */
     expect(within(cards[0]).getAllByText('—')).toHaveLength(2);
-
-    await user.click(cards[0]);
-    expect(await screen.findByText('Bez slevy')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText(/26.400 Kč/)).toBeInTheDocument());
-    expect(screen.getByText(/^12 × 2.200 Kč$/)).toBeInTheDocument();
   });
 
   it('saves the discount the administrator types, as a number', async () => {
     const user = userEvent.setup();
-    render(<Wrap><ClubsPage /></Wrap>);
-    const cards = await screen.findAllByRole('listitem');
-    await user.click(cards[1]);
-    await user.click(await screen.findByRole('button', { name: 'Upravit klub' }));
+    /* the payer record is edited from the club's screen ("Upravit údaje"); the dialog itself is the same one */
+    const { PayerDialog } = await import('./clubs/PayerDialog');
+    render(<Wrap><PayerDialog editing={kladno as never} onClose={vi.fn()} onSaved={vi.fn()} /></Wrap>);
     const dialog = await screen.findByRole('dialog');
     const discount = within(dialog).getByLabelText('Sleva klubu (%)');
     expect(discount).toHaveValue('');
@@ -345,24 +297,6 @@ describe('ClubsPage', () => {
     expect(screen.getByRole('button', { name: 'Zkusit znovu' })).toBeInTheDocument();
   });
 
-  it('still edits the payer record from the detail', async () => {
-    const user = userEvent.setup();
-    render(<Wrap><ClubsPage /></Wrap>);
-    const cards = await screen.findAllByRole('listitem');
-    await user.click(cards[1]);
-
-    expect(await screen.findByText('Tento klub zatím nemá hromadnou rezervaci.')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Upravit klub' }));
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('heading', { name: 'Upravit klub' })).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('Název')).toHaveValue('HC Kladno');
-
-    await user.clear(within(dialog).getByLabelText('Město'));
-    await user.type(within(dialog).getByLabelText('Město'), 'Kladno');
-    await user.click(within(dialog).getByRole('button', { name: 'Uložit' }));
-
-    await waitFor(() => expect(update).toHaveBeenCalledWith('club-2', expect.objectContaining({ name: 'HC Kladno', city: 'Kladno' })));
-  });
 });
 
 /* ── Etapa 2: three layouts, club blocks and the router state ── */
@@ -401,28 +335,16 @@ describe('ClubsPage in three layouts', () => {
   });
 
   it.each([
-    ['phone', VIEWPORTS.phone, '1'],
-    ['tablet', VIEWPORTS.tablet, '1'],
-    ['desktop', VIEWPORTS.desktop, '2'],
-  ])('draws the %s detail in %s column(s)', async (device, width, columns) => {
+    ['phone', VIEWPORTS.phone],
+    ['tablet', VIEWPORTS.tablet],
+    ['desktop', VIEWPORTS.desktop],
+  ])("a card opens the club's own screen in the %s layout", async (_device, width) => {
     setViewport(width);
     const user = userEvent.setup();
     render(<Wrap><ClubsPage /></Wrap>);
     const cards = await screen.findAllByRole('listitem');
-    await screen.findByText('Aktivní rezervace');
-    await user.click(cards[0]);
-    const detail = await screen.findByTestId('club-detail');
-    expect(detail).toHaveAttribute('data-layout', device);
-    expect(detail).toHaveAttribute('data-columns', columns);
-    expect(screen.getByTestId('club-link')).toBeInTheDocument();
-    /* Phone: the places are small cards; elsewhere the table. */
-    if (device === 'phone') {
-      expect(await screen.findByRole('list', { name: 'Rezervovaná místa' })).toBeInTheDocument();
-      expect(screen.queryByRole('table', { name: 'Rezervovaná místa' })).not.toBeInTheDocument();
-      expect(screen.getByTestId('pinned-actions')).toBeInTheDocument();
-    } else {
-      expect(await screen.findByRole('table', { name: 'Rezervovaná místa' })).toBeInTheDocument();
-    }
+    await user.click(cards[1]);
+    expect(await screen.findByTestId('elsewhere')).toHaveTextContent('/clubs/club-2');
   });
 });
 
@@ -438,35 +360,7 @@ describe('ClubsPage with club blocks', () => {
     expect(within(cards[0]).getByTestId('club-avatar')).toHaveAttribute('data-color', '');
   });
 
-  it("shows the club's blocks in the detail, with a link to register and a 'Nová objednávka' for this club", async () => {
-    listBlocks.mockResolvedValue([block(), block({ id: 'b-old', status: 'Cancelled', fromDate: '2026-01-05', toDate: '2026-01-09' })]);
-    const user = userEvent.setup();
-    render(<Wrap><ClubsPage /></Wrap>);
-    const cards = await screen.findAllByRole('listitem');
-    await screen.findAllByText('Aktivní rezervace');
-    await user.click(cards[1]);
 
-    const panels = await screen.findAllByTestId('club-block-panel');
-    expect(panels).toHaveLength(2);
-    expect(within(panels[0]).getByText('Aktivní blok')).toBeInTheDocument();
-    expect(within(panels[0]).getByTestId('block-link')).toHaveTextContent('https://app.test/klub/kladno-tok');
-    expect(within(panels[1]).getByText('Zrušen')).toBeInTheDocument();
-    expect(screen.queryByText('Tento klub zatím nemá hromadnou rezervaci.')).not.toBeInTheDocument();
-    expect(screen.getByTestId('club-hero-subtitle')).toHaveTextContent('1 starší rezervace');
-
-    expect(screen.queryByRole('button', { name: 'Nový blok' })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Nová objednávka klubu' })[0]).toBeInTheDocument();
-  });
-
-  it('tells a club without anything to make an order or the older reservation', async () => {
-    const user = userEvent.setup();
-    render(<Wrap><ClubsPage /></Wrap>);
-    const cards = await screen.findAllByRole('listitem');
-    await user.click(cards[1]);
-    expect(await screen.findByText('Tento klub zatím nemá hromadnou rezervaci.')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Nová objednávka klubu' }).length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: 'Vytvořit rezervaci' })).toBeInTheDocument();
-  });
 
   it('keeps the cards and names the missing part when the blocks cannot be read', async () => {
     listBlocks.mockRejectedValue(new Error('500'));
@@ -485,32 +379,25 @@ describe('ClubsPage with club blocks', () => {
 });
 
 describe('ClubsPage router state', () => {
-  it("opens the club's detail on the block it was sent to", async () => {
-    const scroll = vi.fn();
-    Element.prototype.scrollIntoView = scroll;
+  it("sends a club window's hand-off to the club's screen, landing on that block", async () => {
     listBlocks.mockResolvedValue([block({ id: 'b-1', clubId: 'club-2' }), block({ id: 'b-2', clubId: 'club-2', fromDate: day2, toDate: day2 })]);
     render(<Wrap state={{ clubId: 'club-2', clubBlockId: 'b-2' }}><ClubsPage /></Wrap>);
-
-    expect(await screen.findByRole('heading', { name: 'HC Kladno', level: 1 })).toBeInTheDocument();
-    const panels = await screen.findAllByTestId('club-block-panel');
-    const target = panels.find((p) => p.getAttribute('data-block-id') === 'b-2');
-    expect(target).toBeDefined();
-    await waitFor(() => expect(scroll).toHaveBeenCalled());
-    expect(scroll.mock.contexts.some((c) => c === target)).toBe(true);
-    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('null'));
+    const where = await screen.findByTestId('elsewhere');
+    expect(where).toHaveTextContent('/clubs/club-2');
+    expect(where).toHaveTextContent('{"clubBlockId":"b-2"}');
   });
 
   it('finds the club from the block when only the block id is given', async () => {
     listBlocks.mockResolvedValue([block({ id: 'b-7', clubId: 'club-2' })]);
     render(<Wrap state={{ clubBlockId: 'b-7' }}><ClubsPage /></Wrap>);
-    expect(await screen.findByRole('heading', { name: 'HC Kladno', level: 1 })).toBeInTheDocument();
-    expect(await screen.findByTestId('club-block-panel')).toHaveAttribute('data-block-id', 'b-7');
+    const where = await screen.findByTestId('elsewhere');
+    expect(where).toHaveTextContent('/clubs/club-2');
+    expect(where).toHaveTextContent('{"clubBlockId":"b-7"}');
   });
 
   it('still opens a club straight away from the older { clubId } hand-off', async () => {
     render(<Wrap state={{ clubId: 'club-1' }}><ClubsPage /></Wrap>);
-    expect(await screen.findByRole('heading', { name: 'FK Slaný', level: 1 })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('null'));
+    expect(await screen.findByTestId('elsewhere')).toHaveTextContent('/clubs/club-1');
   });
 });
 
@@ -530,22 +417,19 @@ describe('ClubsPage order router state (Etapa 4)', () => {
   });
 });
 
-describe('club detail: "Nová objednávka klubu" (Etapa 5)', () => {
-  it('opens the two-way chooser, not the old dialog, and the phone choice goes to the calendar for this club', async () => {
+describe('"Nová objednávka" in the list (Etapa 5)', () => {
+  it('opens the two-way chooser, and the phone choice goes to the calendar setup', async () => {
     const user = userEvent.setup();
     render(<Wrap><ClubsPage /></Wrap>);
-    const cards = await screen.findAllByRole('listitem');
-    await user.click(cards[1]);
-    await user.click((await screen.findAllByRole('button', { name: 'Nová objednávka klubu' }))[0]);
+    await user.click(await screen.findByRole('button', { name: 'Nová objednávka' }));
     const entry = await screen.findByTestId('club-order-entry');
     expect(within(entry).getAllByRole('button')).toHaveLength(2);
     await user.click(within(entry).getByTestId('entry-phone'));
     const where = await screen.findByTestId('elsewhere');
     expect(where).toHaveTextContent('/planovani');
-    expect(where).toHaveTextContent('{"pickOrder":{"clubId":"club-2"}}');
   });
 
-  it('"Nová objednávka" in the list opens the same chooser (one flow, no term form)', async () => {
+  it('is the same chooser as everywhere (one flow, no term form)', async () => {
     const user = userEvent.setup();
     render(<Wrap><ClubsPage /></Wrap>);
     await user.click(await screen.findByRole('button', { name: 'Nová objednávka' }));
@@ -554,25 +438,5 @@ describe('club detail: "Nová objednávka klubu" (Etapa 5)', () => {
     expect(within(entry).getByTestId('entry-link')).toBeInTheDocument();
     expect(screen.queryByLabelText(/Denně od/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Automatický návrh/)).not.toBeInTheDocument();
-  });
-
-  it('"Vytvořit rezervaci" of a club goes straight to the calendar setup for this club', async () => {
-    const user = userEvent.setup();
-    render(<Wrap><ClubsPage /></Wrap>);
-    const cards = await screen.findAllByRole('listitem');
-    await user.click(cards[1]);
-    await user.click((await screen.findAllByRole('button', { name: 'Vytvořit rezervaci' }))[0]);
-    const where = await screen.findByTestId('elsewhere');
-    expect(where).toHaveTextContent('/planovani');
-    expect(where).toHaveTextContent('{"pickOrder":{"clubId":"club-2"}}');
-  });
-
-  it('"Všechny objednávky" opens the orders page filtered to this club', async () => {
-    const user = userEvent.setup();
-    render(<Wrap><ClubsPage /></Wrap>);
-    const cards = await screen.findAllByRole('listitem');
-    await user.click(cards[1]);
-    await user.click(await screen.findByRole('button', { name: 'Všechny objednávky' }));
-    expect(await screen.findByTestId('elsewhere')).toHaveTextContent('/clubs/objednavky?clubId=club-2');
   });
 });

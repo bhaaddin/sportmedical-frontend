@@ -313,7 +313,7 @@ export default function HealthQuestionnaire({
             label={`${percent} %`}
             sx={{ fontWeight: 800, bgcolor: palette.accent, color: palette.ink, fontSize: 14 }}
           />
-          <IconButton onClick={onClose} sx={{ color: '#FFFFFF' }} aria-label="Zavřít dotazník">
+          <IconButton onClick={onClose} sx={{ color: '#FFFFFF', width: 44, height: 44 }} aria-label="Zavřít dotazník">
             <CloseOutlined />
           </IconButton>
         </Box>
@@ -533,8 +533,10 @@ export default function HealthQuestionnaire({
           flexShrink: 0,
           borderTop: `1px solid ${palette.line}`,
           bgcolor: '#FFFFFF',
-          px: { xs: 2, md: 4 },
-          py: 1.5,
+          pl: { xs: 'max(16px, env(safe-area-inset-left))', md: 4 },
+          pr: { xs: 'max(16px, env(safe-area-inset-right))', md: 4 },
+          pt: 1.5,
+          pb: 'max(12px, env(safe-area-inset-bottom))',
           display: 'flex',
           alignItems: 'center',
           gap: 1.5,

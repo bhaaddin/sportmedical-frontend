@@ -177,6 +177,8 @@ export interface BoardCalendarInput {
   mayBook: boolean;
   /** Club windows of this club are drawn as session cards (club planning): skip them. */
   excludeClubId?: string | null;
+  /** Windows (club block ids) drawn as session cards of the edited order: skipped, the club's other ones are drawn. */
+  excludeClubBlockIds?: ReadonlySet<string>;
 }
 
 export interface BoardModel {
@@ -422,6 +424,7 @@ function windowModels(
       for (const { block, span } of drawnBlocksOfDay(blocks, day, lunch)) {
         const club = block.kind === 'club';
         if (club && calendar.excludeClubId && block.clubId === calendar.excludeClubId) continue;
+        if (club && calendar.excludeClubBlockIds && block.clubBlockId && calendar.excludeClubBlockIds.has(block.clubBlockId)) continue;
         if (club) {
           const key = `${block.clubBlockId ?? block.id}|${span.start}|${span.end}`;
           if (seenClub.has(key)) continue;

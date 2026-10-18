@@ -42,8 +42,8 @@ import {
   ARCHIVO, BRAND, clinicDate, clinicTime, czk, telHref,
 } from '../../components/public/brand';
 import {
-  LABEL_COLOR, LoadError, Panel, PanelTitle, PageTitle, PinnedBar, PublicMain, Steps, FieldLabel,
-  ctaSx, ghostSx, shortDate,
+  LABEL_COLOR, LoadError, Pane, PaneColumn, Panel, PanelTitle, PageTitle, PinnedBar, PublicMain, Steps, FieldLabel,
+  ctaSx, ghostSx, scrollPublicTop, shortDate,
 } from '../../components/public/kit';
 import ServiceGroup, { minuteWord, priceLine } from './booking/ServiceGroup';
 import { useSlotTexts } from '../../site/useSlotTexts';
@@ -172,7 +172,7 @@ export default function PublicBooking() {
     setChosen({ service, activity });
     setComplaint(null);
     // The booking opens at the top of the page, not wherever the card was.
-    document.documentElement.scrollTop = 0;
+    scrollPublicTop();
   };
 
   const firstFree = days !== null && days.length > 0 ? days[0] : null;
@@ -246,15 +246,19 @@ export default function PublicBooking() {
     </Button>
   );
 
+  const head = (
+    <>
+      <Steps steps={['Služba', 'Termín', 'Vaše údaje']} current={chosen === null ? 1 : 2} />
+      <PageTitle>{chosen === null ? 'Vyberte si službu' : 'Vyberte si termín'}</PageTitle>
+    </>
+  );
+
   return (
     <PublicLayout clinic={clinic}>
-      <PublicMain>
-        <Steps steps={['Služba', 'Termín', 'Vaše údaje']} current={chosen === null ? 1 : 2} />
-        <PageTitle>{chosen === null ? 'Vyberte si službu' : 'Vyberte si termín'}</PageTitle>
-
+      <PublicMain maxWidth="none" head={head} workspace columns={chosen === null ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) clamp(300px, 24vw, 440px)'} gap={2.5}>
         {/* ── 1 · Služba ── */}
         {chosen === null && (
-          <>
+          <PaneColumn>
             {offerFailed && (
               <LoadError
                 what={`Nabídku se nepodařilo načíst${ringUs(clinic, txt['formulare.booking.call-us'])}.`}
@@ -281,29 +285,25 @@ export default function PublicBooking() {
             )}
 
             {services !== null && services.length > 0 && (
-              <Box sx={{ display: 'grid', gap: { xs: 3.5, md: 4 } }}>
+              /* A column per service where the width allows (a service never splits), so a wide screen shows the whole offer at once. */
+              <Box
+                sx={{
+                  display: 'grid', gap: { xs: 3.5, md: 4 }, alignItems: 'start',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))',
+                }}
+              >
                 {services.map((service) => (
                   <ServiceGroup key={service.id} service={service} onChoose={(a) => choose(service, a)} />
                 ))}
               </Box>
             )}
-          </>
+          </PaneColumn>
         )}
 
         {/* ── 2 · Termín ── */}
         {chosen !== null && activity !== null && (
-          <Box
-            id="rezervace"
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 2.5,
-              alignItems: 'flex-start',
-              flexDirection: device === 'phone' ? 'column' : 'row',
-              '& > *': device === 'phone' ? { width: '100%', boxSizing: 'border-box' } : undefined,
-            }}
-          >
-            <Box sx={{ flex: device === 'phone' ? undefined : '999 1 460px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2.25 }}>
+          <Box id="rezervace" sx={{ display: 'contents' }}>
+            <PaneColumn>
               <Panel sx={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.375, minWidth: 0 }}>
                   <FieldLabel>Vybrané vyšetření</FieldLabel>
@@ -350,19 +350,9 @@ export default function PublicBooking() {
                   </>
                 )}
               </Panel>
-            </Box>
+            </PaneColumn>
 
-            <Panel
-              component="aside"
-              labelledBy="booking-summary"
-              sx={{
-                flex: device === 'phone' ? undefined : '1 1 280px',
-                position: device === 'desktop' ? 'sticky' : 'static',
-                top: 96,
-                gap: 2,
-              }}
-            >
-              <PanelTitle id="booking-summary">Shrnutí</PanelTitle>
+            <Pane component="aside" labelledBy="booking-summary" title={<PanelTitle id="booking-summary">Shrnutí</PanelTitle>} sx={{ alignSelf: 'start' }}>
               <Box component="dl" sx={{ m: 0, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                 <SummaryRow term="Služba" value={activity.name} />
                 <SummaryRow
@@ -372,7 +362,7 @@ export default function PublicBooking() {
                     : `${shortDate(picked.slot.startUtc)} · ${clinicTime(picked.slot.startUtc)}`}
                   label={picked === null ? undefined : `${clinicDate(picked.day)}, ${clinicTime(picked.slot.startUtc)}`}
                 />
-                {activity.durationMinutes > 0 && <SummaryRow term="Délka" value={`${activity.durationMinutes} minut`} />}
+                {activity.durationMinutes > 0 && <SummaryRow term="Délka" value={`${activity.durationMinutes} minut`} />}
                 {address !== '' && <SummaryRow term="Místo" value={address} />}
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, pt: 1.75, borderTop: '1px solid #F0ECE6', alignItems: 'baseline' }}>
@@ -387,7 +377,7 @@ export default function PublicBooking() {
                   {txt['formulare.booking.pick-time']}
                 </Typography>
               )}
-            </Panel>
+            </Pane>
           </Box>
         )}
 
@@ -406,6 +396,7 @@ export default function PublicBooking() {
     </PublicLayout>
   );
 }
+
 
 function SummaryRow({ term, value, label }: { term: string; value: ReactNode; label?: string }) {
   return (

@@ -8,7 +8,8 @@
  * `#move-ghost`, `#move-lanes`, `#move-hud`, `#term-resize-range`,
  * `#term-resize-added`, `#term-resize-hud`.
  * `boardWidth` / `boardHeight` are the DESIGN pixel size of `#day-board`
- * (`board.clientWidth/Height`), unaffected by the stage scale.
+ * (`board.clientWidth/Height`), unaffected by the stage scale. `timelineHeight` (the optional last argument of each
+ * function) is the MEASURED height the 12 hours are drawn in (the fluid stage); it defaults to the file's 455 px.
  */
 import { bookingState } from './booking';
 import { categoryOrFallback, demandOf, slotMinutesOf } from './context';
@@ -17,8 +18,8 @@ import { TIMELINE_HEIGHT } from './week';
 import { clamp, dateOf, minutesAsTime, printable, timeAsMinutes, timeLeft } from './time';
 import type { MovePreview, PlacementPreview, PlannerContext, ResizePreview } from './types';
 
-const y = (ctx: PlannerContext, minutes: number): number =>
-  ((minutes - ctx.window.startMinutes) / (ctx.window.endMinutes - ctx.window.startMinutes)) * TIMELINE_HEIGHT;
+const y = (ctx: PlannerContext, minutes: number, timeline = TIMELINE_HEIGHT): number =>
+  ((minutes - ctx.window.startMinutes) / (ctx.window.endMinutes - ctx.window.startMinutes)) * timeline;
 
 const colLeft = (col: number, pad: number) => `calc(${col} * 100% / 7 + ${pad}px)`;
 const colWidth = (pad: number) => `calc(100% / 7 - ${pad * 2}px)`;
@@ -55,20 +56,20 @@ export interface PlacementOverlay {
   };
 }
 
-export function placementOverlay(ctx: PlannerContext, p: PlacementPreview, boardWidth: number): PlacementOverlay {
+export function placementOverlay(ctx: PlannerContext, p: PlacementPreview, boardWidth: number, timelineHeight = TIMELINE_HEIGHT): PlacementOverlay {
   const c = categoryOrFallback(ctx, p.categoryId);
   const requested = demandOf(ctx, p.categoryId)?.requested ?? 0;
   const valid = p.validation.ok;
   const after = plannedOf(ctx, p.categoryId) + p.quantity;
   const progress = Math.round((after / requested) * 100);
   const centre = ((p.col + 0.5) * boardWidth) / 7;
-  const pixelTop = y(ctx, p.startMinutes);
+  const pixelTop = y(ctx, p.startMinutes, timelineHeight);
   return {
     preview: {
       left: colLeft(p.col, 4),
       width: colWidth(4),
       top: pixelTop,
-      height: y(ctx, p.endMinutes) - y(ctx, p.startMinutes),
+      height: y(ctx, p.endMinutes, timelineHeight) - y(ctx, p.startMinutes, timelineHeight),
       tone: c.color,
       invalid: !valid,
       limitReached: valid && p.isLimit,
@@ -78,7 +79,7 @@ export function placementOverlay(ctx: PlannerContext, p: PlacementPreview, board
     },
     hud: {
       left: Math.min(boardWidth - 254, Math.max(7, centre + 18)),
-      top: clamp(pixelTop > 154 ? pixelTop - 143 : y(ctx, p.endMinutes) + 10, 7, TIMELINE_HEIGHT - 141),
+      top: clamp(pixelTop > 154 ? pixelTop - 143 : y(ctx, p.endMinutes, timelineHeight) + 10, 7, timelineHeight - 141),
       tone: c.color,
       conflict: !valid,
       heading: valid ? 'ŽIVÝ NÁHLED PLÁNOVÁNÍ' : 'TERMÍN NELZE VYTVOŘIT',
@@ -129,20 +130,20 @@ export interface MoveOverlay {
   };
 }
 
-export function moveOverlay(ctx: PlannerContext, p: MovePreview, boardWidth: number): MoveOverlay | null {
+export function moveOverlay(ctx: PlannerContext, p: MovePreview, boardWidth: number, timelineHeight = TIMELINE_HEIGHT): MoveOverlay | null {
   const original = ctx.sessions.find((e) => e.id === p.eventId);
   if (!original) return null;
   const c = categoryOrFallback(ctx, original.categoryId);
   const ok = p.validation.ok;
   const centre = ((p.col + 0.5) * boardWidth) / 7;
-  const cellY = y(ctx, p.startMinutes);
+  const cellY = y(ctx, p.startMinutes, timelineHeight);
   const count = bookingState(original, ctx.today).confirmed;
   return {
     ghost: {
       left: colLeft(p.col, 4),
       width: colWidth(4),
       top: cellY,
-      height: Math.max(27, y(ctx, p.endMinutes) - y(ctx, p.startMinutes)),
+      height: Math.max(27, y(ctx, p.endMinutes, timelineHeight) - y(ctx, p.startMinutes, timelineHeight)),
       tone: c.color,
       notAllowed: !ok,
       name: c.name,
@@ -153,7 +154,7 @@ export function moveOverlay(ctx: PlannerContext, p: MovePreview, boardWidth: num
     lanes: { left: `calc(${p.col} * 100% / 7)`, width: 'calc(100% / 7)', invalid: !ok },
     hud: {
       left: clamp(centre + 20, 8, boardWidth - 267),
-      top: clamp(cellY > 195 ? cellY - 168 : y(ctx, p.endMinutes) + 10, 7, TIMELINE_HEIGHT - 169),
+      top: clamp(cellY > 195 ? cellY - 168 : y(ctx, p.endMinutes, timelineHeight) + 10, 7, timelineHeight - 169),
       tone: c.color,
       invalid: !ok,
       heading: ok ? 'NÁHLED PŘESUNU' : 'NELZE PŘESUNOUT',
@@ -193,7 +194,13 @@ export interface ResizeOverlay {
 }
 
 /** Null when nothing is added yet (the prototype hides all three layers then). */
-export function resizeOverlay(ctx: PlannerContext, p: ResizePreview, boardWidth: number, boardHeight: number): ResizeOverlay | null {
+export function resizeOverlay(
+  ctx: PlannerContext,
+  p: ResizePreview,
+  boardWidth: number,
+  boardHeight: number,
+  timelineHeight = TIMELINE_HEIGHT,
+): ResizeOverlay | null {
   if (p.added <= 0) return null;
   const original = ctx.sessions.find((e) => e.id === p.eventId);
   if (!original) return null;
@@ -206,7 +213,7 @@ export function resizeOverlay(ctx: PlannerContext, p: ResizePreview, boardWidth:
   const center = ((p.col + 0.5) * boardWidth) / 7;
   const eY = (p.edge === 'top' ? p.startMinutes : p.endMinutes) - ctx.window.startMinutes;
   const span = ctx.window.endMinutes - ctx.window.startMinutes;
-  const ePx = (eY / span) * TIMELINE_HEIGHT;
+  const ePx = (eY / span) * timelineHeight;
   const count = original.capacity + p.added;
   return {
     tone: c.color,
@@ -214,12 +221,12 @@ export function resizeOverlay(ctx: PlannerContext, p: ResizePreview, boardWidth:
     left: colLeft(p.col, 4),
     width: colWidth(4),
     range: {
-      top: y(ctx, p.startMinutes),
-      height: Math.max(18, ((p.endMinutes - p.startMinutes) / span) * TIMELINE_HEIGHT),
+      top: y(ctx, p.startMinutes, timelineHeight),
+      height: Math.max(18, ((p.endMinutes - p.startMinutes) / span) * timelineHeight),
     },
     added: {
-      top: y(ctx, extStart),
-      height: Math.max(9, ((extEnd - extStart) / span) * TIMELINE_HEIGHT),
+      top: y(ctx, extStart, timelineHeight),
+      height: Math.max(9, ((extEnd - extStart) / span) * timelineHeight),
       label: `+${p.added} ${p.added === 1 ? 'slot' : 'slotů'}`,
       times: `${minutesAsTime(extStart)}–${minutesAsTime(extEnd)}`,
     },

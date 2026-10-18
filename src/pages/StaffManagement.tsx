@@ -13,6 +13,7 @@
    employee is now switched off here, on the account, and the server ends
    their open sessions with it.
    ══════════════════════════════════════════════════════════════ */
+import { StackTable } from "../components/ui/StackTable";
 import { useCallback, useEffect, useState } from 'react';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
@@ -285,7 +286,7 @@ export default function StaffManagement() {
 
       {/* Accounts */}
       <div>
-        <TableContainer component={Paper}>
+        <StackTable component={Paper}>
           <Table>
             <TableHead>
               <TableRow>
@@ -410,7 +411,7 @@ export default function StaffManagement() {
               )}
             </TableBody>
           </Table>
-        </TableContainer>
+        </StackTable>
       </div>
 
       <WhereSomebodyWorksDialog

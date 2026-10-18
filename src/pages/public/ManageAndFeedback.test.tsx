@@ -3,7 +3,7 @@
  * /hodnoceni/:token (rate a visit) — in the public frame, at 390 / 834 / 1440.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { VIEWPORTS, setViewport } from '../../test/viewport';
@@ -92,7 +92,8 @@ describe('/rezervace/:token', () => {
      price as the plain amount, never the list it was adjusted from. */
   it('shows the price from the public offer when the booking carries none', async () => {
     renderManage();
-    expect(await screen.findByTestId('price-line')).toHaveTextContent('Cena: 1 600 Kč');
+    // The price arrives one request after the booking, so it is waited for rather than read at the first paint.
+    await waitFor(() => expect(screen.getByTestId('price-line')).toHaveTextContent('Cena: 1 600 Kč'));
     expect(bookableOffer).toHaveBeenCalledTimes(1);
   });
 

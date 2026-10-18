@@ -15,7 +15,8 @@ import { useDevice } from '../../layout/useDevice';
  */
 export type FieldGridLayout = 'single' | 'auto';
 
-const TWO_COLUMNS_AT_MOST = 'repeat(auto-fit, minmax(max(260px, 40%), 1fr))';
+/* Up to three columns when the card is wide (>= ~830 px), two when it is medium, one when it is narrow. */
+const TWO_COLUMNS_AT_MOST = 'repeat(auto-fit, minmax(max(260px, 31%), 1fr))';
 
 export function FieldGrid({
   children,

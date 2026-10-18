@@ -391,7 +391,7 @@ export default function SiteContentAdminPage() {
       onChange={(event) => setSearch(event.target.value)}
       placeholder="Hledat v textech a fotkách"
       slotProps={{
-        htmlInput: { 'aria-label': 'Hledat v textech a fotkách', style: { minHeight: 28 } },
+        htmlInput: { 'aria-label': 'Hledat v textech a fotkách' },
         input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> },
       }}
       sx={{ '& .MuiInputBase-root': { minHeight: 44 } }}

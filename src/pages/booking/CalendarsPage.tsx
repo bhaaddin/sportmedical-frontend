@@ -1,3 +1,4 @@
+import { StackTable } from "../../components/ui/StackTable";
 import { useMemo, useState } from "react";
 import {
   Alert,
@@ -344,7 +345,7 @@ export default function CalendarsPage() {
         emptyAction={{ label: t("booking.calendars.new"), onClick: openCreate }}
         onRetry={() => void calendarsQuery.refetch()}
       >
-        <Box sx={{ overflowX: "auto" }}>
+        <StackTable>
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -495,7 +496,7 @@ export default function CalendarsPage() {
               ))}
             </TableBody>
           </Table>
-        </Box>
+        </StackTable>
       </AsyncSection>
 
       <Dialog

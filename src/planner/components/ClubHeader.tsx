@@ -21,6 +21,8 @@
  */
 import type { ChangeEvent, ReactNode } from 'react';
 import { ClubAvatar } from '../../components/clubs/ClubAvatar';
+import { canBeInvoiced } from '../../pages/clubs/payerForm';
+import { useClubPlanner } from '../club/ClubPlannerContext';
 import { usePlannerCommands } from '../data/usePlannerCommands';
 import { clubDisplayName, headerValues, type ClubProfile, type ClubProfileField } from '../model';
 import { usePlannerActions } from '../state/PlannerStoreProvider';
@@ -71,6 +73,8 @@ const DOM_IDS: Record<ClubProfileField, string> = {
 /** Why the logo cannot be changed, in the words the desk reads. */
 export const LOGO_DISABLED_TEXT = 'Logo klubu zde zatím nelze nahrát. Místo něj slouží iniciály klubu.';
 
+const isClinicMode = (mode: ClubHeaderMode): boolean => mode === 'clinic';
+
 export function ClubHeader({ user = null, mode = 'club' }: ClubHeaderProps) {
   const planned = usePlannerProfile();
   const catalogue = usePlannerCatalogue();
@@ -79,6 +83,9 @@ export function ClubHeader({ user = null, mode = 'club' }: ClubHeaderProps) {
   const navigate = useAppNavigate();
   const feed = usePlannerNotificationFeed();
   const account = usePlannerUser();
+  /* A club's own screen: the invoice needs the club's address and bank account - when they are missing the section says so. */
+  const clubScreen = useClubPlanner();
+  const billingMissing = clubScreen !== null && !isClinicMode(mode) && !canBeInvoiced(clubScreen.club);
 
   const clinic = useClinicHeaderProfile(catalogue.clinicName, mode === 'clinic');
   const isClinic = mode === 'clinic';
@@ -103,10 +110,11 @@ export function ClubHeader({ user = null, mode = 'club' }: ClubHeaderProps) {
     </div>
   );
 
-  const section = (title: string, ariaLabel: string, icon: keyof typeof SECTION_ICONS, children: ReactNode) => (
+  const section = (title: string, ariaLabel: string, icon: keyof typeof SECTION_ICONS, children: ReactNode, badge?: ReactNode) => (
     <section className="club-head-info" aria-label={ariaLabel}>
       <div className="club-head-title">
         <svg className="club-info-icon" viewBox="0 0 24 24" aria-hidden="true">{SECTION_ICONS[icon]}</svg> {title}
+        {badge}
       </div>
       {children}
     </section>
@@ -227,7 +235,9 @@ export function ClubHeader({ user = null, mode = 'club' }: ClubHeaderProps) {
             {line('DIČ', 'dic', 'doc')}
             {line('Adresa', 'address', 'pin')}
           </>
-        ))}
+        ), billingMissing ? (
+          <span className="club-billing-warn" data-testid="club-billing-warning" role="img" aria-label="Chybí fakturační údaje" title="Chybí fakturační údaje (adresa a bankovní spojení klubu)">!</span>
+        ) : undefined)}
         {section(strip.lead, strip.leadAria, 'team', (
           <>
             {line('Jméno', 'leaderName', 'user')}

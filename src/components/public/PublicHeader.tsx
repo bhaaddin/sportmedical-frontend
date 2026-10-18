@@ -17,7 +17,7 @@ import { useLocation } from 'react-router-dom';
 import { Box } from '@mui/material';
 import { SiteLink } from '../../web/SiteLink';
 import { ArrowIcon, ChevronDownIcon, CtaButton, PersonIcon } from '../../web/ui';
-import { FONT_HEAD, GUTTER, MAX_WIDTH, MQ, W } from '../../web/tokens';
+import { FONT_HEAD, GUTTER, MQ, SITE_MAX, W, WIDE_GUTTER } from '../../web/tokens';
 import { SITE } from '../../pages/public/content';
 import { SITE_HOME_PATH, STAFF_HOME_PATH } from '../../web/sitePaths';
 import { useStaffSession } from '../../web/useStaffSession';
@@ -99,6 +99,8 @@ export interface PublicHeaderProps {
   extra?: ReactNode;
   /** Hide "Můj portál" — on the sign-in page itself, and inside the portal. */
   hidePortalLink?: boolean;
+  /** The application's public pages (booking, portal, …): the bar spans the page body's own width and gutters, edge to edge on a big screen. */
+  wide?: boolean;
 }
 
 const navItem = {
@@ -107,7 +109,7 @@ const navItem = {
   '&:hover': { color: W.white }, '&[aria-current="page"]': { color: W.white, fontWeight: 600 },
 } as const;
 
-export function PublicHeader({ extra, hidePortalLink = false }: PublicHeaderProps) {
+export function PublicHeader({ extra, hidePortalLink = false, wide = false }: PublicHeaderProps) {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   /* False on the server and on the first client render (the page is prerendered), true after mount for a signed-in staff member. */
@@ -128,11 +130,11 @@ export function PublicHeader({ extra, hidePortalLink = false }: PublicHeaderProp
     <Box
       component="header"
       sx={{
-        position: 'sticky', top: 0, zIndex: 50, bgcolor: W.ink, color: W.white, borderBottom: `1px solid ${W.inkLine}`,
+        position: 'sticky', top: 0, zIndex: 50, flex: '0 0 auto', bgcolor: W.ink, color: W.white, borderBottom: `1px solid ${W.inkLine}`,
       
       }}
     >
-      <Box sx={{ maxWidth: MAX_WIDTH, mx: 'auto', px: GUTTER, height: { xs: 60, md: 72 }, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+      <Box sx={{ maxWidth: wide ? 'none' : SITE_MAX, mx: 'auto', ...(wide ? WIDE_GUTTER : { px: GUTTER }), height: { xs: 60, md: 72 }, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: '16px', lg: '38px' }, minWidth: 0 }}>
           <Brand />
           <Box
@@ -249,11 +251,11 @@ export function PublicHeader({ extra, hidePortalLink = false }: PublicHeaderProp
           aria-label="Hlavní menu"
           sx={{
             [MQ.nav]: { display: 'none' }, position: 'absolute', top: '100%', left: 0, right: 0, bgcolor: W.ink, borderTop: `1px solid ${W.inkLine}`,
-            borderBottom: `1px solid ${W.inkLine}`, maxHeight: 'calc(100vh - 60px)', overflowY: 'auto', px: GUTTER, pt: '8px', pb: '24px',
+            borderBottom: `1px solid ${W.inkLine}`, maxHeight: 'calc(100vh - 60px)', '@supports (height: 100dvh)': { maxHeight: 'calc(100dvh - 60px)' }, overflowY: 'auto', px: GUTTER, pt: '8px', pb: '24px',
             boxShadow: '0 24px 40px rgba(0,0,0,0.35)',
           }}
         >
-          <Box sx={{ maxWidth: MAX_WIDTH, mx: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ maxWidth: wide ? 'none' : SITE_MAX, mx: 'auto', display: 'flex', flexDirection: 'column' }}>
             {[...NAV_BEFORE_SERVICES].map((item) => (
               <MobileLink key={item.to} to={item.to} current={current(item.to)}>{item.label}</MobileLink>
             ))}

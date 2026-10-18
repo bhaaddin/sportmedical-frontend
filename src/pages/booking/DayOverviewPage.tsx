@@ -1,3 +1,5 @@
+import { StackTable } from "../../components/ui/StackTable";
+import { FIT_SCROLL_SX, FitBody, FitPage } from "../../components/ui/fit";
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -248,7 +250,7 @@ export default function DayOverviewPage() {
       : (patientNameById.get(row.patientId) ?? t("booking.day.loadingName"));
 
   return (
-    <Box sx={{ maxWidth: 1100, mx: "auto" }}>
+    <FitPage>
       <PageHeader
         title={t("booking.day.title")}
         /* Noon in Prague on that date, so the weekday is that date's wherever
@@ -309,7 +311,7 @@ export default function DayOverviewPage() {
         skeletonRows={3}
       >
         {/* Which columns the day counts: every calendar on by default. */}
-        <Box sx={{ mb: 2.5 }}>
+        <Box sx={{ mb: 2.5, flexShrink: 0 }}>
           <CalendarTogglePills calendars={calendars} selected={selected} onChange={setSelected} />
         </Box>
 
@@ -323,11 +325,11 @@ export default function DayOverviewPage() {
           skeletonRows={5}
         >
           {summary ? (
-            <Stack spacing={2.5}>
+            <>
               {/* Who is out today. Their hours are already left out of the
                   working time below, so the figures and this line agree. */}
               {summary.absent.length > 0 ? (
-                <Alert severity="warning">
+                <Alert severity="warning" sx={{ mb: 2.5, flexShrink: 0 }}>
                   {t("booking.day.absent", {
                     list: summary.absent
                       .map((a) =>
@@ -338,11 +340,23 @@ export default function DayOverviewPage() {
                 </Alert>
               ) : null}
 
+              {/* From 1024 the day is two columns - the tallies and the capacity left, the lists right - and each scrolls by itself. */}
+              <FitBody
+                scroll
+                sx={{
+                  display: "grid",
+                  gap: 2.5,
+                  gridTemplateColumns: "minmax(0, 1fr)",
+                  alignContent: "start",
+                  "@media (min-width: 1024px)": { gridTemplateColumns: "minmax(0, 5fr) minmax(0, 7fr)", gridTemplateRows: "minmax(0, 1fr)", alignContent: "stretch", overflow: "hidden" },
+                }}
+              >
+              <Stack spacing={2.5} sx={{ minWidth: 0, "@media (min-width: 1024px)": { ...FIT_SCROLL_SX, pr: 0.5 } }}>
               {/* ── The five tallies ── */}
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)", md: "repeat(5, 1fr)" },
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))",
                   gap: 2,
                 }}
               >
@@ -359,7 +373,7 @@ export default function DayOverviewPage() {
               </Box>
 
               {/* ── By activity and by calendar ── */}
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 2 }}>
                 <Breakdown
                   title={t("booking.day.byActivity")}
                   rows={summary.byActivity}
@@ -373,6 +387,49 @@ export default function DayOverviewPage() {
                 />
               </Box>
 
+              {/* ── Minutes: free, next, and what stayed empty ── */}
+                            <SoftCard>
+                <SectionLabel>Kapacita dne</SectionLabel>
+                <Stack spacing={1}>
+                  <Line
+                    label={t("booking.day.freeToday")}
+                    value={t("booking.day.minutes", {
+                      count: summary.freeMinutesLeft,
+                    })}
+                  />
+                  <Line
+                    label={t("booking.day.next")}
+                    value={
+                      summary.nextAppointment
+                        ? `${formatPragueTime(
+                            summary.nextAppointment.startUtc,
+                          )} · ${summary.nextAppointment.activityName} · ${
+                            summary.nextAppointment.calendarName
+                          }`
+                        : t("booking.day.noneLeft")
+                    }
+                  />
+                  {/*
+                    A day with no working hours has nothing to be unused out of.
+                    Dividing by it would print "0 % využití" for a closed
+                    Saturday, which reads like a bad day rather than no day.
+                  */}
+                  <Line
+                    label={t("booking.day.unused")}
+                    value={
+                      summary.workingMinutes > 0
+                        ? t("booking.day.unusedOf", {
+                            unused: summary.unusedMinutes,
+                            working: summary.workingMinutes,
+                            percent: utilisation,
+                          })
+                        : t("booking.day.noWorkingHours")
+                    }
+                  />
+                </Stack>
+              </SoftCard>
+              </Stack>
+              <Stack spacing={2.5} sx={{ minWidth: 0, "@media (min-width: 1024px)": { ...FIT_SCROLL_SX, pr: 0.5 } }}>
               {/* ── Who is late, with the one button that fixes it ── */}
               <SoftCard sx={{ p: 0, overflow: "hidden" }}>
                 <Box sx={{ px: 2.5, pt: 2.5, pb: 1.5, display: "flex", alignItems: "baseline", gap: 1.5, flexWrap: "wrap" }}>
@@ -405,7 +462,7 @@ export default function DayOverviewPage() {
                     onRetry={() => void dayQuery.refetch()}
                     skeletonRows={2}
                   >
-                    <TableContainer sx={{ border: "1px solid", borderColor: "divider" }}>
+                    <StackTable sx={{ border: "1px solid", borderColor: "divider" }}>
                       <Table size="small">
                         <TableHead>
                           <TableRow>
@@ -505,7 +562,7 @@ export default function DayOverviewPage() {
                           })}
                         </TableBody>
                       </Table>
-                    </TableContainer>
+                    </StackTable>
                   </AsyncSection>
                 </Box>
               </SoftCard>
@@ -529,7 +586,7 @@ export default function DayOverviewPage() {
                       {t("booking.paperwork.nobodyMissing")}
                     </Typography>
                   ) : (
-                    <TableContainer sx={{ border: "1px solid", borderColor: "divider" }}>
+                    <StackTable sx={{ border: "1px solid", borderColor: "divider" }}>
                       <Table size="small">
                         <TableHead>
                           <TableRow>
@@ -558,53 +615,14 @@ export default function DayOverviewPage() {
                           ))}
                         </TableBody>
                       </Table>
-                    </TableContainer>
+                    </StackTable>
                   )}
                 </SoftCard>
               ) : null}
 
-              {/* ── Minutes: free, next, and what stayed empty ── */}
-              <SoftCard>
-                <SectionLabel>Kapacita dne</SectionLabel>
-                <Stack spacing={1}>
-                  <Line
-                    label={t("booking.day.freeToday")}
-                    value={t("booking.day.minutes", {
-                      count: summary.freeMinutesLeft,
-                    })}
-                  />
-                  <Line
-                    label={t("booking.day.next")}
-                    value={
-                      summary.nextAppointment
-                        ? `${formatPragueTime(
-                            summary.nextAppointment.startUtc,
-                          )} · ${summary.nextAppointment.activityName} · ${
-                            summary.nextAppointment.calendarName
-                          }`
-                        : t("booking.day.noneLeft")
-                    }
-                  />
-                  {/*
-                    A day with no working hours has nothing to be unused out of.
-                    Dividing by it would print "0 % využití" for a closed
-                    Saturday, which reads like a bad day rather than no day.
-                  */}
-                  <Line
-                    label={t("booking.day.unused")}
-                    value={
-                      summary.workingMinutes > 0
-                        ? t("booking.day.unusedOf", {
-                            unused: summary.unusedMinutes,
-                            working: summary.workingMinutes,
-                            percent: utilisation,
-                          })
-                        : t("booking.day.noWorkingHours")
-                    }
-                  />
-                </Stack>
-              </SoftCard>
-            </Stack>
+              </Stack>
+              </FitBody>
+            </>
           ) : null}
         </AsyncSection>
       </AsyncSection>
@@ -621,7 +639,7 @@ export default function DayOverviewPage() {
           initialCalendarId={shownIds.length === 1 ? shownIds[0] : undefined}
         />
       ) : null}
-    </Box>
+    </FitPage>
   );
 }
 

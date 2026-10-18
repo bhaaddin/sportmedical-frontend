@@ -16,6 +16,7 @@
    screen that saves.
    ══════════════════════════════════════════════════════════════ */
 
+import { StackTable } from "../../components/ui/StackTable";
 import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import {
@@ -171,7 +172,7 @@ export default function GroupDiscountsPage() {
         ) : null}
         {saved ? <Alert severity="success">Uloženo.</Alert> : null}
 
-        <TableContainer component={SoftCard} sx={{ p: 0 }}>
+        <StackTable component={SoftCard} sx={{ p: 0 }}>
           <Table>
             <TableHead>
               <TableRow>
@@ -265,7 +266,7 @@ export default function GroupDiscountsPage() {
               </TableRow>
             </TableBody>
           </Table>
-        </TableContainer>
+        </StackTable>
 
         <Box
           sx={{

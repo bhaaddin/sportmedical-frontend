@@ -12,7 +12,7 @@ import type { DayAppointment } from '../../api/bookingContracts';
 import { pragueWallClockToInstant } from '../../utils/time';
 import {
   clubDiscountOf, clubStatus, describeDiscount, formatCzk, formatDateRange, formatDiscount,
-  formatShortRange, formatWeekdayDate, isOrderActive, matchesSearch, orderTotal, ordersOfClub,
+  formatShortRange, formatWeekdayDate, isOrderActive, matchesFilter, matchesSearch, orderTotal, ordersOfClub,
   pragueHHMM, primaryOrder, seatRows,
 } from './clubOrders';
 
@@ -195,5 +195,23 @@ describe('seat rows', () => {
     ]);
     expect(rows).toHaveLength(3);
     expect(rows.every((r) => r.name !== null)).toBe(true);
+  });
+});
+
+describe('the club list filters: deactivated clubs are archived', () => {
+  it('never show under Všechny, S aktivní rezervací or Bez objednávky, only under Neaktivní', () => {
+    for (const filter of ['all', 'active', 'none'] as const) {
+      expect(matchesFilter('none', filter, false)).toBe(false);
+      expect(matchesFilter('active', filter, false)).toBe(false);
+    }
+    expect(matchesFilter('none', 'inactive', false)).toBe(true);
+    expect(matchesFilter('none', 'inactive', true)).toBe(false);
+  });
+
+  it('keep the old behaviour for an active club (the third argument defaults to active)', () => {
+    expect(matchesFilter('active', 'all')).toBe(true);
+    expect(matchesFilter('active', 'active')).toBe(true);
+    expect(matchesFilter('none', 'active')).toBe(false);
+    expect(matchesFilter('none', 'none')).toBe(true);
   });
 });

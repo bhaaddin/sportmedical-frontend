@@ -21,6 +21,7 @@ import { KpiCard, PageHeader, SectionLabel, SoftCard, StatusChip, type ChipTone 
 import { ResponsiveDataList, type DataColumn } from '../components/ui/ResponsiveDataList';
 import { PinnedActionBar } from '../components/ui/PinnedActionBar';
 import { useDevice } from '../layout/useDevice';
+import { FitBody, FitPage } from '../components/ui/fit';
 
 /*
  * The plocha (owner/admin home), in the board's look: a greeting, the day's
@@ -155,7 +156,8 @@ function Panel({
   empty: string;
 }) {
   const device = useDevice();
-  const desktop = device === 'desktop';
+  /* From 768 the panel is a card whose list scrolls inside it (the page fits the window); a phone gets cards per row. */
+  const desktop = device !== 'phone';
   const head = (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: desktop ? 2.5 : 0.5, pt: desktop ? 2 : 0, pb: 1.25 }}>
       <SectionLabel sx={{ mb: 0, flex: 1 }}>{title}</SectionLabel>
@@ -413,7 +415,7 @@ function OwnerDashboard() {
   );
 
   return (
-    <Box data-device={device}>
+    <FitPage data-device={device}>
       <PageHeader
         title={`${getGreeting()}, ${user.firstName || 'Doktore'}`}
         subtitle={`${today.charAt(0).toUpperCase()}${today.slice(1)}${patientTotal !== null ? ` · ${patientTotal} pacientů v registru` : ''}`}
@@ -421,7 +423,7 @@ function OwnerDashboard() {
       />
 
       {/* ── The day's facts: two-up on a phone and a portrait tablet, four across when there is room ── */}
-      <Grid container spacing={2} sx={{ mb: 2.5 }} data-layout={phone ? 'kpi-2up' : 'kpi'}>
+      <Grid container spacing={2} sx={{ mb: 2, flexShrink: 0 }} data-layout={phone ? 'kpi-2up' : 'kpi'}>
         <Grid size={{ xs: 6, md: 2.4 }}>
           <KpiCard label="Dnes objednáno" value={booked.length} hint="termínů, které ještě stojí" />
         </Grid>
@@ -445,7 +447,7 @@ function OwnerDashboard() {
       </Grid>
 
       {/* ── Vyhledání pacienta ── */}
-      <SoftCard sx={{ mb: 2.5 }}>
+      <SoftCard sx={{ mb: 2, flexShrink: 0 }}>
         <SectionLabel>Vyhledání pacienta</SectionLabel>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
           <TextField
@@ -506,14 +508,15 @@ function OwnerDashboard() {
       </SoftCard>
 
       {/* ── Panels: one column on a phone and a portrait tablet, two on a landscape tablet, four on a desktop ── */}
-      <Box
+      <FitBody
         data-layout={phone ? 'stack' : device === 'tablet' ? 'tablet' : 'four'}
         sx={{
           display: 'grid',
           gap: 2,
           gridTemplateColumns: '1fr',
-          '@media (min-width: 768px)': { gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))' },
-          '@media (min-width: 1280px)': { gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' },
+          /* Two panels across on a tablet (2 x 2), four on a desktop; the rows share the height that is left. */
+          '@media (min-width: 768px)': { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gridAutoRows: 'minmax(150px, 1fr)', minHeight: 330 },
+          '@media (min-width: 1280px)': { gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gridAutoRows: 'minmax(260px, 1fr)', minHeight: 260 },
         }}
       >
         <Panel
@@ -546,10 +549,10 @@ function OwnerDashboard() {
           headers={['Čas', 'Pacient']}
           empty="Vše vyřízeno — žádné notifikace."
         />
-      </Box>
+      </FitBody>
 
       {/* ── The main action of a phone screen is pinned at the bottom ── */}
       {phone && <PinnedActionBar label="Hlavní akce">{openCalendar}</PinnedActionBar>}
-    </Box>
+    </FitPage>
   );
 }

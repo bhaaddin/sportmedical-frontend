@@ -18,6 +18,7 @@ import { AccountMenu } from './components/shell/AccountMenu';
 import { WhereAmI, computeCrumbs, useDocumentTitle } from './components/shell/whereAmI';
 import { loginUrl } from './components/shell/loginRedirect';
 import { RAIL_WIDTH, SIDEBAR_WIDTH } from './components/shell/shellStyles';
+import { isPlannerRoute } from './components/shell/plannerRoutes';
 import type { MenuEntry, ShellNav } from './components/shell/shellTypes';
 import { SECTION_CHILDREN, type ContextualParent } from './components/shell/shellModel';
 import { useDevice } from './layout/useDevice';
@@ -38,6 +39,7 @@ import UniversalSearch from './components/UniversalSearch';
 const NotFound = lazy(() => import('./pages/NotFound'));
 const PlannerLabPage = lazy(() => import('./planner/PlannerLabPage'));
 const PlannerPage = lazy(() => import('./planner/PlannerPage'));
+const ClubPlannerPage = lazy(() => import('./planner/ClubPlannerPage'));
 const Login = lazy(() => import('./pages/Login'));
 const IntakeQuestionnaire = lazy(() => import('./pages/public/IntakeQuestionnaire'));
 const PublicBooking = lazy(() => import('./pages/public/PublicBooking'));
@@ -237,6 +239,9 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 }
 
 
+/** The main area's side padding per device; also the region's negative margin so its scroll bar hugs the window edge. */
+const FIT_PAD_X = { desktop: 28, tablet: 24, phone: 16 } as const;
+
 /** Is this address inside the settings - a catalogue destination, /settings itself, or a /nastaveni/ screen? */
 function isSettingsRoute(pathname: string, settingsHere: ReturnType<typeof settingsItemAt>): boolean {
   return (
@@ -327,6 +332,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const crumbs = computeCrumbs({ pathname: location.pathname, patientId, settingsHere, menu: menuItems });
   useDocumentTitle(crumbs);
 
+  const fit = !isPlannerRoute(location.pathname);
+  const regionRef = useRef<HTMLDivElement | null>(null);
+  /* A new screen starts at its top. */
+  useEffect(() => { regionRef.current?.scrollTo?.({ top: 0 }); }, [location.pathname]);
+
   const settingsNeedsFrame = settingsHere !== null && SETTINGS_UNFRAMED.has(settingsHere.item.to);
 
   /* The area's offset is a pixel STRING: sx `ml` with a number is spacing × 8. */
@@ -335,7 +345,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <SettingsSearchContext.Provider value={settingsSearch}>
       <SidebarSlotProvider available={device === 'desktop' && !settingsMode}>
-        <Box sx={{ minHeight: '100vh' }}>
+        <Box sx={fit ? { height: '100dvh', overflow: 'hidden' } : { minHeight: '100vh' }}>
           <a href="#main-content" className="skip-link">
             Přeskočit na hlavní obsah
           </a>
@@ -358,15 +368,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
             data-device={device}
             sx={{
               minWidth: 0,
-              minHeight: '100vh',
               boxSizing: 'border-box',
               /* One margin per device and no transition: nothing moves while a page loads. */
               ml: marginLeft,
+              /*
+               * The screen is exactly the window (100dvh): the line of place stays on top, the page sits in
+               * the region below it, and only that region may scroll - never the document. A page lays its
+               * panels out to fit it (components/ui/fit.tsx) and scrolls its own lists; one that has not
+               * been arranged yet scrolls as a whole inside the region. The planner's stage keeps its sizing.
+               */
+              ...(fit ? { height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' } : { minHeight: '100vh' }),
               ...(device === 'desktop'
-                ? { px: '28px', pt: '24px', pb: '40px' }
+                ? { px: `${FIT_PAD_X.desktop}px`, pt: '20px', pb: fit ? 0 : '40px' }
                 : device === 'tablet'
-                  ? { px: 3, pt: 3, pb: 4 }
-                  : { px: 2, pt: `calc(${PHONE_TOP_BAR} + 16px)`, pb: `calc(${PHONE_BOTTOM_BAR} + 24px)` }),
+                  ? { px: `${FIT_PAD_X.tablet}px`, pt: 2.5, pb: fit ? 0 : 4 }
+                  : { px: `${FIT_PAD_X.phone}px`, pt: `calc(${PHONE_TOP_BAR} + ${fit ? 12 : 16}px)`, pb: fit ? PHONE_BOTTOM_BAR : `calc(${PHONE_BOTTOM_BAR} + 24px)` }),
             }}
           >
             {/* The line of place; on a phone it lives in the top bar, in settings the screens draw their own. */}
@@ -399,7 +415,32 @@ export function Layout({ children }: { children: React.ReactNode }) {
               * No page transition: routes render at once, and a nested layout
               * stays mounted across its children.
               */}
-            {children}
+            {fit ? (
+              <Box
+                ref={regionRef}
+                id="fit-region"
+                data-fit-region=""
+                sx={{
+                  /* Positioned, so a visually-hidden or absolutely placed child is held (and scrolled) by the region, never the document. */
+                  position: 'relative',
+                  flex: '1 1 0',
+                  minHeight: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                  overscrollBehavior: 'contain',
+                  /* The scroll bar sits on the window's edge, not inside the padding. */
+                  mx: `-${FIT_PAD_X[device]}px`,
+                  px: `${FIT_PAD_X[device]}px`,
+                  pb: device === 'desktop' ? '24px' : 3,
+                  /* The region ends where the bottom bar begins, so a pinned bar sticks to the region's foot. */
+                  '--bottom-bar-height': '0px',
+                }}
+              >
+                {children}
+              </Box>
+            ) : children}
           </Box>
         </Box>
       </SidebarSlotProvider>
@@ -503,6 +544,7 @@ export default function App() {
                     <Route path="/clubs/hraci" element={<ClubPlayersPage />} />
                     <Route path="/clubs/statistiky" element={<ClubStatsPage />} />
                     <Route path="/clubs/fakturace" element={<ClubBillingPage />} />
+                    <Route path="/clubs/:clubId" element={<ClubPlannerPage />} />
                     <Route path="/accounting-export" element={<RequirePermission of="billing.manage"><AccountingExportPage /></RequirePermission>} />
                     <Route path="/intake-review" element={<RequirePermission of="patients.register"><IntakeReviewQueue /></RequirePermission>} />
                     <Route path="/planovani" element={<PlannerPage />} />

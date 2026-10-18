@@ -83,8 +83,11 @@ export const rowSx = (active = false) => ({
   },
 });
 
-/** Widest a settings page's content grows. */
-export const SETTINGS_MAX_WIDTH = 1240;
+/**
+ * Widest a settings page's content grows: beyond it (an ultrawide) the page is centred with equal gutters. A page that gives
+ * up the right column (a wide table) is not capped at all.
+ */
+export const SETTINGS_MAX_WIDTH = 2000;
 
 /** The three interfaces' edges (brief rule 3): phone to 767, iPad 768-1279, desktop from 1280. */
 export const DESKTOP_UP = '@media (min-width: 1280px)';

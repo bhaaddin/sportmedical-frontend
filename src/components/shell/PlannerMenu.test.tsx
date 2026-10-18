@@ -66,6 +66,43 @@ describe('isPlannerRoute', () => {
     for (const p of ['/planovani', '/planner-lab', '/planner-lab/page', '/planovani/x']) expect(isPlannerRoute(p)).toBe(true);
     for (const p of ['/planovanizz', '/dnes', '/clubs', '/prehled', '/planner-labs']) expect(isPlannerRoute(p)).toBe(false);
   });
+
+  it("knows a club's own screen /clubs/<id>, and not the clubs list or its other pages", () => {
+    for (const p of ['/clubs/942e2676-d730-4a13-8016-17f95abd26e2', '/clubs/club-1', '/clubs/club-1/']) expect(isPlannerRoute(p)).toBe(true);
+    for (const p of ['/clubs', '/clubs/', '/clubs/objednavky', '/clubs/rezervace', '/clubs/hraci', '/clubs/statistiky', '/clubs/fakturace', '/clubs/club-1/x', '/clubsx/1']) expect(isPlannerRoute(p)).toBe(false);
+  });
+});
+
+describe.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet]] as const)("a club's own screen at %s", (_name, width) => {
+  it('/clubs/<id>: no sidebar, no rail, the Menu button and "Zpět na kluby" in the where-am-I row', async () => {
+    renderShell('/clubs/club-1', width);
+    expect(document.querySelector('[data-shell="sidebar"]')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-shell="rail"]')).not.toBeInTheDocument();
+    expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '0px' });
+    const row = screen.getByLabelText('Kde jsem');
+    expect(within(row).getByRole('button', { name: 'Menu' })).toBe(menuButton());
+    await userEvent.click(within(row).getByRole('button', { name: 'Zpět na kluby' }));
+    expect(screen.getByTestId('path')).toHaveTextContent('/clubs');
+    expect(screen.getByTestId('path').textContent).toBe('/clubs');
+    /* ...and the list is an ordinary page again, with the navigation */
+    if (width === VIEWPORTS.desktop) expect(document.querySelector('[data-shell="sidebar"]')).toBeInTheDocument();
+    else expect(document.querySelector('[data-shell="rail"]')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Zpět na kluby' })).not.toBeInTheDocument();
+  });
+
+  it('the Menu button opens the navigation as a drawer on a club screen too', async () => {
+    renderShell('/clubs/club-1', width);
+    await userEvent.click(menuButton());
+    const drawer = await screen.findByRole('dialog', { name: 'Menu' });
+    expect(within(drawer).getByRole('link', { name: 'Všechny sekce' })).toBeInTheDocument();
+    expect(within(drawer).getByRole('link', { name: 'Přehled klubů' })).toHaveAttribute('href', '/clubs');
+  });
+
+  it.each(['/clubs/objednavky', '/clubs/hraci', '/clubs/fakturace'])('%s keeps the normal shell', (route) => {
+    renderShell(route, width);
+    expect(screen.queryByRole('button', { name: 'Menu' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Zpět na kluby' })).not.toBeInTheDocument();
+  });
 });
 
 describe.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet]] as const)('planner routes at %s', (_name, width) => {

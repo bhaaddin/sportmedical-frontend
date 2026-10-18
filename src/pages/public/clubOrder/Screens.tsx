@@ -3,12 +3,12 @@ import { Box, Button, CircularProgress, Typography } from '@mui/material';
 import { CheckCircleOutlined } from '@mui/icons-material';
 import type { OrderQuote } from '../../../api/publicClubOrder';
 import { ARCHIVO, BRAND, telHref } from '../../../components/public/brand';
-import { FieldLabel, Panel, PanelTitle, PublicMain, SOFT_TEXT, ctaSx } from '../../../components/public/kit';
+import { FieldLabel, NoticeScreen, PanelTitle, SOFT_TEXT, ctaSx } from '../../../components/public/kit';
 import { czk, hhmm } from './model';
 
 
 export function Centered({ children }: { children: ReactNode }) {
-  return <PublicMain maxWidth={640}>{children}</PublicMain>;
+  return <NoticeScreen maxWidth={640}>{children}</NoticeScreen>;
 }
 
 export function Loading() {
@@ -25,7 +25,7 @@ export function Loading() {
 export function NoticePage({ title, text, phone }: { title: string; text: string; phone: string }) {
   return (
     <Centered>
-      <Panel>
+      <>
         <Typography component="h1" sx={{ m: 0, fontFamily: ARCHIVO, fontWeight: 800, fontSize: 'clamp(24px, 3vw, 30px)' }}>{title}</Typography>
         <Typography sx={{ fontSize: 16, color: SOFT_TEXT, lineHeight: 1.55 }}>{text}</Typography>
         {phone !== '' && (
@@ -33,7 +33,7 @@ export function NoticePage({ title, text, phone }: { title: string; text: string
             Zavolat {phone}
           </Button>
         )}
-      </Panel>
+      </>
     </Centered>
   );
 }
@@ -57,7 +57,7 @@ export interface ConfirmationProps {
 export function Confirmation(p: ConfirmationProps) {
   return (
     <Centered>
-      <Panel>
+      <>
         <CheckCircleOutlined sx={{ fontSize: 44, color: BRAND.success }} aria-hidden="true" />
         <Typography component="h1" sx={{ m: 0, fontFamily: ARCHIVO, fontWeight: 800, fontSize: 'clamp(26px, 3.2vw, 34px)' }}>{p.title}</Typography>
         <Box>
@@ -78,9 +78,9 @@ export function Confirmation(p: ConfirmationProps) {
           <Typography data-testid="order-link-note" sx={{ fontSize: 15.5, fontWeight: 600, lineHeight: 1.55 }}>{p.linkNote}</Typography>
         )}
         <Typography sx={{ fontSize: 15.5, color: SOFT_TEXT, lineHeight: 1.55 }}>
-          {p.change}{p.phone !== '' ? <> <a href={telHref(p.phone)}>{p.phone}</a></> : null}
+          {p.change}{p.phone !== '' ? <> <a href={telHref(p.phone)} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>{p.phone}</a></> : null}
         </Typography>
-      </Panel>
+      </>
     </Centered>
   );
 }

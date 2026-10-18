@@ -113,7 +113,7 @@ import type { PublicClinic } from '../../api/clinicSettings';
 import PublicLayout from './PublicLayout';
 import { BRAND as PUBLIC_BRAND } from '../../components/public/brand';
 import {
-  LABEL_COLOR, Panel, PanelTitle, PageTitle, PinnedBar, PublicMain, ctaSx, longWhen,
+  ColumnGroup, LABEL_COLOR, NoticeScreen, PaneColumn, Panel, PanelTitle, PageTitle, PinnedBar, PublicMain, ctaSx, longWhen,
 } from '../../components/public/kit';
 import {
   FormSection, LinkProblem, RequiredDocuments, ReservationSummary, intakeTheme,
@@ -960,8 +960,8 @@ export default function IntakeQuestionnaire() {
   if (result !== null) {
     return (
       <PublicLayout clinic={clinic}>
-        <PublicMain maxWidth={760}>
-          <Panel sx={{ textAlign: 'center', alignItems: 'stretch' }}>
+        <NoticeScreen maxWidth={760}>
+          <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 2.25 }}>
                   <CheckCircleOutlined sx={{ fontSize: 64, color: 'success.main', mb: 1 }} />
 
                   {/*
@@ -1127,8 +1127,8 @@ export default function IntakeQuestionnaire() {
                       </Box>
                     )}
                   </Box>
-          </Panel>
-        </PublicMain>
+          </Box>
+        </NoticeScreen>
       </PublicLayout>
     );
   }
@@ -1138,8 +1138,7 @@ export default function IntakeQuestionnaire() {
   if (completionToken && completion !== null && completionView === null) {
     return (
       <PublicLayout clinic={clinic}>
-        <PublicMain maxWidth={760}>
-          <PageTitle>Dokončete registraci</PageTitle>
+        <NoticeScreen maxWidth={760} head={<PageTitle>Dokončete registraci</PageTitle>}>
           {completion === 'loading' ? (
             <Box role="status" sx={{ color: LABEL_COLOR, fontSize: 15 }}>Načítáme vaši rezervaci…</Box>
           ) : (
@@ -1149,7 +1148,7 @@ export default function IntakeQuestionnaire() {
               onRetry={() => setCompletionAttempt((attempt) => attempt + 1)}
             />
           )}
-        </PublicMain>
+        </NoticeScreen>
       </PublicLayout>
     );
   }
@@ -1229,37 +1228,73 @@ export default function IntakeQuestionnaire() {
           }}
         />
 
-      <PublicMain maxWidth={760}>
-        <PageTitle
-          sub={completionView !== null
-            ? 'Zabere to minutu. Údaje, které už máme, jsou vyplněné — stačí je zkontrolovat a doplnit zbytek.'
-            : held !== null
-              ? `Pro vaši prohlídku ${longWhen(held.startUtc)}. Vyplňte jednou a na místě pak nic nevypisujete.`
-              : 'Vyplňte jednou a máte hotovo. Nemusíte se nikam registrovat ani si nic pamatovat.'}
-        >
-          {completionView !== null ? 'Dokončete registraci' : 'Vstupní dotazník'}
-        </PageTitle>
-
-        {/* What they are finishing: it is the reason they are here, so it comes first. */}
-        {held !== null && (
-          <ReservationSummary
-            held
-            activityName={held.activityName}
-            serviceName={held.serviceName}
-            startUtc={held.startUtc}
-          />
+      <PublicMain
+        maxWidth="none"
+        workspace
+        columns="minmax(0, 1fr) minmax(0, 1fr)"
+        columnsXl="repeat(3, minmax(0, 1fr))"
+        gap={2.5}
+        head={(
+          <>
+          <PageTitle
+            sub={completionView !== null
+              ? 'Zabere to minutu. Údaje, které už máme, jsou vyplněné — stačí je zkontrolovat a doplnit zbytek.'
+              : held !== null
+                ? `Pro vaši prohlídku ${longWhen(held.startUtc)}. Vyplňte jednou a na místě pak nic nevypisujete.`
+                : 'Vyplňte jednou a máte hotovo. Nemusíte se nikam registrovat ani si nic pamatovat.'}
+          >
+            {completionView !== null ? 'Dokončete registraci' : 'Vstupní dotazník'}
+          </PageTitle>
+  
+          {/* What they are finishing: it is the reason they are here, so it comes first. */}
+          {held !== null && (
+            <ReservationSummary
+              held
+              activityName={held.activityName}
+              serviceName={held.serviceName}
+              startUtc={held.startUtc}
+            />
+          )}
+          {held === null && appointment !== null && (
+            <ReservationSummary
+              activityName={appointment.activityName}
+              serviceName={appointment.serviceName}
+              startUtc={appointment.startUtc === '' ? null : appointment.startUtc}
+              deadlineUtc={completionView?.deadlineUtc}
+            />
+          )}
+  
+          </>
         )}
-        {held === null && appointment !== null && (
-          <ReservationSummary
-            activityName={appointment.activityName}
-            serviceName={appointment.serviceName}
-            startUtc={appointment.startUtc === '' ? null : appointment.startUtc}
-            deadlineUtc={completionView?.deadlineUtc}
-          />
-        )}
+        foot={(
+          <>
+            {submitError !== null && (
+              <Alert severity="error" role="alert" sx={{ borderRadius: 2 }}>
+                {submitError}
+              </Alert>
+            )}
 
+            {/* One button, because there is one page; pinned at the bottom on a phone. */}
+            <PinnedBar label="Odeslat registraci" card>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: LABEL_COLOR, mr: { sm: 'auto' } }}>
+                <LockOutlined sx={{ fontSize: 15 }} aria-hidden />
+                <Typography variant="caption">{txt['formulare.form.privacy-line']}</Typography>
+              </Box>
+              <Button
+                variant="contained"
+                onClick={() => void handleSubmit()}
+                disabled={submitting}
+                sx={ctaSx(52)}
+              >
+                {submitting ? 'Odesílám…' : completionView !== null ? 'Dokončit registraci' : 'Odeslat dotazník'}
+              </Button>
+            </PinnedBar>
+          </>
+        )}
+      >
         <ThemeProvider theme={intakeTheme}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25 }}>
+          <ColumnGroup>
+            <PaneColumn nested>
             <FormSection title="Kdo jste" labelledBy="sec-who">
 
             <Box sx={{ display: 'grid', gap: 2 }}>
@@ -1464,7 +1499,8 @@ export default function IntakeQuestionnaire() {
               </Box>
             </Box>
             </FormSection>
-
+            </PaneColumn>
+            <PaneColumn nested>
             <FormSection title="Pojištění" labelledBy="sec-insurance">
 
             <Box sx={{ display: 'grid', gap: 2 }}>
@@ -1572,7 +1608,9 @@ export default function IntakeQuestionnaire() {
               )}
             </Box>
             </FormSection>
-
+            </PaneColumn>
+          </ColumnGroup>
+          <PaneColumn>
             <FormSection title="Souhlasy" labelledBy="sec-consents">
 
             {/*
@@ -1733,28 +1771,7 @@ export default function IntakeQuestionnaire() {
               </Panel>
             )}
 
-            {submitError !== null && (
-              <Alert severity="error" role="alert" sx={{ borderRadius: 2 }}>
-                {submitError}
-              </Alert>
-            )}
-
-            {/* One button, because there is one page; pinned at the bottom on a phone. */}
-            <PinnedBar label="Odeslat registraci" card>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: LABEL_COLOR, mr: { sm: 'auto' } }}>
-                <LockOutlined sx={{ fontSize: 15 }} aria-hidden />
-                <Typography variant="caption">{txt['formulare.form.privacy-line']}</Typography>
-              </Box>
-              <Button
-                variant="contained"
-                onClick={() => void handleSubmit()}
-                disabled={submitting}
-                sx={ctaSx(52)}
-              >
-                {submitting ? 'Odesílám…' : completionView !== null ? 'Dokončit registraci' : 'Odeslat dotazník'}
-              </Button>
-            </PinnedBar>
-          </Box>
+          </PaneColumn>
         </ThemeProvider>
       </PublicMain>
     </PublicLayout>

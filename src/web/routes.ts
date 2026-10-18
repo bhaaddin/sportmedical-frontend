@@ -53,6 +53,11 @@ export interface WebRoute {
   /** <meta name="description">. */
   description: string;
   Component: ComponentType;
+  /**
+   * A board page: exactly one screen high, the document never scrolls (the page's panes scroll inside it), like the
+   * application's public pages. Every other page of the site is long-form and scrolls.
+   */
+  fit?: boolean;
 }
 
 const BRAND = 'SportMedical Diagnostics';
@@ -87,7 +92,7 @@ const PAGE_DETAILS: Record<SitePageId, PageDetails> = {
     description: 'Svalová hmota, tuk, voda a rovnováha mezi segmenty těla. Měření InBody 770 a výživový plán.',
   },
   cenik: {
-    label: 'Ceník', Component: CenikPage,
+    label: 'Ceník', Component: CenikPage, fit: true,
     title: `Ceník služeb — ${BRAND}`,
     description: 'Aktuální ceník sportovních prohlídek, diagnostiky a InBody měření.',
   },

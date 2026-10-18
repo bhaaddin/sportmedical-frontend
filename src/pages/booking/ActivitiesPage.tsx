@@ -1,3 +1,4 @@
+import { StackTable } from "../../components/ui/StackTable";
 import { useMemo, useState } from "react";
 import {
   Alert,
@@ -395,7 +396,7 @@ export default function ActivitiesPage() {
         }}
         onRetry={() => void activitiesQuery.refetch()}
       >
-        <Box sx={{ overflowX: "auto" }}>
+        <StackTable>
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -507,7 +508,7 @@ export default function ActivitiesPage() {
               ))}
             </TableBody>
           </Table>
-        </Box>
+        </StackTable>
 
         {archivedActivities.length > 0 && (
           <Box sx={{ mt: 2 }}>

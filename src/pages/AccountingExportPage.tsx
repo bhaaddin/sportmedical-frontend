@@ -9,6 +9,7 @@ import {
 } from '../services/accountingExportApi';
 import type { ExportForm, ExportResult } from '../services/accountingExportApi';
 import { PageHeader, SectionLabel, SoftCard, DESIGN } from '../components/ui';
+import { FitBody, FitPage } from '../components/ui/fit';
 import { ResponsiveDataList, type DataColumn } from '../components/ui/ResponsiveDataList';
 import { PinnedActionBar } from '../components/ui/PinnedActionBar';
 import { useDevice } from '../layout/useDevice';
@@ -121,13 +122,25 @@ export default function AccountingExportPage() {
   );
 
   return (
-    <Box>
+    <FitPage>
       <PageHeader title="Účetní export" subtitle="Podklady pro účetní — faktury, dobropisy a platby za období" />
 
-      <SoftCard sx={{ mb: 2.5 }}>
+      {/* From 1280 the form stands left and the history takes the rest of the width and height; below, they stack. */}
+      <FitBody
+        sx={{
+          display: 'grid',
+          gap: 2.5,
+          gridTemplateColumns: 'minmax(0, 1fr)',
+          gridTemplateRows: device === 'phone' ? undefined : 'auto minmax(0, 1fr)',
+          '@media (min-width: 1280px)': { gridTemplateColumns: 'clamp(300px, 28vw, 440px) minmax(0, 1fr)', gridTemplateRows: 'minmax(0, 1fr)' },
+          alignItems: 'start',
+        }}
+      >
+      <Box sx={{ minWidth: 0 }}>
+      <SoftCard sx={{ mb: 0 }}>
         <SectionLabel>Nový export</SectionLabel>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 6, lg: 3 }}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <TextField select fullWidth label="Formát" value={form.format}
               onChange={e => setForm(f => ({ ...f, format: e.target.value as ExportForm['format'] }))}>
               {formatOptions.map((f) => (
@@ -135,7 +148,7 @@ export default function AccountingExportPage() {
               ))}
             </TextField>
           </Grid>
-          <Grid size={{ xs: 12, md: 6, lg: 3 }}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <TextField select fullWidth label="Typ" value={form.type}
               onChange={e => setForm(f => ({ ...f, type: e.target.value as ExportForm['type'] }))}>
               {EXPORT_TYPES.map(t => (
@@ -143,18 +156,18 @@ export default function AccountingExportPage() {
               ))}
             </TextField>
           </Grid>
-          <Grid size={{ xs: 12, md: 6, lg: 2 }}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <TextField fullWidth type="date" label="Od" value={form.from}
               onChange={e => setForm(f => ({ ...f, from: e.target.value }))}
               slotProps={{ inputLabel: { shrink: true } }} />
           </Grid>
-          <Grid size={{ xs: 12, md: 6, lg: 2 }}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <TextField fullWidth type="date" label="Do" value={form.to}
               onChange={e => setForm(f => ({ ...f, to: e.target.value }))}
               slotProps={{ inputLabel: { shrink: true } }} />
           </Grid>
           {device === 'desktop' && (
-            <Grid size={{ lg: 2 }} sx={{ display: 'flex', alignItems: 'center' }}>
+            <Grid size={{ xs: 12 }} sx={{ display: 'flex', alignItems: 'center' }}>
               {exportButton}
             </Grid>
           )}
@@ -163,9 +176,10 @@ export default function AccountingExportPage() {
 
       {/* Tablet: the button sits under the form; phone: pinned at the bottom. */}
       {device !== 'desktop' && <PinnedActionBar label="Exportovat">{exportButton}</PinnedActionBar>}
+      </Box>
 
-      <Box sx={{ mt: device === 'desktop' ? 0 : 2.5 }}>
-        <SectionLabel>Historie</SectionLabel>
+      <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', ...(device === 'phone' ? {} : { minHeight: 0, height: '100%' }) }}>
+        <Box sx={{ flexShrink: 0 }}><SectionLabel>Historie</SectionLabel></Box>
         {isLoading ? (
           <ListSkeleton rows={3} height={device === 'phone' ? 96 : 56} />
         ) : isError ? (
@@ -177,6 +191,7 @@ export default function AccountingExportPage() {
             rowKey={(h: ExportResult) => h.id}
             columns={columns}
             empty="Zatím žádné exporty."
+            fill
             renderCard={(h) => (
               <Stack spacing={1}>
                 <Typography sx={{ fontSize: 15, fontWeight: 600, wordBreak: 'break-all' }}>{h.fileName}</Typography>
@@ -196,6 +211,7 @@ export default function AccountingExportPage() {
           />
         )}
       </Box>
-    </Box>
+      </FitBody>
+    </FitPage>
   );
 }

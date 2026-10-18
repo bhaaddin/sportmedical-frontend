@@ -58,7 +58,7 @@ import { readPublicClinic } from '../../api/clinicSettings';
 import type { PublicClinic } from '../../api/clinicSettings';
 import PublicLayout from './PublicLayout';
 import { BRAND } from '../../components/public/brand';
-import { PageTitle, Panel, PublicMain } from '../../components/public/kit';
+import { NoticePane, PageTitle, Pane, Panel, PublicMain } from '../../components/public/kit';
 import type { ReactNode } from 'react';
 import type { SxProps, Theme } from '@mui/material/styles';
 
@@ -252,134 +252,140 @@ export default function ManageBooking() {
     }
   };
 
+  const head = <PageTitle>Vaše rezervace</PageTitle>;
+
+  /* One PublicMain whatever the state, so the title (and the page) stay the same elements while the booking loads. */
+  const notice = loadFailed !== null ? (
+    <>
+      <Typography sx={{ fontWeight: 800, fontSize: 19 }}>
+        Rezervaci jsme nenašli
+      </Typography>
+      <Typography variant="body2" sx={{ color: BRAND.muted }}>
+        {loadFailed} Odkaz mohl být neúplný, nebo už byl termín zrušen.
+        {clinic?.phone.trim()
+          ? ` Zavolejte nám prosím na ${clinic.phone.trim()} a rádi to s vámi projdeme.`
+          : ''}
+      </Typography>
+    </>
+  ) : booking === null ? (
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}>
+      <CircularProgress size={18} sx={{ color: BRAND.accent }} />
+      <Typography variant="body2" sx={{ color: BRAND.muted }}>
+        Načítáme vaši rezervaci…
+      </Typography>
+    </Box>
+  ) : booking.isCancelled ? (
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+      <EventBusyOutlined sx={{ fontSize: 44, color: BRAND.muted, mb: 1 }} />
+      <Typography sx={{ fontWeight: 800, fontSize: 21, mb: 0.5 }}>
+        Termín je zrušený
+      </Typography>
+      <Typography variant="body2" sx={{ color: BRAND.muted, mb: 2 }}>
+        {booking.activityName} — {clinicMoment(booking.startUtc)}
+      </Typography>
+      <Typography variant="body2" sx={{ color: BRAND.muted }}>
+        Čas jsme uvolnili pro ostatní. Nový termín si můžete vybrat
+        na stránce objednání.
+      </Typography>
+      <Button
+        fullWidth
+        variant="contained"
+        disableElevation
+        href="/objednat"
+        sx={{ mt: 2.5, borderRadius: 999, py: 1.25, color: BRAND.ink, maxWidth: 420 }}
+      >
+        Vybrat nový termín
+      </Button>
+    </Box>
+  ) : null;
+
+  const mainView = (
+    <PublicMain maxWidth="none" workspace columns={notice !== null ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) minmax(0, 1fr)'} head={<PageTitle>Vaše rezervace</PageTitle>} gap={2.5}>
+      {notice !== null ? <NoticePane>{notice}</NoticePane> : booking !== null && (
+        <>
+          <Pane>
+            <Box sx={{ width: '100%', maxWidth: 560, mx: 'auto', my: { md: 'auto' }, py: { md: 2 } }}>
+              <EventAvailableOutlined sx={{ fontSize: 44, color: BRAND.accent, mb: 1 }} />
+              <Typography sx={{ fontWeight: 800, fontSize: 21, mb: 0.25 }}>
+                {clinicMoment(booking.startUtc)}
+              </Typography>
+              <Typography variant="body2" sx={{ color: BRAND.muted, mb: 0.5 }}>
+                {booking.activityName}
+                {booking.serviceName !== '' && ` — ${booking.serviceName}`}
+              </Typography>
+              <Typography data-testid="price-line" sx={{ fontWeight: 700 }}>
+                {bookingPriceLine(booking, offerPrice)}
+              </Typography>
+            </Box>
+          </Pane>
+
+          <Pane>
+            <Box sx={{ width: '100%', maxWidth: 560, mx: 'auto', my: { md: 'auto' }, py: { md: 2 } }}>
+              {complaint !== null && (
+                <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
+                  {complaint}
+                </Alert>
+              )}
+
+              {/*
+                A plain link, not a fetch. The browser downloads the file and
+                hands it to whatever the patient keeps their calendar in,
+                which is the whole point of offering it.
+              */}
+              <Button
+                fullWidth
+                variant="contained"
+                disableElevation
+                href={calendarFileUrl(token)}
+                startIcon={<DownloadOutlined />}
+                sx={{ borderRadius: 999, py: 1.25, color: BRAND.ink }}
+              >
+                Přidat do kalendáře
+              </Button>
+
+              <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 1, mb: 2.5 }}>
+                Stáhne soubor, který si otevřete v Google, Apple i jinde.
+              </Typography>
+
+              {canReschedule && (
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  color="inherit"
+                  onClick={() => { void openReschedule(); }}
+                  sx={{ borderRadius: 999, py: 1.1, borderColor: BRAND.line, mb: 2.5 }}
+                >
+                  Přesunout na jiný čas
+                </Button>
+              )}
+
+              <Box sx={{ borderTop: `1px solid ${BRAND.line}`, pt: 2.5 }}>
+                <Typography variant="body2" sx={{ color: BRAND.muted, mb: 1.5 }}>
+                  Nemůžete přijít? Zrušte termín prosím co nejdřív, ať ho
+                  můžeme nabídnout někomu jinému.
+                </Typography>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  color="inherit"
+                  onClick={() => setAsking(true)}
+                  sx={{ borderRadius: 999, py: 1.1, borderColor: BRAND.line }}
+                >
+                  Zrušit termín
+                </Button>
+              </Box>
+            </Box>
+          </Pane>
+        </>
+      )}
+    </PublicMain>
+  );
+
   return (
     <PublicLayout clinic={clinic}>
-      <PublicMain maxWidth={640} gap={2.5}>
-        <PageTitle>Vaše rezervace</PageTitle>
+      {mainView}
 
-        <Box>
-          {loadFailed !== null && (
-            <Card sx={{ p: 3 }}>
-              <Typography sx={{ fontWeight: 800, fontSize: 19, mb: 1 }}>
-                Rezervaci jsme nenašli
-              </Typography>
-              <Typography variant="body2" sx={{ color: BRAND.muted }}>
-                {loadFailed} Odkaz mohl být neúplný, nebo už byl termín zrušen.
-                {clinic?.phone.trim()
-                  ? ` Zavolejte nám prosím na ${clinic.phone.trim()} a rádi to s vámi projdeme.`
-                  : ''}
-              </Typography>
-            </Card>
-          )}
-
-          {loadFailed === null && booking === null && (
-            <Card sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <CircularProgress size={18} sx={{ color: BRAND.accent }} />
-              <Typography variant="body2" sx={{ color: BRAND.muted }}>
-                Načítáme vaši rezervaci…
-              </Typography>
-            </Card>
-          )}
-
-          {booking !== null && (
-            <Card sx={{ p: { xs: 2.5, md: 3.5 } }}>
-              {booking.isCancelled ? (
-                <>
-                  <EventBusyOutlined sx={{ fontSize: 44, color: BRAND.muted, mb: 1 }} />
-                  <Typography sx={{ fontWeight: 800, fontSize: 21, mb: 0.5 }}>
-                    Termín je zrušený
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: BRAND.muted, mb: 2 }}>
-                    {booking.activityName} — {clinicMoment(booking.startUtc)}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: BRAND.muted }}>
-                    Čas jsme uvolnili pro ostatní. Nový termín si můžete vybrat
-                    na stránce objednání.
-                  </Typography>
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    disableElevation
-                    href="/objednat"
-                    sx={{ mt: 2.5, borderRadius: 999, py: 1.25, color: BRAND.ink }}
-                  >
-                    Vybrat nový termín
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <EventAvailableOutlined sx={{ fontSize: 44, color: BRAND.accent, mb: 1 }} />
-                  <Typography sx={{ fontWeight: 800, fontSize: 21, mb: 0.25 }}>
-                    {clinicMoment(booking.startUtc)}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: BRAND.muted, mb: 0.5 }}>
-                    {booking.activityName}
-                    {booking.serviceName !== '' && ` — ${booking.serviceName}`}
-                  </Typography>
-                  <Typography data-testid="price-line" sx={{ fontWeight: 700, mb: 2.5 }}>
-                    {bookingPriceLine(booking, offerPrice)}
-                  </Typography>
-
-                  {complaint !== null && (
-                    <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
-                      {complaint}
-                    </Alert>
-                  )}
-
-                  {/*
-                    A plain link, not a fetch. The browser downloads the file and
-                    hands it to whatever the patient keeps their calendar in,
-                    which is the whole point of offering it.
-                  */}
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    disableElevation
-                    href={calendarFileUrl(token)}
-                    startIcon={<DownloadOutlined />}
-                    sx={{ borderRadius: 999, py: 1.25, color: BRAND.ink }}
-                  >
-                    Přidat do kalendáře
-                  </Button>
-
-                  <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', mt: 1, mb: 2.5 }}>
-                    Stáhne soubor, který si otevřete v Google, Apple i jinde.
-                  </Typography>
-
-                  {canReschedule && (
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      color="inherit"
-                      onClick={() => { void openReschedule(); }}
-                      sx={{ borderRadius: 999, py: 1.1, borderColor: BRAND.line, mb: 2.5 }}
-                    >
-                      Přesunout na jiný čas
-                    </Button>
-                  )}
-
-                  <Box sx={{ borderTop: `1px solid ${BRAND.line}`, pt: 2.5 }}>
-                    <Typography variant="body2" sx={{ color: BRAND.muted, mb: 1.5 }}>
-                      Nemůžete přijít? Zrušte termín prosím co nejdřív, ať ho
-                      můžeme nabídnout někomu jinému.
-                    </Typography>
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      color="inherit"
-                      onClick={() => setAsking(true)}
-                      sx={{ borderRadius: 999, py: 1.1, borderColor: BRAND.line }}
-                    >
-                      Zrušit termín
-                    </Button>
-                  </Box>
-                </>
-              )}
-            </Card>
-          )}
-
-        </Box>
-
+      <Box sx={{ display: 'contents' }}>
         {/*
           Cancelling gives the time away to whoever books it next, and there is
           no undo. A confirm step for a one-click irreversible action is the
@@ -491,7 +497,7 @@ export default function ManageBooking() {
             </Button>
           </DialogActions>
         </Dialog>
-      </PublicMain>
+      </Box>
     </PublicLayout>
   );
 }

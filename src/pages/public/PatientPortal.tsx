@@ -40,7 +40,7 @@ import {
   ARCHIVO, BRAND, clinicMoment, czk, mapsHref, telHref,
 } from '../../components/public/brand';
 import {
-  FieldLabel, LABEL_COLOR, LoadError, Panel, PanelTitle, PinnedBar, PageTitle, PublicMain, ctaSx, ghostSx, NoticeBox,
+  ColumnGroup, FieldLabel, LABEL_COLOR, LoadError, NoticeScreen, PaneColumn, Panel, PanelTitle, PinnedBar, PageTitle, PublicMain, ctaSx, ghostSx, NoticeBox, scrollPublicTo, scrollPublicTop,
 } from '../../components/public/kit';
 import { LANDING_PATH, PORTAL_SIGN_IN_PATH } from '../../components/public/PublicHeader';
 import { shownPrice } from '../../components/booking/grid/appointmentPrice';
@@ -266,7 +266,7 @@ function ClinicContactCard({ clinic }: { clinic: PublicClinic | null }) {
   if (phone === '' && email === '' && address === '') return null;
 
   const line = { display: 'flex', alignItems: 'center', gap: 1.25, minHeight: 44 } as const;
-  const link = { color: 'inherit', fontWeight: 600, textDecoration: 'none' } as const;
+  const link = { color: 'inherit', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', minHeight: 44, flex: 1 } as const;
 
   return (
     <Panel labelledBy="portal-help">
@@ -432,12 +432,10 @@ function PasswordCard({
 
 function Waiting({ text }: { text: string }) {
   return (
-    <Panel sx={{ alignItems: 'center', textAlign: 'center', py: 4 }}>
-      <Box role="status" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: LABEL_COLOR }}>
-        <CircularProgress size={22} sx={{ color: BRAND.accent }} />
-        <Typography>{text}</Typography>
-      </Box>
-    </Panel>
+    <Box role="status" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, color: LABEL_COLOR }}>
+      <CircularProgress size={22} sx={{ color: BRAND.accent }} />
+      <Typography>{text}</Typography>
+    </Box>
   );
 }
 
@@ -502,12 +500,9 @@ export default function PatientPortal() {
     else nextParams.delete('zalozka');
     setParams(nextParams, { replace: true });
     if (anchor !== undefined) {
-      window.setTimeout(() => {
-        const target = document.getElementById(anchor);
-        if (target !== null && typeof target.scrollIntoView === 'function') target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 0);
+      window.setTimeout(() => { scrollPublicTo(anchor); }, 0);
     } else {
-      document.documentElement.scrollTop = 0;
+      scrollPublicTop();
     }
   };
 
@@ -572,47 +567,54 @@ export default function PatientPortal() {
     </Button>
   ) : undefined;
 
-  const twoColumns = device !== 'phone';
+  /* Measurements and invoices make a column of their own on a big screen; without either there is no empty column. */
+  const hasSecondColumn = measurements.length > 0 || invoices.length > 0;
 
   return (
     <PublicLayout clinic={clinic} hidePortalLink extra={headerActions}>
       {state === 'ok' && <PortalNav view={view} go={go} name={fullName} />}
 
-      <PublicMain maxWidth={1240}>
-        {state === 'loading' && <Waiting text="Načítáme váš portál…" />}
+      {state === 'loading' && <NoticeScreen><Waiting text="Načítáme váš portál…" /></NoticeScreen>}
 
-        {state === 'error' && (
-          <>
-            <PageTitle>Váš portál</PageTitle>
-            <LoadError what="Tento odkaz už neplatí, je neúplný, nebo se portál nepodařilo načíst. Požádejte prosím ordinaci o nový odkaz nebo to zkuste znovu." onRetry={() => setAttempt((n) => n + 1)} />
-            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-              <Button variant="contained" component={RouterLink} to={PORTAL_SIGN_IN_PATH} onClick={forgetPortalToken} sx={ctaSx(50)}>
-                Přihlásit se heslem
-              </Button>
-              <Button variant="outlined" component={RouterLink} to={LANDING_PATH} sx={ghostSx(50)}>Objednat se</Button>
-            </Box>
-          </>
-        )}
+      {state === 'error' && (
+        <NoticeScreen head={<PageTitle>Váš portál</PageTitle>} maxWidth={760}>
+          <LoadError what="Tento odkaz už neplatí, je neúplný, nebo se portál nepodařilo načíst. Požádejte prosím ordinaci o nový odkaz nebo to zkuste znovu." onRetry={() => setAttempt((n) => n + 1)} />
+          <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+            <Button variant="contained" component={RouterLink} to={PORTAL_SIGN_IN_PATH} onClick={forgetPortalToken} sx={ctaSx(50)}>
+              Přihlásit se heslem
+            </Button>
+            <Button variant="outlined" component={RouterLink} to={LANDING_PATH} sx={ghostSx(50)}>Objednat se</Button>
+          </Box>
+        </NoticeScreen>
+      )}
 
-        {state === 'ok' && dashboard && view === 'vysledky' && (
-          <ResultsView results={dashboard.results} />
-        )}
+      {state === 'ok' && dashboard && view === 'vysledky' && (
+        <ResultsView results={dashboard.results} />
+      )}
 
-        {state === 'ok' && dashboard && view === 'prehled' && (
-          <>
-            <PageTitle sub="Vaše termíny, výsledky a dokumenty na jednom místě.">
-              {`Dobrý den, ${dashboard.givenName}`}
-            </PageTitle>
+      {state === 'ok' && dashboard && view === 'prehled' && (
+        <PublicMain
+          maxWidth="none"
+          workspace
+          columns="minmax(0, 1.6fr) minmax(0, 1fr)"
+          columnsXl={hasSecondColumn ? 'repeat(3, minmax(0, 1fr))' : undefined}
+          head={(
+            <>
+              <PageTitle sub="Vaše termíny, výsledky a dokumenty na jednom místě.">
+                {`Dobrý den, ${dashboard.givenName}`}
+              </PageTitle>
 
-            {notice && (
-              <Alert severity={notice.severity} onClose={() => setNotice(null)}>
-                {notice.text}
-              </Alert>
-            )}
-
-            <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: twoColumns ? 'minmax(0, 1.6fr) minmax(0, 1fr)' : '1fr', alignItems: 'start' }}>
-              {/* ── Main column ── */}
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, minWidth: 0 }}>
+              {notice && (
+                <Alert severity={notice.severity} onClose={() => setNotice(null)}>
+                  {notice.text}
+                </Alert>
+              )}
+            </>
+          )}
+        >
+          {/* The main column is two columns on a big screen: what is coming up, then what has been measured and billed. */}
+          <ColumnGroup>
+            <PaneColumn nested>
                 {next !== undefined ? (
                   <NextAppointmentCard appointment={next} address={address} onCancel={cancel} />
                 ) : (
@@ -651,6 +653,18 @@ export default function PatientPortal() {
                   </Section>
                 )}
 
+                {next !== undefined && (
+                  <Box>
+                    <Button variant="outlined" component={RouterLink} to={LANDING_PATH} sx={ghostSx(46)}>
+                      Objednat další termín
+                    </Button>
+                  </Box>
+                )}
+
+            </PaneColumn>
+
+            {hasSecondColumn && (
+              <PaneColumn nested>
                 {measurements.length > 0 && (
                   <Section
                     title="Jak se vyvíjíte"
@@ -667,14 +681,6 @@ export default function PatientPortal() {
                   </Section>
                 )}
 
-                {next !== undefined && (
-                  <Box>
-                    <Button variant="outlined" component={RouterLink} to={LANDING_PATH} sx={ghostSx(46)}>
-                      Objednat další termín
-                    </Button>
-                  </Box>
-                )}
-
                 {invoices.length > 0 && (
                   <Section
                     title="Doklady"
@@ -689,10 +695,12 @@ export default function PatientPortal() {
                     </Box>
                   </Section>
                 )}
-              </Box>
+              </PaneColumn>
+            )}
+          </ColumnGroup>
 
-              {/* ── Side column ── */}
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, minWidth: 0 }}>
+          {/* ── Side column ── */}
+          <PaneColumn>
                 <Section id="dokumenty" title="Dokumenty">
                   {dashboard.documents.length === 0 ? (
                     <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
@@ -767,20 +775,18 @@ export default function PatientPortal() {
                     </Button>
                   </Box>
                 </Section>
-              </Box>
-            </Box>
+          </PaneColumn>
 
-            {/* The phone's main action, pinned at the bottom of the screen. */}
-            {device === 'phone' && (
-              <PinnedBar label="Objednat termín">
-                <Button variant="contained" component={RouterLink} to={LANDING_PATH} sx={ctaSx(50)}>
-                  Objednat termín
-                </Button>
-              </PinnedBar>
-            )}
-          </>
-        )}
-      </PublicMain>
+          {/* The phone's main action, pinned at the bottom of the screen. */}
+          {device === 'phone' && (
+            <PinnedBar label="Objednat termín">
+              <Button variant="contained" component={RouterLink} to={LANDING_PATH} sx={ctaSx(50)}>
+                Objednat termín
+              </Button>
+            </PinnedBar>
+          )}
+        </PublicMain>
+      )}
     </PublicLayout>
   );
 }

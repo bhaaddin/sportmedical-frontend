@@ -29,7 +29,7 @@ vi.mock('../../api/clubBlocks', async (importOriginal) => {
 vi.mock('../../api/clinicSettings', () => ({ readSettings: vi.fn().mockResolvedValue({}) }));
 vi.mock('./order/ClubOrderDialog', () => ({ ClubOrderDialog: () => null }));
 
-const { ClubOrderCard } = await import('./detail/ClubOrderCard');
+const { WindowPills } = await import('./orders/WindowPills');
 const { ClubOrderDetailPanel } = await import('./orders/ClubOrderDetailPanel');
 const { orderWindows, windowActivityNames } = await import('./orders/orderWindows');
 const { clubOrdersApi } = await import('../../api/clubOrders');
@@ -77,7 +77,12 @@ function useWindowRestrictions(): Map<string, string> {
   return map;
 }
 
-/** The club page's order list (the same query as ClubPresentation) and the calendar's reading of the windows. */
+/** One order of the club screen's list: its windows as pills (what the overview's order rows draw from the same read). */
+function OrderCard({ order }: { order: ClubOrderView }) {
+  return <div data-testid="club-order-card"><WindowPills order={order} today="2099-10-01" /></div>;
+}
+
+/** The club screen's order list (the same query as the club planner) and the calendar's reading of the windows. */
 function ClubPageAndCalendar() {
   const query = useQuery({ queryKey: ['club-orders', 'club-1', '', ''], queryFn: () => list({ clubId: 'club-1' }), placeholderData: keepPreviousData });
   const restricted = useWindowRestrictions();
@@ -85,7 +90,7 @@ function ClubPageAndCalendar() {
   return (
     <div>
       {orders.map((o) => (
-        <ClubOrderCard key={o.id} order={o} today="2099-10-01" onOpen={() => undefined} onChanged={() => undefined} />
+        <OrderCard key={o.id} order={o} />
       ))}
       <div data-testid="calendar-restricted">{[...restricted.values()].join(' | ') || 'none'}</div>
     </div>

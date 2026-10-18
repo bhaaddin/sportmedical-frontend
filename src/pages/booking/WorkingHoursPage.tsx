@@ -1,3 +1,4 @@
+import { StackTable } from "../../components/ui/StackTable";
 import { useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
@@ -484,7 +485,7 @@ function TimetableEditor({
         </Stack>
       ) : null}
 
-      <Box sx={{ overflowX: "auto" }}>
+      <StackTable>
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -509,7 +510,7 @@ function TimetableEditor({
             ))}
           </TableBody>
         </Table>
-      </Box>
+      </StackTable>
 
       <Stack direction="row" spacing={2} sx={{ mt: 2, alignItems: "center", flexWrap: "wrap" }}>
         <Button

@@ -13,7 +13,7 @@ import { Box, Typography } from '@mui/material';
 import type { ClubPortal, PortalStatus } from '../../../api/publicClubOrder';
 import { useDevice } from '../../../layout/useDevice';
 import { ARCHIVO, BRAND } from '../../../components/public/brand';
-import { PageTitle, Panel, PanelTitle, PublicMain, SOFT_TEXT, LABEL_COLOR, NoticeBox } from '../../../components/public/kit';
+import { ColumnGroup, PageTitle, PaneColumn, Panel, PanelTitle, PublicMain, SOFT_TEXT, LABEL_COLOR, NoticeBox } from '../../../components/public/kit';
 import { LinkCard } from './LinkCard';
 import { PortalCalendar } from './PortalCalendar';
 import { PortalContact, PortalDay, PortalNotices, PortalPrices, PortalProgress } from './PortalSections';
@@ -63,62 +63,86 @@ export function ClubPortalPage({ portal, t, stale = false }: {
   const message = latestNotice(portal);
   const side = device !== 'phone';
 
+  const head = (
+    <>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+        <PageTitle sub={reference}>{portal.clubName}</PageTitle>
+        <StatusChip status={status} label={chip} />
+        <Typography data-testid="portal-status-text" sx={{ fontFamily: ARCHIVO, fontWeight: 700, fontSize: 19, color: BRAND.text }}>{sentence}</Typography>
+      </Box>
+
+      {stale && <NoticeBox tone="plain"><span data-testid="portal-stale">{t['formulare.club-order.portal.stale']}</span></NoticeBox>}
+    </>
+  );
+
+  const link = portal.registrationUrl !== null && !cancelled && (
+    <LinkCard
+      path={portal.registrationUrl}
+      t={{
+        title: t['formulare.club-order.link.title'],
+        text: t['formulare.club-order.link.text'],
+        copy: t['formulare.club-order.link.copy'],
+        copied: t['formulare.club-order.link.copied'],
+      }}
+    />
+  );
+
+  /* The calendar of the club's windows takes the wide column (with the day's hours and players beside it once it is wide enough);
+     progress and prices, then the desk's notices, the link and the contact, are columns of their own on a big screen. */
   return (
-    <PublicMain maxWidth={960}>
-      <Box data-testid="club-portal" data-status={status} data-layout={device} sx={{ display: 'contents' }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-          <PageTitle sub={reference}>{portal.clubName}</PageTitle>
-          <StatusChip status={status} label={chip} />
-          <Typography data-testid="portal-status-text" sx={{ fontFamily: ARCHIVO, fontWeight: 700, fontSize: 19, color: BRAND.text }}>{sentence}</Typography>
-        </Box>
-
-        {stale && <NoticeBox tone="plain"><span data-testid="portal-stale">{t['formulare.club-order.portal.stale']}</span></NoticeBox>}
-
+    <Box data-testid="club-portal" data-status={status} data-layout={device} sx={{ display: 'contents' }}>
+      <PublicMain
+        maxWidth="none"
+        workspace
+        head={head}
+        columns={cancelled ? 'minmax(0, 1fr)' : 'minmax(0, 1.6fr) minmax(0, 1fr)'}
+        columnsXl={cancelled ? undefined : 'minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr)'}
+        gap={2.5}
+      >
         {cancelled ? (
-          <Panel labelledBy="portal-cancelled-title" sx={{ bgcolor: BRAND.page }}>
-            <PanelTitle id="portal-cancelled-title">{t['formulare.club-order.portal.cancelled.title']}</PanelTitle>
-            <Typography data-testid="portal-cancelled-text" sx={{ fontSize: 16, color: message !== null ? BRAND.text : SOFT_TEXT, lineHeight: 1.55, whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>
-              {message !== null ? message.text : t['formulare.club-order.portal.cancelled.text']}
-            </Typography>
-          </Panel>
+          <PaneColumn>
+            <Panel labelledBy="portal-cancelled-title" sx={{ bgcolor: BRAND.page }}>
+              <PanelTitle id="portal-cancelled-title">{t['formulare.club-order.portal.cancelled.title']}</PanelTitle>
+              <Typography data-testid="portal-cancelled-text" sx={{ fontSize: 16, color: message !== null ? BRAND.text : SOFT_TEXT, lineHeight: 1.55, whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>
+                {message !== null ? message.text : t['formulare.club-order.portal.cancelled.text']}
+              </Typography>
+            </Panel>
+            <PortalNotices portal={portal} t={t} />
+            <PortalContact phone={portal.clinic.phone} email={portal.clinic.email} t={t} />
+          </PaneColumn>
         ) : (
           <>
-            <Panel labelledBy="portal-cal-title">
-              <PanelTitle id="portal-cal-title">{t['formulare.club-order.portal.cal.title']}</PanelTitle>
-              {dates.length === 0 ? (
-                <Typography role="status" data-testid="portal-cal-empty" sx={{ fontSize: 15, color: LABEL_COLOR }}>{t['formulare.club-order.portal.cal.empty']}</Typography>
-              ) : (
-                <>
-                  <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>{t['formulare.club-order.portal.cal.hint']}</Typography>
-                  <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: side ? 'minmax(300px, 380px) minmax(0, 1fr)' : 'minmax(0, 1fr)', alignItems: 'start' }}>
-                    <PortalCalendar dates={dates} counts={counts} day={day} onDay={setDay} today={today} />
-                    <PortalDay portal={portal} day={day} t={t} />
-                  </Box>
-                </>
-              )}
-            </Panel>
-            <PortalProgress portal={portal} t={t} />
-            <PortalPrices portal={portal} t={t} />
+            <PaneColumn>
+              <Panel labelledBy="portal-cal-title">
+                <PanelTitle id="portal-cal-title">{t['formulare.club-order.portal.cal.title']}</PanelTitle>
+                {dates.length === 0 ? (
+                  <Typography role="status" data-testid="portal-cal-empty" sx={{ fontSize: 15, color: LABEL_COLOR }}>{t['formulare.club-order.portal.cal.empty']}</Typography>
+                ) : (
+                  <>
+                    <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>{t['formulare.club-order.portal.cal.hint']}</Typography>
+                    <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: side ? 'minmax(300px, 380px) minmax(0, 1fr)' : 'minmax(0, 1fr)', alignItems: 'start' }}>
+                      <PortalCalendar dates={dates} counts={counts} day={day} onDay={setDay} today={today} />
+                      <PortalDay portal={portal} day={day} t={t} />
+                    </Box>
+                  </>
+                )}
+              </Panel>
+            </PaneColumn>
+            <ColumnGroup>
+              <PaneColumn nested>
+                <PortalProgress portal={portal} t={t} />
+                <PortalPrices portal={portal} t={t} />
+              </PaneColumn>
+              <PaneColumn nested>
+                <PortalNotices portal={portal} t={t} />
+                {link}
+                <PortalContact phone={portal.clinic.phone} email={portal.clinic.email} t={t} />
+              </PaneColumn>
+            </ColumnGroup>
           </>
         )}
-
-        <PortalNotices portal={portal} t={t} />
-
-        {portal.registrationUrl !== null && !cancelled && (
-          <LinkCard
-            path={portal.registrationUrl}
-            t={{
-              title: t['formulare.club-order.link.title'],
-              text: t['formulare.club-order.link.text'],
-              copy: t['formulare.club-order.link.copy'],
-              copied: t['formulare.club-order.link.copied'],
-            }}
-          />
-        )}
-
-        <PortalContact phone={portal.clinic.phone} email={portal.clinic.email} t={t} />
-      </Box>
-    </PublicMain>
+      </PublicMain>
+    </Box>
   );
 }
 

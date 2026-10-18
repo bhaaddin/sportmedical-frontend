@@ -1,4 +1,5 @@
 import { Box, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material';
+import { useMediaQuery } from '@mui/material';
 import { useDevice } from '../../layout/useDevice';
 import { SoftCard } from './SoftCard';
 
@@ -33,6 +34,7 @@ export function ResponsiveDataList<T>({
   empty,
   ariaLabel,
   footer,
+  fill = false,
 }: {
   rows: readonly T[];
   rowKey: (row: T) => string;
@@ -43,8 +45,15 @@ export function ResponsiveDataList<T>({
   empty?: React.ReactNode;
   ariaLabel?: string;
   footer?: React.ReactNode;
+  /**
+   * Fit the page (tablet and desktop): the table is a card that takes the height its parent left over, with a sticky
+   * header and its own scroll for the rows. The parent must give it a definite height (FitPage / FitBody).
+   */
+  fill?: boolean;
 }) {
   const device = useDevice();
+  /* A landscape tablet (1024+) has the room for every column; only the portrait tablet keeps three. */
+  const roomy = useMediaQuery('(min-width: 1024px)');
 
   if (rows.length === 0 && empty !== undefined) {
     return (
@@ -73,7 +82,7 @@ export function ResponsiveDataList<T>({
   }
 
   const shown =
-    device === 'tablet'
+    device === 'tablet' && !roomy
       ? (() => {
           const marked = columns.filter((c) => c.tablet === true);
           return marked.length > 0 ? marked.slice(0, 3) : columns.slice(0, 3);
@@ -81,9 +90,12 @@ export function ResponsiveDataList<T>({
       : columns;
 
   return (
-    <SoftCard sx={{ p: 0, overflow: 'hidden' }} data-layout={device === 'tablet' ? 'table-3' : 'table'}>
-      <TableContainer>
-        <Table aria-label={ariaLabel}>
+    <SoftCard
+      sx={{ p: 0, overflow: 'hidden', ...(fill ? { flex: '1 1 0', minHeight: 0, display: 'flex', flexDirection: 'column' } : {}) }}
+      data-layout={device === 'tablet' ? 'table-3' : 'table'}
+    >
+      <TableContainer sx={fill ? { flex: '1 1 0', minHeight: 0, overflow: 'auto', overscrollBehavior: 'contain' } : undefined}>
+        <Table aria-label={ariaLabel} stickyHeader={fill}>
           <TableHead>
             <TableRow>
               {shown.map((c) => (
@@ -111,7 +123,7 @@ export function ResponsiveDataList<T>({
           </TableBody>
         </Table>
       </TableContainer>
-      {footer !== undefined && <Box>{footer}</Box>}
+      {footer !== undefined && <Box sx={fill ? { flexShrink: 0 } : undefined}>{footer}</Box>}
     </SoftCard>
   );
 }

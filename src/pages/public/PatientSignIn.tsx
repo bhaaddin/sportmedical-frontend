@@ -27,7 +27,7 @@ import { useSlotTexts } from '../../site/useSlotTexts';
 import { BRAND } from '../../components/public/brand';
 import { LANDING_PATH } from '../../components/public/PublicHeader';
 import {
-  LABEL_COLOR, PageTitle, Panel, PinnedBar, PublicMain, ctaSx,
+  LABEL_COLOR, PageTitle, Pane, PinnedBar, PublicMain, ctaSx,
 } from '../../components/public/kit';
 
 export const portalPath = (token: string): string => `/portal/${encodeURIComponent(token)}`;
@@ -72,46 +72,71 @@ export default function PatientSignIn() {
     }
   };
 
+  const form = (
+    <Box
+      component="form"
+      onSubmit={(event) => { void submit(event); }}
+      noValidate
+      sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, width: '100%', maxWidth: 480, mx: 'auto', my: { md: 'auto' }, flexGrow: { md: 0 } }}
+    >
+      <TextField
+        label="E-mail"
+        type="email"
+        autoComplete="username"
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
+        fullWidth
+        autoFocus
+        slotProps={{ input: { startAdornment: <PersonOutlined sx={{ color: BRAND.muted, mr: 1 }} /> } }}
+      />
+      <TextField
+        label="Heslo"
+        type="password"
+        autoComplete="current-password"
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
+        fullWidth
+        slotProps={{ input: { startAdornment: <LockOutlined sx={{ color: BRAND.muted, mr: 1 }} /> } }}
+      />
+
+      {complaint !== null && (
+        <Alert severity="warning" role="alert">{complaint}</Alert>
+      )}
+
+      <PinnedBar label="Přihlásit se">
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={busy}
+          startIcon={busy ? <CircularProgress size={18} sx={{ color: BRAND.ink }} /> : undefined}
+          sx={{ ...ctaSx(50), ...(phone ? {} : { width: '100%' }) }}
+        >
+          {busy ? 'Přihlašuji…' : 'Přihlásit se'}
+        </Button>
+      </PinnedBar>
+    </Box>
+  );
+
   return (
     <PublicLayout hidePortalLink noFooter>
-      <PublicMain maxWidth={520} gap={2.5}>
-        <PageTitle sub={txt['formulare.portal.signin.sub']}>Přihlášení do portálu</PageTitle>
-
-        <Panel component="div" sx={{ flex: phone ? 1 : undefined }}>
-          <Box
-            component="form"
-            onSubmit={(event) => { void submit(event); }}
-            noValidate
-            sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}
-          >
-            <TextField
-              label="E-mail"
-              type="email"
-              autoComplete="username"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              fullWidth
-              autoFocus
-              slotProps={{ input: { startAdornment: <PersonOutlined sx={{ color: BRAND.muted, mr: 1 }} /> } }}
-            />
-            <TextField
-              label="Heslo"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              fullWidth
-              slotProps={{ input: { startAdornment: <LockOutlined sx={{ color: BRAND.muted, mr: 1 }} /> } }}
-            />
-
-            {complaint !== null && (
-              <Alert severity="warning" role="alert">{complaint}</Alert>
-            )}
-
-            <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
+      {/* Two halves from an iPad up: the form, and what the portal is and how to get in without a password. The two
+          notes and the booking link keep the wording they had; the halves fill the window instead of one narrow column. */}
+      <PublicMain
+        maxWidth="none"
+        workspace
+        columns="minmax(0, 1fr) minmax(0, 1fr)"
+        head={<PageTitle sub={txt['formulare.portal.signin.sub']}>Přihlášení do portálu</PageTitle>}
+        gap={2.5}
+      >
+        <Pane sx={phone ? { flex: 1 } : undefined}>
+          {form}
+        </Pane>
+        <Pane component="aside" sx={{ bgcolor: BRAND.accentWash, borderColor: BRAND.accentEdge }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%', maxWidth: 480, mx: 'auto', my: { md: 'auto' } }}>
+            <Typography sx={{ fontSize: 15, color: LABEL_COLOR, lineHeight: 1.6 }}>
               {txt['formulare.portal.signin.no-password']}
             </Typography>
-            <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>
+            <Typography sx={{ fontSize: 15, color: LABEL_COLOR, lineHeight: 1.6 }}>
               {txt['formulare.portal.signin.forgot']}
             </Typography>
 
@@ -121,20 +146,8 @@ export default function PatientSignIn() {
                 Objednat se
               </Link>
             </Box>
-
-            <PinnedBar label="Přihlásit se">
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={busy}
-                startIcon={busy ? <CircularProgress size={18} sx={{ color: BRAND.ink }} /> : undefined}
-                sx={ctaSx(50)}
-              >
-                {busy ? 'Přihlašuji…' : 'Přihlásit se'}
-              </Button>
-            </PinnedBar>
           </Box>
-        </Panel>
+        </Pane>
       </PublicMain>
     </PublicLayout>
   );

@@ -8,7 +8,7 @@ import { lowestPrice, formatCzk, usePriceList } from '../../api/priceList';
 import { useSlotText, SlotText } from '../../site/SlotText';
 import { MediaSlot } from '../../site/MediaSlot';
 import { WebSection, Eyebrow, CtaButton } from '../ui';
-import { FONT_HEAD, MQ, W } from '../tokens';
+import { FONT_HEAD, MQ, SITE_MAX, W } from '../tokens';
 import { BOOKING_PATH } from '../../components/public/PublicHeader';
 
 const fade3 = keyframes`
@@ -34,7 +34,7 @@ export function HeroCarousel() {
       <Box
         role="group"
         aria-label="Fotografie z kliniky"
-        sx={{ position: 'relative', height: { xs: 240, sm: 340, md: 380, lg: 420 }, borderRadius: '20px', overflow: 'hidden', bgcolor: '#16191E' }}
+        sx={{ position: 'relative', height: { xs: 240, sm: 340, md: 380, lg: 'clamp(420px, 26vw, 640px)' }, borderRadius: '20px', overflow: 'hidden', bgcolor: '#16191E' }}
       >
         {SLIDES.map((slide, index) => (
           <Box
@@ -50,7 +50,7 @@ export function HeroCarousel() {
               badge={`0${index + 1} / 03`}
               eager={index === 0}
               placeholderBackground={slide.bg}
-              sizes="(max-width: 767px) 100vw, 400px"
+              sizes="(max-width: 767px) 100vw, min(28vw, 760px)"
               sx={{ height: '100%', minHeight: 0, borderRadius: 0, aspectRatio: 'auto' }}
             />
           </Box>
@@ -102,12 +102,12 @@ export function Hero() {
   const primary = useSlotText('landing.hero.cta.primary');
 
   return (
-    <WebSection tone="ink" pt={[36, 72]} pb={[0, 0]} component="section" innerSx={{ maxWidth: 1320 }} sx={{ overflow: 'hidden' }}>
+    <WebSection tone="ink" pt={[36, 72]} pb={[0, 0]} component="section" innerSx={{ maxWidth: SITE_MAX }} sx={{ overflow: 'hidden' }}>
       <Box
         sx={{
           display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: { xs: '32px', sm: '40px', lg: '56px' }, alignItems: 'end',
           [MQ.tablet]: { gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)' },
-          [MQ.desktop]: { gridTemplateColumns: 'minmax(0, 1fr) 400px' },
+          [MQ.desktop]: { gridTemplateColumns: 'minmax(0, 1fr) clamp(400px, 28vw, 760px)' },
         }}
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: '20px', md: '26px' }, minWidth: 0, pb: { xs: 0, sm: '56px', lg: '72px' } }}>

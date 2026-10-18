@@ -30,7 +30,7 @@ import { usePublicClinic } from '../../web/data';
 import { useDevice } from '../../layout/useDevice';
 import { useSlotTexts } from '../../site/useSlotTexts';
 import PublicLayout from './PublicLayout';
-import { PageTitle, PinnedBar, PublicMain, LoadError, ctaSx } from '../../components/public/kit';
+import { ColumnGroup, NoticeScreen, PageTitle, PaneColumn, PinnedBar, PublicMain, LoadError, ctaSx } from '../../components/public/kit';
 import { telHref } from '../../components/public/brand';
 import {
   ActivitySection, ContactSection, DaysSection, NoteSection, PaymentSection, ServiceSection, TermSection,
@@ -205,7 +205,7 @@ function OrderForm() {
   if (load.kind === 'error') {
     return (
       <PublicLayout>
-        <PublicMain maxWidth={640}><LoadError what="Objednávku se nepodařilo načíst." onRetry={fetchForm} /></PublicMain>
+        <NoticeScreen><LoadError what="Objednávku se nepodařilo načíst." onRetry={fetchForm} /></NoticeScreen>
       </PublicLayout>
     );
   }
@@ -215,8 +215,7 @@ function OrderForm() {
       if (registrationUrl !== null) {
         return (
           <PublicLayout>
-            <PublicMain maxWidth={640}>
-              <PageTitle sub={t['formulare.club-order.processed']}>Objednávka je potvrzena</PageTitle>
+            <NoticeScreen head={<PageTitle sub={t['formulare.club-order.processed']}>Objednávka je potvrzena</PageTitle>}>
               <LinkCard
                 path={registrationUrl}
                 t={{
@@ -226,8 +225,8 @@ function OrderForm() {
                   copied: t['formulare.club-order.link.copied'],
                 }}
               />
-              {phone !== '' && <Box sx={{ fontSize: 15 }}>Potřebujete poradit? Zavolejte nám: <a href={telHref(phone)}>{phone}</a></Box>}
-            </PublicMain>
+              {phone !== '' && <Box sx={{ fontSize: 15 }}>Potřebujete poradit? Zavolejte nám: <a href={telHref(phone)} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>{phone}</a></Box>}
+            </NoticeScreen>
           </PublicLayout>
         );
       }
@@ -293,8 +292,10 @@ function OrderForm() {
   const stepOf = (key: 'service' | 'activity' | 'term' | 'contact' | 'note'): number =>
     ({ service: 2, activity: multiService ? 3 : 2, term: multiService ? 4 : 3, contact: multiService ? 5 : 4, note: multiService ? 6 : 5 })[key];
 
-  const sections = (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, minWidth: 0 }}>
+  /* Two groups of sections (what is ordered / when and who), then the live summary: a column each on a big screen, the first two
+     stacked on a tablet, everything stacked on a phone. Each column scrolls on its own; the send bar stays under them. */
+  const sectionsOrder = (
+    <>
       <PaymentSection
         n={1}
         texts={payTexts}
@@ -323,6 +324,10 @@ function OrderForm() {
         errors={serverErrors.activitySeats}
         onChange={(id, n) => { patch({ seats: { ...state.seats, [id]: Math.max(0, Math.min(MAX_SEATS, n)) } }); clearErrors('activitySeats'); }}
       />
+    </>
+  );
+  const sectionsWho = (
+    <>
       {hasOffer ? (
         <DaysSection
           n={stepOf('term')}
@@ -358,7 +363,7 @@ function OrderForm() {
         onChange={(p) => patch({ contact: { ...state.contact, ...p } })}
       />
       <NoteSection n={stepOf('note')} note={state.note} errors={serverErrors.note} onNote={(note) => patch({ note })} />
-    </Box>
+    </>
   );
 
   const totalPlayers = quote?.totalSeats ?? lines.reduce((n, l) => n + l.seats, 0);
@@ -379,7 +384,7 @@ function OrderForm() {
       failed={quoteFailed}
       minimumHint={minimumHint}
       priceNote={t['formulare.club-order.price.note']}
-      sticky={device !== 'phone'}
+      sticky={false}
       perPerson={perPerson}
       sentence={sentence}
     />
@@ -400,24 +405,32 @@ function OrderForm() {
 
   return (
     <PublicLayout>
-      <PublicMain maxWidth={1100}>
-        <PageTitle sub={t['formulare.club-order.next']}>{`Objednávka pro klub ${offer.clubName}`}</PageTitle>
-        {phone !== '' && (
-          <Box sx={{ fontSize: 15 }}>Potřebujete poradit? Zavolejte nám: <a href={telHref(phone)}>{phone}</a></Box>
+      <PublicMain
+        maxWidth="none"
+        workspace
+        columns="minmax(0, 1fr) clamp(300px, 26vw, 460px)"
+        columnsXl="minmax(0, 1fr) minmax(0, 1fr) clamp(380px, 22vw, 520px)"
+        gap={2.5}
+        head={(
+          <>
+            <PageTitle sub={t['formulare.club-order.next']}>{`Objednávka pro klub ${offer.clubName}`}</PageTitle>
+            {phone !== '' && (
+              <Box sx={{ fontSize: 15 }}>Potřebujete poradit? Zavolejte nám: <a href={telHref(phone)} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>{phone}</a></Box>
+            )}
+          </>
         )}
-        {device === 'phone' ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-            {sections}
-            {summary}
-          </Box>
-        ) : (
-          <Box sx={{ display: 'grid', gridTemplateColumns: { md: 'minmax(0, 1fr) 300px', lg: 'minmax(0, 1fr) 360px' }, gap: 3, alignItems: 'start' }}>
-            {sections}
-            {summary}
-          </Box>
+        foot={(
+          <>
+            {(serverErrors.other ?? []).map((m) => <Alert key={m} severity="error">{m}</Alert>)}
+            {footer}
+          </>
         )}
-        {(serverErrors.other ?? []).map((m) => <Alert key={m} severity="error">{m}</Alert>)}
-        {footer}
+      >
+        <ColumnGroup>
+          <PaneColumn nested>{sectionsOrder}</PaneColumn>
+          <PaneColumn nested>{sectionsWho}</PaneColumn>
+        </ColumnGroup>
+        <PaneColumn>{summary}</PaneColumn>
       </PublicMain>
     </PublicLayout>
   );

@@ -46,6 +46,10 @@ export const windowLabel = (ctx: Pick<PlannerContext, 'window'>): string =>
  * Pointer -> fractions of the board (`pointerCoords`).
  * `rect` is `board.getBoundingClientRect()`; because both numerator and
  * denominator are scaled equally by the stage, no scale correction is needed.
+ * It is also what makes the fluid stage cheap: the answer is a FRACTION of whatever box the board really has (any
+ * width, any height - `components/PlannerMetrics.tsx`), so the day and the minute under the pointer are right at every
+ * size without a single design-size constant (`beginPlacement` / `selectionFromPointer` turn the fractions into the
+ * day column and the clock).
  */
 export function pointerCoords(
   rect: { left: number; top: number; width: number; height: number },

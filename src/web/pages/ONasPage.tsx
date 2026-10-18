@@ -65,7 +65,7 @@ function GuaranteeSection() {
           <NumberedCard key={n} n={n} titleKey={`onas.pillar.${n}.title`} textKey={`onas.pillar.${n}.text`} />
         ))}
       </CardGrid>
-      <MediaSlot slotKey="onas.guarantee.graphic" sizes="(max-width: 1320px) 100vw, 1320px" sx={{ borderRadius: '16px', minHeight: { xs: 160, md: 220 } }} />
+      <MediaSlot slotKey="onas.guarantee.graphic" sizes="(max-width: 1320px) 100vw, min(76vw, 2240px)" sx={{ borderRadius: '16px', minHeight: { xs: 160, md: 220 } }} />
     </WebSection>
   );
 }

@@ -197,8 +197,8 @@ export type PlannerAction =
   | { type: 'showCompletion'; categoryId: CategoryId; alreadyCompleted: boolean }
   | { type: 'hideCompletion' }
   /* carousel */
-  | { type: 'carouselTo'; index: number; quantity: number }
-  | { type: 'carouselMove'; delta: number; quantity: number }
+  | { type: 'carouselTo'; index: number; quantity: number; visible?: number }
+  | { type: 'carouselMove'; delta: number; quantity: number; visible?: number }
   /* layers */
   | { type: 'pushToast'; toast: NewToast }
   | { type: 'dismissToast'; id: number }
@@ -361,8 +361,9 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
 
     /* ------------------------------ carousel ------------------------------ */
     case 'carouselTo': {
-      const index = clampCarouselIndex(action.quantity, action.index);
-      if (action.quantity < 3) return state;
+      const visible = action.visible ?? 2;
+      const index = clampCarouselIndex(action.quantity, action.index, visible);
+      if (action.quantity <= visible) return state;
       // Every real page change exits the activity planning mode.
       const exits = index !== state.carousel.index && state.planning.selectedCategoryId !== null;
       return {
@@ -372,8 +373,8 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
       };
     }
     case 'carouselMove': {
-      if (action.quantity < 3) return state;
-      return plannerReducer(state, { type: 'carouselTo', index: state.carousel.index + action.delta, quantity: action.quantity });
+      if (action.quantity <= (action.visible ?? 2)) return state;
+      return plannerReducer(state, { type: 'carouselTo', index: state.carousel.index + action.delta, quantity: action.quantity, ...(action.visible !== undefined ? { visible: action.visible } : {}) });
     }
 
     /* ------------------------------ layers ------------------------------ */
@@ -497,8 +498,8 @@ export const plannerActions = {
   showCompletion: (categoryId: CategoryId, alreadyCompleted = false): PlannerAction => ({ type: 'showCompletion', categoryId, alreadyCompleted }),
   hideCompletion: (): PlannerAction => ({ type: 'hideCompletion' }),
 
-  carouselTo: (index: number, quantity: number): PlannerAction => ({ type: 'carouselTo', index, quantity }),
-  carouselMove: (delta: number, quantity: number): PlannerAction => ({ type: 'carouselMove', delta, quantity }),
+  carouselTo: (index: number, quantity: number, visible?: number): PlannerAction => ({ type: 'carouselTo', index, quantity, ...(visible !== undefined ? { visible } : {}) }),
+  carouselMove: (delta: number, quantity: number, visible?: number): PlannerAction => ({ type: 'carouselMove', delta, quantity, ...(visible !== undefined ? { visible } : {}) }),
 
   toast: (message: string, extra: Partial<NewToast> = {}): PlannerAction => ({ type: 'pushToast', toast: { message, ...extra } }),
   dismissToast: (id: number): PlannerAction => ({ type: 'dismissToast', id }),

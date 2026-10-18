@@ -12,7 +12,7 @@ import type { ReactNode } from 'react';
 import { Box } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material/styles';
 import { SiteLink } from './SiteLink';
-import { FONT_HEAD, GUTTER, MAX_WIDTH, MQ, W } from './tokens';
+import { FONT_HEAD, GUTTER, MQ, SITE_MAX, W } from './tokens';
 import { formatCzk, formatMinutes } from '../api/priceList';
 import type { PriceItem } from '../api/priceList';
 
@@ -60,7 +60,8 @@ export interface WebSectionProps {
   borderTop?: boolean;
   innerSx?: SxProps<Theme>;
   sx?: SxProps<Theme>;
-  maxWidth?: number;
+  /** px, or any CSS width; the default is the site's fluid column (tokens.ts, SITE_MAX). */
+  maxWidth?: number | string;
   component?: 'section' | 'div';
 }
 
@@ -71,7 +72,7 @@ const BAND = {
 } as const;
 
 export function WebSection({
-  children, tone = 'white', py = [56, 84], pt, pb, id, borderTop = false, innerSx, sx, maxWidth = MAX_WIDTH, component = 'section',
+  children, tone = 'white', py = [56, 84], pt, pb, id, borderTop = false, innerSx, sx, maxWidth = SITE_MAX, component = 'section',
 }: WebSectionProps) {
   return (
     <Box

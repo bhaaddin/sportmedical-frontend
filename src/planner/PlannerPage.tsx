@@ -12,15 +12,22 @@
  *                nothing             standard ordering: the same board, the header shows the clinic's own data
  *   board      `realCalendar`: the board reads the clinic's real calendar (bookings, blocks, filters) on top of
  *              the planner's data, and offers "Nová objednávka" / "Klubová objednávka".
+ *   club       `/clubs/:clubId` (`clubId` prop): the same screen for ONE club - its data in the header, the order
+ *              the club's switcher names (`?order=`) on the stage, the club's other windows on the board, every
+ *              action of the old club page reachable from the planner (see `club/`). A club without an editable
+ *              order gets the same layout with an empty deck (`ApiDataSource.clubContext`).
  *   prices     the old sidebar's SLUŽBY legend is gone; the služba filter is the gear's "Služby" row
  *              (`boardSettings.serviceSet`) and a činnost's price stands next to its name in the agenda
  *              (`AgendaPanel`), the činnost filter lists and the board's term bubbles.
  */
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { PickOrderSetup } from '../components/clubs/order/PickOrderSetup';
 import { readPickOrderState, type PickSession } from '../components/clubs/order/pickSession';
+import { Alert, Box, Button, CircularProgress } from '@mui/material';
 import { pragueDateKey } from '../utils/time';
+import { ClubPlannerProvider } from './club/ClubPlannerContext';
+import { useClubPlannerData, type ClubPlannerData } from './club/useClubPlannerData';
 import { useApiDataSource } from './api/useApiDataSource';
 import { PlannerShell } from './components/PlannerShell';
 import { BoardConfigProvider, type BoardConfig } from './components/board/boardConfig';
@@ -45,7 +52,67 @@ function useDemoSource(enabled: boolean, today: string): PlannerDataSource | nul
   return useMemo(() => (enabled ? new DemoDataSource({ today }) : null), [enabled, today]);
 }
 
-export default function PlannerPage() {
+/** A short stable id of what the club screen shows, so two orders never share the planner's query cache. */
+function hashOf(text: string): string {
+  let h = 5381;
+  for (let i = 0; i < text.length; i += 1) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+/** The planner as a page: the everyday calendar on `/planovani`, one club's screen on `/clubs/:clubId`. */
+export default function PlannerPage({ clubId }: { clubId?: string } = {}) {
+  return clubId ? <ClubPlannerScreen clubId={clubId} /> : <PlannerScreen club={null} />;
+}
+
+/** `/clubs/:clubId`: load the club and its orders, then draw the planner in the club's context. */
+function ClubPlannerScreen({ clubId }: { clubId: string }) {
+  const location = useLocation();
+  const [params] = useSearchParams();
+  const today = useMemo(() => pragueDateKey(new Date()), []);
+  const orderId = params.get('order');
+  /* the router state a club window / a club card hands over (spent by the screen, never by the URL) */
+  const blockId = (location.state as { clubBlockId?: string } | null)?.clubBlockId ?? null;
+  const data = useClubPlannerData(clubId, today, { orderId, blockId });
+  const pick = readPickOrderState(location.state);
+
+  if (data.status === 'loading') {
+    return (
+      <Box data-testid="club-planner-loading" sx={{ display: 'grid', placeItems: 'center', height: 'calc(100vh - 32px)', minHeight: 520 }}>
+        <CircularProgress aria-label="Načítám klub" />
+      </Box>
+    );
+  }
+  if (data.status !== 'ready' || data.club === null) {
+    return (
+      <Box data-testid="club-planner-error" sx={{ maxWidth: 560, mx: 'auto', mt: 6 }}>
+        <Alert severity={data.status === 'notFound' ? 'warning' : 'error'} action={data.status === 'notFound' ? undefined : <Button color="inherit" size="small" onClick={data.refetch}>Zkusit znovu</Button>}>
+          {data.status === 'notFound' ? 'Tento klub neexistuje.' : 'Klub se nepodařilo načíst.'}
+        </Alert>
+        <Button component={RouterLink} to="/clubs" sx={{ mt: 2 }}>Zpět na kluby</Button>
+      </Box>
+    );
+  }
+
+  /* A session the router state carries (a new order, a request being processed, players changed in a dialog) is what
+     the stage plans; otherwise the selected group's. */
+  const routerSession = pick?.start ?? null;
+  const adhoc: 'new' | 'edit' | null = routerSession === null ? null : routerSession.editOrder ? 'edit' : 'new';
+  const effective: ClubPlannerData = routerSession === null
+    ? data
+    : {
+        ...data,
+        session: routerSession,
+        selected: routerSession.editOrder ? (data.groups.find((g) => g.orders.some((o) => o.id === routerSession.editOrder?.orderId)) ?? null) : null,
+        openOn: routerSession.editOrder?.firstDate ?? data.today,
+      };
+  return (
+    <ClubPlannerProvider data={effective} club={data.club} adhoc={adhoc}>
+      <PlannerScreen club={effective} />
+    </ClubPlannerProvider>
+  );
+}
+
+function PlannerScreen({ club }: { club: ClubPlannerData | null }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -55,9 +122,9 @@ export default function PlannerPage() {
 
   /* ---- the mode, from the router state ---- */
   const pick = readPickOrderState(location.state);
-  const session: PickSession | null = pick?.start ?? null;
-  const needsSetup = pick !== null && session === null;
-  const mode: BoardConfig['mode'] = session !== null ? 'club' : 'standard';
+  const session: PickSession | null = club !== null ? club.session : (pick?.start ?? null);
+  const needsSetup = pick !== null && pick.start === undefined;
+  const mode: BoardConfig['mode'] = session !== null || club !== null ? 'club' : 'standard';
 
   const startWith = useCallback(
     (next: PickSession) => navigate(location.pathname + location.search, { replace: true, state: { pickOrder: { start: next } } }),
@@ -84,23 +151,33 @@ export default function PlannerPage() {
   }, [sessionServiceId]);
 
   /* ---- the data source ---- */
-  const api = useApiDataSource({ session, today });
+  const clubSourceId = club === null ? null : `api:club:${club.club?.id ?? ''}:${hashOf(JSON.stringify(session))}`;
+  const api = useApiDataSource(
+    club === null || clubSourceId === null
+      ? { session, today }
+      : { session, today, id: clubSourceId, clubContext: { clubId: club.club?.id ?? '', clubName: club.club?.name ?? '' } },
+  );
   const demoSource = useDemoSource(demo, today);
   const source: PlannerDataSource = demoSource ?? api;
 
+  /* On a club's own screen the club's other windows stay on the board; only the edited order's are the draft's. */
+  const inClub = club !== null;
+  const ownBlocks = useMemo(() => new Set((session?.editOrder?.blocks ?? []).map((b) => b.id)), [session]);
   const config = useMemo<BoardConfig>(
-    () => ({ realCalendar: true, mode, excludeClubId: session?.clubId ?? null }),
-    [mode, session?.clubId],
+    () => (!inClub
+      ? { realCalendar: true, mode, excludeClubId: session?.clubId ?? null }
+      : { realCalendar: true, mode, excludeClubId: null, excludeClubBlockIds: ownBlocks }),
+    [mode, session?.clubId, inClub, ownBlocks],
   );
 
   return (
     <BoardConfigProvider value={config}>
       <div style={{ height: 'calc(100vh - 32px)', minHeight: 520, width: '100%' }} data-testid="planner-page" data-mode={mode}>
         <PlannerShell
-          key={`${source.id}:${session ? `${session.clubId}:${session.editOrder?.orderId ?? 'new'}` : 'standard'}`}
+          key={`${source.id}:${session ? `${session.clubId}:${session.editOrder?.orderId ?? 'new'}` : club !== null ? 'club' : 'standard'}`}
           source={source}
           today={today}
-          initialDate={today}
+          initialDate={club !== null ? club.openOn : today}
           user={user}
           headerMode={mode === 'club' ? 'club' : 'clinic'}
         />

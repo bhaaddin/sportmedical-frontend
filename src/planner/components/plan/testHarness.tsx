@@ -66,18 +66,19 @@ export function mountPlanner(source: DemoDataSource, initialEntries: Parameters<
 /** jsdom has no layout: the board is 700 x 455 at (100, 50) - 100 px a day, 455 px for 07:00-19:00. */
 export const BOARD = { left: 100, top: 50, width: 700, height: 455 };
 
-export function giveBoardGeometry(board: HTMLElement): void {
+/** `geometry`: another board size (the fluid stage's measured one); default the file's. */
+export function giveBoardGeometry(board: HTMLElement, geometry: typeof BOARD = BOARD): void {
   board.getBoundingClientRect = () =>
-    ({ ...BOARD, right: BOARD.left + BOARD.width, bottom: BOARD.top + BOARD.height, x: BOARD.left, y: BOARD.top, toJSON: () => ({}) }) as DOMRect;
-  Object.defineProperty(board, 'clientWidth', { configurable: true, value: BOARD.width });
-  Object.defineProperty(board, 'clientHeight', { configurable: true, value: BOARD.height });
+    ({ ...geometry, right: geometry.left + geometry.width, bottom: geometry.top + geometry.height, x: geometry.left, y: geometry.top, toJSON: () => ({}) }) as DOMRect;
+  Object.defineProperty(board, 'clientWidth', { configurable: true, value: geometry.width });
+  Object.defineProperty(board, 'clientHeight', { configurable: true, value: geometry.height });
   (board as HTMLElement & { setPointerCapture: () => void }).setPointerCapture = () => undefined;
 }
 
 /** Client coordinates of a day column (0 = Monday) at a wall-clock minute. */
-export const at = (day: number, minute: number): { clientX: number; clientY: number } => ({
-  clientX: BOARD.left + (day + 0.5) * (BOARD.width / 7),
-  clientY: BOARD.top + ((minute - 420) / 720) * BOARD.height,
+export const at = (day: number, minute: number, geometry: typeof BOARD = BOARD): { clientX: number; clientY: number } => ({
+  clientX: geometry.left + (day + 0.5) * (geometry.width / 7),
+  clientY: geometry.top + ((minute - 420) / 720) * geometry.height,
 });
 
 export const pointer = (extra: Record<string, unknown> = {}) => ({ button: 0, pointerId: 1, pointerType: 'mouse', isPrimary: true, ...extra });

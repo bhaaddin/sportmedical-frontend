@@ -1,3 +1,4 @@
+import { StackTable } from "../../components/ui/StackTable";
 import { useMemo, useState } from "react";
 import {
   Alert,
@@ -188,7 +189,7 @@ export default function EmployeeAbsencesPage() {
         emptyAction={{ label: t("booking.absences.new"), onClick: openCreate }}
         onRetry={() => void absencesQuery.refetch()}
       >
-        <Box sx={{ overflowX: "auto" }}>
+        <StackTable>
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -223,7 +224,7 @@ export default function EmployeeAbsencesPage() {
               ))}
             </TableBody>
           </Table>
-        </Box>
+        </StackTable>
       </AsyncSection>
 
       <Dialog open={draft !== null} onClose={() => setDraft(null)} fullWidth maxWidth="sm">

@@ -16,7 +16,7 @@ import { sectionKey } from '../../../site/slots/textPage';
 import type { TextSection } from '../../../site/slots/textPage';
 import { SiteLink } from '../../SiteLink';
 import { PageHero, SectionTitle, WebSection } from '../../ui';
-import { FONT_HEAD, W } from '../../tokens';
+import { FONT_HEAD, READING_COLUMNS, W } from '../../tokens';
 import { labelSx } from './blocks';
 import { useContactDetails } from './contactData';
 import { RichSlotText } from './richText';
@@ -64,13 +64,13 @@ function ContactBlock({ prefix }: { prefix: string }) {
   ];
 
   return (
-    <WebSection tone="warm" py={[40, 56]} borderTop maxWidth={860} innerSx={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <WebSection tone="warm" py={[40, 56]} borderTop innerSx={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <SectionTitle size="md"><SlotText slotKey={`${prefix}.contact.title`} /></SectionTitle>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
         <Box component="strong" sx={{ fontFamily: FONT_HEAD, fontSize: 18 }}>{company}</Box>
         <SlotText slotKey={`${prefix}.contact.lead`} sx={{ fontSize: 15, color: W.bodySoft }} />
       </Box>
-      <Box component="dl" sx={{ m: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '14px 24px', '@media (min-width: 768px)': { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' } }}>
+      <Box component="dl" sx={{ m: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '14px 24px', '@media (min-width: 768px)': { gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))' } }}>
         {rows.map((row) => (
           <Box key={row.label} sx={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
             <Box component="dt" sx={labelSx}>{row.label}</Box>
@@ -102,14 +102,14 @@ export function TextPage({ prefix, sections, path }: TextPageProps) {
         lead={<SlotText slotKey={`${prefix}.hero.lead`} />}
       />
 
-      <WebSection py={[40, 64]} maxWidth={860} innerSx={{ display: 'flex', flexDirection: 'column', gap: { xs: '32px', md: '44px' } }}>
+      <WebSection py={[40, 64]} innerSx={{ display: 'flex', flexDirection: 'column', gap: { xs: '32px', md: '44px' } }}>
         {sections.length >= TOC_FROM && (
           <Box component="nav" aria-label="Obsah" sx={{ display: 'flex', flexDirection: 'column', gap: '8px', pb: '8px', borderBottom: `1px solid ${W.line}` }}>
             <SlotText slotKey={tocTitle} sx={labelSx} />
-            <Box component="ol" sx={{ m: 0, pl: '22px', columns: { xs: 1, md: 2 }, columnGap: '32px', fontSize: 15, lineHeight: 1.5 }}>
+            <Box component="ol" sx={{ m: 0, pl: '22px', ...READING_COLUMNS, columnWidth: '300px', fontSize: 15, lineHeight: 1.5 }}>
               {sections.map((section) => (
                 <li key={section.id}>
-                  <Box component="a" href={`#${prefix}-${section.id}`} sx={{ ...linkReset, display: 'inline-flex', alignItems: 'center', minHeight: 32 }}>
+                  <Box component="a" href={`#${prefix}-${section.id}`} sx={{ ...linkReset, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>
                     <SlotText slotKey={sectionKey(prefix, section.id, 'title')} />
                   </Box>
                 </li>
@@ -117,17 +117,19 @@ export function TextPage({ prefix, sections, path }: TextPageProps) {
             </Box>
           </Box>
         )}
+        <Box sx={{ ...READING_COLUMNS }}>
         {sections.map((section) => (
-          <Box key={section.id} component="section" id={`${prefix}-${section.id}`} sx={{ display: 'flex', flexDirection: 'column', gap: '14px', scrollMarginTop: '88px' }}>
+          <Box key={section.id} component="section" id={`${prefix}-${section.id}`} sx={{ display: 'flex', flexDirection: 'column', gap: '14px', scrollMarginTop: '88px', breakInside: 'avoid', mb: { xs: '32px', md: '44px' } }}>
             <SlotText slotKey={sectionKey(prefix, section.id, 'title')} as="h2" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 800, fontSize: 'clamp(22px, 2.6vw, 28px)', letterSpacing: '-0.025em', lineHeight: 1.15 }} />
             <RichSlotText slotKey={sectionKey(prefix, section.id, 'text')} tokens={tokens} />
           </Box>
         ))}
+        </Box>
       </WebSection>
 
       <ContactBlock prefix={prefix} />
 
-      <WebSection py={[24, 32]} borderTop maxWidth={860}>
+      <WebSection py={[24, 32]} borderTop>
         <LegalLinks exclude={path} titleKey={`${prefix}.more.title`} />
       </WebSection>
     </>

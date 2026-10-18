@@ -1,3 +1,4 @@
+import { StackTable } from "../../components/ui/StackTable";
 import { useMemo, useState } from "react";
 import {
   Alert,
@@ -215,7 +216,7 @@ export default function ExceptionsPage() {
           }}
           onRetry={() => void exceptionsQuery.refetch()}
         >
-          <Box sx={{ overflowX: "auto" }}>
+          <StackTable>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -290,7 +291,7 @@ export default function ExceptionsPage() {
                 ))}
               </TableBody>
             </Table>
-          </Box>
+          </StackTable>
         </AsyncSection>
 
         {remove.error ? (

@@ -13,6 +13,8 @@ export interface BoardConfig {
   mode: 'standard' | 'club';
   /** The club being planned: its windows from the calendar are not drawn twice. */
   excludeClubId: string | null;
+  /** The club's own screen: only the windows of the order that is edited are drawn from the draft, the club's other windows stay on the board. */
+  excludeClubBlockIds?: ReadonlySet<string>;
   /** Fixed wall-clock minute for the now-line (tests); the real clock when undefined. */
   nowMinute?: number;
 }

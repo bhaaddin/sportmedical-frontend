@@ -3,12 +3,11 @@
  * (phone: cards in one column and the actions pinned to the bottom; tablet: two
  * columns; desktop: the board's three).
  *
- * One screen, two views (the opened club is a presentation page, components/clubs/detail).
- * a reservation or a block running, who to call, how many athletes it brings and
- * the discount the administrator gave it. Opening a card shows the club's
- * blocks and bulk reservation - the athletes' registration link, how many of the
- * places are taken, who took them - and on the right the club's facts and the
- * order's money.
+ * This is the LIST of clubs. A card shows a reservation or a block running, who to
+ * call, how many athletes it brings and the discount the administrator gave it.
+ * Opening a card goes to the club's own screen, `/clubs/:clubId` - the planner in
+ * club mode (planner/ClubPlannerPage): the club's header, its orders on the board,
+ * and every action of the old detail page reachable from there.
  *
  * The data is what the API answers. Payers come from `/api/clubs`, club blocks
  * from `/api/v1/club-blocks` (C4), reservations are the partner orders of every
@@ -19,14 +18,15 @@
  *
  * Router state this page understands (all optional, spent once read):
  *
- *   { clubId }                       open that club's detail
+ *   { clubId }                       go to that club's screen (`/clubs/:clubId`)
  *   { clubId, clubBlockId }          ... and land on that block
  *   { clubBlockId }                  the same, the club is found from the block
  *   { openOrderId } / { newOrder }   open an order's detail / the new-order chooser
  *
- * The payer record itself - IČO, fakturační adresa, bankovní spojení - is still
- * edited here ("Upravit klub", "Nový klub"), because an invoice to a club
- * needs all of that and the day it is due is the wrong day to find it missing.
+ * The payer record itself - IČO, fakturační adresa, bankovní spojení - is edited
+ * here for a new club ("Nový klub") and from the club's screen ("Upravit údaje"),
+ * because an invoice to a club needs all of that and the day it is due is the
+ * wrong day to find it missing.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { invalidateClubWorld } from '../components/clubs/clubWorld';
@@ -38,7 +38,6 @@ import toast from 'react-hot-toast';
 import { clubsApi } from '../api/clubs';
 import type { Club } from '../api/clubs';
 import { calendarsApi } from '../api/calendars';
-import { activitiesApi } from '../api/activities';
 import { clubBlocksApi } from '../api/clubBlocks';
 import type { ClubBlockView } from '../api/clubBlocks';
 import { clubOrdersApi } from '../api/clubOrders';
@@ -52,7 +51,6 @@ import type { ClubFilter } from './clubs/clubOrders';
 import { buildClubRow } from './clubs/clubRow';
 import type { ClubRow } from './clubs/clubRow';
 import { ClubCard } from './clubs/ClubCard';
-import { ClubPresentation } from '../components/clubs/detail/ClubPresentation';
 import { PayerDialog } from './clubs/PayerDialog';
 import { PinnedActions } from './clubs/PinnedActions';
 import { ClubOrderEntry } from '../components/clubs/order/ClubOrderEntry';
@@ -91,8 +89,6 @@ export default function ClubsPage() {
 
   const [filter, setFilter] = useState<ClubFilter>('all');
   const [search, setSearch] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(handoff?.clubId ?? null);
-  const [focusBlockId, setFocusBlockId] = useState<string | null>(handoff?.clubBlockId ?? null);
 
   /* `null` closed; a club to change it; `'new'` to add one. */
   const [editing, setEditing] = useState<Club | 'new' | null>(null);
@@ -148,14 +144,6 @@ export default function ClubsPage() {
   });
   const billableByClub = useMemo(() => liveTotalsByClub(clubOrdersQuery.data ?? []), [clubOrdersQuery.data]);
 
-  const activitiesQuery = useQuery({
-    queryKey: ['activities'],
-    queryFn: activitiesApi.list,
-    staleTime: 5 * 60 * 1000,
-  });
-  const priceOf = (activityId: string): number | null =>
-    (activitiesQuery.data?.activities ?? []).find((a) => a.id === activityId)?.priceCzk ?? null;
-
   /*
    * The one required read is `/api/clubs`. Everything else on this screen -
    * calendars, each calendar's orders, the club blocks, the price list - is an
@@ -177,9 +165,6 @@ export default function ClubsPage() {
   if (blocksQuery.isError) {
     missingParts.push({ what: 'bloky klubů', retry: () => void blocksQuery.refetch() });
   }
-  if (activitiesQuery.isError) {
-    missingParts.push({ what: 'ceník činností (částky objednávek se nezobrazí)', retry: () => void activitiesQuery.refetch() });
-  }
   if (clubOrdersQuery.isError) {
     missingParts.push({ what: 'objednávky klubů (částky k fakturaci se nezobrazí)', retry: () => void clubOrdersQuery.refetch() });
   }
@@ -190,48 +175,46 @@ export default function ClubsPage() {
     [clubsQuery.data, orders, allBlocks, today],
   );
 
+  /* Deactivated clubs are archived: hidden from the first three chips, listed under "Neaktivní" when there are any. */
+  const liveRows = useMemo(() => rows.filter((r) => r.club.isActive), [rows]);
   const counts = useMemo(
     () => ({
-      all: rows.length,
-      active: rows.filter((r) => r.status === 'active').length,
-      none: rows.filter((r) => r.status === 'none').length,
+      all: liveRows.length,
+      active: liveRows.filter((r) => r.status === 'active').length,
+      none: liveRows.filter((r) => r.status === 'none').length,
+      inactive: rows.length - liveRows.length,
     }),
-    [rows],
+    [rows, liveRows],
+  );
+  const chips = counts.inactive > 0 ? [...FILTERS, { key: 'inactive' as ClubFilter, label: 'Neaktivní' }] : FILTERS;
+
+  const visible = rows.filter(
+    (r) => matchesFilter(r.status, filter, r.club.isActive) && matchesSearch(r.club, search),
   );
 
-  const visible = rows.filter((r) => matchesFilter(r.status, filter) && matchesSearch(r.club, search));
-  const selected = selectedId === null ? null : (rows.find((r) => r.club.id === selectedId) ?? null);
-
-  /* Spend the handoff once it has done its job, so Back does not reopen it.
-     Mount-only on purpose: everything it carried has been read into state. */
+  /* A club handed over by another screen (the calendar, an invoice, a window on the board): go to its own screen, once.
+     A block id without its club: the club is found from the block once the blocks have arrived. */
+  const handoffBlockId = handoff?.clubBlockId ?? null;
   useEffect(() => {
-    if (hasOrderState(orderHandoff) || (handoff !== null && (handoff.clubId !== undefined || handoff.clubBlockId !== undefined))) {
+    if (hasOrderState(orderHandoff)) {
       navigate(location.pathname, { replace: true, state: null });
+      return;
     }
+    if (handoff?.clubId !== undefined) {
+      navigate(`/clubs/${handoff.clubId}`, { replace: true, state: handoffBlockId !== null ? { clubBlockId: handoffBlockId } : null });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- a hand-over is read once, on arrival
   }, []);
-
-  /* A block id without its club: find the club once the blocks have arrived. */
   useEffect(() => {
-    if (selectedId === null && focusBlockId !== null && blocksQuery.data !== undefined) {
-      const owner = blocksQuery.data.find((b) => b.id === focusBlockId)?.clubId;
-      if (owner !== undefined && owner !== '') setSelectedId(owner);
-    }
-  }, [selectedId, focusBlockId, blocksQuery.data]);
+    if (handoff?.clubId !== undefined || handoffBlockId === null || blocksQuery.data === undefined) return;
+    const owner = blocksQuery.data.find((b) => b.id === handoffBlockId)?.clubId;
+    if (owner !== undefined && owner !== '') navigate(`/clubs/${owner}`, { replace: true, state: { clubBlockId: handoffBlockId } });
+    else navigate(location.pathname, { replace: true, state: null });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- as above: once the blocks are known
+  }, [blocksQuery.data]);
 
   const reload = () => {
     void invalidateClubWorld(queryClient);
-  };
-
-  const remove = async (id: string, name: string) => {
-    if (!window.confirm(`Deaktivovat klub ${name}?`)) return;
-    try {
-      await clubsApi.deactivate(id);
-      toast.success('Klub deaktivován');
-      if (selectedId === id) setSelectedId(null);
-      reload();
-    } catch {
-      toast.error('Akce selhala');
-    }
   };
 
   const dialogs = (
@@ -279,33 +262,6 @@ export default function ClubsPage() {
     );
   }
 
-  /* ── Detail: design-17 ── */
-
-  if (selected !== null) {
-    return (
-      <Box>
-        <ClubPresentation
-          row={selected}
-          priceOf={priceOf}
-          pricesReady={activitiesQuery.isSuccess || activitiesQuery.isError}
-          today={today}
-          focusBlockId={focusBlockId}
-          onBack={() => { setSelectedId(null); setFocusBlockId(null); }}
-          onEdit={() => setEditing(selected.club)}
-          onDeactivate={() => void remove(selected.club.id, selected.club.name)}
-          onReload={reload}
-          onInvoice={() =>
-            navigate('/billing', { state: { clubId: selected.club.id, partnerOrderId: selected.order?.id ?? null } })
-          }
-          onNewReservation={() => navigate('/planovani', { state: { pickOrder: { clubId: selected.club.id } } })}
-          onNewOrder={() => setEntry({ clubId: selected.club.id })}
-          onOpenOrder={setOpenOrderId}
-        />
-        {dialogs}
-      </Box>
-    );
-  }
-
   /* ── List: design-16 ── */
 
   const columns = phone ? 1 : device === 'tablet' ? 2 : 3;
@@ -345,7 +301,7 @@ export default function ClubsPage() {
         />
         <FilterChips
           ariaLabel="Filtr klubů"
-          options={FILTERS.map((f) => ({ ...f, count: counts[f.key] }))}
+          options={chips.map((f) => ({ ...f, count: counts[f.key] }))}
           value={filter}
           onChange={setFilter}
         />
@@ -391,7 +347,7 @@ export default function ClubsPage() {
               row={row}
               ordersLoading={ordersLoading}
               billableCzk={clubOrdersQuery.isLoading ? undefined : (billableByClub.get(row.club.id) ?? null)}
-              onOpen={() => setSelectedId(row.club.id)}
+              onOpen={() => navigate(`/clubs/${row.club.id}`)}
             />
           ))}
         </Box>

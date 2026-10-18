@@ -91,6 +91,7 @@ import MapyAddressPicker from '../components/registration/MapyAddressPicker';
 import CandidateReviewDialog from '../components/registration/CandidateReviewDialog';
 import FormField from '../components/registration/FormField';
 import IssuedLinkCard from '../components/registration/IssuedLinkCard';
+import { FIT_SCROLL_SX, FitBody, FitPage } from '../components/ui/fit';
 import StickyFormFooter from '../components/registration/StickyFormFooter';
 import { FieldCell, FieldGrid } from '../components/registration/FieldGrid';
 import { PHONE_TOUCH_TARGETS } from '../components/registration/touchTargets';
@@ -789,7 +790,7 @@ export default function PatientRegistration() {
   if (issued !== null) {
     const expiry = formatExpiry(issued.issued.expiresAtUtc);
     return (
-      <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
+      <Box sx={{ maxWidth: 1200, mx: 'auto', width: '100%' }}>
         <PageHeader
           title="Nový pacient"
           subtitle={`${MODE_LABEL.Quick} — hotovo`}
@@ -856,10 +857,10 @@ export default function PatientRegistration() {
   }
 
   return (
-    <Box
+    <FitPage
       data-device={device}
       data-mode={quick ? 'quick' : 'standard'}
-      sx={[{ p: { xs: 2, md: 3 }, pb: 0, maxWidth: 1200, mx: 'auto' }, phoneLayout && PHONE_TOUCH_TARGETS]}
+      sx={[phoneLayout && PHONE_TOUCH_TARGETS]}
     >
       {/* ── Header ── */}
       <PageHeader
@@ -886,14 +887,24 @@ export default function PatientRegistration() {
       />
 
       {banner !== null && (
-        <Alert severity={banner.severity} sx={{ mb: 2 }} onClose={() => setBanner(null)}>
+        <Alert severity={banner.severity} sx={{ mb: 2, flexShrink: 0 }} onClose={() => setBanner(null)}>
           {banner.text}
         </Alert>
       )}
 
-      <Stack direction={{ xs: 'column', lg: 'row' }} spacing={3} sx={{ alignItems: 'flex-start' }}>
+      {/* From 1280 the form and the card stand side by side and each scrolls by itself; below, they stack and scroll as one. */}
+      <FitBody
+        scroll
+        sx={{
+          display: 'grid',
+          gap: 3,
+          alignContent: 'start',
+          gridTemplateColumns: 'minmax(0, 1fr)',
+          '@media (min-width: 1280px)': { gridTemplateColumns: 'minmax(0, 1fr) clamp(300px, 24vw, 400px)', gridTemplateRows: 'minmax(0, 1fr)', alignContent: 'stretch', overflow: 'hidden' },
+        }}
+      >
         {/* ═══ The form ═══ */}
-        <Stack spacing={2} sx={{ flexGrow: 1, width: '100%', minWidth: 0 }}>
+        <Stack spacing={2} sx={{ minWidth: 0, '@media (min-width: 1280px)': { ...FIT_SCROLL_SX, pr: 0.5 } }}>
 
           {quick && (
             <SoftCard tone="muted" sx={{ p: 2, display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
@@ -1427,10 +1438,7 @@ export default function PatientRegistration() {
         {/* ═══ The card — the former "Shrnutí" step ═══ */}
         <Stack
           spacing={2}
-          sx={{
-            width: { xs: '100%', lg: 320 }, flexShrink: 0,
-            position: { lg: 'sticky' }, top: { lg: 16 },
-          }}
+          sx={{ minWidth: 0, '@media (min-width: 1280px)': { ...FIT_SCROLL_SX, pr: 0.5 } }}
         >
           <SoftCard>
             <SectionLabel>Uloží se takto</SectionLabel>
@@ -1513,7 +1521,7 @@ export default function PatientRegistration() {
             Rodné číslo i číslo pojištěnce se do protokolu zapisují zamaskované.
           </Typography>
         </Stack>
-      </Stack>
+      </FitBody>
 
       <StickyFormFooter
         start={
@@ -1542,7 +1550,7 @@ export default function PatientRegistration() {
         onConfirmDistinct={() => { if (review !== null) void send(review.confirmation); }}
         onUseExisting={(candidate) => { setReview(null); navigate(`/patients/${candidate.patientId}`); }}
       />
-    </Box>
+    </FitPage>
   );
 }
 

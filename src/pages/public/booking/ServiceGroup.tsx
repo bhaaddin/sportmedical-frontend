@@ -76,7 +76,7 @@ export default function ServiceGroup({
         <Typography sx={{ color: '#5C6067', fontSize: 14, maxWidth: 760 }}>{service.description}</Typography>
       )}
 
-      <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))' } }}>
+      <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
         {service.activities.map((activity) => (
           <Box
             key={activity.id}

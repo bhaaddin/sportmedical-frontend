@@ -1,3 +1,5 @@
+import { FitPage, fitCardSx, fitTableSx } from "../../components/ui/fit";
+import { useIsPhone } from "../../layout/useDevice";
 import { Fragment, useCallback, useMemo, useState } from "react";
 import {
   Alert,
@@ -263,18 +265,19 @@ export default function ServiceOverviewPage() {
   const freeText = (starts: number, days: number) =>
     `${t("booking.serviceOverview.startsCount", { count: starts })} ${t("booking.serviceOverview.daysCount", { count: days })}`;
 
+  const phone = useIsPhone();
   const codebookError =
     calendarsQuery.error ?? activitiesQuery.error ?? servicesQuery.error;
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto" }}>
+    <FitPage>
       <PageHeader
         title={t("booking.serviceOverview.title")}
         subtitle={t("booking.serviceOverview.subtitle")}
       />
 
       {/* ── Filters: every axis the owner named, nothing fixed ── */}
-      <SoftCard sx={{ mb: 2.5 }}>
+      <SoftCard sx={{ mb: 2.5, flexShrink: 0 }}>
         <SectionLabel>Filtr</SectionLabel>
         <Stack
           direction="row"
@@ -387,10 +390,10 @@ export default function ServiceOverviewPage() {
             }}
             skeletonRows={5}
           >
-            <SoftCard sx={{ p: 0, overflow: "hidden" }}>
+            <SoftCard sx={{ p: 0, overflow: "hidden", ...fitCardSx(phone) }}>
               <Stack
                 direction="row"
-                sx={{ flexWrap: "wrap", gap: 2, alignItems: "baseline", px: 2.5, py: 2 }}
+                sx={{ flexWrap: "wrap", gap: 2, alignItems: "baseline", px: 2.5, py: 2, flexShrink: 0 }}
               >
                 <Typography sx={{ fontWeight: 700 }}>
                   {t("booking.serviceOverview.totals", {
@@ -411,8 +414,8 @@ export default function ServiceOverviewPage() {
                 </Alert>
               ) : null}
 
-              <TableContainer sx={{ borderRadius: 0, borderTop: "1px solid", borderColor: "divider" }}>
-                <Table size="small">
+              <TableContainer sx={{ borderRadius: 0, borderTop: "1px solid", borderColor: "divider", ...fitTableSx(phone) }}>
+                <Table size="small" stickyHeader={!phone}>
                   <TableHead>
                     <TableRow>
                       <TableCell>{t("booking.serviceOverview.column.activity")}</TableCell>
@@ -474,7 +477,7 @@ export default function ServiceOverviewPage() {
           </AsyncSection>
         )}
       </AsyncSection>
-    </Box>
+    </FitPage>
   );
 }
 

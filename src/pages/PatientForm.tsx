@@ -30,6 +30,7 @@ import { PageHeader, SectionLabel, SoftCard, StatusChip } from "../components/ui
 import MapyAddressPicker from "../components/registration/MapyAddressPicker";
 import FormField from "../components/registration/FormField";
 import IssuedLinkCard from "../components/registration/IssuedLinkCard";
+import { FIT_SCROLL_SX, FitBody, FitPage } from "../components/ui/fit";
 import StickyFormFooter from "../components/registration/StickyFormFooter";
 import { FieldCell, FieldGrid } from "../components/registration/FieldGrid";
 import { PHONE_TOUCH_TARGETS } from "../components/registration/touchTargets";
@@ -357,9 +358,9 @@ export default function PatientForm() {
   const busy = savingDemographics || savingProfile || savingAll;
 
   return (
-    <Box
+    <FitPage
       data-device={phone ? "phone" : "other"}
-      sx={[{ p: { xs: 2, md: 3 }, pb: 0, maxWidth: 1200, mx: "auto" }, phone && PHONE_TOUCH_TARGETS]}
+      sx={[phone && PHONE_TOUCH_TARGETS]}
     >
       <PageHeader
         title="Úprava karty"
@@ -371,8 +372,18 @@ export default function PatientForm() {
         }
       />
 
-      <Stack direction={{ xs: "column", lg: "row" }} spacing={3} sx={{ alignItems: "flex-start" }}>
-        <Stack spacing={2} sx={{ flexGrow: 1, width: "100%", minWidth: 0 }}>
+      {/* From 1280 the form and the locked identity card stand side by side and each scrolls by itself. */}
+      <FitBody
+        scroll
+        sx={{
+          display: "grid",
+          gap: 3,
+          alignContent: "start",
+          gridTemplateColumns: "minmax(0, 1fr)",
+          "@media (min-width: 1280px)": { gridTemplateColumns: "minmax(0, 1fr) clamp(300px, 24vw, 400px)", gridTemplateRows: "minmax(0, 1fr)", alignContent: "stretch", overflow: "hidden" },
+        }}
+      >
+        <Stack spacing={2} sx={{ minWidth: 0, "@media (min-width: 1280px)": { ...FIT_SCROLL_SX, pr: 0.5 } }}>
           {/* 1. Name and demographics — route 1 */}
           <SoftCard>
             <SectionLabel>Základní údaje</SectionLabel>
@@ -558,12 +569,7 @@ export default function PatientForm() {
         {/* 2. Identity — read-only, changed through the governed routes */}
         <Stack
           spacing={2}
-          sx={{
-            width: { xs: "100%", lg: 320 },
-            flexShrink: 0,
-            position: { lg: "sticky" },
-            top: { lg: 16 },
-          }}
+          sx={{ minWidth: 0, "@media (min-width: 1280px)": { ...FIT_SCROLL_SX, pr: 0.5 } }}
         >
           <SoftCard>
             <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1 }}>
@@ -635,7 +641,7 @@ export default function PatientForm() {
             )}
           </SoftCard>
         </Stack>
-      </Stack>
+      </FitBody>
 
       <StickyFormFooter
         start={
@@ -675,7 +681,7 @@ export default function PatientForm() {
           }}
         />
       ) : null}
-    </Box>
+    </FitPage>
   );
 }
 

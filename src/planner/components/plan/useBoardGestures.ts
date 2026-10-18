@@ -99,9 +99,11 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
     if (!board) return undefined;
 
     const rectOf = () => board.getBoundingClientRect();
+    /* The board's height in its own (design) px - fractional on the fluid stage, so not `clientHeight` (an integer). */
+    const layoutHeight = () => parseFloat(getComputedStyle(board).height) || board.clientHeight;
     const scaleOf = () => {
       const r = rectOf();
-      return r.height / Math.max(1, board.clientHeight) || 1;
+      return r.height / Math.max(1, layoutHeight()) || 1;
     };
 
     const findClubTerm = (target: EventTarget | null): { card: HTMLElement; session: PlannerSession } | null => {
@@ -183,7 +185,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
           if (!resizeHasStarted(p.resize, e.clientY)) return;
           act.updateResize(true, null);
         }
-        act.updateResize(true, guardResize(proposalForTermExpansion(ctx, p.resize, e.clientY, scaleOf(), state.weekStart, board.clientHeight || undefined), figures));
+        act.updateResize(true, guardResize(proposalForTermExpansion(ctx, p.resize, e.clientY, scaleOf(), state.weekStart, layoutHeight() || undefined), figures));
         return;
       }
       if (p.drag && p.selectedCategoryId) {
@@ -214,7 +216,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
       }
       if (p.resize && e.pointerId === p.resize.pointerId) {
         const drag = p.resize;
-        const proposal = drag.started ? guardResize(proposalForTermExpansion(ctx, drag, e.clientY, scaleOf(), state.weekStart, board.clientHeight || undefined), figures) : null;
+        const proposal = drag.started ? guardResize(proposalForTermExpansion(ctx, drag, e.clientY, scaleOf(), state.weekStart, layoutHeight() || undefined), figures) : null;
         suppress.current = { id: drag.id, until: Date.now() + 550 };
         act.endResize();
         if (!drag.started || !proposal || !proposal.added) return;

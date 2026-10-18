@@ -3,6 +3,7 @@ import { Box, Typography, Grid, Button, TextField, MenuItem, Stack } from '@mui/
 import { PersonAdd } from '@mui/icons-material';
 import { availabilityApi, type Availability } from '../api/availability';
 import { FilterChips, KpiCard, PageHeader, StatusChip, type ChipTone } from '../components/ui';
+import { FitPage } from '../components/ui/fit';
 import { ResponsiveDataList, type DataColumn } from '../components/ui/ResponsiveDataList';
 import { PinnedActionBar } from '../components/ui/PinnedActionBar';
 import { useIsPhone } from '../layout/useDevice';
@@ -87,14 +88,14 @@ export default function Availability() {
   );
 
   return (
-    <Box>
+    <FitPage>
       <PageHeader
         title="Dostupnost sportovců"
         subtitle="Kdo může trénovat a závodit"
         actions={phone ? undefined : addButton}
       />
 
-      <Grid container spacing={2} sx={{ mb: 2.5 }}>
+      <Grid container spacing={2} sx={{ mb: 2.5, flexShrink: 0 }}>
         <Grid size={{ xs: 6, sm: 3 }}>
           <KpiCard label="K dispozici" value={available} tone="green" />
         </Grid>
@@ -109,7 +110,7 @@ export default function Availability() {
         </Grid>
       </Grid>
 
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ mb: 2, flexShrink: 0 }}>
         <ScrollChips>
           <FilterChips<StatusFilter>
             ariaLabel="Filtr dostupnosti"
@@ -136,6 +137,7 @@ export default function Availability() {
           rows={shown}
           rowKey={(a) => a.id}
           columns={columns}
+          fill
           empty={
             athletes.length === 0 ? (
               <>
@@ -197,6 +199,6 @@ export default function Availability() {
           <Grid size={{ xs: 12 }}><TextField fullWidth type="date" label="Očekávaný návrat" value={form.expectedReturnDate} onChange={e => update('expectedReturnDate', e.target.value)} slotProps={{ inputLabel: { shrink: true } }} /></Grid>
         </Grid>
       </FormDialog>
-    </Box>
+    </FitPage>
   );
 }

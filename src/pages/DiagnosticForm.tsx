@@ -250,7 +250,7 @@ export default function DiagnosticForm() {
       ['Svalová hmota', `${result.muscleMassKg} kg`],
     ];
     return (
-      <Box sx={{ maxWidth: 1000, mx: 'auto' }}>
+      <Box sx={{ maxWidth: 1280, width: '100%', mx: 'auto' }}>
         <PageHeader
           title="Výsledky"
           subtitle="Diagnostika a měření · uložená relace"
@@ -319,7 +319,7 @@ export default function DiagnosticForm() {
   if (mode === 'manual') {
     const urlPatient = new URLSearchParams(window.location.search).get('patientId') ?? undefined;
     return (
-      <Box sx={{ maxWidth: 900, mx: 'auto' }}>
+      <Box sx={{ maxWidth: 1280, width: '100%', mx: 'auto' }}>
         <PageHeader
           title="Výsledky"
           subtitle="Diagnostika a měření · ruční zápis naměřených hodnot"
@@ -336,7 +336,7 @@ export default function DiagnosticForm() {
 
   /* ── Wizard View ── */
   return (
-    <Box sx={{ maxWidth: 900, mx: 'auto' }}>
+    <Box sx={{ maxWidth: 1280, width: '100%', mx: 'auto' }}>
       <PageHeader
         title="Výsledky"
         subtitle={`Diagnostika a měření · krok ${activeStep + 1} ze ${steps.length} — ${steps[activeStep].label}`}
@@ -375,6 +375,7 @@ export default function DiagnosticForm() {
             <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2.5 }}>
               Zadejte naměřené hodnoty. Štítek pod polem říká, do jakého rozsahu hodnota spadá.
             </Typography>
+            <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', alignItems: 'start' }}>
             <MetricField label="Klidová srdeční frekvence" value={form.vitals.restingHeartRateBpm}
               onChange={v => updateVital('restingHeartRateBpm', v)} min={30} max={150} unit="bpm"
               zones={[
@@ -405,6 +406,7 @@ export default function DiagnosticForm() {
                 { from: 40, to: 55, tone: 'green', label: 'Dobré — zdravá kondice' },
                 { from: 55, to: 80, tone: 'blue', label: 'Výborné — sportovní úroveň' },
               ]} />
+            </Box>
           </Box>
         )}
 
@@ -415,6 +417,7 @@ export default function DiagnosticForm() {
             <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2.5 }}>
               Zadejte krevní tlak a metriky složení těla.
             </Typography>
+            <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', alignItems: 'start' }}>
             <MetricField label="Systolický krevní tlak" value={form.vitals.systolicBloodPressure}
               onChange={v => updateVital('systolicBloodPressure', v)} min={60} max={200} unit="mmHg"
               zones={[
@@ -446,6 +449,7 @@ export default function DiagnosticForm() {
                 { from: 25, to: 50, tone: 'green', label: 'Průměrná — zdravý rozsah' },
                 { from: 50, to: 80, tone: 'blue', label: 'Nad průměrem — sportovní postava' },
               ]} />
+            </Box>
           </Box>
         )}
 

@@ -75,9 +75,12 @@ describe('contextual sidebar (1440)', () => {
     expect(within(nav).getByRole('link', { name: 'Přehled klubů' })).not.toHaveAttribute('aria-current');
   });
 
-  it('lights the club overview on a club page', () => {
+  it('the club screen is a planner route: no sidebar - the Menu drawer lights the club overview', async () => {
     renderShell('/clubs/some-club-id', VIEWPORTS.desktop);
-    expect(within(mainNav()).getByRole('link', { name: 'Přehled klubů' })).toHaveAttribute('aria-current', 'page');
+    expect(document.querySelector('[data-shell="sidebar"]')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Menu' });
+    expect(within(drawer).getByRole('link', { name: 'Přehled klubů' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('Pacienti: overview, new patient, registration check', () => {

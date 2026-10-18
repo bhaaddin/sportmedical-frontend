@@ -5,6 +5,7 @@
    latest failed operations from the audit log. A section whose
    call failed says so instead of showing anything in its place.
    ══════════════════════════════════════════════════════════════ */
+import { StackTable } from "../components/ui/StackTable";
 import { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Grid, Card, CardContent, Table, TableBody, TableCell,
@@ -175,7 +176,7 @@ export default function SystemHealth() {
             {sessionsFailed ? (
               <Alert severity="error" action={<Button color="inherit" size="small" startIcon={<Refresh />} onClick={() => { void handleRefresh(); }} sx={{ minHeight: 44 }}>Zkusit znovu</Button>}>Aktivní relace se nepodařilo načíst.</Alert>
             ) : (
-              <TableContainer>
+              <StackTable>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
@@ -211,7 +212,7 @@ export default function SystemHealth() {
                     )}
                   </TableBody>
                 </Table>
-              </TableContainer>
+              </StackTable>
             )}
           </CardContent>
         </Card>
@@ -228,7 +229,7 @@ export default function SystemHealth() {
             {errorsFailed ? (
               <Alert severity="error" action={<Button color="inherit" size="small" startIcon={<Refresh />} onClick={() => { void handleRefresh(); }} sx={{ minHeight: 44 }}>Zkusit znovu</Button>}>Poslední chyby se nepodařilo načíst.</Alert>
             ) : (
-              <TableContainer>
+              <StackTable>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
@@ -259,7 +260,7 @@ export default function SystemHealth() {
                     )}
                   </TableBody>
                 </Table>
-              </TableContainer>
+              </StackTable>
             )}
           </CardContent>
         </Card>

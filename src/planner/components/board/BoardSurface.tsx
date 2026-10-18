@@ -45,6 +45,7 @@ import { plannerKeys } from '../../data/PlannerDataSource';
 import { usePlannerData } from '../../data/PlannerDataProvider';
 import { usePlannerActions, usePlannerSelector } from '../../state/PlannerStoreProvider';
 import { PlanningBoardLayer } from '../PlanningBoardLayer';
+import { DESIGN_TIMELINE_HEIGHT, useBoardMetrics } from '../PlannerMetrics';
 import { usePlannerCtx, usePlannerModelState } from '../context';
 import { DayList, MonthMatrix } from './AlternateView';
 import { BookingCard, SessionCard, WindowBlock } from './BoardCards';
@@ -67,6 +68,7 @@ import { useBoardMove, type BoardNotice } from './useBoardMove';
 import { useBoardNow } from './useBoardNow';
 import { useBoardSelection, type BoardSelection } from './useBoardSelection';
 import { useNextFree } from './useNextFree';
+import { useClubPlanner } from '../../club/ClubPlannerContext';
 import { useSafeNavigate } from './useSafeNavigate';
 import './board.css';
 
@@ -132,15 +134,15 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     return spans;
   }, [standardLayout, calendar, weekStart]);
   const drawnWindow = useMemo(() => widenWindow(ctx.window, outside), [ctx.window, outside]);
+  /* The fluid stage: the 12 hours of the planning window are drawn in the height the board really has (measured, design
+     px), so extra height gives taller rows and extra width wider day columns (`PlannerMetrics`). Until it is measured
+     (jsdom, the first frame) the file's numbers: 455 px, 629 px in the standard layout. */
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const metrics = useBoardMetrics(bodyRef);
+  const baseTimeline = metrics.measured ? metrics.height : standardLayout ? STANDARD_TIMELINE_HEIGHT : DESIGN_TIMELINE_HEIGHT;
   const geometry = useMemo(
-    () =>
-      boardGeometry(
-        drawnWindow,
-        settings.zoom,
-        standardLayout ? STANDARD_TIMELINE_HEIGHT : undefined,
-        ctx.window.endMinutes - ctx.window.startMinutes,
-      ),
-    [drawnWindow, ctx.window, settings.zoom, standardLayout],
+    () => boardGeometry(drawnWindow, settings.zoom, baseTimeline, ctx.window.endMinutes - ctx.window.startMinutes),
+    [drawnWindow, ctx.window, settings.zoom, baseTimeline],
   );
   /* Club planning's layer listens to every press on an empty board (and says "Nejprve vyberte činnost" when nothing is
      armed). Standard ordering without an order has nothing to arm, so there the board's presses are the desk's own. */
@@ -156,7 +158,6 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const days = head.days.map((d) => d.date);
 
   const boardRef = useRef<HTMLDivElement | null>(null);
-  const bodyRef = useRef<HTMLDivElement | null>(null);
   const [notice, setNotice] = useState<BoardNotice | null>(null);
   const noticeTimer = useRef<number | undefined>(undefined);
   const showNotice = useCallback((next: BoardNotice) => {
@@ -220,11 +221,12 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
               catalogue: calendar.catalogue,
               mayBook: calendar.mayBook,
               excludeClubId: config.excludeClubId,
+              ...(config.excludeClubBlockIds ? { excludeClubBlockIds: config.excludeClubBlockIds } : {}),
             }
           : null,
         nowMinute,
       }),
-    [ctx, weekStart, filter, geometry, dayMarks, catalogue, calendar, move.appointments, config.excludeClubId, nowMinute],
+    [ctx, weekStart, filter, geometry, dayMarks, catalogue, calendar, move.appointments, config.excludeClubId, config.excludeClubBlockIds, nowMinute],
   );
 
   /* ---- marking free time ---- */
@@ -435,7 +437,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const lunch = catalogue?.dayMarkColors.lunch ?? '#CBD1D8';
   const nowColor = calendar?.display.nowLineColor ?? CALENDAR_DISPLAY_OFFLINE.nowLineColor;
   const stepPx = stepLineHeight(geometry, resolution.step);
-  const tall = geometry.height > 456;
+  const tall = geometry.height > baseTimeline + 1;
   const labels = hourLabels(geometry);
   const visibleCards = model.cards;
 
@@ -463,8 +465,10 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     [ctx, calendarMonth, filter, calendar, move.appointments, dayMarks],
   );
 
+  /* On a club's own screen "Klub" is the order switcher's "Nová objednávka klubu"; the toolbar keeps room for the heading. */
+  const onClubScreen = useClubPlanner() !== null;
   const entry = calendar && calendar.mayBook
-    ? { onNewBooking: () => void bookNextFree(), ...(nav.available ? { onClubOrder: () => setEntryOpen(true) } : {}) }
+    ? { onNewBooking: () => void bookNextFree(), ...(nav.available && !onClubScreen ? { onClubOrder: () => setEntryOpen(true) } : {}) }
     : null;
 
   /* The empty day's button: a booking in the real calendar, the file's "Vytvořit termín" otherwise. */

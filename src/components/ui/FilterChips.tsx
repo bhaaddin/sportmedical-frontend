@@ -36,6 +36,7 @@ export function FilterChips<K extends string>({
               borderRadius: 999,
               px: 1.75,
               minHeight: 36,
+              '@media (max-width: 1279.95px)': { minHeight: 44, minWidth: 44 },
               fontSize: 13,
               fontWeight: 600,
               border: '1px solid',

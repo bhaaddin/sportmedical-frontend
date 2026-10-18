@@ -72,7 +72,7 @@ export default function InBodyPage() {
 
       <PageSection title="inbody.precise.title" tone="warm">
         <InfoCards prefix="inbody.precise" count={INBODY_PRECISE.cards.length} minWidth={280} numbered />
-        <MediaSlot slotKey="inbody.precise.photo" sizes="(max-width: 1279px) 100vw, 1200px" sx={{ borderRadius: '16px', aspectRatio: '16 / 7', minHeight: 0 }} />
+        <MediaSlot slotKey="inbody.precise.photo" sizes="(max-width: 1279px) 100vw, min(70vw, 1700px)" sx={{ borderRadius: '16px', aspectRatio: '16 / 7', minHeight: 0 }} />
       </PageSection>
 
       <PageSection title="inbody.price.title">

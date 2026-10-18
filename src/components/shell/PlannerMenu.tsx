@@ -9,6 +9,9 @@
  * portalled into the where-am-I row's slot (SidebarSlot.tsx), and the page's left margin that the sidebar/rail used to
  * claim is given back here.
  *
+ * On a club's own screen (`/clubs/:clubId`) a second button of the same tokens, "Zpět na kluby", stands next to Menu and
+ * leads to the clubs list (the list keeps the normal shell with its sidebar).
+ *
  * Button tokens are copied from the prototype's `#club-edit-link` (the secondary header button in
  * `design/planner-v65.html`): 32px, radius 7px, 1px #32b5c7c9, gradient 105deg #063649 -> #072a3d, ink #ddffff,
  * 700 12.3px, icon 15px #6af8f0; hover border #74fff4, gradient #07576b -> #074154, glow 0 0 12px #04ebdd36.
@@ -16,28 +19,16 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button, GlobalStyles } from '@mui/material';
-import { Menu as MenuIcon } from '@mui/icons-material';
+import type { Theme } from '@mui/material/styles';
+import { ArrowBack, Menu as MenuIcon } from '@mui/icons-material';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { NewOrderChooser } from '../booking/NewOrderChooser';
 import { NavDrawer } from './Sidebar';
+import { clubIdOfRoute } from './plannerRoutes';
 import { usePlannerMenuEl } from './SidebarSlot';
 import type { ShellNav } from './shellTypes';
 
-export function PlannerMenu({ nav }: { nav: ShellNav }) {
-  const [open, setOpen] = useState(false);
-  const [chooser, setChooser] = useState(false);
-  const slot = usePlannerMenuEl();
-
-  const button = (
-    <Button
-      variant="outlined"
-      size="small"
-      data-testid="planner-menu-button"
-      aria-label="Menu"
-      aria-haspopup="dialog"
-      aria-expanded={open}
-      startIcon={<MenuIcon sx={{ fontSize: '15px !important' }} />}
-      onClick={() => setOpen(true)}
-      sx={(t) => ({
+const buttonSx = (t: Theme) => ({
         mr: 1.5,
         minWidth: 0,
         height: 32,
@@ -54,7 +45,26 @@ export function PlannerMenu({ nav }: { nav: ShellNav }) {
         ...(t.palette.mode === 'dark'
           ? { '& .MuiButton-startIcon svg': { color: '#6AF8F0' } }
           : {}),
-      })}
+});
+
+export function PlannerMenu({ nav }: { nav: ShellNav }) {
+  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const onClubScreen = clubIdOfRoute(useLocation().pathname) !== null;
+  const [chooser, setChooser] = useState(false);
+  const slot = usePlannerMenuEl();
+
+  const button = (
+    <Button
+      variant="outlined"
+      size="small"
+      data-testid="planner-menu-button"
+      aria-label="Menu"
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      startIcon={<MenuIcon sx={{ fontSize: '15px !important' }} />}
+      onClick={() => setOpen(true)}
+      sx={buttonSx}
     >
       Menu
     </Button>
@@ -64,7 +74,24 @@ export function PlannerMenu({ nav }: { nav: ShellNav }) {
     <>
       {/* The sidebar's / rail's margin is the page's no more: the stage gets the whole width. */}
       <GlobalStyles styles={{ 'main#main-content': { marginLeft: 0 } }} />
-      {slot !== null ? createPortal(button, slot) : null}
+      {slot !== null ? createPortal(
+        <>
+          {button}
+          {onClubScreen ? (
+            <Button
+              variant="outlined"
+              size="small"
+              data-testid="club-back-button"
+              startIcon={<ArrowBack sx={{ fontSize: '15px !important' }} />}
+              onClick={() => navigate('/clubs')}
+              sx={buttonSx}
+            >
+              Zpět na kluby
+            </Button>
+          ) : null}
+        </>,
+        slot,
+      ) : null}
       <NavDrawer nav={nav} open={open} onClose={() => setOpen(false)} onNewOrder={() => setChooser(true)} />
       <NewOrderChooser open={chooser} onClose={() => setChooser(false)} />
     </>

@@ -33,6 +33,7 @@ import { usePermission } from '../auth/usePermission';
 import { SENSITIVE_IDENTITY, shownFields, usePatientFields } from '../api/displaySettings';
 import { FilterChips, PageHeader, StatusChip } from '../components/ui';
 import type { FilterOption } from '../components/ui';
+import { FitPage } from '../components/ui/fit';
 import { ResponsiveDataList } from '../components/ui/ResponsiveDataList';
 import type { DataColumn } from '../components/ui/ResponsiveDataList';
 import { PinnedActionBar } from '../components/ui/PinnedActionBar';
@@ -207,7 +208,7 @@ export default function PatientList() {
         to={`/patients/${p.id}`}
         underline="hover"
         onClick={(e) => e.stopPropagation()}
-        sx={{ fontWeight: 600, color: 'primary.main' }}
+        sx={{ fontWeight: 600, color: 'primary.main', '@media (max-width: 1279.95px)': { display: 'inline-flex', alignItems: 'center', minHeight: 44 } }}
       >
         {p.firstName} {p.lastName}
       </Link>
@@ -267,7 +268,7 @@ export default function PatientList() {
   );
 
   return (
-    <Box>
+    <FitPage>
       <PageHeader
         title="Pacienti"
         subtitle={query === '' ? `Kartotéka kliniky · ${total} záznamů` : `Nalezeno: ${total}`}
@@ -317,12 +318,13 @@ export default function PatientList() {
         onRowClick={(p) => navigate(`/patients/${p.id}`)}
         empty={emptyText}
         ariaLabel="Pacienti"
+        fill
       />
 
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
         spacing={1}
-        sx={{ mt: 2, alignItems: { sm: 'center' }, justifyContent: 'space-between' }}
+        sx={{ mt: 2, alignItems: { sm: 'center' }, justifyContent: 'space-between', flexShrink: 0 }}
       >
         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           {`Zobrazeno ${visible.length} z ${total} pacientů`}
@@ -350,6 +352,6 @@ export default function PatientList() {
           </Button>
         </PinnedActionBar>
       )}
-    </Box>
+    </FitPage>
   );
 }

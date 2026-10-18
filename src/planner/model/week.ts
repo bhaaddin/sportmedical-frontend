@@ -23,7 +23,10 @@ import {
 } from './time';
 import type { CategoryId, IsoDate, PlannerContext, PlannerSession } from './types';
 
-/** Height in px of the 12 hour timeline at design scale (`TIMELINE_HEIGHT`). */
+/**
+ * Height in px of the 12 hour timeline at design scale (`TIMELINE_HEIGHT`). The functions below take the MEASURED
+ * timeline height as an optional last argument (the fluid stage, `PlannerMetrics`); it defaults to this, the file's.
+ */
 export const TIMELINE_HEIGHT = 455;
 
 export const isInWeek = (weekStart: IsoDate, date: IsoDate): boolean =>
@@ -37,14 +40,18 @@ export interface WeekHeadModel {
 }
 
 /** Heading, seven day titles and hour labels ("7:00" … "18:00"). */
-export function weekHeadModel(weekStart: IsoDate, window = { startMinutes: 420, endMinutes: 1140 }): WeekHeadModel {
+export function weekHeadModel(
+  weekStart: IsoDate,
+  window = { startMinutes: 420, endMinutes: 1140 },
+  timelineHeight = TIMELINE_HEIGHT,
+): WeekHeadModel {
   const first = dateOf(weekStart);
   const startH = window.startMinutes / 60;
   const endH = window.endMinutes / 60;
   const span = endH - startH;
   const hours: WeekHeadModel['hours'] = [];
   for (let h = startH; h < endH; h++) {
-    hours.push({ label: `${h}:00`, top: ((h - startH) * TIMELINE_HEIGHT) / span + 11 });
+    hours.push({ label: `${h}:00`, top: ((h - startH) * timelineHeight) / span + 11 });
   }
   return {
     range: weekRangeLabel(weekStart),
@@ -83,6 +90,7 @@ export function weekEventsModel(
   ctx: PlannerContext,
   weekStart: IsoDate,
   filter: CategoryId | 'all',
+  timelineHeight = TIMELINE_HEIGHT,
 ): WeekEventModel[] {
   const ordered = orderCategoryIds(ctx);
   const startH = ctx.window.startMinutes / 60;
@@ -100,13 +108,13 @@ export function weekEventsModel(
     if (col < 0 || col > 6) continue;
     const start = startHour(e.start);
     const end = startHour(e.end);
-    const height = Math.max(25, ((end - start) * TIMELINE_HEIGHT) / span);
+    const height = Math.max(25, ((end - start) * timelineHeight) / span);
     const c = categoryOrFallback(ctx, e.categoryId);
     out.push({
       id: e.id,
       categoryId: e.categoryId,
       col,
-      top: ((start - startH) * TIMELINE_HEIGHT) / span,
+      top: ((start - startH) * timelineHeight) / span,
       height,
       compact: height < 52,
       left: `calc(${col} * 100% / 7 + 3px)`,

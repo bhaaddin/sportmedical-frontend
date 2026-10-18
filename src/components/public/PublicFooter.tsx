@@ -15,7 +15,7 @@ import { resolveSlot } from '../../api/siteContent';
 import type { SiteContent } from '../../api/siteContent';
 import { DEFAULT_SITE_CONTENT } from '../../site/defaults';
 import { SiteLink } from '../../web/SiteLink';
-import { FONT_HEAD, GUTTER, MAX_WIDTH, MQ, W } from '../../web/tokens';
+import { FONT_HEAD, GUTTER, MQ, SITE_MAX, W, WIDE_GUTTER } from '../../web/tokens';
 import { Lines } from '../../site/SlotText';
 import { mapsHref, telHref } from './brand';
 import { Brand } from './PublicHeader';
@@ -25,7 +25,7 @@ import { LEGAL_LINKS } from '../../site/slots/spolecne';
 
 const colLabel = { fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: W.onInkMuted } as const;
 const linkStyle = {
-  display: 'flex', alignItems: 'center', minHeight: { xs: 44, md: 28 }, color: W.onInk, fontSize: 15, textDecoration: 'none',
+  display: 'flex', alignItems: 'center', minHeight: 44, color: W.onInk, fontSize: 15, textDecoration: 'none',
   '&:hover': { color: W.white, textDecoration: 'underline' },
 } as const;
 
@@ -44,7 +44,7 @@ export function PublicFooter({ clinic, content = DEFAULT_SITE_CONTENT }: { clini
 
   return (
     <Box component="footer" sx={{ bgcolor: W.ink, color: W.onInk, mt: 'auto', px: GUTTER, pt: { xs: '44px', md: '60px' }, pb: { xs: '32px', md: '36px' } }}>
-      <Box sx={{ maxWidth: MAX_WIDTH, mx: 'auto' }}>
+      <Box sx={{ maxWidth: SITE_MAX, mx: 'auto' }}>
         <Box
           sx={{
             display: 'grid', gap: { xs: '36px', md: '46px' }, gridTemplateColumns: '1fr',
@@ -59,7 +59,7 @@ export function PublicFooter({ clinic, content = DEFAULT_SITE_CONTENT }: { clini
               href={mapsHref(addressForMaps)}
               target="_blank"
               rel="noopener noreferrer"
-              sx={{ fontSize: 15, lineHeight: 1.7, color: W.onInk, textDecoration: 'none', '&:hover': { color: W.white } }}
+              sx={{ display: 'flex', alignItems: 'center', minHeight: 44, fontSize: 15, lineHeight: 1.7, color: W.onInk, textDecoration: 'none', '&:hover': { color: W.white } }}
             >
               {address !== '' ? address : <Lines text={slot('site.footer.address')} />}
             </Box>
@@ -127,6 +127,47 @@ export function PublicFooter({ clinic, content = DEFAULT_SITE_CONTENT }: { clini
             </Box>
             <span suppressHydrationWarning>© {new Date().getFullYear()} {SITE.legalName}</span>
           </Box>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * The slim footer of the application's public pages from an iPad in portrait up (a page that fits one screen has no room for
+ * the full one): the legal links, the telephone and the e-mail on one bar. Below that the full footer closes the page's
+ * scrolling region instead (PublicLayout / kit's FitContext). Same slots and settings as the full footer.
+ */
+export function PublicFooterBar({ clinic, content = DEFAULT_SITE_CONTENT }: { clinic: PublicClinic | null; content?: SiteContent }) {
+  const slot = (key: string) => resolveSlot(content, key).text;
+  const phone = clinic?.phone.trim() || slot('site.footer.phone');
+  const email = clinic?.email.trim() || slot('site.footer.email');
+  const link = {
+    display: 'inline-flex', alignItems: 'center', minHeight: 44, fontSize: 13, color: W.onInkMuted, textDecoration: 'none',
+    '&:hover': { color: W.white, textDecoration: 'underline' },
+  } as const;
+  return (
+    <Box
+      component="footer"
+      data-testid="footer-bar"
+      sx={{
+        flex: '0 0 auto', bgcolor: W.ink, color: W.onInk, borderTop: `1px solid ${W.inkLine}`,
+        ...WIDE_GUTTER,
+      }}
+    >
+      <Box sx={{ mx: 'auto', maxWidth: 'none', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0 24px', minHeight: 52 }}>
+        <Box component="nav" aria-label="Právní informace" sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0 20px' }}>
+          <Box component="span" suppressHydrationWarning sx={{ fontSize: 13, color: W.onInkMuted, display: { xs: 'none', xl: 'inline' } }}>
+            © {new Date().getFullYear()} {SITE.legalName}
+          </Box>
+          {LEGAL_LINKS.map((item) => (
+            <Box key={item.to} component={SiteLink} to={item.to} sx={link}>{slot(item.key)}</Box>
+          ))}
+          <Box component={SiteLink} to={LOGIN_PATH} sx={link}>Pro personál</Box>
+        </Box>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0 22px' }}>
+          <Box component="a" href={telHref(phone)} sx={{ ...link, color: W.white, fontWeight: 600 }}>{phone}</Box>
+          <Box component="a" href={`mailto:${email}`} sx={{ ...link, color: W.white }}>{email}</Box>
         </Box>
       </Box>
     </Box>

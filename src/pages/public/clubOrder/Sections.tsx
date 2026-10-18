@@ -252,6 +252,8 @@ export function DaysSection({
     <Panel labelledBy="co-days">
       <PanelTitle id="co-days">{n}. {texts.title}</PanelTitle>
       <Typography sx={{ fontSize: 14.5, color: SOFT_TEXT }}>{texts.hint}</Typography>
+      {/* On a narrow phone the seven day buttons are 39 px wide; a few px of the panel's padding go to them and each is a full 44 px target. */}
+      <Box sx={{ mx: { xs: '-8px', sm: 0 }, '& button': { minWidth: 44 } }}>
       <DayCalendar
         selected={selected}
         onToggle={onToggle}
@@ -262,6 +264,7 @@ export function DaysSection({
         testId="club-days-calendar"
         label="Nabízené dny"
       />
+      </Box>
       <Typography sx={{ fontSize: 15, fontWeight: 600 }} data-testid="club-days-count" aria-live="polite">
         {texts.count.replace('{n}', String(selected.length))}
       </Typography>

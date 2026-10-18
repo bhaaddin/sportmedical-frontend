@@ -8,7 +8,7 @@ import { useSiteContent } from '../../api/siteContent';
 import type { SitePartner } from '../../api/siteContent';
 import { SlotText } from '../../site/SlotText';
 import { cloudinaryWidth } from '../../site/cloudinary';
-import { GUTTER, MAX_WIDTH, MQ, W } from '../tokens';
+import { GUTTER, MQ, SITE_MAX, W } from '../tokens';
 
 const jede = keyframes`
   from { transform: translateX(0) }
@@ -57,7 +57,7 @@ export function PartnerMarquee() {
 
   return (
     <Box component="section" aria-label="Partneři" sx={{ bgcolor: W.warm, pt: { xs: '40px', md: '56px' }, pb: { xs: '44px', md: '60px' }, overflow: 'hidden' }}>
-      <Box sx={{ maxWidth: MAX_WIDTH, mx: 'auto', px: GUTTER, mb: '28px' }}>
+      <Box sx={{ maxWidth: SITE_MAX, mx: 'auto', px: GUTTER, mb: '28px' }}>
         <SlotText slotKey="landing.partners.eyebrow" sx={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: W.muted }} />
       </Box>
       <Box sx={{ [MQ.reduceMotion]: { overflowX: 'auto', px: GUTTER } }}>

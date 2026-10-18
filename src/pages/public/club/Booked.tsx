@@ -34,7 +34,7 @@ export function Booked({
     ? `${capitalise(clinicDate(booked.date))} v ${hhmm(booked.startLocal)}${booked.endLocal !== null ? `–${hhmm(booked.endLocal)}` : ''}`
     : capitalise(longWhen(booked.startUtc));
   return (
-    <Panel sx={{ alignItems: 'center', textAlign: 'center', py: 5 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25, alignItems: 'center', textAlign: 'center', py: 3 }}>
       <CheckCircleOutlined sx={{ fontSize: 56, color: BRAND.accent }} aria-hidden />
       <Typography component="h1" sx={{ m: 0, fontFamily: ARCHIVO, fontWeight: 800, fontSize: 30, letterSpacing: '-0.03em' }}>{title}</Typography>
       <Typography data-testid="booked-when" sx={{ fontFamily: ARCHIVO, fontWeight: 700, fontSize: 20 }}>{when}</Typography>
@@ -57,6 +57,6 @@ export function Booked({
       {onAdd !== null && (
         <Button variant="contained" onClick={onAdd} sx={ctaSx(50)}>{addLabel}</Button>
       )}
-    </Panel>
+    </Box>
   );
 }

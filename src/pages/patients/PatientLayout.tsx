@@ -35,6 +35,7 @@ import type { PhoneInspection } from '../../api/patientRegistry';
 import { HOME_REGION, storedNumberDisplay } from '../../services/patientRegistration/phoneDisplay';
 import ConsentLine from '../../components/patients/ConsentLine';
 import PortalPasswordReset from '../../components/patients/PortalPasswordReset';
+import { FIT_SCROLL_SX, FitBody, FitPage } from '../../components/ui/fit';
 import { PageHeader, SoftCard, StatusChip } from '../../components/ui';
 import { fetchUpcomingWindow } from '../../components/patients/appointmentsSource';
 import { birthYear, initialsOf, questionnaireMissing } from '../../components/patients/patientActivity';
@@ -140,6 +141,9 @@ function sectionOf(pathname: string, patientId: string): string {
   const found = PATIENT_SECTIONS.find((s) => s.path === rest);
   return found?.id ?? 'prehled';
 }
+
+/** Master / detail from a landscape tablet up. */
+const MASTER_UP = '@media (min-width: 1024px)';
 
 export default function PatientLayout() {
   const { id } = useParams<{ id: string }>();
@@ -263,7 +267,7 @@ export default function PatientLayout() {
   const current = sectionOf(location.pathname, id);
 
   return (
-    <Box>
+    <FitPage>
       <PageHeader
         title={`${patient.firstName} ${patient.lastName}`}
         subtitle="Karta pacienta"
@@ -274,6 +278,20 @@ export default function PatientLayout() {
         )}
       />
 
+      {/*
+        * From 1024 the file is master / detail: who the patient is and what is missing stand in a column of their
+        * own on the left, the sections and the open section fill the rest. Each scrolls by itself; the page never does.
+        * Below 1024 the two stack, the open section scrolling under the tabs.
+        */}
+      <FitBody
+        sx={{
+          display: 'grid',
+          gap: { xs: 0, md: 2.5 },
+          gridTemplateColumns: 'minmax(0, 1fr)',
+          [MASTER_UP]: { gridTemplateColumns: 'clamp(280px, 24vw, 380px) minmax(0, 1fr)', gridTemplateRows: 'minmax(0, 1fr)' },
+        }}
+      >
+      <Box sx={{ minWidth: 0, [MASTER_UP]: { ...FIT_SCROLL_SX, pr: 0.5 } }}>
       {/*
         * Stays on screen whichever section is open: somebody who walked away
         * from the overview should not lose sight of what is missing.
@@ -355,7 +373,7 @@ export default function PatientLayout() {
         <Stack
           direction={{ xs: 'column', md: 'row' }}
           spacing={2}
-          sx={{ alignItems: { xs: 'flex-start', md: 'center' } }}
+          sx={{ alignItems: { xs: 'flex-start', md: 'center' }, [MASTER_UP]: { flexDirection: 'column', alignItems: 'stretch', '& > * + *': { marginLeft: '0 !important', marginTop: '16px !important' } } }}
         >
           <Stack direction="row" spacing={2} sx={{ alignItems: 'center', minWidth: 0, flex: 1 }}>
             <Avatar sx={{ width: 56, height: 56, fontSize: 18 }}>{initialsOf(patient)}</Avatar>
@@ -401,12 +419,14 @@ export default function PatientLayout() {
         </Box>
       </SoftCard>
 
+      </Box>
+      <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* The same sections the sidebar lists, as the board's tab row. Inside
           somebody's file the navigation is theirs, and the two agree because
           both read `PATIENT_SECTIONS`. */}
       <Tabs
         value={tabs.some((t) => t.value === current) ? current : false}
-        sx={{ mb: 2.5, borderBottom: 1, borderColor: 'divider', '& .MuiTab-root': { minHeight: 44 } }}
+        sx={{ mb: 2.5, borderBottom: 1, borderColor: 'divider', flexShrink: 0, '& .MuiTab-root': { minHeight: 44 } }}
         variant="scrollable"
         scrollButtons="auto"
         allowScrollButtonsMobile
@@ -416,7 +436,11 @@ export default function PatientLayout() {
         ))}
       </Tabs>
 
-      <Outlet context={context} />
+      <Box sx={[{ minWidth: 0 }, ...(phone ? [] : [{ flex: '1 1 0', ...FIT_SCROLL_SX, pr: 0.5 }])]}>
+        <Outlet context={context} />
+      </Box>
+      </Box>
+      </FitBody>
 
       {phone && (
         <PinnedActionBar label="Objednat termín">
@@ -428,6 +452,6 @@ export default function PatientLayout() {
             </Button>
         </PinnedActionBar>
       )}
-    </Box>
+    </FitPage>
   );
 }

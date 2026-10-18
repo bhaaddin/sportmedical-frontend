@@ -53,7 +53,7 @@ function Section({ page, section }: { page: string; section: DetailSection }) {
       <PageSection title={`${prefix}.title`} lead={section.lead !== undefined ? `${prefix}.lead` : undefined} tone={tone}>
         <InfoCards prefix={prefix} count={section.cards.length} more={section.cards.some((card) => card.more !== undefined)} numbered={section.numbered} minWidth={280} />
         {section.photo !== undefined && (
-          <MediaSlot slotKey={`${prefix}.photo`} sizes="(max-width: 1279px) 100vw, 1200px" sx={{ borderRadius: '16px', aspectRatio: '16 / 7', minHeight: 0 }} />
+          <MediaSlot slotKey={`${prefix}.photo`} sizes="(max-width: 1279px) 100vw, min(70vw, 1700px)" sx={{ borderRadius: '16px', aspectRatio: '16 / 7', minHeight: 0 }} />
         )}
       </PageSection>
     );

@@ -42,7 +42,7 @@ import { downloadIcs } from './club/ics';
 import type { SlotsStatus } from './club/SlotPicker';
 import { ARCHIVO, BRAND, clinicDate, clinicTime, telHref } from '../../components/public/brand';
 import {
-  FieldLabel, LABEL_COLOR, LoadError, ON_ORANGE, Panel, PanelTitle, PinnedBar, PublicMain, ctaSx, ghostSx, longWhen,
+  ColumnGroup, FieldLabel, LABEL_COLOR, LoadError, NoticeScreen, ON_ORANGE, PaneColumn, Panel, PanelTitle, PinnedBar, PublicMain, ctaSx, ghostSx, longWhen,
 } from '../../components/public/kit';
 import { PhoneField } from '../../components/ui/PhoneField';
 import { LANDING_PATH } from '../../components/public/PublicHeader';
@@ -109,8 +109,8 @@ function Hero({ offer }: { offer: ClubOffer }) {
   const activities = offer.activities.map((a) => a.activityName).join(' · ');
 
   return (
-    <Box sx={{ bgcolor: BRAND.ink, color: '#FFFFFF', px: { xs: 2, md: 4, lg: '44px' }, py: { xs: 4, md: 5 } }}>
-      <Box sx={{ maxWidth: 880, mx: 'auto', display: 'flex', flexWrap: 'wrap', gap: 3.5, alignItems: 'center', justifyContent: 'space-between' }}>
+    <Box sx={{ flex: '0 0 auto', bgcolor: BRAND.ink, color: '#FFFFFF', pl: { xs: 'max(16px, env(safe-area-inset-left))', md: 4, lg: '44px' }, pr: { xs: 'max(16px, env(safe-area-inset-right))', md: 4, lg: '44px' }, py: { xs: 4, md: '20px' } }}>
+      <Box sx={{ mx: 'auto', display: 'flex', flexWrap: 'wrap', gap: 3.5, alignItems: 'center', justifyContent: 'space-between' }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, minWidth: 0, flex: '1 1 320px' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
             <Box aria-hidden="true" data-testid="club-colour" sx={{ width: 12, height: 12, borderRadius: '3px', bgcolor: colour, flex: '0 0 12px' }} />
@@ -359,17 +359,17 @@ export default function ClubRegistration() {
     }, 'termin-prohlidky.ics');
   };
 
+  /* A notice (dead link, loading, confirmed, full): the hero when there is one, then one pane that fills the region. */
   const frame = (children: ReactNode, hero?: ReactNode) => (
     <PublicLayout clinic={clinic}>
-      {hero}
-      <PublicMain maxWidth={880}>{children}</PublicMain>
+      <NoticeScreen band={hero} maxWidth={720}>{children}</NoticeScreen>
     </PublicLayout>
   );
 
   /* ── Dead / failed / loading ── */
   if (dead) {
     return frame(
-      <Panel>
+      <>
         <PanelTitle>Odkaz neplatí</PanelTitle>
         <Typography role="status" sx={{ fontSize: 16, color: '#5C6067', lineHeight: 1.6 }}>
           Tento odkaz už není platný nebo vypršel. Ozvěte se prosím svému klubu.
@@ -378,7 +378,7 @@ export default function ClubRegistration() {
           <Button variant="contained" href={LANDING_PATH} sx={ctaSx(50)}>Objednat se samostatně</Button>
           {phoneOfClinic !== '' && <Button variant="outlined" href={telHref(phoneOfClinic)} sx={ghostSx(50)}>Zavolat {phoneOfClinic}</Button>}
         </Box>
-      </Panel>,
+      </>,
     );
   }
 
@@ -390,7 +390,7 @@ export default function ClubRegistration() {
 
   if (offer === null) {
     return frame(
-      <Box role="status" sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+      <Box role="status" sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
         <CircularProgress sx={{ color: BRAND.accent }} aria-label="Načítáme registraci" />
       </Box>,
     );
@@ -431,12 +431,12 @@ export default function ClubRegistration() {
     offer.activities.length > 0 && offer.activities.every((a) => activityRemaining(a, offer.remaining) <= 0);
   if (expired || offer.remaining <= 0 || everyActivityFull) {
     return frame(
-      <Panel>
+      <>
         <PanelTitle>{expired ? 'Odkaz vypršel' : 'Všechna místa jsou obsazená'}</PanelTitle>
         <Typography role="status" sx={{ fontSize: 16, color: '#5C6067', lineHeight: 1.6 }}>
           {expired ? txt['formulare.club.closed'] : txt['formulare.club.full']}
         </Typography>
-      </Panel>,
+      </>,
       <Hero offer={offer} />,
     );
   }
@@ -599,56 +599,81 @@ export default function ClubRegistration() {
       </Panel>
   );
 
-  return frame(
-    <>
-      {info !== null && <InfoPanel info={info} activities={offer.activities} t={txt} device={device} cal={cal} />}
-      {chooseActivity && (
-        <Panel labelledBy="club-step-activity">
-          <PanelTitle id="club-step-activity">1 · Vyberte činnost</PanelTitle>
-          <ActivityCards
-            activities={offer.activities}
-            blockRemaining={offer.remaining}
-            value={activityId}
-            full={fullIds}
-            onPick={(id) => { setActivityId(id); setComplaint(null); }}
-            paysClub={paysClub}
-            t={cal}
-          />
-        </Panel>
-      )}
+  /* Three columns on a big screen, two on a tablet in landscape and up: what the club offers and who pays, the details of the
+     athlete, the term. Each scrolls on its own and the confirm bar stays under them; stacked below that. */
+  const hasLeftTop = info !== null || chooseActivity;
+  const leftSecond = infoMode ? detailsPanel : termPanel;
+  const rightPanel = infoMode ? (activityId !== '' ? termPanel : null) : detailsPanel;
 
-{infoMode ? <>{detailsPanel}{activityId !== '' && termPanel}</> : <>{termPanel}{detailsPanel}</>}      {complaint !== null && (
-        <Alert severity="warning" onClose={() => setComplaint(null)} sx={{ borderRadius: 2 }}>
-          {complaint}
-        </Alert>
-      )}
+  return (
+    <PublicLayout clinic={clinic}>
+      <PublicMain
+        maxWidth="none"
+        workspace
+        band={<Hero offer={offer} />}
+        columns={rightPanel !== null ? 'minmax(0, 1fr) minmax(0, 1fr)' : 'minmax(0, 1fr)'}
+        columnsXl={hasLeftTop && rightPanel !== null ? 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr)' : undefined}
+        gap={2.5}
+        foot={(
+          <>
+            {complaint !== null && (
+              <Alert severity="warning" onClose={() => setComplaint(null)} sx={{ borderRadius: 2 }}>
+                {complaint}
+              </Alert>
+            )}
 
-      <PinnedBar label="Potvrdit registraci" card>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.375, minWidth: 0, mr: { sm: 'auto' }, textAlign: { xs: 'center', sm: 'left' } }}>
-          <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>Vybraný termín</Typography>
-          <Typography sx={{ fontFamily: ARCHIVO, fontWeight: 700, fontSize: 18, fontVariantNumeric: 'tabular-nums' }}>
-            {slotUtc !== null
-              ? capitalise(longWhen(slotUtc))
-              : choosesTime ? 'Zatím nevybráno' : 'Přidělíme vám v rezervovaném čase'}
-          </Typography>
-          {/* Etapa 12: the chosen činnost and what it costs, and who pays, right where the athlete confirms. */}
-          {chosenActivity !== undefined && (
-            <Typography data-testid="club-chosen-price" sx={{ fontSize: 14, color: LABEL_COLOR, fontVariantNumeric: 'tabular-nums' }}>
-              {chosenActivity.activityName} · {priceLabel(chosenActivity.unitPriceCzk, paysClub, cal)}
-            </Typography>
+            <PinnedBar label="Potvrdit registraci" card>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.375, minWidth: 0, mr: { sm: 'auto' }, textAlign: { xs: 'center', sm: 'left' } }}>
+                <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>Vybraný termín</Typography>
+                <Typography sx={{ fontFamily: ARCHIVO, fontWeight: 700, fontSize: 18, fontVariantNumeric: 'tabular-nums' }}>
+                  {slotUtc !== null
+                    ? capitalise(longWhen(slotUtc))
+                    : choosesTime ? 'Zatím nevybráno' : 'Přidělíme vám v rezervovaném čase'}
+                </Typography>
+                {/* Etapa 12: the chosen činnost and what it costs, and who pays, right where the athlete confirms. */}
+                {chosenActivity !== undefined && (
+                  <Typography data-testid="club-chosen-price" sx={{ fontSize: 14, color: LABEL_COLOR, fontVariantNumeric: 'tabular-nums' }}>
+                    {chosenActivity.activityName} · {priceLabel(chosenActivity.unitPriceCzk, paysClub, cal)}
+                  </Typography>
+                )}
+              </Box>
+              <Button
+                variant="contained"
+                disabled={!canSubmit}
+                onClick={() => { void submit(); }}
+                startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : undefined}
+                sx={ctaSx(52)}
+              >
+                {submitting ? 'Rezervuji…' : 'Potvrdit registraci'}
+              </Button>
+            </PinnedBar>
+          </>
+        )}
+      >
+        <ColumnGroup>
+          {hasLeftTop && (
+            <PaneColumn nested>
+              {info !== null && <InfoPanel info={info} activities={offer.activities} t={txt} device={device} cal={cal} />}
+              {chooseActivity && (
+                <Panel labelledBy="club-step-activity">
+                  <PanelTitle id="club-step-activity">1 · Vyberte činnost</PanelTitle>
+                  <ActivityCards
+                    activities={offer.activities}
+                    blockRemaining={offer.remaining}
+                    value={activityId}
+                    full={fullIds}
+                    onPick={(id) => { setActivityId(id); setComplaint(null); }}
+                    paysClub={paysClub}
+                    t={cal}
+                  />
+                </Panel>
+              )}
+            </PaneColumn>
           )}
-        </Box>
-        <Button
-          variant="contained"
-          disabled={!canSubmit}
-          onClick={() => { void submit(); }}
-          startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : undefined}
-          sx={ctaSx(52)}
-        >
-          {submitting ? 'Rezervuji…' : 'Potvrdit registraci'}
-        </Button>
-      </PinnedBar>
-    </>,
-    <Hero offer={offer} />,
+          <PaneColumn nested>{leftSecond}</PaneColumn>
+        </ColumnGroup>
+        {rightPanel !== null && <PaneColumn>{rightPanel}</PaneColumn>}
+      </PublicMain>
+    </PublicLayout>
   );
 }

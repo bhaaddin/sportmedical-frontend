@@ -228,7 +228,7 @@ export function TermCalendar({
         )}
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>{t['formulare.club-reg.slots.other']}</Typography>
-          <Button size="small" onClick={onRefresh}>Obnovit termíny</Button>
+          <Button size="small" onClick={onRefresh} sx={{ minHeight: 44 }}>Obnovit termíny</Button>
         </Box>
       </Box>
     </Box>

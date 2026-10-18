@@ -61,7 +61,7 @@ function MapBlock() {
   const label = useSlotText('kontakt.map.cta');
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      <MediaSlot slotKey="kontakt.map.image" sizes="(max-width: 1320px) 100vw, 1320px" sx={{ borderRadius: '16px', minHeight: { xs: 200, md: 260 } }} />
+      <MediaSlot slotKey="kontakt.map.image" sizes="(max-width: 1320px) 100vw, min(76vw, 2240px)" sx={{ borderRadius: '16px', minHeight: { xs: 200, md: 260 } }} />
       <Box
         component="a"
         href={mapyCzHref(contact.addressOneLine)}

@@ -8,7 +8,7 @@
 
 import { Box } from '@mui/material';
 import { BRAND } from '../../../components/public/brand';
-import { GUTTERS } from '../../../components/public/kit';
+import { WIDE_GUTTER } from '../../../web/tokens';
 
 export type PortalView = 'prehled' | 'vysledky';
 
@@ -40,12 +40,12 @@ function Item({ active, onClick, children }: { active?: boolean; onClick: () => 
 
 export default function PortalNav({ view, go, name }: PortalNavProps) {
   return (
-    <Box sx={{ bgcolor: BRAND.paper, borderBottom: `1px solid ${BRAND.line}` }}>
-      <Box sx={{ maxWidth: 1240, mx: 'auto', px: GUTTERS, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+    <Box sx={{ flex: '0 0 auto', bgcolor: BRAND.paper, borderBottom: `1px solid ${BRAND.line}` }}>
+      <Box sx={{ ...WIDE_GUTTER, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
         <Box
           component="nav"
           aria-label="Portál"
-          sx={{ display: 'flex', overflowX: 'auto', mx: { xs: -1, md: 0 }, scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' } }}
+          sx={{ display: 'flex', overflowX: 'auto', ml: '-14px', scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' } }}
         >
           <Item active={view === 'prehled'} onClick={() => go('prehled')}>Přehled</Item>
           <Item active={view === 'vysledky'} onClick={() => go('vysledky')}>Výsledky</Item>

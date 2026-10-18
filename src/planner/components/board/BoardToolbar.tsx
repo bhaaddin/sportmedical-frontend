@@ -2,11 +2,13 @@
  * The board's toolbar - the prototype's `.planner-toolbar`: week arrows and "Dnes", the heading with
  * the week counter, Den / Týden / Měsíc, the činnost filter and the gear. In the real calendar it
  * also carries the clinic's two entry points, "Nová objednávka" and "Klubová objednávka" (the file
- * has no create button of its own; its create action is the board itself).
+ * has no create button of its own; its create action is the board itself). On a club's own screen the same place
+ * holds the club's order switcher (`club/ClubOrderSwitcher`).
  */
 import type { WeekHeadModel, PlannerCategory } from '../../model';
 import type { PlannerView } from '../../state/plannerState';
 import type { BoundPlannerActions } from '../../state/PlannerStoreProvider';
+import { ClubOrderSwitcher } from '../../club/ClubOrderSwitcher';
 import { categoryWithPrice } from '../categoryPrice';
 import { Icon } from '../Icons';
 
@@ -52,6 +54,8 @@ export function BoardToolbar({
         <button className="control today" data-command="today" onClick={() => act.today(today)}>Dnes</button>
       </div>
       <div className="week-heading"><h2 id="week-range">{head.range}</h2><span id="week-number">{head.weekNumber}</span></div>
+      {/* A club's own screen: which of the club's orders the stage shows (nothing on any other route). */}
+      <ClubOrderSwitcher />
       {entry ? (
         <div className="planner-actions" data-testid="board-entry-points">
           <button className="control primary" type="button" data-command="newBooking" onClick={entry.onNewBooking}><Icon name="plus" />Objednávka</button>

@@ -2,7 +2,8 @@
  * The few things club planning does from several places (the carousel's summary card, the command panel,
  * the corner button, the dialogs): arming a činnost, going back to the order, opening the publication.
  */
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
+import { usePlannerMetrics } from '../PlannerMetrics';
 import { usePlannerActions, usePlannerStore } from '../../state/PlannerStoreProvider';
 import type { OrderFigures } from './orderFigures';
 
@@ -27,6 +28,9 @@ export interface PlanActions {
 export function usePlanActions(): PlanActions {
   const act = usePlannerActions();
   const store = usePlannerStore();
+  /* Cards the deck shows at once (2 in the file, more on a wider fluid stage): read when a činnost is armed. */
+  const deckVisibleRef = useRef(2);
+  deckVisibleRef.current = usePlannerMetrics().deckVisible;
   return useMemo<PlanActions>(() => {
     const arm: PlanActions['arm'] = (figures, categoryId, options = {}) => {
       const f = figures.byId.get(categoryId);
@@ -34,7 +38,8 @@ export function usePlanActions(): PlanActions {
       const quantity = figures.list.length;
       const index = figures.list.findIndex((x) => x.categoryId === categoryId);
       const page = store.getState().carousel.index;
-      if (quantity >= 3 && (index < page || index > page + 1)) act.carouselTo(Math.min(index, quantity - 2), quantity);
+      const visible = deckVisibleRef.current;
+      if (quantity > visible && (index < page || index > page + visible - 1)) act.carouselTo(Math.min(index, quantity - visible), quantity, visible);
       act.setExtraArmed(options.extra === true);
       if (store.getState().planning.selectedCategoryId === categoryId) return; // already armed: arming twice would disarm it
       act.selectPlanningCategory(categoryId, options.toast ?? `Aktivní: ${f.name}. Táhněte myší v kalendáři.`);

@@ -102,7 +102,7 @@ function DayTimes({
   return (
     <Box sx={row ? { display: 'flex', flexWrap: 'wrap', gap: '9px' } : { display: 'flex', flexDirection: 'column', gap: '9px' }}>
       {slots.map((slot) => (
-        <Box key={slot.startUtc} sx={row ? { minWidth: 84 } : undefined}>
+        <Box key={slot.startUtc} sx={row ? { minWidth: 84 } : { width: '100%', maxWidth: 170, mx: 'auto' }}>
           <TimeButton
             slot={slot}
             day={day}

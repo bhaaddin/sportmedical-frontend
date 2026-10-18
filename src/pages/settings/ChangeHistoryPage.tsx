@@ -7,6 +7,7 @@
  * again, so a value that slipped through unmasked still never reaches the screen.
  * On a phone the table becomes cards.
  */
+import { StackTable } from "../../components/ui/StackTable";
 import { useCallback, useEffect, useState } from 'react';
 import {
   Alert, Box, Button, MenuItem, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -217,7 +218,7 @@ export default function ChangeHistoryPage() {
               ))}
             </Box>
           ) : (
-            <TableContainer sx={{ border: '1px solid', borderColor: settingsLine, borderRadius: 3, bgcolor: 'background.paper' }}>
+            <StackTable sx={{ border: '1px solid', borderColor: settingsLine, borderRadius: 3, bgcolor: 'background.paper' }}>
               <Table aria-label="Historie změn">
                 <TableHead>
                   <TableRow>
@@ -244,7 +245,7 @@ export default function ChangeHistoryPage() {
                   ))}
                 </TableBody>
               </Table>
-            </TableContainer>
+            </StackTable>
           )}
 
           <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'space-between', mt: 2 }}>

@@ -114,6 +114,14 @@ export interface ApiDataSourceOptions {
   newCalendarIds?: string[];
   /** The clinic's today (Prague date). */
   today?: IsoDate;
+  /**
+   * A club's own screen (`/clubs/:clubId`) without an order that can be edited right now (the club has no order yet,
+   * or the order in view is waiting for the club / done): the planner still is in club mode - the club's header, an
+   * empty deck, its windows on the board - but nothing is planned and nothing is written.
+   */
+  clubContext?: { clubId: string; clubName: string } | null;
+  /** The source's id (the planner's query keys hang on it); one per club screen, so two orders never share a cache entry. */
+  id?: string;
   newId?: () => string;
   maxUndo?: number;
 }
@@ -138,13 +146,14 @@ interface Known {
 }
 
 export class ApiDataSource implements PlannerDataSource {
-  readonly id = 'api';
+  readonly id: string;
 
   private readonly deps: ApiDeps;
   private session: PickSession | null;
   private readonly explicitCalendarIds: string[] | undefined;
   private readonly explicitNewCalendarIds: string[] | undefined;
   private readonly today: IsoDate;
+  private readonly clubContext: { clubId: string; clubName: string } | null;
   private readonly newId: () => string;
   private readonly maxUndo: number;
 
@@ -167,6 +176,8 @@ export class ApiDataSource implements PlannerDataSource {
     this.explicitCalendarIds = options.calendarIds;
     this.explicitNewCalendarIds = options.newCalendarIds;
     this.today = options.today ?? pragueDateKey(new Date());
+    this.id = options.id ?? 'api';
+    this.clubContext = options.session ? null : (options.clubContext ?? null);
     this.newId = options.newId ?? defaultIdFactory;
     this.maxUndo = options.maxUndo ?? 30;
     this.mode = this.modeOf(this.session);
@@ -372,7 +383,7 @@ export class ApiDataSource implements PlannerDataSource {
         canBook,
         canEditBookings,
         canPlanClubs: canBook && canEditBookings,
-        mode: this.planning ? 'club' : 'standard',
+        mode: this.planning || this.clubContext !== null ? 'club' : 'standard',
       },
     };
   }
@@ -388,6 +399,10 @@ export class ApiDataSource implements PlannerDataSource {
   }
 
   async getOrder(): Promise<PlannerOrder> {
+    if (!this.session && this.clubContext) {
+      /* A club's screen with nothing to plan: the club layout, no činnosti, no order behind it. */
+      return { ...noOrder(), club: true, clubId: this.clubContext.clubId, clubName: this.clubContext.clubName, status: 'New', code: null, totalSeats: 0, registered: 0 };
+    }
     if (!this.session) return noOrder();
     await this.ensureLoaded();
     const view = this.orderView;
@@ -413,6 +428,7 @@ export class ApiDataSource implements PlannerDataSource {
   }
 
   async getClubProfile(): Promise<ClubProfile> {
+    if (!this.session && this.clubContext) return profileOf(await this.deps.club(this.clubContext.clubId));
     if (this.session) {
       await this.ensureLoaded();
       const profile = profileOf(await this.deps.club(this.session.clubId));

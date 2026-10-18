@@ -245,13 +245,13 @@ export function tierRange(tiers: DiscountTier[], index: number): string {
  * club card. With no tiers the whole block is hidden (`alwaysShowClub` keeps just the club card —
  * the price list page, where the "Kluby" chip points at it).
  */
-export function GroupDiscounts({ alwaysShowClub = false, id }: { alwaysShowClub?: boolean; id?: string }) {
+/** The content of the group-discount block (title, a card per tier, the club card, the note): shared by the section and the price board. */
+export function DiscountCards({ headingLevel = 'h2' }: { headingLevel?: 'h2' | 'h3' }) {
   const { data: tiers } = useDiscountTiers();
   const hasTiers = tiers.length > 0;
-  if (!hasTiers && !alwaysShowClub) return null;
   return (
-    <WebSection tone="warm" id={id} py={[44, 64]} borderTop innerSx={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <SlotText slotKey="sluzby.shared.discount.title" as="h2" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 700, fontSize: { xs: 22, md: 26 }, letterSpacing: '-0.02em' }} />
+    <>
+      <SlotText slotKey="sluzby.shared.discount.title" as={headingLevel} sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 700, fontSize: { xs: 22, md: 26 }, letterSpacing: '-0.02em' }} />
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '14px' }}>
         {tiers.map((tier, index) => (
           <Box key={tier.minPersons} sx={[{ flex: '1 1 180px', p: '18px 20px', display: 'flex', flexDirection: 'column', gap: '5px' }, CARD_SX as object]}>
@@ -273,6 +273,16 @@ export function GroupDiscounts({ alwaysShowClub = false, id }: { alwaysShowClub?
         </Box>
       </Box>
       {hasTiers && <SlotText slotKey="sluzby.shared.discount.note" as="p" sx={{ m: 0, fontSize: 14, color: W.muted }} />}
+    </>
+  );
+}
+
+export function GroupDiscounts({ alwaysShowClub = false, id }: { alwaysShowClub?: boolean; id?: string }) {
+  const { data: tiers } = useDiscountTiers();
+  if (tiers.length === 0 && !alwaysShowClub) return null;
+  return (
+    <WebSection tone="warm" id={id} py={[44, 64]} borderTop innerSx={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <DiscountCards />
     </WebSection>
   );
 }

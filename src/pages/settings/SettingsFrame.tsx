@@ -27,6 +27,7 @@ import { Alert, Box, Button, InputAdornment, Skeleton, Stack, TextField, Typogra
 import { ArrowBack, ChevronRight, ExpandMore, Refresh as RefreshIcon, Search as SearchIcon } from '@mui/icons-material';
 import { usePermissions } from '../../auth/usePermission';
 import { useIsPhone } from '../../layout/useDevice';
+import { FIT_SCROLL_SX } from '../../components/ui/fit';
 import { RecentChanges } from '../../components/settings/RecentChanges';
 import {
   DESKTOP_UP, PHONE_ONLY, SETTINGS_MAX_WIDTH, TYPE, focusRing, rowSx, settingsGrey, settingsHover, settingsLine, settingsSelected,
@@ -102,7 +103,7 @@ export function SettingsNav({
               borderColor: settingsLine,
               pr: 2,
               pb: 2,
-              maxHeight: '100vh',
+              maxHeight: '100dvh',
               overflowY: 'auto',
             }
       }
@@ -320,6 +321,7 @@ export function SettingsCrumbs({ parts }: { parts: Crumb[] }) {
                   display: 'inline-flex',
                   alignItems: 'center',
                   minHeight: 32,
+                  '@media (max-width: 1279.95px)': { minHeight: 44, px: 0.5 },
                   '&:hover': { textDecoration: 'underline' },
                   ...focusRing,
                 }}
@@ -536,11 +538,23 @@ function FrameLayout({
   const phone = useIsPhone();
   const hasRelated = resolvedRelated !== false && resolvedRelated.length > 0;
   const hasAside = aside !== false && (aside !== undefined || hasRelated);
-  const maxWidth = Math.max(width ?? 0, SETTINGS_MAX_WIDTH);
+  /* A form page is centred with equal gutters beyond a comfortable width; a page that gives up its right column
+     (a wide table) takes every pixel. Phone: the region around scrolls; from 768 the header stays and the columns scroll. */
+  const wide = aside === false;
+  const maxWidth = wide ? undefined : Math.max(width ?? 0, SETTINGS_MAX_WIDTH);
   const pinSave = phone && save !== undefined;
+  const fit = !phone;
 
   return (
-    <Box sx={{ minWidth: 0, maxWidth, width: '100%' }}>
+    <Box
+      data-fit-page=""
+      sx={{
+        minWidth: 0,
+        width: '100%',
+        ...(maxWidth !== undefined ? { maxWidth, mx: 'auto' } : {}),
+        ...(fit ? { flex: '1 1 0', minHeight: 0, display: 'flex', flexDirection: 'column' } : {}),
+      }}
+    >
       {crumbs !== null && (
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
           {backTo !== undefined && (
@@ -561,7 +575,7 @@ function FrameLayout({
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
         spacing={{ xs: 1.5, sm: 3 }}
-        sx={{ alignItems: { xs: 'stretch', sm: 'flex-start' }, justifyContent: 'space-between', mb: 3 }}
+        sx={{ alignItems: { xs: 'stretch', sm: 'flex-start' }, justifyContent: 'space-between', mb: { xs: 3, sm: 2 }, flexShrink: 0 }}
       >
         <Box sx={{ minWidth: 0 }}>
           <Typography component="h1" sx={TYPE.pageTitle}>{title}</Typography>
@@ -583,10 +597,11 @@ function FrameLayout({
           gap: 3,
           alignItems: 'start',
           gridTemplateColumns: 'minmax(0, 1fr)',
-          ...(hasAside ? { [DESKTOP_UP]: { gridTemplateColumns: 'minmax(0, 1fr) 320px' } } : {}),
+          ...(hasAside ? { [DESKTOP_UP]: { gridTemplateColumns: 'minmax(0, 1fr) clamp(300px, 22vw, 400px)' } } : {}),
+          ...(fit ? { flex: '1 1 0', minHeight: 0, alignItems: 'stretch', gridTemplateRows: 'minmax(0, 1fr)' } : {}),
         }}
       >
-        <Box sx={{ minWidth: 0 }}>
+        <Box sx={[{ minWidth: 0 }, ...(fit ? [FIT_SCROLL_SX, { pr: 0.5 }] : [])]}>
           {error !== undefined && error !== null && error !== false ? (
             <Alert
               severity="error"
@@ -608,22 +623,21 @@ function FrameLayout({
           ) : (
             children
           )}
+          {resolvedScope !== null && <RecentChanges scope={resolvedScope} />}
         </Box>
         {hasAside && (
-          <Stack spacing={2.5} sx={{ minWidth: 0, [DESKTOP_UP]: { position: 'sticky', top: 16 } }}>
+          <Stack spacing={2.5} sx={[{ minWidth: 0 }, ...(fit ? [FIT_SCROLL_SX] : [])]}>
             {aside !== undefined && <SettingsAsideCard title={asideTitle}>{aside}</SettingsAsideCard>}
             {hasRelated && <RelatedCard links={resolvedRelated as RelatedLink[]} />}
           </Stack>
         )}
       </Box>
 
-      {resolvedScope !== null && <RecentChanges scope={resolvedScope} />}
-
       {pinSave && (
         <Box
           sx={{
             position: 'sticky',
-            bottom: 72,
+            bottom: 8,
             zIndex: 5,
             mt: 3,
             display: 'flex',

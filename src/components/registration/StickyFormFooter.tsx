@@ -31,7 +31,8 @@ export function StickyFormFooter({
         position: 'sticky',
         bottom: 'var(--bottom-bar-height, 0px)',
         zIndex: 2,
-        mt: 3,
+        mt: 2,
+        flexShrink: 0,
         mx: { xs: -2, md: -3 },
         px: { xs: 2, md: 3 },
         py: 1.5,
@@ -46,8 +47,6 @@ export function StickyFormFooter({
         sx={{
           alignItems: phone ? 'stretch' : 'center',
           justifyContent: 'space-between',
-          maxWidth: 1200,
-          mx: 'auto',
         }}
       >
         <Box sx={{ minWidth: 0, color: 'text.secondary', fontSize: 13 }}>{start}</Box>

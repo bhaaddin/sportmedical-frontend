@@ -53,7 +53,7 @@ function Line({ linePrefix, id, line, included, more }: { linePrefix: string; id
       <Box
         component="details"
         sx={{
-          '& > summary': { listStyle: 'none', cursor: 'pointer', minHeight: 36, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 12px', py: '3px' },
+          '& > summary': { listStyle: 'none', cursor: 'pointer', minHeight: 44, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 12px', py: '3px' },
           '& > summary::-webkit-details-marker': { display: 'none' },
           '&[open] > summary .more': { color: W.orangeTextHover },
         }}
@@ -124,7 +124,7 @@ export function PriceCard({ card, prefix, linePrefix, lines, prices }: PriceCard
           <Box sx={{ fontSize: 14, color: W.bodySoft, display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
             <SlotText slotKey="sluzby.shared.cta.phone" />
             {phone !== '' && (
-              <Box component="a" href={telHref(phone)} sx={{ color: W.orangeText, fontWeight: 700, textDecoration: 'none', minHeight: 24, '&:hover': { color: W.orangeTextHover } }}>{phone}</Box>
+              <Box component="a" href={telHref(phone)} sx={{ color: W.orangeText, fontWeight: 700, textDecoration: 'none', minHeight: 44, display: 'inline-flex', alignItems: 'center', '&:hover': { color: W.orangeTextHover } }}>{phone}</Box>
             )}
           </Box>
         )}

@@ -25,7 +25,7 @@ interface NavigatorLike {
   push?: (to: { pathname: string; search?: string; hash?: string }, state?: unknown) => void;
 }
 
-/** "Zpět na klub": the club page of the application (the club list with the club opened). Null without a router. */
+/** "Zpět na klub": the club's own screen (`/clubs/:clubId`); without a club the clubs list. Null without a router. */
 export function useGoToClub(clubId: string | null | undefined): (() => void) | null {
   const navigation = useContext(UNSAFE_NavigationContext) as { navigator?: NavigatorLike } | null;
   const navigator = navigation?.navigator ?? null;
@@ -33,6 +33,6 @@ export function useGoToClub(clubId: string | null | undefined): (() => void) | n
   if (!navigator?.push) return null;
   return () => {
     act.closeDialog();
-    navigator.push!({ pathname: '/clubs' }, clubId ? { clubId } : undefined);
+    navigator.push!({ pathname: clubId ? `/clubs/${clubId}` : '/clubs' });
   };
 }

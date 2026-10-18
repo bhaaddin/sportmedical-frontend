@@ -140,7 +140,7 @@ export function LinkProblem({
   }
   const message = kind === 'expired' ? expiredText : invalidText;
   return (
-    <Panel sx={{ alignItems: 'flex-start' }}>
+    <>
       <PanelTitle>{kind === 'expired' ? 'Odkaz vypršel' : 'Odkaz neplatí'}</PanelTitle>
       <Typography role="status" sx={{ fontSize: 16, color: '#5C6067', lineHeight: 1.6, maxWidth: '56ch' }}>{message}</Typography>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
@@ -151,7 +151,7 @@ export function LinkProblem({
           </Button>
         )}
       </Box>
-    </Panel>
+    </>
   );
 }
 

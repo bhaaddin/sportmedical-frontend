@@ -17,7 +17,8 @@ import type { PublicClinic } from '../../api/clinicSettings';
 import { BRAND, publicTheme } from '../../components/public/brand';
 import { PublicHeader } from '../../components/public/PublicHeader';
 import type { PublicHeaderProps } from '../../components/public/PublicHeader';
-import { PublicFooter } from '../../components/public/PublicFooter';
+import { PublicFooter, PublicFooterBar } from '../../components/public/PublicFooter';
+import { FIT_NARROW, FitContext } from '../../components/public/kit';
 
 export interface PublicLayoutProps extends PublicHeaderProps {
   children: ReactNode;
@@ -54,12 +55,21 @@ export default function PublicLayout({ children, clinic, noFooter = false, ...he
           '*::-webkit-scrollbar-thumb': { backgroundColor: 'initial', borderRadius: 'initial', border: 'initial' },
         }}
       />
-      <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', bgcolor: BRAND.page, color: BRAND.text }}>
-        <PublicHeader {...header} />
-        <Box component="main" sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          {children}
-        </Box>
-        {!noFooter && <PublicFooter clinic={details ?? null} />}
+      {/* Exactly one viewport high: the document never scrolls (kit.tsx, THE FIT RULE); the page's own region does.
+          100vh first for a browser without dynamic units, 100dvh where the address bar comes and goes (iPhone). */}
+      <Box
+        sx={{
+          height: '100vh', '@supports (height: 100dvh)': { height: '100dvh' }, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          bgcolor: BRAND.page, color: BRAND.text,
+        }}
+      >
+        <PublicHeader wide {...header} />
+        <FitContext.Provider value={{ footer: noFooter ? null : <PublicFooter clinic={details ?? null} /> }}>
+          <Box component="main" sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            {children}
+          </Box>
+        </FitContext.Provider>
+        {!noFooter && <Box sx={{ display: 'contents', [FIT_NARROW]: { display: 'none' } }}><PublicFooterBar clinic={details ?? null} /></Box>}
       </Box>
     </ThemeProvider>
   );

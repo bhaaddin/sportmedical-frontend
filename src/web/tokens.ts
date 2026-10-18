@@ -47,6 +47,13 @@ export const FONT_BODY = "'Public Sans', system-ui, -apple-system, 'Segoe UI', R
 /** Content width and side gutter (the artboard: 1320 px, 40 px; phone 20 px). */
 export const MAX_WIDTH = 1320;
 
+/**
+ * The width of the centred column on a screen of any size: the artboard's 1320 px up to a 1740 px window, then 76 % of the
+ * window, never more than 2240 px (a 2560 monitor reads 1946 px, an ultrawide 2240 px, with equal gutters on both sides and
+ * full-bleed bands behind). A computed value, so a section and the header/footer inside it always share one edge.
+ */
+export const SITE_MAX = 'min(100%, clamp(1320px, 76vw, 2240px))';
+
 /*
  * The three interfaces, as media queries for `sx`. They are the same numbers as
  * src/layout/useDevice.ts (phone ≤767, tablet 768–1279, desktop ≥1280); CSS is
@@ -62,6 +69,16 @@ export const MQ = {
 } as const;
 
 /** Side padding of every section: 20 px on a phone, 28 on an iPad, 40 on a desktop. */
-export const GUTTER = { xs: '20px', sm: '28px', md: '40px' } as const;
+export const GUTTER = { xs: 'max(20px, env(safe-area-inset-left))', sm: '28px', md: 'clamp(40px, 2.4vw, 64px)' } as const;
+
+/** The same gutters, written as the padding of a bar that spans the whole window (the application's public pages). */
+export const WIDE_GUTTER = { pl: { xs: 'max(16px, env(safe-area-inset-left))', md: '32px', lg: '44px' }, pr: { xs: 'max(16px, env(safe-area-inset-right))', md: '32px', lg: '44px' } } as const;
 
 export const WEB_BASE = '/web';
+
+/**
+ * A page that is nothing but reading text (the legal pages, the questions): its sections flow into columns of at least 560 px, so
+ * a wide screen shows two or three of them side by side instead of one 860 px strip in the middle of the window.
+ * `breakInside: avoid` on a section keeps it whole where it fits.
+ */
+export const READING_COLUMNS = { columnWidth: '560px', columnGap: 'clamp(32px, 4vw, 72px)' } as const;

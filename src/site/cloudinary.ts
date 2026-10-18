@@ -11,7 +11,7 @@
 export const CLOUDINARY_HOST = 'res.cloudinary.com';
 
 /** Widths offered in `srcset`. */
-export const IMAGE_WIDTHS = [480, 768, 1200, 1600] as const;
+export const IMAGE_WIDTHS = [480, 768, 1200, 1600, 2000, 2560] as const;
 
 export function isCloudinaryUrl(url: string): boolean {
   try {

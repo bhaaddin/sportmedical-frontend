@@ -5,6 +5,8 @@
    - Date range filter
    - Expandable rows for JSON diff
    ══════════════════════════════════════════════════════════════ */
+import { Fragment } from 'react';
+import { StackTable } from "../components/ui/StackTable";
 import { useState, useEffect } from 'react';
 import {
   Alert, Box, Button, Typography, Paper, Table, TableBody, TableCell, TableContainer,
@@ -151,7 +153,7 @@ export default function AuditLog() {
 
       {/* Table */}
       <div>
-        <TableContainer component={Paper}>
+        <StackTable component={Paper}>
           <Table>
             <TableHead>
               <TableRow>
@@ -173,68 +175,88 @@ export default function AuditLog() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredEntries.map((entry) => (
-                  <tr key={entry.id}>
-                    <TableCell colSpan={7} sx={{ p: 0 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider' }}>
-                        {(entry.beforeState || entry.afterState) && (
-                          <IconButton size="small" onClick={() => setExpandedRow(expandedRow === entry.id ? null : entry.id)}>
-                            {expandedRow === entry.id ? <CollapseIcon fontSize="small" /> : <ExpandIcon fontSize="small" />}
-                          </IconButton>
-                        )}
-                        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 2, py: 1.5, px: 1 }}>
-                          <Typography variant="caption" color="text.secondary" sx={{ minWidth: 140, whiteSpace: 'nowrap' }}>
+                filteredEntries.map((entry) => {
+                  const hasDiff = Boolean(entry.beforeState || entry.afterState);
+                  return (
+                    <Fragment key={entry.id}>
+                      <TableRow hover>
+                        <TableCell sx={{ width: 48, p: 0.5 }}>
+                          {hasDiff && (
+                            <IconButton
+                              size="small"
+                              aria-label="Zobrazit změnu"
+                              aria-expanded={expandedRow === entry.id}
+                              onClick={() => setExpandedRow(expandedRow === entry.id ? null : entry.id)}
+                            >
+                              {expandedRow === entry.id ? <CollapseIcon fontSize="small" /> : <ExpandIcon fontSize="small" />}
+                            </IconButton>
+                          )}
+                        </TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                          <Typography variant="caption" color="text.secondary">
                             {new Date(entry.timestamp).toLocaleString('cs-CZ')}
                           </Typography>
-                          <Typography sx={{ fontWeight: 500, minWidth: 150 }}>
+                        </TableCell>
+                        <TableCell>
+                          <Typography sx={{ fontWeight: 500, overflowWrap: 'anywhere' }}>
                             {entry.userEmail || entry.userName || 'System'}
                           </Typography>
-                          <StatusChip tone={toneOf(entry.action)} sx={{ minWidth: 70, justifyContent: 'center' }}>
+                        </TableCell>
+                        <TableCell>
+                          <StatusChip tone={toneOf(entry.action)} sx={{ justifyContent: 'center' }}>
                             {entry.action}
                           </StatusChip>
-                          <Typography sx={{ minWidth: 100 }}>{entry.entity}</Typography>
+                        </TableCell>
+                        <TableCell>{entry.entity}</TableCell>
+                        <TableCell>
                           <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: 11 }}>
                             {entry.entityId?.slice(0, 8)}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" color="text.secondary">
                             {entry.notes || '—'}
                           </Typography>
-                        </Box>
-                      </Box>
+                        </TableCell>
+                      </TableRow>
                       {/* Expanded JSON diff */}
-                      {expandedRow === entry.id && (entry.beforeState || entry.afterState) && (
-                        <Box sx={{ p: 2, bgcolor: 'background.default', borderBottom: '1px solid', borderColor: 'divider' }}>
-                          <Grid container spacing={2}>
-                            {entry.beforeState && (
-                              <Grid size={{ xs: 6 }}>
-                                <Typography variant="overline" sx={{ color: DESIGN.tone.red.fg }}>Před</Typography>
-                                <Paper sx={{ p: 1, mt: 0.5, maxHeight: 200, overflow: 'auto' }}>
-                                  <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
-                                    {JSON.stringify(entry.beforeState, null, 2)}
-                                  </pre>
-                                </Paper>
+                      {expandedRow === entry.id && hasDiff && (
+                        <TableRow>
+                          <TableCell colSpan={7} sx={{ p: 0 }}>
+                            <Box sx={{ p: 2, bgcolor: 'background.default' }}>
+                              <Grid container spacing={2}>
+                                {entry.beforeState && (
+                                  <Grid size={{ xs: 12, sm: 6 }}>
+                                    <Typography variant="overline" sx={{ color: DESIGN.tone.red.fg }}>Před</Typography>
+                                    <Paper sx={{ p: 1, mt: 0.5, maxHeight: 200, overflow: 'auto' }}>
+                                      <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
+                                        {JSON.stringify(entry.beforeState, null, 2)}
+                                      </pre>
+                                    </Paper>
+                                  </Grid>
+                                )}
+                                {entry.afterState && (
+                                  <Grid size={{ xs: 12, sm: 6 }}>
+                                    <Typography variant="overline" sx={{ color: DESIGN.tone.green.fg }}>Po</Typography>
+                                    <Paper sx={{ p: 1, mt: 0.5, maxHeight: 200, overflow: 'auto' }}>
+                                      <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
+                                        {JSON.stringify(entry.afterState, null, 2)}
+                                      </pre>
+                                    </Paper>
+                                  </Grid>
+                                )}
                               </Grid>
-                            )}
-                            {entry.afterState && (
-                              <Grid size={{ xs: 6 }}>
-                                <Typography variant="overline" sx={{ color: DESIGN.tone.green.fg }}>Po</Typography>
-                                <Paper sx={{ p: 1, mt: 0.5, maxHeight: 200, overflow: 'auto' }}>
-                                  <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
-                                    {JSON.stringify(entry.afterState, null, 2)}
-                                  </pre>
-                                </Paper>
-                              </Grid>
-                            )}
-                          </Grid>
-                        </Box>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </TableCell>
-                  </tr>
-                ))
+                    </Fragment>
+                  );
+                })
               )}
             </TableBody>
           </Table>
-        </TableContainer>
+        </StackTable>
       </div>
     </SettingsScreen>
   );

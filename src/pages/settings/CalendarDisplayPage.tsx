@@ -189,7 +189,7 @@ export default function CalendarDisplayPage() {
                 value={/^#[0-9a-fA-F]{6}$/.test(draft.nowLineColor) ? draft.nowLineColor : '#000000'}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   set('nowLineColor', event.target.value.toUpperCase())}
-                sx={{ width: 56, height: 56, border: 'none', background: 'none', cursor: 'pointer', p: 0 }}
+                sx={{ width: 56, height: 56, flexShrink: 0, border: 'none', background: 'none', cursor: 'pointer', p: 0 }}
               />
             </Stack>
 
@@ -209,7 +209,7 @@ export default function CalendarDisplayPage() {
                 value={/^#[0-9a-fA-F]{6}$/.test(draft.holidayColor) ? draft.holidayColor : '#64748B'}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   set('holidayColor', event.target.value.toUpperCase())}
-                sx={{ width: 56, height: 56, border: 'none', background: 'none', cursor: 'pointer', p: 0 }}
+                sx={{ width: 56, height: 56, flexShrink: 0, border: 'none', background: 'none', cursor: 'pointer', p: 0 }}
               />
             </Stack>
 
@@ -229,7 +229,7 @@ export default function CalendarDisplayPage() {
                 value={/^#[0-9a-fA-F]{6}$/.test(draft.lunchColor) ? draft.lunchColor : '#E11D48'}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   set('lunchColor', event.target.value.toUpperCase())}
-                sx={{ width: 56, height: 56, border: 'none', background: 'none', cursor: 'pointer', p: 0 }}
+                sx={{ width: 56, height: 56, flexShrink: 0, border: 'none', background: 'none', cursor: 'pointer', p: 0 }}
               />
             </Stack>
 

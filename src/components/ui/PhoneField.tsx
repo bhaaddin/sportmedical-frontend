@@ -217,6 +217,7 @@ export function PhoneField({
                     gap: 0.25,
                     px: 0.75,
                     py: 0.5,
+                    minHeight: 44,
                     mr: 0.25,
                     borderRadius: 1.5,
                     fontFamily: 'inherit',

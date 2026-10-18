@@ -10,7 +10,7 @@ import { SlotText, useSlotText } from '../../site/SlotText';
 import { FAQ_CATEGORIES, FAQ_ITEMS, faqCategoryKey, faqKey } from '../../site/slots/otazky';
 import { BOOKING_PATH } from '../../components/public/PublicHeader';
 import { ChevronDownIcon, CtaButton, PageHero, SectionTitle, WebSection } from '../ui';
-import { FONT_HEAD, W } from '../tokens';
+import { FONT_HEAD, READING_COLUMNS, W } from '../tokens';
 import { RichSlotText } from './company/richText';
 
 function QuestionItem({ n }: { n: number }) {
@@ -65,9 +65,9 @@ export default function FaqPage() {
         title={<SlotText slotKey="otazky.hero.title" />}
         lead={<SlotText slotKey="otazky.hero.lead" />}
       />
-      <WebSection py={[36, 64]} maxWidth={900} innerSx={{ display: 'flex', flexDirection: 'column', gap: { xs: '36px', md: '52px' } }}>
+      <WebSection py={[36, 64]} innerSx={{ ...READING_COLUMNS }}>
         {FAQ_CATEGORIES.map((category) => (
-          <Box key={category.id} component="section" id={`faq-${category.id}`} sx={{ display: 'flex', flexDirection: 'column', gap: '12px', scrollMarginTop: '88px' }}>
+          <Box key={category.id} component="section" id={`faq-${category.id}`} sx={{ display: 'flex', flexDirection: 'column', gap: '12px', scrollMarginTop: '88px', breakInside: 'avoid', mb: { xs: '36px', md: '52px' } }}>
             <SectionTitle size="md"><SlotText slotKey={faqCategoryKey(category.id)} /></SectionTitle>
             <Box sx={{ display: 'flex', flexDirection: 'column', borderTop: `1px solid ${W.line}` }}>
               {FAQ_ITEMS.filter((item) => item.categoryId === category.id).map((item) => (

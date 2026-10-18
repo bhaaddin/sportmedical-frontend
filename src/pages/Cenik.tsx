@@ -47,6 +47,7 @@ import ServiceDialog from './pricing/ServiceDialog';
 import ActivityLine from './cenik/ActivityLine';
 import ActivityExtrasDialog from './cenik/ActivityExtrasDialog';
 import { StatusChip, SoftCard, DESIGN } from '../components/ui';
+import { FitPage } from '../components/ui/fit';
 import { ResponsiveDataList, type DataColumn } from '../components/ui/ResponsiveDataList';
 import { TYPE } from '../components/settings/settingsStyle';
 
@@ -189,8 +190,8 @@ export default function Cenik() {
   ];
 
   return (
-    <Box>
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { xs: 'stretch', sm: 'flex-start' }, justifyContent: 'space-between', mb: 3 }}>
+    <FitPage>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { xs: 'stretch', sm: 'flex-start' }, justifyContent: 'space-between', mb: 3, flexShrink: 0 }}>
         <Box sx={{ minWidth: 0 }}>
           <Typography component="h1" sx={TYPE.pageTitle}>Ceník</Typography>
           <Typography sx={[TYPE.caption, { mt: 0.75, maxWidth: 760 }]}>
@@ -254,6 +255,7 @@ export default function Cenik() {
           rowKey={(s) => s.id}
           columns={columns}
           ariaLabel="Ceník"
+          fill
           /* Only about the search. An empty price list has its own words above -
              "nic takového není" answers a question nobody asked when there is
              nothing to search through. */
@@ -317,6 +319,6 @@ export default function Cenik() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FitPage>
   );
 }

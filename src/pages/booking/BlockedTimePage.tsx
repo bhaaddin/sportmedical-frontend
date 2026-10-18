@@ -1,3 +1,5 @@
+import { FitPage, fitCardSx, fitTableSx } from "../../components/ui/fit";
+import { useIsPhone } from "../../layout/useDevice";
 import { useMemo, useState } from "react";
 import {
   Alert,
@@ -180,9 +182,10 @@ export default function BlockedTimePage() {
   };
 
   const problem = draft ? draftProblem(draft) : null;
+  const phone = useIsPhone();
 
   return (
-    <Box sx={{ maxWidth: 1000, mx: "auto" }}>
+    <FitPage>
       <PageHeader
         title={t("booking.blocks.title")}
         subtitle={
@@ -211,7 +214,7 @@ export default function BlockedTimePage() {
         the booking (409) but does not remove the time from the offered slots.
         Whoever uses this should know before a patient tells them.
       */}
-      <Alert severity="info" sx={{ mb: 2.5 }}>
+      <Alert severity="info" sx={{ mb: 2.5, flexShrink: 0 }}>
         {t("booking.blocks.availabilityCaveat")}
       </Alert>
 
@@ -224,7 +227,7 @@ export default function BlockedTimePage() {
         onRetry={() => void calendarsQuery.refetch()}
         skeletonRows={2}
       >
-        <SoftCard sx={{ mb: 2.5 }}>
+        <SoftCard sx={{ mb: 2.5, flexShrink: 0 }}>
           <SectionLabel>{t("booking.workingHours.calendar")}</SectionLabel>
           <TextField
             select
@@ -256,9 +259,9 @@ export default function BlockedTimePage() {
           emptyAction={{ label: t("booking.blocks.new"), onClick: openCreate }}
           onRetry={() => void blocksQuery.refetch()}
         >
-          <SoftCard sx={{ p: 0, overflow: "hidden" }}>
-            <TableContainer sx={{ borderRadius: 0 }}>
-            <Table size="small">
+          <SoftCard sx={{ p: 0, overflow: "hidden", ...fitCardSx(phone) }}>
+            <TableContainer sx={{ borderRadius: 0, ...fitTableSx(phone) }}>
+            <Table size="small" stickyHeader={!phone}>
               <TableHead>
                 <TableRow>
                   <TableCell>{t("booking.blocks.date")}</TableCell>
@@ -382,6 +385,6 @@ export default function BlockedTimePage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FitPage>
   );
 }

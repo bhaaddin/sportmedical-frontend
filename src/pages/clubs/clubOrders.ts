@@ -330,10 +330,15 @@ export function seatRows(order: PartnerOrderDetail, appointments: readonly DayAp
   return [...taken, ...free];
 }
 
-export type ClubFilter = 'all' | 'active' | 'none';
+export type ClubFilter = 'all' | 'active' | 'none' | 'inactive';
 
-/** The three chips: Všechny · S aktivní rezervací · Bez objednávky. */
-export function matchesFilter(status: ClubStatus, filter: ClubFilter): boolean {
+/**
+ * The chips: Všechny · S aktivní rezervací · Bez objednávky · (when any exist) Neaktivní. Deactivated clubs are
+ * archived: they never show under the first three, only under "Neaktivní" (archive instead of delete).
+ */
+export function matchesFilter(status: ClubStatus, filter: ClubFilter, isActive = true): boolean {
+  if (filter === 'inactive') return !isActive;
+  if (!isActive) return false;
   if (filter === 'all') return true;
   if (filter === 'active') return status === 'active';
   return status === 'none';

@@ -18,6 +18,7 @@
  * Last on the hub come the two things that belong to the person rather than to
  * the clinic - the look of their workspace and their own account.
  */
+import { FitBody, FitPage } from '../components/ui/fit';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   Alert, Avatar, Box, Button, InputAdornment, Stack, TextField, Typography,
@@ -196,34 +197,35 @@ function GroupPage({ groupId }: { groupId: string }) {
 
   if (known === null) {
     return (
-      <Box sx={{ maxWidth: 1240 }}>
+      <FitPage>
         <HubHeader
           title="Tuhle skupinu nastavení neznáme"
           subtitle="Adresa může být stará. Vyberte skupinu na přehledu nastavení."
           crumbs={<SettingsCrumbs parts={[{ label: 'Nastavení', to: '/settings' }, { label: 'Skupina' }]} />}
           back={{ label: 'Nastavení', to: '/settings' }}
         />
-        <Button component={RouterLink} to="/settings" variant="contained" sx={{ minHeight: 44 }}>Na přehled nastavení</Button>
-      </Box>
+        <Button component={RouterLink} to="/settings" variant="contained" sx={{ minHeight: 44, alignSelf: 'flex-start' }}>Na přehled nastavení</Button>
+      </FitPage>
     );
   }
 
   return (
-    <Box sx={{ maxWidth: 1240 }}>
+    <FitPage>
       <HubHeader
         title={known.label}
         subtitle={known.description}
         crumbs={<SettingsCrumbs parts={[{ label: 'Nastavení', to: '/settings' }, { label: known.label }]} />}
         back={{ label: 'Nastavení', to: '/settings' }}
       />
+      <FitBody scroll>
       {section === undefined ? (
         <Alert severity="info">
           V téhle skupině pro vás zatím není nic, co byste smět otevřít. Oprávnění přiděluje správce v sekci Systém.
         </Alert>
       ) : (
-        <Box component="ul" aria-label={known.label} sx={[cardSx, { listStyle: 'none', m: 0, p: 0, overflow: 'hidden' }]}>
-          {section.items.map((item, index) => (
-            <Box key={item.id} component="li" sx={{ borderTop: index === 0 ? 'none' : '1px solid', borderColor: settingsLine }}>
+        <Box component="ul" aria-label={known.label} sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gap: 1.5, alignContent: 'start', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 480px), 1fr))' }}>
+          {section.items.map((item) => (
+            <Box key={item.id} component="li" sx={[cardSx, { overflow: 'hidden' }]}>
               <Box component={RouterLink} to={item.to} sx={[rowSx(false), { minHeight: 76 }]}>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography sx={TYPE.itemName}>{item.label}</Typography>
@@ -235,7 +237,8 @@ function GroupPage({ groupId }: { groupId: string }) {
           ))}
         </Box>
       )}
-    </Box>
+      </FitBody>
+    </FitPage>
   );
 }
 
@@ -368,23 +371,24 @@ function Hub() {
   const staleSession = !hasStoredPermissions();
 
   return (
-    <Box sx={{ maxWidth: 1240, minWidth: 0 }}>
+    <FitPage>
       <HubHeader
         title="Nastavení"
         subtitle="Provoz, služby a ceny, kluby, komunikace, dokumenty, web a systém — vyberte skupinu nebo hledejte"
       />
 
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: 3, flexShrink: 0, maxWidth: 720 }}>
         <SearchBox query={query} onChange={setQuery} />
       </Box>
 
       {staleSession && (
-        <Alert severity="info" sx={{ mb: 3 }}>
+        <Alert severity="info" sx={{ mb: 3, flexShrink: 0 }}>
           Přihlášení je starší než nastavení oprávnění, takže se tu teď ukazuje jen část.
           Odhlaste se a přihlaste znovu a uvidíte všechno, na co máte právo.
         </Alert>
       )}
 
+      <FitBody scroll>
       {searching ? (
         hits.length === 0 ? (
           <Typography sx={[TYPE.caption, { mb: 2.5 }]}>
@@ -419,8 +423,7 @@ function Hub() {
               sx={{
                 display: 'grid',
                 gap: 2.5,
-                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                [DESKTOP_UP]: { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' },
+                gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))',
               }}
             >
               {sections.map((section) => (
@@ -431,7 +434,8 @@ function Hub() {
           <PersonalSection />
         </>
       )}
-    </Box>
+      </FitBody>
+    </FitPage>
   );
 }
 

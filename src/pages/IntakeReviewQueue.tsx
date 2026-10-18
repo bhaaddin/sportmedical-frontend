@@ -24,6 +24,7 @@ import { PersonAdd, Block, Refresh } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import { formatDateOnly } from '../utils/time';
 import { usePermission } from '../auth/usePermission';
+import { FitBody, FitPage } from '../components/ui/fit';
 import { PageHeader, SoftCard, StatusChip } from '../components/ui';
 import { FormDialog } from './sports/FormDialog';
 import { LoadError, PageSkeleton } from './sports/LoadStates';
@@ -144,7 +145,7 @@ export default function IntakeReviewQueue() {
   };
 
   return (
-    <Box>
+    <FitPage>
       <PageHeader
         title="Fronta ke kontrole"
         subtitle={
@@ -164,11 +165,13 @@ export default function IntakeReviewQueue() {
       />
 
       {error !== null && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+        <Alert severity="error" sx={{ mb: 2, flexShrink: 0 }} onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
 
+      {/* The queue is a feed: it scrolls inside its own region, and a wide screen lays the records out in columns. */}
+      <FitBody scroll>
       {loading ? (
         <PageSkeleton rows={3} />
       ) : loadFailed ? (
@@ -184,8 +187,9 @@ export default function IntakeReviewQueue() {
           </Typography>
         </SoftCard>
       ) : (
-        entries.map((entry) => (
-          <SoftCard key={entry.intakeId} sx={{ p: { xs: 2, sm: 2.5 }, mb: 2 }}>
+        <Box sx={{ display: 'grid', gap: 2, alignItems: 'start', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 560px), 1fr))' }}>
+        {entries.map((entry) => (
+          <SoftCard key={entry.intakeId} sx={{ p: { xs: 2, sm: 2.5 } }}>
             <Stack direction="row" sx={{ alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 2 }} data-intake-head>
               <Typography sx={{ fontSize: 18, fontWeight: 700 }}>
                 {entry.givenName} {entry.familyName}
@@ -351,8 +355,10 @@ export default function IntakeReviewQueue() {
               </Button>
             </Box>
           </SoftCard>
-        ))
+        ))}
+        </Box>
       )}
+      </FitBody>
 
       {/* Rejection is the one action that destroys a patient's submission, so
           it asks for a reason. Every resolution is audited; this one needs the
@@ -434,7 +440,7 @@ export default function IntakeReviewQueue() {
             placeholder="Například: testovací odeslání, duplicitní žádost…"
           />
       </FormDialog>
-    </Box>
+    </FitPage>
   );
 }
 

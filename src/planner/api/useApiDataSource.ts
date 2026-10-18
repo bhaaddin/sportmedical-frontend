@@ -31,6 +31,8 @@ export function useApiDataSource(options: UseApiDataSourceOptions = {}): ApiData
     options.calendarIds ?? null,
     options.newCalendarIds ?? null,
     options.today ?? null,
+    options.clubContext ?? null,
+    options.id ?? null,
   ]);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- the source is rebuilt only when what it plans changes
   return useMemo(() => new ApiDataSource({ ...options, deps: options.deps ?? defaultApiDeps(queryClient) }), [queryClient, key]);

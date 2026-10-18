@@ -12,11 +12,13 @@
    price, those come from the API.
    ══════════════════════════════════════════════════════════════ */
 
+import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 import { Alert, Box, Button, Typography } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material/styles';
 import { useDevice, useIsPhone } from '../../layout/useDevice';
 import { ARCHIVO, BRAND } from './brand';
+import { GUTTER as SITE_GUTTER } from '../../web/tokens';
 
 /** The warm-grey label colour of the artboards (#6E6960). */
 export const LABEL_COLOR = '#6E6960';
@@ -28,28 +30,200 @@ export const ON_ORANGE = '#1A1206';
 /** The side gutters of every page body: 16 px phone, 32 px iPad, 44 px desktop (the artboards). */
 export const GUTTERS = { xs: 2, md: 4, lg: '44px' } as const;
 
-/** A page body: centred, with the artboard's gutters (16 phone, 32 iPad, 44 desktop). */
+/**
+ * THE FIT RULE of the application's public pages (booking, portal, club pages, manage, feedback, questionnaire):
+ * the DOCUMENT never scrolls. PublicLayout is exactly one viewport high (100dvh) and the page body lives in a region
+ * that fills what the header leaves. From an iPad in portrait up (FIT_WIDE) a page may be a workspace: panes side by
+ * side, each scrolling on its own under a fixed head; below that, or when the window is short, the panes stack and the
+ * region itself scrolls, between the fixed header and the pinned action bar, like a native app.
+ */
+export const FIT_WIDE = '@media (min-width: 720px) and (min-height: 520px)';
+/** The complement of FIT_WIDE: phone, landscape phone, a very short window (stacked panes in one scrolling region). */
+/** A screen that has room for a third column (a 1920 monitor and up). */
+export const FIT_XL = '@media (min-width: 1800px) and (min-height: 520px)';
+export const FIT_NARROW = '@media not all and (min-width: 720px) and (min-height: 520px)';
+
+/** The layout hands the full footer to the page's own scrolling region (narrow); it keeps a slim bar for the wide layout. */
+export const FitContext = createContext<{ footer: ReactNode }>({ footer: null });
+
+/** Scrolls the page's own region back to the top (the document does not scroll in fit pages). */
+export function scrollPublicTop(): void {
+  if (typeof document === 'undefined') return;
+  document.documentElement.scrollTop = 0;
+  document.querySelectorAll('[data-fit-scroll]').forEach((el) => { el.scrollTop = 0; });
+}
+
+/** Scrolls an element of the page into view inside the page's own region. */
+export function scrollPublicTo(id: string): void {
+  if (typeof document === 'undefined') return;
+  const target = document.getElementById(id);
+  if (target !== null && typeof target.scrollIntoView === 'function') target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/**
+ * A page body: centred, with the artboard's gutters (16 phone, 32 iPad, 44 desktop) in a region of exactly the height
+ * the layout leaves. `workspace`: from FIT_WIDE up the children become panes of a grid that fills that height
+ * (`head` stays on top, outside the panes); otherwise (and below FIT_WIDE) the region scrolls as one column.
+ * `maxWidth` caps the body: a number in px, or 'none' for a page that should use every pixel of a big screen.
+ */
 export function PublicMain({
-  children, maxWidth = 1100, gap = 3.25, sx,
-}: { children: ReactNode; maxWidth?: number; gap?: number; sx?: SxProps<Theme> }) {
+  children, maxWidth = 1100, gap = 3.25, sx, workspace = false, head, columns, columnsXl, band, foot, siteGutters = false,
+}: {
+  children: ReactNode; maxWidth?: number | string; gap?: number; sx?: SxProps<Theme>;
+  workspace?: boolean; head?: ReactNode;
+  /** CSS grid-template-columns of the workspace panes (default: one column). */
+  columns?: string;
+  /** The columns from FIT_XL up (e.g. a third column on a big screen). */
+  columnsXl?: string;
+  /** A full-bleed band above the body (a hero): it scrolls away on a stacked layout and stays on top of a workspace. */
+  band?: ReactNode;
+  /** The gutters of the prerendered site's sections (tokens.ts GUTTER) instead of the application pages': one edge with the site header. */
+  siteGutters?: boolean;
+  /** The action bar under the body (a PinnedBar): under the panes on a workspace, pinned to the region's bottom when stacked. */
+  foot?: ReactNode;
+}) {
   const device = useDevice();
+  const { footer } = useContext(FitContext);
+  const cap = typeof maxWidth === 'number' ? `${maxWidth}px` : maxWidth;
   return (
     <Box
-      component="div"
+      data-fit-region="true"
       data-device={device}
+      suppressHydrationWarning
+      sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', width: '100%' }}
+    >
+      <Box
+        data-fit-scroll="true"
+        sx={{
+          flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehaviorY: 'contain',
+          display: 'flex', flexDirection: 'column',
+          [FIT_WIDE]: workspace ? { overflowY: 'hidden' } : undefined,
+        }}
+      >
+        {band}
+        <Box
+          sx={{
+            width: '100%',
+            maxWidth: cap,
+            mx: 'auto',
+            boxSizing: 'border-box',
+            ...(siteGutters
+              ? { pl: SITE_GUTTER, pr: SITE_GUTTER }
+              : {
+                pl: { xs: 'max(16px, env(safe-area-inset-left))', md: 4, lg: '44px' },
+                pr: { xs: 'max(16px, env(safe-area-inset-right))', md: 4, lg: '44px' },
+              }),
+            pt: { xs: 3, md: '28px' },
+            pb: { xs: 3, md: 3 },
+            display: 'flex',
+            flexDirection: 'column',
+            gap,
+            flex: '1 0 auto',
+            // Stacked: at least one screen tall, so the footer behind it starts below the fold and does not jump while the page loads.
+            [FIT_NARROW]: { minHeight: '100%' },
+            [FIT_WIDE]: workspace ? { flex: '1 1 0', minHeight: 0, pb: '20px' } : undefined,
+            ...sx,
+          }}
+        >
+          {head !== undefined && <Box sx={{ display: 'flex', flexDirection: 'column', gap, flex: '0 0 auto' }}>{head}</Box>}
+          {workspace ? (
+            <Box
+              data-fit-workspace="true"
+              sx={{
+                display: 'flex', flexDirection: 'column', gap: 2.5, flex: '1 0 auto', minWidth: 0,
+                [FIT_WIDE]: {
+                  display: 'grid', gridTemplateColumns: columns ?? 'minmax(0, 1fr)', gridTemplateRows: 'minmax(0, 1fr)',
+                  flex: '1 1 0', minHeight: 0, alignItems: 'stretch', gridAutoRows: 'minmax(0, 1fr)',
+                  '& > *': { minHeight: 0, minWidth: 0 },
+                },
+                ...(columnsXl !== undefined ? { [FIT_XL]: { gridTemplateColumns: columnsXl } } : {}),
+              }}
+            >
+              {children}
+            </Box>
+          ) : children}
+          {foot}
+        </Box>
+        {footer !== null && <Box sx={{ [FIT_WIDE]: { display: 'none' }, mt: 'auto' }}>{footer}</Box>}
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * A pane of a workspace: a panel whose header stays and whose body scrolls (FIT_WIDE up); in the stacked layout it is
+ * simply a panel. `title` and `actions` make the fixed header.
+ */
+export function Pane({
+  children, title, actions, sx, id, labelledBy, component = 'section',
+}: {
+  children: ReactNode; title?: ReactNode; actions?: ReactNode; sx?: SxProps<Theme>; id?: string; labelledBy?: string;
+  component?: 'section' | 'div' | 'aside';
+}) {
+  return (
+    <Panel
+      component={component}
+      id={id}
+      labelledBy={labelledBy}
       sx={{
-        width: '100%',
-        maxWidth,
-        mx: 'auto',
-        boxSizing: 'border-box',
-        px: GUTTERS,
-        pt: { xs: 3, md: '34px' },
-        pb: { xs: 3, md: 7 },
-        display: 'flex',
-        flexDirection: 'column',
-        gap,
-        flex: 1,
+        [FIT_WIDE]: { overflow: 'hidden', gap: 0, p: 0, maxHeight: '100%', minHeight: 0 },
         ...sx,
+      }}
+    >
+      {(title !== undefined || actions !== undefined) && (
+        <Box
+          sx={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap',
+            [FIT_WIDE]: { flex: '0 0 auto', px: '24px', py: '16px', borderBottom: `1px solid ${BRAND.line}` },
+          }}
+        >
+          {title}
+          {actions}
+        </Box>
+      )}
+      <Box
+        data-pane-body="true"
+        sx={{
+          display: 'flex', flexDirection: 'column', gap: 2.25, minWidth: 0,
+          [FIT_WIDE]: { flex: '0 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehaviorY: 'contain', p: '20px 24px' },
+        }}
+      >
+        {children}
+      </Box>
+    </Panel>
+  );
+}
+
+/**
+ * A column of a workspace: stacked panels that scroll together (FIT_WIDE up). `nested`: one of the columns of a
+ * ColumnGroup — it only scrolls on its own once the group is spread over the grid (FIT_XL).
+ */
+export function PaneColumn({ children, sx, nested = false }: { children: ReactNode; sx?: SxProps<Theme>; nested?: boolean }) {
+  return (
+    <Box
+      sx={{
+        display: 'flex', flexDirection: 'column', gap: 2.5, minWidth: 0,
+        [FIT_WIDE]: nested ? {} : { overflowY: 'auto', overscrollBehaviorY: 'contain', pr: '4px', pb: '2px' },
+        ...(nested ? { [FIT_XL]: { overflowY: 'auto', overscrollBehaviorY: 'contain', pr: '4px', pb: '2px' } } : {}),
+        ...sx,
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+/**
+ * Two or more nested PaneColumns that share ONE grid column (they stack and scroll together) until the screen has room
+ * for a column each (FIT_XL), where the group dissolves into the grid.
+ */
+export function ColumnGroup({ children }: { children: ReactNode }) {
+  return (
+    <Box
+      sx={{
+        display: 'flex', flexDirection: 'column', gap: 2.5, minWidth: 0,
+        [FIT_WIDE]: { overflowY: 'auto', overscrollBehaviorY: 'contain', pr: '4px', pb: '2px' },
+        [FIT_XL]: { display: 'contents' },
       }}
     >
       {children}
@@ -165,7 +339,7 @@ export function PinnedBar({
         data-pinned="false"
         sx={{
           display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center', justifyContent: 'flex-end',
-          ...(card ? { bgcolor: BRAND.paper, border: `1px solid ${BRAND.line}`, borderRadius: '16px', p: '20px 24px' } : {}),
+          ...(card ? { bgcolor: BRAND.paper, border: `1px solid ${BRAND.line}`, borderRadius: '16px', p: '14px 24px' } : {}),
         }}
       >
         {children}
@@ -182,9 +356,12 @@ export function PinnedBar({
         bottom: 0,
         mt: 'auto',
         zIndex: 5,
-        mx: -2,
-        px: 2,
-        py: 1.25,
+        ml: 'calc(-1 * max(16px, env(safe-area-inset-left)))',
+        mr: 'calc(-1 * max(16px, env(safe-area-inset-right)))',
+        pl: 'max(16px, env(safe-area-inset-left))',
+        pr: 'max(16px, env(safe-area-inset-right))',
+        pt: 1.25,
+        pb: 'max(10px, env(safe-area-inset-bottom))',
         bgcolor: BRAND.paper,
         borderTop: `1px solid ${BRAND.line}`,
         display: 'flex',
@@ -288,4 +465,27 @@ export function longWhen(utc: string): string {
   const day = when.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Prague' });
   const time = when.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Prague' });
   return `${day} v ${time}`;
+}
+
+/** The card of a whole-screen notice: one pane, the message centred in a readable column. */
+export function NoticePane({ children, maxWidth = 640 }: { children: ReactNode; maxWidth?: number }) {
+  return (
+    <Pane>
+      <Box sx={{ width: '100%', maxWidth, mx: 'auto', my: 'auto', display: 'flex', flexDirection: 'column', gap: 2, py: 3 }}>
+        {children}
+      </Box>
+    </Pane>
+  );
+}
+
+/**
+ * A whole-screen notice (thanks, a dead link, a confirmation): one pane that fills the region, its message centred in
+ * a readable column. The pane takes the window's width so no strip of the page is left empty beside a small card.
+ */
+export function NoticeScreen({ children, maxWidth = 640, head, band }: { children: ReactNode; maxWidth?: number; head?: ReactNode; band?: ReactNode }) {
+  return (
+    <PublicMain maxWidth="none" workspace head={head} band={band} gap={2.5}>
+      <NoticePane maxWidth={maxWidth}>{children}</NoticePane>
+    </PublicMain>
+  );
 }

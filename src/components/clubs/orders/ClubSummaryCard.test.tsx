@@ -69,6 +69,11 @@ describe('helpers', () => {
     expect(s.byActivity).toEqual([]);
   });
 
+  it('normalizeSummary reads the camelCase status counts (`confirmed`) as well as the capitalised ones', () => {
+    const s = normalizeSummary({ clubId: 'x', totalSeats: 1, registered: 0, ordersByStatus: { invited: 2, confirmed: 6, Requested: 1 } } as never);
+    expect(s.ordersByStatus).toMatchObject({ Invited: 2, Confirmed: 6, Requested: 1, Completed: 0, Cancelled: 0 });
+  });
+
   const o = (id: string, status: string, extra: Record<string, unknown> = {}) =>
     toOrder({ id, status, createdAtUtc: `2026-10-0${id}T00:00:00Z`, requestedRanges: [{ fromDate: '2026-11-02', toDate: '2026-11-04' }], ...extra });
 

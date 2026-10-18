@@ -12,6 +12,7 @@ import PatientPicker from '../components/patients/PatientPicker';
 import toast from 'react-hot-toast';
 import { PageHeader, KpiCard, StatusChip, SectionLabel, DESIGN } from '../components/ui';
 import type { ChipTone } from '../components/ui';
+import { FitPage } from '../components/ui/fit';
 import { ResponsiveDataList, type DataColumn } from '../components/ui/ResponsiveDataList';
 import { PinnedActionBar } from '../components/ui/PinnedActionBar';
 import { useDevice } from '../layout/useDevice';
@@ -208,11 +209,11 @@ export default function CashierPage() {
   }
 
   return (
-    <Box>
+    <FitPage>
       {header}
 
       {/* Stats */}
-      <Grid container spacing={2} sx={{ mb: 2.5 }}>
+      <Grid container spacing={2} sx={{ mb: 2.5, flexShrink: 0 }}>
         <Grid size={{ xs: 6, md: 3 }}>
           <KpiCard label="Dnešní tržba" value={stats ? kc(stats.todayRevenue) : '—'} hint="všechny způsoby platby" />
         </Grid>
@@ -228,7 +229,7 @@ export default function CashierPage() {
       </Grid>
 
       {/* Transactions */}
-      <SectionLabel>Dnešní transakce</SectionLabel>
+      <Box sx={{ flexShrink: 0 }}><SectionLabel>Dnešní transakce</SectionLabel></Box>
       {loadFailed ? (
         <LoadError what="Dnešní transakce" onRetry={load} />
       ) : (
@@ -238,6 +239,7 @@ export default function CashierPage() {
           rowKey={(t) => t.id}
           columns={columns}
           empty="Zatím žádné platby."
+          fill
           renderCard={(t) => (
             <Stack spacing={1}>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'baseline', justifyContent: 'space-between' }}>
@@ -304,6 +306,6 @@ export default function CashierPage() {
             slotProps={{ input: { endAdornment: <InputAdornment position="end">Kč</InputAdornment> } }} />
         </Stack>
       </FormDialog>
-    </Box>
+    </FitPage>
   );
 }

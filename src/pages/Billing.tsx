@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, InputAdornment, MenuItem, Paper, Skeleton,
-  Stack, TextField, Typography,
+  Stack, TextField, Typography, useMediaQuery,
 } from '@mui/material';
 import { Add, Search } from '@mui/icons-material';
 import toast from 'react-hot-toast';
@@ -42,6 +42,7 @@ import type { InvoiceFilter } from './billing/invoiceView';
 import { hasPrefill, readNavState, wantsNewInvoice } from './billing/invoicePrefill';
 import type { BillingNavState } from './billing/invoicePrefill';
 import { openPdfBlob, pdfFileName } from './billing/openPdf';
+import { FitPage, FIT_FILL_SX, STICKY_HEAD_SX } from '../components/ui/fit';
 
 /** The permission that lets somebody approve or reject an invoice above a discount limit. */
 const APPROVE_PERMISSION = 'billing.approve';
@@ -55,7 +56,9 @@ const messageOf = (error: unknown, fallback: string): string => toBookingError(e
 export default function Billing() {
   const device = useDevice();
   const phone = device === 'phone';
-  const tablet = device === 'tablet';
+  /* The seven-column table needs about 1300 px beside the sidebar; narrower than that it folds into five columns. */
+  const narrow = useMediaQuery('(max-width: 1679px)');
+  const tablet = device === 'tablet' || narrow;
   const canApprove = usePermissions().includes(APPROVE_PERMISSION);
 
   /* ── Data ── */
@@ -299,12 +302,13 @@ export default function Billing() {
   const emptyText = invoices.length === 0 ? 'Zatím žádné doklady.' : 'Žádný doklad neodpovídá hledání.';
 
   return (
-    <Box>
+    <FitPage>
       {header}
 
       {/* ── KPI cards: 2×2 on a phone ── */}
       <Box
         sx={{
+          flexShrink: 0,
           display: 'grid',
           gridTemplateColumns: {
             xs: 'repeat(2, minmax(0, 1fr))',
@@ -346,7 +350,7 @@ export default function Billing() {
       </Box>
 
       {/* ── Search + filters (the chips scroll sideways on a phone) ── */}
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mb: 2, alignItems: { md: 'center' } }}>
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mb: 2, alignItems: { md: 'center' }, flexShrink: 0 }}>
         <TextField
           fullWidth
           placeholder="Číslo dokladu, pacient nebo klub"
@@ -387,8 +391,8 @@ export default function Billing() {
           empty={emptyText}
         />
       ) : (
-        <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
-          <Box sx={{ overflowX: 'auto' }}>
+        <Paper variant="outlined" sx={{ overflow: 'hidden', ...FIT_FILL_SX, display: 'flex', flexDirection: 'column' }}>
+          <Box sx={[{ overflow: 'auto', overscrollBehavior: 'contain', ...FIT_FILL_SX }, STICKY_HEAD_SX]}>
             <InvoiceTable
               invoices={filteredInvoices}
               now={now}
@@ -402,7 +406,7 @@ export default function Billing() {
               empty={emptyText}
             />
           </Box>
-          <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
               Zobrazeno {filteredInvoices.length} z {doklady(invoices.length)}
             </Typography>
@@ -484,6 +488,6 @@ export default function Billing() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </FitPage>
   );
 }

@@ -1,3 +1,4 @@
+import { FitBody, FitPage } from "../../components/ui/fit";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -242,11 +243,10 @@ export default function PartnerOrdersPage() {
   );
 
   return (
-    <Box
+    <FitPage
       data-testid="partner-orders"
       data-layout={device}
       data-columns={columns}
-      sx={{ maxWidth: 1180, mx: "auto" }}
     >
       <PageHeader
         title="Hromadné objednávky"
@@ -328,14 +328,14 @@ export default function PartnerOrdersPage() {
           onRetry={() => void ordersQuery.refetch()}
           skeletonRows={4}
         >
-          <Stack spacing={2}>
+          <FitBody scroll sx={{ gap: 2 }}>
             {revoke.error ? (
               <Alert severity="error">{errorText(revoke.error, t)}</Alert>
             ) : null}
             <Box
               role="list"
               aria-label="Hromadné objednávky"
-              sx={{ display: "grid", gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: 2, alignItems: "start" }}
+              sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 400px), 1fr))", gap: 2, alignItems: "start" }}
             >
             {orders.map((order) => (
               <OrderCard
@@ -361,7 +361,7 @@ export default function PartnerOrdersPage() {
               />
             ))}
             </Box>
-          </Stack>
+          </FitBody>
         </AsyncSection>
       </AsyncSection>
 
@@ -430,7 +430,7 @@ export default function PartnerOrdersPage() {
           onReleased={reload}
         />
       ) : null}
-    </Box>
+    </FitPage>
   );
 }
 

@@ -109,7 +109,7 @@ export default function DiagnostikaPage() {
             <VizItem key={viz.title} index={index} />
           ))}
         </Box>
-        <MediaSlot slotKey="diagnostika.viz.photo7" sizes="(max-width: 1279px) 100vw, 1200px" sx={{ borderRadius: '16px', aspectRatio: '16 / 7', minHeight: 0 }} />
+        <MediaSlot slotKey="diagnostika.viz.photo7" sizes="(max-width: 1279px) 100vw, min(70vw, 1700px)" sx={{ borderRadius: '16px', aspectRatio: '16 / 7', minHeight: 0 }} />
       </PageSection>
 
       <PageSection title="diagnostika.faq.duration.title" tone="warm">

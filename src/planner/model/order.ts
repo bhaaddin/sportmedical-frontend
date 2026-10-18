@@ -534,13 +534,17 @@ export interface CarouselModel {
   dots: boolean[];
 }
 
-export function carouselModel(quantity: number, rawIndex: number): CarouselModel {
+/**
+ * `visible` = cards that fit the deck at once. The file shows two (the default); the fluid stage shows more when it is
+ * wider (`PlannerMetrics.deckVisibleCount`). At 2 every answer is the prototype's.
+ */
+export function carouselModel(quantity: number, rawIndex: number, visible = 2): CarouselModel {
   const showNavigation = quantity >= 2;
-  const showCarousel = quantity >= 3;
-  const rightLimit = Math.max(0, quantity - 2);
+  const showCarousel = quantity > visible;
+  const rightLimit = Math.max(0, quantity - visible);
   const index = Math.min(rawIndex, rightLimit);
   const pageStart = showCarousel ? index + 1 : 1;
-  const pageEnd = showCarousel ? Math.min(quantity, index + 2) : Math.min(quantity, 2);
+  const pageEnd = showCarousel ? Math.min(quantity, index + visible) : Math.min(quantity, visible);
   return {
     quantity,
     mode: quantity < 3 ? `mode-${quantity}` : 'mode-scroll',
@@ -553,14 +557,14 @@ export function carouselModel(quantity: number, rawIndex: number): CarouselModel
     pageLabel: `${pageStart}–${pageEnd} / ${quantity}`,
     prevDisabled: !showCarousel || index === 0,
     nextDisabled: !showCarousel || index === rightLimit,
-    dots: Array.from({ length: quantity }, (_, i) => i >= index && i < index + 2),
+    dots: Array.from({ length: quantity }, (_, i) => i >= index && i < index + visible),
   };
 }
 
-/** `setAdaptivePosition`: clamp a requested page to 0 … quantity-2; no paging under three cards. */
-export function clampCarouselIndex(quantity: number, index: number): number {
-  if (quantity < 3) return 0;
-  return Math.max(0, Math.min(quantity - 2, index));
+/** `setAdaptivePosition`: clamp a requested page to 0 … quantity-visible; no paging while every card is in view. */
+export function clampCarouselIndex(quantity: number, index: number, visible = 2): number {
+  if (quantity <= visible) return 0;
+  return Math.max(0, Math.min(quantity - visible, index));
 }
 
 /** Card opacity for the scroll-synchronised fade (`syncCarouselVisibility`). */

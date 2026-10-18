@@ -24,6 +24,8 @@ import { S41Icon } from './plan/S41Icon';
 import { useClubPlanningContext } from './plan/useClubPlanningContext';
 import { usePlanActions } from './plan/usePlanActions';
 import { usePlanFigures } from './plan/usePlanFigures';
+import { useDeckVisible } from './PlannerMetrics';
+import { ClubDeckEmpty } from '../club/ClubDeckEmpty';
 import './plan/plan.css';
 
 /** The arrow bitmap that the prototype inlined as a 80 kB base64 string. */
@@ -172,8 +174,10 @@ export function PlanningCarousel() {
   const { base, live, previewCategoryId, added } = usePlanFigures();
 
   const quantity = base.list.length;
-  const deck = carouselModel(quantity, index);
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  /* The file shows two cards at a time; a wider fluid stage shows as many as fit (`PlannerMetrics.deckVisibleCount`). */
+  const visible = useDeckVisible(viewportRef);
+  const deck = carouselModel(quantity, index, visible);
   const hostRef = useRef<HTMLElement | null>(null);
 
   /* ---- the focus dimming of the siblings (delayed on the first selection so the browser animates it) ---- */
@@ -276,7 +280,7 @@ export function PlanningCarousel() {
       if (!d.dragging) return;
       suppressClickUntil.current = performance.now() + 850;
       const step = cardStep();
-      if (step) act.carouselTo(snapCarouselIndex(d.viewport.scrollLeft, d.startLeft, step, cancelled), quantity);
+      if (step) act.carouselTo(snapCarouselIndex(d.viewport.scrollLeft, d.startLeft, step, cancelled), quantity, visible);
       try { if (d.viewport.hasPointerCapture(e.pointerId)) d.viewport.releasePointerCapture(e.pointerId); } catch { /* released */ }
     };
     const onCancel = (e: PointerEvent) => onUp(e, true);
@@ -328,7 +332,7 @@ export function PlanningCarousel() {
     if (performance.now() < suppressClickUntil.current) return;
     plan.selectCategory(base, id);
   };
-  const go = (direction: -1 | 1) => act.carouselMove(direction, quantity);
+  const go = (direction: -1 | 1) => act.carouselMove(direction, quantity, visible);
 
   const t = live;
   const showPreviewChip = added > 0;
@@ -339,7 +343,7 @@ export function PlanningCarousel() {
       ref={hostRef}
       id="planning-cards"
       className={`planning-cards${focusOn ? ' activity-focus-on' : ''}`}
-      style={standard ? { display: 'none' } : undefined}
+      style={standard ? { display: 'none' } : ({ '--deck-n': visible } as CSSProperties)}
       data-standard={standard ? 'true' : undefined}
       aria-label="Výběr činnosti pro přetažení do kalendáře"
       data-testid="planning-carousel"
@@ -356,6 +360,7 @@ export function PlanningCarousel() {
           {deck.showNavigation ? <Bracket direction={-1} disabled={deck.prevDisabled} onGo={go} /> : <span className="precision-bracket-placeholder" />}
           <div className="adaptive-card-viewport" id="adaptive-viewport" ref={viewportRef} aria-label="Činnosti klubové objednávky" onScroll={queueVisibility}>
             <div className="adaptive-card-track">
+              {quantity === 0 ? <ClubDeckEmpty /> : null}
               {base.list.map((f) => (
                 <PlanCard
                   key={f.categoryId}

@@ -78,9 +78,13 @@ export const minutesText = (n: number): string => `${Math.round(n).toLocaleStrin
 
 /** What the summary needs even when the server leaves a field out. */
 export function normalizeSummary(raw: ClubSummary): ClubSummary {
-  const by = (raw.ordersByStatus ?? {}) as Partial<ClubSummary['ordersByStatus']>;
+  /* The server counts under camelCase keys (`confirmed`); the client's statuses are capitalised (`Confirmed`): read both. */
+  const by = (raw.ordersByStatus ?? {}) as Partial<ClubSummary['ordersByStatus']> & Record<string, number | undefined>;
   const ordersByStatus = {} as ClubSummary['ordersByStatus'];
-  for (const s of ORDER_STATUSES) ordersByStatus[s] = typeof by[s] === 'number' ? by[s] : 0;
+  for (const s of ORDER_STATUSES) {
+    const n = by[s] ?? by[s.charAt(0).toLowerCase() + s.slice(1)];
+    ordersByStatus[s] = typeof n === 'number' ? n : 0;
+  }
   const totalSeats = raw.totalSeats ?? 0;
   const registered = raw.registered ?? 0;
   return {

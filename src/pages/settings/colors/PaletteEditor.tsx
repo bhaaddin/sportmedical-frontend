@@ -63,7 +63,7 @@ export function PaletteEditor({
                 helperText={errors.rows[row.key]}
                 placeholder="#RRGGBB"
                 fullWidth
-                slotProps={{ htmlInput: { 'aria-label': `Barva ${index + 1} jako text`, spellCheck: false, autoCapitalize: 'characters', maxLength: 7, style: { fontVariantNumeric: 'tabular-nums', minHeight: 28 } } }}
+                slotProps={{ htmlInput: { 'aria-label': `Barva ${index + 1} jako text`, spellCheck: false, autoCapitalize: 'characters', maxLength: 7, style: { fontVariantNumeric: 'tabular-nums' } } }}
               />
               <IconButton
                 aria-label={`Odebrat barvu ${index + 1}`}

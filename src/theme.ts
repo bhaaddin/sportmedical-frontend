@@ -229,6 +229,22 @@ export function buildTheme(accentColor: string, mode: ThemeMode): Theme {
                 }),
           },
           '::selection': { backgroundColor: alpha(primary, light ? 0.18 : 0.35) },
+          /*
+           * Touch (phone and tablet, below the desktop's 1280): every control is at least 44 px in both directions
+           * (constitution VI). One block here instead of a size on every button; the dense desktop keeps its own sizes.
+           * `body ` in front lifts these above the components' own single-class rules.
+           */
+          '@media (max-width: 1279.95px)': {
+            'body .MuiButton-root, body .MuiToggleButton-root, body .MuiTab-root, body .MuiMenuItem-root, body .MuiListItemButton-root': { minHeight: 44 },
+            'body .MuiIconButton-root:not(.MuiPickersArrowSwitcher-button)': { minWidth: 44, minHeight: 44 },
+            'body .MuiButton-root': { minWidth: 44 },
+            'body .MuiInputBase-input:not(.MuiInputBase-inputMultiline)': { minHeight: 44, boxSizing: 'border-box' },
+            'body .MuiCheckbox-root, body .MuiRadio-root': { padding: 10 },
+            'body .MuiCheckbox-sizeSmall, body .MuiRadio-sizeSmall': { padding: 12 },
+            'body .MuiSwitch-root:not(.MuiSwitch-sizeSmall)': { height: 44, padding: '11px 8px' },
+            'body .MuiSwitch-root:not(.MuiSwitch-sizeSmall) .MuiSwitch-switchBase': { padding: 12, left: -3, top: 0 },
+            'body .MuiChip-root.MuiChip-clickable': { minHeight: 44 },
+          },
           ...(light
             ? {}
             : {

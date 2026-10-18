@@ -1,0 +1,131 @@
+/*
+ * The club screen's own pieces, every value copied from the prototype's CSS (design/planner-v65.html):
+ *
+ *   .club-switch-menu            <- `.filter-select`: background #001b2b, border 1px #103a52, radius 6px (the panel);
+ *                                   option text #f4f7fc 13px (`.filter-select select`)
+ *   .club-switch-item:hover      <- `.view-segment button:not(.active):hover`: background #085166
+ *   .club-switch-item.is-active  <- `.view-segment button.active`: linear-gradient(160deg,#026755,#00a89b), #fff,
+ *                                   glow 0 0 14px #00a79b99, inset 0 0 10px #14dfce3d
+ *   .club-switch-rule            <- `.view-segment` border colour #06415b
+ *   toolbar button               <- `.control` + `.planner-actions .control` (board.css), unchanged
+ */
+.sm-planner .club-switch { position: relative; }
+.sm-planner .club-switch > .control { max-width: 230px; }
+.sm-planner .club-switch > .control > span { overflow: hidden; text-overflow: ellipsis; }
+.sm-planner .club-switch-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  width: 330px;
+  max-height: 340px;
+  overflow: auto;
+  padding: 4px;
+  background: #001b2b;
+  border: 1px solid #103a52;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px #000a;
+}
+.sm-planner .club-switch-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #f4f7fc;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.sm-planner .club-switch-item b { font-weight: 650; }
+.sm-planner .club-switch-item small { font-size: 12px; color: #cfdae8; }
+.sm-planner .club-switch-item:hover { background: #085166; }
+.sm-planner .club-switch-item.is-active {
+  color: #fff;
+  background: linear-gradient(160deg, #026755, #00a89b);
+  box-shadow: 0 0 14px #00a79b99, inset 0 0 10px #14dfce3d;
+}
+.sm-planner .club-switch-item.is-active small { color: #fff; }
+.sm-planner .club-switch-rule { height: 1px; margin: 4px 2px; background: #06415b; }
+.sm-planner .club-switch-empty { padding: 8px 10px; font-size: 12px; color: #cfdae8; }
+
+/*
+ * The order overview dialog on a club's screen (ClubOverviewSections). Every value is copied:
+ *   .club-ov-title h3            <- `.club-profile-section h3` (10px, letter-spacing .8px, #3ef1db, border-bottom 1px #195168)
+ *   .club-order-row              <- `.activity-detail-row` (padding 11px 12px, border 1px #20596d, radius 8px, #002537);
+ *                                   `.is-shown` takes the border of its buttons, #0c978f
+ *   .club-order-head strong      <- `.activity-detail-row strong` 14px;  small / muted: #a2bdcd
+ *   .club-ov-btn                 <- `.activity-detail-row button` (1px #0c978f, radius 5px, #074b51, #9fffee, 12px, 8px)
+ *   .club-ov-btn.primary         <- `.app-button.primary`;  .danger <- `.app-button.danger`
+ *   .club-ov-note                <- `.club-overview-note` (#88b6c3, 11.5px);  .club-ov-warn <- `.plan-dialog-error` text #ffc2cf
+ *   .club-ov-window / progress   <- `.activity-detail-row` surface and `.capacity-bar`
+ */
+.sm-planner .club-ov-section { margin-top: 16px; }
+.sm-planner .club-ov-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px; padding-bottom: 10px; border-bottom: 1px solid #195168; }
+.sm-planner .club-ov-title h3 { font-size: 10px; letter-spacing: .8px; color: #3ef1db; margin: 0; line-height: 1.4; }
+.sm-planner .club-ov-aside { display: flex; gap: 8px; flex-wrap: wrap; }
+.sm-planner .club-order-list { display: flex; flex-direction: column; gap: 9px; }
+.sm-planner .club-order-row, .sm-planner .club-ov-window {
+  padding: 11px 12px;
+  border: 1px solid #20596d;
+  border-radius: 8px;
+  background: #002537;
+}
+.sm-planner .club-order-row.is-shown { border-color: #0c978f; }
+.sm-planner .club-order-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sm-planner .club-order-head strong { font-size: 14px; }
+.sm-planner .club-order-head strong span { color: #a2bdcd; font-weight: 400; }
+.sm-planner .club-order-badges { display: flex; gap: 6px; flex: none; }
+.sm-planner .club-order-lines { margin-top: 6px; font-size: 12.8px; color: #f0faff; display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+.sm-planner .club-order-muted { color: #a2bdcd; }
+.sm-planner .club-order-windows { margin-top: 9px; font-size: 12.8px; }
+.sm-planner .club-order-windows small, .sm-planner .club-ov-sub, .sm-planner .club-order-cancelled > small { display: block; color: #a2bdcd; margin-bottom: 4px; font-size: 11px; }
+.sm-planner .club-order-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 11px; }
+.sm-planner .club-ov-section > .club-order-actions { margin-top: 0; }
+.sm-planner .club-ov-btn { border: 1px solid #0c978f; border-radius: 5px; background: #074b51; color: #9fffee; font-size: 12px; padding: 8px; cursor: pointer; }
+.sm-planner .club-ov-btn:hover { filter: brightness(1.23); }
+.sm-planner .club-ov-btn:disabled { opacity: .45; cursor: not-allowed; }
+.sm-planner .club-ov-btn.primary { background: linear-gradient(120deg, #007f83, #00adab); border-color: #06cacf; box-shadow: 0 0 12px #00c5c52e; color: #fff; }
+.sm-planner .club-ov-btn.danger { border-color: #bc3459; background: #5f1631; color: #fff; }
+.sm-planner .club-order-cancelled { margin-top: 4px; }
+.sm-planner .club-order-cancelled-row { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 2px; border: 0; background: transparent; color: #a2bdcd; font-size: 12.8px; text-align: left; cursor: pointer; }
+.sm-planner .club-order-cancelled-row:hover { color: #f0faff; }
+.sm-planner .club-ov-note { margin: 4px 0; color: #88b6c3; font-size: 11.5px; line-height: 1.5; }
+.sm-planner .club-ov-warn { color: #ffc2cf; }
+.sm-planner .club-ov-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; }
+.sm-planner .club-ov-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.sm-planner .club-ov-progress { padding: 9px 0; border-bottom: 1px solid #195168; }
+.sm-planner .club-ov-progress-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.sm-planner .club-ov-progress-head strong { font-size: 12.8px; }
+.sm-planner .club-ov-progress-head span, .sm-planner .club-ov-progress small, .sm-planner .club-ov-window small { color: #a2bdcd; font-size: 11.5px; }
+.sm-planner .club-ov-progress small, .sm-planner .club-ov-window small { display: block; }
+.sm-planner .club-ov-window { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sm-planner .club-ov-window strong { font-size: 12.8px; overflow-wrap: anywhere; }
+.sm-planner .club-ov-details { margin: 6px 0; }
+.sm-planner .club-ov-details > summary { cursor: pointer; font-size: 12.8px; font-weight: 650; color: #f0faff; padding: 6px 0; }
+.sm-planner .club-ov-history { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.sm-planner .club-ov-history li { border-left: 2px solid #195168; padding-left: 10px; font-size: 12.8px; display: flex; flex-direction: column; }
+.sm-planner .club-ov-history small { color: #a2bdcd; font-size: 11px; }
+.sm-planner .club-ov-legacy { display: flex; flex-direction: column; gap: 14px; }
+
+/* The overview dialog is the wide order card on a club's screen: `.modal-card.order-wizard` (width 920px, max-height 850px). */
+.sm-planner .modal-card:has(.club-ov-wide-flag) { width: 920px; max-height: 850px; }
+
+/* The header's "Chybí fakturační údaje" mark: the shape of `.club-identity-tag` (height 20px, 1px border, 800 10.2px), round,
+   in the colours of `.plan-dialog-error` (#a8344f border, #3a1220 fill, #ffc2cf text). */
+.sm-planner .club-billing-warn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 20px; height: 20px; border: 1px solid #a8344f; border-radius: 30px; background: #3a1220; color: #ffc2cf; font: 800 10.2px/1 "Segoe UI", Arial, sans-serif; }
+
+/* The empty deck card: the deck's own `.plan-card` frame; the text under the head reads like `.plan-card-sub` (#b8d4df, 11.6px);
+   the card's content ignores the pointer (`#planning-cards .plan-card .card-content`), so the buttons take it back. */
+.sm-planner #planning-cards .plan-card-empty { grid-column: 1 / -1; cursor: default; }
+.sm-planner .club-deck-empty-body { color: #b8d4df; font-size: 11.6px; line-height: 1.4; justify-content: center; text-align: center; min-height: 0; }
+.sm-planner .club-deck-empty-actions { display: flex; gap: 8px; pointer-events: auto; position: relative; z-index: 5; }
+.sm-planner .club-deck-empty-actions > button { pointer-events: auto; height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 7px; white-space: nowrap; }
+.sm-planner .club-deck-empty-actions > .oc-back { flex: none; padding: 0 12px; }
+
+/* The three figure cards take the height of their own content (the file's `.club-profile-grid` stretches them). */
+.sm-planner .club-ov > .club-profile-grid { align-items: start; }

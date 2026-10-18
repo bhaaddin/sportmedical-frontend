@@ -21,7 +21,7 @@ import {
 import PublicLayout from './PublicLayout';
 import { useSlotText } from '../../site/SlotText';
 import { ARCHIVO, BRAND } from '../../components/public/brand';
-import { LABEL_COLOR, PageTitle, Panel, PinnedBar, PublicMain, ctaSx } from '../../components/public/kit';
+import { LABEL_COLOR, NoticeScreen, PageTitle, Pane, PinnedBar, PublicMain, ctaSx } from '../../components/public/kit';
 
 const RATING_WORDS: Record<number, string> = {
   1: 'Špatné',
@@ -32,11 +32,7 @@ const RATING_WORDS: Record<number, string> = {
 };
 
 function Shell({ children }: { children: ReactNode }) {
-  return (
-    <PublicLayout>
-      <PublicMain maxWidth={640} gap={2.5}>{children}</PublicMain>
-    </PublicLayout>
-  );
+  return <PublicLayout>{children}</PublicLayout>;
 }
 
 export default function FeedbackPage() {
@@ -71,9 +67,11 @@ export default function FeedbackPage() {
   if (outcome === 'dead') {
     return (
       <Shell>
-        <Alert severity="warning" sx={{ borderRadius: 2 }}>
-          Tento odkaz už není platný. Pokud chcete něco sdělit, ozvěte se nám prosím přímo.
-        </Alert>
+        <NoticeScreen>
+          <Alert severity="warning" sx={{ borderRadius: 2 }}>
+            Tento odkaz už není platný. Pokud chcete něco sdělit, ozvěte se nám prosím přímo.
+          </Alert>
+        </NoticeScreen>
       </Shell>
     );
   }
@@ -81,9 +79,11 @@ export default function FeedbackPage() {
   if (outcome === 'already') {
     return (
       <Shell>
-        <Alert severity="info" sx={{ borderRadius: 2 }}>
-          Toto hodnocení už bylo odesláno. Děkujeme vám.
-        </Alert>
+        <NoticeScreen>
+          <Alert severity="info" sx={{ borderRadius: 2 }}>
+            Toto hodnocení už bylo odesláno. Děkujeme vám.
+          </Alert>
+        </NoticeScreen>
       </Shell>
     );
   }
@@ -91,75 +91,85 @@ export default function FeedbackPage() {
   if (outcome === 'thanks') {
     return (
       <Shell>
-        <Panel component="div" sx={{ alignItems: 'center', textAlign: 'center', py: 5 }}>
-          <CheckCircleOutlined sx={{ fontSize: 56, color: BRAND.accent }} aria-hidden />
-          <Typography component="h1" sx={{ m: 0, fontFamily: ARCHIVO, fontWeight: 800, fontSize: 30, letterSpacing: '-0.03em' }}>
-            Děkujeme
-          </Typography>
-          <Typography sx={{ color: LABEL_COLOR }}>
-            Vaše hodnocení nám pomáhá zlepšovat péči.
-          </Typography>
-        </Panel>
+        <NoticeScreen>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 2 }}>
+            <CheckCircleOutlined sx={{ fontSize: 56, color: BRAND.accent }} aria-hidden />
+            <Typography component="h1" sx={{ m: 0, fontFamily: ARCHIVO, fontWeight: 800, fontSize: 30, letterSpacing: '-0.03em' }}>
+              Děkujeme
+            </Typography>
+            <Typography sx={{ color: LABEL_COLOR }}>
+              Vaše hodnocení nám pomáhá zlepšovat péči.
+            </Typography>
+          </Box>
+        </NoticeScreen>
       </Shell>
     );
   }
 
   return (
     <Shell>
-      <PageTitle sub={subtitle}>
-        Jak jste byli spokojeni?
-      </PageTitle>
+      <PublicMain
+        maxWidth="none"
+        workspace
+        columns="minmax(0, 1fr) minmax(0, 1fr)"
+        head={<PageTitle sub={subtitle}>Jak jste byli spokojeni?</PageTitle>}
+        gap={2.5}
+      >
+        <Pane>
+          <Box
+            sx={{
+              border: `1px solid ${BRAND.accentEdge}`,
+              borderRadius: '12px',
+              p: 3,
+              bgcolor: BRAND.accentWash,
+              textAlign: 'center',
+              my: { md: 'auto' },
+            }}
+          >
+            <Rating
+              name="rating"
+              size="large"
+              value={rating}
+              onChange={(_, value) => setRating(value)}
+              sx={{ fontSize: 'clamp(40px, 4vw, 64px)', color: BRAND.accent }}
+            />
+            <Typography sx={{ mt: 1, fontWeight: 700, minHeight: 24 }}>
+              {rating !== null ? RATING_WORDS[rating] : ' '}
+            </Typography>
+          </Box>
+        </Pane>
 
-      <Panel component="div">
-        <Box
-          sx={{
-            border: `1px solid ${BRAND.accentEdge}`,
-            borderRadius: '12px',
-            p: 3,
-            bgcolor: BRAND.accentWash,
-            textAlign: 'center',
-          }}
-        >
-          <Rating
-            name="rating"
-            size="large"
-            value={rating}
-            onChange={(_, value) => setRating(value)}
-            sx={{ fontSize: 44, color: BRAND.accent }}
+        <Pane>
+          <TextField
+            fullWidth
+            multiline
+            minRows={3}
+            label="Chcete nám něco napsat? (nepovinné)"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            /* The label is longer than a phone-wide field: it stays above the box (shrunk) instead of being cut off inside it. */
+            slotProps={{ htmlInput: { maxLength: 2000 }, inputLabel: { shrink: true } }}
           />
-          <Typography sx={{ mt: 1, fontWeight: 700, minHeight: 24 }}>
-            {rating !== null ? RATING_WORDS[rating] : ' '}
-          </Typography>
-        </Box>
 
-        <TextField
-          fullWidth
-          multiline
-          minRows={3}
-          label="Chcete nám něco napsat? (nepovinné)"
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          slotProps={{ htmlInput: { maxLength: 2000 } }}
-        />
+          {complaint ? (
+            <Alert severity="warning" onClose={() => setComplaint(null)} sx={{ borderRadius: 2 }}>
+              {complaint}
+            </Alert>
+          ) : null}
 
-        {complaint ? (
-          <Alert severity="warning" onClose={() => setComplaint(null)} sx={{ borderRadius: 2 }}>
-            {complaint}
-          </Alert>
-        ) : null}
-      </Panel>
-
-      <PinnedBar label="Odeslat hodnocení">
-        <Button
-          variant="contained"
-          disabled={rating === null || submitting}
-          onClick={submit}
-          startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : null}
-          sx={ctaSx(50)}
-        >
-          {submitting ? 'Odesílám…' : 'Odeslat hodnocení'}
-        </Button>
-      </PinnedBar>
+          <PinnedBar label="Odeslat hodnocení">
+            <Button
+              variant="contained"
+              disabled={rating === null || submitting}
+              onClick={submit}
+              startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : null}
+              sx={ctaSx(50)}
+            >
+              {submitting ? 'Odesílám…' : 'Odeslat hodnocení'}
+            </Button>
+          </PinnedBar>
+        </Pane>
+      </PublicMain>
     </Shell>
   );
 }

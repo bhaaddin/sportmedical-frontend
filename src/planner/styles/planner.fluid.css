@@ -1,0 +1,163 @@
+/*
+ * The fluid desktop stage (owner, 18. 10. 2026: the planner must use ALL the room the page has, no dead band at any side).
+ *
+ * `PlannerStage` lays the stage out in design pixels like the file, but its LOGICAL size follows the room:
+ *
+ *     --stage-w  = W' = containerW / s  (>= 1672)        --stage-h  = H' = containerH / s  (>= 941)
+ *     s = min(containerW / 1672, containerH / 941)       (exactly 1672 x 941 at the file's aspect ratio)
+ *
+ * so at 1672 x 941 every rule below gives the file's number, and any other size shares the difference out. NOTHING here is
+ * a new design value: each number is copied from planner.css (the rule is named) and only the EDGE a panel hangs on
+ * changes - the file anchors from the top / left with a fixed size, here the far edge is derived with calc():
+ *
+ *     rule in planner.css                                         file value       fluid value
+ *     .sidebar              left 25  top 155  w 417  h 751        h 751            H' - 190   (155 + 751 + 35 bottom)
+ *     .club-unified-header  left 25  top 8    w 1599 h 140        w 1599           W' - 73    (25 left, 48 right)
+ *       #club-details-strip grid 310px 407px 408px                (3 data columns) 310fr 407fr 408fr (share the extra width)
+ *     .planner              left 454 top 155  w 1170 h 576 / 750  w 1170           W' - 502   (454 left, 48 right)
+ *                                                                 h 576 (club)     H' - 365   (club deck below: 365 = 155 top + 210 bottom)
+ *                                                                 h 750 (standard) H' - 191   (the board takes the deck's room)
+ *       .planner-toolbar    h 59                                  unchanged
+ *       .board-head         h 51                                  unchanged
+ *       .week-board         h 508 / 682  (= panel - 59 - 7 - 2)   fills what is left  (flex)
+ *       .board-body         h 455 / 629  (= week-board - 51 - 2)  fills what is left  (12 hours = this height)
+ *       .hour-column        w 58                                  unchanged; the 7 day columns share the rest
+ *     #planning-cards       left 462 top 730 w 1155 h 210         w 1155           W' - 517   (462 left, 55 right)
+ *                                                                 top 730          H' - 211   (anchored at the bottom: 941 - 211)
+ *       .adaptive-deck      grid minmax(0,1.78fr) minmax(0,1fr)   summary card 1147 / 2.78 = 412.59 px, kept; the cards take the rest
+ *       .plan-card          flex-basis calc((100% - 9px) / 2)     calc((100% - (n - 1) * 9px) / n), n = cards that fit (--deck-n)
+ *     .active-plan-hint     left 552 top 677                      top 677          H' - 264   (54 above the board's bottom edge)
+ *
+ * Only `.sm-planner[data-layout="desktop"]` is fluid; tablet and phone keep planner.compact.css.
+ */
+
+/* ============================== the stage ============================== */
+.sm-planner[data-layout='desktop'] {
+  /* planner.css v18: `--v18-planner-height` is what `#dashboard.live-mode .planner` takes as its height. */
+  --v18-planner-height: calc(var(--stage-h, 941px) - 365px);
+}
+.sm-planner[data-layout='desktop']:has(.planner[data-layout='standard']) {
+  /* standard ordering (planner.extras / board.css: 750 px, the deck is not drawn) */
+  --v18-planner-height: calc(var(--stage-h, 941px) - 191px);
+}
+
+/* ---------------------------------- left panel ---------------------------------- */
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .sidebar {
+  display: flex;
+  flex-direction: column;
+  height: calc(var(--stage-h, 941px) - 190px);
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .sidebar > .mini-calendar {
+  flex: 0 0 auto;
+}
+/* planner.css: `#dashboard .sidebar .appointments.agenda-panel{height:250px!important;min-height:250px;max-height:250px}` */
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .sidebar > .appointments.agenda-panel {
+  height: auto !important;
+  flex: 1 1 0 !important;
+  min-height: 250px !important;
+  max-height: none !important;
+}
+
+/* ---------------------------------- header strip ---------------------------------- */
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .club-unified-header {
+  width: calc(var(--stage-w, 1672px) - 73px) !important;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .club-unified-header #club-details-strip {
+  grid-template-columns: minmax(0, 310fr) minmax(0, 407fr) minmax(0, 408fr) !important;
+}
+
+/* ---------------------------------- board panel ---------------------------------- */
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .planner {
+  width: calc(var(--stage-w, 1672px) - 502px);
+  display: flex;
+  flex-direction: column;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .planner > .planner-toolbar {
+  flex: 0 0 auto;
+}
+/* board.css sets 682 px for the standard layout with a longer selector: the flex fill must win there too. */
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .planner > .week-board {
+  height: auto !important;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .planner > .week-board > .board-head {
+  flex: 0 0 auto;
+}
+/* planner.css v18: `.planner .board-body{height:var(--v18-timeline-height)}` (455 / 629): now whatever is left. */
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .planner > .week-board > .board-body {
+  height: auto;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* ---------------------------------- činnost deck ---------------------------------- */
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards {
+  left: 462px;
+  width: calc(var(--stage-w, 1672px) - 517px);
+  top: calc(var(--stage-h, 941px) - 211px) !important;
+  --deck-n: 2;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards .adaptive-deck[class*='mode-'] {
+  grid-template-columns: minmax(0, 1fr) 412.59px !important;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards .adaptive-deck .adaptive-card-track > .plan-card {
+  flex: 0 0 calc((100% - (var(--deck-n, 2) - 1) * 9px) / var(--deck-n, 2)) !important;
+  width: calc((100% - (var(--deck-n, 2) - 1) * 9px) / var(--deck-n, 2)) !important;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode .active-plan-hint {
+  top: calc(var(--stage-h, 941px) - 264px);
+}
+
+/* ============================== the page around the stage ============================== */
+/*
+ * Owner: "a page must not have scroll up and down - everything must fit in the page". On the planner pages the shell's
+ * content area is exactly the window (100dvh): the "Menu" row stays on top, the host of the planner takes what is left
+ * and the document itself never scrolls. The shell's own padding there is smaller than on the other pages so the
+ * stage gets the room (24 / 28 / 40 px -> 10 / 14 / 14 px). Only the pages that contain a planner are touched.
+ */
+html:has(.sm-planner),
+body:has(.sm-planner) {
+  height: 100dvh;
+  overflow: hidden;
+}
+:has(> #main-content .sm-planner) {
+  min-height: 0 !important;
+  height: 100dvh !important;
+  overflow: hidden;
+}
+#main-content:has(.sm-planner) {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0 !important;
+  overflow: hidden;
+}
+/* desktop: the shell's padding (24 / 28 / 40) gives way; tablet and phone keep theirs (the phone's bars live in it). */
+#main-content[data-device='desktop']:has(.sm-planner) {
+  padding: 10px 14px 14px !important;
+}
+/* The host the page gives the planner (`planner-page`, `planner-lab`, the club screen): whatever the row above leaves. */
+#main-content:has(.sm-planner) > :has(> .sm-planner) {
+  flex: 1 1 0;
+  min-height: 0 !important;
+  height: auto !important;
+  display: flex;
+  flex-direction: column;
+}
+:has(> .sm-planner) > .sm-planner {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Tablet and phone: the document does not scroll, the planner's own region does (the reflowed column). */
+.sm-planner.is-compact {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
