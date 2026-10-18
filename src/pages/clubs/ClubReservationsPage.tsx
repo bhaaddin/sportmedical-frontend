@@ -11,6 +11,7 @@ import { clubOrdersApi } from '../../api/clubOrders';
 import { calendarsApi } from '../../api/calendars';
 import { PageHeader, SoftCard, StatusChip } from '../../components/ui';
 import { ResponsiveDataList, type DataColumn } from '../../components/ui/ResponsiveDataList';
+import { FitBody, FitPage } from '../../components/ui/fit';
 import { pragueDateKey } from '../../utils/time';
 import { orderCode } from '../../components/clubs/order/orderFormat';
 import { priceText } from '../../components/clubs/orders/orderMoney';
@@ -74,7 +75,7 @@ export default function ClubReservationsPage() {
     row.block.status === 'Cancelled' ? <StatusChip tone="grey">Zrušeno</StatusChip> : <StatusChip tone="green">Aktivní</StatusChip>;
 
   const calendarButton = (row: ReservationRow) => (
-    <Button size="small" variant="outlined" sx={{ minHeight: 36 }} onClick={(e) => { e.stopPropagation(); showInCalendar(row); }}>
+    <Button size="small" variant="outlined" sx={{ minHeight: 44, '@media (min-width: 1280px)': { minHeight: 36 } }} onClick={(e) => { e.stopPropagation(); showInCalendar(row); }}>
       Zobrazit v kalendáři
     </Button>
   );
@@ -127,12 +128,12 @@ export default function ClubReservationsPage() {
   );
 
   return (
-    <Box>
-      <PageHeader title="Rezervace klubů" subtitle={`Termíny a okna klubů v kalendáři · ${rows.length}`} />
-      <SoftCard sx={{ mb: 2 }}>
-        <Stack spacing={1.5}>
+    <FitPage>
+      <PageHeader title="Rezervace klubů" subtitle={`Termíny a okna klubů v kalendáři · ${rows.length}`} mb={2} />
+      <SoftCard sx={{ mb: 2, p: 1.5 }}>
+        <Stack direction={{ xs: 'column', lg: 'row' }} spacing={1.5} sx={{ alignItems: { lg: 'center' }, justifyContent: { lg: 'space-between' } }}>
           <RangeFilter value={rangeKey} custom={custom} onChange={setRangeKey} onCustom={setCustom} />
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+          <Stack direction="row" spacing={1} sx={{ '& > *': { flex: { xs: 1, sm: 'none' } } }}>
             <SelectFilter
               label="Klub"
               value={clubId}
@@ -149,20 +150,23 @@ export default function ClubReservationsPage() {
         </Stack>
       </SoftCard>
 
-      {blocksQuery.isPending ? (
-        <Skeleton variant="rounded" height={160} />
-      ) : blocksQuery.isError ? (
-        <LoadError onRetry={() => void blocksQuery.refetch()} />
-      ) : (
-        <ResponsiveDataList
-          rows={rows}
-          rowKey={(r) => r.block.id}
-          columns={columns}
-          renderCard={card}
-          ariaLabel="Rezervace klubů"
-          empty="V tomto období nejsou žádné rezervace klubů."
-        />
-      )}
-    </Box>
+      <FitBody>
+        {blocksQuery.isPending ? (
+          <Skeleton variant="rounded" height={160} />
+        ) : blocksQuery.isError ? (
+          <LoadError onRetry={() => void blocksQuery.refetch()} />
+        ) : (
+          <ResponsiveDataList
+            fill
+            rows={rows}
+            rowKey={(r) => r.block.id}
+            columns={columns}
+            renderCard={card}
+            ariaLabel="Rezervace klubů"
+            empty="V tomto období nejsou žádné rezervace klubů."
+          />
+        )}
+      </FitBody>
+    </FitPage>
   );
 }

@@ -3,18 +3,21 @@
  * how many places are still missing and how much of the booked window time is used.
  */
 import { useMemo, useState } from 'react';
-import { Box, Button, Skeleton, Typography } from '@mui/material';
+import { Button, Skeleton, Typography } from '@mui/material';
+import { useIsPhone } from '../../layout/useDevice';
 import { useQuery } from '@tanstack/react-query';
 import { clubOrdersApi } from '../../api/clubOrders';
 import { ClubStatsView } from '../../components/clubs/stats/ClubStatsView';
 import { activityRows, clubRevenue, clubRows, isEmptyStats, occupancyPercent, normalizeSummary, serviceRows } from '../../components/clubs/stats/statsMath';
 import { PageHeader, SoftCard } from '../../components/ui';
+import { FitBody, FitPage } from '../../components/ui/fit';
 import { pragueDateKey } from '../../utils/time';
 import { buildStatisticsCsv, downloadCsv, statisticsCsvFileName } from '../statistics/csv';
 import { LoadError, RangeFilter } from './subpages/common';
 import { rangeFor, type DateRange, type RangeKey } from './subpages/range';
 
 export default function ClubStatsPage() {
+  const phone = useIsPhone();
   const [rangeKey, setRangeKey] = useState<RangeKey>('all');
   const [custom, setCustom] = useState<DateRange>({ from: null, to: null });
   const today = pragueDateKey(new Date());
@@ -59,27 +62,38 @@ export default function ClubStatsPage() {
   };
 
   return (
-    <Box>
+    <FitPage>
       <PageHeader
         title="Statistiky klubů"
         subtitle="Kapacita, zapsaní hráči a chybějící místa"
-        actions={<Button variant="outlined" disabled={!stats || isEmptyStats(stats)} onClick={exportCsv}>Export CSV</Button>}
+        actions={(
+          <>
+            {/* The period sits in the header on a tablet and a desktop (one row of height saved), in its own card on a phone. */}
+            {!phone && <RangeFilter value={rangeKey} custom={custom} onChange={setRangeKey} onCustom={setCustom} />}
+            <Button variant="outlined" disabled={!stats || isEmptyStats(stats)} onClick={exportCsv}>Export CSV</Button>
+          </>
+        )}
+        mb={2}
       />
-      <SoftCard sx={{ mb: 2 }}>
-        <RangeFilter value={rangeKey} custom={custom} onChange={setRangeKey} onCustom={setCustom} />
-      </SoftCard>
-
-      {query.isPending ? (
-        <Skeleton variant="rounded" height={220} />
-      ) : query.isError ? (
-        <LoadError onRetry={() => void query.refetch()} />
-      ) : stats && isEmptyStats(stats) ? (
-        <SoftCard sx={{ py: 5, textAlign: 'center' }}>
-          <Typography sx={{ color: 'text.secondary' }}>V tomto období nejsou žádná data klubů.</Typography>
+      {phone && (
+        <SoftCard sx={{ mb: 2, p: 1.5 }}>
+          <RangeFilter value={rangeKey} custom={custom} onChange={setRangeKey} onCustom={setCustom} />
         </SoftCard>
-      ) : stats ? (
-        <ClubStatsView stats={stats} period={period} revenue={revenue} revenueLoading={ordersQuery.isLoading} />
-      ) : null}
-    </Box>
+      )}
+
+      <FitBody>
+        {query.isPending ? (
+          <Skeleton variant="rounded" height={220} />
+        ) : query.isError ? (
+          <LoadError onRetry={() => void query.refetch()} />
+        ) : stats && isEmptyStats(stats) ? (
+          <SoftCard sx={{ py: 5, textAlign: 'center' }}>
+            <Typography sx={{ color: 'text.secondary' }}>V tomto období nejsou žádná data klubů.</Typography>
+          </SoftCard>
+        ) : stats ? (
+          <ClubStatsView stats={stats} period={period} revenue={revenue} revenueLoading={ordersQuery.isLoading} />
+        ) : null}
+      </FitBody>
+    </FitPage>
   );
 }

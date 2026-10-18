@@ -355,3 +355,54 @@ describe('failure', () => {
     expect(screen.getByRole('button', { name: 'Zkusit znovu' })).toBeInTheDocument();
   });
 });
+
+/* The owner's rule: a page does not scroll up and down. The list is a panel of its own and, from 1024 px, the detail is a
+ * second panel beside it instead of a drawer over it. (jsdom has no layout; these pin the structure the browser run measured.) */
+describe('one screen (fitted page)', () => {
+  const scrolls = (el: Element) => { const c = getComputedStyle(el); return /auto|scroll/.test(`${c.overflowY} ${c.overflow}`); };
+
+  it('desktop: the page is a fitted region and the table is the box that scrolls', async () => {
+    render(<Wrap><ClubOrdersPage /></Wrap>);
+    const root = await screen.findByTestId('club-orders');
+    expect(root).toHaveAttribute('data-fit-page');
+    await screen.findAllByTestId('order-row');
+    expect(scrolls(root.querySelector('[data-list="table"]')!)).toBe(true);
+    expect(root.querySelector('[data-list="table"] thead th')).not.toBeNull();
+  });
+
+  it('from 1024 px an opened order is docked beside the list, not a drawer; its body scrolls by itself', async () => {
+    setViewport(1100);
+    const user = setupUser();
+    render(<Wrap><ClubOrdersPage /></Wrap>);
+    await user.click((await screen.findAllByTestId('order-card'))[0]);
+    await screen.findByTestId('order-detail');
+    const panel = screen.getByTestId('order-drawer');
+    expect(panel).toHaveAttribute('data-layout', 'docked');
+    expect(document.querySelector('.MuiDrawer-root')).toBeNull();
+    expect(screen.getByTestId('club-orders')).toHaveAttribute('data-docked', 'true');
+    expect(scrolls(screen.getByTestId('order-detail').parentElement!)).toBe(true);
+    /* the list stays on screen next to it, with the opened card marked */
+    expect(screen.getAllByTestId('order-card')[0]).toHaveAttribute('aria-current', 'true');
+    /* closing the detail gives the list the whole width back */
+    await user.click(screen.getByRole('button', { name: 'Zavřít detail' }));
+    expect(screen.queryByTestId('order-drawer')).toBeNull();
+  });
+
+  it('a portrait tablet (below 1024 px) keeps the drawer; the cards are their own scroll box', async () => {
+    setViewport(VIEWPORTS.tablet);
+    const user = setupUser();
+    render(<Wrap><ClubOrdersPage /></Wrap>);
+    const cards = await screen.findAllByTestId('order-card');
+    expect(scrolls(cards[0].parentElement!)).toBe(true);
+    await user.click(cards[0]);
+    await screen.findByTestId('order-detail');
+    expect(document.querySelector('[data-testid="order-drawer"]')).toHaveAttribute('data-layout', 'side');
+  });
+
+  it('a phone flows: no inner scroll box, the region scrolls', async () => {
+    setViewport(VIEWPORTS.phone);
+    render(<Wrap><ClubOrdersPage /></Wrap>);
+    const cards = await screen.findAllByTestId('order-card');
+    expect(scrolls(cards[0].parentElement!)).toBe(false);
+  });
+});

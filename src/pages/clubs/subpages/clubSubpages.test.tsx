@@ -381,3 +381,67 @@ describe('Fakturace', () => {
     expect(await screen.findByRole('button', { name: 'Zkusit znovu' })).toBeInTheDocument();
   });
 });
+
+/* The owner's rule: a page does not scroll up and down. Tables scroll inside their panel (sticky head), the statistics
+ * are a grid on a desktop and one group at a time on a tablet and a phone. */
+describe('one screen (fitted pages)', () => {
+  const scrolls = (el: Element) => { const c = getComputedStyle(el); return /auto|scroll/.test(`${c.overflowY} ${c.overflow}`); };
+
+  it.each([
+    ['Rezervace', () => <ReservationsPage />, 'Rezervace klubů'],
+    ['Hráči', () => <PlayersPage />, 'Hráči klubů'],
+  ])('%s: the table is the box that scrolls, its head sticks', async (_n, page, label) => {
+    mount(page());
+    const table = await screen.findByRole('table', { name: label });
+    const box = table.parentElement!;
+    expect(scrolls(box)).toBe(true);
+    expect(document.querySelector('[data-fit-page]')).not.toBeNull();
+    expect(table.querySelector('thead th')).not.toBeNull();
+  });
+
+  it('Fakturace: the clubs and the invoices are two tables that scroll inside their own panels', async () => {
+    mount(<BillingPage />);
+    const invoices = await screen.findByRole('table', { name: 'Faktury klubů' });
+    expect(scrolls(invoices.parentElement!)).toBe(true);
+    expect(scrolls(screen.getByRole('table', { name: 'Součty podle klubu' }).parentElement!)).toBe(true);
+  });
+
+  it('Statistiky on a desktop: a grid of panels - clubs, services, činnosti, two charts - and each table scrolls', async () => {
+    mount(<StatsPage />);
+    await screen.findByTestId('club-kpis');
+    expect(document.querySelector('[data-layout="grid"]')).not.toBeNull();
+    expect(screen.queryByRole('group', { name: 'Část statistik' })).toBeNull();
+    expect(screen.getByRole('table', { name: 'Statistiky podle klubu' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Statistiky podle služby' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Statistiky podle činnosti' })).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'Obsazení míst podle klubu' })).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'Hráči podle činnosti' })).toBeInTheDocument();
+    expect(scrolls(screen.getByRole('table', { name: 'Statistiky podle klubu' }).parentElement!)).toBe(true);
+  });
+
+  it.each(['tablet', 'phone'] as const)('Statistiky at %s: one group at a time, chosen with the segmented control', async (name) => {
+    setViewport(VIEWPORTS[name]);
+    const user = userEvent.setup();
+    mount(<StatsPage />);
+    await screen.findByTestId('club-kpis');
+    expect(document.querySelector(`[data-layout="${name === 'phone' ? 'stack' : 'tabs'}"]`)).not.toBeNull();
+    const control = screen.getByRole('group', { name: 'Část statistik' });
+    expect(screen.queryByRole('article', { name: 'Hráči podle činnosti' })).toBeNull();
+    await user.click(within(control).getByRole('button', { name: 'Grafy' }));
+    expect(screen.getByRole('article', { name: 'Hráči podle činnosti' })).toBeInTheDocument();
+    expect(screen.queryByTestId('club-revenue')).toBeNull();
+    await user.click(within(control).getByRole('button', { name: 'Služby a činnosti' }));
+    expect(screen.getByRole('heading', { name: 'Podle služby' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Podle činnosti' })).toBeInTheDocument();
+  });
+
+  it('Statistiky: a chart can show its table and export its own CSV', async () => {
+    const user = userEvent.setup();
+    mount(<StatsPage />);
+    const chart = await screen.findByRole('article', { name: 'Hráči podle činnosti' });
+    await user.click(within(chart).getByRole('button', { name: 'Tabulka' }));
+    expect(within(chart).getByRole('table', { name: 'Tabulka: Hráči podle činnosti' })).toBeInTheDocument();
+    await user.click(within(chart).getByRole('button', { name: 'Export CSV' }));
+    expect(downloadCsv.mock.calls.at(-1)![1]).toContain('Diagnostika;60');
+  });
+});

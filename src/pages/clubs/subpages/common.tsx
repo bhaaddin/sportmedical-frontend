@@ -3,7 +3,8 @@
  * "could not load" panel with its retry. Nothing here knows a club, a price or a clinic.
  */
 import { Alert, Box, Button, LinearProgress, Stack, TextField, Typography } from '@mui/material';
-import { FilterChips } from '../../../components/ui';
+import { FilterChips, SectionLabel } from '../../../components/ui';
+import { FIT_FILL_SX, FIT_SCROLL_SX } from '../../../components/ui/fit';
 import { useIsPhone } from '../../../layout/useDevice';
 import { RANGE_OPTIONS, type DateRange, type RangeKey } from './range';
 
@@ -95,12 +96,38 @@ export function SelectFilter({
       label={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      sx={{ minWidth: 170 }}
+      sx={{ minWidth: { xs: 0, sm: 170 } }}
       slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>{o.label}</option>
       ))}
     </TextField>
+  );
+}
+
+/**
+ * A titled section of a fitted page. On a tablet and a desktop it takes the room its cell gives it and its content fills
+ * that room (a `ResponsiveDataList fill` scrolls its rows inside; `scroll` makes the section's own body scroll, for a
+ * stack of cards); a phone's section just flows and the page region scrolls it.
+ */
+export function FitSection({ title, area, scroll = false, children, sx }: {
+  title: string;
+  /** The `grid-area` of the cell it sits in. */
+  area?: string;
+  scroll?: boolean;
+  children: React.ReactNode;
+  sx?: object;
+}) {
+  const phone = useIsPhone();
+  return (
+    <Box
+      component="section"
+      aria-label={title}
+      sx={{ display: 'flex', flexDirection: 'column', minWidth: 0, ...(phone ? {} : { minHeight: 0 }), ...(area !== undefined ? { gridArea: area } : {}), ...sx }}
+    >
+      <SectionLabel component="h2" sx={{ mb: 1, flexShrink: 0 }}>{title}</SectionLabel>
+      <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 0, ...(phone ? {} : { ...FIT_FILL_SX, ...(scroll ? FIT_SCROLL_SX : {}) }) }}>{children}</Box>
+    </Box>
   );
 }

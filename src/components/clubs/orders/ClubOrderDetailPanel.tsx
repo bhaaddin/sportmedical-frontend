@@ -1,7 +1,9 @@
 /*
  * The detail of one club order: summary, requested terms against the confirmed windows, činnosti with
  * registered/seats and price per line, the price quote, payment, the club person, the history - and the
- * actions that the status allows. Right drawer on desktop/tablet, full screen on a phone.
+ * actions that the status allows. Right drawer on a tablet, full screen on a phone; `docked` (the orders page from
+ * 1024 px) draws the same head, body and actions as a panel beside the list that fills the height it is given and
+ * scrolls its body itself, so the page stays one screen.
  *
  * It owns the dialogs it opens (process / edit through ClubOrderDialog, confirm cancel), so the orders page
  * and the club overview open it the same way.
@@ -85,12 +87,14 @@ function CollapsibleBlock({ title, count, labelClosed, labelOpen = 'Skrýt', con
   );
 }
 
-export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose, onChanged }: {
+export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose, onChanged, docked = false }: {
   orderId: string;
   /** The row the list already holds: shown at once while the full order loads. */
   initialOrder?: ClubOrderView;
   onClose: () => void;
   onChanged?: () => void;
+  /** A panel beside the list instead of a drawer over it; the parent gives it a height (a flex item of a fitted page). */
+  docked?: boolean;
 }) {
   const phone = useIsPhone();
   const navigate = useNavigate();
@@ -441,29 +445,49 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
 
   const footer = actions();
 
+  const head = (
+    <Stack direction="row" sx={{ alignItems: 'center', gap: 1.5, px: 2.5, py: 1.75, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+      {order?.clubColorHex ? <Box aria-hidden sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: order.clubColorHex }} /> : null}
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography component="h2" sx={{ fontSize: 18, fontWeight: 700 }} noWrap>{order?.clubName ?? 'Objednávka klubu'}</Typography>
+        {order !== undefined ? <StatusChip tone={STATUS_TONE[order.status]} size="sm">{ORDER_STATUS_LABEL[order.status]}</StatusChip> : null}
+      </Box>
+      <IconButton aria-label="Zavřít detail" onClick={onClose} sx={{ width: 44, height: 44 }}><Close /></IconButton>
+    </Stack>
+  );
+  const scrollBody = <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', p: 2.5 }}>{body()}</Box>;
+  const foot = footer !== null ? (
+    <Stack direction={phone ? 'column' : 'row'} sx={{ gap: 1, p: 2, borderTop: '1px solid', borderColor: 'divider', flexWrap: 'wrap', flexShrink: 0 }} data-testid="order-actions">
+      {footer}
+    </Stack>
+  ) : null;
+
   return (
     <>
-      <Drawer
-        anchor="right"
-        open
-        onClose={onClose}
-        slotProps={{ paper: { sx: { width: phone ? '100%' : 560, maxWidth: '100%' }, 'data-testid': 'order-drawer', 'data-layout': phone ? 'phone' : 'side' } as object }}
-      >
-        <Stack direction="row" sx={{ alignItems: 'center', gap: 1.5, px: 2.5, py: 1.75, borderBottom: '1px solid', borderColor: 'divider' }}>
-          {order?.clubColorHex ? <Box aria-hidden sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: order.clubColorHex }} /> : null}
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography component="h2" sx={{ fontSize: 18, fontWeight: 700 }} noWrap>{order?.clubName ?? 'Objednávka klubu'}</Typography>
-            {order !== undefined ? <StatusChip tone={STATUS_TONE[order.status]} size="sm">{ORDER_STATUS_LABEL[order.status]}</StatusChip> : null}
-          </Box>
-          <IconButton aria-label="Zavřít detail" onClick={onClose} sx={{ width: 44, height: 44 }}><Close /></IconButton>
-        </Stack>
-        <Box sx={{ flex: 1, overflowY: 'auto', p: 2.5 }}>{body()}</Box>
-        {footer !== null ? (
-          <Stack direction={phone ? 'column' : 'row'} sx={{ gap: 1, p: 2, borderTop: '1px solid', borderColor: 'divider', flexWrap: 'wrap' }} data-testid="order-actions">
-            {footer}
-          </Stack>
-        ) : null}
-      </Drawer>
+      {docked ? (
+        <SoftCard
+          component="aside"
+          aria-label="Detail objednávky"
+          data-testid="order-drawer"
+          data-layout="docked"
+          sx={{ p: 0, height: '100%', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        >
+          {head}
+          {scrollBody}
+          {foot}
+        </SoftCard>
+      ) : (
+        <Drawer
+          anchor="right"
+          open
+          onClose={onClose}
+          slotProps={{ paper: { sx: { width: phone ? '100%' : 560, maxWidth: '100%' }, 'data-testid': 'order-drawer', 'data-layout': phone ? 'phone' : 'side' } as object }}
+        >
+          {head}
+          {scrollBody}
+          {foot}
+        </Drawer>
+      )}
 
       {cancelOpen && order !== undefined ? (
         <CancelOrderDialog order={order} onClose={() => setCancelOpen(false)} onCancelled={() => { setCancelOpen(false); refresh(); }} />

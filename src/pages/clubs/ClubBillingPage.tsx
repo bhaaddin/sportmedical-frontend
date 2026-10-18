@@ -4,23 +4,26 @@
  */
 import { useMemo, useState } from 'react';
 import { Box, Button, Skeleton, Stack, Typography } from '@mui/material';
+import { useIsPhone } from '../../layout/useDevice';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { billingApi, type Invoice } from '../../api/billing';
 import { clubOrdersApi, type ClubOrderView } from '../../api/clubOrders';
-import { KpiCard, PageHeader, SectionLabel, SoftCard, StatusChip } from '../../components/ui';
+import { KpiCard, PageHeader, SoftCard, StatusChip } from '../../components/ui';
+import { FitBody, FitPage } from '../../components/ui/fit';
 import { ResponsiveDataList, type DataColumn } from '../../components/ui/ResponsiveDataList';
 import { formatPricedSeats, orderTotalCzk, priceText } from '../../components/clubs/orders/orderMoney';
 import { formatPlayersTotal } from '../../components/clubs/panel/seats';
 import { formatCzk, formatLongDate } from './clubOrders';
 import { customerOf, statusOf } from '../billing/invoiceView';
 import { pragueDateKey } from '../../utils/time';
-import { LoadError } from './subpages/common';
+import { FitSection, LoadError } from './subpages/common';
 import { ClubInvoiceDialog } from '../../components/clubs/orders/ClubInvoiceDialog';
 import { clubTotals, ordersAwaitingInvoice, teamInvoices, type ClubTotals } from './subpages/billing';
 
 export default function ClubBillingPage() {
   const navigate = useNavigate();
+  const phone = useIsPhone();
   const invoicesQuery = useQuery({ queryKey: ['club-billing', 'invoices'], queryFn: () => billingApi.getInvoices({}) });
   const ordersQuery = useQuery({ queryKey: ['club-billing', 'orders'], queryFn: () => clubOrdersApi.list({ status: 'Confirmed' }) });
 
@@ -80,8 +83,8 @@ export default function ClubBillingPage() {
   );
 
   return (
-    <Box>
-      <PageHeader title="Fakturace klubů" subtitle={`Faktury týmům · ${invoices.length}`} />
+    <FitPage>
+      <PageHeader title="Fakturace klubů" subtitle={`Faktury týmům · ${invoices.length}`} mb={2} />
 
       {invoicesQuery.isPending ? (
         <Skeleton variant="rounded" height={200} />
@@ -89,47 +92,62 @@ export default function ClubBillingPage() {
         <LoadError onRetry={() => void invoicesQuery.refetch()} />
       ) : (
         <>
-          <Box sx={{ display: 'grid', gap: 1.5, mb: 3, gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))' } }}>
+          <Box sx={{ display: 'grid', gap: 1.5, mb: 2, flexShrink: 0, gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))' }, '& > :last-child': { gridColumn: { xs: 'span 2', md: 'auto' } } }}>
             <KpiCard label="Vystaveno" value={formatCzk(sum.issued)} />
             <KpiCard label="Zaplaceno" value={formatCzk(sum.paid)} tone="green" />
             <KpiCard label="Nezaplaceno" value={formatCzk(sum.unpaid)} tone={sum.unpaid > 0 ? 'red' : 'ink'} />
           </Box>
 
-          {awaiting.length > 0 && (
-            <Box sx={{ mb: 3 }} data-testid="awaiting-invoice">
-              <SectionLabel component="h2" sx={{ mb: 1.5 }}>Čeká na fakturu</SectionLabel>
-              <Stack spacing={1}>{awaiting.map(waitingCard)}</Stack>
-            </Box>
-          )}
-
-          <SectionLabel component="h2" sx={{ mb: 1.5 }}>Podle klubu</SectionLabel>
-          <Box sx={{ mb: 3 }}>
-            <ResponsiveDataList
-              rows={totals}
-              rowKey={(t) => t.key}
-              columns={totalColumns}
-              ariaLabel="Součty podle klubu"
-              empty="Žádný klub zatím nemá fakturu."
-              renderCard={(t) => (
-                <Stack spacing={0.25}>
-                  <Typography sx={{ fontWeight: 700 }}>{t.clubName}</Typography>
-                  <Typography variant="body2">Vystaveno {formatCzk(t.issuedCzk)} · Zaplaceno {formatCzk(t.paidCzk)}</Typography>
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>Nezaplaceno {formatCzk(t.unpaidCzk)}</Typography>
-                </Stack>
+          {/* The clubs and the invoices side by side from 1024 px (one above the other below it); each table scrolls inside its panel. */}
+          <FitBody
+            sx={{
+              ...(phone ? { display: 'flex', flexDirection: 'column', gap: 3 } : {
+                display: 'grid',
+                gap: 2,
+                gridTemplateColumns: 'minmax(0, 1fr)',
+                gridAutoRows: 'minmax(0, 1fr)',
+                '@media (min-width: 1024px)': { gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.6fr)' },
+              }),
+            }}
+          >
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, ...(phone ? {} : { minHeight: 0 }) }}>
+              {awaiting.length > 0 && (
+                <FitSection title="Čeká na fakturu" scroll sx={phone ? undefined : { flex: '0 1 auto', maxHeight: '45%' }}>
+                  <Stack spacing={1} data-testid="awaiting-invoice">{awaiting.map(waitingCard)}</Stack>
+                </FitSection>
               )}
-            />
-          </Box>
+              <FitSection title="Podle klubu" sx={phone ? undefined : { flex: '1 1 0' }}>
+                <ResponsiveDataList
+                  fill={!phone}
+                  rows={totals}
+                  rowKey={(t) => t.key}
+                  columns={totalColumns}
+                  ariaLabel="Součty podle klubu"
+                  empty="Žádný klub zatím nemá fakturu."
+                  renderCard={(t) => (
+                    <Stack spacing={0.25}>
+                      <Typography sx={{ fontWeight: 700 }}>{t.clubName}</Typography>
+                      <Typography variant="body2">Vystaveno {formatCzk(t.issuedCzk)} · Zaplaceno {formatCzk(t.paidCzk)}</Typography>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>Nezaplaceno {formatCzk(t.unpaidCzk)}</Typography>
+                    </Stack>
+                  )}
+                />
+              </FitSection>
+            </Box>
 
-          <SectionLabel component="h2" sx={{ mb: 1.5 }}>Faktury</SectionLabel>
-          <ResponsiveDataList
-            rows={invoices}
-            rowKey={(i) => i.id}
-            columns={invoiceColumns}
-            renderCard={invoiceCard}
-            onRowClick={openInvoice}
-            ariaLabel="Faktury klubů"
-            empty="Zatím žádné faktury klubům."
-          />
+            <FitSection title="Faktury">
+              <ResponsiveDataList
+                fill={!phone}
+                rows={invoices}
+                rowKey={(i) => i.id}
+                columns={invoiceColumns}
+                renderCard={invoiceCard}
+                onRowClick={openInvoice}
+                ariaLabel="Faktury klubů"
+                empty="Zatím žádné faktury klubům."
+              />
+            </FitSection>
+          </FitBody>
         </>
       )}
       {invoiceFor !== null ? (
@@ -139,6 +157,6 @@ export default function ClubBillingPage() {
           onChanged={() => { void ordersQuery.refetch(); void invoicesQuery.refetch(); }}
         />
       ) : null}
-    </Box>
+    </FitPage>
   );
 }

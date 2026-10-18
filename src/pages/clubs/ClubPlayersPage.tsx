@@ -10,6 +10,7 @@ import { clubOrdersApi } from '../../api/clubOrders';
 import { ATHLETE_STATUS_LABEL, ATHLETE_STATUS_TONE, athletePriceText } from '../../components/clubs/athleteList';
 import { PageHeader, SoftCard, StatusChip } from '../../components/ui';
 import { ResponsiveDataList, type DataColumn } from '../../components/ui/ResponsiveDataList';
+import { FitBody, FitPage } from '../../components/ui/fit';
 import { downloadCsv } from '../statistics/csv';
 import { formatSlotTime } from './clubOrders';
 import { ClubDot, LoadError, SelectFilter } from './subpages/common';
@@ -36,7 +37,7 @@ export default function ClubPlayersPage() {
 
   const phoneLink = (p: PlayerRow) =>
     p.phone ? (
-      <Link href={telHref(p.phone)} onClick={(e) => e.stopPropagation()}>{p.phone}</Link>
+      <Link href={telHref(p.phone)} onClick={(e) => e.stopPropagation()} sx={{ display: 'inline-flex', alignItems: 'center', '@media (max-width: 1279.95px)': { minHeight: 44 } }}>{p.phone}</Link>
     ) : (
       <Typography variant="body2" sx={{ color: 'text.secondary' }}>—</Typography>
     );
@@ -80,7 +81,7 @@ export default function ClubPlayersPage() {
   );
 
   return (
-    <Box>
+    <FitPage>
       <PageHeader
         title="Hráči klubů"
         subtitle={`Zaregistrovaní přes odkazy klubů · ${rows.length}`}
@@ -89,10 +90,11 @@ export default function ClubPlayersPage() {
             Stáhnout seznam
           </Button>
         }
+        mb={2}
       />
-      <SoftCard sx={{ mb: 2 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
-          <TextField size="small" label="Hledat jméno" value={search} onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: 220 }} />
+      <SoftCard sx={{ mb: 2, p: 1.5 }}>
+        <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'minmax(220px, 1.4fr) repeat(3, minmax(150px, 1fr))' } }}>
+          <TextField size="small" label="Hledat jméno" value={search} onChange={(e) => setSearch(e.target.value)} sx={{ gridColumn: { xs: '1 / -1', md: 'auto' } }} />
           <SelectFilter label="Klub" value={clubId} onChange={setClubId} options={[{ value: '', label: 'Všechny kluby' }, ...clubs.map(([id, n]) => ({ value: id, label: n }))]} />
           <SelectFilter label="Činnost" value={activity} onChange={setActivity} options={[{ value: '', label: 'Všechny činnosti' }, ...activities.map((a) => ({ value: a, label: a }))]} />
           <SelectFilter
@@ -101,23 +103,26 @@ export default function ClubPlayersPage() {
             onChange={(v) => setStatus(v as '' | ClubBlockAthleteStatus)}
             options={[{ value: '', label: 'Všechny' }, ...ATHLETE_STATUSES.map((s) => ({ value: s, label: ATHLETE_STATUS_LABEL[s] }))]}
           />
-        </Stack>
+        </Box>
       </SoftCard>
 
-      {blocksQuery.isPending ? (
-        <Skeleton variant="rounded" height={160} />
-      ) : blocksQuery.isError ? (
-        <LoadError onRetry={() => void blocksQuery.refetch()} />
-      ) : (
-        <ResponsiveDataList
-          rows={rows}
-          rowKey={(p) => p.id}
-          columns={columns}
-          renderCard={card}
-          ariaLabel="Hráči klubů"
-          empty="Zatím se nikdo přes odkazy klubů nezaregistroval."
-        />
-      )}
-    </Box>
+      <FitBody>
+        {blocksQuery.isPending ? (
+          <Skeleton variant="rounded" height={160} />
+        ) : blocksQuery.isError ? (
+          <LoadError onRetry={() => void blocksQuery.refetch()} />
+        ) : (
+          <ResponsiveDataList
+            fill
+            rows={rows}
+            rowKey={(p) => p.id}
+            columns={columns}
+            renderCard={card}
+            ariaLabel="Hráči klubů"
+            empty="Zatím se nikdo přes odkazy klubů nezaregistroval."
+          />
+        )}
+      </FitBody>
+    </FitPage>
   );
 }

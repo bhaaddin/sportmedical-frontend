@@ -46,6 +46,7 @@ import { partnerOrdersApi } from '../api/partnerOrders';
 import { useDevice } from '../layout/useDevice';
 import { toDateOnly } from '../utils/time';
 import { FilterChips, PageHeader, SoftCard } from '../components/ui';
+import { FIT_FILL_SX, FIT_SCROLL_SX, FitBody, FitPage } from '../components/ui/fit';
 import { matchesFilter, matchesSearch } from './clubs/clubOrders';
 import type { ClubFilter } from './clubs/clubOrders';
 import { buildClubRow } from './clubs/clubRow';
@@ -267,7 +268,7 @@ export default function ClubsPage() {
   const columns = phone ? 1 : device === 'tablet' ? 2 : 3;
 
   return (
-    <Box data-testid="clubs-list" data-layout={device} data-columns={columns}>
+    <FitPage data-testid="clubs-list" data-layout={device} data-columns={columns}>
       <PageHeader
         title="Kluby a týmy"
         subtitle="Hromadné objednávky a registrační odkazy"
@@ -321,37 +322,45 @@ export default function ClubsPage() {
         </Alert>
       ) : null}
 
-      {rows.length === 0 ? (
-        <SoftCard sx={{ textAlign: 'center', py: 6 }}>
-          <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Zatím tu žádný klub není.</Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-            Přidejte klub nebo organizaci, která objednává prohlídky pro své sportovce.
-          </Typography>
-          <Button variant="contained" onClick={() => setEditing('new')} sx={{ minHeight: 44 }}>Nový klub</Button>
-        </SoftCard>
-      ) : visible.length === 0 ? (
-        <SoftCard sx={{ textAlign: 'center', py: 5 }}>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Tomuto filtru neodpovídá žádný klub.
-          </Typography>
-        </SoftCard>
-      ) : (
-        <Box
-          role="list"
-          aria-label="Kluby"
-          sx={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: phone ? 1.5 : 2 }}
-        >
-          {visible.map((row) => (
-            <ClubCard
-              key={row.club.id}
-              row={row}
-              ordersLoading={ordersLoading}
-              billableCzk={clubOrdersQuery.isLoading ? undefined : (billableByClub.get(row.club.id) ?? null)}
-              onOpen={() => navigate(`/clubs/${row.club.id}`)}
-            />
-          ))}
-        </Box>
-      )}
+      {/* The clubs are the rest of the screen: the cards scroll inside it, the page does not (a phone's page flows). */}
+      <FitBody>
+        {rows.length === 0 ? (
+          <SoftCard sx={{ textAlign: 'center', py: 6 }}>
+            <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Zatím tu žádný klub není.</Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+              Přidejte klub nebo organizaci, která objednává prohlídky pro své sportovce.
+            </Typography>
+            <Button variant="contained" onClick={() => setEditing('new')} sx={{ minHeight: 44 }}>Nový klub</Button>
+          </SoftCard>
+        ) : visible.length === 0 ? (
+          <SoftCard sx={{ textAlign: 'center', py: 5 }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Tomuto filtru neodpovídá žádný klub.
+            </Typography>
+          </SoftCard>
+        ) : (
+          <Box
+            role="list"
+            aria-label="Kluby"
+            sx={{
+              display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: phone ? 1.5 : 2,
+              /* rows as tall as their card: `auto` rows of a box with a fixed height would shrink to the cards' min-height */
+              gridAutoRows: 'max-content', alignContent: 'start',
+              ...(phone ? {} : { ...FIT_FILL_SX, ...FIT_SCROLL_SX }),
+            }}
+          >
+            {visible.map((row) => (
+              <ClubCard
+                key={row.club.id}
+                row={row}
+                ordersLoading={ordersLoading}
+                billableCzk={clubOrdersQuery.isLoading ? undefined : (billableByClub.get(row.club.id) ?? null)}
+                onOpen={() => navigate(`/clubs/${row.club.id}`)}
+              />
+            ))}
+          </Box>
+        )}
+      </FitBody>
 
       <PinnedActions>
         <Button variant="outlined" onClick={() => setEditing('new')}>Nový klub</Button>
@@ -359,6 +368,6 @@ export default function ClubsPage() {
       </PinnedActions>
 
       {dialogs}
-    </Box>
+    </FitPage>
   );
 }
