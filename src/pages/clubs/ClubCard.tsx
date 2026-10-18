@@ -6,12 +6,14 @@
  * No hover-only content: everything the card says is on it, and the whole card
  * is one 44px-plus tap target.
  */
+import { useEffect, useRef } from 'react';
 import { Box, Divider, Skeleton, Stack, Typography } from '@mui/material';
 import { SoftCard, StatusChip } from '../../components/ui';
 import type { ChipTone } from '../../components/ui';
 import { ClubAvatar } from '../../components/clubs/ClubAvatar';
 import { useClubSummary } from '../../components/clubs/orders/ClubSummaryCard';
 import { formatCzk } from '../../components/clubs/order/orderFormat';
+import { HOVER_INTENT_MS } from '../../api/warmReads';
 import { formatDiscount } from './clubOrders';
 import type { ClubStatus } from './clubOrders';
 import type { ClubRow } from './clubRow';
@@ -36,16 +38,31 @@ export function Figure({ value, label }: { value: string; label: string }) {
   );
 }
 
-export function ClubCard({ row, ordersLoading, billableCzk, onOpen }: {
+export function ClubCard({ row, ordersLoading, billableCzk, onOpen, onPrefetch }: {
   row: ClubRow;
   ordersLoading: boolean;
   /** Etapa 12: the club's live orders' totals ("k fakturaci"); null = no priced live order, undefined = still loading. */
   billableCzk?: number | null;
   onOpen: () => void;
+  /** The pointer rested on the card (or it got focus): warm what its screen starts from. Never changes what is drawn. */
+  onPrefetch?: () => void;
 }) {
   const chip = STATUS_CHIP[row.status];
+  const intent = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelIntent = () => {
+    if (intent.current !== null) clearTimeout(intent.current);
+    intent.current = null;
+  };
+  const showIntent = () => {
+    if (onPrefetch === undefined || !row.club.isActive || intent.current !== null) return;
+    intent.current = setTimeout(() => {
+      intent.current = null;
+      onPrefetch();
+    }, HOVER_INTENT_MS);
+  };
+  useEffect(() => cancelIntent, []);
   /* The club as one whole from the server; the block totals stand in when that call fails or says nothing. */
-  const summary = useClubSummary(row.club.id).data;
+  const summary = useClubSummary(row.club.id, row.club.isActive).data;
   const seats = summary !== undefined && summary.totalSeats > 0
     ? { seats: summary.totalSeats, registered: summary.registered, remaining: summary.remaining }
     : row.seatTotals !== null ? { seats: row.seatTotals.seats, registered: row.seatTotals.registered, remaining: Math.max(0, row.seatTotals.seats - row.seatTotals.registered) } : null;
@@ -61,6 +78,10 @@ export function ClubCard({ row, ordersLoading, billableCzk, onOpen }: {
         ...(row.club.isActive ? {} : { opacity: 0.6 }),
       }}
       tabIndex={0}
+      onMouseEnter={showIntent}
+      onMouseLeave={cancelIntent}
+      onFocus={showIntent}
+      onBlur={cancelIntent}
       onClick={onOpen}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {

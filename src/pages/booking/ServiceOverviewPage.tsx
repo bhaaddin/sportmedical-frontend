@@ -153,7 +153,7 @@ export default function ServiceOverviewPage() {
 
   const appointmentsQuery = useQuery({
     queryKey: ["day-range", from, to, shownIds.join(",")],
-    queryFn: () => appointmentsApi.range(from, to, shownIds),
+    queryFn: ({ signal }) => appointmentsApi.range(from, to, shownIds, { signal }),
     enabled,
     placeholderData: (previous) => previous,
   });

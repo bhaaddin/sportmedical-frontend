@@ -321,9 +321,9 @@ describe('Statistiky', () => {
     const user = userEvent.setup();
     mount(<StatsPage />);
     await screen.findByTestId('club-kpis');
-    expect(ordersStats).toHaveBeenLastCalledWith({});
+    expect(ordersStats).toHaveBeenLastCalledWith({}, expect.anything());
     await user.click(screen.getByRole('button', { name: 'Tento měsíc' }));
-    await waitFor(() => expect(ordersStats).toHaveBeenLastCalledWith({ from: expect.stringMatching(/^\d{4}-\d{2}-01$/), to: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }));
+    await waitFor(() => expect(ordersStats).toHaveBeenLastCalledWith({ from: expect.stringMatching(/^\d{4}-\d{2}-01$/), to: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }, expect.anything()));
   });
 
   it('shows the empty state and the error state with a retry', async () => {

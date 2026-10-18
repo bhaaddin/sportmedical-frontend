@@ -1,5 +1,6 @@
 import client from './client';
 import { toBookingError } from './apiError';
+import { createDayRowsCover } from './dayRowsCover';
 import {
   dayActivityGridSchema,
   cycleDatesSchema,
@@ -40,6 +41,16 @@ async function request<T>(run: () => Promise<T>): Promise<T> {
     throw toBookingError(error);
   }
 }
+
+/* One row per date, so a week is cut out of the month that is already here instead of asked for again. */
+const previewCover = createDayRowsCover<PreviewDay>((calendarId, from, to) =>
+  request(async () => {
+    const res = await client.get(`/api/calendars/${calendarId}/preview`, {
+      params: { from, to },
+    });
+    return parseResponse(previewListSchema, res.data);
+  }),
+);
 
 export const workingHoursApi = {
   /* ── Validity periods ── */
@@ -146,12 +157,7 @@ export const workingHoursApi = {
    * empty list that reads like a closed clinic.
    */
   preview: (calendarId: string, from: string, to: string): Promise<PreviewDay[]> =>
-    request(async () => {
-      const res = await client.get(`/api/calendars/${calendarId}/preview`, {
-        params: { from, to },
-      });
-      return parseResponse(previewListSchema, res.data);
-    }),
+    previewCover.read(calendarId, from, to),
 
   /**
    * The dates a candidate cycle falls on (4.2). Pure: it stores nothing and

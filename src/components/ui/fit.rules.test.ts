@@ -48,19 +48,19 @@ describe('data pages take the width that is there', () => {
 
 describe('the page is as tall as the window, never taller', () => {
   it('the Layout is 100dvh with one scroll region, and the planner keeps its own sizing', () => {
-    const app = read('App.tsx');
+    const app = read('App.tsx') + read('StaffApp.tsx');
     expect(app).toMatch(/height: '100dvh'/);
     expect(app).toMatch(/id="fit-region"/);
     expect(app).toMatch(/isPlannerRoute\(location\.pathname\)/);
   });
 
-  it.each(['pages/Login.tsx', 'components/GlobalErrorBoundary.tsx', 'pages/settings/SettingsFrame.tsx', 'App.tsx'])(
+  it.each(['pages/Login.tsx', 'components/GlobalErrorBoundary.tsx', 'pages/settings/SettingsFrame.tsx', 'App.tsx', 'StaffApp.tsx'])(
     '%s uses dvh where it means "the window"',
     (file) => {
       const source = read(file);
-      /* App keeps `minHeight: '100vh'` for the planner's untouched branch only. */
+      /* The staff Layout keeps `minHeight: '100vh'` for the planner's untouched branch only. */
       const vh = (source.match(/['"]100vh['"]/g) ?? []).length;
-      expect(vh).toBeLessThanOrEqual(file === 'App.tsx' ? 2 : 0);
+      expect(vh).toBeLessThanOrEqual(file === 'StaffApp.tsx' ? 2 : 0);
     },
   );
 });

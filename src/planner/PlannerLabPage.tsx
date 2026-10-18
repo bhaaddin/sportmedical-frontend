@@ -21,7 +21,7 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import { pragueDateKey } from '../utils/time';
 import { useApiDataSource, useLabOrderSession } from './api/useApiDataSource';
 import { PlannerShell } from './components/PlannerShell';
-import { DemoDataSource } from './data/DemoDataSource';
+import { useDemoDataSource } from './data/useDemoDataSource';
 import { todayIso } from './model';
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -46,8 +46,15 @@ function DemoLab({ params }: { params: URLSearchParams }) {
   const latency = Number(params.get('latency') ?? 0) || 0;
   const today = todayParam && ISO.test(todayParam) ? todayParam : todayIso();
   const initialDate = dateParam && ISO.test(dateParam) ? dateParam : '2026-11-20';
-  const source = useMemo(() => new DemoDataSource({ today, latencyMs: latency }), [today, latency]);
+  const source = useDemoDataSource(true, { today, latencyMs: latency });
   const user = useMemo(storedUser, []);
+  if (source === null) {
+    return (
+      <div style={frame} role="status" data-testid="planner-lab-loading">
+        Načítám ukázková data…
+      </div>
+    );
+  }
   return (
     <div style={frame} data-testid="planner-lab" data-source="demo">
       <PlannerShell source={source} today={today} initialDate={initialDate} user={user} />

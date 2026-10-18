@@ -55,12 +55,13 @@ export function isPrerendered(html) {
 /** The woff2 files worth preloading: the faces the first screen is set in, Latin and Latin-ext (Czech). */
 const PRELOAD_FACES = [/^archivo-latin(?:-ext)?-800-normal/, /^public-sans-latin(?:-ext)?-400-normal/];
 
-export function pickFontPreloads(cssText) {
+/** `faces`: patterns for the file names to keep (default: the public pages' first screen). */
+export function pickFontPreloads(cssText, faces = PRELOAD_FACES) {
   const urls = [...cssText.matchAll(/url\((\/assets\/[^)\s]+?\.woff2)\)/g)].map((m) => m[1]);
   const picked = [];
   for (const url of urls) {
     const name = url.slice(url.lastIndexOf('/') + 1);
-    if (PRELOAD_FACES.some((face) => face.test(name)) && !picked.includes(url)) picked.push(url);
+    if (faces.some((face) => face.test(name)) && !picked.includes(url)) picked.push(url);
   }
   return picked;
 }

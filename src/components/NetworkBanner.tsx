@@ -6,10 +6,9 @@
        restarting or down. The client keeps asking in the background
        (api/connection.ts) and this says so, then says when it came back.
    ══════════════════════════════════════════════════════════════ */
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Box, Typography, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { WifiOff, CheckCircle, CloudOff } from '@mui/icons-material';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { connection } from '../api/connection';
 
@@ -17,6 +16,13 @@ export const SERVER_UNREACHABLE_TEXT = 'Server je nedostupný — zkouším znov
 /** After a quarter of an hour unused the server sleeps; the first answer takes up to a minute. The client keeps asking. */
 export const SERVER_WAKING_HINT = 'Po delší nečinnosti se server probouzí – může to trvat až minutu, počkejte prosím.';
 export const OFFLINE_TEXT ='Jste offline — některé funkce mohou být nedostupné';
+
+/* The strip slides in with the animation library, which is fetched the first time the strip is needed (not with the
+   page). If it cannot be fetched - which is exactly what an offline browser means - the strip appears without the slide. */
+function PlainSlide({ show, children }: { show: boolean; children: ReactNode }) {
+  return show ? <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999 }}>{children}</div> : null;
+}
+const Slide = lazy(() => import('./NetworkBannerSlide').catch(() => ({ default: PlainSlide })));
 
 export default function NetworkBanner() {
   const isOnline = useNetworkStatus();
@@ -26,6 +32,9 @@ export default function NetworkBanner() {
 
   const wasTroubled = useRef(false);
   const [showRestored, setShowRestored] = useState(false);
+  /* Once the strip has been needed it stays mounted, so it can slide out again. */
+  const [needed, setNeeded] = useState(false);
+  if (troubled && !needed) setNeeded(true);
 
   useEffect(() => {
     if (troubled) {
@@ -42,14 +51,9 @@ export default function NetworkBanner() {
 
   return (
     <>
-      <AnimatePresence>
-        {troubled && (
-          <motion.div
-            initial={{ y: -50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -50, opacity: 0 }}
-            style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999 }}
-          >
+      {(troubled || needed) && (
+        <Suspense fallback={null}>
+          <Slide show={troubled}>
             <Box
               role="alert"
               sx={{
@@ -68,9 +72,9 @@ export default function NetworkBanner() {
                 </Typography>
               )}
             </Box>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </Slide>
+        </Suspense>
+      )}
 
       <Snackbar open={showRestored} autoHideDuration={3000} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert severity="success" icon={<CheckCircle />} sx={{ borderRadius: 2 }}>

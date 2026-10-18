@@ -30,7 +30,7 @@ vi.mock('../NotificationCenter', () => ({
   default: () => <button type="button" aria-label="Oznámení">zvonek</button>,
 }));
 
-const { Layout } = await import('../../App');
+const { Layout } = await import('../../StaffApp');
 const { SidebarPortal, useHasSidebarSlot } = await import('./SidebarSlot');
 const { OPEN_SEARCH_EVENT } = await import('../UniversalSearch');
 

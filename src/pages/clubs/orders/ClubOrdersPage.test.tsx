@@ -167,9 +167,9 @@ describe('filters', () => {
     await screen.findAllByTestId('order-row');
     await user.click(screen.getByLabelText('Klub'));
     await user.click(await screen.findByRole('option', { name: 'HC Kladno' }));
-    await waitFor(() => expect(list).toHaveBeenLastCalledWith({ clubId: 'club-2' }));
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith({ clubId: 'club-2' }, expect.anything()));
     await user.type(screen.getByLabelText('Termín od'), '2026-11-10');
-    await waitFor(() => expect(list).toHaveBeenLastCalledWith({ clubId: 'club-2', from: '2026-11-10' }));
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith({ clubId: 'club-2', from: '2026-11-10' }, expect.anything()));
   });
 
   it('narrows by date range against the terms', async () => {

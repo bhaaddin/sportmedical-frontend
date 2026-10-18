@@ -10,14 +10,16 @@
  *      ask for (or the Owner does not hold)                     -> NotFound
  *   3. the route points at a page module that does not exist    -> blank / crash
  *
- * App.tsx is parsed as text, the same way catalogue.test.ts does.
+ * App.tsx is parsed as text, the same way catalogue.test.ts does - together with StaffApp.tsx, where the staff route table
+ * lives since the staff portal became a chunk of its own.
  */
 import { describe, it, expect } from 'vitest';
 import appRaw from '../../App.tsx?raw';
+import staffRaw from '../../StaffApp.tsx?raw';
 import type { Permission } from '../../auth/usePermission';
 import { SETTINGS_SECTIONS, visibleSections } from './catalogue';
 
-const appSource = appRaw as string;
+const appSource = (appRaw as string) + (staffRaw as string);
 
 /** Every permission the server defines - the Owner holds all of them. */
 const OWNER = [

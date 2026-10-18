@@ -9,6 +9,10 @@
          it with English pronunciation. -->
     <title>SportMedical Diagnostics</title>
     <meta name="robots" content="noindex" />
+    <!-- There is no favicon file. Without this line the browser asks for /favicon.ico on every page, and the
+         SPA fallback answers it with the whole HTML shell (a wasted request and a few hundred bytes each time).
+         An empty icon says "none" and the tab looks exactly as it did. -->
+    <link rel="icon" href="data:," />
   </head>
   <body>
     <div id="root"></div>

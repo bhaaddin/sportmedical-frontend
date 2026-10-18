@@ -20,10 +20,11 @@ vi.mock('./client', () => ({
   default: { get, post, put, delete: vi.fn(), patch: vi.fn() },
 }));
 
-const { appointmentsApi } = await import('./appointments');
+const { appointmentsApi, resetRangeCoversForTests } = await import('./appointments');
 
 /* The endpoints parse their answer with zod, so give them a valid empty list. */
 beforeEach(() => {
+  resetRangeCoversForTests();
   get.mockReset();
   get.mockResolvedValue({ data: [] });
   post.mockReset();

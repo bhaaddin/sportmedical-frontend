@@ -43,12 +43,37 @@ const appMessages: NotificationFeedMessages = {
 /* One feed per bell, one channel between them. */
 const siblings = new Set<() => void>();
 const announceChange = (except: () => void) => {
+  seedList = null;
+  seedSeen = null;
   siblings.forEach((refresh) => {
     if (refresh !== except) refresh();
   });
 };
 
 const POLL_MS = 60_000;
+
+/*
+ * What the last bell to ask was told, kept for a moment. Every page draws its own bell, so each navigation used to
+ * download the whole list (the largest answer on most screens) again, and the sidebar's bell and the planner's bell,
+ * mounted a render apart, asked for the very list the other had just received. A bell that mounts within SEED_MS of an
+ * answer starts from it instead of asking again; the socket's nudge and the 60 s poll still refresh it, and any change
+ * made here (read, deleted, seen) empties it, so a bell never starts from a list that is known to be out of date.
+ */
+const SEED_MS = 15_000;
+let seedList: { at: number; list: FeedNotification[] } | null = null;
+let seedSeen: { at: number; seenAt: string | null } | null = null;
+const freshList = () => (seedList !== null && Date.now() - seedList.at < SEED_MS ? seedList : null);
+const freshSeen = () => (seedSeen !== null && Date.now() - seedSeen.at < SEED_MS ? seedSeen : null);
+
+/**
+ * Test hook: a bell on a new test starts from nothing. The shared test setup reaches it through `globalThis`, so that
+ * setting up every test does not import this module (and with it the HTTP client) before the test's own mocks exist.
+ */
+export function resetNotificationFeedForTests(): void {
+  seedList = null;
+  seedSeen = null;
+}
+(globalThis as { __smResetNotificationFeed?: () => void }).__smResetNotificationFeed = resetNotificationFeedForTests;
 
 export interface NotificationFeed {
   notifications: FeedNotification[];
@@ -65,14 +90,14 @@ export interface NotificationFeed {
 }
 
 export function useNotificationFeed(messages: NotificationFeedMessages = appMessages): NotificationFeed {
-  const [notifications, setNotifications] = useState<FeedNotification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState<FeedNotification[]>(() => freshList()?.list ?? []);
+  const [loading, setLoading] = useState(() => freshList() === null);
   /*
    * When this viewer last opened the panel, straight from the server. Null until
    * the server sends it, and then no "new since" line is drawn at all - a divider
    * in the wrong place is worse than none.
    */
-  const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
+  const [lastSeenAt, setLastSeenAt] = useState<string | null>(() => freshSeen()?.seenAt ?? null);
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
   const notificationsRef = useRef(notifications);
@@ -83,7 +108,9 @@ export function useNotificationFeed(messages: NotificationFeedMessages = appMess
     try {
       const res = await client.get('/api/notifications');
       const data = res.data?.value ?? res.data;
-      setNotifications(Array.isArray(data) ? data : data?.items ?? []);
+      const list: FeedNotification[] = Array.isArray(data) ? data : data?.items ?? [];
+      setNotifications(list);
+      seedList = { at: Date.now(), list };
     } catch {
       /* Keep what is on screen; the next poll asks again. */
     } finally {
@@ -96,6 +123,7 @@ export function useNotificationFeed(messages: NotificationFeedMessages = appMess
       const res = await client.get('/api/notifications/seen');
       const at = res.data?.lastSeenAtUtc ?? null;
       setLastSeenAt(typeof at === 'string' ? at : null);
+      seedSeen = { at: Date.now(), seenAt: typeof at === 'string' ? at : null };
     } catch {
       /* Older servers have no such route. No marker, no line. */
       setLastSeenAt(null);
@@ -103,8 +131,8 @@ export function useNotificationFeed(messages: NotificationFeedMessages = appMess
   }, []);
 
   useEffect(() => {
-    void fetchNotifications();
-    void fetchLastSeen();
+    if (freshList() === null) void fetchNotifications();
+    if (freshSeen() === null) void fetchLastSeen();
   }, [fetchNotifications, fetchLastSeen]);
 
   useEffect(() => {
@@ -173,6 +201,7 @@ export function useNotificationFeed(messages: NotificationFeedMessages = appMess
     try {
       const res = await client.post('/api/notifications/seen');
       const at = res.data?.lastSeenAtUtc ?? null;
+      seedSeen = null;
       if (typeof at === 'string') setLastSeenAt(at);
     } catch {
       /* Failing to stamp shows the line again next time - a repeat, not a loss. */

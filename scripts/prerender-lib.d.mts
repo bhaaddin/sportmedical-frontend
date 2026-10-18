@@ -4,7 +4,7 @@ export function assetsForEntry(
   manifest: Record<string, { file: string; css?: string[]; imports?: string[] }>,
   entryKey: string,
 ): { js: string[]; css: string[] };
-export function pickFontPreloads(cssText: string): string[];
+export function pickFontPreloads(cssText: string, faces?: RegExp[]): string[];
 export interface PageParts {
   html: string;
   styles: string;

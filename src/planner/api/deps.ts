@@ -83,8 +83,11 @@ export interface ApiDeps {
   invalidate(): Promise<void>;
 }
 
-/** How long a shared read counts as fresh. Writes invalidate explicitly. */
-export const READ_STALE_MS = 10_000;
+/**
+ * How long a shared read counts as fresh: the same 30 s the application's query client gives ordinary data, so a
+ * planner read and the calendar's own query for the same key agree on what "fresh" means. Writes invalidate explicitly.
+ */
+export const READ_STALE_MS = 30_000;
 
 /** A read that uses the application's cache (same key, same shape as the screens) or just calls through. */
 export type Reader = <T>(key: QueryKey, run: () => Promise<T>, staleMs?: number) => Promise<T>;
@@ -142,7 +145,7 @@ export function defaultApiDeps(queryClient?: QueryClient | null): ApiDeps {
           }),
         );
         return new Map<string, Map<string, PreviewDay>>(perCalendar);
-      }),
+      }, FIVE_MIN),
     holidays: (year) => read(['holidays', year], () => holidaysApi.year(year), 10 * 60 * 1000),
     clubBlocks: (from, to) => read(['club-blocks', 'details', from, to], () => clubBlocksApi.list({ from, to }), 30_000),
     appointment: (calendarId, id) => appointmentsApi.get(calendarId, id),
@@ -154,7 +157,8 @@ export function defaultApiDeps(queryClient?: QueryClient | null): ApiDeps {
     updateOrder: (id, input, cancelAffectedAthletes) => clubOrdersApi.update(id, input, cancelAffectedAthletes),
     confirmOrder: (id, input) => clubOrdersApi.confirm(id, input),
     inviteClub: (input) => clubOrdersApi.invite(input),
-    club: (id) => read(['club', id], () => clubsApi.getById(id), 0),
+    /* The key the club's own screen reads (`useClubPlannerData`), so opening the planner from it asks nothing twice. */
+    club: (id) => read(['clubs', 'one', id], () => clubsApi.getById(id)),
     updateClub: (id, data) => clubsApi.update(id, data),
     permissions: () => parsePermissions(permissionsSnapshot()),
     invalidate: async () => {

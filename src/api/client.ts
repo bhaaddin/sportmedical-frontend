@@ -2,6 +2,7 @@ import axios, { type AxiosError } from 'axios';
 import { reportReachable, reportUnreachable } from './connection';
 import { clearLocalSession } from '../auth/localSession';
 import { socketService } from '../services/socketService';
+import { installRequestPolicy } from './requestPolicy';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -120,6 +121,10 @@ client.interceptors.response.use(
     return Promise.reject(err);
   }
 );
+
+/* Shared identical reads, 429 pauses and the "a write happened" signal: see requestPolicy.ts. Installed after the
+   handlers above so a retried read goes through every one of them again. */
+installRequestPolicy(client);
 
 export { client };
 export default client;

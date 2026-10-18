@@ -26,12 +26,12 @@ export default function ClubStatsPage() {
   const periodFilter = { ...(range.from ? { from: range.from } : {}), ...(range.to ? { to: range.to } : {}) };
   const query = useQuery({
     queryKey: ['club-stats', range.from, range.to],
-    queryFn: () => clubOrdersApi.stats(periodFilter),
+    queryFn: ({ signal }) => clubOrdersApi.stats(periodFilter, { signal }),
   });
   /* Etapa 12: the money next to the counts comes from the orders of the same period; the counts stand without it. */
   const ordersQuery = useQuery({
     queryKey: ['club-orders', '', range.from ?? '', range.to ?? ''],
-    queryFn: () => clubOrdersApi.list(periodFilter),
+    queryFn: ({ signal }) => clubOrdersApi.list(periodFilter, { signal }),
     retry: false,
   });
 

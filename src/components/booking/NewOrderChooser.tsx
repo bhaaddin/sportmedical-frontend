@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   Alert,
   Box,
@@ -30,7 +30,9 @@ import { DESIGN } from "../ui";
 import { addDaysToDateOnly, pragueDateKey, toDateOnly } from "../../utils/time";
 import { NEXT_FREE_HORIZON_DAYS } from "./grid/nextFreeSlot";
 import { pragueClock } from "./NewAppointmentDialog.logic";
-import { NewAppointmentDialog } from "./NewAppointmentDialog";
+/* The booking drawer (~55 kB with its forms) is only needed once a slot has been found, so it is fetched then - not with
+   the sidebar this chooser sits in, which every staff screen carries. */
+const NewAppointmentDialog = lazy(() => import("./NewAppointmentDialog").then((m) => ({ default: m.NewAppointmentDialog })));
 
 /**
  * "Nová objednávka": what the desk does first is choose the služba; then there
@@ -188,20 +190,22 @@ export function NewOrderChooser({ open, onClose }: NewOrderChooserProps) {
   /* The drawer takes over once a slot is found; the chooser is gone behind it. */
   if (slot !== null) {
     return (
-      <NewAppointmentDialog
-        open
-        onClose={finish}
-        onBooked={() => {
-          void queryClient.invalidateQueries({ queryKey: ["day-range"] });
-          void queryClient.invalidateQueries({ queryKey: ["availability"] });
-        }}
-        initialCalendarId={slot.calendarId}
-        initialStart={`${slot.date}T${slot.time}`}
-        initialEnd={`${slot.date}T${slot.end}`}
-        initialQuick
-        initialActivityId={slot.activityId}
-        initialServiceId={service?.id}
-      />
+      <Suspense fallback={null}>
+        <NewAppointmentDialog
+          open
+          onClose={finish}
+          onBooked={() => {
+            void queryClient.invalidateQueries({ queryKey: ["day-range"] });
+            void queryClient.invalidateQueries({ queryKey: ["availability"] });
+          }}
+          initialCalendarId={slot.calendarId}
+          initialStart={`${slot.date}T${slot.time}`}
+          initialEnd={`${slot.date}T${slot.end}`}
+          initialQuick
+          initialActivityId={slot.activityId}
+          initialServiceId={service?.id}
+        />
+      </Suspense>
     );
   }
 

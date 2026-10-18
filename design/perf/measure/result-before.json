@@ -1,0 +1,5337 @@
+{
+ "results": [
+  {
+   "name": "01 sign-in -> /prehled (cold)",
+   "tv": 4258,
+   "quiet": 4258,
+   "reqs": [
+    {
+     "method": "POST",
+     "path": "/api/v1/session",
+     "full": "/api/v1/session",
+     "query": "",
+     "start": 2076,
+     "scen": "login",
+     "status": 200,
+     "ms": 153,
+     "bytes": 1033
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 2303,
+     "scen": "login",
+     "status": 200,
+     "ms": 27,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 2303,
+     "scen": "login",
+     "status": 200,
+     "ms": 26,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/account",
+     "full": "/api/v1/account",
+     "query": "",
+     "start": 2303,
+     "scen": "login",
+     "status": 200,
+     "ms": 27,
+     "bytes": 949
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 2303,
+     "scen": "login",
+     "status": 200,
+     "ms": 36,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 2303,
+     "scen": "login",
+     "status": 200,
+     "ms": 36,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients",
+     "full": "/api/patients?page=1&pageSize=6",
+     "query": "?page=1&pageSize=6",
+     "start": 2595,
+     "scen": "login",
+     "status": 200,
+     "ms": 29,
+     "bytes": 3039
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients",
+     "full": "/api/patients?page=1&pageSize=1",
+     "query": "?page=1&pageSize=1",
+     "start": 2596,
+     "scen": "login",
+     "status": 200,
+     "ms": 28,
+     "bytes": 631
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-18&to=2026-10-18",
+     "query": "?from=2026-10-18&to=2026-10-18",
+     "start": 2596,
+     "scen": "login",
+     "status": 200,
+     "ms": 40,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients",
+     "full": "/api/patients?page=1&pageSize=1",
+     "query": "?page=1&pageSize=1",
+     "start": 2596,
+     "scen": "login",
+     "status": 200,
+     "ms": 41,
+     "bytes": 631
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-18&to=2026-10-18",
+     "query": "?from=2026-10-18&to=2026-10-18",
+     "start": 2596,
+     "scen": "login",
+     "status": 200,
+     "ms": 64,
+     "bytes": 78
+    }
+   ]
+  },
+  {
+   "name": "02 /planovani cold load",
+   "tv": 2190,
+   "quiet": 3786,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/v1/account",
+     "full": "/api/v1/account",
+     "query": "",
+     "start": 5211,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 128,
+     "bytes": 949
+    },
+    {
+     "method": "GET",
+     "path": "/api/public/clinic",
+     "full": "/api/public/clinic",
+     "query": "",
+     "start": 5544,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 42,
+     "bytes": 358
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars",
+     "full": "/api/calendars",
+     "query": "",
+     "start": 5544,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 43,
+     "bytes": 1849
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/calendar-display",
+     "full": "/api/v1/settings/calendar-display",
+     "query": "",
+     "start": 5544,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 42,
+     "bytes": 2790
+    },
+    {
+     "method": "GET",
+     "path": "/api/activities",
+     "full": "/api/activities",
+     "query": "",
+     "start": 5544,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 107,
+     "bytes": 16116
+    },
+    {
+     "method": "GET",
+     "path": "/api/clinic-services",
+     "full": "/api/clinic-services",
+     "query": "",
+     "start": 5544,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 64,
+     "bytes": 1626
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/clubs",
+     "full": "/api/v1/settings/clubs",
+     "query": "",
+     "start": 5544,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 43,
+     "bytes": 662
+    },
+    {
+     "method": "GET",
+     "path": "/api/holidays/2026",
+     "full": "/api/holidays/2026",
+     "query": "",
+     "start": 5587,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 43,
+     "bytes": 2285
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 5587,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 125,
+     "bytes": 20337
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 5587,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 140,
+     "bytes": 21709
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 5587,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 140,
+     "bytes": 21709
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 5587,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 151,
+     "bytes": 23081
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 5587,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 180,
+     "bytes": 13645
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 5587,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 168,
+     "bytes": 14576
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 5587,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 195,
+     "bytes": 14576
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 5587,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 236,
+     "bytes": 15507
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-09-28&to=2026-11-08&calendarIds={id},{id},{id},{id}",
+     "start": 5652,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 265,
+     "bytes": 11971
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 5652,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 130,
+     "bytes": 5527
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 5652,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 122,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 5652,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 131,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 5652,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 137,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-blocks",
+     "full": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 5652,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 167,
+     "bytes": 12809
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-12&to=2026-10-18&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-10-12&to=2026-10-18&calendarIds={id},{id},{id},{id}",
+     "start": 6115,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 55,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 6115,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 69,
+     "bytes": 3503
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 6115,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 56,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 6115,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 85,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 6115,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 85,
+     "bytes": 3993
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 6115,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 84,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 6150,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 206,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 6150,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 188,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 6151,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 206,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 6151,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 187,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 6151,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 186,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/company",
+     "full": "/api/v1/settings/company",
+     "query": "",
+     "start": 6151,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 115,
+     "bytes": 432
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/users",
+     "full": "/api/v1/users",
+     "query": "",
+     "start": 6151,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 207,
+     "bytes": 374
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 6151,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 206,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 6151,
+     "scen": "02 /planovani cold load",
+     "status": 200,
+     "ms": 207,
+     "bytes": 29
+    }
+   ]
+  },
+  {
+   "name": "03 planner: next week",
+   "tv": null,
+   "quiet": 1908,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-19&to=2026-10-25&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-10-19&to=2026-10-25&calendarIds={id},{id},{id},{id}",
+     "start": 8332,
+     "scen": "03 planner: next week",
+     "status": 200,
+     "ms": 34,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-19&to=2026-10-25",
+     "query": "?from=2026-10-19&to=2026-10-25",
+     "start": 8332,
+     "scen": "03 planner: next week",
+     "status": 200,
+     "ms": 34,
+     "bytes": 3503
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-19&to=2026-10-25",
+     "query": "?from=2026-10-19&to=2026-10-25",
+     "start": 8332,
+     "scen": "03 planner: next week",
+     "status": 200,
+     "ms": 34,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-19&to=2026-10-25",
+     "query": "?from=2026-10-19&to=2026-10-25",
+     "start": 8332,
+     "scen": "03 planner: next week",
+     "status": 200,
+     "ms": 45,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-19&to=2026-10-25",
+     "query": "?from=2026-10-19&to=2026-10-25",
+     "start": 8332,
+     "scen": "03 planner: next week",
+     "status": 200,
+     "ms": 45,
+     "bytes": 3993
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-10-19&to=2026-10-25",
+     "query": "?from=2026-10-19&to=2026-10-25",
+     "start": 8332,
+     "scen": "03 planner: next week",
+     "status": 200,
+     "ms": 21,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-10-19&to=2026-10-25",
+     "query": "?from=2026-10-19&to=2026-10-25",
+     "start": 8332,
+     "scen": "03 planner: next week",
+     "status": 200,
+     "ms": 46,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-10-19&to=2026-10-25",
+     "query": "?from=2026-10-19&to=2026-10-25",
+     "start": 8332,
+     "scen": "03 planner: next week",
+     "status": 200,
+     "ms": 46,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-10-19&to=2026-10-25",
+     "query": "?from=2026-10-19&to=2026-10-25",
+     "start": 8332,
+     "scen": "03 planner: next week",
+     "status": 200,
+     "ms": 46,
+     "bytes": 78
+    }
+   ]
+  },
+  {
+   "name": "04 planner: previous week (back, should be cached)",
+   "tv": null,
+   "quiet": 1701,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-12&to=2026-10-18&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-10-12&to=2026-10-18&calendarIds={id},{id},{id},{id}",
+     "start": 10074,
+     "scen": "04 planner: previous week (back, should be cached)",
+     "status": 200,
+     "ms": 30,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 10074,
+     "scen": "04 planner: previous week (back, should be cached)",
+     "status": 200,
+     "ms": 45,
+     "bytes": 3503
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 10074,
+     "scen": "04 planner: previous week (back, should be cached)",
+     "status": 200,
+     "ms": 31,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 10074,
+     "scen": "04 planner: previous week (back, should be cached)",
+     "status": 200,
+     "ms": 31,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 10104,
+     "scen": "04 planner: previous week (back, should be cached)",
+     "status": 200,
+     "ms": 1,
+     "bytes": 3993
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 10104,
+     "scen": "04 planner: previous week (back, should be cached)",
+     "status": 200,
+     "ms": 0,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 10104,
+     "scen": "04 planner: previous week (back, should be cached)",
+     "status": 200,
+     "ms": 30,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 10104,
+     "scen": "04 planner: previous week (back, should be cached)",
+     "status": 200,
+     "ms": 20,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 10104,
+     "scen": "04 planner: previous week (back, should be cached)",
+     "status": 200,
+     "ms": 21,
+     "bytes": 78
+    }
+   ]
+  },
+  {
+   "name": "05 planner: Den",
+   "tv": null,
+   "quiet": 1789,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-12&to=2026-10-12&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-10-12&to=2026-10-12&calendarIds={id},{id},{id},{id}",
+     "start": 11860,
+     "scen": "05 planner: Den",
+     "status": 200,
+     "ms": 46,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-12&to=2026-10-12",
+     "query": "?from=2026-10-12&to=2026-10-12",
+     "start": 11860,
+     "scen": "05 planner: Den",
+     "status": 200,
+     "ms": 47,
+     "bytes": 617
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-12&to=2026-10-12",
+     "query": "?from=2026-10-12&to=2026-10-12",
+     "start": 11860,
+     "scen": "05 planner: Den",
+     "status": 200,
+     "ms": 47,
+     "bytes": 666
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-12&to=2026-10-12",
+     "query": "?from=2026-10-12&to=2026-10-12",
+     "start": 11860,
+     "scen": "05 planner: Den",
+     "status": 200,
+     "ms": 47,
+     "bytes": 666
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-12&to=2026-10-12",
+     "query": "?from=2026-10-12&to=2026-10-12",
+     "start": 11860,
+     "scen": "05 planner: Den",
+     "status": 200,
+     "ms": 47,
+     "bytes": 715
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-10-12&to=2026-10-12",
+     "query": "?from=2026-10-12&to=2026-10-12",
+     "start": 11860,
+     "scen": "05 planner: Den",
+     "status": 200,
+     "ms": 48,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-10-12&to=2026-10-12",
+     "query": "?from=2026-10-12&to=2026-10-12",
+     "start": 11897,
+     "scen": "05 planner: Den",
+     "status": 200,
+     "ms": 18,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-10-12&to=2026-10-12",
+     "query": "?from=2026-10-12&to=2026-10-12",
+     "start": 11897,
+     "scen": "05 planner: Den",
+     "status": 200,
+     "ms": 19,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-10-12&to=2026-10-12",
+     "query": "?from=2026-10-12&to=2026-10-12",
+     "start": 11897,
+     "scen": "05 planner: Den",
+     "status": 200,
+     "ms": 22,
+     "bytes": 78
+    }
+   ]
+  },
+  {
+   "name": "06 planner: Měsíc",
+   "tv": null,
+   "quiet": 1629,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-09-28&to=2026-11-08&calendarIds={id},{id},{id},{id}",
+     "start": 13499,
+     "scen": "06 planner: Měsíc",
+     "status": 200,
+     "ms": 52,
+     "bytes": 11971
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 13499,
+     "scen": "06 planner: Měsíc",
+     "status": 200,
+     "ms": 29,
+     "bytes": 20337
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 13499,
+     "scen": "06 planner: Měsíc",
+     "status": 200,
+     "ms": 28,
+     "bytes": 21709
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 13499,
+     "scen": "06 planner: Měsíc",
+     "status": 200,
+     "ms": 29,
+     "bytes": 21709
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 13499,
+     "scen": "06 planner: Měsíc",
+     "status": 200,
+     "ms": 28,
+     "bytes": 23081
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 13499,
+     "scen": "06 planner: Měsíc",
+     "status": 200,
+     "ms": 28,
+     "bytes": 5527
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 13499,
+     "scen": "06 planner: Měsíc",
+     "status": 200,
+     "ms": 36,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 13499,
+     "scen": "06 planner: Měsíc",
+     "status": 200,
+     "ms": 37,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 13499,
+     "scen": "06 planner: Měsíc",
+     "status": 200,
+     "ms": 37,
+     "bytes": 78
+    }
+   ]
+  },
+  {
+   "name": "07 planner: Týden again",
+   "tv": null,
+   "quiet": 1608,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-12&to=2026-10-18&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-10-12&to=2026-10-18&calendarIds={id},{id},{id},{id}",
+     "start": 15125,
+     "scen": "07 planner: Týden again",
+     "status": 200,
+     "ms": 19,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 15126,
+     "scen": "07 planner: Týden again",
+     "status": 200,
+     "ms": 20,
+     "bytes": 3503
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 15126,
+     "scen": "07 planner: Týden again",
+     "status": 200,
+     "ms": 20,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 15126,
+     "scen": "07 planner: Týden again",
+     "status": 200,
+     "ms": 20,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 15126,
+     "scen": "07 planner: Týden again",
+     "status": 200,
+     "ms": 19,
+     "bytes": 3993
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 15126,
+     "scen": "07 planner: Týden again",
+     "status": 200,
+     "ms": 16,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 15126,
+     "scen": "07 planner: Týden again",
+     "status": 200,
+     "ms": 30,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 15126,
+     "scen": "07 planner: Týden again",
+     "status": 200,
+     "ms": 30,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 15126,
+     "scen": "07 planner: Týden again",
+     "status": 200,
+     "ms": 30,
+     "bytes": 78
+    }
+   ]
+  },
+  {
+   "name": "08 planner: change service filter",
+   "tv": null,
+   "quiet": 1544,
+   "reqs": []
+  },
+  {
+   "name": "09 planner: tab hidden 1 s, then visible (focus)",
+   "tv": null,
+   "quiet": 2574,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/v1/account",
+     "full": "/api/v1/account",
+     "query": "",
+     "start": 19266,
+     "scen": "09 planner: tab hidden 1 s, then visible (focus)",
+     "status": 200,
+     "ms": 13,
+     "bytes": 949
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 19266,
+     "scen": "09 planner: tab hidden 1 s, then visible (focus)",
+     "status": 200,
+     "ms": 14,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-12&to=2026-10-18&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-10-12&to=2026-10-18&calendarIds={id},{id},{id},{id}",
+     "start": 19266,
+     "scen": "09 planner: tab hidden 1 s, then visible (focus)",
+     "status": 200,
+     "ms": 15,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 19266,
+     "scen": "09 planner: tab hidden 1 s, then visible (focus)",
+     "status": 200,
+     "ms": 15,
+     "bytes": 3503
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 19267,
+     "scen": "09 planner: tab hidden 1 s, then visible (focus)",
+     "status": 200,
+     "ms": 15,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 19267,
+     "scen": "09 planner: tab hidden 1 s, then visible (focus)",
+     "status": 200,
+     "ms": 14,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 19267,
+     "scen": "09 planner: tab hidden 1 s, then visible (focus)",
+     "status": 200,
+     "ms": 18,
+     "bytes": 3993
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 19267,
+     "scen": "09 planner: tab hidden 1 s, then visible (focus)",
+     "status": 200,
+     "ms": 14,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 19267,
+     "scen": "09 planner: tab hidden 1 s, then visible (focus)",
+     "status": 200,
+     "ms": 19,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 19267,
+     "scen": "09 planner: tab hidden 1 s, then visible (focus)",
+     "status": 200,
+     "ms": 18,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 19267,
+     "scen": "09 planner: tab hidden 1 s, then visible (focus)",
+     "status": 200,
+     "ms": 19,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 19267,
+     "scen": "09 planner: tab hidden 1 s, then visible (focus)",
+     "status": 200,
+     "ms": 29,
+     "bytes": 13645
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 19267,
+     "scen": "09 planner: tab hidden 1 s, then visible (focus)",
+     "status": 200,
+     "ms": 29,
+     "bytes": 14576
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 19267,
+     "scen": "09 planner: tab hidden 1 s, then visible (focus)",
+     "status": 200,
+     "ms": 29,
+     "bytes": 14576
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 19267,
+     "scen": "09 planner: tab hidden 1 s, then visible (focus)",
+     "status": 200,
+     "ms": 29,
+     "bytes": 15507
+    }
+   ]
+  },
+  {
+   "name": "09b planner: tab hidden 35 s, then visible (focus)",
+   "tv": null,
+   "quiet": 36522,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/v1/account",
+     "full": "/api/v1/account",
+     "query": "",
+     "start": 55806,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 949
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 55806,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-12&to=2026-10-18&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-10-12&to=2026-10-18&calendarIds={id},{id},{id},{id}",
+     "start": 55806,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 49,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 55806,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 50,
+     "bytes": 3503
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 55806,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 50,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 55806,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 50,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 55806,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 51,
+     "bytes": 3993
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 55806,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 55806,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 51,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 55807,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 50,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 55807,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 50,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 55807,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 62,
+     "bytes": 20337
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 55808,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 61,
+     "bytes": 21709
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 55808,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 66,
+     "bytes": 21709
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 55808,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 67,
+     "bytes": 23081
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 55808,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 69,
+     "bytes": 13645
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 55808,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 72,
+     "bytes": 14576
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 55808,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 76,
+     "bytes": 14576
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 55808,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 78,
+     "bytes": 15507
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-09-28&to=2026-11-08&calendarIds={id},{id},{id},{id}",
+     "start": 55808,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 121,
+     "bytes": 11971
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 55808,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 113,
+     "bytes": 5527
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 55808,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 112,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 55808,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 113,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 55808,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 115,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-blocks",
+     "full": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 55808,
+     "scen": "09b planner: tab hidden 35 s, then visible (focus)",
+     "status": 200,
+     "ms": 115,
+     "bytes": 12809
+    }
+   ]
+  },
+  {
+   "name": "10 /clubs cold load",
+   "tv": 847,
+   "quiet": 2806,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 58083,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 17,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 58083,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 20,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/account",
+     "full": "/api/v1/account",
+     "query": "",
+     "start": 58083,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 30,
+     "bytes": 949
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 58083,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 50,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 58083,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 47,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/clubs",
+     "full": "/api/clubs?activeOnly=false",
+     "query": "?activeOnly=false",
+     "start": 58382,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 8,
+     "bytes": 11112
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-blocks",
+     "full": "/api/v1/club-blocks",
+     "query": "",
+     "start": 58382,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 48,
+     "bytes": 39205
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars",
+     "full": "/api/calendars",
+     "query": "",
+     "start": 58382,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 46,
+     "bytes": 1849
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders",
+     "full": "/api/v1/club-orders",
+     "query": "",
+     "start": 58382,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 61,
+     "bytes": 94357
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/clubs/{id}/summary",
+     "full": "/api/v1/clubs/942e2676-d730-4a13-8016-17f95abd26e2/summary",
+     "query": "",
+     "start": 58427,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 55,
+     "bytes": 1042
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/clubs/{id}/summary",
+     "full": "/api/v1/clubs/c9e343b3-8cd4-4853-8c0c-e55bf01c4848/summary",
+     "query": "",
+     "start": 58427,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 53,
+     "bytes": 331
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/clubs/{id}/summary",
+     "full": "/api/v1/clubs/6413a7f3-1924-4313-aed2-b2df37b7499d/summary",
+     "query": "",
+     "start": 58427,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 55,
+     "bytes": 331
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/clubs/{id}/summary",
+     "full": "/api/v1/clubs/b1044f41-bd2f-4766-8b5b-499301e72b4e/summary",
+     "query": "",
+     "start": 58427,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 54,
+     "bytes": 331
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/partner-orders",
+     "query": "",
+     "start": 58468,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 238,
+     "bytes": 45806
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/partner-orders",
+     "query": "",
+     "start": 58468,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 38,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/partner-orders",
+     "query": "",
+     "start": 58468,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 39,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/partner-orders",
+     "query": "",
+     "start": 58468,
+     "scen": "10 /clubs cold load",
+     "status": 200,
+     "ms": 39,
+     "bytes": 78
+    }
+   ]
+  },
+  {
+   "name": "11 clubs -> FK Slaný (SPA nav)",
+   "tv": 846,
+   "quiet": 2367,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/clubs/{id}",
+     "full": "/api/clubs/942e2676-d730-4a13-8016-17f95abd26e2",
+     "query": "",
+     "start": 60489,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 9,
+     "bytes": 596
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders",
+     "full": "/api/v1/club-orders?clubId=942e2676-d730-4a13-8016-17f95abd26e2",
+     "query": "?clubId={id}",
+     "start": 60489,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 50,
+     "bytes": 51174
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-blocks",
+     "full": "/api/v1/club-blocks",
+     "query": "",
+     "start": 60489,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 22,
+     "bytes": 39205
+    },
+    {
+     "method": "GET",
+     "path": "/api/activities",
+     "full": "/api/activities",
+     "query": "",
+     "start": 60542,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 26,
+     "bytes": 16116
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders/{id}",
+     "full": "/api/v1/club-orders/01a105ca-380e-78e8-8874-0569cc041917",
+     "query": "",
+     "start": 60577,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 56,
+     "bytes": 6007
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/calendar-display",
+     "full": "/api/v1/settings/calendar-display",
+     "query": "",
+     "start": 60577,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 10,
+     "bytes": 2790
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-26&to=2026-10-26",
+     "query": "?from=2026-10-26&to=2026-10-26",
+     "start": 60633,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 26,
+     "bytes": 617
+    },
+    {
+     "method": "GET",
+     "path": "/api/public/clinic",
+     "full": "/api/public/clinic",
+     "query": "",
+     "start": 60660,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 23,
+     "bytes": 358
+    },
+    {
+     "method": "GET",
+     "path": "/api/activities",
+     "full": "/api/activities",
+     "query": "",
+     "start": 60660,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 40,
+     "bytes": 16116
+    },
+    {
+     "method": "GET",
+     "path": "/api/clinic-services",
+     "full": "/api/clinic-services",
+     "query": "",
+     "start": 60661,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 34,
+     "bytes": 1626
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/clubs",
+     "full": "/api/v1/settings/clubs",
+     "query": "",
+     "start": 60663,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 21,
+     "bytes": 662
+    },
+    {
+     "method": "GET",
+     "path": "/api/clubs/{id}",
+     "full": "/api/clubs/942e2676-d730-4a13-8016-17f95abd26e2",
+     "query": "",
+     "start": 60663,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 21,
+     "bytes": 596
+    },
+    {
+     "method": "GET",
+     "path": "/api/holidays/2026",
+     "full": "/api/holidays/2026",
+     "query": "",
+     "start": 60663,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 22,
+     "bytes": 2285
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 60664,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 41,
+     "bytes": 20337
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 60664,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 13645
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01",
+     "query": "?from=2026-09-28&to=2026-11-08&calendarIds={id}",
+     "start": 60700,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 52,
+     "bytes": 11971
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 60700,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 17,
+     "bytes": 5527
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-blocks",
+     "full": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 60700,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 17,
+     "bytes": 12809
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}",
+     "start": 60839,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 44,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 60839,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 44,
+     "bytes": 3379
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 60839,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 45,
+     "bytes": 3575
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 60839,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 45,
+     "bytes": 3575
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 60839,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 45,
+     "bytes": 3771
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 60839,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 44,
+     "bytes": 3193
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 60839,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 46,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 60839,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 45,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 60839,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 46,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 60839,
+     "scen": "11 clubs -> FK Slaný (SPA nav)",
+     "status": 200,
+     "ms": 46,
+     "bytes": 29
+    }
+   ]
+  },
+  {
+   "name": "12 club: click a club window (popover)",
+   "tv": null,
+   "quiet": 1621,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/v1/club-blocks/{id}",
+     "full": "/api/v1/club-blocks/01a105ca-3993-7bc3-a6f1-a28a7d3e0b65",
+     "query": "",
+     "start": 62573,
+     "scen": "12 club: click a club window (popover)",
+     "status": 200,
+     "ms": 29,
+     "bytes": 930
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders/{id}",
+     "full": "/api/v1/club-orders/01a105ca-3990-7710-9ccf-8732a2280010",
+     "query": "",
+     "start": 62612,
+     "scen": "12 club: click a club window (popover)",
+     "status": 200,
+     "ms": 34,
+     "bytes": 3936
+    }
+   ]
+  },
+  {
+   "name": "13 club: close popover, click it again (cache)",
+   "tv": null,
+   "quiet": 2235,
+   "reqs": []
+  },
+  {
+   "name": "14 club cold load /clubs/{id}",
+   "tv": 1540,
+   "quiet": 3070,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/v1/account",
+     "full": "/api/v1/account",
+     "query": "",
+     "start": 67126,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 36,
+     "bytes": 949
+    },
+    {
+     "method": "GET",
+     "path": "/api/clubs/{id}",
+     "full": "/api/clubs/942e2676-d730-4a13-8016-17f95abd26e2",
+     "query": "",
+     "start": 67423,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 5,
+     "bytes": 596
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders",
+     "full": "/api/v1/club-orders?clubId=942e2676-d730-4a13-8016-17f95abd26e2",
+     "query": "?clubId={id}",
+     "start": 67423,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 34,
+     "bytes": 51174
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-blocks",
+     "full": "/api/v1/club-blocks",
+     "query": "",
+     "start": 67423,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 15,
+     "bytes": 39205
+    },
+    {
+     "method": "GET",
+     "path": "/api/activities",
+     "full": "/api/activities",
+     "query": "",
+     "start": 67459,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 21,
+     "bytes": 16116
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders/{id}",
+     "full": "/api/v1/club-orders/01a105ca-380e-78e8-8874-0569cc041917",
+     "query": "",
+     "start": 67487,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 32,
+     "bytes": 6007
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars",
+     "full": "/api/calendars",
+     "query": "",
+     "start": 67487,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 11,
+     "bytes": 1849
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/calendar-display",
+     "full": "/api/v1/settings/calendar-display",
+     "query": "",
+     "start": 67487,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 8,
+     "bytes": 2790
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-26&to=2026-10-26",
+     "query": "?from=2026-10-26&to=2026-10-26",
+     "start": 67520,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 33,
+     "bytes": 617
+    },
+    {
+     "method": "GET",
+     "path": "/api/public/clinic",
+     "full": "/api/public/clinic",
+     "query": "",
+     "start": 67553,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 7,
+     "bytes": 358
+    },
+    {
+     "method": "GET",
+     "path": "/api/activities",
+     "full": "/api/activities",
+     "query": "",
+     "start": 67553,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 23,
+     "bytes": 16116
+    },
+    {
+     "method": "GET",
+     "path": "/api/clinic-services",
+     "full": "/api/clinic-services",
+     "query": "",
+     "start": 67553,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 15,
+     "bytes": 1626
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/clubs",
+     "full": "/api/v1/settings/clubs",
+     "query": "",
+     "start": 67553,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 8,
+     "bytes": 662
+    },
+    {
+     "method": "GET",
+     "path": "/api/clubs/{id}",
+     "full": "/api/clubs/942e2676-d730-4a13-8016-17f95abd26e2",
+     "query": "",
+     "start": 67553,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 8,
+     "bytes": 596
+    },
+    {
+     "method": "GET",
+     "path": "/api/holidays/2026",
+     "full": "/api/holidays/2026",
+     "query": "",
+     "start": 67553,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 8,
+     "bytes": 2285
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 67553,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 25,
+     "bytes": 20337
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 67554,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 27,
+     "bytes": 13645
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01",
+     "query": "?from=2026-09-28&to=2026-11-08&calendarIds={id}",
+     "start": 67576,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 46,
+     "bytes": 11971
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 67576,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 19,
+     "bytes": 5527
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-blocks",
+     "full": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 67576,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 18,
+     "bytes": 12809
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}",
+     "start": 67676,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 46,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 67676,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 46,
+     "bytes": 3379
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 67676,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 45,
+     "bytes": 3575
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 67676,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 44,
+     "bytes": 3575
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 67676,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 46,
+     "bytes": 3771
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 67676,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 45,
+     "bytes": 3193
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 67676,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 62,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 67676,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 61,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 67676,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 78,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 67676,
+     "scen": "14 club cold load /clubs/{id}",
+     "status": 200,
+     "ms": 78,
+     "bytes": 29
+    }
+   ]
+  },
+  {
+   "name": "15 club: back to /clubs (Zpět na kluby)",
+   "tv": null,
+   "quiet": 2037,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 69579,
+     "scen": "15 club: back to /clubs (Zpět na kluby)",
+     "status": 200,
+     "ms": 6,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 69579,
+     "scen": "15 club: back to /clubs (Zpět na kluby)",
+     "status": 200,
+     "ms": 18,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 69579,
+     "scen": "15 club: back to /clubs (Zpět na kluby)",
+     "status": 200,
+     "ms": 19,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 69579,
+     "scen": "15 club: back to /clubs (Zpět na kluby)",
+     "status": 200,
+     "ms": 20,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/clubs",
+     "full": "/api/clubs?activeOnly=false",
+     "query": "?activeOnly=false",
+     "start": 69870,
+     "scen": "15 club: back to /clubs (Zpět na kluby)",
+     "status": 200,
+     "ms": 8,
+     "bytes": 11112
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-blocks",
+     "full": "/api/v1/club-blocks",
+     "query": "",
+     "start": 69870,
+     "scen": "15 club: back to /clubs (Zpět na kluby)",
+     "status": 200,
+     "ms": 44,
+     "bytes": 39205
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/partner-orders",
+     "query": "",
+     "start": 69870,
+     "scen": "15 club: back to /clubs (Zpět na kluby)",
+     "status": 200,
+     "ms": 212,
+     "bytes": 45806
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/partner-orders",
+     "query": "",
+     "start": 69870,
+     "scen": "15 club: back to /clubs (Zpět na kluby)",
+     "status": 200,
+     "ms": 44,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/partner-orders",
+     "query": "",
+     "start": 69870,
+     "scen": "15 club: back to /clubs (Zpět na kluby)",
+     "status": 200,
+     "ms": 43,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/partner-orders",
+     "query": "",
+     "start": 69870,
+     "scen": "15 club: back to /clubs (Zpět na kluby)",
+     "status": 200,
+     "ms": 44,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders",
+     "full": "/api/v1/club-orders",
+     "query": "",
+     "start": 69870,
+     "scen": "15 club: back to /clubs (Zpět na kluby)",
+     "status": 200,
+     "ms": 52,
+     "bytes": 94357
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/clubs/{id}/summary",
+     "full": "/api/v1/clubs/942e2676-d730-4a13-8016-17f95abd26e2/summary",
+     "query": "",
+     "start": 69910,
+     "scen": "15 club: back to /clubs (Zpět na kluby)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 1042
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/clubs/{id}/summary",
+     "full": "/api/v1/clubs/c9e343b3-8cd4-4853-8c0c-e55bf01c4848/summary",
+     "query": "",
+     "start": 69910,
+     "scen": "15 club: back to /clubs (Zpět na kluby)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 331
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/clubs/{id}/summary",
+     "full": "/api/v1/clubs/6413a7f3-1924-4313-aed2-b2df37b7499d/summary",
+     "query": "",
+     "start": 69910,
+     "scen": "15 club: back to /clubs (Zpět na kluby)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 331
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/clubs/{id}/summary",
+     "full": "/api/v1/clubs/b1044f41-bd2f-4766-8b5b-499301e72b4e/summary",
+     "query": "",
+     "start": 69910,
+     "scen": "15 club: back to /clubs (Zpět na kluby)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 331
+    }
+   ]
+  },
+  {
+   "name": "16 /clubs/objednavky cold load",
+   "tv": 1363,
+   "quiet": 2881,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 72182,
+     "scen": "16 /clubs/objednavky cold load",
+     "status": 200,
+     "ms": 28,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 72182,
+     "scen": "16 /clubs/objednavky cold load",
+     "status": 200,
+     "ms": 27,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/account",
+     "full": "/api/v1/account",
+     "query": "",
+     "start": 72182,
+     "scen": "16 /clubs/objednavky cold load",
+     "status": 200,
+     "ms": 28,
+     "bytes": 949
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 72182,
+     "scen": "16 /clubs/objednavky cold load",
+     "status": 200,
+     "ms": 34,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 72182,
+     "scen": "16 /clubs/objednavky cold load",
+     "status": 200,
+     "ms": 33,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/clubs",
+     "full": "/api/clubs?activeOnly=false",
+     "query": "?activeOnly=false",
+     "start": 72475,
+     "scen": "16 /clubs/objednavky cold load",
+     "status": 200,
+     "ms": 14,
+     "bytes": 11112
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders",
+     "full": "/api/v1/club-orders",
+     "query": "",
+     "start": 72475,
+     "scen": "16 /clubs/objednavky cold load",
+     "status": 200,
+     "ms": 47,
+     "bytes": 94357
+    }
+   ]
+  },
+  {
+   "name": "17 orders: open an order",
+   "tv": null,
+   "quiet": 1730,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/settings",
+     "full": "/api/settings",
+     "query": "",
+     "start": 74487,
+     "scen": "17 orders: open an order",
+     "status": 200,
+     "ms": 63,
+     "bytes": 5574
+    },
+    {
+     "method": "GET",
+     "path": "/api/activities",
+     "full": "/api/activities",
+     "query": "",
+     "start": 74487,
+     "scen": "17 orders: open an order",
+     "status": 200,
+     "ms": 63,
+     "bytes": 16116
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders/{id}",
+     "full": "/api/v1/club-orders/01a14c84-4f35-70e0-a116-2a2896d87f52",
+     "query": "",
+     "start": 74487,
+     "scen": "17 orders: open an order",
+     "status": 200,
+     "ms": 63,
+     "bytes": 3879
+    }
+   ]
+  },
+  {
+   "name": "17b orders: open another order",
+   "tv": null,
+   "quiet": 1638,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders/{id}",
+     "full": "/api/v1/club-orders/01a14c67-5016-7e5e-a510-9091ed4a64e5",
+     "query": "",
+     "start": 76204,
+     "scen": "17b orders: open another order",
+     "status": 200,
+     "ms": 27,
+     "bytes": 3865
+    }
+   ]
+  },
+  {
+   "name": "18 /patients cold load",
+   "tv": 1423,
+   "quiet": 2944,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 78464,
+     "scen": "18 /patients cold load",
+     "status": 200,
+     "ms": 63,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 78464,
+     "scen": "18 /patients cold load",
+     "status": 200,
+     "ms": 63,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/account",
+     "full": "/api/v1/account",
+     "query": "",
+     "start": 78464,
+     "scen": "18 /patients cold load",
+     "status": 200,
+     "ms": 67,
+     "bytes": 949
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 78464,
+     "scen": "18 /patients cold load",
+     "status": 200,
+     "ms": 75,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 78464,
+     "scen": "18 /patients cold load",
+     "status": 200,
+     "ms": 103,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/patient-fields",
+     "full": "/api/v1/settings/patient-fields",
+     "query": "",
+     "start": 78755,
+     "scen": "18 /patients cold load",
+     "status": 200,
+     "ms": 10,
+     "bytes": 3808
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients",
+     "full": "/api/patients?page=1&pageSize=50",
+     "query": "?page=1&pageSize=50",
+     "start": 78755,
+     "scen": "18 /patients cold load",
+     "status": 200,
+     "ms": 27,
+     "bytes": 3507
+    },
+    {
+     "method": "GET",
+     "path": "/api/scheduling/appointments",
+     "full": "/api/scheduling/appointments",
+     "query": "",
+     "start": 78755,
+     "scen": "18 /patients cold load",
+     "status": 200,
+     "ms": 28,
+     "bytes": 13158
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-18&to=2026-12-18",
+     "query": "?from=2026-10-18&to=2026-12-18",
+     "start": 78755,
+     "scen": "18 /patients cold load",
+     "status": 200,
+     "ms": 72,
+     "bytes": 5274
+    }
+   ]
+  },
+  {
+   "name": "19 patients -> a patient",
+   "tv": 23,
+   "quiet": 1859,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/patients/{id}",
+     "full": "/api/patients/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5",
+     "query": "",
+     "start": 80744,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 13,
+     "bytes": 484
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients/{id}/profile",
+     "full": "/api/patients/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5/profile",
+     "query": "",
+     "start": 80744,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 37,
+     "bytes": 430
+    },
+    {
+     "method": "GET",
+     "path": "/api/documents/templates",
+     "full": "/api/documents/templates",
+     "query": "",
+     "start": 80744,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 11,
+     "bytes": 1285
+    },
+    {
+     "method": "GET",
+     "path": "/api/documents/patient/{id}/check",
+     "full": "/api/documents/patient/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5/check",
+     "query": "",
+     "start": 80744,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 11,
+     "bytes": 139
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-18&to=2026-12-18",
+     "query": "?from=2026-10-18&to=2026-12-18",
+     "start": 80744,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 53,
+     "bytes": 5274
+    },
+    {
+     "method": "GET",
+     "path": "/api/documents/patient/{id}",
+     "full": "/api/documents/patient/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5",
+     "query": "",
+     "start": 80744,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 10,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients/{id}",
+     "full": "/api/patients/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5",
+     "query": "",
+     "start": 80744,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 38,
+     "bytes": 484
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients/{id}/profile",
+     "full": "/api/patients/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5/profile",
+     "query": "",
+     "start": 80744,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 55,
+     "bytes": 430
+    },
+    {
+     "method": "GET",
+     "path": "/api/documents/templates",
+     "full": "/api/documents/templates",
+     "query": "",
+     "start": 80744,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 36,
+     "bytes": 1285
+    },
+    {
+     "method": "GET",
+     "path": "/api/documents/patient/{id}/check",
+     "full": "/api/documents/patient/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5/check",
+     "query": "",
+     "start": 80744,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 37,
+     "bytes": 139
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-18&to=2026-12-18",
+     "query": "?from=2026-10-18&to=2026-12-18",
+     "start": 80744,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 95,
+     "bytes": 5274
+    },
+    {
+     "method": "GET",
+     "path": "/api/documents/patient/{id}",
+     "full": "/api/documents/patient/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5",
+     "query": "",
+     "start": 80744,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 37,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients/{id}/consents",
+     "full": "/api/patients/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5/consents",
+     "query": "",
+     "start": 80915,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 9,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/diagnostics/patients/{id}/sessions",
+     "full": "/api/v1/diagnostics/patients/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5/sessions",
+     "query": "",
+     "start": 80915,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 17,
+     "bytes": 866
+    },
+    {
+     "method": "GET",
+     "path": "/api/activities",
+     "full": "/api/activities",
+     "query": "",
+     "start": 80915,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 94,
+     "bytes": 16116
+    },
+    {
+     "method": "GET",
+     "path": "/api/billing/invoices",
+     "full": "/api/billing/invoices",
+     "query": "",
+     "start": 80915,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 714,
+     "bytes": 4753
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients/{id}/consents",
+     "full": "/api/patients/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5/consents",
+     "query": "",
+     "start": 80915,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 49,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/diagnostics/patients/{id}/sessions",
+     "full": "/api/v1/diagnostics/patients/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5/sessions",
+     "query": "",
+     "start": 80915,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 94,
+     "bytes": 866
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients/{id}",
+     "full": "/api/patients/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5",
+     "query": "",
+     "start": 80917,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 36,
+     "bytes": 484
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients/{id}/profile",
+     "full": "/api/patients/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5/profile",
+     "query": "",
+     "start": 80917,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 46,
+     "bytes": 430
+    },
+    {
+     "method": "GET",
+     "path": "/api/documents/templates",
+     "full": "/api/documents/templates",
+     "query": "",
+     "start": 80917,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 46,
+     "bytes": 1285
+    },
+    {
+     "method": "GET",
+     "path": "/api/documents/patient/{id}/check",
+     "full": "/api/documents/patient/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5/check",
+     "query": "",
+     "start": 80917,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 46,
+     "bytes": 139
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-18&to=2026-12-18",
+     "query": "?from=2026-10-18&to=2026-12-18",
+     "start": 80918,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 91,
+     "bytes": 5274
+    },
+    {
+     "method": "GET",
+     "path": "/api/documents/patient/{id}",
+     "full": "/api/documents/patient/01a0fc70-8de3-7853-b8d6-bafc40d8a8c5",
+     "query": "",
+     "start": 80918,
+     "scen": "19 patients -> a patient",
+     "status": 200,
+     "ms": 46,
+     "bytes": 78
+    }
+   ]
+  },
+  {
+   "name": "20 settings /nastaveni/cenik (cold load)",
+   "tv": null,
+   "quiet": 2765,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 83256,
+     "scen": "20 settings /nastaveni/cenik (cold load)",
+     "status": 200,
+     "ms": 22,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 83256,
+     "scen": "20 settings /nastaveni/cenik (cold load)",
+     "status": 200,
+     "ms": 17,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/account",
+     "full": "/api/v1/account",
+     "query": "",
+     "start": 83256,
+     "scen": "20 settings /nastaveni/cenik (cold load)",
+     "status": 200,
+     "ms": 27,
+     "bytes": 949
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 83256,
+     "scen": "20 settings /nastaveni/cenik (cold load)",
+     "status": 200,
+     "ms": 56,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 83256,
+     "scen": "20 settings /nastaveni/cenik (cold load)",
+     "status": 200,
+     "ms": 57,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/services",
+     "full": "/api/services",
+     "query": "",
+     "start": 83560,
+     "scen": "20 settings /nastaveni/cenik (cold load)",
+     "status": 200,
+     "ms": 7,
+     "bytes": 6926
+    },
+    {
+     "method": "GET",
+     "path": "/api/activities",
+     "full": "/api/activities",
+     "query": "",
+     "start": 83560,
+     "scen": "20 settings /nastaveni/cenik (cold load)",
+     "status": 200,
+     "ms": 85,
+     "bytes": 16116
+    },
+    {
+     "method": "GET",
+     "path": "/api/clinic-services",
+     "full": "/api/clinic-services",
+     "query": "",
+     "start": 83560,
+     "scen": "20 settings /nastaveni/cenik (cold load)",
+     "status": 200,
+     "ms": 85,
+     "bytes": 1626
+    },
+    {
+     "method": "GET",
+     "path": "/api/documents/templates",
+     "full": "/api/documents/templates",
+     "query": "",
+     "start": 83560,
+     "scen": "20 settings /nastaveni/cenik (cold load)",
+     "status": 200,
+     "ms": 85,
+     "bytes": 1285
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/service-colors",
+     "full": "/api/v1/settings/service-colors",
+     "query": "",
+     "start": 83560,
+     "scen": "20 settings /nastaveni/cenik (cold load)",
+     "status": 200,
+     "ms": 85,
+     "bytes": 184
+    },
+    {
+     "method": "GET",
+     "path": "/api/services",
+     "full": "/api/services",
+     "query": "",
+     "start": 83560,
+     "scen": "20 settings /nastaveni/cenik (cold load)",
+     "status": 200,
+     "ms": 85,
+     "bytes": 6926
+    }
+   ]
+  },
+  {
+   "name": "20 settings /nastaveni/sluzby (cold load)",
+   "tv": null,
+   "quiet": 2739,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 86054,
+     "scen": "20 settings /nastaveni/sluzby (cold load)",
+     "status": 200,
+     "ms": 13,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 86054,
+     "scen": "20 settings /nastaveni/sluzby (cold load)",
+     "status": 200,
+     "ms": 13,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/account",
+     "full": "/api/v1/account",
+     "query": "",
+     "start": 86054,
+     "scen": "20 settings /nastaveni/sluzby (cold load)",
+     "status": 200,
+     "ms": 34,
+     "bytes": 949
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 86054,
+     "scen": "20 settings /nastaveni/sluzby (cold load)",
+     "status": 200,
+     "ms": 40,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 86054,
+     "scen": "20 settings /nastaveni/sluzby (cold load)",
+     "status": 200,
+     "ms": 37,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/changes",
+     "full": "/api/v1/settings/changes?scope=sluzby&take=5",
+     "query": "?scope=sluzby&take=5",
+     "start": 86338,
+     "scen": "20 settings /nastaveni/sluzby (cold load)",
+     "status": 200,
+     "ms": 27,
+     "bytes": 34
+    },
+    {
+     "method": "GET",
+     "path": "/api/clinic-services",
+     "full": "/api/clinic-services",
+     "query": "",
+     "start": 86338,
+     "scen": "20 settings /nastaveni/sluzby (cold load)",
+     "status": 200,
+     "ms": 33,
+     "bytes": 1626
+    },
+    {
+     "method": "GET",
+     "path": "/api/activities",
+     "full": "/api/activities",
+     "query": "",
+     "start": 86338,
+     "scen": "20 settings /nastaveni/sluzby (cold load)",
+     "status": 200,
+     "ms": 33,
+     "bytes": 16116
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars",
+     "full": "/api/calendars",
+     "query": "",
+     "start": 86338,
+     "scen": "20 settings /nastaveni/sluzby (cold load)",
+     "status": 200,
+     "ms": 14,
+     "bytes": 1849
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/changes",
+     "full": "/api/v1/settings/changes?scope=sluzby&take=5",
+     "query": "?scope=sluzby&take=5",
+     "start": 86338,
+     "scen": "20 settings /nastaveni/sluzby (cold load)",
+     "status": 200,
+     "ms": 33,
+     "bytes": 34
+    }
+   ]
+  },
+  {
+   "name": "20 settings /calendars (cold load)",
+   "tv": null,
+   "quiet": 2519,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 88723,
+     "scen": "20 settings /calendars (cold load)",
+     "status": 200,
+     "ms": 25,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 88723,
+     "scen": "20 settings /calendars (cold load)",
+     "status": 200,
+     "ms": 27,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/account",
+     "full": "/api/v1/account",
+     "query": "",
+     "start": 88723,
+     "scen": "20 settings /calendars (cold load)",
+     "status": 200,
+     "ms": 32,
+     "bytes": 949
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 88723,
+     "scen": "20 settings /calendars (cold load)",
+     "status": 200,
+     "ms": 35,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 88723,
+     "scen": "20 settings /calendars (cold load)",
+     "status": 200,
+     "ms": 35,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/changes",
+     "full": "/api/v1/settings/changes?scope=kalendare&take=5",
+     "query": "?scope=kalendare&take=5",
+     "start": 89024,
+     "scen": "20 settings /calendars (cold load)",
+     "status": 200,
+     "ms": 10,
+     "bytes": 34
+    },
+    {
+     "method": "GET",
+     "path": "/api/clinic-services",
+     "full": "/api/clinic-services",
+     "query": "",
+     "start": 89024,
+     "scen": "20 settings /calendars (cold load)",
+     "status": 200,
+     "ms": 50,
+     "bytes": 1626
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars",
+     "full": "/api/calendars",
+     "query": "",
+     "start": 89024,
+     "scen": "20 settings /calendars (cold load)",
+     "status": 200,
+     "ms": 9,
+     "bytes": 1849
+    },
+    {
+     "method": "GET",
+     "path": "/api/activities",
+     "full": "/api/activities",
+     "query": "",
+     "start": 89024,
+     "scen": "20 settings /calendars (cold load)",
+     "status": 200,
+     "ms": 51,
+     "bytes": 16116
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/changes",
+     "full": "/api/v1/settings/changes?scope=kalendare&take=5",
+     "query": "?scope=kalendare&take=5",
+     "start": 89024,
+     "scen": "20 settings /calendars (cold load)",
+     "status": 200,
+     "ms": 50,
+     "bytes": 34
+    }
+   ]
+  },
+  {
+   "name": "21 settings /activities (SPA nav from /calendars)",
+   "tv": null,
+   "quiet": 1753,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/changes",
+     "full": "/api/v1/settings/changes?scope=cinnosti&take=5",
+     "query": "?scope=cinnosti&take=5",
+     "start": 90772,
+     "scen": "21 settings /activities (SPA nav from /calendars)",
+     "status": 200,
+     "ms": 16,
+     "bytes": 34
+    },
+    {
+     "method": "GET",
+     "path": "/api/services",
+     "full": "/api/services",
+     "query": "",
+     "start": 90772,
+     "scen": "21 settings /activities (SPA nav from /calendars)",
+     "status": 200,
+     "ms": 16,
+     "bytes": 6926
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/changes",
+     "full": "/api/v1/settings/changes?scope=cinnosti&take=5",
+     "query": "?scope=cinnosti&take=5",
+     "start": 90772,
+     "scen": "21 settings /activities (SPA nav from /calendars)",
+     "status": 200,
+     "ms": 63,
+     "bytes": 34
+    }
+   ]
+  },
+  {
+   "name": "22 SPA nav /prehled",
+   "tv": null,
+   "quiet": 1637,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/patients",
+     "full": "/api/patients?page=1&pageSize=6",
+     "query": "?page=1&pageSize=6",
+     "start": 92380,
+     "scen": "22 SPA nav /prehled",
+     "status": 200,
+     "ms": 23,
+     "bytes": 3039
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients",
+     "full": "/api/patients?page=1&pageSize=1",
+     "query": "?page=1&pageSize=1",
+     "start": 92380,
+     "scen": "22 SPA nav /prehled",
+     "status": 200,
+     "ms": 22,
+     "bytes": 631
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-18&to=2026-10-18",
+     "query": "?from=2026-10-18&to=2026-10-18",
+     "start": 92380,
+     "scen": "22 SPA nav /prehled",
+     "status": 200,
+     "ms": 35,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients",
+     "full": "/api/patients?page=1&pageSize=1",
+     "query": "?page=1&pageSize=1",
+     "start": 92380,
+     "scen": "22 SPA nav /prehled",
+     "status": 200,
+     "ms": 35,
+     "bytes": 631
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-18&to=2026-10-18",
+     "query": "?from=2026-10-18&to=2026-10-18",
+     "start": 92380,
+     "scen": "22 SPA nav /prehled",
+     "status": 200,
+     "ms": 52,
+     "bytes": 78
+    }
+   ]
+  },
+  {
+   "name": "23 SPA nav /planovani (remount, cache warm)",
+   "tv": 874,
+   "quiet": 2392,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/public/clinic",
+     "full": "/api/public/clinic",
+     "query": "",
+     "start": 94288,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 6,
+     "bytes": 358
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/calendar-display",
+     "full": "/api/v1/settings/calendar-display",
+     "query": "",
+     "start": 94288,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 14,
+     "bytes": 2790
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/clubs",
+     "full": "/api/v1/settings/clubs",
+     "query": "",
+     "start": 94290,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 5,
+     "bytes": 662
+    },
+    {
+     "method": "GET",
+     "path": "/api/holidays/2026",
+     "full": "/api/holidays/2026",
+     "query": "",
+     "start": 94290,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 13,
+     "bytes": 2285
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 94290,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 27,
+     "bytes": 20337
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 94290,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 28,
+     "bytes": 21709
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 94290,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 27,
+     "bytes": 21709
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 94291,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 28,
+     "bytes": 23081
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-09-28&to=2026-11-08&calendarIds={id},{id},{id},{id}",
+     "start": 94291,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 67,
+     "bytes": 11971
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 94292,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 25,
+     "bytes": 5527
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 94292,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 41,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 94292,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 41,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 94292,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 43,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-blocks",
+     "full": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 94292,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 55,
+     "bytes": 12809
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 94302,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 47,
+     "bytes": 13645
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 94302,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 56,
+     "bytes": 14576
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 94302,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 59,
+     "bytes": 14576
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 94302,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 57,
+     "bytes": 15507
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-12&to=2026-10-18&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-10-12&to=2026-10-18&calendarIds={id},{id},{id},{id}",
+     "start": 94444,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 46,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 94444,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 48,
+     "bytes": 3503
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 94444,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 48,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 94444,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 47,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 94445,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 45,
+     "bytes": 3993
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 94445,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 20,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 94445,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 47,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 94445,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 75,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 94445,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 78,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 94445,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 48,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 94445,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 49,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/company",
+     "full": "/api/v1/settings/company",
+     "query": "",
+     "start": 94445,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 47,
+     "bytes": 432
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/users",
+     "full": "/api/v1/users",
+     "query": "",
+     "start": 94445,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 76,
+     "bytes": 374
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 94445,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 79,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 94445,
+     "scen": "23 SPA nav /planovani (remount, cache warm)",
+     "status": 200,
+     "ms": 79,
+     "bytes": 29
+    }
+   ]
+  },
+  {
+   "name": "24 history back",
+   "tv": null,
+   "quiet": 1646,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 96404,
+     "scen": "24 history back",
+     "status": 200,
+     "ms": 13,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 96404,
+     "scen": "24 history back",
+     "status": 200,
+     "ms": 10,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients",
+     "full": "/api/patients?page=1&pageSize=1",
+     "query": "?page=1&pageSize=1",
+     "start": 96404,
+     "scen": "24 history back",
+     "status": 200,
+     "ms": 19,
+     "bytes": 631
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-18&to=2026-10-18",
+     "query": "?from=2026-10-18&to=2026-10-18",
+     "start": 96405,
+     "scen": "24 history back",
+     "status": 200,
+     "ms": 26,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 96405,
+     "scen": "24 history back",
+     "status": 200,
+     "ms": 22,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 96405,
+     "scen": "24 history back",
+     "status": 200,
+     "ms": 22,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients",
+     "full": "/api/patients?page=1&pageSize=1",
+     "query": "?page=1&pageSize=1",
+     "start": 96405,
+     "scen": "24 history back",
+     "status": 200,
+     "ms": 29,
+     "bytes": 631
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-18&to=2026-10-18",
+     "query": "?from=2026-10-18&to=2026-10-18",
+     "start": 96405,
+     "scen": "24 history back",
+     "status": 200,
+     "ms": 46,
+     "bytes": 78
+    }
+   ]
+  },
+  {
+   "name": "25 history back",
+   "tv": null,
+   "quiet": 1734,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/changes",
+     "full": "/api/v1/settings/changes?scope=cinnosti&take=5",
+     "query": "?scope=cinnosti&take=5",
+     "start": 98133,
+     "scen": "25 history back",
+     "status": 200,
+     "ms": 25,
+     "bytes": 34
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/settings/changes",
+     "full": "/api/v1/settings/changes?scope=cinnosti&take=5",
+     "query": "?scope=cinnosti&take=5",
+     "start": 98133,
+     "scen": "25 history back",
+     "status": 200,
+     "ms": 35,
+     "bytes": 34
+    }
+   ]
+  },
+  {
+   "name": "26 history forward",
+   "tv": null,
+   "quiet": 1631,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/patients",
+     "full": "/api/patients?page=1&pageSize=1",
+     "query": "?page=1&pageSize=1",
+     "start": 99757,
+     "scen": "26 history forward",
+     "status": 200,
+     "ms": 15,
+     "bytes": 631
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-18&to=2026-10-18",
+     "query": "?from=2026-10-18&to=2026-10-18",
+     "start": 99757,
+     "scen": "26 history forward",
+     "status": 200,
+     "ms": 23,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients",
+     "full": "/api/patients?page=1&pageSize=1",
+     "query": "?page=1&pageSize=1",
+     "start": 99757,
+     "scen": "26 history forward",
+     "status": 200,
+     "ms": 26,
+     "bytes": 631
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-18&to=2026-10-18",
+     "query": "?from=2026-10-18&to=2026-10-18",
+     "start": 99757,
+     "scen": "26 history forward",
+     "status": 200,
+     "ms": 43,
+     "bytes": 78
+    }
+   ]
+  },
+  {
+   "name": "27a SPA -> /clubs (fresh)",
+   "tv": 25,
+   "quiet": 1656,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/clubs",
+     "full": "/api/clubs?activeOnly=false",
+     "query": "?activeOnly=false",
+     "start": 101416,
+     "scen": "27a SPA -> /clubs (fresh)",
+     "status": 200,
+     "ms": 8,
+     "bytes": 11112
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-blocks",
+     "full": "/api/v1/club-blocks",
+     "query": "",
+     "start": 101416,
+     "scen": "27a SPA -> /clubs (fresh)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 39205
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/partner-orders",
+     "query": "",
+     "start": 101416,
+     "scen": "27a SPA -> /clubs (fresh)",
+     "status": 200,
+     "ms": 208,
+     "bytes": 45806
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/partner-orders",
+     "query": "",
+     "start": 101416,
+     "scen": "27a SPA -> /clubs (fresh)",
+     "status": 200,
+     "ms": 41,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/partner-orders",
+     "query": "",
+     "start": 101416,
+     "scen": "27a SPA -> /clubs (fresh)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/partner-orders",
+     "query": "",
+     "start": 101416,
+     "scen": "27a SPA -> /clubs (fresh)",
+     "status": 200,
+     "ms": 45,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders",
+     "full": "/api/v1/club-orders",
+     "query": "",
+     "start": 101416,
+     "scen": "27a SPA -> /clubs (fresh)",
+     "status": 200,
+     "ms": 46,
+     "bytes": 94357
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/clubs/{id}/summary",
+     "full": "/api/v1/clubs/942e2676-d730-4a13-8016-17f95abd26e2/summary",
+     "query": "",
+     "start": 101450,
+     "scen": "27a SPA -> /clubs (fresh)",
+     "status": 200,
+     "ms": 40,
+     "bytes": 1042
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/clubs/{id}/summary",
+     "full": "/api/v1/clubs/c9e343b3-8cd4-4853-8c0c-e55bf01c4848/summary",
+     "query": "",
+     "start": 101450,
+     "scen": "27a SPA -> /clubs (fresh)",
+     "status": 200,
+     "ms": 36,
+     "bytes": 331
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/clubs/{id}/summary",
+     "full": "/api/v1/clubs/6413a7f3-1924-4313-aed2-b2df37b7499d/summary",
+     "query": "",
+     "start": 101450,
+     "scen": "27a SPA -> /clubs (fresh)",
+     "status": 200,
+     "ms": 36,
+     "bytes": 331
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/clubs/{id}/summary",
+     "full": "/api/v1/clubs/b1044f41-bd2f-4766-8b5b-499301e72b4e/summary",
+     "query": "",
+     "start": 101450,
+     "scen": "27a SPA -> /clubs (fresh)",
+     "status": 200,
+     "ms": 36,
+     "bytes": 331
+    }
+   ]
+  },
+  {
+   "name": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+   "tv": 838,
+   "quiet": 2358,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/clubs/{id}",
+     "full": "/api/clubs/942e2676-d730-4a13-8016-17f95abd26e2",
+     "query": "",
+     "start": 103325,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 7,
+     "bytes": 596
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders",
+     "full": "/api/v1/club-orders?clubId=942e2676-d730-4a13-8016-17f95abd26e2",
+     "query": "?clubId={id}",
+     "start": 103325,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 38,
+     "bytes": 51174
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-blocks",
+     "full": "/api/v1/club-blocks",
+     "query": "",
+     "start": 103325,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 17,
+     "bytes": 39205
+    },
+    {
+     "method": "GET",
+     "path": "/api/activities",
+     "full": "/api/activities",
+     "query": "",
+     "start": 103365,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 30,
+     "bytes": 16116
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders/{id}",
+     "full": "/api/v1/club-orders/01a105ca-380e-78e8-8874-0569cc041917",
+     "query": "",
+     "start": 103407,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 39,
+     "bytes": 6007
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-26&to=2026-10-26",
+     "query": "?from=2026-10-26&to=2026-10-26",
+     "start": 103447,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 21,
+     "bytes": 617
+    },
+    {
+     "method": "GET",
+     "path": "/api/clubs/{id}",
+     "full": "/api/clubs/942e2676-d730-4a13-8016-17f95abd26e2",
+     "query": "",
+     "start": 103469,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 5,
+     "bytes": 596
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 103469,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 19,
+     "bytes": 20337
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 103469,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 17,
+     "bytes": 13645
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01",
+     "query": "?from=2026-09-28&to=2026-11-08&calendarIds={id}",
+     "start": 103469,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 36,
+     "bytes": 11971
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}",
+     "start": 103559,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 47,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 103559,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 47,
+     "bytes": 3379
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 103559,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 47,
+     "bytes": 3575
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 103559,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 47,
+     "bytes": 3575
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 103559,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 47,
+     "bytes": 3771
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 103559,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 46,
+     "bytes": 3193
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 103559,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 47,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 103560,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 69,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 103560,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 74,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 103560,
+     "scen": "27b SPA -> /clubs/{FK Slaný} (hover-less)",
+     "status": 200,
+     "ms": 75,
+     "bytes": 29
+    }
+   ]
+  },
+  {
+   "name": "27c SPA -> /clubs again (<30 s)",
+   "tv": 55,
+   "quiet": 1574,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 105419,
+     "scen": "27c SPA -> /clubs again (<30 s)",
+     "status": 200,
+     "ms": 6,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 105420,
+     "scen": "27c SPA -> /clubs again (<30 s)",
+     "status": 200,
+     "ms": 8,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/clubs",
+     "full": "/api/clubs?activeOnly=false",
+     "query": "?activeOnly=false",
+     "start": 105420,
+     "scen": "27c SPA -> /clubs again (<30 s)",
+     "status": 200,
+     "ms": 4,
+     "bytes": 11112
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-blocks",
+     "full": "/api/v1/club-blocks",
+     "query": "",
+     "start": 105420,
+     "scen": "27c SPA -> /clubs again (<30 s)",
+     "status": 200,
+     "ms": 18,
+     "bytes": 39205
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/partner-orders",
+     "query": "",
+     "start": 105420,
+     "scen": "27c SPA -> /clubs again (<30 s)",
+     "status": 200,
+     "ms": 236,
+     "bytes": 45806
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/partner-orders",
+     "query": "",
+     "start": 105420,
+     "scen": "27c SPA -> /clubs again (<30 s)",
+     "status": 200,
+     "ms": 15,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/partner-orders",
+     "query": "",
+     "start": 105420,
+     "scen": "27c SPA -> /clubs again (<30 s)",
+     "status": 200,
+     "ms": 24,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/partner-orders",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/partner-orders",
+     "query": "",
+     "start": 105420,
+     "scen": "27c SPA -> /clubs again (<30 s)",
+     "status": 200,
+     "ms": 23,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders",
+     "full": "/api/v1/club-orders",
+     "query": "",
+     "start": 105420,
+     "scen": "27c SPA -> /clubs again (<30 s)",
+     "status": 200,
+     "ms": 49,
+     "bytes": 94357
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 105420,
+     "scen": "27c SPA -> /clubs again (<30 s)",
+     "status": 200,
+     "ms": 18,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 105420,
+     "scen": "27c SPA -> /clubs again (<30 s)",
+     "status": 200,
+     "ms": 25,
+     "bytes": 29
+    }
+   ]
+  },
+  {
+   "name": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+   "tv": 261,
+   "quiet": 1790,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 68,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 69,
+     "bytes": 3379
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 69,
+     "bytes": 3575
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 69,
+     "bytes": 3575
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 69,
+     "bytes": 3771
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 68,
+     "bytes": 3193
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 71,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 69,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-10-26&to=2026-11-01",
+     "query": "?from=2026-10-26&to=2026-11-01",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 71,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 71,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 71,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders/{id}",
+     "full": "/api/v1/club-orders/01a105ca-380e-78e8-8874-0569cc041917",
+     "query": "",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 112,
+     "bytes": 6007
+    },
+    {
+     "method": "GET",
+     "path": "/api/clubs/{id}",
+     "full": "/api/clubs/942e2676-d730-4a13-8016-17f95abd26e2",
+     "query": "",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 71,
+     "bytes": 596
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-orders",
+     "full": "/api/v1/club-orders?clubId=942e2676-d730-4a13-8016-17f95abd26e2",
+     "query": "?clubId={id}",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 134,
+     "bytes": 51174
+    },
+    {
+     "method": "GET",
+     "path": "/api/v1/club-blocks",
+     "full": "/api/v1/club-blocks",
+     "query": "",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 104,
+     "bytes": 39205
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 72,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 107066,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 88,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/clubs/{id}",
+     "full": "/api/clubs/942e2676-d730-4a13-8016-17f95abd26e2",
+     "query": "",
+     "start": 107179,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 22,
+     "bytes": 596
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 107179,
+     "scen": "27d SPA -> /clubs/{FK Slaný} again (<30 s)",
+     "status": 200,
+     "ms": 34,
+     "bytes": 5527
+    }
+   ]
+  },
+  {
+   "name": "27e SPA -> /planovani (<30 s of 23)",
+   "tv": 32,
+   "quiet": 1661,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-12&to=2026-10-18&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-10-12&to=2026-10-18&calendarIds={id},{id},{id},{id}",
+     "start": 108864,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 45,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 44,
+     "bytes": 3503
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 44,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 47,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 46,
+     "bytes": 3993
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 27,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 46,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 46,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 97,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 126,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 47,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 47,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 48,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 81,
+     "bytes": 20337
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 82,
+     "bytes": 21709
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 85,
+     "bytes": 21709
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 85,
+     "bytes": 23081
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 86,
+     "bytes": 13645
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 86,
+     "bytes": 14576
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 108865,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 94,
+     "bytes": 14576
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-18&to=2026-11-14",
+     "query": "?from=2026-10-18&to=2026-11-14",
+     "start": 108866,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 85,
+     "bytes": 15507
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-09-28&to=2026-11-08&calendarIds={id},{id},{id},{id}",
+     "start": 108866,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 139,
+     "bytes": 11971
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 108867,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 84,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 108867,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 89,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-09-28&to=2026-11-08",
+     "query": "?from=2026-09-28&to=2026-11-08",
+     "start": 108867,
+     "scen": "27e SPA -> /planovani (<30 s of 23)",
+     "status": 200,
+     "ms": 88,
+     "bytes": 78
+    }
+   ]
+  },
+  {
+   "name": "27f SPA -> /prehled -> /planovani (<30 s)",
+   "tv": 1052,
+   "quiet": 2583,
+   "reqs": [
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 110431,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 14,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 110431,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 13,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients",
+     "full": "/api/patients?page=1&pageSize=1",
+     "query": "?page=1&pageSize=1",
+     "start": 110431,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 21,
+     "bytes": 631
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-18&to=2026-10-18",
+     "query": "?from=2026-10-18&to=2026-10-18",
+     "start": 110431,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 28,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 110431,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 22,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 110431,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 28,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/patients",
+     "full": "/api/patients?page=1&pageSize=1",
+     "query": "?page=1&pageSize=1",
+     "start": 110431,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 54,
+     "bytes": 631
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-18&to=2026-10-18",
+     "query": "?from=2026-10-18&to=2026-10-18",
+     "start": 110431,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 79,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/day",
+     "full": "/api/day?from=2026-10-12&to=2026-10-18&calendarIds=01a0fe86-3f9c-7e41-b2e3-69290e55de01,01a106ba-20c0-799f-b882-76c0a77e9029,01a106ba-21e0-716f-b22d-9e9d602bb856,01a106ba-81bb-7a55-b278-72875746783e",
+     "query": "?from=2026-10-12&to=2026-10-18&calendarIds={id},{id},{id},{id}",
+     "start": 111359,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 51,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 111359,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 51,
+     "bytes": 3503
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 111359,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 51,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 111359,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 57,
+     "bytes": 3748
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/preview",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/preview?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 111359,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 55,
+     "bytes": 3993
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a0fe86-3f9c-7e41-b2e3-69290e55de01/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 111359,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 51,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-20c0-799f-b882-76c0a77e9029/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 111359,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 58,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-21e0-716f-b22d-9e9d602bb856/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 111375,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/calendars/{id}/blocks",
+     "full": "/api/calendars/01a106ba-81bb-7a55-b278-72875746783e/blocks?from=2026-10-12&to=2026-10-18",
+     "query": "?from=2026-10-12&to=2026-10-18",
+     "start": 111375,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 78
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 111375,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 111375,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 29
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications",
+     "full": "/api/notifications",
+     "query": "",
+     "start": 111375,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 22190
+    },
+    {
+     "method": "GET",
+     "path": "/api/notifications/seen",
+     "full": "/api/notifications/seen",
+     "query": "",
+     "start": 111375,
+     "scen": "27f SPA -> /prehled -> /planovani (<30 s)",
+     "status": 200,
+     "ms": 42,
+     "bytes": 29
+    }
+   ]
+  }
+ ],
+ "notes": []
+}

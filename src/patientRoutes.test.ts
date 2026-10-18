@@ -9,8 +9,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import appRaw from './App.tsx?raw';
+import staffRaw from './StaffApp.tsx?raw';
 
-const appSource = appRaw as string;
+const appSource = (appRaw as string) + (staffRaw as string);
 const guards = new Map(
   [...appSource.matchAll(/path="(\/[a-z0-9/:-]*)" element=\{<RequirePermission of="([a-z._]+)">/g)]
     .map((m) => [m[1], m[2]] as const),

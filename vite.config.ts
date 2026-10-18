@@ -1,9 +1,10 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { defineConfig } from 'vitest/config';
-import type { Plugin } from 'vite';
+import { loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { legacyWebRedirect } from './src/web/sitePaths.ts';
+import { apiOriginOf } from './src/web/apiOrigin.ts';
 
 /*
  * Two builds share this file:
@@ -51,8 +52,29 @@ function appShellFallback(): Plugin {
   };
 }
 
-export default defineConfig(({ isSsrBuild }) => ({
-  plugins: [react(), appShellFallback()],
+/*
+ * The browser opens the connection to the API while it is still reading the page: the first request of
+ * every screen (the account, the data) then skips the DNS lookup and the TLS handshake (about 3 round
+ * trips on a phone). Written only when the build is given an ABSOLUTE API address (`VITE_API_BASE_URL`,
+ * set in the Vercel project); with the usual empty value the API is on the same origin and there is
+ * nothing to hint. The address is read from the environment, never typed here.
+ */
+function apiOriginHints(apiBase: string | undefined): Plugin {
+  const origin = apiOriginOf(apiBase);
+  return {
+    name: 'sm-api-origin-hints',
+    transformIndexHtml() {
+      if (origin === null) return [];
+      return [
+        { tag: 'link', attrs: { rel: 'preconnect', href: origin, crossorigin: true }, injectTo: 'head-prepend' },
+        { tag: 'link', attrs: { rel: 'dns-prefetch', href: origin }, injectTo: 'head-prepend' },
+      ];
+    },
+  };
+}
+
+export default defineConfig(({ isSsrBuild, mode }) => ({
+  plugins: [react(), appShellFallback(), apiOriginHints(loadEnv(mode, process.cwd(), 'VITE_').VITE_API_BASE_URL)],
   // The server bundle never serves static files; do not copy public/ into it.
   publicDir: isSsrBuild ? false : 'public',
   build: {
@@ -69,13 +91,17 @@ export default defineConfig(({ isSsrBuild }) => ({
             codeSplitting: {
               includeDependenciesRecursively: false,
               groups: [
-                { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 50 },
+                /* use-sync-external-store serves react-i18next (every screen) and recharts alike: it belongs with
+                   React. Left in 'charts' it dragged the whole charts library into every page that translates. */
+                { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler|use-sync-external-store)[\\/]/, priority: 50 },
                 {
                   name: 'charts',
-                  test: /node_modules[\\/](recharts|d3-[^\/]+|victory-vendor|es-toolkit|immer|redux|@reduxjs|reselect|decimal\.js-light|internmap|react-redux|use-sync-external-store)[\\/]/,
+                  test: /node_modules[\\/](recharts|d3-[^\/]+|victory-vendor|es-toolkit|immer|redux|@reduxjs|reselect|decimal\.js-light|internmap|react-redux)[\\/]/,
                   priority: 40,
                 },
                 { name: 'mui', test: /node_modules[\\/]@(mui|emotion)[\\/]/, priority: 30 },
+                { name: 'motion', test: /node_modules[\\/](framer-motion|motion-dom|motion-utils)[\\/]/, priority: 25 },
+                { name: 'signalr', test: /node_modules[\\/]@microsoft[\\/]signalr[\\/]/, priority: 25 },
                 { name: 'router', test: /node_modules[\\/](react-router|react-router-dom|@remix-run|cookie|set-cookie-parser)[\\/]/, priority: 20 },
                 { name: 'query', test: /node_modules[\\/]@tanstack[\\/]/, priority: 20 },
               ],

@@ -86,12 +86,12 @@ describe('?clubId=', () => {
   it('asks the server for that club only and shows it in the club filter', async () => {
     mount('?clubId=club-2');
     await screen.findAllByTestId('order-row');
-    expect(list).toHaveBeenCalledWith({ clubId: 'club-2' });
+    expect(list).toHaveBeenCalledWith({ clubId: 'club-2' }, expect.anything());
   });
 
   it('without it the list is not filtered', async () => {
     mount();
     await screen.findAllByTestId('order-row');
-    expect(list).toHaveBeenCalledWith({});
+    expect(list).toHaveBeenCalledWith({}, expect.anything());
   });
 });

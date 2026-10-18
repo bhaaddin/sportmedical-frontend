@@ -22,9 +22,9 @@ export default function ClubPlayersPage() {
   const [status, setStatus] = useState<'' | ClubBlockAthleteStatus>('');
   const [search, setSearch] = useState('');
 
-  const blocksQuery = useQuery({ queryKey: ['club-players', 'blocks'], queryFn: () => clubBlocksApi.list({}) });
+  const blocksQuery = useQuery({ queryKey: ['club-blocks', 'list'], queryFn: () => clubBlocksApi.list() });
   /* An order may carry athletes the block list does not; if it fails the blocks still tell most of the story. */
-  const ordersQuery = useQuery({ queryKey: ['club-players', 'orders'], queryFn: () => clubOrdersApi.list({}) });
+  const ordersQuery = useQuery({ queryKey: ['club-orders', '', '', ''], queryFn: () => clubOrdersApi.list({}) });
 
   const all = useMemo(() => collectPlayers(blocksQuery.data ?? [], ordersQuery.data ?? []), [blocksQuery.data, ordersQuery.data]);
   const clubs = useMemo(() => {

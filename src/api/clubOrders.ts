@@ -445,9 +445,10 @@ export const clubOrdersApi = {
   createStaff: (input: StaffOrderInput): Promise<ClubOrderView> =>
     call(async () => toOrder(unwrap((await client.post(`${BASE}/staff`, input)).data))),
 
-  list: (filter: { clubId?: string; status?: ClubOrderStatus; from?: string; to?: string; groupId?: string } = {}): Promise<ClubOrderView[]> =>
+  /** `options.signal`: a read whose filter has just changed under the person's hands is cancelled instead of awaited. */
+  list: (filter: { clubId?: string; status?: ClubOrderStatus; from?: string; to?: string; groupId?: string } = {}, options: { signal?: AbortSignal } = {}): Promise<ClubOrderView[]> =>
     call(async () => {
-      const body = unwrap((await client.get(BASE, { params: filter })).data);
+      const body = unwrap((await client.get(BASE, { params: filter, signal: options.signal })).data);
       return arr<unknown>(body).map(toOrder);
     }),
 
@@ -498,8 +499,8 @@ export const clubOrdersApi = {
   clubSummary: (clubId: string): Promise<ClubSummary> =>
     call(async () => unwrap((await client.get(`/api/v1/clubs/${clubId}/summary`)).data) as ClubSummary),
 
-  stats: (range: { from?: string; to?: string } = {}): Promise<ClubOrderStats> =>
-    call(async () => unwrap((await client.get(`${BASE}/stats`, { params: range })).data) as ClubOrderStats),
+  stats: (range: { from?: string; to?: string } = {}, options: { signal?: AbortSignal } = {}): Promise<ClubOrderStats> =>
+    call(async () => unwrap((await client.get(`${BASE}/stats`, { params: range, signal: options.signal })).data) as ClubOrderStats),
 };
 
 /** 409 `club_order.athletes_affected`, reason of an athlete: the window no longer allows the činnost they registered for. */

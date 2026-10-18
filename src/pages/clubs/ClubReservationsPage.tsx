@@ -27,10 +27,10 @@ export default function ClubReservationsPage() {
   const [clubId, setClubId] = useState('');
   const [status, setStatus] = useState<'' | 'Active' | 'Cancelled'>('');
 
-  const blocksQuery = useQuery({ queryKey: ['club-reservations', 'blocks'], queryFn: () => clubBlocksApi.list({}) });
+  const blocksQuery = useQuery({ queryKey: ['club-blocks', 'list'], queryFn: () => clubBlocksApi.list() });
   /* Orders and calendar names only enrich the rows; the page works without them. */
-  const ordersQuery = useQuery({ queryKey: ['club-reservations', 'orders'], queryFn: () => clubOrdersApi.list({}) });
-  const calendarsQuery = useQuery({ queryKey: ['club-reservations', 'calendars'], queryFn: () => calendarsApi.list() });
+  const ordersQuery = useQuery({ queryKey: ['club-orders', '', '', ''], queryFn: () => clubOrdersApi.list({}) });
+  const calendarsQuery = useQuery({ queryKey: ['calendars'], queryFn: calendarsApi.list });
 
   const today = pragueDateKey(new Date());
   const range = rangeFor(rangeKey, today, custom);

@@ -21,7 +21,8 @@ import {
   type HistoryLine,
   type TimeBlock,
 } from './bookingContracts';
-import { addDaysToDateOnly, type DateOnly } from '../utils/time';
+import { addDaysToDateOnly, pragueDateKey, type DateOnly } from '../utils/time';
+import { createRangeCover, type CoverRules } from './dayRowsCover';
 
 /**
  * Etapa 2, contract C2 - the desk's quick registration. The slot is already
@@ -88,6 +89,44 @@ function assertRangeWithinLimit(from: DateOnly, to: DateOnly): void {
   }
 }
 
+/*
+ * A week is cut out of the month that is already here instead of asked for again (see dayRowsCover.ts). The rules are
+ * the server's, checked against it window by window: a booking belongs to the range its start day (Prague) lies in; a
+ * block belongs to every range that shares a Prague day with it. A call that can be cancelled goes straight to the server.
+ */
+export const DAY_COVER_RULES: CoverRules<Pick<DayAppointment, 'startUtc'>> = {
+  inRange: (a, from, to) => {
+    const day = pragueDateKey(a.startUtc);
+    return day >= from && day <= to;
+  },
+  maxSpanDays: MAX_RANGE_DAYS,
+};
+
+export const BLOCK_COVER_RULES: CoverRules<Pick<TimeBlock, 'startUtc' | 'endUtc'>> = {
+  inRange: (b, from, to) => pragueDateKey(b.startUtc) <= to && pragueDateKey(new Date(Date.parse(b.endUtc) - 1)) >= from,
+  maxSpanDays: MAX_RANGE_DAYS,
+};
+
+const dayCover = createRangeCover<DayAppointment>(
+  (ids, from, to) =>
+    request(async () => {
+      const res = await client.get('/api/day', {
+        params: { from, to, calendarIds: ids === '' ? undefined : ids },
+      });
+      return parseResponse(dayAppointmentListSchema, res.data);
+    }),
+  DAY_COVER_RULES,
+);
+
+const blockCover = createRangeCover<TimeBlock>(
+  (calendarId, from, to) =>
+    request(async () => {
+      const res = await client.get(`/api/calendars/${calendarId}/blocks`, { params: { from, to } });
+      return parseResponse(timeBlockListSchema, res.data);
+    }),
+  BLOCK_COVER_RULES,
+);
+
 async function request<T>(run: () => Promise<T>): Promise<T> {
   try {
     return await run();
@@ -127,6 +166,20 @@ function asUtcInstant(value: string | Date): string {
   return typeof value === 'string' ? new Date(value).toISOString() : value.toISOString();
 }
 
+/** Test hook: forget the rows held for a smaller range. */
+export function resetRangeCoversForTests(): void {
+  dayCover.clear();
+  blockCover.clear();
+}
+
+function rangeCovered(from: DateOnly, to: DateOnly, calendarIds?: string[]): Promise<DayAppointment[]> {
+  return request(async () => {
+    assertRangeWithinLimit(from, to);
+    requireDate(from, 'from');
+    requireDate(to, 'to');
+  }).then(() => dayCover.read(calendarIds && calendarIds.length > 0 ? [...calendarIds].sort().join(',') : '', from, to));
+}
+
 export const appointmentsApi = {
   /* ── The whole visible window (4.5) ── */
 
@@ -141,8 +194,8 @@ export const appointmentsApi = {
    * one they may not see simply does not appear - it is not betrayed by a 404
    * either (6.5).
    */
-  range: (from: DateOnly, to: DateOnly, calendarIds?: string[]): Promise<DayAppointment[]> =>
-    request(async () => {
+  range: (from: DateOnly, to: DateOnly, calendarIds?: string[], options: { signal?: AbortSignal } = {}): Promise<DayAppointment[]> =>
+    options.signal === undefined ? rangeCovered(from, to, calendarIds) : request(async () => {
       assertRangeWithinLimit(from, to);
       const res = await client.get('/api/day', {
         params: {
@@ -150,6 +203,7 @@ export const appointmentsApi = {
           to: requireDate(to, 'to'),
           calendarIds: calendarIds && calendarIds.length > 0 ? calendarIds.join(',') : undefined,
         },
+        signal: options.signal,
       });
       return parseResponse(dayAppointmentListSchema, res.data);
     }),
@@ -300,11 +354,9 @@ export const appointmentsApi = {
 
   blocks: (calendarId: string, from: DateOnly, to: DateOnly): Promise<TimeBlock[]> =>
     request(async () => {
-      const res = await client.get(`/api/calendars/${calendarId}/blocks`, {
-        params: { from: requireDate(from, 'from'), to: requireDate(to, 'to') },
-      });
-      return parseResponse(timeBlockListSchema, res.data);
-    }),
+      requireDate(from, 'from');
+      requireDate(to, 'to');
+    }).then(() => blockCover.read(calendarId, from, to)),
 
   createBlock: (
     calendarId: string,
@@ -332,13 +384,14 @@ export const appointmentsApi = {
    * `calendarIds` is optional; leaving it out means every calendar this user may
    * see, and only those. The day belongs to the clinic, not to one column.
    */
-  daySummary: (date: DateOnly, calendarIds?: string[]): Promise<DaySummary> =>
+  daySummary: (date: DateOnly, calendarIds?: string[], options: { signal?: AbortSignal } = {}): Promise<DaySummary> =>
     request(async () => {
       const res = await client.get('/api/day/summary', {
         params: {
           date: requireDate(date, 'date'),
           calendarIds: calendarIds && calendarIds.length > 0 ? calendarIds.join(',') : undefined,
         },
+        signal: options.signal,
       });
       return parseResponse(daySummarySchema, res.data);
     }),

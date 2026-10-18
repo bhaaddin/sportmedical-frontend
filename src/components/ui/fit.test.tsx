@@ -25,7 +25,7 @@ vi.mock('../booking/NewOrderChooser', () => {
 });
 vi.mock('../NotificationCenter', () => ({ default: () => null }));
 
-const { Layout } = await import('../../App');
+const { Layout } = await import('../../StaffApp');
 const { FitPage, FitBody, FitPanel } = await import('./fit');
 const { StackTable } = await import('./StackTable');
 const { ResponsiveDataList } = await import('./ResponsiveDataList');

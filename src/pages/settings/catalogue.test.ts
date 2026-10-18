@@ -11,6 +11,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import appRaw from '../../App.tsx?raw';
+import staffRaw from '../../StaffApp.tsx?raw';
 import {
   SETTINGS_SECTIONS,
   visibleSections,
@@ -26,7 +27,8 @@ import {
 
 /* Vite hands us the file's text; `node:fs` would need Node types this project
    does not carry, and the point is the routes, not the reading. */
-const appSource = appRaw as string;
+/* The staff route table and the sidebar's menu live in StaffApp.tsx (the staff portal is a chunk of its own). */
+const appSource = (appRaw as string) + (staffRaw as string);
 const routes = new Set(
   [...appSource.matchAll(/path="(\/[a-z0-9/:-]*)"/g)].map((m) => m[1]),
 );

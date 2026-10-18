@@ -52,6 +52,7 @@ import type { ClubFilter } from './clubs/clubOrders';
 import { buildClubRow } from './clubs/clubRow';
 import type { ClubRow } from './clubs/clubRow';
 import { ClubCard } from './clubs/ClubCard';
+import { prefetchClubScreen } from '../api/warmReads';
 import { PayerDialog } from './clubs/PayerDialog';
 import { PinnedActions } from './clubs/PinnedActions';
 import { ClubOrderEntry } from '../components/clubs/order/ClubOrderEntry';
@@ -356,6 +357,7 @@ export default function ClubsPage() {
                 ordersLoading={ordersLoading}
                 billableCzk={clubOrdersQuery.isLoading ? undefined : (billableByClub.get(row.club.id) ?? null)}
                 onOpen={() => navigate(`/clubs/${row.club.id}`)}
+                onPrefetch={() => prefetchClubScreen(queryClient, row.club.id)}
               />
             ))}
           </Box>

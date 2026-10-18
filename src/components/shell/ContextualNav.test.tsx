@@ -22,7 +22,7 @@ vi.mock('../NotificationCenter', () => ({
   default: () => <button type="button" aria-label="Oznámení">zvonek</button>,
 }));
 
-const { Layout } = await import('../../App');
+const { Layout } = await import('../../StaffApp');
 
 const EVERYTHING = [
   'patients.view', 'patients.register', 'patients.edit', 'billing.manage',

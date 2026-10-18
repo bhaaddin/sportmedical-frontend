@@ -37,12 +37,13 @@
  *      the bell rather than here: the worst that may happen is "a minute late",
  *      never "not at all".
  */
-import {
-  HubConnection,
-  HubConnectionBuilder,
-  HubConnectionState,
-  LogLevel,
-} from '@microsoft/signalr';
+/*
+ * Types only. The SignalR client is ~100 kB of script that no screen needs to paint: it is imported
+ * when the connection is opened (below), after the first paint, so it never sits in the entry that
+ * every page - the sign-in and the patients' pages included - has to download.
+ */
+import type { HubConnection } from '@microsoft/signalr';
+import { afterFirstPaint } from '../utils/afterFirstPaint';
 
 type EventCallback = (data: any) => void;
 
@@ -76,8 +77,15 @@ export function reconnectDelayMs(attempt: number, jitter: number = Math.random()
   return base + Math.floor(jitter * 1_000);
 }
 
+/** `HubConnectionState`'s values, spelled out so the library need not be loaded just to compare them. */
+const STATE_CONNECTED = 'Connected';
+const STATE_RECONNECTING = 'Reconnecting';
+
 class SocketService {
   private connection: HubConnection | null = null;
+  /* Bumped by stop(): an open() that was waiting (for the page, or for the library) when the browser
+     signed out finds a different number and gives up instead of connecting a signed-out browser. */
+  private epoch = 0;
   private listeners: Map<string, Set<EventCallback>> = new Map();
   private starting: Promise<void> | null = null;
   /* Set by stop(): a signed-out browser must not keep knocking. */
@@ -108,12 +116,35 @@ class SocketService {
   /* ── Connect ── */
   connect() {
     this.stopped = false;
-    if (this.connection?.state === HubConnectionState.Connected) return;
-    if (this.connection?.state === HubConnectionState.Reconnecting) return;
+    if (this.connection?.state === STATE_CONNECTED) return;
+    if (this.connection?.state === STATE_RECONNECTING) return;
     if (this.starting) return;
     /* Nobody signed in, nobody to authenticate as. */
     if (!localStorage.getItem('token')) return;
     if (!this.config.url) this.init();
+
+    const epoch = this.epoch;
+    this.starting = this.open(epoch).finally(() => {
+      /* Only this attempt's own bookkeeping: a stop() + connect() in between started another one. */
+      if (this.epoch === epoch) this.starting = null;
+    });
+  }
+
+  /** Waits for the first paint, loads the client, builds the connection and starts it. */
+  private async open(epoch: number): Promise<void> {
+    await afterFirstPaint();
+    if (this.stopped || this.epoch !== epoch) return;
+    let signalr: typeof import('@microsoft/signalr');
+    try {
+      signalr = await import('@microsoft/signalr');
+    } catch (err) {
+      /* The script itself would not load (offline, a deploy replaced it): same answer as a failed start. */
+      this.scheduleRestart();
+      console.warn('[SocketService] hub client unavailable, falling back to polling:', err);
+      return;
+    }
+    const { HubConnectionBuilder, LogLevel } = signalr;
+    if (this.stopped || this.epoch !== epoch || !localStorage.getItem('token')) return;
 
     const connection = new HubConnectionBuilder()
       .withUrl(this.config.url, {
@@ -168,7 +199,7 @@ class SocketService {
     });
 
     this.connection = connection;
-    this.starting = connection
+    await connection
       .start()
       .then(() => {
         this.startAttempt = 0;
@@ -183,9 +214,6 @@ class SocketService {
          * out loud so nobody debugging an un-ringing bell has to guess.
          */
         console.warn('[SocketService] hub unavailable, falling back to polling:', err);
-      })
-      .finally(() => {
-        this.starting = null;
       });
   }
 
@@ -210,6 +238,7 @@ class SocketService {
       this.retryTimer = null;
     }
     this.startAttempt = 0;
+    this.epoch += 1;
     const connection = this.connection;
     this.connection = null;
     this.starting = null;

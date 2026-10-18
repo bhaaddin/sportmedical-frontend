@@ -10,10 +10,11 @@
  */
 import { describe, expect, it } from 'vitest';
 import appRaw from '../App.tsx?raw';
+import staffRaw from '../StaffApp.tsx?raw';
 import { allDestinations } from '../pages/settings/catalogue';
 import { SITE_PAGES, isPublicSitePath } from './sitePaths';
 
-const appSource = appRaw as string;
+const appSource = (appRaw as string) + (staffRaw as string);
 
 const routePaths = [...appSource.matchAll(/<Route\s+path="([^"]+)"/g)].map((m) => m[1]);
 const menuPaths = [...appSource.matchAll(/\{ text: '[^']+', icon: <\w+ \/>, path: '([^']+)'/g)].map((m) => m[1]);

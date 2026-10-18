@@ -32,7 +32,7 @@ import { useApiDataSource } from './api/useApiDataSource';
 import { PlannerShell } from './components/PlannerShell';
 import { BoardConfigProvider, type BoardConfig } from './components/board/boardConfig';
 import { boardSettings } from './components/board/boardSettings';
-import { DemoDataSource } from './data/DemoDataSource';
+import { useDemoDataSource } from './data/useDemoDataSource';
 import type { PlannerDataSource } from './data/PlannerDataSource';
 
 function storedUser(): { displayName: string } | null {
@@ -45,11 +45,6 @@ function storedUser(): { displayName: string } | null {
   } catch {
     return null;
   }
-}
-
-/** The demo source for `?source=demo`, built once. */
-function useDemoSource(enabled: boolean, today: string): PlannerDataSource | null {
-  return useMemo(() => (enabled ? new DemoDataSource({ today }) : null), [enabled, today]);
 }
 
 /** A short stable id of what the club screen shows, so two orders never share the planner's query cache. */
@@ -157,7 +152,8 @@ function PlannerScreen({ club }: { club: ClubPlannerData | null }) {
       ? { session, today }
       : { session, today, id: clubSourceId, clubContext: { clubId: club.club?.id ?? '', clubName: club.club?.name ?? '' } },
   );
-  const demoSource = useDemoSource(demo, today);
+  /* `?source=demo` fetches the demo code on demand (it is not part of the planner's own script). */
+  const demoSource = useDemoDataSource(demo, { today });
   const source: PlannerDataSource = demoSource ?? api;
 
   /* On a club's own screen the club's other windows stay on the board; only the edited order's are the draft's. */
@@ -170,6 +166,13 @@ function PlannerScreen({ club }: { club: ClubPlannerData | null }) {
     [mode, session?.clubId, inClub, ownBlocks],
   );
 
+  if (demo && demoSource === null) {
+    return (
+      <Box data-testid="planner-demo-loading" sx={{ display: 'grid', placeItems: 'center', height: 'calc(100vh - 32px)', minHeight: 520 }}>
+        <CircularProgress aria-label="Načítám ukázková data" />
+      </Box>
+    );
+  }
   return (
     <BoardConfigProvider value={config}>
       <div style={{ height: 'calc(100vh - 32px)', minHeight: 520, width: '100%' }} data-testid="planner-page" data-mode={mode}>

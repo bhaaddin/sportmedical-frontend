@@ -28,3 +28,6 @@ dist-ssr
 
 # Browser-check snapshots written by the Playwright tool
 .playwright-mcp/
+
+# load-speed harness: throw-away self-signed certificate
+design/perf/harness/*.pem

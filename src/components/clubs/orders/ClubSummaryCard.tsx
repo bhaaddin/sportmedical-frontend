@@ -10,12 +10,17 @@ import type { ClubSummary } from '../../../api/clubOrders';
 import { SectionLabel, SoftCard, StatusChip } from '../../ui';
 import { minutesText, normalizeSummary, seatPercent, STATUS_TONE } from './orderLogic';
 
-export function useClubSummary(clubId: string) {
+/**
+ * `enabled` is false for a club nobody works with (a deactivated one): its card draws from the block totals and no
+ * request is made for it.
+ */
+export function useClubSummary(clubId: string, enabled = true) {
   return useQuery<ClubSummary>({
     queryKey: ['club-summary', clubId],
     queryFn: async () => normalizeSummary(await clubOrdersApi.clubSummary(clubId)),
-    staleTime: 30 * 1000,
+    staleTime: 60 * 1000,
     retry: false,
+    enabled: enabled && clubId !== '',
   });
 }
 

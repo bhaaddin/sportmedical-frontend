@@ -1,6 +1,10 @@
 /* Adds the DOM matchers (toBeInTheDocument, toHaveTextContent, ...) to
    vitest's expect. Without this they exist but throw at the call site. */
 import '@testing-library/jest-dom/vitest';
+import { afterEach } from 'vitest';
+
+/* The notification bells keep the last list for a few seconds; a test must never start from the previous test's. */
+afterEach(() => (globalThis as { __smResetNotificationFeed?: () => void }).__smResetNotificationFeed?.());
 
 /*
  * Czech, the way the application actually renders.

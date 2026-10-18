@@ -84,7 +84,7 @@ export default function ClubOrdersPage() {
   });
   const ordersQuery = useQuery({
     queryKey: ['club-orders', clubId, from, to],
-    queryFn: () => clubOrdersApi.list({ ...(clubId !== '' ? { clubId } : {}), ...(from !== '' ? { from } : {}), ...(to !== '' ? { to } : {}) }),
+    queryFn: ({ signal }) => clubOrdersApi.list({ ...(clubId !== '' ? { clubId } : {}), ...(from !== '' ? { from } : {}), ...(to !== '' ? { to } : {}) }, { signal }),
     placeholderData: keepPreviousData,
   });
 

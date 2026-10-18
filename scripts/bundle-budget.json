@@ -1,0 +1,12 @@
+{
+  "unit": "bytes, brotli",
+  "tolerance": 0.1,
+  "baseline": {
+    "app-entry": 260585,
+    "public-entry": 314866,
+    "login": 5496,
+    "staff-portal": 60406,
+    "dashboard": 43075,
+    "planner": 230675
+  }
+}
