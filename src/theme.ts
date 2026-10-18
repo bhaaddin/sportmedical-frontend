@@ -244,6 +244,8 @@ export function buildTheme(accentColor: string, mode: ThemeMode): Theme {
             'body .MuiSwitch-root:not(.MuiSwitch-sizeSmall)': { height: 44, padding: '11px 8px' },
             'body .MuiSwitch-root:not(.MuiSwitch-sizeSmall) .MuiSwitch-switchBase': { padding: 12, left: -3, top: 0 },
             'body .MuiChip-root.MuiChip-clickable': { minHeight: 44 },
+            /* The round filter / calendar pills (a ButtonBase that says aria-pressed). */
+            'body .MuiButtonBase-root[aria-pressed]': { minHeight: 44, minWidth: 44 },
           },
           ...(light
             ? {}

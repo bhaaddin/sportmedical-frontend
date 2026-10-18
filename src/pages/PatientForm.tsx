@@ -338,7 +338,7 @@ export default function PatientForm() {
 
   if (patientQuery.isError) {
     return (
-      <Box sx={{ maxWidth: 900, mx: "auto", p: 2 }}>
+      <Box sx={{ maxWidth: "min(100%, 900px)", mx: "auto", p: 2 }}>
         <Alert
           severity="error"
           action={

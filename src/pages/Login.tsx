@@ -164,8 +164,10 @@ export default function Login() {
 
   return (
     <Box sx={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      /* dvh, not vh: a phone's address bar must not push the card under the fold. */
+      minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
       bgcolor: 'background.default', p: 2,
+      pt: 'max(16px, env(safe-area-inset-top, 0px))', pb: 'max(16px, env(safe-area-inset-bottom, 0px))',
     }}>
       <SoftCard
         data-layout="login-card"

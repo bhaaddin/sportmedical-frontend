@@ -120,7 +120,7 @@ export function ClubPortalPage({ portal, t, stale = false }: {
                 ) : (
                   <>
                     <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>{t['formulare.club-order.portal.cal.hint']}</Typography>
-                    <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: side ? 'minmax(300px, 380px) minmax(0, 1fr)' : 'minmax(0, 1fr)', alignItems: 'start' }}>
+                    <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: side ? 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))' : 'minmax(0, 1fr)', alignItems: 'start' }}>
                       <PortalCalendar dates={dates} counts={counts} day={day} onDay={setDay} today={today} />
                       <PortalDay portal={portal} day={day} t={t} />
                     </Box>

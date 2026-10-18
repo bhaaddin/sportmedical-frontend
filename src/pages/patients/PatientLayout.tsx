@@ -288,6 +288,8 @@ export default function PatientLayout() {
           display: 'grid',
           gap: { xs: 0, md: 2.5 },
           gridTemplateColumns: 'minmax(0, 1fr)',
+          /* Stacked: the file's header takes what it needs, the open section the rest. */
+          gridTemplateRows: 'auto minmax(0, 1fr)',
           [MASTER_UP]: { gridTemplateColumns: 'clamp(280px, 24vw, 380px) minmax(0, 1fr)', gridTemplateRows: 'minmax(0, 1fr)' },
         }}
       >

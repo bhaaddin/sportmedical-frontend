@@ -1,3 +1,4 @@
+import { StackTable } from "../../components/ui/StackTable";
 import { FitPage, fitCardSx, fitTableSx } from "../../components/ui/fit";
 import { useIsPhone } from "../../layout/useDevice";
 import { useMemo, useState } from "react";
@@ -260,7 +261,7 @@ export default function BlockedTimePage() {
           onRetry={() => void blocksQuery.refetch()}
         >
           <SoftCard sx={{ p: 0, overflow: "hidden", ...fitCardSx(phone) }}>
-            <TableContainer sx={{ borderRadius: 0, ...fitTableSx(phone) }}>
+            <StackTable sx={{ borderRadius: 0, ...fitTableSx(phone) }}>
             <Table size="small" stickyHeader={!phone}>
               <TableHead>
                 <TableRow>
@@ -299,7 +300,7 @@ export default function BlockedTimePage() {
                 ))}
               </TableBody>
             </Table>
-            </TableContainer>
+            </StackTable>
           </SoftCard>
         </AsyncSection>
       </AsyncSection>

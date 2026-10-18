@@ -29,7 +29,7 @@ export const STACK_TABLE_PHONE_SX = {
   '@media (max-width: 767.95px)': {
     overflowX: 'visible',
     '& table': { display: 'block', width: '100%', minWidth: '0 !important', tableLayout: 'auto' },
-    '& thead': { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' },
+    '& thead': { display: 'block', position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' },
     '& tbody': { display: 'block' },
     '& tbody > tr': { display: 'block', borderBottom: '1px solid', borderColor: 'divider', py: 1 },
     '& tbody > tr:last-of-type': { borderBottom: 'none' },

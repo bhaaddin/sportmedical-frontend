@@ -12,7 +12,12 @@ import { RECIPIENT_LABEL, customerOf, recipientTypeOf } from '../../pages/billin
 export default function InvoiceCustomer({ invoice, wrap = false }: { invoice: Invoice; wrap?: boolean }) {
   const type = recipientTypeOf(invoice);
   const name = customerOf(invoice);
-  const linkSx = { color: 'primary.main', fontWeight: 600 };
+  const linkSx = {
+    color: 'primary.main',
+    fontWeight: 600,
+    /* A name in a table row is a touch target of its own. */
+    '@media (max-width: 1279.95px)': { display: 'inline-flex', alignItems: 'center', minHeight: 44 },
+  };
 
   let who: React.ReactNode = name;
   if (type === 'Person' && invoice.patientId) {

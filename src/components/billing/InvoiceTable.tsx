@@ -87,7 +87,8 @@ export default function InvoiceTable({
                   )}
                 </TableCell>
                 {!compact && (
-                  <TableCell sx={{ maxWidth: 360 }}>
+                  /* The one flexible column: it takes what the others leave and ends its text with an ellipsis. */
+                  <TableCell sx={{ width: '30%', maxWidth: 0, minWidth: 140 }}>
                     <Typography variant="body2" noWrap title={items}>{items}</Typography>
                   </TableCell>
                 )}

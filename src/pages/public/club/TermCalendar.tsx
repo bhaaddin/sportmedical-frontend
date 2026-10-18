@@ -121,7 +121,7 @@ export function TermCalendar({
     <Box
       data-testid="club-term"
       data-layout={device}
-      sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: side ? 'minmax(300px, 380px) minmax(0, 1fr)' : 'minmax(0, 1fr)', alignItems: 'start' }}
+      sx={{ display: 'grid', gap: 2.5, /* side by side only while the column is wide enough for both (a pane of a workspace can be 420 px wide on a tablet) */ gridTemplateColumns: side ? 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))' : 'minmax(0, 1fr)', alignItems: 'start' }}
     >
       <Box data-testid="club-calendar" sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, minWidth: 0 }}>
         <Typography sx={{ fontSize: 14, color: LABEL_COLOR }}>{texts['formulare.club-reg.cal.hint']}</Typography>
@@ -130,7 +130,8 @@ export function TermCalendar({
           <Typography component="h3" aria-live="polite" data-testid="club-month" sx={{ m: 0, fontSize: 17, fontWeight: 700 }}>{capitalise(monthTitle(shown))}</Typography>
           {arrow('Další měsíc', nextMonth, <ChevronRight />)}
         </Box>
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '2px' }}>
+        {/* seven 44 px targets are 322 px; a phone's pane is 294, so the grid takes a few px of the pane's padding */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '2px', mx: { xs: '-8px', sm: 0 } }}>
           {WEEKDAYS.map((w) => (
             <Typography key={w} component="span" aria-hidden="true" sx={{ textAlign: 'center', fontSize: 12, fontWeight: 700, color: LABEL_COLOR }}>{w}</Typography>
           ))}
@@ -142,7 +143,7 @@ export function TermCalendar({
             const selected = date === day;
             const long = clinicDate(date);
             const base = {
-              minHeight: 48, minWidth: 0, p: 0, borderRadius: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              minHeight: 48, minWidth: 44, p: 0, borderRadius: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               fontFamily: 'inherit', fontSize: 15, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums',
               outline: isToday ? `2px dotted ${BRAND.text}` : 'none', outlineOffset: -3,
             } as const;

@@ -328,12 +328,14 @@ export function failures(r) {
   if (r.touch.small.length) f.push('touch');
   if (r.clipped.length) f.push('clipped');
   if (r.overlap.length) f.push('overlap');
-  if (r.covered.length) f.push('covered-by-bar');
+  // an open dialog or the open mobile menu covers the page on purpose
+  const overlay = r.dialogs.length > 0 || r.page.startsWith('menu-');
+  if (r.covered.length && !overlay) f.push('covered-by-bar');
   if (r.imgs.noIntrinsic.length) f.push('img-no-size');
   if (r.cls > 0.25) f.push('cls');
   if (r.forms.length) f.push('form-narrow');
   if (r.dialogs.some((d) => d.tallerThanViewport || d.widerThanViewport)) f.push('dialog-oversize');
-  if (r.barTopMax > r.h * 0.25 || r.barBottomMax > r.h * 0.25) f.push('bar-too-big');
+  if (!overlay && (r.barTopMax > r.h * 0.25 || r.barBottomMax > r.h * 0.25)) f.push('bar-too-big');
   return f;
 }
 

@@ -14,7 +14,7 @@
  *    them; "Nový pacient" only for somebody who may register one.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { setViewport, VIEWPORTS } from '../test/viewport';
@@ -284,16 +284,17 @@ describe('three layouts', () => {
     expect(getComputedStyle(button).minHeight).toBe('44px');
   });
 
-  it('tablet: the lists are tables of three columns, and nothing is pinned', async () => {
+  it('tablet: the page fits the window - two panels across, each a card whose list scrolls inside it, nothing is pinned', async () => {
     setViewport(VIEWPORTS.tablet);
     range.mockResolvedValue([at(8, 0, 'a', 'p1')]);
 
     const { container } = renderDashboard();
 
     const objednani = await panelAt('Objednaní');
-    const table = await objednani.findByRole('table', { name: 'Objednaní' });
-    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Čas', 'Pacient', 'Stav']);
     expect(await objednani.findByText('Jana Marková')).toBeInTheDocument();
+    /* A compact list in a card (the page never scrolls; the list does), not a table that makes the page taller. */
+    expect(container.querySelector('table')).toBeNull();
+    expect(container.querySelectorAll('[data-panel]')).toHaveLength(4);
 
     expect(container.querySelector('[data-layout="tablet"]')).not.toBeNull();
     expect(screen.queryByRole('region', { name: 'Hlavní akce' })).toBeNull();
@@ -314,11 +315,16 @@ describe('three layouts', () => {
     expect(screen.getAllByRole('button', { name: 'Otevřít kalendář' }).length).toBeGreaterThan(0);
   });
 
-  it('phone: an empty list says so in a card instead of a blank gap', async () => {
+  it('phone: one list at a time - the chips choose it, and an empty one says so in a card instead of a blank gap', async () => {
     setViewport(VIEWPORTS.phone);
-    renderDashboard();
+    const { container } = renderDashboard();
 
+    /* The first list is showing; the others are one tap away, not stacked under it. */
+    await panelAt('Objednaní');
+    expect(container.querySelectorAll('[data-panel]')).toHaveLength(1);
+    fireEvent.click(await screen.findByRole('button', { name: /^Čekárna/ }));
     const card = await panelAt('Čekárna');
+    expect(container.querySelectorAll('[data-panel]')).toHaveLength(1);
     expect(await card.findByText('Čekárna je prázdná.')).toBeInTheDocument();
   });
 });
@@ -369,6 +375,8 @@ describe('the prices on the plocha', () => {
       renderDashboard();
 
       expect(await (await panelAt('Objednaní')).findByText('Kontrola · 1 200 Kč (upraveno)')).toBeInTheDocument();
+      /* A phone shows one list at a time: the chip brings the waiting room up. */
+      if (width === VIEWPORTS.phone) fireEvent.click(await screen.findByRole('button', { name: /^Čekárna/ }));
       expect(await (await panelAt('Čekárna')).findByText('Kontrola · 1 600 Kč')).toBeInTheDocument();
     },
   );

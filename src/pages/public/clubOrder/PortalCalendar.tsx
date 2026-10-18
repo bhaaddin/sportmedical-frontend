@@ -62,7 +62,7 @@ export function PortalCalendar({ dates, counts, day, onDay, today }: {
         <Typography component="h3" aria-live="polite" data-testid="portal-month" sx={{ m: 0, fontSize: 17, fontWeight: 700 }}>{capitalise(monthTitle(shown))}</Typography>
         {arrow('Další měsíc', nextMonth, <ChevronRight />)}
       </Box>
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '2px' }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '2px', mx: { xs: '-8px', sm: 0 } }}>
         {WEEKDAYS.map((w) => (
           <Typography key={w} component="span" aria-hidden="true" sx={{ textAlign: 'center', fontSize: 12, fontWeight: 700, color: LABEL_COLOR }}>{w}</Typography>
         ))}
@@ -71,7 +71,7 @@ export function PortalCalendar({ dates, counts, day, onDay, today }: {
           const dayNo = Number(date.slice(8));
           const isToday = date === today;
           const base = {
-            minHeight: 48, minWidth: 0, p: 0, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            minHeight: 48, minWidth: 44, p: 0, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontFamily: 'inherit', fontSize: 15, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums',
             outline: isToday ? `2px dotted ${BRAND.text}` : 'none', outlineOffset: -3,
           } as const;

@@ -104,6 +104,9 @@ function measureInPage() {
     const cs = getComputedStyle(el);
     if (!visible(cs) || cs.position === 'fixed') return;
     if (cs.position === 'sticky') sticky = true;
+    /* a visually-hidden helper (1 px, absolutely placed) is not a painted box */
+    if (cs.position === 'absolute' && el.getBoundingClientRect().width <= 2 && el.getBoundingClientRect().height <= 2) return;
+    if (el.matches('label.MuiFormLabel-root, label.MuiInputLabel-root')) sticky = true;
     const rect = el.getBoundingClientRect();
     let c = clip;
     const clipsX = cs.overflowX !== 'visible';
@@ -265,7 +268,10 @@ function coveredInPage() {
 
 async function settle(page) {
   try { await page.waitForSelector('#main-content', { timeout: 15000 }); } catch { /* a page without a shell (login) */ }
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   await page.waitForTimeout(500);
+  /* a page that says it is loading is not measured yet */
+  await page.waitForFunction(() => !/Načítám|Načítání/.test(document.querySelector('#main-content')?.innerText ?? ''), null, { timeout: 12000 }).catch(() => {});
   for (let i = 0; i < 12; i++) {
     const busy = await page.evaluate(() => !!document.querySelector('#main-content .MuiCircularProgress-root, #main-content .MuiSkeleton-root, #main-content [role=progressbar]'));
     if (!busy) break;

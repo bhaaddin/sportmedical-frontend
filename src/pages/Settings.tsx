@@ -223,7 +223,7 @@ function GroupPage({ groupId }: { groupId: string }) {
           V téhle skupině pro vás zatím není nic, co byste smět otevřít. Oprávnění přiděluje správce v sekci Systém.
         </Alert>
       ) : (
-        <Box component="ul" aria-label={known.label} sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gap: 1.5, alignContent: 'start', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 480px), 1fr))' }}>
+        <Box component="ul" aria-label={known.label} sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gap: 1.5, alignContent: 'start', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 480px), 1fr))' }}>
           {section.items.map((item) => (
             <Box key={item.id} component="li" sx={[cardSx, { overflow: 'hidden' }]}>
               <Box component={RouterLink} to={item.to} sx={[rowSx(false), { minHeight: 76 }]}>

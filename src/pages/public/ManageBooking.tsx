@@ -400,7 +400,7 @@ export default function ManageBooking() {
             </DialogContentText>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
-            <Button onClick={() => setAsking(false)} color="inherit" sx={{ borderRadius: 999 }}>
+            <Button onClick={() => setAsking(false)} color="inherit" sx={{ borderRadius: 999, minHeight: 44 }}>
               Nechat termín
             </Button>
             <Button
@@ -408,7 +408,7 @@ export default function ManageBooking() {
               disabled={cancelling}
               variant="contained"
               disableElevation
-              sx={{ borderRadius: 999, color: BRAND.ink }}
+              sx={{ borderRadius: 999, color: BRAND.ink, minHeight: 44 }}
             >
               {cancelling ? 'Rušíme…' : 'Ano, zrušit'}
             </Button>
@@ -445,7 +445,7 @@ export default function ManageBooking() {
                       variant="outlined"
                       color="inherit"
                       onClick={() => { void pickDay(d); }}
-                      sx={{ borderRadius: 2, borderColor: BRAND.line }}
+                      sx={{ borderRadius: 2, borderColor: BRAND.line, minHeight: 44 }}
                     >
                       {dayLabel(d)}
                     </Button>
@@ -458,7 +458,7 @@ export default function ManageBooking() {
                   size="small"
                   color="inherit"
                   onClick={() => { setDay(null); setSlots(null); }}
-                  sx={{ mb: 1 }}
+                  sx={{ mb: 1, minHeight: 44 }}
                 >
                   ← jiný den
                 </Button>
@@ -481,7 +481,7 @@ export default function ManageBooking() {
                         disableElevation
                         disabled={movingNow}
                         onClick={() => { void confirmMove(s.startUtc); }}
-                        sx={{ borderRadius: 2, color: BRAND.ink }}
+                        sx={{ borderRadius: 2, color: BRAND.ink, minHeight: 44, minWidth: 44 }}
                       >
                         {slotTime(s.startUtc)}
                       </Button>
@@ -492,7 +492,7 @@ export default function ManageBooking() {
             )}
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
-            <Button onClick={() => setMoving(false)} color="inherit" sx={{ borderRadius: 999 }}>
+            <Button onClick={() => setMoving(false)} color="inherit" sx={{ borderRadius: 999, minHeight: 44 }}>
               Zavřít
             </Button>
           </DialogActions>

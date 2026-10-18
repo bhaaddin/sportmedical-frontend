@@ -1,3 +1,4 @@
+import { StackTable } from "../../components/ui/StackTable";
 import { FitPage, fitCardSx, fitTableSx } from "../../components/ui/fit";
 import { useIsPhone } from "../../layout/useDevice";
 import { Fragment, useCallback, useMemo, useState } from "react";
@@ -414,7 +415,7 @@ export default function ServiceOverviewPage() {
                 </Alert>
               ) : null}
 
-              <TableContainer sx={{ borderRadius: 0, borderTop: "1px solid", borderColor: "divider", ...fitTableSx(phone) }}>
+              <StackTable sx={{ borderRadius: 0, borderTop: "1px solid", borderColor: "divider", ...fitTableSx(phone) }}>
                 <Table size="small" stickyHeader={!phone}>
                   <TableHead>
                     <TableRow>
@@ -472,7 +473,7 @@ export default function ServiceOverviewPage() {
                     ))}
                   </TableBody>
                 </Table>
-              </TableContainer>
+              </StackTable>
             </SoftCard>
           </AsyncSection>
         )}

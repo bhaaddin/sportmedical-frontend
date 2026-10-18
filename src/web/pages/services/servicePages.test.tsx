@@ -385,18 +385,39 @@ describe('Ceník — the whole list, live', () => {
     expect(screen.getByText('Anamnéza a EKG')).toBeInTheDocument();
   });
 
-  it('has an anchor chip for every category and for the clubs, each pointing at an element that exists', async () => {
+  it('has a filter chip for "Vše", every category, the notes and the clubs; a chip narrows the board to a pane that exists', async () => {
     serverUp();
     const { container } = renderWeb(<CenikPage />);
     await screen.findByText(/^1\s111\sKč$/);
     const nav = screen.getByRole('navigation', { name: 'Kategorie ceníku' });
-    const chips = within(nav).getAllByRole('link');
-    expect(chips).toHaveLength(5);
-    expect(chips[0]).toHaveAttribute('href', `#${categorySlug('Sportovní lékařské prohlídky')}`);
-    chips.forEach((chip) => {
-      const id = (chip.getAttribute('href') ?? '').slice(1);
-      expect(container.querySelector(`[id="${id}"]`), id).not.toBeNull();
-    });
+    const chips = within(nav).getAllByRole('button');
+    expect(chips).toHaveLength(7); // Vše + 4 categories + the notes + the clubs
+    expect(chips[0]).toHaveAttribute('aria-pressed', 'true');
+    // every category chip shows exactly its own section (the heading carries the id the old anchor chips pointed at)
+    for (const chip of chips.slice(1, 5)) {
+      fireEvent.click(chip);
+      expect(chip).toHaveAttribute('aria-pressed', 'true');
+      expect(container.querySelector(`h2[id="${categorySlug(chip.textContent ?? '')}"]`), chip.textContent ?? '').not.toBeNull();
+      expect(container.querySelectorAll('section[aria-labelledby]')).toHaveLength(1);
+    }
+    // the clubs chip shows the group-discount section the "Kluby" link of the long page jumped to
+    fireEvent.click(chips[6]);
+    expect(container.querySelector('[id="kluby-a-skupiny"]')).not.toBeNull();
+    fireEvent.click(chips[0]);
+    expect(container.querySelectorAll('section[aria-labelledby]').length).toBeGreaterThan(4);
+  });
+
+  it('opens the pane an address asks for (#kluby-a-skupiny) after the first paint', async () => {
+    serverUp();
+    window.history.replaceState(null, '', '/cenik#kluby-a-skupiny');
+    try {
+      const { container } = renderWeb(<CenikPage />);
+      await waitFor(() => { expect(container.querySelectorAll('section[aria-labelledby]')).toHaveLength(0); });
+      expect(container.querySelector('[id="kluby-a-skupiny"]')).not.toBeNull();
+      expect(screen.getByRole('button', { name: /Kluby/ })).toHaveAttribute('aria-pressed', 'true');
+    } finally {
+      window.history.replaceState(null, '', '/');
+    }
   });
 
   it('shows the three service names with dashes while the API has said nothing, and a "Zkusit znovu" that retries', async () => {

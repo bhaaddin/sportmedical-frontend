@@ -1,3 +1,4 @@
+import { StackTable } from '../ui/StackTable';
 import { useMemo, useState } from 'react';
 import {
   Alert, Box, Button, Checkbox, Menu, MenuItem, Stack, Table, TableBody, TableCell, TableHead,
@@ -255,7 +256,7 @@ export function DayActivityGrid({ calendarId, periodId, workingDays, clinicServi
         }}
         skeletonRows={4}
       >
-        <Box sx={{ overflowX: 'auto' }}>
+        <StackTable>
           <Table size="small">
             {/* The board's plain header: white, normal case - not the filled uppercase of other tables. */}
             <TableHead
@@ -384,7 +385,7 @@ export function DayActivityGrid({ calendarId, periodId, workingDays, clinicServi
               })}
             </TableBody>
           </Table>
-        </Box>
+        </StackTable>
 
         <Menu
           open={copyMenu !== null}

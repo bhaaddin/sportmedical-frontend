@@ -17,7 +17,7 @@ import { formatCzk, shownPrice, sumPrices } from '../components/booking/grid/app
 import DayOverviewPage from './booking/DayOverviewPage';
 import { toDateOnly, formatPragueTime } from '../utils/time';
 import { DashboardSkeleton } from '../components/SkeletonLoader';
-import { KpiCard, PageHeader, SectionLabel, SoftCard, StatusChip, type ChipTone } from '../components/ui';
+import { FilterChips, KpiCard, PageHeader, SectionLabel, SoftCard, StatusChip, type ChipTone } from '../components/ui';
 import { ResponsiveDataList, type DataColumn } from '../components/ui/ResponsiveDataList';
 import { PinnedActionBar } from '../components/ui/PinnedActionBar';
 import { useDevice } from '../layout/useDevice';
@@ -77,6 +77,8 @@ function namesOf(results: { data?: Patient }[]): Record<string, string> {
 }
 
 /* ── Dashboard: a doctor lands on their day; the owner/admin get the plocha. ── */
+type PanelKey = 'booked' | 'waiting' | 'history' | 'alerts';
+
 export default function Dashboard() {
   let role = '';
   try {
@@ -249,6 +251,8 @@ function OwnerDashboard() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   /* ── Patient search ── */
+  /* A phone shows one list at a time, chosen with the chips above it (a screen shows one thing). */
+  const [phonePanel, setPhonePanel] = useState<PanelKey>('booked');
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   useEffect(() => {
@@ -437,7 +441,7 @@ function OwnerDashboard() {
           {/* Etapa 12: the day's money - today's visits that stand or happened, at their agreed prices. */}
           <KpiCard label="Dnes" value={formatCzk(todayCzk)} hint="za dnešní nezrušené termíny" />
         </Grid>
-        <Grid size={{ xs: 6, md: 2.4 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
           <KpiCard
             label="Kartotéka"
             value={patientTotal !== null ? patientTotal : '—'}
@@ -516,39 +520,62 @@ function OwnerDashboard() {
           gridTemplateColumns: '1fr',
           /* Two panels across on a tablet (2 x 2), four on a desktop; the rows share the height that is left. */
           '@media (min-width: 768px)': { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gridAutoRows: 'minmax(150px, 1fr)', minHeight: 330 },
+          /* A short window (a landscape tablet, a browser zoomed to 125 %): the panels may be a little lower rather than push the page. */
+          '@media (min-width: 768px) and (max-height: 820px)': { gridAutoRows: 'minmax(124px, 1fr)', minHeight: 264 },
           '@media (min-width: 1280px)': { gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gridAutoRows: 'minmax(260px, 1fr)', minHeight: 260 },
         }}
       >
-        <Panel
-          title="Objednaní"
-          count={booked.length}
-          action={{ label: 'Otevřít kalendář', onClick: toCalendar }}
-          rows={booked.map(appointmentRow)}
-          headers={['Čas', 'Pacient', 'Stav']}
-          empty="Na dnešek nikdo objednaný."
-        />
-        <Panel
-          title="Čekárna"
-          count={waiting.length}
-          action={{ label: 'Dnešní přehled', onClick: () => navigate('/dnes') }}
-          rows={waiting.map(appointmentRow)}
-          headers={['Čas', 'Pacient', 'Stav']}
-          empty="Čekárna je prázdná."
-        />
-        <Panel
-          title="Historie"
-          action={{ label: 'Všichni pacienti', onClick: () => navigate('/patients') }}
-          rows={historyRows}
-          headers={['', 'Pacient']}
-          empty={historyEmpty}
-        />
-        <Panel
-          title="Notifikace"
-          count={alerts.length}
-          rows={alerts.map(alertRow)}
-          headers={['Čas', 'Pacient']}
-          empty="Vše vyřízeno — žádné notifikace."
-        />
+        {phone && (
+          <FilterChips<PanelKey>
+            ariaLabel="Seznam na přehledu"
+            value={phonePanel}
+            onChange={setPhonePanel}
+            options={[
+              { key: 'booked', label: 'Objednaní', count: booked.length },
+              { key: 'waiting', label: 'Čekárna', count: waiting.length },
+              { key: 'history', label: 'Historie' },
+              { key: 'alerts', label: 'Notifikace', count: alerts.length },
+            ]}
+          />
+        )}
+        {(!phone || phonePanel === 'booked') && (
+          <Panel
+            title="Objednaní"
+            count={booked.length}
+            action={{ label: 'Otevřít kalendář', onClick: toCalendar }}
+            rows={booked.map(appointmentRow)}
+            headers={['Čas', 'Pacient', 'Stav']}
+            empty="Na dnešek nikdo objednaný."
+          />
+        )}
+        {(!phone || phonePanel === 'waiting') && (
+          <Panel
+            title="Čekárna"
+            count={waiting.length}
+            action={{ label: 'Dnešní přehled', onClick: () => navigate('/dnes') }}
+            rows={waiting.map(appointmentRow)}
+            headers={['Čas', 'Pacient', 'Stav']}
+            empty="Čekárna je prázdná."
+          />
+        )}
+        {(!phone || phonePanel === 'history') && (
+          <Panel
+            title="Historie"
+            action={{ label: 'Všichni pacienti', onClick: () => navigate('/patients') }}
+            rows={historyRows}
+            headers={['', 'Pacient']}
+            empty={historyEmpty}
+          />
+        )}
+        {(!phone || phonePanel === 'alerts') && (
+          <Panel
+            title="Notifikace"
+            count={alerts.length}
+            rows={alerts.map(alertRow)}
+            headers={['Čas', 'Pacient']}
+            empty="Vše vyřízeno — žádné notifikace."
+          />
+        )}
       </FitBody>
 
       {/* ── The main action of a phone screen is pinned at the bottom ── */}

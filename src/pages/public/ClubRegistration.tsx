@@ -532,7 +532,6 @@ export default function ClubRegistration() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             sx={{ flex: '1 1 100%' }}
-            slotProps={{ htmlInput: { style: { minHeight: 20 } } }}
           />
           {infoMode && (
             <FormControlLabel

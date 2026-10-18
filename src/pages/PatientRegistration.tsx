@@ -790,7 +790,7 @@ export default function PatientRegistration() {
   if (issued !== null) {
     const expiry = formatExpiry(issued.issued.expiresAtUtc);
     return (
-      <Box sx={{ maxWidth: 1200, mx: 'auto', width: '100%' }}>
+      <Box sx={{ maxWidth: 'min(100%, 1200px)', mx: 'auto', width: '100%' }}>
         <PageHeader
           title="Nový pacient"
           subtitle={`${MODE_LABEL.Quick} — hotovo`}

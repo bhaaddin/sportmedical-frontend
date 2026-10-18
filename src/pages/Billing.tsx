@@ -56,8 +56,8 @@ const messageOf = (error: unknown, fallback: string): string => toBookingError(e
 export default function Billing() {
   const device = useDevice();
   const phone = device === 'phone';
-  /* The seven-column table needs about 1300 px beside the sidebar; narrower than that it folds into five columns. */
-  const narrow = useMediaQuery('(max-width: 1679px)');
+  /* The seven-column table needs about 1180 px beside the sidebar (a 1440 window has that); narrower, it folds into five columns. */
+  const narrow = useMediaQuery('(max-width: 1439px)');
   const tablet = device === 'tablet' || narrow;
   const canApprove = usePermissions().includes(APPROVE_PERMISSION);
 
