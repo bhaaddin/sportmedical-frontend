@@ -242,12 +242,12 @@ describe('/planovani draws the clinic\'s real calendar', () => {
 });
 
 describe('/planovani remembers what the desk set', () => {
-  it('the resolution is kept under the calendar\'s own key and is still there after the page is opened again', async () => {
+  it('the resolution (the zoom) is kept under calendarZoomV2 and is still there after the page is opened again', async () => {
     const view = mount();
     await screen.findByTestId('board-booking-b1');
     fireEvent.click(screen.getByRole('button', { name: 'Nastavení' }));
     fireEvent.click(await screen.findByRole('button', { name: '15 min' }));
-    expect(window.localStorage.getItem('calendarZoom')).toBe('1.5');
+    expect(window.localStorage.getItem('calendarZoomV2')).toBe('3.5');
     expect(board()).toHaveAttribute('data-step', '15');
     view.unmount();
     boardSettings.reset(); // "a reload": the store is built again from the same storage

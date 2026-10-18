@@ -4,14 +4,27 @@
  * selection - is drawn here, in the file's palette, scoped under .sm-planner.
  */
 
-/* ---- the body scrolls when a finer resolution makes the timeline taller than the file's 455 px ---- */
+/* ---- the body scrolls when the zoom (up to 6x) makes the timeline taller than the body: only the body, never the page ---- */
 .sm-planner .planner .board-body {
   align-items: flex-start;
   overflow-x: hidden;
   overflow-y: hidden;
   scrollbar-width: none;
+  overscroll-behavior: contain;
 }
 .sm-planner .planner .board-body.is-tall { overflow-y: auto; }
+/* the hour column stays at the left edge of the scroll region and the labels scroll with their rows */
+.sm-planner .planner .board-body > .hour-column { position: sticky; left: 0; z-index: 20; }
+/* a label between two hours (7:10, 7:15, 7:30): the file's hour label, dimmer */
+.sm-planner .hour-label.is-sub { color: #9db7cc; }
+/* the board takes the keyboard (+ - 0 zoom it): the file's own focus ring */
+.sm-planner .week-board:focus { outline: none; }
+.sm-planner .week-board:focus-visible { outline: 2px solid #50ffff; outline-offset: -2px; }
+/* the zoom group: the file's `.view-segment` with narrow buttons (36 px) and a value in the middle */
+.sm-planner .zoom-segment button { width: 37px; font-size: 18px; line-height: 1; }
+.sm-planner .zoom-segment button.zoom-value { width: 49px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.sm-planner .zoom-segment button:disabled { opacity: 0.4; cursor: default; }
+.sm-planner .planner-filters > .zoom-segment { margin-left: -4px; }
 .sm-planner .planner .board-body::-webkit-scrollbar { display: none; }
 .sm-planner .planner .board-body > .hour-column { flex: none; align-self: flex-start; }
 .sm-planner .planner .board-body > .day-board { flex: 1; align-self: flex-start; min-width: 0; }
@@ -124,7 +137,8 @@
   align-items: center;
   justify-content: center;
   gap: 1px;
-  overflow: hidden;
+  /* clip, not hidden: a scroll container would be the scrollport of the sticky label inside (`.board-sticky`) */
+  overflow: clip;
   text-align: center;
   padding: 0 6px;
   font: inherit;
@@ -142,6 +156,17 @@
 .sm-planner .board-window.is-manual { color: #b4cbdc; border-left-style: dashed; border-left-width: 1px; }
 .sm-planner .board-window:hover { filter: brightness(1.25); }
 .sm-planner .board-window:focus-visible { outline: 2px solid #23f2e7; outline-offset: 1px; }
+/* a tall block (a zoomed-in day) keeps its words in view: they stay between the top and the bottom of the scrolled body */
+.sm-planner .board-sticky {
+  position: sticky;
+  top: 6px;
+  bottom: 6px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
 .sm-planner .board-window .win-label { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sm-planner .board-window .win-time { font-size: 10px; font-weight: 500; opacity: 0.85; white-space: nowrap; }
 
@@ -161,6 +186,15 @@
   font-variant-numeric: tabular-nums;
 }
 .sm-planner .schedule-event .event-time-row { display: flex; justify-content: space-between; gap: 6px; }
+/* a zoomed-in card has room for one more line: booked / capacity (a term), the calendar's name (a booking) */
+.sm-planner .schedule-event .event-more {
+  display: block;
+  font-size: 11px;
+  color: #9fc3d6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .sm-planner .schedule-event .event-time-row .event-price { font-weight: 500; color: #d9e7f8; }
 .sm-planner .schedule-event.board-booking .event-contents strong { font-weight: 650; }
 .sm-planner .board-chip {
@@ -283,7 +317,9 @@
 .sm-planner .schedule-event[data-lanes='3'] { padding: 0 4px; gap: 4px; }
 .sm-planner .schedule-event[data-lanes='2'] .event-symbol,
 .sm-planner .schedule-event[data-lanes='3'] .event-symbol { display: none; }
-.sm-planner .schedule-event[data-lanes='2'] .event-price { display: none; }
+.sm-planner .schedule-event[data-lanes='2'] .event-price,
+.sm-planner .schedule-event[data-lanes='2'] .event-more,
+.sm-planner .schedule-event[data-lanes='3'] .event-more { display: none; }
 .sm-planner .schedule-event[data-lanes='3'] .event-title { font-size: 10px; letter-spacing: -0.2px; }
 .sm-planner .schedule-event[data-lanes='3'] .event-contents strong,
 .sm-planner .schedule-event[data-lanes='3'] .event-price { display: none; }

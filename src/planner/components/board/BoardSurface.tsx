@@ -12,7 +12,7 @@
  *               (`planning.selectedCategoryId !== null`) or one of those gestures runs, this component
  *               keeps its hands off the board.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Button, ClickAwayListener, Paper, Popover, Popper } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -26,7 +26,6 @@ import { BlockDetailDialog, BlockReasonDialog, type BlockTarget } from '../../..
 import { GRID_TEXT } from '../../../components/booking/grid/gridText';
 import { columnStep } from '../../../components/booking/grid/moveDrag';
 import { longDate, minutesFree } from '../../../components/booking/grid/periodTitle';
-import { resolutionOf } from '../../../components/booking/grid/resolution';
 import { localDateTime, pragueMinuteOfDay, spanLabel, spanOnDay, touchesDay, type MinuteRange } from '../../../components/booking/grid/timeRange';
 import type { GridMoveRequest } from '../../../components/booking/grid/moveRequest';
 import { MoveConfirmDialog } from '../../../components/booking/calendar/MoveConfirmDialog';
@@ -53,6 +52,19 @@ import { BoardToolbar } from './BoardToolbar';
 import type { BoardCalendarData } from './boardCalendar';
 import { useBoardConfig } from './boardConfig';
 import { boardGeometry, hourLabels, STANDARD_TIMELINE_HEIGHT, stepLineHeight, widenWindow, yOfMinute } from './boardGeometry';
+import {
+  clampZoom,
+  focusMinuteFor,
+  lineStepFor,
+  minuteAtViewportY,
+  pinchDistance,
+  scrollTopFor,
+  snapStepFor,
+  stepZoom,
+  wheelFactor,
+  ZOOM_MAX,
+  ZOOM_MIN,
+} from './boardZoom';
 import {
   buildBoardModel,
   dayListModel,
@@ -147,17 +159,22 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   /* Club planning's layer listens to every press on an empty board (and says "Nejprve vyberte činnost" when nothing is
      armed). Standard ordering without an order has nothing to arm, so there the board's presses are the desk's own. */
   const planningPossible = !standardLayout && (config.mode === 'club' || ctx.demands.length > 0);
-  const resolution = resolutionOf(settings.zoom);
-  /* A board widened above the planning window opens at the planning window, not at the odd hour. */
+  /* The zoom (1-6x) decides which lines the board draws and the step marking and moving snap to (`boardZoom.ts`). */
+  const lineStep = lineStepFor(settings.zoom);
+  const snapStep = snapStepFor(settings.zoom);
+  /* A board widened above the planning window opens at the planning window, not at the odd hour. The scroll is NOT reset
+     by the week arrows or the Den / Týden / Měsíc switch: the hours the desk scrolled to stay. */
   const windowTop = drawnWindow.startMinutes;
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = yOfMinute(geometry, ctx.window.startMinutes);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [windowTop, weekStart, standardLayout]);
+  }, [windowTop, standardLayout]);
   const head = useMemo(() => weekHeadModel(weekStart, ctx.window), [weekStart, ctx.window]);
   const days = head.days.map((d) => d.date);
 
   const boardRef = useRef<HTMLDivElement | null>(null);
+  /* Two fingers on the board are a pinch (zoom), never a mark, a move or a placement. */
+  const [pinching, setPinching] = useState(false);
   const [notice, setNotice] = useState<BoardNotice | null>(null);
   const noticeTimer = useRef<number | undefined>(undefined);
   const showNotice = useCallback((next: BoardNotice) => {
@@ -195,8 +212,8 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     days,
     calendar,
     dayMarks,
-    resolutionStep: resolution.step,
-    paused: planningOwnsPointer,
+    resolutionStep: snapStep,
+    paused: planningOwnsPointer || pinching,
     onCommit: commitMove,
     onNotice: showNotice,
     describeError: (error) => errorText(error, t),
@@ -229,14 +246,176 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     [ctx, weekStart, filter, geometry, dayMarks, catalogue, calendar, move.appointments, config.excludeClubId, config.excludeClubBlockIds, nowMinute],
   );
 
+  /* ---- zoom: 1x = the 12 hours fill the body; above, the body scrolls and the time under the pointer stays put ---- */
+  const weekRef = useRef<HTMLDivElement | null>(null);
+  const geometryRef = useRef(geometry);
+  geometryRef.current = geometry;
+  /* The body's visible height in design px (the fitted height the zoom multiplies). */
+  const viewport = metrics.measured ? metrics.height : baseTimeline;
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
+  const focusRef = useRef<() => number>(() => drawnWindow.startMinutes);
+  focusRef.current = () =>
+    focusMinuteFor({
+      window: drawnWindow,
+      nowMinute: days.includes(ctx.today) ? nowMinute : null,
+      firstSessionMinute: model.cards.length > 0 ? Math.min(...model.cards.map((c) => c.startMinute)) : null,
+    });
+  /* What the next zoom change keeps fixed: the minute under a pointer / the centre, or "show now / the first session". */
+  const anchorRef = useRef<{ kind: 'minute'; minute: number; offset: number } | { kind: 'focus' } | null>(null);
+  const prevZoomRef = useRef(settings.zoom);
+  const prevGeometryRef = useRef(geometry);
+  const topMinuteRef = useRef<number | null>(null);
+  const wheelZoomRef = useRef<number | null>(null);
+
+  const requestZoom = useCallback((next: number, pointerClientY?: number) => {
+    const target = clampZoom(next);
+    const current = boardSettings.getState().zoom;
+    if (target === current) return;
+    const body = bodyRef.current;
+    if (body) {
+      const rect = body.getBoundingClientRect();
+      const view = viewportRef.current;
+      const scale = rect.height > 0 && view > 0 ? rect.height / view : 1;
+      if (pointerClientY === undefined && current <= ZOOM_MIN + 0.001) {
+        anchorRef.current = { kind: 'focus' };
+      } else {
+        const y = pointerClientY ?? rect.top + rect.height / 2;
+        anchorRef.current = {
+          kind: 'minute',
+          minute: minuteAtViewportY(geometryRef.current, body.scrollTop, rect.top, scale, y),
+          offset: (y - rect.top) / scale,
+        };
+      }
+    }
+    boardSettings.setZoom(target);
+  }, []);
+
+  useLayoutEffect(() => {
+    const from = prevZoomRef.current;
+    const anchor = anchorRef.current;
+    anchorRef.current = null;
+    const previous = prevGeometryRef.current;
+    prevZoomRef.current = settings.zoom;
+    prevGeometryRef.current = geometry;
+    const body = bodyRef.current;
+    if (!body || from === settings.zoom) return;
+    const view = viewportRef.current;
+    let top: number;
+    if (settings.zoom <= ZOOM_MIN) {
+      top = scrollTopFor(geometry, ctx.window.startMinutes, 0, view);
+    } else if (anchor?.kind === 'minute') {
+      top = scrollTopFor(geometry, anchor.minute, anchor.offset, view);
+    } else if (from <= ZOOM_MIN || anchor?.kind === 'focus') {
+      top = scrollTopFor(geometry, focusRef.current(), view / 3, view);
+    } else {
+      /* A change from outside (the gear): keep the middle of what was on screen. */
+      const topMinute = topMinuteRef.current ?? previous.startMinutes;
+      top = scrollTopFor(geometry, topMinute + view / 2 / previous.pxPerMinute, view / 2, view);
+    }
+    body.scrollTop = top;
+    topMinuteRef.current = geometry.startMinutes + top / geometry.pxPerMinute;
+    boardSettings.setTopMinute(topMinuteRef.current);
+  });
+
+  /* The first time the board is measured with a saved zoom above 1x: back to the hours it showed, else now / the first session. */
+  const restoredRef = useRef(false);
+  useLayoutEffect(() => {
+    if (restoredRef.current || !metrics.measured) return;
+    restoredRef.current = true;
+    const body = bodyRef.current;
+    if (!body || settings.zoom <= ZOOM_MIN) return;
+    const remembered = boardSettings.getTopMinute();
+    const top =
+      remembered !== null
+        ? Math.max(0, Math.min(geometry.height - viewport, yOfMinute(geometry, remembered)))
+        : scrollTopFor(geometry, focusRef.current(), viewport / 3, viewport);
+    body.scrollTop = top;
+    topMinuteRef.current = geometry.startMinutes + top / geometry.pxPerMinute;
+  }, [metrics.measured, settings.zoom, geometry, viewport]);
+
+  /* Ctrl / Cmd + wheel over the board zooms it (and only then keeps the browser from zooming the page); two fingers pinch. */
+  useEffect(() => {
+    const node = weekRef.current;
+    if (!node) return undefined;
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      const current = boardSettings.getState().zoom;
+      const held = wheelZoomRef.current;
+      const base = held !== null && Math.abs(held - current) < 0.011 ? held : current;
+      const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, base * wheelFactor(event.deltaY, event.deltaMode)));
+      wheelZoomRef.current = next;
+      requestZoom(next, event.clientY);
+    };
+    let pinch: { zoom: number; distance: number } | null = null;
+    const points = (event: TouchEvent) => {
+      const a = event.touches[0];
+      const b = event.touches[1];
+      return a && b ? { a: { x: a.clientX, y: a.clientY }, b: { x: b.clientX, y: b.clientY } } : null;
+    };
+    const onTouchStart = (event: TouchEvent) => {
+      const two = event.touches.length === 2 ? points(event) : null;
+      if (!two) return;
+      pinch = { zoom: boardSettings.getState().zoom, distance: Math.max(1, pinchDistance(two.a, two.b)) };
+      setPinching(true);
+      if (event.cancelable) event.preventDefault();
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      if (!pinch) return;
+      const two = event.touches.length === 2 ? points(event) : null;
+      if (!two) return;
+      if (event.cancelable) event.preventDefault();
+      requestZoom(pinch.zoom * (pinchDistance(two.a, two.b) / pinch.distance), (two.a.y + two.b.y) / 2);
+    };
+    const onTouchEnd = (event: TouchEvent) => {
+      if (pinch && event.touches.length < 2) {
+        pinch = null;
+        setPinching(false);
+      }
+    };
+    node.addEventListener('wheel', onWheel, { passive: false });
+    node.addEventListener('touchstart', onTouchStart, { passive: false });
+    node.addEventListener('touchmove', onTouchMove, { passive: false });
+    node.addEventListener('touchend', onTouchEnd);
+    node.addEventListener('touchcancel', onTouchEnd);
+    return () => {
+      node.removeEventListener('wheel', onWheel);
+      node.removeEventListener('touchstart', onTouchStart);
+      node.removeEventListener('touchmove', onTouchMove);
+      node.removeEventListener('touchend', onTouchEnd);
+      node.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [requestZoom]);
+
+  /* + / − / 0 with the board focused (the board itself or anything on it). */
+  const onBoardKey = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if ((event.target as HTMLElement).closest('input, textarea, select, [contenteditable="true"]')) return;
+    const current = boardSettings.getState().zoom;
+    if (event.key === '+' || event.key === '=' || event.key === 'Add') requestZoom(stepZoom(current, 1));
+    else if (event.key === '-' || event.key === '_' || event.key === 'Subtract') requestZoom(stepZoom(current, -1));
+    else if (event.key === '0') requestZoom(ZOOM_MIN);
+    else return;
+    event.preventDefault();
+  };
+  const zoomControl = useMemo(
+    () => ({
+      zoom: settings.zoom,
+      onStep: (direction: -1 | 1) => requestZoom(stepZoom(boardSettings.getState().zoom, direction)),
+      onReset: () => requestZoom(ZOOM_MIN),
+    }),
+    [settings.zoom, requestZoom],
+  );
+
   /* ---- marking free time ---- */
   /* Marking free time is the everyday calendar's gesture; while a club order is planned the board belongs to the order
      (a press on an empty board there is the planning layer's: it asks for a činnost first). */
   const mayMark = calendar !== null && (calendar.mayBook || calendar.mayBlock) && config.mode === 'standard';
   const step = useMemo(() => {
-    const own = calendar?.calendars.map((c) => columnStep(c, resolution.step)) ?? [];
-    return own.length ? Math.min(resolution.step, ...own) : resolution.step;
-  }, [calendar, resolution.step]);
+    const own = calendar?.calendars.map((c) => columnStep(c, snapStep)) ?? [];
+    return own.length ? Math.min(snapStep, ...own) : snapStep;
+  }, [calendar, snapStep]);
   const [pending, setPending] = useState<PendingSelection | null>(null);
 
   /** The calendar a marked time belongs to: the first that works that day (and is not off for the worker). */
@@ -261,7 +440,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     geometry,
     days,
     step,
-    enabled: mayMark && view === 'week' && !planningOwnsPointer && move.moving === null,
+    enabled: mayMark && view === 'week' && !planningOwnsPointer && !pinching && move.moving === null,
     dayOpen: (day) => !(dayMarks[day]?.closed ?? false),
     onSelect: (sel) => {
       setSelected(null);
@@ -436,9 +615,9 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const holiday = catalogue?.dayMarkColors.holiday ?? '#E7CBA9';
   const lunch = catalogue?.dayMarkColors.lunch ?? '#CBD1D8';
   const nowColor = calendar?.display.nowLineColor ?? CALENDAR_DISPLAY_OFFLINE.nowLineColor;
-  const stepPx = stepLineHeight(geometry, resolution.step);
+  const stepPx = stepLineHeight(geometry, lineStep);
   const tall = geometry.height > baseTimeline + 1;
-  const labels = hourLabels(geometry);
+  const labels = hourLabels(geometry, lineStep);
   const visibleCards = model.cards;
 
   const pendingRange = selection.live ?? (pending ? { col: pending.col, range: pending.range } : null);
@@ -500,8 +679,18 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
       data-real-calendar={calendar ? 'true' : 'false'}
       data-layout={standardLayout ? 'standard' : 'club'}
     >
-      <BoardToolbar head={head} view={view} filter={filter} categories={ctx.categories} today={ctx.today} act={act} entry={entry} filterActive={filterActive} />
-      <div id="week-board" className="week-board">
+      <BoardToolbar head={head} view={view} filter={filter} categories={ctx.categories} today={ctx.today} act={act} entry={entry} filterActive={filterActive} zoomControl={zoomControl} />
+      <div
+        id="week-board"
+        className="week-board"
+        ref={weekRef}
+        tabIndex={0}
+        role="group"
+        aria-label="Časová osa týdne"
+        aria-keyshortcuts="+ - 0"
+        data-testid="week-board"
+        onKeyDown={onBoardKey}
+      >
         <div className="board-head">
           <div className="time-head" />
           <div id="day-headings" className="day-headings">
@@ -525,9 +714,20 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
             })}
           </div>
         </div>
-        <div className={`board-body${tall ? ' is-tall' : ''}`} id="board-body" data-testid="board-body" ref={bodyRef}>
+        <div
+          className={`board-body${tall ? ' is-tall' : ''}`}
+          id="board-body"
+          data-testid="board-body"
+          ref={bodyRef}
+          onScroll={(event) => {
+            const g = geometryRef.current;
+            const minute = g.startMinutes + event.currentTarget.scrollTop / g.pxPerMinute;
+            topMinuteRef.current = minute;
+            boardSettings.setTopMinute(minute);
+          }}
+        >
           <div className="hour-column" id="hour-column" style={{ height: `${geometry.height}px` }}>
-            {labels.map((h) => <div className="hour-label" key={h.label} style={{ top: `${h.top}px` }}>{h.label}</div>)}
+            {labels.map((h) => <div className={`hour-label${h.sub ? ' is-sub' : ''}`} key={h.label} style={{ top: `${h.top}px` }}>{h.label}</div>)}
           </div>
           <div
             /* The planning layer toggles `is-armed` / `moving-existing-term` / ... on this element itself, so the
@@ -540,7 +740,8 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
             id="day-board"
             data-testid="day-board"
             data-zoom={settings.zoom}
-            data-step={resolution.step}
+            data-step={lineStep}
+            data-snap={snapStep}
             ref={boardRef}
             style={boardStyle}
             onClickCapture={(e) => {
@@ -588,7 +789,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                       } as CSSProperties}
                       data-testid={`closed-${s.day}`}
                     >
-                      {s.closedLabel}
+                      <span className="board-sticky">{s.closedLabel}</span>
                     </div>
                   ) : null}
                 </div>

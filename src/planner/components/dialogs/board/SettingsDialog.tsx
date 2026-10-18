@@ -5,8 +5,9 @@
  * capacity of the mini calendar (saved through the data source). Added, because the clinic uses them
  * daily and the file lacks them, in the same `settings-row` language:
  *
- *   Rozlišení    Hodina / 30 min / 15 min / 10 min + coarser / finer (the old grid's "ROZLIŠENÍ"; the same
- *                persisted zoom, `localStorage.calendarZoom`);
+ *   Rozlišení    Hodina / 30 min / 15 min / 10 min + coarser / finer: four points of the board's one zoom
+ *                (1x / 2x / 3.5x / 6x, `board/boardZoom.ts`; persisted as `localStorage.calendarZoomV2`) - the same
+ *                zoom the "− 2× +" group of the board's toolbar sets, so the two always agree;
  *   Kalendáře    which calendars the board shows;
  *   Pracovník    only the days of one worker;
  *   Služby       which služby are shown (the legend in the sidebar is the same filter).
@@ -15,11 +16,10 @@
  * to offer are published by the board when it has read them (so they are absent in the lab).
  */
 import { useId } from 'react';
-import { RESOLUTIONS, resolutionOf } from '../../../../components/booking/grid/resolution';
 import { GRID_TEXT } from '../../../../components/booking/grid/gridText';
 import { usePlannerCommands } from '../../../data/usePlannerCommands';
 import { usePlannerActions } from '../../../state/PlannerStoreProvider';
-import { boardSettings, useBoardSettings } from '../../board/boardSettings';
+import { boardSettings, RESOLUTIONS, resolutionOf, useBoardSettings } from '../../board/boardSettings';
 import { usePlannerModelState } from '../../context';
 import type { DialogRenderer } from '../../dialogRegistry';
 import './board-dialogs.css';

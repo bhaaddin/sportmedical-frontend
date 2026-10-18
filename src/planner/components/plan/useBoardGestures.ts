@@ -47,6 +47,8 @@ export interface GestureInputs {
   /** A club order is planned. Standard booking (`order.club === false`) has nothing to plan: the layer stays silent. */
   clubMode: boolean;
   commit: PlanCommit;
+  /** Minutes the pointer snaps to (the file's 5; the visible grid line of a zoomed board). */
+  snap?: number;
 }
 
 const ID_ATTRS = ['sessionId', 'eventId', 'id', 'termId'] as const;
@@ -116,7 +118,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
     };
 
     const onPointerDown = (e: PointerEvent) => {
-      if (!latest.current.clubMode) return;
+      if (!latest.current.clubMode || e.isPrimary === false) return;
       const state = store.getState();
       if (e.button !== 0 || state.dialog || state.summary.open || state.drawer || state.planning.ask) return;
       if (state.view !== 'week') return;
@@ -152,7 +154,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
         if (board.dataset.pickable !== 'true') act.toast('Nejprve klikněte na činnost ve spodních kartách.');
         return;
       }
-      const start = planStart(ctx, figures, selected, pointerCoords(rectOf(), e.clientX, e.clientY), p.extraArmed);
+      const start = planStart(ctx, figures, selected, pointerCoords(rectOf(), e.clientX, e.clientY), p.extraArmed, latest.current.snap);
       if (start.kind === 'noSelection') {
         act.toast('Nejprve klikněte na činnost ve spodních kartách.');
         return;
@@ -164,7 +166,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
       }
       act.beginPlacement(start.drag);
       try { board.setPointerCapture(e.pointerId); } catch { /* not capturable */ }
-      act.updatePlacement(planSelection(ctx, figures, start.drag, selected, store.getState().weekStart, pointerCoords(rectOf(), e.clientX, e.clientY), latest.current.dayMarks, p.extraArmed));
+      act.updatePlacement(planSelection(ctx, figures, start.drag, selected, store.getState().weekStart, pointerCoords(rectOf(), e.clientX, e.clientY), latest.current.dayMarks, p.extraArmed, latest.current.snap));
       e.preventDefault();
     };
 
@@ -177,7 +179,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
           if (!moveHasStarted(p.move, e.clientX, e.clientY)) return;
           act.updateMove(true, null);
         }
-        act.updateMove(true, proposalForMove(ctx, p.move, e, rectOf(), state.weekStart));
+        act.updateMove(true, proposalForMove(ctx, p.move, e, rectOf(), state.weekStart, latest.current.snap));
         return;
       }
       if (p.resize && e.pointerId === p.resize.pointerId) {
@@ -189,7 +191,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
         return;
       }
       if (p.drag && p.selectedCategoryId) {
-        const next = planSelection(ctx, figures, p.drag, p.selectedCategoryId, state.weekStart, pointerCoords(rectOf(), e.clientX, e.clientY), dayMarks, p.extraArmed);
+        const next = planSelection(ctx, figures, p.drag, p.selectedCategoryId, state.weekStart, pointerCoords(rectOf(), e.clientX, e.clientY), dayMarks, p.extraArmed, latest.current.snap);
         if (!samePreview(p.preview, next)) act.updatePlacement(next);
       }
     };
@@ -201,7 +203,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
 
       if (p.move && e.pointerId === p.move.pointerId) {
         const drag = p.move;
-        const proposal = drag.started ? proposalForMove(ctx, drag, e, rectOf(), state.weekStart) : null;
+        const proposal = drag.started ? proposalForMove(ctx, drag, e, rectOf(), state.weekStart, latest.current.snap) : null;
         suppress.current = { id: drag.id, until: Date.now() + 450 };
         act.endMove();
         if (!drag.started || !proposal) return;
@@ -228,7 +230,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
         return;
       }
       if (p.drag && p.selectedCategoryId) {
-        const result = planSelection(ctx, figures, p.drag, p.selectedCategoryId, state.weekStart, pointerCoords(rectOf(), e.clientX, e.clientY), dayMarks, p.extraArmed);
+        const result = planSelection(ctx, figures, p.drag, p.selectedCategoryId, state.weekStart, pointerCoords(rectOf(), e.clientX, e.clientY), dayMarks, p.extraArmed, latest.current.snap);
         act.endPlacement();
         try { if (board.hasPointerCapture(e.pointerId)) board.releasePointerCapture(e.pointerId); } catch { /* released */ }
         if (!result) return;

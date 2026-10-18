@@ -122,6 +122,8 @@ export function proposalForMove(
   pointer: { clientX: number; clientY: number },
   rect: Rect,
   weekStart: IsoDate,
+  /** Minutes the start snaps to: the file's 5, or the visible grid line of a zoomed board. */
+  snap = SNAP,
 ): MovePreview | null {
   const original = ctx.sessions.find((e) => e.id === drag.id);
   if (!original) return null;
@@ -135,7 +137,7 @@ export function proposalForMove(
   const y = (pointer.clientY - rect.top) / rect.height;
   const day = Math.floor(x * 7);
   const duration = minutesOf(original);
-  let startMinutes = Math.round((w.start + y * w.span - drag.grabOffset) / SNAP) * SNAP;
+  let startMinutes = Math.round((w.start + y * w.span - drag.grabOffset) / snap) * snap;
   // Keep whole appointments in the working window; never change number or length of slots.
   startMinutes = clamp(startMinutes, w.start, w.end - duration);
   const start = minutesAsTime(startMinutes);

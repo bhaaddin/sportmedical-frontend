@@ -26,6 +26,8 @@ import type { BoardSize } from './plan/boardOverlays';
 import { usePlanCommit } from './plan/usePlanCommit';
 import { useBoardGestures } from './plan/useBoardGestures';
 import { usePlanFigures } from './plan/usePlanFigures';
+import { placementSnapFor } from './board/boardZoom';
+import { useBoardSettings } from './board/boardSettings';
 import './plan/plan.css';
 
 const FALLBACK: BoardSize = { width: 1000, height: TIMELINE_HEIGHT };
@@ -51,10 +53,14 @@ export function PlanningBoardLayer({ board: boardProp }: PlanningBoardLayerProps
   const commit = usePlanCommit();
   const ask = usePlannerSelector((s) => s.planning.ask);
   const weekStart = usePlannerSelector((s) => s.weekStart);
+  /* The pointer lands on the rows the board draws: the file's 5 minutes at 1x, the visible grid line from 2x up. */
+  const snap = placementSnapFor(useBoardSettings().zoom);
 
   const anchor = useRef<HTMLElement | null>(null);
   const [board, setBoard] = useState<HTMLElement | null>(boardProp ?? null);
   const [size, setSize] = useState<BoardSize>(FALLBACK);
+  /* How far the board's scroll region (a zoomed-in board scrolls inside its panel) shows: the HUDs stay inside it. */
+  const [view, setView] = useState<{ top: number; height: number } | null>(null);
 
   useLayoutEffect(() => {
     const el = boardProp ?? anchor.current?.closest<HTMLElement>('#day-board') ?? anchor.current?.parentElement ?? null;
@@ -77,6 +83,24 @@ export function PlanningBoardLayer({ board: boardProp }: PlanningBoardLayerProps
     return () => observer.disconnect();
   }, [boardProp]);
 
+  useLayoutEffect(() => {
+    const el = board?.closest<HTMLElement>('.board-body') ?? null;
+    if (!el) return undefined;
+    const read = () => {
+      const cs = getComputedStyle(el);
+      const height = parseFloat(cs.height) || el.clientHeight;
+      /* Only a body that really scrolls has a smaller view than the board. */
+      setView((prev) => {
+        const top = Math.round(el.scrollTop * 10) / 10;
+        if (prev && prev.top === top && prev.height === height) return prev;
+        return { top, height };
+      });
+    };
+    read();
+    el.addEventListener('scroll', read, { passive: true });
+    return () => el.removeEventListener('scroll', read);
+  }, [board]);
+
   const wantsAsk = base.list.filter((f) => f.requested > 0 && !f.done).length >= 2;
   useBoardGestures(board, {
     ctx,
@@ -86,17 +110,20 @@ export function PlanningBoardLayer({ board: boardProp }: PlanningBoardLayerProps
     wantsAsk,
     clubMode: order?.club !== false,
     commit,
+    snap,
   });
 
   const held = useMemo(() => (ask ? heldWindow(ask, slotMinutesOf(ctx, ask.categoryId), weekStart) : null), [ask, ctx, weekStart]);
   const heldVisible = held && held.col >= 0 && held.col <= 6 ? held : null;
 
+  const sized = useMemo<BoardSize>(() => (view && view.height > 0 && view.height < size.height - 1 ? { ...size, viewTop: view.top, viewHeight: view.height } : size), [size, view]);
+
   return (
     <>
       <i ref={anchor} hidden aria-hidden="true" data-testid="planning-board-layer" />
-      <PlacementLayer board={size} held={heldVisible} />
-      <MoveLayer board={size} />
-      <ResizeLayer board={size} />
+      <PlacementLayer board={sized} held={heldVisible} />
+      <MoveLayer board={sized} />
+      <ResizeLayer board={sized} />
       <PlanAskHost />
     </>
   );

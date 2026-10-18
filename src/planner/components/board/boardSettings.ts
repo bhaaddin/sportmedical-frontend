@@ -1,23 +1,36 @@
 /*
- * What the desk chose for the board and wants kept while it works: the zoom ("Rozlišení"),
+ * What the desk chose for the board and wants kept while it works: the zoom (1-6x, the gear's "Rozlišení"),
  * which calendars are shown, which služby, which worker. A tiny external store shared by the
  * board (it draws with it) and the settings dialog behind the gear (it edits it) - the two live
  * in different branches of the stage, so a store beats props.
  *
- * Persistence is exactly the calendar page's:
- *   - the zoom is remembered in `localStorage` under the SAME key (`calendarZoom`, 0.6-2), so a
- *     level chosen here is the level the old grid opens at and vice versa;
- *   - calendars, služby and worker are session state (the page did not store them either).
+ * Persistence:
+ *   - the zoom is remembered in `localStorage` under `calendarZoomV2` (1-6). The first version kept 0.6-2 under
+ *     `calendarZoom`; that value is migrated once to the nearest preset (0.6 -> 1, 1 -> 2, 1.5 -> 3.5, 2 -> 6), so the
+ *     desk's saved level does not break (`boardZoom.ts`). The old grid keeps its own key;
+ *   - calendars, služby and worker are session state (the page did not store them either);
+ *   - the minute at the top of the scrolled board is kept in memory (not storage), so leaving the planner and coming
+ *     back shows the same hours.
  *
  * The board also PUBLISHES the facets the dialog needs to offer (the calendars on screen, the
  * workers of the rota, the služby), because only the board has read them.
  */
 import { useSyncExternalStore } from 'react';
-import { RESOLUTIONS, resolutionOf, stepResolution, type Resolution } from '../../../components/booking/grid/resolution';
+import {
+  clampZoom,
+  presetOf,
+  readStoredZoom,
+  stepPreset,
+  stepZoom,
+  ZOOM_MAX,
+  ZOOM_MIN,
+  ZOOM_PRESETS,
+  ZOOM_STORAGE_KEY,
+  type ResolutionKey,
+  type ZoomPreset,
+} from './boardZoom';
 
-export const ZOOM_STORAGE_KEY = 'calendarZoom';
-export const ZOOM_MIN = 0.6;
-export const ZOOM_MAX = 2;
+export { ZOOM_MAX, ZOOM_MIN, ZOOM_STORAGE_KEY };
 
 export interface FacetCalendar {
   id: string;
@@ -52,13 +65,17 @@ export interface BoardSettingsState {
 
 const EMPTY_FACETS: BoardFacets = { calendars: [], employees: [], services: [] };
 
-function readZoom(storage: Pick<Storage, 'getItem'> | null): number {
-  try {
-    const v = Number(storage?.getItem(ZOOM_STORAGE_KEY));
-    return v >= ZOOM_MIN && v <= ZOOM_MAX ? v : 1;
-  } catch {
-    return 1;
+/** The stored zoom; a saved value of the first version is migrated and written under the new key once. */
+function readZoom(storage: Storage | null): number {
+  const { zoom, migrated } = readStoredZoom(storage);
+  if (migrated) {
+    try {
+      storage?.setItem(ZOOM_STORAGE_KEY, String(zoom));
+    } catch {
+      /* storage blocked: the migrated level still works for this view */
+    }
   }
+  return zoom;
 }
 
 const browserStorage = (): Storage | null => {
@@ -73,9 +90,14 @@ export interface BoardSettingsStore {
   getState(): BoardSettingsState;
   subscribe(listener: () => void): () => void;
   setZoom(zoom: number): void;
-  /** One level coarser (-1) / finer (+1) than the current zoom. */
+  /** One step of the ladder smaller (-1) / larger (+1): the "−" / "+" of the board. */
+  stepZoom(direction: -1 | 1): void;
+  /** One gear preset coarser (-1) / finer (+1) than the current zoom. */
   stepResolution(direction: -1 | 1): void;
-  setResolution(key: Resolution['key']): void;
+  setResolution(key: ResolutionKey): void;
+  /** The minute at the top of the scrolled board (kept for the next time the board is drawn); `null` = never scrolled. */
+  getTopMinute(): number | null;
+  setTopMinute(minute: number | null): void;
   /** Tick / untick one calendar (`allIds` = every calendar, to fold "all ticked" back into `null`). */
   toggleCalendar(id: string, allIds: readonly string[]): void;
   onlyCalendar(id: string): void;
@@ -98,8 +120,10 @@ export function createBoardSettings(getStorage: () => Storage | null = browserSt
   };
   const fold = (next: Set<string>, all: readonly string[]): ReadonlySet<string> | null =>
     all.length > 0 && next.size >= all.length && all.every((id) => next.has(id)) ? null : next;
+  let topMinute: number | null = null;
   const setZoom = (zoom: number) => {
-    const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(zoom * 10) / 10));
+    const next = clampZoom(zoom);
+    if (next === state.zoom) return;
     try {
       getStorage()?.setItem(ZOOM_STORAGE_KEY, String(next));
     } catch {
@@ -114,12 +138,19 @@ export function createBoardSettings(getStorage: () => Storage | null = browserSt
       return () => listeners.delete(listener);
     },
     setZoom,
+    stepZoom(direction) {
+      setZoom(stepZoom(state.zoom, direction));
+    },
     stepResolution(direction) {
-      setZoom(stepResolution(state.zoom, direction).zoom);
+      setZoom(stepPreset(state.zoom, direction).zoom);
     },
     setResolution(key) {
-      const level = RESOLUTIONS.find((r) => r.key === key);
+      const level = ZOOM_PRESETS.find((r) => r.key === key);
       if (level) setZoom(level.zoom);
+    },
+    getTopMinute: () => topMinute,
+    setTopMinute(minute) {
+      topMinute = minute;
     },
     toggleCalendar(id, allIds) {
       const next = new Set(state.ticked ?? allIds);
@@ -144,6 +175,7 @@ export function createBoardSettings(getStorage: () => Storage | null = browserSt
       if (!same) set({ facets });
     },
     reset() {
+      topMinute = null;
       set({ zoom: readZoom(getStorage()), ticked: null, serviceSet: null, employeeId: null, facets: EMPTY_FACETS });
     },
   };
@@ -156,5 +188,5 @@ export function useBoardSettings(): BoardSettingsState {
   return useSyncExternalStore(boardSettings.subscribe, boardSettings.getState, boardSettings.getState);
 }
 
-export { RESOLUTIONS, resolutionOf };
-export type { Resolution };
+export { ZOOM_PRESETS as RESOLUTIONS, presetOf as resolutionOf };
+export type { ZoomPreset as Resolution };

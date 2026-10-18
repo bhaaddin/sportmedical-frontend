@@ -32,6 +32,14 @@ import type {
 /** Snap of the pointer to the clock, in minutes. */
 export const SNAP_MINUTES = 5;
 
+/**
+ * The wall-clock minute a pointer position means, snapped. The file's 5 minutes round to the nearest tick; a coarser `snap`
+ * is the grid line step of a zoomed board (10 / 15 / 30), where the pointer means the ROW it is in - the row's top line.
+ */
+export function snapPointerMinute(minute: number, snap = SNAP_MINUTES): number {
+  return snap > SNAP_MINUTES ? Math.floor(minute / snap + 1e-6) * snap : Math.round(minute / snap) * snap;
+}
+
 const win = (ctx: Pick<PlannerContext, 'window'>) => ({
   start: ctx.window.startMinutes,
   end: ctx.window.endMinutes,
@@ -117,13 +125,13 @@ export type PlacementStart =
  * hint, selected činnost already complete -> completion callout, otherwise the
  * drag anchor (day column + the minute, aligned so one slot still fits).
  */
-export function beginPlacement(ctx: PlannerContext, selected: CategoryId | null, point: BoardPoint): PlacementStart {
+export function beginPlacement(ctx: PlannerContext, selected: CategoryId | null, point: BoardPoint, snap = SNAP_MINUTES): PlacementStart {
   if (!selected) return { kind: 'noSelection' };
   const d = demandOf(ctx, selected);
   if (d && plannedOf(ctx, selected) >= d.requested) return { kind: 'complete', categoryId: selected };
   const w = win(ctx);
   const slot = slotMinutesOf(ctx, selected);
-  const at = clamp(Math.round((w.start + point.y * w.span) / SNAP_MINUTES) * SNAP_MINUTES, w.start, w.end);
+  const at = clamp(snapPointerMinute(w.start + point.y * w.span, snap), w.start, w.end);
   const aligned = at > w.end - slot ? w.end - slot : at;
   return { kind: 'start', drag: { day: Math.floor(point.x * 7), startMinutes: aligned } };
 }
@@ -139,6 +147,7 @@ export function selectionFromPointer(
   categoryId: CategoryId | null,
   weekStart: IsoDate,
   point: BoardPoint,
+  snap = SNAP_MINUTES,
 ): PlacementPreview | null {
   if (!drag || !categoryId) return null;
   const demand = demandOf(ctx, categoryId);
@@ -148,7 +157,7 @@ export function selectionFromPointer(
   if (remaining === 0) return null; // hard stop, not an invalid/red interval
   const w = win(ctx);
   const anchor = drag.startMinutes;
-  const pointer = clamp(Math.round((w.start + point.y * w.span) / SNAP_MINUTES) * SNAP_MINUTES, w.start, w.end);
+  const pointer = clamp(snapPointerMinute(w.start + point.y * w.span, snap), w.start, w.end);
   const upwards = pointer < anchor;
   const maxByTime = upwards ? Math.floor((anchor - w.start) / duration) : Math.floor((w.end - anchor) / duration);
   const rawQty = Math.max(1, Math.ceil((upwards ? anchor - pointer : pointer - anchor) / duration));

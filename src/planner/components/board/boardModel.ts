@@ -83,6 +83,8 @@ interface CardCommon {
   showPrice: boolean;
   /** ... on a line of its own (four lines). */
   priceOwnLine: boolean;
+  /** A zoomed-in card has room for one more line (five lines): booked / capacity, the calendar's name. */
+  showMore: boolean;
 }
 
 export interface SessionCardModel extends CardCommon {
@@ -203,7 +205,7 @@ const minutesOfClock = (value: string | null | undefined): number | null => pars
 function priceFlags(height: number, compact: boolean) {
   const lines = linesThatFit(height);
   const showPrice = !compact && lines >= 3;
-  return { showPrice, priceOwnLine: showPrice && lines >= 4 };
+  return { showPrice, priceOwnLine: showPrice && lines >= 4, showMore: !compact && lines >= 5 };
 }
 
 /** A hex colour with an alpha, for the hatch and the glow. */

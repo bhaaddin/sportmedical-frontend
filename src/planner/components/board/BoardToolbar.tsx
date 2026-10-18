@@ -1,6 +1,6 @@
 /*
  * The board's toolbar - the prototype's `.planner-toolbar`: week arrows and "Dnes", the heading with
- * the week counter, Den / Týden / Měsíc, the činnost filter and the gear. In the real calendar it
+ * the week counter, Den / Týden / Měsíc, the činnost filter, the zoom ("−  2×  +") and the gear. In the real calendar it
  * also carries the clinic's two entry points, "Nová objednávka" and "Klubová objednávka" (the file
  * has no create button of its own; its create action is the board itself). On a club's own screen the same place
  * holds the club's order switcher (`club/ClubOrderSwitcher`).
@@ -11,6 +11,7 @@ import type { BoundPlannerActions } from '../../state/PlannerStoreProvider';
 import { ClubOrderSwitcher } from '../../club/ClubOrderSwitcher';
 import { categoryWithPrice } from '../categoryPrice';
 import { Icon } from '../Icons';
+import { formatZoom, ZOOM_MAX, ZOOM_MIN } from './boardZoom';
 
 const VIEWS = [
   { value: 'day', label: 'Den' },
@@ -25,6 +26,13 @@ export interface BoardEntryPoints {
   onClubOrder?: () => void;
 }
 
+/** The board's zoom in the file's own segment (`.view-segment`): "−  2×  +"; the value resets to 1×. */
+export interface BoardZoomControl {
+  zoom: number;
+  onStep: (direction: -1 | 1) => void;
+  onReset: () => void;
+}
+
 export function BoardToolbar({
   head,
   view,
@@ -34,6 +42,7 @@ export function BoardToolbar({
   act,
   entry,
   filterActive,
+  zoomControl,
 }: {
   head: WeekHeadModel;
   view: PlannerView;
@@ -44,6 +53,8 @@ export function BoardToolbar({
   entry: BoardEntryPoints | null;
   /** Some other board filter (calendars, služby, worker) is narrowing the board: the gear says so. */
   filterActive: boolean;
+  /** The zoom group next to the gear; absent where the board is not zoomable. */
+  zoomControl?: BoardZoomControl;
 }) {
   const chosen = categories.find((c) => c.id === filter);
   return (
@@ -78,6 +89,23 @@ export function BoardToolbar({
           </select>
           <Icon name="chevron-down" />
         </label>
+        {zoomControl ? (
+          <div className="view-segment zoom-segment" role="group" aria-label="Přiblížení časové osy" data-testid="board-zoom">
+            <button type="button" data-zoom-command="out" title="Oddálit (−)" aria-label="Oddálit" disabled={zoomControl.zoom <= ZOOM_MIN} onClick={() => zoomControl.onStep(-1)}>−</button>
+            <button
+              type="button"
+              className="zoom-value"
+              data-zoom-command="reset"
+              data-testid="board-zoom-value"
+              title="Původní velikost (0)"
+              aria-label={`Přiblížení ${formatZoom(zoomControl.zoom)}`}
+              onClick={zoomControl.onReset}
+            >
+              {formatZoom(zoomControl.zoom)}
+            </button>
+            <button type="button" data-zoom-command="in" title="Přiblížit (+)" aria-label="Přiblížit" disabled={zoomControl.zoom >= ZOOM_MAX} onClick={() => zoomControl.onStep(1)}>+</button>
+          </div>
+        ) : null}
         <button
           className={`control settings-control${filterActive ? ' has-filter' : ''}`}
           data-command="settings"

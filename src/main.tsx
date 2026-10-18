@@ -13,6 +13,7 @@
  * server, a preview) that does not.
  */
 import './styles/reset.css';
+import { warmUpServer } from './api/warmUp';
 import { isPublicSitePath, legacyWebRedirect } from './web/sitePaths';
 
 const container = document.getElementById('root')!;
@@ -21,8 +22,12 @@ const moved = legacyWebRedirect(`${pathname}${search}${hash}`);
 
 if (moved !== null) {
   window.location.replace(moved);
-} else if (isPublicSitePath(pathname)) {
-  void import('./web/entry-client').then((entry) => entry.mountWeb(container));
 } else {
-  void import('./web/appEntry').then((entry) => entry.mountApp(container));
+  /* Any page of the site starts waking a sleeping API (see api/warmUp.ts) while the first screen is still loading. */
+  warmUpServer();
+  if (isPublicSitePath(pathname)) {
+    void import('./web/entry-client').then((entry) => entry.mountWeb(container));
+  } else {
+    void import('./web/appEntry').then((entry) => entry.mountApp(container));
+  }
 }

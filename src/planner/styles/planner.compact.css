@@ -456,8 +456,10 @@
   overflow: hidden;
 }
 .sm-planner.is-compact .planner .board-head { height: 48px; }
+/* The body's height does not depend on what is in it (the zoom grows the timeline, not the body): the file's 455 px (629 in
+   standard ordering), never more than the room the screen has. At 1x the timeline is exactly this tall; zoomed, it scrolls. */
 .sm-planner.is-compact .planner .board-body {
-  height: auto;
+  height: 455px;
   max-height: clamp(320px, calc(100dvh - 400px), 640px);
   overflow-x: hidden;
   overflow-y: auto;
@@ -465,7 +467,7 @@
   -webkit-overflow-scrolling: touch;
 }
 .sm-planner[data-layout='tablet'] .planner .board-body { max-height: clamp(360px, calc(100dvh - 520px), 760px); }
-.sm-planner.is-compact:has(.planner[data-layout='standard']) .planner .board-body { max-height: clamp(360px, calc(100dvh - 330px), 900px); }
+.sm-planner.is-compact:has(.planner[data-layout='standard']) .planner .board-body { height: 629px; max-height: clamp(360px, calc(100dvh - 330px), 900px); }
 .sm-planner.is-compact .planner .day-title { font-size: 12px; }
 .sm-planner.is-compact .planner .day-title strong { font-size: 12.5px; }
 .sm-planner.is-compact .planner .time-head,
@@ -848,6 +850,12 @@
 .sm-planner.is-compact .month-buttons { gap: 4px; }
 .sm-planner.is-compact .show-all { min-height: 44px; }
 .sm-planner.is-compact .planner-actions .control { padding: 0 14px; font-size: 14px; }
+/* the board's zoom group ("−  2×  +"): the file's .view-segment at touch size, narrower than the Den / Týden / Měsíc buttons;
+   on a phone the filters wrap, so the činnost filter keeps its room and the zoom + gear take the second row */
+.sm-planner.is-compact .zoom-segment button { min-width: 44px; padding: 0 6px; }
+.sm-planner.is-compact .zoom-segment button.zoom-value { min-width: 52px; }
+.sm-planner[data-layout='phone'] .planner-filters { flex-wrap: wrap; }
+.sm-planner[data-layout='phone'] .filter-select { flex: 1 1 150px; }
 
 /* ============================== 9 · the order summary (full screen) ============================== */
 .sm-planner.is-compact #dashboard .s41-scene { position: relative; inset: auto; min-height: 100%; padding: 12px 12px 24px; }

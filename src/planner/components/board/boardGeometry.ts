@@ -1,18 +1,16 @@
 /*
- * Geometry of the week board: minutes <-> design pixels, the zoom ("Rozlišení") and the
- * hour labels. Pure; no DOM, no React.
+ * Geometry of the week board: minutes <-> design pixels, the zoom and the hour labels. Pure; no DOM, no React.
  *
- * The prototype draws 07:00-19:00 into 455 px (`TIMELINE_HEIGHT`, 37.9167 px an hour). That is
- * the "30 min" level of our calendar and it stays exactly so. The calendar's other levels
- * (`grid/resolution.ts`: Hodina 46 / 30 min 52 / 15 min 65 / 10 min 78 px an hour) enlarge the
- * board by the SAME ratio they enlarge our old grid, never below the prototype's own height:
+ * The prototype draws 07:00-19:00 into 455 px (`TIMELINE_HEIGHT`, 37.9167 px an hour). That is zoom 1 and it stays
+ * exactly so. The board is zoomable from 1x to 6x (`boardZoom.ts`): the timeline is `zoom` times as tall as the fitted
+ * one,
  *
- *     scale(zoom) = max(1, pxPerHour(zoom) / pxPerHour(1))      1 / 1 / 1.25 / 1.5
+ *     height(zoom) = fittedHeight x zoom       fittedHeight = the board body's own height (455 px at the file's size)
  *
- * so "Hodina" and "30 min" share one size (they differ in the lines and the snapping step) and
- * the finer levels grow the board; the board body then scrolls (see `board.css`).
+ * and the board body scrolls inside the panel (see `board.css`). Everything else - cards, bands, the now line, the
+ * selection, the ghosts - is placed by the pixels-per-minute of THIS geometry, so it follows the zoom without knowing it.
  */
-import { pxPerHour } from '../../../components/booking/grid/resolution';
+import { clampZoom, lineStepFor } from './boardZoom';
 import { TIMELINE_HEIGHT } from '../../model';
 import type { PlanningWindow } from '../../model';
 
@@ -33,17 +31,15 @@ export interface BoardGeometry {
   pxPerMinute: number;
   /** Design px per hour. */
   pxPerHour: number;
-  /** Height of the whole timeline in design px (>= 455). */
+  /** Height of the whole timeline in design px (the fitted height x the zoom). */
   height: number;
   /** Enlargement against the prototype (1 = the file). */
   scale: number;
 }
 
-/** The enlargement of the board at a calendar zoom (1 = the prototype's 455 px). */
+/** The enlargement of the board at a zoom (1 = the prototype's 455 px, 6 = six times as tall). */
 export function boardScaleFor(zoom: number): number {
-  const base = pxPerHour(1);
-  if (!(base > 0)) return 1;
-  return Math.max(1, pxPerHour(zoom) / base);
+  return clampZoom(zoom);
 }
 
 /** Timeline height of the standard-ordering layout: the club deck is gone, the board takes its place (455 + 174). */
@@ -95,25 +91,51 @@ export function cardBox(g: BoardGeometry, start: number, end: number): { top: nu
   return { top, height, compact: height < COMPACT_BELOW };
 }
 
-/** Hour labels ("7:00" … "18:00"): `top` as the prototype's `renderWeekHead`. */
-export function hourLabels(g: BoardGeometry): { label: string; hour: number; top: number }[] {
-  const out: { label: string; hour: number; top: number }[] = [];
-  const first = Math.ceil(g.startMinutes / 60);
-  const last = Math.floor(g.endMinutes / 60);
-  for (let h = first; h < last; h++) {
-    out.push({ label: `${h}:00`, hour: h, top: (h * 60 - g.startMinutes) * g.pxPerMinute + HOUR_LABEL_OFFSET });
+/** One label of the hour column: "7:00" at an hour, "7:10" / "7:15" / "7:30" between (`sub`). */
+export interface HourLabel {
+  label: string;
+  hour: number;
+  /** Minute of the hour (0 for an hour label). */
+  minute: number;
+  top: number;
+  /** A label between two hours - drawn smaller and dimmer. */
+  sub: boolean;
+}
+
+/**
+ * The labels of the hour column. `stepMinutes` 60 (the file) gives "7:00" … "18:00", `top` as the prototype's
+ * `renderWeekHead`; 30 / 15 / 10 add the labels of those lines between the hours ("7:30", "7:15", "7:10" …), in the same
+ * style as the hour labels, the same 11 px below their line.
+ */
+export function hourLabels(g: BoardGeometry, stepMinutes = 60): HourLabel[] {
+  const step = stepMinutes > 0 && stepMinutes < 60 ? stepMinutes : 60;
+  const out: HourLabel[] = [];
+  const first = Math.ceil(g.startMinutes / step) * step;
+  for (let m = first; m < g.endMinutes; m += step) {
+    const hour = Math.floor(m / 60);
+    const minute = m % 60;
+    out.push({
+      label: `${hour}:${String(minute).padStart(2, '0')}`,
+      hour,
+      minute,
+      top: (m - g.startMinutes) * g.pxPerMinute + HOUR_LABEL_OFFSET,
+      sub: minute !== 0,
+    });
   }
   return out;
 }
 
 /**
- * Lines the board draws: every hour (the CSS does it, exactly as the file) plus the finer step of the
- * 15 / 10 minute levels. At 30 min and Hodina the file's own hour lines are all there is.
+ * Lines the board draws besides the hour lines (the CSS does those, exactly as the file): the step lines between the hours
+ * from 2x up (every 30 / 15 / 10 minutes). `null` at 1x - the file has hour lines alone.
  */
 export function stepLineHeight(g: BoardGeometry, stepMinutes: number): number | null {
-  if (!(stepMinutes > 0) || stepMinutes >= 30) return null;
+  if (!(stepMinutes > 0) || stepMinutes >= 60) return null;
   return stepMinutes * g.pxPerMinute;
 }
+
+/** The step lines of a zoom (`lineStepFor`), as `stepLineHeight`. */
+export const stepLineHeightFor = (g: BoardGeometry, zoom: number): number | null => stepLineHeight(g, lineStepFor(zoom));
 
 /** The day column (0..6) under a horizontal fraction of the board, clamped. */
 export function columnAtFraction(fraction: number, columns = 7): number {

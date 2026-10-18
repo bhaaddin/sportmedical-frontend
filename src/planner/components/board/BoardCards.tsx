@@ -115,6 +115,7 @@ export function SessionCard({
           <strong>{card.capacityLabel}</strong>
           <span className="event-time">{card.timeLabel}</span>
           {card.priceOwnLine ? <span className="event-price" data-testid="price-line">{card.priceText}</span> : null}
+          {card.showMore ? <span className="event-more" data-testid="more-line">{card.booked} / {card.capacity} osob</span> : null}
         </span>
         <span className="term-resize-handle term-resize-top" data-expand-edge="top" aria-hidden="true" />
         <span className="term-resize-handle term-resize-bottom" data-expand-edge="bottom" aria-hidden="true" />
@@ -226,6 +227,7 @@ export function BookingCard({
           {card.priceOwnLine ? (
             <span className="event-price" data-testid="price-line">{card.priceAdjusted ? `${card.priceText} · upraveno` : card.priceText}</span>
           ) : null}
+          {card.showMore && card.calendar ? <span className="event-more" data-testid="more-line">{card.calendar.name}</span> : null}
         </span>
       </button>
     </Tooltip>
@@ -264,8 +266,10 @@ export function WindowBlock({ window: w, onOpen }: { window: BoardWindowModel; o
         onOpen(w, { x: e.clientX, y: e.clientY });
       }}
     >
-      <span className="win-label">{w.label}</span>
-      {!manual ? <span className="win-time" data-testid="club-window-time">{w.timeLabel}</span> : null}
+      <span className="board-sticky">
+        <span className="win-label">{w.label}</span>
+        {!manual ? <span className="win-time" data-testid="club-window-time">{w.timeLabel}</span> : null}
+      </span>
     </button>
   );
 }

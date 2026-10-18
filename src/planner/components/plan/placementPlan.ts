@@ -13,6 +13,7 @@ import {
   minutesAsTime,
   placementOverlay,
   SNAP_MINUTES,
+  snapPointerMinute,
   timeAsMinutes,
   timeLeft,
   windowLabel,
@@ -41,13 +42,13 @@ const win = (ctx: Pick<PlannerContext, 'window'>) => ({
 
 /** Pointer down on the empty board: nothing armed -> hint; armed činnost already complete -> callout; else the anchor. */
 /** `extra`: the desk armed "Přidat termín navíc" - one more drop beyond the players is allowed. */
-export function planStart(ctx: PlannerContext, figures: OrderFigures, selected: string | null, point: BoardPoint, extra = false): PlanStart {
+export function planStart(ctx: PlannerContext, figures: OrderFigures, selected: string | null, point: BoardPoint, extra = false, snap = SNAP_MINUTES): PlanStart {
   if (!selected) return { kind: 'noSelection' };
   const f = figures.byId.get(selected);
   if (!f) return { kind: 'noSelection' };
   if (f.done && !extra) return { kind: 'complete', categoryId: selected };
   const w = win(ctx);
-  const at = clamp(Math.round((w.start + point.y * w.span) / SNAP_MINUTES) * SNAP_MINUTES, w.start, w.end);
+  const at = clamp(snapPointerMinute(w.start + point.y * w.span, snap), w.start, w.end);
   const aligned = at > w.end - f.slotMinutes ? w.end - f.slotMinutes : at;
   return { kind: 'start', drag: { day: Math.floor(point.x * 7), startMinutes: aligned } };
 }
@@ -93,6 +94,8 @@ export function planSelection(
   point: BoardPoint,
   dayMarks: Readonly<Record<string, DayMark>> = {},
   extra = false,
+  /** Minutes the pointer snaps to: the file's 5, or the visible grid line of a zoomed board. */
+  snap = SNAP_MINUTES,
 ): PlacementPreview | null {
   if (!drag || !categoryId) return null;
   const f = figures.byId.get(categoryId);
@@ -104,7 +107,7 @@ export function planSelection(
   if (remaining === 0) return null; // hard stop, not an invalid/red interval
   const w = win(ctx);
   const anchor = drag.startMinutes;
-  const pointer = clamp(Math.round((w.start + point.y * w.span) / SNAP_MINUTES) * SNAP_MINUTES, w.start, w.end);
+  const pointer = clamp(snapPointerMinute(w.start + point.y * w.span, snap), w.start, w.end);
   const upwards = pointer < anchor;
   const maxByTime = upwards ? Math.floor((anchor - w.start) / duration) : Math.floor((w.end - anchor) / duration);
   const rawQty = Math.max(1, Math.ceil((upwards ? anchor - pointer : pointer - anchor) / duration));

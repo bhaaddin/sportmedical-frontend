@@ -307,35 +307,42 @@ describe('the board on the demo data (the file)', () => {
 /* ------------------------------------------------------------------------ */
 
 describe('the gear: Rozlišení, Kalendáře, Pracovník', () => {
-  it('opens the settings dialog with the file\'s rows and the resolution', async () => {
+  it('opens the settings dialog with the file\'s rows and the resolution (Hodina = 1x at the start)', async () => {
     mount({ real: false, initialDate: '2026-11-20' });
     await screen.findByTestId('board-card-m1');
     fireEvent.click(screen.getByRole('button', { name: 'Nastavení' }));
     const dialog = await screen.findByTestId('board-settings');
     expect(within(dialog).getByText('Více činností během jednoho dne')).toBeInTheDocument();
     expect(within(dialog).getByText('Referenční denní kapacita mini kalendáře')).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: '30 min' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(dialog).getByRole('button', { name: 'Hodina' })).toHaveAttribute('aria-pressed', 'true');
     // the lab has read no calendars: nothing to filter
     expect(screen.queryByTestId('settings-calendars')).toBeNull();
     expect(screen.queryByTestId('settings-employee')).toBeNull();
   });
 
-  it('a resolution changes the board, is remembered under the calendar page\'s own key and survives a reload', async () => {
+  it('a resolution is a zoom: Hodina 1x, 30 min 2x, 15 min 3.5x, 10 min 6x - remembered under calendarZoomV2 and kept after a reload', async () => {
     mount({ real: false, initialDate: '2026-11-20' });
     await screen.findByTestId('board-card-m1');
     const heightOf = () => Number.parseFloat(board().style.height);
     expect(heightOf()).toBeCloseTo(455, 3);
     expect(screen.queryByTestId('board-substeps')).toBeNull();
+    expect(board()).toHaveAttribute('data-step', '60');
     fireEvent.click(screen.getByRole('button', { name: 'Nastavení' }));
+    fireEvent.click(await screen.findByRole('button', { name: '30 min' }));
+    expect(board()).toHaveAttribute('data-step', '30');
+    expect(heightOf()).toBeCloseTo(455 * 2, 3);
     fireEvent.click(await screen.findByRole('button', { name: '15 min' }));
-    expect(window.localStorage.getItem('calendarZoom')).toBe('1.5');
+    expect(window.localStorage.getItem('calendarZoomV2')).toBe('3.5');
     expect(board()).toHaveAttribute('data-step', '15');
-    expect(heightOf()).toBeCloseTo(455 * (65 / 52), 3);
+    expect(heightOf()).toBeCloseTo(455 * 3.5, 3);
     expect(screen.getByTestId('board-substeps')).toBeInTheDocument();
     expect(screen.getByTestId('board-body')).toHaveClass('is-tall');
-    // + goes one finer, − one coarser
+    // the toolbar group shows the same zoom
+    expect(screen.getByRole('button', { name: 'Přiblížení 3,5×' })).toBeInTheDocument();
+    // + goes one preset finer, − one coarser
     fireEvent.click(screen.getByRole('button', { name: 'Jemnější mřížka' }));
     expect(board()).toHaveAttribute('data-step', '10');
+    expect(heightOf()).toBeCloseTo(455 * 6, 3);
     fireEvent.click(screen.getByRole('button', { name: 'Hrubší mřížka' }));
     fireEvent.click(screen.getByRole('button', { name: 'Hrubší mřížka' }));
     expect(board()).toHaveAttribute('data-step', '30');
@@ -346,9 +353,177 @@ describe('the gear: Rozlišení, Kalendáře, Pracovník', () => {
     mount({ real: false, initialDate: '2026-11-20' });
     await screen.findByTestId('board-card-m1');
     expect(board()).toHaveAttribute('data-step', '30');
-    window.localStorage.setItem('calendarZoom', '2');
-    boardSettings.reset();
     expect(boardSettings.getState().zoom).toBe(2);
+    // the first version\'s key is migrated once (1.5 = "15 min" of the old grid -> 3.5x)
+    window.localStorage.clear();
+    window.localStorage.setItem('calendarZoom', '1.5');
+    boardSettings.reset();
+    expect(boardSettings.getState().zoom).toBe(3.5);
+    expect(window.localStorage.getItem('calendarZoomV2')).toBe('3.5');
+  });
+
+  it('the zoom group of the toolbar: - and + walk the ladder 1-6, the value resets, the labels are Czech', async () => {
+    mount({ real: false, initialDate: '2026-11-20' });
+    await screen.findByTestId('board-card-m1');
+    const group = screen.getByRole('group', { name: 'Přiblížení časové osy' });
+    expect(within(group).getByRole('button', { name: 'Přiblížení 1×' })).toBeInTheDocument();
+    expect(within(group).getByRole('button', { name: 'Oddálit' })).toBeDisabled();
+    fireEvent.click(within(group).getByRole('button', { name: 'Přiblížit' }));
+    expect(boardSettings.getState().zoom).toBe(1.5);
+    fireEvent.click(within(group).getByRole('button', { name: 'Přiblížit' }));
+    expect(within(group).getByRole('button', { name: 'Přiblížení 2×' })).toBeInTheDocument();
+    expect(board()).toHaveAttribute('data-step', '30');
+    expect(Number.parseFloat(board().style.height)).toBeCloseTo(910, 3);
+    for (let i = 0; i < 10; i += 1) {
+      const more = within(group).getByRole('button', { name: 'Přiblížit' });
+      if (!(more as HTMLButtonElement).disabled) fireEvent.click(more);
+    }
+    expect(boardSettings.getState().zoom).toBe(6);
+    expect(within(group).getByRole('button', { name: 'Přiblížit' })).toBeDisabled();
+    expect(board()).toHaveAttribute('data-step', '10');
+    expect(board()).toHaveAttribute('data-snap', '10');
+    fireEvent.click(within(group).getByRole('button', { name: 'Přiblížení 6×' }));
+    expect(boardSettings.getState().zoom).toBe(1);
+    expect(Number.parseFloat(board().style.height)).toBeCloseTo(455, 3);
+  });
+
+  it('+ - 0 zoom the board when it is focused; other keys and Ctrl combinations do not', async () => {
+    mount({ real: false, initialDate: '2026-11-20' });
+    await screen.findByTestId('board-card-m1');
+    const area = screen.getByTestId('week-board');
+    area.focus();
+    expect(area).toHaveFocus();
+    fireEvent.keyDown(area, { key: '+' });
+    expect(boardSettings.getState().zoom).toBe(1.5);
+    fireEvent.keyDown(area, { key: '=' });
+    fireEvent.keyDown(area, { key: 'Add' });
+    expect(boardSettings.getState().zoom).toBe(2.5);
+    fireEvent.keyDown(area, { key: '-' });
+    expect(boardSettings.getState().zoom).toBe(2);
+    fireEvent.keyDown(area, { key: '+', ctrlKey: true });
+    fireEvent.keyDown(area, { key: 'x' });
+    expect(boardSettings.getState().zoom).toBe(2);
+    fireEvent.keyDown(area, { key: '0' });
+    expect(boardSettings.getState().zoom).toBe(1);
+    for (let i = 0; i < 12; i += 1) fireEvent.keyDown(area, { key: '+' });
+    expect(boardSettings.getState().zoom).toBe(6);
+    for (let i = 0; i < 12; i += 1) fireEvent.keyDown(area, { key: '-' });
+    expect(boardSettings.getState().zoom).toBe(1);
+  });
+
+  it('Ctrl / Cmd + wheel over the board zooms it and stops the browser zooming the page; a plain wheel does neither', async () => {
+    mount({ real: false, initialDate: '2026-11-20' });
+    await screen.findByTestId('board-card-m1');
+    const area = screen.getByTestId('week-board');
+    const wheel = (init: WheelEventInit) => {
+      const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, ...init });
+      act(() => {
+        area.dispatchEvent(event);
+      });
+      return event;
+    };
+    const plain = wheel({ deltaY: -100 });
+    expect(plain.defaultPrevented).toBe(false);
+    expect(boardSettings.getState().zoom).toBe(1);
+    const up = wheel({ deltaY: -100, ctrlKey: true });
+    expect(up.defaultPrevented).toBe(true);
+    expect(boardSettings.getState().zoom).toBeGreaterThan(1.2);
+    const afterOne = boardSettings.getState().zoom;
+    wheel({ deltaY: -100, metaKey: true });
+    expect(boardSettings.getState().zoom).toBeGreaterThan(afterOne);
+    for (let i = 0; i < 20; i += 1) wheel({ deltaY: -100, ctrlKey: true });
+    expect(boardSettings.getState().zoom).toBe(6);
+    for (let i = 0; i < 30; i += 1) wheel({ deltaY: 100, ctrlKey: true });
+    expect(boardSettings.getState().zoom).toBe(1);
+    // still keeps the page from zooming at the limit
+    expect(wheel({ deltaY: 100, ctrlKey: true }).defaultPrevented).toBe(true);
+  });
+
+  it('two fingers on the board pinch it: the spread of the fingers is the zoom', async () => {
+    mount({ real: false, initialDate: '2026-11-20' });
+    await screen.findByTestId('board-card-m1');
+    const area = screen.getByTestId('week-board');
+    const fingers = (spread: number) =>
+      [
+        { identifier: 1, clientX: 100, clientY: 200 },
+        { identifier: 2, clientX: 100, clientY: 200 + spread },
+      ] as unknown as Touch[];
+    const send = (type: string, list: Touch[]) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'touches', { value: list });
+      act(() => {
+        area.dispatchEvent(event);
+      });
+      return event;
+    };
+    send('touchstart', fingers(100));
+    send('touchmove', fingers(200));
+    expect(boardSettings.getState().zoom).toBeCloseTo(2, 1);
+    send('touchmove', fingers(900));
+    expect(boardSettings.getState().zoom).toBe(6);
+    send('touchmove', fingers(50));
+    expect(boardSettings.getState().zoom).toBe(1);
+    send('touchend', []);
+    // one finger is not a pinch
+    send('touchstart', [{ identifier: 1, clientX: 1, clientY: 1 }] as unknown as Touch[]);
+    send('touchmove', [{ identifier: 1, clientX: 1, clientY: 90 }] as unknown as Touch[]);
+    expect(boardSettings.getState().zoom).toBe(1);
+  });
+
+  it('the hour column labels the lines of the zoom: hours at 1x, half hours, quarters and ten minutes as it grows', async () => {
+    mount({ real: false, initialDate: '2026-11-20' });
+    await screen.findByTestId('board-card-m1');
+    const labels = () => [...document.querySelectorAll<HTMLElement>('.hour-label')];
+    expect(labels().map((l) => l.textContent).slice(0, 3)).toEqual(['7:00', '8:00', '9:00']);
+    expect(labels().some((l) => l.classList.contains('is-sub'))).toBe(false);
+    act(() => boardSettings.setZoom(2));
+    expect(labels()).toHaveLength(24);
+    expect(labels().slice(0, 3).map((l) => l.textContent)).toEqual(['7:00', '7:30', '8:00']);
+    act(() => boardSettings.setZoom(3.5));
+    expect(labels()).toHaveLength(48);
+    expect(labels()[1]).toHaveTextContent('7:15');
+    act(() => boardSettings.setZoom(5));
+    expect(labels()).toHaveLength(72);
+    expect(labels().slice(0, 4).map((l) => l.textContent)).toEqual(['7:00', '7:10', '7:20', '7:30']);
+    expect(labels()[1]).toHaveClass('is-sub');
+    expect(labels()[0]).not.toHaveClass('is-sub');
+    // 7:10 sits ten minutes below 7:00 on the zoomed board (11 px label offset as the file's)
+    const tops = labels().map((l) => Number.parseFloat(l.style.top));
+    expect(tops[1]! - tops[0]!).toBeCloseTo(10 * (455 / 720) * 5, 3);
+    act(() => boardSettings.setZoom(1));
+    expect(labels()).toHaveLength(12);
+  });
+
+  it('a zoomed-in card has room for more lines: booked / capacity appears with the height, not at 1x', async () => {
+    mount({ real: false, initialDate: '2026-11-20' });
+    const f1 = await screen.findByTestId('board-card-f1');
+    expect(within(f1).queryByTestId('more-line')).toBeNull();
+    act(() => boardSettings.setZoom(6));
+    const zoomed = screen.getByTestId('board-card-f1');
+    expect(within(zoomed).getByTestId('more-line')).toHaveTextContent('12 / 12 osob');
+    // the lines it shows are unchanged: the činnost, the slots, the time and the price
+    expect(zoomed).toHaveTextContent('Kondiční diagnostika');
+    expect(zoomed).toHaveTextContent('14:00 – 16:00');
+    act(() => boardSettings.setZoom(1));
+    expect(within(screen.getByTestId('board-card-f1')).queryByTestId('more-line')).toBeNull();
+  });
+
+  it('the scroll position and the zoom stay when the week, the view or the day changes', async () => {
+    mount({ real: false, initialDate: '2026-11-20' });
+    await screen.findByTestId('board-card-m1');
+    act(() => boardSettings.setZoom(4));
+    const body = screen.getByTestId('board-body');
+    body.scrollTop = 777;
+    fireEvent.scroll(body);
+    fireEvent.click(screen.getByRole('button', { name: 'Následující týden' }));
+    expect(document.getElementById('week-number')).toHaveTextContent('48. týden');
+    expect(screen.getByTestId('board-body').scrollTop).toBe(777);
+    fireEvent.click(screen.getByRole('button', { name: 'Den' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Měsíc' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Týden' }));
+    expect(screen.getByTestId('board-body').scrollTop).toBe(777);
+    expect(boardSettings.getState().zoom).toBe(4);
+    expect(boardSettings.getTopMinute()).not.toBeNull();
   });
 
   it('the calendars and the worker are chosen here and filter what the board shows', async () => {

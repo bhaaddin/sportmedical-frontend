@@ -178,7 +178,8 @@ describe('the week model at a measured timeline height (the default is the file\
     expect(minuteAtY(g, (180 / 720) * 620)).toBeCloseTo(600, 9);
     expect(hourLabels(g)[2]!.top).toBeCloseTo((120 / 720) * 620 + 11, 9);
     expect(cardBox(g, 480, 600).height).toBeCloseTo((120 / 720) * 620, 9);
-    expect(boardGeometry(win, 1.5, 620).height).toBeCloseTo(620 * (65 / 52), 9);
+    expect(boardGeometry(win, 1.5, 620).height).toBeCloseTo(620 * 1.5, 9);
+    expect(boardGeometry(win, 6, 620).height).toBeCloseTo(620 * 6, 9);
     // the default is still the file's 455
     expect(boardGeometry(win, 1).height).toBe(455);
   });

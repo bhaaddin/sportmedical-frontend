@@ -63,20 +63,50 @@ describe('the board at the file\'s own zoom', () => {
   });
 });
 
-describe('the resolution ("Rozlišení") levels', () => {
-  it('keeps Hodina and 30 min at the file\'s size and grows the finer levels like the old grid', () => {
+describe('the zoom (1x - 6x)', () => {
+  it('keeps 1x at the file\'s size and makes the timeline z times as tall, never beyond 1-6', () => {
     expect(boardScaleFor(0.6)).toBe(1);
     expect(boardScaleFor(1)).toBe(1);
-    expect(boardScaleFor(1.5)).toBeCloseTo(65 / 52, 6);
-    expect(boardScaleFor(2)).toBeCloseTo(78 / 52, 6);
-    expect(boardGeometry(DEFAULT_WINDOW, 2).height).toBeCloseTo(TIMELINE_HEIGHT * (78 / 52), 6);
+    expect(boardScaleFor(3.5)).toBe(3.5);
+    expect(boardScaleFor(9)).toBe(6);
+    expect(boardGeometry(DEFAULT_WINDOW, 1).height).toBeCloseTo(TIMELINE_HEIGHT, 6);
+    expect(boardGeometry(DEFAULT_WINDOW, 2).height).toBeCloseTo(TIMELINE_HEIGHT * 2, 6);
+    const six = boardGeometry(DEFAULT_WINDOW, 6);
+    expect(six.height).toBeCloseTo(TIMELINE_HEIGHT * 6, 6);
+    // at 6x one hour is six times its height, and ten minutes are a legible row
+    expect(six.pxPerHour).toBeCloseTo((TIMELINE_HEIGHT / 12) * 6, 6);
+    expect(10 * six.pxPerMinute).toBeGreaterThan(35);
   });
 
-  it('draws finer step lines only for the 15 and 10 minute levels - the file has hour lines alone', () => {
-    const g = boardGeometry(DEFAULT_WINDOW, 1.5);
+  it('draws step lines between the hours from 2x up - the file has hour lines alone', () => {
+    const g = boardGeometry(DEFAULT_WINDOW, 6);
     expect(stepLineHeight(g, 60)).toBeNull();
-    expect(stepLineHeight(g, 30)).toBeNull();
+    expect(stepLineHeight(g, 30)).toBeCloseTo(30 * g.pxPerMinute, 6);
     expect(stepLineHeight(g, 15)).toBeCloseTo(15 * g.pxPerMinute, 6);
+    expect(stepLineHeight(g, 10)).toBeCloseTo(10 * g.pxPerMinute, 6);
+  });
+
+  it('labels the lines of the step: hours at 60, then 7:30 / 7:15 / 7:10 between them, 11 px under their line', () => {
+    const g = boardGeometry(DEFAULT_WINDOW, 6);
+    expect(hourLabels(g, 60).map((l) => l.label)).toEqual(['7:00', '8:00', '9:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00']);
+    expect(hourLabels(g, 30)).toHaveLength(24);
+    expect(hourLabels(g, 15)).toHaveLength(48);
+    const ten = hourLabels(g, 10);
+    expect(ten).toHaveLength(72);
+    expect(ten.slice(0, 7).map((l) => l.label)).toEqual(['7:00', '7:10', '7:20', '7:30', '7:40', '7:50', '8:00']);
+    expect(ten[1]!.sub).toBe(true);
+    expect(ten[0]!.sub).toBe(false);
+    expect(ten[1]!.top).toBeCloseTo(10 * g.pxPerMinute + 11, 6);
+    // 1x draws the file\'s labels, unchanged
+    expect(hourLabels(boardGeometry(DEFAULT_WINDOW, 1))).toEqual(hourLabels(boardGeometry(DEFAULT_WINDOW, 1), 60));
+  });
+
+  it('keeps pointer and minute exact at 6x: every ten-minute row maps to its own minute', () => {
+    const g = boardGeometry(DEFAULT_WINDOW, 6);
+    for (let m = 420; m < 1140; m += 10) {
+      const y = yOfMinute(g, m) + 2; // inside the row
+      expect(Math.floor(minuteAtY(g, y) / 10) * 10).toBe(m);
+    }
   });
 });
 
