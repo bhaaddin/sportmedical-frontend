@@ -14,7 +14,9 @@ import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { connection } from '../api/connection';
 
 export const SERVER_UNREACHABLE_TEXT = 'Server je nedostupný — zkouším znovu';
-export const OFFLINE_TEXT = 'Jste offline — některé funkce mohou být nedostupné';
+/** After a quarter of an hour unused the server sleeps; the first answer takes up to a minute. The client keeps asking. */
+export const SERVER_WAKING_HINT = 'Po delší nečinnosti se server probouzí – může to trvat až minutu, počkejte prosím.';
+export const OFFLINE_TEXT ='Jste offline — některé funkce mohou být nedostupné';
 
 export default function NetworkBanner() {
   const isOnline = useNetworkStatus();
@@ -52,7 +54,7 @@ export default function NetworkBanner() {
               role="alert"
               sx={{
                 bgcolor: serverDown ? '#C62828' : '#ED6C02', color: '#fff', px: 3, py: 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1,
+                display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', columnGap: 1, rowGap: 0.25,
               }}
             >
               {serverDown ? <CloudOff sx={{ fontSize: 18 }} /> : <WifiOff sx={{ fontSize: 18 }} />}
@@ -60,6 +62,11 @@ export default function NetworkBanner() {
                 {serverDown ? SERVER_UNREACHABLE_TEXT : OFFLINE_TEXT}
               </Typography>
               {serverDown && <CircularProgress size={14} sx={{ color: '#fff', ml: 1 }} />}
+              {serverDown && (
+                <Typography variant="caption" data-testid="server-waking-hint" sx={{ width: '100%', textAlign: 'center', opacity: 0.9, lineHeight: 1.3 }}>
+                  {SERVER_WAKING_HINT}
+                </Typography>
+              )}
             </Box>
           </motion.div>
         )}

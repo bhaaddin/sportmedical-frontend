@@ -7,10 +7,15 @@ import {
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { authApi, isSecondFactorChallenge } from '../api/auth';
 import { savePermissions, saveUser } from '../auth/localSession';
+import { withWakeUp } from '../auth/wakeUpRetry';
 import { DESIGN, SoftCard } from '../components/ui';
 import { safeNextPath } from '../components/shell/loginRedirect';
 import { SiteLink } from '../web/SiteLink';
 import { SITE_HOME_PATH, STAFF_HOME_PATH, isPublicSitePath } from '../web/sitePaths';
+
+/** What the sign-in says while the sleeping server wakes up (it keeps trying on its own). */
+export const WAKING_MESSAGE =
+  'Server se po delší nečinnosti probouzí, může to trvat až minutu. Přihlásím vás, jakmile odpoví – nic dalšího není potřeba.';
 
 /** What the sign-in says when the client ended a session nobody closed here. */
 export const SESSION_EXPIRED_MESSAGE =
@@ -69,12 +74,15 @@ export default function Login() {
     }
   };
 
+  /* The server sleeps after a quarter of an hour unused; the first sign-in waits for it instead of failing. */
+  const [waking, setWaking] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      const res = await authApi.login(email, password);
+      const res = await withWakeUp(() => authApi.login(email, password), setWaking);
       if (isSecondFactorChallenge(res)) {
         setSecondFactorToken(res.challengeToken);
         setLoading(false);
@@ -199,6 +207,12 @@ export default function Login() {
 
         {sessionExpired && !error && !mustChange && (
           <Alert severity="warning" sx={{ mb: 2 }}>{SESSION_EXPIRED_MESSAGE}</Alert>
+        )}
+
+        {waking && !error && (
+          <Alert severity="info" role="status" data-testid="login-waking" sx={{ mb: 2 }}>
+            {WAKING_MESSAGE}
+          </Alert>
         )}
 
         {error && (
