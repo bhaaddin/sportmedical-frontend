@@ -914,3 +914,12 @@
 .sm-planner[data-layout='phone'] #dashboard .s41-sheet { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: auto; height: min(88dvh, 680px); border-radius: 18px 18px 0 0; }
 .sm-planner[data-layout='tablet'] #dashboard .s41-sheet { position: fixed; right: 0; left: auto; top: 0; bottom: 0; width: min(620px, 100vw); height: auto; border-radius: 18px 0 0 18px; }
 .sm-planner.is-compact #dashboard .s41-sheet-close { width: 44px; height: 44px; }
+
+/* club inquiries on touch screens: the chips are buttons into the order, 44 px tall; the dashed flag of a week heading keeps its look and grows its hit area */
+.sm-planner.is-compact button.inquiry-chip { min-height: 44px; display: inline-flex; align-items: center; }
+.sm-planner.is-compact .inquiry-list { padding: 8px 6px 0; }
+.sm-planner.is-compact .day-title .day-inquiry::after { content: ''; position: absolute; inset: -14px -8px; }
+
+/* the phone's lists are one long page inside the planner's own scroller: no second scroller in the middle, the strip of the week stays in view */
+.sm-planner[data-layout='phone'] .planner .alternate-view { max-height: none; overflow: visible; min-height: 0; }
+.sm-planner[data-layout='phone'] .planner .phone-strip { position: sticky; top: 0; z-index: 5; background: #001727; }

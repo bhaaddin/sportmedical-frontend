@@ -449,6 +449,24 @@ describe('the month: Ctrl-drag adds places, the tray blocks them all', () => {
     expect(within(menu.closest('[role="presentation"]') as HTMLElement).getByText('22. 12. – 24. 12.')).toBeInTheDocument();
   });
 
+  it('touch: a press held 380 ms starts the drag across days, a quick tap does not', async () => {
+    await openMonth();
+    const touch = { button: 0, pointerType: 'touch', pointerId: 2, clientY: 10 };
+    /* a quick touch: pointer up before the long press - nothing is marked, the click opens the day later */
+    fireEvent.pointerDown(tile('2026-12-14'), { ...touch, clientX: over('2026-12-14') });
+    fireEvent.pointerUp(tile('2026-12-14'), { ...touch, clientX: over('2026-12-14') });
+    await act(async () => { await new Promise((r) => setTimeout(r, 450)); });
+    expect(tile('2026-12-14')).not.toHaveAttribute('data-picked');
+    /* held: the drag starts, the finger travels, the run is chosen */
+    fireEvent.pointerDown(tile('2026-12-14'), { ...touch, clientX: over('2026-12-14') });
+    await act(async () => { await new Promise((r) => setTimeout(r, 450)); });
+    expect(screen.getByTestId('month-matrix')).toHaveAttribute('data-dragging', 'true');
+    fireEvent.pointerMove(window, { ...touch, clientX: over('2026-12-17') });
+    fireEvent.pointerUp(window, { ...touch, clientX: over('2026-12-17') });
+    const menu = await screen.findByRole('menu', { name: 'Akce pro vybraný čas' });
+    expect(within(menu.closest('[role="presentation"]') as HTMLElement).getByText('14. 12. – 17. 12.')).toBeInTheDocument();
+  });
+
   it('a whole-day block of the desk is named on its tile; a part of a day and a club window are not', async () => {
     blocks = [
       { id: 'm1', startUtc: '2026-12-14T23:00:00Z', endUtc: '2026-12-15T23:00:00Z', reason: 'Dovolená', kind: 'manual' }, // the 15th, whole

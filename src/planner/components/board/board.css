@@ -411,3 +411,6 @@
 }
 .sm-planner .day-title .day-inquiry:hover { color: #fff; border-color: #00e1e4; }
 .sm-planner .day-title .day-inquiry.is-current { color: #23f2e7; border-color: #23f2e7; }
+
+/* the Den / Měsíc list covers the whole board, the sticky hour column (z-index 20) included */
+.sm-planner .planner .alternate-view { z-index: 30; }
