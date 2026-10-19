@@ -18,7 +18,8 @@
 import { isTerminalStatus, statusTally, type Calendar, type DayAppointment, type TimeBlock } from '../../../api/bookingContracts';
 import { shownPrice } from '../../../components/booking/grid/appointmentPrice';
 import { drawnBlocksOfDay } from '../../../components/booking/grid/clubWindows';
-import { formatMinutes, parseTimeOfDay, pragueMinuteOfDay, spanOnDay, touchesDay, type MinuteRange } from '../../../components/booking/grid/timeRange';
+import { formatMinutes, MINUTES_PER_DAY, parseTimeOfDay, pragueMinuteOfDay, spanOnDay, touchesDay, type MinuteRange } from '../../../components/booking/grid/timeRange';
+import type { InquiryRef } from '../../model/inquiries';
 import {
   cleanHex,
   clubBlockDates,
@@ -658,6 +659,10 @@ export interface MonthTileModel {
   countLabel: string | null;
   /** Reason the day is closed (holiday ...), from the day marks. */
   flag: string | null;
+  /** Club inquiries (orders that block no time yet) asking for or offering this day. */
+  inquiries: InquiryRef[];
+  /** Every calendar on screen is blocked for the whole day by hand ("Zablokovat celé dny"). */
+  blocked: boolean;
 }
 
 export interface MonthListModel {
@@ -673,6 +678,7 @@ export function monthTilesModel(
   bookings: readonly DayAppointment[],
   dayMarks: Readonly<Record<string, DayMark>>,
   hideCalendarBacked: boolean,
+  extras: { inquiries?: ReadonlyMap<string, InquiryRef[]>; blockedDays?: ReadonlySet<string> } = {},
 ): MonthListModel {
   const base = monthViewModel(ctx, calendarMonth, filter);
   const publicIds = hideCalendarBacked ? new Set(ctx.sessions.filter(isCalendarBacked).map((s) => s.id)) : null;
@@ -702,7 +708,34 @@ export function monthTilesModel(
         count,
         countLabel: count ? `${count} ${termWord(count)}` : null,
         flag: mark?.closed ? mark.label?.trim() || 'Zavřeno' : null,
+        inquiries: extras.inquiries?.get(t.date) ?? [],
+        blocked: extras.blockedDays?.has(t.date) ?? false,
       };
     }),
   };
+}
+
+/**
+ * The days blocked by hand from the first minute to the last ("Zablokovat celé dny"): every calendar given has a
+ * manual block (a club's window is not the desk's block) that covers the whole day. A day one calendar still works
+ * is not blocked - the clinic is open.
+ */
+export function blockedDaysOf(
+  days: readonly IsoDate[],
+  calendarIds: readonly string[],
+  blocksByCalendar: ReadonlyMap<string, readonly TimeBlock[]>,
+): Set<IsoDate> {
+  const out = new Set<IsoDate>();
+  if (calendarIds.length === 0) return out;
+  for (const day of days) {
+    const everyCalendar = calendarIds.every((id) =>
+      (blocksByCalendar.get(id) ?? []).some((b) => {
+        if (b.kind === 'club' || !touchesDay(b.startUtc, b.endUtc, day)) return false;
+        const span = spanOnDay(b.startUtc, b.endUtc, day);
+        return span.start <= 0 && span.end >= MINUTES_PER_DAY;
+      }),
+    );
+    if (everyCalendar) out.add(day);
+  }
+  return out;
 }

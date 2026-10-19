@@ -6,6 +6,7 @@ import { DEFAULT_WINDOW, makeContext, type DayMark, type PlannerCategory, type P
 import { demoCategories, demoDemands, demoSessions } from '../../data/demoFixtures';
 import { boardGeometry } from './boardGeometry';
 import {
+  blockedDaysOf,
   buildBoardModel,
   dayListModel,
   isCalendarBacked,
@@ -288,6 +289,37 @@ describe('the day list and the month tiles', () => {
     expect(tile('2026-11-18')).toMatchObject({ count: 1, countLabel: '1 termín' });
     expect(tile('2026-11-19')).toMatchObject({ flag: 'Zavřeno', countLabel: null });
     expect(tile('2026-10-26').otherMonth).toBe(true);
+  });
+
+  it('carries the club inquiries and the whole-day blocks of a day to its tile', () => {
+    const inquiries = new Map([['2026-11-19', [{ orderId: 'o1', clubName: 'Dukla', kind: 'requested' as const, current: false }]]]);
+    const tiles = monthTilesModel(ctxOf(sessions), '2026-11-01', 'all', [], marks(), false, { inquiries, blockedDays: new Set(['2026-11-20']) });
+    const tile = (d: string) => tiles.tiles.find((t) => t.date === d)!;
+    expect(tile('2026-11-19').inquiries.map((i) => i.clubName)).toEqual(['Dukla']);
+    expect(tile('2026-11-18').inquiries).toEqual([]);
+    expect(tile('2026-11-20').blocked).toBe(true);
+    expect(tile('2026-11-19').blocked).toBe(false);
+  });
+});
+
+describe('blockedDaysOf - days the desk blocked from midnight to midnight', () => {
+  const manual = (id: string, startUtc: string, endUtc: string): TimeBlock => ({ id, startUtc, endUtc, reason: 'Dovolená', kind: 'manual' });
+  // November is CET: Prague midnight = 23:00Z of the day before.
+  const fullDay = manual('m1', '2026-11-18T23:00:00Z', '2026-11-19T23:00:00Z'); // the 19th, whole
+  const twoDays = manual('m2', '2026-11-19T23:00:00Z', '2026-11-21T23:00:00Z'); // the 20th and 21st
+  const morning = manual('m3', '2026-11-22T07:00:00Z', '2026-11-22T11:00:00Z');
+  const club: TimeBlock = { id: 'k1', startUtc: '2026-11-22T23:00:00Z', endUtc: '2026-11-23T23:00:00Z', reason: '', kind: 'club', clubBlockId: 'cb1' };
+  const days = ['2026-11-19', '2026-11-20', '2026-11-21', '2026-11-22', '2026-11-23'];
+
+  it('a manual block over the whole day marks it; part of a day does not; a club window is no block of the desk', () => {
+    const blocked = blockedDaysOf(days, ['c1'], new Map([['c1', [fullDay, twoDays, morning, club]]]));
+    expect([...blocked].sort()).toEqual(['2026-11-19', '2026-11-20', '2026-11-21']);
+  });
+
+  it('needs every calendar on screen blocked - one that still works keeps the day open', () => {
+    const blocked = blockedDaysOf(days, ['c1', 'c2'], new Map([['c1', [fullDay, twoDays]], ['c2', [fullDay]]]));
+    expect([...blocked]).toEqual(['2026-11-19']);
+    expect(blockedDaysOf(days, [], new Map()).size).toBe(0);
   });
 });
 

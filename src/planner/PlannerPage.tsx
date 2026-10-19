@@ -159,11 +159,13 @@ function PlannerScreen({ club }: { club: ClubPlannerData | null }) {
   /* On a club's own screen the club's other windows stay on the board; only the edited order's are the draft's. */
   const inClub = club !== null;
   const ownBlocks = useMemo(() => new Set((session?.editOrder?.blocks ?? []).map((b) => b.id)), [session]);
+  /* The order whose request is being processed: its inquiry days read "Klub žádá". */
+  const inquiryOrderId = session?.editOrder?.mode === 'process' ? session.editOrder.orderId : null;
   const config = useMemo<BoardConfig>(
     () => (!inClub
-      ? { realCalendar: true, mode, excludeClubId: session?.clubId ?? null }
-      : { realCalendar: true, mode, excludeClubId: null, excludeClubBlockIds: ownBlocks }),
-    [mode, session?.clubId, inClub, ownBlocks],
+      ? { realCalendar: true, mode, excludeClubId: session?.clubId ?? null, inquiryOrderId }
+      : { realCalendar: true, mode, excludeClubId: null, excludeClubBlockIds: ownBlocks, inquiryOrderId }),
+    [mode, session?.clubId, inClub, ownBlocks, inquiryOrderId],
   );
 
   if (demo && demoSource === null) {

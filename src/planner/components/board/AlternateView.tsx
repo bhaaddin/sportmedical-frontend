@@ -3,20 +3,45 @@
  * the week board (`renderAlternative`). With the real calendar the day's bookings are among the
  * rows and the tiles count them too; closed days are named on their tile.
  */
+import { inquiryLabel, inquiryTileLabel, inquiryTitle, type InquiryRef } from '../../model/inquiries';
+import { PLANNER_TEXT } from '../../text';
 import type { DayListModel, MonthListModel } from './boardModel';
+
+/** A club inquiry as a dashed chip; a button that opens the order when `onOpen` is given. */
+export function InquiryChip({ inquiry, onOpen }: { inquiry: InquiryRef; onOpen?: (orderId: string) => void }) {
+  const className = `inquiry-chip${inquiry.current ? ' is-current' : ''}`;
+  const common = { 'data-testid': `inquiry-chip-${inquiry.orderId}`, title: inquiryTitle(inquiry) };
+  return onOpen ? (
+    <button type="button" className={className} {...common} aria-label={`${inquiryLabel(inquiry)}. ${PLANNER_TEXT.inquiry.openOrder}`} onClick={() => onOpen(inquiry.orderId)}>
+      {inquiryLabel(inquiry)}
+    </button>
+  ) : (
+    <span className={className} {...common}>{inquiryLabel(inquiry)}</span>
+  );
+}
 
 export function DayList({
   model,
   onOpen,
   onCreate,
+  inquiries = [],
+  onOpenInquiry,
 }: {
   model: DayListModel;
   onOpen: (row: DayListModel['rows'][number]) => void;
   onCreate: () => void;
+  /** The club inquiries asking for this day: dashed chips above the rows. */
+  inquiries?: readonly InquiryRef[];
+  onOpenInquiry?: (orderId: string) => void;
 }) {
   return (
     <>
       <div className="alternative-head">{model.heading}</div>
+      {inquiries.length ? (
+        <div className="inquiry-list" role="group" aria-label={PLANNER_TEXT.inquiry.listTitle} data-testid="day-inquiries">
+          {inquiries.map((inquiry) => <InquiryChip key={inquiry.orderId} inquiry={inquiry} {...(onOpenInquiry ? { onOpen: onOpenInquiry } : {})} />)}
+        </div>
+      ) : null}
       {model.rows.length ? (
         model.rows.map((row) => (
           <div
@@ -66,12 +91,19 @@ export function MonthMatrix({ model, onPick }: { model: MonthListModel; onPick: 
             type="button"
             className="month-tile"
             data-day={t.date}
+            data-inquiry={t.inquiries.length ? 'true' : undefined}
             style={{ opacity: t.otherMonth ? 0.42 : 1 }}
             onClick={() => onPick(t.date)}
           >
             <span className="date-num">{t.dayNumber}</span>
             {t.countLabel ? <small>{t.countLabel}</small> : null}
             {t.flag ? <small className="tile-flag" style={{ color: '#e7cba9' }}>{t.flag}</small> : null}
+            {t.blocked ? <small className="tile-blocked" data-testid={`tile-blocked-${t.date}`}>{PLANNER_TEXT.days.blockedTile}</small> : null}
+            {t.inquiries.length ? (
+              <small className="tile-inquiry" data-testid={`tile-inquiry-${t.date}`} title={t.inquiries.map(inquiryTitle).join(' · ')}>
+                {inquiryTileLabel(t.inquiries)}
+              </small>
+            ) : null}
           </button>
         ))}
       </div>

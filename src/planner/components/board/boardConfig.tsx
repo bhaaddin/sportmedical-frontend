@@ -15,6 +15,8 @@ export interface BoardConfig {
   excludeClubId: string | null;
   /** The club's own screen: only the windows of the order that is edited are drawn from the draft, the club's other windows stay on the board. */
   excludeClubBlockIds?: ReadonlySet<string>;
+  /** The club order being processed right now: its inquiry days read "Klub žádá" instead of "Poptávka · club". */
+  inquiryOrderId?: string | null;
   /** Fixed wall-clock minute for the now-line (tests); the real clock when undefined. */
   nowMinute?: number;
 }

@@ -440,6 +440,10 @@
 .sm-planner.is-compact .compact-day b { font-size: 11.5px; font-weight: 650; color: #f6faff; white-space: nowrap; }
 .sm-planner.is-compact .compact-day.is-today b { color: var(--aqua); }
 .sm-planner.is-compact .compact-day.is-closed { background: repeating-linear-gradient(135deg, #ffffff0a 0 6px, transparent 6px 12px), #001c31f0; color: #e7cba9; }
+.sm-planner.is-compact .compact-day { position: relative; }
+/* a club inquiry asks for this day: a small dashed ring in the corner */
+.sm-planner.is-compact .compact-day-inquiry { position: absolute; top: 3px; right: 4px; width: 8px; height: 8px; border-radius: 50%; border: 1px dashed #b7d6e6; }
+.sm-planner.is-compact .compact-day.is-selected .compact-day-inquiry { border-color: #fff; }
 .sm-planner.is-compact .compact-day.is-selected {
   color: #fff;
   border-color: #00fff1;

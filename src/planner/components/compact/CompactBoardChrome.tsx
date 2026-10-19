@@ -14,6 +14,9 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { createPortal } from 'react-dom';
 import { weekHeadModel, type IsoDate } from '../../model';
 import { usePlannerActions, usePlannerSelector } from '../../state/PlannerStoreProvider';
+import { PLANNER_TEXT } from '../../text';
+import { useBoardConfig } from '../board/boardConfig';
+import { useInquiries } from '../board/useInquiries';
 import { Icon } from '../Icons';
 import { usePlannerCtx, usePlannerModelState } from '../context';
 import { WEEK_FIT_MIN_WIDTH } from './media';
@@ -122,6 +125,8 @@ export function BoardStrip({ mainRef, fit, onFit, sidebarOpen, sidebarPinned, on
   const view = usePlannerSelector((s) => s.view);
   const head = useMemo(() => weekHeadModel(weekStart, ctx.window), [weekStart, ctx.window]);
   const days = useMemo(() => head.days.map((d) => d.date), [head]);
+  const config = useBoardConfig();
+  const inquiries = useInquiries(config.inquiryOrderId ?? null, config.realCalendar);
 
   useDaySnap(mainRef, fit, days, view);
 
@@ -163,19 +168,21 @@ export function BoardStrip({ mainRef, fit, onFit, sidebarOpen, sidebarPinned, on
           {head.days.map((d) => {
             const mark = dayMarks[d.date];
             const selected = d.date === selectedDate;
+            const asked = inquiries.get(d.date)?.length ?? 0;
             return (
               <button
                 key={d.date}
                 type="button"
-                className={`compact-day${selected ? ' is-selected' : ''}${d.date === ctx.today ? ' is-today' : ''}${mark?.closed ? ' is-closed' : ''}`}
+                className={`compact-day${selected ? ' is-selected' : ''}${d.date === ctx.today ? ' is-today' : ''}${mark?.closed ? ' is-closed' : ''}${asked ? ' has-inquiry' : ''}`}
                 data-day={d.date}
                 aria-pressed={selected}
                 aria-current={d.date === ctx.today ? 'date' : undefined}
-                aria-label={`${d.weekName} ${d.label}${mark?.closed ? ' – zavřeno' : ''}`}
+                aria-label={`${d.weekName} ${d.label}${mark?.closed ? ' – zavřeno' : ''}${asked ? ` – ${PLANNER_TEXT.inquiry.flagLabel(asked).toLowerCase()}` : ''}`}
                 onClick={() => act.focusDate(d.date, false)}
               >
                 <span>{d.weekName}</span>
                 <b>{d.label}</b>
+                {asked ? <i className="compact-day-inquiry" data-testid={`compact-inquiry-${d.date}`} aria-hidden="true" /> : null}
               </button>
             );
           })}

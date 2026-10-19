@@ -39,7 +39,8 @@ import type { ClubOrderView } from '../../../api/clubOrders';
 import { DESIGN } from '../../../theme';
 import { pragueDateKey } from '../../../utils/time';
 import { errorText } from '../../../components/booking/errorText';
-import { addDays, weekHeadModel, type IsoDate } from '../../model';
+import { addDays, monthCells, weekHeadModel, type IsoDate } from '../../model';
+import { PLANNER_TEXT } from '../../text';
 import { plannerKeys } from '../../data/PlannerDataSource';
 import { usePlannerData } from '../../data/PlannerDataProvider';
 import { usePlannerActions, usePlannerSelector } from '../../state/PlannerStoreProvider';
@@ -66,6 +67,7 @@ import {
   ZOOM_MIN,
 } from './boardZoom';
 import {
+  blockedDaysOf,
   buildBoardModel,
   dayListModel,
   monthTilesModel,
@@ -79,7 +81,9 @@ import { boardSettings, useBoardSettings } from './boardSettings';
 import { useBoardMove, type BoardNotice } from './useBoardMove';
 import { useBoardNow } from './useBoardNow';
 import { useBoardSelection, type BoardSelection } from './useBoardSelection';
+import { useInquiries } from './useInquiries';
 import { useNextFree } from './useNextFree';
+import { inquiryLabel, inquiryTitle } from '../../model/inquiries';
 import { useClubPlanner } from '../../club/ClubPlannerContext';
 import { useSafeNavigate } from './useSafeNavigate';
 import './board.css';
@@ -639,10 +643,17 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
       ),
     [ctx, selectedDate, filter, calendar, move.appointments, t],
   );
-  const monthTiles = useMemo(
-    () => monthTilesModel(ctx, calendarMonth, filter, calendar ? move.appointments : [], dayMarks, calendar !== null),
-    [ctx, calendarMonth, filter, calendar, move.appointments, dayMarks],
+  /* Club orders that block no time yet (a request, an offer): their days are marked in the week, the list and the month. */
+  const inquiries = useInquiries(config.inquiryOrderId ?? null, calendar !== null);
+  const blockedDays = useMemo(
+    () => (calendar && view === 'month' ? blockedDaysOf(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.blocksByCalendar) : new Set<string>()),
+    [calendar, view, calendarMonth],
   );
+  const monthTiles = useMemo(
+    () => monthTilesModel(ctx, calendarMonth, filter, calendar ? move.appointments : [], dayMarks, calendar !== null, { inquiries, blockedDays }),
+    [ctx, calendarMonth, filter, calendar, move.appointments, dayMarks, inquiries, blockedDays],
+  );
+  const [inquiryPop, setInquiryPop] = useState<{ day: IsoDate; x: number; y: number } | null>(null);
 
   /* On a club's own screen "Klub" is the order switcher's "Nová objednávka klubu"; the toolbar keeps room for the heading. */
   const onClubScreen = useClubPlanner() !== null;
@@ -698,9 +709,10 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
               const mark = dayMarks[d.date];
               const isToday = d.date === ctx.today;
               const flag = mark?.closed ? mark.label?.trim() || 'Zavřeno' : null;
+              const asked = inquiries.get(d.date) ?? [];
               return (
                 <div
-                  className={`day-title${isToday ? ' is-today' : ''}${mark?.closed ? ' is-closed' : ''}`}
+                  className={`day-title${isToday ? ' is-today' : ''}${mark?.closed ? ' is-closed' : ''}${asked.length ? ' has-inquiry' : ''}`}
                   title={flag ?? undefined}
                   key={d.date}
                   data-day={d.date}
@@ -709,6 +721,21 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                 >
                   {d.weekName}
                   <strong>{d.label}</strong>
+                  {asked.length ? (
+                    <button
+                      type="button"
+                      className={`day-inquiry${asked.some((i) => i.current) ? ' is-current' : ''}`}
+                      data-testid={`day-inquiry-${d.date}`}
+                      aria-label={`${PLANNER_TEXT.inquiry.flagLabel(asked.length)}. ${PLANNER_TEXT.inquiry.openOrder}`}
+                      title={asked.map(inquiryTitle).join(' · ')}
+                      onClick={(e) => {
+                        if (asked.length === 1) goOrder(asked[0]!.orderId);
+                        else setInquiryPop({ day: d.date, x: e.clientX, y: e.clientY });
+                      }}
+                    >
+                      {asked.some((i) => i.current) ? PLANNER_TEXT.inquiry.current : PLANNER_TEXT.inquiry.flag(asked.length)}
+                    </button>
+                  ) : null}
                 </div>
               );
             })}
@@ -911,6 +938,8 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
               else act.openDialog({ kind: ctx.sessions.find((s) => s.id === row.id)?.origin === 'public' ? 'eventDetail' : 'agendaDetail', id: row.id });
             }}
             onCreate={createTerm}
+            inquiries={inquiries.get(selectedDate) ?? []}
+            onOpenInquiry={goOrder}
           />
         ) : null}
         {view === 'month' ? (
@@ -971,6 +1000,31 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
           onConfirm={move.confirmProposal}
         />
       ) : null}
+
+      <Popover
+        open={inquiryPop !== null}
+        onClose={() => setInquiryPop(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={inquiryPop ? { top: inquiryPop.y, left: inquiryPop.x } : undefined}
+        slotProps={{ paper: { sx: { width: 280, maxWidth: 'calc(100vw - 24px)', p: 1, borderRadius: '10px', boxShadow: DESIGN.shadow.menu } } }}
+      >
+        <div data-testid="inquiry-popover" role="group" aria-label={PLANNER_TEXT.inquiry.listTitle} className="inquiry-popover">
+          {(inquiryPop ? inquiries.get(inquiryPop.day) ?? [] : []).map((inquiry) => (
+            <Button
+              key={inquiry.orderId}
+              fullWidth
+              data-testid={`inquiry-pop-${inquiry.orderId}`}
+              sx={{ justifyContent: 'flex-start', textAlign: 'left', minHeight: 44 }}
+              onClick={() => {
+                setInquiryPop(null);
+                goOrder(inquiry.orderId);
+              }}
+            >
+              {inquiryLabel(inquiry)}
+            </Button>
+          ))}
+        </div>
+      </Popover>
 
       <Popover
         open={folded !== null}
