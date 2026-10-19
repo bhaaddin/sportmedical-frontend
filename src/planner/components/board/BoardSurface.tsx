@@ -23,6 +23,7 @@ import { AppointmentDetail } from '../../../components/booking/AppointmentDetail
 import { NewAppointmentDialog } from '../../../components/booking/NewAppointmentDialog';
 import { AppointmentHoverCard } from '../../../components/booking/grid/AppointmentHoverCard';
 import { BlockDetailDialog, BlockReasonDialog, type BlockTarget } from '../../../components/booking/grid/BlockDialogs';
+import { CAL_TEXT } from '../../../components/booking/calendar/calendarText';
 import { GRID_TEXT } from '../../../components/booking/grid/gridText';
 import { columnStep } from '../../../components/booking/grid/moveDrag';
 import { longDate, minutesFree } from '../../../components/booking/grid/periodTitle';
@@ -32,6 +33,8 @@ import { MoveConfirmDialog } from '../../../components/booking/calendar/MoveConf
 import { AddToClubOrderDialog } from '../../../components/booking/calendar/AddToClubOrderDialog';
 import { ClubBlockPopover, type ClubBlockPick } from '../../../components/booking/calendar/ClubBlockPopover';
 import { SelectionPopover } from '../../../components/booking/calendar/SelectionPopover';
+import { dayCount, daysWord, rangeDates } from '../../../components/booking/calendar/model';
+import type { PickedRange } from '../../../components/booking/calendar/multiSelect';
 import { ClubOrderEntry } from '../../../components/clubs/order/ClubOrderEntry';
 import { editSessionFor } from '../../../components/clubs/order/editSession';
 import { fetchBlockableActivities } from '../../../api/clubBlocks';
@@ -40,11 +43,13 @@ import { DESIGN } from '../../../theme';
 import { pragueDateKey } from '../../../utils/time';
 import { errorText } from '../../../components/booking/errorText';
 import { addDays, monthCells, weekHeadModel, type IsoDate } from '../../model';
+import { blockableRanges } from '../../model/daySelect';
 import { PLANNER_TEXT } from '../../text';
 import { plannerKeys } from '../../data/PlannerDataSource';
 import { usePlannerData } from '../../data/PlannerDataProvider';
 import { usePlannerActions, usePlannerSelector } from '../../state/PlannerStoreProvider';
 import { PlanningBoardLayer } from '../PlanningBoardLayer';
+import { useStage } from '../PlannerStage';
 import { DESIGN_TIMELINE_HEIGHT, useBoardMetrics } from '../PlannerMetrics';
 import { usePlannerCtx, usePlannerModelState } from '../context';
 import { DayList, MonthMatrix } from './AlternateView';
@@ -81,6 +86,8 @@ import { boardSettings, useBoardSettings } from './boardSettings';
 import { useBoardMove, type BoardNotice } from './useBoardMove';
 import { useBoardNow } from './useBoardNow';
 import { useBoardSelection, type BoardSelection } from './useBoardSelection';
+import { DaysBlockDialog } from './month/DaysBlockDialog';
+import { useDaySelect } from './month/useDaySelect';
 import { useInquiries } from './useInquiries';
 import { useNextFree } from './useNextFree';
 import { inquiryLabel, inquiryTitle } from '../../model/inquiries';
@@ -422,6 +429,13 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   }, [calendar, snapStep]);
   const [pending, setPending] = useState<PendingSelection | null>(null);
 
+  /* ---- the month: several days marked at once (a mouse drags, Ctrl / Cmd / Shift adds a place; touch has toggles) ---- */
+  const phone = useStage().layout === 'phone';
+  const monthSurface = useRef<HTMLDivElement | null>(null);
+  const maySelectDays = calendar !== null && (calendar.mayBook || calendar.mayBlock) && config.mode === 'standard' && !phone && view === 'month';
+  const select = useDaySelect(ctx.today, maySelectDays, monthSurface);
+  const [dayBlock, setDayBlock] = useState<readonly { from: IsoDate; to: IsoDate }[] | null>(null);
+
   /** The calendar a marked time belongs to: the first that works that day (and is not off for the worker). */
   const calendarFor = useCallback(
     (day: IsoDate, range: MinuteRange): { id: string; name: string } | null => {
@@ -458,7 +472,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const openBooking = useCallback((prefill: BookingPrefill) => setBooking((c) => ({ key: (c?.key ?? 0) + 1, prefill })), []);
   const [blockTarget, setBlockTarget] = useState<BlockTarget | null>(null);
   const [openBlock, setOpenBlock] = useState<{ calendarId: string; calendarName: string; block: TimeBlock } | null>(null);
-  const [addToClub, setAddToClub] = useState<{ day: IsoDate; calendarId: string; range: MinuteRange } | null>(null);
+  const [addToClub, setAddToClub] = useState<{ marked: PickedRange } | null>(null);
   const [clubPick, setClubPick] = useState<ClubBlockPick | null>(null);
   const [folded, setFolded] = useState<{ keys: string[]; x: number; y: number } | null>(null);
   const [entryOpen, setEntryOpen] = useState(false);
@@ -489,7 +503,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   };
   const chooseClub = () => {
     if (!pending || !pending.calendarId) return;
-    setAddToClub({ day: pending.day, calendarId: pending.calendarId, range: pending.range });
+    setAddToClub({ marked: { id: 'pending-range', kind: 'time', columnKey: pending.calendarId, calendarId: pending.calendarId, activityId: null, dayKey: pending.day, range: pending.range } });
     setPending(null);
   };
 
@@ -949,6 +963,9 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
               act.selectDay(date);
               act.setView('day');
             }}
+            {...(maySelectDays
+              ? { selection: { select, surfaceRef: monthSurface, today: ctx.today, mayBlock: calendar?.mayBlock ?? false, onBlock: () => setDayBlock(blockableRanges(select.places, ctx.today)) } }
+              : {})}
           />
         ) : null}
       </div>
@@ -965,6 +982,34 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         onBlock={chooseBlock}
         onAddToClubOrder={chooseClub}
         onClose={() => setPending(null)}
+      />
+
+      {/* The days dragged across in the month: book from the first, block whole days, or hand them to a club order. */}
+      <SelectionPopover
+        anchor={addToClub || !select.chosen ? null : { x: select.chosen.x, y: select.chosen.y }}
+        title={select.chosen ? rangeDates(select.chosen) : ''}
+        subtitle={select.chosen ? daysWord(dayCount(select.chosen)) : ''}
+        caption={calendar && calendar.calendars.length > 1 ? `${GRID_TEXT.calendars}: ${calendar.calendars.map((c) => c.name).join(', ')}` : calendar?.calendars[0]?.name}
+        mayBook={calendar?.mayBook ?? false}
+        mayBlock={calendar?.mayBlock ?? false}
+        hints={{ book: CAL_TEXT.rangeBookHint, block: CAL_TEXT.rangeBlockHint }}
+        onBook={() => {
+          const chosen = select.chosen;
+          if (!chosen || !calendar) return;
+          select.clear();
+          openBooking({ initialDate: chosen.from, ...(calendar.calendars[0] ? { initialCalendarId: calendar.calendars[0].id } : {}), anchor: { x: chosen.x, y: chosen.y, width: 0, height: 0 } });
+        }}
+        onBlock={() => {
+          const chosen = select.chosen;
+          if (!chosen) return;
+          select.clear();
+          setDayBlock(blockableRanges([chosen], ctx.today));
+        }}
+        onAddToClubOrder={() => {
+          const chosen = select.chosen;
+          if (chosen) setAddToClub({ marked: { id: 'popover-range', kind: 'days', from: chosen.from, to: chosen.to } });
+        }}
+        onClose={select.clear}
       />
 
       <Popper
@@ -1051,6 +1096,19 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         </div>
       </Popover>
 
+      {dayBlock && calendar ? (
+        <DaysBlockDialog
+          ranges={dayBlock}
+          calendars={calendar.calendars}
+          onClose={() => setDayBlock(null)}
+          onDone={(count) => {
+            setDayBlock(null);
+            select.clear();
+            act.toast(PLANNER_TEXT.days.blockDone(count));
+            void refreshCalendar();
+          }}
+        />
+      ) : null}
       {blockTarget ? <BlockReasonDialog target={blockTarget} onClose={() => setBlockTarget(null)} /> : null}
       {openBlock ? (
         <BlockDetailDialog
@@ -1064,13 +1122,14 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
 
       {addToClub && calendar ? (
         <AddToClubOrderDialog
-          marked={{ id: 'pending-range', kind: 'time', columnKey: addToClub.calendarId, calendarId: addToClub.calendarId, activityId: null, dayKey: addToClub.day, range: addToClub.range }}
+          marked={addToClub.marked}
           calendars={calendar.calendars}
           serviceId={settings.serviceSet !== null && settings.serviceSet.size === 1 ? [...settings.serviceSet][0]! : null}
           today={ctx.today}
           onClose={() => setAddToClub(null)}
           onAdded={() => {
             setAddToClub(null);
+            select.clear();
             void refreshCalendar();
           }}
         />

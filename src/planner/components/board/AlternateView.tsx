@@ -3,9 +3,14 @@
  * the week board (`renderAlternative`). With the real calendar the day's bookings are among the
  * rows and the tiles count them too; closed days are named on their tile.
  */
+import type { RefObject } from 'react';
+import { inRange, rangePill } from '../../../components/booking/calendar/model';
 import { inquiryLabel, inquiryTileLabel, inquiryTitle, type InquiryRef } from '../../model/inquiries';
 import { PLANNER_TEXT } from '../../text';
 import type { DayListModel, MonthListModel } from './boardModel';
+import './month/month.css';
+import { DayTray, MonthTools } from './month/MonthSelectionUi';
+import type { DaySelectApi } from './month/useDaySelect';
 
 /** A club inquiry as a dashed chip; a button that opens the order when `onOpen` is given. */
 export function InquiryChip({ inquiry, onOpen }: { inquiry: InquiryRef; onOpen?: (orderId: string) => void }) {
@@ -80,33 +85,70 @@ export function DayList({
   );
 }
 
-export function MonthMatrix({ model, onPick }: { model: MonthListModel; onPick: (date: string) => void }) {
+/** The month's several-days selection: the state, the element the drag is read from, and what the tray may do. */
+export interface MonthSelection {
+  select: DaySelectApi;
+  surfaceRef: RefObject<HTMLDivElement | null>;
+  today: string;
+  mayBlock: boolean;
+  onBlock: () => void;
+}
+
+export function MonthMatrix({ model, onPick, selection }: { model: MonthListModel; onPick: (date: string) => void; selection?: MonthSelection }) {
+  const select = selection?.select;
+  const highlight = select?.highlight ?? null;
+  const firstLit = highlight ? model.tiles.find((t) => inRange(t.date, highlight))?.date : undefined;
   return (
     <>
       <div className="alternative-head">{model.heading}</div>
-      <div className="month-matrix">
-        {model.tiles.map((t) => (
-          <button
-            key={t.date}
-            type="button"
-            className="month-tile"
-            data-day={t.date}
-            data-inquiry={t.inquiries.length ? 'true' : undefined}
-            style={{ opacity: t.otherMonth ? 0.42 : 1 }}
-            onClick={() => onPick(t.date)}
-          >
-            <span className="date-num">{t.dayNumber}</span>
-            {t.countLabel ? <small>{t.countLabel}</small> : null}
-            {t.flag ? <small className="tile-flag" style={{ color: '#e7cba9' }}>{t.flag}</small> : null}
-            {t.blocked ? <small className="tile-blocked" data-testid={`tile-blocked-${t.date}`}>{PLANNER_TEXT.days.blockedTile}</small> : null}
-            {t.inquiries.length ? (
-              <small className="tile-inquiry" data-testid={`tile-inquiry-${t.date}`} title={t.inquiries.map(inquiryTitle).join(' · ')}>
-                {inquiryTileLabel(t.inquiries)}
-              </small>
-            ) : null}
-          </button>
-        ))}
+      {select ? <MonthTools select={select} /> : null}
+      <div
+        className="month-matrix"
+        ref={selection?.surfaceRef}
+        data-testid="month-matrix"
+        data-dragging={select?.dragging ? 'true' : undefined}
+      >
+        {model.tiles.map((t) => {
+          const lit = inRange(t.date, highlight);
+          const placed = select?.placeState(t.date) ?? null;
+          return (
+            <button
+              key={t.date}
+              type="button"
+              className={`month-tile${lit || placed === 'active' ? ' is-picked' : placed === 'past' ? ' is-picked-past' : ''}`}
+              data-day={t.date}
+              data-range-day={select ? t.date : undefined}
+              data-picked={lit || placed === 'active' ? 'true' : placed === 'past' ? 'past' : undefined}
+              data-inquiry={t.inquiries.length ? 'true' : undefined}
+              style={{ opacity: t.otherMonth ? 0.42 : 1 }}
+              onPointerDown={(event) => {
+                if (select && event.button === 0) select.begin(t.date, event);
+              }}
+              onPointerUp={select?.cancelPress}
+              onPointerCancel={select?.cancelPress}
+              onClick={(event) => {
+                if (select?.tap(t.date, { x: event.clientX, y: event.clientY })) return;
+                if (select?.swallowClick(event)) return;
+                onPick(t.date);
+              }}
+            >
+              {highlight && t.date === firstLit ? (
+                <span className="range-pill" data-testid="range-pill" aria-hidden="true">{rangePill(highlight)}</span>
+              ) : null}
+              <span className="date-num">{t.dayNumber}</span>
+              {t.countLabel ? <small>{t.countLabel}</small> : null}
+              {t.flag ? <small className="tile-flag" style={{ color: '#e7cba9' }}>{t.flag}</small> : null}
+              {t.blocked ? <small className="tile-blocked" data-testid={`tile-blocked-${t.date}`}>{PLANNER_TEXT.days.blockedTile}</small> : null}
+              {t.inquiries.length ? (
+                <small className="tile-inquiry" data-testid={`tile-inquiry-${t.date}`} title={t.inquiries.map(inquiryTitle).join(' · ')}>
+                  {inquiryTileLabel(t.inquiries)}
+                </small>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
+      {selection ? <DayTray select={selection.select} today={selection.today} mayBlock={selection.mayBlock} onBlock={selection.onBlock} /> : null}
     </>
   );
 }

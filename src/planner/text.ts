@@ -30,6 +30,7 @@ export const PLANNER_TEXT = {
     additiveMode: 'Vybrat víc dnů',
     additiveModeHint: 'Každé klepnutí přidá den do výběru.',
     rangeMode: 'Vybrat od–do',
+    rangeModeHint: 'Klepněte na první a pak na poslední den.',
     blockTitle: 'Zablokovat celé dny',
     blockDone: (n: number) => `Zablokováno: ${n === 1 ? '1 místo' : n >= 2 && n <= 4 ? `${n} místa` : `${n} míst`}.`,
     pickCalendars: 'Kalendáře',

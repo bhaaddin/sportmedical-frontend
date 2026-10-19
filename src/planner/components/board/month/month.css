@@ -1,0 +1,90 @@
+/*
+ * The month's several-days selection (Ctrl-drag, "Vybrat od–do", the tray of marked places). Additions to the file's
+ * CSS (planner.css is generated and never edited), in the file's palette, scoped under .sm-planner.
+ */
+.sm-planner .month-tile { position: relative; -webkit-touch-callout: none; }
+.sm-planner .month-matrix[data-dragging='true'] { user-select: none; -webkit-user-select: none; }
+.sm-planner .month-tile.is-picked {
+  background: #0a5361;
+  border-color: #00fff1;
+  box-shadow: inset 0 0 0 1px #00fff1, 0 0 12px #00fbfc55;
+  z-index: 2;
+}
+.sm-planner .month-tile.is-picked-past { background: #0a3a49; border-color: #2d7a8e; border-style: dashed; }
+.sm-planner .month-tile .range-pill {
+  position: absolute;
+  left: 4px;
+  top: -11px;
+  z-index: 9;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #23f2e7;
+  color: #04120f;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.sm-planner .month-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 15px 0; }
+.sm-planner .month-tools .app-button { min-height: 34px; padding: 0 14px; font-size: 13px; }
+.sm-planner .month-hint { margin-left: auto; color: #8caec3; font-size: 12px; }
+
+.sm-planner .day-tray {
+  position: sticky;
+  bottom: 0;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin: 8px 15px 0;
+  padding: 10px 14px;
+  background: #001f33f2;
+  border: 1px solid #19708a;
+  border-radius: 8px;
+  box-shadow: 0 -6px 20px #0008;
+}
+.sm-planner .day-tray-count { color: #fff; font-size: 14px; }
+.sm-planner .day-tray-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+.sm-planner .day-tray-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 2px 0 12px;
+  border: 1px solid #00b6b9;
+  border-radius: 16px;
+  background: #06404f;
+  color: #f6faff;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  max-width: 100%;
+}
+.sm-planner .day-tray-chip em { font-style: normal; font-size: 12px; color: #9db7cc; }
+.sm-planner .day-tray-chip.is-past { color: #9db7cc; border-color: #2d7a8e; background: #0a2a3a; text-decoration: line-through; }
+.sm-planner .day-tray-chip button {
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sm-planner .day-tray-chip button:hover { background: #008f9b55; }
+.sm-planner .day-tray-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.sm-planner .day-tray-actions .app-button:disabled { opacity: 0.45; cursor: default; filter: none; }
+
+/* touch: the targets are 44 px, the keyboard hint has no use */
+.sm-planner.is-compact .month-tools .app-button { min-height: 44px; }
+.sm-planner.is-compact .month-hint { display: none; }
+.sm-planner.is-compact .day-tray { margin: 8px 4px 0; }
+.sm-planner.is-compact .day-tray-chip { min-height: 40px; }
+.sm-planner.is-compact .day-tray-chip button { min-width: 44px; height: 40px; }
+.sm-planner.is-compact .day-tray-actions .app-button { min-height: 44px; }
+.sm-planner .month-tile .tile-blocked { display: block; }

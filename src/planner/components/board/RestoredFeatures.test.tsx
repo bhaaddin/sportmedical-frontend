@@ -95,7 +95,7 @@ function stubLayout() {
     return (this as HTMLElement).id === 'day-board' ? rect(0, 0, 700, 455) : rect(0, 0, 0, 0);
   });
   /* jsdom has no hit testing: the day under a pointer is the one the test says. */
-  (document as { elementFromPoint?: unknown }).elementFromPoint = vi.fn((x: number) => document.querySelector(`[data-day="${hoverDay(x)}"]`));
+  (document as { elementFromPoint?: unknown }).elementFromPoint = vi.fn((x: number) => document.querySelector(`[data-range-day="${hoverDay(x)}"]`));
 }
 /** Test coordinates: x = 1000 + day-of-month, so a pointer "over a tile" is a number. */
 const hoverDay = (x: number) => `2026-12-${String(x - 1000).padStart(2, '0')}`;
@@ -250,6 +250,234 @@ describe('club inquiries on the days they ask for', () => {
   });
 });
 
+/* ------------------------------------------------------------------------ */
+/* 2. the month: several days at once, "Zablokovat celé dny"                  */
+/* ------------------------------------------------------------------------ */
+
+const tile = (day: string) => alternate().querySelector<HTMLElement>(`[data-day="${day}"]`)!;
+/** A mouse press on a tile, travelling to `to`, let go there. */
+function dragDays(from: string, to: string, init: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean } = {}) {
+  fireEvent.pointerDown(tile(from), { button: 0, pointerType: 'mouse', clientX: over(from), clientY: 10, pointerId: 1, ...init });
+  fireEvent.pointerMove(window, { pointerType: 'mouse', clientX: over(to), clientY: 10, pointerId: 1 });
+  fireEvent.pointerUp(window, { pointerType: 'mouse', clientX: over(to), clientY: 10, pointerId: 1 });
+  fireEvent.click(tile(to), init);
+}
+async function openMonth() {
+  mount();
+  await screen.findByTestId('board-booking-b1');
+  click('Měsíc');
+  await screen.findByTestId('month-matrix');
+}
+
+describe('the month: marking days', () => {
+  it('a drag across days opens the popover for the run: book from its first day, block, hand to a club order', async () => {
+    await openMonth();
+    dragDays('2026-12-14', '2026-12-16');
+    const menu = await screen.findByRole('menu', { name: 'Akce pro vybraný čas' });
+    const paper = menu.closest('[role="presentation"]') as HTMLElement;
+    expect(within(paper).getByText('14. 12. – 16. 12.')).toBeInTheDocument();
+    expect(within(paper).getByText('3 dny')).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Objednat pacienta/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Zablokovat čas/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Přidat do objednávky klubu/ })).toBeInTheDocument();
+    expect(alternate()).toHaveTextContent('Prosinec 2026'); // the drag did not open a day
+    for (const day of ['2026-12-14', '2026-12-15', '2026-12-16']) expect(tile(day)).toHaveAttribute('data-picked', 'true');
+    expect(tile('2026-12-17')).not.toHaveAttribute('data-picked');
+    expect(screen.getByTestId('range-pill')).toHaveTextContent('14. 12. – 16. 12. · 3 dny');
+  });
+
+  it('the run lights up while it is dragged', async () => {
+    await openMonth();
+    fireEvent.pointerDown(tile('2026-12-14'), { button: 0, pointerType: 'mouse', clientX: over('2026-12-14'), clientY: 10, pointerId: 1 });
+    fireEvent.pointerMove(window, { pointerType: 'mouse', clientX: over('2026-12-15'), clientY: 10, pointerId: 1 });
+    expect(tile('2026-12-15')).toHaveAttribute('data-picked', 'true');
+    expect(screen.getByTestId('month-matrix')).toHaveAttribute('data-dragging', 'true');
+    fireEvent.pointerUp(window, { pointerType: 'mouse', clientX: over('2026-12-15'), clientY: 10, pointerId: 1 });
+  });
+
+  it('"Objednat pacienta" opens the booking on the first day of the run, in the first calendar', async () => {
+    await openMonth();
+    dragDays('2026-12-14', '2026-12-16');
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Objednat pacienta/ }));
+    const props = JSON.parse((await screen.findByTestId('new-appointment')).dataset.props!);
+    expect(props).toMatchObject({ initialDate: '2026-12-14', initialCalendarId: 'c1' });
+  });
+
+  it('"Přidat do objednávky klubu" hands the run to the club order dialog as whole days', async () => {
+    await openMonth();
+    dragDays('2026-12-14', '2026-12-16');
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Přidat do objednávky klubu/ }));
+    expect(JSON.parse((await screen.findByTestId('add-to-club')).dataset.marked!)).toMatchObject({ kind: 'days', from: '2026-12-14', to: '2026-12-16' });
+  });
+
+  it('"Zablokovat čas" on the run asks for the reason and blocks whole days, midnight to midnight, in every calendar ticked', async () => {
+    calendars = [calendar, calendar2];
+    vi.mocked(appointmentsApi.createBlock).mockResolvedValue({ id: 'new', startUtc: '', endUtc: '', reason: 'Dovolená' } as TimeBlock);
+    await openMonth();
+    dragDays('2026-12-14', '2026-12-16');
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Zablokovat čas/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Zablokovat celé dny' });
+    expect(within(dialog).getByTestId('days-block-list')).toHaveTextContent('14. 12. – 16. 12. · 3 dny');
+    fireEvent.click(within(dialog).getByLabelText('Ordinace 2')); // not this one
+    fireEvent.change(within(dialog).getByLabelText(/Důvod blokace/), { target: { value: 'Dovolená' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Zablokovat' }));
+    await waitFor(() => expect(appointmentsApi.createBlock).toHaveBeenCalledTimes(1));
+    const [calendarId, startUtc, endUtc, reason] = vi.mocked(appointmentsApi.createBlock).mock.calls[0]!;
+    expect(calendarId).toBe('c1');
+    expect(new Date(startUtc as string).toISOString()).toBe('2026-12-13T23:00:00.000Z'); // 14. 12. 00:00 Prague
+    expect(new Date(endUtc as string).toISOString()).toBe('2026-12-16T23:00:00.000Z'); // 17. 12. 00:00 Prague
+    expect(reason).toBe('Dovolená');
+    expect(await screen.findByText('Zablokováno: 1 místo.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Zablokovat celé dny' })).toBeNull());
+    expect(tile('2026-12-14')).not.toHaveAttribute('data-picked');
+  });
+
+  it('a plain click on a day still opens it, and Esc drops the marked run', async () => {
+    await openMonth();
+    dragDays('2026-12-14', '2026-12-16');
+    await screen.findByRole('menu', { name: 'Akce pro vybraný čas' });
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('menu', { name: 'Akce pro vybraný čas' })).toBeNull());
+    expect(tile('2026-12-14')).not.toHaveAttribute('data-picked');
+    act(() => { vi.setSystemTime(Date.now() + 500); }); // the click after a drag is over
+    dragDays('2026-12-18', '2026-12-18'); // press and release on one day
+    expect(screen.queryByRole('menu', { name: 'Akce pro vybraný čas' })).toBeNull();
+    expect(alternate()).toHaveTextContent('Pá 18. 12. 2026 · Denní přehled');
+  });
+});
+
+describe('the month: Ctrl-drag adds places, the tray blocks them all', () => {
+  it('Ctrl (or Cmd, Shift) keeps what is marked and adds a place; nothing opens, no day is entered', async () => {
+    await openMonth();
+    dragDays('2026-12-14', '2026-12-16', { ctrlKey: true });
+    dragDays('2026-12-21', '2026-12-21', { metaKey: true });
+    dragDays('2026-12-30', '2026-12-28', { shiftKey: true });
+    expect(screen.queryByRole('menu', { name: 'Akce pro vybraný čas' })).toBeNull();
+    const tray = screen.getByTestId('day-tray');
+    expect(tray).toHaveTextContent('3 místa');
+    expect(within(tray).getAllByTestId('day-tray-chip').map((c) => c.textContent?.replace('×', ''))).toEqual(['14. 12. – 16. 12.', 'Po 21. 12.', '28. 12. – 30. 12.']);
+    expect(alternate()).toHaveTextContent('Prosinec 2026');
+    expect(tile('2026-12-15')).toHaveAttribute('data-picked', 'true');
+    expect(tile('2026-12-29')).toHaveAttribute('data-picked', 'true');
+  });
+
+  it('a chip is taken out with its x, "Zrušit výběr" drops them all', async () => {
+    await openMonth();
+    dragDays('2026-12-14', '2026-12-16', { ctrlKey: true });
+    dragDays('2026-12-21', '2026-12-21', { ctrlKey: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Odebrat 14. 12. – 16. 12. z výběru' }));
+    expect(within(screen.getByTestId('day-tray')).getAllByTestId('day-tray-chip')).toHaveLength(1);
+    expect(tile('2026-12-15')).not.toHaveAttribute('data-picked');
+    fireEvent.click(screen.getByTestId('day-tray-clear'));
+    expect(screen.queryByTestId('day-tray')).toBeNull();
+  });
+
+  it('a plain press starts over', async () => {
+    await openMonth();
+    dragDays('2026-12-14', '2026-12-16', { ctrlKey: true });
+    dragDays('2026-12-21', '2026-12-23');
+    expect(screen.queryByTestId('day-tray')).toBeNull();
+    expect(tile('2026-12-15')).not.toHaveAttribute('data-picked');
+  });
+
+  it('"Zablokovat dny" blocks every place in every ticked calendar and says how many it saved', async () => {
+    calendars = [calendar, calendar2];
+    vi.mocked(appointmentsApi.createBlock).mockResolvedValue({ id: 'new', startUtc: '', endUtc: '', reason: 'Školení' } as TimeBlock);
+    await openMonth();
+    dragDays('2026-12-14', '2026-12-15', { ctrlKey: true });
+    dragDays('2026-12-21', '2026-12-21', { ctrlKey: true });
+    fireEvent.click(screen.getByTestId('day-tray-block'));
+    const dialog = await screen.findByRole('dialog', { name: 'Zablokovat celé dny' });
+    expect(within(dialog).getByTestId('days-block-list')).toHaveTextContent('14. 12. – 15. 12. · 2 dny');
+    expect(within(dialog).getByTestId('days-block-list')).toHaveTextContent('Po 21. 12. · 1 den');
+    fireEvent.change(within(dialog).getByLabelText(/Důvod blokace/), { target: { value: 'Školení' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Zablokovat' }));
+    await waitFor(() => expect(appointmentsApi.createBlock).toHaveBeenCalledTimes(4));
+    const calls = vi.mocked(appointmentsApi.createBlock).mock.calls.map(([id, start, end]) => [id, new Date(start as string).toISOString(), new Date(end as string).toISOString()]);
+    expect(calls).toEqual([
+      ['c1', '2026-12-13T23:00:00.000Z', '2026-12-15T23:00:00.000Z'],
+      ['c2', '2026-12-13T23:00:00.000Z', '2026-12-15T23:00:00.000Z'],
+      ['c1', '2026-12-20T23:00:00.000Z', '2026-12-21T23:00:00.000Z'],
+      ['c2', '2026-12-20T23:00:00.000Z', '2026-12-21T23:00:00.000Z'],
+    ]);
+    expect(await screen.findByText('Zablokováno: 2 místa.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId('day-tray')).toBeNull());
+  });
+
+  it("the server's refusal (a patient is booked) stays in the dialog, the marks stay, nothing is announced", async () => {
+    vi.mocked(appointmentsApi.createBlock).mockRejectedValue(new Error('V tomto čase je objednaný pacient.'));
+    await openMonth();
+    dragDays('2026-12-14', '2026-12-15', { ctrlKey: true });
+    fireEvent.click(screen.getByTestId('day-tray-block'));
+    const dialog = await screen.findByRole('dialog', { name: 'Zablokovat celé dny' });
+    fireEvent.change(within(dialog).getByLabelText(/Důvod blokace/), { target: { value: 'Školení' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Zablokovat' }));
+    expect(await within(dialog).findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByText(/^Zablokováno:/)).toBeNull();
+    expect(screen.getByTestId('day-tray')).toBeInTheDocument();
+  });
+
+  it('a place in the past is marked as such and cannot be blocked; with a place of today on, only that one is', async () => {
+    await openMonth();
+    dragDays('2026-12-07', '2026-12-07', { ctrlKey: true });
+    const chip = within(screen.getByTestId('day-tray')).getByTestId('day-tray-chip');
+    expect(chip).toHaveAttribute('data-past', 'true');
+    expect(chip).toHaveTextContent('v minulosti');
+    expect(tile('2026-12-07')).toHaveAttribute('data-picked', 'past');
+    expect(screen.getByTestId('day-tray-block')).toBeDisabled();
+    dragDays('2026-12-21', '2026-12-21', { ctrlKey: true });
+    expect(screen.getByTestId('day-tray-block')).toBeEnabled();
+    fireEvent.click(screen.getByTestId('day-tray-block'));
+    expect(await screen.findByTestId('days-block-list')).toHaveTextContent('Po 21. 12. · 1 den');
+    expect(screen.getByTestId('days-block-list').querySelectorAll('li')).toHaveLength(1);
+  });
+
+  it('touch: "Vybrat víc dnů" turns every tap into a mark, "Vybrat od–do" taps the first and the last day', async () => {
+    await openMonth();
+    fireEvent.click(screen.getByTestId('month-tool-more'));
+    fireEvent.click(tile('2026-12-14'));
+    fireEvent.click(tile('2026-12-18'));
+    expect(within(screen.getByTestId('day-tray')).getAllByTestId('day-tray-chip')).toHaveLength(2);
+    expect(alternate()).toHaveTextContent('Prosinec 2026'); // no tap opened a day
+    fireEvent.click(screen.getByTestId('month-tool-more')); // off
+    fireEvent.click(screen.getByTestId('day-tray-clear'));
+    fireEvent.click(screen.getByTestId('month-tool-range'));
+    fireEvent.click(tile('2026-12-22'));
+    expect(tile('2026-12-22')).toHaveAttribute('data-picked', 'true');
+    fireEvent.click(tile('2026-12-24'));
+    const menu = await screen.findByRole('menu', { name: 'Akce pro vybraný čas' });
+    expect(within(menu.closest('[role="presentation"]') as HTMLElement).getByText('22. 12. – 24. 12.')).toBeInTheDocument();
+  });
+
+  it('a whole-day block of the desk is named on its tile; a part of a day and a club window are not', async () => {
+    blocks = [
+      { id: 'm1', startUtc: '2026-12-14T23:00:00Z', endUtc: '2026-12-15T23:00:00Z', reason: 'Dovolená', kind: 'manual' }, // the 15th, whole
+      { id: 'm2', startUtc: '2026-12-16T08:00:00Z', endUtc: '2026-12-16T09:00:00Z', reason: 'Školení', kind: 'manual' },
+      { id: 'k1', startUtc: '2026-12-17T07:00:00Z', endUtc: '2026-12-17T15:00:00Z', reason: '', kind: 'club', clubBlockId: 'cb1', clubName: 'FK Slaný' },
+    ];
+    await openMonth();
+    await waitFor(() => expect(screen.getByTestId('tile-blocked-2026-12-15')).toHaveTextContent('Blokováno'));
+    expect(screen.queryByTestId('tile-blocked-2026-12-16')).toBeNull();
+    expect(screen.queryByTestId('tile-blocked-2026-12-17')).toBeNull();
+  });
+
+  it('offers nothing without the permission to book or block', async () => {
+    window.localStorage.setItem('permissions', JSON.stringify([]));
+    await openMonth();
+    expect(screen.queryByTestId('month-tools')).toBeNull();
+    expect(tile('2026-12-14')).not.toHaveAttribute('data-range-day');
+    dragDays('2026-12-14', '2026-12-16');
+    expect(screen.queryByRole('menu', { name: 'Akce pro vybraný čas' })).toBeNull();
+  });
+
+  it('is not offered while a club order is planned (the board belongs to the order)', async () => {
+    mount({ config: { mode: 'club' } });
+    await screen.findByTestId('board-booking-b1');
+    click('Měsíc');
+    await screen.findByTestId('month-matrix');
+    expect(screen.queryByTestId('month-tools')).toBeNull();
+  });
+});
+
 void act;
-void waitFor;
-void calendar2;
+void actions;
