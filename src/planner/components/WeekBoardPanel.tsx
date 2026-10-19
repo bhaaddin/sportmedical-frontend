@@ -22,6 +22,7 @@ import { usePlannerSelector } from '../state/PlannerStoreProvider';
 import { BoardSurface } from './board/BoardSurface';
 import { useBoardCalendar } from './board/boardCalendar';
 import { useBoardConfig } from './board/boardConfig';
+import { useStage } from './PlannerStage';
 
 /** The real calendar, read for the days the shown view needs. */
 function RealBoard() {
@@ -29,11 +30,13 @@ function RealBoard() {
   const weekStart = usePlannerSelector((s) => s.weekStart);
   const selectedDate = usePlannerSelector((s) => s.selectedDate);
   const calendarMonth = usePlannerSelector((s) => s.calendarMonth);
+  /* The phone's agenda shows the day under a strip of its week (counts, club dots, inquiries): the week is read. */
+  const phone = useStage().layout === 'phone';
   const days = useMemo(() => {
-    if (view === 'day') return [selectedDate];
+    if (view === 'day' && !phone) return [selectedDate];
     if (view === 'month') return monthCells(calendarMonth);
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  }, [view, weekStart, selectedDate, calendarMonth]);
+  }, [view, phone, weekStart, selectedDate, calendarMonth]);
   const calendar = useBoardCalendar(days);
   return <BoardSurface calendar={calendar} />;
 }

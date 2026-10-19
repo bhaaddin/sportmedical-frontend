@@ -53,6 +53,8 @@ import { useStage } from '../PlannerStage';
 import { DESIGN_TIMELINE_HEIGHT, useBoardMetrics } from '../PlannerMetrics';
 import { usePlannerCtx, usePlannerModelState } from '../context';
 import { DayList, MonthMatrix } from './AlternateView';
+import { PhoneAgenda, PhoneMonthList } from './PhoneAgenda';
+import { clubLinesByDay, lunchOfMarks, phoneEntries, phoneMonthRows, weekStripModel } from './phoneModel';
 import { BookingCard, SessionCard, WindowBlock } from './BoardCards';
 import { BoardToolbar } from './BoardToolbar';
 import type { BoardCalendarData } from './boardCalendar';
@@ -642,20 +644,16 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const ghost = move.moving?.target ?? null;
   const filterActive = settings.ticked !== null || settings.serviceSet !== null || settings.employeeId !== null;
 
+  const statusWord = useCallback(
+    (a: DayAppointment) => {
+      const name = statusName(a.status);
+      return name ? t(`booking.status.${name}`) : t('booking.status.unknown');
+    },
+    [t],
+  );
   const dayRows = useMemo(
-    () =>
-      dayListModel(
-        ctx,
-        selectedDate,
-        filter,
-        calendar ? move.appointments : [],
-        (a: DayAppointment) => {
-          const name = statusName(a.status);
-          return name ? t(`booking.status.${name}`) : t('booking.status.unknown');
-        },
-        calendar !== null,
-      ),
-    [ctx, selectedDate, filter, calendar, move.appointments, t],
+    () => dayListModel(ctx, selectedDate, filter, calendar ? move.appointments : [], statusWord, calendar !== null),
+    [ctx, selectedDate, filter, calendar, move.appointments, statusWord],
   );
   /* Club orders that block no time yet (a request, an offer): their days are marked in the week, the list and the month. */
   const inquiries = useInquiries(config.inquiryOrderId ?? null, calendar !== null);
@@ -668,6 +666,31 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     [ctx, calendarMonth, filter, calendar, move.appointments, dayMarks, inquiries, blockedDays],
   );
   const [inquiryPop, setInquiryPop] = useState<{ day: IsoDate; x: number; y: number } | null>(null);
+
+  /* ---- the phone's list: the day as an agenda with the week's strip, the month as a list of days ---- */
+  const phoneAgenda = useMemo(() => {
+    if (!phone || view !== 'day') return null;
+    const bookings = calendar ? move.appointments : [];
+    return {
+      entries: phoneEntries(dayRows.rows, model.windows, selectedDate),
+      strip: weekStripModel({
+        days: head.days,
+        selected: selectedDate,
+        today: ctx.today,
+        dayMarks,
+        rowCount: (date) => dayListModel(ctx, date, filter, bookings, statusWord, calendar !== null).rows.length,
+        windows: model.windows,
+        inquiries,
+      }),
+    };
+  }, [phone, view, calendar, move.appointments, dayRows, model.windows, selectedDate, head, ctx, dayMarks, filter, statusWord, inquiries]);
+  const phoneMonth = useMemo(() => {
+    if (!phone || view !== 'month') return null;
+    const lines = calendar
+      ? clubLinesByDay(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.blocksByCalendar, lunchOfMarks(dayMarks), config.excludeClubBlockIds)
+      : new Map<IsoDate, string[]>();
+    return phoneMonthRows(monthTiles.tiles, lines, ctx.today);
+  }, [phone, view, calendar, calendarMonth, dayMarks, config.excludeClubBlockIds, monthTiles, ctx.today]);
 
   /* On a club's own screen "Klub" is the order switcher's "Nová objednávka klubu"; the toolbar keeps room for the heading. */
   const onClubScreen = useClubPlanner() !== null;
@@ -944,7 +967,26 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
       </div>
 
       <div id="alternate-view" className="alternate-view" hidden={view === 'week'} data-testid="alternate-view">
-        {view === 'day' ? (
+        {view === 'day' && phoneAgenda ? (
+          <PhoneAgenda
+            heading={dayRows.heading}
+            strip={phoneAgenda.strip}
+            entries={phoneAgenda.entries}
+            empty={dayRows.empty}
+            inquiries={inquiries.get(selectedDate) ?? []}
+            onSelectDay={(date) => act.selectDay(date)}
+            onStep={(direction) => act.selectDay(addDays(selectedDate, direction))}
+            onOpenEntry={(entry, point) => {
+              if (entry.kind === 'booking') openBookingDetail(entry.id);
+              else if (entry.window) openWindow(entry.window, point);
+              else act.openDialog({ kind: ctx.sessions.find((s) => s.id === entry.id)?.origin === 'public' ? 'eventDetail' : 'agendaDetail', id: entry.id });
+            }}
+            onOpenInquiry={goOrder}
+            onCreate={createTerm}
+            canCreate={calendar?.mayBook ?? false}
+          />
+        ) : null}
+        {view === 'day' && !phoneAgenda ? (
           <DayList
             model={dayRows}
             onOpen={(row) => {
@@ -956,7 +998,17 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
             onOpenInquiry={goOrder}
           />
         ) : null}
-        {view === 'month' ? (
+        {view === 'month' && phoneMonth ? (
+          <PhoneMonthList
+            heading={monthTiles.heading}
+            rows={phoneMonth}
+            onPick={(date) => {
+              act.selectDay(date);
+              act.setView('day');
+            }}
+          />
+        ) : null}
+        {view === 'month' && !phoneMonth ? (
           <MonthMatrix
             model={monthTiles}
             onPick={(date) => {

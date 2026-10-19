@@ -138,6 +138,9 @@ export interface BoardWindowModel {
   width: string;
   label: string;
   timeLabel: string;
+  /** Wall-clock minutes the window covers on this day. */
+  start: number;
+  end: number;
   /** `#RRGGBB`. */
   colour: string;
   block: TimeBlock;
@@ -445,6 +448,8 @@ function windowModels(
           height: box.height,
           label,
           timeLabel: `${formatMinutes(span.start)}–${formatMinutes(span.end)}`,
+          start: span.start,
+          end: span.end,
           colour: club ? cleanHex(block.colorHex) ?? fallbackColour : fallbackColour,
           block,
           allBlocks: all,
@@ -593,6 +598,8 @@ export interface DayRowModel {
   /** "6/8" for a session, the status word for a booking. */
   tail: string;
   priceText: string | null;
+  /** The činnost's colour (`#RRGGBB`) for the phone's list; null when the činnost is unknown. */
+  colour: string | null;
 }
 
 export interface DayListModel {
@@ -628,6 +635,7 @@ export function dayListModel(
       sub: null,
       tail: r.occupancy,
       priceText: shownPrice(null, category.priceCzk ?? null).text,
+      colour: cleanHex(category.color),
     });
   }
   for (const a of bookings) {
@@ -645,6 +653,7 @@ export function dayListModel(
       sub: a.patientName?.trim() ? a.activityName : null,
       tail: statusWord(a),
       priceText: shownPrice(a, category?.priceCzk ?? null).text,
+      colour: cleanHex(category?.color),
     });
   }
   rows.sort((a, b) => a.sortStart - b.sortStart || a.key.localeCompare(b.key));

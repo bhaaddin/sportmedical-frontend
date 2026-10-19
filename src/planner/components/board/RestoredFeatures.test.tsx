@@ -479,5 +479,175 @@ describe('the month: Ctrl-drag adds places, the tray blocks them all', () => {
   });
 });
 
+/* ------------------------------------------------------------------------ */
+/* 3. the phone's list                                                        */
+/* ------------------------------------------------------------------------ */
+
+const agenda = () => screen.getByTestId('phone-agenda');
+async function openAgenda(opts: { initialDate?: string } = {}) {
+  mount({ layout: 'phone', ...opts });
+  await screen.findByRole('button', { name: 'Den' });
+  click('Den');
+  await screen.findByTestId('phone-agenda');
+}
+const piece = (id: string, startUtc: string, endUtc: string): TimeBlock => ({ id, startUtc, endUtc, reason: '', kind: 'club', clubBlockId: 'cb1', clubId: 'club1', clubName: 'FK Slaný', colorHex: '#2E7D32' });
+
+describe('the phone: Den is an agenda of the day under the week\'s strip', () => {
+  beforeEach(() => {
+    blocks = [
+      piece('k1', '2026-12-09T07:00:00Z', '2026-12-09T11:00:00Z'), // Wednesday 08:00-12:00
+      { id: 'm1', startUtc: '2026-12-09T12:00:00Z', endUtc: '2026-12-09T13:00:00Z', reason: 'Školení', kind: 'manual' }, // Wednesday 13:00-14:00
+    ];
+    clubOrders = [order({ id: 'o1', clubName: 'Dukla', status: 'Requested', requestedDates: ['2026-12-09', '2026-12-11'] })];
+  });
+
+  it('is a list, not the grid: bookings, club windows and blocks in the order they start, with what each is', async () => {
+    await openAgenda();
+    const list = await within(agenda()).findByTestId('phone-day-list');
+    await waitFor(() => expect(within(list).getAllByRole('button')).toHaveLength(3));
+    const rows = within(list).getAllByRole('button');
+    expect(rows.map((r) => r.getAttribute('data-kind'))).toEqual(['club', 'booking', 'block']);
+    expect(rows[0]).toHaveTextContent('08:00–12:00');
+    expect(rows[0]).toHaveTextContent('FK Slaný');
+    expect(rows[1]).toHaveTextContent('10:00 – 10:30');
+    expect(rows[1]).toHaveTextContent('Pacient b2');
+    expect(rows[1]).toHaveTextContent('Fyzio');
+    expect(rows[2]).toHaveTextContent('Školení');
+    expect(rows[2]).toHaveTextContent('Ordinace 1');
+    expect(agenda()).toHaveTextContent('St 9. 12. 2026 · Denní přehled');
+    expect(document.getElementById('day-board')).toBeTruthy(); // the board is kept behind, hidden, not torn down
+    expect(screen.getByTestId('alternate-view')).not.toHaveAttribute('hidden');
+  });
+
+  it('the strip counts each day of the week, dots the clubs and rings the inquiries', async () => {
+    await openAgenda();
+    await within(agenda()).findByTestId('phone-day-list');
+    const strip = within(agenda()).getByRole('group', { name: 'Dny týdne' });
+    expect(within(strip).getAllByRole('button')).toHaveLength(7);
+    const tuesday = within(strip).getByTestId('phone-strip-2026-12-08');
+    expect(tuesday).toHaveTextContent('Út');
+    expect(tuesday).toHaveTextContent('1'); // b1
+    const wednesday = within(strip).getByTestId('phone-strip-2026-12-09');
+    expect(wednesday).toHaveAttribute('aria-pressed', 'true');
+    expect(wednesday).toHaveAttribute('aria-current', 'date');
+    expect(within(wednesday).getByTestId('club-dots')).toBeInTheDocument();
+    expect(within(wednesday).getByTestId('inquiry-dot')).toBeInTheDocument();
+    expect(within(strip).getByTestId('phone-strip-2026-12-11')).toContainElement(within(strip).getByTestId('phone-strip-2026-12-11').querySelector('[data-testid="inquiry-dot"]'));
+    expect(within(tuesday).queryByTestId('inquiry-dot')).toBeNull();
+  });
+
+  it('reads the whole week for the strip, not only the day', async () => {
+    await openAgenda();
+    await waitFor(() => expect(vi.mocked(appointmentsApi.range).mock.calls.some(([from, to]) => from === '2026-12-07' && to === '2026-12-13')).toBe(true));
+  });
+
+  it('a tap on a day of the strip shows that day; a swipe moves a day on or back', async () => {
+    await openAgenda();
+    fireEvent.click(within(agenda()).getByTestId('phone-strip-2026-12-08'));
+    expect(agenda()).toHaveTextContent('Út 8. 12. 2026 · Denní přehled');
+    expect(within(agenda()).getByTestId('phone-day-list')).toHaveTextContent('Pacient b1');
+    fireEvent.touchStart(agenda(), { touches: [{ clientX: 300, clientY: 200 }] });
+    fireEvent.touchEnd(agenda(), { changedTouches: [{ clientX: 120, clientY: 210 }] });
+    expect(agenda()).toHaveTextContent('St 9. 12. 2026 · Denní přehled');
+    fireEvent.touchStart(agenda(), { touches: [{ clientX: 100, clientY: 200 }] });
+    fireEvent.touchEnd(agenda(), { changedTouches: [{ clientX: 300, clientY: 205 }] });
+    expect(agenda()).toHaveTextContent('Út 8. 12. 2026 · Denní přehled');
+    /* a mostly vertical move is a scroll, not a swipe */
+    fireEvent.touchStart(agenda(), { touches: [{ clientX: 100, clientY: 100 }] });
+    fireEvent.touchEnd(agenda(), { changedTouches: [{ clientX: 250, clientY: 300 }] });
+    expect(agenda()).toHaveTextContent('Út 8. 12. 2026 · Denní přehled');
+  });
+
+  it('a booking opens its detail, a club window the club\'s popover, a block its detail', async () => {
+    await openAgenda();
+    fireEvent.click(await within(agenda()).findByTestId('phone-entry-b2'));
+    expect((await screen.findByTestId('appointment-detail')).dataset.id).toBe('b2');
+    cleanup();
+    await openAgenda();
+    await within(agenda()).findByTestId('phone-entry-b2');
+    await waitFor(() => expect(within(agenda()).getAllByRole('button').some((b) => b.getAttribute('data-kind') === 'club')).toBe(true));
+    fireEvent.click(within(agenda()).getAllByRole('button').find((b) => b.getAttribute('data-kind') === 'club')!);
+    expect(JSON.parse(screen.getByTestId('club-popover').dataset.pick!)).toMatchObject({ clubBlockId: 'cb1', clubName: 'FK Slaný' });
+    fireEvent.click(within(agenda()).getAllByRole('button').find((b) => b.getAttribute('data-kind') === 'block')!);
+    expect(await screen.findByRole('dialog', { name: /Zablokovaný čas/ })).toHaveTextContent('Školení');
+  });
+
+  it('the day\'s inquiries are chips above the list; one opens the order', async () => {
+    await openAgenda();
+    const chips = await screen.findByTestId('day-inquiries');
+    fireEvent.click(within(chips).getByTestId('inquiry-chip-o1'));
+    expect(lastLocation()).toMatchObject({ path: '/clubs/objednavky', state: { openOrderId: 'o1' } });
+  });
+
+  it('an empty day says so and offers the booking', async () => {
+    await openAgenda();
+    fireEvent.click(within(agenda()).getByTestId('phone-strip-2026-12-12'));
+    expect(within(agenda()).queryByTestId('phone-day-list')).toBeNull();
+    expect(within(agenda()).getByTestId('phone-empty')).toHaveTextContent('Na vybraný den zatím nejsou vytvořené termíny.');
+    fireEvent.click(within(agenda()).getByRole('button', { name: 'Nová objednávka' }));
+    expect(await screen.findByTestId('new-appointment')).toBeInTheDocument();
+  });
+
+  it('a closed day is named in the strip', async () => {
+    await openAgenda({ initialDate: '2026-11-26' });
+    const day = within(agenda()).getByTestId('phone-strip-2026-11-26');
+    expect(day).toHaveClass('is-closed');
+    expect(day).toHaveAttribute('aria-label', expect.stringContaining('Zavřeno (ukázka)'));
+  });
+});
+
+describe('the phone: Měsíc is a list of days', () => {
+  beforeEach(() => {
+    blocks = [piece('k1', '2026-12-09T07:00:00Z', '2026-12-09T15:00:00Z'), { id: 'm1', startUtc: '2026-12-14T23:00:00Z', endUtc: '2026-12-15T23:00:00Z', reason: 'Dovolená', kind: 'manual' }];
+    clubOrders = [order({ id: 'o1', clubName: 'Dukla', status: 'Requested', requestedDates: ['2026-12-10'] })];
+  });
+  async function openPhoneMonth() {
+    mount({ layout: 'phone' });
+    await screen.findByRole('button', { name: 'Měsíc' });
+    click('Měsíc');
+    return screen.findByTestId('phone-month-list');
+  }
+
+  it('is one row per day of the month, no tiles and no marking tools', async () => {
+    const list = await openPhoneMonth();
+    expect(within(list).getAllByRole('listitem')).toHaveLength(31);
+    expect(screen.queryByTestId('month-matrix')).toBeNull();
+    expect(screen.queryByTestId('month-tools')).toBeNull();
+    expect(alternate()).toHaveTextContent('Prosinec 2026 · Měsíční přehled');
+    const wednesday = within(list).getByTestId('phone-month-day-2026-12-09');
+    expect(wednesday).toHaveTextContent('St');
+    expect(wednesday).toHaveAttribute('aria-current', 'date');
+  });
+
+  it('writes out what a day holds: bookings, the club\'s window, the inquiry, a day blocked whole', async () => {
+    const list = await openPhoneMonth();
+    await waitFor(() => expect(within(list).getByTestId('phone-month-club-2026-12-09')).toHaveTextContent('FK Slaný · 08:00–16:00'));
+    expect(within(list).getByTestId('phone-month-day-2026-12-09')).toHaveTextContent('1 termín'); // b2
+    expect(within(list).getByTestId('phone-month-inquiry-2026-12-10')).toHaveTextContent('Poptávka · Dukla');
+    expect(within(list).getByTestId('phone-month-blocked-2026-12-15')).toHaveTextContent('Blokováno');
+    expect(within(list).getByTestId('phone-month-day-2026-12-20')).toHaveTextContent('Žádné rezervace');
+  });
+
+  it('a tap on a row opens that day as the agenda', async () => {
+    const list = await openPhoneMonth();
+    fireEvent.click(within(list).getByTestId('phone-month-day-2026-12-08'));
+    expect(await screen.findByTestId('phone-agenda')).toHaveTextContent('Út 8. 12. 2026 · Denní přehled');
+    expect(within(agenda()).getByTestId('phone-day-list')).toHaveTextContent('Pacient b1');
+  });
+});
+
+describe('the other layouts keep the file\'s own list and tiles', () => {
+  it.each(['tablet', 'desktop'] as const)('%s: Den is the file\'s list, Měsíc the tiles', async (layout) => {
+    mount({ layout });
+    await screen.findByRole('button', { name: 'Den' });
+    click('Den');
+    expect(screen.queryByTestId('phone-agenda')).toBeNull();
+    expect(alternate()).toHaveTextContent('Denní přehled');
+    click('Měsíc');
+    expect(screen.queryByTestId('phone-month-list')).toBeNull();
+    expect(alternate().querySelectorAll('.month-tile')).toHaveLength(42);
+  });
+});
+
 void act;
 void actions;
