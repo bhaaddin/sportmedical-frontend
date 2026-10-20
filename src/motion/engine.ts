@@ -15,7 +15,15 @@ export type MotionApi = typeof import('./vendor');
 let pending: Promise<MotionApi> | null = null;
 let loaded: MotionApi | null = null;
 
+/** The Web Animations API is there (every current browser; not jsdom, not a browser from before 2017). motion/mini needs it. */
+export const canAnimate = (): boolean => typeof Element !== 'undefined' && typeof Element.prototype.animate === 'function';
+
+/**
+ * The library, once. Where the browser cannot run Web Animations the promise never settles: every caller does its work in a
+ * `.then`, so nothing is armed, hidden or moved and the page simply stays as it was rendered.
+ */
 export function loadMotion(): Promise<MotionApi> {
+  if (!canAnimate()) return new Promise<MotionApi>(() => undefined);
   pending ??= import('./vendor').then((api) => {
     loaded = api;
     return api;
@@ -25,7 +33,7 @@ export function loadMotion(): Promise<MotionApi> {
 
 /** The library when it is already there, else null (callers then skip the animation, never wait for it). */
 export function motionIfLoaded(): MotionApi | null {
-  return loaded;
+  return canAnimate() ? loaded : null;
 }
 
 /** Starts the download after the first paint, unless the person turned motion off. Idempotent. */
