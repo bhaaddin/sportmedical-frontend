@@ -1,0 +1,52 @@
+{
+ "at": "2026-10-20T21:34:19.409Z",
+ "report": [
+  {
+   "vp": "820x1180",
+   "layout": "tablet",
+   "stage": "-",
+   "header": "top 0 h 50 w 756",
+   "sidebar": "top -84 h 1180",
+   "board": "top 60 h 996",
+   "boardBody": "h 772",
+   "gapSidebar": "-134",
+   "gapBoard": "10",
+   "bottomSidebar": "-40",
+   "bottomBoard": "0",
+   "rightHeader": "0",
+   "leftHeader": "0",
+   "scroll": "doc 0/0 main 0 host 0",
+   "hours": 12,
+   "removed": "none",
+   "logo": false,
+   "strip": false,
+   "toggle": false,
+   "text": "SportMedical Diagnostics s.r.o. 31 MJ MUDr. Jan Novák",
+   "touch": "44x44 145x44"
+  },
+  {
+   "vp": "1100x800",
+   "layout": "tablet",
+   "stage": "-",
+   "header": "top 0 h 50 w 1036",
+   "sidebar": "top 60 h 616",
+   "board": "top 60 h 616",
+   "boardBody": "h 392",
+   "gapSidebar": "10",
+   "gapBoard": "10",
+   "bottomSidebar": "0",
+   "bottomBoard": "0",
+   "rightHeader": "0",
+   "leftHeader": "0",
+   "scroll": "doc 0/0 main 0 host 0",
+   "hours": 12,
+   "removed": "none",
+   "logo": false,
+   "strip": false,
+   "toggle": false,
+   "text": "SportMedical Diagnostics s.r.o. 31 MJ MUDr. Jan Novák",
+   "touch": "44x44 145x44"
+  }
+ ],
+ "failures": []
+}
