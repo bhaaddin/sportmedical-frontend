@@ -1,15 +1,16 @@
 /*
- * What the header strip shows when no club is being planned ("clinic" mode): the clinic's own
- * company data, from the settings the owner already keeps.
+ * The clinic's own company data for the planner when no club is being planned ("clinic" mode), from the settings the owner already
+ * keeps.
  *
  *   Identifikační údaje  company name, IČO, DIČ, address      <- GET /api/v1/settings/company
  *   Vedení               the account with the Owner role      <- GET /api/v1/users
  *   Kontaktní osoba      the clinic's e-mail and telephone    <- company settings
  *
- * Nothing is invented: a value the settings do not hold stays empty and the strip prints its
- * "Doplnit" placeholder. Both reads are permission gated in the application (company settings:
- * `settings.clinic.manage`, accounts: `users.manage`); a person without the permission is not
- * asked, and sees the placeholders and the clinic's name from the planner catalogue.
+ * The standard calendar's slim top bar (`ClinicTopBar`) shows only the NAME from this (the company's legal name, else the
+ * catalogue's clinic name) and asks for nothing else (`withLeadership: false`); the other fields stay available to whoever needs
+ * the clinic's data in the planner. Nothing is invented: a value the settings do not hold stays empty. Both reads are permission
+ * gated in the application (company settings: `settings.clinic.manage`, accounts: `users.manage`); a person without the permission
+ * is not asked, and sees the clinic's name from the planner catalogue.
  */
 import { useQuery } from '@tanstack/react-query';
 import { COMPANY_SETTINGS_QUERY_KEY, companySettingsApi } from '../../../../api/companySettings';
@@ -32,8 +33,12 @@ const addressOf = (street: string, postalCode: string, city: string): string => 
   return [street.trim(), town].filter(Boolean).join(', ');
 };
 
-/** `enabled: false` (club mode) reads nothing; the profile then only carries the catalogue's clinic name. */
-export function useClinicHeaderProfile(clinicName: string, enabled = true): ClinicHeaderProfile {
+/**
+ * `enabled: false` (club mode) reads nothing; the profile then only carries the catalogue's clinic name.
+ * `withLeadership: false` skips the account list: the slim top bar of the standard calendar shows the clinic's name only,
+ * so it asks the company settings and nothing else.
+ */
+export function useClinicHeaderProfile(clinicName: string, enabled = true, withLeadership = true): ClinicHeaderProfile {
   const canEditCompany = usePermission('settings.clinic.manage');
   const canSeeAccounts = usePermission('users.manage');
 
@@ -47,7 +52,7 @@ export function useClinicHeaderProfile(clinicName: string, enabled = true): Clin
   const accounts = useQuery({
     queryKey: ['planner', 'header', 'accounts'],
     queryFn: userAccountsApi.list,
-    enabled: enabled && canSeeAccounts,
+    enabled: enabled && withLeadership && canSeeAccounts,
     retry: false,
     staleTime: 60_000,
   });

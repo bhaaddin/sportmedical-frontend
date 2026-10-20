@@ -1,37 +1,28 @@
 /*
  * ClubHeader - `<header id="club-unified-header">` (prototype lines 2943-2976).
  *
- * Owns: the top user bar (bell, profile chip), the identity block (logo slot `#club-logo-slot`,
- * name `#club-identity-name`, the edit action `#club-edit-link`) and the strip
- * `#club-details-strip` with the three sections IDENTIFIKAČNÍ ÚDAJE / VEDENÍ / KONTAKTNÍ OSOBA
- * (`#hdr-ico … #hdr-contact-phone`).
- *
  * Two modes, decided by the page that draws the planner:
  *
- *   club    a club's order is being planned. Values come from the planner's data source
- *           (`getClubProfile`), "Upravit údaje" opens the club editor (`clubEdit`), the logo slot
- *           shows the club's initials on its own colour and, where the source can store one, a
- *           real logo.
- *   clinic  the standard calendar, no club. The same strip shows the clinic's own company data
- *           from the settings (see `dialogs/generic/headerData.ts`); there is no club to edit, the
- *           action leads to the settings page instead.
- *
- * Both modes: the bell shows the unread count of the application's notifications and opens them
- * (`notifications` dialog); the profile chip opens the account dialog (`profile`).
+ *   club    a club's order is being planned (`/clubs/:id`, a club order on the stage). The full banner: the top user bar
+ *           (bell, profile chip - `PlannerUserTools`), the identity block (logo slot `#club-logo-slot`, name
+ *           `#club-identity-name`, "Upravit údaje" `#club-edit-link` -> `clubEdit`) and the strip `#club-details-strip` with
+ *           the three sections IDENTIFIKAČNÍ ÚDAJE / VEDENÍ / KONTAKTNÍ OSOBA (`#hdr-ico ... #hdr-contact-phone`). Values
+ *           come from the planner's data source (`getClubProfile`); the logo slot shows the club's initials on its own
+ *           colour and, where the source can store one, a real logo.
+ *   clinic  the standard calendar, no club: NOT this banner any more but the slim one-line bar `ClinicTopBar` (clinic name,
+ *           bell, profile chip). The clinic's company data lives in the settings.
  */
 import { useRef, type ChangeEvent, type CSSProperties, type ReactNode } from 'react';
 import { ClubAvatar } from '../../components/clubs/ClubAvatar';
 import { canBeInvoiced } from '../../pages/clubs/payerForm';
 import { useClubPlanner } from '../club/ClubPlannerContext';
 import { usePlannerCommands } from '../data/usePlannerCommands';
-import { clubDisplayName, headerValues, type ClubProfile, type ClubProfileField } from '../model';
+import { clubDisplayName, headerValues, type ClubProfileField } from '../model';
 import { usePlannerActions } from '../state/PlannerStoreProvider';
-import { Icon } from './Icons';
+import { ClinicTopBar } from './ClinicTopBar';
+import { PlannerUserTools } from './PlannerUserTools';
 import { useFitName } from './useFitName';
 import { usePlannerCatalogue, usePlannerProfile } from './context';
-import { initialsOf, useAppNavigate, usePlannerUser } from './dialogs/generic/account';
-import { useClinicHeaderProfile } from './dialogs/generic/headerData';
-import { usePlannerNotificationFeed } from './dialogs/generic/notificationFeed';
 import './dialogs/generic/generic.css';
 
 export type ClubHeaderMode = 'club' | 'clinic';
@@ -74,32 +65,26 @@ const DOM_IDS: Record<ClubProfileField, string> = {
 /** Why the logo cannot be changed, in the words the desk reads. */
 export const LOGO_DISABLED_TEXT = 'Logo klubu zde zatím nelze nahrát. Místo něj slouží iniciály klubu.';
 
-const isClinicMode = (mode: ClubHeaderMode): boolean => mode === 'clinic';
-
+/** The standard calendar (`clinic`) gets the slim bar; a club's screen gets the full banner. */
 export function ClubHeader({ user = null, mode = 'club' }: ClubHeaderProps) {
-  const planned = usePlannerProfile();
+  return mode === 'clinic' ? <ClinicTopBar user={user} /> : <ClubBanner user={user} />;
+}
+
+function ClubBanner({ user = null }: { user?: ClubHeaderProps['user'] }) {
+  const profile = usePlannerProfile();
   const catalogue = usePlannerCatalogue();
   const act = usePlannerActions();
   const commands = usePlannerCommands();
-  const navigate = useAppNavigate();
-  const feed = usePlannerNotificationFeed();
-  const account = usePlannerUser();
   /* A club's own screen: the invoice needs the club's address and bank account - when they are missing the section says so. */
   const clubScreen = useClubPlanner();
-  const billingMissing = clubScreen !== null && !isClinicMode(mode) && !canBeInvoiced(clubScreen.club);
-
-  const clinic = useClinicHeaderProfile(catalogue.clinicName, mode === 'clinic');
-  const isClinic = mode === 'clinic';
-  const profile: ClubProfile = isClinic ? clinic.profile : planned;
+  const billingMissing = clubScreen !== null && !canBeInvoiced(clubScreen.club);
 
   const values = Object.fromEntries(headerValues(profile).map((v) => [v.field, v])) as Record<
     Exclude<ClubProfileField, 'clubName'>,
     ReturnType<typeof headerValues>[number]
   >;
-  const name = profile.clubName?.trim() || (isClinic ? 'Doplnit název kliniky' : clubDisplayName(profile));
-  const displayName = user?.displayName?.trim() || account?.displayName || 'Uživatel';
-  const unread = feed.unreadCount;
-  const canUploadLogo = !isClinic && catalogue.capabilities.logoUpload;
+  const name = profile.clubName?.trim() || clubDisplayName(profile);
+  const canUploadLogo = catalogue.capabilities.logoUpload;
   const nameRef = useRef<HTMLElement | null>(null);
   const nameFit = useFitName(nameRef, name);
 
@@ -140,10 +125,6 @@ export function ClubHeader({ user = null, mode = 'club' }: ClubHeaderProps) {
     }
   };
 
-  const strip = isClinic
-    ? { identity: 'Identifikační a kontaktní údaje kliniky', lead: 'VEDENÍ KLINIKY', leadAria: 'Vedení kliniky', contact: 'KONTAKTNÍ OSOBA' }
-    : { identity: 'Identifikační a kontaktní údaje klubu', lead: 'VEDENÍ KLUBU', leadAria: 'Vedení klubu', contact: 'KONTAKTNÍ OSOBA' };
-
   const logoSlot = (
     <div
       className={`club-logo-slot${profile.logoUrl ? ' has-logo' : ''}${canUploadLogo ? '' : ' is-readonly'}`}
@@ -155,11 +136,11 @@ export function ClubHeader({ user = null, mode = 'club' }: ClubHeaderProps) {
         type="file"
         id="club-logo-input"
         accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
-        aria-label={isClinic ? 'Logo kliniky' : 'Nastavit logo klubu'}
+        aria-label="Nastavit logo klubu"
         disabled={!canUploadLogo}
         onChange={onLogo}
       />
-      {profile.logoUrl ? <img id="club-logo-preview" alt={isClinic ? 'Logo kliniky' : 'Logo klubu'} src={profile.logoUrl} /> : <img id="club-logo-preview" alt="" />}
+      {profile.logoUrl ? <img id="club-logo-preview" alt="Logo klubu" src={profile.logoUrl} /> : <img id="club-logo-preview" alt="" />}
       {canUploadLogo ? (
         <label htmlFor="club-logo-input" className="club-logo-label">
           <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -172,8 +153,8 @@ export function ClubHeader({ user = null, mode = 'club' }: ClubHeaderProps) {
         </label>
       ) : profile.logoUrl ? null : (
         <div className="club-logo-label is-readonly" data-testid="club-logo-readonly">
-          <ClubAvatar name={profile.clubName || name} color={isClinic ? null : planned.colorHex ?? null} size={64} />
-          <small>{isClinic ? 'Logo kliniky' : 'Logo zatím nelze nahrát'}</small>
+          <ClubAvatar name={profile.clubName || name} color={profile.colorHex ?? null} size={64} />
+          <small>Logo zatím nelze nahrát</small>
           <span className="sr-only">{LOGO_DISABLED_TEXT}</span>
         </div>
       )}
@@ -181,36 +162,12 @@ export function ClubHeader({ user = null, mode = 'club' }: ClubHeaderProps) {
   );
 
   return (
-    <header id="club-unified-header" className="club-unified-header" aria-label="Hlavička klubu a kontaktní údaje" data-testid="club-header" data-mode={mode}>
-      <nav className="club-top-userbar" aria-label="Uživatelské nástroje">
-        <div className="club-user-actions">
-          <button
-            type="button"
-            className="club-user-bell"
-            data-command="notification"
-            aria-label="Oznámení"
-            aria-describedby={unread > 0 ? 'club-bell-count' : undefined}
-            title={unread > 0 ? `Oznámení (${unread} nepřečtených)` : 'Oznámení'}
-            onClick={() => act.openDialog({ kind: 'notifications' })}
-          >
-            <Icon name="bell" />
-            {unread > 0 ? (
-              <span className="club-bell-badge" id="club-bell-count" data-testid="club-bell-count" aria-label={`${unread} nepřečtených oznámení`}>
-                {unread > 99 ? '99+' : unread}
-              </span>
-            ) : null}
-          </button>
-          <button type="button" className="club-user-chip" data-command="profile" aria-label={`Profil uživatele ${displayName}`} title="Profil uživatele" onClick={() => act.openDialog({ kind: 'profile' })}>
-            <span className="club-user-avatar">{initialsOf(displayName)}</span>
-            <span className="club-user-name">{displayName}</span>
-            <span className="club-user-chevron"><Icon name="chevron-down" /></span>
-          </button>
-        </div>
-      </nav>
-      <section className="club-identity-v45" aria-label={isClinic ? 'Název kliniky a logo' : 'Název klubu, logo a úpravy'}>
+    <header id="club-unified-header" className="club-unified-header" aria-label="Hlavička klubu a kontaktní údaje" data-testid="club-header" data-mode="club">
+      <PlannerUserTools user={user} />
+      <section className="club-identity-v45" aria-label="Název klubu, logo a úpravy">
         {logoSlot}
         <div className="club-identity-content">
-          <div className="club-identity-meta"><span className="club-identity-tag">{isClinic ? 'KLINIKA' : 'KLUB'}</span></div>
+          <div className="club-identity-meta"><span className="club-identity-tag">KLUB</span></div>
           <strong
             id="club-identity-name"
             ref={nameRef}
@@ -221,27 +178,17 @@ export function ClubHeader({ user = null, mode = 'club' }: ClubHeaderProps) {
           >
             {name}
           </strong>
-          {isClinic ? (
-            <button type="button" id="club-edit-link" aria-label="Otevřít nastavení firmy" title="Údaje kliniky se upravují v nastavení" onClick={() => navigate(clinic.settingsPath)}>
-              <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
-              </svg>
-              <span id="club-edit-label">Nastavení firmy</span>
-            </button>
-          ) : (
-            <button type="button" id="club-edit-link" aria-label="Upravit údaje klubu" title="Upravit údaje klubu" onClick={() => act.openDialog({ kind: 'clubEdit' })}>
-              <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M12 20h9" />
-                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4L16.5 3.5Z" />
-              </svg>
-              <span id="club-edit-label">Upravit údaje</span>
-            </button>
-          )}
+          <button type="button" id="club-edit-link" aria-label="Upravit údaje klubu" title="Upravit údaje klubu" onClick={() => act.openDialog({ kind: 'clubEdit' })}>
+            <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4L16.5 3.5Z" />
+            </svg>
+            <span id="club-edit-label">Upravit údaje</span>
+          </button>
         </div>
       </section>
-      <div id="club-details-strip" aria-label={strip.identity}>
-        {section('IDENTIFIKAČNÍ ÚDAJE', isClinic ? 'Identifikační údaje kliniky' : 'Identifikační údaje klubu', 'building', (
+      <div id="club-details-strip" aria-label="Identifikační a kontaktní údaje klubu">
+        {section('IDENTIFIKAČNÍ ÚDAJE', 'Identifikační údaje klubu', 'building', (
           <>
             {line('IČO', 'ico', 'card')}
             {line('DIČ', 'dic', 'doc')}
@@ -250,14 +197,14 @@ export function ClubHeader({ user = null, mode = 'club' }: ClubHeaderProps) {
         ), billingMissing ? (
           <span className="club-billing-warn" data-testid="club-billing-warning" role="img" aria-label="Chybí fakturační údaje" title="Chybí fakturační údaje (adresa a bankovní spojení klubu)">!</span>
         ) : undefined)}
-        {section(strip.lead, strip.leadAria, 'team', (
+        {section('VEDENÍ KLUBU', 'Vedení klubu', 'team', (
           <>
             {line('Jméno', 'leaderName', 'user')}
             {line('E-mail', 'leaderEmail', 'mail')}
             {line('Telefon', 'leaderPhone', 'phone')}
           </>
         ))}
-        {section(strip.contact, 'Kontaktní osoba', 'person', (
+        {section('KONTAKTNÍ OSOBA', 'Kontaktní osoba', 'person', (
           <>
             {line('Jméno', 'contactName', 'user')}
             {line('E-mail', 'contactEmail', 'mail')}

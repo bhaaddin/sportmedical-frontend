@@ -76,6 +76,23 @@ describe('PlannerShell', () => {
     expect(document.getElementById('hdr-ico')).toHaveAttribute('title', 'Údaj zatím není vyplněn');
   });
 
+  it('the standard calendar (headerMode clinic) draws the slim bar over the same sidebar and board - and none of the card', async () => {
+    mount(new DemoDataSource({ today: TODAY }), { headerMode: 'clinic' });
+    await screen.findByTestId('week-board-panel');
+    const bar = screen.getByTestId('club-header');
+    expect(bar).toHaveClass('is-slim');
+    expect(bar).toHaveAttribute('data-mode', 'clinic');
+    const CARD = ['club-logo-slot', 'club-logo-input', 'club-logo-preview', 'club-edit-link', 'club-edit-label', 'club-details-strip',
+      'hdr-ico', 'hdr-dic', 'hdr-address', 'hdr-leader', 'hdr-leader-email', 'hdr-leader-phone', 'hdr-contact', 'hdr-contact-email', 'hdr-contact-phone'];
+    expect(CARD.filter((id) => document.getElementById(id))).toEqual([]);
+    expect(within(bar).getAllByRole('button')).toHaveLength(2);
+    // the panels the freed room goes to are the usual ones
+    expect(screen.getByTestId('sidebar')).toContainElement(document.getElementById('mini-days'));
+    expect(screen.getByTestId('sidebar')).toContainElement(document.getElementById('agenda-panel'));
+    expect(document.getElementById('week-board')).not.toBeNull();
+    expect(document.querySelectorAll('#hour-column .hour-label')).toHaveLength(12);
+  });
+
   it('wires the order numbers from the demo order', async () => {
     mount();
     await screen.findByTestId('order-command');

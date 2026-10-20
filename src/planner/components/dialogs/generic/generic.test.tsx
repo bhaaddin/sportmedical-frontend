@@ -188,47 +188,84 @@ describe('header - club mode', () => {
 });
 
 /* -------------------------------------------------------------------------- */
-describe('header - clinic mode', () => {
+describe('header - clinic mode: the slim top bar', () => {
   const company = {
     legalName: 'SportMedical Diagnostics s.r.o.', ico: '11223344', dic: 'CZ11223344', address: 'Sportovní 5', city: 'Brno',
     postalCode: '602 00', bankAccount: '', iban: '', dataBox: '', phone: '+420 541 000 000', email: 'recepce@klinika.cz', invoiceDueDays: 14,
   };
+  /** Everything the big card used to carry; none of it is on the standard calendar any more. */
+  const REMOVED_TEXTS = ['KLINIKA', 'Nastavení firmy', 'IDENTIFIKAČNÍ ÚDAJE', 'VEDENÍ KLINIKY', 'KONTAKTNÍ OSOBA', 'IČO', 'DIČ', 'Adresa', 'Telefon', 'E-mail', 'Jméno', 'Doplnit', 'Logo kliniky'];
+  const REMOVED_IDS = [
+    'club-logo-slot', 'club-logo-input', 'club-logo-preview', 'club-edit-link', 'club-edit-label', 'club-details-strip',
+    'hdr-ico', 'hdr-dic', 'hdr-address', 'hdr-leader', 'hdr-leader-email', 'hdr-leader-phone', 'hdr-contact', 'hdr-contact-email', 'hdr-contact-phone',
+  ];
 
-  it('shows the clinic company data and links to the settings, with no club action', async () => {
+  it('is one line: the clinic name from the company settings, the bell and the profile chip - and nothing else', async () => {
     window.localStorage.setItem('permissions', JSON.stringify(['settings.clinic.manage', 'users.manage']));
     getCompany.mockResolvedValue(company);
-    listAccounts.mockResolvedValue([
-      { userId: 'u1', email: 'owner@klinika.cz', displayName: 'MUDr. Eva Vlastníková', role: 'Owner', isActive: true },
-      { userId: 'u2', email: 'staff@klinika.cz', displayName: 'Recepční', role: 'Staff', isActive: true },
-    ]);
-    mount({ mode: 'clinic' });
-    await waitFor(() => expect(text('hdr-ico')).toHaveTextContent('11223344'));
-    expect(text('club-identity-name')).toHaveTextContent('SportMedical Diagnostics s.r.o.');
-    expect(text('hdr-dic')).toHaveTextContent('CZ11223344');
-    expect(text('hdr-address')).toHaveTextContent('Sportovní 5, 602 00 Brno');
-    await waitFor(() => expect(text('hdr-leader')).toHaveTextContent('MUDr. Eva Vlastníková'));
-    expect(text('hdr-leader-email')).toHaveTextContent('owner@klinika.cz');
-    expect(text('hdr-leader-phone')).toHaveTextContent('Doplnit');
-    expect(text('hdr-contact')).toHaveTextContent('Doplnit');
-    expect(text('hdr-contact-email')).toHaveTextContent('recepce@klinika.cz');
-    expect(text('hdr-contact-phone')).toHaveTextContent('+420 541 000 000');
-    expect(document.querySelector('.club-identity-tag')).toHaveTextContent('KLINIKA');
-    expect(screen.queryByRole('button', { name: /Upravit údaje klubu/ })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Otevřít nastavení firmy' }));
-    expect(screen.getByTestId('where')).toHaveTextContent('/nastaveni/firma-a-faktury');
-    expect(screen.getByTestId('dialog-layer')).toHaveAttribute('data-dialog', '');
+    listAccounts.mockResolvedValue([{ userId: 'u1', email: 'owner@klinika.cz', displayName: 'MUDr. Eva Vlastníková', role: 'Owner', isActive: true }]);
+    mount({ mode: 'clinic', user: { displayName: 'Jan Novák' } });
+    const bar = await screen.findByTestId('club-header');
+    expect(bar).toHaveAttribute('data-mode', 'clinic');
+    expect(bar).toHaveClass('is-slim');
+    await waitFor(() => expect(text('club-identity-name')).toHaveTextContent('SportMedical Diagnostics s.r.o.'));
+    // the only controls: the bell and the profile chip
+    expect(within(bar).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Oznámení', 'Profil uživatele Jan Novák']);
+    expect(within(bar).getByText('JN')).toBeInTheDocument();
+    // not one of the removed pieces: no text, no id, no logo, no strip, no tag, no settings button
+    for (const t of REMOVED_TEXTS) expect(bar).not.toHaveTextContent(t);
+    for (const id of REMOVED_IDS) expect(document.getElementById(id), id).toBeNull();
+    expect(document.querySelector('.club-identity-tag, .club-head-info, .club-head-line, .club-identity-v45')).toBeNull();
+    expect(within(bar).queryByRole('img')).toBeNull();
+    // the name is all there is of the company: the company settings are read, the account list is not
+    expect(getCompany).toHaveBeenCalled();
+    expect(listAccounts).not.toHaveBeenCalled();
   });
 
-  it('asks nothing it may not and prints the placeholders, with the clinic name from the catalogue', async () => {
+  it('asks nothing it may not and shows the clinic name from the catalogue', async () => {
     mount({ mode: 'clinic' });
     await screen.findByTestId('club-header');
     expect(getCompany).not.toHaveBeenCalled();
     expect(listAccounts).not.toHaveBeenCalled();
     expect(text('club-identity-name')).toHaveTextContent(/\S/);
     expect(text('club-identity-name')).not.toHaveTextContent('RC Mountfield Říčany');
-    expect(within(screen.getByTestId('club-header')).getAllByText('Doplnit')).toHaveLength(9);
-    fireEvent.click(screen.getByRole('button', { name: 'Otevřít nastavení firmy' }));
-    expect(screen.getByTestId('where')).toHaveTextContent('/settings');
+    expect(screen.queryByRole('button', { name: 'Otevřít nastavení firmy' })).toBeNull();
+  });
+
+  it('keeps the bell badge: the unread count of the feed, 99+ above 99', async () => {
+    api.get.mockImplementation(async (url: string) => (url === '/api/notifications/seen' ? { data: { lastSeenAtUtc: null } } : { data: FEED }));
+    mount({ mode: 'clinic' });
+    expect(await screen.findByTestId('club-bell-count')).toHaveTextContent('1');
+    expect(screen.getByRole('button', { name: 'Oznámení' })).toHaveAttribute('title', 'Oznámení (1 nepřečtených)');
+  });
+
+  it('keeps the bell and the profile chip working: each opens its dialog', async () => {
+    api.get.mockImplementation(async (url: string) => (url === '/api/notifications/seen' ? { data: { lastSeenAtUtc: null } } : { data: FEED }));
+    mount({ mode: 'clinic', user: { displayName: 'Jan Novák' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Oznámení' }));
+    const notes = await screen.findByTestId('planner-dialog');
+    expect(within(notes).getByRole('heading', { name: 'Upozornění' })).toBeInTheDocument();
+    expect(screen.getByTestId('dialog-layer')).toHaveAttribute('data-dialog', 'notifications');
+    act(() => actions.closeDialog());
+    await waitFor(() => expect(screen.getByTestId('dialog-layer')).toHaveAttribute('data-dialog', ''));
+    fireEvent.click(screen.getByRole('button', { name: 'Profil uživatele Jan Novák' }));
+    expect(screen.getByTestId('dialog-layer')).toHaveAttribute('data-dialog', 'profile');
+  });
+});
+
+describe('header - club mode keeps the full banner', () => {
+  it('has the logo slot, the tag, the edit action and the three data sections, and is not the slim bar', async () => {
+    mount({ mode: 'club' });
+    const header = await screen.findByTestId('club-header');
+    expect(header).toHaveAttribute('data-mode', 'club');
+    expect(header).not.toHaveClass('is-slim');
+    expect(screen.getByTestId('club-logo-slot')).toBeInTheDocument();
+    expect(document.querySelector('.club-identity-tag')).toHaveTextContent('KLUB');
+    expect(screen.getByRole('button', { name: 'Upravit údaje klubu' })).toBeInTheDocument();
+    expect(document.getElementById('club-details-strip')).not.toBeNull();
+    for (const id of ['hdr-ico', 'hdr-dic', 'hdr-address', 'hdr-leader', 'hdr-contact', 'hdr-contact-phone']) expect(document.getElementById(id), id).not.toBeNull();
+    expect(within(header).getByRole('button', { name: 'Oznámení' })).toBeInTheDocument();
+    expect(within(header).getByRole('button', { name: /^Profil uživatele/ })).toBeInTheDocument();
   });
 });
 

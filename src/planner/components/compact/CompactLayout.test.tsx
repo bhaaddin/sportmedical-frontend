@@ -72,6 +72,30 @@ describe.each([
     expect(document.getElementById('hdr-ico')).not.toBeNull(); // the data stays in the DOM either way
   });
 
+  it('the standard calendar has the slim bar and no expander: name, bell and profile, nothing to unfold', async () => {
+    mount(width, new DemoDataSource({ today: TODAY }), { headerMode: 'clinic' });
+    await ready();
+    const bar = screen.getByTestId('club-header');
+    expect(bar).toHaveAttribute('data-mode', 'clinic');
+    expect(bar).toHaveClass('is-slim');
+    expect(screen.queryByTestId('compact-header')).toBeNull();
+    expect(screen.queryByTestId('compact-header-toggle')).toBeNull();
+    for (const id of ['club-details-strip', 'hdr-ico', 'hdr-contact-phone', 'club-logo-slot', 'club-edit-link']) expect(document.getElementById(id), id).toBeNull();
+    expect(bar).not.toHaveTextContent(/KLINIKA|Nastavení firmy|IČO|DIČ|Adresa|Údaje/);
+    expect(within(bar).getAllByRole('button')).toHaveLength(2);
+    expect(within(bar).getByRole('button', { name: 'Oznámení' })).toBeInTheDocument();
+    expect(within(bar).getByRole('button', { name: /^Profil uživatele/ })).toBeInTheDocument();
+    // the board and the left column are still all there
+    expect(IDS.filter((id) => !['club-details-strip', 'hdr-ico', 'hdr-contact-phone'].includes(id)).filter((id) => !document.getElementById(id))).toEqual([]);
+  });
+
+  it('a club screen keeps the full header with its expander', async () => {
+    mount(width, new DemoDataSource({ today: TODAY }), { headerMode: 'club' });
+    await ready();
+    expect(screen.getByTestId('compact-header-toggle')).toBeInTheDocument();
+    expect(screen.getByTestId('club-header')).not.toHaveClass('is-slim');
+  });
+
   it('opens one day by default and switches to the whole week', async () => {
     mount(width);
     await ready();

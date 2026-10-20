@@ -3,7 +3,8 @@
  * same components the desktop stage composes (`PlannerLayers`); only the arrangement differs, and it is mostly CSS
  * (`styles/planner.compact.css`, scoped under `.sm-planner[data-layout]`). The DOM order is the reading and tab order:
  *
- *   header           one row + an expander for the three data columns            (CompactHeader)
+ *   header           a club's screen: one row + an expander for the three data columns   (CompactHeader)
+ *                    the standard calendar: the slim one-line bar (name, bell, profile), no expander (ClinicTopBar)
  *   #live-ui         the mini calendar + agenda as a pinned column, drawer or sheet (CompactSidebar)
  *                    and the board with its calendar button / day strip            (CompactBoardChrome)
  *   #planning-cards  the činnost cards as a horizontal scroll-snap strip           (PlanningCarousel, unchanged)
@@ -59,9 +60,13 @@ export function CompactLayers({ layout, user, headerMode }: CompactLayersProps) 
 
   return (
     <>
-      <CompactHeader>
-        <ClubHeader user={user} mode={headerMode} />
-      </CompactHeader>
+      {headerMode === 'clinic' ? (
+        <ClubHeader user={user} mode="clinic" />
+      ) : (
+        <CompactHeader>
+          <ClubHeader user={user} mode={headerMode} />
+        </CompactHeader>
+      )}
       <div id="live-ui" className="compact-live" aria-label="Interaktivní kalendář a termíny" data-testid="live-ui" data-fit={fit} data-pinned={pinned ? 'true' : 'false'}>
         <CompactSidebar open={sidebarOpen} pinned={pinned} layout={layout} onClose={closeSidebar} openerRef={openerRef}>
           <MiniCalendarPanel />
