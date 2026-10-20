@@ -39,7 +39,9 @@ vi.mock('../../api/clinicServices', () => ({
     deactivate: vi.fn(),
   },
 }));
-vi.mock('../../api/activities', () => ({
+vi.mock('../../api/activities', async (importOriginal) => ({
+  /* Everything real (activityToInput builds the body); only the requests are doubles. */
+  ...(await importOriginal<typeof import('../../api/activities')>()),
   activitiesApi: { list: listActivities, update: updateActivity },
 }));
 vi.mock('../../api/calendars', () => ({
@@ -177,6 +179,32 @@ describe('ticking what belongs under the service', () => {
       isPubliclyBookable: true,
       sortOrder: 3,
       serviceItemId: 'item-7',
+    });
+  });
+
+  /*
+   * Etapa 2 added three fields to a činnost that the hand-written body of this
+   * move never carried: its own colour, how many it serves at once and the
+   * documents it asks for. The dev API cleared the colour on exactly this call
+   * (audit 20. 10. 2026: colorHex #AA0000 -> null after a move).
+   */
+  it("carries the činnost's own colour, capacity and documents through a move", async () => {
+    listActivities.mockResolvedValue({
+      activities: [act({ colorHex: '#AA0000', parallelCapacity: 3, requiredDocumentTemplateIds: ['t1', 't2'], questionnaireRequirement: 'Required' })],
+      warnings: [],
+    });
+    await openTheService();
+
+    await pick(/Činnosti/, 'Spiroergometrie');
+    await userEvent.click(screen.getByRole('button', { name: /Uložit/i }));
+
+    await waitFor(() => expect(updateActivity).toHaveBeenCalled());
+    expect(updateActivity.mock.calls[0][1]).toMatchObject({
+      clinicServiceId: 's1',
+      colorHex: '#AA0000',
+      parallelCapacity: 3,
+      requiredDocumentTemplateIds: ['t1', 't2'],
+      questionnaireRequirement: 'Required',
     });
   });
 

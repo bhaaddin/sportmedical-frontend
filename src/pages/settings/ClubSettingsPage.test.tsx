@@ -197,7 +197,7 @@ describe('ClubSettingsPage in three layouts', () => {
 
 describe('validateClubSettings', () => {
   const draftOf = (d: { registrationLinkValidityDays: string; minimumPlayers: string; releaseUnusedDaysBefore?: string }) =>
-    validateClubSettings({ releaseUnusedDaysBefore: '', allowMultiServiceOrders: false, ...d });
+    validateClubSettings({ releaseUnusedDaysBefore: '', allowMultiServiceOrders: false, payerTextClubInvoice: '', payerTextPerPerson: '', ...d });
 
   it('wants whole numbers and at least a day; the minimum may be empty, otherwise a whole number from 1', () => {
     expect(draftOf({ registrationLinkValidityDays: '14', minimumPlayers: '' })).toEqual({});
@@ -207,7 +207,7 @@ describe('validateClubSettings', () => {
       minimumPlayers: 'Zadejte celý počet sportovců od 1, nebo pole nechte prázdné.',
     });
     expect(draftOf({ registrationLinkValidityDays: '14', minimumPlayers: 'abc' }).minimumPlayers).toMatch(/celý počet sportovců/);
-    expect(draftOf({ registrationLinkValidityDays: '5000', minimumPlayers: '' }).registrationLinkValidityDays).toMatch(/překlep/);
+    expect(draftOf({ registrationLinkValidityDays: '5000', minimumPlayers: '' }).registrationLinkValidityDays).toMatch(/nejvýše 1095 dní/);
   });
 
   it('lets the release days be empty (never) or 0 and up', () => {

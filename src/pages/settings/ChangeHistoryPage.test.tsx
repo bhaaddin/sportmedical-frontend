@@ -64,7 +64,12 @@ describe('Historie změn', () => {
     await user.click(screen.getByRole('button', { name: 'Filtrovat' }));
 
     await waitFor(() => expect(get).toHaveBeenLastCalledWith('/api/v1/audit/changes', {
-      params: { take: 25, skip: 0, scope: 'pracovni-doba', from: '2026-10-01', to: '2026-10-03', user: 'jana' },
+      /* The whole of both days: a bare date reached the server as midnight and dropped the "to" day. */
+      params: {
+        take: 25, skip: 0, scope: 'pracovni-doba', user: 'jana',
+        from: new Date(2026, 9, 1, 0, 0, 0, 0).toISOString(),
+        to: new Date(2026, 9, 3, 23, 59, 59, 999).toISOString(),
+      },
     }));
   });
 

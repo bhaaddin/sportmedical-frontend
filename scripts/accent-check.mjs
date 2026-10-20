@@ -23,7 +23,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { CYAN, DEFAULT_ACCENT_HEX, deriveShift, shiftColor } from '../src/accent.ts';
+import { CYAN, deriveShift, shiftColor } from '../src/accent.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = process.env.BASE ?? 'http://localhost:3000';
