@@ -273,7 +273,7 @@ export default function DocumentRequirementsPage() {
                     sx={{ alignItems: 'flex-start', flexWrap: 'wrap', rowGap: 1 }}
                   >
                     <DescriptionIcon
-                      sx={{ color: health === 'ok' ? '#0D7377' : 'warning.main', mt: 0.5 }}
+                      sx={{ color: health === 'ok' ? 'var(--color-primary)' : 'warning.main', mt: 0.5 }}
                     />
                     <Box sx={{ flex: 1, minWidth: 160 }}>
                       <Typography sx={{ fontWeight: 700 }}>

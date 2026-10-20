@@ -12,6 +12,7 @@
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Box } from '@mui/material';
+import { accentLiteral } from '../../theme';
 import { PATIENT_SECTIONS, sectionPath } from '../../pages/patients/sections';
 import { PlannerMenuSlot } from './SidebarSlot';
 import { isPlannerRoute } from './plannerRoutes';
@@ -87,7 +88,7 @@ export function WhereAmI({ crumbs }: { crumbs: Crumb[] }) {
       {planner && <PlannerMenuSlot />}
       {crumbs.length > 0 && (
         <>
-          <Box component="span" sx={(t) => ({ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, ...(t.palette.mode === 'dark' ? { boxShadow: '0 0 10px #00EDDA' } : {}) })} />
+          <Box component="span" sx={(t) => ({ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, ...(t.palette.mode === 'dark' ? { boxShadow: `0 0 10px ${accentLiteral(t, '#00EDDA')}` } : {}) })} />
           <Trail crumbs={crumbs} />
         </>
       )}

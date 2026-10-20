@@ -18,6 +18,8 @@ import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
 import NetworkBanner from './components/NetworkBanner';
 import { startPrefetching } from './prefetchRoutes';
+import { AccentRootVars } from './AccentRootVars';
+import { sanitizeAccent } from './accent';
 
 /* ── Lazy-loaded routes (code-split per page) ── */
 /* The signed-in staff portal (shell + menu + every staff screen) is one chunk behind the sign-in guard. */
@@ -62,8 +64,10 @@ export default function App() {
   const [accent, setAccentState] = useState<string>(readStoredAccent);
   const [mode, setModeState] = useState<ThemeMode>(readStoredMode);
   const setAccent = (color: string) => {
-    setAccentState(color);
-    try { localStorage.setItem(ACCENT_STORAGE_KEY, color); } catch { /* private mode */ }
+    /* Only a usable colour is kept: a junk value would otherwise be stored and read back as the default next time anyway. */
+    const next = sanitizeAccent(color);
+    setAccentState(next);
+    try { localStorage.setItem(ACCENT_STORAGE_KEY, next); } catch { /* private mode */ }
   };
   const setMode = (next: ThemeMode) => {
     setModeState(next);
@@ -102,6 +106,7 @@ export default function App() {
             <Route path="/portal" element={<Suspense fallback={<PageLoader />}><PatientPortal /></Suspense>} />
             <Route path="/*" element={
               <AuthGuard>
+                <AccentRootVars />
                 <Suspense fallback={<StaffShellPlaceholder />}>
                   <StaffApp />
                 </Suspense>

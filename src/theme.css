@@ -19,14 +19,16 @@
   --color-border: #E2E8F0;
   --color-border-strong: #CBD5E1;
 
-  /* Primary (Teal) — hover: -12% lightness, active: -20%, disabled: 40% opacity */
-  --color-primary: #0D7377;
-  --color-primary-light: #14A3A8;
-  --color-primary-dark: #095456;
-  --color-primary-bg: rgba(13, 115, 119, 0.08);
-  --color-primary-hover: #119194;
-  --color-primary-active: #0B6266;
-  --color-primary-disabled: rgba(13, 115, 119, 0.40);
+  /* Primary (Teal) — hover: -12% lightness, active: -20%, disabled: 40% opacity.
+     The picked accent (Nastavení → Osobní → Vzhled) reaches these through --sm-accent* which the staff app sets on the
+     document root (src/AccentRootVars.tsx, values from src/accent.ts); each fallback below is the value the file always had. */
+  --color-primary: var(--sm-accent, #0D7377);
+  --color-primary-light: var(--sm-accent-light, #14A3A8);
+  --color-primary-dark: var(--sm-accent-dark, #095456);
+  --color-primary-bg: rgba(var(--sm-accent-rgb, 13, 115, 119), 0.08);
+  --color-primary-hover: var(--sm-accent-hover, #119194);
+  --color-primary-active: var(--sm-accent-active, #0B6266);
+  --color-primary-disabled: rgba(var(--sm-accent-rgb, 13, 115, 119), 0.40);
 
   /* Secondary (Navy) */
   --color-secondary: #1A1A2E;
@@ -132,7 +134,7 @@
   --shadow-elevated: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
   --shadow-modal: 0 20px 60px rgba(0,0,0,0.15), 0 8px 16px rgba(0,0,0,0.08);
   --shadow-dragged: 0 12px 36px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.1);
-  --shadow-glow: 0 0 20px rgba(13,115,119,0.3);
+  --shadow-glow: 0 0 20px rgba(var(--sm-accent-rgb, 13, 115, 119), 0.3);
 
   /* ── Transitions ── */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -177,7 +179,7 @@
   outline: 3px solid var(--color-primary);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
-  box-shadow: 0 0 0 6px rgba(13, 115, 119, 0.15);
+  box-shadow: 0 0 0 6px rgba(var(--sm-accent-rgb, 13, 115, 119), 0.15);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -185,7 +187,7 @@
    ══════════════════════════════════════════════════════════════ */
 :root {
   /* Verified contrast ratios for light mode */
-  --contrast-text-on-primary: #FFFFFF; /* 4.6:1 on #0D7377 */
+  --contrast-text-on-primary: var(--sm-on-accent, #FFFFFF); /* 4.6:1 on #0D7377 */
   --contrast-text-on-success: #FFFFFF; /* 4.5:1 on #16A34A */
   --contrast-text-on-warning: #FFFFFF; /* 4.6:1 on #EA580C */
   --contrast-text-on-critical: #FFFFFF; /* 4.8:1 on #DC2626 */
@@ -259,11 +261,11 @@
 .btn--primary {
   background: var(--color-primary);
   color: var(--contrast-text-on-primary);
-  box-shadow: 0 1px 3px rgba(13, 115, 119, 0.25);
+  box-shadow: 0 1px 3px rgba(var(--sm-accent-rgb, 13, 115, 119), 0.25);
 }
 .btn--primary:hover:not(:disabled) {
   background: var(--color-primary-hover);
-  box-shadow: 0 4px 12px rgba(13, 115, 119, 0.3);
+  box-shadow: 0 4px 12px rgba(var(--sm-accent-rgb, 13, 115, 119), 0.3);
   transform: translateY(-1px);
 }
 .btn--primary:active:not(:disabled) {

@@ -5,7 +5,7 @@
  */
 import { Box, ButtonBase, Typography } from '@mui/material';
 import type { RecipientType } from '../../api/billing';
-import { DESIGN } from '../ui';
+import { ACCENT_SOFT } from '../ui';
 
 const OPTIONS: { type: RecipientType; title: string; caption: string }[] = [
   { type: 'Person', title: 'Osoba', caption: 'Pacient z kartotéky' },
@@ -45,8 +45,8 @@ export default function RecipientTypeButtons({
               textAlign: 'left',
               border: '2px solid',
               borderColor: selected ? 'primary.main' : 'divider',
-              bgcolor: selected ? DESIGN.softPrimary.bg : 'background.paper',
-              '&:hover': { bgcolor: selected ? DESIGN.softPrimary.bg : 'action.hover' },
+              bgcolor: selected ? ACCENT_SOFT.bg : 'background.paper',
+              '&:hover': { bgcolor: selected ? ACCENT_SOFT.bg : 'action.hover' },
             }}
           >
             <Typography sx={{ fontSize: 16, fontWeight: 700, color: selected ? 'primary.main' : 'text.primary' }}>

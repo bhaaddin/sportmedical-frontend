@@ -22,7 +22,7 @@
   height: 34px;
   border-radius: 50%;
   border: 3px solid #0b4a60;
-  border-top-color: #23f2e7;
+  border-top-color: hsl(from #23f2e7 var(--sm-hsl, h s l));
   animation: smp-planner-spin 0.9s linear infinite;
 }
 @keyframes smp-planner-spin { to { transform: rotate(360deg); } }

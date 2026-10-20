@@ -1,4 +1,6 @@
 import type { Theme } from '@mui/material';
+import { alpha } from '@mui/material/styles';
+import { darkOf, tintsOf } from '../../theme';
 
 /*
  * The look of every settings screen, in one place.
@@ -28,11 +30,11 @@ export const settingsLine = (theme: Theme): string =>
 
 /** What a hovered row turns: a visible tint, not a one-percent grey. */
 export const settingsHover = (theme: Theme): string =>
-  theme.palette.mode === 'light' ? '#E4EEEB' : 'rgba(0, 230, 228, 0.09)';
+  theme.palette.mode === 'light' ? tintsOf(theme).hover : alpha(darkOf(theme).cyan, 0.09);
 
 /** What the row you are on (or have selected) rests on. */
 export const settingsSelected = (theme: Theme): string =>
-  theme.palette.mode === 'light' ? '#D7E9E5' : 'rgba(0, 230, 228, 0.16)';
+  theme.palette.mode === 'light' ? tintsOf(theme).selected : alpha(darkOf(theme).cyan, 0.16);
 
 export const TYPE = {
   pageTitle: { fontSize: { xs: 24, md: 28 }, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.015em', color: 'text.primary' },

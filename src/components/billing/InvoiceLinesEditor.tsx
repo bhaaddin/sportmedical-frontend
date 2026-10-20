@@ -8,7 +8,7 @@ import { Add, Check, Remove } from '@mui/icons-material';
 import type { Activity } from '../../api/bookingContracts';
 import type { DraftLine } from '../../pages/billing/invoicePrefill';
 import { czk } from '../../pages/billing/money';
-import { DESIGN } from '../ui';
+import { ACCENT_SOFT, DESIGN } from '../ui';
 
 export const MAX_QUANTITY = 10000;
 
@@ -77,8 +77,8 @@ export default function InvoiceLinesEditor({
                 gap: 1.5,
                 textAlign: 'left',
                 border: '1px solid',
-                borderColor: selected ? DESIGN.softPrimary.line : 'divider',
-                bgcolor: selected ? DESIGN.softPrimary.bg : 'background.paper',
+                borderColor: selected ? ACCENT_SOFT.line : 'divider',
+                bgcolor: selected ? ACCENT_SOFT.bg : 'background.paper',
               }}
             >
               <Box sx={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 1 }}>

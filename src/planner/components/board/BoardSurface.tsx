@@ -13,7 +13,7 @@
  *               keeps its hands off the board.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { Button, ClickAwayListener, Paper, Popover, Popper } from '@mui/material';
+import { Button, ClickAwayListener, Paper, Popover, Popper, useTheme } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { appointmentsApi } from '../../../api/appointments';
@@ -39,7 +39,7 @@ import { ClubOrderEntry } from '../../../components/clubs/order/ClubOrderEntry';
 import { editSessionFor } from '../../../components/clubs/order/editSession';
 import { fetchBlockableActivities } from '../../../api/clubBlocks';
 import type { ClubOrderView } from '../../../api/clubOrders';
-import { DESIGN } from '../../../theme';
+import { DESIGN, accentLiteral } from '../../../theme';
 import { pragueDateKey } from '../../../utils/time';
 import { errorText } from '../../../components/booking/errorText';
 import { addDays, monthCells, weekHeadModel, type IsoDate } from '../../model';
@@ -117,6 +117,8 @@ interface PendingSelection extends BoardSelection {
 }
 
 export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null }) {
+  /* The prototype's cyan, moved to the desk's accent: the move ghost of a card that has no colour of its own. */
+  const ghostTone = accentLiteral(useTheme(), '#0fead6');
   const { t } = useTranslation();
   const ctx = usePlannerCtx();
   const { dayMarks, catalogue, order } = usePlannerModelState();
@@ -947,7 +949,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                   aria-hidden="true"
                   style={{
                     '--col': ghost.col,
-                    ...toneVars(move.moving ? (model.cards.find((c) => c.kind === 'booking' && c.appointment.id === move.moving!.appointment.id)?.tone ?? '#0fead6') : '#0fead6'),
+                    ...toneVars(move.moving ? (model.cards.find((c) => c.kind === 'booking' && c.appointment.id === move.moving!.appointment.id)?.tone ?? ghostTone) : ghostTone),
                     '--move-tone': 'var(--ev-border)',
                     top: (ghost.range.start - geometry.startMinutes) * geometry.pxPerMinute,
                     height: Math.max(24, (ghost.range.end - ghost.range.start) * geometry.pxPerMinute),

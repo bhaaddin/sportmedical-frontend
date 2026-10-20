@@ -7,12 +7,12 @@
 /* ---- completion callout: the third button, "Přidat termín navíc" ---- */
 .sm-planner .completion-actions { flex-wrap: wrap; }
 .sm-planner .completion-actions button.completion-extra {
-  color: #bff7ee;
+  color: hsl(from #bff7ee var(--sm-hsl, h s l));
   background: transparent;
-  border: 1px solid #2aa79a;
+  border: 1px solid hsl(from #2aa79a var(--sm-hsl, h s l));
   border-radius: 6px;
 }
-.sm-planner .completion-actions button.completion-extra:hover { background: #09404a; }
+.sm-planner .completion-actions button.completion-extra:hover { background: hsl(from #09404a var(--sm-hsl, h s l)); }
 
 /* ---- summary experience: money ---- */
 .sm-planner .s41-money {
@@ -24,11 +24,11 @@
 }
 .sm-planner .s41-money b { font-size: 21px; color: #e9fbff; font-variant-numeric: tabular-nums; }
 .sm-planner .s41-money small { color: #8fb8c8; font-size: 11px; }
-.sm-planner .s41-reference { color: #6af3e3; letter-spacing: 0.4px; }
+.sm-planner .s41-reference { color: hsl(from #6af3e3 var(--sm-hsl, h s l)); letter-spacing: 0.4px; }
 .sm-planner .s41-sheet-money { margin-top: 16px; padding-top: 12px; border-top: 1px solid #0d4b61; display: grid; gap: 6px; }
 .sm-planner .s41-money-line { display: flex; justify-content: space-between; gap: 12px; color: #b9d8e4; font-size: 12.5px; }
 .sm-planner .s41-money-line strong { color: #e9fbff; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.sm-planner .s41-money-line.is-total { margin-top: 4px; padding-top: 8px; border-top: 1px dashed #145a70; font-size: 14px; color: #e9fbff; }
+.sm-planner .s41-money-line.is-total { margin-top: 4px; padding-top: 8px; border-top: 1px dashed hsl(from #145a70 var(--sm-hsl, h s l)); font-size: 14px; color: #e9fbff; }
 .sm-planner .s41-sheet-money small { color: #8fb8c8; }
 
 /* ---- "Přidat další den" ---- */
@@ -38,21 +38,21 @@
   padding: 0 10px;
   margin-left: 6px;
   border-radius: 11px;
-  border: 1px solid #1d8f95;
-  background: #07404c;
-  color: #a8f5ec;
+  border: 1px solid hsl(from #1d8f95 var(--sm-hsl, h s l));
+  background: hsl(from #07404c var(--sm-hsl, h s l));
+  color: hsl(from #a8f5ec var(--sm-hsl, h s l));
   font-size: 10.5px;
   font-weight: 750;
   letter-spacing: 0.2px;
 }
-.sm-planner .active-plan-hint .plan-add-day:hover:not(:disabled) { background: #0a5560; color: #fff; }
+.sm-planner .active-plan-hint .plan-add-day:hover:not(:disabled) { background: hsl(from #0a5560 var(--sm-hsl, h s l)); color: #fff; }
 .sm-planner .active-plan-hint .plan-add-day:disabled { opacity: 0.45; cursor: not-allowed; }
 .sm-planner .plan-link-button {
   margin-top: 8px;
   padding: 0;
   border: 0;
   background: none;
-  color: #5ff0e0;
+  color: hsl(from #5ff0e0 var(--sm-hsl, h s l));
   font-size: 12px;
   font-weight: 700;
   text-decoration: underline;

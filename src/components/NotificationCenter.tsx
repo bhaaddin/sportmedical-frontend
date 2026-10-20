@@ -17,7 +17,7 @@ import {
   Info, Delete, DoneAll, Settings, ExpandMore, ExpandLess,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { DESIGN } from './ui';
+import { ACCENT_SOFT, DESIGN } from './ui';
 import { useNotificationFeed, type FeedNotification } from './notifications/useNotificationFeed';
 import {
   buildNotificationSections,
@@ -63,7 +63,7 @@ const NOTIFICATION_CONFIG: Record<string, { icon: React.ReactNode; color: string
 };
 
 /* The unread tint: the board's soft accent surface, with the accent as the left edge. */
-const UNREAD_BG = DESIGN.softPrimary.bg;
+const UNREAD_BG = ACCENT_SOFT.bg;
 
 /**
  * One notification. Lives apart from the list so a row inside an expanded

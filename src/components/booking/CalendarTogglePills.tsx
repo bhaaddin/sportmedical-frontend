@@ -1,6 +1,6 @@
 import { Box, ButtonBase } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { DESIGN } from "../ui";
+import { ACCENT_SOFT } from "../ui";
 
 /**
  * The row of calendar pills on the overview screens: every calendar on by
@@ -43,12 +43,12 @@ export function CalendarTogglePills({
               border: "1px solid",
               borderColor: on
                 ? theme.palette.mode === "light"
-                  ? DESIGN.softPrimary.line
+                  ? ACCENT_SOFT.line
                   : theme.palette.primary.main
                 : theme.palette.divider,
               bgcolor: on
                 ? theme.palette.mode === "light"
-                  ? DESIGN.softPrimary.bg
+                  ? ACCENT_SOFT.bg
                   : alpha(theme.palette.primary.main, 0.14)
                 : theme.palette.background.paper,
               color: on ? theme.palette.primary.main : theme.palette.text.secondary,

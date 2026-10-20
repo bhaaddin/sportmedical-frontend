@@ -19,6 +19,7 @@ import { patientsApi } from '../../../api/patients';
 import { AppointmentHoverCard } from '../../../components/booking/grid/AppointmentHoverCard';
 import { DOUBLE_TAP_MS, DRAG_THRESHOLD_PX } from '../../../components/booking/grid/moveDrag';
 import { Icon } from '../Icons';
+import { accentCss } from '../../../accent';
 import { toneVars, withAlpha, type BookingCardModel, type BoardWindowModel, type SessionCardModel } from './boardModel';
 
 const tooltipSlotProps = {
@@ -26,7 +27,7 @@ const tooltipSlotProps = {
     sx: {
       bgcolor: '#042c3d',
       color: '#eaf7ff',
-      border: '1px solid #19708a',
+      border: `1px solid ${accentCss('#19708a')}`,
       boxShadow: '0 10px 30px #000c',
       p: 1,
       fontSize: 12,

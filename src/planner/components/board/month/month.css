@@ -5,12 +5,12 @@
 .sm-planner .month-tile { position: relative; -webkit-touch-callout: none; }
 .sm-planner .month-matrix[data-dragging='true'] { user-select: none; -webkit-user-select: none; }
 .sm-planner .month-tile.is-picked {
-  background: #0a5361;
-  border-color: #00fff1;
-  box-shadow: inset 0 0 0 1px #00fff1, 0 0 12px #00fbfc55;
+  background: hsl(from #0a5361 var(--sm-hsl, h s l));
+  border-color: hsl(from #00fff1 var(--sm-hsl, h s l));
+  box-shadow: inset 0 0 0 1px hsl(from #00fff1 var(--sm-hsl, h s l)), 0 0 12px hsl(from #00fbfc55 var(--sm-hsl, h s l));
   z-index: 2;
 }
-.sm-planner .month-tile.is-picked-past { background: #0a3a49; border-color: #2d7a8e; border-style: dashed; }
+.sm-planner .month-tile.is-picked-past { background: hsl(from #0a3a49 var(--sm-hsl, h s l)); border-color: hsl(from #2d7a8e var(--sm-hsl, h s l)); border-style: dashed; }
 .sm-planner .month-tile .range-pill {
   position: absolute;
   left: 4px;
@@ -18,7 +18,7 @@
   z-index: 9;
   padding: 2px 8px;
   border-radius: 6px;
-  background: #23f2e7;
+  background: hsl(from #23f2e7 var(--sm-hsl, h s l));
   color: #04120f;
   font-size: 11px;
   font-weight: 700;
@@ -42,7 +42,7 @@
   margin: 8px 15px 0;
   padding: 10px 14px;
   background: #001f33f2;
-  border: 1px solid #19708a;
+  border: 1px solid hsl(from #19708a var(--sm-hsl, h s l));
   border-radius: 8px;
   box-shadow: 0 -6px 20px #0008;
 }
@@ -54,16 +54,16 @@
   gap: 4px;
   min-height: 32px;
   padding: 0 2px 0 12px;
-  border: 1px solid #00b6b9;
+  border: 1px solid hsl(from #00b6b9 var(--sm-hsl, h s l));
   border-radius: 16px;
-  background: #06404f;
+  background: hsl(from #06404f var(--sm-hsl, h s l));
   color: #f6faff;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   max-width: 100%;
 }
 .sm-planner .day-tray-chip em { font-style: normal; font-size: 12px; color: #9db7cc; }
-.sm-planner .day-tray-chip.is-past { color: #9db7cc; border-color: #2d7a8e; background: #0a2a3a; text-decoration: line-through; }
+.sm-planner .day-tray-chip.is-past { color: #9db7cc; border-color: hsl(from #2d7a8e var(--sm-hsl, h s l)); background: #0a2a3a; text-decoration: line-through; }
 .sm-planner .day-tray-chip button {
   min-width: 28px;
   height: 28px;
@@ -76,7 +76,7 @@
   line-height: 1;
   cursor: pointer;
 }
-.sm-planner .day-tray-chip button:hover { background: #008f9b55; }
+.sm-planner .day-tray-chip button:hover { background: hsl(from #008f9b55 var(--sm-hsl, h s l)); }
 .sm-planner .day-tray-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .sm-planner .day-tray-actions .app-button:disabled { opacity: 0.45; cursor: default; filter: none; }
 

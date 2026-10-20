@@ -27,6 +27,7 @@ import { NavDrawer } from './Sidebar';
 import { clubIdOfRoute } from './plannerRoutes';
 import { usePlannerMenuEl } from './SidebarSlot';
 import type { ShellNav } from './shellTypes';
+import { accentLiteral } from '../../theme';
 
 const buttonSx = (t: Theme) => ({
         mr: 1.5,
@@ -43,7 +44,7 @@ const buttonSx = (t: Theme) => ({
         textTransform: 'none',
         '& .MuiButton-startIcon': { m: 0 },
         ...(t.palette.mode === 'dark'
-          ? { '& .MuiButton-startIcon svg': { color: '#6AF8F0' } }
+          ? { '& .MuiButton-startIcon svg': { color: accentLiteral(t, '#6AF8F0') } }
           : {}),
 });
 

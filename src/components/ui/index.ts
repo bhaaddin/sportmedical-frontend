@@ -10,6 +10,6 @@ export { SectionLabel } from './SectionLabel';
 export { SoftCard } from './SoftCard';
 export { FilterChips, type FilterOption } from './FilterChips';
 export { KpiCard } from './KpiCard';
-export { DESIGN } from '../../theme';
+export { ACCENT_SOFT, DESIGN } from '../../theme';
 export { ProgressRing } from './ProgressRing';
 export { FitPage, FitBody, FitPanel, FIT_SCROLL_SX, FIT_FILL_SX } from './fit';

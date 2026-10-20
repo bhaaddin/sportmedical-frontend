@@ -3,9 +3,9 @@
  *
  *   .club-switch-menu            <- `.filter-select`: background #001b2b, border 1px #103a52, radius 6px (the panel);
  *                                   option text #f4f7fc 13px (`.filter-select select`)
- *   .club-switch-item:hover      <- `.view-segment button:not(.active):hover`: background #085166
- *   .club-switch-item.is-active  <- `.view-segment button.active`: linear-gradient(160deg,#026755,#00a89b), #fff,
- *                                   glow 0 0 14px #00a79b99, inset 0 0 10px #14dfce3d
+ *   .club-switch-item:hover      <- `.view-segment button:not(.active):hover`: background hsl(from #085166 var(--sm-hsl, h s l))
+ *   .club-switch-item.is-active  <- `.view-segment button.active`: linear-gradient(160deg,hsl(from #026755 var(--sm-hsl, h s l)),hsl(from #00a89b var(--sm-hsl, h s l))), #fff,
+ *                                   glow 0 0 14px hsl(from #00a79b99 var(--sm-hsl, h s l)), inset 0 0 10px hsl(from #14dfce3d var(--sm-hsl, h s l))
  *   .club-switch-rule            <- `.view-segment` border colour #06415b
  *   toolbar button               <- `.control` + `.planner-actions .control` (board.css), unchanged
  */
@@ -43,11 +43,11 @@
 }
 .sm-planner .club-switch-item b { font-weight: 650; }
 .sm-planner .club-switch-item small { font-size: 12px; color: #cfdae8; }
-.sm-planner .club-switch-item:hover { background: #085166; }
+.sm-planner .club-switch-item:hover { background: hsl(from #085166 var(--sm-hsl, h s l)); }
 .sm-planner .club-switch-item.is-active {
   color: #fff;
-  background: linear-gradient(160deg, #026755, #00a89b);
-  box-shadow: 0 0 14px #00a79b99, inset 0 0 10px #14dfce3d;
+  background: linear-gradient(160deg, hsl(from #026755 var(--sm-hsl, h s l)), hsl(from #00a89b var(--sm-hsl, h s l)));
+  box-shadow: 0 0 14px hsl(from #00a79b99 var(--sm-hsl, h s l)), inset 0 0 10px hsl(from #14dfce3d var(--sm-hsl, h s l));
 }
 .sm-planner .club-switch-item.is-active small { color: #fff; }
 .sm-planner .club-switch-rule { height: 1px; margin: 4px 2px; background: #06415b; }
@@ -55,18 +55,18 @@
 
 /*
  * The order overview dialog on a club's screen (ClubOverviewSections). Every value is copied:
- *   .club-ov-title h3            <- `.club-profile-section h3` (10px, letter-spacing .8px, #3ef1db, border-bottom 1px #195168)
+ *   .club-ov-title h3            <- `.club-profile-section h3` (10px, letter-spacing .8px, hsl(from #3ef1db var(--sm-hsl, h s l)), border-bottom 1px #195168)
  *   .club-order-row              <- `.activity-detail-row` (padding 11px 12px, border 1px #20596d, radius 8px, #002537);
- *                                   `.is-shown` takes the border of its buttons, #0c978f
+ *                                   `.is-shown` takes the border of its buttons, hsl(from #0c978f var(--sm-hsl, h s l))
  *   .club-order-head strong      <- `.activity-detail-row strong` 14px;  small / muted: #a2bdcd
- *   .club-ov-btn                 <- `.activity-detail-row button` (1px #0c978f, radius 5px, #074b51, #9fffee, 12px, 8px)
+ *   .club-ov-btn                 <- `.activity-detail-row button` (1px hsl(from #0c978f var(--sm-hsl, h s l)), radius 5px, hsl(from #074b51 var(--sm-hsl, h s l)), hsl(from #9fffee var(--sm-hsl, h s l)), 12px, 8px)
  *   .club-ov-btn.primary         <- `.app-button.primary`;  .danger <- `.app-button.danger`
  *   .club-ov-note                <- `.club-overview-note` (#88b6c3, 11.5px);  .club-ov-warn <- `.plan-dialog-error` text #ffc2cf
  *   .club-ov-window / progress   <- `.activity-detail-row` surface and `.capacity-bar`
  */
 .sm-planner .club-ov-section { margin-top: 16px; }
 .sm-planner .club-ov-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px; padding-bottom: 10px; border-bottom: 1px solid #195168; }
-.sm-planner .club-ov-title h3 { font-size: 10px; letter-spacing: .8px; color: #3ef1db; margin: 0; line-height: 1.4; }
+.sm-planner .club-ov-title h3 { font-size: 10px; letter-spacing: .8px; color: hsl(from #3ef1db var(--sm-hsl, h s l)); margin: 0; line-height: 1.4; }
 .sm-planner .club-ov-aside { display: flex; gap: 8px; flex-wrap: wrap; }
 .sm-planner .club-order-list { display: flex; flex-direction: column; gap: 9px; }
 .sm-planner .club-order-row, .sm-planner .club-ov-window {
@@ -75,7 +75,7 @@
   border-radius: 8px;
   background: #002537;
 }
-.sm-planner .club-order-row.is-shown { border-color: #0c978f; }
+.sm-planner .club-order-row.is-shown { border-color: hsl(from #0c978f var(--sm-hsl, h s l)); }
 .sm-planner .club-order-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .sm-planner .club-order-head strong { font-size: 14px; }
 .sm-planner .club-order-head strong span { color: #a2bdcd; font-weight: 400; }
@@ -86,10 +86,10 @@
 .sm-planner .club-order-windows small, .sm-planner .club-ov-sub, .sm-planner .club-order-cancelled > small { display: block; color: #a2bdcd; margin-bottom: 4px; font-size: 11px; }
 .sm-planner .club-order-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 11px; }
 .sm-planner .club-ov-section > .club-order-actions { margin-top: 0; }
-.sm-planner .club-ov-btn { border: 1px solid #0c978f; border-radius: 5px; background: #074b51; color: #9fffee; font-size: 12px; padding: 8px; cursor: pointer; }
+.sm-planner .club-ov-btn { border: 1px solid hsl(from #0c978f var(--sm-hsl, h s l)); border-radius: 5px; background: hsl(from #074b51 var(--sm-hsl, h s l)); color: hsl(from #9fffee var(--sm-hsl, h s l)); font-size: 12px; padding: 8px; cursor: pointer; }
 .sm-planner .club-ov-btn:hover { filter: brightness(1.23); }
 .sm-planner .club-ov-btn:disabled { opacity: .45; cursor: not-allowed; }
-.sm-planner .club-ov-btn.primary { background: linear-gradient(120deg, #007f83, #00adab); border-color: #06cacf; box-shadow: 0 0 12px #00c5c52e; color: #fff; }
+.sm-planner .club-ov-btn.primary { background: linear-gradient(120deg, hsl(from #007f83 var(--sm-hsl, h s l)), hsl(from #00adab var(--sm-hsl, h s l))); border-color: hsl(from #06cacf var(--sm-hsl, h s l)); box-shadow: 0 0 12px hsl(from #00c5c52e var(--sm-hsl, h s l)); color: #fff; }
 .sm-planner .club-ov-btn.danger { border-color: #bc3459; background: #5f1631; color: #fff; }
 .sm-planner .club-order-cancelled { margin-top: 4px; }
 .sm-planner .club-order-cancelled-row { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 2px; border: 0; background: transparent; color: #a2bdcd; font-size: 12.8px; text-align: left; cursor: pointer; }

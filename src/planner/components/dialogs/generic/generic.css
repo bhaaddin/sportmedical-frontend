@@ -42,23 +42,23 @@
 .sm-planner #toast-layer #undo-plan-action {
   pointer-events: auto;
   background: #15485a;
-  color: #9dfcf1;
-  border: 1px solid #179caa;
+  color: hsl(from #9dfcf1 var(--sm-hsl, h s l));
+  border: 1px solid hsl(from #179caa var(--sm-hsl, h s l));
   border-radius: 5px;
   padding: 6px 10px;
   margin-left: 10px;
   cursor: pointer;
   font: inherit;
 }
-.sm-planner #toast-layer #undo-plan-action:hover { background: #1a5d73; }
-.sm-planner #toast-layer #undo-plan-action:focus-visible { outline: 2px solid #5ff9ed; outline-offset: 2px; }
+.sm-planner #toast-layer #undo-plan-action:hover { background: hsl(from #1a5d73 var(--sm-hsl, h s l)); }
+.sm-planner #toast-layer #undo-plan-action:focus-visible { outline: 2px solid hsl(from #5ff9ed var(--sm-hsl, h s l)); outline-offset: 2px; }
 
 /* Notifications dialog. */
 .sm-planner .generic-note-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .sm-planner .generic-note-head .event-info-note { margin-top: 0; flex: 1; }
 .sm-planner .generic-note-day { margin-top: 14px; }
 .sm-planner .generic-note { display: flex; align-items: stretch; border-left: 3px solid transparent; }
-.sm-planner .generic-note.is-unread { border-left-color: #03ddd8; background: #05303f; }
+.sm-planner .generic-note.is-unread { border-left-color: hsl(from #03ddd8 var(--sm-hsl, h s l)); background: #05303f; }
 .sm-planner .generic-note.is-nested { padding-left: 22px; }
 .sm-planner .generic-note .search-result { flex: 1; min-width: 0; gap: 14px; }
 .sm-planner .generic-note .search-result > span:first-child { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -75,11 +75,11 @@
   font-size: 20px;
   cursor: pointer;
 }
-.sm-planner .generic-note-delete:hover { color: #ff8da7; background: #07586e; }
+.sm-planner .generic-note-delete:hover { color: #ff8da7; background: hsl(from #07586e var(--sm-hsl, h s l)); }
 .sm-planner .generic-note-group > span:first-child { display: flex; flex-direction: column; gap: 4px; }
 .sm-planner .generic-note-boundary {
   margin: 8px 0 4px;
-  color: #03ddd8;
+  color: hsl(from #03ddd8 var(--sm-hsl, h s l));
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.3px;
@@ -88,7 +88,7 @@
   gap: 10px;
 }
 .sm-planner .generic-note-boundary::before,
-.sm-planner .generic-note-boundary::after { content: ''; flex: 1; height: 1px; background: #03ddd8; opacity: 0.6; }
+.sm-planner .generic-note-boundary::after { content: ''; flex: 1; height: 1px; background: hsl(from #03ddd8 var(--sm-hsl, h s l)); opacity: 0.6; }
 .sm-planner .generic-note-occupancy-title { margin-top: 22px; }
 
 /* Profile dialog: the initials badge is text, not an icon. */

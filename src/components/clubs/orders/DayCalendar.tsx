@@ -9,7 +9,8 @@
  */
 import { useState } from 'react';
 import { Box, ButtonBase, IconButton, Typography, useTheme } from '@mui/material';
-import { DARK } from '../../../theme';
+import { alpha, type Theme } from '@mui/material/styles';
+import { DARK, darkOf } from '../../../theme';
 import { ChevronLeftRounded, ChevronRightRounded } from '@mui/icons-material';
 import { addMonths, monthGrid, monthStart, monthTitle, splitIso, WEEKDAYS_CS, dayText } from './dayOffer';
 
@@ -29,9 +30,12 @@ const STAFF: DayCalendarColors = {
 };
 
 /** The desk's own colours in the dark theme: the prototype's cyan on glass (the light ones above are the board's green). */
-const STAFF_DARK: DayCalendarColors = {
-  accent: DARK.cyan, onAccent: DARK.onCyan, wash: 'rgba(0, 230, 228, 0.12)', edge: 'rgba(0, 230, 228, 0.5)',
-  text: DARK.white, muted: 'rgba(163, 185, 206, 0.74)', line: 'rgba(0, 223, 227, 0.22)',
+const staffDark = (theme: Theme): DayCalendarColors => {
+  const cyan = darkOf(theme).cyan;
+  return {
+    accent: cyan, onAccent: DARK.onCyan, wash: alpha(cyan, 0.12), edge: alpha(cyan, 0.5),
+    text: DARK.white, muted: 'rgba(163, 185, 206, 0.74)', line: alpha(cyan, 0.22),
+  };
 };
 
 export function DayCalendar({
@@ -48,8 +52,9 @@ export function DayCalendar({
   testId?: string;
   label?: string;
 }) {
-  const dark = useTheme().palette.mode === 'dark';
-  const colors = colorsProp ?? (dark ? STAFF_DARK : STAFF);
+  const theme = useTheme();
+  const dark = theme.palette.mode === 'dark';
+  const colors = colorsProp ?? (dark ? staffDark(theme) : STAFF);
   const [month, setMonth] = useState(monthStart(initialMonth));
   const chosen = new Set(selected);
   const weeks = monthGrid(month);

@@ -18,6 +18,11 @@
  *   5. `@property` registrations stay (the spec makes them global); the script FAILS if the application
  *      outside src/planner uses one of the registered names
  *   6. the `crystalArrowArt` data URI of the script is decoded into the PNG above
+ *   7. every accent-chrome colour (bright cyan / aqua / teal: `isAccentChrome` in src/accent.ts) is wrapped as
+ *      `hsl(from <the prototype's colour> var(--sm-hsl, h s l))`. Without `--sm-hsl` the fallback `h s l` is the
+ *      identity, so the default accent paints the prototype's own colours; the staff app sets `--sm-hsl` from the
+ *      picked accent (AccentRootVars) and the whole stage follows it. Navy surfaces, near-white text and the
+ *      semantic tones are not accent chrome and stay as written.
  *
  * The scoping means the application cannot reach into the planner and the planner cannot leak into
  * the application. Re-run only when design/planner-v65.html changes.
@@ -26,6 +31,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'n
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postcss from 'postcss';
+import { wrapCssColors } from '../src/accent.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(join(root, 'design', 'planner-v65.html'), 'utf8');
@@ -138,6 +144,20 @@ const banner = `/*
  */
 `;
 mkdirSync(join(root, 'src', 'planner', 'styles'), { recursive: true });
+/*
+ * 7. accent colours. The prototype's semantic palette variables (--green, --blue, --purple, --amber, --red) are statuses,
+ *    not the accent: --green (#00e5c6) sits in the cyan hue range but must stay a status colour.
+ */
+const SEMANTIC_PROPS = /^--(green|blue|purple|amber|red)$/;
+stats.accentWrapped = 0;
+ast.walkDecls((decl) => {
+  if (SEMANTIC_PROPS.test(decl.prop)) return;
+  const { css: value, wrapped } = wrapCssColors(decl.value);
+  if (wrapped > 0) {
+    decl.value = value;
+    stats.accentWrapped += wrapped;
+  }
+});
 const out = banner + ast.toResult().css.replace(/\n{3,}/g, '\n\n').trim() + '\n';
 writeFileSync(join(root, 'src', 'planner', 'styles', 'planner.css'), out, 'utf8');
 
@@ -152,5 +172,5 @@ writeFileSync(join(root, 'src', 'planner', 'assets', 'crystal-arrow.png'), png);
 console.log(
   `planner.css: ${stats.rules} rules scoped, ${stats.dropped} rules + ${stats.droppedSelectors} selectors dropped, ` +
     `${stats.keyframes} keyframes renamed, @property ${stats.properties.join(', ')}; ${(out.length / 1024).toFixed(0)} kB. ` +
-    `crystal-arrow.png ${(png.length / 1024).toFixed(0)} kB.`,
+    `crystal-arrow.png ${(png.length / 1024).toFixed(0)} kB. ${stats.accentWrapped} accent colours follow --sm-hsl.`,
 );

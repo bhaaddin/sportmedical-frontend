@@ -1,0 +1,756 @@
+{
+ "components": {
+  "MuiAlert": {
+   "styleOverrides": {
+    "icon": {
+     "opacity": 0.9
+    },
+    "root": {
+     "alignItems": "center",
+     "borderRadius": 10,
+     "fontSize": 14
+    },
+    "standard": {
+     "&.MuiAlert-colorError": {
+      "backgroundColor": "#F5E0D8",
+      "color": "#9B3B1B"
+     },
+     "&.MuiAlert-colorInfo": {
+      "backgroundColor": "#F4F8F7",
+      "color": "#1A1D21"
+     },
+     "&.MuiAlert-colorSuccess": {
+      "backgroundColor": "#E2EBE4",
+      "color": "#27603A"
+     },
+     "&.MuiAlert-colorWarning": {
+      "backgroundColor": "#FBF1E7",
+      "color": "#8A5A2F"
+     }
+    }
+   }
+  },
+  "MuiAppBar": {
+   "defaultProps": {
+    "color": "inherit",
+    "elevation": 0
+   },
+   "styleOverrides": {
+    "root": {
+     "backgroundColor": "#FFFFFF",
+     "backgroundImage": "none",
+     "borderBottom": "1px solid #E2E6EA",
+     "boxShadow": "none",
+     "color": "#1A1D21"
+    }
+   }
+  },
+  "MuiAvatar": {
+   "styleOverrides": {
+    "root": {
+     "backgroundColor": "#EFF1F4",
+     "color": "#1A1D21",
+     "fontSize": 14,
+     "fontWeight": 700
+    }
+   }
+  },
+  "MuiBackdrop": {
+   "styleOverrides": {
+    "root": {}
+   }
+  },
+  "MuiButton": {
+   "defaultProps": {
+    "disableElevation": true
+   },
+   "styleOverrides": {
+    "contained": {
+     "&:hover": {
+      "boxShadow": "none"
+     },
+     "boxShadow": "none"
+    },
+    "outlined": {
+     "&.MuiButton-colorError": {
+      "borderColor": "#E3C3BA",
+      "color": "#9B3B1B"
+     },
+     "&.MuiButton-colorPrimary": {
+      "borderColor": "rgba(13, 92, 82, 0.35)",
+      "color": "#0D5C52"
+     },
+     "&:hover": {
+      "backgroundColor": "#F4F6F7",
+      "borderColor": "#DCE0E5"
+     },
+     "backgroundColor": "#FFFFFF",
+     "borderColor": "#E2E6EA",
+     "color": "#1A1D21"
+    },
+    "root": {
+     "borderRadius": 10,
+     "boxShadow": "none",
+     "fontWeight": 600,
+     "minHeight": 40,
+     "paddingInline": 16,
+     "textTransform": "none"
+    },
+    "sizeLarge": {
+     "fontSize": 15,
+     "minHeight": 48,
+     "paddingInline": 22
+    },
+    "sizeSmall": {
+     "fontSize": 13,
+     "minHeight": 32,
+     "paddingInline": 12
+    },
+    "text": {
+     "&:hover": {
+      "backgroundColor": "#F4F6F7"
+     }
+    }
+   }
+  },
+  "MuiCard": {
+   "styleOverrides": {
+    "root": {
+     "backgroundImage": "none",
+     "border": "1px solid #E2E6EA",
+     "borderRadius": 12,
+     "boxShadow": "none"
+    }
+   }
+  },
+  "MuiCardContent": {
+   "styleOverrides": {
+    "root": {
+     "&:last-child": {
+      "paddingBottom": 20
+     },
+     "padding": 20
+    }
+   }
+  },
+  "MuiChip": {
+   "styleOverrides": {
+    "label": {
+     "paddingInline": 10
+    },
+    "outlined": {
+     "borderColor": "#E2E6EA"
+    },
+    "root": {
+     "borderRadius": 999,
+     "fontSize": 12,
+     "fontWeight": 600,
+     "height": 24
+    },
+    "sizeSmall": {
+     "fontSize": 11,
+     "height": 22
+    }
+   }
+  },
+  "MuiCssBaseline": {
+   "styleOverrides": {
+    "::selection": {
+     "backgroundColor": "rgba(13, 92, 82, 0.18)"
+    },
+    "@media (max-width: 1279.95px)": {
+     "body .MuiButton-root": {
+      "minWidth": 44
+     },
+     "body .MuiButton-root, body .MuiToggleButton-root, body .MuiTab-root, body .MuiMenuItem-root, body .MuiListItemButton-root": {
+      "minHeight": 44
+     },
+     "body .MuiButtonBase-root[aria-pressed]": {
+      "minHeight": 44,
+      "minWidth": 44
+     },
+     "body .MuiCheckbox-root, body .MuiRadio-root": {
+      "padding": 10
+     },
+     "body .MuiCheckbox-sizeSmall, body .MuiRadio-sizeSmall": {
+      "padding": 12
+     },
+     "body .MuiChip-root.MuiChip-clickable": {
+      "minHeight": 44
+     },
+     "body .MuiIconButton-root:not(.MuiPickersArrowSwitcher-button)": {
+      "minHeight": 44,
+      "minWidth": 44
+     },
+     "body .MuiInputBase-input:not(.MuiInputBase-inputMultiline)": {
+      "boxSizing": "border-box",
+      "minHeight": 44
+     },
+     "body .MuiSwitch-root:not(.MuiSwitch-sizeSmall)": {
+      "height": 44,
+      "padding": "11px 8px"
+     },
+     "body .MuiSwitch-root:not(.MuiSwitch-sizeSmall) .MuiSwitch-switchBase": {
+      "left": -3,
+      "padding": 12,
+      "top": 0
+     }
+    },
+    "body": {
+     "backgroundColor": "#EFF1F4",
+     "color": "#1A1D21",
+     "fontFamily": "\"Public Sans\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif"
+    },
+    "html": {
+     "colorScheme": "light"
+    }
+   }
+  },
+  "MuiDialog": {
+   "styleOverrides": {
+    "paper": {
+     "border": "none",
+     "borderRadius": 14,
+     "boxShadow": "0 24px 60px rgba(20, 24, 28, 0.20)"
+    }
+   }
+  },
+  "MuiDialogActions": {
+   "styleOverrides": {
+    "root": {
+     "borderTop": "1px solid #E2E6EA",
+     "gap": 8,
+     "padding": "12px 24px 20px"
+    }
+   }
+  },
+  "MuiDialogContent": {
+   "styleOverrides": {
+    "root": {
+     "padding": "8px 24px 16px"
+    }
+   }
+  },
+  "MuiDialogTitle": {
+   "styleOverrides": {
+    "root": {
+     "fontSize": 20,
+     "fontWeight": 700,
+     "padding": "20px 24px 8px"
+    }
+   }
+  },
+  "MuiDivider": {
+   "styleOverrides": {
+    "root": {
+     "borderColor": "#E2E6EA"
+    }
+   }
+  },
+  "MuiDrawer": {
+   "styleOverrides": {
+    "paper": {
+     "backgroundImage": "none",
+     "borderRadius": 0,
+     "boxShadow": "none"
+    }
+   }
+  },
+  "MuiFormHelperText": {
+   "styleOverrides": {
+    "root": {
+     "marginLeft": 2
+    }
+   }
+  },
+  "MuiIconButton": {
+   "styleOverrides": {
+    "root": {
+     "borderRadius": 8
+    }
+   }
+  },
+  "MuiInputLabel": {
+   "styleOverrides": {
+    "root": {
+     "fontSize": 14
+    }
+   }
+  },
+  "MuiLinearProgress": {
+   "styleOverrides": {
+    "bar": {
+     "borderRadius": 999
+    },
+    "root": {
+     "backgroundColor": "#E2E6EA",
+     "borderRadius": 999,
+     "height": 6
+    }
+   }
+  },
+  "MuiListItemButton": {
+   "styleOverrides": {
+    "root": {
+     "&.Mui-selected": {
+      "&:hover": {
+       "backgroundColor": "#F4F8F7"
+      },
+      "backgroundColor": "#F4F8F7",
+      "color": "#0D5C52"
+     },
+     "borderRadius": 8
+    }
+   }
+  },
+  "MuiMenu": {
+   "styleOverrides": {
+    "list": {
+     "padding": 6
+    },
+    "paper": {
+     "border": "1px solid #E2E6EA",
+     "borderRadius": 10,
+     "boxShadow": "0 12px 32px rgba(20, 24, 28, 0.14)"
+    }
+   }
+  },
+  "MuiMenuItem": {
+   "styleOverrides": {
+    "root": {
+     "&:hover": {
+      "backgroundColor": "#F4F6F7"
+     },
+     "borderRadius": 8,
+     "fontSize": 14,
+     "minHeight": 36
+    }
+   }
+  },
+  "MuiOutlinedInput": {
+   "styleOverrides": {
+    "input": {
+     "paddingBottom": 11,
+     "paddingTop": 11
+    },
+    "root": {
+     "& .MuiOutlinedInput-notchedOutline": {
+      "borderColor": "#E2E6EA"
+     },
+     "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+      "borderColor": "#0D5C52",
+      "borderWidth": 2
+     },
+     "&:hover .MuiOutlinedInput-notchedOutline": {
+      "borderColor": "rgba(13, 92, 82, 0.5)"
+     },
+     "backgroundColor": "#FFFFFF",
+     "borderRadius": 10
+    }
+   }
+  },
+  "MuiPaper": {
+   "defaultProps": {
+    "elevation": 0
+   },
+   "styleOverrides": {
+    "root": {
+     "__fn": {
+      "0": {
+       "backgroundImage": "none",
+       "border": "1px solid #E2E6EA",
+       "borderRadius": 12,
+       "boxShadow": "none"
+      },
+      "1": {
+       "backgroundImage": "none",
+       "border": "1px solid #E2E6EA",
+       "borderRadius": 12,
+       "boxShadow": "none"
+      },
+      "2": {
+       "backgroundImage": "none",
+       "border": "1px solid #E2E6EA",
+       "borderRadius": 12,
+       "boxShadow": "0 12px 32px rgba(20, 24, 28, 0.14)"
+      },
+      "3": {
+       "backgroundImage": "none",
+       "borderRadius": 12,
+       "boxShadow": "0 24px 60px rgba(20, 24, 28, 0.20)"
+      },
+      "4": {
+       "backgroundImage": "none",
+       "borderColor": "#E2E6EA",
+       "borderRadius": 12,
+       "boxShadow": "none"
+      },
+      "5": {
+       "backgroundImage": "none",
+       "border": "1px solid #E2E6EA",
+       "borderRadius": 12,
+       "boxShadow": "none"
+      }
+     }
+    }
+   }
+  },
+  "MuiPopover": {
+   "styleOverrides": {
+    "paper": {
+     "border": "1px solid #E2E6EA",
+     "borderRadius": 10,
+     "boxShadow": "0 12px 32px rgba(20, 24, 28, 0.14)"
+    }
+   }
+  },
+  "MuiSkeleton": {
+   "styleOverrides": {
+    "root": {
+     "borderRadius": 8
+    }
+   }
+  },
+  "MuiSwitch": {
+   "styleOverrides": {
+    "root": {
+     "padding": 8
+    },
+    "track": {
+     "borderRadius": 999
+    }
+   }
+  },
+  "MuiTab": {
+   "styleOverrides": {
+    "root": {
+     "&.Mui-selected": {
+      "color": "#0D5C52"
+     },
+     "color": "#67707A",
+     "fontSize": 14,
+     "fontWeight": 600,
+     "minHeight": 44,
+     "textTransform": "none"
+    }
+   }
+  },
+  "MuiTableCell": {
+   "styleOverrides": {
+    "root": {
+     "borderBottom": "1px solid #E2E6EA",
+     "fontSize": 14,
+     "padding": "12px 16px"
+    }
+   }
+  },
+  "MuiTableContainer": {
+   "styleOverrides": {
+    "root": {
+     "borderRadius": 12
+    }
+   }
+  },
+  "MuiTableHead": {
+   "styleOverrides": {
+    "root": {
+     "& .MuiTableCell-head": {
+      "backgroundColor": "#F4F6F7",
+      "borderBottom": "1px solid #E2E6EA",
+      "color": "#67707A",
+      "fontSize": 11,
+      "fontWeight": 700,
+      "letterSpacing": "0.08em",
+      "paddingBottom": 10,
+      "paddingTop": 10,
+      "textTransform": "uppercase"
+     }
+    }
+   }
+  },
+  "MuiTableRow": {
+   "styleOverrides": {
+    "root": {
+     "&.MuiTableRow-hover:hover": {
+      "backgroundColor": "#F4F6F7"
+     },
+     "&:last-child td": {
+      "borderBottom": 0
+     }
+    }
+   }
+  },
+  "MuiTabs": {
+   "styleOverrides": {
+    "indicator": {
+     "backgroundColor": "#0D5C52",
+     "height": 2
+    },
+    "root": {
+     "borderBottom": "1px solid #E2E6EA",
+     "minHeight": 44
+    }
+   }
+  },
+  "MuiToggleButton": {
+   "styleOverrides": {
+    "root": {
+     "&.Mui-selected": {
+      "&:hover": {
+       "backgroundColor": "#0D5C52"
+      },
+      "backgroundColor": "#0D5C52",
+      "borderColor": "#0D5C52",
+      "color": "#FFFFFF"
+     },
+     "color": "#1A1D21",
+     "fontSize": 13,
+     "fontWeight": 600,
+     "minHeight": 38,
+     "paddingInline": 14,
+     "textTransform": "none"
+    }
+   }
+  },
+  "MuiToggleButtonGroup": {
+   "styleOverrides": {
+    "grouped": {
+     "&:not(:first-of-type)": {
+      "borderLeft": "1px solid #E2E6EA",
+      "marginLeft": -1
+     },
+     "border": "1px solid #E2E6EA"
+    },
+    "root": {
+     "backgroundColor": "#FFFFFF",
+     "borderRadius": 10
+    }
+   }
+  },
+  "MuiTooltip": {
+   "styleOverrides": {
+    "arrow": {
+     "color": "#14181C"
+    },
+    "tooltip": {
+     "backgroundColor": "#14181C",
+     "borderRadius": 8,
+     "fontSize": 12,
+     "fontWeight": 500,
+     "padding": "6px 10px"
+    }
+   }
+  }
+ },
+ "palette": {
+  "action": {
+   "activatedOpacity": 0.12,
+   "active": "rgba(0, 0, 0, 0.54)",
+   "disabled": "rgba(0, 0, 0, 0.26)",
+   "disabledBackground": "rgba(0, 0, 0, 0.12)",
+   "disabledOpacity": 0.38,
+   "focus": "rgba(13, 92, 82, 0.12)",
+   "focusOpacity": 0.12,
+   "hover": "rgba(26, 29, 33, 0.04)",
+   "hoverOpacity": 0.04,
+   "selected": "rgba(13, 92, 82, 0.08)",
+   "selectedOpacity": 0.08
+  },
+  "augmentColor": {
+   "__fn": {
+    "0": "[throws]",
+    "1": "[throws]",
+    "2": "[throws]",
+    "3": "[throws]",
+    "4": "[throws]",
+    "5": "[throws]"
+   }
+  },
+  "background": {
+   "default": "#EFF1F4",
+   "paper": "#FFFFFF"
+  },
+  "common": {
+   "black": "#000",
+   "white": "#fff"
+  },
+  "contrastThreshold": 3,
+  "divider": "#E2E6EA",
+  "error": {
+   "contrastText": "#FFFFFF",
+   "dark": "rgb(108, 41, 18)",
+   "light": "#F5E0D8",
+   "main": "#9B3B1B"
+  },
+  "getContrastText": {
+   "__fn": {
+    "0": "[throws]",
+    "1": "[throws]",
+    "2": "[throws]",
+    "3": "[throws]",
+    "4": "[throws]",
+    "5": "[throws]"
+   }
+  },
+  "grey": {
+   "50": "#fafafa",
+   "100": "#f5f5f5",
+   "200": "#eeeeee",
+   "300": "#e0e0e0",
+   "400": "#bdbdbd",
+   "500": "#9e9e9e",
+   "600": "#757575",
+   "700": "#616161",
+   "800": "#424242",
+   "900": "#212121",
+   "A100": "#f5f5f5",
+   "A200": "#eeeeee",
+   "A400": "#bdbdbd",
+   "A700": "#616161"
+  },
+  "info": {
+   "contrastText": "#FFFFFF",
+   "dark": "rgb(30, 64, 108)",
+   "light": "#E3ECF7",
+   "main": "#2B5C9B"
+  },
+  "mode": "light",
+  "primary": {
+   "contrastText": "#FFFFFF",
+   "dark": "rgb(9, 64, 57)",
+   "light": "rgb(61, 124, 116)",
+   "main": "#0D5C52"
+  },
+  "secondary": {
+   "contrastText": "#fff",
+   "dark": "rgb(30, 36, 44)",
+   "light": "rgb(85, 92, 102)",
+   "main": "#2B3440"
+  },
+  "success": {
+   "contrastText": "#FFFFFF",
+   "dark": "rgb(27, 67, 40)",
+   "light": "#E2EBE4",
+   "main": "#27603A"
+  },
+  "text": {
+   "disabled": "#B3B9C0",
+   "primary": "#1A1D21",
+   "secondary": "#67707A"
+  },
+  "tonalOffset": 0.2,
+  "warning": {
+   "contrastText": "#FFFFFF",
+   "dark": "rgb(96, 62, 32)",
+   "light": "#FBF1E7",
+   "main": "#8A5A2F"
+  }
+ },
+ "shape": {
+  "borderRadius": 10
+ },
+ "typography": {
+  "body1": {
+   "fontFamily": "\"Public Sans\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+   "fontSize": 15,
+   "fontWeight": 400,
+   "lineHeight": 1.5
+  },
+  "body2": {
+   "fontFamily": "\"Public Sans\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+   "fontSize": 14,
+   "fontWeight": 400,
+   "lineHeight": 1.5
+  },
+  "button": {
+   "fontFamily": "\"Public Sans\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+   "fontSize": 14,
+   "fontWeight": 600,
+   "letterSpacing": 0,
+   "lineHeight": 1.75,
+   "textTransform": "none"
+  },
+  "caption": {
+   "fontFamily": "\"Public Sans\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+   "fontSize": 12,
+   "fontWeight": 400,
+   "lineHeight": 1.4
+  },
+  "fontFamily": "\"Public Sans\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+  "fontSize": 14,
+  "fontWeightBold": 700,
+  "fontWeightLight": 300,
+  "fontWeightMedium": 500,
+  "fontWeightRegular": 400,
+  "h1": {
+   "fontFamily": "\"Public Sans\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+   "fontSize": 36,
+   "fontWeight": 700,
+   "letterSpacing": "-0.02em",
+   "lineHeight": 1.15
+  },
+  "h2": {
+   "fontFamily": "\"Public Sans\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+   "fontSize": 30,
+   "fontWeight": 700,
+   "letterSpacing": "-0.02em",
+   "lineHeight": 1.2
+  },
+  "h3": {
+   "fontFamily": "\"Public Sans\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+   "fontSize": 26,
+   "fontWeight": 700,
+   "letterSpacing": "-0.015em",
+   "lineHeight": 1.2
+  },
+  "h4": {
+   "fontFamily": "\"Public Sans\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+   "fontSize": 26,
+   "fontWeight": 800,
+   "letterSpacing": "-0.015em",
+   "lineHeight": 1.25
+  },
+  "h5": {
+   "fontFamily": "\"Public Sans\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+   "fontSize": 21,
+   "fontWeight": 800,
+   "letterSpacing": "-0.01em",
+   "lineHeight": 1.3
+  },
+  "h6": {
+   "fontFamily": "\"Public Sans\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+   "fontSize": 18,
+   "fontWeight": 700,
+   "letterSpacing": "-0.005em",
+   "lineHeight": 1.35
+  },
+  "htmlFontSize": 16,
+  "inherit": {
+   "fontFamily": "inherit",
+   "fontSize": "inherit",
+   "fontWeight": "inherit",
+   "letterSpacing": "inherit",
+   "lineHeight": "inherit"
+  },
+  "overline": {
+   "fontFamily": "\"Public Sans\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+   "fontSize": 11,
+   "fontWeight": 700,
+   "letterSpacing": "0.08em",
+   "lineHeight": 1.4,
+   "textTransform": "uppercase"
+  },
+  "subtitle1": {
+   "fontFamily": "\"Public Sans\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+   "fontSize": 15,
+   "fontWeight": 600,
+   "lineHeight": 1.75
+  },
+  "subtitle2": {
+   "fontFamily": "\"Public Sans\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+   "fontSize": 13,
+   "fontWeight": 600,
+   "lineHeight": 1.57
+  }
+ }
+}

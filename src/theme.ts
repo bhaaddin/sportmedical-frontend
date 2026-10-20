@@ -1,4 +1,14 @@
 import { createTheme, alpha, type Theme } from '@mui/material/styles';
+import {
+  DEFAULT_ACCENT_HEX,
+  IDENTITY_SHIFT,
+  deriveShift,
+  lightTints,
+  onAccentText,
+  sanitizeAccent,
+  shiftCssColors,
+  type AccentShift,
+} from './accent';
 
 /*
  * The clinic's design language, taken from the board Matko handed over on
@@ -121,6 +131,80 @@ export const DARK = {
   },
 } as const;
 
+type Widen<T> = T extends string ? string : { -readonly [K in keyof T]: Widen<T[K]> };
+/**
+ * The soft accent surfaces of LIGHT mode as CSS values that follow the picked accent (AccentRootVars sets
+ * --sm-soft-bg / --sm-soft-line for any accent but the default; the fallbacks are the board's forest values,
+ * i.e. DESIGN.softPrimary). For code that has no theme at hand; code with a theme reads tintsOf(theme).
+ */
+export const ACCENT_SOFT = {
+  bg: 'var(--sm-soft-bg, #F4F8F7)',
+  line: 'var(--sm-soft-line, #C9D6D3)',
+} as const;
+
+export type DarkTokens = Widen<typeof DARK>;
+
+/**
+ * The dark theme's tokens for a picked accent: the accent chrome (cyan, aqua, the lit border, the primary fill and its
+ * glows) moved by the accent's shift, everything else - the navy surfaces, the white ink, the semantic green/amber/red/
+ * blue/purple tones - exactly as the prototype has it. With the default accent (the identity shift) this IS `DARK`.
+ */
+export function darkTokens(shift: AccentShift): DarkTokens {
+  const c = (value: string): string => shiftCssColors(value, shift);
+  return {
+    ...DARK,
+    tone: { ...DARK.tone },
+    text: { ...DARK.text },
+    cyan: c(DARK.cyan),
+    aqua: c(DARK.aqua),
+    lineLight: c(DARK.lineLight),
+    panelLine: c(DARK.panelLine),
+    panelGlow: c(DARK.panelGlow),
+    floatingGlow: c(DARK.floatingGlow),
+    primaryFill: c(DARK.primaryFill),
+    primaryFillHover: c(DARK.primaryFillHover),
+    primaryLine: c(DARK.primaryLine),
+    primaryGlow: c(DARK.primaryGlow),
+    primaryGlowHover: c(DARK.primaryGlowHover),
+  };
+}
+
+declare module '@mui/material/styles' {
+  interface Theme {
+    /** The dark tokens for the accent this theme was built with (the prototype's `DARK` for the default accent). */
+    smDark: DarkTokens;
+    /** The accent's shift of the cyan family (the identity for the default accent). */
+    smShift: AccentShift;
+    /** Light mode's tints of the accent: hover, selected, soft card background and line. */
+    smTints: { hover: string; selected: string; softBg: string; softLine: string };
+  }
+  interface ThemeOptions {
+    smDark?: DarkTokens;
+    smShift?: AccentShift;
+    smTints?: { hover: string; selected: string; softBg: string; softLine: string };
+  }
+}
+
+/** The dark tokens a theme was built with (the prototype's own for a theme not made by buildTheme, e.g. MUI's default in a test). */
+export function darkOf(theme: Theme): DarkTokens {
+  return theme.smDark ?? darkTokens(IDENTITY_SHIFT);
+}
+
+/** The accent's shift a theme was built with (the identity for a theme not made by buildTheme). */
+export function shiftOf(theme: Theme): AccentShift {
+  return theme.smShift ?? IDENTITY_SHIFT;
+}
+
+/** Light mode's accent tints a theme was built with (the board's forest tints for a theme not made by buildTheme). */
+export function tintsOf(theme: Theme): { hover: string; selected: string; softBg: string; softLine: string } {
+  return theme.smTints ?? lightTints(DEFAULT_ACCENT_HEX);
+}
+
+/** A cyan-family literal (a hex or rgba from the prototype) moved to the accent this theme was built with. */
+export function accentLiteral(theme: Theme, literal: string): string {
+  return shiftCssColors(literal, shiftOf(theme));
+}
+
 /** One of the soft status tones for the theme's mode: the board's pastels in light, tinted glass in dark. */
 export function toneColors(theme: Theme, tone: keyof typeof DESIGN.tone): { bg: string; fg: string; line: string } {
   return theme.palette.mode === 'light' ? DESIGN.tone[tone] : DARK.tone[tone];
@@ -134,34 +218,45 @@ export function toneColors(theme: Theme, tone: keyof typeof DESIGN.tone): { bg: 
  *
  * Dark mode is the partner's planner prototype (`design/planner-v65.html`, the
  * owner's instruction of 17. 10. 2026): a navy glass dashboard with teal
- * borders and a cyan primary. The accent tunes the LIGHT theme; in dark the
- * primary is always the prototype's cyan, so one dark look exists.
+ * borders and a cyan primary. The picked accent reaches both modes: light draws
+ * in the colour itself, dark moves the prototype's cyan family to the pick's hue
+ * (src/accent.ts). The default accent is the identity - the prototype exactly.
  */
-export function buildTheme(accentColor: string, mode: ThemeMode): Theme {
+export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
   const light = mode === 'light';
-  const D = DARK;
-  /* The colour the interface is drawn in: the doctor's accent in light, the prototype's cyan in dark. */
+  /* A stored value that is not a colour falls back to the default instead of poisoning the palette. */
+  const accentColor = sanitizeAccent(accentInput);
+  const shift = deriveShift(accentColor);
+  const D = darkTokens(shift);
+  /* A cyan-family literal, moved to the accent (a no-op for the default accent). */
+  const c = (value: string): string => shiftCssColors(value, shift);
+  const tints = lightTints(accentColor);
+  const onAccent = onAccentText(accentColor);
+  /* The colour the interface is drawn in: the doctor's accent in light, the accent's cyan family in dark. */
   const primary = light ? accentColor : D.cyan;
   const line = light ? DESIGN.line : D.line;
   const page = light ? DESIGN.page : D.bg;
   const paper = light ? DESIGN.paper : D.glass;
   const ink = light ? DESIGN.ink : D.white;
   const muted = light ? DESIGN.muted : D.muted;
-  const head = light ? DESIGN.head : 'rgba(0, 230, 228, 0.07)';
-  const hover = light ? '#F4F6F7' : 'rgba(0, 230, 228, 0.09)';
+  const head = light ? DESIGN.head : alpha(D.cyan, 0.07);
+  const hover = light ? '#F4F6F7' : alpha(D.cyan, 0.09);
   /* A card's outline: the board's hairline in light, the glass panel's teal edge in dark. */
   const edge = light ? line : D.panelLine;
-  const menuEdge = light ? line : 'rgba(0, 224, 232, 0.5)';
+  const menuEdge = light ? line : c('rgba(0, 224, 232, 0.5)');
   /* What floats (menus, popovers, dialogs): the board's white with a shadow, the prototype's lit glass in dark. */
   const floating = light ? {} : { backgroundImage: D.floating };
   const toneFor = (tone: keyof typeof DESIGN.tone) => (light ? DESIGN.tone[tone] : D.tone[tone]);
 
   return createTheme({
+    smDark: D,
+    smShift: shift,
+    smTints: tints,
     palette: {
       mode,
       primary: light
-        ? { main: accentColor, contrastText: '#FFFFFF' }
-        : { main: D.cyan, light: D.aqua, dark: '#00ADAB', contrastText: D.onCyan },
+        ? { main: accentColor, contrastText: onAccent }
+        : { main: D.cyan, light: D.aqua, dark: c('#00ADAB'), contrastText: D.onCyan },
       secondary: { main: light ? '#2B3440' : '#D6EAF4' },
       background: { default: page, paper },
       text: { primary: ink, secondary: muted, disabled: light ? DESIGN.faint : '#6F8399' },
@@ -331,18 +426,18 @@ export function buildTheme(accentColor: string, mode: ThemeMode): Theme {
               : {
                   /* The prototype's secondary button (`#club-edit-link`): a teal-to-navy gradient, a lit edge, ink that is nearly white. */
                   backgroundImage: 'linear-gradient(105deg, #063649, #072A3D)',
-                  borderColor: 'rgba(50, 181, 199, 0.79)',
+                  borderColor: c('rgba(50, 181, 199, 0.79)'),
                   color: '#DDFFFF',
                   boxShadow: 'inset 0 1px rgba(255, 255, 255, 0.07), 0 2px 8px rgba(0, 0, 0, 0.4)',
                 }),
             '&:hover': {
               backgroundColor: light ? hover : '#0C384C',
-              borderColor: light ? DESIGN.lineStrong : '#74FFF4',
-              ...(light ? {} : { backgroundImage: 'linear-gradient(105deg, #07576B, #074154)', boxShadow: '0 0 12px rgba(4, 235, 221, 0.21)' }),
+              borderColor: light ? DESIGN.lineStrong : c('#74FFF4'),
+              ...(light ? {} : { backgroundImage: 'linear-gradient(105deg, #07576B, #074154)', boxShadow: `0 0 12px ${c('rgba(4, 235, 221, 0.21)')}` }),
             },
             '&.MuiButton-colorPrimary': {
               color: light ? primary : '#DDFFFF',
-              borderColor: light ? alpha(primary, 0.35) : 'rgba(50, 181, 199, 0.79)',
+              borderColor: light ? alpha(primary, 0.35) : c('rgba(50, 181, 199, 0.79)'),
             },
             '&.MuiButton-colorError': {
               color: light ? DESIGN.danger : D.text.red,
@@ -414,7 +509,7 @@ export function buildTheme(accentColor: string, mode: ThemeMode): Theme {
         styleOverrides: {
           paper: {
             borderRadius: 14,
-            border: light ? 'none' : '1px solid rgba(0, 224, 232, 0.6)',
+            border: light ? 'none' : `1px solid ${c('rgba(0, 224, 232, 0.6)')}`,
             boxShadow: light ? DESIGN.shadow.dialog : D.floatingGlow,
             ...floating,
           },
@@ -481,7 +576,7 @@ export function buildTheme(accentColor: string, mode: ThemeMode): Theme {
           ...(light
             ? {}
             : {
-                colorPrimary: { backgroundColor: 'rgba(0, 230, 228, 0.12)', color: D.aqua, borderColor: 'rgba(0, 230, 228, 0.5)' },
+                colorPrimary: { backgroundColor: alpha(D.cyan, 0.12), color: D.aqua, borderColor: alpha(D.cyan, 0.5) },
                 colorSecondary: { backgroundColor: D.tone.grey.bg, color: D.tone.grey.fg, borderColor: D.tone.grey.line },
                 colorSuccess: { backgroundColor: D.tone.green.bg, color: D.tone.green.fg, borderColor: D.tone.green.line },
                 colorWarning: { backgroundColor: D.tone.beige.bg, color: D.tone.beige.fg, borderColor: D.tone.beige.line },
@@ -560,17 +655,17 @@ export function buildTheme(accentColor: string, mode: ThemeMode): Theme {
             '&.Mui-selected': light
               ? {
                   backgroundColor: accentColor,
-                  color: '#FFFFFF',
+                  color: onAccent,
                   borderColor: accentColor,
                   '&:hover': { backgroundColor: accentColor },
                 }
               : {
                   /* The prototype's Den / Týden / Měsíc: the selected segment is lit teal with dark ink. */
-                  background: 'linear-gradient(105deg, #17EAD8, #00BDA9)',
+                  background: c('linear-gradient(105deg, #17EAD8, #00BDA9)'),
                   color: D.onCyan,
                   fontWeight: 700,
                   borderColor: D.primaryLine,
-                  '&:hover': { background: 'linear-gradient(105deg, #3AF4E4, #10CDB9)' },
+                  '&:hover': { background: c('linear-gradient(105deg, #3AF4E4, #10CDB9)') },
                 },
           },
         },
@@ -602,9 +697,9 @@ export function buildTheme(accentColor: string, mode: ThemeMode): Theme {
           root: {
             borderRadius: DESIGN.radius.md,
             '&.Mui-selected': {
-              backgroundColor: light ? DESIGN.softPrimary.bg : alpha(primary, 0.14),
+              backgroundColor: light ? tints.softBg : alpha(primary, 0.14),
               color: primary,
-              '&:hover': { backgroundColor: light ? DESIGN.softPrimary.bg : alpha(primary, 0.18) },
+              '&:hover': { backgroundColor: light ? tints.softBg : alpha(primary, 0.18) },
             },
           },
         },
@@ -617,14 +712,14 @@ export function buildTheme(accentColor: string, mode: ThemeMode): Theme {
             '&.MuiAlert-colorWarning': { backgroundColor: toneFor('beige').bg, color: toneFor('beige').fg },
             '&.MuiAlert-colorError': { backgroundColor: toneFor('red').bg, color: toneFor('red').fg },
             '&.MuiAlert-colorInfo': {
-              backgroundColor: light ? DESIGN.softPrimary.bg : alpha(primary, 0.12),
+              backgroundColor: light ? tints.softBg : alpha(primary, 0.12),
               color: light ? ink : D.white,
             },
             ...(light
               ? {}
               : {
                   '&.MuiAlert-colorSuccess, &.MuiAlert-colorWarning, &.MuiAlert-colorError, &.MuiAlert-colorInfo': {
-                    border: '1px solid rgba(0, 230, 228, 0.22)',
+                    border: `1px solid ${alpha(D.cyan, 0.22)}`,
                   },
                 }),
           },
@@ -653,8 +748,8 @@ export function buildTheme(accentColor: string, mode: ThemeMode): Theme {
               ? {}
               : {
                   '&.MuiLinearProgress-barColorPrimary': {
-                    backgroundImage: 'linear-gradient(90deg, #00998E, #02F3E5)',
-                    boxShadow: '0 0 8px rgba(2, 243, 229, 0.45)',
+                    backgroundImage: c('linear-gradient(90deg, #00998E, #02F3E5)'),
+                    boxShadow: `0 0 8px ${c('rgba(2, 243, 229, 0.45)')}`,
                   },
                 }),
           },

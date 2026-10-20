@@ -27,6 +27,7 @@ import { usePlanFigures } from './plan/usePlanFigures';
 import { deckColumns, useDeckVisible } from './PlannerMetrics';
 import { ClubDeckEmpty } from '../club/ClubDeckEmpty';
 import './plan/plan.css';
+import { accentCss } from '../../accent';
 
 /** The arrow bitmap that the prototype inlined as a 80 kB base64 string. */
 export const CRYSTAL_ARROW_URL: string = crystalArrowUrl;
@@ -406,7 +407,7 @@ export function PlanningCarousel() {
           <svg className="s42-ambient-wave" viewBox="0 0 420 160" preserveAspectRatio="none" aria-hidden="true">
             <defs>
               <linearGradient id="s42-wavelight" x1="0" x2="1" y1="0" y2=".1">
-                <stop stopColor="#2e9ab8" stopOpacity="0" /><stop offset=".48" stopColor="#96f6fb" stopOpacity=".29" /><stop offset="1" stopColor="#0ca2d5" stopOpacity="0" />
+                <stop stopColor={accentCss('#2e9ab8')} stopOpacity="0" /><stop offset=".48" stopColor={accentCss('#96f6fb')} stopOpacity=".29" /><stop offset="1" stopColor="#0ca2d5" stopOpacity="0" />
               </linearGradient>
             </defs>
             <g fill="none" stroke="url(#s42-wavelight)" strokeWidth=".75">

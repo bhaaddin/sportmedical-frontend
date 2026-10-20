@@ -44,7 +44,9 @@ describe('planner.css', () => {
   });
   it('keeps the root variables on .sm-planner and animates only prefixed keyframes', () => {
     const rootRule = generated.nodes.find((n): n is Rule => n.type === 'rule' && n.selector === '.sm-planner');
-    expect(rootRule?.toString()).toContain('--cyan:#00e6e4');
+    /* The accent chrome of the root variables follows --sm-hsl; the statuses (--green ...) are written as the prototype has them. */
+    expect(rootRule?.toString()).toContain('--cyan:hsl(from #00e6e4 var(--sm-hsl, h s l))');
+    expect(rootRule?.toString()).toContain('--green:#00e5c6');
     const frames = new Set<string>();
     generated.walkAtRules(/keyframes$/i, (at) => { frames.add(at.params); });
     expect(frames.size).toBeGreaterThan(15);

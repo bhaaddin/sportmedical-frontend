@@ -2,7 +2,7 @@ import { Box, ButtonBase, Typography } from "@mui/material";
 import PersonSearchOutlined from "@mui/icons-material/PersonSearchOutlined";
 import PersonAddAlt1Outlined from "@mui/icons-material/PersonAddAlt1Outlined";
 import { useDevice } from "../../../layout/useDevice";
-import { DESIGN } from "../../ui";
+import { ACCENT_SOFT } from "../../ui";
 import type { DrawerMode } from "../NewAppointmentDialog.logic";
 
 /** The two cards under "KDO SE OBJEDNÁVÁ", in the board's order. */
@@ -56,10 +56,10 @@ export function ModeCards({
               border: "1px solid",
               borderColor: selected ? "primary.main" : "divider",
               boxShadow: selected ? (t) => `inset 0 0 0 1px ${t.palette.primary.main}` : "none",
-              bgcolor: selected ? DESIGN.softPrimary.bg : "background.paper",
+              bgcolor: selected ? ACCENT_SOFT.bg : "background.paper",
               color: selected ? "primary.main" : "text.primary",
               fontFamily: "inherit",
-              "&:hover": { bgcolor: selected ? DESIGN.softPrimary.bg : "action.hover" },
+              "&:hover": { bgcolor: selected ? ACCENT_SOFT.bg : "action.hover" },
               "&.Mui-focusVisible": { outline: "2px solid", outlineColor: "primary.main" },
             }}
           >

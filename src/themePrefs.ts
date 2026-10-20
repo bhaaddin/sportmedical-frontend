@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { ThemeMode } from './theme';
+import { sanitizeAccent } from './accent';
 
 /** The doctor's own appearance choice, remembered in this browser. */
 export interface ThemePrefs {
@@ -37,9 +38,10 @@ export function useThemePrefs(): ThemePrefs {
   return ctx;
 }
 
+/** The saved accent: a plain hex colour that works as a button on the light page, else (nothing saved, junk) the default. */
 export function readStoredAccent(): string {
   try {
-    return localStorage.getItem(ACCENT_STORAGE_KEY) || DEFAULT_ACCENT;
+    return sanitizeAccent(localStorage.getItem(ACCENT_STORAGE_KEY));
   } catch {
     return DEFAULT_ACCENT;
   }

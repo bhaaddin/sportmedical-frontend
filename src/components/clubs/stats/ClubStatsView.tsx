@@ -14,7 +14,8 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import type { ClubOrderStats } from '../../../api/clubOrders';
 import { FilterChips, SectionLabel, SoftCard, StatusChip } from '../../ui';
 import { FIT_FILL_SX } from '../../ui/fit';
-import { DARK, DESIGN, toneColors } from '../../../theme';
+import { alpha } from '@mui/material/styles';
+import { DARK, DESIGN, darkOf, toneColors } from '../../../theme';
 import { ResponsiveDataList, type DataColumn } from '../../ui/ResponsiveDataList';
 import { useIsPhone } from '../../../layout/useDevice';
 import type { Period } from '../../../pages/statistics/aggregate';
@@ -71,7 +72,7 @@ export function ClubStatsView({ stats, period, revenue = null, revenueLoading = 
   const gridLine = dark ? theme.palette.divider : DESIGN.line;
   const missingFill = dark ? DARK.amber : DESIGN.tone.beige.line;
   const tooltipStyle = dark
-    ? { contentStyle: { background: theme.palette.background.paper, border: '1px solid ' + theme.palette.divider, borderRadius: 8, color: theme.palette.text.primary }, cursor: { fill: 'rgba(0, 230, 228, 0.08)' } }
+    ? { contentStyle: { background: theme.palette.background.paper, border: '1px solid ' + theme.palette.divider, borderRadius: 8, color: theme.palette.text.primary }, cursor: { fill: alpha(darkOf(theme).cyan, 0.08) } }
     : {};
   const kpi = statsKpis(stats);
   const clubs = clubRows(stats);

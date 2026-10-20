@@ -1,5 +1,6 @@
 import { Paper, type PaperProps } from '@mui/material';
-import { DARK } from '../../theme';
+import { alpha } from '@mui/material/styles';
+import { DARK, darkOf, tintsOf } from '../../theme';
 
 /**
  * A bordered white surface with no shadow - the board's card. Padding is the
@@ -24,7 +25,7 @@ export function SoftCard({
             borderRadius: 3,
             ...(dark && tone === 'plain' ? { backgroundImage: DARK.panel } : {}),
             ...(tone === 'soft'
-              ? { bgcolor: dark ? 'rgba(0,230,228,0.07)' : '#F4F8F7', borderColor: dark ? 'rgba(0,230,228,0.32)' : '#C9D6D3' }
+              ? { bgcolor: dark ? alpha(darkOf(t).cyan, 0.07) : tintsOf(t).softBg, borderColor: dark ? alpha(darkOf(t).cyan, 0.32) : tintsOf(t).softLine }
               : tone === 'muted'
                 ? { bgcolor: 'background.default' }
                 : {}),

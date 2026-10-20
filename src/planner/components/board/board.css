@@ -19,7 +19,7 @@
 .sm-planner .hour-label.is-sub { color: #9db7cc; }
 /* the board takes the keyboard (+ - 0 zoom it): the file's own focus ring */
 .sm-planner .week-board:focus { outline: none; }
-.sm-planner .week-board:focus-visible { outline: 2px solid #50ffff; outline-offset: -2px; }
+.sm-planner .week-board:focus-visible { outline: 2px solid hsl(from #50ffff var(--sm-hsl, h s l)); outline-offset: -2px; }
 /* the zoom group: the file's `.view-segment` with narrow buttons (36 px) and a value in the middle */
 .sm-planner .zoom-segment button { width: 37px; font-size: 18px; line-height: 1; }
 .sm-planner .zoom-segment button.zoom-value { width: 49px; font-size: 14px; font-variant-numeric: tabular-nums; }
@@ -48,10 +48,10 @@
 .sm-planner .day-title { position: relative; }
 .sm-planner .day-title.is-today strong {
   color: #04120f;
-  background: #23f2e7;
+  background: hsl(from #23f2e7 var(--sm-hsl, h s l));
   border-radius: 9px;
   padding: 0 7px;
-  box-shadow: 0 0 12px rgba(35, 242, 231, 0.45);
+  box-shadow: 0 0 12px hsl(from rgba(35, 242, 231, 0.45) var(--sm-hsl, h s l));
 }
 .sm-planner .day-title.is-closed { background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.045) 0 6px, transparent 6px 12px); }
 .sm-planner .day-title .day-flag-unused {
@@ -155,7 +155,7 @@
 }
 .sm-planner .board-window.is-manual { color: #b4cbdc; border-left-style: dashed; border-left-width: 1px; }
 .sm-planner .board-window:hover { filter: brightness(1.25); }
-.sm-planner .board-window:focus-visible { outline: 2px solid #23f2e7; outline-offset: 1px; }
+.sm-planner .board-window:focus-visible { outline: 2px solid hsl(from #23f2e7 var(--sm-hsl, h s l)); outline-offset: 1px; }
 /* a tall block (a zoomed-in day) keeps its words in view: they stay between the top and the bottom of the scrolled body */
 .sm-planner .board-sticky {
   position: sticky;
@@ -172,14 +172,14 @@
 
 /* ---- cards ---- */
 .sm-planner .schedule-event.is-cancelled { opacity: 0.5; text-decoration: line-through; }
-.sm-planner .schedule-event.is-selected { outline: 2px solid #23f2e7; outline-offset: 1px; z-index: 12; }
+.sm-planner .schedule-event.is-selected { outline: 2px solid hsl(from #23f2e7 var(--sm-hsl, h s l)); outline-offset: 1px; z-index: 12; }
 .sm-planner .schedule-event.is-proposed { outline: 2px dashed var(--ev-border); outline-offset: 1px; z-index: 12; }
 .sm-planner .schedule-event.is-moving-origin { opacity: 0.3; }
 .sm-planner .schedule-event .event-price {
   display: block;
   font-size: 11px;
   font-weight: 650;
-  color: #bff7f1;
+  color: hsl(from #bff7f1 var(--sm-hsl, h s l));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -200,7 +200,7 @@
 .sm-planner .board-chip {
   position: absolute;
   z-index: 4;
-  border: 1px solid #1c6b82;
+  border: 1px solid hsl(from #1c6b82 var(--sm-hsl, h s l));
   border-radius: 6px;
   background: #002a3f;
   color: #e7f4ff;
@@ -210,7 +210,7 @@
   cursor: pointer;
   padding: 0;
 }
-.sm-planner .board-chip:hover { background: #075368; }
+.sm-planner .board-chip:hover { background: hsl(from #075368 var(--sm-hsl, h s l)); }
 
 /* ---- now-line, today's column ---- */
 .sm-planner .board-now {
@@ -268,9 +268,9 @@
 .sm-planner .planner-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 .sm-planner .planner-actions .control { padding: 0 11px; font-size: 13px; font-weight: 650; white-space: nowrap; gap: 6px; }
 .sm-planner .planner-actions .control.primary {
-  background: linear-gradient(160deg, #026755, #00a89b);
-  border-color: #06cacf;
-  box-shadow: 0 0 12px #00a79b66;
+  background: linear-gradient(160deg, hsl(from #026755 var(--sm-hsl, h s l)), hsl(from #00a89b var(--sm-hsl, h s l)));
+  border-color: hsl(from #06cacf var(--sm-hsl, h s l));
+  box-shadow: 0 0 12px hsl(from #00a79b66 var(--sm-hsl, h s l));
 }
 .sm-planner .planner-actions .control .icon { width: 17px; height: 17px; }
 .sm-planner .board-notice {
@@ -286,7 +286,7 @@
   font-weight: 650;
   background: #052a3c;
   color: #e7f4ff;
-  border: 1px solid #19708a;
+  border: 1px solid hsl(from #19708a var(--sm-hsl, h s l));
   box-shadow: 0 8px 24px #000a;
   pointer-events: none;
 }
@@ -294,8 +294,8 @@
 
 /* ---- day / month alternates ---- */
 .sm-planner .alt-row .alt-sub { color: #9bc2d6; font-size: 12px; margin-left: 8px; font-weight: 500; }
-.sm-planner .alt-row.is-booking > span:first-child { color: #9ee9ff; }
-.sm-planner .alt-row .alt-price { color: #bff7f1; font-size: 12px; margin-left: 8px; }
+.sm-planner .alt-row.is-booking > span:first-child { color: hsl(from #9ee9ff var(--sm-hsl, h s l)); }
+.sm-planner .alt-row .alt-price { color: hsl(from #bff7f1 var(--sm-hsl, h s l)); font-size: 12px; margin-left: 8px; }
 .sm-planner .month-tile { text-align: left; color: inherit; font: inherit; }
 
 /* ---- the card summary (hover and click) - a MUI Tooltip / Popper in the file's colours ---- */
@@ -333,8 +333,8 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #23f2e7;
-  box-shadow: 0 0 8px #23f2e7;
+  background: hsl(from #23f2e7 var(--sm-hsl, h s l));
+  box-shadow: 0 0 8px hsl(from #23f2e7 var(--sm-hsl, h s l));
 }
 
 /*
@@ -372,8 +372,8 @@
   text-overflow: ellipsis;
 }
 .sm-planner button.inquiry-chip { cursor: pointer; }
-.sm-planner button.inquiry-chip:hover { color: #fff; border-color: #00e1e4; background: #008f9b30; }
-.sm-planner .inquiry-chip.is-current { color: #23f2e7; border-color: #23f2e7; background: #23f2e714; }
+.sm-planner button.inquiry-chip:hover { color: #fff; border-color: hsl(from #00e1e4 var(--sm-hsl, h s l)); background: hsl(from #008f9b30 var(--sm-hsl, h s l)); }
+.sm-planner .inquiry-chip.is-current { color: hsl(from #23f2e7 var(--sm-hsl, h s l)); border-color: hsl(from #23f2e7 var(--sm-hsl, h s l)); background: hsl(from #23f2e714 var(--sm-hsl, h s l)); }
 .sm-planner .inquiry-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px 0; }
 .sm-planner .month-tile .tile-inquiry {
   display: block;
@@ -409,8 +409,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sm-planner .day-title .day-inquiry:hover { color: #fff; border-color: #00e1e4; }
-.sm-planner .day-title .day-inquiry.is-current { color: #23f2e7; border-color: #23f2e7; }
+.sm-planner .day-title .day-inquiry:hover { color: #fff; border-color: hsl(from #00e1e4 var(--sm-hsl, h s l)); }
+.sm-planner .day-title .day-inquiry.is-current { color: hsl(from #23f2e7 var(--sm-hsl, h s l)); border-color: hsl(from #23f2e7 var(--sm-hsl, h s l)); }
 
 /* the Den / Měsíc list covers the whole board, the sticky hour column (z-index 20) included */
 .sm-planner .planner .alternate-view { z-index: 30; }

@@ -1,3 +1,4 @@
+import { accentLiteral } from '../../theme';
 import { Box, type SxProps, type Theme } from '@mui/material';
 
 /**
@@ -35,7 +36,7 @@ export function ProgressRing({
           const arc = tone ?? (dark ? t.palette.primary.light : t.palette.primary.main);
           /* The prototype's `.s42-ring`: a light-aqua to sky arc over a slate track, a hairline halo, a sunk navy disc. */
           const from = dark && tone === undefined ? 'from -90deg, ' : '';
-          const fill = tone === undefined && dark ? `#9CFFF3 0deg, #78DDFC ${pct * 3.6}deg` : `${arc} 0deg, ${arc} ${pct * 3.6}deg`;
+          const fill = tone === undefined && dark ? `${accentLiteral(t, '#9CFFF3')} 0deg, ${accentLiteral(t, '#78DDFC')} ${pct * 3.6}deg` : `${arc} 0deg, ${arc} ${pct * 3.6}deg`;
           return {
             position: 'relative',
             flex: 'none',
@@ -45,7 +46,7 @@ export function ProgressRing({
             display: 'grid',
             placeItems: 'center',
             background: `conic-gradient(${from}${fill}, ${dark ? `#273D54 ${pct * 3.6}deg, #263A50 360deg` : `${t.palette.divider} ${pct * 3.6}deg 360deg`})`,
-            boxShadow: dark ? '0 0 0 1px rgba(171, 237, 255, 0.31), 0 0 14px rgba(75, 219, 239, 0.17), inset 0 0 8px rgba(130, 249, 238, 0.1)' : 'none',
+            boxShadow: dark ? accentLiteral(t, '0 0 0 1px rgba(171, 237, 255, 0.31), 0 0 14px rgba(75, 219, 239, 0.17), inset 0 0 8px rgba(130, 249, 238, 0.1)') : 'none',
             '&::before': {
               content: '""',
               position: 'absolute',

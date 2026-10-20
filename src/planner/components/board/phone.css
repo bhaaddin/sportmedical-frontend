@@ -26,14 +26,14 @@
 }
 .sm-planner .phone-strip-day b { font-size: 16px; font-weight: 650; color: inherit; }
 .sm-planner .phone-strip-day small { font-size: 10.5px; font-weight: 600; opacity: 0.45; }
-.sm-planner .phone-strip-day small.has-count { opacity: 1; color: #80eee7; }
-.sm-planner .phone-strip-day.is-today b { color: #23f2e7; }
+.sm-planner .phone-strip-day small.has-count { opacity: 1; color: hsl(from #80eee7 var(--sm-hsl, h s l)); }
+.sm-planner .phone-strip-day.is-today b { color: hsl(from #23f2e7 var(--sm-hsl, h s l)); }
 .sm-planner .phone-strip-day.is-closed { background: repeating-linear-gradient(135deg, #ffffff0a 0 6px, transparent 6px 12px), #001c31f0; color: #e7cba9; }
 .sm-planner .phone-strip-day.is-selected {
   color: #fff;
-  border-color: #00fff1;
-  background: linear-gradient(160deg, #026755, #00a89b);
-  box-shadow: 0 0 12px #00a79b88;
+  border-color: hsl(from #00fff1 var(--sm-hsl, h s l));
+  background: linear-gradient(160deg, hsl(from #026755 var(--sm-hsl, h s l)), hsl(from #00a89b var(--sm-hsl, h s l)));
+  box-shadow: 0 0 12px hsl(from #00a79b88 var(--sm-hsl, h s l));
 }
 .sm-planner .phone-strip-day.is-selected b,
 .sm-planner .phone-strip-day.is-selected small.has-count { color: #fff; }
@@ -60,15 +60,15 @@
   text-align: left;
   cursor: pointer;
 }
-.sm-planner .phone-entry:hover { background: #075368; }
+.sm-planner .phone-entry:hover { background: hsl(from #075368 var(--sm-hsl, h s l)); }
 .sm-planner .phone-entry-bar { align-self: stretch; width: 5px; border-radius: 6px 0 0 6px; background: #5799ca; }
 .sm-planner .phone-entry-time { color: var(--cyan); font-variant-numeric: tabular-nums; font-size: 12.5px; }
-.sm-planner .phone-entry[data-kind='booking'] .phone-entry-time { color: #9ee9ff; }
+.sm-planner .phone-entry[data-kind='booking'] .phone-entry-time { color: hsl(from #9ee9ff var(--sm-hsl, h s l)); }
 .sm-planner .phone-entry-main { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .sm-planner .phone-entry-main strong { font-weight: 650; overflow-wrap: anywhere; }
 .sm-planner .phone-entry-main small { color: #9bc2d6; font-size: 12px; }
 .sm-planner .phone-entry-tail { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; font-size: 12px; color: #d9e7f8; text-align: right; }
-.sm-planner .phone-entry-tail small { color: #bff7f1; }
+.sm-planner .phone-entry-tail small { color: hsl(from #bff7f1 var(--sm-hsl, h s l)); }
 .sm-planner .phone-entry[data-kind='club'] { background: #05303a; }
 .sm-planner .phone-entry[data-kind='block'] { background: repeating-linear-gradient(135deg, #ffffff0a 0 6px, transparent 6px 12px), #00182a; }
 .sm-planner .phone-empty-action { margin-top: 18px; }
@@ -91,13 +91,13 @@
   text-align: left;
   cursor: pointer;
 }
-.sm-planner .phone-month-row:hover { border-color: #00e1e4; }
-.sm-planner .phone-month-row.is-today { border-color: #23f2e7; }
+.sm-planner .phone-month-row:hover { border-color: hsl(from #00e1e4 var(--sm-hsl, h s l)); }
+.sm-planner .phone-month-row.is-today { border-color: hsl(from #23f2e7 var(--sm-hsl, h s l)); }
 .sm-planner .phone-month-row.is-closed { background: repeating-linear-gradient(135deg, #ffffff0a 0 6px, transparent 6px 12px), #062c41; }
 .sm-planner .phone-month-date { display: flex; flex-direction: column; align-items: center; line-height: 1.2; color: #9bc2d6; font-size: 11px; font-weight: 600; }
 .sm-planner .phone-month-date b { font-size: 17px; color: #f6fbff; }
-.sm-planner .phone-month-row.is-today .phone-month-date b { color: #23f2e7; }
-.sm-planner .phone-month-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; color: #80eee7; }
+.sm-planner .phone-month-row.is-today .phone-month-date b { color: hsl(from #23f2e7 var(--sm-hsl, h s l)); }
+.sm-planner .phone-month-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; color: hsl(from #80eee7 var(--sm-hsl, h s l)); }
 .sm-planner .phone-month-flag { color: #e7cba9; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-size: 11px; }
 .sm-planner .phone-month-club { color: #d9e7f8; overflow-wrap: anywhere; }
 .sm-planner .phone-month-none { color: #6f8399; }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Box, ButtonBase, Link, Radio, Stack, Typography } from "@mui/material";
-import { DESIGN } from "../../ui";
+import { ACCENT_SOFT } from "../../ui";
 import type { Activity } from "../../../api/bookingContracts";
 import { priceWord } from "../price/agreedPrice";
 
@@ -61,9 +61,9 @@ export function ActivityCards({
                 boxShadow: selected
                   ? (t) => `inset 0 0 0 1px ${t.palette.primary.main}`
                   : "none",
-                bgcolor: selected ? DESIGN.softPrimary.bg : "background.paper",
+                bgcolor: selected ? ACCENT_SOFT.bg : "background.paper",
                 fontFamily: "inherit",
-                "&:hover": { bgcolor: selected ? DESIGN.softPrimary.bg : "action.hover" },
+                "&:hover": { bgcolor: selected ? ACCENT_SOFT.bg : "action.hover" },
                 "&.Mui-focusVisible": { outline: "2px solid", outlineColor: "primary.main" },
               }}
             >

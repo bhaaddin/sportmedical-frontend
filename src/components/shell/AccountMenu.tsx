@@ -16,8 +16,7 @@ export function AppearanceControls() {
       <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.75 }}>
         Vzhled
       </Typography>
-      {/* The accent tunes the light theme; the dark theme is the planner prototype's fixed cyan, so a swatch would do nothing there. */}
-      {mode === 'light' && (
+      {/* The accent reaches both modes: light draws in the colour itself, dark moves the prototype's cyan family to it (src/accent.ts). */}
       <Box sx={{ display: 'flex', gap: 1.25, mb: 1.25 }}>
         {THEME_ACCENTS.map((a) => (
           <Box
@@ -44,7 +43,6 @@ export function AppearanceControls() {
           />
         ))}
       </Box>
-      )}
       <Button size="small" variant="outlined" fullWidth onClick={() => setMode(mode === 'light' ? 'dark' : 'light')}>
         {mode === 'light' ? 'Tmavý režim' : 'Světlý režim'}
       </Button>

@@ -1,5 +1,5 @@
 import { alpha, type Theme } from '@mui/material/styles';
-import { DARK, DESIGN } from '../../theme';
+import { DARK, DESIGN, darkOf, tintsOf } from '../../theme';
 
 /** The full sidebar's width, from the board (Main.dc.html: flex 0 0 258px). */
 export const SIDEBAR_WIDTH = 258;
@@ -10,11 +10,11 @@ export const BAR_HEIGHT = 56;
 
 /** The active entry's surface: the board's soft accent, kept readable in dark mode. */
 export const activeBg = (t: Theme): string =>
-  t.palette.mode === 'light' ? DESIGN.softPrimary.bg : alpha(t.palette.primary.main, 0.16);
+  t.palette.mode === 'light' ? tintsOf(t).softBg : alpha(t.palette.primary.main, 0.16);
 
 /** The lit edge of the active entry in the dark theme (the prototype's cyan glow); nothing in light. */
 export const activeGlow = (t: Theme, active: boolean): string =>
-  t.palette.mode === 'dark' && active ? `inset 0 0 0 1px ${alpha(DARK.cyan, 0.38)}, 0 0 14px ${alpha(DARK.cyan, 0.14)}` : 'none';
+  t.palette.mode === 'dark' && active ? `inset 0 0 0 1px ${alpha(darkOf(t).cyan, 0.38)}, 0 0 14px ${alpha(darkOf(t).cyan, 0.14)}` : 'none';
 
 /**
  * The glass of the sidebar and the tablet rail in the dark theme: the panel
@@ -26,26 +26,26 @@ export const sideGlass = (t: Theme) =>
     ? {}
     : {
         backgroundImage: DARK.panel,
-        borderColor: DARK.panelLine,
-        boxShadow: `0 0 24px ${alpha(DARK.cyan, 0.1)}, inset -1px 0 0 ${alpha(DARK.cyan, 0.12)}`,
+        borderColor: darkOf(t).panelLine,
+        boxShadow: `0 0 24px ${alpha(darkOf(t).cyan, 0.1)}, inset -1px 0 0 ${alpha(darkOf(t).cyan, 0.12)}`,
       };
 
 /** The phone's top and bottom bars in dark: the page's navy, nearly opaque, with the prototype's teal edge. */
 export const barGlass = (t: Theme) =>
   t.palette.mode === 'light'
     ? {}
-    : { bgcolor: 'rgba(0, 19, 33, 0.94)', backdropFilter: 'blur(14px)', borderColor: DARK.lineLight };
+    : { bgcolor: 'rgba(0, 19, 33, 0.94)', backdropFilter: 'blur(14px)', borderColor: darkOf(t).lineLight };
 
 /** A round or square primary action ("Nová objednávka" as an icon): flat accent in light, the lit aqua gradient in dark. */
 export const primaryIconSx = (t: Theme) =>
   t.palette.mode === 'light'
     ? { bgcolor: 'primary.main', color: 'primary.contrastText', '&:hover': { bgcolor: 'primary.dark' } }
     : {
-        background: DARK.primaryFill,
-        color: DARK.onCyan,
-        border: `1px solid ${DARK.primaryLine}`,
-        boxShadow: DARK.primaryGlow,
-        '&:hover': { background: DARK.primaryFillHover, boxShadow: DARK.primaryGlowHover },
+        background: darkOf(t).primaryFill,
+        color: darkOf(t).onCyan,
+        border: `1px solid ${darkOf(t).primaryLine}`,
+        boxShadow: darkOf(t).primaryGlow,
+        '&:hover': { background: darkOf(t).primaryFillHover, boxShadow: darkOf(t).primaryGlowHover },
       };
 
 /** The visible keyboard focus every navigation control shares. */
