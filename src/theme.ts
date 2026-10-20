@@ -433,7 +433,7 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
             '&:hover': {
               backgroundColor: light ? hover : '#0C384C',
               borderColor: light ? DESIGN.lineStrong : c('#74FFF4'),
-              ...(light ? {} : { backgroundImage: 'linear-gradient(105deg, #07576B, #074154)', boxShadow: `0 0 12px ${c('rgba(4, 235, 221, 0.21)')}` }),
+              ...(light ? {} : { backgroundImage: c('linear-gradient(105deg, #07576B, #074154)'), boxShadow: `0 0 12px ${c('rgba(4, 235, 221, 0.21)')}` }),
             },
             '&.MuiButton-colorPrimary': {
               color: light ? primary : '#DDFFFF',
@@ -732,11 +732,11 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
             borderRadius: DESIGN.radius.md,
             fontSize: 12,
             fontWeight: 500,
-            backgroundColor: light ? DESIGN.inkSoft : '#063C4C',
+            backgroundColor: light ? DESIGN.inkSoft : c('#063C4C'),
             padding: '6px 10px',
-            ...(light ? {} : { color: D.white, border: '1px solid #12647A', boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5)' }),
+            ...(light ? {} : { color: D.white, border: `1px solid ${c('#12647A')}`, boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5)' }),
           },
-          arrow: { color: light ? DESIGN.inkSoft : '#063C4C' },
+          arrow: { color: light ? DESIGN.inkSoft : c('#063C4C') },
         },
       },
       MuiLinearProgress: {

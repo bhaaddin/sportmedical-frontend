@@ -1,6 +1,6 @@
 import type { Theme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { darkOf, tintsOf } from '../../theme';
+import { accentLiteral, darkOf, tintsOf } from '../../theme';
 
 /*
  * The look of every settings screen, in one place.
@@ -26,7 +26,7 @@ export const settingsGrey = (theme: Theme): string =>
 
 /** A line harder than the app's hairline, so a row's edge is seen. */
 export const settingsLine = (theme: Theme): string =>
-  theme.palette.mode === 'light' ? '#C9D0D7' : '#0F5A73';
+  theme.palette.mode === 'light' ? '#C9D0D7' : accentLiteral(theme, '#0F5A73');
 
 /** What a hovered row turns: a visible tint, not a one-percent grey. */
 export const settingsHover = (theme: Theme): string =>

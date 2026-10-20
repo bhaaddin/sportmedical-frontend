@@ -1,25 +1,17 @@
 import { BrowserRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom';
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { CssBaseline } from '@mui/material';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './api/queryClient';
 import { Toaster } from 'react-hot-toast';
-import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { loginUrl } from './components/shell/loginRedirect';
 import { PageLoader, StaffShellPlaceholder } from './components/shell/PageLoader';
-import { buildTheme, type ThemeMode } from './theme';
-import {
-  ThemePrefsContext,
-  readStoredAccent,
-  readStoredMode,
-  ACCENT_STORAGE_KEY,
-  MODE_STORAGE_KEY,
-} from './themePrefs';
+import { ThemePrefsProvider } from './ThemePrefsProvider';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
 import NetworkBanner from './components/NetworkBanner';
 import { startPrefetching } from './prefetchRoutes';
 import { AccentRootVars } from './AccentRootVars';
-import { sanitizeAccent } from './accent';
 
 /* ── Lazy-loaded routes (code-split per page) ── */
 /* The signed-in staff portal (shell + menu + every staff screen) is one chunk behind the sign-in guard. */
@@ -61,23 +53,9 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
 
 export default function App() {
-  const [accent, setAccentState] = useState<string>(readStoredAccent);
-  const [mode, setModeState] = useState<ThemeMode>(readStoredMode);
-  const setAccent = (color: string) => {
-    /* Only a usable colour is kept: a junk value would otherwise be stored and read back as the default next time anyway. */
-    const next = sanitizeAccent(color);
-    setAccentState(next);
-    try { localStorage.setItem(ACCENT_STORAGE_KEY, next); } catch { /* private mode */ }
-  };
-  const setMode = (next: ThemeMode) => {
-    setModeState(next);
-    try { localStorage.setItem(MODE_STORAGE_KEY, next); } catch { /* private mode */ }
-  };
-  const activeTheme = useMemo(() => buildTheme(accent, mode), [accent, mode]);
   return (
     <GlobalErrorBoundary>
-    <ThemePrefsContext.Provider value={{ accent, mode, setAccent, setMode }}>
-    <ThemeProvider theme={activeTheme}>
+    <ThemePrefsProvider>
       <CssBaseline />
       <KeyboardShortcuts />
       <QueryClientProvider client={queryClient}>
@@ -118,8 +96,7 @@ export default function App() {
           <Toaster position="top-right" />
         </BrowserRouter>
       </QueryClientProvider>
-    </ThemeProvider>
-    </ThemePrefsContext.Provider>
+    </ThemePrefsProvider>
     </GlobalErrorBoundary>
   );
 }
