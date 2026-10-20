@@ -19,6 +19,8 @@ import { WebApp } from './WebApp';
 import { createWebQueryClient, seedQueryClient } from './data';
 /* Archivo + Public Sans (self-hosted). The prerender inlines this chunk's CSS into every page. */
 import './fonts';
+/* The kit's stylesheet half: kinetic headline, hero intro, press feedback, the 'vypnuto' kill switch. Inlined by the prerender. */
+import '../motion/motion.css';
 
 export function mountWeb(container: HTMLElement): void {
   const queryClient = createWebQueryClient();

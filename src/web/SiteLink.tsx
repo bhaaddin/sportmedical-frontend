@@ -37,11 +37,16 @@ export interface SiteLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorEleme
 export const SiteLink = forwardRef<HTMLAnchorElement, SiteLinkProps>(function SiteLink({ to: rawTo, children, ...rest }, ref) {
   const inWeb = useContext(WebRouterContext);
   const hasRouter = useInRouterContext();
+  /* <html data-motion="full"> is the motion setting (src/motion/preference.ts): read here instead of imported, because
+     the sign-in page carries this file and must not carry the kit. */
+  const cinematic = typeof document !== 'undefined' && document.documentElement.dataset.motion === 'full';
   const to = currentSiteAddress(rawTo);
 
   if (hasRouter && !isExternal(to) && isWebTarget(to) === inWeb) {
     return (
-      <RouterLink ref={ref} to={to} {...rest}>
+      /* Between two pages of the public site the browser cross-fades them with a curtain (View Transitions, styled in
+         src/motion/motion.css); only with full motion, and only where the browser can. */
+      <RouterLink ref={ref} to={to} viewTransition={inWeb && cinematic} {...rest}>
         {children}
       </RouterLink>
     );

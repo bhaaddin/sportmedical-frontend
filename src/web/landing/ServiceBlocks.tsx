@@ -6,6 +6,7 @@
    Desktop: block 01 hangs its number in a left gutter; 02 puts the photo first. */
 
 import { Box } from '@mui/material';
+import { Parallax } from '../../motion/Parallax';
 import { pickRows, usePriceList } from '../../api/priceList';
 import type { RowSpec } from '../../api/priceList';
 import { MediaSlot } from '../../site/MediaSlot';
@@ -21,12 +22,15 @@ interface BlockDef {
   fallback: readonly string[];
   /** 'a' = number in the left gutter on desktop; 'b' = photo first; 'c' = plain. */
   layout: 'a' | 'b' | 'c';
+  /** What the block does as it arrives (src/motion/scenes/fx.ts): each block its own move. */
+  photoFx?: 'curtain' | 'scale';
+  blockFx?: 'pan';
 }
 
 const BLOCKS: BlockDef[] = [
-  { n: 1, to: '/prohlidky', spec: ROW_SPECS.prohlidky, fallback: FALLBACK_ROWS.prohlidky, layout: 'a' },
-  { n: 2, to: '/diagnostika', spec: ROW_SPECS.diagnostika, fallback: FALLBACK_ROWS.diagnostika, layout: 'b' },
-  { n: 3, to: '/inbody', spec: ROW_SPECS.inbody, fallback: FALLBACK_ROWS.inbody, layout: 'c' },
+  { n: 1, to: '/prohlidky', spec: ROW_SPECS.prohlidky, fallback: FALLBACK_ROWS.prohlidky, layout: 'a', photoFx: 'curtain' },
+  { n: 2, to: '/diagnostika', spec: ROW_SPECS.diagnostika, fallback: FALLBACK_ROWS.diagnostika, layout: 'b', photoFx: 'scale' },
+  { n: 3, to: '/inbody', spec: ROW_SPECS.inbody, fallback: FALLBACK_ROWS.inbody, layout: 'c', blockFx: 'pan' },
 ];
 
 function ServiceBlock({ def }: { def: BlockDef }) {
@@ -40,6 +44,7 @@ function ServiceBlock({ def }: { def: BlockDef }) {
   return (
     <Box
       component="article"
+      data-fx={def.blockFx}
       sx={{
         display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: { xs: '28px', md: '44px' }, alignItems: 'stretch',
         pt: { xs: '28px', md: '40px' }, borderTop: `2px solid ${W.text}`,
@@ -70,7 +75,7 @@ function ServiceBlock({ def }: { def: BlockDef }) {
           sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 'clamp(26px, 3vw, 34px)', letterSpacing: '-0.03em', lineHeight: 1.1 }}
         />
         <SlotText slotKey={`${prefix}.text`} as="p" sx={{ m: 0, fontSize: 17, lineHeight: 1.65, color: W.body, maxWidth: '60ch' }} />
-        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+        <Box data-fx="ticker" sx={{ display: 'flex', flexDirection: 'column' }}>
           {rows.length > 0
             ? rows.map((item, index) => (
                 <PriceRow key={item.code || item.name} to={def.to} name={item.name} item={item} last={index === rows.length - 1} />
@@ -81,15 +86,22 @@ function ServiceBlock({ def }: { def: BlockDef }) {
         </Box>
         <ArrowLink to={def.to}>{linkText}</ArrowLink>
       </Box>
-      <Box sx={{ minWidth: 0, order: photoFirst ? 1 : 2, [MQ.phoneOnly]: { order: 2 } }}>
-        <MediaSlot
-          slotKey={`${prefix}.photo`}
-          sizes="(max-width: 767px) 100vw, (max-width: 1279px) 40vw, 300px"
-          sx={{
-            aspectRatio: '4 / 3', minHeight: 0,
-            [MQ.tablet]: { aspectRatio: 'auto', height: '100%', minHeight: 300 },
-          }}
-        />
+      <Box
+        data-fx={def.photoFx}
+        sx={{ minWidth: 0, order: photoFirst ? 1 : 2, [MQ.phoneOnly]: { order: 2 }, borderRadius: '16px', overflow: 'hidden', [MQ.tablet]: { display: 'flex', flexDirection: 'column' } }}
+      >
+        <Parallax style={{ flex: '1 1 auto', borderRadius: 16 }}>
+          <Box data-fx-inner="" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <MediaSlot
+              slotKey={`${prefix}.photo`}
+              sizes="(max-width: 767px) 100vw, (max-width: 1279px) 40vw, 300px"
+              sx={{
+                aspectRatio: '4 / 3', minHeight: 0,
+                [MQ.tablet]: { aspectRatio: 'auto', height: '100%', minHeight: 300 },
+              }}
+            />
+          </Box>
+        </Parallax>
       </Box>
     </Box>
   );
@@ -98,11 +110,11 @@ function ServiceBlock({ def }: { def: BlockDef }) {
 export function ServiceBlocks() {
   const allPrices = useSlotText('landing.services.allprices');
   return (
-    <WebSection id="sluzby" py={[56, 84]} innerSx={{ display: 'flex', flexDirection: 'column', gap: { xs: '36px', md: '52px' } }}>
+    <WebSection id="sluzby" py={[56, 84]} reveal={false} innerSx={{ display: 'flex', flexDirection: 'column', gap: { xs: '36px', md: '52px' } }}>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '24px 36px', alignItems: 'flex-end', justifyContent: 'space-between' }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: 720 }}>
           <Eyebrow><SlotText slotKey="landing.services.eyebrow" /></Eyebrow>
-          <SectionTitle><SlotText slotKey="landing.services.title" /></SectionTitle>
+          <SectionTitle fx="wipe"><SlotText slotKey="landing.services.title" /></SectionTitle>
         </Box>
         <CtaButton to="/cenik" variant="ghostLight" height={50} fontSize={16} arrow>{allPrices}</CtaButton>
       </Box>

@@ -130,7 +130,7 @@ export function PublicHeader({ extra, hidePortalLink = false, wide = false }: Pu
     <Box
       component="header"
       sx={{
-        position: 'sticky', top: 0, zIndex: 50, flex: '0 0 auto', bgcolor: W.ink, color: W.white, borderBottom: `1px solid ${W.inkLine}`,
+        position: 'sticky', top: 0, zIndex: 50, viewTransitionName: 'sm-header', flex: '0 0 auto', bgcolor: W.ink, color: W.white, borderBottom: `1px solid ${W.inkLine}`,
       
       }}
     >

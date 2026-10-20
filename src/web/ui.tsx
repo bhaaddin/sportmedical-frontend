@@ -8,10 +8,13 @@
    price or a sentence.
    ══════════════════════════════════════════════════════════════ */
 
+import { useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Box } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material/styles';
 import { SiteLink } from './SiteLink';
+import { Magnetic } from '../motion/Magnetic';
+import { useReveal } from '../motion/Reveal';
 import { FONT_HEAD, GUTTER, MQ, SITE_MAX, W } from './tokens';
 import { formatCzk, formatMinutes } from '../api/priceList';
 import type { PriceItem } from '../api/priceList';
@@ -63,6 +66,14 @@ export interface WebSectionProps {
   /** px, or any CSS width; the default is the site's fluid column (tokens.ts, SITE_MAX). */
   maxWidth?: number | string;
   component?: 'section' | 'div';
+  /** The inner content rises in when it scrolls into view (default). The home page's own scenes pass false. */
+  reveal?: boolean;
+  /** A section transition of the scroll scenes (src/motion/scenes/fx.ts), put on the band itself. */
+  fx?: string;
+  /** Marks the band for a scroll scene (data-sm). */
+  dataSm?: string;
+  /** Drawn behind the content (the hero's shader). */
+  backdrop?: ReactNode;
 }
 
 const BAND = {
@@ -73,14 +84,20 @@ const BAND = {
 
 export function WebSection({
   children, tone = 'white', py = [56, 84], pt, pb, id, borderTop = false, innerSx, sx, maxWidth = SITE_MAX, component = 'section',
+  reveal = true, fx, dataSm, backdrop,
 }: WebSectionProps) {
+  const innerRef = useRef<HTMLDivElement>(null);
+  useReveal(innerRef, { variant: 'rise', enabled: reveal });
   return (
     <Box
       component={component}
       id={id}
+      data-fx={fx}
+      data-sm={dataSm}
       sx={[
         {
           ...BAND[tone],
+          ...(backdrop !== undefined ? { position: 'relative' } : {}),
           px: GUTTER,
           pt: { xs: `${(pt ?? py)[0]}px`, md: `${(pt ?? py)[1]}px` },
           pb: { xs: `${(pb ?? py)[0]}px`, md: `${(pb ?? py)[1]}px` },
@@ -90,7 +107,8 @@ export function WebSection({
         ...(Array.isArray(sx) ? sx : sx !== undefined ? [sx] : []),
       ]}
     >
-      <Box sx={[{ maxWidth, mx: 'auto' }, ...(Array.isArray(innerSx) ? innerSx : innerSx !== undefined ? [innerSx] : [])]}>{children}</Box>
+      {backdrop}
+      <Box ref={innerRef} sx={[{ maxWidth, mx: 'auto', ...(backdrop !== undefined ? { position: 'relative', zIndex: 1 } : {}) }, ...(Array.isArray(innerSx) ? innerSx : innerSx !== undefined ? [innerSx] : [])]}>{children}</Box>
     </Box>
   );
 }
@@ -118,15 +136,15 @@ export function Eyebrow({ children, onInk = false, rule = false, sx }: { childre
 
 /** Section title, Archivo 800. `size` picks the clamp of the artboard. */
 export function SectionTitle({
-  children, as = 'h2', size = 'lg', sx,
-}: { children: ReactNode; as?: 'h1' | 'h2' | 'h3'; size?: 'xl' | 'lg' | 'md'; sx?: SxProps<Theme> }) {
+  children, as = 'h2', size = 'lg', sx, fx,
+}: { children: ReactNode; as?: 'h1' | 'h2' | 'h3'; size?: 'xl' | 'lg' | 'md'; sx?: SxProps<Theme>; fx?: string }) {
   const font = {
     xl: { fontSize: 'clamp(32px, 4.4vw, 54px)', lineHeight: 1.02, letterSpacing: '-0.04em' },
     lg: { fontSize: 'clamp(32px, 4.2vw, 52px)', lineHeight: 1.04, letterSpacing: '-0.035em' },
     md: { fontSize: 'clamp(28px, 3.6vw, 44px)', lineHeight: 1.06, letterSpacing: '-0.035em' },
   }[size];
   return (
-    <Box component={as} sx={[{ m: 0, fontFamily: FONT_HEAD, fontWeight: 800, ...font }, ...(Array.isArray(sx) ? sx : sx !== undefined ? [sx] : [])]}>
+    <Box component={as} data-fx={fx} sx={[{ m: 0, fontFamily: FONT_HEAD, fontWeight: 800, ...font }, ...(Array.isArray(sx) ? sx : sx !== undefined ? [sx] : [])]}>
       {children}
     </Box>
   );
@@ -167,14 +185,17 @@ export interface CtaButtonProps {
   px?: number;
   fontSize?: number;
   arrow?: boolean;
+  /** The pill leans toward the pointer (fine pointers, full motion only). */
+  magnetic?: boolean;
   sx?: SxProps<Theme>;
 }
 
-export function CtaButton({ to, children, variant = 'primary', height = 56, px, fontSize = 17, arrow = false, sx }: CtaButtonProps) {
+export function CtaButton({ to, children, variant = 'primary', height = 56, px, fontSize = 17, arrow = false, magnetic = false, sx }: CtaButtonProps) {
   const base = {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '10px', height: Math.max(44, height),
     borderRadius: `${height / 2}px`, textDecoration: 'none', whiteSpace: 'nowrap', fontSize,
-    transition: 'transform .14s ease, box-shadow .14s ease', [MQ.reduceMotion]: { transition: 'none' },
+    transition: 'transform .14s ease, box-shadow .14s ease, scale var(--sm-dur-quick, 140ms) var(--sm-ease-pop, ease)', [MQ.reduceMotion]: { transition: 'none' },
+    '&:active': { scale: 'var(--sm-press, 1)' },
   } as const;
   const look = {
     primary: {
@@ -190,12 +211,13 @@ export function CtaButton({ to, children, variant = 'primary', height = 56, px, 
       '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 10px 24px rgba(0,0,0,.18)', color: W.text, [MQ.reduceMotion]: { transform: 'none' } },
     },
   }[variant];
-  return (
+  const button = (
     <Box component={SiteLink} to={to} sx={[base, look, ...(Array.isArray(sx) ? sx : sx !== undefined ? [sx] : [])]}>
       {children}
       {arrow && <ArrowIcon size={18} stroke={2.4} />}
     </Box>
   );
+  return magnetic ? <Magnetic style={{ display: 'inline-flex', maxWidth: '100%' }}>{button}</Magnetic> : button;
 }
 
 /* ── Price row ── */
@@ -215,6 +237,7 @@ export function PriceRow({
     <Box
       component={SiteLink}
       to={to}
+      data-fx-item=""
       sx={{
         display: 'flex', flexWrap: 'wrap', gap: '4px 16px', alignItems: 'baseline', py: '15px', textDecoration: 'none', color: W.text,
         borderTop: `1px solid ${W.line}`, ...(last ? { borderBottom: `1px solid ${W.line}` } : {}),

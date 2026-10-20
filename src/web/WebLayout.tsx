@@ -1,6 +1,7 @@
 /* The frame of every /web page: skip link, sticky header, the page, the footer, and — on a
    phone only — the pinned "Objednat termín" bar so the primary action is always in thumb reach. */
 
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Box } from '@mui/material';
@@ -12,6 +13,9 @@ import { usePublicClinic } from './data';
 import { CtaButton } from './ui';
 import { FONT_BODY, MQ, W } from './tokens';
 import { findWebRoute } from './routes';
+import { warmMotion } from '../motion/engine';
+import { LenisProvider } from '../motion/LenisProvider';
+import { useScrollScene } from '../motion/ScrollScene';
 
 export const MAIN_ID = 'web-main';
 
@@ -34,6 +38,11 @@ export function WebLayout({ children }: { children: ReactNode }) {
   const { data: content } = useSiteContent();
   const { pathname } = useLocation();
   const fit = findWebRoute(pathname)?.fit === true;
+  const mainRef = useRef<HTMLElement>(null);
+  /* The public site's scroll scenes (section transitions, the pinned sequence) and smooth scroll: after the first paint,
+     'plné' only, never on the board pages that do not scroll. */
+  useScrollScene(mainRef, () => import('../motion/scenes/site'), fit ? '' : pathname);
+  useEffect(() => warmMotion(), []);
 
   if (fit) {
     /* A board page: one screen high, the document never scrolls. The footer closes the page's own scrolling region on a phone and
@@ -86,7 +95,8 @@ export function WebLayout({ children }: { children: ReactNode }) {
         Přeskočit na obsah
       </Box>
       <PublicHeader />
-      <Box component="main" id={MAIN_ID} sx={{ flex: 1 }}>
+      {!fit && <LenisProvider />}
+      <Box component="main" id={MAIN_ID} ref={mainRef} sx={{ flex: 1 }}>
         {children}
       </Box>
       <PublicFooter clinic={clinic} content={content} />

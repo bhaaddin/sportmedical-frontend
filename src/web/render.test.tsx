@@ -24,7 +24,8 @@ describe('render() — the prerender entry', () => {
   it('puts the H1, the service names and the footer in the landing HTML', () => {
     const { html } = render('/', EMPTY_BOOTSTRAP);
     const h1 = /<h1[^>]*>(.*?)<\/h1>/.exec(html)?.[1] ?? '';
-    expect(h1.replace(/<[^>]+>/g, '|')).toMatch(/Sportovní lékařské.*prohlídky.*a diagnostika/);
+    // The words are masked spans (the kinetic headline): read the text, not the markup.
+    expect(h1.replace(/<br\s*\/?>/g, ' ').replace(/<[^>]+>/g, '')).toMatch(/Sportovní lékařské\s+prohlídky\s+a diagnostika/);
     expect(h1.match(/<br\/>/g)).toHaveLength(2);
     for (const name of ['Sportovní lékařské prohlídky', 'Sportovní diagnostika', 'InBody 770']) expect(html).toContain(name);
     expect(html).toContain('Mám odkaz od klubu');
