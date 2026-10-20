@@ -233,6 +233,16 @@ export interface ClubSettings {
   allowMultiServiceOrders: boolean;
   /** Owned by the palette settings; carried through untouched so a save here cannot wipe it. */
   blockPalette?: unknown;
+  /**
+   * The sentence parents read about who pays when the club is invoiced / when each parent pays.
+   * `null` = the clinic has written none and the default below is shown. On a PUT `null` KEEPS the
+   * stored sentence and `""` clears it (measured on the dev API), so the screen sends text or "".
+   */
+  payerTextClubInvoice?: string | null;
+  payerTextPerPerson?: string | null;
+  /** The sentences used while the two above are empty - the server's, shown as the placeholder. */
+  defaultPayerTextClubInvoice?: string;
+  defaultPayerTextPerPerson?: string;
 }
 
 export const CLUB_SETTINGS_QUERY_KEY = ['settings', 'clubs'] as const;
@@ -246,6 +256,10 @@ function toClubSettings(data: unknown): ClubSettings {
     releaseUnusedDaysBefore:
       typeof r.releaseUnusedDaysBefore === 'number' && Number.isFinite(r.releaseUnusedDaysBefore) ? r.releaseUnusedDaysBefore : null,
     allowMultiServiceOrders: r.allowMultiServiceOrders === true,
+    payerTextClubInvoice: typeof r.payerTextClubInvoice === 'string' && r.payerTextClubInvoice.trim() !== '' ? r.payerTextClubInvoice : null,
+    payerTextPerPerson: typeof r.payerTextPerPerson === 'string' && r.payerTextPerPerson.trim() !== '' ? r.payerTextPerPerson : null,
+    defaultPayerTextClubInvoice: typeof r.defaultPayerTextClubInvoice === 'string' ? r.defaultPayerTextClubInvoice : '',
+    defaultPayerTextPerPerson: typeof r.defaultPayerTextPerPerson === 'string' ? r.defaultPayerTextPerPerson : '',
     ...(r.blockPalette !== undefined ? { blockPalette: r.blockPalette } : {}),
   };
 }

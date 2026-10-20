@@ -5,6 +5,10 @@ import {
   Alert,
   Box,
   Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   LinearProgress,
   MenuItem,
@@ -22,7 +26,7 @@ import type { ClubBlockView } from "../../api/clubBlocks";
 import { partnerTypeName } from "../../api/bookingContracts";
 import type { PartnerWindow } from "../../api/bookingContracts";
 import { useDevice } from "../../layout/useDevice";
-import { formatDateOnly, formatPragueDate, pragueDateKey, toDateOnly } from "../../utils/time";
+import { formatDateOnly, formatPragueDate, pragueDateKey } from "../../utils/time";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import {
   NewPartnerOrderDialog,
@@ -149,6 +153,8 @@ export default function PartnerOrdersPage() {
     window: PartnerWindow;
   } | null>(null);
   const [extending, setExtending] = useState<PartnerOrder | null>(null);
+  /* Revoking the link cannot be undone, so it asks first. */
+  const [confirmRevoke, setConfirmRevoke] = useState<PartnerOrder | null>(null);
   const [newDeadline, setNewDeadline] = useState("");
 
   const calendarsQuery = useQuery({
@@ -172,8 +178,8 @@ export default function PartnerOrdersPage() {
   });
 
   const noticesQuery = useQuery({
-    queryKey: ["partner-notices", chosen, toDateOnly(new Date())],
-    queryFn: () => partnerOrdersApi.notices(chosen, toDateOnly(new Date())),
+    queryKey: ["partner-notices", chosen, pragueDateKey(new Date())],
+    queryFn: () => partnerOrdersApi.notices(chosen, pragueDateKey(new Date())),
     enabled: chosen !== "",
   });
 
@@ -219,7 +225,10 @@ export default function PartnerOrdersPage() {
   const revoke = useMutation({
     mutationFn: (order: PartnerOrder) =>
       partnerOrdersApi.revoke(order.calendarId, order.id),
-    onSuccess: reload,
+    onSuccess: () => {
+      setConfirmRevoke(null);
+      reload();
+    },
   });
 
   const orders = ordersQuery.data ?? [];
@@ -329,9 +338,6 @@ export default function PartnerOrdersPage() {
           skeletonRows={4}
         >
           <FitBody scroll sx={{ gap: 2 }}>
-            {revoke.error ? (
-              <Alert severity="error">{errorText(revoke.error, t)}</Alert>
-            ) : null}
             <Box
               role="list"
               aria-label="Hromadné objednávky"
@@ -357,7 +363,10 @@ export default function PartnerOrdersPage() {
                   setExtending(order);
                   setNewDeadline("");
                 }}
-                onRevoke={() => revoke.mutate(order)}
+                onRevoke={() => {
+                  revoke.reset();
+                  setConfirmRevoke(order);
+                }}
               />
             ))}
             </Box>
@@ -386,11 +395,20 @@ export default function PartnerOrdersPage() {
               label={t("booking.partner.newDeadline")}
               value={newDeadline}
               onChange={(e) => setNewDeadline(e.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
+              error={newDeadline !== "" && newDeadline < pragueDateKey(new Date())}
+              helperText={
+                newDeadline !== "" && newDeadline < pragueDateKey(new Date())
+                  ? "Lhůta nemůže být v minulosti."
+                  : undefined
+              }
+              slotProps={{
+                inputLabel: { shrink: true },
+                htmlInput: { min: pragueDateKey(new Date()) },
+              }}
             />
             <Button
               variant="contained"
-              disabled={newDeadline === "" || extendDeadline.isPending}
+              disabled={newDeadline === "" || newDeadline < pragueDateKey(new Date()) || extendDeadline.isPending}
               onClick={() =>
                 extendDeadline.mutate({ order: extending, date: newDeadline })
               }
@@ -420,12 +438,42 @@ export default function PartnerOrdersPage() {
         />
       ) : null}
 
+      <Dialog open={confirmRevoke !== null} onClose={() => setConfirmRevoke(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Zrušit odkaz?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Odkaz pro „{confirmRevoke?.partnerName}“ přestane fungovat a už se nedá obnovit. Kdo už má
+            termín, ten mu zůstane; nikdo se neruší.
+          </Typography>
+          {revoke.error ? (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {errorText(revoke.error, t)}
+            </Alert>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmRevoke(null)} sx={{ minHeight: 44 }}>
+            {t("booking.common.cancel")}
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={revoke.isPending}
+            onClick={() => confirmRevoke && revoke.mutate(confirmRevoke)}
+            sx={{ minHeight: 44 }}
+          >
+            {t("booking.partner.revokeLink")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {releasing ? (
         <ReleaseWindowDialog
           open
           order={releasing.order}
           window={releasing.window}
-          otherOrders={orders.filter((o) => o.id !== releasing.order.id)}
+          /* A revoked order's link is dead; the time cannot go back to it. */
+          otherOrders={orders.filter((o) => o.id !== releasing.order.id && !o.isRevoked)}
           onClose={() => setReleasing(null)}
           onReleased={reload}
         />
@@ -456,7 +504,7 @@ function OrderCard({
   onRevoke: () => void;
 }) {
   const { t } = useTranslation();
-  const today = toDateOnly(new Date());
+  const today = pragueDateKey(new Date());
   const typeKey = partnerTypeName(order.partnerType);
   const [reportOpen, setReportOpen] = useState(false);
   const free = Math.max(0, order.requestedCount - order.bookedCount);

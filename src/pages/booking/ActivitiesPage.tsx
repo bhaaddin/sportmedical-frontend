@@ -54,6 +54,7 @@ import { AsyncSection } from "../../components/booking/AsyncSection";
 import { errorText } from "../../components/booking/errorText";
 import { ColorSelect } from "../../components/booking/ColorSelect";
 import { SettingsScreen } from "../settings/SettingsFrame";
+import { FIELD_LIMITS } from "../../api/fieldLimits";
 import {
   DEFAULT_PALETTE_ENTRY,
   readableTextOn,
@@ -325,6 +326,8 @@ export default function ActivitiesPage() {
   const noServicesYet = clinicServicesQuery.isSuccess && clinicServices.length === 0;
   const serviceIsValid = (draft?.clinicServiceId ?? "").trim().length > 0;
   const durationIsValid = (draft?.durationMinutes ?? 0) > 0;
+  /* The server refuses a negative order (as `scheduling.sort_order_negative`). */
+  const orderIsValid = (draft?.sortOrder ?? 0) >= 0;
 
   return (
     <SettingsScreen
@@ -591,6 +594,7 @@ export default function ActivitiesPage() {
                 }}
                 error={duplicate !== null || (draft.name !== "" && !nameIsValid)}
                 helperText={duplicate ?? undefined}
+                slotProps={{ htmlInput: { maxLength: FIELD_LIMITS.activityName } }}
               />
               <TextField
                 required
@@ -709,6 +713,7 @@ export default function ActivitiesPage() {
                 onChange={(e) =>
                   setDraft({ ...draft, publicNote: e.target.value })
                 }
+                slotProps={{ htmlInput: { maxLength: FIELD_LIMITS.activityPublicNote } }}
               />
               <TextField
                 fullWidth
@@ -718,6 +723,9 @@ export default function ActivitiesPage() {
                 onChange={(e) =>
                   setDraft({ ...draft, sortOrder: Number(e.target.value) || 0 })
                 }
+                error={!orderIsValid}
+                helperText={orderIsValid ? undefined : "Pořadí musí být celé číslo od 0."}
+                slotProps={{ htmlInput: { min: 0 } }}
               />
               <FormControlLabel
                 control={
@@ -867,7 +875,7 @@ export default function ActivitiesPage() {
           <Button onClick={closeDialog}>{t("booking.common.cancel")}</Button>
           <Button
             variant="contained"
-            disabled={!nameIsValid || !durationIsValid || !serviceIsValid || save.isPending}
+            disabled={!nameIsValid || !durationIsValid || !orderIsValid || !serviceIsValid || save.isPending}
             onClick={() => draft && nameIsValid && save.mutate({ ...draft, name: draft.name.trim() })}
           >
             {t("booking.common.save")}

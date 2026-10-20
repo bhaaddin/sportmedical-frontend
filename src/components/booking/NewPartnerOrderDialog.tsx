@@ -69,6 +69,11 @@ import { hourToTime } from "../../utils/dayHours";
  * is optional and only fills what the owner has not typed.
  */
 
+/** What the server keeps: a name of up to 100 characters, an e-mail of up to 128. */
+export const PARTNER_NAME_MAX = 100;
+export const PARTNER_EMAIL_MAX = 128;
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /** 4.7 takes these as numbers; the strings that match the prose are refused. */
 const PARTNER_TYPES = Object.keys(PARTNER_TYPE_NAMES).map(Number);
 
@@ -302,10 +307,21 @@ export function NewPartnerOrderDialog({
     },
   });
 
+  /* Measured on the dev API: the same činnost twice is a bare 500, a window that ends where it starts is a 422
+     after the order already exists (so a half-made order), and an e-mail is stored whatever it says. */
+  const usedActivities = items.map((i) => i.activityId).filter((id) => id !== "");
+  const duplicateActivity = new Set(usedActivities).size !== usedActivities.length;
+  const windowBackwards = (w: WindowDraft) => w.startTime !== "" && w.endTime !== "" && w.endTime <= w.startTime;
+  const emailInvalid = contactEmail.trim() !== "" && !EMAIL_SHAPE.test(contactEmail.trim());
+
   const canSave =
     partnerName.trim().length > 0 &&
+    !emailInvalid &&
+    !duplicateActivity &&
     items.every((i) => i.activityId !== "" && i.requestedCount > 0) &&
-    windows.every((w) => w.date !== "" && w.startTime !== "" && w.endTime !== "") &&
+    windows.every((w) => w.date !== "" && w.startTime !== "" && w.endTime !== "" && !windowBackwards(w)) &&
+    /* After a part-way failure the order exists: saving again would make a second one. */
+    partial === null &&
     !save.isPending;
 
   const short = requiredMinutes > 0 && coveredMinutes < requiredMinutes;
@@ -326,6 +342,7 @@ export function NewPartnerOrderDialog({
                 label={t("booking.partner.name")}
                 value={partnerName}
                 onChange={(e) => setPartnerName(e.target.value)}
+                slotProps={{ htmlInput: { maxLength: PARTNER_NAME_MAX } }}
               />
               <TextField
                 select
@@ -347,6 +364,9 @@ export function NewPartnerOrderDialog({
                 label={t("booking.partner.email")}
                 value={contactEmail}
                 onChange={(e) => setContactEmail(e.target.value)}
+                error={emailInvalid}
+                helperText={emailInvalid ? "Zadejte e-mail ve tvaru klub@priklad.cz, nebo pole nechte prázdné." : undefined}
+                slotProps={{ htmlInput: { maxLength: PARTNER_EMAIL_MAX } }}
               />
             </Stack>
           </Box>
@@ -408,7 +428,12 @@ export function NewPartnerOrderDialog({
                       }
                     >
                       {activities.map((a) => (
-                        <MenuItem key={a.id} value={a.id}>
+                        <MenuItem
+                          key={a.id}
+                          value={a.id}
+                          /* One line per činnost: the same one twice is a 500 on the server. */
+                          disabled={a.id !== item.activityId && usedActivities.includes(a.id)}
+                        >
                           {a.name} · {a.durationMinutes} min
                           {a.priceCzk !== null ? ` · ${a.priceCzk.toLocaleString("cs-CZ")} Kč` : ""}
                         </MenuItem>
@@ -571,6 +596,8 @@ export function NewPartnerOrderDialog({
                     type="time"
                     size="small"
                     label={t("booking.partner.to")}
+                    error={windowBackwards(w)}
+                    helperText={windowBackwards(w) ? "Konec musí být později než začátek." : undefined}
                     value={w.endTime}
                     onChange={(e) =>
                       setWindows((prev) =>

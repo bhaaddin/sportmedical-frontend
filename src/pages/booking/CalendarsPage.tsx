@@ -43,6 +43,8 @@ import { AsyncSection } from "../../components/booking/AsyncSection";
 import { errorText } from "../../components/booking/errorText";
 import { CalendarAccessDialog } from "../../components/booking/CalendarAccessDialog";
 import { SettingsScreen } from "../settings/SettingsFrame";
+import { FIELD_LIMITS, PUBLIC_NUMBER_MINIMUMS } from "../../api/fieldLimits";
+import { calendarProblems, hasCalendarProblems } from "./calendarForm";
 import { ColorSelect } from "../../components/booking/ColorSelect";
 import {
   DEFAULT_PALETTE_ENTRY,
@@ -284,6 +286,8 @@ export default function CalendarsPage() {
   const showHandoffNotice = handoffAsks === 'assign' && handedOver !== handoffTaken;
 
   const nameIsValid = (draft?.name ?? "").trim().length > 0;
+  /* Measured server rules, said at the field they are about (calendarForm.ts). */
+  const problems = draft === null ? {} : calendarProblems(draft);
 
   return (
     <SettingsScreen
@@ -520,7 +524,9 @@ export default function CalendarsPage() {
                 label={t("booking.calendars.column.name")}
                 value={draft.name}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                error={draft.name !== "" && !nameIsValid}
+                error={problems.name !== undefined && draft.name !== ""}
+                helperText={draft.name !== "" ? problems.name : undefined}
+                slotProps={{ htmlInput: { maxLength: FIELD_LIMITS.calendarName } }}
               />
               <ColorSelect
                 label={t("booking.calendars.column.color")}
@@ -534,6 +540,9 @@ export default function CalendarsPage() {
                 onChange={(e) =>
                   setDraft({ ...draft, location: e.target.value })
                 }
+                error={problems.location !== undefined}
+                helperText={problems.location}
+                slotProps={{ htmlInput: { maxLength: FIELD_LIMITS.calendarLocation } }}
               />
               {/*
                 * Which služba this calendar runs. Required in practice though
@@ -579,7 +588,9 @@ export default function CalendarsPage() {
                     displayStepMinutes: Number(e.target.value) || 0,
                   })
                 }
-                helperText={t("booking.calendars.stepHelp")}
+                error={problems.displayStepMinutes !== undefined}
+                helperText={problems.displayStepMinutes ?? t("booking.calendars.stepHelp")}
+                slotProps={{ htmlInput: { min: 1 } }}
               />
               <TextField
                 fullWidth
@@ -589,6 +600,9 @@ export default function CalendarsPage() {
                 onChange={(e) =>
                   setDraft({ ...draft, sortOrder: Number(e.target.value) || 0 })
                 }
+                error={problems.sortOrder !== undefined}
+                helperText={problems.sortOrder}
+                slotProps={{ htmlInput: { min: 0 } }}
               />
               {/*
                 * Objednavani online.
@@ -629,7 +643,9 @@ export default function CalendarsPage() {
                       publicMinimumNoticeMinutes: numberOrNull(e.target.value),
                     })
                   }
-                  helperText="Kolik času musí zbývat, aby si pacient termín ještě objednal. Prázdné = bez omezení."
+                  error={problems.publicMinimumNoticeMinutes !== undefined}
+                  helperText={problems.publicMinimumNoticeMinutes ?? "Kolik času musí zbývat, aby si pacient termín ještě objednal. Prázdné = bez omezení."}
+                  slotProps={{ htmlInput: { min: PUBLIC_NUMBER_MINIMUMS.publicMinimumNoticeMinutes } }}
                 />
 
                 <TextField
@@ -643,7 +659,9 @@ export default function CalendarsPage() {
                       publicHorizonDays: numberOrNull(e.target.value),
                     })
                   }
-                  helperText="Jak daleko dopředu se lze objednat. Prázdné = bez omezení."
+                  error={problems.publicHorizonDays !== undefined}
+                  helperText={problems.publicHorizonDays ?? "Jak daleko dopředu se lze objednat. Prázdné = bez omezení."}
+                  slotProps={{ htmlInput: { min: PUBLIC_NUMBER_MINIMUMS.publicHorizonDays } }}
                 />
 
                 <TextField
@@ -657,7 +675,9 @@ export default function CalendarsPage() {
                       publicHoldMinutes: numberOrNull(e.target.value),
                     })
                   }
-                  helperText="Jak dlouho termín držíme, než pacient dovyplní registraci. Prázdné = výchozí délka držení v ordinaci."
+                  error={problems.publicHoldMinutes !== undefined}
+                  helperText={problems.publicHoldMinutes ?? "Jak dlouho termín držíme, než pacient dovyplní registraci. Prázdné = výchozí délka držení v ordinaci."}
+                  slotProps={{ htmlInput: { min: PUBLIC_NUMBER_MINIMUMS.publicHoldMinutes } }}
                 />
 
                 <TextField
@@ -671,7 +691,9 @@ export default function CalendarsPage() {
                       publicCancellationHours: numberOrNull(e.target.value),
                     })
                   }
-                  helperText="Do kdy může pacient termín zrušit sám. Později už jen telefonicky. Prázdné = výchozí lhůta v ordinaci."
+                  error={problems.publicCancellationHours !== undefined}
+                  helperText={problems.publicCancellationHours ?? "Do kdy může pacient termín zrušit sám. Později už jen telefonicky. Prázdné = výchozí lhůta v ordinaci."}
+                  slotProps={{ htmlInput: { min: PUBLIC_NUMBER_MINIMUMS.publicCancellationHours } }}
                 />
               </Box>
 
@@ -693,8 +715,8 @@ export default function CalendarsPage() {
           <Button onClick={closeDialog}>{t("booking.common.cancel")}</Button>
           <Button
             variant="contained"
-            disabled={!nameIsValid || !serviceIsChosen || save.isPending}
-            onClick={() => draft && save.mutate(draft)}
+            disabled={!nameIsValid || !serviceIsChosen || hasCalendarProblems(problems) || save.isPending}
+            onClick={() => draft && save.mutate({ ...draft, name: draft.name.trim(), location: draft.location.trim() })}
           >
             {t("booking.common.save")}
           </Button>

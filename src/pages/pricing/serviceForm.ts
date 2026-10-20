@@ -15,6 +15,7 @@
  * "1.500". All three mean the same amount and all three are accepted.
  */
 import type { ServiceItem } from '../../api/services';
+import { FIELD_LIMITS } from '../../api/fieldLimits';
 
 /*
  * What goes in the column nobody reads any more.
@@ -53,7 +54,16 @@ export type ServiceErrors = Partial<Record<keyof ServiceDraft, string>>;
  * has one and people use it.
  */
 export function parseCzechNumber(text: string): number | null {
-  const cleaned = text.replace(/[\s\u00A0\u202F]/g, '').replace(',', '.');
+  let cleaned = text.replace(/[\s\u00A0\u202F]/g, '');
+  /*
+   * "1.500,50" and "1.500" are the Czech way to write one thousand five hundred:
+   * a dot is a thousands separator when a comma follows it, or when it splits
+   * groups of exactly three digits ("1.500", "12.345.678"). "1500.50" and "0.5"
+   * stay decimals - money has two decimals, never three. Without this "1.500"
+   * was saved as 1,5 K\u010D, which the header above promised not to do.
+   */
+  if (cleaned.includes(',')) cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+  else if (/^-?[1-9]\d{0,2}(\.\d{3})+$/.test(cleaned)) cleaned = cleaned.replace(/\./g, '');
   if (cleaned === '') return null;
   if (!/^-?\d*\.?\d*$/.test(cleaned)) return null;
   const value = Number(cleaned);
@@ -105,24 +115,41 @@ export function validateService(
   }
 
   if (name === '') errors.name = 'Název je povinný.';
+  else if (name.length > FIELD_LIMITS.priceItemName) errors.name = `Název může mít nejvýše ${FIELD_LIMITS.priceItemName} znaků.`;
+
+  if (code.length > FIELD_LIMITS.priceItemCode && errors.code === undefined) {
+    errors.code = `Kód může mít nejvýše ${FIELD_LIMITS.priceItemCode} znaků.`;
+  }
+  if (draft.description.trim().length > FIELD_LIMITS.priceItemDescription) {
+    errors.description = `Popis může mít nejvýše ${FIELD_LIMITS.priceItemDescription} znaků.`;
+  }
 
   const price = parseCzechNumber(draft.priceCzk);
   if (price === null) {
     errors.priceCzk = 'Zadejte cenu v Kč.';
   } else if (price < 0) {
     errors.priceCzk = 'Cena nemůže být záporná.';
+  } else if (!hasAtMostTwoDecimals(price)) {
+    errors.priceCzk = 'Cena může mít nejvýše dvě desetinná místa.';
   }
 
   if ((draft.listPriceCzk ?? '').trim() !== '') {
     const list = parseCzechNumber(draft.listPriceCzk ?? '');
     if (list === null) {
       errors.listPriceCzk = 'Zadejte původní cenu v Kč, nebo pole nechte prázdné.';
+    } else if (!hasAtMostTwoDecimals(list)) {
+      errors.listPriceCzk = 'Původní cena může mít nejvýše dvě desetinná místa.';
     } else if (list <= 0 || (price !== null && list <= price)) {
       errors.listPriceCzk = 'Původní cena musí být vyšší než cena.';
     }
   }
 
   return errors;
+}
+
+/** Koruny and haléře: the server stores whatever it is sent, so three decimals would end up on an invoice. */
+export function hasAtMostTwoDecimals(value: number): boolean {
+  return Math.abs(value * 100 - Math.round(value * 100)) < 1e-7;
 }
 
 export function hasErrors(errors: ServiceErrors): boolean {

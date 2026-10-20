@@ -110,7 +110,14 @@ export default function Admin() {
   /* Empty is allowed (club links then use this app's own address); anything else must read as a web address. */
   const siteUrlInvalid = pub.siteUrl.trim() !== '' && normalizeBase(pub.siteUrl) === '';
 
+  /* The server stores any text as the contact e-mail (measured: "not-an-email" was accepted), and the public pages print it. */
+  const emailInvalid = pub.contactEmail.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(pub.contactEmail.trim());
+
   const handleSave = async () => {
+    if (emailInvalid) {
+      setSaveFailed('E-mail pro pacienty není platný. Zadejte jej například ve tvaru recepce@priklad.cz.');
+      return;
+    }
     if (siteUrlInvalid) {
       setSaveFailed('Veřejná adresa webu není platná. Zadejte ji například ve tvaru https://www.priklad.cz.');
       return;
@@ -163,6 +170,8 @@ export default function Admin() {
         </Box>
       }
       asideTitle="Tak to uvidí pacient"
+      /* The server files these under "pub" (measured: "Veřejný web: název ordinace …"). */
+      scope="pub"
       actions={
         <Button
           variant="contained"
@@ -197,6 +206,8 @@ export default function Admin() {
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextField fullWidth label="Email" value={pub.contactEmail}
               onChange={e => updatePub('contactEmail', e.target.value)}
+              error={emailInvalid}
+              helperText={emailInvalid ? 'Zadejte e-mail ve tvaru recepce@priklad.cz.' : undefined}
               slotProps={{ input: { startAdornment: adornment(<Email fontSize="small" />) } }} />
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>

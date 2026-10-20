@@ -163,7 +163,7 @@ export default function ServiceColorsPage() {
     <SettingsScreen
       title="Barvy služeb"
       subtitle="Každá služba má svou barvu, její činnosti jsou v odstínech téže barvy — stejně v kalendáři, legendách i štítcích."
-      scope="service-colors"
+      scope="calendar"
       save={{ dirty, saving: savePalette.isPending, onSave: submit, onDiscard: discard }}
       loading={rows === null && !paletteQuery.isError}
       error={paletteQuery.isError ? 'Paletu barev se nepodařilo načíst.' : undefined}

@@ -34,8 +34,9 @@ import {
 } from "../../api/employeeAbsences";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { errorText } from "../../components/booking/errorText";
-import { formatDateOnly, toDateOnly } from "../../utils/time";
+import { formatDateOnly, pragueDateKey } from "../../utils/time";
 import { SettingsScreen } from "../settings/SettingsFrame";
+import { FIELD_LIMITS } from "../../api/fieldLimits";
 
 /*
  * Nepřítomnost zaměstnanců - who is out, and when.
@@ -63,7 +64,7 @@ export default function EmployeeAbsencesPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const today = toDateOnly(new Date());
+  const today = pragueDateKey(new Date());
 
   /** Everybody when empty; one person when opened from their row. */
   const userFilter = searchParams.get("userId") ?? "";
@@ -145,6 +146,8 @@ export default function EmployeeAbsencesPage() {
   };
 
   const problem = draft ? absenceDraftProblem(draft) : null;
+  /* Said at the end date whether or not a worker is chosen yet: `problem` names only the first thing that is wrong. */
+  const endBeforeStart = draft !== null && draft.fromDate !== "" && draft.toDate !== "" && draft.toDate < draft.fromDate;
 
   return (
     <SettingsScreen
@@ -268,8 +271,8 @@ export default function EmployeeAbsencesPage() {
                   type="date"
                   label={t("booking.absences.to")}
                   value={draft.toDate}
-                  error={problem === "order"}
-                  helperText={problem === "order" ? t("booking.absences.orderProblem") : undefined}
+                  error={endBeforeStart}
+                  helperText={endBeforeStart ? t("booking.absences.orderProblem") : undefined}
                   onChange={(e) => setDraft({ ...draft, toDate: e.target.value })}
                   slotProps={{ inputLabel: { shrink: true } }}
                 />
@@ -280,6 +283,7 @@ export default function EmployeeAbsencesPage() {
                 placeholder={t("booking.absences.reasonPlaceholder")}
                 value={draft.reason}
                 onChange={(e) => setDraft({ ...draft, reason: e.target.value })}
+                slotProps={{ htmlInput: { maxLength: FIELD_LIMITS.reason } }}
               />
               <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 {t("booking.absences.effect")}

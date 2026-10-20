@@ -19,7 +19,7 @@ import { TYPE, settingsGrey } from '../../../components/settings/settingsStyle';
 import {
   type DiscountErrors, type PackageRow, type PricedActivity, type RoleRow, type TierRange, type TierRow,
   dearestPriced, exampleLine, formatKc, formatPercent, headcountSentence, initialHeadcount, isOwnerRole,
-  nextKey, parseWhole, rangeFor, rangeText, roleLabel,
+  nextKey, parseWhole, rangeFor, rangeText, roleName,
 } from './discountLogic';
 
 /** A titled card: the section title (18/700) and one sentence under it. */
@@ -237,14 +237,14 @@ export function RoleLimitEditor({
       label={size === 'medium' ? 'Nejvýše' : undefined}
       fullWidth
       slotProps={{
-        htmlInput: { inputMode: 'decimal', 'aria-label': `Nejvyšší ruční sleva — ${roleLabel(row.role)}` },
+        htmlInput: { inputMode: 'decimal', 'aria-label': `Nejvyšší ruční sleva — ${roleName(row)}` },
         input: { endAdornment: <InputAdornment position="end">%</InputAdornment> },
       }}
       sx={{ minWidth: 120 }}
     />
   );
   const columns: DataColumn<RoleRow>[] = [
-    { key: 'role', header: 'Role', tablet: true, cell: (r) => <Typography sx={TYPE.itemName}>{roleLabel(r.role)}</Typography> },
+    { key: 'role', header: 'Role', tablet: true, cell: (r) => <Typography sx={TYPE.itemName}>{roleName(r)}</Typography> },
     { key: 'limit', header: 'Ruční sleva nejvýše', tablet: true, cell: percentField },
   ];
 
@@ -258,7 +258,7 @@ export function RoleLimitEditor({
         empty="Server zatím neposlal žádnou roli, které by šlo limit nastavit."
         renderCard={(row) => (
           <Stack spacing={1.5}>
-            <Typography sx={TYPE.itemName}>{roleLabel(row.role)}</Typography>
+            <Typography sx={TYPE.itemName}>{roleName(row)}</Typography>
             {percentField(row)}
           </Stack>
         )}

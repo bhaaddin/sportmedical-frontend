@@ -14,7 +14,7 @@ const NBSP = ' ';
 
 export interface TierRow { key: string; min: string; percent: string }
 export interface PackageRow { key: string; activityId: string; percent: string }
-export interface RoleRow { key: string; role: string; percent: string }
+export interface RoleRow { key: string; role: string; percent: string; /** The server's own word for the role, when it sent one. */ label?: string }
 export interface DiscountDraft { tiers: TierRow[]; packages: PackageRow[]; roles: RoleRow[] }
 
 let seq = 0;
@@ -26,7 +26,7 @@ export function toDraft(settings: DiscountSettings): DiscountDraft {
   return {
     tiers: settings.tiers.map((t) => ({ key: nextKey(), min: asText(t.minPersons), percent: asText(t.percent) })),
     packages: settings.packageDiscounts.map((p) => ({ key: nextKey(), activityId: p.activityId, percent: asText(p.percent) })),
-    roles: settings.roleLimits.map((r) => ({ key: nextKey(), role: r.role, percent: asText(r.maxManualPercent) })),
+    roles: settings.roleLimits.map((r) => ({ key: nextKey(), role: r.role, percent: asText(r.maxManualPercent), ...(r.label !== undefined ? { label: r.label } : {}) })),
   };
 }
 
@@ -242,6 +242,9 @@ const ROLE_LABELS: Record<string, string> = {
 
 /** The role as the screen says it; a role the screen does not know keeps the server's own word. */
 export const roleLabel = (role: string): string => ROLE_LABELS[role.trim().toLowerCase()] ?? role;
+
+/** What a role row is called: the word the server sent for it, else the screen's own, else the role itself. */
+export const roleName = (row: { role: string; label?: string }): string => (row.label !== undefined && row.label.trim() !== '' ? row.label : roleLabel(row.role));
 
 /** The owner is unlimited by rule: shown, never edited. */
 export const isOwnerRole = (role: string): boolean => ['owner', 'vlastnik', 'vlastník'].includes(role.trim().toLowerCase());

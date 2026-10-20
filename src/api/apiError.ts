@@ -1,4 +1,5 @@
 import { AxiosError } from 'axios';
+import { wordedServerMessage } from './schedulingMessages';
 
 /**
  * Maps a failed request onto the booking contract's error table (3.2).
@@ -53,7 +54,8 @@ interface ApiResultEnvelope {
 function readServerMessage(payload: unknown): string | undefined {
   if (payload && typeof payload === 'object' && 'message' in payload) {
     const message = (payload as ApiResultEnvelope).message;
-    if (typeof message === 'string' && message.trim() !== '') return message;
+    /* A rule's code ("scheduling.…") is worded in Czech, never shown as it is. */
+    if (typeof message === 'string' && message.trim() !== '') return wordedServerMessage(message);
   }
   return undefined;
 }

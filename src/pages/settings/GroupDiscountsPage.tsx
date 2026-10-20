@@ -150,6 +150,8 @@ export default function GroupDiscountsPage() {
     <SettingsScreen
       title="Doporučené hladiny slev"
       subtitle="Doporučené hladiny — slevu klubu určuje administrátor na kartě klubu"
+      /* The same tiers as Slevy a cenové hladiny, so the same history ("pricing"). */
+      scope="pricing"
       actions={
         <>
           <Button variant="outlined" onClick={discard} disabled={!dirty || save.isPending}>

@@ -51,6 +51,7 @@ import UndoIcon from '@mui/icons-material/Undo';
 import { SettingsScreen } from './SettingsFrame';
 import EditIcon from '@mui/icons-material/Edit';
 import { holidaysApi } from '../../api/holidays';
+import { FIELD_LIMITS, HOLIDAY_YEAR_MAX, HOLIDAY_YEAR_MIN } from '../../api/fieldLimits';
 import type { ClinicHoliday } from '../../api/holidays';
 import { calendarsApi } from '../../api/calendars';
 import { workingHoursApi } from '../../api/workingHours';
@@ -95,7 +96,8 @@ export default function HolidaysPage() {
   const queryClient = useQueryClient();
 
   const [year, setYear] = useState(thisYear);
-  const [editing, setEditing] = useState<{ date: string; name: string; isHoliday: boolean } | null>(null);
+  /* `existing`: a day already on the list is renamed, never moved - its date is fixed. */
+  const [editing, setEditing] = useState<{ date: string; name: string; isHoliday: boolean; existing: boolean } | null>(null);
   const [blocked, setBlocked] = useState<{ date: string; calendars: string[] } | null>(null);
 
   const holidays = useQuery({
@@ -191,7 +193,8 @@ export default function HolidaysPage() {
 
   const busy = setWorking.isPending || setOnline.isPending || reset.isPending;
   const rows = holidays.data ?? [];
-  const failure = setWorking.error ?? setOnline.error ?? reset.error ?? save.error;
+  /* The dialog's own refusal is shown inside the dialog: behind a modal the page banner is out of sight. */
+  const failure = setWorking.error ?? setOnline.error ?? reset.error;
 
   return (
     <SettingsScreen
@@ -201,7 +204,7 @@ export default function HolidaysPage() {
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={() => setEditing({ date: `${year}-01-01`, name: '', isHoliday: true })}
+          onClick={() => { save.reset(); setEditing({ date: `${year}-01-01`, name: '', isHoliday: true, existing: false }); }}
         >
           Přidat vlastní volno
         </Button>
@@ -215,9 +218,9 @@ export default function HolidaysPage() {
       </Typography>
 
       <Stack direction="row" spacing={1} sx={{ my: 2.5, alignItems: 'center' }}>
-        <Button variant="outlined" size="small" onClick={() => setYear((y) => y - 1)}>{year - 1}</Button>
+        <Button variant="outlined" size="small" disabled={year <= HOLIDAY_YEAR_MIN} onClick={() => setYear((y) => y - 1)}>{year - 1}</Button>
         <Typography sx={{ fontWeight: 700, fontSize: 20, px: 1 }}>{year}</Typography>
-        <Button variant="outlined" size="small" onClick={() => setYear((y) => y + 1)}>{year + 1}</Button>
+        <Button variant="outlined" size="small" disabled={year >= HOLIDAY_YEAR_MAX} onClick={() => setYear((y) => y + 1)}>{year + 1}</Button>
       </Stack>
 
       {failure !== null && (
@@ -330,11 +333,15 @@ export default function HolidaysPage() {
                 <IconButton
                   size="small"
                   aria-label="Upravit"
-                  onClick={() => setEditing({
-                    date: holiday.date,
-                    name: holiday.name,
-                    isHoliday: holiday.isHoliday,
-                  })}
+                  onClick={() => {
+                    save.reset();
+                    setEditing({
+                      date: holiday.date,
+                      name: holiday.name,
+                      isHoliday: holiday.isHoliday,
+                      existing: true,
+                    });
+                  }}
                 >
                   <EditIcon fontSize="small" />
                 </IconButton>
@@ -359,9 +366,9 @@ export default function HolidaysPage() {
         })}
       </Stack>
 
-      <Dialog open={editing !== null} onClose={() => setEditing(null)} fullWidth maxWidth="xs">
+      <Dialog open={editing !== null} onClose={() => { save.reset(); setEditing(null); }} fullWidth maxWidth="xs">
         <DialogTitle sx={{ fontWeight: 800 }}>
-          {editing?.name === '' ? 'Přidat vlastní volno' : 'Upravit den'}
+          {editing?.existing === true ? 'Upravit den' : 'Přidat vlastní volno'}
         </DialogTitle>
         <DialogContent>
           {editing !== null && (
@@ -371,6 +378,8 @@ export default function HolidaysPage() {
                 label="Datum"
                 value={editing.date}
                 onChange={(event) => setEditing({ ...editing, date: event.target.value })}
+                disabled={editing.existing}
+                helperText={editing.existing ? 'Datum dne se nemění — přidejte jiný den jako nové volno.' : undefined}
                 slotProps={{ inputLabel: { shrink: true } }}
               />
               <TextField
@@ -379,15 +388,17 @@ export default function HolidaysPage() {
                 value={editing.name}
                 onChange={(event) => setEditing({ ...editing, name: event.target.value })}
                 helperText="Uvidíte ho v seznamu i v kalendáři."
+                slotProps={{ htmlInput: { maxLength: FIELD_LIMITS.holidayName } }}
               />
+              {save.error ? <Alert severity="error">{errorText(save.error, t)}</Alert> : null}
             </Stack>
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setEditing(null)}>Zrušit</Button>
+          <Button onClick={() => { save.reset(); setEditing(null); }}>Zrušit</Button>
           <Button
             variant="contained"
-            disabled={editing === null || editing.name.trim() === '' || save.isPending}
+            disabled={editing === null || editing.name.trim() === '' || !/^\d{4}-\d{2}-\d{2}$/.test(editing.date) || save.isPending}
             onClick={() => editing !== null && save.mutate({
               date: editing.date,
               isHoliday: editing.isHoliday,

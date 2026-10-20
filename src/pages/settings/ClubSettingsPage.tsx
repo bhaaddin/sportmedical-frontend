@@ -33,6 +33,7 @@ import type { ClubSettings } from '../../api/clubs';
 import { useIsPhone } from '../../layout/useDevice';
 import { SectionLabel, SoftCard } from '../../components/ui';
 import { SettingsScreen } from './SettingsFrame';
+import { MAX_PAYER_TEXT, MAX_REGISTRATION_LINK_DAYS } from '../../api/fieldLimits';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 
 interface Draft {
@@ -40,6 +41,9 @@ interface Draft {
   minimumPlayers: string;
   releaseUnusedDaysBefore: string;
   allowMultiServiceOrders: boolean;
+  /** The sentences about who pays; empty = the server's default sentence is shown to parents. */
+  payerTextClubInvoice: string;
+  payerTextPerPerson: string;
 }
 
 const toDraft = (s: ClubSettings): Draft => ({
@@ -47,6 +51,8 @@ const toDraft = (s: ClubSettings): Draft => ({
   minimumPlayers: s.minimumPlayers === null ? '' : String(s.minimumPlayers),
   releaseUnusedDaysBefore: s.releaseUnusedDaysBefore == null ? '' : String(s.releaseUnusedDaysBefore),
   allowMultiServiceOrders: s.allowMultiServiceOrders === true,
+  payerTextClubInvoice: s.payerTextClubInvoice ?? '',
+  payerTextPerPerson: s.payerTextPerPerson ?? '',
 });
 
 const wholeNumber = (text: string): number | null => {
@@ -66,13 +72,29 @@ export function validateClubSettings(draft: Draft): Partial<Record<keyof Draft, 
   const days = wholeNumber(draft.registrationLinkValidityDays);
   if (days === null) errors.registrationLinkValidityDays = 'Zadejte celý počet dní.';
   else if (days < 1) errors.registrationLinkValidityDays = 'Odkaz musí platit aspoň jeden den.';
-  else if (days > 3650) errors.registrationLinkValidityDays = 'Víc než deset let je nejspíš překlep.';
+  else if (days > MAX_REGISTRATION_LINK_DAYS) {
+    /* The server's own limit (measured: 1 to 1095); 3650 used to pass here and come back as a 400. */
+    errors.registrationLinkValidityDays = `Odkaz může platit nejvýše ${MAX_REGISTRATION_LINK_DAYS} dní (tři roky).`;
+  }
+  for (const field of ['payerTextClubInvoice', 'payerTextPerPerson'] as const) {
+    if (draft[field].trim().length > MAX_PAYER_TEXT) errors[field] = `Věta smí mít nejvýše ${MAX_PAYER_TEXT} znaků.`;
+  }
   /* Empty is a valid answer: no minimum. */
   if (draft.minimumPlayers.trim() !== '') {
     const players = wholeNumber(draft.minimumPlayers);
     if (players === null || players < 1) errors.minimumPlayers = 'Zadejte celý počet sportovců od 1, nebo pole nechte prázdné.';
   }
   return errors;
+}
+
+/** The payer sentences the owner changed, as the PUT wants them (text, or "" to clear); nothing for one left alone. */
+export function changedPayerTexts(saved: ClubSettings, draft: Draft): Partial<Pick<ClubSettings, 'payerTextClubInvoice' | 'payerTextPerPerson'>> {
+  const out: Partial<Pick<ClubSettings, 'payerTextClubInvoice' | 'payerTextPerPerson'>> = {};
+  for (const field of ['payerTextClubInvoice', 'payerTextPerPerson'] as const) {
+    const next = draft[field].trim();
+    if (next !== (saved[field] ?? '').trim()) out[field] = next;
+  }
+  return out;
 }
 
 /** The server's field names come back in either case; match the draft's. */
@@ -123,6 +145,8 @@ export default function ClubSettingsPage() {
       releaseUnusedDaysBefore:
         draft.releaseUnusedDaysBefore.trim() === '' ? null : (wholeNumber(draft.releaseUnusedDaysBefore) as number),
       allowMultiServiceOrders: draft.allowMultiServiceOrders,
+      /* Sent only when changed. "" clears a sentence (the default shows again); null would KEEP the stored one. */
+      ...changedPayerTexts(saved, draft),
     });
   };
 
@@ -135,7 +159,7 @@ export default function ClubSettingsPage() {
 
   const edit = <K extends keyof Draft>(field: K, value: Draft[K]) => {
     setEdits((e) => ({
-      ...(e ?? (saved !== undefined ? toDraft(saved) : { registrationLinkValidityDays: '', minimumPlayers: '', releaseUnusedDaysBefore: '', allowMultiServiceOrders: false })),
+      ...(e ?? (saved !== undefined ? toDraft(saved) : { registrationLinkValidityDays: '', minimumPlayers: '', releaseUnusedDaysBefore: '', allowMultiServiceOrders: false, payerTextClubInvoice: '', payerTextPerPerson: '' })),
       [field]: value,
     }));
     setServerErrors((e) => ({ ...e, [field]: '', [field.charAt(0).toUpperCase() + field.slice(1)]: '' }));
@@ -230,6 +254,36 @@ export default function ClubSettingsPage() {
                     'Vypnuto: objednávka klubu patří vždy jedné službě. Zapnuto: klub může v jedné objednávce kombinovat činnosti více služeb.'}
                 </Typography>
               </Box>
+            </Stack>
+          </SoftCard>
+
+          <SoftCard>
+            <SectionLabel>Kdo hradí vyšetření — věty pro rodiče</SectionLabel>
+            <Stack spacing={2}>
+              <TextField
+                label="Když platí klub fakturou"
+                value={draft.payerTextClubInvoice}
+                onChange={(e) => edit('payerTextClubInvoice', e.target.value)}
+                error={fieldError('payerTextClubInvoice') !== undefined}
+                helperText={fieldError('payerTextClubInvoice') ?? 'Prázdné pole = výchozí věta (viz šedý text). Rodiče ji čtou na stránce klubu.'}
+                placeholder={saved?.defaultPayerTextClubInvoice ?? ''}
+                multiline
+                minRows={2}
+                fullWidth
+                slotProps={{ htmlInput: { maxLength: MAX_PAYER_TEXT } }}
+              />
+              <TextField
+                label="Když platí každý rodič sám"
+                value={draft.payerTextPerPerson}
+                onChange={(e) => edit('payerTextPerPerson', e.target.value)}
+                error={fieldError('payerTextPerPerson') !== undefined}
+                helperText={fieldError('payerTextPerPerson') ?? 'Prázdné pole = výchozí věta (viz šedý text).'}
+                placeholder={saved?.defaultPayerTextPerPerson ?? ''}
+                multiline
+                minRows={2}
+                fullWidth
+                slotProps={{ htmlInput: { maxLength: MAX_PAYER_TEXT } }}
+              />
             </Stack>
           </SoftCard>
 

@@ -28,13 +28,14 @@ import { calendarsApi } from "../../api/calendars";
 import { appointmentsApi } from "../../api/appointments";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { errorText } from "../../components/booking/errorText";
+import { FIELD_LIMITS } from "../../api/fieldLimits";
 import { PageHeader, SectionLabel, SoftCard } from "../../components/ui";
 import {
   addDaysToDateOnly,
   formatDateOnly,
   formatPragueTime,
+  pragueDateKey,
   pragueWallClockToInstant,
-  toDateOnly,
 } from "../../utils/time";
 
 /**
@@ -110,7 +111,8 @@ function emptyDraft(today: string): Draft {
 export default function BlockedTimePage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const today = toDateOnly(new Date());
+  /* The clinic's day, not the browser's: the times below are Prague times too. */
+  const today = pragueDateKey(new Date());
 
   const [calendarId, setCalendarId] = useState<string>("");
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -210,15 +212,9 @@ export default function BlockedTimePage() {
         }
       />
 
-      {/*
-        Said on the screen, not only in the code: on this server a block stops
-        the booking (409) but does not remove the time from the offered slots.
-        Whoever uses this should know before a patient tells them.
-      */}
-      <Alert severity="info" sx={{ mb: 2.5, flexShrink: 0 }}>
-        {t("booking.blocks.availabilityCaveat")}
-      </Alert>
-
+      {/* The warning that a blocked time still showed among the free slots is gone: measured on the dev API
+          on 20. 10. 2026 (a block took the 07:00 slot off /availability, 17 -> 15 slots), which is the condition the
+          note at the top of this file set for removing it. */}
       <AsyncSection
         isLoading={calendarsQuery.isLoading}
         isSettled={calendarsQuery.isSuccess}
@@ -277,7 +273,7 @@ export default function BlockedTimePage() {
                 {blocks.map((block) => (
                   <TableRow key={block.id} hover>
                     <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-                      {formatDateOnly(toDateOnly(new Date(block.startUtc)))}
+                      {formatDateOnly(pragueDateKey(block.startUtc))}
                     </TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>
                       {formatPragueTime(block.startUtc)}–
@@ -359,7 +355,7 @@ export default function BlockedTimePage() {
                   onChange={(e) => setDraft({ ...draft, reason: e.target.value })}
                   placeholder={t("booking.blocks.reasonPlaceholder")}
                   required
-                  slotProps={{ htmlInput: { "aria-label": t("booking.blocks.reason") } }}
+                  slotProps={{ htmlInput: { "aria-label": t("booking.blocks.reason"), maxLength: FIELD_LIMITS.reason } }}
                 />
                 <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
                   Důvod se zobrazí v kalendáři místo jména pacienta.

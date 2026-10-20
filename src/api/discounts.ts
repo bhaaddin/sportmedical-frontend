@@ -27,6 +27,8 @@ export interface PackageDiscount {
 export interface RoleLimit {
   role: string;
   maxManualPercent: number;
+  /** The word the clinic uses for the role ("Recepce" for Staff) - the server sends it, the screen shows it. */
+  label?: string;
 }
 
 export interface DiscountSettings {
@@ -52,7 +54,11 @@ export function normalizeDiscountSettings(raw: unknown): DiscountSettings {
       .map((t) => ({ minPersons: num(t.minPersons), percent: num(t.percent) }))
       .sort((a, b) => a.minPersons - b.minPersons),
     packageDiscounts: rows(inner.packageDiscounts).map((p) => ({ activityId: str(p.activityId), percent: num(p.percent) })),
-    roleLimits: rows(inner.roleLimits).map((r) => ({ role: str(r.role), maxManualPercent: num(r.maxManualPercent) })),
+    roleLimits: rows(inner.roleLimits).map((r) => ({
+      role: str(r.role),
+      maxManualPercent: num(r.maxManualPercent),
+      ...(str(r.label).trim() !== '' ? { label: str(r.label).trim() } : {}),
+    })),
   };
 }
 

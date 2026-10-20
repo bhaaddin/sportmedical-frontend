@@ -18,7 +18,7 @@
    ══════════════════════════════════════════════════════════════ */
 
 import { useMemo, useRef, useState } from 'react';
-import { Alert, Box, Button, Stack } from '@mui/material';
+import { Alert, Box, Button, Stack, useMediaQuery } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { DISCOUNT_SETTINGS_QUERY_KEY, discountSettingsApi, type DiscountSettings } from '../../api/discounts';
@@ -51,6 +51,8 @@ function mergeErrors(client: DiscountErrors, server: DiscountErrors | null): Dis
 export default function DiscountsPage() {
   const queryClient = useQueryClient();
   const device = useDevice();
+  /* The tier table needs about 440 px; beside the preview a PORTRAIT tablet (768-1023) leaves it 350 and the table scrolled sideways. */
+  const roomy = useMediaQuery('(min-width: 1024px)');
 
   const query = useQuery({ queryKey: DISCOUNT_SETTINGS_QUERY_KEY, queryFn: discountSettingsApi.get, retry: false });
   const activitiesQuery = useQuery({
@@ -122,7 +124,7 @@ export default function DiscountsPage() {
     <SettingsScreen
       title="Slevy a cenové hladiny"
       subtitle="Čím víc lidí přijde společně, tím víc ušetří. Hladiny, balíčky i limity ručních slev určujete tady."
-      scope="discounts"
+      scope="pricing"
       save={{ dirty, saving: save.isPending, onSave: submit, onDiscard: discard }}
       loading={draft === null && !query.isError}
       error={query.isError ? 'Slevy se nepodařilo načíst.' : undefined}
@@ -143,7 +145,7 @@ export default function DiscountsPage() {
               display: 'grid',
               gap: 2.5,
               alignItems: 'start',
-              gridTemplateColumns: device === 'tablet' ? 'minmax(0, 1.4fr) minmax(0, 1fr)' : 'minmax(0, 1fr)',
+              gridTemplateColumns: device === 'tablet' && roomy ? 'minmax(0, 1.4fr) minmax(0, 1fr)' : 'minmax(0, 1fr)',
             }}
           >
             <SectionCard

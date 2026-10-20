@@ -3,6 +3,7 @@
  * what makes a palette wrong, and which colour a činnost is drawn in.
  */
 import { HEX_COLOR, MIN_PALETTE_SIZE } from '../../../api/serviceColors';
+import { MAX_PALETTE_SIZE } from '../../../api/fieldLimits';
 
 /** "0d5c52", "#0d5c52" -> "#0D5C52"; anything that is not six hex digits comes back unchanged (trimmed). */
 export function normalizeHex(text: string): string {
@@ -35,6 +36,7 @@ export function validatePalette(rows: readonly PaletteRow[]): PaletteErrors {
     else seen.add(hex);
   }
   if (rows.length < MIN_PALETTE_SIZE) errors.general = `Paleta musí mít aspoň ${MIN_PALETTE_SIZE} barev, aby se nové služby nezačaly opakovat hned.`;
+  else if (rows.length > MAX_PALETTE_SIZE) errors.general = `Paleta může mít nejvýše ${MAX_PALETTE_SIZE} barev.`;
   return errors;
 }
 

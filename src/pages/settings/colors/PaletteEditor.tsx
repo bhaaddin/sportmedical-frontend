@@ -6,6 +6,7 @@
 import { Box, Button, IconButton, Stack, TextField, Typography } from '@mui/material';
 import { Add as AddIcon, DeleteOutlined as DeleteIcon } from '@mui/icons-material';
 import { MIN_PALETTE_SIZE } from '../../../api/serviceColors';
+import { MAX_PALETTE_SIZE } from '../../../api/fieldLimits';
 import { TYPE, settingsLine } from '../../../components/settings/settingsStyle';
 import { useIsPhone } from '../../../layout/useDevice';
 import { isHex, nextColorKey, normalizeHex, type PaletteErrors, type PaletteRow } from './colorLogic';
@@ -16,6 +17,8 @@ export function PaletteEditor({
   const phone = useIsPhone();
   const edit = (key: string, hex: string) => onChange(rows.map((r) => (r.key === key ? { ...r, hex } : r)));
   const canRemove = rows.length > MIN_PALETTE_SIZE;
+  /* The server takes 6 to 24 colours; a 25th would only come back as a 400. */
+  const canAdd = rows.length < MAX_PALETTE_SIZE;
 
   return (
     <Stack spacing={1.5}>
@@ -83,10 +86,13 @@ export function PaletteEditor({
         <Typography sx={TYPE.caption}>Paleta má nejméně {MIN_PALETTE_SIZE} barev — odebrat jde až po přidání další.</Typography>
       )}
 
+      {!canAdd && <Typography sx={TYPE.caption}>Paleta má nejvíce {MAX_PALETTE_SIZE} barev.</Typography>}
+
       <Button
         variant="outlined"
         color="inherit"
         startIcon={<AddIcon />}
+        disabled={!canAdd}
         onClick={() => onChange([...rows, { key: nextColorKey(), hex: '' }])}
         sx={{ minHeight: 44, alignSelf: 'flex-start', borderStyle: 'dashed', color: 'primary.main', fontWeight: 600 }}
       >

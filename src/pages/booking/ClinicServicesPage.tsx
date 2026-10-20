@@ -32,13 +32,14 @@ import { usePermission } from '../../auth/usePermission';
 import { useTranslation } from 'react-i18next';
 import { clinicServicesApi } from '../../api/clinicServices';
 import type { ClinicService, ClinicServiceInput } from '../../api/clinicServices';
-import { activitiesApi } from '../../api/activities';
+import { activitiesApi, activityToInput } from '../../api/activities';
 import { calendarsApi } from '../../api/calendars';
 import type { Activity, Calendar } from '../../api/bookingContracts';
 import { AsyncSection } from '../../components/booking/AsyncSection';
 import { errorText } from '../../components/booking/errorText';
 import { isDuplicateName } from '../../api/duplicateName';
 import { SettingsScreen } from '../settings/SettingsFrame';
+import { FIELD_LIMITS } from '../../api/fieldLimits';
 import {
   movedFrom, offerable, partialFailureText, toAttach, under,
 } from './serviceLinks';
@@ -158,28 +159,11 @@ export default function ClinicServicesPage() {
       if (a === undefined) continue;
       writes.push({
         name: a.name,
-        run: () => activitiesApi.update(a.id, {
-          name: a.name,
-          durationMinutes: a.durationMinutes,
-          color: a.color,
-          publicNote: a.publicNote,
-          isPubliclyBookable: a.isPubliclyBookable,
-          // Carried, not defaulted. A PUT is the whole entity, so moving a
-          // činnost to another služba would otherwise silently un-tick the
-          // consents the clinic set on it.
-          requiresReportByEmail: a.requiresReportByEmail,
-          requiresClubSharing: a.requiresClubSharing,
-          // Carried too, for the same reason as the consents above: a PUT is
-          // the whole činnost, so moving one to another služba would otherwise
-          // silently stop it asking for the questionnaire.
-          questionnaireRequirement: a.questionnaireRequirement,
-          sortOrder: a.sortOrder,
-          serviceItemId: a.serviceItemId,
-          clinicServiceId: serviceId,
-          // And which questionnaire: left out, the move would switch the
-          // činnost back to the clinic's default one.
-          questionnaireDefinitionId: a.questionnaireDefinitionId,
-        }),
+        /* The whole činnost as it was read, with only its služba changed: the consents,
+           the questionnaire, the price link AND the colour of its own, the capacity and the
+           required documents travel back. (The hand-written body this replaces left the last
+           three out, and the server cleared the činnost's own colour on every move.) */
+        run: () => activitiesApi.update(a.id, activityToInput(a, { clinicServiceId: serviceId })),
       });
     }
 
@@ -272,6 +256,8 @@ export default function ClinicServicesPage() {
   };
 
   const nameIsValid = (draft?.name ?? '').trim() !== '';
+  /* The server refuses a negative order (as `scheduling.sort_order_negative`). */
+  const orderIsValid = (draft?.sortOrder ?? 0) >= 0;
   /* The server's duplicate-name refusal belongs to the name box, not to a banner. */
   const duplicate = isDuplicateName(save.error) ? (save.error.serverMessage ?? TEXT.duplicateFallback) : null;
 
@@ -411,6 +397,7 @@ export default function ClinicServicesPage() {
                 onChange={(e) => { if (save.isError) save.reset(); setDraft({ ...draft, name: e.target.value }); }}
                 error={duplicate !== null || (draft.name !== '' && !nameIsValid)}
                 helperText={duplicate ?? TEXT.nameHelp}
+                slotProps={{ htmlInput: { maxLength: FIELD_LIMITS.clinicServiceName } }}
                 required
                 fullWidth
               />
@@ -421,6 +408,7 @@ export default function ClinicServicesPage() {
                 multiline
                 minRows={2}
                 helperText="Nepovinné. K čemu ta služba je."
+                slotProps={{ htmlInput: { maxLength: FIELD_LIMITS.clinicServiceDescription } }}
                 fullWidth
               />
               <TextField
@@ -428,6 +416,9 @@ export default function ClinicServicesPage() {
                 type="number"
                 value={draft.sortOrder}
                 onChange={(e) => setDraft({ ...draft, sortOrder: Number(e.target.value) || 0 })}
+                error={!orderIsValid}
+                helperText={orderIsValid ? undefined : 'Pořadí musí být celé číslo od 0.'}
+                slotProps={{ htmlInput: { min: 0 } }}
                 sx={{ width: 160 }}
               />
               {/*
@@ -577,8 +568,8 @@ export default function ClinicServicesPage() {
           <Button onClick={closeDialog}>Zrušit</Button>
           <Button
             variant="contained"
-            disabled={!nameIsValid || save.isPending}
-            onClick={() => draft && nameIsValid && save.mutate({ ...draft, name: draft.name.trim() })}
+            disabled={!nameIsValid || !orderIsValid || save.isPending}
+            onClick={() => draft && nameIsValid && orderIsValid && save.mutate({ ...draft, name: draft.name.trim() })}
           >
             Uložit
           </Button>

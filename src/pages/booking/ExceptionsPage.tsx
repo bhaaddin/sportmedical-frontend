@@ -32,8 +32,10 @@ import { workingHoursApi } from "../../api/workingHours";
 import type { ScheduleExceptionInput } from "../../api/bookingContracts";
 import { AsyncSection } from "../../components/booking/AsyncSection";
 import { errorText } from "../../components/booking/errorText";
-import { addDaysToDateOnly, formatDateOnly, toDateOnly } from "../../utils/time";
+import { addDaysToDateOnly, formatDateOnly, pragueDateKey } from "../../utils/time";
 import { SettingsScreen } from "../settings/SettingsFrame";
+import { FIELD_LIMITS } from "../../api/fieldLimits";
+import { EXCEPTION_PROBLEM_TEXT, exceptionProblem, type ExceptionKind } from "./exceptionForm";
 
 /**
  * Exceptions - contract screen 5.5: closed, different hours, different worker.
@@ -49,7 +51,6 @@ const CODEBOOK_STALE_MS = 5 * 60 * 1000;
  * usual, the website does not offer the day. Before it the only way to keep
  * the web out of a day was to close it for everybody.
  */
-type ExceptionKind = "closed" | "differentHours" | "differentWorker" | "onlineOff";
 
 function draftFor(kind: ExceptionKind, date: string): ScheduleExceptionInput {
   return {
@@ -78,7 +79,7 @@ function kindOf(exception: {
 export default function ExceptionsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const today = toDateOnly(new Date());
+  const today = pragueDateKey(new Date());
 
   const [calendarId, setCalendarId] = useState<string>("");
   const [kind, setKind] = useState<ExceptionKind>("closed");
@@ -145,10 +146,18 @@ export default function ExceptionsPage() {
     save.reset();
   };
 
-  const workers = (workersQuery.data ?? []).map((w) => ({
-    id: w.userId,
-    name: w.displayName,
-  }));
+  /* Only the accounts ticked for this calendar can stand in on it. */
+  const workers = (workersQuery.data ?? [])
+    .filter((w) => w.hasAccess)
+    .map((w) => ({
+      id: w.userId,
+      name: w.displayName,
+    }));
+
+  const problem = draft === null ? null : exceptionProblem(kind, draft);
+  /* Shown only once a time is typed: an untouched form should not open in red. */
+  const hoursProblem =
+    problem === "hoursMissing" || problem === "hoursOrder" ? EXCEPTION_PROBLEM_TEXT[problem] : null;
 
   const kindLabel = (value: ExceptionKind) => t(`booking.exceptions.kind.${value}`);
 
@@ -375,6 +384,11 @@ export default function ExceptionsPage() {
                   />
                 </Stack>
               ) : null}
+              {kind === "differentHours" && hoursProblem !== null ? (
+                <Typography variant="caption" sx={{ color: "error.main" }}>
+                  {hoursProblem}
+                </Typography>
+              ) : null}
 
               {kind === "differentWorker" ? (
                 <TextField
@@ -405,6 +419,7 @@ export default function ExceptionsPage() {
                 label={t("booking.exceptions.reason")}
                 value={draft.reason}
                 onChange={(e) => setDraft({ ...draft, reason: e.target.value })}
+                slotProps={{ htmlInput: { maxLength: FIELD_LIMITS.reason } }}
               />
 
               {save.error ? (
@@ -419,12 +434,7 @@ export default function ExceptionsPage() {
           </Button>
           <Button
             variant="contained"
-            disabled={
-              save.isPending ||
-              draft === null ||
-              draft.date === "" ||
-              (kind === "differentWorker" && !draft.workerUserId)
-            }
+            disabled={save.isPending || draft === null || problem !== null}
             onClick={() => draft && save.mutate(draft)}
           >
             {t("booking.common.save")}

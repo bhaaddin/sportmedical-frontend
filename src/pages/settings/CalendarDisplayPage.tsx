@@ -29,6 +29,7 @@ import { SectionLabel, SoftCard } from '../../components/ui';
 import { SettingsScreen } from './SettingsFrame';
 import {
   CALENDAR_DISPLAY_QUERY_KEY,
+  hoverChoices,
   readCalendarDisplay,
   saveCalendarDisplay,
 } from '../../api/displaySettings';
@@ -44,22 +45,14 @@ const VIEW_LABELS: Record<CalendarView, string> = {
 
 const HOURS = Array.from({ length: 25 }, (_, hour) => hour);
 
-/**
- * The facts the calendar hover can show, and what to call them. The admin ticks
- * which appear (and the order they are ticked in is the order shown), so nothing
- * about the hover is hard-coded — the same list the hover card reads keys from.
- */
-const HOVER_FIELD_LABELS: { key: string; label: string }[] = [
-  { key: 'patientName', label: 'Jméno pacienta' },
-  { key: 'activity', label: 'Činnost' },
-  { key: 'price', label: 'Cena' },
-  { key: 'registrationStatus', label: 'Stav registrace' },
-  { key: 'status', label: 'Stav objednávky' },
-  { key: 'phone', label: 'Telefon' },
-  { key: 'email', label: 'E-mail' },
-  { key: 'birthDate', label: 'Datum narození' },
-  { key: 'paperwork', label: 'Podklady' },
-];
+/** What is wrong with the default lunch break, in words, or null. Both empty is allowed (no default lunch). */
+export function lunchBreakProblem(from: string, to: string): string | null {
+  const a = from.trim().slice(0, 5);
+  const b = to.trim().slice(0, 5);
+  if (a === '' && b === '') return null;
+  if (a === '' || b === '') return 'Obědová pauza potřebuje začátek i konec, nebo obě pole prázdná.';
+  return b <= a ? 'Obědová pauza musí končit později, než začne.' : null;
+}
 
 export default function CalendarDisplayPage() {
   const queryClient = useQueryClient();
@@ -67,6 +60,8 @@ export default function CalendarDisplayPage() {
   /* Unsaved edits over what the server has; null means "nothing changed yet". */
   const [edited, setDraft] = useState<CalendarDisplaySettings | null>(null);
   const [saved, setSaved] = useState(false);
+  /* The lunch break is checked when Uložit is pressed, not while the second box is still empty. */
+  const [lunchTried, setLunchTried] = useState(false);
 
 
   const save = useMutation({
@@ -82,12 +77,12 @@ export default function CalendarDisplayPage() {
   const sentence = 'Jak se kalendář kreslí všem v ordinaci — den se roztáhne tak, aby byla vidět pracovní doba i každá rezervace mimo ni';
 
   if (query.isPending) {
-    return <SettingsScreen title="Kalendář a mřížka" subtitle={sentence} loading>{null}</SettingsScreen>;
+    return <SettingsScreen title="Kalendář a mřížka" subtitle={sentence} scope="calendar" loading>{null}</SettingsScreen>;
   }
 
   if (query.isError || !query.data) {
     return (
-      <SettingsScreen title="Kalendář a mřížka" subtitle={sentence} error="Nastavení kalendáře se nepodařilo načíst." onRetry={() => { void query.refetch(); }}>
+      <SettingsScreen title="Kalendář a mřížka" subtitle={sentence} scope="calendar" error="Nastavení kalendáře se nepodařilo načíst." onRetry={() => { void query.refetch(); }}>
         {null}
       </SettingsScreen>
     );
@@ -96,6 +91,7 @@ export default function CalendarDisplayPage() {
   const { views, slotLengths, defaults } = query.data;
   const draft = edited ?? query.data.settings;
   const errors = save.isError ? fieldErrorsOf(save.error) : {};
+  const lunchProblem = lunchBreakProblem(draft.lunchFrom ?? '', draft.lunchTo ?? '');
   const set = <K extends keyof CalendarDisplaySettings>(key: K, value: CalendarDisplaySettings[K]) => {
     setSaved(false);
     setDraft({ ...draft, [key]: value });
@@ -105,11 +101,16 @@ export default function CalendarDisplayPage() {
     <SettingsScreen
       title="Kalendář a mřížka"
       subtitle="Jak se kalendář kreslí všem v ordinaci — den se roztáhne tak, aby byla vidět pracovní doba i každá rezervace mimo ni"
+      /* The server files the calendar's settings under "calendar" (measured: "Kalendář: výchozí pohled …"); the catalogue id found nothing. */
+      scope="calendar"
       save={{
         dirty: edited !== null,
         saving: save.isPending,
-        onSave: () => save.mutate(draft),
-        onDiscard: () => { setSaved(false); setDraft(null); },
+        onSave: () => {
+          setLunchTried(true);
+          if (lunchProblem === null) save.mutate(draft);
+        },
+        onDiscard: () => { setSaved(false); setLunchTried(false); setDraft(null); },
       }}
     >
       <SoftCard>
@@ -169,6 +170,35 @@ export default function CalendarDisplayPage() {
                 ))}
               </TextField>
             </Stack>
+
+            {/*
+              * The clinic's default lunch break. Measured on the dev API: it is the break every day of the timetable
+              * gets while its working-hours row names none (a row with its own break overrides it), and both
+              * boxes empty means no default lunch. It rides in this same PUT and had no box on this screen.
+              */}
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                fullWidth
+                type="time"
+                label="Výchozí oběd od"
+                value={draft.lunchFrom ?? ''}
+                onChange={(event) => set('lunchFrom', event.target.value)}
+                error={(lunchTried && lunchProblem !== null) || errors.lunch !== undefined}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+              <TextField
+                fullWidth
+                type="time"
+                label="Výchozí oběd do"
+                value={draft.lunchTo ?? ''}
+                onChange={(event) => set('lunchTo', event.target.value)}
+                error={(lunchTried && lunchProblem !== null) || errors.lunch !== undefined}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+            </Stack>
+            <Typography variant="caption" color={(lunchTried && lunchProblem !== null) || errors.lunch !== undefined ? 'error' : 'text.secondary'} sx={{ mt: -1.5 }}>
+              {(lunchTried ? lunchProblem : null) ?? errors.lunch ?? 'Pauza, kterou má každý pracovní den, dokud mu řádek pracovní doby nepřidělí vlastní. Obě pole prázdná = žádný výchozí oběd.'}
+            </Typography>
 
             <Divider />
             <SectionLabel sx={{ mb: 0 }}>Barvy</SectionLabel>
@@ -244,7 +274,7 @@ export default function CalendarDisplayPage() {
                 Vyberte, které údaje se zobrazí v bublině nad termínem. Platí pro celou ordinaci.
               </Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 0.5 }}>
-                {HOVER_FIELD_LABELS.map(({ key, label }) => {
+                {hoverChoices(query.data.hoverFieldCatalogue).map(({ key, label, help }) => {
                   const on = draft.hoverFields.includes(key);
                   return (
                     <FormControlLabel
@@ -261,11 +291,21 @@ export default function CalendarDisplayPage() {
                             )}
                         />
                       }
-                      label={label}
+                      label={
+                        <>
+                          {label}
+                          <Typography component="span" variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            {help}
+                          </Typography>
+                        </>
+                      }
                     />
                   );
                 })}
               </Box>
+              {errors.hoverFields !== undefined && (
+                <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>{errors.hoverFields}</Typography>
+              )}
             </Box>
 
             {save.isError && (

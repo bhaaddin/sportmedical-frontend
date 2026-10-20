@@ -41,6 +41,23 @@ export interface CalendarDisplaySettings {
    * `paperwork`, `birthDate`, …). The owner chooses these; the server sends them.
    */
   hoverFields: string[];
+  /**
+   * `HH:mm` — the lunch break the grid paints. The server keeps them with the
+   * rest and `PUT` is the whole settings object: a body that leaves them out
+   * WRITES `""` over both (measured on the dev API), so a save has to carry
+   * back what it read. Optional only so a fixture need not name them.
+   */
+  lunchFrom?: string;
+  lunchTo?: string;
+}
+
+/** One fact the hover card may show, as the server describes it. */
+export interface HoverFieldChoice {
+  key: string;
+  label: string;
+  help: string;
+  /** Only for accounts that may see sensitive identity data. */
+  sensitive: boolean;
 }
 
 export interface CalendarDisplayResponse {
@@ -49,6 +66,41 @@ export interface CalendarDisplayResponse {
   views: CalendarView[];
   slotLengths: number[];
   defaults: CalendarDisplaySettings;
+  /** What the hover card may be asked to show (an older server sends none). */
+  hoverFieldCatalogue?: HoverFieldChoice[];
+}
+
+/**
+ * The hover facts the booking card in the calendar can actually draw. The
+ * server's catalogue also lists the note, the insurer and the last change, but
+ * a calendar row carries none of them, so ticking one would change nothing;
+ * the screen offers only what the card draws.
+ */
+export const HOVER_FIELDS_THE_CARD_DRAWS: readonly string[] = [
+  'patientName', 'phone', 'email', 'birthDate', 'activity', 'service', 'status', 'paperwork',
+];
+
+/** What the screen offers when the server sent no catalogue (its own list, the same labels). */
+export const HOVER_FIELD_FALLBACK: HoverFieldChoice[] = [
+  { key: 'patientName', label: 'Jméno pacienta', help: 'Celé jméno pacienta z registru.', sensitive: false },
+  { key: 'phone', label: 'Telefon', help: 'Telefon z profilu pacienta, aby šlo zavolat bez otevírání karty.', sensitive: false },
+  { key: 'email', label: 'E-mail', help: 'E-mail z profilu pacienta.', sensitive: false },
+  { key: 'activity', label: 'Činnost', help: 'Co je objednáno, například Vstupní prohlídka.', sensitive: false },
+  { key: 'service', label: 'Služba', help: 'Služba, pod kterou činnost a kalendář patří.', sensitive: false },
+  { key: 'status', label: 'Stav termínu', help: 'Objednán, přišel, nepřišel, dokončeno nebo zrušeno.', sensitive: false },
+  { key: 'paperwork', label: 'Podklady', help: 'Zda pacient má dotazník a výpis, které činnost vyžaduje.', sensitive: false },
+  { key: 'birthDate', label: 'Datum narození', help: 'Jen pro účty s oprávněním vidět citlivé identifikační údaje.', sensitive: true },
+];
+
+/**
+ * The checkboxes of the hover section: the server's catalogue (its labels and
+ * order) narrowed to what the card draws. A key already saved but unknown to
+ * the catalogue is kept out of the list, never silently dropped from the
+ * setting itself.
+ */
+export function hoverChoices(catalogue: readonly HoverFieldChoice[] | undefined): HoverFieldChoice[] {
+  const source = catalogue !== undefined && catalogue.length > 0 ? catalogue : HOVER_FIELD_FALLBACK;
+  return source.filter((choice) => HOVER_FIELDS_THE_CARD_DRAWS.includes(choice.key));
 }
 
 /**

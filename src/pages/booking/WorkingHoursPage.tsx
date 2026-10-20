@@ -124,7 +124,10 @@ export default function WorkingHoursPage() {
     staleTime: CODEBOOK_STALE_MS,
   });
 
-  const workers = (workersQuery.data ?? []).map((w) => ({ id: w.userId, name: w.displayName }));
+  /* The access list names every account; only those ticked for this calendar can be put on its day. */
+  const workers = (workersQuery.data ?? [])
+    .filter((w) => w.hasAccess)
+    .map((w) => ({ id: w.userId, name: w.displayName }));
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ["periods", activeCalendarId] });
@@ -620,7 +623,7 @@ function ShiftCells({ label, shift, workers, workersFailed, onChange }: ShiftCel
             disabled={off}
             onChange={(e) => onChange({ ...shift, start: e.target.value })}
             slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: 120 }}
+            sx={{ width: 104 }}
           />
           <TextField
             type="time"
@@ -630,7 +633,7 @@ function ShiftCells({ label, shift, workers, workersFailed, onChange }: ShiftCel
             disabled={off}
             onChange={(e) => onChange({ ...shift, end: e.target.value })}
             slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: 120 }}
+            sx={{ width: 104 }}
           />
         </Stack>
         {problem ? (
@@ -649,7 +652,7 @@ function ShiftCells({ label, shift, workers, workersFailed, onChange }: ShiftCel
             disabled={off}
             onChange={(e) => onChange({ ...shift, breakStart: e.target.value || null })}
             slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: 120 }}
+            sx={{ width: 104 }}
           />
           <TextField
             type="time"
@@ -659,11 +662,11 @@ function ShiftCells({ label, shift, workers, workersFailed, onChange }: ShiftCel
             disabled={off}
             onChange={(e) => onChange({ ...shift, breakEnd: e.target.value || null })}
             slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: 120 }}
+            sx={{ width: 104 }}
           />
         </Stack>
       </TableCell>
-      <TableCell sx={{ verticalAlign: "top", pt: 2, minWidth: 180 }}>
+      <TableCell sx={{ verticalAlign: "top", pt: 2, minWidth: 160 }}>
         <TextField
           select
           size="small"

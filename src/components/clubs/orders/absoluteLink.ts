@@ -19,6 +19,8 @@ const ABSOLUTE = /^https?:\/\//i;
 export function normalizeBase(value: string | null | undefined): string {
   const text = (value ?? '').trim();
   if (text === '') return '';
+  /* "ftp://x" is another kind of address, not a host called "ftp" with a port: refuse it instead of making https://ftp. */
+  if (!ABSOLUTE.test(text) && /^[a-z][a-z0-9+.-]*:\/\//i.test(text)) return '';
   const withScheme = ABSOLUTE.test(text) ? text : `https://${text}`;
   try {
     const url = new URL(withScheme);

@@ -110,7 +110,8 @@ export default function ServiceDialog({ open, service, existing, onClose, onSave
             multiline
             minRows={2}
             fullWidth
-            helperText="Co pacient dostane. Ukazuje se na kartě v ceníku."
+            error={errors.description !== undefined}
+            helperText={errors.description ?? 'Co pacient dostane. Ukazuje se na kartě v ceníku.'}
           />
 
           {/*
