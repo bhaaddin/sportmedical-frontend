@@ -4,6 +4,7 @@ import {
   getMotionSnapshot,
   getServerMotionSnapshot,
   osPrefersReducedMotion,
+  readStoredMotion,
   setMotionPreference,
   subscribeMotion,
 } from './preference';
@@ -18,6 +19,8 @@ export interface MotionPreferenceState extends MotionAllowance {
   reduced: boolean;
   /** True for 'vypnuto': not even a fade. */
   off: boolean;
+  /** True while nothing is chosen and the system's "reduce motion" decides. */
+  followsSystem: boolean;
 }
 
 /**
@@ -28,7 +31,7 @@ export interface MotionPreferenceState extends MotionAllowance {
 export function useMotionPreference(): MotionPreferenceState {
   const mode = useSyncExternalStore(subscribeMotion, getMotionSnapshot, getServerMotionSnapshot);
   const setMode = useCallback((next: MotionPreference | null) => setMotionPreference(next), []);
-  return { mode, setMode, ...allowanceFor(mode), reduced: mode !== 'plné', off: mode === 'vypnuto' };
+  return { mode, setMode, ...allowanceFor(mode), reduced: mode !== 'plné', off: mode === 'vypnuto', followsSystem: readStoredMotion() === null };
 }
 
 /** For code outside React (event handlers, scenes): the effective state right now. */

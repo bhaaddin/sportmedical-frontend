@@ -429,22 +429,24 @@ function OwnerDashboard() {
       {/* ── The day's facts: two-up on a phone and a portrait tablet, four across when there is room ── */}
       <Grid container spacing={2} sx={{ mb: 2, flexShrink: 0 }} data-layout={phone ? 'kpi-2up' : 'kpi'}>
         <Grid size={{ xs: 6, md: 2.4 }}>
-          <KpiCard label="Dnes objednáno" value={booked.length} hint="termínů, které ještě stojí" />
+          <KpiCard label="Dnes objednáno" value={booked.length} countTo={booked.length} pending={loading} hint="termínů, které ještě stojí" />
         </Grid>
         <Grid size={{ xs: 6, md: 2.4 }}>
-          <KpiCard label="V čekárně" value={waiting.length} hint="přišli a čekají" tone={waiting.length > 0 ? 'green' : 'ink'} />
+          <KpiCard label="V čekárně" value={waiting.length} countTo={waiting.length} pending={loading} hint="přišli a čekají" tone={waiting.length > 0 ? 'green' : 'ink'} />
         </Grid>
         <Grid size={{ xs: 6, md: 2.4 }}>
-          <KpiCard label="Chybí podklady" value={alerts.length} hint="dnešních termínů bez dotazníku" tone={alerts.length > 0 ? 'red' : 'ink'} />
+          <KpiCard label="Chybí podklady" value={alerts.length} countTo={alerts.length} pending={loading} hint="dnešních termínů bez dotazníku" tone={alerts.length > 0 ? 'red' : 'ink'} />
         </Grid>
         <Grid size={{ xs: 6, md: 2.4 }}>
           {/* Etapa 12: the day's money - today's visits that stand or happened, at their agreed prices. */}
-          <KpiCard label="Dnes" value={formatCzk(todayCzk)} hint="za dnešní nezrušené termíny" />
+          <KpiCard label="Dnes" value={formatCzk(todayCzk)} countTo={todayCzk} format={formatCzk} pending={loading} hint="za dnešní nezrušené termíny" />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
           <KpiCard
             label="Kartotéka"
             value={patientTotal !== null ? patientTotal : '—'}
+            countTo={patientTotal ?? undefined}
+            pending={loading}
             hint={patientTotal !== null ? 'registrovaných pacientů' : 'bez oprávnění'}
           />
         </Grid>

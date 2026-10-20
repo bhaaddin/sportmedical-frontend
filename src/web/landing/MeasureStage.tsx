@@ -22,8 +22,9 @@ const DEVICES = [1, 2, 3, 4] as const;
 /* The staged layout, switched on by the scene on the section itself, only when it really runs. */
 const STAGED = '[data-stage="pinned"] &';
 const STAGED_SELF = '&[data-stage="pinned"]';
-/* The stage is the screen minus the sticky header; the track is the stage plus 90 % of a screen per device. */
-const STAGE_HEIGHT = 'calc(100svh - var(--sm-hh, 72px))';
+/* The stage is the screen minus the sticky header (and, on a phone, the pinned booking bar: --sm-bar); the track is the
+   stage plus 90 % of a screen per device. */
+const STAGE_HEIGHT = 'calc(100svh - var(--sm-hh, 72px) - var(--sm-bar, 0px))';
 
 function Tick({ n }: { n: number }) {
   const name = useSlotText(`landing.equipment.${n}.name`);
@@ -50,6 +51,7 @@ export function MeasureStage() {
       data-sm="measure"
       sx={{
         bgcolor: W.ink, color: W.white, overflow: 'clip',
+        [MQ.phoneOnly]: { '--sm-bar': 'calc(62px + max(10px, env(safe-area-inset-bottom)))' },
         [STAGED_SELF]: { height: `calc(${STAGE_HEIGHT} + var(--sm-beats, 4) * 90svh)` },
       }}
     >

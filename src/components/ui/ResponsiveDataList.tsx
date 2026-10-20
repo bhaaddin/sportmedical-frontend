@@ -1,6 +1,8 @@
 import { Box, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material';
 import { useMediaQuery } from '@mui/material';
+import { useRef } from 'react';
 import { useDevice } from '../../layout/useDevice';
+import { useRowStagger } from '../../motion/useRowStagger';
 import { SoftCard } from './SoftCard';
 
 /**
@@ -54,6 +56,9 @@ export function ResponsiveDataList<T>({
   const device = useDevice();
   /* A landscape tablet (1024+) has the room for every column; only the portrait tablet keeps three. */
   const roomy = useMediaQuery('(min-width: 1024px)');
+  /* The rows arrive one after another the first time the list has any - never again on a refetch or a filter. */
+  const rowsRef = useRef<HTMLDivElement & HTMLTableSectionElement>(null);
+  useRowStagger(rowsRef, rows.length > 0);
 
   if (rows.length === 0 && empty !== undefined) {
     return (
@@ -65,7 +70,7 @@ export function ResponsiveDataList<T>({
 
   if (device === 'phone') {
     return (
-      <Stack spacing={1.25} role="list" aria-label={ariaLabel} data-layout="cards">
+      <Stack ref={rowsRef} spacing={1.25} role="list" aria-label={ariaLabel} data-layout="cards">
         {rows.map((row) => (
           <SoftCard
             key={rowKey(row)}
@@ -105,7 +110,7 @@ export function ResponsiveDataList<T>({
               ))}
             </TableRow>
           </TableHead>
-          <TableBody>
+          <TableBody ref={rowsRef}>
             {rows.map((row) => (
               <TableRow
                 key={rowKey(row)}

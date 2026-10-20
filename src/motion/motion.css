@@ -18,6 +18,7 @@
   --sm-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --sm-ease-expo: cubic-bezier(0.19, 1, 0.22, 1);
   --sm-ease-in: cubic-bezier(0.7, 0, 0.84, 1);
+  --sm-ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
   --sm-ease-pop: cubic-bezier(0.34, 1.4, 0.64, 1);
   --sm-press: 1;
 }
@@ -160,6 +161,65 @@ html[data-motion='full']::view-transition-new(sm-header) {
   }
   to {
     clip-path: inset(0 0 0 0);
+  }
+}
+
+/* ── staff: a dialog grows out of the button that was pressed. MUI fades the container (Fade); this adds a spring scale
+      about the pressed point (--sm-pop-x/y, src/motion/pointerOrigin.ts) while it opens. Full motion only: with
+      'omezené' the fade alone, with 'vypnuto' nothing. Menus and popovers already grow from their anchor (MUI's Grow). ── */
+html[data-motion='full'] .MuiDialog-container {
+  transform-origin: var(--sm-pop-x, 50%) var(--sm-pop-y, 50%);
+  animation: sm-pop-in 340ms var(--sm-ease-pop) both;
+}
+@keyframes sm-pop-in {
+  from {
+    transform: scale(0.94);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* ── staff: buttons dip while held and spring back. `scale` is the individual transform property, so it never fights a
+      button's own transform; the colour transitions are MUI's own 250 ms list, repeated because a transition declaration
+      replaces the whole list. --sm-press is 1 (no transform) when motion is 'vypnuto'. The selector is heavier than the
+      theme's so the stylesheet order does not matter. ── */
+html body .MuiButton-root,
+html body .MuiToggleButton-root,
+html body .MuiFab-root {
+  transition:
+    background-color 250ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 250ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 250ms cubic-bezier(0.4, 0, 0.2, 1),
+    scale var(--sm-dur-quick) var(--sm-ease-pop);
+}
+html body .MuiIconButton-root {
+  transition:
+    background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    scale var(--sm-dur-quick) var(--sm-ease-pop);
+}
+html body :is(.MuiButton-root, .MuiToggleButton-root, .MuiFab-root, .MuiIconButton-root):active:not(.Mui-disabled) {
+  scale: var(--sm-press);
+}
+
+/* ── staff: a skeleton shimmers (a light band travelling across) instead of dimming. Stilled by 'vypnuto' above. ── */
+html:not([data-motion='off']) .MuiSkeleton-pulse {
+  animation: none;
+  position: relative;
+  overflow: hidden;
+}
+html:not([data-motion='off']) .MuiSkeleton-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(128, 128, 128, 0.2), transparent);
+  transform: translateX(-100%);
+  animation: sm-shimmer 1.5s var(--sm-ease-inout, ease-in-out) infinite;
+}
+@keyframes sm-shimmer {
+  to {
+    transform: translateX(100%);
   }
 }
 

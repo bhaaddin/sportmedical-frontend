@@ -31,6 +31,8 @@ import { SECTION_CHILDREN, type ContextualParent } from './components/shell/shel
 import { useDevice } from './layout/useDevice';
 import { afterFirstPaint } from './utils/afterFirstPaint';
 import UniversalSearch from './components/UniversalSearch';
+import { warmMotion } from './motion/engine';
+import { usePageArrival } from './motion/PageTransition';
 
 /* ── Lazy-loaded routes (code-split per page) ── */
 const NotFound = lazy(() => import('./pages/NotFound'));
@@ -298,6 +300,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const regionRef = useRef<HTMLDivElement | null>(null);
   /* A new screen starts at its top. */
   useEffect(() => { regionRef.current?.scrollTo?.({ top: 0 }); }, [location.pathname]);
+  /* ... and arrives with a 6 px nudge in at most 180 ms (src/motion/PageTransition.tsx): the screen is already rendered, nothing waits
+     for this, and the planner's stage (not a `fit` screen) is never animated. */
+  usePageArrival(regionRef, fit ? location.pathname : '__planner');
+  /* The animation library is fetched once the shell has painted, so the first dialog or list already finds it. */
+  useEffect(() => warmMotion(), []);
 
   const settingsNeedsFrame = settingsHere !== null && SETTINGS_UNFRAMED.has(settingsHere.item.to);
 
@@ -374,8 +381,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
             )}
 
             {/*
-              * No page transition: routes render at once, and a nested layout
-              * stays mounted across its children.
+              * Routes render at once and a nested layout stays mounted across its children; the region only
+              * replays a short arrival (usePageArrival above).
               */}
             {fit ? (
               <Box

@@ -1,5 +1,6 @@
 import { Typography } from '@mui/material';
 import { toneColors } from '../../theme';
+import { CountUp } from '../../motion/CountUp';
 import { SectionLabel } from './SectionLabel';
 import { SoftCard } from './SoftCard';
 
@@ -12,11 +13,20 @@ export function KpiCard({
   value,
   hint,
   tone = 'ink',
+  countTo,
+  format,
+  pending = false,
 }: {
   label: React.ReactNode;
   value: React.ReactNode;
   hint?: React.ReactNode;
   tone?: 'ink' | 'red' | 'green' | 'primary';
+  /** The figure counts up to this number, once, when it first has its data (and only with full motion). `value` stays the plain text. */
+  countTo?: number;
+  /** How the counted number is written (default: Czech grouping). */
+  format?: (n: number) => string;
+  /** The data has not arrived: show `value` as it is; the count starts when this turns false. */
+  pending?: boolean;
 }) {
   return (
     <SoftCard sx={{ p: 2.25 }}>
@@ -37,7 +47,7 @@ export function KpiCard({
                   : 'text.primary',
         })}
       >
-        {value}
+        {countTo !== undefined && !pending ? <CountUp value={countTo} format={format} /> : value}
       </Typography>
       {hint !== undefined && (
         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}>

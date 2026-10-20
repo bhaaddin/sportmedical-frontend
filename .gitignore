@@ -31,3 +31,5 @@ dist-ssr
 
 # load-speed harness: throw-away self-signed certificate
 design/perf/harness/*.pem
+design/motion/scratch/
+design/motion/video/tmp/
