@@ -36,6 +36,15 @@ function reminderLead(hours: number): string {
   return rest === 0 ? daysText : `${daysText} a ${hoursText}`;
 }
 
+/**
+ * The hours as typed, or null when the text is not a whole number. `parseInt` read
+ * "12.5" as 12 and "1e1" as 1 and saved that silently; the field says what it takes.
+ */
+export function wholeHours(text: string): number | null {
+  const trimmed = text.trim();
+  return /^\d+$/.test(trimmed) && Number.isSafeInteger(Number(trimmed)) ? Number(trimmed) : null;
+}
+
 export default function RemindersPage() {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: REMINDER_SETTINGS_QUERY_KEY, queryFn: readReminderSettings });
@@ -67,7 +76,11 @@ export default function RemindersPage() {
 
   const { settings, defaults, minHours, maxHours } = query.data;
   const draft = edited ?? String(settings.hoursBefore);
-  const hours = Number.parseInt(draft, 10);
+  const parsed = wholeHours(draft);
+  const hours = parsed ?? Number.NaN;
+  const typed = edited !== null && edited.trim() !== '';
+  const notWhole = typed && parsed === null;
+  const outOfRange = parsed !== null && (parsed < minHours || parsed > maxHours);
   const errors = save.isError ? fieldErrorsOf(save.error) : {};
   const problem = save.isError ? problemMessageOf(save.error, 'Nastavení nelze uložit.') : null;
 
@@ -76,7 +89,8 @@ export default function RemindersPage() {
       title="Připomínky"
       subtitle="Kolik hodin před termínem pacientovi odejde připomínka"
       save={{
-        dirty: edited !== null && !Number.isNaN(hours),
+        /* Nothing to save when the number is the stored one, or is not one the server would take. */
+        dirty: parsed !== null && !outOfRange && parsed !== settings.hoursBefore,
         saving: save.isPending,
         onSave: () => save.mutate(hours),
         onDiscard: () => { setSaved(false); setEdited(null); },
@@ -109,8 +123,15 @@ export default function RemindersPage() {
               setSaved(false);
               setEdited(event.target.value);
             }}
-            error={errors.hoursBefore !== undefined}
-            helperText={errors.hoursBefore ?? `Od ${minHours} do ${maxHours} hodin. Výchozí: ${defaults.hoursBefore}.`}
+            error={errors.hoursBefore !== undefined || notWhole || outOfRange}
+            helperText={
+              errors.hoursBefore
+              ?? (notWhole
+                ? 'Zadejte celý počet hodin, bez desetinné čárky.'
+                : outOfRange
+                  ? `Předstih je od ${minHours} do ${maxHours} hodin.`
+                  : `Od ${minHours} do ${maxHours} hodin. Výchozí: ${defaults.hoursBefore}.`)
+            }
             slotProps={{ htmlInput: { min: minHours, max: maxHours, step: 1 } }}
             sx={{ maxWidth: 260 }}
           />

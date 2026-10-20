@@ -345,23 +345,72 @@ export const refusalText = (error: unknown): string => {
 };
 
 /**
- * One choice per line, keyed by position.
+ * One choice per line.
  *
- * The key is the question's key and the choice's place, not a slug of the
- * Czech: a key has to be ASCII, and slugging the wording would change the key
- * the moment somebody fixes a typo — leaving every answer filed under the old
- * one matching nothing.
+ * The key is the question's key and a number, not a slug of the Czech: a key
+ * has to be ASCII, and slugging the wording would change the key the moment
+ * somebody fixes a typo - leaving every answer filed under the old one
+ * matching nothing.
+ *
+ * With nothing to compare against (a new question) the number is the place.
+ * With the options the question already has (`existing`), a choice KEEPS its
+ * key when it is rewritten: found by its exact wording, or - a typo fixed -
+ * by standing in the same place as an option nobody else claimed. Only a
+ * genuinely new choice gets a new number, the smallest one not yet used. Without
+ * this, removing the first choice renumbered all the others and answers already
+ * given silently pointed at the wrong wording.
  */
 export const toOptions = (
   questionKey: string,
   text: string,
-): Array<{ key: string; displayText: string; sortOrder: number }> =>
-  text
+  existing: ReadonlyArray<{ key: string; displayText: string }> = [],
+): Array<{ key: string; displayText: string; sortOrder: number }> => {
+  const lines = text
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((displayText, index) => ({
-      key: `${questionKey || 'volba'}_${index + 1}`,
-      displayText,
-      sortOrder: index + 1,
-    }));
+    .filter((line) => line.length > 0);
+  const base = questionKey || 'volba';
+
+  if (existing.length === 0) {
+    return lines.map((displayText, index) => ({ key: `${base}_${index + 1}`, displayText, sortOrder: index + 1 }));
+  }
+
+  const keys: Array<string | null> = lines.map(() => null);
+  const claimed = new Set<string>();
+
+  lines.forEach((line, index) => {
+    const same = existing.find((option) => option.displayText.trim() === line && !claimed.has(option.key));
+    if (same !== undefined) {
+      keys[index] = same.key;
+      claimed.add(same.key);
+    }
+  });
+  lines.forEach((_, index) => {
+    const there = existing[index];
+    if (keys[index] === null && there !== undefined && !claimed.has(there.key)) {
+      keys[index] = there.key;
+      claimed.add(there.key);
+    }
+  });
+
+  const used = new Set<string>([...claimed, ...existing.map((option) => option.key)]);
+  let next = 1;
+  return lines.map((displayText, index) => {
+    let key = keys[index];
+    if (key === null) {
+      while (used.has(`${base}_${next}`)) next += 1;
+      key = `${base}_${next}`;
+      used.add(key);
+    }
+    return { key, displayText, sortOrder: index + 1 };
+  });
+};
+
+/**
+ * A key the server files answers under and a condition names: ASCII, lower case, digits and
+ * underscores, starting with a letter or digit. Every key in the shipped questionnaire has this
+ * shape; the server itself accepted "" and "Špatný klíč" (measured) and then filed answers under them.
+ */
+export const QUESTION_KEY_PATTERN = /^[a-z0-9][a-z0-9_]*$/;
+
+export const isValidQuestionKey = (key: string): boolean => QUESTION_KEY_PATTERN.test(key);

@@ -30,6 +30,17 @@ const when = (utc: string): string =>
 
 type Entry = FeedbackEntry;
 
+/**
+ * The mean of the stars given. An answer without a rating (a comment only) is not a
+ * zero-star answer: counting it as 0 dragged the average down.
+ */
+export function averageRating(entries: readonly Pick<FeedbackEntry, 'rating'>[]): number | null {
+  const rated = entries
+    .map((entry) => entry.rating)
+    .filter((rating): rating is number => typeof rating === 'number' && Number.isFinite(rating));
+  return rated.length === 0 ? null : rated.reduce((sum, rating) => sum + rating, 0) / rated.length;
+}
+
 const patientLink = (entry: Entry) => (
   <Typography
     variant="body2"
@@ -76,10 +87,7 @@ export default function FeedbackReviewPage() {
   }
 
   const entries = query.data;
-  const average =
-    entries.length === 0
-      ? null
-      : entries.reduce((sum, entry) => sum + (entry.rating ?? 0), 0) / entries.length;
+  const average = averageRating(entries);
 
   const columns: DataColumn<Entry>[] = [
     {

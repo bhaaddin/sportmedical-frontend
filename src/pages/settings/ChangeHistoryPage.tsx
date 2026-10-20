@@ -80,7 +80,9 @@ export default function ChangeHistoryPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const apply = () => { setPage(0); setApplied(draft); };
+  /* ISO dates compare as text. An end before the start can only answer "Žádné změny". */
+  const backwards = draft.from !== '' && draft.to !== '' && draft.to < draft.from;
+  const apply = () => { if (backwards) return; setPage(0); setApplied(draft); };
   const reset = () => { setDraft(NO_FILTERS); setPage(0); setApplied(NO_FILTERS); };
 
   const total = result?.total ?? 0;
@@ -135,9 +137,11 @@ export default function ChangeHistoryPage() {
             slotProps={{ htmlInput: { 'aria-label': 'Oblast' }, select: { displayEmpty: true } }}
           >
             <MenuItem value="">Všechno</MenuItem>
-            {SETTINGS_SECTIONS.flatMap((section) => section.items.map((item) => (
-              <MenuItem key={item.id} value={scopeOf(item)}>{section.label} — {item.label}</MenuItem>
-            )))}
+            {/* Screens whose saves are not written to this history (scope null) would only ever answer "Žádné změny". */}
+            {SETTINGS_SECTIONS.flatMap((section) => section.items.flatMap((item) => {
+              const scope = scopeOf(item);
+              return scope === null ? [] : [<MenuItem key={item.id} value={scope}>{section.label} — {item.label}</MenuItem>];
+            }))}
           </TextField>
         </Box>
         <Box>
@@ -159,6 +163,8 @@ export default function ChangeHistoryPage() {
             type="date"
             value={draft.to}
             onChange={(e) => setDraft({ ...draft, to: e.target.value })}
+            error={backwards}
+            helperText={backwards ? 'Konec je dřív než začátek.' : undefined}
             slotProps={{ htmlInput: { 'aria-label': 'Do data' } }}
           />
         </Box>
@@ -174,7 +180,7 @@ export default function ChangeHistoryPage() {
           />
         </Box>
         <Stack direction="row" spacing={1}>
-          <Button type="submit" variant="contained" sx={{ minHeight: 44, fontWeight: 700 }}>Filtrovat</Button>
+          <Button type="submit" variant="contained" disabled={backwards} sx={{ minHeight: 44, fontWeight: 700 }}>Filtrovat</Button>
           <Button type="button" variant="outlined" color="inherit" onClick={reset} sx={{ minHeight: 44, color: 'text.primary', borderColor: settingsLine }}>
             Zrušit filtr
           </Button>

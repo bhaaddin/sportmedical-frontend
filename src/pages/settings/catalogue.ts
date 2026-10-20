@@ -62,8 +62,17 @@ export interface SettingsItem {
    * Etapa 2 screens use the name of their settings endpoint
    * (/api/v1/settings/<scope>) - the backend may file them under another
    * prefix, and then the panel under the page simply stays empty or hidden.
+   *
+   * `null` = this screen's saves are NOT written to the settings history at all
+   * (they go to the audit log instead: e-mail templates, document kinds and rules,
+   * the questionnaire, site content, accounts). The "Poslední změny" panel is then
+   * left off the page and the history filter does not offer it - a panel that says
+   * "nobody has changed anything" about a screen somebody just changed is a lie.
+   * Measured against the dev API on 2026-10-20: the history stores a setting under
+   * the first word(s) of its key (`booking.reminderHoursBefore`, `consent`,
+   * `registration.quick`, `media`, `patients`, `company`, `integrations`).
    */
-  scope?: string;
+  scope?: string | null;
 }
 
 export interface SettingsSection {
@@ -268,6 +277,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'SMS a e-maily',
         description: 'Šablony zpráv: předmět a text, náhled se vzorovými hodnotami a testovací odeslání',
         to: '/nastaveni/sablony-emailu',
+        scope: null,
         keywords: ['email', 'e-mail', 'sms', 'šablona', 'šablony', 'šablony zpráv', 'text zprávy', 'zpráva', 'potvrzení', 'předmět', 'testovací odeslání', 'notifikace'],
         requires: 'communication.manage',
       },
@@ -276,6 +286,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Připomínky',
         description: 'Kolik hodin před termínem se pacientovi připraví připomínka',
         to: '/nastaveni/pripominky',
+        scope: 'booking.reminderHoursBefore',
         keywords: ['připomínka', 'připomenutí', 'upomínka', 'sms', 'email', 'hodin před termínem', 'notifikace'],
         requires: 'settings.clinic.manage',
       },
@@ -284,6 +295,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Hodnocení pacientů',
         description: 'Co pacienti napsali po dokončené návštěvě — soukromé, nic se nezveřejňuje',
         to: '/hodnoceni-pacientu',
+        scope: null,
         keywords: ['hodnocení', 'recenze', 'zpětná vazba', 'feedback', 'spokojenost', 'hvězdičky'],
       },
     ],
@@ -304,6 +316,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Vstupní dotazník',
         description: 'Dotazníky pro pacienty — nový dotazník, otázky, zapnutí a vypnutí a který je výchozí',
         to: '/dotaznik-nastaveni',
+        scope: null,
         keywords: ['dotazník', 'anamnéza', 'otázky', 'otázka', 'zdravotní dotazník', 'vstupní dotazník', 'formulář'],
         requires: 'questionnaires.manage',
       },
@@ -317,6 +330,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Souhlasy a GDPR',
         description: 'Marketingový souhlas na objednávkovém formuláři — zda se ukáže a jak zní; zákonné souhlasy zůstávají vždy zapnuté',
         to: '/nastaveni/souhlasy',
+        scope: 'consent',
         keywords: ['souhlas', 'gdpr', 'marketing', 'marketingový souhlas', 'podpis', 'objednávkový formulář', 'newsletter'],
         requires: 'settings.clinic.manage',
       },
@@ -329,6 +343,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Dokumenty, šablony a hlavičky',
         description: 'Druhy dokumentů, které ordinace vede — název, popis a co se používá',
         to: '/dokumenty-sablony',
+        scope: null,
         keywords: ['dokument', 'dokumenty', 'hlavička', 'hlavičky', 'druh dokumentu', 'výpis', 'potvrzení', 'lékařská zpráva', 'šablona dokumentu'],
         requires: 'settings.clinic.manage',
       },
@@ -337,6 +352,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Pravidla dokumentů',
         description: 'Co musí pacient doložit a ke které službě — činnosti pod ní to dědí',
         to: '/pravidla-dokumentu',
+        scope: null,
         keywords: ['dokument', 'pravidlo', 'doložit', 'povinné dokumenty', 'výpis', 'ke které službě', 'co pacient přinese'],
         requires: 'settings.clinic.manage',
       },
@@ -345,6 +361,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Údaje pacienta',
         description: 'Které údaje karta a seznam pacientů ukazují a v jakém pořadí',
         to: '/nastaveni/udaje-pacienta',
+        scope: 'patients',
         keywords: ['pacient', 'karta', 'pole', 'sloupce', 'údaje', 'pořadí', 'rodné číslo', 'pojišťovna', 'seznam pacientů'],
         requires: 'settings.clinic.manage',
       },
@@ -353,8 +370,23 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Rychlá registrace',
         description: 'Jak dlouho platí dokončovací odkaz po objednání u přepážky, kdy se připomene a zda se žádá datum narození',
         to: '/nastaveni/rychla-registrace',
-        scope: 'quick-registration',
+        scope: 'registration.quick',
         keywords: ['rychlá registrace', 'dokončení registrace', 'odkaz', 'lhůta', 'platnost', 'datum narození', 'hodin', 'přepážka', 'recepce'],
+        requires: 'settings.clinic.manage',
+      },
+      {
+        /*
+         * The other registration link: the personal one the desk e-mails a patient to finish
+         * his own details. The server read all four of its settings from the start (lifetime,
+         * e-mail subject and text, the web address the link is built on) and told the desk to
+         * set the address "v Nastavení"; no screen existed, so it could not be set.
+         */
+        id: 'odkaz-registrace',
+        label: 'Odkaz k dokončení registrace',
+        description: 'Jak dlouho platí osobní odkaz pro pacienta, jak zní e-mail s ním a na jaké adrese webu se odkaz skládá',
+        to: '/nastaveni/odkaz-registrace',
+        scope: 'intake',
+        keywords: ['odkaz', 'osobní odkaz', 'předregistrace', 'dokončení registrace', 'e-mail s odkazem', 'adresa webu', 'platnost odkazu', 'zástupné údaje', 'recepce'],
         requires: 'settings.clinic.manage',
       },
     ],
@@ -370,7 +402,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Média a texty',
         description: 'Texty, fotky a videa na veřejném webu, partneři a časté dotazy — vše bez zásahu do kódu',
         to: '/nastaveni/media-a-texty',
-        scope: 'site-content',
+        scope: null,
         keywords: ['web', 'texty', 'fotky', 'video', 'obrázky', 'partneři', 'faq', 'časté dotazy', 'úvodní stránka', 'obsah'],
         requires: 'settings.clinic.manage',
       },
@@ -379,7 +411,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Úložiště médií',
         description: 'Kam se nahrávají fotky a videa — přístupové údaje k úložišti a zda je zapnuté',
         to: '/nastaveni/uloziste-medii',
-        scope: 'media-storage',
+        scope: 'media',
         keywords: ['cloudinary', 'úložiště', 'média', 'nahrávání', 'fotky', 'video', 'klíč', 'cloud'],
         requires: 'settings.clinic.manage',
       },
@@ -402,6 +434,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Uživatelé a práva',
         description: 'Tým: zaměstnanci, jejich role a oprávnění, reset hesla a vypnutí přístupu',
         to: '/staff-management',
+        scope: null,
         keywords: ['tým', 'zaměstnanec', 'zaměstnanci', 'lékař', 'lékaři', 'sestra', 'recepce', 'uživatel', 'uživatelé', 'práva', 'oprávnění', 'role', 'reset hesla', 'přístup', 'nový účet'],
         requires: 'users.manage',
       },
@@ -414,6 +447,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Zabezpečení',
         description: 'Dvoufázové ověření — chraňte svůj účet jednorázovým kódem z ověřovací aplikace',
         to: '/nastaveni/zabezpeceni',
+        scope: null,
         keywords: ['heslo', '2fa', 'dvoufázové', 'dvoufaktorové', 'přihlášení', 'ověření', 'kód', 'authenticator', 'bezpečnost', 'účet'],
       },
       {
@@ -439,6 +473,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Historie změn',
         description: 'Kdo kdy změnil které nastavení — z jaké hodnoty na jakou, s filtrem podle oblasti, data a uživatele',
         to: '/nastaveni/historie-zmen',
+        scope: null,
         keywords: ['historie', 'změny', 'kdo změnil', 'před a po', 'záznam změn', 'kdy', 'nastavení'],
         requires: 'settings.clinic.manage',
       },
@@ -447,6 +482,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Auditní log',
         description: 'Kdo co změnil a kdy — včetně přístupů k citlivým údajům',
         to: '/audit-log',
+        scope: null,
         keywords: ['audit', 'log', 'kdo co změnil', 'protokol', 'záznam', 'přístupy'],
         requires: 'settings.clinic.manage',
       },
@@ -455,6 +491,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Zdraví systému',
         description: 'Chyby, přihlášená zařízení a stav služeb',
         to: '/system-health',
+        scope: null,
         keywords: ['chyby', 'stav systému', 'zařízení', 'přihlášená zařízení', 'server', 'health', 'diagnostika systému'],
         requires: 'settings.clinic.manage',
       },
@@ -602,8 +639,8 @@ export function sectionById(id: string | undefined): SettingsSection | null {
 }
 
 /** The change-history scope an item's saves are written under. */
-export function scopeOf(item: SettingsItem): string {
-  return item.scope ?? item.id;
+export function scopeOf(item: SettingsItem): string | null {
+  return item.scope === undefined ? item.id : item.scope;
 }
 
 /**

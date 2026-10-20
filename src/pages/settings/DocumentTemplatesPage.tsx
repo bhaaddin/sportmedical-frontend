@@ -123,10 +123,6 @@ export default function DocumentTemplatesPage() {
         vidět, takže ho lze kdykoli zapnout zpátky.
       </Alert>
 
-      {save.error ? (
-        <Alert severity="error" sx={{ mb: 2 }}>{errorText(save.error, t)}</Alert>
-      ) : null}
-
       <AsyncSection
         isLoading={templatesQuery.isLoading}
         isSettled={templatesQuery.isSuccess || templatesQuery.isError}
@@ -240,6 +236,9 @@ export default function DocumentTemplatesPage() {
                   </Alert>
                 )}
               </Box>
+
+              {/* In the dialog: above the list it sat behind the modal, so a refused save looked like nothing happening. */}
+              {save.error ? <Alert severity="error">{errorText(save.error, t)}</Alert> : null}
             </Stack>
           )}
         </DialogContent>

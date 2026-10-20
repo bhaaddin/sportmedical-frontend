@@ -76,6 +76,7 @@ const ChangeHistoryPage = lazy(() => import('./pages/settings/ChangeHistoryPage'
 const DiscountsPage = lazy(() => import('./pages/settings/DiscountsPage'));
 const ServiceColorsPage = lazy(() => import('./pages/settings/ServiceColorsPage'));
 const QuickRegistrationSettingsPage = lazy(() => import('./pages/settings/QuickRegistrationSettingsPage'));
+const IntakeLinkSettingsPage = lazy(() => import('./pages/settings/IntakeLinkSettingsPage'));
 const CompanyInvoiceSettingsPage = lazy(() => import('./pages/settings/CompanyInvoiceSettingsPage'));
 const SiteContentAdminPage = lazy(() => import('./pages/settings/SiteContentAdminPage'));
 const MediaStorageSettingsPage = lazy(() => import('./pages/settings/MediaStorageSettingsPage'));
@@ -447,6 +448,7 @@ export default function StaffApp() {
           <Route path="/nastaveni/slevy" element={<RequirePermission of="settings.clinic.manage"><DiscountsPage /></RequirePermission>} />
           <Route path="/nastaveni/barvy-sluzeb" element={<RequirePermission of="settings.clinic.manage"><ServiceColorsPage /></RequirePermission>} />
           <Route path="/nastaveni/rychla-registrace" element={<RequirePermission of="settings.clinic.manage"><QuickRegistrationSettingsPage /></RequirePermission>} />
+          <Route path="/nastaveni/odkaz-registrace" element={<RequirePermission of="settings.clinic.manage"><IntakeLinkSettingsPage /></RequirePermission>} />
           <Route path="/nastaveni/firma-a-faktury" element={<RequirePermission of="settings.clinic.manage"><CompanyInvoiceSettingsPage /></RequirePermission>} />
           <Route path="/nastaveni/media-a-texty" element={<RequirePermission of="settings.clinic.manage"><SiteContentAdminPage /></RequirePermission>} />
           <Route path="/nastaveni/uloziste-medii" element={<RequirePermission of="settings.clinic.manage"><MediaStorageSettingsPage /></RequirePermission>} />

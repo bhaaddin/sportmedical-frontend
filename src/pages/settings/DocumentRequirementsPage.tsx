@@ -44,6 +44,12 @@ import {
 } from './requirementSettings';
 import { SettingsScreen } from './SettingsFrame';
 
+/**
+ * An emptied number field is "not a number yet", not 0: 0 means "never expires" / "no warning",
+ * and a field the person just cleared to type a new number must not silently say that.
+ */
+const numberOrNaN = (text: string): number => (text.trim() === '' ? Number.NaN : Number(text));
+
 export default function DocumentRequirementsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -350,8 +356,8 @@ export default function DocumentRequirementsPage() {
               <TextField
                 label="Platnost (měsíců)"
                 type="number"
-                value={draft.validityMonths}
-                onChange={(e) => setDraft({ ...draft, validityMonths: Number(e.target.value) })}
+                value={Number.isNaN(draft.validityMonths) ? '' : draft.validityMonths}
+                onChange={(e) => setDraft({ ...draft, validityMonths: numberOrNaN(e.target.value) })}
                 error={problems.some((x) => x.startsWith('validity'))}
                 /* From the issue date, not from the upload. A výpis written in
                    March and handed in in June has three months already spent,
@@ -367,8 +373,8 @@ export default function DocumentRequirementsPage() {
               <TextField
                 label="Upozornit předem (dní)"
                 type="number"
-                value={draft.warnDaysBefore}
-                onChange={(e) => setDraft({ ...draft, warnDaysBefore: Number(e.target.value) })}
+                value={Number.isNaN(draft.warnDaysBefore) ? '' : draft.warnDaysBefore}
+                onChange={(e) => setDraft({ ...draft, warnDaysBefore: numberOrNaN(e.target.value) })}
                 error={problems.some((x) => x.startsWith('warn'))}
                 helperText={
                   problems.find((x) => x.startsWith('warn')) !== undefined
@@ -518,9 +524,11 @@ export default function DocumentRequirementsPage() {
                 )}
               </Box>
 
-              <Alert severity="info" icon={false}>
-                {settingsSummary(draft)}
-              </Alert>
+              {settingsAreValid(draft) && (
+                <Alert severity="info" icon={false}>
+                  {settingsSummary(draft)}
+                </Alert>
+              )}
 
               {save.error ? <Alert severity="error">{errorText(save.error, t)}</Alert> : null}
             </Stack>

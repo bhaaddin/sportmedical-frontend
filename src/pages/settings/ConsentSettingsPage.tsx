@@ -79,7 +79,7 @@ export default function ConsentSettingsPage() {
       title={title}
       subtitle={sentence}
       save={{
-        dirty: edited !== null,
+        dirty: edited !== null && JSON.stringify(edited) !== JSON.stringify(query.data),
         saving: save.isPending,
         onSave: () => save.mutate(draft),
         onDiscard: () => { setSaved(false); setDraft(null); },

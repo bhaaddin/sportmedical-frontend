@@ -77,11 +77,13 @@ export default function IntegrationsPage() {
     ? 'Zadejte celou adresu včetně https://'
     : null;
   const missing = draft !== null && draft.enabled && (draft.baseUrl.trim() === '' || draft.username.trim() === '');
+  /* The server refuses to switch it on with no password stored or sent; say so before the round trip. */
+  const needsPassword = draft !== null && loaded !== null && draft.enabled && !loaded.adam.hasPassword && draft.password === '';
 
   const save = async () => {
     if (draft === null || loaded === null) return;
-    if (urlProblem !== null || missing) {
-      setSaveError(urlProblem ?? 'Zapnuté napojení potřebuje adresu a uživatelské jméno.');
+    if (urlProblem !== null || missing || needsPassword) {
+      setSaveError(urlProblem ?? (missing ? 'Zapnuté napojení potřebuje adresu a uživatelské jméno.' : 'Zapnuté napojení potřebuje heslo.'));
       return;
     }
     setSaving(true);

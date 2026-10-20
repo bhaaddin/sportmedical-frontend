@@ -87,6 +87,7 @@ export default function StaffManagement() {
   const [roleFor, setRoleFor] = useState<UserAccount | null>(null);
   const [roleChoice, setRoleChoice] = useState<UserAccountRole>('Staff');
   const [switchingOff, setSwitchingOff] = useState<UserAccount | null>(null);
+  const [resetting, setResetting] = useState<UserAccount | null>(null);
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
 
@@ -157,13 +158,23 @@ export default function StaffManagement() {
   };
 
   /* ── Password ── */
+  /*
+   * Asked first, and only once at a time. One click on a small lock icon used to throw away the
+   * person's password at once (and a second click issued yet another, invalidating the first).
+   */
   const resetPassword = async (account: UserAccount) => {
+    if (busy) return;
+    setBusy(true);
     try {
       const issued = await userAccountsApi.resetPassword(account.userId);
+      setResetting(null);
       setCredentials({ email: account.email, password: issued.temporaryPassword });
       load();
     } catch (error) {
+      setResetting(null);
       say(accountRefusal(error), 'error');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -378,7 +389,7 @@ export default function StaffManagement() {
                         <Tooltip title="Resetovat heslo">
                           <IconButton
                             aria-label={`Resetovat heslo pro ${acc.email}`}
-                            onClick={() => void resetPassword(acc)}
+                            onClick={() => setResetting(acc)}
                           >
                             <LockResetIcon fontSize="small" />
                           </IconButton>
@@ -534,6 +545,28 @@ export default function StaffManagement() {
           <Button onClick={() => setSwitchingOff(null)}>Zrušit</Button>
           <Button color="error" variant="contained" disabled={busy} onClick={() => void switchOff()}>
             Vypnout přístup
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Resetting a password */}
+      <Dialog open={resetting !== null} onClose={() => setResetting(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Resetovat heslo?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            <strong>{resetting ? nameOf(resetting) : ''}</strong> dostane nové dočasné heslo a to
+            dosavadní přestane platit. Nové heslo se ukáže jednou — předáte mu ho.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setResetting(null)}>Zrušit</Button>
+          <Button
+            color="warning"
+            variant="contained"
+            disabled={busy}
+            onClick={() => { if (resetting !== null) void resetPassword(resetting); }}
+          >
+            Resetovat heslo
           </Button>
         </DialogActions>
       </Dialog>

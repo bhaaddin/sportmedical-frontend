@@ -62,6 +62,7 @@ import {
   draftOf,
   isActive,
   latestOf,
+  isValidQuestionKey,
   possibleTriggers,
   toOptions,
   publishedOf,
@@ -864,17 +865,36 @@ function QuestionDialog({
   saving,
 }: QuestionDialogProps) {
   const [keyTouched, setKeyTouched] = useState(false);
+  /*
+   * The choices exactly as typed. They used to be re-derived from the parsed
+   * options on every keystroke, which dropped the empty line the moment Enter
+   * made it - so a second choice could not be typed, only pasted.
+   */
+  const [optionsText, setOptionsText] = useState(
+    () => (draft.options ?? []).map((option) => option.displayText).join('\n'),
+  );
 
   const triggers = possibleTriggers(version, null);
   const choices = draft.type === 'SingleChoice';
+  const keyProblem = draft.questionKey === ''
+    ? 'Klíč je potřeba — pod ním se ukládají odpovědi. Malá písmena bez diakritiky, číslice a podtržítka.'
+    : !isValidQuestionKey(draft.questionKey)
+      ? 'Klíč smí mít jen malá písmena bez diakritiky, číslice a podtržítka (např. bolest_hrudi).'
+      : null;
+
+  /* The choices follow the key they are numbered from, so changing the key later cannot leave them behind. */
+  const withKey = (next: NewQuestion): NewQuestion =>
+    (optionsText.trim() === ''
+      ? next
+      : { ...next, options: toOptions(next.questionKey, optionsText) });
 
   const setPrompt = (prompt: string) => {
-    onChange({
+    onChange(withKey({
       ...draft,
       prompt,
       // Suggested only while nobody has typed a key of their own.
       questionKey: keyTouched ? draft.questionKey : suggestKey(prompt, draft.sectionNumber),
-    });
+    }));
   };
 
   return (
@@ -886,7 +906,15 @@ function QuestionDialog({
             select
             label="Typ otázky"
             value={draft.type}
-            onChange={(event) => onChange({ ...draft, type: event.target.value })}
+            onChange={(event) =>
+              /* Choices belong to a choice question only; they must not travel with another type. */
+              onChange({
+                ...draft,
+                type: event.target.value,
+                options: event.target.value === 'SingleChoice' && optionsText.trim() !== ''
+                  ? toOptions(draft.questionKey, optionsText)
+                  : null,
+              })}
             helperText={KINDS.find((kind) => kind.value === draft.type)?.hint}
           >
             {KINDS.map((kind) => (
@@ -909,9 +937,14 @@ function QuestionDialog({
             value={draft.questionKey}
             onChange={(event) => {
               setKeyTouched(true);
-              onChange({ ...draft, questionKey: event.target.value });
+              onChange(withKey({ ...draft, questionKey: event.target.value.trim() }));
             }}
-            helperText="Pod tímhle se ukládají odpovědi a na tohle se odkazují doplňující otázky. Později už se nemění."
+            error={draft.prompt.trim() !== '' && keyProblem !== null}
+            helperText={
+              draft.prompt.trim() !== '' && keyProblem !== null
+                ? keyProblem
+                : 'Pod tímhle se ukládají odpovědi a na tohle se odkazují doplňující otázky. Později už se nemění.'
+            }
             slotProps={{ htmlInput: { style: { fontFamily: 'monospace' } } }}
           />
 
@@ -944,13 +977,11 @@ function QuestionDialog({
               helperText="Každá na svém řádku."
               multiline
               minRows={3}
-              value={(draft.options ?? []).map((option) => option.displayText).join('\n')}
-              onChange={(event) =>
-                onChange({
-                  ...draft,
-                  options: toOptions(draft.questionKey, event.target.value),
-                })
-              }
+              value={optionsText}
+              onChange={(event) => {
+                setOptionsText(event.target.value);
+                onChange({ ...draft, options: toOptions(draft.questionKey, event.target.value) });
+              }}
             />
           )}
 
@@ -989,7 +1020,7 @@ function QuestionDialog({
         <Button onClick={onClose}>Zrušit</Button>
         <Button
           variant="contained"
-          disabled={saving || draft.prompt.trim() === ''}
+          disabled={saving || draft.prompt.trim() === '' || keyProblem !== null}
           onClick={onSave}
         >
           Přidat
@@ -1120,7 +1151,7 @@ function RewordDialog({ question, version, onClose, onSave, saving }: RewordDial
               showWhenAnswered: trigger === '' ? null : trigger,
               // Null leaves the choices alone, which is what a question with
               // none means here. An empty list would try to clear them.
-              options: choices ? toOptions(question.questionKey, optionText) : null,
+              options: choices ? toOptions(question.questionKey, optionText, question.options) : null,
             })
           }
         >

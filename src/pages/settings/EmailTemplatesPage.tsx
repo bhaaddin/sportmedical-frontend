@@ -26,13 +26,7 @@ import type { EmailPlaceholder, EmailTemplate, RenderedEmail } from '../../api/e
 import { AsyncSection } from '../../components/booking/AsyncSection';
 import { errorText } from '../../components/booking/errorText';
 import { SettingsScreen } from './SettingsFrame';
-
-/** The delimiter the body already uses, so an inserted placeholder matches it. */
-function wrap(key: string, body: string): string {
-  if (body.includes('{{')) return `{{${key}}}`;
-  if (/\{[a-zA-Z]/.test(body)) return `{${key}}`;
-  return `{{${key}}}`;
-}
+import { placeholderToken, singleBraceWarning } from './emailTemplateText';
 
 export default function EmailTemplatesPage() {
   const { t } = useTranslation();
@@ -87,10 +81,12 @@ export default function EmailTemplatesPage() {
   });
 
   const dirty = selected !== null && (subject !== selected.subject || body !== selected.bodyHtml);
-  const canSave = dirty && subject.trim() !== '' && body.trim() !== '' && !save.isPending;
+  /* The server saves a single-brace token without complaint and the patient then gets it as written. */
+  const braceWarning = selected === null ? null : singleBraceWarning(subject, body);
+  const canSave = dirty && subject.trim() !== '' && body.trim() !== '' && braceWarning === null && !save.isPending;
 
   const insertPlaceholder = (placeholder: EmailPlaceholder) => {
-    const token = wrap(placeholder.key, body);
+    const token = placeholderToken(placeholder.key);
     const el = bodyRef.current;
     if (!el) { setBody((b) => b + token); return; }
     const start = el.selectionStart ?? body.length;
@@ -108,7 +104,7 @@ export default function EmailTemplatesPage() {
   return (
     <SettingsScreen
       title="SMS a e-maily"
-      subtitle="Předmět a text každé zprávy — vložte zástupné údaje, prohlédněte náhled se vzorovými hodnotami a pošlete si test, než uložíte"
+      subtitle="Předmět a text každé zprávy — vložte zástupné údaje, prohlédněte náhled se vzorovými hodnotami a po uložení si pošlete test"
     >
 
       <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -169,6 +165,7 @@ export default function EmailTemplatesPage() {
                   {reset.error ? <Alert severity="error">{errorText(reset.error, t)}</Alert> : null}
                   {test.error ? <Alert severity="error">{errorText(test.error, t)}</Alert> : null}
                   {previewMutation.error ? <Alert severity="error">{errorText(previewMutation.error, t)}</Alert> : null}
+                  {braceWarning !== null ? <Alert severity="warning">{braceWarning}</Alert> : null}
 
                   <TextField
                     label="Předmět"
@@ -230,14 +227,19 @@ export default function EmailTemplatesPage() {
                     >
                       Náhled
                     </Button>
-                    <Button
-                      variant="outlined"
-                      startIcon={<SendIcon />}
-                      disabled={test.isPending}
-                      onClick={() => test.mutate()}
-                    >
-                      Poslat test sobě
-                    </Button>
+                    {/* The server sends the SAVED template; with unsaved edits the test would show the old wording. */}
+                    <Tooltip title={dirty ? 'Test se posílá z uložené šablony. Nejdřív uložte změny.' : ''}>
+                      <span>
+                        <Button
+                          variant="outlined"
+                          startIcon={<SendIcon />}
+                          disabled={test.isPending || dirty}
+                          onClick={() => test.mutate()}
+                        >
+                          Poslat test sobě
+                        </Button>
+                      </span>
+                    </Tooltip>
                     <Box sx={{ flexGrow: 1 }} />
                     <Tooltip title={selected.isCustomized ? '' : 'Šablona je v původním znění.'}>
                       <span>

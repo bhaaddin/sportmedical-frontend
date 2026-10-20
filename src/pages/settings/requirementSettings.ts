@@ -45,6 +45,9 @@ export const MAX_VALIDITY_MONTHS = 240;
 export const MAX_WARN_DAYS = 365;
 
 export type SettingsProblem =
+  /** Not a whole number: a half month, or an empty field (NaN). The server refuses it with a bare 400. */
+  | 'validity-not-whole'
+  | 'warn-not-whole'
   | 'validity-negative'
   | 'validity-too-large'
   | 'warn-negative'
@@ -53,6 +56,8 @@ export type SettingsProblem =
   | 'warn-outlives-validity';
 
 export const SETTINGS_PROBLEM_TEXT: Record<SettingsProblem, string> = {
+  'validity-not-whole': 'Zadejte celý počet měsíců. Zadejte 0, pokud nikdy nevyprší.',
+  'warn-not-whole': 'Zadejte celý počet dní. Zadejte 0, pokud se nemá upozorňovat.',
   'validity-negative': 'Platnost nemůže být záporná. Zadejte 0, pokud nikdy nevyprší.',
   'validity-too-large': `Platnost přes ${MAX_VALIDITY_MONTHS} měsíců je nejspíš překlep. Zadejte 0, pokud nemá vypršet.`,
   'warn-negative': 'Počet dní nemůže být záporný. Zadejte 0, pokud se nemá upozorňovat.',
@@ -73,10 +78,12 @@ export function settingsProblems(
 ): SettingsProblem[] {
   const problems: SettingsProblem[] = [];
 
-  if (settings.validityMonths < 0) problems.push('validity-negative');
+  if (!Number.isInteger(settings.validityMonths)) problems.push('validity-not-whole');
+  else if (settings.validityMonths < 0) problems.push('validity-negative');
   else if (settings.validityMonths > MAX_VALIDITY_MONTHS) problems.push('validity-too-large');
 
-  if (settings.warnDaysBefore < 0) problems.push('warn-negative');
+  if (!Number.isInteger(settings.warnDaysBefore)) problems.push('warn-not-whole');
+  else if (settings.warnDaysBefore < 0) problems.push('warn-negative');
   else if (settings.warnDaysBefore > MAX_WARN_DAYS) problems.push('warn-too-large');
 
   /*

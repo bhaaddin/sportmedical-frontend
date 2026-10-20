@@ -1,4 +1,5 @@
 import client from './client';
+import { toBookingError } from './apiError';
 
 /*
  * Two-factor authentication for the signed-in user's own account.
@@ -35,28 +36,45 @@ export interface TwoFactorEnabled {
   recoveryCodes: string[];
 }
 
+/**
+ * A refusal reaches the screen as a BookingApiError, so the server's own sentence ("Kód není správný.",
+ * "Nejdřív začněte nastavení…") is shown. Raw axios errors made `errorText` fall back to the fixed
+ * "server error" line for every wrong code.
+ */
+async function request<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    throw toBookingError(error);
+  }
+}
+
 export const twoFactorApi = {
-  status: async (): Promise<TwoFactorStatus> => {
-    const res = await client.get('/api/v1/account/two-factor');
-    return unwrap<TwoFactorStatus>(res.data);
-  },
+  status: (): Promise<TwoFactorStatus> =>
+    request(async () => {
+      const res = await client.get('/api/v1/account/two-factor');
+      return unwrap<TwoFactorStatus>(res.data);
+    }),
 
   /** Begins setup; returns the secret to show once. Does not enable yet. */
-  beginSetup: async (): Promise<TwoFactorSetup> => {
-    const res = await client.post('/api/v1/account/two-factor/setup', {});
-    return unwrap<TwoFactorSetup>(res.data);
-  },
+  beginSetup: (): Promise<TwoFactorSetup> =>
+    request(async () => {
+      const res = await client.post('/api/v1/account/two-factor/setup', {});
+      return unwrap<TwoFactorSetup>(res.data);
+    }),
 
   /** Confirms the secret with a live code and switches 2FA on; returns recovery codes. */
-  confirm: async (code: string): Promise<TwoFactorEnabled> => {
-    const res = await client.post('/api/v1/account/two-factor/confirm', { code });
-    return unwrap<TwoFactorEnabled>(res.data);
-  },
+  confirm: (code: string): Promise<TwoFactorEnabled> =>
+    request(async () => {
+      const res = await client.post('/api/v1/account/two-factor/confirm', { code });
+      return unwrap<TwoFactorEnabled>(res.data);
+    }),
 
   /** Switches 2FA off; needs a current code to prove it is the owner. */
-  disable: async (code: string): Promise<void> => {
-    await client.post('/api/v1/account/two-factor/disable', { code });
-  },
+  disable: (code: string): Promise<void> =>
+    request(async () => {
+      await client.post('/api/v1/account/two-factor/disable', { code });
+    }),
 };
 
 export default twoFactorApi;

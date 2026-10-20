@@ -19,6 +19,7 @@ import {
 import client from '../api/client';
 import { DESIGN, KpiCard, StatusChip, type ChipTone } from '../components/ui';
 import { SettingsScreen } from './settings/SettingsFrame';
+import { stateAfter, stateBefore, toneOfAction, topActions } from './auditLogModel';
 
 /* ── Types ── */
 interface AuditEntry {
@@ -31,23 +32,16 @@ interface AuditEntry {
   entityId: string;
   timestamp: string;
   notes?: string;
-  beforeState?: any;
-  afterState?: any;
+  /** What the API sends (the scrubbed value before and after). */
+  oldValue?: unknown;
+  newValue?: unknown;
+  /** Older names, kept so an entry that still carries them is read too. */
+  beforeState?: unknown;
+  afterState?: unknown;
 }
 
-/* ── Config: the board's soft tones, one per kind of action ── */
-const ACTION_TONES: Record<string, ChipTone> = {
-  Create: 'green',
-  Update: 'blue',
-  Delete: 'red',
-  Sign: 'primary',
-  Import: 'beige',
-  Override: 'beige',
-  Login: 'grey',
-  Logout: 'grey',
-};
-
-const toneOf = (action: string): ChipTone => ACTION_TONES[action] ?? 'grey';
+/* ── Config: the board's soft tones, one per kind of action (auditLogModel.toneOfAction) ── */
+const toneOf = (action: string): ChipTone => toneOfAction(action);
 
 /* ══════════════════════════════════════════════════════════════ */
 export default function AuditLog() {
@@ -140,15 +134,11 @@ export default function AuditLog() {
 
       {/* Stats */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        {Object.keys(ACTION_TONES).map((action) => {
-          const count = entries.filter(e => e.action === action).length;
-          if (count === 0) return null;
-          return (
-            <Grid key={action} size={{ xs: 6, sm: 4, md: 2 }}>
-              <KpiCard label={action} value={count} tone={action === 'Delete' ? 'red' : 'ink'} />
-            </Grid>
-          );
-        })}
+        {topActions(entries).map(({ action, count }) => (
+          <Grid key={action} size={{ xs: 6, sm: 4, md: 2 }}>
+            <KpiCard label={action} value={count} tone={toneOf(action) === 'red' ? 'red' : 'ink'} />
+          </Grid>
+        ))}
       </Grid>
 
       {/* Table */}
@@ -176,7 +166,9 @@ export default function AuditLog() {
                 </TableRow>
               ) : (
                 filteredEntries.map((entry) => {
-                  const hasDiff = Boolean(entry.beforeState || entry.afterState);
+                  const before = stateBefore(entry);
+                  const after = stateAfter(entry);
+                  const hasDiff = before !== null || after !== null;
                   return (
                     <Fragment key={entry.id}>
                       <TableRow hover>
@@ -225,22 +217,22 @@ export default function AuditLog() {
                           <TableCell colSpan={7} sx={{ p: 0 }}>
                             <Box sx={{ p: 2, bgcolor: 'background.default' }}>
                               <Grid container spacing={2}>
-                                {entry.beforeState && (
+                                {before !== null && (
                                   <Grid size={{ xs: 12, sm: 6 }}>
                                     <Typography variant="overline" sx={{ color: DESIGN.tone.red.fg }}>Před</Typography>
                                     <Paper sx={{ p: 1, mt: 0.5, maxHeight: 200, overflow: 'auto' }}>
                                       <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
-                                        {JSON.stringify(entry.beforeState, null, 2)}
+                                        {JSON.stringify(before, null, 2)}
                                       </pre>
                                     </Paper>
                                   </Grid>
                                 )}
-                                {entry.afterState && (
+                                {after !== null && (
                                   <Grid size={{ xs: 12, sm: 6 }}>
                                     <Typography variant="overline" sx={{ color: DESIGN.tone.green.fg }}>Po</Typography>
                                     <Paper sx={{ p: 1, mt: 0.5, maxHeight: 200, overflow: 'auto' }}>
                                       <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
-                                        {JSON.stringify(entry.afterState, null, 2)}
+                                        {JSON.stringify(after, null, 2)}
                                       </pre>
                                     </Paper>
                                   </Grid>

@@ -62,11 +62,32 @@ export interface ChangeFilter {
   skip: number;
 }
 
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * The first instant of a calendar day (the clinic's, i.e. the browser's), as the ISO instant the
+ * server compares timestamps with. A bare "2026-10-20" is read as midnight, which made "do data"
+ * leave out the whole of that day: measured against the dev API, `to=2026-10-20` found 1 change
+ * where `to=2026-10-20T23:59:59.999Z` found 148, and `from=to=same day` found none at all.
+ */
+export function dayStart(date: string): string {
+  const m = DATE_ONLY.exec(date);
+  if (m === null) return date;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0).toISOString();
+}
+
+/** The last instant of a calendar day, so "do data" includes that day. */
+export function dayEnd(date: string): string {
+  const m = DATE_ONLY.exec(date);
+  if (m === null) return date;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 23, 59, 59, 999).toISOString();
+}
+
 export async function fetchAuditChanges(filter: ChangeFilter): Promise<ChangePage> {
   const params: Record<string, string | number> = { take: filter.take, skip: filter.skip };
   if (filter.scope) params.scope = filter.scope;
-  if (filter.from) params.from = filter.from;
-  if (filter.to) params.to = filter.to;
+  if (filter.from) params.from = dayStart(filter.from);
+  if (filter.to) params.to = dayEnd(filter.to);
   if (filter.user) params.user = filter.user;
   const res = await client.get('/api/v1/audit/changes', { params });
   const page = parsePage(res.data);

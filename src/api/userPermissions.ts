@@ -76,7 +76,15 @@ export const PERMISSION_LABELS: Record<string, { label: string; detail: string }
   },
   'communication.manage': {
     label: 'Psát a odesílat za ordinaci',
-    detail: 'Dnes nic neotvírá: žádná obrazovka ani rozhraní aplikace ho nevyžaduje.',
+    detail: 'Otevírá Nastavení → SMS a e-maily: úprava šablon zpráv pacientům a testovací odeslání.',
+  },
+  'billing.approve': {
+    label: 'Schvalovat slevy nad limit',
+    detail: 'Slevu nad limit nastavený pro roli smí schválit jen správce nebo vlastník.',
+  },
+  'patients.export': {
+    label: 'Vystavit úplný výpis údajů pacienta',
+    detail: 'Úplný výpis všech údajů o pacientovi (např. na jeho žádost o přístup k údajům).',
   },
   'questionnaires.manage': {
     label: 'Pracovat s dotazníky',

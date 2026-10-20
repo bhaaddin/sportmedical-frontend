@@ -18,13 +18,9 @@ import { DESKTOP_UP } from '../components/settings/settingsStyle';
 import client from '../api/client';
 import { KpiCard } from '../components/ui';
 import { SettingsScreen } from './settings/SettingsFrame';
+import { STATUS_TEXT, gigabytes, readHealth, waitText, type HealthView } from './systemHealthModel';
 
 /* ── What the server sends (api/client.ts has already unwrapped the envelope) ── */
-interface SystemHealthDto {
-  dbLatencyMs: number;
-  activeSessions: number;
-  timestamp: string;
-}
 
 interface SystemSessionDto {
   id: string;
@@ -51,7 +47,7 @@ function formatDateTime(value: string): string {
 
 /* ══════════════════════════════════════════════════════════════ */
 export default function SystemHealth() {
-  const [health, setHealth] = useState<SystemHealthDto | null>(null);
+  const [health, setHealth] = useState<HealthView | null>(null);
   const [healthFailed, setHealthFailed] = useState(false);
   const [sessions, setSessions] = useState<SystemSessionDto[]>([]);
   const [sessionsFailed, setSessionsFailed] = useState(false);
@@ -62,13 +58,13 @@ export default function SystemHealth() {
 
   const fetchAll = useCallback(async () => {
     const [healthRes, sessionsRes, errorsRes] = await Promise.allSettled([
-      client.get<SystemHealthDto>('/api/system/health'),
+      client.get<unknown>('/api/system/health'),
       client.get<SystemSessionsResponse>('/api/system/sessions'),
       client.get<SystemErrorDto[]>('/api/system/errors'),
     ]);
 
     if (healthRes.status === 'fulfilled') {
-      setHealth(healthRes.value.data);
+      setHealth(readHealth(healthRes.value.data));
       setHealthFailed(false);
     } else {
       setHealth(null);
@@ -131,7 +127,7 @@ export default function SystemHealth() {
   return (
     <SettingsScreen
       title="Zdraví systému"
-      subtitle={health
+      subtitle={health?.timestamp
         ? `Změřeno ${formatDateTime(health.timestamp)}`
         : 'Odezva databáze, přihlášení uživatelé a poslední chyby'}
       aside={false}
@@ -154,11 +150,52 @@ export default function SystemHealth() {
         </Alert>
       ) : health && (
         <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <KpiCard label="Odezva databáze" value={`${health.dbLatencyMs} ms`} hint="Jedna otázka databázi a zpět" />
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <KpiCard
+              label="Stav systému"
+              value={STATUS_TEXT[health.status]}
+              tone={health.status === 'ok' ? 'green' : health.status === 'unknown' ? 'ink' : 'red'}
+              hint={health.version ?? undefined}
+            />
           </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <KpiCard label="Aktivní relace" value={health.activeSessions} hint="Kdo je právě přihlášený" />
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <KpiCard
+              label="Odezva databáze"
+              value={health.dbLatencyMs === null ? '—' : `${health.dbLatencyMs} ms`}
+              hint={health.dbReachable === false ? 'Databáze neodpovídá' : 'Jedna otázka databázi a zpět'}
+              tone={health.dbReachable === false ? 'red' : 'ink'}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <KpiCard label="Aktivní relace" value={health.activeSessions ?? '—'} hint="Kdo je právě přihlášený" />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <KpiCard
+              label="Fronta zpráv"
+              value={health.outboxPending ?? '—'}
+              tone={(health.outboxFailed ?? 0) > 0 ? 'red' : 'ink'}
+              hint={
+                health.outboxPending
+                  ? `Nejstarší čeká ${waitText(health.outboxOldestMinutes)}${(health.outboxFailed ?? 0) > 0 ? ` · selhalo ${health.outboxFailed}` : ''}`
+                  : 'Nic nečeká na odeslání'
+              }
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <KpiCard
+              label="E-mailový server"
+              value={health.smtpConfigured === null ? '—' : health.smtpConfigured ? 'Nastaven' : 'Nenastaven'}
+              tone={health.smtpConfigured === false ? 'red' : 'ink'}
+              hint={health.smtpConfigured === false ? 'Zprávy se nikam neodesílají' : undefined}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <KpiCard
+              label="Úložiště dokumentů"
+              value={gigabytes(health.storageFreeBytes)}
+              tone={health.storageWritable === false ? 'red' : 'ink'}
+              hint={health.storageWritable === false ? 'Nejde do něj zapisovat' : 'Volné místo'}
+            />
           </Grid>
         </Grid>
       )}

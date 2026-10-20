@@ -105,9 +105,10 @@ export default function PatientFieldsPage() {
       title="Údaje pacienta"
       subtitle="Které údaje karta pacienta a seznam pacientů ukazují a v jakém pořadí — jméno je vidět vždy"
       save={{
-        dirty: edited !== null,
+        dirty: edited !== null && edited.join('|') !== query.data.visible.join('|'),
         saving: save.isPending,
-        onSave: () => save.mutate(visible),
+        /* Only keys the server's catalogue still knows: it refuses the whole list over one it does not. */
+        onSave: () => save.mutate(visible.filter((key) => byKey.has(key))),
         onDiscard: () => { setSaved(false); setVisible(null); },
       }}
     >
