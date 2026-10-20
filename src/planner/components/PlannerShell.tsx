@@ -38,6 +38,8 @@ import { OrderCommandPanel } from './OrderCommandPanel';
 import { PlannerGate } from './PlannerGate';
 import { PlannerProviders } from './PlannerProviders';
 import { PlannerStage, type PlannerLayout } from './PlannerStage';
+import { ApplyDefaultView } from './ApplyDefaultView';
+import type { PlannerView } from '../state/plannerState';
 import { PlanningCarousel } from './PlanningCarousel';
 import { ReservationDrawer } from './ReservationDrawer';
 import { SummaryExperience } from './SummaryExperience';
@@ -54,6 +56,8 @@ export interface PlannerShellProps {
   user?: ClubHeaderProps['user'];
   /** `club` (default): a club's order is planned. `clinic`: the standard calendar, the strip shows the clinic's own data. */
   headerMode?: ClubHeaderMode;
+  /** The calendar's "Výchozí pohled" setting, once it has arrived (the standard calendar only); applied once, see `ApplyDefaultView`. */
+  defaultView?: PlannerView;
   /** Render the stage even below 1280 px (tests, screenshots). */
   forceDesktop?: boolean;
   /** Force a layout instead of reading the window (tests, screenshots). Wins over `forceDesktop`. */
@@ -87,11 +91,12 @@ export function PlannerLayers({ user, headerMode }: { user?: ClubHeaderProps['us
   );
 }
 
-export function PlannerShell({ source, today, initialDate, user, headerMode, forceDesktop = false, layout: forcedLayout }: PlannerShellProps) {
+export function PlannerShell({ source, today, initialDate, user, headerMode, defaultView, forceDesktop = false, layout: forcedLayout }: PlannerShellProps) {
   const device = useDevice();
   const layout: PlannerLayout = forcedLayout ?? (forceDesktop ? 'desktop' : device);
   return (
     <PlannerProviders source={source} today={today} initialDate={initialDate}>
+      <ApplyDefaultView view={defaultView} />
       <PlannerStage layout={layout}>
         <PlannerGate>
           <PlannerAccountProvider user={user}>

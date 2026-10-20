@@ -26,6 +26,7 @@ import { PickOrderSetup } from '../components/clubs/order/PickOrderSetup';
 import { readPickOrderState, type PickSession } from '../components/clubs/order/pickSession';
 import { Alert, Box, Button, CircularProgress } from '@mui/material';
 import { pragueDateKey } from '../utils/time';
+import { useCalendarDisplay } from '../api/displaySettings';
 import { ClubPlannerProvider } from './club/ClubPlannerContext';
 import { useClubPlannerData, type ClubPlannerData } from './club/useClubPlannerData';
 import { useApiDataSource } from './api/useApiDataSource';
@@ -114,6 +115,8 @@ function PlannerScreen({ club }: { club: ClubPlannerData | null }) {
   const demo = params.get('source') === 'demo';
   const today = useMemo(() => pragueDateKey(new Date()), []);
   const user = useMemo(() => storedUser(), []);
+  /* The clinic's "Výchozí pohled": the standard calendar opens in it (a club's planning stage and the demo keep the week). */
+  const display = useCalendarDisplay();
 
   /* ---- the mode, from the router state ---- */
   const pick = readPickOrderState(location.state);
@@ -185,6 +188,7 @@ function PlannerScreen({ club }: { club: ClubPlannerData | null }) {
           initialDate={club !== null ? club.openOn : today}
           user={user}
           headerMode={mode === 'club' ? 'club' : 'clinic'}
+          defaultView={mode === 'standard' && !demo && display.loaded ? display.settings.defaultView : undefined}
         />
       </div>
       {needsSetup ? <PickOrderSetup open defaultClubId={pick?.clubId} parent={pick?.parent} onClose={closeSetup} onStart={startWith} /> : null}
