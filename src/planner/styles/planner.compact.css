@@ -212,6 +212,38 @@
 .sm-planner[data-layout='tablet'] .compact-header-toggle { min-width: 96px; top: 4px; }
 .sm-planner[data-layout='tablet'] #dashboard .club-unified-header { padding-right: 104px !important; }
 
+/*
+ * 2b · the standard calendar's slim bar (`ClinicTopBar`, `.club-unified-header.is-slim`): ONE 50 px row - name, bell, profile - and no
+ * expander (CompactLayers does not wrap it in `CompactHeader`). It replaces the card of 83 px (phone) / 67 px (tablet) with the
+ * name over two lines; the room goes to the board (section 4: `.is-compact:has(.is-slim)`). The bell and the profile chip keep their
+ * 44 px; the bar is 50 px tall, so they sit 3 px from its edges.
+ */
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header.is-slim {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  width: auto !important;
+  flex: none;
+  padding: 0 3px 0 14px !important;
+  border-radius: 14px !important;
+}
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header.is-slim .club-identity-name {
+  --name-base: 18px;
+  display: block !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: calc(var(--name-base) * var(--name-fit, 1)) !important;
+  letter-spacing: -0.3px !important;
+}
+.sm-planner[data-layout='tablet'] #dashboard.live-mode .club-unified-header.is-slim .club-identity-name { --name-base: 20px; }
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header.is-slim .club-user-actions { gap: 0 !important; }
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header.is-slim .club-user-bell { width: 44px !important; height: 44px !important; }
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header.is-slim .club-user-bell .icon { width: 22px !important; height: 22px !important; }
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header.is-slim .club-user-chip { min-width: 44px !important; min-height: 44px !important; }
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header.is-slim .club-user-avatar { width: 34px !important; height: 34px !important; }
+.sm-planner.is-compact #dashboard.live-mode .club-unified-header.is-slim .club-user-name { font-size: 13px !important; }
+
 /* ============================== 3 · the left column ============================== */
 .sm-planner.is-compact #dashboard.live-mode #live-ui {
   display: grid;
@@ -548,6 +580,70 @@
 .sm-planner.is-compact #dashboard.live-mode .day-board[data-board-mode='club'] .schedule-event[data-source='club'] { overflow: visible; }
 .sm-planner.is-compact #dashboard.live-mode .day-board[data-board-mode='club'] .schedule-event[data-source='club'] .event-contents { overflow: hidden; }
 .sm-planner.is-compact #dashboard.live-mode .day-board[data-board-mode='club'] .schedule-event:not([data-source='club']) .term-resize-handle { display: none; }
+
+/*
+ * 4b · the standard calendar's slim bar gives its room to the board (`.is-slim`, see 2b). The old card was 83 px (phone) / 67 px (tablet);
+ * the bar is 50, so:
+ *   phone   the board body keeps its `100dvh - K` rule with K 31 px smaller (330 -> 299): 31 px more of rows (the region scrolls as before,
+ *           the toolbar above the board is as tall as the screen's width makes it)
+ *   tablet  nothing is guessed any more: the planner region is a flex column and the board (and, pinned, the left column) take whatever
+ *           is left under the bar - no blank band under the board on a tall tablet, a longer timeline = taller hour rows. The body is
+ *           never shorter than 360 px (the region scrolls below that).
+ */
+.sm-planner[data-layout='phone']:has(#club-unified-header.is-slim) .planner .board-body {
+  max-height: clamp(360px, calc(100dvh - 299px), 900px);
+}
+.sm-planner[data-layout='tablet']:has(#club-unified-header.is-slim) {
+  display: flex;
+  flex-direction: column;
+}
+.sm-planner[data-layout='tablet']:has(#club-unified-header.is-slim) #screen-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sm-planner[data-layout='tablet']:has(#club-unified-header.is-slim) #dashboard.live-mode {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.sm-planner[data-layout='tablet']:has(#club-unified-header.is-slim) #dashboard.live-mode #live-ui {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+}
+.sm-planner[data-layout='tablet']:has(#club-unified-header.is-slim) #dashboard.live-mode .compact-sidebar[data-compact-sidebar='pinned'] {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.sm-planner[data-layout='tablet']:has(#club-unified-header.is-slim) .compact-main {
+  min-height: 0;
+}
+.sm-planner[data-layout='tablet']:has(#club-unified-header.is-slim) #dashboard.live-mode .planner {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.sm-planner[data-layout='tablet']:has(#club-unified-header.is-slim) #dashboard.live-mode .planner .week-board {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sm-planner[data-layout='tablet']:has(#club-unified-header.is-slim) #dashboard.live-mode .planner:has(.alternate-view:not([hidden])) #week-board {
+  display: none;
+}
+.sm-planner[data-layout='tablet']:has(#club-unified-header.is-slim) #dashboard.live-mode .planner .week-board > .board-head {
+  flex: 0 0 auto;
+}
+.sm-planner[data-layout='tablet']:has(#club-unified-header.is-slim) #dashboard.live-mode .planner .week-board > .board-body {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 360px;
+  max-height: none;
+}
 
 /* ============================== 5 · the deck ============================== */
 /*

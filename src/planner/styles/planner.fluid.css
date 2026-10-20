@@ -28,6 +28,13 @@
  *       .plan-card          flex-basis calc((100% - 9px) / 2)     calc((100% - (n - 1) * 9px) / n), n = min(cards that fit, cards there are) (--deck-n)
  *     .active-plan-hint     left 552 top 677                      top 677          H' - 264   (54 above the board's bottom edge)
  *
+ * The standard calendar (`ClinicTopBar`, `.club-unified-header.is-slim`) has no 140 px card on top, only a 50 px bar (planner.extras.css), so
+ * everything that hung under the card moves up by 90 (the bar's 8 + 50 + the file's 7 gap = 65 instead of 155) and takes the 90 px as height:
+ *
+ *     .club-unified-header.is-slim  left 25  top 8   w W' - 73   h 50
+ *     .sidebar                      top 65           h H' - 100  (65 + 35 bottom)
+ *     .planner (standard)           top 65           h H' - 101  (65 + 36 bottom)  -> the 12 hour rows are 90 / 12 = 7.5 design px taller each
+ *
  * Only `.sm-planner[data-layout="desktop"]` is fluid; tablet and phone keep planner.compact.css.
  */
 
@@ -87,9 +94,10 @@
  * The name of the club / clinic (`useFitName`): planner.css `#club-identity-name` is `font:770 25.5px/1.13 ...; white-space:nowrap;
  * overflow:visible` inside a block that clips at its right edge. A name wider than the block is drawn at `--name-fit` x 25.5 px
  * (the hook measures it, 1 = the file's size); only a name that does not fit even at the smallest size gets the ellipsis.
+ * `--name-base` is the size at fit 1: 25.5 px, 17 px on the slim bar of the standard calendar (planner.extras.css).
  */
 .sm-planner #dashboard.live-mode .club-unified-header .club-identity-name {
-  font-size: calc(25.5px * var(--name-fit, 1)) !important;
+  font-size: calc(var(--name-base, 25.5px) * var(--name-fit, 1)) !important;
 }
 .sm-planner #dashboard.live-mode .club-unified-header .club-identity-name[data-fit='cut'] {
   overflow: hidden !important;
@@ -197,6 +205,28 @@
     justify-content: center;
     gap: 26px;
   }
+}
+
+/* ---------------------------------- the standard calendar: slim top bar ---------------------------------- */
+/*
+ * `--slim-top` is where the sidebar and the board start under the slim bar: 8 (bar top) + 50 (bar) + 7 (the file's gap between its
+ * header and the panels). The deck (club planning) is not drawn on the standard calendar; should a deck ever be, its 210 px
+ * bottom reserve stays.
+ */
+.sm-planner[data-layout='desktop']:has(#club-unified-header.is-slim) {
+  --slim-bar-top: 8px;
+  --slim-bar-h: 50px;
+  --slim-gap: 7px;
+  --slim-top: calc(var(--slim-bar-top) + var(--slim-bar-h) + var(--slim-gap));
+  --v18-planner-top: var(--slim-top);
+  --v18-planner-height: calc(var(--stage-h, 941px) - var(--slim-top) - 210px);
+}
+.sm-planner[data-layout='desktop']:has(#club-unified-header.is-slim):has(.planner[data-layout='standard']) {
+  --v18-planner-height: calc(var(--stage-h, 941px) - var(--slim-top) - 36px);
+}
+.sm-planner[data-layout='desktop']:has(#club-unified-header.is-slim) #dashboard.live-mode .sidebar {
+  top: var(--slim-top);
+  height: calc(var(--stage-h, 941px) - var(--slim-top) - 35px);
 }
 
 /* ============================== the page around the stage ============================== */

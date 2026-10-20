@@ -60,3 +60,44 @@
   white-space: normal;
   direction: ltr;
 }
+
+/*
+ * The slim top bar of the standard calendar (`ClinicTopBar`, owner 20. 10. 2026: "make it smaller and keep only what is really
+ * needed"): the clinic name on the left, the bell and the profile chip on the right, ONE line instead of the 140 px card.
+ * Frame, gradient, glow and the accent colours are the header's own (planner.css `.club-unified-header`, untouched); only the
+ * layout is changed here - no new colour. The stage's room it frees is handed to the sidebar and the board in
+ * planner.fluid.css (desktop) and planner.compact.css (tablet, phone).
+ */
+.sm-planner #dashboard.live-mode .club-unified-header.is-slim {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  grid-template-columns: none !important;
+  grid-template-areas: none !important;
+  gap: 12px !important;
+  height: var(--slim-bar-h, 50px) !important;
+  padding: 0 12px 0 20px !important;
+  border-radius: 12px !important;
+  overflow: visible !important;
+}
+.sm-planner #dashboard.live-mode .club-unified-header.is-slim .club-top-userbar {
+  position: static !important;
+  flex: none !important;
+  height: auto !important;
+  z-index: auto !important;
+}
+.sm-planner #dashboard.live-mode .club-unified-header.is-slim .club-identity-name {
+  --name-base: 17px;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  width: auto !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.3px !important;
+  line-height: 1.25 !important;
+}
+.sm-planner #dashboard.live-mode .club-unified-header.is-slim .club-user-actions { gap: 10px !important; }
+.sm-planner #dashboard.live-mode .club-unified-header.is-slim .club-user-bell { width: 34px !important; height: 34px !important; }
+.sm-planner #dashboard.live-mode .club-unified-header.is-slim .club-user-bell .icon { width: 19px !important; height: 19px !important; }
+.sm-planner #dashboard.live-mode .club-unified-header.is-slim .club-user-avatar { width: 30px !important; height: 30px !important; }
+.sm-planner #dashboard.live-mode .club-unified-header.is-slim .club-user-name { font-size: 13px !important; }
