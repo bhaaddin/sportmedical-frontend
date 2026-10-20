@@ -15,6 +15,7 @@ import type { SxProps, Theme } from '@mui/material/styles';
 import { SiteLink } from './SiteLink';
 import { Magnetic } from '../motion/Magnetic';
 import { useReveal } from '../motion/Reveal';
+import { KineticLines } from '../motion/KineticText';
 import { FONT_HEAD, GUTTER, MQ, SITE_MAX, W } from './tokens';
 import { formatCzk, formatMinutes } from '../api/priceList';
 import type { PriceItem } from '../api/priceList';
@@ -269,7 +270,7 @@ export function PageHero({ eyebrow, title, lead, children }: { eyebrow?: ReactNo
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: '22px', maxWidth: 820 }}>
         {eyebrow !== undefined && <Eyebrow onInk rule>{eyebrow}</Eyebrow>}
         <Box component="h1" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 800, fontSize: 'clamp(36px, 5vw, 64px)', lineHeight: 0.98, letterSpacing: '-0.04em' }}>
-          {title}
+          {typeof title === 'string' ? <KineticLines text={title} delay={0.1} /> : title}
         </Box>
         {lead !== undefined && (
           <Box component="p" sx={{ m: 0, fontSize: { xs: 17, md: 19 }, lineHeight: 1.55, color: W.onInk, maxWidth: '52ch' }}>{lead}</Box>

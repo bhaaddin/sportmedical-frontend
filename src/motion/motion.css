@@ -53,28 +53,30 @@ html[data-motion='off'] .MuiTouchRipple-root {
   scale: var(--sm-press);
 }
 
-/* ── kinetic headline (KineticText): words rise out of a mask. The wrapper has padding so accents and descenders are
-      not cut, and a matching negative margin so the layout is exactly the plain text's. ── */
+/* ── kinetic headline (KineticText): the words come into FOCUS one after another - blurred, a little low and dim,
+      then sharp and in place. Not a clip/mask reveal on purpose: a clipped headline is only "painted" as far as it is
+      uncovered, so the browser would call the page's largest content ready when the last word finishes (LCP 0.8 s -> 3.3 s
+      on a throttled phone, measured). Here every word is present at its full size from the first frame. ── */
 .sm-kt-w {
   display: inline-block;
-  overflow: hidden;
-  vertical-align: bottom;
-  padding: 0.16em 0.06em 0.18em;
-  margin: -0.16em -0.06em -0.18em;
 }
 .sm-kt-i {
   display: inline-block;
 }
 html[data-motion='full'] .sm-kt-i {
   animation: sm-kt-in var(--sm-dur-cinematic) var(--sm-ease-expo) both;
-  animation-delay: calc(var(--d, 0.18s) + var(--i, 0) * 75ms);
+  animation-delay: calc(var(--d, 0.1s) + var(--i, 0) * 70ms);
 }
 @keyframes sm-kt-in {
   from {
-    transform: translateY(128%) rotate(3deg);
+    opacity: 0.22;
+    transform: translateY(0.2em);
+    filter: blur(14px);
   }
   to {
+    opacity: 1;
     transform: none;
+    filter: blur(0);
   }
 }
 
@@ -84,7 +86,7 @@ html[data-motion='full'] .sm-hero-rule {
   animation: sm-draw var(--sm-dur-cinematic) var(--sm-ease-expo) 0.05s both;
 }
 html[data-motion='full'] .sm-hero-up {
-  animation: sm-up 0.95s var(--sm-ease-out) calc(var(--d, 0) * 1s) both;
+  animation: sm-up 0.75s var(--sm-ease-out) calc(var(--d, 0) * 1s) both;
 }
 html[data-motion='full'] .sm-hero-frame {
   animation: sm-frame-open 1.35s var(--sm-ease-expo) 0.3s both;
@@ -114,12 +116,15 @@ html[data-motion='full'] .sm-hero-line {
     transform: none;
   }
 }
+/* The frame grows to its size from 7 % smaller on every side (never from nothing: see the headline note on LCP). */
 @keyframes sm-frame-open {
   from {
-    clip-path: inset(100% 0 0 0 round 20px);
+    clip-path: inset(7% 7% 7% 7% round 34px);
+    opacity: 0.4;
   }
   to {
     clip-path: inset(0 0 0 0 round 20px);
+    opacity: 1;
   }
 }
 @keyframes sm-settle {

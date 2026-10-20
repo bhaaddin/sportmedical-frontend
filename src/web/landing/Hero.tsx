@@ -148,10 +148,10 @@ export function Hero() {
               delay={0.2}
               sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 800, fontSize: 'clamp(44px, 6.4vw, 88px)', lineHeight: 0.94, letterSpacing: '-0.045em' }}
             />
-            <Box className="sm-hero-up" style={{ '--d': 0.85 } as CSSProperties}>
+            <Box className="sm-hero-up" style={{ '--d': 0.45 } as CSSProperties}>
               <SlotText slotKey="landing.hero.lead" as="p" sx={{ m: 0, fontSize: { xs: 17, md: 19 }, lineHeight: 1.55, color: W.onInk, maxWidth: '48ch' }} />
             </Box>
-            <Box className="sm-hero-up" style={{ '--d': 1.0 } as CSSProperties} sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: '13px', pt: '6px' }}>
+            <Box className="sm-hero-up" style={{ '--d': 0.6 } as CSSProperties} sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: '13px', pt: '6px' }}>
               <CtaButton to={BOOKING_PATH} arrow magnetic sx={{ width: { xs: '100%', sm: 'auto' } }}>{primary}</CtaButton>
               <CtaButton to="/cenik" variant="ghostDark" sx={{ width: { xs: '100%', sm: 'auto' } }}>
                 {lowest !== null ? `${secondary} od ${lowest}` : secondary}

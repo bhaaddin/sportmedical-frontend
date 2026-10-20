@@ -50,22 +50,32 @@ for (const path of PATHS) {
     page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
     page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
 
-    // Frame strip: photograph the page while its first second plays.
+    // Frame strip: a CDP screencast delivers a frame whenever the page repaints, so the first second of the hero is caught
+    // at the browser's own rate (a screenshot loop managed two frames a second on this machine).
     const frames = [];
     const started = Date.now();
+    const cdp = await context.newCDPSession(page);
+    if (STRIP) {
+      cdp.on('Page.screencastFrame', (event) => {
+        frames.push({ t: Date.now() - started, data: event.data });
+        void cdp.send('Page.screencastFrameAck', { sessionId: event.sessionId }).catch(() => undefined);
+      });
+      await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 60, maxWidth: width, maxHeight: height, everyNthFrame: 1 });
+    }
     await page.goto(`${BASE}${path}`, { waitUntil: 'commit' });
     if (STRIP) {
-      while (Date.now() - started < 2600 && frames.length < 8) {
-        try {
-          frames.push({ t: Date.now() - started, data: (await page.screenshot({ type: 'jpeg', quality: 55 })).toString('base64') });
-        } catch { /* navigation in flight */ }
-        await page.waitForTimeout(130);
-      }
+      await page.waitForTimeout(2600);
+      await cdp.send('Page.stopScreencast').catch(() => undefined);
     }
     await page.waitForLoadState('load');
     await page.waitForTimeout(3200); // idle: scenes, Lenis and the shader arrive
 
     if (frames.length > 0) {
+      // up to 8 frames spread over the first 2.4 s, always including the last one
+      const early = frames.filter((f) => f.t <= 2400);
+      const picked = early.length <= 8 ? early : Array.from({ length: 8 }, (_, i) => early[Math.round((i * (early.length - 1)) / 7)]);
+      frames.length = 0;
+      frames.push(...picked);
       const sheet = await context.newPage();
       const cell = Math.round(Math.min(360, width / 2));
       await sheet.setViewportSize({ width: cell * Math.min(4, frames.length), height: Math.ceil(frames.length / 4) * Math.round((cell * height) / width) + 8 });

@@ -51,7 +51,7 @@ describe('render() — the prerender entry', () => {
   it('renders the not-found page for an address that is not in the table', () => {
     const result = render('/neexistuje', EMPTY_BOOTSTRAP);
     expect(result.found).toBe(false);
-    expect(result.html).toContain('Stránka nenalezena');
+    expect(result.html.replace(/<[^>]+>/g, '')).toContain('Stránka nenalezena'); // the title is kinetic words in spans: read the text
   });
 
   it('is deterministic: the same input gives the same HTML (so hydration matches)', () => {

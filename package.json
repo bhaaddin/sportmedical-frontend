@@ -16,7 +16,10 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check:prerender": "node scripts/prerender-check.mjs",
+    "motion:perf": "node scripts/motion-perf.mjs",
+    "motion:shots": "node scripts/motion-shots.mjs"
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",

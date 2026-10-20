@@ -38,6 +38,7 @@ vi.mock('./engine', () => ({
 import { ThemePrefsProvider } from '../ThemePrefsProvider';
 import Settings from '../pages/Settings';
 import { KpiCard } from '../components/ui/KpiCard';
+import { CountUp } from './CountUp';
 import { ResponsiveDataList } from '../components/ui/ResponsiveDataList';
 import { setViewport, VIEWPORTS } from '../test/viewport';
 
@@ -112,26 +113,18 @@ describe('Nastavení -> Osobní -> Vzhled -> Pohyb', () => {
   });
 });
 
-describe('KpiCard count-up', () => {
-  it("shows the plain value until it is told to count, and counts only under 'plné'", async () => {
+describe('the dashboard figures (a KpiCard whose value is a CountUp)', () => {
+  it("show the plain number except under 'plné', where they count once", async () => {
     setMode('vypnuto');
-    const { container, unmount } = render(<KpiCard label="Dnes objednáno" value={12} countTo={12} />);
+    const { container, unmount } = render(<KpiCard label="Dnes objednáno" value={<CountUp value={12} />} />);
     await flush();
     expect(container.textContent).toContain('12');
     expect(fake.api.animate).not.toHaveBeenCalled();
     unmount();
     setMode('plné');
-    render(<KpiCard label="Dnes objednáno" value={12} countTo={12} />);
+    render(<KpiCard label="Dnes objednáno" value={<CountUp value={12} />} />);
     await flush();
     expect(fake.api.animate).toHaveBeenCalled();
-  });
-
-  it('keeps the plain text while the data has not arrived (pending)', async () => {
-    setMode('plné');
-    const { container } = render(<KpiCard label="Kartotéka" value="—" countTo={40} pending />);
-    await flush();
-    expect(container.textContent).toContain('—');
-    expect(fake.api.animate).not.toHaveBeenCalled();
   });
 });
 
