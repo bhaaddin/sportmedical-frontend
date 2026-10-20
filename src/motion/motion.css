@@ -1,0 +1,315 @@
+/* ══════════════════════════════════════════════════════════════
+   MOTION - the stylesheet half of the kit (docs/motion-kit.md).
+
+   It is keyed on <html data-motion="full|reduced|off">, which a tiny inline script in index.html sets before the
+   first paint (and src/motion/preference.ts keeps in step). No data-motion at all (script blocked) means the page
+   is static: every animation below needs `html[data-motion="full"]`.
+
+   The numbers come from src/motion/tokens.ts (written on :root as --sm-* variables when the app starts); the
+   fallbacks here are the same values, so the first paint is right before any script has run.
+   ══════════════════════════════════════════════════════════════ */
+
+:root {
+  --sm-dur-instant: 80ms;
+  --sm-dur-quick: 140ms;
+  --sm-dur-base: 320ms;
+  --sm-dur-slow: 700ms;
+  --sm-dur-cinematic: 1100ms;
+  --sm-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --sm-ease-expo: cubic-bezier(0.19, 1, 0.22, 1);
+  --sm-ease-in: cubic-bezier(0.7, 0, 0.84, 1);
+  --sm-ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+  --sm-ease-pop: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --sm-press: 1;
+}
+html[data-motion='full'],
+html[data-motion='reduced'] {
+  --sm-press: 0.97;
+}
+
+/* ── 'vypnuto': nothing moves. Transitions are instant, entrance animations are skipped. Progress indicators keep
+      turning (a spinner that stood still would look like a hang) and so does anything marked .sm-keep-motion. ── */
+html[data-motion='off'] *,
+html[data-motion='off'] *::before,
+html[data-motion='off'] *::after {
+  transition-duration: 1ms !important;
+  transition-delay: 0ms !important;
+  scroll-behavior: auto !important;
+}
+html[data-motion='off'] *:not(.MuiCircularProgress-root, .MuiCircularProgress-root *, .MuiLinearProgress-root *, .sm-keep-motion, .sm-keep-motion *),
+html[data-motion='off'] *:not(.MuiCircularProgress-root, .MuiLinearProgress-root, .sm-keep-motion)::before,
+html[data-motion='off'] *:not(.MuiCircularProgress-root, .MuiLinearProgress-root, .sm-keep-motion)::after {
+  animation: none !important;
+}
+html[data-motion='off'] .MuiTouchRipple-root {
+  display: none;
+}
+
+/* ── press feedback (PressScale and the theme's buttons read --sm-press: 1 when off) ── */
+.sm-press {
+  transition: scale var(--sm-dur-quick) var(--sm-ease-pop);
+}
+.sm-press:active:not(:disabled) {
+  scale: var(--sm-press);
+}
+
+/* ── kinetic headline (KineticText): the words come into FOCUS one after another - blurred, a little low and dim,
+      then sharp and in place. Not a clip/mask reveal on purpose: a clipped headline is only "painted" as far as it is
+      uncovered, so the browser would call the page's largest content ready when the last word finishes (LCP 0.8 s -> 3.3 s
+      on a throttled phone, measured). Here every word is present at its full size from the first frame. ── */
+.sm-kt-w {
+  display: inline-block;
+}
+.sm-kt-i {
+  display: inline-block;
+}
+html[data-motion='full'] .sm-kt-i {
+  animation: sm-kt-in var(--sm-dur-cinematic) var(--sm-ease-expo) both;
+  animation-delay: calc(var(--d, 0.1s) + var(--i, 0) * 70ms);
+}
+@keyframes sm-kt-in {
+  from {
+    opacity: 0.22;
+    transform: translateY(0.2em);
+    filter: blur(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+/* ── the hero's one orchestrated moment: everything is ordinary markup; these classes only schedule its arrival ── */
+html[data-motion='full'] .sm-hero-rule {
+  transform-origin: left center;
+  animation: sm-draw var(--sm-dur-cinematic) var(--sm-ease-expo) 0.05s both;
+}
+html[data-motion='full'] .sm-hero-up {
+  animation: sm-up 0.75s var(--sm-ease-out) calc(var(--d, 0) * 1s) both;
+}
+html[data-motion='full'] .sm-hero-frame {
+  animation: sm-frame-open 1.35s var(--sm-ease-expo) 0.3s both;
+}
+html[data-motion='full'] .sm-hero-frame-img {
+  animation: sm-settle 1.9s var(--sm-ease-expo) 0.3s both;
+}
+html[data-motion='full'] .sm-hero-line {
+  transform-origin: left center;
+  animation: sm-draw 1.2s var(--sm-ease-expo) calc(0.9s + var(--d, 0) * 1s) both;
+}
+@keyframes sm-draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+/* From 0.2, not 0: an element that starts fully transparent is not "painted" for LCP until its fade has run (the opacity
+   animation lives on the compositor), so a large lead paragraph would postpone LCP by the whole animation. */
+@keyframes sm-up {
+  from {
+    opacity: 0.2;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* The frame grows to its size from 7 % smaller on every side (never from nothing: see the headline note on LCP). */
+@keyframes sm-frame-open {
+  from {
+    clip-path: inset(7% 7% 7% 7% round 34px);
+    opacity: 0.4;
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 20px);
+    opacity: 1;
+  }
+}
+@keyframes sm-settle {
+  from {
+    transform: scale(1.28);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* ── light-up words of a quote (scroll scene) ── */
+.sm-lw {
+  display: inline;
+}
+
+/* ── between two public pages: View Transitions (SiteLink asks for them, 'plné' only). The old page recedes, the new
+      one is drawn over it from the bottom like a curtain; the header stays where it is. ── */
+html[data-motion='full']::view-transition-old(root) {
+  animation: sm-vt-out 0.5s var(--sm-ease-in) both;
+}
+html[data-motion='full']::view-transition-new(root) {
+  animation: sm-vt-in 0.8s var(--sm-ease-expo) both;
+}
+html[data-motion='full']::view-transition-old(sm-header),
+html[data-motion='full']::view-transition-new(sm-header) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+@keyframes sm-vt-out {
+  to {
+    transform: scale(0.96) translateY(-2%);
+    opacity: 0.4;
+  }
+}
+@keyframes sm-vt-in {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* ── staff: a dialog grows out of the button that was pressed. MUI fades the container (Fade); this adds a spring scale
+      about the pressed point (--sm-pop-x/y, src/motion/pointerOrigin.ts) while it opens. Full motion only: with
+      'omezené' the fade alone, with 'vypnuto' nothing. Menus and popovers already grow from their anchor (MUI's Grow). ── */
+html[data-motion='full'] .MuiDialog-container {
+  transform-origin: var(--sm-pop-x, 50%) var(--sm-pop-y, 50%);
+  animation: sm-pop-in 340ms var(--sm-ease-pop) both;
+}
+@keyframes sm-pop-in {
+  from {
+    transform: scale(0.94);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* ── staff: buttons dip while held and spring back. `scale` is the individual transform property, so it never fights a
+      button's own transform; the colour transitions are MUI's own 250 ms list, repeated because a transition declaration
+      replaces the whole list. --sm-press is 1 (no transform) when motion is 'vypnuto'. The selector is heavier than the
+      theme's so the stylesheet order does not matter. ── */
+html body .MuiButton-root,
+html body .MuiToggleButton-root,
+html body .MuiFab-root {
+  transition:
+    background-color 250ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 250ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 250ms cubic-bezier(0.4, 0, 0.2, 1),
+    scale var(--sm-dur-quick) var(--sm-ease-pop);
+}
+html body .MuiIconButton-root {
+  transition:
+    background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    scale var(--sm-dur-quick) var(--sm-ease-pop);
+}
+html body :is(.MuiButton-root, .MuiToggleButton-root, .MuiFab-root, .MuiIconButton-root):active:not(.Mui-disabled) {
+  scale: var(--sm-press);
+}
+
+/* ── staff: a skeleton shimmers (a light band travelling across) instead of dimming. Stilled by 'vypnuto' above. ── */
+html:not([data-motion='off']) .MuiSkeleton-pulse {
+  animation: none;
+  position: relative;
+  overflow: hidden;
+}
+html:not([data-motion='off']) .MuiSkeleton-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(128, 128, 128, 0.2), transparent);
+  transform: translateX(-100%);
+  animation: sm-shimmer 1.5s var(--sm-ease-inout, ease-in-out) infinite;
+}
+@keyframes sm-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* ── staff: the offline / server-down strip slides down from the top edge and back up ── */
+.sm-banner-in {
+  animation: sm-banner-in 260ms var(--sm-ease-out) both;
+}
+.sm-banner-out {
+  animation: sm-banner-out 180ms var(--sm-ease-in) both;
+}
+html[data-motion='reduced'] .sm-banner-in {
+  animation-name: sm-fade-in;
+}
+html[data-motion='reduced'] .sm-banner-out {
+  animation-name: sm-fade-out;
+}
+@keyframes sm-banner-in {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+@keyframes sm-banner-out {
+  to {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+@keyframes sm-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* ── staff: skeleton and toast ── */
+@keyframes sm-toast-in {
+  from {
+    opacity: 0;
+    transform: translate3d(24px, 0, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sm-toast-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(16px, 0, 0) scale(0.98);
+  }
+}
+html[data-motion='reduced'] .sm-toast {
+  animation-name: sm-fade-in !important;
+}
+@keyframes sm-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Lenis (smooth scroll) needs these; they are the library's own recommended rules ── */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis:not(.lenis-autoToggle).lenis-stopped {
+  overflow: clip;
+}
+.lenis [data-lenis-prevent],
+.lenis [data-lenis-prevent-wheel],
+.lenis [data-lenis-prevent-touch] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}

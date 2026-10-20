@@ -1,0 +1,73 @@
+{
+  "base": "http://localhost:4301",
+  "mode": "desktop",
+  "runs": 7,
+  "pages": {
+    "/": {
+      "fcp": 96,
+      "lcp": 96,
+      "cls": 0,
+      "tbt": 0,
+      "jsBytes": 355598,
+      "jsFiles": 16,
+      "samples": [
+        {
+          "fcp": 172,
+          "lcp": 172,
+          "cls": 0,
+          "tbt": 0,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 84,
+          "lcp": 84,
+          "cls": 0.000027399761686599796,
+          "tbt": 0,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 84,
+          "lcp": 84,
+          "cls": 0.000027399761686599796,
+          "tbt": 0,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 116,
+          "lcp": 116,
+          "cls": 0,
+          "tbt": 0,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 96,
+          "lcp": 96,
+          "cls": 0.000027399761686599796,
+          "tbt": 0,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 96,
+          "lcp": 96,
+          "cls": 0.000027399761686599796,
+          "tbt": 0,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 116,
+          "lcp": 116,
+          "cls": 0,
+          "tbt": 0,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        }
+      ]
+    }
+  }
+}

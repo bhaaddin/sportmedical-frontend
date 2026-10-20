@@ -5,6 +5,9 @@
 import { Box } from '@mui/material';
 import { formatPercent, topTier, useDiscountTiers } from '../../api/publicDiscounts';
 import { useClubTerms } from '../../api/publicClubTerms';
+import { CountUp } from '../../motion/CountUp';
+import { ShaderBackdrop } from '../../motion/ShaderBackdrop';
+import { Tilt } from '../../motion/Magnetic';
 import { MediaSlot } from '../../site/MediaSlot';
 import { SlotText, useSlotText } from '../../site/SlotText';
 import { BENEFIT_COUNT } from '../../site/slots/kluby';
@@ -12,52 +15,13 @@ import { BOOKING_PATH } from '../../components/public/PublicHeader';
 import { ArrowLink, CtaButton, Eyebrow, SectionTitle, WebSection } from '../ui';
 import { FONT_HEAD, MQ, W } from '../tokens';
 
-/* ── Equipment ── */
-
-const EQUIPMENT = [1, 2, 3, 4] as const;
-
-export function EquipmentSection() {
-  return (
-    <WebSection tone="warm" py={[48, 76]} borderTop innerSx={{ display: 'flex', flexDirection: 'column', gap: { xs: '26px', md: '34px' } }}>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <Eyebrow><SlotText slotKey="landing.equipment.eyebrow" /></Eyebrow>
-        <SectionTitle size="md"><SlotText slotKey="landing.equipment.title" /></SectionTitle>
-      </Box>
-      <Box
-        component="ul"
-        sx={{
-          listStyle: 'none', m: 0, p: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: '1px',
-          bgcolor: W.lineStrong, border: `1px solid ${W.lineStrong}`, borderRadius: '18px', overflow: 'hidden',
-        }}
-      >
-        {EQUIPMENT.map((n) => (
-          <Box
-            key={n}
-            component="li"
-            sx={{
-              bgcolor: W.white, p: { xs: '24px 22px', md: '28px 26px' }, display: 'flex', flexDirection: 'column', gap: '10px', minHeight: { xs: 0, md: 180 },
-              '@media (hover: hover)': {
-                transition: 'background-color .2s ease, color .2s ease', [MQ.reduceMotion]: { transition: 'none' },
-                '&:hover': { bgcolor: '#15181C', color: W.white, '& .pp': { color: W.onInk } },
-              },
-            }}
-          >
-            <SlotText slotKey={`landing.equipment.${n}.name`} sx={{ fontFamily: FONT_HEAD, fontWeight: 800, fontSize: 21, letterSpacing: '-0.02em' }} />
-            <SlotText slotKey={`landing.equipment.${n}.text`} sx={{ fontSize: 15, lineHeight: 1.6, color: W.bodySoft }} />
-          </Box>
-        ))}
-      </Box>
-    </WebSection>
-  );
-}
-
 /* ── How it works ── */
 
 const STEPS = [1, 2, 3, 4] as const;
 
 export function StepsSection() {
   return (
-    <WebSection id="jak-to-probiha" py={[48, 80]}>
+    <WebSection id="jak-to-probiha" py={[48, 80]} reveal={false}>
       <Box
         sx={{
           display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: { xs: '32px', md: '40px', lg: '56px' }, alignItems: 'start',
@@ -66,21 +30,25 @@ export function StepsSection() {
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '14px', minWidth: 0 }}>
           <Eyebrow><SlotText slotKey="landing.steps.eyebrow" /></Eyebrow>
-          <SectionTitle size="md"><SlotText slotKey="landing.steps.title" /></SectionTitle>
+          <SectionTitle size="md" fx="wipe"><SlotText slotKey="landing.steps.title" /></SectionTitle>
           <SlotText slotKey="landing.steps.lead" as="p" sx={{ m: 0, fontSize: 17, lineHeight: 1.6, color: W.bodySoft, maxWidth: '44ch' }} />
         </Box>
         <Box
           component="ol"
+          data-fx="draw"
           sx={{
             listStyle: 'none', m: 0, p: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '28px',
             [MQ.tablet]: { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
           }}
         >
           {STEPS.map((n) => (
-            <Box key={n} component="li" sx={{ display: 'flex', flexDirection: 'column', gap: '11px', pt: '20px', borderTop: `3px solid ${W.orange}`, minWidth: 0 }}>
-              <Box component="span" aria-hidden="true" sx={{ fontFamily: FONT_HEAD, fontWeight: 800, fontSize: 32, letterSpacing: '-0.03em', color: W.numeral }}>{`0${n}`}</Box>
-              <SlotText slotKey={`landing.steps.${n}.title`} sx={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 19 }} />
-              <SlotText slotKey={`landing.steps.${n}.text`} sx={{ fontSize: 15, lineHeight: 1.6, color: W.bodySoft }} />
+            <Box key={n} component="li" sx={{ position: 'relative', pt: '20px', minWidth: 0 }}>
+              <Box aria-hidden="true" data-fx-line="" sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', bgcolor: W.orange }} />
+              <Box data-fx-item="" sx={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
+                <Box component="span" aria-hidden="true" sx={{ fontFamily: FONT_HEAD, fontWeight: 800, fontSize: 32, letterSpacing: '-0.03em', color: W.numeral }}>{`0${n}`}</Box>
+                <SlotText slotKey={`landing.steps.${n}.title`} sx={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 19 }} />
+                <SlotText slotKey={`landing.steps.${n}.text`} sx={{ fontSize: 15, lineHeight: 1.6, color: W.bodySoft }} />
+              </Box>
             </Box>
           ))}
         </Box>
@@ -91,10 +59,12 @@ export function StepsSection() {
 
 /* ── Club offer ── */
 
-function Stat({ value, label, first }: { value: string; label: string; first: boolean }) {
+function Stat({ value, label, first, count }: { value: string; label: string; first: boolean; count?: { value: number; format: (n: number) => string } }) {
   return (
     <Box sx={{ minWidth: 0, py: '22px', pr: '16px', pl: first ? 0 : '16px', borderLeft: first ? 'none' : `1px solid ${W.inkLine}`, display: 'flex', flexDirection: 'column', gap: '3px' }}>
-      <Box component="span" sx={{ fontFamily: FONT_HEAD, fontWeight: 800, fontSize: { xs: 28, md: 32 }, color: W.orange, letterSpacing: '-0.03em' }}>{value}</Box>
+      <Box component="span" sx={{ fontFamily: FONT_HEAD, fontWeight: 800, fontSize: { xs: 28, md: 32 }, color: W.orange, letterSpacing: '-0.03em' }}>
+        {count !== undefined ? <CountUp value={count.value} format={count.format} /> : value}
+      </Box>
       <Box component="span" sx={{ fontSize: 14, color: W.onInk }}>{label}</Box>
     </Box>
   );
@@ -113,14 +83,29 @@ export function ClubSection() {
 
   const stats = [
     // The minimum is the clinic's own setting; without one this figure is simply not shown.
-    ...(minimum !== null ? [{ value: String(minimum), label: stat1Label }] : []),
+    ...(minimum !== null ? [{ value: String(minimum), label: stat1Label, count: { value: minimum, format: (n: number) => String(Math.round(n)) } }] : []),
     // The discount is the server's own figure; without it the number is simply not shown.
     ...(best !== null ? [{ value: formatPercent(best.percent), label: `od ${best.minPersons} osob` }] : []),
     { value: stat3Value, label: stat3Label },
   ].filter((stat) => stat.value.trim() !== '');
 
   return (
-    <WebSection tone="ink" id="kluby" py={[52, 80]}>
+    <WebSection
+      tone="ink"
+      id="kluby"
+      py={[52, 80]}
+      reveal={false}
+      fx="iris"
+      backdrop={
+        <ShaderBackdrop
+          kind="swirl"
+          accent={W.orange}
+          base={W.ink}
+          opacity={0.3}
+          style={{ WebkitMaskImage: 'radial-gradient(60% 90% at 88% 70%, #000 0%, transparent 75%)', maskImage: 'radial-gradient(60% 90% at 88% 70%, #000 0%, transparent 75%)' }}
+        />
+      }
+    >
       <Box
         sx={{
           display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: { xs: '32px', md: '40px', lg: '52px' }, alignItems: 'center',
@@ -147,7 +132,7 @@ export function ClubSection() {
               }}
             >
               {stats.map((stat, index) => (
-                <Stat key={stat.label} value={stat.value} label={stat.label} first={index === 0} />
+                <Stat key={stat.label} value={stat.value} label={stat.label} first={index === 0} count={'count' in stat ? stat.count : undefined} />
               ))}
             </Box>
           )}
@@ -172,11 +157,13 @@ export function ClubSection() {
 export function PhilosophySection() {
   const link = useSlotText('landing.philosophy.link');
   return (
-    <WebSection py={[48, 76]} borderTop maxWidth={900} innerSx={{ display: 'flex', flexDirection: 'column', gap: '24px', alignItems: 'center', textAlign: 'center' }}>
+    <WebSection py={[48, 76]} borderTop maxWidth={900} reveal={false} innerSx={{ display: 'flex', flexDirection: 'column', gap: '24px', alignItems: 'center', textAlign: 'center' }}>
       <Eyebrow><SlotText slotKey="landing.philosophy.eyebrow" /></Eyebrow>
       <SlotText
         slotKey="landing.philosophy.quote"
         as="blockquote"
+        split="words"
+        fx="light"
         sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 600, fontSize: 'clamp(20px, 2.6vw, 29px)', lineHeight: 1.38, letterSpacing: '-0.02em' }}
       />
       <ArrowLink to="/o-nas" sx={{ alignSelf: 'center' }}>{link}</ArrowLink>
@@ -191,23 +178,26 @@ const BOOKING_CARDS = [1, 2, 3] as const;
 export function BookingSection() {
   const cta = useSlotText('landing.booking.cta');
   return (
-    <WebSection tone="warm" py={[48, 76]} borderTop innerSx={{ display: 'flex', flexDirection: 'column', gap: { xs: '26px', md: '34px' } }}>
+    <WebSection tone="warm" py={[48, 76]} borderTop reveal={false} innerSx={{ display: 'flex', flexDirection: 'column', gap: { xs: '26px', md: '34px' } }}>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <Eyebrow><SlotText slotKey="landing.booking.eyebrow" /></Eyebrow>
-        <SectionTitle size="md"><SlotText slotKey="landing.booking.title" /></SectionTitle>
+        <SectionTitle size="md" fx="wipe"><SlotText slotKey="landing.booking.title" /></SectionTitle>
       </Box>
-      <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '14px', [MQ.tablet]: { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '18px' } }}>
+      <Box component="ul" data-fx="fan" sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '14px', [MQ.tablet]: { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '18px' } }}>
         {BOOKING_CARDS.map((n) => (
           <Box
             key={n}
-            component="li"
-            sx={{ bgcolor: W.white, border: `1px solid ${W.lineStrong}`, borderRadius: '16px', p: { xs: '20px', md: '26px' }, display: 'flex', flexDirection: 'column', gap: '18px', minWidth: 0 }}
+            component={Tilt}
+            as="li"
+            data-fx-item=""
+            sx={{ bgcolor: W.white, border: `1px solid ${W.lineStrong}`, borderRadius: '16px', transformStyle: 'preserve-3d', p: { xs: '20px', md: '26px' }, display: 'flex', flexDirection: 'column', gap: '18px', minWidth: 0 }}
           >
             <SlotText slotKey={`landing.booking.card${n}`} as="h3" sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 21, letterSpacing: '-0.02em' }} />
             <ArrowLink to={BOOKING_PATH} sx={{ mt: 'auto' }}>{cta}</ArrowLink>
           </Box>
         ))}
       </Box>
+      <CtaButton to={BOOKING_PATH} arrow magnetic sx={{ alignSelf: { xs: 'stretch', sm: 'flex-start' }, justifyContent: 'center' }}>{cta}</CtaButton>
     </WebSection>
   );
 }

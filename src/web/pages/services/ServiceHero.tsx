@@ -2,6 +2,7 @@
    lead, the booking button and a photo slot beside the text. Phone: one column, photo under the
    text. iPad: two columns. Desktop: text + a wide photo. */
 
+import type { CSSProperties } from 'react';
 import { Box } from '@mui/material';
 import { MediaSlot } from '../../../site/MediaSlot';
 import { SlotText, useSlotText } from '../../../site/SlotText';
@@ -32,20 +33,27 @@ export function ServiceHero({ page, priceButton = true, compact = false }: Servi
         }}
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: compact ? { xs: '20px', md: '10px' } : '20px', minWidth: 0 }}>
-          <Eyebrow onInk rule><SlotText slotKey={`${page}.hero.eyebrow`} /></Eyebrow>
+          <Box className="sm-hero-up" style={{ '--d': 0.05 } as CSSProperties}>
+            <Eyebrow onInk rule><SlotText slotKey={`${page}.hero.eyebrow`} /></Eyebrow>
+          </Box>
           <SlotText
             slotKey={`${page}.hero.title`}
             as="h1"
+            split="kinetic"
+            delay={0.12}
             sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 800, fontSize: compact ? 'clamp(30px, 3vw, 44px)' : 'clamp(34px, 4.6vw, 56px)', lineHeight: 1.04, letterSpacing: '-0.035em' }}
           />
-          <SlotText slotKey={`${page}.hero.lead`} as="p" sx={{ m: 0, fontSize: { xs: 17, md: 18 }, lineHeight: 1.6, color: W.onInk, maxWidth: compact ? 'min(100%, 90ch)' : '56ch' }} />
-          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: '12px', pt: '4px', ...(compact ? { [FIT_WIDE]: { display: 'none' } } : {}) }}>
+          <Box className="sm-hero-up" style={{ '--d': 0 } as CSSProperties}>
+            <SlotText slotKey={`${page}.hero.lead`} as="p" sx={{ m: 0, fontSize: { xs: 17, md: 18 }, lineHeight: 1.6, color: W.onInk, maxWidth: compact ? 'min(100%, 90ch)' : '56ch' }} />
+          </Box>
+          <Box className="sm-hero-up" style={{ '--d': 0.12 } as CSSProperties} sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: '12px', pt: '4px', ...(compact ? { [FIT_WIDE]: { display: 'none' } } : {}) }}>
             <CtaButton to={BOOKING_PATH} height={52} px={28} fontSize={16} sx={{ width: { xs: '100%', sm: 'auto' } }}>{book}</CtaButton>
             {priceButton && (
               <CtaButton to="/cenik" variant="ghostDark" height={52} px={26} fontSize={16} sx={{ width: { xs: '100%', sm: 'auto' } }}>{prices}</CtaButton>
             )}
           </Box>
         </Box>
+        <Box className="sm-hero-frame" sx={{ minWidth: 0, borderRadius: '18px', overflow: 'hidden' }}>
         <MediaSlot
           slotKey={`${page}.hero.photo`}
           tone="dark"
@@ -53,6 +61,7 @@ export function ServiceHero({ page, priceButton = true, compact = false }: Servi
           sizes="(max-width: 767px) 100vw, (max-width: 1279px) 45vw, min(28vw, 760px)"
           sx={{ borderRadius: '18px', aspectRatio: '4 / 3', minHeight: 0, [MQ.tablet]: { aspectRatio: 'auto', height: compact ? 110 : 300 }, [MQ.desktop]: { height: compact ? 130 : 'clamp(320px, 20vw, 460px)' } }}
         />
+        </Box>
       </Box>
     </WebSection>
   );

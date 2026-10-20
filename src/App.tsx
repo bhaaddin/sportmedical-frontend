@@ -2,7 +2,7 @@ import { BrowserRouter, Navigate, Routes, Route, useLocation } from 'react-route
 import { CssBaseline } from '@mui/material';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './api/queryClient';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, ToastBar } from 'react-hot-toast';
 import { useEffect, lazy, Suspense } from 'react';
 import { loginUrl } from './components/shell/loginRedirect';
 import { PageLoader, StaffShellPlaceholder } from './components/shell/PageLoader';
@@ -12,6 +12,7 @@ import { KeyboardShortcuts } from './components/KeyboardShortcuts';
 import NetworkBanner from './components/NetworkBanner';
 import { startPrefetching } from './prefetchRoutes';
 import { AccentRootVars } from './AccentRootVars';
+import { isLabHost } from './motion/lab/labHost';
 
 /* ── Lazy-loaded routes (code-split per page) ── */
 /* The signed-in staff portal (shell + menu + every staff screen) is one chunk behind the sign-in guard. */
@@ -25,6 +26,8 @@ const PatientSignIn = lazy(() => import('./pages/public/PatientSignIn'));
 const ClubRegistration = lazy(() => import('./pages/public/ClubRegistration'));
 const ClubOrderForm = lazy(() => import('./pages/public/ClubOrderForm'));
 const FeedbackPage = lazy(() => import('./pages/public/FeedbackPage'));
+/* /motion-lab: the motion kit's showcase. Dev server and `vite preview` only (any localhost), not linked, not prerendered. */
+const MotionLab = lazy(() => import('./motion/lab/MotionLabPage'));
 
 
 /** Fetches the next likely screen's script in idle time and when a link is pointed at (src/prefetchRoutes.ts). Draws nothing. */
@@ -62,6 +65,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Suspense fallback={<PageLoader />}><Login /></Suspense>} />
+            {isLabHost() && <Route path="/motion-lab" element={<Suspense fallback={<PageLoader />}><MotionLab /></Suspense>} />}
             <Route path="/dotaznik" element={<Suspense fallback={<PageLoader />}><IntakeQuestionnaire /></Suspense>} />
             {/* Dokončení registrace z odkazu, který desk poslal pacientovi.
                 Anonymní jako /dotaznik — pacient nemá účet, dokud ho tu nezaloží. */}
@@ -93,7 +97,18 @@ export default function App() {
           </Routes>
           <Prefetcher />
           <NetworkBanner />
-          <Toaster position="top-right" />
+          {/* A toast springs in from the right and leaves quickly (src/motion/motion.css: sm-toast-in / -out); 'omezené' fades, 'vypnuto' just appears. */}
+          <Toaster position="top-right" toastOptions={{ className: 'sm-toast' }}>
+            {(t) => (
+              <ToastBar
+                toast={t}
+                style={{
+                  ...t.style,
+                  ...(t.height ? { animation: t.visible ? 'sm-toast-in 340ms var(--sm-ease-pop) both' : 'sm-toast-out 160ms var(--sm-ease-in) forwards' } : {}),
+                }}
+              />
+            )}
+          </Toaster>
         </BrowserRouter>
       </QueryClientProvider>
     </ThemePrefsProvider>

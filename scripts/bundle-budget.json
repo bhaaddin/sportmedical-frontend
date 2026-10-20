@@ -3,10 +3,10 @@
   "tolerance": 0.1,
   "baseline": {
     "app-entry": 260585,
-    "public-entry": 314866,
+    "public-entry": 324703,
     "login": 5496,
-    "staff-portal": 60406,
-    "dashboard": 43075,
+    "staff-portal": 65584,
+    "dashboard": 44401,
     "planner": 230675
   }
 }

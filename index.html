@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- The motion setting (src/motion/preference.ts), applied before the first paint so CSS can switch movement off
+         without waiting for any script: <html data-motion="full|reduced|off">. The stored choice (localStorage
+         "sm-motion") wins, else the system's "reduce motion". Keep in step with resolveMotion(); a test runs this text. -->
+    <script data-sm-motion>(function(){var m=null;try{m=localStorage.getItem('sm-motion')}catch(e){}if(m!=='plné'&&m!=='omezené'&&m!=='vypnuto'){try{m=matchMedia('(prefers-reduced-motion: reduce)').matches?'vypnuto':'plné'}catch(e){m='plné'}}document.documentElement.setAttribute('data-motion',m==='vypnuto'?'off':m==='omezené'?'reduced':'full')})()</script>
     <!-- What every patient sees in the browser tab. It said
          "sportmedical-frontend", the npm package name, and lang="en" on a
          site written entirely in Czech - which also made screen readers read

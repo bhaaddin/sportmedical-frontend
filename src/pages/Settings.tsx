@@ -41,6 +41,8 @@ import { useIsPhone } from '../layout/useDevice';
 import { signOut } from '../auth/signOut';
 import { useThemePrefs } from '../themePrefs';
 import { THEME_ACCENTS } from '../theme';
+import { useMotionPreference } from '../motion/useMotionPreference';
+import { MOTION_LABELS, MOTION_MODES } from '../motion/preference';
 
 interface StoredUser {
   firstName?: string;
@@ -245,6 +247,7 @@ function GroupPage({ groupId }: { groupId: string }) {
 /** The two things that belong to the person, not to the clinic. */
 function PersonalSection() {
   const appearance = useThemePrefs();
+  const motion = useMotionPreference();
   const user = readUser();
   const name = [user.firstName, user.lastName].filter(Boolean).join(' ');
   const initials = [user.firstName?.[0], user.lastName?.[0]].filter(Boolean).join('') || '?';
@@ -259,7 +262,7 @@ function PersonalSection() {
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'minmax(0, 1fr)', [TABLET_UP]: { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' } }}>
         <Box sx={[cardSx, { p: 3 }]}>
           <Typography sx={[TYPE.itemName, { mb: 0.25 }]}>Vzhled</Typography>
-          <Typography sx={[TYPE.caption, { mb: 2 }]}>Barva a světlý/tmavý režim — platí hned</Typography>
+          <Typography sx={[TYPE.caption, { mb: 2 }]}>Barva, světlý/tmavý režim a pohyb — platí hned</Typography>
 
           <Typography sx={[TYPE.label, { mb: 1 }]}>Barva aplikace</Typography>
           <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', gap: 1.25, mb: 2.5 }}>
@@ -307,6 +310,30 @@ function PersonalSection() {
               Tmavý
             </Button>
           </Stack>
+
+          <Typography sx={[TYPE.label, { mb: 1, mt: 2.5 }]}>Pohyb</Typography>
+          <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', gap: 1 }} role="group" aria-label="Pohyb v aplikaci">
+            {MOTION_MODES.map((option) => (
+              <Button
+                key={option}
+                variant={motion.mode === option ? 'contained' : 'outlined'}
+                aria-pressed={motion.mode === option}
+                onClick={() => motion.setMode(option)}
+                sx={{ minHeight: 44 }}
+              >
+                {MOTION_LABELS[option].label}
+              </Button>
+            ))}
+          </Stack>
+          <Typography sx={[TYPE.caption, { mt: 1 }]}>
+            {MOTION_LABELS[motion.mode].hint}
+            {motion.followsSystem ? ' — podle nastavení vašeho zařízení' : ''}
+          </Typography>
+          {!motion.followsSystem && (
+            <Button size="small" onClick={() => motion.setMode(null)} sx={{ minHeight: 44, mt: 0.5, alignSelf: 'flex-start' }}>
+              Řídit se nastavením zařízení
+            </Button>
+          )}
         </Box>
 
         <Box sx={[cardSx, { p: 3 }]}>

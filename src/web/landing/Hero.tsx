@@ -2,6 +2,7 @@
    (three media slots) and the strip of four advantages. Layout: phone one column with a
    shorter carousel; iPad two columns; desktop text + a 400 px carousel (V-Web2). */
 
+import type { CSSProperties } from 'react';
 import { Box } from '@mui/material';
 import { keyframes } from '@mui/material/styles';
 import { lowestPrice, formatCzk, usePriceList } from '../../api/priceList';
@@ -10,6 +11,8 @@ import { MediaSlot } from '../../site/MediaSlot';
 import { WebSection, Eyebrow, CtaButton } from '../ui';
 import { FONT_HEAD, MQ, SITE_MAX, W } from '../tokens';
 import { BOOKING_PATH } from '../../components/public/PublicHeader';
+import { ShaderBackdrop } from '../../motion/ShaderBackdrop';
+import { SignalLine } from './Signal';
 
 const fade3 = keyframes`
   0%, 26% { opacity: 1 }
@@ -34,11 +37,13 @@ export function HeroCarousel() {
       <Box
         role="group"
         aria-label="Fotografie z kliniky"
+        className="sm-hero-frame"
         sx={{ position: 'relative', height: { xs: 240, sm: 340, md: 380, lg: 'clamp(420px, 26vw, 640px)' }, borderRadius: '20px', overflow: 'hidden', bgcolor: '#16191E' }}
       >
         {SLIDES.map((slide, index) => (
           <Box
             key={slide.key}
+            className="sm-hero-frame-img"
             sx={{
               position: 'absolute', inset: 0, animation: `${fade3} 15s infinite`, animationDelay: slide.delay,
               [MQ.reduceMotion]: { animation: 'none', ...(index > 0 ? { display: 'none' } : {}) },
@@ -102,43 +107,71 @@ export function Hero() {
   const primary = useSlotText('landing.hero.cta.primary');
 
   return (
-    <WebSection tone="ink" pt={[36, 72]} pb={[0, 0]} component="section" innerSx={{ maxWidth: SITE_MAX }} sx={{ overflow: 'hidden' }}>
-      <Box
-        sx={{
-          display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: { xs: '32px', sm: '40px', lg: '56px' }, alignItems: 'end',
-          [MQ.tablet]: { gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)' },
-          [MQ.desktop]: { gridTemplateColumns: 'minmax(0, 1fr) clamp(400px, 28vw, 760px)' },
-        }}
-      >
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: '20px', md: '26px' }, minWidth: 0, pb: { xs: 0, sm: '56px', lg: '72px' } }}>
-          <Eyebrow onInk rule sx={{ fontSize: { xs: 11, md: 12 } }}>
-            <SlotText slotKey="landing.hero.eyebrow" />
-          </Eyebrow>
-          <SlotText
-            slotKey="landing.hero.headline"
-            as="h1"
-            accentLast
-            accent={W.orange}
-            sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 800, fontSize: 'clamp(44px, 6.4vw, 88px)', lineHeight: 0.94, letterSpacing: '-0.045em' }}
-          />
-          <SlotText slotKey="landing.hero.lead" as="p" sx={{ m: 0, fontSize: { xs: 17, md: 19 }, lineHeight: 1.55, color: W.onInk, maxWidth: '48ch' }} />
-          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: '13px', pt: '6px' }}>
-            <CtaButton to={BOOKING_PATH} arrow sx={{ width: { xs: '100%', sm: 'auto' } }}>{primary}</CtaButton>
-            <CtaButton to="/cenik" variant="ghostDark" sx={{ width: { xs: '100%', sm: 'auto' } }}>
-              {lowest !== null ? `${secondary} od ${lowest}` : secondary}
-            </CtaButton>
+    <WebSection
+      tone="ink"
+      pt={[36, 72]}
+      pb={[0, 0]}
+      component="section"
+      innerSx={{ maxWidth: SITE_MAX }}
+      sx={{ overflow: 'hidden' }}
+      reveal={false}
+      backdrop={
+        <ShaderBackdrop
+          kind="mesh"
+          accent={W.orange}
+          base={W.ink}
+          opacity={0.55}
+          style={{ WebkitMaskImage: 'radial-gradient(80% 95% at 86% 32%, #000 0%, rgba(0,0,0,0.35) 55%, transparent 80%)', maskImage: 'radial-gradient(80% 95% at 86% 32%, #000 0%, rgba(0,0,0,0.35) 55%, transparent 80%)' }}
+        />
+      }
+    >
+      <Box data-fx="recede">
+        <Box
+          sx={{
+            display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: { xs: '32px', sm: '40px', lg: '56px' }, alignItems: 'end',
+            [MQ.tablet]: { gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)' },
+            [MQ.desktop]: { gridTemplateColumns: 'minmax(0, 1fr) clamp(400px, 28vw, 760px)' },
+          }}
+        >
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: '20px', md: '26px' }, minWidth: 0, pb: { xs: 0, sm: '56px', lg: '72px' } }}>
+            <Box className="sm-hero-up" style={{ '--d': 0.05 } as CSSProperties}>
+              <Eyebrow onInk rule sx={{ fontSize: { xs: 11, md: 12 } }}>
+                <SlotText slotKey="landing.hero.eyebrow" />
+              </Eyebrow>
+            </Box>
+            <SlotText
+              slotKey="landing.hero.headline"
+              as="h1"
+              accentLast
+              accent={W.orange}
+              split="kinetic"
+              delay={0.2}
+              sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 800, fontSize: 'clamp(44px, 6.4vw, 88px)', lineHeight: 0.94, letterSpacing: '-0.045em' }}
+            />
+            <Box className="sm-hero-up" style={{ '--d': 0.45 } as CSSProperties}>
+              <SlotText slotKey="landing.hero.lead" as="p" sx={{ m: 0, fontSize: { xs: 17, md: 19 }, lineHeight: 1.55, color: W.onInk, maxWidth: '48ch' }} />
+            </Box>
+            <Box className="sm-hero-up" style={{ '--d': 0.6 } as CSSProperties} sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: '13px', pt: '6px' }}>
+              <CtaButton to={BOOKING_PATH} arrow magnetic sx={{ width: { xs: '100%', sm: 'auto' } }}>{primary}</CtaButton>
+              <CtaButton to="/cenik" variant="ghostDark" sx={{ width: { xs: '100%', sm: 'auto' } }}>
+                {lowest !== null ? `${secondary} od ${lowest}` : secondary}
+              </CtaButton>
+            </Box>
+          </Box>
+          <Box sx={{ pb: { xs: '8px', sm: '56px' } }}>
+            <HeroCarousel />
           </Box>
         </Box>
-        <Box sx={{ pb: { xs: '8px', sm: '56px' } }}>
-          <HeroCarousel />
-        </Box>
-      </Box>
 
-      <Box sx={{ borderTop: `1px solid ${W.inkLine}`, display: 'grid', gridTemplateColumns: '1fr', [MQ.tablet]: { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }, [MQ.desktop]: { gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' } }}>
-        <Advantage n={1} first last={false} />
-        <Advantage n={2} first={false} last={false} />
-        <Advantage n={3} first={false} last={false} />
-        <Advantage n={4} first={false} last />
+        <Box className="sm-hero-line" style={{ '--d': 0.1 } as CSSProperties} sx={{ pt: '2px' }}>
+          <SignalLine strip={34} />
+        </Box>
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', [MQ.tablet]: { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }, [MQ.desktop]: { gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' } }}>
+          <Advantage n={1} first last={false} />
+          <Advantage n={2} first={false} last={false} />
+          <Advantage n={3} first={false} last={false} />
+          <Advantage n={4} first={false} last />
+        </Box>
       </Box>
     </WebSection>
   );

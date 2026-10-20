@@ -8,6 +8,8 @@ import '../i18n';
 import App from '../App';
 import '../theme.css';
 import '../styles/accessibility.css';
+import '../motion/motion.css';
+import { trackPointerOrigin } from '../motion/pointerOrigin';
 /* Public Sans is the product's face (design board 3. 10. 2026); Inter stays as
    the fallback and for the public pages that already wear it. Archivo is the public
    pages' heading face (artboard V-Web2). */
@@ -25,6 +27,8 @@ import '@fontsource/archivo/700.css';
 import '@fontsource/archivo/800.css';
 
 export function mountApp(container: HTMLElement): void {
+  /* Dialogs grow out of the button that was pressed (motion.css reads this). */
+  trackPointerOrigin();
   ReactDOM.createRoot(container).render(
     <React.StrictMode>
       <App />
