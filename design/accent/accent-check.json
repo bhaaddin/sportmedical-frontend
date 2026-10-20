@@ -1,0 +1,150 @@
+{
+ "at": "2026-10-20T10:55:25.373Z",
+ "rows": [
+  {
+   "where": "390x844 dark",
+   "what": "settings.button",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "390x844 dark",
+   "what": "settings.menu",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "390x844 dark",
+   "what": "settings.focus",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "390x844 dark",
+   "what": "planner.header",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "390x844 dark",
+   "what": "planner.segment",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "390x844 dark",
+   "what": "planner.cyan",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "390x844 light",
+   "what": "settings.button",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "390x844 light",
+   "what": "settings.menu",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "390x844 light",
+   "what": "settings.focus",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "390x844 light",
+   "what": "planner.header",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "390x844 light",
+   "what": "planner.segment",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "390x844 light",
+   "what": "planner.cyan",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "1440x900 dark",
+   "what": "settings.button",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "1440x900 dark",
+   "what": "settings.menu",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "1440x900 dark",
+   "what": "settings.focus",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "1440x900 dark",
+   "what": "planner.header",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "1440x900 dark",
+   "what": "planner.segment",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "1440x900 dark",
+   "what": "planner.cyan",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "1440x900 light",
+   "what": "settings.button",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "1440x900 light",
+   "what": "settings.menu",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "1440x900 light",
+   "what": "settings.focus",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "1440x900 light",
+   "what": "planner.header",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "1440x900 light",
+   "what": "planner.segment",
+   "distinct": 6,
+   "of": 6
+  },
+  {
+   "where": "1440x900 light",
+   "what": "planner.cyan",
+   "distinct": 6,
+   "of": 6
+  }
+ ],
+ "failures": []
+}
