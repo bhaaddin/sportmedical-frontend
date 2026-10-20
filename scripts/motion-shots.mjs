@@ -113,6 +113,17 @@ for (const path of PATHS) {
       if (overflow > 0) failures.push(`${path} ${width}x${height} s${i}: horizontal overflow ${overflow}px`);
       await page.screenshot({ path: join(OUT, `${slug}-${width}x${height}-s${String(i).padStart(2, '0')}.png`) });
     }
+    // A visitor's click on a link of the header: the curtain between two public pages (View Transitions), mid-way and done.
+    if (path === '/' && !phone && process.env.NAV !== '0') {
+      await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+      await page.waitForTimeout(500);
+      await page.locator('header nav a[href="/cenik"]').first().click();
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: join(OUT, `${slug}-${width}x${height}-nav-mid.png`) });
+      await page.waitForTimeout(1600);
+      await page.screenshot({ path: join(OUT, `${slug}-${width}x${height}-nav-end.png`) });
+      if (!page.url().endsWith('/cenik')) failures.push(`${path} ${width}x${height}: the click on Ceník ended at ${page.url()}`);
+    }
     const m = await page.evaluate(() => window.__m);
     log(`   CLS at load ${atLoad.cls.toFixed(4)}, after a wheel scroll of the whole page ${afterScroll.toFixed(4)}, after the jumps ${m.cls.toFixed(4)}  LCP ${Math.round(atLoad.lcp)} ms  errors ${errors.length}`);
     if (afterScroll >= 0.1) failures.push(`${path} ${width}x${height}: CLS ${afterScroll} after scrolling like a visitor`);

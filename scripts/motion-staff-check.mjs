@@ -29,6 +29,7 @@ const LABEL = process.env.LABEL ?? 'after';
 const RUNS = Number(process.env.RUNS ?? 5);
 const CPU = Number(process.env.CPU ?? 4);
 const LAYOUT = process.env.LAYOUT === '1';
+const API = process.env.API ?? 'http://localhost:5092';
 const login = readFileSync(process.env.DEV_LOGIN ?? 'C:/Users/Matko/SportMedical.Booking/.dev-login.txt', 'utf8');
 const EMAIL = /E-mail:\s*(\S+)/.exec(login)[1];
 const PASS = /Password:\s*(\S+)/.exec(login)[1];
@@ -40,11 +41,27 @@ const report = { label: LABEL, base: BASE, cpu: CPU, planner: null, layouts: [],
 const pw = await loadPlaywright();
 const browser = await pw.chromium.launch({ executablePath: findChrome(), headless: true });
 
+/** `vite preview` does not proxy /api (the dev server does): forward it to the API from here. */
+async function proxyApi(context) {
+  await context.route(/^https?:\/\/[^/]+\/(api|health|openapi)(\/|$)/, async (route) => {
+    const url = new URL(route.request().url());
+    try {
+      const response = await route.fetch({ url: `${API}${url.pathname}${url.search}` });
+      await route.fulfill({ response });
+    } catch {
+      await route.abort();
+    }
+  });
+  // The live connection (SignalR) needs a WebSocket proxy that `vite preview` does not have: leave it out rather than log its failures.
+  await context.route(/^https?:\/\/[^/]+\/hubs\//, (route) => route.abort());
+}
+
 async function signIn(context) {
+  await proxyApi(context);
   const page = await context.newPage();
   await page.goto(`${BASE}/login`, { waitUntil: 'load' });
-  await page.getByLabel('E-mail').fill(EMAIL);
-  await page.getByLabel('Heslo', { exact: true }).fill(PASS);
+  await page.getByLabel(/^E-mail/).fill(EMAIL);
+  await page.getByLabel(/^Heslo/).fill(PASS);
   await page.getByRole('button', { name: 'Přihlásit se' }).click();
   await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 });
   return page;
@@ -64,6 +81,9 @@ async function plannerRun(context, page) {
     window.__raf = requestAnimationFrame(loop);
     new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__s.tasks.push(e.duration); }).observe({ type: 'longtask', buffered: false });
   });
+  await cdp.send('Performance.enable');
+  const metric = async () => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value]));
+  const before = await metric();
   const box = await page.locator('[data-testid="board-body"]').boundingBox();
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
@@ -76,6 +96,8 @@ async function plannerRun(context, page) {
   for (let i = 0; i < 40; i += 1) { await page.mouse.wheel(0, 140); await page.waitForTimeout(24); }
   for (let i = 0; i < 40; i += 1) { await page.mouse.wheel(0, -140); await page.waitForTimeout(24); }
   const total = Date.now() - started;
+  const after = await metric();
+  const spent = (name) => Math.round((after[name] - before[name]) * 1000);
   const s = await page.evaluate(() => { cancelAnimationFrame(window.__raf); return window.__s; });
   if (CPU > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
   const frames = s.frames.slice(2).sort((a, b) => a - b);
@@ -86,6 +108,11 @@ async function plannerRun(context, page) {
     p95FrameMs: frames[Math.floor(frames.length * 0.95)],
     over50: frames.filter((f) => f > 50).length,
     longTaskMs: s.tasks.reduce((a, b) => a + b, 0),
+    // The browser's own account of the work the interaction cost the main thread (ms, under the CPU throttle).
+    taskMs: spent('TaskDuration'),
+    scriptMs: spent('ScriptDuration'),
+    layoutMs: spent('LayoutDuration'),
+    styleMs: spent('RecalcStyleDuration'),
   };
 }
 
@@ -95,8 +122,8 @@ async function plannerRun(context, page) {
   const runs = [];
   for (let i = 0; i < RUNS; i += 1) runs.push(await plannerRun(context, page));
   const pick = (k) => Number(median(runs.map((r) => r[k])).toFixed(2));
-  report.planner = { runs: RUNS, totalMs: pick('totalMs'), frames: pick('frames'), meanFrameMs: pick('meanFrameMs'), p95FrameMs: pick('p95FrameMs'), over50: pick('over50'), longTaskMs: pick('longTaskMs'), samples: runs };
-  console.log(`planner (${LABEL}, CPU x${CPU}): total ${report.planner.totalMs} ms, mean frame ${report.planner.meanFrameMs} ms, p95 ${report.planner.p95FrameMs} ms, >50 ms frames ${report.planner.over50}, long tasks ${report.planner.longTaskMs} ms`);
+  report.planner = { runs: RUNS, totalMs: pick('totalMs'), frames: pick('frames'), meanFrameMs: pick('meanFrameMs'), p95FrameMs: pick('p95FrameMs'), over50: pick('over50'), longTaskMs: pick('longTaskMs'), taskMs: pick('taskMs'), scriptMs: pick('scriptMs'), layoutMs: pick('layoutMs'), styleMs: pick('styleMs'), samples: runs };
+  console.log(`planner (${LABEL}, CPU x${CPU}): total ${report.planner.totalMs} ms, mean frame ${report.planner.meanFrameMs} ms, p95 ${report.planner.p95FrameMs} ms, >50 ms frames ${report.planner.over50}, long tasks ${report.planner.longTaskMs} ms; main thread: tasks ${report.planner.taskMs} ms, script ${report.planner.scriptMs} ms, layout ${report.planner.layoutMs} ms, style ${report.planner.styleMs} ms`);
   await context.close();
 }
 
@@ -108,7 +135,7 @@ if (LAYOUT) {
     const context = await browser.newContext({ viewport: { width, height }, isMobile: name === 'phone', hasTouch: name !== 'desktop' });
     const page = await signIn(context);
     const errors = [];
-    page.on('console', (m) => { if (m.type() === 'error' && !/favicon|Failed to load resource/.test(m.text())) errors.push(m.text().slice(0, 160)); });
+    page.on('console', (m) => { if (m.type() === 'error' && !/favicon|Failed to load resource|negotiation|Failed to start the connection|hubs\//.test(m.text())) errors.push(m.text().slice(0, 160)); });
     page.on('pageerror', (e) => errors.push(`pageerror: ${e.message.slice(0, 160)}`));
     for (const path of PAGES) {
       await page.goto(`${BASE}${path}`, { waitUntil: 'load' });
@@ -125,7 +152,15 @@ if (LAYOUT) {
         const heights = await page.getByRole('group', { name: 'Pohyb v aplikaci' }).getByRole('button').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
         row.motionButtons = heights;
         if (heights.length !== 3 || heights.some((h) => h < 44)) failures.push(`${name} /settings: motion buttons ${JSON.stringify(heights)} (need 3 at >= 44 px)`);
-        await page.screenshot({ path: resolve(root, 'design', 'motion', `staff-settings-${name}.png`) });
+        // The Vzhled card with each state pressed, as a person sees it (the card sits below the groups: scroll it into view).
+        const group = page.getByRole('group', { name: 'Pohyb v aplikaci' });
+        for (const label of ['Plné', 'Omezené', 'Vypnuto']) {
+          await group.getByRole('button', { name: label }).click();
+          await group.scrollIntoViewIfNeeded();
+          await page.waitForTimeout(250);
+          await page.screenshot({ path: resolve(root, 'design', 'motion', `staff-settings-${name}-${label.toLowerCase().replace('é', 'e')}.png`) });
+        }
+        await group.getByRole('button', { name: 'Plné' }).click();
       }
       report.layouts.push(row);
     }

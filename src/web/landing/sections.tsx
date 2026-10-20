@@ -45,9 +45,9 @@ export function StepsSection() {
             <Box key={n} component="li" sx={{ position: 'relative', pt: '20px', minWidth: 0 }}>
               <Box aria-hidden="true" data-fx-line="" sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', bgcolor: W.orange }} />
               <Box data-fx-item="" sx={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
-              <Box component="span" aria-hidden="true" sx={{ fontFamily: FONT_HEAD, fontWeight: 800, fontSize: 32, letterSpacing: '-0.03em', color: W.numeral }}>{`0${n}`}</Box>
-              <SlotText slotKey={`landing.steps.${n}.title`} sx={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 19 }} />
-              <SlotText slotKey={`landing.steps.${n}.text`} sx={{ fontSize: 15, lineHeight: 1.6, color: W.bodySoft }} />
+                <Box component="span" aria-hidden="true" sx={{ fontFamily: FONT_HEAD, fontWeight: 800, fontSize: 32, letterSpacing: '-0.03em', color: W.numeral }}>{`0${n}`}</Box>
+                <SlotText slotKey={`landing.steps.${n}.title`} sx={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 19 }} />
+                <SlotText slotKey={`landing.steps.${n}.text`} sx={{ fontSize: 15, lineHeight: 1.6, color: W.bodySoft }} />
               </Box>
             </Box>
           ))}

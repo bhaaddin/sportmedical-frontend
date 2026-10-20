@@ -7,14 +7,7 @@ import type { MotionPreference } from './preference';
 const fake = vi.hoisted(() => {
   const state = { loaded: true, loads: 0 };
   const done = () => Promise.resolve();
-  const animate = vi.fn((target: unknown, _kf?: unknown, options?: { onUpdate?: (n: number) => void; onComplete?: () => void }) => {
-    if (typeof target === 'number') {
-      options?.onUpdate?.(Math.round(_kf as number) / 2);
-      options?.onComplete?.();
-      return { stop: vi.fn(), then: (fn: () => void) => Promise.resolve().then(fn) };
-    }
-    return done();
-  });
+  const animate = vi.fn((_target: unknown, _kf?: unknown, _options?: unknown) => done());
   const inViewCallbacks: (() => void)[] = [];
   const inView = vi.fn((_el: unknown, cb: () => void) => {
     inViewCallbacks.push(cb);
@@ -162,7 +155,13 @@ describe('PopIn', () => {
     const { rerender } = render(<PopIn open origin={{ x: 10, y: 20 }} onExited={exited}><span data-testid="c">x</span></PopIn>);
     await flush();
     const kf = fake.api.animate.mock.calls[0][1] as Record<string, unknown>;
-    expect(Object.keys(kf).sort()).toEqual(['opacity', 'scale']);
+    expect(Object.keys(kf).sort()).toEqual(['opacity', 'transform']);
+    expect((kf.transform as string[])[0]).toBe('scale(0.94)');
+    const options = fake.api.animate.mock.calls[0][2] as { ease: (t: number) => number };
+    // the spring is an easing FUNCTION (motion/mini ignores a linear() string): 0 -> 1 with an overshoot on the way
+    expect(options.ease(0)).toBe(0);
+    expect(options.ease(1)).toBe(1);
+    expect(Math.max(...Array.from({ length: 60 }, (_, k) => options.ease((k + 1) / 61)))).toBeGreaterThan(1);
     expect((screen.getByTestId('c').parentElement as HTMLElement).style.transformOrigin).toContain('px');
     rerender(<PopIn open={false} origin={{ x: 10, y: 20 }} onExited={exited}><span data-testid="c">x</span></PopIn>);
     await flush();
@@ -234,11 +233,12 @@ describe('CountUp', () => {
 
   it("'plné': starts at 0, counts when it comes into view, ends on the value; a later value shows at once", async () => {
     setMode('plné');
-    const { rerender, container } = render(<CountUp value={80} format={(n) => `${Math.round(n)} x`} />);
+    const { rerender, container } = render(<CountUp value={80} duration={0.03} format={(n) => `${Math.round(n)} x`} />);
     expect(container.textContent).toBe('0 x');
     await act(async () => { fake.inViewCallbacks[0](); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 150)); });
     expect(container.textContent).toBe('80 x');
-    rerender(<CountUp value={95} format={(n) => `${Math.round(n)} x`} />);
+    rerender(<CountUp value={95} duration={0.03} format={(n) => `${Math.round(n)} x`} />);
     expect(container.textContent).toBe('95 x');
   });
 

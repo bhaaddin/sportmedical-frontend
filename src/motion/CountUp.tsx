@@ -10,10 +10,27 @@
 
 import { createElement, useEffect, useRef } from 'react';
 import type { ElementType } from 'react';
-import { DUR, EASE } from './tokens';
+import { DUR } from './tokens';
 import { canObserve, motionIfLoaded } from './engine';
 import { useIsoLayoutEffect } from './hooks';
 import { useMotionPreference } from './useMotionPreference';
+
+/** An eased counter on requestAnimationFrame (ease-out expo, like the rest of the site). Returns its stop function. */
+export function countTo(from: number, to: () => number, seconds: number, onUpdate: (n: number) => void, onDone: () => void): () => void {
+  // Time is measured on the animation frames' own clock, from the first frame (never mixed with performance.now()).
+  let started = -1;
+  let frame = 0;
+  const step = (now: number) => {
+    if (started < 0) started = now;
+    const t = Math.max(0, Math.min(1, (now - started) / (seconds * 1000)));
+    const eased = t >= 1 ? 1 : 1 - 2 ** (-10 * t);
+    onUpdate(from + (to() - from) * eased);
+    if (t < 1) frame = requestAnimationFrame(step);
+    else onDone();
+  };
+  frame = requestAnimationFrame(step);
+  return () => cancelAnimationFrame(frame);
+}
 
 const cs = new Intl.NumberFormat('cs-CZ');
 export const defaultFormat = (n: number): string => cs.format(Math.round(n));
@@ -48,19 +65,14 @@ export function CountUp({ value, format = defaultFormat, duration = DUR.slow * 1
     counted.current = true;
     setText(latest.current.format(0));
     let stopView: (() => void) | undefined;
-    let controls: { stop: () => void } | undefined;
+    let stopCount: (() => void) | undefined;
     stopView = api.inView(el, () => {
       stopView?.();
-      controls = api.animate(0, latest.current.value, {
-        duration,
-        ease: EASE.out as never,
-        onUpdate: (n: number) => setText(latest.current.format(n)),
-        onComplete: () => setText(latest.current.format(latest.current.value)),
-      });
+      stopCount = countTo(0, () => latest.current.value, duration, (n) => setText(latest.current.format(n)), () => setText(latest.current.format(latest.current.value)));
     });
     return () => {
       stopView?.();
-      controls?.stop();
+      stopCount?.();
       counted.current = false;
       setText(latest.current.format(latest.current.value));
     };

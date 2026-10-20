@@ -119,9 +119,29 @@ export function springEasing(stiffness: number, damping: number, mass = 1, steps
   return `linear(${points.join(', ')})`;
 }
 
+/**
+ * The same spring as a plain easing FUNCTION (progress 0..1 -> value, overshooting 1 when under-damped). motion/mini accepts a
+ * function and samples it into a CSS linear() itself; it silently ignores a linear() *string*, which is why PopIn uses this.
+ */
+export function springCurve(stiffness: number, damping: number, mass = 1): (t: number) => number {
+  const omega = Math.sqrt(stiffness / mass);
+  const zeta = damping / (2 * Math.sqrt(stiffness * mass));
+  const wd = omega * Math.sqrt(Math.max(1e-6, 1 - zeta * zeta));
+  const settle = zeta >= 1 ? 7 / omega : Math.log(500) / (zeta * omega);
+  return (progress) => {
+    if (progress <= 0) return 0;
+    if (progress >= 1) return 1;
+    const t = progress * settle;
+    return zeta >= 1
+      ? 1 - (1 + omega * t) * Math.exp(-omega * t)
+      : 1 - Math.exp(-zeta * omega * t) * (Math.cos(wd * t) + ((zeta * omega) / wd) * Math.sin(wd * t));
+  };
+}
+
 /** Spring easing and its natural duration for the dialog pop (CSS). */
 export const POP_EASING = springEasing(SPRING.pop.stiffness, SPRING.pop.damping, SPRING.pop.mass);
 export const SETTLE_EASING = springEasing(SPRING.settle.stiffness, SPRING.settle.damping, SPRING.settle.mass);
+export const POP_CURVE = springCurve(SPRING.pop.stiffness, SPRING.pop.damping, SPRING.pop.mass);
 
 /** The tokens as CSS custom properties, written once on the root (src/motion/motion.css reads them). */
 export function cssVariables(): Record<string, string> {

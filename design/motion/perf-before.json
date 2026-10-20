@@ -1,153 +1,267 @@
 {
   "base": "http://localhost:4301",
   "mode": "mobile-slow4g-cpu4x",
-  "runs": 5,
+  "runs": 7,
   "pages": {
     "/": {
-      "fcp": 1032,
-      "lcp": 1032,
+      "fcp": 808,
+      "lcp": 808,
       "cls": 0,
-      "tbt": 335,
+      "tbt": 113,
       "jsBytes": 355598,
       "jsFiles": 16,
       "samples": [
         {
-          "fcp": 1032,
-          "lcp": 1032,
+          "fcp": 808,
+          "lcp": 808,
           "cls": 0,
-          "tbt": 328,
+          "tbt": 113,
           "jsBytes": 355598,
           "jsFiles": 16
         },
         {
-          "fcp": 844,
-          "lcp": 844,
+          "fcp": 860,
+          "lcp": 860,
           "cls": 0,
-          "tbt": 311,
+          "tbt": 122,
           "jsBytes": 355598,
           "jsFiles": 16
         },
         {
-          "fcp": 908,
-          "lcp": 908,
+          "fcp": 792,
+          "lcp": 792,
           "cls": 0,
-          "tbt": 335,
+          "tbt": 112,
           "jsBytes": 355598,
           "jsFiles": 16
         },
         {
-          "fcp": 1416,
-          "lcp": 1416,
+          "fcp": 788,
+          "lcp": 788,
           "cls": 0,
-          "tbt": 817,
+          "tbt": 148,
           "jsBytes": 355598,
           "jsFiles": 16
         },
         {
-          "fcp": 1064,
-          "lcp": 1064,
+          "fcp": 788,
+          "lcp": 788,
           "cls": 0,
-          "tbt": 441,
+          "tbt": 105,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 824,
+          "lcp": 824,
+          "cls": 0,
+          "tbt": 108,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 824,
+          "lcp": 824,
+          "cls": 0,
+          "tbt": 127,
           "jsBytes": 355598,
           "jsFiles": 16
         }
       ]
     },
     "/sluzby": {
-      "fcp": 804,
-      "lcp": 804,
+      "fcp": 736,
+      "lcp": 736,
       "cls": 0,
-      "tbt": 262,
+      "tbt": 123,
       "jsBytes": 355598,
       "jsFiles": 16,
       "samples": [
         {
-          "fcp": 804,
-          "lcp": 804,
+          "fcp": 784,
+          "lcp": 784,
           "cls": 0,
-          "tbt": 217,
+          "tbt": 139,
           "jsBytes": 355598,
           "jsFiles": 16
         },
         {
-          "fcp": 836,
-          "lcp": 836,
+          "fcp": 732,
+          "lcp": 732,
           "cls": 0,
-          "tbt": 333,
+          "tbt": 117,
           "jsBytes": 355598,
           "jsFiles": 16
         },
         {
-          "fcp": 768,
-          "lcp": 768,
+          "fcp": 784,
+          "lcp": 784,
           "cls": 0,
-          "tbt": 222,
+          "tbt": 123,
           "jsBytes": 355598,
           "jsFiles": 16
         },
         {
-          "fcp": 764,
-          "lcp": 764,
+          "fcp": 752,
+          "lcp": 752,
           "cls": 0,
-          "tbt": 262,
+          "tbt": 123,
           "jsBytes": 355598,
           "jsFiles": 16
         },
         {
-          "fcp": 1268,
-          "lcp": 1268,
+          "fcp": 732,
+          "lcp": 732,
           "cls": 0,
-          "tbt": 592,
+          "tbt": 107,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 704,
+          "lcp": 704,
+          "cls": 0,
+          "tbt": 127,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 736,
+          "lcp": 736,
+          "cls": 0,
+          "tbt": 80,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        }
+      ]
+    },
+    "/diagnostika": {
+      "fcp": 828,
+      "lcp": 828,
+      "cls": 0,
+      "tbt": 158,
+      "jsBytes": 355598,
+      "jsFiles": 16,
+      "samples": [
+        {
+          "fcp": 828,
+          "lcp": 828,
+          "cls": 0,
+          "tbt": 147,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 872,
+          "lcp": 872,
+          "cls": 0,
+          "tbt": 143,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 788,
+          "lcp": 788,
+          "cls": 0,
+          "tbt": 158,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 840,
+          "lcp": 840,
+          "cls": 0,
+          "tbt": 146,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 824,
+          "lcp": 824,
+          "cls": 0,
+          "tbt": 162,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 820,
+          "lcp": 820,
+          "cls": 0,
+          "tbt": 250,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 924,
+          "lcp": 924,
+          "cls": 0,
+          "tbt": 255,
           "jsBytes": 355598,
           "jsFiles": 16
         }
       ]
     },
     "/cenik": {
-      "fcp": 1068,
-      "lcp": 1068,
+      "fcp": 736,
+      "lcp": 736,
       "cls": 0,
-      "tbt": 474,
+      "tbt": 103,
       "jsBytes": 355598,
       "jsFiles": 16,
       "samples": [
         {
-          "fcp": 996,
-          "lcp": 996,
+          "fcp": 748,
+          "lcp": 748,
           "cls": 0,
-          "tbt": 474,
+          "tbt": 170,
           "jsBytes": 355598,
           "jsFiles": 16
         },
         {
-          "fcp": 1068,
-          "lcp": 1068,
+          "fcp": 736,
+          "lcp": 736,
           "cls": 0,
-          "tbt": 534,
+          "tbt": 101,
           "jsBytes": 355598,
           "jsFiles": 16
         },
         {
-          "fcp": 1084,
-          "lcp": 1084,
+          "fcp": 736,
+          "lcp": 736,
           "cls": 0,
-          "tbt": 347,
+          "tbt": 103,
           "jsBytes": 355598,
           "jsFiles": 16
         },
         {
-          "fcp": 884,
-          "lcp": 884,
+          "fcp": 736,
+          "lcp": 736,
           "cls": 0,
-          "tbt": 245,
+          "tbt": 90,
           "jsBytes": 355598,
           "jsFiles": 16
         },
         {
-          "fcp": 1108,
-          "lcp": 1108,
+          "fcp": 752,
+          "lcp": 752,
           "cls": 0,
-          "tbt": 542,
+          "tbt": 81,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 732,
+          "lcp": 732,
+          "cls": 0,
+          "tbt": 114,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 716,
+          "lcp": 716,
+          "cls": 0,
+          "tbt": 104,
           "jsBytes": 355598,
           "jsFiles": 16
         }

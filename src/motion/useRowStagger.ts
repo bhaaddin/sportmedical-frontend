@@ -33,7 +33,7 @@ export function useRowStagger<T extends HTMLElement>(ref: React.RefObject<T | nu
     if (rows.length === 0) return;
     for (const row of rows) row.style.opacity = '0';
     void api
-      .animate(rows, { opacity: [0, 1], y: [DIST.nudge, 0] } as never, { duration: DUR.quick, ease: EASE.out as never, delay: api.stagger(STAGGER.rows) })
+      .animate(rows, { opacity: [0, 1], transform: [`translateY(${DIST.nudge}px)`, 'translateY(0px)'] } as never, { duration: DUR.quick, ease: EASE.out as never, delay: api.stagger(STAGGER.rows) })
       .then(() => {
         for (const row of rows) {
           row.style.removeProperty('opacity');

@@ -36,7 +36,7 @@ export function usePageArrival(ref: React.RefObject<HTMLElement | null>, routeKe
     }
     const staff = personality === 'staff';
     const rise = staff ? DIST.nudge : DIST.rise;
-    const keyframes = mode === 'omezené' ? { opacity: [0.001, 1] } : { opacity: [0.001, 1], y: [rise, 0] };
+    const keyframes = mode === 'omezené' ? { opacity: [0.001, 1] } : { opacity: [0.001, 1], transform: [`translateY(${rise}px)`, 'translateY(0px)'] };
     void api
       .animate(el, keyframes as never, { duration: staff ? DUR.staffMax : 0.45, ease: EASE.out as never })
       .then(() => {

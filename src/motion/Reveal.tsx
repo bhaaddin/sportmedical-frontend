@@ -28,11 +28,11 @@ interface VariantDef {
 
 export const REVEAL_VARIANTS: Record<RevealVariant, VariantDef> = {
   fade: { hidden: { opacity: '0' }, keyframes: { opacity: [0, 1] } },
-  rise: { hidden: { opacity: '0', transform: `translateY(${DIST.rise}px)` }, keyframes: { opacity: [0, 1], y: [DIST.rise, 0] } },
-  scale: { hidden: { opacity: '0', transform: 'scale(0.92)' }, keyframes: { opacity: [0, 1], scale: [0.92, 1] } },
+  rise: { hidden: { opacity: '0', transform: `translateY(${DIST.rise}px)` }, keyframes: { opacity: [0, 1], transform: [`translateY(${DIST.rise}px)`, 'translateY(0px)'] } },
+  scale: { hidden: { opacity: '0', transform: 'scale(0.92)' }, keyframes: { opacity: [0, 1], transform: ['scale(0.92)', 'scale(1)'] } },
   wipe: { hidden: { clipPath: 'inset(0 100% 0 0)' }, keyframes: { clipPath: ['inset(0 100% 0 0)', 'inset(0 0% 0 0)'] } },
-  left: { hidden: { opacity: '0', transform: `translateX(${-DIST.slide}px)` }, keyframes: { opacity: [0, 1], x: [-DIST.slide, 0] } },
-  right: { hidden: { opacity: '0', transform: `translateX(${DIST.slide}px)` }, keyframes: { opacity: [0, 1], x: [DIST.slide, 0] } },
+  left: { hidden: { opacity: '0', transform: `translateX(${-DIST.slide}px)` }, keyframes: { opacity: [0, 1], transform: [`translateX(${-DIST.slide}px)`, 'translateX(0px)'] } },
+  right: { hidden: { opacity: '0', transform: `translateX(${DIST.slide}px)` }, keyframes: { opacity: [0, 1], transform: [`translateX(${DIST.slide}px)`, 'translateX(0px)'] } },
 };
 
 /** What a state is allowed to do with a variant: 'plné' as asked, 'omezené' a fade, 'vypnuto' nothing (null). */

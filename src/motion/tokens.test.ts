@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DIST, DUR, EASE, POP_EASING, SETTLE_EASING, SPRING, STAGGER, cssEase, cssVariables, ms, springEasing } from './tokens';
+import { DIST, DUR, EASE, POP_CURVE, POP_EASING, SETTLE_EASING, SPRING, STAGGER, cssEase, cssVariables, ms, springCurve, springEasing } from './tokens';
 
 describe('motion tokens', () => {
   it('keeps the durations in order and the staff ceiling at 180 ms', () => {
@@ -39,6 +39,16 @@ describe('motion tokens', () => {
     const heavy = /^linear\((.*)\)$/.exec(springEasing(200, 80, 1))![1].split(', ').map(Number);
     expect(Math.max(...heavy)).toBeLessThanOrEqual(1);
     expect(SETTLE_EASING).toMatch(/^linear\(/);
+  });
+
+  it('the spring is also an easing function that agrees with the CSS sampling', () => {
+    const curve = springCurve(SPRING.pop.stiffness, SPRING.pop.damping, SPRING.pop.mass);
+    expect(curve).toEqual(expect.any(Function));
+    expect(POP_CURVE(0)).toBe(0);
+    expect(POP_CURVE(1)).toBe(1);
+    const points = /^linear\((.*)\)$/.exec(POP_EASING)![1].split(', ').map(Number);
+    points.forEach((value, i) => expect(Math.abs(curve(i / (points.length - 1)) - value)).toBeLessThan(0.002));
+    expect(Math.max(...points.map((_, i) => curve(i / 28)))).toBeGreaterThan(1);
   });
 
   it('exposes every token as a CSS variable', () => {

@@ -10,7 +10,7 @@
 
 import { createElement, useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ElementType, ReactNode } from 'react';
-import { DIST, DUR, EASE, SPRING } from './tokens';
+import { DIST, DUR, EASE, POP_CURVE } from './tokens';
 import { loadMotion, motionIfLoaded } from './engine';
 import { useMotionPreference } from './useMotionPreference';
 
@@ -76,8 +76,9 @@ export function PopIn({ open, origin = null, as = 'div', className, style, child
         el.style.transformOrigin = `${origin.x - r.left}px ${origin.y - r.top}px`;
       }
       const reduced = mode === 'omezené';
-      const keyframes = reduced ? { opacity: [0, 1] } : { opacity: [0, 1], scale: [DIST.popFrom, 1] };
-      const transition = reduced ? { duration: DUR.instant * 1.5 } : { ...SPRING.pop, opacity: { duration: DUR.quick } };
+      const keyframes = reduced ? { opacity: [0, 1] } : { opacity: [0, 1], transform: [`scale(${DIST.popFrom})`, 'scale(1)'] };
+      // The spring is SPRING.pop as an easing function (tokens.ts); motion/mini samples it into a CSS linear() the browser runs.
+      const transition = reduced ? { duration: DUR.instant * 1.5 } : { duration: 0.34, ease: POP_CURVE };
       void api.animate(el, keyframes as never, transition as never).then(() => {
         el.style.removeProperty('transform');
         el.style.removeProperty('opacity');
@@ -87,7 +88,7 @@ export function PopIn({ open, origin = null, as = 'div', className, style, child
         finish();
         return;
       }
-      const keyframes = mode === 'omezené' ? { opacity: 0 } : { opacity: 0, scale: 0.96 };
+      const keyframes = mode === 'omezené' ? { opacity: 0 } : { opacity: 0, transform: 'scale(0.96)' };
       void api.animate(el, keyframes as never, { duration: DUR.quick, ease: EASE.in as never }).then(finish, finish);
     } else {
       finish();
@@ -158,11 +159,11 @@ export function PresenceList<T>({ items, getKey, render, as = 'ul', itemAs = 'li
           drop();
         } else if (el.dataset.leaving !== '1') {
           el.dataset.leaving = '1';
-          const keyframes = mode === 'omezené' ? { opacity: 0 } : { opacity: 0, height: 0, scale: 0.98 };
+          const keyframes = mode === 'omezené' ? { opacity: 0 } : { opacity: 0, height: 0, transform: 'scale(0.98)' };
           void api.animate(el, keyframes as never, { duration: DUR.quick, ease: EASE.in as never }).then(drop, drop);
         }
       } else if (fresh && api !== null && mode !== 'vypnuto' && el !== undefined) {
-        const keyframes = mode === 'omezené' ? { opacity: [0, 1] } : { opacity: [0, 1], y: [DIST.nudge, 0] };
+        const keyframes = mode === 'omezené' ? { opacity: [0, 1] } : { opacity: [0, 1], transform: [`translateY(${DIST.nudge}px)`, 'translateY(0px)'] };
         void api.animate(el, keyframes as never, { duration: DUR.quick, ease: EASE.out as never }).then(() => {
           el.style.removeProperty('transform');
           el.style.removeProperty('opacity');

@@ -43,10 +43,10 @@ export function ServiceHero({ page, priceButton = true, compact = false }: Servi
             delay={0.12}
             sx={{ m: 0, fontFamily: FONT_HEAD, fontWeight: 800, fontSize: compact ? 'clamp(30px, 3vw, 44px)' : 'clamp(34px, 4.6vw, 56px)', lineHeight: 1.04, letterSpacing: '-0.035em' }}
           />
-          <Box className="sm-hero-up" style={{ '--d': 0.1 } as CSSProperties}>
+          <Box className="sm-hero-up" style={{ '--d': 0 } as CSSProperties}>
             <SlotText slotKey={`${page}.hero.lead`} as="p" sx={{ m: 0, fontSize: { xs: 17, md: 18 }, lineHeight: 1.6, color: W.onInk, maxWidth: compact ? 'min(100%, 90ch)' : '56ch' }} />
           </Box>
-          <Box className="sm-hero-up" style={{ '--d': 0.22 } as CSSProperties} sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: '12px', pt: '4px', ...(compact ? { [FIT_WIDE]: { display: 'none' } } : {}) }}>
+          <Box className="sm-hero-up" style={{ '--d': 0.12 } as CSSProperties} sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', gap: '12px', pt: '4px', ...(compact ? { [FIT_WIDE]: { display: 'none' } } : {}) }}>
             <CtaButton to={BOOKING_PATH} height={52} px={28} fontSize={16} sx={{ width: { xs: '100%', sm: 'auto' } }}>{book}</CtaButton>
             {priceButton && (
               <CtaButton to="/cenik" variant="ghostDark" height={52} px={26} fontSize={16} sx={{ width: { xs: '100%', sm: 'auto' } }}>{prices}</CtaButton>

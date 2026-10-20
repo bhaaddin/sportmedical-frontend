@@ -15,8 +15,9 @@
    ══════════════════════════════════════════════════════════════ */
 
 import { createContext, forwardRef, useContext } from 'react';
-import type { AnchorHTMLAttributes } from 'react';
-import { Link as RouterLink, useInRouterContext } from 'react-router-dom';
+import type { AnchorHTMLAttributes, MouseEvent } from 'react';
+import { flushSync } from 'react-dom';
+import { Link as RouterLink, useInRouterContext, useNavigate } from 'react-router-dom';
 import { isPublicSitePath, legacyWebRedirect } from './sitePaths';
 
 /** True inside the prerendered public bundle (see WebApp). */
@@ -34,21 +35,44 @@ export interface SiteLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorEleme
   to: string;
 }
 
+/**
+ * A client-side link between two pages of the public site. With full motion (<html data-motion="full">, read at click time:
+ * the sign-in page carries this file and must not carry the motion kit) and a browser that has View Transitions, the click
+ * runs the navigation inside document.startViewTransition, so the old page recedes and the new one is drawn over it like a
+ * curtain (styled in src/motion/motion.css; the header keeps its place). React Router's own `viewTransition` option exists
+ * only for data routers; this site uses a declarative BrowserRouter, so the transition is started here. Modified clicks
+ * (new tab), hash links and anything else fall through to the normal link.
+ */
+const PageLink = forwardRef<HTMLAnchorElement, SiteLinkProps & { inWeb: boolean }>(function PageLink({ to, inWeb, children, onClick, ...rest }, ref) {
+  const navigate = useNavigate();
+  const handle = (event: MouseEvent<HTMLAnchorElement>) => {
+    onClick?.(event);
+    if (event.defaultPrevented || !inWeb || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || rest.target) return;
+    const start = (document as Document & { startViewTransition?: (update: () => void) => unknown }).startViewTransition;
+    if (typeof start !== 'function' || document.documentElement.dataset.motion !== 'full') return;
+    if (to.split('#')[0] === window.location.pathname) return;
+    event.preventDefault();
+    start.call(document, () => {
+      flushSync(() => navigate(to));
+    });
+  };
+  return (
+    <RouterLink ref={ref} to={to} {...rest} onClick={handle}>
+      {children}
+    </RouterLink>
+  );
+});
+
 export const SiteLink = forwardRef<HTMLAnchorElement, SiteLinkProps>(function SiteLink({ to: rawTo, children, ...rest }, ref) {
   const inWeb = useContext(WebRouterContext);
   const hasRouter = useInRouterContext();
-  /* <html data-motion="full"> is the motion setting (src/motion/preference.ts): read here instead of imported, because
-     the sign-in page carries this file and must not carry the kit. */
-  const cinematic = typeof document !== 'undefined' && document.documentElement.dataset.motion === 'full';
   const to = currentSiteAddress(rawTo);
 
   if (hasRouter && !isExternal(to) && isWebTarget(to) === inWeb) {
     return (
-      /* Between two pages of the public site the browser cross-fades them with a curtain (View Transitions, styled in
-         src/motion/motion.css); only with full motion, and only where the browser can. */
-      <RouterLink ref={ref} to={to} viewTransition={inWeb && cinematic} {...rest}>
+      <PageLink ref={ref} to={to} inWeb={inWeb} {...rest}>
         {children}
-      </RouterLink>
+      </PageLink>
     );
   }
   return (

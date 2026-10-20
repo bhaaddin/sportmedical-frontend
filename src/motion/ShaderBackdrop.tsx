@@ -12,7 +12,7 @@
 
 import { Component, useEffect, useRef, useState } from 'react';
 import type { ComponentType, CSSProperties, ReactNode } from 'react';
-import { afterFirstPaint } from '../utils/afterFirstPaint';
+import { STAGE, afterFirstPaintPlus } from './idle';
 import { useMotionPreference } from './useMotionPreference';
 import type { ShaderBackdropInnerProps, ShaderKind } from './ShaderBackdropInner';
 
@@ -92,13 +92,15 @@ export function ShaderBackdrop({ kind = 'mesh', accent = '#F0912E', base = '#0E1
   const hostRef = useRef<HTMLDivElement>(null);
   const [Inner, setInner] = useState<ComponentType<ShaderBackdropInnerProps> | null>(null);
   const [onScreen, setOnScreen] = useState(false);
+  /* A band far down the page does not start its WebGL context (and download the shader code) until it is nearly in view. */
+  const [near, setNear] = useState(false);
   const [tabVisible, setTabVisible] = useState(true);
 
   // Load the shader code only when it will be drawn.
   useEffect(() => {
-    if (mode === 'vypnuto' || !webglAvailable()) return undefined;
+    if (mode === 'vypnuto' || !near || !webglAvailable()) return undefined;
     let cancelled = false;
-    void afterFirstPaint().then(async () => {
+    void afterFirstPaintPlus(STAGE.shaders).then(async () => {
       try {
         const module = await import('./ShaderBackdropInner');
         if (!cancelled) setInner(() => module.default);
@@ -109,17 +111,23 @@ export function ShaderBackdrop({ kind = 'mesh', accent = '#F0912E', base = '#0E1
     return () => {
       cancelled = true;
     };
-  }, [mode]);
+  }, [mode, near]);
 
   useEffect(() => {
     const host = hostRef.current;
     if (host === null || typeof IntersectionObserver === 'undefined') return undefined;
-    const observer = new IntersectionObserver(([entry]) => setOnScreen(entry.isIntersecting), { rootMargin: '5% 0px' });
+    const observer = new IntersectionObserver(([entry]) => {
+      setOnScreen(entry.isIntersecting);
+      if (entry.isIntersecting) setNear(true);
+    }, { rootMargin: '5% 0px' });
+    const early = new IntersectionObserver(([entry]) => entry.isIntersecting && setNear(true), { rootMargin: '60% 0px' });
     observer.observe(host);
+    early.observe(host);
     const onVisibility = () => setTabVisible(document.visibilityState === 'visible');
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       observer.disconnect();
+      early.disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);

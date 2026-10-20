@@ -248,6 +248,7 @@ export function PublicHeader({ extra, hidePortalLink = false, wide = false }: Pu
         <Box
           id="web-mobile-menu"
           component="nav"
+          data-lenis-prevent=""
           aria-label="Hlavní menu"
           sx={{
             [MQ.nav]: { display: 'none' }, position: 'absolute', top: '100%', left: 0, right: 0, bgcolor: W.ink, borderTop: `1px solid ${W.inkLine}`,

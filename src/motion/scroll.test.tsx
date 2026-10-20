@@ -29,6 +29,7 @@ vi.mock('lenis', () => ({
   },
 }));
 vi.mock('../utils/afterFirstPaint', () => ({ afterFirstPaint: () => Promise.resolve() }));
+vi.mock('./idle', () => ({ afterFirstPaintPlus: () => Promise.resolve(), STAGE: { scenes: 0, smoothScroll: 0, shaders: 0 } }));
 
 import { ScrollScene } from './ScrollScene';
 import { LenisProvider } from './LenisProvider';

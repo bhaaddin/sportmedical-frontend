@@ -16,7 +16,7 @@
 
    Rules this component keeps for you:
      - nothing happens on the server, on the first client render, or until the page has been painted
-       (afterFirstPaint): the markup is the plain, readable page;
+       (afterFirstPaint, then a pause so the libraries do not parse at once): the markup is the plain, readable page;
      - nothing happens unless the setting is 'plné' (no pin, no scrub in 'omezené' or 'vypnuto');
      - GSAP and the scene are imported dynamically, both gone from every first load;
      - everything the scene created (tweens, triggers, matchMedia listeners, inline styles) is reverted when the
@@ -26,7 +26,7 @@
 
 import { createElement, useEffect, useRef } from 'react';
 import type { ElementType, HTMLAttributes, ReactNode } from 'react';
-import { afterFirstPaint } from '../utils/afterFirstPaint';
+import { STAGE, afterFirstPaintPlus } from './idle';
 import { useMotionPreference } from './useMotionPreference';
 
 type Vendor = typeof import('./gsapVendor');
@@ -57,7 +57,7 @@ export function useScrollScene(ref: React.RefObject<HTMLElement | null>, loader:
     let cancelled = false;
     let cleanup: (() => void) | undefined;
 
-    void afterFirstPaint().then(async () => {
+    void afterFirstPaintPlus(STAGE.scenes).then(async () => {
       if (cancelled) return;
       try {
         const [vendor, scene] = await Promise.all([import('./gsapVendor'), loaderRef.current()]);

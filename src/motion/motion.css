@@ -106,9 +106,11 @@ html[data-motion='full'] .sm-hero-line {
     transform: none;
   }
 }
+/* From 0.2, not 0: an element that starts fully transparent is not "painted" for LCP until its fade has run (the opacity
+   animation lives on the compositor), so a large lead paragraph would postpone LCP by the whole animation. */
 @keyframes sm-up {
   from {
-    opacity: 0;
+    opacity: 0.2;
     transform: translateY(20px);
   }
   to {
@@ -225,6 +227,37 @@ html:not([data-motion='off']) .MuiSkeleton-pulse::after {
 @keyframes sm-shimmer {
   to {
     transform: translateX(100%);
+  }
+}
+
+/* ── staff: the offline / server-down strip slides down from the top edge and back up ── */
+.sm-banner-in {
+  animation: sm-banner-in 260ms var(--sm-ease-out) both;
+}
+.sm-banner-out {
+  animation: sm-banner-out 180ms var(--sm-ease-in) both;
+}
+html[data-motion='reduced'] .sm-banner-in {
+  animation-name: sm-fade-in;
+}
+html[data-motion='reduced'] .sm-banner-out {
+  animation-name: sm-fade-out;
+}
+@keyframes sm-banner-in {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+@keyframes sm-banner-out {
+  to {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+@keyframes sm-fade-out {
+  to {
+    opacity: 0;
   }
 }
 

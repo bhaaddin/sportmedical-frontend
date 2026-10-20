@@ -13,9 +13,7 @@ import type { MotionPreference } from './preference';
 
 const fake = vi.hoisted(() => {
   const state = { loaded: true };
-  const animate = vi.fn((target: unknown, _kf?: unknown, _options?: unknown) =>
-    typeof target === 'number' ? ({ stop: vi.fn(), then: (fn: () => void) => Promise.resolve().then(fn) } as unknown as Promise<void>) : Promise.resolve(),
-  );
+  const animate = vi.fn((_target: unknown, _kf?: unknown, _options?: unknown) => Promise.resolve());
   const api = {
     animate,
     inView: vi.fn((_el: unknown, cb: () => void) => {
@@ -122,9 +120,10 @@ describe('the dashboard figures (a KpiCard whose value is a CountUp)', () => {
     expect(fake.api.animate).not.toHaveBeenCalled();
     unmount();
     setMode('plné');
-    render(<KpiCard label="Dnes objednáno" value={<CountUp value={12} />} />);
-    await flush();
-    expect(fake.api.animate).toHaveBeenCalled();
+    render(<KpiCard label="Dnes objednáno" value={<CountUp value={12} duration={0.03} />} />);
+    expect(screen.getByText('0')).toBeTruthy(); // counts up from zero...
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 150)); });
+    expect(screen.getByText('12')).toBeTruthy(); // ...and ends on the figure
   });
 });
 
@@ -208,7 +207,7 @@ describe('the stylesheet half (src/motion/motion.css)', () => {
     const blocks = css.split('}').filter((block) => /animation:/.test(block) && !/@keyframes|from|to \{/.test(block));
     for (const block of blocks) {
       const selector = block.split('{')[0];
-      if (/MuiSkeleton|off'\]|toast|lenis|sm-press|MuiButton|MuiIconButton/.test(selector)) continue;
+      if (/MuiSkeleton|off']|toast|banner|lenis|sm-press|MuiButton|MuiIconButton/.test(selector)) continue;
       expect(selector, block).toMatch(/data-motion='full'/);
     }
   });

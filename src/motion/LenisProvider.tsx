@@ -11,7 +11,7 @@
    ══════════════════════════════════════════════════════════════ */
 
 import { useEffect } from 'react';
-import { afterFirstPaint } from '../utils/afterFirstPaint';
+import { STAGE, afterFirstPaintPlus } from './idle';
 import { hasFinePointer } from './hooks';
 import { bridgeLenis } from './scrollBridge';
 import { useMotionPreference } from './useMotionPreference';
@@ -24,7 +24,7 @@ export function LenisProvider(): null {
     let cancelled = false;
     let destroy: (() => void) | undefined;
 
-    void afterFirstPaint().then(async () => {
+    void afterFirstPaintPlus(STAGE.smoothScroll).then(async () => {
       if (cancelled) return;
       const { default: Lenis } = await import('lenis');
       if (cancelled) return;
