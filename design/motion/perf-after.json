@@ -1,0 +1,271 @@
+{
+  "base": "http://localhost:4300",
+  "mode": "mobile-slow4g-cpu4x",
+  "runs": 7,
+  "pages": {
+    "/": {
+      "fcp": 804,
+      "lcp": 804,
+      "cls": 0,
+      "tbt": 176,
+      "jsBytes": 372963,
+      "jsFiles": 23,
+      "samples": [
+        {
+          "fcp": 888,
+          "lcp": 888,
+          "cls": 0,
+          "tbt": 167,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 856,
+          "lcp": 856,
+          "cls": 0,
+          "tbt": 176,
+          "jsBytes": 373436,
+          "jsFiles": 24
+        },
+        {
+          "fcp": 780,
+          "lcp": 780,
+          "cls": 0,
+          "tbt": 175,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 768,
+          "lcp": 768,
+          "cls": 0,
+          "tbt": 195,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 804,
+          "lcp": 804,
+          "cls": 0,
+          "tbt": 178,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 804,
+          "lcp": 804,
+          "cls": 0,
+          "tbt": 198,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 824,
+          "lcp": 824,
+          "cls": 0,
+          "tbt": 157,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        }
+      ]
+    },
+    "/sluzby": {
+      "fcp": 716,
+      "lcp": 716,
+      "cls": 0,
+      "tbt": 131,
+      "jsBytes": 372963,
+      "jsFiles": 23,
+      "samples": [
+        {
+          "fcp": 716,
+          "lcp": 716,
+          "cls": 0,
+          "tbt": 148,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 696,
+          "lcp": 696,
+          "cls": 0,
+          "tbt": 123,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 716,
+          "lcp": 716,
+          "cls": 0,
+          "tbt": 159,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 716,
+          "lcp": 716,
+          "cls": 0,
+          "tbt": 131,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 748,
+          "lcp": 748,
+          "cls": 0,
+          "tbt": 182,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 700,
+          "lcp": 700,
+          "cls": 0,
+          "tbt": 113,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 712,
+          "lcp": 712,
+          "cls": 0,
+          "tbt": 131,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        }
+      ]
+    },
+    "/diagnostika": {
+      "fcp": 824,
+      "lcp": 824,
+      "cls": 0,
+      "tbt": 223,
+      "jsBytes": 372963,
+      "jsFiles": 23,
+      "samples": [
+        {
+          "fcp": 808,
+          "lcp": 808,
+          "cls": 0,
+          "tbt": 205,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 880,
+          "lcp": 880,
+          "cls": 0,
+          "tbt": 213,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 824,
+          "lcp": 824,
+          "cls": 0,
+          "tbt": 234,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 812,
+          "lcp": 812,
+          "cls": 0,
+          "tbt": 236,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 820,
+          "lcp": 820,
+          "cls": 0,
+          "tbt": 230,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 836,
+          "lcp": 836,
+          "cls": 0,
+          "tbt": 223,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 828,
+          "lcp": 828,
+          "cls": 0,
+          "tbt": 202,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        }
+      ]
+    },
+    "/cenik": {
+      "fcp": 720,
+      "lcp": 720,
+      "cls": 0,
+      "tbt": 146,
+      "jsBytes": 372963,
+      "jsFiles": 23,
+      "samples": [
+        {
+          "fcp": 732,
+          "lcp": 732,
+          "cls": 0,
+          "tbt": 152,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 700,
+          "lcp": 700,
+          "cls": 0,
+          "tbt": 134,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 748,
+          "lcp": 748,
+          "cls": 0,
+          "tbt": 146,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 720,
+          "lcp": 720,
+          "cls": 0,
+          "tbt": 131,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 712,
+          "lcp": 712,
+          "cls": 0,
+          "tbt": 151,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 680,
+          "lcp": 680,
+          "cls": 0,
+          "tbt": 190,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        },
+        {
+          "fcp": 764,
+          "lcp": 764,
+          "cls": 0,
+          "tbt": 133,
+          "jsBytes": 372963,
+          "jsFiles": 23
+        }
+      ]
+    }
+  }
+}

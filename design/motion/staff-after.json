@@ -1,0 +1,226 @@
+{
+  "label": "after",
+  "base": "http://localhost:4300",
+  "cpu": 4,
+  "planner": {
+    "runs": 7,
+    "totalMs": 6562,
+    "frames": 369,
+    "meanFrameMs": 17.73,
+    "p95FrameMs": 18.1,
+    "over50": 0,
+    "longTaskMs": 0,
+    "taskMs": 1541,
+    "scriptMs": 69,
+    "layoutMs": 0,
+    "styleMs": 424,
+    "samples": [
+      {
+        "totalMs": 6760,
+        "frames": 374,
+        "meanFrameMs": 18.073529411764717,
+        "p95FrameMs": 18.100000000000364,
+        "over50": 2,
+        "longTaskMs": 108,
+        "taskMs": 1749,
+        "scriptMs": 153,
+        "layoutMs": 11,
+        "styleMs": 559
+      },
+      {
+        "totalMs": 6523,
+        "frames": 367,
+        "meanFrameMs": 17.733514986376036,
+        "p95FrameMs": 18.100000000000364,
+        "over50": 0,
+        "longTaskMs": 0,
+        "taskMs": 1453,
+        "scriptMs": 69,
+        "layoutMs": 0,
+        "styleMs": 417
+      },
+      {
+        "totalMs": 6537,
+        "frames": 369,
+        "meanFrameMs": 17.723035230352316,
+        "p95FrameMs": 18.100000000000364,
+        "over50": 0,
+        "longTaskMs": 0,
+        "taskMs": 1480,
+        "scriptMs": 80,
+        "layoutMs": 0,
+        "styleMs": 407
+      },
+      {
+        "totalMs": 6517,
+        "frames": 367,
+        "meanFrameMs": 17.753678474114448,
+        "p95FrameMs": 18.100000000000364,
+        "over50": 0,
+        "longTaskMs": 0,
+        "taskMs": 1598,
+        "scriptMs": 68,
+        "layoutMs": 0,
+        "styleMs": 424
+      },
+      {
+        "totalMs": 6680,
+        "frames": 373,
+        "meanFrameMs": 17.914745308311005,
+        "p95FrameMs": 18.100000000000364,
+        "over50": 1,
+        "longTaskMs": 0,
+        "taskMs": 1636,
+        "scriptMs": 78,
+        "layoutMs": 0,
+        "styleMs": 457
+      },
+      {
+        "totalMs": 6562,
+        "frames": 369,
+        "meanFrameMs": 17.733062330623316,
+        "p95FrameMs": 18.100000000000364,
+        "over50": 0,
+        "longTaskMs": 0,
+        "taskMs": 1391,
+        "scriptMs": 65,
+        "layoutMs": 0,
+        "styleMs": 394
+      },
+      {
+        "totalMs": 6593,
+        "frames": 372,
+        "meanFrameMs": 17.726344086021513,
+        "p95FrameMs": 18.100000000000364,
+        "over50": 0,
+        "longTaskMs": 0,
+        "taskMs": 1541,
+        "scriptMs": 69,
+        "layoutMs": 0,
+        "styleMs": 441
+      }
+    ]
+  },
+  "layouts": [
+    {
+      "view": "phone",
+      "path": "/prehled",
+      "docScroll": 0,
+      "overflowX": 0,
+      "motion": "full"
+    },
+    {
+      "view": "phone",
+      "path": "/patients",
+      "docScroll": 0,
+      "overflowX": 0,
+      "motion": "full"
+    },
+    {
+      "view": "phone",
+      "path": "/planovani",
+      "docScroll": 0,
+      "overflowX": 0,
+      "motion": "full"
+    },
+    {
+      "view": "phone",
+      "path": "/settings",
+      "docScroll": 0,
+      "overflowX": 0,
+      "motion": "full",
+      "motionButtons": [
+        44,
+        44,
+        44
+      ]
+    },
+    {
+      "view": "tablet",
+      "path": "/prehled",
+      "docScroll": 0,
+      "overflowX": 0,
+      "motion": "full"
+    },
+    {
+      "view": "tablet",
+      "path": "/patients",
+      "docScroll": 0,
+      "overflowX": 0,
+      "motion": "full"
+    },
+    {
+      "view": "tablet",
+      "path": "/planovani",
+      "docScroll": 0,
+      "overflowX": 0,
+      "motion": "full"
+    },
+    {
+      "view": "tablet",
+      "path": "/settings",
+      "docScroll": 0,
+      "overflowX": 0,
+      "motion": "full",
+      "motionButtons": [
+        44,
+        44,
+        44
+      ]
+    },
+    {
+      "view": "desktop",
+      "path": "/prehled",
+      "docScroll": 0,
+      "overflowX": 0,
+      "motion": "full"
+    },
+    {
+      "view": "desktop",
+      "path": "/patients",
+      "docScroll": 0,
+      "overflowX": 0,
+      "motion": "full"
+    },
+    {
+      "view": "desktop",
+      "path": "/planovani",
+      "docScroll": 0,
+      "overflowX": 0,
+      "motion": "full"
+    },
+    {
+      "view": "desktop",
+      "path": "/settings",
+      "docScroll": 0,
+      "overflowX": 0,
+      "motion": "full",
+      "motionButtons": [
+        44,
+        44,
+        44
+      ]
+    }
+  ],
+  "dialog": [
+    {
+      "mode": "plné",
+      "popped": true,
+      "origin": "581px 450px",
+      "transformAfter": "matrix(1, 0, 0, 1, 0, 0)"
+    },
+    {
+      "mode": "omezené",
+      "popped": false,
+      "origin": "720px 450px",
+      "transformAfter": "none"
+    },
+    {
+      "mode": "vypnuto",
+      "popped": false,
+      "origin": "720px 450px",
+      "transformAfter": "none"
+    }
+  ],
+  "failures": []
+}

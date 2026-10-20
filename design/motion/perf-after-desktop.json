@@ -1,0 +1,73 @@
+{
+  "base": "http://localhost:4300",
+  "mode": "desktop",
+  "runs": 7,
+  "pages": {
+    "/": {
+      "fcp": 96,
+      "lcp": 96,
+      "cls": 0,
+      "tbt": 123,
+      "jsBytes": 439432,
+      "jsFiles": 30,
+      "samples": [
+        {
+          "fcp": 284,
+          "lcp": 284,
+          "cls": 0,
+          "tbt": 168,
+          "jsBytes": 439432,
+          "jsFiles": 30
+        },
+        {
+          "fcp": 84,
+          "lcp": 84,
+          "cls": 0,
+          "tbt": 122,
+          "jsBytes": 439432,
+          "jsFiles": 30
+        },
+        {
+          "fcp": 84,
+          "lcp": 84,
+          "cls": 0,
+          "tbt": 124,
+          "jsBytes": 439432,
+          "jsFiles": 30
+        },
+        {
+          "fcp": 96,
+          "lcp": 96,
+          "cls": 0,
+          "tbt": 120,
+          "jsBytes": 439432,
+          "jsFiles": 30
+        },
+        {
+          "fcp": 116,
+          "lcp": 116,
+          "cls": 0,
+          "tbt": 122,
+          "jsBytes": 439432,
+          "jsFiles": 30
+        },
+        {
+          "fcp": 100,
+          "lcp": 100,
+          "cls": 0,
+          "tbt": 126,
+          "jsBytes": 439432,
+          "jsFiles": 30
+        },
+        {
+          "fcp": 96,
+          "lcp": 96,
+          "cls": 0,
+          "tbt": 123,
+          "jsBytes": 439432,
+          "jsFiles": 30
+        }
+      ]
+    }
+  }
+}
