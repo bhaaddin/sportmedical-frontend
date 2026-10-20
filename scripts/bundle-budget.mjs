@@ -35,11 +35,11 @@ export const GROUPS = [
 
 /** Libraries that must not be in these groups' static closure. */
 export const FORBIDDEN = [
-  ['app-entry', /^(charts|heic-to|motion|signalr)$/, 'the charts, HEIC, animation and SignalR libraries load only where they are used'],
-  ['login', /^(charts|heic-to|motion|signalr)$/, 'the sign-in page must not carry them'],
-  ['staff-portal', /^(heic-to)$/, 'the HEIC converter loads only when somebody picks a HEIC photo'],
-  ['planner', /^(heic-to|charts|DemoDataSource)$/, 'the planner must not carry the HEIC converter, the charts or the demo data'],
-  ['public-entry', /^(charts|heic-to|signalr|StaffApp)$/, 'the public site must not carry the application'],
+  ['app-entry', /^(charts|heic-to|motion|signalr|gsap|lenis|shaders)$/, 'the charts, HEIC, animation, scroll-scene, smooth-scroll and shader libraries load only where they are used'],
+  ['login', /^(charts|heic-to|motion|signalr|gsap|lenis|shaders)$/, 'the sign-in page must not carry them'],
+  ['staff-portal', /^(heic-to|motion|gsap|lenis|shaders)$/, 'the HEIC converter loads only when somebody picks a HEIC photo; the animation library is fetched after the first paint (src/motion/engine.ts), and GSAP, Lenis and the shaders belong to the public site only'],
+  ['planner', /^(heic-to|charts|DemoDataSource|motion|gsap|lenis|shaders)$/, 'the planner must not carry the HEIC converter, the charts, the demo data or any animation library (its drop settle is CSS)'],
+  ['public-entry', /^(charts|heic-to|signalr|StaffApp|motion|gsap|lenis|shaders)$/, 'the public site must not carry the application, and its motion libraries load after the first paint'],
 ];
 
 /** `assets/charts-BdwChCap.js` -> `charts` */

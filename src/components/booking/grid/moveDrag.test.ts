@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DayAppointment, PreviewDay, TimeBlock } from '../../../api/bookingContracts';
+import { MOTION_STORAGE_KEY, resetMotionStoreForTests } from '../../../motion/preference';
 import {
+  GLIDE_BACK_MS,
   columnStep,
   ghostLabel,
   glideFrom,
@@ -167,6 +169,8 @@ describe('motion', () => {
   const original = window.matchMedia;
   afterEach(() => {
     window.matchMedia = original;
+    window.localStorage.clear();
+    resetMotionStoreForTests();
   });
 
   const element = (left: number, top: number) => {
@@ -186,7 +190,8 @@ describe('motion', () => {
     const [frames, options] = animate.mock.calls[0];
     expect(frames[0].transform).toBe('translate(0px, -200px)');
     expect(frames[1].transform).toBe('translate(0, 0)');
-    expect(options.duration).toBe(280);
+    expect(options.duration).toBe(GLIDE_BACK_MS);
+    expect(options.easing).toMatch(/^linear\(/); // a spring (src/motion/tokens.ts), not an ease
     settle(el);
     expect(animate).toHaveBeenCalledTimes(2);
   });
@@ -200,9 +205,35 @@ describe('motion', () => {
 
   it('respects prefers-reduced-motion: the card just snaps', () => {
     window.matchMedia = ((query: string) => ({ matches: query.includes('reduce') })) as unknown as typeof window.matchMedia;
+    resetMotionStoreForTests();
     const { el, animate } = element(10, 300);
     glideFrom(el, rect(10, 100));
     settle(el);
     expect(animate).not.toHaveBeenCalled();
+  });
+
+  it("follows the motion setting: 'omezené' lets the card breathe but never travel, 'vypnuto' neither; a stored 'plné' wins over the system", () => {
+    window.matchMedia = (() => ({ matches: false })) as unknown as typeof window.matchMedia;
+    window.localStorage.setItem(MOTION_STORAGE_KEY, 'omezené');
+    resetMotionStoreForTests();
+    const limited = element(10, 300);
+    glideFrom(limited.el, rect(10, 100));
+    settle(limited.el);
+    expect(limited.animate).toHaveBeenCalledTimes(1);
+    expect(limited.animate.mock.calls[0][0][0].transform).toBe('scale(1.045)');
+
+    window.localStorage.setItem(MOTION_STORAGE_KEY, 'vypnuto');
+    resetMotionStoreForTests();
+    const off = element(10, 300);
+    glideFrom(off.el, rect(10, 100));
+    settle(off.el);
+    expect(off.animate).not.toHaveBeenCalled();
+
+    window.matchMedia = ((query: string) => ({ matches: query.includes('reduce') })) as unknown as typeof window.matchMedia;
+    window.localStorage.setItem(MOTION_STORAGE_KEY, 'plné');
+    resetMotionStoreForTests();
+    const full = element(10, 300);
+    glideFrom(full.el, rect(10, 100));
+    expect(full.animate).toHaveBeenCalledTimes(1);
   });
 });

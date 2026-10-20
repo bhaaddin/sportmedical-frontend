@@ -4,7 +4,7 @@
  * so a session that never loses its connection never downloads it.
  */
 import type { ReactNode } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function NetworkBannerSlide({ show, children }: { show: boolean; children: ReactNode }) {
   return (

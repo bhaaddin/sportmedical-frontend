@@ -100,7 +100,11 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
                   priority: 40,
                 },
                 { name: 'mui', test: /node_modules[\\/]@(mui|emotion)[\\/]/, priority: 30 },
-                { name: 'motion', test: /node_modules[\\/](framer-motion|motion-dom|motion-utils)[\\/]/, priority: 25 },
+                { name: 'motion', test: /node_modules[\\/](motion|framer-motion|motion-dom|motion-utils)[\\/]/, priority: 25 },
+                /* The scroll-driven public pages (src/motion): each its own lazy chunk, none of them in any first load. */
+                { name: 'gsap', test: /node_modules[\\/]gsap[\\/]/, priority: 25 },
+                { name: 'lenis', test: /node_modules[\\/]lenis[\\/]/, priority: 25 },
+                { name: 'shaders', test: /node_modules[\\/]@paper-design[\\/]/, priority: 25 },
                 { name: 'signalr', test: /node_modules[\\/]@microsoft[\\/]signalr[\\/]/, priority: 25 },
                 { name: 'router', test: /node_modules[\\/](react-router|react-router-dom|@remix-run|cookie|set-cookie-parser)[\\/]/, priority: 20 },
                 { name: 'query', test: /node_modules[\\/]@tanstack[\\/]/, priority: 20 },

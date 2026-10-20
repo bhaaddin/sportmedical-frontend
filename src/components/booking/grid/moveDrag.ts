@@ -1,5 +1,7 @@
 import { isTerminalStatus, type Calendar, type DayAppointment, type PreviewDay, type TimeBlock } from '../../../api/bookingContracts';
 import { pragueDateKey, type DateOnly } from '../../../utils/time';
+import { currentMotion } from '../../../motion/preference';
+import { SETTLE_EASING } from '../../../motion/tokens';
 import { GRID_TEXT } from './gridText';
 import { minuteAt, parseTimeOfDay, spanOnDay, type MinuteRange } from './timeRange';
 
@@ -24,9 +26,9 @@ export const TOUCH_SCROLL_SLACK_PX = 8;
 /** Two clicks or taps on the same card within this window open its detail. */
 export const DOUBLE_TAP_MS = 350;
 /** How long the card takes to glide back to its slot after a cancelled move. */
-export const GLIDE_BACK_MS = 280;
+export const GLIDE_BACK_MS = 360;
 /** The settle after a confirmed move. */
-export const SETTLE_MS = 150;
+export const SETTLE_MS = 360;
 
 const DEFAULT_STEP = 30;
 
@@ -187,12 +189,14 @@ export function subscribeMoveNotice(listener: NoticeListener): () => void {
 
 /* ---- Motion: the card glides back when a move is dropped, settles when it is kept. ---- */
 
+/** The staff app's motion setting (src/motion/preference.ts): 'vypnuto' (or the system's "reduce motion" when nothing is chosen) moves nothing. */
 export function reducedMotion(): boolean {
-  try {
-    return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches === true;
-  } catch {
-    return false;
-  }
+  return currentMotion() === 'vypnuto';
+}
+
+/** The card TRAVELS when it glides back; only the full setting lets it (the other two leave it where the data puts it). */
+function mayTravel(): boolean {
+  return currentMotion() === 'plné';
 }
 
 /**
@@ -205,10 +209,10 @@ export function glideFrom(element: HTMLElement, from: DOMRect): void {
   const dx = from.left - to.left;
   const dy = from.top - to.top;
   if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
-  if (reducedMotion() || typeof element.animate !== 'function') return;
+  if (!mayTravel() || typeof element.animate !== 'function') return;
   element.animate(
     [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
-    { duration: GLIDE_BACK_MS, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+    { duration: GLIDE_BACK_MS, easing: SETTLE_EASING },
   );
 }
 
@@ -216,7 +220,7 @@ export function glideFrom(element: HTMLElement, from: DOMRect): void {
 export function settle(element: HTMLElement): void {
   if (reducedMotion() || typeof element.animate !== 'function') return;
   element.animate(
-    [{ transform: 'scale(1.02)' }, { transform: 'scale(1)' }],
-    { duration: SETTLE_MS, easing: 'ease-out' },
+    [{ transform: 'scale(1.045)' }, { transform: 'scale(1)' }],
+    { duration: SETTLE_MS, easing: SETTLE_EASING },
   );
 }

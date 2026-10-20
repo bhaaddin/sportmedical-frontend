@@ -1,0 +1,157 @@
+{
+  "base": "http://localhost:4301",
+  "mode": "mobile-slow4g-cpu4x",
+  "runs": 5,
+  "pages": {
+    "/": {
+      "fcp": 1032,
+      "lcp": 1032,
+      "cls": 0,
+      "tbt": 335,
+      "jsBytes": 355598,
+      "jsFiles": 16,
+      "samples": [
+        {
+          "fcp": 1032,
+          "lcp": 1032,
+          "cls": 0,
+          "tbt": 328,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 844,
+          "lcp": 844,
+          "cls": 0,
+          "tbt": 311,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 908,
+          "lcp": 908,
+          "cls": 0,
+          "tbt": 335,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 1416,
+          "lcp": 1416,
+          "cls": 0,
+          "tbt": 817,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 1064,
+          "lcp": 1064,
+          "cls": 0,
+          "tbt": 441,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        }
+      ]
+    },
+    "/sluzby": {
+      "fcp": 804,
+      "lcp": 804,
+      "cls": 0,
+      "tbt": 262,
+      "jsBytes": 355598,
+      "jsFiles": 16,
+      "samples": [
+        {
+          "fcp": 804,
+          "lcp": 804,
+          "cls": 0,
+          "tbt": 217,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 836,
+          "lcp": 836,
+          "cls": 0,
+          "tbt": 333,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 768,
+          "lcp": 768,
+          "cls": 0,
+          "tbt": 222,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 764,
+          "lcp": 764,
+          "cls": 0,
+          "tbt": 262,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 1268,
+          "lcp": 1268,
+          "cls": 0,
+          "tbt": 592,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        }
+      ]
+    },
+    "/cenik": {
+      "fcp": 1068,
+      "lcp": 1068,
+      "cls": 0,
+      "tbt": 474,
+      "jsBytes": 355598,
+      "jsFiles": 16,
+      "samples": [
+        {
+          "fcp": 996,
+          "lcp": 996,
+          "cls": 0,
+          "tbt": 474,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 1068,
+          "lcp": 1068,
+          "cls": 0,
+          "tbt": 534,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 1084,
+          "lcp": 1084,
+          "cls": 0,
+          "tbt": 347,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 884,
+          "lcp": 884,
+          "cls": 0,
+          "tbt": 245,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        },
+        {
+          "fcp": 1108,
+          "lcp": 1108,
+          "cls": 0,
+          "tbt": 542,
+          "jsBytes": 355598,
+          "jsFiles": 16
+        }
+      ]
+    }
+  }
+}

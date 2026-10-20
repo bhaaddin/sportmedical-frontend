@@ -8,6 +8,7 @@ import '../i18n';
 import App from '../App';
 import '../theme.css';
 import '../styles/accessibility.css';
+import '../motion/motion.css';
 /* Public Sans is the product's face (design board 3. 10. 2026); Inter stays as
    the fallback and for the public pages that already wear it. Archivo is the public
    pages' heading face (artboard V-Web2). */
