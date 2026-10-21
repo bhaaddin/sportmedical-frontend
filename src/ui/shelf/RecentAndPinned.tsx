@@ -56,7 +56,7 @@ export function PinButton({ entity, size = 40 }: { entity: EntityRef; size?: num
 }
 
 export function RecentAndPinned({
-  limit = 8, emptyAction, kinds, dense = false, title = 'Připnuté a nedávné', hint = 'Co jste naposledy otevřeli',
+  limit = 8, emptyAction, kinds, dense = false, hideWhenEmpty = false, title = 'Připnuté a nedávné', hint = 'Co jste naposledy otevřeli',
 }: {
   limit?: number;
   emptyAction?: { label: string; to: string };
@@ -64,6 +64,8 @@ export function RecentAndPinned({
   kinds?: readonly EntityKind[];
   /** One-line cards: for a page where this shelf is context, not content. */
   dense?: boolean;
+  /** Draw nothing at all while there is nothing (context shelves; a home shelf teaches with its empty state instead). */
+  hideWhenEmpty?: boolean;
   title?: string;
   hint?: string;
 }) {
@@ -73,6 +75,8 @@ export function RecentAndPinned({
   const pinned = memory.pinned.filter(open);
   const recent = recentsWithoutPins(memory).filter(open);
   const shown = [...pinned.map((e) => ({ e, pinned: true, at: e.at })), ...recent.map((e) => ({ e, pinned: false, at: e.at }))].slice(0, limit);
+
+  if (hideWhenEmpty && shown.length === 0) return null;
 
   return (
     <Shelf

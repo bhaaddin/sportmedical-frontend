@@ -311,7 +311,7 @@ export default function PatientList() {
         </Shelf>
       )}
 
-      <RecentAndPinned kinds={['patient']} dense limit={6} title="Naposledy otevření" hint="Pacienti, ke kterým jste se vraceli" />
+      <RecentAndPinned kinds={['patient']} dense hideWhenEmpty limit={6} title="Naposledy otevření" hint="Pacienti, ke kterým jste se vraceli" />
 
       <Shelf id="register" title="Kartotéka" count={total} layout="free" grow controls={filters}>
         <TextField

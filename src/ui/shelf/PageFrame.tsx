@@ -128,7 +128,7 @@ export function PageFrame({ title, purpose, breadcrumb, primaryAction, actions, 
         <Box data-connected="" sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, mb: 2.5 }}>
           {badges}
           {entities !== undefined && entities.length > 0 && (
-            <Box role="list" aria-label="Související" sx={{ display: 'contents' }}>
+            <Box role="list" aria-label="Propojené" sx={{ display: 'contents' }}>
               {entities.map((e) => (
                 <Box component="span" role="listitem" key={`${e.kind}:${e.id}`} sx={{ display: 'inline-flex', maxWidth: '100%' }}><EntityChip entity={e} /></Box>
               ))}

@@ -33,6 +33,8 @@ const CLOSE_DELAY = 140;
 function usePeekState(enabled: boolean) {
   const [open, setOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* A focus that follows a press of the mouse or a finger is a click already on its way; only the keyboard peeks. */
+  const pressed = useRef(false);
   const clear = () => {
     if (timer.current !== null) clearTimeout(timer.current);
     timer.current = null;
@@ -47,11 +49,10 @@ function usePeekState(enabled: boolean) {
     ? {
         onPointerEnter: (e: React.PointerEvent) => { if (e.pointerType === 'mouse') schedule(true, OPEN_DELAY_MOUSE); },
         onPointerLeave: () => schedule(false, CLOSE_DELAY),
-        onFocus: (e: React.FocusEvent<HTMLElement>) => {
-          /* Only keyboard focus peeks; a mouse click that focuses the link is already navigating. */
-          if (e.currentTarget.matches?.(':focus-visible') ?? true) schedule(true, OPEN_DELAY_FOCUS);
-        },
-        onBlur: () => schedule(false, 0),
+        onPointerDown: () => { pressed.current = true; },
+        onPointerUp: () => { pressed.current = false; },
+        onFocus: () => { if (!pressed.current) schedule(true, OPEN_DELAY_FOCUS); },
+        onBlur: () => { pressed.current = false; schedule(false, 0); },
         onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Escape') { clear(); setOpen(false); } },
       }
     : {};
@@ -70,7 +71,7 @@ function PeekCard({ entity, anchorEl, id, keepOpen }: { entity: EntityRef; ancho
     retry: false,
   });
   return (
-    <Popper open anchorEl={anchorEl} placement="bottom-start" transition modifiers={[{ name: 'offset', options: { offset: [0, 6] } }, { name: 'flip', enabled: true }]} sx={{ zIndex: (t) => t.zIndex.tooltip }}>
+    <Popper open anchorEl={anchorEl} placement="bottom-start" role="presentation" transition modifiers={[{ name: 'offset', options: { offset: [0, 6] } }, { name: 'flip', enabled: true }]} sx={{ zIndex: (t) => t.zIndex.tooltip }}>
       {({ TransitionProps }) => (
         <Fade {...TransitionProps} timeout={120}>
           <Paper
