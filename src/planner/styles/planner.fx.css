@@ -1,0 +1,84 @@
+/* ══════════════════════════════════════════════════════════════
+   PLANNER MOTION - the personality of the planning area (docs/motion-kit.md, "staff: answering").
+
+   Everything here answers an ACTION and is over in well under half a second; nothing moves a box in the layout (only
+   transform / translate / opacity / box-shadow), nothing waits for data, nothing runs before the desk does something.
+   Keyed on <html data-motion>: `plné` travels, `omezené` only fades / flashes, `vypnuto` (or no attribute) does nothing.
+   No colour literal of its own: tones come from the card (`--tone`) and from `currentColor`, so the accent still rules.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── a slot lands where it was placed ── */
+@keyframes plan-land {
+  0% { opacity: 0; transform: scale(0.93) translateY(-8px); }
+  55% { opacity: 1; transform: scale(1.02) translateY(0); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes plan-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+html[data-motion='full'] .sm-planner .schedule-event[data-fresh='true'] {
+  animation: plan-land var(--sm-dur-base, 320ms) var(--sm-ease-pop, cubic-bezier(0.34, 1.4, 0.64, 1)) both;
+}
+html[data-motion='reduced'] .sm-planner .schedule-event[data-fresh='true'] {
+  animation: plan-fade-in var(--sm-dur-quick, 140ms) ease-out both;
+}
+
+/* ── a pick ripples across the days it took (the delay of each tile is its place in the pick) ── */
+@keyframes plan-ripple {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent); transform: scale(0.95); }
+  45% { transform: scale(1.04); }
+  100% { box-shadow: 0 0 0 12px transparent; transform: none; }
+}
+html[data-motion='full'] .sm-planner .month-tile[data-fx='picked'],
+html[data-motion='full'] .sm-planner .phone-month-row[data-fx='picked'] {
+  animation: plan-ripple 620ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation-delay: calc(var(--ripple-i, 0) * 48ms);
+}
+html[data-motion='reduced'] .sm-planner .month-tile[data-fx='picked'],
+html[data-motion='reduced'] .sm-planner .phone-month-row[data-fx='picked'] {
+  animation: plan-fade-in var(--sm-dur-quick, 140ms) ease-out both;
+  animation-delay: calc(var(--ripple-i, 0) * 24ms);
+}
+
+/* ── a refusal: the board (and the armed card) shake a little, the message is already on screen ── */
+@keyframes plan-shake {
+  0%, 100% { translate: 0 0; }
+  16% { translate: -7px 0; }
+  34% { translate: 6px 0; }
+  52% { translate: -4px 0; }
+  70% { translate: 3px 0; }
+  86% { translate: -1px 0; }
+}
+@keyframes plan-flash {
+  0%, 100% { opacity: 1; }
+  35% { opacity: 0.55; }
+}
+html[data-motion='full'] .sm-planner[data-refuse] #day-board,
+html[data-motion='full'] .sm-planner[data-refuse] .month-matrix,
+html[data-motion='full'] .sm-planner[data-refuse] .phone-month,
+html[data-motion='full'] .sm-planner[data-refuse] .plan-card.is-selected {
+  animation: plan-shake 420ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+html[data-motion='reduced'] .sm-planner[data-refuse] #day-board,
+html[data-motion='reduced'] .sm-planner[data-refuse] .month-matrix,
+html[data-motion='reduced'] .sm-planner[data-refuse] .phone-month,
+html[data-motion='reduced'] .sm-planner[data-refuse] .plan-card.is-selected {
+  animation: plan-flash 320ms ease-out both;
+}
+
+/* ── switching Den / Týden / Měsíc: the new view slides in from the side it lies on ── */
+@keyframes plan-view-in {
+  from { opacity: 0; translate: 14px 0; }
+  to { opacity: 1; translate: 0 0; }
+}
+html[data-motion='full'] .sm-planner .month-matrix,
+html[data-motion='full'] .sm-planner .phone-month,
+html[data-motion='full'] .sm-planner .alternative-head ~ * {
+  animation: plan-view-in var(--sm-dur-quick, 140ms) var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+html[data-motion='reduced'] .sm-planner .month-matrix,
+html[data-motion='reduced'] .sm-planner .phone-month,
+html[data-motion='reduced'] .sm-planner .alternative-head ~ * {
+  animation: plan-fade-in var(--sm-dur-quick, 140ms) ease-out both;
+}

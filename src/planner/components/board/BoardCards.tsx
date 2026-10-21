@@ -10,7 +10,8 @@
  *
  * Hover cards are MUI tooltips (real size, portalled to the body); they carry the price line.
  */
-import { useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import { useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import { wasJustWritten } from '../../motion/planFx';
 import { Tooltip } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import type { DayAppointment } from '../../../api/bookingContracts';
@@ -82,6 +83,8 @@ export function SessionCard({
   onOpen: (card: SessionCardModel) => void;
 }) {
   const down = useRef<{ x: number; y: number } | null>(null);
+  /* A card that mounts right after a write is the slot that write made: it lands, once (planner.fx.css). */
+  const [fresh] = useState(wasJustWritten);
   return (
     <Tooltip arrow placement="top" enterDelay={350} enterNextDelay={350} slotProps={tooltipSlotProps} title={armed ? '' : <SessionTip card={card} />}>
       <button
@@ -93,6 +96,7 @@ export function SessionCard({
         data-lane={card.lane}
         data-lanes={card.lanes}
         data-session-id={card.session.id}
+        data-fresh={fresh ? 'true' : undefined}
         data-category-id={card.categoryId}
         data-source={card.source}
         data-testid={`board-card-${card.session.id}`}

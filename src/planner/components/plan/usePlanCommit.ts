@@ -10,6 +10,7 @@ import { usePlannerCommands } from '../../data/usePlannerCommands';
 import { PlannerWriteError } from '../../data/PlannerDataSource';
 import { minutesAsTime, planToastCaption, slotMinutesOf, type PlannerContext } from '../../model';
 import { usePlannerActions, usePlannerStore } from '../../state/PlannerStoreProvider';
+import { planFx } from '../../motion/planFx';
 import { orderFigures, previewFigures, previewWindow, previewWindows, type OrderFigures } from './orderFigures';
 import type { PlanPart } from '../../../components/booking/calendar/pickPlan';
 
@@ -50,6 +51,7 @@ export function usePlanCommit(): PlanCommit {
           quantity: input.quantity,
           ...(extra ? { allowExtra: true } : {}),
         });
+        planFx.wrote();
         act.setUndoToken(result.undoToken);
         act.focusDate(input.date);
         if (extra) {
@@ -62,6 +64,7 @@ export function usePlanCommit(): PlanCommit {
         else act.toast(planToastCaption(input.quantity, f.name, result.mergedCount), { actionLabel: '↶ Zpět', actionKey: 'undo', durationMs: 5200 });
         return true;
       } catch (error) {
+        planFx.refuse();
         act.toast(writeMessage(error, 'Termín se nepodařilo vytvořit.'));
         return false;
       }
@@ -99,6 +102,7 @@ export function usePlanCommit(): PlanCommit {
         );
         return created > 0;
       }
+      planFx.wrote();
       act.setUndoToken(lastToken);
       act.focusDate(date);
       const after = orderFigures(ctx, {

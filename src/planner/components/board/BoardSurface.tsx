@@ -91,6 +91,7 @@ import { useBoardSelection, type BoardSelection } from './useBoardSelection';
 import { DaysBlockDialog } from './month/DaysBlockDialog';
 import { useDaySelect } from './month/useDaySelect';
 import { useDayPick } from '../plan/useDayPick';
+import { PlanFxHost } from '../../motion/PlanFxHost';
 import { useInquiries } from './useInquiries';
 import { useNextFree } from './useNextFree';
 import { inquiryLabel, inquiryTitle } from '../../model/inquiries';
@@ -1066,6 +1067,8 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
           />
         ) : null}
       </div>
+
+      <PlanFxHost />
 
       {/* ---- everything below is real-size MUI, portalled out of the stage ---- */}
       <SelectionPopover

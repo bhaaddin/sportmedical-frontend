@@ -9,6 +9,7 @@ import { usePlannerData } from '../../data/PlannerDataProvider';
 import { usePlannerCommands } from '../../data/usePlannerCommands';
 import type { DayMark } from '../../model';
 import { usePlannerActions, usePlannerStore } from '../../state/PlannerStoreProvider';
+import { planFx } from '../../motion/planFx';
 import { usePlannerCtx, usePlannerModelState } from '../context';
 import { describeDayPick, expandRanges, planDays, type DayPickPlan, type DayRangeLike } from './dayPick';
 import { writeMessage } from './usePlanCommit';
@@ -50,10 +51,12 @@ export function useDayPick(): DayPick {
         const names = new Map(base.list.map((f) => [f.categoryId, f.name] as const));
         const said = describeDayPick(plan, names);
         if (plan.inputs.length === 0) {
+          planFx.refuse();
           act.toast(said.text, { durationMs: 6500 });
           return plan;
         }
         const result = await commands.createIntervals(plan.inputs);
+        planFx.picked(plan.daysUsed);
         act.setUndoToken(result.undoToken);
         const done = [...plan.seatsBy.entries()].find(([id, seats]) => {
           const f = base.byId.get(id);
@@ -64,6 +67,7 @@ export function useDayPick(): DayPick {
         if (!done || said.tone !== 'ok') act.toast(said.text, { actionLabel: '↶ Zpět', actionKey: 'undo', durationMs: 7000 });
         return plan;
       } catch (error) {
+        planFx.refuse();
         act.toast(writeMessage(error, 'Dny se nepodařilo naplánovat.'), { durationMs: 6500 });
         return null;
       } finally {

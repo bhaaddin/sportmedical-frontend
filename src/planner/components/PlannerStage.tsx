@@ -52,6 +52,7 @@ import {
 import { useDevice } from '../../layout/useDevice';
 import '../styles/planner.css';
 import '../styles/planner.extras.css';
+import '../styles/planner.fx.css';
 import '../styles/planner.compact.css';
 import '../styles/planner.fluid.css';
 import { Icons } from './Icons';

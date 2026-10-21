@@ -5,6 +5,7 @@
 import { useMemo, useRef } from 'react';
 import { usePlannerMetrics } from '../PlannerMetrics';
 import { usePlannerActions, usePlannerStore } from '../../state/PlannerStoreProvider';
+import { planFx } from '../../motion/planFx';
 import type { OrderFigures } from './orderFigures';
 
 export interface PlanActions {
@@ -56,6 +57,7 @@ export function usePlanActions(): PlanActions {
           return;
         }
         if (f.done) {
+          planFx.refuse();
           act.clearPlanningSelection();
           act.showCompletion(categoryId, true);
           return;

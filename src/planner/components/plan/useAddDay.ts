@@ -7,6 +7,7 @@ import { useCallback, useState } from 'react';
 import { usePlannerData } from '../../data/PlannerDataProvider';
 import { dayOfWeekShort, formatShortDate } from './dayLabels';
 import { usePlannerActions } from '../../state/PlannerStoreProvider';
+import { planFx } from '../../motion/planFx';
 import { usePlannerCtx, usePlannerModelState } from '../context';
 import { ADD_DAY_HORIZON, planNextDay } from './addDay';
 import { orderTerms } from './orderFigures';
@@ -42,6 +43,7 @@ export function useAddDay(): { addDay: (categoryId: string) => Promise<void>; bu
         const [sessions, marks] = await Promise.all([source.listSessions(range), source.listDayMarks(range)]);
         const plan = planNextDay({ figure: f, from, marks: Object.fromEntries(marks.map((m) => [m.date, m])), sessions });
         if (!plan) {
+          planFx.refuse();
           act.toast(`Pro ${f.name} není v nejbližších ${ADD_DAY_HORIZON} dnech po posledním termínu volný den.`);
           return;
         }

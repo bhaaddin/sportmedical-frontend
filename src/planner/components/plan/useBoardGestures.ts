@@ -32,6 +32,7 @@ import {
   type ResizeEdge,
 } from '../../model';
 import { usePlannerActions, usePlannerStore } from '../../state/PlannerStoreProvider';
+import { planFx } from '../../motion/planFx';
 import { guardResize, planSelection, planStart } from './placementPlan';
 import type { OrderFigures } from './orderFigures';
 import type { PlanCommit } from './usePlanCommit';
@@ -160,6 +161,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
         return;
       }
       if (start.kind === 'complete') {
+        planFx.refuse();
         act.clearPlanningSelection();
         act.showCompletion(start.categoryId, true);
         return;
@@ -208,6 +210,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
         act.endMove();
         if (!drag.started || !proposal) return;
         if (!proposal.validation.ok) {
+          planFx.refuse();
           act.toast(proposal.validation.reason || 'Přesun nebyl možný. Termín zůstal beze změny.');
           return;
         }
@@ -223,6 +226,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
         act.endResize();
         if (!drag.started || !proposal || !proposal.added) return;
         if (!proposal.validation.ok) {
+          planFx.refuse();
           act.toast(proposal.validation.reason);
           return;
         }
@@ -235,6 +239,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
         try { if (board.hasPointerCapture(e.pointerId)) board.releasePointerCapture(e.pointerId); } catch { /* released */ }
         if (!result) return;
         if (!result.validation.ok) {
+          planFx.refuse();
           act.toast(result.validation.reason);
           return;
         }

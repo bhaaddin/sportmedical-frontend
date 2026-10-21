@@ -3,7 +3,8 @@
  * the week board (`renderAlternative`). With the real calendar the day's bookings are among the
  * rows and the tiles count them too; closed days are named on their tile.
  */
-import type { RefObject } from 'react';
+import type { CSSProperties, RefObject } from 'react';
+import { FRESH_MS, usePickedDays } from '../../motion/planFx';
 import { inRange, rangePill } from '../../../components/booking/calendar/model';
 import { inquiryLabel, inquiryTileLabel, inquiryTitle, type InquiryRef } from '../../model/inquiries';
 import { PLANNER_TEXT } from '../../text';
@@ -98,6 +99,9 @@ export interface MonthSelection {
 
 export function MonthMatrix({ model, onPick, selection }: { model: MonthListModel; onPick: (date: string) => void; selection?: MonthSelection }) {
   const select = selection?.select;
+  const picked = usePickedDays();
+  /* The days the last pick took ripple once, in the order they were taken; a month opened later stays calm. */
+  const rippleOf = new Map(Date.now() - picked.at < FRESH_MS + 400 ? picked.dates.map((d, i) => [d, i] as const) : []);
   const highlight = select?.highlight ?? null;
   const firstLit = highlight ? model.tiles.find((t) => inRange(t.date, highlight))?.date : undefined;
   return (
@@ -122,7 +126,8 @@ export function MonthMatrix({ model, onPick, selection }: { model: MonthListMode
               data-range-day={select ? t.date : undefined}
               data-picked={lit || placed === 'active' ? 'true' : placed === 'past' ? 'past' : undefined}
               data-inquiry={t.inquiries.length ? 'true' : undefined}
-              style={{ opacity: t.otherMonth ? 0.42 : 1 }}
+              data-fx={rippleOf.has(t.date) ? 'picked' : undefined}
+              style={{ opacity: t.otherMonth ? 0.42 : 1, ...(rippleOf.has(t.date) ? { '--ripple-i': rippleOf.get(t.date) } : {}) } as CSSProperties}
               onPointerDown={(event) => {
                 if (select && event.button === 0) select.begin(t.date, event);
               }}
