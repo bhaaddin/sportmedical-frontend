@@ -23,12 +23,14 @@ export function comparePrices(list, fixture) {
   const byName = new Map(list.map((i) => [fold(i.name), i]));
   const mismatches = [];
   const missing = [];
+  /* `ours` is one name or a list of names the same item has in different environments (live and dev differ). */
+  const namesOf = (want) => (Array.isArray(want.ours) ? want.ours : [want.ours]);
   for (const want of fixture.items) {
-    const have = byName.get(fold(want.ours));
+    const have = namesOf(want).map((n) => byName.get(fold(n))).find((i) => i !== undefined);
     if (!have) missing.push(want.website);
     else if (have.priceCzk !== want.priceCzk) mismatches.push({ item: want.website, ours: have.priceCzk, website: want.priceCzk });
   }
-  const known = new Set(fixture.items.map((i) => fold(i.ours)));
+  const known = new Set(fixture.items.flatMap((i) => namesOf(i).map(fold)));
   const extra = list.filter((i) => !known.has(fold(i.name))).map((i) => i.name);
   return { ok: mismatches.length === 0 && missing.length === 0, mismatches, missing, extra };
 }

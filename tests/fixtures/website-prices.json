@@ -1,19 +1,73 @@
 {
   "source": "https://sportmedical-diagnostics.cz/pages/cenik-sluzeb",
   "checkedOn": "2026-10-21",
-  "note": "Prices of the public website, in CZK. `ours` is the name the same item has in our price list (compared accent- and case-insensitively). Items of our list that are not here (the combination packages) are reported but never fail the check.",
+  "note": "Prices of the public website, in CZK. `ours` is the name (or the list of names) the same item has in our price list (compared accent- and case-insensitively). Items of our list that are not here (the combination packages) are reported but never fail the check.",
   "items": [
-    { "website": "Základní sportovní prohlídka", "ours": "Základní sportovní prohlídka", "priceCzk": 1600 },
-    { "website": "Komplexní sportovní prohlídka", "ours": "Komplexní sportovní prohlídka", "priceCzk": 2200 },
-    { "website": "Spiroergometrie", "ours": "Spiroergometrické vyšetření", "priceCzk": 4000 },
-    { "website": "Základní diagnostika", "ours": "Základní diagnostika", "priceCzk": 1200 },
-    { "website": "Komplexní diagnostika", "ours": "Komplexní diagnostika", "priceCzk": 2000 },
-    { "website": "Komplexní diagnostika + Vo2max", "ours": "Komplexní diagnostika + VO₂max analýza", "priceCzk": 5000 },
-    { "website": "Vo2max", "ours": "VO₂max analýza", "priceCzk": 3500 },
-    { "website": "Individuální kompenzační plán", "ours": "Sestavení individuálního videoinstruovaného kompenzačního plánu", "priceCzk": 1000 },
-    { "website": "InBody základní měření", "ours": "Základní InBody měření", "priceCzk": 500 },
-    { "website": "InBody komplexní měření + konzultace", "ours": "InBody komplexní měření + odborná konzultace", "priceCzk": 1200 },
-    { "website": "Sestavení výživového plánu", "ours": "Sestavení personalizovaného výživového plánu", "priceCzk": 2500 },
-    { "website": "Balíček 5 měření InBody", "ours": "Zvýhodněný Balíček 5 Měření (Základní)", "priceCzk": 2000 }
+    {
+      "website": "Základní sportovní prohlídka",
+      "ours": "Základní sportovní prohlídka",
+      "priceCzk": 1600
+    },
+    {
+      "website": "Komplexní sportovní prohlídka",
+      "ours": "Komplexní sportovní prohlídka",
+      "priceCzk": 2200
+    },
+    {
+      "website": "Spiroergometrie",
+      "ours": "Spiroergometrické vyšetření",
+      "priceCzk": 4000
+    },
+    {
+      "website": "Základní diagnostika",
+      "ours": "Základní diagnostika",
+      "priceCzk": 1200
+    },
+    {
+      "website": "Komplexní diagnostika",
+      "ours": "Komplexní diagnostika",
+      "priceCzk": 2000
+    },
+    {
+      "website": "Komplexní diagnostika + Vo2max",
+      "ours": "Komplexní diagnostika + VO₂max analýza",
+      "priceCzk": 5000
+    },
+    {
+      "website": "Vo2max",
+      "ours": "VO₂max analýza",
+      "priceCzk": 3500
+    },
+    {
+      "website": "Individuální kompenzační plán",
+      "ours": [
+        "Sestavení individuálního videoinstruovaného kompenzačního plánu",
+        "Individuální videoinstruovaný kompenzační plán"
+      ],
+      "priceCzk": 1000
+    },
+    {
+      "website": "InBody základní měření",
+      "ours": "Základní InBody měření",
+      "priceCzk": 500
+    },
+    {
+      "website": "InBody komplexní měření + konzultace",
+      "ours": "InBody komplexní měření + odborná konzultace",
+      "priceCzk": 1200
+    },
+    {
+      "website": "Sestavení výživového plánu",
+      "ours": "Sestavení personalizovaného výživového plánu",
+      "priceCzk": 2500
+    },
+    {
+      "website": "Balíček 5 měření InBody",
+      "ours": [
+        "Zvýhodněný Balíček 5 Měření (Základní)",
+        "Zvýhodněný balíček 5 měření InBody (základní)"
+      ],
+      "priceCzk": 2000
+    }
   ]
 }
