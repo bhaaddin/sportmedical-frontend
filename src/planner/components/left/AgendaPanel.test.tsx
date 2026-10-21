@@ -12,6 +12,15 @@ afterEach(() => cleanup());
 
 const text = (id: string) => document.getElementById(id)!;
 
+/** R3: the standard sidebar is the činnosti list alone. */
+function expectNoAllTermsTab() {
+  expect(screen.queryByRole('button', { name: /Všechny termíny/ })).toBeNull();
+  for (const id of ['agenda-all-view', 'agenda-all-list', 'agenda-all-totals', 'agenda-scope-note', 'agenda-total-count', 'agenda-footer-status']) expect(document.getElementById(id)).toBeNull();
+  expect(document.querySelector('[data-agenda-scope], [data-agenda-full], [data-agenda-mode]')).toBeNull();
+  expect(screen.queryByText(/Kompletní seznam/)).toBeNull();
+  expect(text('agenda-activities-view')).not.toHaveAttribute('hidden');
+}
+
 describe('AgendaPanel while planning a club order', () => {
   it('shows the ordered činnosti as chips and the selected one with planned / ordered seats', async () => {
     mountPanels(<AgendaPanel />);
@@ -125,19 +134,15 @@ describe('AgendaPanel in standard booking (no club order)', () => {
     expect(kpi.querySelector('.agenda-kpi-numbers')).toHaveTextContent(/^\d+ slotů$/);
     expect(kpi.querySelector('.agenda-kpi-numbers')).not.toHaveTextContent('/');
     expect(kpi.querySelector('.agenda-remaining')).toHaveTextContent('% všech slotů');
-    expect(text('agenda-footer-status')).toHaveTextContent(/termínů? v přehledu/);
-    // "Všechny termíny" counts every loaded session, club windows included
-    expect(Number(text('agenda-total-count').textContent)).toBe(18);
-    fireEvent.click(screen.getByRole('button', { name: /Všechny termíny/ }));
-    expect(text('agenda-scope-note')).toHaveTextContent('Zobrazené období');
-    expect(text('agenda-footer-status')).toHaveTextContent('18 termínů v kalendáři');
+    // R3: nothing of the "Všechny termíny" tab is left - no tab, list, scopes, counter or footer
+    expectNoAllTermsTab();
   });
 
-  it("speaks the clinic's words, not the club order's (Činnosti / Všechny termíny, not Plánované činnosti)", async () => {
+  it("speaks the clinic's words, not the club order's: one heading \"Činnosti\", no tabs (R3)", async () => {
     mountPanels(<AgendaPanel />, { source: standardSource() });
     await screen.findByTestId('agenda-panel');
-    const tabs = [...document.querySelectorAll('.agenda-mode-tabs button')].map((b) => b.textContent);
-    expect(tabs).toEqual(['Činnosti', expect.stringMatching(/^Všechny termíny/)]);
+    expect(screen.getByTestId('agenda-title')).toHaveTextContent('Činnosti');
+    expect(document.querySelectorAll('.agenda-mode-tabs button')).toHaveLength(0);
     expect(screen.getByTestId('agenda-panel')).toHaveAttribute('aria-label', 'Přehled termínů');
     expect(document.querySelector('.agenda-section-caption span')).toHaveTextContent('TERMÍNY ČINNOSTI V KALENDÁŘI');
     expect(screen.getByTestId('agenda-panel').textContent).not.toMatch(/Plánované|vytvořen/);
@@ -151,7 +156,6 @@ describe('AgendaPanel in standard booking (no club order)', () => {
     await screen.findByTestId('agenda-panel');
     expect(document.querySelectorAll('#agenda-activity-chips .agenda-chip')).toHaveLength(0);
     expect(text('agenda-activity-list')).toHaveTextContent('Pro tuto činnost zatím nejsou v kalendáři žádné termíny.');
-    expect(text('agenda-total-count')).toHaveTextContent('0');
   });
 });
 
@@ -175,7 +179,6 @@ describe('AgendaPanel and other clubs\' windows', () => {
     source.getOrder = async () => ({ ...(await order()), demands: [], baselineSessions: [] });
     mountPanels(<AgendaPanel />, { source });
     await screen.findByTestId('agenda-panel');
-    expect(text('agenda-total-count')).toHaveTextContent('2');
     expect(document.querySelectorAll('#agenda-activity-chips .agenda-chip')).toHaveLength(1);
   });
 });

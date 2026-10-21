@@ -4,7 +4,9 @@
  * "Všechny termíny", the činnost chips + KPI + term list, the scope buttons Vše / Den / Týden and
  * the footer.
  *
- * The wording follows the mode: a club order is "Plánované činnosti", standard ordering "Činnosti" and "Všechny termíny".
+ * The wording follows the mode: a club order is "Plánované činnosti" and "Všechny termíny"; standard ordering (the main calendar,
+ * a club's overview) is "Činnosti" ONLY - the "Všechny termíny" tab with its list, scopes, counter and "Kompletní seznam"
+ * footer was removed (R3, owner: "delete everything here, put nothing there for now").
  *
  * Planning a club order: chips are the ordered činnosti, the KPI measures planned seats against the
  * ordered ones, "Vše" lists every term of the order. Standard booking (no order): the same lists over
@@ -62,6 +64,9 @@ export function AgendaPanel() {
   const overview = club !== null && !club.planning;
   const clubCtx = overview ? { ...ctx, sessions: ctx.sessions.filter((s) => s.clubBlockId != null && club.data.blocks.some((b) => b.id === s.clubBlockId)) } : ctx;
   const m = agendaView(clubCtx, agenda, { weekStart, selectedDate }, overview ? 'standard' : catalogue?.capabilities.mode, figures.live);
+  /* R3: the standard sidebar is the činnosti list alone */
+  const tabs = !m.standard;
+  const mode = tabs ? agenda.mode : 'activities';
   const openTerm = (row: AgendaRowModel) => {
     act.focusDate(row.date, true);
     /* A činnost's several bookings of the day are one row: it opens the day (its people are in the day panel), not one of them. */
@@ -73,15 +78,21 @@ export function AgendaPanel() {
   };
   return (
     <section className="appointments agenda-panel" id="agenda-panel" aria-label={m.standard ? 'Přehled termínů' : 'Přehled plánovaných termínů'} data-testid="agenda-panel" data-agenda-standard={m.standard ? 'true' : undefined}>
-      <div className="agenda-mode-tabs" role="group" aria-label="Režim přehledu termínů">
-        <button type="button" data-agenda-mode="activities" className={agenda.mode === 'activities' ? 'is-active' : undefined} aria-pressed={agenda.mode === 'activities'} onClick={() => act.setAgendaMode('activities')}>
-          {m.standard ? 'Činnosti' : 'Plánované činnosti'}
-        </button>
-        <button type="button" data-agenda-mode="all" className={agenda.mode === 'all' ? 'is-active' : undefined} aria-pressed={agenda.mode === 'all'} onClick={() => act.setAgendaMode('all')}>
-          Všechny termíny <span className="agenda-tab-count" id="agenda-total-count">{m.totalCount}</span>
-        </button>
-      </div>
-      <div className="agenda-pane" id="agenda-activities-view" hidden={agenda.mode !== 'activities'}>
+      {tabs ? (
+        <div className="agenda-mode-tabs" role="group" aria-label="Režim přehledu termínů">
+          <button type="button" data-agenda-mode="activities" className={mode === 'activities' ? 'is-active' : undefined} aria-pressed={mode === 'activities'} onClick={() => act.setAgendaMode('activities')}>
+            Plánované činnosti
+          </button>
+          <button type="button" data-agenda-mode="all" className={mode === 'all' ? 'is-active' : undefined} aria-pressed={mode === 'all'} onClick={() => act.setAgendaMode('all')}>
+            Všechny termíny <span className="agenda-tab-count" id="agenda-total-count">{m.totalCount}</span>
+          </button>
+        </div>
+      ) : (
+        <div className="agenda-mode-tabs agenda-mode-single" data-testid="agenda-title">
+          <span className="agenda-single-title">Činnosti</span>
+        </div>
+      )}
+      <div className="agenda-pane" id="agenda-activities-view" hidden={mode !== 'activities'}>
         <div id="agenda-activity-chips" className="agenda-chips" role="group" aria-label="Filtrovat podle činnosti">
           {m.chips.map((chip) => (
             <button
@@ -124,7 +135,9 @@ export function AgendaPanel() {
             : <div className="agenda-empty">{m.activityEmpty}</div>}
         </div>
       </div>
-      <div className="agenda-pane" id="agenda-all-view" hidden={agenda.mode !== 'all'}>
+      {tabs ? (
+        <>
+      <div className="agenda-pane" id="agenda-all-view" hidden={mode !== 'all'}>
         <div className="agenda-filter-row">
           <div className="agenda-scopes" role="group" aria-label="Období termínů">
             {SCOPES.map((s) => (
@@ -147,10 +160,12 @@ export function AgendaPanel() {
       </div>
       <div className="agenda-footer">
         <span><i className="agenda-led" /><span id="agenda-footer-status">{m.footerStatus}</span></span>
-        <button type="button" data-agenda-full="1" onClick={() => act.openDialog({ kind: 'agendaFullList', categoryId: agenda.mode === 'activities' ? (m.categoryId ?? 'all') : 'all' })}>
+        <button type="button" data-agenda-full="1" onClick={() => act.openDialog({ kind: 'agendaFullList', categoryId: mode === 'activities' ? (m.categoryId ?? 'all') : 'all' })}>
           Kompletní seznam <Icon name="arrow-right" />
         </button>
       </div>
+        </>
+      ) : null}
     </section>
   );
 }

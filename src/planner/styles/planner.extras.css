@@ -142,3 +142,13 @@
   line-height: 1.15;
   text-align: center;
 }
+
+/* R3 - the standard sidebar has one heading, "Činnosti", instead of the two tabs. */
+.sm-planner #dashboard .agenda-mode-tabs.agenda-mode-single { display: flex; align-items: center; }
+.sm-planner #dashboard .agenda-mode-tabs .agenda-single-title {
+  color: #d6ffff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
