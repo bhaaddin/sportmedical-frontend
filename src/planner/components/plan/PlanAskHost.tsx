@@ -13,7 +13,7 @@
  * A click outside keeps what is ticked (= "Potvrdit"), exactly as in the calendar.
  */
 import { useMemo } from 'react';
-import { slotMinutesOf, minutesAsTime } from '../../model';
+import { layoutSlots, minutesAsTime, piecesOf, slotMinutesOf, type MinutePiece } from '../../model';
 import { usePlannerActions, usePlannerSelector } from '../../state/PlannerStoreProvider';
 import { useDevice } from '../../../layout/useDevice';
 import { normalizeAllowed } from '../../../components/clubs/order/routing';
@@ -53,19 +53,22 @@ function AskBubble() {
 
   const pickAsk = useMemo<PickAsk>(() => {
     const slot = slotMinutesOf(ctx, ask.categoryId);
-    const window: PickedTime = {
-      id: 'ask',
+    /* One window per run of slots: a drop that crosses the lunch break is two windows, the break belongs to none. */
+    const laid = layoutSlots(piecesOf(ctx, ask.date), ask.startMinutes, ask.slots, slot).parts;
+    const runs = laid.length > 0 ? laid : [{ start: ask.startMinutes, end: ask.startMinutes + ask.slots * slot, slots: ask.slots }];
+    const windows: PickedTime[] = runs.map((run, i) => ({
+      id: i === 0 ? 'ask' : `ask-${i}`,
       kind: 'time',
       columnKey: PLANNER_CALENDAR_ID,
       calendarId: PLANNER_CALENDAR_ID,
       activityId: null,
       dayKey: ask.date,
-      range: { start: ask.startMinutes, end: ask.startMinutes + ask.slots * slot },
+      range: { start: run.start, end: run.end },
       activityIds: normalizeAllowed([ask.categoryId], allIds),
-    };
+    }));
     return {
       mode: 'new',
-      windows: [window],
+      windows,
       activities,
       others,
       ...(baseline ? { baseline: [...baseline] } : {}),
@@ -105,9 +108,10 @@ function AskBubble() {
 }
 
 /** The held window as a placement preview, for the board to keep drawing it under the bubble. */
-export function heldWindow(ask: { date: string; categoryId: string; startMinutes: number; slots: number }, slotMinutes: number, weekStart: string) {
-  const startMinutes = ask.startMinutes;
-  const endMinutes = ask.startMinutes + ask.slots * slotMinutes;
+export function heldWindow(ask: { date: string; categoryId: string; startMinutes: number; slots: number }, slotMinutes: number, weekStart: string, pieces?: readonly MinutePiece[]) {
+  const parts = pieces ? layoutSlots(pieces, ask.startMinutes, ask.slots, slotMinutes).parts : [];
+  const startMinutes = parts[0]?.start ?? ask.startMinutes;
+  const endMinutes = parts.length > 0 ? parts[parts.length - 1]!.end : ask.startMinutes + ask.slots * slotMinutes;
   const a = Date.UTC(+weekStart.slice(0, 4), +weekStart.slice(5, 7) - 1, +weekStart.slice(8, 10));
   const b = Date.UTC(+ask.date.slice(0, 4), +ask.date.slice(5, 7) - 1, +ask.date.slice(8, 10));
   const col = Math.round((b - a) / 86400000);
@@ -126,5 +130,6 @@ export function heldWindow(ask: { date: string; categoryId: string; startMinutes
     stoppedAtLimit: false,
     blockedByEndOfDay: false,
     remaining: 0,
+    ...(parts.length > 1 ? { parts } : {}),
   };
 }

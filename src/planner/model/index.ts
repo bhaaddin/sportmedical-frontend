@@ -10,6 +10,7 @@ export * from './booking';
 export * from './order';
 export * from './agenda';
 export * from './week';
+export * from './openTime';
 export * from './placement';
 export * from './edit';
 export * from './overlays';

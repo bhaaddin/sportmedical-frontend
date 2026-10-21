@@ -17,7 +17,7 @@
  * fire after a drag.
  */
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { TIMELINE_HEIGHT, slotMinutesOf } from '../model';
+import { TIMELINE_HEIGHT, piecesOf, slotMinutesOf } from '../model';
 import { usePlannerSelector } from '../state/PlannerStoreProvider';
 import { usePlannerCtx, usePlannerModelState } from './context';
 import { MoveLayer, PlacementLayer, ResizeLayer } from './plan/BoardLayers';
@@ -113,7 +113,7 @@ export function PlanningBoardLayer({ board: boardProp }: PlanningBoardLayerProps
     snap,
   });
 
-  const held = useMemo(() => (ask ? heldWindow(ask, slotMinutesOf(ctx, ask.categoryId), weekStart) : null), [ask, ctx, weekStart]);
+  const held = useMemo(() => (ask ? heldWindow(ask, slotMinutesOf(ctx, ask.categoryId), weekStart, piecesOf(ctx, ask.date)) : null), [ask, ctx, weekStart]);
   const heldVisible = held && held.col >= 0 && held.col <= 6 ? held : null;
 
   const sized = useMemo<BoardSize>(() => (view && view.height > 0 && view.height < size.height - 1 ? { ...size, viewTop: view.top, viewHeight: view.height } : size), [size, view]);

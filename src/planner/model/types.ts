@@ -237,6 +237,11 @@ export interface PlannerContext {
   today: IsoDate;
   /** Working window of the planning board in minutes (07:00 = 420 … 19:00 = 1140). */
   window: PlanningWindow;
+  /**
+   * Hours and lunch break of the days the source has read (the clinic's own settings). With a day here no term may
+   * touch the break or reach outside the hours (`openTime.ts`); a day without a mark is the whole planning window.
+   */
+  dayMarks?: Readonly<Record<IsoDate, DayMark>>;
 }
 
 export interface PlanningWindow {
@@ -466,6 +471,8 @@ export interface PlacementPreview {
   stoppedAtLimit: boolean;
   blockedByEndOfDay: boolean;
   remaining: number;
+  /** The runs of whole slots the drop is made of: more than one when the block would cross the lunch break. */
+  parts?: { start: number; end: number; slots: number }[];
 }
 
 /** Result of moving an existing term (`proposalForMove`). */

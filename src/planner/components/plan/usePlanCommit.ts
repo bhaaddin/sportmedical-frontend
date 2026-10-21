@@ -10,7 +10,7 @@ import { usePlannerCommands } from '../../data/usePlannerCommands';
 import { PlannerWriteError } from '../../data/PlannerDataSource';
 import { minutesAsTime, planToastCaption, slotMinutesOf, type PlannerContext } from '../../model';
 import { usePlannerActions, usePlannerStore } from '../../state/PlannerStoreProvider';
-import { orderFigures, previewFigures, previewWindow, type OrderFigures } from './orderFigures';
+import { orderFigures, previewFigures, previewWindow, previewWindows, type OrderFigures } from './orderFigures';
 import type { PlanPart } from '../../../components/booking/calendar/pickPlan';
 
 export const writeMessage = (error: unknown, fallback = 'Změnu se nepodařilo uložit.'): string =>
@@ -41,7 +41,7 @@ export function usePlanCommit(): PlanCommit {
       const f = base.byId.get(input.categoryId);
       if (!f) return false;
       const extra = store.getState().planning.extraArmed;
-      const pre = previewFigures(ctx, base, previewWindow('preview', input.date, input.categoryId, input.startMinutes, input.quantity, slotMinutesOf(ctx, input.categoryId)), { orderId: options.orderId ?? null });
+      const pre = previewFigures(ctx, base, previewWindows(ctx, 'preview', input.date, input.categoryId, input.startMinutes, input.quantity), { orderId: options.orderId ?? null });
       try {
         const result = await commands.createInterval({
           date: input.date,

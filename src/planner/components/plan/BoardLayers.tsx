@@ -15,7 +15,7 @@ import { usePlannerSelector } from '../../state/PlannerStoreProvider';
 import { Icon } from '../Icons';
 import { usePlannerCtx } from '../context';
 import { moveOverlayFor, placementOverlayFor, resizeOverlayFor, type BoardSize } from './boardOverlays';
-import { previewFigures, previewWindow } from './orderFigures';
+import { previewFigures, previewWindows } from './orderFigures';
 import { usePlanFigures } from './usePlanFigures';
 
 export function PlacementLayer({ board, held }: { board: BoardSize; held: PlacementPreview | null }) {
@@ -33,16 +33,18 @@ export function PlacementLayer({ board, held }: { board: BoardSize; held: Placem
     );
   }
   const added = p.validation.ok
-    ? previewFigures(ctx, base, previewWindow('preview', p.date, p.categoryId, p.startMinutes, p.quantity, slotMinutesOf(ctx, p.categoryId))).added
+    ? previewFigures(ctx, base, previewWindows(ctx, 'preview', p.date, p.categoryId, p.startMinutes, p.quantity)).added
     : 0;
   const o = placementOverlayFor(ctx, p, f, added, board);
   const valid = p.validation.ok;
+  /* A drop that crosses the lunch break is one frame with the break cut out of it. */
+  const carve = carveOf(p, o.preview.height);
   return (
     <>
       <div
         id="drag-preview"
         className={`drag-preview${o.preview.invalid ? ' invalid' : ''}${o.preview.limitReached ? ' limit-reached' : ''}`}
-        style={{ '--preview-tone': o.preview.tone, left: o.preview.left, width: o.preview.width, top: `${o.preview.top}px`, height: `${o.preview.height}px` } as CSSProperties}
+        style={{ '--preview-tone': o.preview.tone, left: o.preview.left, width: o.preview.width, top: `${o.preview.top}px`, height: `${o.preview.height}px`, ...carve } as CSSProperties}
         title={o.preview.title}
         data-pick-id={held && !live ? 'ask' : undefined}
       >
@@ -147,4 +149,23 @@ export function ResizeLayer({ board }: { board: BoardSize }) {
       </div>
     </>
   );
+}
+
+/** The lunch break inside a placement that crosses it, as a mask over the frame (nothing: the frame is whole). */
+export function carveOf(p: Pick<PlacementPreview, 'parts' | 'startMinutes' | 'endMinutes'>, heightPx: number): CSSProperties {
+  const parts = p.parts;
+  if (!parts || parts.length < 2) return {};
+  const span = p.endMinutes - p.startMinutes;
+  if (!(span > 0)) return {};
+  const stops: string[] = [];
+  let at = 0;
+  for (let i = 0; i < parts.length - 1; i += 1) {
+    const from = ((parts[i]!.end - p.startMinutes) / span) * heightPx;
+    const to = ((parts[i + 1]!.start - p.startMinutes) / span) * heightPx;
+    stops.push(`#000 ${at}px`, `#000 ${from}px`, `transparent ${from}px`, `transparent ${to}px`);
+    at = to;
+  }
+  stops.push(`#000 ${at}px`, '#000 100%');
+  const mask = `linear-gradient(to bottom, ${stops.join(', ')})`;
+  return { maskImage: mask, WebkitMaskImage: mask } as CSSProperties;
 }

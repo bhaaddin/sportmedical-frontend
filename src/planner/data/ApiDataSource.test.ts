@@ -546,9 +546,11 @@ describe('the draft of the order\'s windows', () => {
   it('moveInterval moves the draft term and a stale version is refused', async () => {
     const { source } = make(fakeState(), editSession());
     const [term] = await source.listOrderSessions();
-    await expect(source.moveInterval({ id: term!.id, date: '2026-11-24', start: '08:00', end: '18:00', expectedVersion: 'old' })).rejects.toMatchObject({ code: 'stale' });
-    const moved = await source.moveInterval({ id: term!.id, date: '2026-11-24', start: '08:00', end: '18:00', expectedVersion: term!.version });
-    expect(moved.session).toMatchObject({ date: '2026-11-24', start: '08:00', end: '18:00' });
+    await expect(source.moveInterval({ id: term!.id, date: '2026-11-24', start: '08:00', end: '12:00', expectedVersion: 'old' })).rejects.toMatchObject({ code: 'stale' });
+    /* the clinic's lunch break (12:00-12:30 on that day) is never eaten by a moved term */
+    await expect(source.moveInterval({ id: term!.id, date: '2026-11-24', start: '08:00', end: '18:00', expectedVersion: term!.version })).rejects.toMatchObject({ code: 'conflict', message: expect.stringContaining('polední pauzy') });
+    const moved = await source.moveInterval({ id: term!.id, date: '2026-11-24', start: '08:00', end: '12:00', expectedVersion: term!.version });
+    expect(moved.session).toMatchObject({ date: '2026-11-24', start: '08:00', end: '12:00' });
     expect(moved.session.version).not.toBe(term!.version);
   });
 
@@ -691,7 +693,7 @@ describe('finishPlan: ONE real call', () => {
   it('409 with athletes: nothing is cancelled until the desk confirms, then the SAME write repeats with the flag', async () => {
     const { source, deps } = make(fakeState(), editSession());
     const [term] = await source.listOrderSessions();
-    await source.moveInterval({ id: term!.id, date: '2026-11-24', start: '08:00', end: '18:00' });
+    await source.moveInterval({ id: term!.id, date: '2026-11-24', start: '08:00', end: '12:00' });
     deps.updateOrder.mockRejectedValueOnce(
       new ClubOrderError('Změna se dotkne přihlášených sportovců.', 409, 'club_order.athletes_affected', [
         { name: 'Jan Sportovec', activityName: 'Základní prohlídka', reason: 'activity_removed_from_window' },
@@ -715,7 +717,9 @@ describe('finishPlan: ONE real call', () => {
 
   it('a new order is created with one createStaff call after the duplicate check; it is then the order being edited', async () => {
     const { source, deps } = make(fakeState(), newSession());
-    await source.createInterval({ date: '2026-11-24', categoryId: A_MEDICAL, start: '08:00', quantity: 20 });
+    /* 16 slots from 08:00 cross the lunch break (12:00-12:30): 8 before it and 8 after it, never a block over it */
+    await source.createInterval({ date: '2026-11-24', categoryId: A_MEDICAL, start: '08:00', quantity: 16 });
+    await source.createInterval({ date: '2026-11-25', categoryId: A_MEDICAL, start: '08:00', quantity: 4 });
     const result = await source.finishPlan();
     expect(deps.clubOrders).toHaveBeenCalledWith('club-1');
     expect(deps.createStaffOrder).toHaveBeenCalledTimes(1);
@@ -724,7 +728,11 @@ describe('finishPlan: ONE real call', () => {
       serviceId: SVC,
       activitySeats: [{ activityId: A_MEDICAL, seats: 20 }],
       paymentMethod: 'ClubInvoice',
-      ranges: [{ fromDate: '2026-11-24', toDate: '2026-11-24', dailyFrom: '08:00', dailyTo: '18:00' }],
+      ranges: [
+        { fromDate: '2026-11-24', toDate: '2026-11-24', dailyFrom: '08:00', dailyTo: '12:00' },
+        { fromDate: '2026-11-24', toDate: '2026-11-24', dailyFrom: '12:30', dailyTo: '16:30' },
+        { fromDate: '2026-11-25', toDate: '2026-11-25', dailyFrom: '08:00', dailyTo: '10:00' },
+      ],
       calendarIds: [CAL_A],
       status: 'Confirmed',
     });
@@ -735,7 +743,9 @@ describe('finishPlan: ONE real call', () => {
   it('the club already has a live order: the desk decides, nothing is created silently', async () => {
     const state = fakeState({ liveOrders: [orderView({ id: '0199c0de-0000-7000-8000-00000000ffff', serviceId: 'svc-other', serviceName: 'Jiná služba' })] });
     const { source, deps } = make(state, newSession());
-    await source.createInterval({ date: '2026-11-24', categoryId: A_MEDICAL, start: '08:00', quantity: 20 });
+    /* 16 slots from 08:00 cross the lunch break (12:00-12:30): 8 before it and 8 after it, never a block over it */
+    await source.createInterval({ date: '2026-11-24', categoryId: A_MEDICAL, start: '08:00', quantity: 16 });
+    await source.createInterval({ date: '2026-11-25', categoryId: A_MEDICAL, start: '08:00', quantity: 4 });
     const failure = await source.finishPlan().catch((e: unknown) => e);
     expect(failure).toBeInstanceOf(PlannerDuplicateOrderError);
     expect((failure as PlannerDuplicateOrderError).liveOrders).toEqual([
@@ -749,7 +759,9 @@ describe('finishPlan: ONE real call', () => {
   it('an addendum goes to the group without the duplicate question', async () => {
     const state = fakeState({ liveOrders: [orderView()] });
     const { source, deps } = make(state, newSession({ parentOrderId: 'root-1' }));
-    await source.createInterval({ date: '2026-11-24', categoryId: A_MEDICAL, start: '08:00', quantity: 20 });
+    /* 16 slots from 08:00 cross the lunch break (12:00-12:30): 8 before it and 8 after it, never a block over it */
+    await source.createInterval({ date: '2026-11-24', categoryId: A_MEDICAL, start: '08:00', quantity: 16 });
+    await source.createInterval({ date: '2026-11-25', categoryId: A_MEDICAL, start: '08:00', quantity: 4 });
     await source.finishPlan();
     expect(deps.clubOrders).not.toHaveBeenCalled();
     expect(deps.createStaffOrder.mock.calls[0]![0]).toMatchObject({ parentOrderId: 'root-1' });

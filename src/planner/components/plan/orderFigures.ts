@@ -16,6 +16,8 @@ import {
   categoryOrFallback,
   countsForOrder,
   isUnsavedPast,
+  layoutSlots,
+  piecesOf,
   orderCategoryIds,
   plannedFrom,
   slotMinutesOf,
@@ -163,6 +165,24 @@ export function previewWindow(
   };
 }
 
+/**
+ * The windows a placement of `slots` slots from `startMinutes` really occupies: the slots are laid through the day's
+ * open pieces, so a drop that crosses the lunch break is two windows and the break counts for nothing.
+ */
+export function previewWindows(
+  ctx: PlannerContext,
+  id: string,
+  date: string,
+  categoryId: CategoryId,
+  startMinutes: number,
+  slots: number,
+): PlanWindow[] {
+  const slotMinutes = slotMinutesOf(ctx, categoryId);
+  const laid = layoutSlots(piecesOf(ctx, date), startMinutes, slots, slotMinutes).parts;
+  if (laid.length === 0) return [previewWindow(id, date, categoryId, startMinutes, slots, slotMinutes)];
+  return laid.map((part, i) => previewWindow(`${id}#${i}`, date, categoryId, part.start, part.slots, slotMinutes));
+}
+
 /** The club terms of the ordered činnosti that belong to this order. */
 export function orderTerms(ctx: PlannerContext, orderId?: string | null): PlannerSession[] {
   const ids = orderCategoryIds(ctx);
@@ -268,11 +288,12 @@ export interface PreviewFigures {
 export function previewFigures(
   ctx: PlannerContext,
   before: OrderFigures,
-  window: PlanWindow,
+  window: PlanWindow | readonly PlanWindow[],
   options: Omit<FigureOptions, 'extraWindows'> = {},
 ): PreviewFigures {
-  const after = orderFigures(ctx, { ...options, extraWindows: [window] });
-  const categoryId = window.activityIds?.[0] ?? '';
+  const windows = Array.isArray(window) ? (window as readonly PlanWindow[]) : [window as PlanWindow];
+  const after = orderFigures(ctx, { ...options, extraWindows: windows });
+  const categoryId = windows[0]?.activityIds?.[0] ?? '';
   const was = before.byId.get(categoryId);
   const now = after.byId.get(categoryId);
   const added = Math.max(0, (now?.planned ?? 0) - (was?.planned ?? 0));

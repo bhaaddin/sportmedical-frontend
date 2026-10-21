@@ -12,6 +12,7 @@
  * cannot matter (see `components/PlannerStage.tsx` for `pointerCoords`).
  */
 import { PAST_REFUSAL, demandOf, slotMinutesOf } from './context';
+import { layoutSlots, openTimeBlock, piecesOf, slotsBefore, slotsFrom, startBefore } from './openTime';
 import { plannedFrom, plannedOf } from './order';
 import { addDays, clamp, minutesAsTime, timeAsMinutes } from './time';
 import type {
@@ -103,6 +104,9 @@ export function validatePlacement(
   if (!Number.isFinite(st) || !Number.isFinite(en) || st < w.start || en > w.end || st >= en) {
     return { ok: false, reason: `Čas musí být v intervalu ${windowLabel(ctx)}` };
   }
+  /* Never over the lunch break, never outside the opening hours (both are the clinic's own settings). */
+  const closed = openTimeBlock(ctx, date, st, en);
+  if (closed) return { ok: false, reason: closed };
   if (quantity <= 0 || !Number.isInteger(quantity)) return { ok: false, reason: 'Neplatný počet slotů' };
   const others = ctx.sessions.filter((e) => e.id !== skipId);
   const baseline = plannedFrom(ctx, others, categoryId);
@@ -263,34 +267,55 @@ export function addPlannedInterval(
   });
   if (!d) return none('Vyberte činnost');
   const duration = slotMinutesOf(ctx, categoryId);
-  const end = minutesAsTime(timeAsMinutes(start) + quantity * duration);
-  const test = validatePlacement(ctx, { date, categoryId, start, end, quantity, allowExtra: input.allowExtra === true });
-  if (!test.ok) return none(test.reason);
-  const candidate: PlannerSession = {
-    id: newId(), date, start, end, categoryId, capacity: quantity, booked: 0,
-    showInList: true, createdByPlanner: true, slotDuration: duration,
-  };
-  const chain = collectAdjacentBlocks(ctx, candidate);
-  const total = quantity + chain.group.reduce((n, e) => n + Number(e.capacity), 0);
-  // Preserve the oldest/leftmost term ID. Only unbooked blocks may merge.
-  const first = chain.group.slice().sort((a, b) => a.start.localeCompare(b.start))[0];
-  const merged: PlannerSession = {
-    ...(first ?? candidate),
-    start: chain.start,
-    end: chain.end,
-    capacity: total,
-    booked: 0,
-    slots: makeSlots(chain.start, total, duration),
-    slotDuration: duration,
-    createdByPlanner: true,
-  };
-  const removeIds = new Set(chain.group.map((x) => x.id));
-  const sessions = ctx.sessions.filter((e) => !removeIds.has(e.id));
-  sessions.push(merged);
-  const complete = plannedFrom(ctx, sessions, categoryId) >= d.requested;
+  /* The cap is checked once for the whole drop (the parts below only lay it out): "Zbývá pouze N osob" names what is left. */
+  const left = d.requested - plannedFrom(ctx, ctx.sessions, categoryId);
+  if (quantity > left && quantity > 0 && input.allowExtra !== true) return none(`Zbývá pouze ${left} osob. Zkraťte časový úsek.`);
+  /* The slots are laid through the clinic's open pieces of the day: a block that crosses the lunch break becomes two
+     terms, one on each side of it, and no slot is ever counted inside the break. */
+  const laid = layoutSlots(piecesOf(ctx, date), timeAsMinutes(start), quantity, duration);
+  const parts = laid.parts.length > 0 ? laid.parts : [{ start: timeAsMinutes(start), end: timeAsMinutes(start) + quantity * duration, slots: quantity }];
+  if (laid.parts.length > 0 && laid.placed < quantity) {
+    return none('Tolik slotů se do zbývající ordinační doby dne nevejde (polední pauza zůstává volná).');
+  }
+  let working = ctx;
+  let first: PlannerSession | null = null;
+  const removed: string[] = [];
+  let mergedCount = 0;
+  for (const part of parts) {
+    const partStart = minutesAsTime(part.start);
+    const end = minutesAsTime(part.end);
+    const test = validatePlacement(working, { date, categoryId, start: partStart, end, quantity: part.slots, allowExtra: true });
+    if (!test.ok) return none(test.reason);
+    const candidate: PlannerSession = {
+      id: newId(), date, start: partStart, end, categoryId, capacity: part.slots, booked: 0,
+      showInList: true, createdByPlanner: true, slotDuration: duration,
+    };
+    const chain = collectAdjacentBlocks(working, candidate);
+    const total = part.slots + chain.group.reduce((n, e) => n + Number(e.capacity), 0);
+    // Preserve the oldest/leftmost term ID. Only unbooked blocks may merge.
+    const oldest = chain.group.slice().sort((a, b) => a.start.localeCompare(b.start))[0];
+    const merged: PlannerSession = {
+      ...(oldest ?? candidate),
+      start: chain.start,
+      end: chain.end,
+      capacity: total,
+      booked: 0,
+      slots: makeSlots(chain.start, total, duration),
+      slotDuration: duration,
+      createdByPlanner: true,
+    };
+    const removeIds = new Set(chain.group.map((x) => x.id));
+    const sessions = working.sessions.filter((e) => !removeIds.has(e.id));
+    sessions.push(merged);
+    working = { ...working, sessions };
+    removed.push(...removeIds);
+    mergedCount += chain.group.length;
+    first ??= merged;
+  }
+  const complete = plannedFrom(ctx, working.sessions, categoryId) >= d.requested;
   return {
-    ok: true, reason: '', sessions, merged, removedIds: [...removeIds],
-    mergedCount: chain.group.length, complete,
+    ok: true, reason: '', sessions: [...working.sessions], merged: first, removedIds: removed,
+    mergedCount, complete,
   };
 }
 

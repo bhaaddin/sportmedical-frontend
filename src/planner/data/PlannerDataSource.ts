@@ -305,6 +305,8 @@ export function buildPlannerContext(parts: {
   sessions: readonly PlannerSession[];
   dayBudget: DayBudget;
   today: IsoDate;
+  /** Hours / lunch of the days read; with them no term may touch the break or the outside of the hours. */
+  dayMarks?: Readonly<Record<IsoDate, DayMark>>;
 }): PlannerContext {
   return {
     sessions: parts.sessions,
@@ -314,5 +316,6 @@ export function buildPlannerContext(parts: {
     dayBudgetMinutes: parts.dayBudget.defaultMinutes,
     today: parts.today,
     window: parts.catalogue.window ?? DEFAULT_WINDOW,
+    ...(parts.dayMarks && Object.keys(parts.dayMarks).length > 0 ? { dayMarks: parts.dayMarks } : {}),
   };
 }

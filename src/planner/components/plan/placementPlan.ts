@@ -9,6 +9,12 @@
  */
 import {
   PAST_REFUSAL,
+  layoutSlots,
+  openPieces,
+  openTimeBlock,
+  slotsBefore,
+  slotsFrom,
+  startBefore,
   addDays,
   clamp,
   minutesAsTime,
@@ -58,7 +64,7 @@ export function planStart(ctx: PlannerContext, figures: OrderFigures, selected: 
 export function planValidation(
   ctx: PlannerContext,
   figures: OrderFigures,
-  p: { date: IsoDate; categoryId: string | null; start: string; end: string; quantity: number },
+  p: { date: IsoDate; categoryId: string | null; start: string; end: string; quantity: number; parts?: readonly { start: number; end: number }[] },
   dayMarks: Readonly<Record<string, DayMark>> = {},
   extra = false,
 ): Validation {
@@ -75,6 +81,11 @@ export function planValidation(
   if (p.date < ctx.today) return { ok: false, reason: PAST_REFUSAL };
   const mark = dayMarks[p.date];
   if (mark?.closed) return { ok: false, reason: `V tento den je zavřeno${mark.label ? ` (${mark.label})` : ''}.` };
+  /* Every run of slots lies inside the open time; the lunch break is never part of a term. */
+  for (const part of p.parts ?? [{ start: st, end: en }]) {
+    const closed = openTimeBlock(ctx, p.date, part.start, part.end);
+    if (closed) return { ok: false, reason: closed };
+  }
   if (!extra && p.quantity > f.remainingSlots) return { ok: false, reason: `Zbývá pouze ${f.remaining} osob. Zkraťte časový úsek.` };
   if (ctx.sessions.some((e) => e.date === p.date && st < timeAsMinutes(e.end) && en > timeAsMinutes(e.start))) {
     return { ok: false, reason: 'Čas se překrývá s již vytvořeným termínem.' };
@@ -109,15 +120,40 @@ export function planSelection(
   if (remaining === 0) return null; // hard stop, not an invalid/red interval
   const w = win(ctx);
   const anchor = drag.startMinutes;
+  const date = addDays(weekStart, drag.day);
+  /* The clinic's open time of the day (the context's day marks, which only a real source enforces): hours without the lunch break. Slots are laid inside it only, so the pause is
+     never counted and never drawn over (a block that crosses it is two runs of slots, `parts`). */
+  const open = openPieces(ctx.window, ctx.dayMarks?.[date]);
+  /* A closed day has no open time: draw the old geometry and let the validation say why it is refused. */
+  const pieces = open.length > 0 ? open : [{ start: w.start, end: w.end }];
   const pointer = clamp(snapPointerMinute(w.start + point.y * w.span, snap), w.start, w.end);
   const upwards = pointer < anchor;
-  const maxByTime = upwards ? Math.floor((anchor - w.start) / duration) : Math.floor((w.end - anchor) / duration);
-  const rawQty = Math.max(1, Math.ceil((upwards ? anchor - pointer : pointer - anchor) / duration));
+  const room = upwards ? slotsBefore(pieces, anchor, duration) : slotsFrom(pieces, anchor, duration);
+  const maxByTime = room;
+  /* Slots whose start (down) / end (up) the pointer has passed: with one open piece this is ceil(distance / slot). */
+  const reached = upwards
+    ? (() => {
+        const ends = layoutBackwards(pieces, anchor, Math.min(room, 5000), duration);
+        const n = ends.filter((e) => e > pointer).length;
+        const farthest = ends.length > 0 ? ends[ends.length - 1]! - duration : anchor;
+        return n + (n === ends.length && pointer < farthest ? Math.ceil((farthest - pointer) / duration) : 0);
+      })()
+    : (() => {
+        const starts = layoutStarts(pieces, anchor, Math.min(room, 5000), duration);
+        const n = starts.filter((p) => p < pointer).length;
+        const farthest = starts.length > 0 ? starts[starts.length - 1]! + duration : anchor;
+        return n + (n === starts.length && pointer > farthest ? Math.ceil((pointer - farthest) / duration) : 0);
+      })();
+  const rawQty = Math.max(1, reached);
   const quantity = Math.min(rawQty, remaining, maxByTime);
   if (quantity < 1) return null;
-  const startMinutes = upwards ? anchor - quantity * duration : anchor;
-  const endMinutes = startMinutes + quantity * duration;
-  const date = addDays(weekStart, drag.day);
+  const from = upwards ? startBefore(pieces, anchor, quantity, duration).start : anchor;
+  const laid = layoutSlots(pieces, from, quantity, duration);
+  const first = laid.parts[0];
+  const last = laid.parts[laid.parts.length - 1];
+  if (!first || !last) return null;
+  const startMinutes = first.start;
+  const endMinutes = last.end;
   const start = minutesAsTime(startMinutes);
   const end = minutesAsTime(endMinutes);
   return {
@@ -127,7 +163,7 @@ export function planSelection(
     start,
     end,
     quantity,
-    validation: planValidation(ctx, figures, { date, categoryId, start, end, quantity }, dayMarks, extra),
+    validation: planValidation(ctx, figures, { date, categoryId, start, end, quantity, parts: laid.parts }, dayMarks, extra),
     col: drag.day,
     startMinutes,
     endMinutes,
@@ -135,7 +171,30 @@ export function planSelection(
     stoppedAtLimit: !extra && rawQty > remaining && remaining <= maxByTime,
     blockedByEndOfDay: rawQty > maxByTime,
     remaining: extra ? 0 : remaining,
+    parts: laid.parts,
   };
+}
+
+/** Start minutes of the slots a down-layout from `from` would use (at most `count`). */
+function layoutStarts(pieces: readonly { start: number; end: number }[], from: number, count: number, duration: number): number[] {
+  const out: number[] = [];
+  for (const part of layoutSlots(pieces, from, count, duration).parts) {
+    for (let i = 0; i < part.slots; i++) out.push(part.start + i * duration);
+  }
+  return out;
+}
+
+/** End minutes of the slots laid backwards from `anchor` (nearest first, at most `count`). */
+function layoutBackwards(pieces: readonly { start: number; end: number }[], anchor: number, count: number, duration: number): number[] {
+  const out: number[] = [];
+  for (const p of [...pieces].sort((a, b) => b.start - a.start)) {
+    let e = Math.min(p.end, anchor);
+    while (out.length < count && e - p.start >= duration - 1e-9) {
+      out.push(e);
+      e -= duration;
+    }
+  }
+  return out;
 }
 
 /** Players one drop adds: slots × the činnost's parallel capacity, never more than are missing. */

@@ -17,6 +17,7 @@
  *
  * Decisions are listed in `../api/mappers.ts`; what is not done is in the PL-F report.
  */
+import { planGuard } from './planGuard';
 import { orderCode } from '../../components/clubs/order/orderFormat';
 import type { PickSession } from '../../components/clubs/order/pickSession';
 import { editBlockRefs } from '../../components/clubs/order/editSession';
@@ -543,7 +544,11 @@ export class ApiDataSource implements PlannerDataSource {
     const sorted = [...dates].sort();
     const [catalogue, order, budget] = await Promise.all([this.getCatalogue(), this.getOrder(), this.getDayBudget()]);
     const targets = new Set(await this.newCalendars());
-    const external = sorted.length > 0 ? await this.externalSessions({ from: sorted[0]!, to: sorted[sorted.length - 1]! }) : [];
+    const span = sorted.length > 0 ? { from: sorted[0]!, to: sorted[sorted.length - 1]! } : null;
+    const [external, marks] = span
+      ? await Promise.all([this.externalSessions(span), this.listDayMarks(span).catch(() => [] as DayMark[])])
+      : [[] as PlannerSession[], [] as DayMark[]];
+    const dayMarks = Object.fromEntries(marks.map((m) => [m.date, m] as const));
     /* A term on another calendar than the ones new terms go to does not collide with them. */
     const relevant = external.filter((s) => !s.calendarIds || s.calendarIds.length === 0 || targets.size === 0 || s.calendarIds.some((c) => targets.has(c)));
     const ctx = buildPlannerContext({
@@ -552,6 +557,7 @@ export class ApiDataSource implements PlannerDataSource {
       sessions: [...this.draft, ...relevant],
       dayBudget: budget,
       today: this.today,
+      dayMarks,
     });
     return { ctx, externalIds: new Set(relevant.map((s) => s.id)) };
   }
@@ -578,6 +584,13 @@ export class ApiDataSource implements PlannerDataSource {
       });
   }
 
+  /** The one gate of every write: the plan never exceeds the need and never lands in the past (`planGuard`). */
+  private guard(ctx: PlannerContext, sessions: readonly PlannerSession[], touched: readonly string[], allowExtra = false): void {
+    const baseline = this.session?.editOrder?.baseline;
+    const refusal = planGuard(ctx, sessions, { orderId: this.orderView?.id ?? null, ...(baseline ? { baseline } : {}), touched, allowExtra });
+    if (refusal) throw new PlannerWriteError('validation', refusal);
+  }
+
   private assertDraftVersion(id: SessionId, expected: string | null | undefined): PlannerSession {
     const current = this.draft.find((s) => s.id === id);
     if (!current) throw new PlannerWriteError('notFound', 'Termín již neexistuje.');
@@ -602,6 +615,7 @@ export class ApiDataSource implements PlannerDataSource {
     const { ctx, externalIds } = await this.context([input.date]);
     const result = addPlannedInterval(ctx, input, this.newId);
     if (!result.ok || !result.merged) throw new PlannerWriteError('validation', result.reason);
+    this.guard(ctx, result.sessions, [result.merged.id], input.allowExtra === true);
     const undoToken = this.remember({ kind: 'draft', draft: clone(this.draft) });
     await this.finalizeDraft(result.sessions, externalIds, [result.merged.id]);
     this.emit();
@@ -621,6 +635,7 @@ export class ApiDataSource implements PlannerDataSource {
     const { ctx, externalIds } = await this.context([input.date]);
     const result = createFromDialog(ctx, input, this.newId);
     if (!result.ok) throw new PlannerWriteError('validation', result.reason);
+    this.guard(ctx, result.sessions, [result.session.id]);
     const undoToken = this.remember({ kind: 'draft', draft: clone(this.draft) });
     await this.finalizeDraft(result.sessions, externalIds, [result.session.id]);
     this.emit();
@@ -647,6 +662,7 @@ export class ApiDataSource implements PlannerDataSource {
     const { ctx, externalIds } = await this.context([input.date, current.date]);
     const r = confirmTermMovement(ctx, input.id, input);
     if (!r.ok || !r.term || !r.before) throw new PlannerWriteError(r.reason.startsWith('Termín již') ? 'notFound' : 'conflict', r.reason);
+    this.guard(ctx, r.sessions, [input.id]);
     const undoToken = this.remember({ kind: 'draft', draft: clone(this.draft) });
     await this.finalizeDraft(r.sessions, externalIds, [input.id]);
     this.emit();
@@ -675,6 +691,7 @@ export class ApiDataSource implements PlannerDataSource {
     };
     const r = commitTermExpansion(ctx, current, proposal);
     if (!r.ok || !r.term || !r.before) throw new PlannerWriteError(r.reason.includes('mezitím') ? 'stale' : 'validation', r.reason);
+    this.guard(ctx, r.sessions, [input.id]);
     const undoToken = this.remember({ kind: 'draft', draft: clone(this.draft) });
     await this.finalizeDraft(r.sessions, externalIds, [input.id]);
     this.emit();
@@ -702,6 +719,7 @@ export class ApiDataSource implements PlannerDataSource {
     };
     const r = commitSmartEdit(ctx, current, next);
     if (!r.ok || !r.term || !r.before) throw new PlannerWriteError(r.reason.includes('mezitím') ? 'stale' : 'validation', r.reason);
+    this.guard(ctx, r.sessions, [input.id]);
     const undoToken = this.remember({ kind: 'draft', draft: clone(this.draft) });
     await this.finalizeDraft(r.sessions, externalIds, [input.id]);
     this.emit();

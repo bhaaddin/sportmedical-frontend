@@ -10,6 +10,7 @@
  * Nothing persists: a reload restores the fixtures (the prototype's
  * localStorage is deliberately not reproduced).
  */
+import { planGuard } from './planGuard';
 import {
   addBooking as modelAddBooking,
   addPlannedInterval,
@@ -146,6 +147,12 @@ export class DemoDataSource implements PlannerDataSource {
     }
   }
 
+  /** The one gate of every write: the plan never exceeds the need and never lands in the past (`planGuard`). */
+  private guard(ctx: PlannerContext, sessions: readonly PlannerSession[], touched: readonly string[], allowExtra = false): void {
+    const refusal = planGuard(ctx, sessions, { orderId: null, touched, allowExtra });
+    if (refusal) throw new PlannerWriteError('validation', refusal);
+  }
+
   private context(): PlannerContext {
     return buildPlannerContext({
       catalogue: this.catalogueSync(),
@@ -243,8 +250,10 @@ export class DemoDataSource implements PlannerDataSource {
 
   async createInterval(input: IntervalInput): Promise<CreateIntervalResult> {
     await this.enter();
-    const result = addPlannedInterval(this.context(), input, this.newId);
+    const before = this.context();
+    const result = addPlannedInterval(before, input, this.newId);
     if (!result.ok || !result.merged) throw new PlannerWriteError('validation', result.reason);
+    this.guard(before, result.sessions, [result.merged.id], input.allowExtra === true);
     const undoToken = this.remember();
     this.replaceWith(result.sessions, [result.merged.id]);
     this.emit();
@@ -259,8 +268,10 @@ export class DemoDataSource implements PlannerDataSource {
 
   async createTerm(input: { date: IsoDate; categoryId: string; start: string; end: string }): Promise<CreateIntervalResult> {
     await this.enter();
-    const result = createFromDialog(this.context(), input, this.newId);
+    const before = this.context();
+    const result = createFromDialog(before, input, this.newId);
     if (!result.ok) throw new PlannerWriteError('validation', result.reason);
+    this.guard(before, result.sessions, [result.session.id]);
     const undoToken = this.remember();
     this.replaceWith(result.sessions, [result.session.id]);
     this.emit();
@@ -288,8 +299,10 @@ export class DemoDataSource implements PlannerDataSource {
   async moveInterval(input: MoveIntervalInput): Promise<TermWriteResult> {
     await this.enter();
     this.assertVersion(input.id, input.expectedVersion);
-    const r = confirmTermMovement(this.context(), input.id, input);
+    const before = this.context();
+    const r = confirmTermMovement(before, input.id, input);
     if (!r.ok || !r.term || !r.before) throw new PlannerWriteError(r.reason.startsWith('Termín již') ? 'notFound' : 'conflict', r.reason);
+    this.guard(before, r.sessions, [input.id]);
     const undoToken = this.remember();
     this.replaceWith(r.sessions, [input.id]);
     this.emit();
@@ -315,8 +328,10 @@ export class DemoDataSource implements PlannerDataSource {
       validation: { ok: true, reason: '' },
       original: current,
     };
-    const r = commitTermExpansion(this.context(), current, proposal);
+    const before = this.context();
+    const r = commitTermExpansion(before, current, proposal);
     if (!r.ok || !r.term || !r.before) throw new PlannerWriteError(r.reason.includes('mezitím') ? 'stale' : 'validation', r.reason);
+    this.guard(before, r.sessions, [input.id]);
     const undoToken = this.remember();
     this.replaceWith(r.sessions, [input.id]);
     this.emit();
@@ -338,6 +353,7 @@ export class DemoDataSource implements PlannerDataSource {
     };
     const r = commitSmartEdit(ctx, current, next);
     if (!r.ok || !r.term || !r.before) throw new PlannerWriteError(r.reason.includes('mezitím') ? 'stale' : 'validation', r.reason);
+    this.guard(ctx, r.sessions, [input.id]);
     const undoToken = this.remember();
     this.replaceWith(r.sessions, [input.id]);
     this.emit();

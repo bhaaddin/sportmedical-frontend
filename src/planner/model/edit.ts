@@ -17,7 +17,8 @@
  * the data source's job to record the change and notify (see `termChangeImpact`).
  */
 import { bookingState } from './booking';
-import { categoryOrFallback, demandOf, minutesOf, slotMinutesOf, sourceFor } from './context';
+import { PAST_REFUSAL, categoryOrFallback, demandOf, minutesOf, slotMinutesOf, sourceFor } from './context';
+import { openTimeBlock } from './openTime';
 import { plannedFrom, plannedOf } from './order';
 import { dayIndexInWeek, makeSlots, validatePlacement, windowLabel } from './placement';
 import {
@@ -106,6 +107,9 @@ export function validateTermMove(
   if (a < w.start || b > w.end || a >= b) {
     return { ok: false, reason: `Čas je mimo plánovací okno ${windowLabel(ctx)}.` };
   }
+  if (sourceFor(original) === 'club' && date < ctx.today) return { ok: false, reason: PAST_REFUSAL };
+  const open = sourceFor(original) === 'club' ? openTimeBlock(ctx, date, a, b) : null;
+  if (open) return { ok: false, reason: open };
   const conflict = ctx.sessions.find(
     (e) => e.id !== original.id && e.date === date && a < timeAsMinutes(e.end) && b > timeAsMinutes(e.start),
   );
@@ -291,6 +295,7 @@ export function validateTermExpansion(
   }
   const duration = slotMinutesOf(ctx, original.categoryId);
   if (!duration) return { ok: false, reason: 'Činnost nemá nastavenou délku slotu.' };
+  if (sourceFor(original) === 'club' && original.date < ctx.today) return { ok: false, reason: PAST_REFUSAL };
   const demand = demandOf(ctx, original.categoryId);
   const remaining = (demand?.requested ?? 0) - plannedOf(ctx, original.categoryId);
   if (sourceFor(original) === 'club' && extra > remaining) {
@@ -299,6 +304,9 @@ export function validateTermExpansion(
   // Inspect only the newly added interval: legacy demo terms can already overlap.
   const extA = edge === 'top' ? a : timeAsMinutes(original.end);
   const extB = edge === 'top' ? timeAsMinutes(original.start) : b;
+  /* The added slots must lie in open time: the lunch break is never eaten by pulling a block over it. */
+  const openReason = sourceFor(original) === 'club' ? openTimeBlock(ctx, original.date, extA, extB) : null;
+  if (openReason) return { ok: false, reason: openReason };
   const collision = ctx.sessions.find(
     (other) => other.id !== original.id && other.date === original.date && extA < timeAsMinutes(other.end) && extB > timeAsMinutes(other.start),
   );
@@ -560,6 +568,11 @@ export function smartEditValidation(ctx: PlannerContext, original: PlannerSessio
   if (!Number.isFinite(a) || !Number.isFinite(b) || a < w.start || b > w.end || b <= a) {
     return { ok: false, reason: `Termín musí být v pracovním okně ${windowLabel(ctx)}.` };
   }
+  if (sourceFor(original) === 'club' && e.date < ctx.today && !(e.date === original.date && original.clubBlockId)) {
+    return { ok: false, reason: PAST_REFUSAL };
+  }
+  const openReason = sourceFor(original) === 'club' && !(e.date === original.date && e.start === original.start && e.end === original.end) ? openTimeBlock(ctx, e.date, a, b) : null;
+  if (openReason) return { ok: false, reason: openReason };
   if (!Number.isInteger(e.capacity) || e.capacity <= 0) {
     return { ok: false, reason: 'Délka musí tvořit alespoň jeden celý slot.' };
   }
@@ -732,6 +745,10 @@ export function commitSmartEdit(ctx: PlannerContext, original: PlannerSession, n
   const future = ctx.sessions.map((e) => (e.id === original.id ? updated : e));
   const w = win(ctx);
   const overOrder = sourceFor(original) === 'club' && plannedFrom(ctx, future, next.categoryId) > (demandOf(ctx, next.categoryId)?.requested ?? 0);
+  if (sourceFor(original) === 'club' && next.date < ctx.today && !(next.date === original.date && original.clubBlockId)) return fail(ctx, PAST_REFUSAL);
+  const unchangedTime = next.date === original.date && next.start === original.start && next.end === original.end;
+  const openReason = sourceFor(original) === 'club' && !unchangedTime ? openTimeBlock(ctx, next.date, a, b) : null;
+  if (openReason) return fail(ctx, openReason);
   if (a < w.start || b > w.end || !Number.isInteger(next.capacity) || next.capacity < booked || b - a !== next.capacity * dur || collisions || overOrder) {
     return fail(ctx, 'Úpravu nelze uložit: změnila se dostupnost nebo kapacita.');
   }

@@ -11,7 +11,7 @@ import { useMemo } from 'react';
 import { slotMinutesOf, timeAsMinutes } from '../../model';
 import { usePlannerSelector } from '../../state/PlannerStoreProvider';
 import { usePlannerCtx, usePlannerModelState } from '../context';
-import { orderFigures, previewFigures, previewWindow, type OrderFigures } from './orderFigures';
+import { orderFigures, previewFigures, previewWindow, previewWindows, type OrderFigures } from './orderFigures';
 import { useClubPlanningContext } from './useClubPlanningContext';
 
 export interface PlanFigures {
@@ -40,7 +40,7 @@ export function usePlanFigures(): PlanFigures {
   return useMemo<PlanFigures>(() => {
     const options = { orderId, ...(baseline ? { baseline } : {}) };
     if (placement && placement.validation.ok && placement.quantity > 0) {
-      const window = previewWindow('preview', placement.date, placement.categoryId, placement.startMinutes, placement.quantity, slotMinutesOf(ctx, placement.categoryId));
+      const window = previewWindows(ctx, 'preview', placement.date, placement.categoryId, placement.startMinutes, placement.quantity);
       const p = previewFigures(ctx, base, window, options);
       return { base, live: p.after, previewCategoryId: p.added > 0 ? placement.categoryId : null, added: p.added, willComplete: p.willComplete };
     }

@@ -68,6 +68,15 @@ export function usePlannerModel(): PlannerModel {
   const pending = required.some((q) => q.data === undefined);
   const status: PlannerModelStatus = failed && failed.data === undefined ? 'error' : pending ? 'loading' : 'ready';
 
+  const dayMarks = useMemo(() => {
+    const out: Record<string, DayMark> = {};
+    for (const m of marks.data ?? []) out[m.date] = m;
+    return out;
+  }, [marks.data]);
+
+  /* A real source's days carry the clinic's hours and lunch break: no term may touch the break (`openTime.ts`). The
+     demo's marks are only decoration for the lab, so its terms are not held to them. */
+  const enforceHours = catalogue.data?.capabilities.realPublish === true;
   const ctx = useMemo<PlannerContext | null>(() => {
     if (!catalogue.data || !order.data || !budget.data || !sessions.data || !orderSessions.data) return null;
     return buildPlannerContext({
@@ -76,14 +85,9 @@ export function usePlannerModel(): PlannerModel {
       sessions: mergeSessions(sessions.data, orderSessions.data),
       dayBudget: budget.data,
       today,
+      ...(enforceHours ? { dayMarks } : {}),
     });
-  }, [catalogue.data, order.data, budget.data, sessions.data, orderSessions.data, today]);
-
-  const dayMarks = useMemo(() => {
-    const out: Record<string, DayMark> = {};
-    for (const m of marks.data ?? []) out[m.date] = m;
-    return out;
-  }, [marks.data]);
+  }, [catalogue.data, order.data, budget.data, sessions.data, orderSessions.data, today, enforceHours, dayMarks]);
 
   return {
     status,
