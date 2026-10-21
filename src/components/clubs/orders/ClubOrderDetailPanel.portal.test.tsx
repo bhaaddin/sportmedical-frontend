@@ -1,13 +1,14 @@
 /*
  * Etapa 11: what the desk does so that the club's portal says the same as the desk. A change the desk makes carries an
- * optional "Zpráva pro klub" (`clubMessage`, sent only when typed); "Napsat klubu"; "Co vidí klub" (exactly the
- * history the club sees); the club's links shown once, with "Vygenerovat nový odkaz" behind a confirm.
+ * optional "Zpráva pro klub" (`clubMessage`, sent only when typed); "Napsat klubu"; the club's links shown once, with
+ * "Vygenerovat nový odkaz" behind a confirm. The history itself (what the club sees, the full list) is on its own page,
+ * see ClubOrderHistoryPage.test.tsx; here only the button that leads there is checked.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { setViewport, VIEWPORTS } from '../../../test/viewport';
 import { toOrder } from '../../../api/clubOrders';
 import type { ClubOrderView } from '../../../api/clubOrders';
@@ -175,11 +176,10 @@ describe.each([['phone'], ['tablet'], ['desktop']] as const)('the club message a
     });
   });
 
-  it('"Napsat klubu": send is disabled until something is typed, then posts the notice and the club sees it under "Co vidí klub"', async () => {
+  it('"Napsat klubu": send is disabled until something is typed, then posts the notice and the history button counts it', async () => {
     const user = userEvent.setup();
     mount(make());
-    await user.click(await screen.findByTestId('club-visible-toggle'));
-    expect(await screen.findByTestId('club-visible-empty')).toHaveTextContent('Klub zatím nevidí žádné změny.');
+    expect(await screen.findByTestId('order-history-button')).toHaveTextContent(/^Historie$/);
     const after = make({ history: [{ atUtc: '2026-10-05T09:00:00Z', user: 'Eva', text: 'Zpráva klubu: Přijďte o 10 minut dřív.', visibleToClub: true }] });
     notice.mockImplementation(async () => {
       get.mockResolvedValue(after);
@@ -196,7 +196,7 @@ describe.each([['phone'], ['tablet'], ['desktop']] as const)('the club message a
     await waitFor(() => expect(notice).toHaveBeenCalledWith(ID, '  Přijďte o 10 minut dřív.  '.trim()));
     await waitFor(() => expect(screen.queryByTestId('write-to-club-dialog')).not.toBeInTheDocument());
     expect(toastSuccess).toHaveBeenCalledWith('Zpráva je v portálu klubu');
-    expect(await screen.findByTestId('club-visible-list')).toHaveTextContent('Přijďte o 10 minut dřív.');
+    await waitFor(() => expect(screen.getByTestId('order-history-button')).toHaveTextContent('Historie (1)'));
   });
 
   it('"Napsat klubu": a failure stays in the dialog with the text kept', async () => {
@@ -211,65 +211,42 @@ describe.each([['phone'], ['tablet'], ['desktop']] as const)('the club message a
     expect(within(dialog).getByLabelText('Zpráva pro klub')).toHaveValue('Dobrý den');
   });
 
-  it('"Co vidí klub" lists only the history the club sees, newest first', async () => {
+  it('the order panel holds no history of its own: only a "Historie" button with the count, which opens the history page', async () => {
     const user = userEvent.setup();
-    mount(make({
-      history: [
-        { atUtc: '2026-10-01T08:00:00Z', user: 'Eva', text: 'Objednávka potvrzena', visibleToClub: true },
-        { atUtc: '2026-10-02T08:00:00Z', user: 'Eva', text: 'Interní poznámka k faktuře', visibleToClub: false },
-        { atUtc: '2026-10-03T08:00:00Z', user: 'Eva', text: 'Termín 29. 10. odebrán', visibleToClub: true },
-        { atUtc: '2026-10-04T08:00:00Z', user: 'Eva', text: 'Bez příznaku' },
-      ],
-    }));
-    await user.click(await screen.findByTestId('club-visible-toggle'));
-    const list = await screen.findByTestId('club-visible-list');
-    const items = within(list).getAllByRole('listitem');
-    expect(items).toHaveLength(2);
-    expect(items[0]).toHaveTextContent('Termín 29. 10. odebrán');
-    expect(items[1]).toHaveTextContent('Objednávka potvrzena');
-    expect(list).not.toHaveTextContent('Interní poznámka');
-    /* the full internal history still shows everything, once opened */
-    await user.click(screen.getByTestId('order-history-wrap-toggle'));
-    expect(within(await screen.findByTestId('order-history')).getAllByRole('listitem')).toHaveLength(4);
-  });
-
-  it('both history blocks start collapsed behind a button, and expand/collapse in place', async () => {
-    const user = userEvent.setup();
-    mount(make({
+    const order = make({
       history: [
         { atUtc: '2026-10-01T08:00:00Z', user: 'Eva', text: 'Objednávka potvrzena', visibleToClub: true },
         { atUtc: '2026-10-02T08:00:00Z', user: 'Eva', text: 'Interní poznámka', visibleToClub: false },
       ],
-    }));
-    const visibleToggle = await screen.findByTestId('club-visible-toggle');
-    const historyToggle = await screen.findByTestId('order-history-wrap-toggle');
-    /* collapsed by default: the content is not rendered, the button names the count, aria-expanded is false */
-    expect(screen.queryByTestId('club-visible-list')).not.toBeInTheDocument();
+    });
+    get.mockReset().mockResolvedValue(order);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/clubs/objednavky']}>
+          <Routes>
+            <Route path="/clubs/objednavky" element={<ClubOrderDetailPanel orderId={order.id} onClose={() => undefined} />} />
+            <Route path="/clubs/objednavky/:orderId/historie" element={<div data-testid="history-page" />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const button = await screen.findByTestId('order-history-button');
+    expect(button).toHaveTextContent('Historie (2)');
     expect(screen.queryByTestId('order-history')).not.toBeInTheDocument();
-    expect(visibleToggle).toHaveTextContent('Zobrazit, co vidí klub (1)');
-    expect(historyToggle).toHaveTextContent('Zobrazit historii (2)');
-    expect(visibleToggle).toHaveAttribute('aria-expanded', 'false');
-    expect(historyToggle).toHaveAttribute('aria-expanded', 'false');
-    expect(visibleToggle).toHaveAttribute('aria-controls', 'club-visible');
-    expect(historyToggle).toHaveAttribute('aria-controls', 'order-history-wrap');
-
-    await user.click(visibleToggle);
-    expect(await screen.findByTestId('club-visible-list')).toBeInTheDocument();
-    expect(visibleToggle).toHaveAttribute('aria-expanded', 'true');
-    await user.click(visibleToggle);
-    expect(screen.queryByTestId('club-visible-list')).not.toBeInTheDocument();
-    expect(visibleToggle).toHaveAttribute('aria-expanded', 'false');
-
-    await user.click(historyToggle);
-    expect(await screen.findByTestId('order-history')).toBeInTheDocument();
-    expect(historyToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.queryByTestId('club-visible')).not.toBeInTheDocument();
+    expect(screen.queryByText('Interní poznámka')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('order-history-wrap-toggle')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('club-visible-toggle')).not.toBeInTheDocument();
+    await user.click(button);
+    expect(await screen.findByTestId('history-page')).toBeInTheDocument();
   });
 
-  it('"Co vidí klub" with no visible history yet still shows a plain button, no count', async () => {
-    mount(make({ history: [] }));
-    const visibleToggle = await screen.findByTestId('club-visible-toggle');
-    expect(visibleToggle).toHaveTextContent('Co vidí klub');
-    expect(visibleToggle).not.toHaveTextContent('(0)');
+  it('the order opens on the order itself: the summary comes first and the club links come after the contact', async () => {
+    mount(make());
+    const detail = await screen.findByTestId('order-detail');
+    const titles = within(detail).getAllByText(/^(Souhrn|Termíny objednávky|Činnosti|Kontakt na klub|Odkazy pro klub)$/).map((n) => n.textContent);
+    expect(titles).toEqual(['Souhrn', 'Termíny objednávky', 'Činnosti', 'Kontakt na klub', 'Odkazy pro klub']);
   });
 
   it('shows the club link and the players\' link once each, with copy', async () => {
