@@ -79,3 +79,110 @@
 .sm-planner .plan-ack input { margin-top: 2px; }
 /* the hint strip itself does not catch the pointer (it lies over the board); its button must */
 .sm-planner .active-plan-hint .plan-add-day { pointer-events: auto; position: relative; z-index: 2; }
+
+/* ---- the činnost strip: nothing hidden without a word (owner, 21. 10. 2026) ---- */
+/* the live region: read, never seen */
+.sm-planner #planning-cards .deck-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* a card never clicked: "NOVÁ" where AKTIVNÍ / the check sit */
+.sm-planner #planning-cards .plan-card .plan-new {
+  position: absolute;
+  right: 0;
+  top: 0;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.7px;
+  white-space: nowrap;
+  color: var(--tone);
+  border: 1px solid var(--tone);
+  background: #021c2acc;
+}
+/* the dot of a new card hidden on that side */
+.sm-planner #planning-cards .deck-fresh-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: #ffc857;
+  box-shadow: 0 0 8px #ffc857aa;
+  vertical-align: middle;
+}
+/* the edge button (the compact strip; the stage keeps its crystal arrows and counts on them) */
+.sm-planner #planning-cards .deck-more {
+  position: absolute;
+  top: 50%;
+  z-index: 4;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 46px;
+  min-height: 52px;
+  padding: 4px 6px;
+  transform: translateY(-50%);
+  border: 1px solid hsl(from #2ccbd0 var(--sm-hsl, h s l));
+  border-radius: 12px;
+  background: #031b29e8;
+  color: hsl(from #bff7f4 var(--sm-hsl, h s l));
+  box-shadow: 0 6px 18px #00000080, 0 0 12px hsl(from #12c3cf55 var(--sm-hsl, h s l));
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  line-height: 1.1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sm-planner #planning-cards .deck-more-before { left: 2px; }
+.sm-planner #planning-cards .deck-more-after { right: 2px; }
+.sm-planner #planning-cards .deck-more:hover { background: hsl(from #06394a var(--sm-hsl, h s l)); }
+.sm-planner #planning-cards .deck-more:focus-visible { outline: 2px solid hsl(from #adfffe var(--sm-hsl, h s l)); outline-offset: 2px; }
+.sm-planner #planning-cards .deck-more-chevron { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.sm-planner #planning-cards .deck-more-count { white-space: nowrap; }
+.sm-planner #planning-cards .deck-more .deck-fresh-dot { position: absolute; top: 5px; right: 5px; margin: 0; }
+/* the count under a crystal arrow of the stage */
+.sm-planner #planning-cards .precision-bracket .deck-count {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  z-index: 3;
+  transform: translateX(-50%);
+  padding: 2px 5px;
+  border-radius: 8px;
+  border: 1px solid hsl(from #2ccbd0 var(--sm-hsl, h s l));
+  background: #031b29f0;
+  color: hsl(from #c8fbf7 var(--sm-hsl, h s l));
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* the side with hidden cards fades out */
+.sm-planner #planning-cards .adaptive-deck .adaptive-card-viewport[data-more-after]:not([data-more-before]) {
+  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 46px), transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 46px), transparent 100%);
+}
+.sm-planner #planning-cards .adaptive-deck .adaptive-card-viewport[data-more-before]:not([data-more-after]) {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 46px, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 46px, #000 100%);
+}
+.sm-planner #planning-cards .adaptive-deck .adaptive-card-viewport[data-more-before][data-more-after] {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 46px, #000 calc(100% - 46px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 46px, #000 calc(100% - 46px), transparent 100%);
+}
+/* omezené / vypnuto: the strip jumps, it never glides (the scripted moves pass `instant` themselves) */
+html:not([data-motion='full']) .sm-planner #planning-cards .adaptive-card-viewport { scroll-behavior: auto !important; }

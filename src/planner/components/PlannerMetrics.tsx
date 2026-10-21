@@ -22,6 +22,7 @@
  * prototype's ~700 answers) is the file exactly.
  */
 import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useState, type ReactNode, type RefObject } from 'react';
+import { cardsThatFit } from '../model/order';
 
 /** The file's stage. */
 export const STAGE_WIDTH = 1672;
@@ -194,8 +195,14 @@ export function useBoardMetrics(bodyRef: RefObject<HTMLElement | null>, enabled 
   return local;
 }
 
-/** The deck's viewport padding (planner.css v29) the card width is measured inside. */
-export function useDeckVisible(viewportRef: RefObject<HTMLElement | null>): number {
+/**
+ * The deck's viewport padding (planner.css v29) the card width is measured inside. The desktop stage sizes its cards from
+ * the count (`--deck-n`), so it uses the file's card width (`deckVisibleCount`); the compact strip (phone / tablet) draws
+ * every card at half the strip, so there the real card is measured (`cardsThatFit`) - the desktop formula once claimed four
+ * cards on a 1200 px tablet that showed two, and the third činnost could not be reached. `quantity` re-measures when the
+ * cards change.
+ */
+export function useDeckVisible(viewportRef: RefObject<HTMLElement | null>, quantity = 0): number {
   const ctx = useContext(MetricsContext);
   const publish = ctx?.publishDeck;
   const [local, setLocal] = useState<number>(DECK_MIN_VISIBLE);
@@ -210,7 +217,14 @@ export function useDeckVisible(viewportRef: RefObject<HTMLElement | null>): numb
       const border = cs.boxSizing === 'border-box';
       const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
       const content = border ? w - pad : w;
-      const next = deckVisibleCount(content);
+      let next = deckVisibleCount(content);
+      const card = vp.closest('.is-compact') ? vp.querySelector<HTMLElement>('.plan-card') : null;
+      if (card) {
+        const track = card.parentElement;
+        const gap = track ? parseFloat(getComputedStyle(track).columnGap) || parseFloat(getComputedStyle(track).gap) || 0 : 0;
+        const fit = cardsThatFit(content, layoutSize(card).width, gap);
+        if (fit > 0) next = fit;
+      }
       setLocal(next);
       publish?.(next);
     };
@@ -222,6 +236,6 @@ export function useDeckVisible(viewportRef: RefObject<HTMLElement | null>): numb
     const observer = new ResizeObserver(measure);
     observer.observe(vp);
     return () => observer.disconnect();
-  }, [viewportRef, publish]);
+  }, [viewportRef, publish, quantity]);
   return local;
 }

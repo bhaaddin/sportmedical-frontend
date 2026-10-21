@@ -197,7 +197,8 @@ export type PlannerAction =
   | { type: 'showCompletion'; categoryId: CategoryId; alreadyCompleted: boolean }
   | { type: 'hideCompletion' }
   /* carousel */
-  | { type: 'carouselTo'; index: number; quantity: number; visible?: number }
+  /** `keep`: a move the strip makes by itself (the escalator, a focused card scrolled into view) keeps the armed činnost. */
+  | { type: 'carouselTo'; index: number; quantity: number; visible?: number; keep?: boolean }
   | { type: 'carouselMove'; delta: number; quantity: number; visible?: number }
   /* layers */
   | { type: 'pushToast'; toast: NewToast }
@@ -365,7 +366,7 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
       const index = clampCarouselIndex(action.quantity, action.index, visible);
       if (action.quantity <= visible) return state;
       // Every real page change exits the activity planning mode.
-      const exits = index !== state.carousel.index && state.planning.selectedCategoryId !== null;
+      const exits = !action.keep && index !== state.carousel.index && state.planning.selectedCategoryId !== null;
       return {
         ...state,
         carousel: { index },
@@ -498,7 +499,7 @@ export const plannerActions = {
   showCompletion: (categoryId: CategoryId, alreadyCompleted = false): PlannerAction => ({ type: 'showCompletion', categoryId, alreadyCompleted }),
   hideCompletion: (): PlannerAction => ({ type: 'hideCompletion' }),
 
-  carouselTo: (index: number, quantity: number, visible?: number): PlannerAction => ({ type: 'carouselTo', index, quantity, ...(visible !== undefined ? { visible } : {}) }),
+  carouselTo: (index: number, quantity: number, visible?: number, keep?: boolean): PlannerAction => ({ type: 'carouselTo', index, quantity, ...(visible !== undefined ? { visible } : {}), ...(keep ? { keep } : {}) }),
   carouselMove: (delta: number, quantity: number, visible?: number): PlannerAction => ({ type: 'carouselMove', delta, quantity, ...(visible !== undefined ? { visible } : {}) }),
 
   toast: (message: string, extra: Partial<NewToast> = {}): PlannerAction => ({ type: 'pushToast', toast: { message, ...extra } }),

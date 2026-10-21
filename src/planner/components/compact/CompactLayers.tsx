@@ -26,7 +26,6 @@ import { WeekBoardPanel } from '../WeekBoardPanel';
 import { usePlannerKeyboard } from '../usePlannerKeyboard';
 import { usePlannerModelState } from '../context';
 import { BoardStrip, useBoardFit } from './CompactBoardChrome';
-import { CompactDeckSync } from './CompactDeckSync';
 import { CompactHeader } from './CompactHeader';
 import { CompactOrderDock } from './CompactOrderDock';
 import { CompactSidebar } from './CompactSidebar';
@@ -86,7 +85,6 @@ export function CompactLayers({ layout, user, headerMode }: CompactLayersProps) 
         </div>
       </div>
       <PlanningCarousel />
-      <CompactDeckSync />
       <CompactOrderDock />
       <div id="status-overlay" aria-live="polite" />
       <MiniDayTooltip />

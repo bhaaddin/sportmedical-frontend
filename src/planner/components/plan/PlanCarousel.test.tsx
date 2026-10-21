@@ -1,7 +1,8 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetMotionStoreForTests, setMotionPreference } from '../../../motion/preference';
 import { setViewport, VIEWPORTS } from '../../../test/viewport';
-import { mountPlanner, ownerSource, term } from './testHarness';
+import { komplexni, mountPlanner, ownerSource, spiro, term } from './testHarness';
 
 beforeEach(() => setViewport(VIEWPORTS.desktop));
 afterEach(() => cleanup());
@@ -45,6 +46,143 @@ describe('PlanningCarousel · paging', () => {
     fireEvent.click(within(dialog).getAllByRole('button', { name: 'Plánovat →' })[3]!);
     expect(card('d')).toHaveClass('is-selected');
     expect(document.getElementById('adaptive-page')).toHaveTextContent('3–4 / 4');
+  });
+});
+
+describe('PlanningCarousel · every činnost reachable (owner, 21. 10. 2026: Spiroergometrické could not be picked)', () => {
+  const zakladni = { id: 'z', name: 'Základní sportovní prohlídka', iconKey: 'heart', color: '#00f1dc', slotMinutes: 40, parallelCapacity: 1 };
+  const three = [zakladni, { ...komplexni }, { ...spiro }];
+  const threeDemands = [
+    { categoryId: 'z', requested: 7, baselinePlanned: 0 },
+    { categoryId: 'k', requested: 5, baselinePlanned: 0 },
+    { categoryId: 's', requested: 4, baselinePlanned: 0 },
+  ];
+  const six = ['a', 'b', 'c', 'd', 'e', 'f'].map((id, i) => ({ id, name: `Činnost ${id.toUpperCase()}`, iconKey: 'heart', color: ['#00f1dc', '#0f94ff', '#9157f2', '#ffb124', '#ff5d8f', '#7bd88f'][i]!, slotMinutes: 30, parallelCapacity: 1 }));
+  const sixDemands = six.map((c) => ({ categoryId: c.id, requested: 4, baselinePlanned: 0 }));
+  const page = () => document.getElementById('adaptive-page')!.textContent;
+  const live = () => document.getElementById('deck-live')!.textContent;
+  const more = (side: 'before' | 'after') => document.querySelector<HTMLButtonElement>(`[data-deck-more="${side}"]`);
+
+  afterEach(() => { setMotionPreference(null); resetMotionStoreForTests(); });
+
+  it('three činnosti, two in view: the hidden one is counted on its side, said aloud and marked NOVÁ', async () => {
+    mountPlanner(ownerSource({ categories: three, demands: threeDemands }));
+    await screen.findByTestId('planning-carousel');
+    expect(page()).toBe('1–2 / 3');
+    const viewport = document.getElementById('adaptive-viewport')!;
+    expect(viewport).toHaveAttribute('data-more-after', 'true');
+    expect(viewport).not.toHaveAttribute('data-more-before');
+    expect(viewport).toHaveAttribute('role', 'group');
+    expect(live()).toBe('Vidíte činnosti 1–2, celkem 3. Vpravo ještě 1.');
+    expect(document.getElementById('deck-live')).toHaveAttribute('aria-live', 'polite');
+    // the stage's arrow carries the count; the compact strip's edge button says the same
+    const next = document.querySelector<HTMLButtonElement>('[data-deck-nav="1"]')!;
+    expect(next).toBeEnabled();
+    expect(next).toHaveAccessibleName('Další činnosti, ještě 1, z toho 1 nová');
+    expect(next.querySelector('.deck-count')).toHaveTextContent('ještě 1');
+    expect(more('after')).toHaveTextContent('ještě 1');
+    expect(more('before')).toBeNull();
+    // every card is new until clicked
+    for (const id of ['z', 'k', 's']) expect(card(id).querySelector('.plan-new')).toHaveTextContent('NOVÁ');
+  });
+
+  it('the escalator: arming Komplexní slides Spiroergometrické in, Komplexní stays armed; Spiro is then selectable', async () => {
+    mountPlanner(ownerSource({ categories: three, demands: threeDemands }));
+    await screen.findByTestId('planning-carousel');
+    fireEvent.click(card('z'));
+    expect(page()).toBe('1–2 / 3'); // Komplexní, the next one, is already beside it
+    expect(card('z').querySelector('.plan-new')).toBeNull();
+    fireEvent.click(card('k'));
+    expect(card('k')).toHaveClass('is-selected');
+    expect(page()).toBe('2–3 / 3');
+    expect(card('k')).toHaveClass('is-selected'); // the strip's own move keeps the armed činnost
+    expect(live()).toBe('Vidíte činnosti 2–3, celkem 3. Vlevo ještě 1.');
+    expect(card('s')).toHaveAttribute('data-fresh', 'true');
+    fireEvent.click(card('s'));
+    expect(card('s')).toHaveClass('is-selected');
+    expect(card('s')).toHaveAttribute('aria-pressed', 'true');
+    expect(card('s').querySelector('.plan-new')).toBeNull();
+    expect(document.getElementById('active-plan-hint')).toHaveTextContent('Právě plánujete: Spiroergometrické vyšetření');
+  });
+
+  it('six činnosti: each armed card brings the next one in; the edge buttons page by what is hidden', async () => {
+    mountPlanner(ownerSource({ categories: six, demands: sixDemands }));
+    await screen.findByTestId('planning-carousel');
+    expect(more('after')).toHaveAccessibleName('Další činnosti, ještě 4, z toho 4 nové');
+    fireEvent.click(card('a'));
+    expect(page()).toBe('1–2 / 6');
+    fireEvent.click(card('b'));
+    expect(page()).toBe('2–3 / 6');
+    fireEvent.click(card('c'));
+    expect(page()).toBe('3–4 / 6');
+    expect(card('c')).toHaveClass('is-selected');
+    expect(more('before')).toHaveTextContent('ještě 2');
+    expect(more('after')).toHaveTextContent('ještě 2');
+    // the user pages: like the arrows, it ends the armed činnost
+    fireEvent.click(more('after')!);
+    expect(page()).toBe('5–6 / 6');
+    expect(card('c')).not.toHaveClass('is-selected');
+    expect(more('after')).toBeNull();
+    fireEvent.click(more('before')!);
+    expect(page()).toBe('3–4 / 6');
+  });
+
+  it('keyboard: arrows, Home and End walk the cards; the focused card scrolls in and the armed one stays armed', async () => {
+    mountPlanner(ownerSource({ categories: six, demands: sixDemands }));
+    await screen.findByTestId('planning-carousel');
+    fireEvent.click(card('a'));
+    card('a').focus();
+    fireEvent.keyDown(card('a'), { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(card('b'));
+    fireEvent.keyDown(card('b'), { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(card('c'));
+    expect(page()).toBe('2–3 / 6');
+    fireEvent.keyDown(card('c'), { key: 'End' });
+    expect(document.activeElement).toBe(card('f'));
+    expect(page()).toBe('5–6 / 6');
+    expect(card('a')).toHaveClass('is-selected');
+    fireEvent.keyDown(card('f'), { key: 'Home' });
+    expect(document.activeElement).toBe(card('a'));
+    expect(page()).toBe('1–2 / 6');
+    fireEvent.keyDown(card('a'), { key: 'ArrowLeft' });
+    expect(document.activeElement).toBe(card('a'));
+    // every card is a button in the tab order
+    for (const id of ['a', 'b', 'c', 'd', 'e', 'f']) expect(card(id).tagName).toBe('BUTTON');
+  });
+
+  it('a fulfilled card stays in the strip, done, never NOVÁ, and is not armed again', async () => {
+    mountPlanner(ownerSource({ categories: three, demands: threeDemands, sessions: [term('full', '2026-11-18', '08:00', '11:20', 'z', 7)] }));
+    await screen.findByTestId('planning-carousel');
+    expect(card('z')).toHaveClass('is-complete');
+    expect(card('z').querySelector('.plan-new')).toBeNull();
+    fireEvent.click(card('z'));
+    expect(card('z')).not.toHaveClass('is-selected');
+    expect(await screen.findByTestId('completion-callout')).toHaveTextContent('Požadavek naplněn');
+  });
+
+  /** jsdom has no layout: give the cards the file's width so the strip can compute its step and scroll. */
+  const giveCardWidths = () => {
+    document.querySelector<HTMLElement>('.adaptive-card-track')!.style.gap = '9px';
+    document.querySelectorAll<HTMLElement>('.plan-card').forEach((c) => { c.style.width = '300px'; });
+    const viewport = document.getElementById('adaptive-viewport')!;
+    const scrollTo = vi.fn();
+    (viewport as HTMLElement & { scrollTo: unknown }).scrollTo = scrollTo;
+    return scrollTo;
+  };
+
+  it.each([
+    ['plné', 'smooth'],
+    ['omezené', 'instant'],
+    ['vypnuto', 'instant'],
+  ] as const)('the motion setting %s: the strip moves %s', async (mode, behavior) => {
+    setMotionPreference(mode);
+    mountPlanner(ownerSource({ categories: three, demands: threeDemands }));
+    await screen.findByTestId('planning-carousel');
+    const scrollTo = giveCardWidths();
+    fireEvent.click(card('z'));
+    fireEvent.click(card('k'));
+    expect(page()).toBe('2–3 / 3');
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 309, behavior });
   });
 });
 

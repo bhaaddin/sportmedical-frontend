@@ -131,6 +131,14 @@ describe('carousel', () => {
     expect(run(start(), a.carouselTo(99, 6)).carousel.index).toBe(4);
     expect(run(start(), a.carouselMove(-1, 6)).carousel.index).toBe(0);
   });
+
+  it('a move the strip makes by itself (keep) turns the page and keeps the armed činnost', () => {
+    const armed = run(start(), a.selectPlanningCategory('medical'));
+    const kept = run(armed, a.carouselTo(2, 6, 2, true));
+    expect(kept.carousel.index).toBe(2);
+    expect(kept.planning.selectedCategoryId).toBe('medical');
+    expect(run(armed, a.carouselTo(2, 6, 2)).planning.selectedCategoryId).toBeNull();
+  });
 });
 
 describe('layers', () => {

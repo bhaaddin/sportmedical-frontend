@@ -176,6 +176,9 @@
   flex: 0 0 calc((100% - (var(--deck-n, 2) - 1) * 9px) / var(--deck-n, 2)) !important;
   width: calc((100% - (var(--deck-n, 2) - 1) * 9px) / var(--deck-n, 2)) !important;
 }
+/* the stage counts hidden cards on its crystal arrows (`.deck-count`); the compact strip's edge buttons are not drawn here */
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards .deck-more { display: none; }
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards .precision-bracket { position: relative; }
 .sm-planner[data-layout='desktop'] #dashboard.live-mode .active-plan-hint {
   top: calc(var(--stage-h, 941px) - 264px);
 }

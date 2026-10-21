@@ -696,7 +696,19 @@
   container-type: inline-size;
 }
 .sm-planner.is-compact #planning-cards .adaptive-card-viewport::-webkit-scrollbar { display: none; }
-.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .adaptive-card-track {
+/* the side with hidden cards fades (plan.css draws the edge buttons over it) - never a card silently off the edge */
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .adaptive-card-viewport[data-more-after]:not([data-more-before]) {
+  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 52px), transparent 100%) !important;
+  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 52px), transparent 100%) !important;
+}
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .adaptive-card-viewport[data-more-before]:not([data-more-after]) {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 52px, #000 100%) !important;
+  mask-image: linear-gradient(90deg, transparent 0, #000 52px, #000 100%) !important;
+}
+.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .adaptive-card-viewport[data-more-before][data-more-after] {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 52px, #000 calc(100% - 52px), transparent 100%) !important;
+  mask-image: linear-gradient(90deg, transparent 0, #000 52px, #000 calc(100% - 52px), transparent 100%) !important;
+}.sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .adaptive-card-track {
   display: flex;
   align-items: stretch !important;
   gap: 8px !important;
