@@ -100,6 +100,9 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
                   priority: 40,
                 },
                 { name: 'mui', test: /node_modules[\\/]@(mui|emotion)[\\/]/, priority: 30 },
+                /* MUI's positioning engine: its own chunk, imported by 'mui'. Left ungrouped, the bundler may merge it into
+                   whichever app chunk shares its importers - and then 'mui' (every first load) imports that app chunk. */
+                { name: 'popper', test: /node_modules[\\/]@popperjs[\\/]/, priority: 30 },
                 { name: 'motion', test: /node_modules[\\/](motion|framer-motion|motion-dom|motion-utils)[\\/]/, priority: 25 },
                 /* The scroll-driven public pages (src/motion): each its own lazy chunk, none of them in any first load. */
                 { name: 'gsap', test: /node_modules[\\/]gsap[\\/]/, priority: 25 },

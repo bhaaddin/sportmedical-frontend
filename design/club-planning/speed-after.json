@@ -1,0 +1,2990 @@
+{
+  "label": "after",
+  "base": "http://localhost:3132",
+  "delayMs": 80,
+  "runs": 5,
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "club": "FK Slaný",
+  "at": "2026-10-21T09:08:06.626Z",
+  "listVsSingle": {
+    "orders": [
+      {
+        "id": "01a11197",
+        "status": "Cancelled",
+        "differs": [
+          "history"
+        ],
+        "listHistory": 0,
+        "singleHistory": 4
+      },
+      {
+        "id": "01a11196",
+        "status": "Cancelled",
+        "differs": [
+          "history"
+        ],
+        "listHistory": 0,
+        "singleHistory": 5
+      },
+      {
+        "id": "01a11142",
+        "status": "Cancelled",
+        "differs": [
+          "history"
+        ],
+        "listHistory": 0,
+        "singleHistory": 2
+      },
+      {
+        "id": "01a11113",
+        "status": "Cancelled",
+        "differs": [
+          "history"
+        ],
+        "listHistory": 0,
+        "singleHistory": 3
+      },
+      {
+        "id": "01a10824",
+        "status": "Confirmed",
+        "differs": [
+          "history"
+        ],
+        "listHistory": 0,
+        "singleHistory": 3
+      },
+      {
+        "id": "01a107ee",
+        "status": "Invited",
+        "differs": [
+          "history"
+        ],
+        "listHistory": 0,
+        "singleHistory": 1
+      },
+      {
+        "id": "01a107ee",
+        "status": "Confirmed",
+        "differs": [
+          "history"
+        ],
+        "listHistory": 0,
+        "singleHistory": 5
+      },
+      {
+        "id": "01a1075b",
+        "status": "Confirmed",
+        "differs": [
+          "history"
+        ],
+        "listHistory": 0,
+        "singleHistory": 3
+      },
+      {
+        "id": "01a10759",
+        "status": "Invited",
+        "differs": [
+          "history"
+        ],
+        "listHistory": 0,
+        "singleHistory": 1
+      },
+      {
+        "id": "01a106f0",
+        "status": "Confirmed",
+        "differs": [
+          "history"
+        ],
+        "listHistory": 0,
+        "singleHistory": 6
+      },
+      {
+        "id": "01a105ca",
+        "status": "Confirmed",
+        "differs": [
+          "history"
+        ],
+        "listHistory": 0,
+        "singleHistory": 3
+      },
+      {
+        "id": "01a105ca",
+        "status": "Confirmed",
+        "differs": [
+          "history"
+        ],
+        "listHistory": 0,
+        "singleHistory": 11
+      },
+      {
+        "id": "01a10498",
+        "status": "Cancelled",
+        "differs": [
+          "history"
+        ],
+        "listHistory": 0,
+        "singleHistory": 5
+      }
+    ],
+    "filtered": {
+      "sameIds": true,
+      "sameContent": true,
+      "rowsFiltered": 13,
+      "rowsOfUnfiltered": 13
+    },
+    "club": {
+      "differs": []
+    }
+  },
+  "variants": {
+    "cold": {
+      "summary": {
+        "readyMs": 1774,
+        "shellMs": 1631,
+        "skeletonMs": null,
+        "settledMs": 1899,
+        "requests": 24,
+        "requestsBeforeReady": 21,
+        "depth": 3,
+        "depthBeforeReady": 2,
+        "waves": 3,
+        "duplicateRuns": 0,
+        "cls": 0
+      },
+      "runs": [
+        {
+          "skeletonMs": null,
+          "shellMs": 1356,
+          "readyMs": 1568,
+          "settledMs": 1704,
+          "requests": 24,
+          "requestsBeforeReady": 21,
+          "depth": 3,
+          "depthBeforeReady": 2,
+          "duplicates": [],
+          "waves": [
+            {
+              "start": 1099,
+              "end": 1230,
+              "calls": 11,
+              "slowest": "/api/v1/club-orders"
+            },
+            {
+              "start": 1309,
+              "end": 1435,
+              "calls": 10,
+              "slowest": "/api/day"
+            },
+            {
+              "start": 1569,
+              "end": 1704,
+              "calls": 3,
+              "slowest": "/hubs/notifications/negotiate"
+            }
+          ],
+          "waterfall": [
+            {
+              "start": 1099,
+              "end": 1208,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/public/clinic"
+            },
+            {
+              "start": 1099,
+              "end": 1207,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clubs/{id}"
+            },
+            {
+              "start": 1100,
+              "end": 1225,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders?clubId={id}"
+            },
+            {
+              "start": 1100,
+              "end": 1212,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks"
+            },
+            {
+              "start": 1100,
+              "end": 1222,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/activities"
+            },
+            {
+              "start": 1100,
+              "end": 1209,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars"
+            },
+            {
+              "start": 1100,
+              "end": 1213,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clinic-services"
+            },
+            {
+              "start": 1100,
+              "end": 1211,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/calendar-display"
+            },
+            {
+              "start": 1100,
+              "end": 1212,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/clubs"
+            },
+            {
+              "start": 1101,
+              "end": 1217,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/holidays/2026"
+            },
+            {
+              "start": 1120,
+              "end": 1230,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/account"
+            },
+            {
+              "start": 1309,
+              "end": 1411,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders"
+            },
+            {
+              "start": 1309,
+              "end": 1409,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders/{id}"
+            },
+            {
+              "start": 1309,
+              "end": 1403,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 1325,
+              "end": 1421,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-09-28&to=2026-11-17"
+            },
+            {
+              "start": 1325,
+              "end": 1421,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 1325,
+              "end": 1422,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 1326,
+              "end": 1422,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 1326,
+              "end": 1435,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds={id}"
+            },
+            {
+              "start": 1326,
+              "end": 1420,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 1326,
+              "end": 1426,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}"
+            },
+            {
+              "start": 1569,
+              "end": 1660,
+              "level": 3,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/notifications"
+            },
+            {
+              "start": 1570,
+              "end": 1659,
+              "level": 3,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/notifications/seen"
+            },
+            {
+              "start": 1612,
+              "end": 1704,
+              "level": 3,
+              "status": 200,
+              "method": "POST",
+              "path": "/hubs/notifications/negotiate?negotiateVersion=1"
+            }
+          ],
+          "cls": 0.005,
+          "errors": []
+        },
+        {
+          "skeletonMs": null,
+          "shellMs": 1682,
+          "readyMs": 1851,
+          "settledMs": 1987,
+          "requests": 24,
+          "requestsBeforeReady": 21,
+          "depth": 3,
+          "depthBeforeReady": 2,
+          "duplicates": [],
+          "waves": [
+            {
+              "start": 1147,
+              "end": 1319,
+              "calls": 11,
+              "slowest": "/api/v1/club-orders"
+            },
+            {
+              "start": 1465,
+              "end": 1591,
+              "calls": 10,
+              "slowest": "/api/day"
+            },
+            {
+              "start": 1852,
+              "end": 1987,
+              "calls": 3,
+              "slowest": "/hubs/notifications/negotiate"
+            }
+          ],
+          "waterfall": [
+            {
+              "start": 1147,
+              "end": 1284,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/public/clinic"
+            },
+            {
+              "start": 1147,
+              "end": 1287,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clubs/{id}"
+            },
+            {
+              "start": 1148,
+              "end": 1319,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders?clubId={id}"
+            },
+            {
+              "start": 1148,
+              "end": 1302,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks"
+            },
+            {
+              "start": 1148,
+              "end": 1318,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/activities"
+            },
+            {
+              "start": 1148,
+              "end": 1290,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars"
+            },
+            {
+              "start": 1148,
+              "end": 1295,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clinic-services"
+            },
+            {
+              "start": 1149,
+              "end": 1293,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/calendar-display"
+            },
+            {
+              "start": 1149,
+              "end": 1300,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/clubs"
+            },
+            {
+              "start": 1149,
+              "end": 1301,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/holidays/2026"
+            },
+            {
+              "start": 1168,
+              "end": 1313,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/account"
+            },
+            {
+              "start": 1465,
+              "end": 1565,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders"
+            },
+            {
+              "start": 1465,
+              "end": 1564,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders/{id}"
+            },
+            {
+              "start": 1466,
+              "end": 1559,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 1482,
+              "end": 1576,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-09-28&to=2026-11-17"
+            },
+            {
+              "start": 1483,
+              "end": 1576,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 1483,
+              "end": 1576,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 1483,
+              "end": 1578,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 1484,
+              "end": 1591,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds={id}"
+            },
+            {
+              "start": 1484,
+              "end": 1575,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 1486,
+              "end": 1582,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}"
+            },
+            {
+              "start": 1852,
+              "end": 1945,
+              "level": 3,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/notifications"
+            },
+            {
+              "start": 1852,
+              "end": 1945,
+              "level": 3,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/notifications/seen"
+            },
+            {
+              "start": 1893,
+              "end": 1987,
+              "level": 3,
+              "status": 200,
+              "method": "POST",
+              "path": "/hubs/notifications/negotiate?negotiateVersion=1"
+            }
+          ],
+          "cls": 0,
+          "errors": []
+        },
+        {
+          "skeletonMs": null,
+          "shellMs": 1631,
+          "readyMs": 1774,
+          "settledMs": 1899,
+          "requests": 24,
+          "requestsBeforeReady": 21,
+          "depth": 3,
+          "depthBeforeReady": 2,
+          "duplicates": [],
+          "waves": [
+            {
+              "start": 1106,
+              "end": 1245,
+              "calls": 11,
+              "slowest": "/api/v1/club-orders"
+            },
+            {
+              "start": 1368,
+              "end": 1499,
+              "calls": 10,
+              "slowest": "/api/day"
+            },
+            {
+              "start": 1775,
+              "end": 1899,
+              "calls": 3,
+              "slowest": "/api/notifications"
+            }
+          ],
+          "waterfall": [
+            {
+              "start": 1106,
+              "end": 1221,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/public/clinic"
+            },
+            {
+              "start": 1107,
+              "end": 1220,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clubs/{id}"
+            },
+            {
+              "start": 1107,
+              "end": 1236,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders?clubId={id}"
+            },
+            {
+              "start": 1108,
+              "end": 1229,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks"
+            },
+            {
+              "start": 1108,
+              "end": 1233,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/activities"
+            },
+            {
+              "start": 1108,
+              "end": 1224,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars"
+            },
+            {
+              "start": 1108,
+              "end": 1227,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clinic-services"
+            },
+            {
+              "start": 1108,
+              "end": 1226,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/calendar-display"
+            },
+            {
+              "start": 1108,
+              "end": 1230,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/clubs"
+            },
+            {
+              "start": 1108,
+              "end": 1232,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/holidays/2026"
+            },
+            {
+              "start": 1126,
+              "end": 1245,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/account"
+            },
+            {
+              "start": 1368,
+              "end": 1478,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders"
+            },
+            {
+              "start": 1368,
+              "end": 1477,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders/{id}"
+            },
+            {
+              "start": 1368,
+              "end": 1469,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 1382,
+              "end": 1484,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-09-28&to=2026-11-17"
+            },
+            {
+              "start": 1384,
+              "end": 1484,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 1384,
+              "end": 1483,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 1384,
+              "end": 1484,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 1385,
+              "end": 1499,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds={id}"
+            },
+            {
+              "start": 1385,
+              "end": 1487,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 1385,
+              "end": 1489,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}"
+            },
+            {
+              "start": 1775,
+              "end": 1869,
+              "level": 3,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/notifications"
+            },
+            {
+              "start": 1775,
+              "end": 1868,
+              "level": 3,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/notifications/seen"
+            },
+            {
+              "start": 1811,
+              "end": 1899,
+              "level": 3,
+              "status": 200,
+              "method": "POST",
+              "path": "/hubs/notifications/negotiate?negotiateVersion=1"
+            }
+          ],
+          "cls": 0,
+          "errors": []
+        },
+        {
+          "skeletonMs": null,
+          "shellMs": 1387,
+          "readyMs": 1592,
+          "settledMs": 1716,
+          "requests": 24,
+          "requestsBeforeReady": 21,
+          "depth": 3,
+          "depthBeforeReady": 2,
+          "duplicates": [],
+          "waves": [
+            {
+              "start": 1105,
+              "end": 1243,
+              "calls": 11,
+              "slowest": "/api/v1/club-orders"
+            },
+            {
+              "start": 1337,
+              "end": 1458,
+              "calls": 10,
+              "slowest": "/api/day"
+            },
+            {
+              "start": 1594,
+              "end": 1716,
+              "calls": 3,
+              "slowest": "/api/notifications"
+            }
+          ],
+          "waterfall": [
+            {
+              "start": 1105,
+              "end": 1218,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/public/clinic"
+            },
+            {
+              "start": 1106,
+              "end": 1219,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clubs/{id}"
+            },
+            {
+              "start": 1107,
+              "end": 1236,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders?clubId={id}"
+            },
+            {
+              "start": 1107,
+              "end": 1226,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks"
+            },
+            {
+              "start": 1107,
+              "end": 1233,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/activities"
+            },
+            {
+              "start": 1107,
+              "end": 1223,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars"
+            },
+            {
+              "start": 1107,
+              "end": 1225,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clinic-services"
+            },
+            {
+              "start": 1107,
+              "end": 1224,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/calendar-display"
+            },
+            {
+              "start": 1107,
+              "end": 1228,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/clubs"
+            },
+            {
+              "start": 1107,
+              "end": 1233,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/holidays/2026"
+            },
+            {
+              "start": 1124,
+              "end": 1243,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/account"
+            },
+            {
+              "start": 1337,
+              "end": 1433,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders"
+            },
+            {
+              "start": 1337,
+              "end": 1432,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders/{id}"
+            },
+            {
+              "start": 1337,
+              "end": 1427,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 1353,
+              "end": 1448,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-09-28&to=2026-11-17"
+            },
+            {
+              "start": 1353,
+              "end": 1447,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 1354,
+              "end": 1447,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 1354,
+              "end": 1446,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 1354,
+              "end": 1458,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds={id}"
+            },
+            {
+              "start": 1354,
+              "end": 1445,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 1354,
+              "end": 1452,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}"
+            },
+            {
+              "start": 1594,
+              "end": 1686,
+              "level": 3,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/notifications"
+            },
+            {
+              "start": 1594,
+              "end": 1686,
+              "level": 3,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/notifications/seen"
+            },
+            {
+              "start": 1629,
+              "end": 1716,
+              "level": 3,
+              "status": 200,
+              "method": "POST",
+              "path": "/hubs/notifications/negotiate?negotiateVersion=1"
+            }
+          ],
+          "cls": 0.005,
+          "errors": []
+        },
+        {
+          "skeletonMs": null,
+          "shellMs": 1645,
+          "readyMs": 1788,
+          "settledMs": 1926,
+          "requests": 24,
+          "requestsBeforeReady": 21,
+          "depth": 3,
+          "depthBeforeReady": 2,
+          "duplicates": [],
+          "waves": [
+            {
+              "start": 1102,
+              "end": 1236,
+              "calls": 11,
+              "slowest": "/api/v1/club-orders"
+            },
+            {
+              "start": 1330,
+              "end": 1484,
+              "calls": 10,
+              "slowest": "/api/day"
+            },
+            {
+              "start": 1789,
+              "end": 1926,
+              "calls": 3,
+              "slowest": "/hubs/notifications/negotiate"
+            }
+          ],
+          "waterfall": [
+            {
+              "start": 1102,
+              "end": 1215,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/public/clinic"
+            },
+            {
+              "start": 1103,
+              "end": 1215,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clubs/{id}"
+            },
+            {
+              "start": 1103,
+              "end": 1232,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders?clubId={id}"
+            },
+            {
+              "start": 1104,
+              "end": 1222,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks"
+            },
+            {
+              "start": 1104,
+              "end": 1229,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/activities"
+            },
+            {
+              "start": 1104,
+              "end": 1218,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars"
+            },
+            {
+              "start": 1104,
+              "end": 1221,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clinic-services"
+            },
+            {
+              "start": 1104,
+              "end": 1220,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/calendar-display"
+            },
+            {
+              "start": 1104,
+              "end": 1224,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/clubs"
+            },
+            {
+              "start": 1104,
+              "end": 1225,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/holidays/2026"
+            },
+            {
+              "start": 1121,
+              "end": 1236,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/account"
+            },
+            {
+              "start": 1330,
+              "end": 1441,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders"
+            },
+            {
+              "start": 1330,
+              "end": 1438,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders/{id}"
+            },
+            {
+              "start": 1330,
+              "end": 1433,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 1362,
+              "end": 1473,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-09-28&to=2026-11-17"
+            },
+            {
+              "start": 1362,
+              "end": 1471,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 1363,
+              "end": 1472,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 1364,
+              "end": 1472,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 1364,
+              "end": 1484,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds={id}"
+            },
+            {
+              "start": 1365,
+              "end": 1472,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 1365,
+              "end": 1476,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}"
+            },
+            {
+              "start": 1789,
+              "end": 1881,
+              "level": 3,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/notifications"
+            },
+            {
+              "start": 1789,
+              "end": 1880,
+              "level": 3,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/notifications/seen"
+            },
+            {
+              "start": 1827,
+              "end": 1926,
+              "level": 3,
+              "status": 200,
+              "method": "POST",
+              "path": "/hubs/notifications/negotiate?negotiateVersion=1"
+            }
+          ],
+          "cls": 0,
+          "errors": []
+        }
+      ]
+    },
+    "nav": {
+      "summary": {
+        "readyMs": 498,
+        "shellMs": 364,
+        "skeletonMs": null,
+        "settledMs": 345,
+        "requests": 17,
+        "requestsBeforeReady": 17,
+        "depth": 2,
+        "depthBeforeReady": 2,
+        "waves": 2,
+        "duplicateRuns": 0,
+        "cls": 0
+      },
+      "runs": [
+        {
+          "skeletonMs": null,
+          "shellMs": 364,
+          "readyMs": 507,
+          "settledMs": 364,
+          "requests": 17,
+          "requestsBeforeReady": 17,
+          "depth": 2,
+          "depthBeforeReady": 2,
+          "duplicates": [],
+          "waves": [
+            {
+              "start": 31,
+              "end": 160,
+              "calls": 8,
+              "slowest": "/api/v1/club-orders"
+            },
+            {
+              "start": 236,
+              "end": 364,
+              "calls": 9,
+              "slowest": "/api/day"
+            }
+          ],
+          "waterfall": [
+            {
+              "start": 31,
+              "end": 144,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/public/clinic"
+            },
+            {
+              "start": 32,
+              "end": 143,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clubs/{id}"
+            },
+            {
+              "start": 33,
+              "end": 160,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders?clubId={id}"
+            },
+            {
+              "start": 33,
+              "end": 156,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/activities"
+            },
+            {
+              "start": 33,
+              "end": 147,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clinic-services"
+            },
+            {
+              "start": 33,
+              "end": 147,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/calendar-display"
+            },
+            {
+              "start": 33,
+              "end": 148,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/clubs"
+            },
+            {
+              "start": 33,
+              "end": 149,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/holidays/2026"
+            },
+            {
+              "start": 236,
+              "end": 347,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders/{id}"
+            },
+            {
+              "start": 236,
+              "end": 341,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 248,
+              "end": 343,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-09-28&to=2026-11-17"
+            },
+            {
+              "start": 249,
+              "end": 342,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 249,
+              "end": 342,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 249,
+              "end": 342,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 249,
+              "end": 364,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds={id}"
+            },
+            {
+              "start": 250,
+              "end": 350,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 250,
+              "end": 348,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}"
+            }
+          ],
+          "hoverLeadMs": 0,
+          "cls": 0,
+          "errors": []
+        },
+        {
+          "skeletonMs": null,
+          "shellMs": 369,
+          "readyMs": 498,
+          "settledMs": 344,
+          "requests": 17,
+          "requestsBeforeReady": 17,
+          "depth": 2,
+          "depthBeforeReady": 2,
+          "duplicates": [],
+          "waves": [
+            {
+              "start": 32,
+              "end": 154,
+              "calls": 8,
+              "slowest": "/api/v1/club-orders"
+            },
+            {
+              "start": 227,
+              "end": 344,
+              "calls": 9,
+              "slowest": "/api/v1/club-orders/{id}"
+            }
+          ],
+          "waterfall": [
+            {
+              "start": 32,
+              "end": 140,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/public/clinic"
+            },
+            {
+              "start": 33,
+              "end": 138,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clubs/{id}"
+            },
+            {
+              "start": 33,
+              "end": 154,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders?clubId={id}"
+            },
+            {
+              "start": 33,
+              "end": 151,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/activities"
+            },
+            {
+              "start": 33,
+              "end": 141,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clinic-services"
+            },
+            {
+              "start": 33,
+              "end": 141,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/calendar-display"
+            },
+            {
+              "start": 33,
+              "end": 145,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/clubs"
+            },
+            {
+              "start": 33,
+              "end": 146,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/holidays/2026"
+            },
+            {
+              "start": 227,
+              "end": 331,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders/{id}"
+            },
+            {
+              "start": 227,
+              "end": 322,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 239,
+              "end": 337,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-09-28&to=2026-11-17"
+            },
+            {
+              "start": 239,
+              "end": 336,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 239,
+              "end": 336,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 239,
+              "end": 337,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 240,
+              "end": 344,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds={id}"
+            },
+            {
+              "start": 240,
+              "end": 338,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 240,
+              "end": 341,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}"
+            }
+          ],
+          "hoverLeadMs": 0,
+          "cls": 0,
+          "errors": []
+        },
+        {
+          "skeletonMs": null,
+          "shellMs": 362,
+          "readyMs": 489,
+          "settledMs": 361,
+          "requests": 17,
+          "requestsBeforeReady": 17,
+          "depth": 2,
+          "depthBeforeReady": 2,
+          "duplicates": [],
+          "waves": [
+            {
+              "start": 30,
+              "end": 155,
+              "calls": 8,
+              "slowest": "/api/v1/club-orders"
+            },
+            {
+              "start": 230,
+              "end": 361,
+              "calls": 9,
+              "slowest": "/api/v1/club-orders/{id}"
+            }
+          ],
+          "waterfall": [
+            {
+              "start": 30,
+              "end": 141,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/public/clinic"
+            },
+            {
+              "start": 31,
+              "end": 140,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clubs/{id}"
+            },
+            {
+              "start": 31,
+              "end": 155,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders?clubId={id}"
+            },
+            {
+              "start": 31,
+              "end": 152,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/activities"
+            },
+            {
+              "start": 31,
+              "end": 143,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clinic-services"
+            },
+            {
+              "start": 31,
+              "end": 141,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/calendar-display"
+            },
+            {
+              "start": 32,
+              "end": 145,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/clubs"
+            },
+            {
+              "start": 32,
+              "end": 146,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/holidays/2026"
+            },
+            {
+              "start": 230,
+              "end": 349,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders/{id}"
+            },
+            {
+              "start": 230,
+              "end": 341,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 243,
+              "end": 346,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-09-28&to=2026-11-17"
+            },
+            {
+              "start": 243,
+              "end": 345,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 243,
+              "end": 344,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 244,
+              "end": 346,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 244,
+              "end": 361,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds={id}"
+            },
+            {
+              "start": 244,
+              "end": 354,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 244,
+              "end": 351,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}"
+            }
+          ],
+          "hoverLeadMs": 0,
+          "cls": 0,
+          "errors": []
+        },
+        {
+          "skeletonMs": null,
+          "shellMs": 364,
+          "readyMs": 505,
+          "settledMs": 345,
+          "requests": 17,
+          "requestsBeforeReady": 17,
+          "depth": 2,
+          "depthBeforeReady": 2,
+          "duplicates": [],
+          "waves": [
+            {
+              "start": 31,
+              "end": 151,
+              "calls": 8,
+              "slowest": "/api/v1/club-orders"
+            },
+            {
+              "start": 220,
+              "end": 345,
+              "calls": 9,
+              "slowest": "/api/day"
+            }
+          ],
+          "waterfall": [
+            {
+              "start": 31,
+              "end": 136,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/public/clinic"
+            },
+            {
+              "start": 32,
+              "end": 135,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clubs/{id}"
+            },
+            {
+              "start": 32,
+              "end": 151,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders?clubId={id}"
+            },
+            {
+              "start": 32,
+              "end": 148,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/activities"
+            },
+            {
+              "start": 32,
+              "end": 140,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clinic-services"
+            },
+            {
+              "start": 32,
+              "end": 139,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/calendar-display"
+            },
+            {
+              "start": 32,
+              "end": 140,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/clubs"
+            },
+            {
+              "start": 32,
+              "end": 141,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/holidays/2026"
+            },
+            {
+              "start": 220,
+              "end": 328,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders/{id}"
+            },
+            {
+              "start": 220,
+              "end": 320,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 231,
+              "end": 335,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-09-28&to=2026-11-17"
+            },
+            {
+              "start": 231,
+              "end": 334,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 232,
+              "end": 335,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 232,
+              "end": 336,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 232,
+              "end": 345,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds={id}"
+            },
+            {
+              "start": 232,
+              "end": 337,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 233,
+              "end": 340,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}"
+            }
+          ],
+          "hoverLeadMs": 0,
+          "cls": 0,
+          "errors": []
+        },
+        {
+          "skeletonMs": null,
+          "shellMs": 362,
+          "readyMs": 490,
+          "settledMs": 343,
+          "requests": 17,
+          "requestsBeforeReady": 17,
+          "depth": 2,
+          "depthBeforeReady": 2,
+          "duplicates": [],
+          "waves": [
+            {
+              "start": 31,
+              "end": 152,
+              "calls": 8,
+              "slowest": "/api/v1/club-orders"
+            },
+            {
+              "start": 221,
+              "end": 343,
+              "calls": 9,
+              "slowest": "/api/day"
+            }
+          ],
+          "waterfall": [
+            {
+              "start": 31,
+              "end": 135,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/public/clinic"
+            },
+            {
+              "start": 32,
+              "end": 134,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clubs/{id}"
+            },
+            {
+              "start": 33,
+              "end": 152,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders?clubId={id}"
+            },
+            {
+              "start": 33,
+              "end": 146,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/activities"
+            },
+            {
+              "start": 33,
+              "end": 140,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clinic-services"
+            },
+            {
+              "start": 33,
+              "end": 139,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/calendar-display"
+            },
+            {
+              "start": 33,
+              "end": 140,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/clubs"
+            },
+            {
+              "start": 33,
+              "end": 140,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/holidays/2026"
+            },
+            {
+              "start": 221,
+              "end": 326,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders/{id}"
+            },
+            {
+              "start": 221,
+              "end": 320,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 233,
+              "end": 333,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-09-28&to=2026-11-17"
+            },
+            {
+              "start": 233,
+              "end": 335,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 234,
+              "end": 335,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 234,
+              "end": 335,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": 234,
+              "end": 343,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds={id}"
+            },
+            {
+              "start": 234,
+              "end": 335,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": 235,
+              "end": 339,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}"
+            }
+          ],
+          "hoverLeadMs": 0,
+          "cls": 0,
+          "errors": []
+        }
+      ]
+    },
+    "nav-hover": {
+      "summary": {
+        "readyMs": 502,
+        "shellMs": 359,
+        "skeletonMs": null,
+        "settledMs": 0,
+        "requests": 17,
+        "requestsBeforeReady": 17,
+        "depth": 2,
+        "depthBeforeReady": 2,
+        "waves": 2,
+        "duplicateRuns": 0,
+        "cls": 0
+      },
+      "runs": [
+        {
+          "skeletonMs": null,
+          "shellMs": 361,
+          "readyMs": 502,
+          "settledMs": 0,
+          "requests": 17,
+          "requestsBeforeReady": 17,
+          "depth": 2,
+          "depthBeforeReady": 2,
+          "duplicates": [],
+          "waves": [
+            {
+              "start": -404,
+              "end": 0,
+              "calls": 8,
+              "slowest": "/api/v1/club-orders"
+            },
+            {
+              "start": -221,
+              "end": 0,
+              "calls": 9,
+              "slowest": "/api/day"
+            }
+          ],
+          "waterfall": [
+            {
+              "start": -404,
+              "end": -305,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/public/clinic"
+            },
+            {
+              "start": -404,
+              "end": -305,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clubs/{id}"
+            },
+            {
+              "start": -404,
+              "end": -289,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders?clubId={id}"
+            },
+            {
+              "start": -403,
+              "end": -294,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/activities"
+            },
+            {
+              "start": -403,
+              "end": -303,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clinic-services"
+            },
+            {
+              "start": -403,
+              "end": -303,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/calendar-display"
+            },
+            {
+              "start": -403,
+              "end": -300,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/clubs"
+            },
+            {
+              "start": -403,
+              "end": -300,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/holidays/2026"
+            },
+            {
+              "start": -221,
+              "end": -121,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders/{id}"
+            },
+            {
+              "start": -221,
+              "end": -129,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": -213,
+              "end": -116,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-09-28&to=2026-11-17"
+            },
+            {
+              "start": -212,
+              "end": -116,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": -212,
+              "end": -117,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": -212,
+              "end": -116,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": -212,
+              "end": -104,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds={id}"
+            },
+            {
+              "start": -212,
+              "end": -113,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": -211,
+              "end": -108,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}"
+            }
+          ],
+          "hoverLeadMs": 655,
+          "cls": 0,
+          "errors": []
+        },
+        {
+          "skeletonMs": null,
+          "shellMs": 358,
+          "readyMs": 488,
+          "settledMs": 0,
+          "requests": 17,
+          "requestsBeforeReady": 17,
+          "depth": 2,
+          "depthBeforeReady": 2,
+          "duplicates": [],
+          "waves": [
+            {
+              "start": -407,
+              "end": 0,
+              "calls": 8,
+              "slowest": "/api/v1/club-orders"
+            },
+            {
+              "start": -235,
+              "end": 0,
+              "calls": 9,
+              "slowest": "/api/day"
+            }
+          ],
+          "waterfall": [
+            {
+              "start": -407,
+              "end": -313,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/public/clinic"
+            },
+            {
+              "start": -406,
+              "end": -309,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clubs/{id}"
+            },
+            {
+              "start": -406,
+              "end": -293,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders?clubId={id}"
+            },
+            {
+              "start": -406,
+              "end": -296,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/activities"
+            },
+            {
+              "start": -406,
+              "end": -306,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clinic-services"
+            },
+            {
+              "start": -406,
+              "end": -308,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/calendar-display"
+            },
+            {
+              "start": -405,
+              "end": -305,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/clubs"
+            },
+            {
+              "start": -405,
+              "end": -304,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/holidays/2026"
+            },
+            {
+              "start": -235,
+              "end": -123,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders/{id}"
+            },
+            {
+              "start": -234,
+              "end": -128,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": -226,
+              "end": -127,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-09-28&to=2026-11-17"
+            },
+            {
+              "start": -226,
+              "end": -126,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": -225,
+              "end": -127,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": -225,
+              "end": -127,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": -225,
+              "end": -110,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds={id}"
+            },
+            {
+              "start": -225,
+              "end": -120,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": -224,
+              "end": -121,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}"
+            }
+          ],
+          "hoverLeadMs": 652,
+          "cls": 0,
+          "errors": []
+        },
+        {
+          "skeletonMs": null,
+          "shellMs": 364,
+          "readyMs": 502,
+          "settledMs": 0,
+          "requests": 17,
+          "requestsBeforeReady": 17,
+          "depth": 2,
+          "depthBeforeReady": 2,
+          "duplicates": [],
+          "waves": [
+            {
+              "start": -409,
+              "end": 0,
+              "calls": 8,
+              "slowest": "/api/v1/club-orders"
+            },
+            {
+              "start": -243,
+              "end": 0,
+              "calls": 9,
+              "slowest": "/api/day"
+            }
+          ],
+          "waterfall": [
+            {
+              "start": -409,
+              "end": -313,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/public/clinic"
+            },
+            {
+              "start": -408,
+              "end": -313,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clubs/{id}"
+            },
+            {
+              "start": -408,
+              "end": -296,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders?clubId={id}"
+            },
+            {
+              "start": -408,
+              "end": -299,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/activities"
+            },
+            {
+              "start": -408,
+              "end": -310,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clinic-services"
+            },
+            {
+              "start": -408,
+              "end": -311,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/calendar-display"
+            },
+            {
+              "start": -408,
+              "end": -309,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/clubs"
+            },
+            {
+              "start": -408,
+              "end": -308,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/holidays/2026"
+            },
+            {
+              "start": -243,
+              "end": -136,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders/{id}"
+            },
+            {
+              "start": -242,
+              "end": -143,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": -235,
+              "end": -141,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-09-28&to=2026-11-17"
+            },
+            {
+              "start": -234,
+              "end": -142,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": -234,
+              "end": -141,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": -234,
+              "end": -141,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": -233,
+              "end": -122,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds={id}"
+            },
+            {
+              "start": -233,
+              "end": -133,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": -233,
+              "end": -135,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}"
+            }
+          ],
+          "hoverLeadMs": 655,
+          "cls": 0,
+          "errors": []
+        },
+        {
+          "skeletonMs": null,
+          "shellMs": 359,
+          "readyMs": 498,
+          "settledMs": 0,
+          "requests": 17,
+          "requestsBeforeReady": 17,
+          "depth": 2,
+          "depthBeforeReady": 2,
+          "duplicates": [],
+          "waves": [
+            {
+              "start": -406,
+              "end": 0,
+              "calls": 8,
+              "slowest": "/api/v1/club-orders"
+            },
+            {
+              "start": -247,
+              "end": 0,
+              "calls": 9,
+              "slowest": "/api/day"
+            }
+          ],
+          "waterfall": [
+            {
+              "start": -406,
+              "end": -302,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/public/clinic"
+            },
+            {
+              "start": -405,
+              "end": -299,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clubs/{id}"
+            },
+            {
+              "start": -405,
+              "end": -282,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders?clubId={id}"
+            },
+            {
+              "start": -405,
+              "end": -285,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/activities"
+            },
+            {
+              "start": -405,
+              "end": -296,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clinic-services"
+            },
+            {
+              "start": -405,
+              "end": -297,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/calendar-display"
+            },
+            {
+              "start": -405,
+              "end": -297,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/clubs"
+            },
+            {
+              "start": -405,
+              "end": -293,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/holidays/2026"
+            },
+            {
+              "start": -247,
+              "end": -137,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders/{id}"
+            },
+            {
+              "start": -247,
+              "end": -143,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": -238,
+              "end": -141,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-09-28&to=2026-11-17"
+            },
+            {
+              "start": -237,
+              "end": -141,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": -237,
+              "end": -140,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": -237,
+              "end": -142,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": -237,
+              "end": -123,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds={id}"
+            },
+            {
+              "start": -236,
+              "end": -134,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": -236,
+              "end": -135,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}"
+            }
+          ],
+          "hoverLeadMs": 654,
+          "cls": 0,
+          "errors": []
+        },
+        {
+          "skeletonMs": null,
+          "shellMs": 357,
+          "readyMs": 503,
+          "settledMs": 0,
+          "requests": 17,
+          "requestsBeforeReady": 17,
+          "depth": 2,
+          "depthBeforeReady": 2,
+          "duplicates": [],
+          "waves": [
+            {
+              "start": -408,
+              "end": 0,
+              "calls": 8,
+              "slowest": "/api/v1/club-orders"
+            },
+            {
+              "start": -230,
+              "end": 0,
+              "calls": 9,
+              "slowest": "/api/day"
+            }
+          ],
+          "waterfall": [
+            {
+              "start": -408,
+              "end": -313,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/public/clinic"
+            },
+            {
+              "start": -408,
+              "end": -313,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clubs/{id}"
+            },
+            {
+              "start": -407,
+              "end": -297,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders?clubId={id}"
+            },
+            {
+              "start": -407,
+              "end": -300,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/activities"
+            },
+            {
+              "start": -407,
+              "end": -312,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/clinic-services"
+            },
+            {
+              "start": -407,
+              "end": -312,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/calendar-display"
+            },
+            {
+              "start": -407,
+              "end": -306,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/settings/clubs"
+            },
+            {
+              "start": -407,
+              "end": -306,
+              "level": 1,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/holidays/2026"
+            },
+            {
+              "start": -230,
+              "end": -120,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-orders/{id}"
+            },
+            {
+              "start": -230,
+              "end": -127,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/v1/club-blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": -221,
+              "end": -125,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-09-28&to=2026-11-17"
+            },
+            {
+              "start": -221,
+              "end": -125,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": -221,
+              "end": -125,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": -220,
+              "end": -125,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/preview?from=2026-10-26&to=2026-11-01"
+            },
+            {
+              "start": -220,
+              "end": -107,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-09-28&to=2026-11-08&calendarIds={id}"
+            },
+            {
+              "start": -220,
+              "end": -118,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/calendars/{id}/blocks?from=2026-09-28&to=2026-11-08"
+            },
+            {
+              "start": -220,
+              "end": -120,
+              "level": 2,
+              "status": 200,
+              "method": "GET",
+              "path": "/api/day?from=2026-10-26&to=2026-11-01&calendarIds={id},{id},{id},{id}"
+            }
+          ],
+          "hoverLeadMs": 654,
+          "cls": 0,
+          "errors": []
+        }
+      ]
+    }
+  }
+}

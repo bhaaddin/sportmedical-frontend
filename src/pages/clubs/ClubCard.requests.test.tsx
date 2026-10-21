@@ -74,6 +74,24 @@ describe('warming the club screen', () => {
     expect(warm).toHaveBeenCalledTimes(1);
   });
 
+  it('a click before the pointer has rested warms at once (once), then opens', () => {
+    vi.useFakeTimers();
+    const warm = vi.fn();
+    const open = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ClubCard row={buildClubRow(club(), [], [], '2026-10-27')} ordersLoading={false} onOpen={open} onPrefetch={warm} />
+      </QueryClientProvider>,
+    );
+    const card = screen.getByRole('listitem');
+    fireEvent.mouseEnter(card);
+    fireEvent.click(card);
+    expect(warm).toHaveBeenCalledTimes(1);
+    expect(warm.mock.invocationCallOrder[0]).toBeLessThan(open.mock.invocationCallOrder[0]!);
+    act(() => void vi.advanceTimersByTime(HOVER_INTENT_MS + 1));
+    expect(warm).toHaveBeenCalledTimes(1);
+  });
+
   it('also starts on keyboard focus, and never for a deactivated club', () => {
     vi.useFakeTimers();
     const warm = vi.fn();

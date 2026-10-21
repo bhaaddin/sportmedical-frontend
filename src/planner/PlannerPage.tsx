@@ -68,12 +68,14 @@ function ClubPlannerScreen({ clubId }: { clubId: string }) {
   const orderId = params.get('order');
   /* the router state a club window / a club card hands over (spent by the screen, never by the URL) */
   const blockId = (location.state as { clubBlockId?: string } | null)?.clubBlockId ?? null;
-  const data = useClubPlannerData(clubId, today, { orderId, blockId });
   const pick = readPickOrderState(location.state);
+  /* the session the router state carries goes in too: the stage's reads start for what the stage will really plan */
+  const data = useClubPlannerData(clubId, today, { orderId, blockId, session: pick?.start ?? null });
 
   if (data.status === 'loading') {
+    /* the same box the planner page then fills (height, min height, width): the swap moves nothing */
     return (
-      <Box data-testid="club-planner-loading" sx={{ display: 'grid', placeItems: 'center', height: 'calc(100vh - 32px)', minHeight: 520 }}>
+      <Box data-testid="club-planner-loading" role="status" aria-busy="true" sx={{ display: 'grid', placeItems: 'center', height: 'calc(100vh - 32px)', minHeight: 520, width: '100%' }}>
         <CircularProgress aria-label="Načítám klub" />
       </Box>
     );

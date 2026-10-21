@@ -14,11 +14,18 @@ const CLUB_SCREEN = /^\/clubs\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 const CALENDAR_SCREEN = /^\/(planovani|dnes|prehled-sluzeb)(\/|$)/;
 const CLUB_LIST = /^\/clubs\/?$/;
 
+/** The window a club address's router state names (react-router keeps it under `usr`), if any. */
+function blockIdOf(historyState: unknown): string | null {
+  const usr = (historyState as { usr?: { clubBlockId?: unknown } } | null)?.usr;
+  return typeof usr?.clubBlockId === 'string' ? usr.clubBlockId : null;
+}
+
 /**
  * Called once when the application loads. Only for a signed-in browser (a token is stored) opened on an address whose
- * screen is known to start from these reads; anything else starts nothing and loads nothing.
+ * screen is known to start from these reads; anything else starts nothing and loads nothing. A club address also
+ * starts its account read, its screen's code and - once its orders are known - its stage's reads (see warmReads.ts).
  */
-export function warmForPath(queryClient: QueryClient, pathname: string): void {
+export function warmForPath(queryClient: QueryClient, pathname: string, search = '', historyState: unknown = null): void {
   let signedIn = false;
   try {
     signedIn = localStorage.getItem('token') !== null;
@@ -34,7 +41,10 @@ export function warmForPath(queryClient: QueryClient, pathname: string): void {
 
   void import('./warmReads')
     .then((reads) => {
-      if (club) reads.prefetchClubScreen(queryClient, club[1]);
+      if (club) {
+        reads.warmAccount();
+        reads.prefetchClubScreen(queryClient, club[1], { orderId: new URLSearchParams(search).get('order'), blockId: blockIdOf(historyState) });
+      }
       else if (list) reads.warmClubList(queryClient);
       else reads.warmReferenceData(queryClient);
     })
