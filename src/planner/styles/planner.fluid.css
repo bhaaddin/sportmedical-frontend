@@ -176,6 +176,36 @@
   flex: 0 0 calc((100% - (var(--deck-n, 2) - 1) * 9px) / var(--deck-n, 2)) !important;
   width: calc((100% - (var(--deck-n, 2) - 1) * 9px) / var(--deck-n, 2)) !important;
 }
+/*
+ * Every činnost reachable (owner, 21. 10. 2026). The stage counts hidden cards on its crystal arrows (`.deck-count`); the
+ * compact strip's edge buttons are not drawn here. planner.css v29 makes a card out of view `visibility: hidden`, which
+ * also takes it out of the tab order - it stays invisible (opacity 0 from the scroll fade, clipped) but focusable, and a
+ * focused card scrolls in. The side with hidden cards fades (v29 switched the mask off). Each crystal arrow is a 44 px
+ * target at the smallest stage scale (0.76 at 1280 px): 58 design px, reaching into the empty gutter beside it.
+ */
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards .deck-more { display: none; }
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards .adaptive-card-track > .plan-card.precision-outside-view {
+  visibility: visible !important;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards .adaptive-deck.mode-scroll .adaptive-card-viewport[data-more-after]:not([data-more-before]) {
+  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 46px), transparent 100%) !important;
+  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 46px), transparent 100%) !important;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards .adaptive-deck.mode-scroll .adaptive-card-viewport[data-more-before]:not([data-more-after]) {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 46px, #000 100%) !important;
+  mask-image: linear-gradient(90deg, transparent 0, #000 46px, #000 100%) !important;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards .adaptive-deck.mode-scroll .adaptive-card-viewport[data-more-before][data-more-after] {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 46px, #000 calc(100% - 46px), transparent 100%) !important;
+  mask-image: linear-gradient(90deg, transparent 0, #000 46px, #000 calc(100% - 46px), transparent 100%) !important;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards .precision-bracket {
+  position: relative;
+  z-index: 3;
+  min-width: 58px;
+}
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards .precision-bracket-left { margin-left: -18px; }
+.sm-planner[data-layout='desktop'] #dashboard.live-mode #planning-cards .precision-bracket-right { margin-right: -18px; }
 .sm-planner[data-layout='desktop'] #dashboard.live-mode .active-plan-hint {
   top: calc(var(--stage-h, 941px) - 264px);
 }

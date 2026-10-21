@@ -10,11 +10,24 @@
  * bars show the order WITH the gesture counted in (`usePlanFigures().live`).
  *
  * Selecting a card arms the činnost for planning (`selectPlanningCategory`); a complete card shows the
- * completion callout instead; a page change by arrow or horizontal drag exits the planning mode (reducer).
+ * completion callout instead; a page change by arrow, edge button, wheel, swipe or horizontal drag exits the planning mode
+ * (reducer), a move the strip makes by itself (the escalator, a focused card) keeps it (`carouselTo(..., keep)`).
+ *
+ * Every činnost is reachable on every layout (owner, 21. 10. 2026: Spiroergometrické vyšetření could not be picked):
+ * the strip shows as many whole cards as fit (measured: `useDeckVisible`), each side with hidden cards fades and carries
+ * a button with the count ("ještě 2", a dot when one of them was never clicked), the live region says what is in view,
+ * arrow keys / Home / End walk the cards, a focused card scrolls in. With more cards than fit it is an escalator: arming
+ * or fulfilling a card slides the next open one in (`escalatorIndex`), smoothly - instantly when the motion setting is
+ * omezené / vypnuto - and a card never clicked says "NOVÁ". The scroll position is the truth: a swipe, a trackpad or a
+ * drag that comes to rest tells the store its page.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import crystalArrowUrl from '../assets/crystal-arrow.png';
-import { cardVisibility, carouselModel, planCardModel, snapCarouselIndex, timeLeft } from '../model';
+import {
+  cardVisibility, carouselModel, clampCarouselIndex, deckIndicators, escalatorIndex, planCardModel, revealIndex, snapCarouselIndex, timeLeft,
+  type DeckCardState, type DeckSide,
+} from '../model';
+import { useMotionPreference } from '../../motion/useMotionPreference';
 import { usePlannerActions, usePlannerSelector } from '../state/PlannerStoreProvider';
 import { Icon } from './Icons';
 import { usePlannerCtx, usePlannerModelState, usePlannerProfile } from './context';
@@ -34,11 +47,11 @@ export const CRYSTAL_ARROW_URL: string = crystalArrowUrl;
 
 const CARD_GAP_FALLBACK = 11;
 
-function Bracket({ direction, disabled, onGo }: { direction: -1 | 1; disabled: boolean; onGo: (direction: -1 | 1) => void }) {
+function Bracket({ direction, disabled, onGo, more }: { direction: -1 | 1; disabled: boolean; onGo: (direction: -1 | 1) => void; more?: DeckSide }) {
   const side = direction < 0 ? 'left' : 'right';
   const ref = useRef<HTMLButtonElement | null>(null);
   const firing = useRef<number>(0);
-  const label = `${direction < 0 ? 'Předchozí' : 'Další'} činnost`;
+  const label = more?.count ? more.aria : `${direction < 0 ? 'Předchozí' : 'Další'} činnost`;
   const onMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
     const el = ref.current;
     if (!el || el.disabled) return;
@@ -93,6 +106,26 @@ function Bracket({ direction, disabled, onGo }: { direction: -1 | 1; disabled: b
           </svg>
         </span>
       </span>
+      {more?.count ? (
+        <span className="deck-count" aria-hidden="true">
+          {more.label}
+          {more.fresh ? <i className="deck-fresh-dot" /> : null}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+/** The edge button of the compact strip (the stage's crystal arrows are hidden there): chevron, "ještě 2", a dot for a new card. */
+function DeckMore({ side, more, onGo }: { side: 'before' | 'after'; more: DeckSide; onGo: () => void }) {
+  if (!more.count) return null;
+  return (
+    <button type="button" className={`deck-more deck-more-${side}`} data-deck-more={side} aria-label={more.aria} title={more.aria} onClick={onGo}>
+      <svg className="deck-more-chevron" viewBox="0 0 24 24" aria-hidden="true">
+        <path d={side === 'before' ? 'M15 5 L8 12 L15 19' : 'M9 5 L16 12 L9 19'} />
+      </svg>
+      <span className="deck-more-count" aria-hidden="true">{more.label}</span>
+      {more.fresh ? <i className="deck-fresh-dot" aria-hidden="true" /> : null}
     </button>
   );
 }
@@ -103,12 +136,15 @@ interface CardProps {
   live: CategoryFigure;
   added: number;
   active: boolean;
+  /** never clicked, nothing planned: the "NOVÁ" mark */
+  fresh: boolean;
   chart: { height: number; opacity: number }[];
   restoring: boolean;
   onSelect: (id: string) => void;
+  onFocusCard: (id: string) => void;
 }
 
-function PlanCard({ figure: f, live, added, active, chart, restoring, onSelect }: CardProps) {
+function PlanCard({ figure: f, live, added, active, fresh, chart, restoring, onSelect, onFocusCard }: CardProps) {
   const previewing = added > 0;
   const shown = previewing ? live : f;
   const done = f.done;
@@ -122,12 +158,14 @@ function PlanCard({ figure: f, live, added, active, chart, restoring, onSelect }
   return (
     <button
       type="button"
-      className={`plan-card${active ? ' is-selected' : ''}${done ? ' is-complete' : ''}${previewing ? ' is-previewing' : ''}${previewing && shown.remaining === 0 ? ' will-complete' : ''}${restoring ? ' focus-restoring' : ''}`}
+      className={`plan-card${active ? ' is-selected' : ''}${done ? ' is-complete' : ''}${previewing ? ' is-previewing' : ''}${previewing && shown.remaining === 0 ? ' will-complete' : ''}${restoring ? ' focus-restoring' : ''}${fresh ? ' is-fresh' : ''}`}
       data-plan-type={f.categoryId}
+      data-fresh={fresh ? 'true' : undefined}
       style={{ '--tone': f.color, '--pct': `${Math.min(100, percent)}%` } as CSSProperties}
       aria-pressed={active}
       title={`${f.name} · ${f.planned}/${f.requested} · ${f.remaining} zbývá`}
       onClick={() => onSelect(f.categoryId)}
+      onFocus={() => onFocusCard(f.categoryId)}
     >
       <span className="fx-surface">
         <span className="fx-liquid" aria-hidden="true" />
@@ -139,7 +177,7 @@ function PlanCard({ figure: f, live, added, active, chart, restoring, onSelect }
               <span className="plan-card-name">{f.name}</span>
               <span className="plan-card-sub">{f.subtitle}</span>
             </span>
-            {active ? <span className="plan-active-label">AKTIVNÍ</span> : done ? <span className="plan-check"><Icon name="check" /></span> : null}
+            {active ? <span className="plan-active-label">AKTIVNÍ</span> : done ? <span className="plan-check"><Icon name="check" /></span> : fresh ? <span className="plan-new" title="Tuto činnost jste ještě nevybrali">NOVÁ</span> : null}
           </span>
           <span className="plan-card-body">
             <span className="plan-ring"><b>{percent}%</b></span>
@@ -176,10 +214,61 @@ export function PlanningCarousel() {
 
   const quantity = base.list.length;
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  /* The file shows two cards at a time; a wider fluid stage shows as many as fit (`PlannerMetrics.deckVisibleCount`). */
-  const visible = useDeckVisible(viewportRef);
+  /* The file shows two cards at a time; a wider fluid stage shows as many as fit, the compact strip as its cards allow. */
+  const visible = useDeckVisible(viewportRef, quantity);
   const deck = carouselModel(quantity, index, visible);
   const hostRef = useRef<HTMLElement | null>(null);
+  const motion = useMotionPreference();
+  /* omezené / vypnuto: the strip jumps, it never glides */
+  const instant = motion.reduced;
+
+  /* ---- the cards never clicked ("NOVÁ"), and what the edges say ---- */
+  const [seen, setSeen] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => {
+    if (selected) setSeen((prev) => (prev.has(selected) ? prev : new Set(prev).add(selected)));
+  }, [selected]);
+  const cards = useMemo<DeckCardState[]>(
+    () => base.list.map((f) => ({ done: f.done, fresh: !f.done && f.planned === 0 && f.categoryId !== selected && !seen.has(f.categoryId) })),
+    [base, seen, selected],
+  );
+  const indicators = deckIndicators(deck, cards);
+  /* the latest numbers for the listeners registered once */
+  const latest = useRef({ quantity, visible, index: deck.index, cards, list: base.list });
+  latest.current = { quantity, visible, index: deck.index, cards, list: base.list };
+
+  /** A move the strip makes by itself: keeps the armed činnost. */
+  const moveKeeping = (to: number) => {
+    const m = latest.current;
+    if (m.quantity <= m.visible || to === m.index) return;
+    act.carouselTo(to, m.quantity, m.visible, true);
+  };
+  /** A page the user asked for (edge button, wheel, swipe, drag): ends the armed činnost like the arrows (reducer). */
+  const pageTo = (to: number) => {
+    const m = latest.current;
+    if (m.quantity <= m.visible) return;
+    act.carouselTo(clampCarouselIndex(m.quantity, to, m.visible), m.quantity, m.visible);
+  };
+  const escalate = (categoryId: string, reason: 'select' | 'complete') => {
+    const m = latest.current;
+    const focus = m.list.findIndex((f) => f.categoryId === categoryId);
+    if (focus < 0 || m.quantity <= m.visible) return;
+    moveKeeping(escalatorIndex({ cards: m.cards, visible: m.visible, index: m.index, focus, reason }));
+  };
+  /* the escalator: arming a card slides the next open one in beside it */
+  useEffect(() => {
+    if (selected) escalate(selected, 'select');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
+  /* ... and fulfilling one brings the next open one into view */
+  const doneBefore = useRef<Map<string, boolean> | null>(null);
+  useEffect(() => {
+    const previous = doneBefore.current;
+    doneBefore.current = new Map(base.list.map((f) => [f.categoryId, f.done]));
+    if (!previous) return;
+    const flipped = base.list.find((f) => f.done && previous.get(f.categoryId) === false);
+    if (flipped) escalate(flipped.categoryId, 'complete');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base]);
 
   /* ---- the focus dimming of the siblings (delayed on the first selection so the browser animates it) ---- */
   const [focusOn, setFocusOn] = useState(false);
@@ -229,18 +318,84 @@ export function PlanningCarousel() {
     if (rafRef.current) return;
     rafRef.current = requestAnimationFrame(() => { rafRef.current = 0; syncVisibility(); });
   };
+  /* The page in the store -> the strip. Only when the page (or the room) changes: a finger in the middle of a swipe is
+     never pulled back by an unrelated render. */
   const lastIndex = useRef(deck.index);
   useLayoutEffect(() => {
     const vp = viewportRef.current;
-    if (!vp || !deck.showCarousel) return;
-    const left = deck.index * cardStep();
-    const smooth = lastIndex.current !== deck.index;
+    const moved = lastIndex.current !== deck.index;
     lastIndex.current = deck.index;
-    if (smooth && typeof vp.scrollTo === 'function') vp.scrollTo({ left, behavior: 'smooth' });
-    else vp.scrollLeft = left;
+    if (!vp || !deck.showCarousel) return;
+    const step = cardStep();
+    const left = deck.index * step;
+    if (step && Math.abs(vp.scrollLeft - left) > 1) {
+      const behavior: ScrollBehavior = moved && !instant ? 'smooth' : 'instant';
+      if (typeof vp.scrollTo === 'function') vp.scrollTo({ left, behavior });
+      else vp.scrollLeft = left;
+    }
     syncVisibility();
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deck.index, deck.showCarousel, visible, quantity, instant]);
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
+
+  /* The strip -> the store: a swipe, a trackpad or a drag that comes to rest on another page tells the store (the page
+     the user went to; it ends the armed činnost like the arrows). A scroll the strip made itself rests on the store's page. */
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return undefined;
+    let timer = 0;
+    const settle = () => {
+      if (dragRef.current?.dragging) return;
+      const m = latest.current;
+      if (m.quantity <= m.visible) return;
+      const step = cardStep();
+      if (!step) return;
+      const at = clampCarouselIndex(m.quantity, Math.round(vp.scrollLeft / step), m.visible);
+      if (at !== m.index) pageTo(at);
+    };
+    const onScroll = () => {
+      queueVisibility();
+      window.clearTimeout(timer);
+      timer = window.setTimeout(settle, 160);
+    };
+    /* a mouse wheel turned over the stage's strip pages it (a trackpad's sideways swipe scrolls it natively) */
+    let wheelLock = 0;
+    const onWheel = (e: WheelEvent) => {
+      const m = latest.current;
+      if (m.quantity <= m.visible || vp.closest('.is-compact')) return;
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      const now = performance.now();
+      if (now < wheelLock) return;
+      wheelLock = now + 320;
+      pageTo(m.index + (e.deltaY > 0 ? 1 : -1));
+    };
+    vp.addEventListener('scroll', onScroll, { passive: true });
+    vp.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      window.clearTimeout(timer);
+      vp.removeEventListener('scroll', onScroll);
+      vp.removeEventListener('wheel', onWheel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [act]);
+
+  /* ---- keyboard: the arrows, Home and End walk the cards; a focused card scrolls in (keeping the armed one) ---- */
+  const onCardFocus = (id: string) => {
+    const m = latest.current;
+    const i = m.list.findIndex((f) => f.categoryId === id);
+    if (i >= 0) moveKeeping(revealIndex(m.quantity, m.visible, m.index, i));
+  };
+  const onTrackKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const card = (e.target as Element).closest<HTMLElement>('.plan-card');
+    if (!card) return;
+    const all = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('.plan-card'));
+    const i = all.indexOf(card);
+    const to = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? all.length - 1 : null;
+    if (to === null || to < 0 || to >= all.length || to === i) return;
+    e.preventDefault();
+    all[to]!.focus({ preventScroll: true });
+  };
 
   /* ---- horizontal drag of the deck (mouse, a click stays a click) ---- */
   const suppressClickUntil = useRef(0);
@@ -281,7 +436,7 @@ export function PlanningCarousel() {
       if (!d.dragging) return;
       suppressClickUntil.current = performance.now() + 850;
       const step = cardStep();
-      if (step) act.carouselTo(snapCarouselIndex(d.viewport.scrollLeft, d.startLeft, step, cancelled), quantity, visible);
+      if (step) pageTo(snapCarouselIndex(d.viewport.scrollLeft, d.startLeft, step, cancelled));
       try { if (d.viewport.hasPointerCapture(e.pointerId)) d.viewport.releasePointerCapture(e.pointerId); } catch { /* released */ }
     };
     const onCancel = (e: PointerEvent) => onUp(e, true);
@@ -356,28 +511,43 @@ export function PlanningCarousel() {
       }}
       onBlur={(e) => resetTilt((e.target as Element).closest('.plan-card'))}
     >
-      <section className={`adaptive-deck ${deck.mode}`} data-mode={quantity} aria-label="Dvě pevné pozice činností a stálý souhrn objednávky">
+      <section className={`adaptive-deck ${deck.mode}`} data-mode={quantity} aria-label="Činnosti objednávky a souhrn objednávky">
         <div className={`adaptive-card-stage ${deck.showNavigation ? 'has-navigation' : 'without-navigation'}`}>
-          {deck.showNavigation ? <Bracket direction={-1} disabled={deck.prevDisabled} onGo={go} /> : <span className="precision-bracket-placeholder" />}
-          <div className="adaptive-card-viewport" id="adaptive-viewport" ref={viewportRef} aria-label="Činnosti klubové objednávky" onScroll={queueVisibility}>
-            <div className="adaptive-card-track">
+          {deck.showNavigation ? <Bracket direction={-1} disabled={deck.prevDisabled} onGo={go} more={indicators.before} /> : <span className="precision-bracket-placeholder" />}
+          <div
+            className="adaptive-card-viewport"
+            id="adaptive-viewport"
+            ref={viewportRef}
+            role="group"
+            aria-label="Činnosti klubové objednávky"
+            aria-describedby="deck-live"
+            data-more-before={indicators.before.count ? 'true' : undefined}
+            data-more-after={indicators.after.count ? 'true' : undefined}
+            data-visible={visible}
+          >
+            <div className="adaptive-card-track" onKeyDown={onTrackKey}>
               {quantity === 0 ? <ClubDeckEmpty /> : null}
-              {base.list.map((f) => (
+              {base.list.map((f, i) => (
                 <PlanCard
                   key={f.categoryId}
                   figure={f}
                   live={live.byId.get(f.categoryId) ?? f}
                   added={previewCategoryId === f.categoryId ? added : 0}
                   active={selected === f.categoryId}
+                  fresh={quantity > 1 && cards[i]?.fresh === true}
                   chart={charts.get(f.categoryId) ?? []}
                   restoring={restoringFrom !== null && restoringFrom !== f.categoryId}
                   onSelect={onCardSelect}
+                  onFocusCard={onCardFocus}
                 />
               ))}
             </div>
           </div>
-          {deck.showNavigation ? <Bracket direction={1} disabled={deck.nextDisabled} onGo={go} /> : <span className="precision-bracket-placeholder" />}
+          <DeckMore side="before" more={indicators.before} onGo={() => pageTo(deck.index - Math.min(indicators.before.count, visible))} />
+          <DeckMore side="after" more={indicators.after} onGo={() => pageTo(deck.index + Math.min(indicators.after.count, visible))} />
+          {deck.showNavigation ? <Bracket direction={1} disabled={deck.nextDisabled} onGo={go} more={indicators.after} /> : <span className="precision-bracket-placeholder" />}
         </div>
+        <span className="deck-live" id="deck-live" aria-live="polite" aria-atomic="true">{quantity > 0 ? indicators.live : ''}</span>
         {deck.showNavigation ? (
           <div className={`adaptive-nav-row ${deck.showCarousel ? 'is-slideable' : 'is-static'}`} aria-label="Pozice činností">
             <span className="nav-page" id="adaptive-page">{deck.pageLabel}</span>

@@ -535,6 +535,9 @@ export interface CarouselModel {
   nextDisabled: boolean;
   /** One flag per dot: is that card currently in view. */
   dots: boolean[];
+  /** Cards scrolled out of view on the left / on the right (0 while every card is in view). */
+  hiddenBefore: number;
+  hiddenAfter: number;
 }
 
 /**
@@ -561,7 +564,110 @@ export function carouselModel(quantity: number, rawIndex: number, visible = 2): 
     prevDisabled: !showCarousel || index === 0,
     nextDisabled: !showCarousel || index === rightLimit,
     dots: Array.from({ length: quantity }, (_, i) => i >= index && i < index + visible),
+    hiddenBefore: showCarousel ? index : 0,
+    hiddenAfter: showCarousel ? Math.max(0, quantity - index - visible) : 0,
   };
+}
+
+/**
+ * Whole cards in a strip whose content box is `contentWidth` wide, measured from a real card (`cardWidth`) - the compact
+ * strip (phone / tablet) draws every card at half the strip whatever the count, so its "visible" is never the desktop
+ * formula's (`PlannerMetrics.deckVisibleCount`, which once claimed four cards on a 1200 px tablet that showed two).
+ * 0 = nothing measurable (the caller keeps its default).
+ */
+export function cardsThatFit(contentWidth: number, cardWidth: number, gap: number): number {
+  if (!(contentWidth > 0) || !(cardWidth > 0)) return 0;
+  return Math.max(1, Math.floor((contentWidth + Math.max(0, gap) + 0.5) / (cardWidth + Math.max(0, gap))));
+}
+
+/** The smallest move of the page (from `index`) that brings card `target` wholly into view. */
+export function revealIndex(quantity: number, visible: number, index: number, target: number): number {
+  const current = clampCarouselIndex(quantity, index, visible);
+  if (target < 0 || target >= quantity) return current;
+  if (target < current) return clampCarouselIndex(quantity, target, visible);
+  if (target > current + visible - 1) return clampCarouselIndex(quantity, target - visible + 1, visible);
+  return current;
+}
+
+/** A card of the strip as the escalator sees it: fulfilled, and never clicked (nothing planned, never armed). */
+export interface DeckCardState {
+  done: boolean;
+  fresh: boolean;
+}
+
+/**
+ * The card the strip brings in next after `from` (-1 = none): the first card not clicked yet to its right, then from the
+ * start; else the first card that is not fulfilled; `null` when every other card is fulfilled.
+ */
+export function nextOpenCard(cards: readonly DeckCardState[], from: number): number | null {
+  const n = cards.length;
+  const order: number[] = [];
+  for (let k = 1; k <= n; k++) {
+    const i = (((from + k) % n) + n) % n;
+    if (i !== from) order.push(i);
+  }
+  const fresh = order.find((i) => !cards[i]!.done && cards[i]!.fresh);
+  if (fresh !== undefined) return fresh;
+  const open = order.find((i) => !cards[i]!.done);
+  return open ?? null;
+}
+
+/**
+ * The escalator (owner, 21. 10. 2026): arming a card (`select`) keeps it in view and slides the next open card in beside
+ * it when both fit (else the armed card waits at the edge facing it); fulfilling a card (`complete`) brings the next open
+ * card into view. Always the smallest move from the current page.
+ */
+export function escalatorIndex(args: {
+  cards: readonly DeckCardState[];
+  visible: number;
+  index: number;
+  focus: number;
+  reason: 'select' | 'complete';
+}): number {
+  const { cards, visible, index, focus, reason } = args;
+  const quantity = cards.length;
+  if (quantity <= visible) return 0;
+  const current = clampCarouselIndex(quantity, index, visible);
+  const next = nextOpenCard(cards, focus);
+  if (reason === 'complete') return revealIndex(quantity, visible, current, next ?? focus);
+  if (next === null) return revealIndex(quantity, visible, current, focus);
+  const lo = Math.min(focus, next);
+  const hi = Math.max(focus, next);
+  if (hi - lo < visible) return clampCarouselIndex(quantity, Math.min(Math.max(current, hi - visible + 1), lo), visible);
+  return clampCarouselIndex(quantity, next > focus ? focus : focus - visible + 1, visible);
+}
+
+export interface DeckSide {
+  /** cards hidden on this side */
+  count: number;
+  /** of them never clicked */
+  fresh: number;
+  /** "ještě 2" ('' when nothing is hidden) */
+  label: string;
+  /** the side button's accessible name */
+  aria: string;
+}
+
+const novaWord = (n: number): string => (n === 1 ? 'nová' : n >= 2 && n <= 4 ? 'nové' : 'nových');
+
+/** What the strip's edges and its live region say about the cards out of view. */
+export function deckIndicators(model: CarouselModel, cards: readonly DeckCardState[]): { before: DeckSide; after: DeckSide; live: string } {
+  const side = (from: number, to: number, name: string): DeckSide => {
+    const count = Math.max(0, to - from);
+    let fresh = 0;
+    for (let i = from; i < to; i++) if (cards[i] && !cards[i]!.done && cards[i]!.fresh) fresh++;
+    return {
+      count,
+      fresh,
+      label: count ? `ještě ${count}` : '',
+      aria: `${name}, ještě ${count}${fresh ? `, z toho ${fresh} ${novaWord(fresh)}` : ''}`,
+    };
+  };
+  const before = side(0, model.hiddenBefore, 'Předchozí činnosti');
+  const after = side(model.quantity - model.hiddenAfter, model.quantity, 'Další činnosti');
+  const shown = model.pageStart === model.pageEnd ? `Vidíte činnost ${model.pageStart}` : `Vidíte činnosti ${model.pageStart}–${model.pageEnd}`;
+  const live = `${shown}, celkem ${model.quantity}.${before.count ? ` Vlevo ${before.label}.` : ''}${after.count ? ` Vpravo ${after.label}.` : ''}`;
+  return { before, after, live };
 }
 
 /** `setAdaptivePosition`: clamp a requested page to 0 … quantity-visible; no paging while every card is in view. */
