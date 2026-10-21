@@ -13,6 +13,7 @@
  * reference and prices. Nothing is e-mailed from here.
  */
 import { useState } from 'react';
+import { usePlannerData } from '../../../data/PlannerDataProvider';
 import { usePlannerCommands } from '../../../data/usePlannerCommands';
 import type { AffectedAthlete } from '../../../data/PlannerDataSource';
 import { contactReady, timeLeft } from '../../../model';
@@ -50,6 +51,22 @@ const duplicatesOf = (error: unknown): DuplicateOrder[] | null => {
   const rows = (error as { liveOrders?: unknown } | null)?.liveOrders;
   return Array.isArray(rows) ? (rows as DuplicateOrder[]) : null;
 };
+
+const termsWord = (n: number): string => (n === 1 ? 'termín' : n >= 2 && n <= 4 ? 'termíny' : 'termínů');
+
+/**
+ * What there is to write. ONE definition: the figures count the terms the save would send (`savableTerms`), so the
+ * dialog can never read 100 % and "nothing to save" at the same time. `saved`: everything is planned and the server
+ * already has it (windows of the past, or an untouched order) - said positively, with nothing to press.
+ */
+function useSaveState() {
+  const { base } = usePlanFigures();
+  const { source } = usePlannerData();
+  const ready = base.remaining === 0 && base.requested > 0;
+  const nothingToSave = base.savableTerms === 0;
+  const unchanged = source.hasUnsavedChanges?.() === false;
+  return { ready, nothingToSave, saved: ready && (nothingToSave || unchanged), ignored: base.pastIgnored };
+}
 
 function useFinish() {
   const commands = usePlannerCommands();
@@ -93,7 +110,7 @@ function FinishBody() {
   const plan = usePlanActions();
   const [trimming, setTrimming] = useState(false);
 
-  const ready = base.remaining === 0 && base.requested > 0;
+  const { ready, nothingToSave, saved, ignored } = useSaveState();
   const editing = session?.editOrder?.mode === 'edit';
 
   const choose = async (choice: ShortfallChoice) => {
@@ -130,7 +147,7 @@ function FinishBody() {
       <div className="planner-review">
         <div>
           <strong>{base.planned} / {base.requested}</strong>
-          <span>{ready ? 'Všechny požadované osoby jsou naplánovány.' : `Zbývá naplánovat ${base.remaining} osob. Dokončení objednávky zatím není možné bez potvrzení.`}</span>
+          <span>{saved ? 'Vše je naplánováno a uloženo. Není co ukládat.' : ready ? 'Všechny požadované osoby jsou naplánovány.' : `Zbývá naplánovat ${base.remaining} osob. Dokončení objednávky zatím není možné bez potvrzení.`}</span>
         </div>
         <b className="percent">{base.percent}%</b>
       </div>
@@ -147,6 +164,12 @@ function FinishBody() {
       </div>
       {base.remainingMinutes > 0 ? (
         <p className="plan-dialog-note">Chybějící kapacita ≈ {timeLeft(base.remainingMinutes)} (celé sloty, činnost po činnosti).</p>
+      ) : null}
+      {ignored > 0 ? (
+        <p className="plan-dialog-note" data-testid="finish-past-note">{`${ignored} ${termsWord(ignored)} v minulosti se nezapočítává a neuloží se. Přesuňte ${ignored === 1 ? 'ho' : 'je'} na dnešní nebo pozdější den.`}</p>
+      ) : null}
+      {!saved && nothingToSave ? (
+        <p className="plan-dialog-note" data-testid="finish-nothing-to-save">Není co uložit: nejsou naplánované žádné termíny ode dneška.</p>
       ) : null}
       {state.error ? <p className="plan-dialog-error" role="alert">{state.error}</p> : null}
       {trimming ? <p className="plan-dialog-note" role="status">Zkracuji termíny…</p> : null}
@@ -196,7 +219,7 @@ function FinishFooter({ close }: { close: () => void }) {
   const state = useFlow(flow);
   const act = usePlannerActions();
   const finish = useFinish();
-  const ready = base.remaining === 0 && base.requested > 0;
+  const { ready, nothingToSave, saved } = useSaveState();
   const contact = contactReady(profile);
   const confirm = () => {
     if (needsShortfallConfirm(base)) { flow.set({ shortfall: true }); return; }
@@ -204,8 +227,8 @@ function FinishFooter({ close }: { close: () => void }) {
   };
   return (
     <>
-      <button type="button" className="app-button" data-close="1" onClick={close}>Zpět</button>
-      {ready && contact ? (
+      <button type="button" className="app-button" data-close="1" onClick={close}>{saved ? 'Zavřít' : 'Zpět'}</button>
+      {saved ? null : ready && contact ? (
         <button type="button" className="app-button primary" id="confirm-local-plan" data-testid="pick-confirm" disabled={state.busy} onClick={confirm}>
           {base.spareSeats > 0 ? 'Zkontrolovat a označit plán jako připravený' : 'Označit plán jako připravený'}
         </button>
@@ -213,7 +236,7 @@ function FinishFooter({ close }: { close: () => void }) {
         <button type="button" className="app-button primary" id="review-close" onClick={() => { act.closeDialog(); act.openDialog({ kind: 'clubEdit' }); }}>Doplnit kontakt klubu</button>
       ) : (
         <>
-          <button type="button" className="app-button" id="confirm-anyway" data-testid="pick-confirm" disabled={state.busy} onClick={confirm}>Uložit i tak</button>
+          <button type="button" className="app-button" id="confirm-anyway" data-testid="pick-confirm" disabled={state.busy || nothingToSave} title={nothingToSave ? 'Není co uložit: nejsou naplánované žádné termíny ode dneška.' : undefined} onClick={confirm}>Uložit i tak</button>
           <button type="button" className="app-button primary" id="review-close" onClick={close}>Pokračovat v plánování</button>
         </>
       )}

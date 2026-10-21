@@ -909,3 +909,39 @@ describe('subscribers', () => {
     expect(calls).toBe(1);
   });
 });
+
+describe('hasUnsavedChanges and the lunch break (owner bugs 21. 10. 2026)', () => {
+  it('an untouched edit session has nothing to save; a move, a new term or a processing request has', async () => {
+    const { source } = make(fakeState(), editSession());
+    await source.listOrderSessions();
+    expect(source.hasUnsavedChanges()).toBe(false);
+    const [term] = await source.listOrderSessions();
+    await source.moveInterval({ id: term!.id, date: '2026-11-24', start: '08:00', end: '12:00' });
+    expect(source.hasUnsavedChanges()).toBe(true);
+
+    const fresh = make(fakeState(), newSession());
+    expect(fresh.source.hasUnsavedChanges()).toBe(false);
+    await fresh.source.createInterval({ date: '2026-11-24', categoryId: A_MEDICAL, start: '08:00', quantity: 2 });
+    expect(fresh.source.hasUnsavedChanges()).toBe(true);
+  });
+
+  it('a drop across the clinic\'s lunch break is two terms and neither touches the break', async () => {
+    const { source } = make(fakeState(), newSession());
+    await source.createInterval({ date: '2026-11-24', categoryId: A_MEDICAL, start: '10:00', quantity: 6 });
+    const terms = (await source.listOrderSessions()).map((s) => [s.start, s.end, s.capacity]);
+    expect(terms).toEqual([['10:00', '12:00', 4], ['12:30', '13:30', 2]]);
+  });
+
+  it('a term in the past is refused where it is placed, with the reason', async () => {
+    const { source } = make(fakeState(), newSession());
+    await expect(source.createInterval({ date: '2026-11-01', categoryId: A_MEDICAL, start: '10:00', quantity: 2 })).rejects.toMatchObject({ code: 'validation', message: expect.stringContaining('minulosti') });
+  });
+
+  it('nothing can be planned beyond what the club ordered (20 players -> the 21st slot is refused)', async () => {
+    const { source } = make(fakeState(), newSession());
+    await source.createInterval({ date: '2026-11-24', categoryId: A_MEDICAL, start: '08:00', quantity: 8 });
+    await source.createInterval({ date: '2026-11-25', categoryId: A_MEDICAL, start: '08:00', quantity: 8 });
+    await expect(source.createInterval({ date: '2026-11-26', categoryId: A_MEDICAL, start: '08:00', quantity: 5 })).rejects.toMatchObject({ code: 'validation', message: expect.stringContaining('Zbývá pouze 4') });
+    await source.createInterval({ date: '2026-11-26', categoryId: A_MEDICAL, start: '08:00', quantity: 4 });
+  });
+});

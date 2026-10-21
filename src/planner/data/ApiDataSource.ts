@@ -840,6 +840,18 @@ export class ApiDataSource implements PlannerDataSource {
 
   /* ------------------------------ finish / publish ------------------------------ */
 
+  hasUnsavedChanges(): boolean {
+    if (!this.session) return false;
+    if (this.mode === 'process') return true;
+    if (this.session.editOrder?.dirty === true) return true;
+    const byId = new Map(this.draft.map((s) => [s.id, s] as const));
+    for (const [id, was] of this.origin.snapshot) {
+      const now = byId.get(id);
+      if (!now || JSON.stringify(snapshotOf(now)) !== JSON.stringify(was)) return true;
+    }
+    return this.draft.some((s) => s.origin === 'club' && !s.foreign && !this.origin.snapshot.has(s.id));
+  }
+
   async finishPlan(options: FinishPlanOptions = {}): Promise<FinishPlanResult> {
     if (!this.session) throw new PlannerWriteError('validation', 'Neplánuje se žádná objednávka klubu.');
     await this.ensureLoaded();
@@ -887,7 +899,8 @@ export class ApiDataSource implements PlannerDataSource {
     } catch (error) {
       throw toWriteError(error, 'Objednávku se nepodařilo uložit. Plán zůstal beze změny - zkuste to znovu.');
     }
-    const ctx = makeContext({ categories: [], demands: demandsOf(this.activities), sessions: this.draft });
+    /* "Ready" is the figures' definition: the same today, the same terms (an unsaved past one counts for nothing). */
+    const ctx = makeContext({ categories: [], demands: demandsOf(this.activities), sessions: this.draft, today: this.today });
     const ready = totals(ctx).pending === 0;
     await this.adopt(view);
     await this.deps.invalidate();

@@ -249,6 +249,11 @@ export interface PlannerDataSource {
   deleteInterval(id: SessionId): Promise<{ undoToken: UndoToken }>;
   /** Revert the write that produced `token` (Ctrl+Z / "↶ Zpět"). */
   undo(token: string): Promise<void>;
+  /**
+   * Real sources: does the draft differ from what the server holds (or does the order still wait to be confirmed)?
+   * `false` = nothing to save. Absent = the source cannot tell; the dialogs then rely on the figures alone.
+   */
+  hasUnsavedChanges?(): boolean;
   /** "Označit plán jako připravený". */
   finishPlan(options?: FinishPlanOptions): Promise<FinishPlanResult>;
   /** "Vygenerovat" the private club form link. */

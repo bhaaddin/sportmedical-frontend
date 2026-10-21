@@ -326,3 +326,55 @@ describe('useClubPlanningContext · how club planning starts and ends', () => {
     expect(forced.result.current).toMatchObject({ mode: 'club', needsSetup: null });
   });
 });
+
+describe('finish · the figures and the save agree (owner bug 21. 10. 2026)', () => {
+  const kOnly5 = [{ categoryId: 'k', requested: 5, baselinePlanned: 0 }];
+  const finishDialogOf = async (source: DemoDataSource) => {
+    mountWithDialog(source, { kind: 'finish' });
+    await screen.findByTestId('planning-carousel');
+    fireEvent.click(screen.getByTestId('open-dialog'));
+    return screen.findByTestId('planner-dialog');
+  };
+
+  it('terms that lie in the past and were never saved do not count: 0 / 5, no ticks, no 100 %', async () => {
+    // TODAY is 2026-11-10; these were "planned" on 2. and 3. 11.
+    const source = ownerSource({ demands: kOnly5, sessions: [term('p1', '2026-11-02', '08:00', '11:00', 'k', 3), term('p2', '2026-11-03', '08:00', '10:00', 'k', 2)] });
+    const dialog = await finishDialogOf(source);
+    expect(dialog).toHaveTextContent('0 / 5');
+    expect(dialog).not.toHaveTextContent('100%');
+    expect(within(dialog).getByRole('heading', { name: 'Kontrola rozpracovaného plánu' })).toBeInTheDocument();
+  });
+
+  it('nothing to save: the save button is disabled and says why - the red box never comes after a green 100 %', async () => {
+    const source = ownerSource({ demands: kOnly5, sessions: [term('p1', '2026-11-02', '08:00', '13:00', 'k', 5)] });
+    const spy = vi.spyOn(source, 'finishPlan');
+    const dialog = await finishDialogOf(source);
+    const save = within(dialog).getByRole('button', { name: 'Uložit i tak' });
+    expect(save).toBeDisabled();
+    expect(dialog).toHaveTextContent('Není co uložit');
+    expect(dialog).toHaveTextContent('1 termín v minulosti');
+    fireEvent.click(save);
+    expect(spy).not.toHaveBeenCalled();
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+  });
+
+  it('everything planned and already saved (windows of the past the server holds): positive, no save button, no error', async () => {
+    const saved = (id: string, date: string, slots: number) => term(id, date, '08:00', `${8 + slots}:00`.padStart(5, '0'), 'k', slots, { clubBlockId: `blk-${id}` });
+    const source = ownerSource({ demands: kOnly5, sessions: [saved('h1', '2026-11-02', 3), saved('h2', '2026-11-03', 2)] });
+    const spy = vi.spyOn(source, 'finishPlan');
+    const dialog = await finishDialogOf(source);
+    expect(dialog).toHaveTextContent('5 / 5');
+    expect(dialog).toHaveTextContent('100%');
+    expect(dialog).toHaveTextContent('Vše je naplánováno a uloženo');
+    expect(within(dialog).queryByRole('button', { name: /označit plán|Uložit i tak/i })).toBeNull();
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('future terms covering the need: 5 / 5 and an enabled save button (unchanged behaviour)', async () => {
+    const source = ownerSource({ demands: kOnly5, sessions: [term('f1', '2026-11-17', '08:00', '13:00', 'k', 5)] });
+    const dialog = await finishDialogOf(source);
+    expect(dialog).toHaveTextContent('5 / 5');
+    expect(within(dialog).getByRole('button', { name: /označit plán jako připravený/i })).toBeEnabled();
+  });
+});
