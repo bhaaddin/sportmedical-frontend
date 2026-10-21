@@ -15,6 +15,7 @@ import type { CSSProperties } from 'react';
 import { usePlannerActions, usePlannerSelector } from '../state/PlannerStoreProvider';
 import type { AgendaRowModel, AgendaScope } from '../model';
 import { Icon } from './Icons';
+import { usePlanFigures } from './plan/usePlanFigures';
 import { usePlannerCtx, usePlannerModelState } from './context';
 import { agendaView } from './left/agendaView';
 import './left/left.css';
@@ -54,7 +55,8 @@ export function AgendaPanel() {
   const weekStart = usePlannerSelector((s) => s.weekStart);
   const selectedDate = usePlannerSelector((s) => s.selectedDate);
   const act = usePlannerActions();
-  const m = agendaView(ctx, agenda, { weekStart, selectedDate }, catalogue?.capabilities.mode);
+  const figures = usePlanFigures();
+  const m = agendaView(ctx, agenda, { weekStart, selectedDate }, catalogue?.capabilities.mode, figures.live);
   const openTerm = (row: AgendaRowModel) => {
     act.focusDate(row.date, true);
     act.openDialog({ kind: 'agendaDetail', id: row.id });

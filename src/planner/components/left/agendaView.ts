@@ -8,6 +8,7 @@
  *    (no ordered seats), so it shows the činnost's share of the visible slots instead of "zbývá".
  */
 import { categoryPriceText, categoryWithPrice } from '../categoryPrice';
+import type { OrderFigures } from '../plan/orderFigures';
 import {
   agendaPanelModel,
   agendaRowModel,
@@ -58,10 +59,23 @@ export function agendaView(
   view: { weekStart: IsoDate; selectedDate: IsoDate },
   /** What the source says the board plans; absent = a club order exactly when the order has demands. */
   mode?: 'club' | 'standard',
+  /** The order's one calculation: the KPI and the footer read the players from it (lanes, past terms, ...), not from a second sum. */
+  figures?: OrderFigures,
 ): AgendaView {
   const club = mode ? mode === 'club' : ctx.demands.length > 0;
   // Other clubs' windows and the clinic's own bookings are busy time on the board, not terms of the order being planned.
-  if (club) return { ...agendaPanelModel({ ...ctx, sessions: ctx.sessions.filter(isTermOfOrder) }, ui, view), standard: false };
+  if (club) {
+    const model = agendaPanelModel({ ...ctx, sessions: ctx.sessions.filter(isTermOfOrder) }, ui, view);
+    const f = figures && model.categoryId ? figures.byId.get(model.categoryId) : undefined;
+    if (!f || !model.kpi) return { ...model, standard: false };
+    const remainingLabel = f.remaining > 0 ? `zbývá ${f.remaining} ${agendaSlotLabel(f.remaining)}` : '✓ Naplánováno';
+    return {
+      ...model,
+      standard: false,
+      kpi: { ...model.kpi, planned: f.planned, requested: f.requested, fillPercent: f.percent, remainingLabel },
+      footerStatus: ui.mode === 'activities' ? `Zbývá ${f.remaining} ${agendaSlotLabel(f.remaining)} naplánovat` : model.footerStatus,
+    };
+  }
 
   const all = standardEvents(ctx);
   const present = ctx.categories.filter((c) => all.some((e) => e.categoryId === c.id));
