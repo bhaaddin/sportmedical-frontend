@@ -226,30 +226,82 @@ describe('/clubs/:clubId - the planner in club mode', () => {
     expect(document.getElementById('day-board')).toHaveAttribute('data-board-mode', 'club');
   });
 
-  it("puts the live group with the nearest window on the stage: the root's edit session, nothing else", async () => {
+  /*
+   * Reviewer 2.3: opening a club is the club's OVERVIEW, not planning. The same layout in the club's context, the order in
+   * view named in the deck, the quick actions beside it; the order goes on the stage only by a planning action (`plan=1`).
+   */
+  it("opens the club's OVERVIEW, not planning: no session on the stage, the order in view and the quick actions in the deck", async () => {
     mount();
     await screen.findByTestId('planner-page');
-    const session = lastOptions().session;
-    expect(session?.editOrder).toMatchObject({ mode: 'edit', orderId: A });
-    expect(session?.editOrder?.blocks.map((b) => b.id)).toEqual(['wa']);
-    expect(session?.activities).toEqual([expect.objectContaining({ activityId: 'a1', seats: 10, minutesPerSeat: 30 })]);
+    expect(lastOptions().session).toBeNull();
+    expect(lastOptions().clubContext).toMatchObject({ clubId: 'club-1' });
+    const deck = await screen.findByTestId('club-overview-deck');
+    expect(within(deck).getByTestId('club-overview-name')).toHaveTextContent('FK Slaný');
+    expect(within(deck).getByTestId('club-overview-order')).toHaveTextContent('KO-0000AA01');
+    expect(within(deck).getByTestId('club-overview-status')).toHaveTextContent('Potvrzeno');
+    expect(within(deck).getByTestId('club-overview-windows')).toHaveTextContent('2 termíny');
+    for (const id of ['ov-new-order', 'ov-plan-terms', 'ov-add-players', 'ov-open-order', 'ov-overview']) expect(within(deck).getByTestId(id)).toBeInTheDocument();
+    /* none of the planning chrome: no činnost cards, no "Celková objednávka", no progress / hint strip */
+    expect(screen.queryByTestId('summary-card')).toBeNull();
+    expect(screen.getByTestId('active-plan-hint')).not.toBeVisible();
+    expect(screen.getByTestId('order-command')).not.toBeVisible();
   });
 
-  it('`?order=` names another group - by its root or by an addendum of it', async () => {
+  it("\"Plánovat termíny\" is what starts planning: the root's edit session, nothing else", async () => {
+    mount();
+    const deck = await screen.findByTestId('club-overview-deck');
+    fireEvent.click(within(deck).getByTestId('ov-plan-terms'));
+    await waitFor(() => expect(where().dataset.search).toBe(`?order=${A}&plan=1`));
+    await waitFor(() => expect(lastOptions().session?.editOrder).toMatchObject({ mode: 'edit', orderId: A }));
+    const session = lastOptions().session;
+    expect(session?.editOrder?.blocks.map((b) => b.id)).toEqual(['wa']);
+    expect(session?.activities).toEqual([expect.objectContaining({ activityId: 'a1', seats: 10, minutesPerSeat: 30 })]);
+    expect(screen.queryByTestId('club-overview-deck')).toBeNull();
+    expect(await screen.findByTestId('planning-carousel')).toBeInTheDocument();
+  });
+
+  it('the address `?order=…&plan=1` (a link that means "plan now") starts planning at once', async () => {
+    mount({ search: `?order=${A}&plan=1` });
+    await screen.findByTestId('planner-page');
+    expect(lastOptions().session?.editOrder).toMatchObject({ mode: 'edit', orderId: A });
+    expect(screen.queryByTestId('club-overview-deck')).toBeNull();
+  });
+
+  it('`?order=` names another group for the overview - by its root or by an addendum of it - and plans it with plan=1', async () => {
     mount({ search: `?order=${B}` });
     await screen.findByTestId('planner-page');
-    expect(lastOptions().session?.editOrder?.orderId).toBe(B);
+    expect(lastOptions().session).toBeNull();
+    expect(within(await screen.findByTestId('club-overview-deck')).getByTestId('club-overview-order')).toHaveTextContent('KO-0000BB01');
     cleanup();
     apiSource.calls = [];
     mount({ search: `?order=${A2}` });
     await screen.findByTestId('planner-page');
+    expect(within(await screen.findByTestId('club-overview-deck')).getByTestId('club-overview-order')).toHaveTextContent('KO-0000AA01');
+    cleanup();
+    apiSource.calls = [];
+    mount({ search: `?order=${B}&plan=1` });
+    await screen.findByTestId('planner-page');
+    expect(lastOptions().session?.editOrder?.orderId).toBe(B);
+    cleanup();
+    apiSource.calls = [];
+    mount({ search: `?order=${A2}&plan=1` });
+    await screen.findByTestId('planner-page');
     expect(lastOptions().session?.editOrder?.orderId).toBe(A);
   });
 
-  it('a window handed over by the calendar (`clubBlockId`) opens the group that owns it', async () => {
+  it('a window handed over by the calendar (`clubBlockId`) opens the club on the group that owns it - the overview, not planning', async () => {
     mount({ state: { clubBlockId: 'wb' } });
     await screen.findByTestId('planner-page');
-    expect(lastOptions().session?.editOrder?.orderId).toBe(B);
+    expect(lastOptions().session).toBeNull();
+    expect(within(await screen.findByTestId('club-overview-deck')).getByTestId('club-overview-order')).toHaveTextContent('KO-0000BB01');
+  });
+
+  it('a session handed over by the router state still plans at once (the order panel\'s "Upravit termíny", "Zpracovat")', async () => {
+    const draft: PickSession = { clubId: 'club-1', clubName: 'FK Slaný', serviceId: 's1', serviceName: 'Diagnostika', activities: [], paymentMethod: 'ClubInvoice', note: '' };
+    mount({ state: { pickOrder: { start: draft } } });
+    await screen.findByTestId('planner-page');
+    expect(lastOptions().session).toEqual(draft);
+    expect(screen.queryByTestId('club-overview-deck')).toBeNull();
   });
 
   it('a club that does not exist says so, with the way back', async () => {
@@ -294,14 +346,35 @@ describe('the order switcher', () => {
     expect(screen.getByTestId('club-order-switch-button')).toHaveTextContent('Objednávka KO-0000AA01');
   });
 
-  it('choosing another group puts it on the stage (`?order=`) and the order context changes', async () => {
+  it('choosing another group shows it (`?order=`) in the mode the screen is in: the overview stays the overview', async () => {
     mount();
     const menu = await openSwitcher();
     fireEvent.click(within(menu).getAllByTestId('club-order-option')[1]);
     await waitFor(() => expect(where().dataset.search).toBe(`?order=${B}`));
+    expect(await screen.findByTestId('club-order-switch-button')).toHaveTextContent('KO-0000BB01');
+    expect(within(screen.getByTestId('club-overview-deck')).getByTestId('club-overview-order')).toHaveTextContent('KO-0000BB01');
+    expect(lastOptions().session).toBeNull();
+  });
+
+  it('while planning, choosing another group puts it on the stage (`plan=1` stays) and the order context changes', async () => {
+    mount({ search: `?order=${A}&plan=1` });
+    const menu = await openSwitcher();
+    fireEvent.click(within(menu).getAllByTestId('club-order-option')[1]);
+    await waitFor(() => expect(where().dataset.search).toBe(`?order=${B}&plan=1`));
     await waitFor(() => expect(lastOptions().session?.editOrder?.orderId).toBe(B));
     expect(lastOptions().session?.editOrder?.blocks.map((b) => b.id)).toEqual(['wb']);
     expect(await screen.findByTestId('club-order-switch-button')).toHaveTextContent('KO-0000BB01');
+  });
+
+  it('while planning the switcher offers "Přehled klubu": back to the overview, the same group in view', async () => {
+    mount({ search: `?order=${B}&plan=1` });
+    const menu = await openSwitcher();
+    fireEvent.click(within(menu).getByTestId('club-order-leave-planning'));
+    await waitFor(() => expect(where().dataset.search).toBe(`?order=${B}`));
+    expect(await screen.findByTestId('club-overview-deck')).toBeInTheDocument();
+    expect(lastOptions().session).toBeNull();
+    const again = await openSwitcher();
+    expect(within(again).queryByTestId('club-order-leave-planning')).toBeNull();
   });
 
   it('a group the stage cannot edit opens for reading: no session, the club stays the context', async () => {
@@ -339,26 +412,53 @@ describe('a club with nothing to plan - the same layout, an empty deck', () => {
     apiSource.source = new EmptyDeckSource({ today: '2026-11-10' });
   });
 
-  it('a club without any order: club header, the deck says so, "Nová objednávka klubu" is one click away', async () => {
+  it('a club without any order: club header, the overview says so, "Nová objednávka" is one click away, nothing to plan', async () => {
     seed([]);
     mount();
     expect(await screen.findByTestId('club-header')).toHaveAttribute('data-mode', 'club');
-    const deck = await screen.findByTestId('deck-empty');
-    expect(within(deck).getByTestId('deck-empty-reason')).toHaveTextContent('Klub zatím nemá žádnou objednávku.');
-    expect(within(deck).queryByTestId('deck-empty-open')).toBeNull();
+    const deck = await screen.findByTestId('club-overview-deck');
+    expect(deck).toHaveAttribute('data-status', 'none');
+    expect(within(deck).getByTestId('club-overview-reason')).toHaveTextContent('Klub zatím nemá žádnou objednávku.');
+    expect(within(deck).queryByTestId('ov-open-order')).toBeNull();
+    expect(within(deck).queryByTestId('ov-plan-terms')).toBeNull();
     expect(screen.getByTestId('club-order-switch-button')).toHaveTextContent('Žádná objednávka');
     expect(lastOptions().session).toBeNull();
-    fireEvent.click(within(deck).getByTestId('deck-empty-new'));
+    fireEvent.click(within(deck).getByTestId('ov-new-order'));
     expect(await screen.findByTestId('entry-stub')).toHaveAttribute('data-club', 'club-1');
   });
 
-  it('a group that is not Confirmed: the reason, and the order\'s own panel behind "Otevřít objednávku"', async () => {
+  it('a group that is not Confirmed: the reason, no "Plánovat termíny", and the order own panel behind "Otevřít objednávku"', async () => {
     mount({ search: `?order=${I}` });
-    const deck = await screen.findByTestId('deck-empty');
+    const deck = await screen.findByTestId('club-overview-deck');
     expect(deck).toHaveAttribute('data-status', 'Invited');
-    expect(within(deck).getByTestId('deck-empty-reason')).toHaveTextContent('nevyplnil klub');
-    fireEvent.click(within(deck).getByTestId('deck-empty-open'));
+    expect(within(deck).getByTestId('club-overview-reason')).toHaveTextContent('nevyplnil klub');
+    expect(within(deck).queryByTestId('ov-plan-terms')).toBeNull();
+    expect(within(deck).queryByTestId('ov-add-players')).toBeNull();
+    fireEvent.click(within(deck).getByTestId('ov-open-order'));
     expect(await screen.findByTestId('panel-stub')).toHaveAttribute('data-order', I);
+  });
+
+  it('"Přidat hráče" of the overview opens the existing dialog for the root of the order in view', async () => {
+    mount();
+    const deck = await screen.findByTestId('club-overview-deck');
+    fireEvent.click(within(deck).getByTestId('ov-add-players'));
+    expect(await screen.findByTestId('players-stub')).toHaveAttribute('data-order', A);
+    expect(screen.getByTestId('players-stub')).toHaveAttribute('data-intent', 'add');
+  });
+
+  it('"Přehled klubu" opens the order overview dialog', async () => {
+    mount();
+    const deck = await screen.findByTestId('club-overview-deck');
+    fireEvent.click(within(deck).getByTestId('ov-overview'));
+    expect(await screen.findByTestId('club-overview')).toBeInTheDocument();
+  });
+
+  it('planning with a činnost-less draft (a new order being set up) still draws the empty planning deck, not the overview', async () => {
+    const draft: PickSession = { clubId: 'club-1', clubName: 'FK Slaný', serviceId: 's1', serviceName: 'Diagnostika', activities: [], paymentMethod: 'ClubInvoice', note: '' };
+    apiSource.source = new EmptyDeckSource({ today: '2026-11-10' });
+    mount({ state: { pickOrder: { start: draft } } });
+    expect(await screen.findByTestId('deck-empty')).toBeInTheDocument();
+    expect(screen.queryByTestId('club-overview-deck')).toBeNull();
   });
 
   it('marks a club whose invoice data are missing, in the header\'s identification block', async () => {
@@ -454,11 +554,11 @@ describe('everything the old club page offered is reachable from the overview', 
     expect(within(invited).getByTestId('club-order-link')).toBeInTheDocument();
   });
 
-  it('"Upravit termíny" of another group arms the stage on it', async () => {
+  it('"Upravit termíny" of another group arms the stage on it (that is a planning action: plan=1)', async () => {
     mount();
     const overview = await openOverview();
     fireEvent.click(within(within(overview).getAllByTestId('club-order-row')[1]).getByTestId('order-card-edit-terms'));
-    await waitFor(() => expect(where().dataset.search).toBe(`?order=${B}`));
+    await waitFor(() => expect(where().dataset.search).toBe(`?order=${B}&plan=1`));
     await waitFor(() => expect(lastOptions().session?.editOrder?.orderId).toBe(B));
   });
 
@@ -596,5 +696,18 @@ describe.each([['phone', VIEWPORTS.phone], ['tablet', VIEWPORTS.tablet], ['deskt
     expect(await screen.findByTestId('planner-page')).toHaveAttribute('data-mode', 'club');
     const overview = await openOverview();
     expect(within(overview).getAllByTestId('club-order-row')).toHaveLength(3);
+  });
+
+  it('opens as the club overview with the quick actions in every layout (reviewer 2.3); on a phone and a tablet they come before the board', async () => {
+    setViewport(width);
+    mount();
+    const deck = await screen.findByTestId('club-overview-deck');
+    expect(within(deck).getAllByRole('button').map((b) => b.getAttribute('data-testid'))).toEqual(['ov-new-order', 'ov-plan-terms', 'ov-add-players', 'ov-open-order', 'ov-overview']);
+    for (const button of within(deck).getAllByRole('button')) expect(button.className).toContain('club-ov-action');
+    expect(lastOptions().session).toBeNull();
+    const board = screen.getByTestId('live-ui');
+    const before = deck.compareDocumentPosition(board) & Node.DOCUMENT_POSITION_FOLLOWING;
+    if (_name === 'desktop') expect(before).toBe(0); /* the stage draws the deck under the board */
+    else expect(before).not.toBe(0);
   });
 });

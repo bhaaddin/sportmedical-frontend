@@ -13,6 +13,7 @@
  */
 import type { CSSProperties } from 'react';
 import { usePlannerActions, usePlannerSelector } from '../state/PlannerStoreProvider';
+import { useClubPlanner } from '../club/ClubPlannerContext';
 import type { AgendaRowModel, AgendaScope } from '../model';
 import { Icon } from './Icons';
 import { usePlanFigures } from './plan/usePlanFigures';
@@ -56,7 +57,11 @@ export function AgendaPanel() {
   const selectedDate = usePlannerSelector((s) => s.selectedDate);
   const act = usePlannerActions();
   const figures = usePlanFigures();
-  const m = agendaView(ctx, agenda, { weekStart, selectedDate }, catalogue?.capabilities.mode, figures.live);
+  /* A club's overview (no order on the stage): the lists are the club's own windows, by činnost - not the order's draft. */
+  const club = useClubPlanner();
+  const overview = club !== null && !club.planning;
+  const clubCtx = overview ? { ...ctx, sessions: ctx.sessions.filter((s) => s.clubBlockId != null && club.data.blocks.some((b) => b.id === s.clubBlockId)) } : ctx;
+  const m = agendaView(clubCtx, agenda, { weekStart, selectedDate }, overview ? 'standard' : catalogue?.capabilities.mode, figures.live);
   const openTerm = (row: AgendaRowModel) => {
     act.focusDate(row.date, true);
     /* A činnost's several bookings of the day are one row: it opens the day (its people are in the day panel), not one of them. */

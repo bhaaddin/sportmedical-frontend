@@ -10,6 +10,7 @@
  * addition is the "Souhrn" button, the summary card's one other job: it opens the full order summary.
  * Standard ordering (no club order) has no bar: the dock is not drawn.
  */
+import { useClubPlanner } from '../../club/ClubPlannerContext';
 import { usePlannerModelState } from '../context';
 import { Icon } from '../Icons';
 import { OrderCommandPanel } from '../OrderCommandPanel';
@@ -18,6 +19,9 @@ import { usePlanActions } from '../plan/usePlanActions';
 export function CompactOrderDock() {
   const standard = usePlannerModelState().order?.club === false;
   const plan = usePlanActions();
+  const club = useClubPlanner();
+  /* A club's overview has no order on the stage: no bar to plan with. */
+  if (club !== null && !club.planning) return null;
   return (
     <div className="compact-dock" data-testid="compact-dock" data-standard={standard ? 'true' : undefined}>
       <OrderCommandPanel />

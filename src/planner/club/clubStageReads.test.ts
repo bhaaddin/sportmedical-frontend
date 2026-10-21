@@ -105,11 +105,19 @@ describe('clubSelection - the screen\'s rule', () => {
   const ahead = orderView({ id: 'o-ahead', groupId: 'o-ahead', blocks: [clubBlock('w-1', { fromDate: '2026-11-23', toDate: '2026-11-23' })] });
   const later = orderView({ id: 'o-later', groupId: 'o-later', blocks: [clubBlock('w-2', { fromDate: '2027-01-11', toDate: '2027-01-11' })] });
 
-  it('opens the group with the nearest window ahead, on that window; its root is what the stage loads', () => {
+  it('opens the group with the nearest window ahead, on that window; the stage plans nothing until a planning action says so', () => {
     const s = clubSelection([later, ahead], [], TODAY, { orderId: null, blockId: null });
     expect(s.selected?.id).toBe('o-ahead');
     expect(s.openOn).toBe('2026-11-23');
+    /* reviewer 2.3: the club opens as its overview - the club's context only */
+    expect(s.start).toEqual({ today: TODAY, openOn: '2026-11-23', session: null });
+  });
+
+  it('with planning asked for (plan=1) the root of the group in view is what the stage loads', () => {
+    const s = clubSelection([later, ahead], [], TODAY, { orderId: null, blockId: null, planning: true });
     expect(s.start).toEqual({ today: TODAY, openOn: '2026-11-23', session: { serviceId: ahead.serviceId, order: ahead } });
+    const invited = orderView({ id: 'o-inv', groupId: 'o-inv', status: 'Invited', blocks: [] });
+    expect(clubSelection([invited], [], TODAY, { orderId: null, blockId: null, planning: true }).start.session).toBeNull();
   });
 
   it('`?order=` and a named window pick their group; a router session replaces the group\'s own', () => {

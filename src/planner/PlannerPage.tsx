@@ -12,10 +12,12 @@
  *                nothing             standard ordering: the same board, the header shows the clinic's own data
  *   board      `realCalendar`: the board reads the clinic's real calendar (bookings, blocks, filters) on top of
  *              the planner's data, and offers "Nová objednávka" / "Klubová objednávka".
- *   club       `/clubs/:clubId` (`clubId` prop): the same screen for ONE club - its data in the header, the order
- *              the club's switcher names (`?order=`) on the stage, the club's other windows on the board, every
- *              action of the old club page reachable from the planner (see `club/`). A club without an editable
- *              order gets the same layout with an empty deck (`ApiDataSource.clubContext`).
+ *   club       `/clubs/:clubId` (`clubId` prop): the same screen for ONE club - its data in the header, the club's
+ *              windows on the board, every action of the old club page reachable from the planner (see `club/`).
+ *              It OPENS AS THE CLUB'S OVERVIEW (reviewer 2.3): the same layout in the club's context
+ *              (`ApiDataSource.clubContext`), the order the switcher names (`?order=`) in view and the quick actions
+ *              in the deck. The order is put on the stage for planning only by a planning action: `?plan=1`
+ *              ("Plánovat termíny", "Upravit termíny"), or a session the router state hands over.
  *   prices     the old sidebar's SLUŽBY legend is gone; the služba filter is the gear's "Služby" row
  *              (`boardSettings.serviceSet`) and a činnost's price stands next to its name in the agenda
  *              (`AgendaPanel`), the činnost filter lists and the board's term bubbles.
@@ -66,11 +68,13 @@ function ClubPlannerScreen({ clubId }: { clubId: string }) {
   const [params] = useSearchParams();
   const today = useMemo(() => pragueDateKey(new Date()), []);
   const orderId = params.get('order');
+  /* "Plan now": a planning action put `plan=1` in the address. A club opened from the list, a card, a link is its overview. */
+  const planning = params.get('plan') === '1';
   /* the router state a club window / a club card hands over (spent by the screen, never by the URL) */
   const blockId = (location.state as { clubBlockId?: string } | null)?.clubBlockId ?? null;
   const pick = readPickOrderState(location.state);
   /* the session the router state carries goes in too: the stage's reads start for what the stage will really plan */
-  const data = useClubPlannerData(clubId, today, { orderId, blockId, session: pick?.start ?? null });
+  const data = useClubPlannerData(clubId, today, { orderId, blockId, session: pick?.start ?? null, planning });
 
   if (data.status === 'loading') {
     /* the same box the planner page then fills (height, min height, width): the swap moves nothing */
@@ -104,7 +108,7 @@ function ClubPlannerScreen({ clubId }: { clubId: string }) {
         openOn: routerSession.editOrder?.firstDate ?? data.today,
       };
   return (
-    <ClubPlannerProvider data={effective} club={data.club} adhoc={adhoc}>
+    <ClubPlannerProvider data={effective} club={data.club} adhoc={adhoc} planning={effective.session !== null}>
       <PlannerScreen club={effective} />
     </ClubPlannerProvider>
   );

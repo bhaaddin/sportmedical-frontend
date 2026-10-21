@@ -61,7 +61,7 @@ async function findOrMakeClub(page) {
 async function startOrder(page, clubId, service, seats) {
   await page.goto(`${BASE}/clubs/${clubId}`);
   await waitPlanner(page);
-  await page.click('[data-testid=deck-empty-new]');
+  await page.click('[data-testid=ov-new-order], [data-testid=deck-empty-new]');
   await page.click('[data-testid=entry-phone]');
   await page.locator('[role=dialog] [role=combobox]').nth(1).click();
   await page.locator('[role=option]', { hasText: service }).first().click();

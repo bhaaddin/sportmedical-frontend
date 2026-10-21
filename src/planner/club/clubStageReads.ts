@@ -71,12 +71,16 @@ export interface ClubSelection {
  *   - a window the caller names (`blockId`, the calendar's "Otevřít klub") picks the group that owns it, and its day;
  *   - else `?order=` (`orderId`), else the default group; the board opens on the group's first window ahead.
  * `session` is a session the router state hands over (it replaces the group's own, as `ClubPlannerScreen` does).
+ *
+ * Reviewer 2.3: opening a club is NOT planning. The stage plans the group in view only when the person chose a planning
+ * action (`planning`: the URL's `plan=1`, or a session handed over); until then it is the club's overview - the club's
+ * context, its windows on the board, the quick actions - and nothing of the order is put on the stage.
  */
 export function clubSelection(
   orders: readonly ClubOrderView[],
   blocks: readonly ClubBlockView[],
   today: IsoDate,
-  wanted: { orderId: string | null; blockId: string | null; session?: PickSession | null },
+  wanted: { orderId: string | null; blockId: string | null; session?: PickSession | null; planning?: boolean },
 ): ClubSelection {
   const groups = clubGroups(orders, today);
   const owner = wanted.blockId === null ? null : (groups.find((g) => g.blockIds.includes(wanted.blockId as string)) ?? null);
@@ -94,7 +98,7 @@ export function clubSelection(
         openOn: routed.editOrder?.firstDate ?? today,
         session: { serviceId: routed.serviceId, order: routed.editOrder ? (orders.find((o) => o.id === routed.editOrder?.orderId) ?? null) : null },
       }
-    : { today, openOn, session: selected?.editable ? { serviceId: selected.root.serviceId ?? '', order: selected.root } : null };
+    : { today, openOn, session: wanted.planning === true && selected?.editable ? { serviceId: selected.root.serviceId ?? '', order: selected.root } : null };
   return { groups, selected, openOn, start };
 }
 

@@ -97,6 +97,12 @@ function Switcher({ club }: { club: ClubPlannerValue }) {
             </button>
           ))}
           <div className="club-switch-rule" />
+          {club.planning ? (
+            <button type="button" role="menuitem" className="club-switch-item" data-testid="club-order-leave-planning" onClick={() => { setOpen(false); club.leavePlanning(); }}>
+              <b>Přehled klubu</b>
+              <small>Ukončit plánování a vrátit se na klub</small>
+            </button>
+          ) : null}
           <button type="button" role="menuitem" className="club-switch-item" data-testid="club-order-new" onClick={() => { setOpen(false); club.newOrder(); }}>
             <b>Nová objednávka klubu</b>
           </button>

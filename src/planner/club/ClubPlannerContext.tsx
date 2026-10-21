@@ -36,8 +36,17 @@ export interface ClubPlannerValue {
   selected: ClubGroup | null;
   /** A planning session that came from the router state (a new order; an order's terms with players changed) rather than from a group. */
   adhoc: 'new' | 'edit' | null;
-  /** Show another group of the club on the stage. */
+  /**
+   * The stage is planning an order. False is the club's OVERVIEW (reviewer 2.3): the layout of the planner in the club's
+   * context - club header, the order in view, its windows on the board - with the quick actions in the deck.
+   */
+  planning: boolean;
+  /** Show another group of the club (in the mode the screen is in: a planning screen keeps planning). */
   select: (groupId: string) => void;
+  /** "Plánovat termíny": put this group on the stage for planning (`plan=1`). */
+  planGroup: (groupId: string) => void;
+  /** Back to the club's overview (no planning, the same group in view). */
+  leavePlanning: () => void;
   /** "Nová objednávka klubu": the two-way chooser (phone order here / link for the club). */
   newOrder: () => void;
   /** "Vytvořit rezervaci": the small setup form on this screen. */
@@ -60,7 +69,7 @@ export const useClubPlanner = (): ClubPlannerValue | null => useContext(ClubPlan
 
 type Intent = 'add' | 'remove';
 
-export function ClubPlannerProvider({ data, club, adhoc, children }: { data: ClubPlannerData; club: Club; adhoc: 'new' | 'edit' | null; children: ReactNode }) {
+export function ClubPlannerProvider({ data, club, adhoc, planning, children }: { data: ClubPlannerData; club: Club; adhoc: 'new' | 'edit' | null; planning: boolean; children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -74,10 +83,19 @@ export function ClubPlannerProvider({ data, club, adhoc, children }: { data: Clu
     void invalidateClubWorld(queryClient);
   }, [queryClient]);
 
-  /* The group in view is the URL's (`?order=`): a link keeps it, the back button returns to it. */
+  /* The group in view is the URL's (`?order=`): a link keeps it, the back button returns to it. Planning is `plan=1` beside it. */
+  const urlOf = useCallback((groupId: string, plan: boolean) => `?order=${encodeURIComponent(groupId)}${plan ? '&plan=1' : ''}`, []);
   const select = useCallback(
-    (groupId: string) => navigate({ pathname: location.pathname, search: `?order=${encodeURIComponent(groupId)}` }, { replace: true, state: null }),
-    [navigate, location.pathname],
+    (groupId: string) => navigate({ pathname: location.pathname, search: urlOf(groupId, planning && adhoc === null) }, { replace: true, state: null }),
+    [navigate, location.pathname, urlOf, planning, adhoc],
+  );
+  const planGroup = useCallback(
+    (groupId: string) => navigate({ pathname: location.pathname, search: urlOf(groupId, true) }, { replace: true, state: null }),
+    [navigate, location.pathname, urlOf],
+  );
+  const leavePlanning = useCallback(
+    () => navigate({ pathname: location.pathname, search: data.selected ? urlOf(data.selected.id, false) : '' }, { replace: true, state: null }),
+    [navigate, location.pathname, urlOf, data.selected],
   );
 
   const newReservation = useCallback(
@@ -91,7 +109,7 @@ export function ClubPlannerProvider({ data, club, adhoc, children }: { data: Clu
       if (activities === undefined) {
         /* The root of a Confirmed group IS what the stage plans; anything else opens on its group. */
         const group = data.groups.find((g) => g.orders.some((o) => o.id === order.id));
-        if (group !== undefined) { select(group.id); return; }
+        if (group !== undefined) { planGroup(group.id); return; }
       }
       const catalogue = await fetchBlockableActivities();
       navigate(
@@ -99,7 +117,7 @@ export function ClubPlannerProvider({ data, club, adhoc, children }: { data: Clu
         { replace: true, state: { pickOrder: { start: editSessionFor(order, catalogue, todayInPrague(), activities) } } },
       );
     },
-    [data.groups, navigate, location.pathname, location.search, select],
+    [data.groups, navigate, location.pathname, location.search, planGroup],
   );
 
   const deactivate = useCallback(async () => {
@@ -121,7 +139,10 @@ export function ClubPlannerProvider({ data, club, adhoc, children }: { data: Clu
       groups: data.groups,
       selected: data.selected,
       adhoc,
+      planning,
       select,
+      planGroup,
+      leavePlanning,
       newOrder: () => setEntry(true),
       newReservation,
       openOrder: setOpenOrderId,
@@ -132,7 +153,7 @@ export function ClubPlannerProvider({ data, club, adhoc, children }: { data: Clu
       deactivate,
       reload,
     }),
-    [club, data, adhoc, select, newReservation, editTerms, deactivate, reload],
+    [club, data, adhoc, planning, select, planGroup, leavePlanning, newReservation, editTerms, deactivate, reload],
   );
 
   const mergeable = mergeableRoots(data.groups);

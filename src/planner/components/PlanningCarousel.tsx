@@ -40,6 +40,8 @@ import { usePlanActions } from './plan/usePlanActions';
 import { usePlanFigures } from './plan/usePlanFigures';
 import { deckColumns, useDeckVisible } from './PlannerMetrics';
 import { ClubDeckEmpty } from '../club/ClubDeckEmpty';
+import { ClubOverviewDeck } from '../club/ClubOverviewDeck';
+import { useClubPlanner } from '../club/ClubPlannerContext';
 import './plan/plan.css';
 import { accentCss } from '../../accent';
 
@@ -213,7 +215,17 @@ function PlanCard({ figure: f, live, added, active, fresh, chart, restoring, onS
   );
 }
 
+/**
+ * The deck under the board. On a club's screen that is not planning (reviewer 2.3: a club opened from the list) it is the
+ * club's overview deck - the order in view and the quick actions; the činnost cards are the planning deck and mount only
+ * while an order is on the stage.
+ */
 export function PlanningCarousel() {
+  const club = useClubPlanner();
+  return club !== null && !club.planning ? <ClubOverviewDeck /> : <PlanningDeck />;
+}
+
+function PlanningDeck() {
   const ctx = usePlannerCtx();
   const profile = usePlannerProfile();
   const act = usePlannerActions();

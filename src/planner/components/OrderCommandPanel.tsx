@@ -13,6 +13,7 @@
 import type { CSSProperties } from 'react';
 import { timeLeft } from '../model';
 import { usePlannerSelector } from '../state/PlannerStoreProvider';
+import { useClubPlanner } from '../club/ClubPlannerContext';
 import { Icon } from './Icons';
 import { personsWord } from './plan/orderFigures';
 import { usePlannerModelState } from './context';
@@ -27,7 +28,9 @@ export function OrderCommandPanel() {
   const preview = usePlannerSelector((s) => s.planning.preview);
   const plan = usePlanActions();
   const { addDay, busy: addingDay } = useAddDay();
-  const hide = usePlannerModelState().order?.club === false ? { display: 'none' as const } : undefined;
+  /* The planning chrome (progress, hint, "Zpět") is for planning: not in the standard calendar, not on a club's overview. */
+  const club = useClubPlanner();
+  const hide = usePlannerModelState().order?.club === false || (club !== null && !club.planning) ? { display: 'none' as const } : undefined;
   const { base, live, previewCategoryId, added } = usePlanFigures();
   const previewing = added > 0;
   const shown = previewing ? live : base;

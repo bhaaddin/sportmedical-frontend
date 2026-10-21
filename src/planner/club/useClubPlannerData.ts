@@ -49,7 +49,7 @@ export function useClubPlannerData(
   clubId: string,
   today: string,
   /** `session`: a session the router state hands over (it replaces the group's own on the stage). */
-  wanted: { orderId: string | null; blockId: string | null; session?: PickSession | null },
+  wanted: { orderId: string | null; blockId: string | null; session?: PickSession | null; /** The URL says "plan now" (`plan=1`); without it the screen is the club's overview. */ planning?: boolean },
 ): ClubPlannerData {
   const queryClient = useQueryClient();
   /* Route entry: everything the screen reads starts now, in one wave (what is already fresh asks nothing). Before the
@@ -78,8 +78,8 @@ export function useClubPlannerData(
   /* Which group is in view and the day the board opens on (a window the caller names picks the group that owns it). */
   const routed = wanted.session ?? null;
   const selection = useMemo(
-    () => clubSelection(orders, blocks, today, { orderId: wanted.orderId, blockId: wanted.blockId, session: routed }),
-    [orders, blocks, today, wanted.orderId, wanted.blockId, routed],
+    () => clubSelection(orders, blocks, today, { orderId: wanted.orderId, blockId: wanted.blockId, session: routed, planning: wanted.planning === true }),
+    [orders, blocks, today, wanted.orderId, wanted.blockId, routed, wanted.planning],
   );
   const { groups, selected, openOn } = selection;
 
@@ -93,7 +93,7 @@ export function useClubPlannerData(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `startKey` is what of `start` the reads depend on
   }, [queryClient, startKey]);
 
-  const needsCatalogue = selected?.editable === true;
+  const needsCatalogue = selected?.editable === true && wanted.planning === true;
   const catalogueQuery = useQuery({
     queryKey: ['club-block-activities'],
     queryFn: fetchBlockableActivities,
@@ -102,8 +102,8 @@ export function useClubPlannerData(
   });
 
   const session = useMemo<PickSession | null>(
-    () => (selected?.editable && catalogueQuery.data ? editSessionFor(selected.root, catalogueQuery.data, today) : null),
-    [selected, catalogueQuery.data, today],
+    () => (wanted.planning === true && selected?.editable && catalogueQuery.data ? editSessionFor(selected.root, catalogueQuery.data, today) : null),
+    [wanted.planning, selected, catalogueQuery.data, today],
   );
 
   const failed = clubQuery.isError && clubQuery.data === undefined;

@@ -23,6 +23,7 @@ import { ReservationDrawer } from '../ReservationDrawer';
 import { SummaryExperience } from '../SummaryExperience';
 import { Toast } from '../Toast';
 import { WeekBoardPanel } from '../WeekBoardPanel';
+import { useClubPlanner } from '../../club/ClubPlannerContext';
 import { usePlannerKeyboard } from '../usePlannerKeyboard';
 import { usePlannerModelState } from '../context';
 import { BoardStrip, useBoardFit } from './CompactBoardChrome';
@@ -41,6 +42,10 @@ export interface CompactLayersProps {
 export function CompactLayers({ layout, user, headerMode }: CompactLayersProps) {
   usePlannerKeyboard();
   const standard = usePlannerModelState().order?.club === false;
+  const club = useClubPlanner();
+  /* A club's overview (reviewer 2.3): its quick actions are the point of the screen, so on a phone / tablet they come right
+     under the header instead of below a whole board; planning keeps the deck under the board. */
+  const overview = club !== null && !club.planning;
   const mainRef = useRef<HTMLDivElement | null>(null);
   const openerRef = useRef<HTMLButtonElement | null>(null);
   /* The tablet pins the left column from 1000 px; below that (and on the phone) it is a drawer / sheet. */
@@ -55,7 +60,7 @@ export function CompactLayers({ layout, user, headerMode }: CompactLayersProps) 
   }, [pinned]);
 
   /* Club planning by touch: tap the start, tap the end. The standard calendar keeps the board's own long-press. */
-  useTouchPlacement(mainRef, !standard);
+  useTouchPlacement(mainRef, !standard && !(club !== null && !club.planning));
 
   return (
     <>
@@ -66,6 +71,7 @@ export function CompactLayers({ layout, user, headerMode }: CompactLayersProps) 
           <ClubHeader user={user} mode={headerMode} />
         </CompactHeader>
       )}
+      {overview ? <PlanningCarousel /> : null}
       <div id="live-ui" className="compact-live" aria-label="Interaktivní kalendář a termíny" data-testid="live-ui" data-fit={fit} data-pinned={pinned ? 'true' : 'false'}>
         <CompactSidebar open={sidebarOpen} pinned={pinned} layout={layout} onClose={closeSidebar} openerRef={openerRef}>
           <MiniCalendarPanel />
@@ -84,7 +90,7 @@ export function CompactLayers({ layout, user, headerMode }: CompactLayersProps) 
           />
         </div>
       </div>
-      <PlanningCarousel />
+      {overview ? null : <PlanningCarousel />}
       <CompactOrderDock />
       <div id="status-overlay" aria-live="polite" />
       <MiniDayTooltip />
