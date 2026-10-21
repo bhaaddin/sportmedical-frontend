@@ -13,7 +13,7 @@
  * once the stage has drawn.
  */
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { clubBlocksApi, fetchBlockableActivities, type ClubBlockView } from '../../api/clubBlocks';
 import { clubOrdersApi, type ClubOrderView } from '../../api/clubOrders';
 import { clubsApi, type Club } from '../../api/clubs';
@@ -54,11 +54,7 @@ export function useClubPlannerData(
   const queryClient = useQueryClient();
   /* Route entry: everything the screen reads starts now, in one wave (what is already fresh asks nothing). Before the
      queries below mount, so a copy shared from the club list is in place when they look. */
-  const entered = useRef<string | null>(null);
-  if (entered.current !== clubId) {
-    entered.current = clubId;
-    prefetchClubScreen(queryClient, clubId, { route: false, stage: false });
-  }
+  useMemo(() => prefetchClubScreen(queryClient, clubId, { stage: false }), [queryClient, clubId]);
 
   const clubQuery = useQuery({
     queryKey: ['clubs', 'one', clubId],
@@ -90,11 +86,11 @@ export function useClubPlannerData(
   /* The stage's reads, as soon as the orders are known (once per distinct start; the cache keeps it from asking twice). */
   const ordersKnown = ordersQuery.data !== undefined;
   const startKey = ordersKnown ? JSON.stringify([clubId, selection.start.openOn, selection.start.session?.serviceId ?? null, selection.start.session?.order?.id ?? null, selection.start.session?.order?.blocks ?? null]) : null;
-  const startRef = useRef(selection.start);
-  startRef.current = selection.start;
+  const start = selection.start;
   useEffect(() => {
     if (startKey === null) return;
-    void prefetchClubStage(queryClient, startRef.current).catch(() => undefined);
+    void prefetchClubStage(queryClient, start).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `startKey` is what of `start` the reads depend on
   }, [queryClient, startKey]);
 
   const needsCatalogue = selected?.editable === true;

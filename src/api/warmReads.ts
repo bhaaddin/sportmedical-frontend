@@ -23,7 +23,6 @@
    decide). A failure is dropped; the screen asks again when it opens.
    ══════════════════════════════════════════════════════════════ */
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
-import { refreshAccount } from '../auth/accountRefresh';
 import { pragueDateKey } from '../utils/time';
 import { activitiesApi } from './activities';
 import { calendarsApi } from './calendars';
@@ -61,9 +60,10 @@ export interface ClubScreenWarmOptions {
   /** A window the router state names (`clubBlockId`). */
   blockId?: string | null;
   year?: number;
-  /** Also fetch the screen's code (the lazy route chunk); default true. */
-  route?: boolean;
-  /** Also start the stage's reads once the orders are known; default true (the screen itself starts them otherwise). */
+  /**
+   * Also fetch the screen's code (the lazy route chunk) and start the stage's reads once the orders are known; default
+   * true. The screen itself passes false: its code is there and it starts its stage with the exact selection.
+   */
   stage?: boolean;
 }
 
@@ -93,7 +93,7 @@ export function seedFrom<S, T>(
 const ordersOf = (clubId: string) => () => clubOrdersApi.list({ clubId });
 
 /** The club screen's code: the same module the route loads lazily, so the router then finds it fetched. */
-export const clubRoute = { load: (): Promise<unknown> => import('../planner/ClubPlannerPage') };
+export const clubRoute = { load: () => import('../planner/ClubPlannerPage') };
 const NO_WINDOWS: never[] = [];
 
 /**
@@ -130,12 +130,13 @@ export function prefetchClubScreen(queryClient: QueryClient, clubId: string, opt
   warm(blocks);
   warm(queryClient.prefetchQuery({ queryKey: ['club-block-activities'], queryFn: fetchBlockableActivities }));
   warmReferenceData(queryClient, options.year);
-  if (options.route !== false) warm(clubRoute.load());
-
   if (options.stage === false) return;
+  /* the screen's code; the stage's planning comes with it (the route module hands it out) */
+  const route = clubRoute.load();
+  warm(route);
   const blockId = options.blockId ?? null;
   warm(
-    Promise.all([orders, blockId === null ? NO_WINDOWS : blocks, import('../planner/club/clubStageReads')]).then(([list, windows, stage]) => {
+    Promise.all([orders, blockId === null ? NO_WINDOWS : blocks, route]).then(([list, windows, stage]) => {
       const { start } = stage.clubSelection(list, windows, pragueDateKey(new Date()), { orderId: options.orderId ?? null, blockId });
       return stage.prefetchClubStage(queryClient, start);
     }),
@@ -144,7 +145,8 @@ export function prefetchClubScreen(queryClient: QueryClient, clubId: string, opt
 
 /** Opened straight on a club's address: the account (the permissions) is read now too, not after the shell has drawn. */
 export function warmAccount(): void {
-  warm(refreshAccount({ force: true }));
+  /* loaded on demand: a static import would pull the signed-in session code into what the public site shares */
+  warm(import('../auth/accountRefresh').then(({ refreshAccount }) => refreshAccount({ force: true })));
 }
 
 /** The reads of the club list: the clubs, their blocks and orders, and the calendars the older reservations hang on. */

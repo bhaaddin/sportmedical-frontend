@@ -26,8 +26,7 @@ vi.mock('./clubs', () => ({
   clubsApi: { getById: m.clubById, getAll: m.clubAll },
 }));
 vi.mock('../auth/accountRefresh', () => ({ refreshAccount: side.account }));
-vi.mock('../planner/ClubPlannerPage', () => ({ default: () => null }));
-vi.mock('../planner/club/clubStageReads', () => ({ clubSelection: side.selection, prefetchClubStage: side.stage }));
+vi.mock('../planner/ClubPlannerPage', () => ({ default: () => null, clubSelection: side.selection, prefetchClubStage: side.stage }));
 
 const { warmForPath } = await import('./warmStart');
 const { prefetchClubScreen, clubRoute, SHARE_MAX_AGE_MS } = await import('./warmReads');
@@ -119,9 +118,9 @@ describe('prefetchClubScreen', () => {
     expect(calls()).toBe(first);
   });
 
-  it('fetches the screen code with it, unless asked not to', async () => {
+  it('fetches the screen code with it, unless the screen itself asks (its code is there)', async () => {
     const load = vi.spyOn(clubRoute, 'load');
-    prefetchClubScreen(new QueryClient(), CLUB, { route: false });
+    prefetchClubScreen(new QueryClient(), CLUB, { stage: false });
     expect(load).not.toHaveBeenCalled();
     prefetchClubScreen(new QueryClient(), CLUB);
     expect(load).toHaveBeenCalledTimes(1);
@@ -156,13 +155,13 @@ describe('prefetchClubScreen', () => {
   it('shares nothing from an answer that is too old or marked stale by a write', async () => {
     const old = new QueryClient();
     old.setQueryData(['club-orders', '', '', ''], [order('o-1', CLUB)], { updatedAt: Date.now() - SHARE_MAX_AGE_MS - 1 });
-    prefetchClubScreen(old, CLUB, { stage: false, route: false });
+    prefetchClubScreen(old, CLUB, { stage: false });
     expect(old.getQueryData(['club-orders', CLUB, '', ''])).toBeUndefined();
 
     const written = new QueryClient();
     written.setQueryData(['club-orders', '', '', ''], [order('o-1', CLUB)]);
     await written.invalidateQueries({ refetchType: 'none' });
-    prefetchClubScreen(written, CLUB, { stage: false, route: false });
+    prefetchClubScreen(written, CLUB, { stage: false });
     expect(written.getQueryData(['club-orders', CLUB, '', ''])).toBeUndefined();
     await settle();
   });
