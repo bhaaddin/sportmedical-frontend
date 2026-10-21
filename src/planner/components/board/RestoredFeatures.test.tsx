@@ -488,12 +488,17 @@ describe('the month: Ctrl-drag adds places, the tray blocks them all', () => {
     expect(screen.queryByRole('menu', { name: 'Akce pro vybraný čas' })).toBeNull();
   });
 
-  it('is not offered while a club order is planned (the board belongs to the order)', async () => {
+  it('while a club order is planned the month marks days FOR THE ORDER: the tray plans them, it does not block them', async () => {
     mount({ config: { mode: 'club' } });
     await screen.findByTestId('board-booking-b1');
     click('Měsíc');
     await screen.findByTestId('month-matrix');
-    expect(screen.queryByTestId('month-tools')).toBeNull();
+    expect(screen.getByTestId('month-tools')).toHaveTextContent(/Klepnutím na den ho naplánujete celý/);
+    click('Vybrat víc dnů');
+    fireEvent.click(document.querySelector('.month-tile[data-day="2026-12-09"]')!);
+    const tray = await screen.findByTestId('day-tray');
+    expect(within(tray).getByTestId('day-tray-plan')).toHaveTextContent('Naplánovat vybrané dny');
+    expect(within(tray).queryByTestId('day-tray-block')).toBeNull();
   });
 });
 

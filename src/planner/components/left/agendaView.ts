@@ -72,7 +72,7 @@ export function agendaView(
     return {
       ...model,
       standard: false,
-      kpi: { ...model.kpi, planned: f.planned, requested: f.requested, fillPercent: f.percent, remainingLabel },
+      kpi: { ...model.kpi, planned: f.planned, requested: f.requested, fillPercent: f.requested > 0 ? Math.min(100, (f.planned / f.requested) * 100) : 0, remainingLabel },
       footerStatus: ui.mode === 'activities' ? `Zbývá ${f.remaining} ${agendaSlotLabel(f.remaining)} naplánovat` : model.footerStatus,
     };
   }
