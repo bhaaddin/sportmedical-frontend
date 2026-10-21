@@ -32,9 +32,9 @@ describe('childrenFor', () => {
     expect(childrenFor(pathname)).toBeNull();
   });
 
-  it('gives Kluby its six screens, in order', () => {
+  it('gives Kluby its five screens, in order (R14b: no Rezervace)', () => {
     expect(childrenFor('/clubs')?.items.map((c) => c.text)).toEqual([
-      'Přehled klubů', 'Objednávky klubů', 'Rezervace', 'Hráči', 'Statistiky', 'Fakturace',
+      'Přehled klubů', 'Objednávky klubů', 'Hráči', 'Statistiky', 'Fakturace',
     ]);
   });
 

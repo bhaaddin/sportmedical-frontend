@@ -37,7 +37,7 @@ export function LinkCopyRow({ label, path, testId, big = false }: {
         >
           {url === '' ? 'Odkaz zatím není k dispozici.' : url}
         </Box>
-        <CopyButton text={url} ariaLabel={`Zkopírovat: ${label}`} testId={testId ? `${testId}-copy` : undefined} />
+        <CopyButton text={url} ariaLabel={`Zkopírovat: ${label}`} testId={testId ? `${testId}-copy` : undefined} onCopied={(ok) => { if (ok) toast.success('Odkaz zkopírován'); else toast.error('Odkaz se nepodařilo zkopírovat'); }} />
       </Stack>
     </Box>
   );

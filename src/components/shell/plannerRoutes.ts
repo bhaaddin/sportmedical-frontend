@@ -5,7 +5,7 @@
  * there - only a "Menu" button in the where-am-I row that opens the same navigation as a slide-over drawer (see
  * PlannerMenu.tsx). The phone keeps its bottom navigation as everywhere else.
  *
- * The clubs LIST (`/clubs`) and the clubs' other pages (`/clubs/objednavky`, `/rezervace`, `/hraci`, `/statistiky`,
+ * The clubs LIST (`/clubs`) and the clubs' other pages (`/clubs/objednavky`, `/hraci`, `/statistiky`,
  * `/fakturace`) are ordinary pages with the sidebar; only `/clubs/<id>` is the stage.
  */
 const PLANNER_PREFIXES = ['/planovani', '/planner-lab'] as const;

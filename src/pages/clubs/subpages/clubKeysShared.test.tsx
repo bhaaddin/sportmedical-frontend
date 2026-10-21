@@ -27,7 +27,6 @@ vi.mock('../../../api/calendars', () => ({ calendarsApi: { list: calendarsList }
 vi.mock('../../../services/socketService', () => ({ socketService: { stop: vi.fn() } }));
 
 const { createQueryClient } = await import('../../../api/queryClient');
-const { default: ReservationsPage } = await import('../ClubReservationsPage');
 const { default: PlayersPage } = await import('../ClubPlayersPage');
 
 const mountOn = (client: ReturnType<typeof createQueryClient>, ui: ReactNode) =>
@@ -44,10 +43,10 @@ describe('club screens share one request per list', () => {
     calendarsList.mockReset().mockResolvedValue([]);
   });
 
-  it('Rezervace then Hráči: blocks and orders are read once', async () => {
+  it('Hráči opened twice: blocks and orders are read once', async () => {
     const client = createQueryClient();
 
-    const first = mountOn(client, <ReservationsPage />);
+    const first = mountOn(client, <PlayersPage />);
     await waitFor(() => expect(blocksList).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(ordersList).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(client.getQueryState(['club-blocks', 'list'])?.status).toBe('success'));
@@ -59,6 +58,5 @@ describe('club screens share one request per list', () => {
 
     expect(blocksList).toHaveBeenCalledTimes(1);
     expect(ordersList).toHaveBeenCalledTimes(1);
-    expect(calendarsList).toHaveBeenCalledTimes(1);
   });
 });

@@ -103,7 +103,6 @@ const CashierPage = lazy(() => import('./pages/CashierPage'));
 const ClubsPage = lazy(() => import('./pages/ClubsPage'));
 const ClubOrdersPage = lazy(() => import('./pages/clubs/orders/ClubOrdersPage'));
 const ClubOrderHistoryPage = lazy(() => import('./pages/clubs/orders/ClubOrderHistoryPage'));
-const ClubReservationsPage = lazy(() => import('./pages/clubs/ClubReservationsPage'));
 const ClubPlayersPage = lazy(() => import('./pages/clubs/ClubPlayersPage'));
 const ClubStatsPage = lazy(() => import('./pages/clubs/ClubStatsPage'));
 const ClubBillingPage = lazy(() => import('./pages/clubs/ClubBillingPage'));
@@ -472,7 +471,8 @@ export default function StaffApp() {
           <Route path="/clubs" element={<ClubsPage />} />
           <Route path="/clubs/objednavky" element={<ClubOrdersPage />} />
           <Route path="/clubs/objednavky/:orderId/historie" element={<ClubOrderHistoryPage />} />
-          <Route path="/clubs/rezervace" element={<ClubReservationsPage />} />
+          {/* R14b: the Rezervace page is gone; an old bookmark lands on the orders (it must not fall through to /clubs/:clubId) */}
+          <Route path="/clubs/rezervace" element={<Navigate to="/clubs/objednavky" replace />} />
           <Route path="/clubs/hraci" element={<ClubPlayersPage />} />
           <Route path="/clubs/statistiky" element={<ClubStatsPage />} />
           <Route path="/clubs/fakturace" element={<ClubBillingPage />} />

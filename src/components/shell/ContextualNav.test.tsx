@@ -66,7 +66,7 @@ describe('contextual sidebar (1440)', () => {
   it('shows only the children of the entry you are in', () => {
     renderShell('/clubs/hraci', VIEWPORTS.desktop);
     const nav = mainNav();
-    for (const name of ['Přehled klubů', 'Objednávky klubů', 'Rezervace', 'Hráči', 'Statistiky', 'Fakturace']) {
+    for (const name of ['Přehled klubů', 'Objednávky klubů', 'Hráči', 'Statistiky', 'Fakturace']) {
       expect(within(nav).getAllByRole('link', { name }).length).toBeGreaterThan(0);
     }
     expect(within(nav).queryByRole('link', { name: 'Dnešní přehled' })).not.toBeInTheDocument();
@@ -132,7 +132,7 @@ describe('contextual navigation (834 / 390)', () => {
     expect(within(bar).getByRole('link', { name: 'Kluby a týmy' })).toHaveAttribute('aria-current', 'page');
     await userEvent.click(screen.getByRole('button', { name: 'Více' }));
     const sheet = await screen.findByRole('dialog', { name: 'Více' });
-    for (const [name, href] of [['Objednávky klubů', '/clubs/objednavky'], ['Rezervace', '/clubs/rezervace'], ['Hráči', '/clubs/hraci']]) {
+    for (const [name, href] of [['Objednávky klubů', '/clubs/objednavky'], ['Hráči', '/clubs/hraci']]) {
       expect(within(sheet).getByRole('link', { name })).toHaveAttribute('href', href);
     }
   });
@@ -207,7 +207,7 @@ const SECTIONS: Array<{ path: string; title: string; items: Array<[string, strin
   {
     path: '/clubs',
     title: 'Kluby a týmy',
-    items: [['Přehled klubů', '/clubs'], ['Objednávky klubů', '/clubs/objednavky'], ['Rezervace', '/clubs/rezervace'], ['Hráči', '/clubs/hraci'], ['Statistiky', '/clubs/statistiky'], ['Fakturace', '/clubs/fakturace']],
+    items: [['Přehled klubů', '/clubs'], ['Objednávky klubů', '/clubs/objednavky'], ['Hráči', '/clubs/hraci'], ['Statistiky', '/clubs/statistiky'], ['Fakturace', '/clubs/fakturace']],
     foreign: ['Dnešní přehled', 'Nový pacient', 'Pokladna'],
   },
   {

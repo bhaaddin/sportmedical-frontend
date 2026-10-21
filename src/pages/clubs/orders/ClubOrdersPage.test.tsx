@@ -323,8 +323,7 @@ describe('new order: two ways in', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Vytvořit odkaz' }));
     expect(invite).toHaveBeenCalledWith({ clubId: 'club-2', note: 'Podzim' });
     const link = await within(dialog).findByTestId('invite-link');
-    expect(link).toHaveTextContent('app.test/klub-objednavka/zz');
-    expect(link).not.toHaveTextContent('https://');
+    expect(link).toHaveTextContent('https://app.test/klub-objednavka/zz');
     await user.click(within(dialog).getByRole('button', { name: /Zkopírovat/ }));
     expect(clipboard).toHaveBeenCalledWith('https://app.test/klub-objednavka/zz');
   });

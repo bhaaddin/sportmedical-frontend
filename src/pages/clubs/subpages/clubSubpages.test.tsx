@@ -44,7 +44,6 @@ vi.mock('react-router-dom', async (importOriginal) => {
   return { ...actual, useNavigate: () => navigate };
 });
 
-const { default: ReservationsPage } = await import('../ClubReservationsPage');
 const { default: PlayersPage } = await import('../ClubPlayersPage');
 const { default: StatsPage } = await import('../ClubStatsPage');
 const { default: BillingPage } = await import('../ClubBillingPage');
@@ -128,13 +127,6 @@ beforeEach(() => {
 describe.each(['phone', 'tablet', 'desktop'] as const)('layouts at %s', (name) => {
   beforeEach(() => setViewport(VIEWPORTS[name]));
 
-  it('Rezervace draws its list in the width\'s own layout', async () => {
-    const { container } = mount(<ReservationsPage />);
-    await screen.findByText('Rezervace klubů');
-    await waitFor(() => expect(container.querySelector(`[data-layout="${layoutOf(name)}"]`)).not.toBeNull());
-    expect(shown('FK Slaný').length).toBeGreaterThan(0);
-  });
-
   it('Hráči draws its list in the width\'s own layout', async () => {
     const { container } = mount(<PlayersPage />);
     await screen.findByText('Jan Novák');
@@ -152,59 +144,6 @@ describe.each(['phone', 'tablet', 'desktop'] as const)('layouts at %s', (name) =
     mount(<BillingPage />);
     expect(await screen.findAllByText(/2026-001/)).not.toHaveLength(0);
     expect(screen.queryByText(/2026-002/)).toBeNull();
-  });
-});
-
-describe('Rezervace', () => {
-  it('filters by club and status, and links to the order and the calendar', async () => {
-    const user = userEvent.setup();
-    mount(<ReservationsPage />);
-    await waitFor(() => expect(shown('SK Kladno').length).toBeGreaterThan(0));
-    await user.click(screen.getByRole('button', { name: /^Vše/ }));
-    await user.selectOptions(screen.getByLabelText('Stav'), 'Cancelled');
-    expect(shown('FK Slaný')).toHaveLength(0);
-    await user.selectOptions(screen.getByLabelText('Stav'), '');
-    await user.selectOptions(screen.getByLabelText('Klub'), 'c1');
-    expect(shown('SK Kladno')).toHaveLength(0);
-
-    await user.click(screen.getByRole('button', { name: /^Objednávka KO-/ }));
-    expect(navigate).toHaveBeenCalledWith('/clubs/objednavky', { state: { openOrderId: 'o1' } });
-    await user.click(screen.getByRole('button', { name: 'Zobrazit v kalendáři' }));
-    expect(navigate).toHaveBeenCalledWith('/planovani', { state: { date: day(0) } });
-  });
-
-  it.each(['phone', 'tablet', 'desktop'] as const)('shows the window\'s worth and the order\'s total on every row at %s; "bez ceny" without an order (Etapa 12)', async (name) => {
-    setViewport(VIEWPORTS[name]);
-    ordersList.mockResolvedValue([order({ activitySeats: [{ activityId: 'a1', activityName: 'Diagnostika', durationMinutes: 30, seats: 12, registered: 4, unitPriceCzk: 500 }], priceQuote: { listTotalCzk: 6000, discounts: [], totalCzk: 5400 } })]);
-    blocksList.mockResolvedValue([
-      { ...blocks[0], activitySeats: [{ activityId: 'a1', activityName: 'Diagnostika', seats: 10, registered: 4 }] },
-      blocks[1],
-    ]);
-    mount(<ReservationsPage />);
-    await screen.findByText('Rezervace klubů');
-    await waitFor(() => expect(shown('SK Kladno').length).toBeGreaterThan(0));
-    const prices = screen.queryAllByTestId('reservation-price');
-    /* tablet keeps its three columns (club, term, seats); the phone card and the desktop table carry the price */
-    if (name === 'tablet') {
-      expect(prices).toHaveLength(0);
-      return;
-    }
-    expect(prices).toHaveLength(2);
-    /* b1: the order's 5 400 Kč, under it the window's 10 seats × 500 Kč at the list price; b2 has no order */
-    expect(prices[0]).toHaveTextContent(/objednávka 5\s400\sKč/);
-    expect(prices[0]).toHaveTextContent(/okno 5\s000\sKč v ceníku/);
-    expect(prices[1]).toHaveTextContent('bez ceny');
-  });
-
-  it('shows the empty state and the retry on an error', async () => {
-    blocksList.mockResolvedValueOnce([]);
-    const view = mount(<ReservationsPage />);
-    expect(await screen.findByText('V tomto období nejsou žádné rezervace klubů.')).toBeInTheDocument();
-    view.unmount();
-    blocksList.mockRejectedValueOnce(new Error('boom'));
-    mount(<ReservationsPage />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Zkusit znovu' }));
-    expect(blocksList).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -388,7 +327,6 @@ describe('one screen (fitted pages)', () => {
   const scrolls = (el: Element) => { const c = getComputedStyle(el); return /auto|scroll/.test(`${c.overflowY} ${c.overflow}`); };
 
   it.each([
-    ['Rezervace', () => <ReservationsPage />, 'Rezervace klubů'],
     ['Hráči', () => <PlayersPage />, 'Hráči klubů'],
   ])('%s: the table is the box that scrolls, its head sticks', async (_n, page, label) => {
     mount(page());

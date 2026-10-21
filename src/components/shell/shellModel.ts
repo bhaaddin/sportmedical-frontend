@@ -49,7 +49,6 @@ export const SECTION_CHILDREN: Record<ContextualParent, ChildSpec[]> = {
   '/clubs': [
     { text: 'Přehled klubů', path: '/clubs' },
     { text: 'Objednávky klubů', path: '/clubs/objednavky' },
-    { text: 'Rezervace', path: '/clubs/rezervace' },
     { text: 'Hráči', path: '/clubs/hraci' },
     { text: 'Statistiky', path: '/clubs/statistiky' },
     { text: 'Fakturace', path: '/clubs/fakturace' },
