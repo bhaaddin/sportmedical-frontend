@@ -92,6 +92,8 @@ export interface MonthSelection {
   today: string;
   mayBlock: boolean;
   onBlock: () => void;
+  /** Club planning: the marked days go to the order being planned (a click on a day plans it whole). */
+  club?: { onPlan: () => void; busy: boolean };
 }
 
 export function MonthMatrix({ model, onPick, selection }: { model: MonthListModel; onPick: (date: string) => void; selection?: MonthSelection }) {
@@ -101,7 +103,7 @@ export function MonthMatrix({ model, onPick, selection }: { model: MonthListMode
   return (
     <>
       <div className="alternative-head">{model.heading}</div>
-      {select ? <MonthTools select={select} /> : null}
+      {select ? <MonthTools select={select} club={selection?.club !== undefined} /> : null}
       <div
         className="month-matrix"
         ref={selection?.surfaceRef}
@@ -148,7 +150,7 @@ export function MonthMatrix({ model, onPick, selection }: { model: MonthListMode
           );
         })}
       </div>
-      {selection ? <DayTray select={selection.select} today={selection.today} mayBlock={selection.mayBlock} onBlock={selection.onBlock} /> : null}
+      {selection ? <DayTray select={selection.select} today={selection.today} mayBlock={selection.mayBlock} onBlock={selection.onBlock} {...(selection.club ? { club: selection.club } : {})} /> : null}
     </>
   );
 }

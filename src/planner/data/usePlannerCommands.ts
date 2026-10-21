@@ -20,6 +20,7 @@ import {
 
 export interface PlannerCommands {
   createInterval: PlannerDataSource['createInterval'];
+  createIntervals: (inputs: readonly IntervalInput[]) => Promise<{ created: number; complete: boolean; mergedCount: number; undoToken: string | null }>;
   createTerm: PlannerDataSource['createTerm'];
   moveInterval: (input: MoveIntervalInput) => ReturnType<PlannerDataSource['moveInterval']>;
   resizeInterval: (input: ResizeIntervalInput) => ReturnType<PlannerDataSource['resizeInterval']>;
@@ -47,6 +48,23 @@ export function usePlannerCommands(): PlannerCommands {
     };
     const commands: PlannerCommands = {
       createInterval: (input: IntervalInput) => after(source.createInterval(input)),
+      createIntervals: (inputs) =>
+        after(
+          source.createIntervals
+            ? source.createIntervals(inputs)
+            : (async () => {
+                let last: string | null = null;
+                let merged = 0;
+                let complete = false;
+                for (const input of inputs) {
+                  const r = await source.createInterval(input);
+                  last = r.undoToken ?? last;
+                  merged += r.mergedCount;
+                  complete = r.complete;
+                }
+                return { created: inputs.length, complete, mergedCount: merged, undoToken: last };
+              })(),
+        ),
       createTerm: (input) => after(source.createTerm(input)),
       moveInterval: (input) => after(source.moveInterval(input)),
       resizeInterval: (input) => after(source.resizeInterval(input)),

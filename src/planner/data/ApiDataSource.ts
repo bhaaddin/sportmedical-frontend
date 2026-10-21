@@ -55,6 +55,7 @@ import {
 } from '../api/mappers';
 import {
   addPlannedInterval,
+  plannedFrom,
   commitSmartEdit,
   commitTermExpansion,
   confirmTermMovement,
@@ -626,6 +627,28 @@ export class ApiDataSource implements PlannerDataSource {
       complete: result.complete,
       undoToken,
     };
+  }
+
+  async createIntervals(inputs: readonly IntervalInput[]): Promise<{ created: number; complete: boolean; mergedCount: number; undoToken: UndoToken | null }> {
+    this.requireClub('Plánování termínů');
+    if (inputs.length === 0) return { created: 0, complete: false, mergedCount: 0, undoToken: null };
+    const { ctx, externalIds } = await this.context(inputs.map((i) => i.date));
+    let working = ctx;
+    const touched: string[] = [];
+    let mergedCount = 0;
+    for (const input of inputs) {
+      const r = addPlannedInterval(working, input, this.newId);
+      if (!r.ok || !r.merged) throw new PlannerWriteError('validation', r.reason);
+      working = { ...working, sessions: r.sessions };
+      touched.push(r.merged.id);
+      mergedCount += r.mergedCount;
+    }
+    this.guard(ctx, working.sessions, touched);
+    const undoToken = this.remember({ kind: 'draft', draft: clone(this.draft) });
+    await this.finalizeDraft([...working.sessions], externalIds, touched);
+    this.emit();
+    const complete = inputs.length > 0 && inputs.every((i) => { const d = ctx.demands.find((x) => x.categoryId === i.categoryId); return d ? plannedFrom(working, working.sessions, i.categoryId) >= d.requested : false; });
+    return { created: inputs.length, complete, mergedCount, undoToken };
   }
 
   async createTerm(input: { date: IsoDate; categoryId: string; start: string; end: string }): Promise<CreateIntervalResult> {

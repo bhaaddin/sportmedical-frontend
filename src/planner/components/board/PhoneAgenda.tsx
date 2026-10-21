@@ -127,10 +127,11 @@ export function PhoneAgenda({
   );
 }
 
-export function PhoneMonthList({ heading, rows, onPick }: { heading: string; rows: readonly PhoneMonthRow[]; onPick: (date: string) => void }) {
+export function PhoneMonthList({ heading, rows, onPick, hint }: { heading: string; rows: readonly PhoneMonthRow[]; onPick: (date: string) => void; hint?: string }) {
   return (
     <>
       <div className="alternative-head">{heading}</div>
+      {hint ? <p className="month-hint phone-month-hint" data-testid="phone-month-hint">{hint}</p> : null}
       <ul className="phone-month" aria-label={PLANNER_TEXT.phone.monthList} data-testid="phone-month-list">
         {rows.map((r) => (
           <li key={r.date}>

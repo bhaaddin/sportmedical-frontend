@@ -240,6 +240,11 @@ export interface PlannerDataSource {
   /* ------------------------------ writes ------------------------------ */
   /** Drop a činnost into the calendar: validate, merge with adjacent safe blocks, store. */
   createInterval(input: IntervalInput): Promise<CreateIntervalResult>;
+  /**
+   * Several drops at once (a month pick of whole days): one read of the calendar, one check against the need, ONE undo
+   * step for all of them. All or nothing - a refused drop leaves the draft untouched. Absent: the caller drops one by one.
+   */
+  createIntervals?(inputs: readonly IntervalInput[]): Promise<{ created: number; complete: boolean; mergedCount: number; undoToken: UndoToken | null }>;
   /** The "Vytvořit termín" dialog: a term from explicit start and end. */
   createTerm(input: { date: IsoDate; categoryId: string; start: ClockTime; end: ClockTime }): Promise<CreateIntervalResult>;
   moveInterval(input: MoveIntervalInput): Promise<TermWriteResult>;

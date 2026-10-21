@@ -14,6 +14,7 @@ import { planGuard } from './planGuard';
 import {
   addBooking as modelAddBooking,
   addPlannedInterval,
+  plannedFrom,
   commitSmartEdit,
   commitTermExpansion,
   confirmTermMovement,
@@ -264,6 +265,28 @@ export class DemoDataSource implements PlannerDataSource {
       complete: result.complete,
       undoToken,
     };
+  }
+
+  async createIntervals(inputs: readonly IntervalInput[]): Promise<{ created: number; complete: boolean; mergedCount: number; undoToken: UndoToken | null }> {
+    await this.enter();
+    if (inputs.length === 0) return { created: 0, complete: false, mergedCount: 0, undoToken: null };
+    const before = this.context();
+    let working = before;
+    const touched: string[] = [];
+    let mergedCount = 0;
+    for (const input of inputs) {
+      const r = addPlannedInterval(working, input, this.newId);
+      if (!r.ok || !r.merged) throw new PlannerWriteError('validation', r.reason);
+      working = { ...working, sessions: r.sessions };
+      touched.push(r.merged.id);
+      mergedCount += r.mergedCount;
+    }
+    this.guard(before, working.sessions, touched);
+    const undoToken = this.remember();
+    this.replaceWith([...working.sessions], touched);
+    this.emit();
+    const complete = inputs.every((i) => { const d = before.demands.find((x) => x.categoryId === i.categoryId); return d ? plannedFrom(working, working.sessions, i.categoryId) >= d.requested : false; });
+    return { created: inputs.length, complete, mergedCount, undoToken };
   }
 
   async createTerm(input: { date: IsoDate; categoryId: string; start: string; end: string }): Promise<CreateIntervalResult> {

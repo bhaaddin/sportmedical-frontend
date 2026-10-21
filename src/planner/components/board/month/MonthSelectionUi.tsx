@@ -10,7 +10,7 @@ import { PLANNER_TEXT } from '../../../text';
 import type { IsoDate } from '../../../model';
 import type { DaySelectApi } from './useDaySelect';
 
-export function MonthTools({ select }: { select: DaySelectApi }) {
+export function MonthTools({ select, club = false }: { select: DaySelectApi; club?: boolean }) {
   return (
     <div className="month-tools" data-testid="month-tools">
       <button
@@ -36,7 +36,7 @@ export function MonthTools({ select }: { select: DaySelectApi }) {
       >
         {PLANNER_TEXT.days.additiveMode}
       </button>
-      <span className="month-hint">{PLANNER_TEXT.days.hint}</span>
+      <span className="month-hint">{club ? PLANNER_TEXT.days.clubHint : PLANNER_TEXT.days.hint}</span>
     </div>
   );
 }
@@ -46,11 +46,13 @@ export function DayTray({
   today,
   mayBlock,
   onBlock,
+  club,
 }: {
   select: DaySelectApi;
   today: IsoDate;
   mayBlock: boolean;
   onBlock: () => void;
+  club?: { onPlan: () => void; busy: boolean };
 }) {
   const places = select.places;
   if (places.length === 0) return null;
@@ -72,7 +74,11 @@ export function DayTray({
         })}
       </div>
       <div className="day-tray-actions">
-        {mayBlock ? (
+        {club ? (
+          <button type="button" className="app-button primary" data-testid="day-tray-plan" disabled={club.busy || blockable === 0} onClick={club.onPlan}>
+            {PLANNER_TEXT.days.planDays}
+          </button>
+        ) : mayBlock ? (
           <button type="button" className="app-button primary" data-testid="day-tray-block" disabled={blockable === 0} onClick={onBlock}>
             {PLANNER_TEXT.days.block}
           </button>

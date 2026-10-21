@@ -90,6 +90,7 @@ import { useBoardNow } from './useBoardNow';
 import { useBoardSelection, type BoardSelection } from './useBoardSelection';
 import { DaysBlockDialog } from './month/DaysBlockDialog';
 import { useDaySelect } from './month/useDaySelect';
+import { useDayPick } from '../plan/useDayPick';
 import { useInquiries } from './useInquiries';
 import { useNextFree } from './useNextFree';
 import { inquiryLabel, inquiryTitle } from '../../model/inquiries';
@@ -436,8 +437,21 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   /* ---- the month: several days marked at once (a mouse drags, Ctrl / Cmd / Shift adds a place; touch has toggles) ---- */
   const phone = useStage().layout === 'phone';
   const monthSurface = useRef<HTMLDivElement | null>(null);
-  const maySelectDays = calendar !== null && (calendar.mayBook || calendar.mayBlock) && config.mode === 'standard' && !phone && view === 'month';
+  /* While a club order is planned the month plans for the order: a click on a day takes the whole day (`useDayPick`). */
+  const clubDays = calendar !== null && calendar.mayBook && config.mode === 'club' && !phone && view === 'month';
+  const maySelectDays = clubDays || (calendar !== null && (calendar.mayBook || calendar.mayBlock) && config.mode === 'standard' && !phone && view === 'month');
   const select = useDaySelect(ctx.today, maySelectDays, monthSurface);
+  const dayPick = useDayPick();
+  /* The phone's month is a list: a tap on a row takes that whole day for the order (the day itself opens from the week strip). */
+  const clubPhoneDays = calendar !== null && calendar.mayBook && config.mode === 'club' && phone && view === 'month';
+  /* A drag over several days plans them at once; places added with Ctrl / Shift wait for the tray's button. */
+  useEffect(() => {
+    if (!clubDays || !select.chosen) return;
+    const chosen = select.chosen;
+    select.clear();
+    void dayPick.pick([{ from: chosen.from, to: chosen.to }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clubDays, select.chosen]);
   const [dayBlock, setDayBlock] = useState<readonly { from: IsoDate; to: IsoDate }[] | null>(null);
 
   /** The calendar a marked time belongs to: the first that works that day (and is not off for the worker). */
@@ -1004,7 +1018,12 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
           <PhoneMonthList
             heading={monthTiles.heading}
             rows={phoneMonth}
+            {...(clubPhoneDays ? { hint: PLANNER_TEXT.days.phoneClubHint } : {})}
             onPick={(date) => {
+              if (clubPhoneDays) {
+                void dayPick.pick([{ from: date, to: date }]);
+                return;
+              }
               act.selectDay(date);
               act.setView('day');
             }}
@@ -1014,11 +1033,35 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
           <MonthMatrix
             model={monthTiles}
             onPick={(date) => {
+              if (clubDays) {
+                void dayPick.pick([{ from: date, to: date }]);
+                return;
+              }
               act.selectDay(date);
               act.setView('day');
             }}
             {...(maySelectDays
-              ? { selection: { select, surfaceRef: monthSurface, today: ctx.today, mayBlock: calendar?.mayBlock ?? false, onBlock: () => setDayBlock(blockableRanges(select.places, ctx.today)) } }
+              ? {
+                  selection: {
+                    select,
+                    surfaceRef: monthSurface,
+                    today: ctx.today,
+                    mayBlock: calendar?.mayBlock ?? false,
+                    onBlock: () => setDayBlock(blockableRanges(select.places, ctx.today)),
+                    ...(clubDays
+                      ? {
+                          club: {
+                            busy: dayPick.busy,
+                            onPlan: () => {
+                              const ranges = select.places.map((p) => ({ from: p.from, to: p.to }));
+                              select.clear();
+                              void dayPick.pick(ranges);
+                            },
+                          },
+                        }
+                      : {}),
+                  },
+                }
               : {})}
           />
         ) : null}
@@ -1040,7 +1083,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
 
       {/* The days dragged across in the month: book from the first, block whole days, or hand them to a club order. */}
       <SelectionPopover
-        anchor={addToClub || !select.chosen ? null : { x: select.chosen.x, y: select.chosen.y }}
+        anchor={addToClub || clubDays || !select.chosen ? null : { x: select.chosen.x, y: select.chosen.y }}
         title={select.chosen ? rangeDates(select.chosen) : ''}
         subtitle={select.chosen ? daysWord(dayCount(select.chosen)) : ''}
         caption={calendar && calendar.calendars.length > 1 ? `${GRID_TEXT.calendars}: ${calendar.calendars.map((c) => c.name).join(', ')}` : calendar?.calendars[0]?.name}
