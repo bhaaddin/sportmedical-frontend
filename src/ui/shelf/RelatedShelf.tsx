@@ -5,22 +5,14 @@
  *
  *   <RelatedShelf groups={patientRelatedGroups({...})}>{extra cards}</RelatedShelf>
  *
- * `PatientRelatedShelf` is the ready-made one for a patient's card: it reads the invoices and the clubs itself and takes
- * what the card already loaded (the booking window, the documents), so it adds two requests and no duplicates.
  */
 import type { ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { Box, Button, Skeleton, Typography } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
-import { billingApi } from '../../api/billing';
-import type { DayAppointment } from '../../api/bookingContracts';
-import { clubsApi } from '../../api/clubs';
-import type { PatientDocument } from '../../api/documents';
-import { usePermission } from '../../auth/usePermission';
 import { useIsPhone } from '../../layout/useDevice';
 import { EntityChip } from './EntityLink';
 import { Shelf } from './Shelf';
-import { patientRelatedGroups, type RelatedGroup } from './related';
+import type { RelatedGroup } from './related';
 import { MUTED_SX, TARGET_SX, cardSurface } from './shelfStyle';
 
 export function RelatedCard({ group }: { group: RelatedGroup }) {
@@ -78,33 +70,4 @@ export function RelatedShelf({ groups, title = 'Související', hint, children }
       {children}
     </Shelf>
   );
-}
-
-/** A patient's related shelf. `upcoming` and `documents` are what the patient's card already loaded. */
-export function PatientRelatedShelf({
-  patientId, upcoming, documents, children,
-}: {
-  patientId: string;
-  upcoming: readonly DayAppointment[] | null;
-  /** `null` until the card has them: an empty list is a real answer, "nothing yet" is not. */
-  documents: readonly PatientDocument[] | null;
-  children?: ReactNode;
-}) {
-  const mayBill = usePermission('billing.manage');
-  const invoices = useQuery({
-    queryKey: ['shelf', 'patient-invoices', patientId],
-    queryFn: () => billingApi.getInvoices({ patientId }),
-    enabled: mayBill,
-    staleTime: 60_000,
-    retry: false,
-  });
-  const clubs = useQuery({ queryKey: ['shelf', 'clubs'], queryFn: () => clubsApi.getAll(), staleTime: 5 * 60_000, retry: false });
-  const groups = patientRelatedGroups({
-    patientId,
-    upcoming: { data: upcoming, loading: upcoming === null },
-    invoices: mayBill ? { data: invoices.data, loading: invoices.isPending, error: invoices.isError } : { hidden: true },
-    documents: { data: documents, loading: documents === null },
-    clubs: { data: clubs.data, loading: clubs.isPending, error: clubs.isError },
-  });
-  return <RelatedShelf groups={groups}>{children}</RelatedShelf>;
 }

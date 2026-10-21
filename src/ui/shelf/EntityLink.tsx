@@ -21,7 +21,6 @@ import { usePermissions } from '../../auth/usePermission';
 import { StatusChip } from '../../components/ui/StatusChip';
 import { ENTITY_LABEL, entityTarget, mayOpen, refKey, type EntityRef } from './entities';
 import { ENTITY_ICON, ENTITY_TONE, EntityBadge } from './entityMeta';
-import { loadPeek } from './peek';
 import { toneOf } from './shelfStyle';
 import { darkOf } from '../../theme';
 
@@ -66,7 +65,8 @@ function PeekCard({ entity, anchorEl, id, keepOpen }: { entity: EntityRef; ancho
   const queryClient = useQueryClient();
   const peek = useQuery({
     queryKey: ['shelf', 'peek', refKey(entity)],
-    queryFn: () => loadPeek(entity, queryClient),
+    /* The peek's api modules are fetched only now, when somebody has rested on a chip. */
+    queryFn: async () => (await import('./peek')).loadPeek(entity, queryClient),
     staleTime: 60_000,
     retry: false,
   });

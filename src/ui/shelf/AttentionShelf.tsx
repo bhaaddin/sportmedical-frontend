@@ -20,7 +20,7 @@ import { readHealth } from '../../pages/systemHealthModel';
 import { expiringSoon } from '../../pages/patients/paperworkStanding';
 import { pragueDateKey } from '../../utils/time';
 import { attentionGroups, attentionTotal, EXPIRING_PATIENT_LIMIT, type AttentionGroup, type ExpiringLike } from './attention';
-import { PEEK_KEYS } from './peek';
+import { PEEK_KEYS } from './peekKeys';
 import { AttentionCard } from './ShelfCard';
 import { Shelf } from './Shelf';
 

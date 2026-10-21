@@ -99,7 +99,9 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
                   test: /node_modules[\\/](recharts|d3-[^\/]+|victory-vendor|es-toolkit|immer|redux|@reduxjs|reselect|decimal\.js-light|internmap|react-redux)[\\/]/,
                   priority: 40,
                 },
-                { name: 'mui', test: /node_modules[\\/]@(mui|emotion)[\\/]/, priority: 30 },
+                /* @popperjs/core travels with MUI (its Popper, Menu and Tooltip): left to the bundler it was shared with whatever
+                   else two lazy screens had in common, which dragged the API chunk and zod into the application entry. */
+                { name: 'mui', test: /node_modules[\\/](@mui|@emotion|@popperjs)[\\/]/, priority: 30 },
                 { name: 'motion', test: /node_modules[\\/](motion|framer-motion|motion-dom|motion-utils)[\\/]/, priority: 25 },
                 /* The scroll-driven public pages (src/motion): each its own lazy chunk, none of them in any first load. */
                 { name: 'gsap', test: /node_modules[\\/]gsap[\\/]/, priority: 25 },

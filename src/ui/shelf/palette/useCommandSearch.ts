@@ -22,7 +22,7 @@ import { usePermissions } from '../../../auth/usePermission';
 import { formatCzk } from '../../../components/booking/grid/appointmentPrice';
 import { searchSettingsItems, visibleSections } from '../../../pages/settings/catalogue';
 import { addDaysToDateOnly, pragueDateKey } from '../../../utils/time';
-import { PEEK_KEYS } from '../peek';
+import { PEEK_KEYS } from '../peekKeys';
 import { getMemory, getServerMemory, subscribeMemory } from '../memory';
 import { mayOpen } from '../entities';
 import {

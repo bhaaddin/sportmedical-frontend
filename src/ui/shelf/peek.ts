@@ -27,6 +27,10 @@ import type { ChipTone } from '../../components/ui';
 import { statusOf } from '../../pages/billing/invoiceView';
 import { formatDateOnly, formatPragueDate, formatPragueDateTime, pragueDateKey } from '../../utils/time';
 import type { EntityRef } from './entities';
+import { PEEK_KEYS } from './peekKeys';
+import { APPOINTMENT_STATUS_WORD } from './words';
+
+export { PEEK_KEYS, APPOINTMENT_STATUS_WORD };
 
 export interface PeekFact {
   label: string;
@@ -37,16 +41,6 @@ export interface Peek {
   facts: PeekFact[];
   status?: { label: string; tone: ChipTone };
 }
-
-/** The booking statuses in words (the names the day lists and the cards already use). */
-export const APPOINTMENT_STATUS_WORD: Record<string, { label: string; tone: ChipTone }> = {
-  Scheduled: { label: 'Naplánováno', tone: 'grey' },
-  Confirmed: { label: 'Potvrzeno', tone: 'green' },
-  CheckedIn: { label: 'Přišel', tone: 'green' },
-  Completed: { label: 'Hotovo', tone: 'grey' },
-  Cancelled: { label: 'Zrušeno', tone: 'red' },
-  NoShow: { label: 'Nepřišel', tone: 'red' },
-};
 
 const DOCUMENT_STATUS_WORD: Record<string, { label: string; tone: ChipTone }> = {
   Pending: { label: 'Čeká na schválení', tone: 'beige' },
@@ -172,13 +166,6 @@ export function activityPeek(activity: { durationMinutes: number; priceCzk: numb
 /* ───────────────────────────── lazy: ask the api modules ───────────────────────────── */
 
 const MINUTE = 60_000;
-
-/** Query keys shared with the screens that already read the same list (so a peek is often free). */
-export const PEEK_KEYS = {
-  invoices: ['billing', 'invoices'] as const,
-  activities: ['activities', 'list'] as const,
-  services: ['shelf', 'clinic-services'] as const,
-};
 
 export async function loadPeek(ref: EntityRef, queryClient: QueryClient, now: Date = new Date()): Promise<Peek> {
   switch (ref.kind) {

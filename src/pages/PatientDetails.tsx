@@ -36,7 +36,8 @@ import { ALL_APPOINTMENTS_KEY, fetchAllAppointments } from '../components/patien
 import { questionnaireMissing, summariseVisits } from '../components/patients/patientActivity';
 import { stillMissing, expiringSoon } from './patients/paperworkStanding';
 import { formatDateOnly } from '../utils/time';
-import { MetricCard, PatientRelatedShelf, Shelf, TARGET_SX, cardSurface } from '../ui/shelf';
+import { MetricCard, Shelf, TARGET_SX, cardSurface } from '../ui/shelf';
+import { PatientRelatedShelf } from '../ui/shelf/PatientRelated';
 import type { PatientContext } from './patients/PatientLayout';
 
 /* ── Helpers ── */

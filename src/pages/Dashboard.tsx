@@ -18,9 +18,10 @@ import { toDateOnly, formatPragueTime } from '../utils/time';
 import { StatusChip } from '../components/ui';
 import { useDevice } from '../layout/useDevice';
 import {
-  AttentionShelf, EntityCard, EntityLink, MetricCard, PageFrame, RecentAndPinned, Shelf, TARGET_SX, entityTarget, useAttention,
+  EntityCard, EntityLink, MetricCard, PageFrame, RecentAndPinned, Shelf, TARGET_SX, entityTarget,
 } from '../ui/shelf';
-import { APPOINTMENT_STATUS_WORD } from '../ui/shelf/peek';
+import { AttentionShelf, useAttention } from '../ui/shelf/AttentionShelf';
+import { APPOINTMENT_STATUS_WORD } from '../ui/shelf/words';
 import { SoftCard } from '../components/ui/SoftCard';
 
 /*
