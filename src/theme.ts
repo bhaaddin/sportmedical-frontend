@@ -467,7 +467,8 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
               ...(light ? {} : { backgroundImage: 'none' }),
             },
           },
-          text: { '&:hover': { backgroundColor: hover }, ...(light ? { '&.MuiButton-colorPrimary': { color: inkAccent } } : {}) },
+          /* the accent as TEXT only where it must differ from the pick (orange, teal): the default accent's picture is unchanged */
+          text: { '&:hover': { backgroundColor: hover }, ...(light && inkAccent !== accentColor ? { '&.MuiButton-colorPrimary': { color: inkAccent } } : {}) },
         },
       },
       MuiIconButton: {

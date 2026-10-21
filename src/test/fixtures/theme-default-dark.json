@@ -246,6 +246,10 @@
     "::selection": {
      "backgroundColor": "rgba(0, 230, 228, 0.35)"
     },
+    ":root": {
+     "--sm-soft-bg": "rgba(0, 230, 228, 0.14)",
+     "--sm-soft-line": "rgba(0, 224, 232, 0.5)"
+    },
     "@media (max-width: 1279.95px)": {
      "body .MuiButton-root": {
       "minWidth": 44

@@ -1,6 +1,26 @@
 /* Reusable board flows for the reviewer-bug scripts. */
 import { login, waitPlanner, boardRect, dayX, minuteY, BASE } from './lib.mjs';
 
+/**
+ * The quiet week the seeded bookings live in (`node seed.mjs`): the Monday, env SEED_MONDAY. Cancelled bookings stay in the
+ * database (nothing is deleted), so every fresh seed goes to a week of its own.
+ */
+export const SEED_MONDAY = process.env.SEED_MONDAY ?? '2027-01-11';
+export const seedDay = (n) => {
+  const d = new Date(SEED_MONDAY + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+/** "11. 1." for the day buttons of the phone / tablet strip. */
+export const dayLabel = (iso) => `${Number(iso.slice(8, 10))}\\. ${Number(iso.slice(5, 7))}\\.`;
+/** How many weeks ahead of the current week the seeded Monday is. */
+export const weeksToSeed = () => {
+  const now = new Date();
+  const monday = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12));
+  monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+  return Math.round((Date.parse(SEED_MONDAY + 'T12:00:00Z') - monday.getTime()) / (7 * 86400000));
+};
+
 export const ACCENTS = { forest: '#0D5C52', slate: '#2B3440', teal: '#0D9488', blue: '#2563EB', purple: '#7C3AED', orange: '#EA580C' };
 
 /** Set the desk's theme (mode + accent) before the app boots: it reads both from localStorage. */

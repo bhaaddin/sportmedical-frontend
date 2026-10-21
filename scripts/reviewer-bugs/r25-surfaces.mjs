@@ -1,6 +1,6 @@
 /* 2.5 audit, part 4: the other planner surfaces (day list, month, left panel, flyouts, card summary, detail) at rest and hovered. */
 import { launch, newPage, shot } from './lib.mjs';
-import { setTheme, openPlanner } from './flows.mjs';
+import { setTheme, openPlanner, weeksToSeed } from './flows.mjs';
 import { probe, failing, hoverAudit } from './contrast.mjs';
 const size = process.argv[2] ?? 'desktop';
 const mode = process.argv[3] ?? 'dark';
@@ -9,7 +9,7 @@ const tag = process.argv[5] ?? 'audit';
 const b = await launch();
 const page = await newPage(b, size);
 await setTheme(page, mode, accent);
-await openPlanner(page, 7);
+await openPlanner(page, weeksToSeed());
 let total = 0;
 const report = (label, rows) => { total += rows.length; console.log(`[${size}/${mode}/${accent}] ${label}: ${rows.length} failing`); for (const r of rows.slice(0, 12)) console.log('   ', r.ratio + '<' + r.need, JSON.stringify(r.text), r.tag, 'bg', r.bg, 'fg', r.fg, r.hovering ? 'hover:' + JSON.stringify(r.hovering) : ''); };
 const HOVERABLE = 'button, [role=button], [role=menuitem], [role=radio], a, .schedule-event, .board-window, .agenda-chip, .agenda-term, [data-testid^=mini-day], .rd-record, .month-tile, [data-testid^=month-day]';

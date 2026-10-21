@@ -1,18 +1,18 @@
 /* 2.4 - booking / marking targets the calendar of the column: click a free place in each column of an empty day and read the calendar the booking bubble names. */
 import { launch, newPage, shot, boardRect, minuteY } from './lib.mjs';
-import { setTheme, openPlanner } from './flows.mjs';
+import { setTheme, openPlanner, dayLabel, seedDay, weeksToSeed } from './flows.mjs';
 const size = process.argv[2] ?? 'desktop';
 const tag = process.argv[3] ?? 'after';
 const b = await launch();
 const page = await newPage(b, size);
 await setTheme(page, 'dark', 'forest');
-await openPlanner(page, 7);
+await openPlanner(page, weeksToSeed());
 const chips = page.locator('.calendar-chip:not(.is-all)');
 for (let i = 2; i < (await chips.count()); i++) await chips.nth(i).click();
 await page.waitForTimeout(900);
 let r = await boardRect(page);
 const FRI = 4;
-if (size !== 'desktop') { await page.getByRole('button', { name: /11\. 12\./ }).first().click(); await page.waitForTimeout(500); r = await boardRect(page); }
+if (size !== 'desktop') { await page.getByRole('button', { name: new RegExp(dayLabel(seedDay(4))) }).first().click(); await page.waitForTimeout(500); r = await boardRect(page); }
 const subs = Number(await page.evaluate(() => document.querySelector('#day-board').getAttribute('data-subs')));
 const dayW = r.w / 7;
 for (const sub of [0, 1]) {

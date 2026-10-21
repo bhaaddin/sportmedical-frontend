@@ -5,7 +5,7 @@
  * Usage: node r25-pos.mjs [tag]
  */
 import { launch, newPage, shot, boardRect, dayX, minuteY } from './lib.mjs';
-import { setTheme, openPlanner, BUBBLE } from './flows.mjs';
+import { setTheme, openPlanner, BUBBLE, weeksToSeed } from './flows.mjs';
 const tag = process.argv[2] ?? 'audit';
 const SIZES = [[1280, 720], [1366, 768], [1440, 900], [1920, 1080]];
 const FAR = 140; /* the anchor is the click point; a bubble sits beside the slot's whole column, so ~half a column + the gap is expected */
@@ -18,7 +18,7 @@ let bad = 0;
 for (const [w, h] of SIZES) {
   const page = await newPage(b, { width: w, height: h, isMobile: false, hasTouch: false });
   await setTheme(page, 'dark', 'forest');
-  await openPlanner(page, 7);
+  await openPlanner(page, weeksToSeed());
   const rect = (sel) => page.evaluate((s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, w: r.width, h: r.height }; }, sel);
   const check = (what, popup, anchor) => {
     if (!popup || !anchor) { console.log(`${w}x${h} ${what}: not found`); return; }

@@ -211,7 +211,6 @@ const TEXT = {
   nearestFree: (time: string) => `Nejbližší volný čas ${time}`,
   tryExactly: (time: string) => `Zkusit přesně ${time}`,
   noneFreeThatDay: "V tento den už pro tuto činnost není volný čas.",
-  changeWhen: "Změnit termín",
   overrideTimeIs: (when: string) => `Objedná se na ${when}, mimo nabídku.`,
   sms: (phone: string | null) => `Poslat SMS s potvrzením${phone ? ` na ${phone}` : ""}`,
   smsUnavailable: "SMS zatím nejsou aktivní (připravujeme).",

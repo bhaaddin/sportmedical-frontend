@@ -1,11 +1,12 @@
 /*
- * Test data for the reviewer-bug checks: event bookings (no patient) named "ZZ reviewer ..." in the dev database, week of
- * 7.-11. 12. 2026 (a quiet week), spread over the clinic's calendars and činnosti. `node seed.mjs` creates, `node seed.mjs clean`
+ * Test data for the reviewer-bug checks: event bookings (no patient) named "ZZ reviewer ..." in the dev database, in the quiet
+ * week SEED_MONDAY (default 11. 1. 2027), spread over the clinic's calendars and činnosti. `node seed.mjs` creates, `node seed.mjs clean`
  * cancels every booking of that name again. Only these rows are ever touched.
  */
 import { launch, newPage, login, api } from './lib.mjs';
 const clean = process.argv[2] === 'clean';
-const WEEK = ['2026-12-07', '2026-12-08', '2026-12-09', '2026-12-10', '2026-12-11'];
+import { seedDay } from './flows.mjs';
+const WEEK = [0, 1, 2, 3, 4].map(seedDay);
 const NAME = 'ZZ reviewer test (smazat)';
 const b = await launch(); const page = await newPage(b); await login(page);
 const cals = (await api(page, 'GET', '/api/calendars')).json.data.filter((c) => c.isActive && !c.name.startsWith('ZZ'));

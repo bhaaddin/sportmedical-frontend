@@ -5,14 +5,14 @@
  * Usage: node r22.mjs [desktop|tablet|phone] [tag]      BASE=http://localhost:3000 for the "before" run on the unchanged app
  */
 import { launch, newPage, shot } from './lib.mjs';
-import { setTheme, openPlanner } from './flows.mjs';
+import { setTheme, openPlanner, seedDay, weeksToSeed } from './flows.mjs';
 const size = process.argv[2] ?? 'desktop';
 const tag = process.argv[3] ?? 'after';
-const THU = '2026-12-10', MON = '2026-12-07';
+const THU = seedDay(3), MON = seedDay(0);
 const b = await launch();
 const page = await newPage(b, size);
 await setTheme(page, 'dark', 'forest');
-await openPlanner(page, 7);
+await openPlanner(page, weeksToSeed());
 const out = (label, value) => console.log(`[${size}] ${label}: ${value}`);
 const text = (sel) => page.evaluate((s) => [...document.querySelectorAll(s)].map((e) => (e.innerText || '').replace(/\s+/g, ' ').trim()), sel);
 
@@ -40,8 +40,8 @@ if (size !== 'phone') {
   await shot(page, `${tag}-2.2-${size}-3-day-list`);
   /* 4. the month */
   await page.getByRole('button', { name: 'Měsíc', exact: true }).first().click(); await page.waitForTimeout(900);
-  out('month tile 10. 12.', JSON.stringify(await page.evaluate((d) => document.querySelector(`.month-tile[data-day="${d}"]`)?.innerText.replace(/\s+/g, ' '), THU)));
-  out('month tile 7. 12.', JSON.stringify(await page.evaluate((d) => document.querySelector(`.month-tile[data-day="${d}"]`)?.innerText.replace(/\s+/g, ' '), MON)));
+  out('month tile Thu', JSON.stringify(await page.evaluate((d) => document.querySelector(`.month-tile[data-day="${d}"]`)?.innerText.replace(/\s+/g, ' '), THU)));
+  out('month tile Mon', JSON.stringify(await page.evaluate((d) => document.querySelector(`.month-tile[data-day="${d}"]`)?.innerText.replace(/\s+/g, ' '), MON)));
   await shot(page, `${tag}-2.2-${size}-4-month`);
   /* 5. the day panel (Rezervační centrum): the mini calendar is only on the desktop stage */
   if (size === 'desktop') {
@@ -59,7 +59,7 @@ if (size !== 'phone') {
   out('phone agenda entries', JSON.stringify((await text('.phone-entry')).slice(0, 6)));
   await shot(page, `${tag}-2.2-${size}-1-agenda`);
   await page.getByRole('button', { name: 'Měsíc', exact: true }).first().click(); await page.waitForTimeout(700);
-  out('phone month 10. 12.', JSON.stringify(await page.evaluate((d) => document.querySelector(`[data-testid=phone-month-day-${d}]`)?.innerText.replace(/\s+/g, ' '), THU)));
+  out('phone month Thu', JSON.stringify(await page.evaluate((d) => document.querySelector(`[data-testid=phone-month-day-${d}]`)?.innerText.replace(/\s+/g, ' '), THU)));
   await shot(page, `${tag}-2.2-${size}-2-month`);
 }
 await b.close();

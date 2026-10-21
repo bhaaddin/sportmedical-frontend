@@ -5,7 +5,7 @@
  * Usage: node r26.mjs [desktop|tablet|phone] [tag]   (BASE=http://localhost:3000 shows how the unchanged app draws it)
  */
 import { launch, newPage, login, shot, waitPlanner, BASE, api } from './lib.mjs';
-import { setTheme } from './flows.mjs';
+import { setTheme, seedDay, weeksToSeed } from './flows.mjs';
 const size = process.argv[2] ?? 'desktop';
 const tag = process.argv[3] ?? 'after';
 const NAME = 'Komplexní sportovní prohlídka';
@@ -43,17 +43,18 @@ out('saved: own / effective', [after.colorHex, after.effectiveColorHex]);
 /* every view of the planner draws it */
 await page.goto(BASE + '/planovani');
 await waitPlanner(page);
-for (let i = 0; i < 7; i++) { await page.getByRole('button', { name: 'Následující týden' }).first().click(); await page.waitForTimeout(200); }
+const THU = seedDay(3);
+for (let i = 0; i < weeksToSeed(); i++) { await page.getByRole('button', { name: 'Následující týden' }).first().click(); await page.waitForTimeout(200); }
 await page.waitForTimeout(1500);
 const want = (after.effectiveColorHex ?? COLOR).toLowerCase();
-const seen = await page.evaluate((name) => {
+const seen = await page.evaluate(({ name, THU }) => {
   const hex = (s) => (s || '').trim().toLowerCase();
   const rgb2hex = (c) => { const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c || ''); return m ? '#' + [m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, '0')).join('') : hex(c); };
   const card = [...document.querySelectorAll('[data-booking-id]')].find((c) => (c.getAttribute('aria-label') || '').includes('Komplexní sportovní'));
   const chip = [...document.querySelectorAll('.agenda-chip')].find((c) => (c.getAttribute('aria-label') || '').includes('Komplexní sportovní'));
-  const ring = [...document.querySelectorAll('[data-testid="mini-day-2026-12-10"] circle')].map((c) => c.getAttribute('stroke')).filter(Boolean);
+  const ring = [...document.querySelectorAll(`[data-testid="mini-day-${THU}"] circle`)].map((c) => c.getAttribute('stroke')).filter(Boolean);
   return { boardCard: rgb2hex(card ? card.style.getPropertyValue('--ev-border') : ''), agendaChip: rgb2hex(chip ? getComputedStyle(chip).getPropertyValue('--agenda-tone') : ''), miniRing: ring.map(rgb2hex) };
-}, NAME);
+}, { name: NAME, THU });
 out('colour wanted', want);
 out('board card', seen.boardCard);
 out('agenda chip', seen.agendaChip);
@@ -61,7 +62,7 @@ out('mini calendar ring (Thu 10. 12.)', seen.miniRing);
 await shot(page, `${tag}-2.6-${size}-3-planner`);
 if (size !== 'phone') {
   await page.getByRole('button', { name: 'Měsíc', exact: true }).first().click(); await page.waitForTimeout(900);
-  out('month tile dot', await page.evaluate(() => { const i = document.querySelector('.month-tile[data-day="2026-12-10"] .tile-activity'); return i ? getComputedStyle(i).getPropertyValue('--tile-tone') : null; }));
+  out('month tile dot', await page.evaluate((d) => { const i = document.querySelector(`.month-tile[data-day="${d}"] .tile-activity`); return i ? getComputedStyle(i).getPropertyValue('--tile-tone') : null; }, THU));
   await shot(page, `${tag}-2.6-${size}-4-month`);
 }
 /* reset to the default */
