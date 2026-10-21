@@ -15,7 +15,7 @@
  * they are, under the header (a data table that is already its own card). `grow` makes a shelf take the height its page has left
  * (tablet and desktop; the children scroll inside it) - the register's table, a long list.
  */
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { Box, Button, Skeleton, Typography } from '@mui/material';
@@ -106,6 +106,30 @@ function useScrollEdges(ref: React.RefObject<HTMLElement | null>, watch: unknown
   return edges;
 }
 
+/**
+ * A row that has not been scrolled stays at its start when cards arrive in FRONT of the first one (a more urgent group, a late
+ * answer). Scroll snapping remembers the card it was resting on and scrolls the row to keep that card in view - the new first
+ * cards ended up off to the left (measured: exactly two cards, 664 px). A row somebody has scrolled keeps where it is.
+ */
+function useStayAtStart(ref: React.RefObject<HTMLElement | null>, enabled: boolean) {
+  const first = useRef<Element | null>(null);
+  const left = useRef(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (el === null || !enabled) return undefined;
+    const read = () => { left.current = el.scrollLeft; };
+    el.addEventListener('scroll', read, { passive: true });
+    return () => el.removeEventListener('scroll', read);
+  }, [ref, enabled]);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el === null || !enabled) return;
+    const now = el.firstElementChild;
+    if (first.current !== null && now !== first.current && left.current < 8) el.scrollLeft = 0;
+    first.current = now;
+  });
+}
+
 export function Shelf({
   id, title, hint, count, countTone = 'primary', layout = 'row', loading = false, error = false, onRetry, empty = false, emptyState,
   viewAll, controls, skeletons = 3, minCardWidth = 232, cardHeight = 132, maxHeight, fill = false, grow = false, phoneWidth = 'min(84vw, 300px)', stagger = true, children,
@@ -120,6 +144,7 @@ export function Shelf({
 
   useRowStagger(bodyRef, stagger && ready && layout !== 'list');
   const edges = useScrollEdges(bodyRef, `${layout}-${state}`);
+  useStayAtStart(bodyRef, layout === 'row');
 
   const cardWidth = phone ? phoneWidth : `${minCardWidth}px`;
   const sizing: Record<string, unknown> =
@@ -133,7 +158,8 @@ export function Shelf({
              themselves: the browser's scroll anchoring did exactly that, and the most urgent card ended up off to the left. */
           overflowAnchor: 'none',
           scrollSnapType: 'x proximity',
-          scrollPaddingInline: phone ? '16px' : 0,
+          /* The snap position of the first card is the row's start, with the row's own padding in front of it. */
+          scrollPaddingInline: phone ? '16px' : '4px',
           /* The first card's shadow and a focus ring are not clipped by the scroller. */
           py: '4px',
           px: phone ? '16px' : '4px',
