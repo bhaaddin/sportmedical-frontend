@@ -10,7 +10,7 @@ import { Box, Button, IconButton } from '@mui/material';
 import { PushPin, PushPinOutlined } from '@mui/icons-material';
 import { usePermissions } from '../../auth/usePermission';
 import { formatPragueTime, pragueDateKey } from '../../utils/time';
-import { mayOpen, type EntityRef } from './entities';
+import { mayOpen, type EntityKind, type EntityRef } from './entities';
 import {
   clearRecents, getMemory, getServerMemory, isPinned, recentsWithoutPins, subscribeMemory, togglePinned, MAX_PINNED,
 } from './memory';
@@ -55,10 +55,21 @@ export function PinButton({ entity, size = 40 }: { entity: EntityRef; size?: num
   );
 }
 
-export function RecentAndPinned({ limit = 8, emptyAction }: { limit?: number; emptyAction?: { label: string; to: string } }) {
+export function RecentAndPinned({
+  limit = 8, emptyAction, kinds, dense = false, title = 'Připnuté a nedávné', hint = 'Co jste naposledy otevřeli',
+}: {
+  limit?: number;
+  emptyAction?: { label: string; to: string };
+  /** Show only these kinds (the register shows patients). */
+  kinds?: readonly EntityKind[];
+  /** One-line cards: for a page where this shelf is context, not content. */
+  dense?: boolean;
+  title?: string;
+  hint?: string;
+}) {
   const memory = useShelfMemory();
   const held = usePermissions();
-  const open = (e: EntityRef) => mayOpen(e.kind, held);
+  const open = (e: EntityRef) => mayOpen(e.kind, held) && (kinds === undefined || kinds.includes(e.kind));
   const pinned = memory.pinned.filter(open);
   const recent = recentsWithoutPins(memory).filter(open);
   const shown = [...pinned.map((e) => ({ e, pinned: true, at: e.at })), ...recent.map((e) => ({ e, pinned: false, at: e.at }))].slice(0, limit);
@@ -66,11 +77,12 @@ export function RecentAndPinned({ limit = 8, emptyAction }: { limit?: number; em
   return (
     <Shelf
       id="recents"
-      title="Připnuté a nedávné"
-      hint="Co jste naposledy otevřeli"
+      title={title}
+      hint={hint}
       count={pinned.length + recent.length}
       layout="row"
-      minCardWidth={236}
+      minCardWidth={dense ? 204 : 236}
+      cardHeight={dense ? 48 : 132}
       empty={shown.length === 0}
       emptyState={{ text: 'Zatím tu nic není. Otevřete pacienta nebo klub a najdete ho tady; připnout ho můžete špendlíkem.', action: emptyAction !== undefined ? { label: emptyAction.label, to: emptyAction.to } : undefined }}
       controls={recent.length > 0 ? <Button size="small" onClick={clearRecents} sx={{ ...TARGET_SX, fontSize: 13, color: 'text.secondary' }}>Vymazat historii</Button> : undefined}
@@ -79,8 +91,9 @@ export function RecentAndPinned({ limit = 8, emptyAction }: { limit?: number; em
         <EntityCard
           key={`${e.kind}:${e.id}`}
           entity={e}
+          dense={dense}
           subtitle={isPin ? 'Připnuto' : `Otevřeno ${whenWords(at)}`}
-          trailing={<Box sx={{ mt: -0.75, mr: -0.75 }}><PinButton entity={e} /></Box>}
+          trailing={<Box sx={dense ? { mr: -0.5 } : { mt: -0.75, mr: -0.75 }}><PinButton entity={e} /></Box>}
         />
       ))}
     </Shelf>

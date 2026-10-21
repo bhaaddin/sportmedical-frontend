@@ -131,7 +131,8 @@ interface Common {
   entity: EntityRef;
   /** `false`: no peek (a dense list, a place where a hover card would cover what is being read). */
   peek?: boolean;
-  onNavigate?: () => void;
+  /** Runs on the click, before the router navigates (a table row that also opens it calls `e.stopPropagation()` here). */
+  onNavigate?: (event: React.MouseEvent) => void;
 }
 
 function useAccess(entity: EntityRef): boolean {

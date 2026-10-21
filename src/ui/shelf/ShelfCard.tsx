@@ -41,8 +41,10 @@ interface Target { to: string; state?: Record<string, unknown> }
 /* ───────────────────────────── EntityCard ───────────────────────────── */
 
 export function EntityCard({
-  entity, subtitle, detail, status, trailing, label,
+  entity, subtitle, detail, status, trailing, label, dense = false,
 }: {
+  /** One line: the badge and the name, nothing else (a shelf that is context, not content). */
+  dense?: boolean;
   entity: EntityRef;
   subtitle?: string;
   detail?: string;
@@ -53,6 +55,17 @@ export function EntityCard({
   label?: string;
 }) {
   const target = entityTarget(entity);
+  if (dense) {
+    return (
+      <Box role="listitem" data-card="entity" data-entity={entity.kind} data-dense="" sx={(t) => ({ ...cardSurface(t, true), px: 1.25, py: 0.5, minHeight: 48, display: 'flex', gap: 1, alignItems: 'center' })}>
+        <EntityBadge kind={entity.kind} size={28} />
+        <Box component={RouterLink} to={target.to} state={target.state} aria-label={label ?? `${ENTITY_LABEL[entity.kind]}: ${entity.label}`} sx={{ ...stretched, display: 'block', flex: 1, minWidth: 0 }}>
+          <Typography noWrap sx={{ fontSize: 14, fontWeight: 650 }}>{entity.label}</Typography>
+        </Box>
+        {trailing !== undefined && <Box sx={ABOVE_LINK}>{trailing}</Box>}
+      </Box>
+    );
+  }
   return (
     <Box role="listitem" data-card="entity" data-entity={entity.kind} sx={(t) => ({ ...cardSurface(t, true), p: 1.5, display: 'flex', gap: 1.25, alignItems: 'flex-start' })}>
       <EntityBadge kind={entity.kind} size={36} />
@@ -213,7 +226,7 @@ export function AttentionCard({ group }: { group: AttentionGroup }) {
             >
               <Box sx={{ minWidth: 0, flex: 1 }}>
                 <Typography noWrap sx={{ fontSize: 13.5, fontWeight: 600 }}>{item.title}</Typography>
-                <Typography noWrap sx={{ ...MUTED_SX, fontSize: 12.5 }}>{item.detail}</Typography>
+                <Typography sx={{ ...MUTED_SX, fontSize: 12.5, lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' }}>{item.detail}</Typography>
               </Box>
               <ArrowForward aria-hidden sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} />
             </Box>

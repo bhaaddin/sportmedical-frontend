@@ -42,7 +42,10 @@ export function AlertsCard({
   patientId,
   questionnaireIsMissing,
   requirements,
+  bare = false,
 }: {
+  /** Leave out the card's own label: the shelf around it already names it. */
+  bare?: boolean;
   patientId: string;
   questionnaireIsMissing: boolean;
   /** What the booked appointments ask for; null while unanswered. */
@@ -56,7 +59,7 @@ export function AlertsCard({
 
   return (
     <SoftCard>
-      <SectionLabel>Upozornění</SectionLabel>
+      {!bare && <SectionLabel>Upozornění</SectionLabel>}
       <Stack spacing={1}>
         {questionnaireIsMissing && (
           <Notice>Chybí vyplněný vstupní dotazník. Pošlete pacientovi odkaz.</Notice>

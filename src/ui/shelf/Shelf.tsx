@@ -10,7 +10,10 @@
  *            full motion only, never replayed by a refetch or a filter)
  *
  * Layouts: `row` scrolls sideways with snap and fades at the edge it continues past (phone: the next card peeks in),
- * `grid` wraps by the card's minimum width, `list` is one glass board of rows for dense data (it may scroll inside).
+ * `grid` wraps by the card's minimum width, `list` is one glass board of rows for dense data (it may scroll inside), `board`
+ * is the same glass board for free content (a search field, a form) - not announced as a list, and `free` draws the children as
+ * they are, under the header (a data table that is already its own card). `grow` makes a shelf take the height its page has left
+ * (tablet and desktop; the children scroll inside it) - the register's table, a long list.
  */
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -41,7 +44,7 @@ export interface ShelfProps {
   /** How many there are in all (not how many are drawn). Shown as a pill; `undefined` draws none. */
   count?: number;
   countTone?: ShelfTone;
-  layout?: 'row' | 'grid' | 'list';
+  layout?: 'row' | 'grid' | 'list' | 'board' | 'free';
   loading?: boolean;
   /** `true`, or the sentence to show. */
   error?: boolean | string;
@@ -60,6 +63,12 @@ export interface ShelfProps {
   cardHeight?: number;
   /** `list`: the board's highest point before it scrolls inside (CSS length). */
   maxHeight?: string | number;
+  /** Take the height the page has left (PageFrame `fit`); the body must scroll inside. Not on a phone. */
+  grow?: boolean;
+  /** `row` on a phone: the card's width (a CSS length). Default: 84 % of the screen, at most 300 px, so the next card peeks in. */
+  phoneWidth?: string;
+  /** `row` only: from the tablet up the cards share the row's width (never narrower than `minCardWidth`, then it scrolls). */
+  fill?: boolean;
   /** Turn the first-load cascade off (a shelf that is always on screen with its data already there). */
   stagger?: boolean;
   children?: ReactNode;
@@ -99,7 +108,7 @@ function useScrollEdges(ref: React.RefObject<HTMLElement | null>, watch: unknown
 
 export function Shelf({
   id, title, hint, count, countTone = 'primary', layout = 'row', loading = false, error = false, onRetry, empty = false, emptyState,
-  viewAll, controls, skeletons = 3, minCardWidth = 232, cardHeight = 132, maxHeight, stagger = true, children,
+  viewAll, controls, skeletons = 3, minCardWidth = 232, cardHeight = 132, maxHeight, fill = false, grow = false, phoneWidth = 'min(84vw, 300px)', stagger = true, children,
 }: ShelfProps) {
   const headingId = useId();
   const phone = useIsPhone();
@@ -112,7 +121,7 @@ export function Shelf({
   useRowStagger(bodyRef, stagger && ready && layout !== 'list');
   const edges = useScrollEdges(bodyRef, `${layout}-${state}`);
 
-  const cardWidth = phone ? 'min(84vw, 300px)' : `${minCardWidth}px`;
+  const cardWidth = phone ? phoneWidth : `${minCardWidth}px`;
   const sizing: Record<string, unknown> =
     layout === 'row'
       ? {
@@ -127,7 +136,7 @@ export function Shelf({
           px: phone ? '16px' : '4px',
           mx: phone ? '-16px' : '-4px',
           scrollbarWidth: 'thin',
-          '& > *': { flex: `0 0 ${cardWidth}`, scrollSnapAlign: 'start' },
+          '& > *': { flex: fill && !phone ? `1 0 ${minCardWidth}px` : `0 0 ${cardWidth}`, scrollSnapAlign: 'start' },
           ...(edges.end || edges.start
             ? { maskImage: `linear-gradient(to right, ${edges.start ? 'transparent 0, #000 28px' : '#000 0'}, ${edges.end ? '#000 calc(100% - 44px), transparent 100%' : '#000 100%'})` }
             : {}),
@@ -141,7 +150,13 @@ export function Shelf({
   ));
 
   return (
-    <Box component="section" aria-labelledby={headingId} data-shelf={id} data-state={state} sx={{ minWidth: 0 }}>
+    <Box
+      component="section"
+      aria-labelledby={headingId}
+      data-shelf={id}
+      data-state={state}
+      sx={{ minWidth: 0, ...(grow && !phone ? { flex: '1 1 0', minHeight: 320, display: 'flex', flexDirection: 'column' } : {}) }}
+    >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, minHeight: { xs: 44, md: 32 }, flexWrap: 'wrap', rowGap: 0.5 }}>
         <Typography id={headingId} component="h2" sx={{ fontSize: 15, fontWeight: 700, letterSpacing: '0.01em', lineHeight: 1.3 }}>
           {title}
@@ -183,7 +198,7 @@ export function Shelf({
 
       {state === 'loading' && (
         <Box aria-busy="true" aria-label={`${title}: načítám`} sx={layout === 'row' ? { ...sizing, maskImage: 'none' } : sizing}>
-          {layout === 'list' ? (
+          {layout === 'list' || layout === 'board' || layout === 'free' ? (
             <SoftCard sx={{ p: 1.5 }}><Skeleton height={44} /><Skeleton height={44} /><Skeleton height={44} /></SoftCard>
           ) : (
             skeletonCards
@@ -210,7 +225,11 @@ export function Shelf({
       )}
 
       {state === 'ready' && (
-        layout === 'list' ? (
+        layout === 'free' ? (
+          <Box sx={{ '& > .MuiPaper-root': { borderRadius: `${CARD_RADIUS}px` }, ...(grow && !phone ? { flex: '1 1 0', minHeight: 0, display: 'flex', flexDirection: 'column' } : { minWidth: 0 }) }}>{children}</Box>
+        ) : layout === 'board' ? (
+          <SoftCard sx={{ p: 0, borderRadius: `${CARD_RADIUS}px` }}>{children}</SoftCard>
+        ) : layout === 'list' ? (
           <SoftCard
             role="list"
             aria-label={title}

@@ -34,7 +34,10 @@ export function VisitHistoryTable({
   visits,
   invoices,
   priceOf,
+  bare = false,
 }: {
+  /** Leave out the card's own label: the shelf around it already names it. */
+  bare?: boolean;
   visits: readonly PatientAppointment[];
   /** Invoices this account may read; empty when it may not. */
   invoices: readonly Invoice[];
@@ -42,7 +45,7 @@ export function VisitHistoryTable({
 }) {
   return (
     <SoftCard>
-      <SectionLabel>Historie návštěv</SectionLabel>
+      {!bare && <SectionLabel>Historie návštěv</SectionLabel>}
       {visits.length === 0 ? (
         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           Zatím žádná návštěva.

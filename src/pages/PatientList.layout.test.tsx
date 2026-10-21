@@ -90,8 +90,8 @@ describe('Pacienti at 390 (phone)', () => {
 
     const pinned = container.querySelector('[data-pinned="true"]');
     expect(pinned).not.toBeNull();
-    expect(within(pinned as HTMLElement).getByRole('button', { name: 'Nový pacient' })).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Nový pacient' })).toHaveLength(1);
+    expect(within(pinned as HTMLElement).getByRole('link', { name: 'Nový pacient' })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Nový pacient' })).toHaveLength(1);
     expect(container.querySelector('[data-filters="scroll"]')).not.toBeNull();
   });
 });
@@ -122,6 +122,6 @@ describe('Pacienti at 1440 (desktop)', () => {
     expect(screen.getByText('petra@example.cz')).toBeInTheDocument();
     /* The button stands in the header, not in a pinned bar. */
     expect(container.querySelector('[data-pinned="true"]')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Nový pacient' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Nový pacient' })).toBeInTheDocument();
   });
 });

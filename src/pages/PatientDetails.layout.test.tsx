@@ -60,7 +60,7 @@ const renderOverview = (upcoming: unknown[] = []) =>
             element={(
               <Outlet
                 context={{
-                  patient: PATIENT, profile: null, documents: [], templates: [], requirements: [],
+                  patient: PATIENT, profile: null, documents: [], documentsKnown: true, templates: [], requirements: [],
                   upcoming, displayPhone: '+420 773 539 001', displayEmail: 'bh@example.cz',
                   reloadDocuments: vi.fn(),
                 }}
@@ -83,12 +83,13 @@ describe.each([
     setViewport(width);
     const { container } = renderOverview();
 
-    expect(await screen.findByText('Osobní údaje')).toBeInTheDocument();
+    /* Every block of the overview is a shelf: a region with its own heading. */
+    for (const name of ['Související', 'Osobní údaje', 'Historie návštěv', 'Výsledky', 'Příští termín', 'Upozornění']) {
+      expect(await screen.findByRole('region', { name }), name).toBeInTheDocument();
+    }
     const history = await screen.findByRole('list', { name: 'Historie návštěv' });
     expect(history.querySelectorAll('li')).toHaveLength(1);
     expect(container.querySelector('table')).toBeNull();
-    expect(screen.getByText('Příští termín')).toBeInTheDocument();
-    expect(screen.getByText('Upozornění')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Poslat odkaz' })).toBeInTheDocument();
   });
 });
@@ -115,7 +116,7 @@ describe('prices on the overview', () => {
     startUtc: '2099-02-01T08:00:00Z', endUtc: '2099-02-01T08:30:00Z', status: 0,
     isRunningLate: false, checkedInUtc: null, paperwork: null, ...over,
   });
-  const nextCard = async () => within((await screen.findByText('Příští termín')).closest('.MuiPaper-root') as HTMLElement);
+  const nextCard = async () => within(await screen.findByRole('region', { name: 'Příští termín' }));
 
   it.each([['phone', VIEWPORTS.phone], ['desktop', VIEWPORTS.desktop]])('%s: the next visit shows its agreed price', async (_n, width) => {
     setViewport(width);

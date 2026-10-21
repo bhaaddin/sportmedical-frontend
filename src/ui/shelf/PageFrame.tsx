@@ -43,10 +43,14 @@ export interface PageFrameProps {
   actions?: ReactNode;
   /** What this page is about / connected to. */
   entities?: EntityRef[];
+  /** Status chips of the subject ("Aktivní", "Dotazník chybí"), drawn before the connected chips. */
+  badges?: ReactNode;
   /** Something before the title: a back button, an avatar. */
   leading?: ReactNode;
   /** Hide the palette button (a page that is itself a search). */
   search?: boolean;
+  /** Fit the window (tablet and desktop): the body takes the height left under the header, so a `grow` shelf can scroll inside. */
+  fit?: boolean;
   children?: ReactNode;
 }
 
@@ -87,7 +91,8 @@ function PrimaryButton({ action }: { action: NonNullable<PageFrameProps['primary
     : <Button onClick={action.onClick} {...common}>{action.label}</Button>;
 }
 
-export function PageFrame({ title, purpose, breadcrumb, primaryAction, actions, entities, leading, search = true, children }: PageFrameProps) {
+export function PageFrame({ title, purpose, breadcrumb, primaryAction, actions, entities, badges, leading, search = true, fit = false, children }: PageFrameProps) {
+  const hasChips = badges !== undefined || (entities !== undefined && entities.length > 0);
   const device = useDevice();
   const phone = device === 'phone';
   return (
@@ -104,7 +109,7 @@ export function PageFrame({ title, purpose, breadcrumb, primaryAction, actions, 
         </Breadcrumbs>
       )}
 
-      <Box component="header" sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'flex-start', md: 'center' }, justifyContent: 'space-between', gap: 1.5, mb: entities !== undefined && entities.length > 0 ? 1.25 : 2.5 }}>
+      <Box component="header" sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'flex-start', md: 'center' }, justifyContent: 'space-between', gap: 1.5, mb: hasChips ? 1.25 : 2.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
           {leading}
           <Box sx={{ minWidth: 0 }}>
@@ -119,15 +124,20 @@ export function PageFrame({ title, purpose, breadcrumb, primaryAction, actions, 
         </Box>
       </Box>
 
-      {entities !== undefined && entities.length > 0 && (
-        <Box role="list" aria-label="Související" data-connected="" sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2.5 }}>
-          {entities.map((e) => (
-            <Box component="span" role="listitem" key={`${e.kind}:${e.id}`} sx={{ display: 'inline-flex', maxWidth: '100%' }}><EntityChip entity={e} /></Box>
-          ))}
+      {hasChips && (
+        <Box data-connected="" sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, mb: 2.5 }}>
+          {badges}
+          {entities !== undefined && entities.length > 0 && (
+            <Box role="list" aria-label="Související" sx={{ display: 'contents' }}>
+              {entities.map((e) => (
+                <Box component="span" role="listitem" key={`${e.kind}:${e.id}`} sx={{ display: 'inline-flex', maxWidth: '100%' }}><EntityChip entity={e} /></Box>
+              ))}
+            </Box>
+          )}
         </Box>
       )}
 
-      <Box data-shelf-body="" sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 3, md: 3.5 }, minWidth: 0 }}>{children}</Box>
+      <Box data-shelf-body="" sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 3, md: 3.5 }, minWidth: 0, ...(fit && !phone ? { flex: '1 1 0', minHeight: 0 } : {}) }}>{children}</Box>
 
       {phone && primaryAction !== undefined && (
         <PinnedActionBar label="Hlavní akce"><PrimaryButton action={primaryAction} /></PinnedActionBar>

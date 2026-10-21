@@ -11,8 +11,8 @@ import { DARK, darkOf, toneColors, tintsOf } from '../../theme';
 
 export type ShelfTone = 'green' | 'beige' | 'red' | 'grey' | 'blue' | 'primary';
 
-/** Card radius: smaller than the board's 24 px panels, so a card on a shelf reads as an object, not a window. */
-export const CARD_RADIUS = 14;
+/** One radius for everything on a shelf: its cards, its boards and the cards a `free` shelf wraps. */
+export const CARD_RADIUS = 16;
 
 export const accentOf = (t: Theme): string => (t.palette.mode === 'dark' ? darkOf(t).cyan : t.palette.primary.main);
 

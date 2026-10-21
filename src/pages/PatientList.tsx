@@ -17,26 +17,31 @@
  * The filter chips work on the same join, so they filter THE PAGE ON SCREEN:
  * the route has no `filter` parameter yet, and that is reported rather than
  * hidden behind a second request per row.
+ *
+ * Built as shelves (docs/ui-shelf-system.md): the header, the registrations
+ * waiting for review (only when there are any), the patients the person opened
+ * last, and the register itself - a shelf that takes the height that is left and
+ * scrolls inside it. A name is a connected chip with a peek; an empty register
+ * offers the ways to fill it.
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
-  Alert, Box, Button, InputAdornment, Link, Stack, TextField, Typography,
+  Alert, Box, Button, InputAdornment, Stack, TextField, Typography,
 } from '@mui/material';
-import { Search } from '@mui/icons-material';
+import { Link as LinkIcon, PersonAdd, Search } from '@mui/icons-material';
 import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
+import { fetchIntakeQueue } from '../api/intakeReview';
 import { PatientListSkeleton } from '../components/SkeletonLoader';
 import { usePermission } from '../auth/usePermission';
 import { SENSITIVE_IDENTITY, shownFields, usePatientFields } from '../api/displaySettings';
-import { FilterChips, PageHeader, StatusChip } from '../components/ui';
+import { FilterChips, StatusChip } from '../components/ui';
 import type { FilterOption } from '../components/ui';
-import { FitPage } from '../components/ui/fit';
 import { ResponsiveDataList } from '../components/ui/ResponsiveDataList';
 import type { DataColumn } from '../components/ui/ResponsiveDataList';
-import { PinnedActionBar } from '../components/ui/PinnedActionBar';
 import { useIsPhone } from '../layout/useDevice';
 import {
   ALL_APPOINTMENTS_KEY, UPCOMING_WINDOW_KEY, fetchAllAppointments, fetchUpcomingWindow,
@@ -46,6 +51,8 @@ import {
 } from '../components/patients/patientActivity';
 import type { VisitSummary } from '../components/patients/patientActivity';
 import { formatDateOnly, formatPragueDate } from '../utils/time';
+import { ActionCard, AttentionCard, EntityLink, PageFrame, RecentAndPinned, Shelf, TARGET_SX } from '../ui/shelf';
+import { intakeReviews } from '../ui/shelf/attention';
 
 const sexLabel = (s: string) => (s === 'Male' ? 'Muž' : s === 'Female' ? 'Žena' : 'Jiné');
 
@@ -128,6 +135,19 @@ export default function PatientList() {
     staleTime: 60_000,
   });
 
+  /* Registrations that wait for a person to match or register them: a card above the register, only when there are any. */
+  const intakeQuery = useQuery({
+    queryKey: ['shelf', 'intake-queue'],
+    queryFn: fetchIntakeQueue,
+    enabled: mayRegister,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const intakeGroup = useMemo(
+    () => (mayRegister ? intakeReviews({ now: new Date(), intake: intakeQuery.data ?? null }) : null),
+    [mayRegister, intakeQuery.data],
+  );
+
   const patients = useMemo(() => patientsQuery.data?.items ?? [], [patientsQuery.data]);
 
   const activity = useMemo(() => {
@@ -184,6 +204,7 @@ export default function PatientList() {
     ? (query === '' ? 'Zatím žádní pacienti.' : 'Nikdo takový v registru není.')
     : 'Na této stránce nikdo filtru neodpovídá.';
   const activityKnown = appointmentsQuery.data !== undefined;
+  const emptyRegister = patients.length === 0 && query === '';
 
   const standingOf = (p: Patient) => {
     const row = activity.get(p.id);
@@ -203,15 +224,11 @@ export default function PatientList() {
 
   const nameCell = (p: Patient) => (
     <>
-      <Link
-        component={RouterLink}
-        to={`/patients/${p.id}`}
-        underline="hover"
-        onClick={(e) => e.stopPropagation()}
-        sx={{ fontWeight: 600, color: 'primary.main', '@media (max-width: 1279.95px)': { display: 'inline-flex', alignItems: 'center', minHeight: 44 } }}
-      >
-        {p.firstName} {p.lastName}
-      </Link>
+      {/* The name is a connected chip's text: it opens the card, and resting on it shows a peek. The row opens it too. */}
+      <EntityLink
+        entity={{ kind: 'patient', id: p.id, label: `${p.firstName} ${p.lastName}` }}
+        onNavigate={(e) => e.stopPropagation()}
+      />
       {p.email && p.email.trim() !== '' && (
         <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', overflowWrap: 'anywhere' }}>
           {p.email}
@@ -267,29 +284,44 @@ export default function PatientList() {
     </Stack>
   );
 
-  return (
-    <FitPage>
-      <PageHeader
-        title="Pacienti"
-        subtitle={query === '' ? `Kartotéka kliniky · ${total} záznamů` : `Nalezeno: ${total}`}
-        actions={mayRegister && !phone ? (
-          /* One way in. The thinner "Nový pacient" form wrote to a different
-             endpoint and skipped the address, birth number and insurer, so
-             which button the operator pressed decided how complete the record
-             was. Editing an existing patient still uses that form. */
-          <Button variant="contained" onClick={() => navigate('/patients/register')}>
-            Nový pacient
-          </Button>
-        ) : undefined}
-      />
+  /* On a phone the chips run in one row that scrolls sideways, so they never push the list off the screen. */
+  const filters = (
+    <Box
+      data-filters={phone ? 'scroll' : 'wrap'}
+      sx={phone ? { order: 3, flexBasis: '100%', overflowX: 'auto', mx: -2, px: 2, pb: 0.5, '& [role="group"]': { flexWrap: 'nowrap' }, '& button': { flexShrink: 0, minHeight: 44 } } : undefined}
+    >
+      <FilterChips options={FILTERS} value={filter} onChange={setFilter} ariaLabel="Filtr pacientů" />
+    </Box>
+  );
 
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ mb: 2, alignItems: { md: 'center' } }}>
+  return (
+    <PageFrame
+      fit
+      title="Pacienti"
+      purpose={query === '' ? `Kartotéka kliniky · ${total} záznamů` : `Nalezeno: ${total}`}
+      /* One way in. The thinner "Nový pacient" form wrote to a different
+         endpoint and skipped the address, birth number and insurer, so
+         which button the operator pressed decided how complete the record
+         was. Editing an existing patient still uses that form. */
+      primaryAction={mayRegister ? { label: 'Nový pacient', icon: <PersonAdd />, to: '/patients/register' } : undefined}
+    >
+      {intakeGroup !== null && (
+        <Shelf id="intake" title="Čeká na vás" count={intakeGroup.count} countTone="red" layout="row" minCardWidth={340} stagger={false}>
+          <AttentionCard group={intakeGroup} />
+        </Shelf>
+      )}
+
+      <RecentAndPinned kinds={['patient']} dense limit={6} title="Naposledy otevření" hint="Pacienti, ke kterým jste se vraceli" />
+
+      <Shelf id="register" title="Kartotéka" count={total} layout="free" grow controls={filters}>
         <TextField
           fullWidth
           placeholder="Jméno, příjmení, telefon nebo e-mail"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          sx={{ mb: 1.5, flexShrink: 0 }}
           slotProps={{
+            htmlInput: { 'aria-label': 'Hledat v kartotéce' },
             input: {
               sx: { minHeight: 44 },
               startAdornment: (
@@ -300,58 +332,54 @@ export default function PatientList() {
             },
           }}
         />
-        {/* On a phone the chips run in one row that scrolls sideways, so they
-            never push the list off the screen. */}
-        <Box
-          data-filters={phone ? 'scroll' : 'wrap'}
-          sx={phone ? { overflowX: 'auto', mx: -2, px: 2, pb: 0.5, '& [role="group"]': { flexWrap: 'nowrap' }, '& button': { flexShrink: 0, minHeight: 44 } } : undefined}
+
+        {emptyRegister ? (
+          /* An empty register is not "no data": it is the first thing to do. */
+          <Box data-empty-register="" sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Typography sx={{ color: 'text.secondary' }}>{emptyText}</Typography>
+            {mayRegister && (
+              <Box role="list" sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' } }}>
+                <ActionCard primary icon={<PersonAdd />} title="Nový pacient" description="Plná registrace: adresa, pojišťovna, souhlasy" to="/patients/register" />
+                <ActionCard icon={<LinkIcon />} title="Odkaz pro registraci" description="Pacient se zaregistruje sám, vy ho jen zkontrolujete" to="/nastaveni/odkaz-registrace" />
+              </Box>
+            )}
+          </Box>
+        ) : (
+          <ResponsiveDataList
+            rows={visible}
+            rowKey={(p) => p.id}
+            columns={columns}
+            renderCard={renderCard}
+            onRowClick={(p) => navigate(`/patients/${p.id}`)}
+            empty={emptyText}
+            ariaLabel="Pacienti"
+            fill
+          />
+        )}
+
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1}
+          sx={{ mt: 2, alignItems: { sm: 'center' }, justifyContent: 'space-between', flexShrink: 0 }}
         >
-          <FilterChips options={FILTERS} value={filter} onChange={setFilter} ariaLabel="Filtr pacientů" />
-        </Box>
-      </Stack>
-
-      <ResponsiveDataList
-        rows={visible}
-        rowKey={(p) => p.id}
-        columns={columns}
-        renderCard={renderCard}
-        onRowClick={(p) => navigate(`/patients/${p.id}`)}
-        empty={emptyText}
-        ariaLabel="Pacienti"
-        fill
-      />
-
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={1}
-        sx={{ mt: 2, alignItems: { sm: 'center' }, justifyContent: 'space-between', flexShrink: 0 }}
-      >
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          {`Zobrazeno ${visible.length} z ${total} pacientů`}
-          {pageCount > 1 ? ` · strana ${page + 1} z ${pageCount}` : ''}
-        </Typography>
-        <Stack direction="row" spacing={1} sx={{ '& .MuiButton-root': { minHeight: 44 }, '& > *': { flex: { xs: 1, sm: 'none' } } }}>
-          <Button variant="outlined" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
-            Předchozí
-          </Button>
-          <Button
-            variant="outlined"
-            disabled={page + 1 >= pageCount}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Další
-          </Button>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            {`Zobrazeno ${visible.length} z ${total} pacientů`}
+            {pageCount > 1 ? ` · strana ${page + 1} z ${pageCount}` : ''}
+          </Typography>
+          <Stack direction="row" spacing={1} sx={{ '& .MuiButton-root': TARGET_SX, '& > *': { flex: { xs: 1, sm: 'none' } } }}>
+            <Button variant="outlined" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+              Předchozí
+            </Button>
+            <Button
+              variant="outlined"
+              disabled={page + 1 >= pageCount}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Další
+            </Button>
+          </Stack>
         </Stack>
-      </Stack>
-
-      {/* The screen's one main action, pinned at the bottom on a phone. */}
-      {mayRegister && phone && (
-        <PinnedActionBar label="Nový pacient">
-          <Button variant="contained" onClick={() => navigate('/patients/register')}>
-            Nový pacient
-          </Button>
-        </PinnedActionBar>
-      )}
-    </FitPage>
+      </Shelf>
+    </PageFrame>
   );
 }

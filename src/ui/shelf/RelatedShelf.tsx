@@ -17,6 +17,7 @@ import type { DayAppointment } from '../../api/bookingContracts';
 import { clubsApi } from '../../api/clubs';
 import type { PatientDocument } from '../../api/documents';
 import { usePermission } from '../../auth/usePermission';
+import { useIsPhone } from '../../layout/useDevice';
 import { EntityChip } from './EntityLink';
 import { Shelf } from './Shelf';
 import { patientRelatedGroups, type RelatedGroup } from './related';
@@ -69,8 +70,10 @@ export function RelatedCard({ group }: { group: RelatedGroup }) {
 }
 
 export function RelatedShelf({ groups, title = 'Související', hint, children }: { groups: RelatedGroup[]; title?: string; hint?: string; children?: ReactNode }) {
+  /* A phone swipes through the relations (one card of the next peeking in); wider screens see them all at once. */
+  const phone = useIsPhone();
   return (
-    <Shelf id="related" title={title} hint={hint} layout="grid" minCardWidth={252} stagger={false}>
+    <Shelf id="related" title={title} hint={hint} layout={phone ? 'row' : 'grid'} minCardWidth={252} phoneWidth="min(78vw, 280px)" stagger={false}>
       {groups.map((g) => <RelatedCard key={g.id} group={g} />)}
       {children}
     </Shelf>

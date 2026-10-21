@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import {
-  Box, Grid, Typography, Avatar, Button, TextField,
-  InputAdornment, List, ListItemButton, CircularProgress, Stack,
+  Avatar, Box, Button, CircularProgress, InputAdornment, List, ListItemButton, TextField, Typography,
 } from '@mui/material';
-import { Search, PersonAdd, ArrowForward } from '@mui/icons-material';
+import { ArrowForward, PersonAdd, Search } from '@mui/icons-material';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { patientsApi } from '../api/patients';
 import type { Patient } from '../api/patients';
@@ -14,28 +13,28 @@ import { activitiesApi } from '../api/activities';
 import type { DayAppointment } from '../api/bookingContracts';
 import { statusName, statusTally } from '../api/bookingContracts';
 import { formatCzk, shownPrice, sumPrices } from '../components/booking/grid/appointmentPrice';
-import { CountUp } from '../motion/CountUp';
 import DayOverviewPage from './booking/DayOverviewPage';
 import { toDateOnly, formatPragueTime } from '../utils/time';
-import { DashboardSkeleton } from '../components/SkeletonLoader';
-import { FilterChips, KpiCard, PageHeader, SectionLabel, SoftCard, StatusChip, type ChipTone } from '../components/ui';
-import { ResponsiveDataList, type DataColumn } from '../components/ui/ResponsiveDataList';
-import { PinnedActionBar } from '../components/ui/PinnedActionBar';
+import { StatusChip } from '../components/ui';
 import { useDevice } from '../layout/useDevice';
-import { FitBody, FitPage } from '../components/ui/fit';
+import {
+  AttentionShelf, EntityCard, EntityLink, MetricCard, PageFrame, RecentAndPinned, Shelf, TARGET_SX, entityTarget, useAttention,
+} from '../ui/shelf';
+import { APPOINTMENT_STATUS_WORD } from '../ui/shelf/peek';
+import { SoftCard } from '../components/ui/SoftCard';
 
 /*
- * The plocha (owner/admin home), in the board's look: a greeting, the day's
- * facts as KPI cards, the patient search, and the four lists as bordered
- * cards. Same data and the same actions as before; no gradients, no shadows,
- * no counters that count up.
+ * Přehled (the plocha): the owner's and the desk's home, built as shelves (docs/ui-shelf-system.md).
  *
- * Three layouts (Etapa 2, rule 3):
- *   desktop  four compact panels across, the primary action in the header
- *   tablet   panels as tables of three columns - two across when the screen
- *            is wide enough (landscape), one when it is not (portrait)
- *   phone    every row its own card with a 44px target, KPI cards two-up,
- *            and the primary action ("Otevřít kalendář") pinned at the bottom
+ *   header      the greeting, the date and the size of the register; "Otevřít kalendář" is the one primary action
+ *   Dnes        five figures, each a link to where it is worked on (they count up once)
+ *   Vyžaduje pozornost   what needs a person today - every case a link to the place that fixes it (ui/shelf/attention.ts)
+ *   Najít pacienta       the quick lookup of the register; Ctrl/Cmd+K reaches everything else
+ *   Objednaní, Čekárna   today's work: the time, the patient (a connected chip with a peek), the činnost and its price
+ *   Připnuté a nedávné   the person's own shortcuts; Nově v kartotéce   the last patients registered
+ *
+ * Same data and the same rules as before: today means today (a one-day range), a cancellation and a no-show are not the
+ * day's work, the waiting room is CheckedIn only, a name rather than an id, nothing about patients without the permission.
  */
 
 function getGreeting(): string {
@@ -44,24 +43,6 @@ function getGreeting(): string {
   if (h < 17) return 'Dobrý den';
   return 'Dobrý večer';
 }
-
-const STATUS_LABELS: Record<string, string> = {
-  Scheduled: 'Naplánováno',
-  Confirmed: 'Potvrzeno',
-  CheckedIn: 'Přišel',
-  Completed: 'Hotovo',
-  Cancelled: 'Zrušeno',
-  NoShow: 'Nepřišel',
-};
-
-const STATUS_TONES: Record<string, ChipTone> = {
-  Scheduled: 'grey',
-  Confirmed: 'green',
-  CheckedIn: 'green',
-  Completed: 'grey',
-  Cancelled: 'red',
-  NoShow: 'red',
-};
 
 const czechDob = (iso: string): string => {
   const [y, m, d] = (iso ?? '').split('-');
@@ -78,8 +59,6 @@ function namesOf(results: { data?: Patient }[]): Record<string, string> {
 }
 
 /* ── Dashboard: a doctor lands on their day; the owner/admin get the plocha. ── */
-type PanelKey = 'booked' | 'waiting' | 'history' | 'alerts';
-
 export default function Dashboard() {
   let role = '';
   try {
@@ -91,154 +70,42 @@ export default function Dashboard() {
   return <OwnerDashboard />;
 }
 
-/* ── One row of a panel, said once and drawn three ways ── */
-interface PanelRow {
-  id: string;
-  onClick: () => void;
-  /** A time, an avatar or a chip: what the eye finds first. */
-  lead: React.ReactNode;
-  title: string;
-  subtitle?: string;
-  trailing?: React.ReactNode;
-}
-
-const rowTitleSx = { fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } as const;
-const rowSubtitleSx = { fontSize: 14, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } as const;
-
-function MainCell({ row }: { row: PanelRow }) {
-  return (
-    <Box sx={{ flex: 1, minWidth: 0 }}>
-      <Typography sx={rowTitleSx}>{row.title}</Typography>
-      {row.subtitle !== undefined && <Typography sx={rowSubtitleSx}>{row.subtitle}</Typography>}
-    </Box>
-  );
-}
-
-function PanelAction({ action, bordered = false }: { action: { label: string; onClick: () => void }; bordered?: boolean }) {
-  return (
-    <Button
-      onClick={action.onClick}
-      endIcon={<ArrowForward sx={{ fontSize: 16 }} />}
-      sx={{
-        justifyContent: 'space-between',
-        px: bordered ? 2.5 : 0.5,
-        py: 1.25,
-        minHeight: 44,
-        width: '100%',
-        color: 'primary.main',
-        ...(bordered ? { borderTop: '1px solid', borderColor: 'divider', borderRadius: 0 } : {}),
-      }}
-    >
-      {action.label}
-    </Button>
-  );
-}
-
-function EmptyRow({ text }: { text: string }) {
-  return (
-    <Box sx={{ textAlign: 'center', color: 'text.secondary', py: 3, fontSize: 14 }}>
-      {text}
-    </Box>
-  );
-}
-
-/*
- * One panel of the plocha. Desktop: a bordered card with a compact list.
- * Tablet: the list becomes a table of three columns. Phone: every row is its
- * own card. The title, the count and the footer action are the same everywhere.
- */
-function Panel({
-  title, count, action, rows, headers, empty,
-}: {
-  title: string;
-  count?: number;
-  action?: { label: string; onClick: () => void };
-  rows: PanelRow[];
-  /** Column headings for the tablet's table: lead, main, trailing. */
-  headers: [string, string, string?];
-  empty: string;
-}) {
-  const device = useDevice();
-  /* From 768 the panel is a card whose list scrolls inside it (the page fits the window); a phone gets cards per row. */
-  const desktop = device !== 'phone';
-  const head = (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: desktop ? 2.5 : 0.5, pt: desktop ? 2 : 0, pb: 1.25 }}>
-      <SectionLabel sx={{ mb: 0, flex: 1 }}>{title}</SectionLabel>
-      {count !== undefined && (
-        <StatusChip tone={count > 0 ? 'green' : 'grey'} size="sm">{count}</StatusChip>
-      )}
-    </Box>
-  );
-
-  if (desktop) {
-    return (
-      <SoftCard data-panel={title} sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 0, overflow: 'hidden' }}>
-        {head}
-        <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 1, pb: 1 }}>
-          {rows.length === 0 ? (
-            <EmptyRow text={empty} />
-          ) : (
-            <List disablePadding>
-              {rows.map((row) => (
-                <ListItemButton key={row.id} onClick={row.onClick} sx={{ borderRadius: 2, mb: 0.25, gap: 1.5, alignItems: 'center' }}>
-                  {row.lead}
-                  <MainCell row={row} />
-                  {row.trailing}
-                </ListItemButton>
-              ))}
-            </List>
-          )}
-        </Box>
-        {action && <PanelAction action={action} bordered />}
-      </SoftCard>
-    );
-  }
-
-  const hasTrailing = rows.some((r) => r.trailing !== undefined);
-  const columns: DataColumn<PanelRow>[] = [
-    { key: 'lead', header: headers[0], cell: (r) => r.lead, tablet: true, width: 96 },
-    { key: 'main', header: headers[1], cell: (r) => <MainCell row={r} />, tablet: true },
-    ...(hasTrailing
-      ? [{ key: 'trailing', header: headers[2] ?? '', cell: (r: PanelRow) => r.trailing, tablet: true, align: 'right' as const }]
-      : []),
-  ];
-
-  return (
-    <Box data-panel={title} sx={{ minWidth: 0 }}>
-      {head}
-      <ResponsiveDataList
-        rows={rows}
-        rowKey={(r) => r.id}
-        columns={columns}
-        onRowClick={(r) => r.onClick()}
-        empty={empty}
-        ariaLabel={title}
-        renderCard={(r) => (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            {r.lead}
-            <MainCell row={r} />
-            {r.trailing}
-          </Box>
-        )}
-      />
-      {action && (
-        <Box sx={{ mt: 0.5 }}>
-          <PanelAction action={action} />
-        </Box>
-      )}
-    </Box>
-  );
-}
-
-const timeLead = (iso: string) => (
-  <Typography sx={{ fontSize: 14, fontWeight: 700, minWidth: 44 }}>{formatPragueTime(iso)}</Typography>
-);
-
 const avatarLead = (p: Patient) => (
   <Avatar sx={{ width: 34, height: 34, fontSize: 13 }}>
     {(p.firstName[0] ?? '') + (p.lastName[0] ?? '')}
   </Avatar>
 );
+
+/* ── One row of today's work: the time, who, what, where it stands, and the way into the booking ── */
+function TodayRow({ appt, name, patientId, subtitle }: { appt: DayAppointment; name: string; patientId: string; subtitle: string }) {
+  const status = statusName(appt.status) ?? '';
+  const word = APPOINTMENT_STATUS_WORD[status] ?? { label: `stav ${appt.status}`, tone: 'grey' as const };
+  const target = entityTarget({ kind: 'appointment', id: appt.id, calendarId: appt.calendarId ?? undefined });
+  return (
+    <Box
+      role="listitem"
+      data-row="appointment"
+      sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1.25, py: 0.5, minHeight: 56, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}
+    >
+      <Typography sx={{ fontSize: 14, fontWeight: 700, minWidth: 46, fontVariantNumeric: 'tabular-nums' }}>{formatPragueTime(appt.startUtc)}</Typography>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography component="div" sx={{ fontSize: 15, fontWeight: 600, overflowWrap: 'anywhere' }}>
+          {patientId !== '' ? <EntityLink entity={{ kind: 'patient', id: patientId, label: name }} /> : name}
+        </Typography>
+        <Typography sx={{ fontSize: 13.5, color: 'text.secondary', overflowWrap: 'anywhere' }}>{subtitle}</Typography>
+      </Box>
+      <StatusChip tone={word.tone} size="sm">{word.label}</StatusChip>
+      <Button
+        component={RouterLink}
+        to={target.to}
+        aria-label={`Otevřít termín: ${name}, ${formatPragueTime(appt.startUtc)}`}
+        sx={{ ...TARGET_SX, minWidth: 44, px: 0.5, flexShrink: 0 }}
+      >
+        <ArrowForward sx={{ fontSize: 18 }} />
+      </Button>
+    </Box>
+  );
+}
 
 function OwnerDashboard() {
   const navigate = useNavigate();
@@ -246,14 +113,18 @@ function OwnerDashboard() {
   const phone = device === 'phone';
   const canSeePatients = usePermission('patients.view');
   const canRegister = usePermission('patients.register');
+  const canBill = usePermission('billing.manage');
   const [patientTotal, setPatientTotal] = useState<number | null>(null);
   const [todayAppointments, setTodayAppointments] = useState<DayAppointment[]>([]);
   const [loading, setLoading] = useState(true);
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  let user: { firstName?: string } = {};
+  try {
+    user = JSON.parse(localStorage.getItem('user') || '{}');
+  } catch {
+    /* a plocha without a name is still a plocha */
+  }
 
   /* ── Patient search ── */
-  /* A phone shows one list at a time, chosen with the chips above it (a screen shows one thing). */
-  const [phonePanel, setPhonePanel] = useState<PanelKey>('booked');
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   useEffect(() => {
@@ -268,7 +139,7 @@ function OwnerDashboard() {
     retry: false,
   });
 
-  /* ── Historie: the most recent register entries ── */
+  /* ── Nově v kartotéce: the most recent register entries ── */
   const recent = useQuery({
     queryKey: ['dashboard-recent-patients'],
     queryFn: () => patientsApi.list({ pageSize: 6 }),
@@ -316,8 +187,7 @@ function OwnerDashboard() {
     })),
     combine: namesOf,
   });
-  const patientName = (patientId: string): string =>
-    patientNames[patientId] ?? patientId.slice(0, 8);
+  const nameOf = (a: DayAppointment): string => patientNames[a.patientId] ?? a.patientName ?? a.patientId.slice(0, 8);
 
   /* Etapa 12, "ceny všude": agreed, else the row's list price, else the
      činnost's catalogue price - the one cached list, asked only when some row
@@ -358,229 +228,171 @@ function OwnerDashboard() {
       .sort((a, b) => a.startUtc.localeCompare(b.startUtc)),
     [todayAppointments],
   );
-  /* Notifikace: today's appointments still missing their paperwork. */
-  const alerts = useMemo(
-    () => booked.concat(waiting).filter((a) => a.paperwork && !a.paperwork.ready),
-    [booked, waiting],
-  );
 
-  if (loading) return <DashboardSkeleton />;
-
-  const toCalendar = () => navigate('/planovani');
-
-  const appointmentRow = (appt: DayAppointment): PanelRow => {
-    const status = statusName(appt.status) ?? '';
-    const price = priceOf(appt);
-    return {
-      id: appt.id,
-      onClick: toCalendar,
-      lead: timeLead(appt.startUtc),
-      title: patientName(appt.patientId),
-      /* The činnost and what it costs, on one line: "Kontrola · 1 600 Kč". */
-      subtitle: [appt.activityName, price.adjusted ? `${price.text} (upraveno)` : price.text]
-        .filter((part) => part !== '')
-        .join(' · '),
-      trailing: (
-        <StatusChip tone={STATUS_TONES[status] ?? 'grey'} size="sm">
-          {STATUS_LABELS[status] ?? `stav ${appt.status}`}
-        </StatusChip>
-      ),
-    };
-  };
-
-  const alertRow = (a: DayAppointment): PanelRow => ({
-    id: a.id,
-    onClick: toCalendar,
-    lead: <StatusChip tone="beige" size="sm">{formatPragueTime(a.startUtc)}</StatusChip>,
-    title: patientName(a.patientId),
-    subtitle: `Chybí podklady — ${a.activityName}`,
-  });
-
-  const historyRows: PanelRow[] = !canSeePatients
-    ? []
-    : (recent.data?.items ?? []).map((p) => ({
-        id: p.id,
-        onClick: () => navigate(`/patients/${p.id}`),
-        lead: avatarLead(p),
-        title: `${p.lastName} ${p.firstName}`,
-        subtitle: `nar. ${czechDob(p.dateOfBirth)}`,
-      }));
-  const historyEmpty = !canSeePatients
-    ? 'Bez oprávnění zobrazit pacienty.'
-    : recent.isLoading
-      ? 'Načítám…'
-      : 'Zatím žádní pacienti.';
+  /* What needs a person: the rules read today's day and the lists the application already holds. */
+  const attention = useAttention(loading ? null : todayAppointments, patientNames);
+  const missingPaperwork = attention.groups.find((g) => g.id === 'paperworkToday')?.count ?? 0;
 
   const today = new Date().toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  const openCalendar = (
-    <Button variant="contained" onClick={toCalendar} sx={{ minHeight: phone ? 44 : undefined }}>
-      Otevřít kalendář
-    </Button>
-  );
+  const row = (a: DayAppointment) => {
+    const price = priceOf(a);
+    return (
+      <TodayRow
+        key={a.id}
+        appt={a}
+        name={nameOf(a)}
+        patientId={canSeePatients && patientNames[a.patientId] !== undefined ? a.patientId : ''}
+        /* The činnost and what it costs, on one line: "Kontrola · 1 600 Kč". */
+        subtitle={[a.activityName, price.adjusted ? `${price.text} (upraveno)` : price.text].filter((part) => part !== '').join(' · ')}
+      />
+    );
+  };
+
+  const recentPatients = canSeePatients ? (recent.data?.items ?? []) : [];
 
   return (
-    <FitPage data-device={device}>
-      <PageHeader
-        title={`${getGreeting()}, ${user.firstName || 'Doktore'}`}
-        subtitle={`${today.charAt(0).toUpperCase()}${today.slice(1)}${patientTotal !== null ? ` · ${patientTotal} pacientů v registru` : ''}`}
-        actions={phone ? undefined : openCalendar}
-      />
+    <PageFrame
+      title={`${getGreeting()}, ${user.firstName || 'Doktore'}`}
+      purpose={`${today.charAt(0).toUpperCase()}${today.slice(1)}${patientTotal !== null ? ` · ${patientTotal} pacientů v registru` : ''}`}
+      primaryAction={{ label: 'Otevřít kalendář', to: '/planovani' }}
+      actions={canRegister ? (
+        <Button component={RouterLink} to="/patients/register" variant="outlined" startIcon={<PersonAdd />} sx={{ ...TARGET_SX, minHeight: phone ? 44 : undefined }}>Nový pacient</Button>
+      ) : undefined}
+    >
+      {/* ── Dnes: the five figures, each a link to where it is worked on ── */}
+      <Shelf id="today-figures" title="Dnes" layout="row" fill minCardWidth={168} phoneWidth="156px" cardHeight={116} skeletons={5} loading={loading}>
+        <MetricCard label="Dnes objednáno" value={booked.length} hint="termínů, které ještě stojí" to="/dnes" />
+        <MetricCard label="V čekárně" value={waiting.length} hint="přišli a čekají" tone={waiting.length > 0 ? 'green' : 'grey'} to="/dnes" />
+        <MetricCard label="Chybí podklady" value={missingPaperwork} hint="dnešních termínů bez dotazníku" tone={missingPaperwork > 0 ? 'red' : 'grey'} to="/dnes" />
+        {/* Etapa 12: the day's money - today's visits that stand or happened, at their agreed prices. */}
+        <MetricCard label="Dnes" value={todayCzk} format={formatCzk} hint="za dnešní nezrušené termíny" to={canBill ? '/billing' : undefined} />
+        <MetricCard
+          label="Kartotéka"
+          value={patientTotal}
+          hint={patientTotal !== null ? 'registrovaných pacientů' : 'bez oprávnění'}
+          to={canSeePatients ? '/patients' : undefined}
+        />
+      </Shelf>
 
-      {/* ── The day's facts: two-up on a phone and a portrait tablet, four across when there is room ── */}
-      <Grid container spacing={2} sx={{ mb: 2, flexShrink: 0 }} data-layout={phone ? 'kpi-2up' : 'kpi'}>
-        <Grid size={{ xs: 6, md: 2.4 }}>
-          <KpiCard label="Dnes objednáno" value={<CountUp value={booked.length} />} hint="termínů, které ještě stojí" />
-        </Grid>
-        <Grid size={{ xs: 6, md: 2.4 }}>
-          <KpiCard label="V čekárně" value={<CountUp value={waiting.length} />} hint="přišli a čekají" tone={waiting.length > 0 ? 'green' : 'ink'} />
-        </Grid>
-        <Grid size={{ xs: 6, md: 2.4 }}>
-          <KpiCard label="Chybí podklady" value={<CountUp value={alerts.length} />} hint="dnešních termínů bez dotazníku" tone={alerts.length > 0 ? 'red' : 'ink'} />
-        </Grid>
-        <Grid size={{ xs: 6, md: 2.4 }}>
-          {/* Etapa 12: the day's money - today's visits that stand or happened, at their agreed prices. */}
-          <KpiCard label="Dnes" value={<CountUp value={todayCzk} format={formatCzk} />} hint="za dnešní nezrušené termíny" />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
-          <KpiCard
-            label="Kartotéka"
-            value={patientTotal !== null ? <CountUp value={patientTotal} /> : '—'}
-            hint={patientTotal !== null ? 'registrovaných pacientů' : 'bez oprávnění'}
-          />
-        </Grid>
-      </Grid>
+      {/* ── What needs a person, and - from a landscape tablet - the lookup of the register beside it ── */}
+      <Box data-shelf-pair="" sx={{ display: 'grid', gap: { xs: 3, md: 3.5 }, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 340px' }, alignItems: 'start' }}>
+      <AttentionShelf state={attention} />
 
-      {/* ── Vyhledání pacienta ── */}
-      <SoftCard sx={{ mb: 2, flexShrink: 0 }}>
-        <SectionLabel>Vyhledání pacienta</SectionLabel>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-          <TextField
-            fullWidth
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Jméno, příjmení, telefon nebo e-mail"
-            autoComplete="off"
-            disabled={!canSeePatients}
-            slotProps={{
-              input: {
-                sx: phone ? { minHeight: 44 } : undefined,
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search sx={{ color: 'text.secondary', fontSize: 20 }} />
-                  </InputAdornment>
-                ),
-                endAdornment: searchResults.isFetching ? (
-                  <InputAdornment position="end"><CircularProgress size={18} /></InputAdornment>
-                ) : undefined,
-              },
-            }}
-          />
-          {canRegister && (
-            <Button
-              variant="contained"
-              startIcon={<PersonAdd />}
-              onClick={() => navigate('/patients/register')}
-              sx={{ whiteSpace: 'nowrap', flexShrink: 0, minHeight: phone ? 44 : undefined }}
-            >
-              Nový pacient
-            </Button>
+      {/* ── Najít pacienta ── */}
+      <Shelf id="find-patient" title="Najít pacienta" hint="Ctrl/Cmd + K hledá všechno" layout="board">
+        <Box sx={{ p: 1.5 }}>
+          <Box sx={{ display: 'flex', gap: 1.5, flexDirection: { xs: 'column', sm: 'row' } }}>
+            <TextField
+              fullWidth
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Jméno, příjmení, telefon nebo e-mail"
+              autoComplete="off"
+              disabled={!canSeePatients}
+              slotProps={{
+                htmlInput: { 'aria-label': 'Vyhledání pacienta' },
+                input: {
+                  sx: { minHeight: 44 },
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search sx={{ color: 'text.secondary', fontSize: 20 }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: searchResults.isFetching ? (
+                    <InputAdornment position="end"><CircularProgress size={18} /></InputAdornment>
+                  ) : undefined,
+                },
+              }}
+            />
+          </Box>
+          {canSeePatients && query.length >= 2 && (
+            <SoftCard tone="muted" sx={{ mt: 1.5, p: 0, maxHeight: 320, overflowY: 'auto' }}>
+              {searchResults.isLoading ? (
+                <Typography sx={{ textAlign: 'center', color: 'text.secondary', py: 3, fontSize: 14 }}>Hledám…</Typography>
+              ) : (searchResults.data ?? []).length === 0 ? (
+                <Typography sx={{ textAlign: 'center', color: 'text.secondary', py: 3, fontSize: 14 }}>Nikdo takový v registru není.</Typography>
+              ) : (
+                <List disablePadding>
+                  {(searchResults.data ?? []).map((p) => (
+                    <ListItemButton key={p.id} onClick={() => navigate(`/patients/${p.id}`)} sx={{ gap: 1.5, minHeight: 44 }}>
+                      {avatarLead(p)}
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography sx={{ fontSize: 15, fontWeight: 600 }}>{p.lastName} {p.firstName}</Typography>
+                        <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>nar. {czechDob(p.dateOfBirth)}</Typography>
+                      </Box>
+                      <ArrowForward sx={{ fontSize: 18, color: 'text.disabled' }} />
+                    </ListItemButton>
+                  ))}
+                </List>
+              )}
+            </SoftCard>
           )}
-        </Stack>
+          {!canSeePatients && (
+            <Typography sx={{ mt: 1, fontSize: 13, color: 'text.secondary' }}>Bez oprávnění zobrazit pacienty.</Typography>
+          )}
+        </Box>
+      </Shelf>
+      </Box>
 
-        {canSeePatients && query.length >= 2 && (
-          <SoftCard tone="muted" sx={{ mt: 1.5, p: 0, maxHeight: 320, overflowY: 'auto' }}>
-            {searchResults.isLoading ? (
-              <EmptyRow text="Hledám…" />
-            ) : (searchResults.data ?? []).length === 0 ? (
-              <EmptyRow text="Nikdo takový v registru není." />
-            ) : (
-              <List disablePadding>
-                {(searchResults.data ?? []).map((p) => (
-                  <ListItemButton key={p.id} onClick={() => navigate(`/patients/${p.id}`)} sx={{ gap: 1.5, minHeight: 44 }}>
-                    {avatarLead(p)}
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ fontSize: 15, fontWeight: 600 }}>{p.lastName} {p.firstName}</Typography>
-                      <Typography sx={rowSubtitleSx}>nar. {czechDob(p.dateOfBirth)}</Typography>
-                    </Box>
-                    <ArrowForward sx={{ fontSize: 18, color: 'text.disabled' }} />
-                  </ListItemButton>
-                ))}
-              </List>
-            )}
-          </SoftCard>
-        )}
-      </SoftCard>
+      {/* ── Dnešní práce: who is booked and who is waiting, side by side from a landscape tablet ── */}
+      <Box data-shelf-pair="" sx={{ display: 'grid', gap: { xs: 3, md: 3.5 }, gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'repeat(2, minmax(0, 1fr))' } }}>
+        <Shelf
+          id="booked"
+          title="Objednaní"
+          hint="Dnešní termíny, které ještě stojí"
+          count={booked.length}
+          layout="list"
+          maxHeight="min(46dvh, 440px)"
+          loading={loading}
+          empty={booked.length === 0}
+          emptyState={{ text: 'Na dnešek nikdo objednaný.', action: { label: 'Objednat termín', to: '/planovani', state: { newAppointment: Date.now() } } }}
+          viewAll={{ to: '/dnes', label: 'Dnešní přehled' }}
+        >
+          {booked.map(row)}
+        </Shelf>
+        <Shelf
+          id="waiting"
+          title="Čekárna"
+          hint="Přišli a čekají"
+          count={waiting.length}
+          countTone="green"
+          layout="list"
+          maxHeight="min(46dvh, 440px)"
+          loading={loading}
+          empty={waiting.length === 0}
+          emptyState={{ text: 'Čekárna je prázdná.' }}
+          viewAll={{ to: '/dnes', label: 'Dnešní přehled' }}
+        >
+          {waiting.map(row)}
+        </Shelf>
+      </Box>
 
-      {/* ── Panels: one column on a phone and a portrait tablet, two on a landscape tablet, four on a desktop ── */}
-      <FitBody
-        data-layout={phone ? 'stack' : device === 'tablet' ? 'tablet' : 'four'}
-        sx={{
-          display: 'grid',
-          gap: 2,
-          gridTemplateColumns: '1fr',
-          /* Two panels across on a tablet (2 x 2), four on a desktop; the rows share the height that is left. */
-          '@media (min-width: 768px)': { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gridAutoRows: 'minmax(150px, 1fr)', minHeight: 330 },
-          /* A short window (a landscape tablet, a browser zoomed to 125 %): the panels may be a little lower rather than push the page. */
-          '@media (min-width: 768px) and (max-height: 820px)': { gridAutoRows: 'minmax(124px, 1fr)', minHeight: 264 },
-          '@media (min-width: 1280px)': { gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gridAutoRows: 'minmax(260px, 1fr)', minHeight: 260 },
-        }}
-      >
-        {phone && (
-          <FilterChips<PanelKey>
-            ariaLabel="Seznam na přehledu"
-            value={phonePanel}
-            onChange={setPhonePanel}
-            options={[
-              { key: 'booked', label: 'Objednaní', count: booked.length },
-              { key: 'waiting', label: 'Čekárna', count: waiting.length },
-              { key: 'history', label: 'Historie' },
-              { key: 'alerts', label: 'Notifikace', count: alerts.length },
-            ]}
-          />
-        )}
-        {(!phone || phonePanel === 'booked') && (
-          <Panel
-            title="Objednaní"
-            count={booked.length}
-            action={{ label: 'Otevřít kalendář', onClick: toCalendar }}
-            rows={booked.map(appointmentRow)}
-            headers={['Čas', 'Pacient', 'Stav']}
-            empty="Na dnešek nikdo objednaný."
-          />
-        )}
-        {(!phone || phonePanel === 'waiting') && (
-          <Panel
-            title="Čekárna"
-            count={waiting.length}
-            action={{ label: 'Dnešní přehled', onClick: () => navigate('/dnes') }}
-            rows={waiting.map(appointmentRow)}
-            headers={['Čas', 'Pacient', 'Stav']}
-            empty="Čekárna je prázdná."
-          />
-        )}
-        {(!phone || phonePanel === 'history') && (
-          <Panel
-            title="Historie"
-            action={{ label: 'Všichni pacienti', onClick: () => navigate('/patients') }}
-            rows={historyRows}
-            headers={['', 'Pacient']}
-            empty={historyEmpty}
-          />
-        )}
-        {(!phone || phonePanel === 'alerts') && (
-          <Panel
-            title="Notifikace"
-            count={alerts.length}
-            rows={alerts.map(alertRow)}
-            headers={['Čas', 'Pacient']}
-            empty="Vše vyřízeno — žádné notifikace."
-          />
-        )}
-      </FitBody>
+      <RecentAndPinned emptyAction={canSeePatients ? { label: 'Všichni pacienti', to: '/patients' } : undefined} />
 
-      {/* ── The main action of a phone screen is pinned at the bottom ── */}
-      {phone && <PinnedActionBar label="Hlavní akce">{openCalendar}</PinnedActionBar>}
-    </FitPage>
+      {canSeePatients && (
+        <Shelf
+          id="new-patients"
+          title="Nově v kartotéce"
+          hint="Poslední zapsaní pacienti"
+          count={patientTotal ?? undefined}
+          layout="row"
+          loading={recent.isLoading}
+          error={recent.isError}
+          onRetry={() => void recent.refetch()}
+          empty={recentPatients.length === 0}
+          emptyState={{ text: 'Zatím žádní pacienti.', action: canRegister ? { label: 'Nový pacient', to: '/patients/register' } : undefined }}
+          viewAll={{ to: '/patients', label: 'Všichni pacienti' }}
+        >
+          {recentPatients.map((p) => (
+            <EntityCard
+              key={p.id}
+              entity={{ kind: 'patient', id: p.id, label: `${p.lastName} ${p.firstName}` }}
+              subtitle={`nar. ${czechDob(p.dateOfBirth)}`}
+            />
+          ))}
+        </Shelf>
+      )}
+    </PageFrame>
   );
 }
