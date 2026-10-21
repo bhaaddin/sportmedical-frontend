@@ -1,7 +1,7 @@
 /* R11: generate the club link in the planner finish/publish flow and read what is shown; then open it. */
 import { launch, newPage, login, findOrMakeClub, startClubOrder, shot, BASE, waitPlanner } from './lib.mjs';
 const browser = await launch();
-const page = await newPage(browser, 'desktop');
+const page = await newPage(browser, process.argv[2] ?? 'desktop');
 await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE }).catch(() => {});
 await login(page);
 const club = (await (await import('./lib.mjs')).api(page, 'GET', '/api/clubs')).json.find((c) => c.name === 'ZZ test plánování');
@@ -16,7 +16,8 @@ await page.click('#pub-generate');
 await page.waitForTimeout(2500);
 const shown = (await page.locator('[data-testid=publish-link]').innerText()).trim();
 console.log('after generate:', shown);
-await shot(page, 'r11-2-generated');
+await shot(page, 'r11-2-generated-' + (process.argv[2] ?? 'desktop'));
+console.log('layout:', JSON.stringify(await page.evaluate(() => { const b = document.querySelector('[data-testid=publish-link-copy]').getBoundingClientRect(); const l = document.querySelector('[data-testid=publish-link]').getBoundingClientRect(); return { copyH: Math.round(b.height), copyW: Math.round(b.width), linkW: Math.round(l.width), overflowX: document.documentElement.scrollWidth > innerWidth, docScrollY: document.documentElement.scrollHeight > innerHeight }; })));
 await page.click('[data-testid=publish-link-copy]');
 await page.waitForTimeout(300);
 console.log('copy button state:', await page.locator('[data-testid=publish-link-copy]').getAttribute('data-copy-state'), '| clipboard:', (await page.evaluate(() => navigator.clipboard.readText()).catch((e) => 'ERR ' + e.message)).replace(/[A-Za-z0-9_-]{30,}/, '<tok>'));
