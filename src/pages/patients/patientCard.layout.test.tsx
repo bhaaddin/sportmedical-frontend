@@ -110,7 +110,7 @@ describe('the card frame', () => {
       await screen.findByText('PŘEHLED');
       expect(container.querySelector('[data-pinned="true"]')).toBeNull();
       expect(screen.getAllByRole('button', { name: 'Objednat termín' })).toHaveLength(1);
-      expect(screen.getByRole('button', { name: 'Upravit kartu' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Upravit kartu' })).toBeInTheDocument();
     },
   );
 

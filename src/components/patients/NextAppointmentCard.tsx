@@ -31,7 +31,10 @@ export function NextAppointmentCard({
   window,
   fallback,
   priceOf,
+  bare = false,
 }: {
+  /** Leave out the card's own label: the shelf around it already names it. */
+  bare?: boolean;
   patientId: string;
   /** The booking window; null while unanswered. */
   window: readonly DayAppointment[] | null;
@@ -110,7 +113,7 @@ export function NextAppointmentCard({
 
   return (
     <SoftCard>
-      <SectionLabel>Příští termín</SectionLabel>
+      {!bare && <SectionLabel>Příští termín</SectionLabel>}
       {body}
     </SoftCard>
   );

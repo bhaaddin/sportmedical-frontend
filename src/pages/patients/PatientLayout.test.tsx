@@ -335,7 +335,7 @@ describe('the way into the edit form', () => {
 
     renderLayout();
 
-    expect(await screen.findByRole('button', { name: 'Upravit kartu' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Upravit kartu' })).toBeInTheDocument();
   });
 
   it('is not offered to somebody who may only look', async () => {
@@ -344,7 +344,7 @@ describe('the way into the edit form', () => {
     renderLayout();
 
     await screen.findByRole('button', { name: 'Objednat termín' });
-    expect(screen.queryByRole('button', { name: 'Upravit kartu' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Upravit kartu' })).not.toBeInTheDocument();
   });
 });
 

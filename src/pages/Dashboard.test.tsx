@@ -1,7 +1,6 @@
 /*
- * The plocha (owner/admin home): a patient search at its centre and four panels
- * — Objednaní, Čekárna, Historie, Notifikace. The behaviours worth pinning are
- * the ones that were bugs before:
+ * The plocha (owner/admin home), built as shelves: Dnes (five figures), Vyžaduje pozornost, Najít pacienta, Objednaní,
+ * Čekárna, Připnuté a nedávné, Nově v kartotéce. The behaviours worth pinning are the ones that were bugs before:
  *
  *  - "today" means today: the booking API is asked for a one-day range, because
  *    the old scheduling endpoint ignored its range and counted every appointment
@@ -12,9 +11,12 @@
  *  - the register's total, not the length of its first page.
  *  - nothing about patients is asked, or shown, without the permission to see
  *    them; "Nový pacient" only for somebody who may register one.
+ *
+ * and the new ones: the attention shelf counts what the figures count, every case on it is a link, and a source that
+ * cannot be read is said rather than turned into an all-clear.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { setViewport, VIEWPORTS } from '../test/viewport';
@@ -23,12 +25,19 @@ const range = vi.fn();
 const getById = vi.fn();
 const list = vi.fn();
 const search = vi.fn();
-
 const listActivities = vi.fn();
+const listClubOrders = vi.fn();
+const checkRequired = vi.fn();
+const getInvoices = vi.fn();
+const fetchIntakeQueue = vi.fn();
 
 vi.mock('../api/appointments', () => ({ appointmentsApi: { range } }));
 vi.mock('../api/patients', () => ({ patientsApi: { getById, list, search } }));
 vi.mock('../api/activities', () => ({ activitiesApi: { list: listActivities } }));
+vi.mock('../api/clubOrders', async (importOriginal) => ({ ...(await importOriginal<typeof import('../api/clubOrders')>()), clubOrdersApi: { list: listClubOrders } }));
+vi.mock('../api/documents', async (importOriginal) => ({ ...(await importOriginal<typeof import('../api/documents')>()), documentsApi: { checkRequired } }));
+vi.mock('../api/billing', () => ({ billingApi: { getInvoices } }));
+vi.mock('../api/intakeReview', async (importOriginal) => ({ ...(await importOriginal<typeof import('../api/intakeReview')>()), fetchIntakeQueue }));
 
 const PEOPLE: Record<string, { id: string; firstName: string; lastName: string; dateOfBirth: string }> = {
   p1: { id: 'p1', firstName: 'Jana', lastName: 'Marková', dateOfBirth: '1990-01-02' },
@@ -38,6 +47,7 @@ const PEOPLE: Record<string, { id: string; firstName: string; lastName: string; 
 beforeEach(() => {
   vi.stubGlobal('requestAnimationFrame', () => 1);
   vi.stubGlobal('cancelAnimationFrame', () => {});
+  localStorage.clear();
   localStorage.setItem('permissions', JSON.stringify(['patients.view']));
   getById.mockReset().mockImplementation((id: string) =>
     PEOPLE[id] ? Promise.resolve(PEOPLE[id]) : Promise.reject(new Error('404')));
@@ -45,6 +55,10 @@ beforeEach(() => {
   search.mockReset().mockResolvedValue([]);
   range.mockReset().mockResolvedValue([]);
   listActivities.mockReset().mockResolvedValue({ activities: [{ id: 'a1', name: 'Kontrola', priceCzk: 900 }] });
+  listClubOrders.mockReset().mockResolvedValue([]);
+  checkRequired.mockReset().mockResolvedValue({ allRequiredPresent: true, requirements: [] });
+  getInvoices.mockReset().mockResolvedValue([]);
+  fetchIntakeQueue.mockReset().mockResolvedValue([]);
   setViewport(VIEWPORTS.desktop);
 });
 
@@ -62,13 +76,19 @@ const at = (hourUtc: number, status: number, id: string, patientId = 'p1', paper
   status,
   isRunningLate: false,
   checkedInUtc: null,
-  paperwork: { ready: paperworkReady, missing: [] },
+  paperwork: { ready: paperworkReady, missing: paperworkReady ? [] : ['questionnaire_missing'] },
 });
 
-/** The bordered card a panel's title sits in (the board's SoftCard is a Paper). */
-const panel = async (title: string) => {
-  const heading = await screen.findByText(title);
-  return within(heading.closest('.MuiPaper-root') as HTMLElement);
+/** A shelf by its title (a `<section>` named by its heading). */
+const shelf = async (title: string) => within(await screen.findByRole('region', { name: title }));
+
+/** Czech figures use non-breaking spaces; compare what a person reads. */
+const plain = (text: string | null) => (text ?? '').replace(/\s+/g, ' ').trim();
+const withText = (text: string) => (_: string, el: Element | null) => el !== null && el.children.length === 0 && plain(el.textContent) === text;
+
+const metric = async (label: string) => {
+  const heading = await screen.findByText(label, { selector: '[data-card="metric"] *' });
+  return within(heading.closest('[data-card="metric"]') as HTMLElement);
 };
 
 const renderDashboard = (queryClient = new QueryClient()) =>
@@ -92,19 +112,20 @@ describe('the patient register total', () => {
     range.mockResolvedValue([at(8, 0, 'a', 'p1')]);
 
     renderDashboard();
-    await screen.findByText('Vyhledání pacienta');
+    await screen.findByText('Najít pacienta');
 
     expect(screen.queryByText(/pacientů v registru/)).not.toBeInTheDocument();
     expect(list).not.toHaveBeenCalled();
     expect(getById).not.toHaveBeenCalled();
     expect(search).not.toHaveBeenCalled();
+    expect(screen.queryByRole('region', { name: 'Nově v kartotéce' })).not.toBeInTheDocument();
   });
 });
 
-describe('"today" in the panels', () => {
+describe('"today" on the shelves', () => {
   it('asks the booking API for today, and for one day only', async () => {
     renderDashboard();
-    await screen.findByText('Objednaní');
+    await screen.findByRole('region', { name: 'Objednaní' });
 
     const today = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -123,7 +144,7 @@ describe('"today" in the panels', () => {
 
     renderDashboard();
 
-    const card = await panel('Objednaní');
+    const card = await shelf('Objednaní');
     expect(await card.findByText('Jana Marková')).toBeInTheDocument();
     expect(card.queryByText('Anna Černá')).not.toBeInTheDocument();
   });
@@ -136,20 +157,31 @@ describe('"today" in the panels', () => {
 
     renderDashboard();
 
-    const card = await panel('Čekárna');
+    const card = await shelf('Čekárna');
     expect(await card.findByText('Jana Marková')).toBeInTheDocument();
     expect(card.queryByText('Anna Černá')).not.toBeInTheDocument();
   });
 
-  it('shows a name rather than an id when the patient is known', async () => {
+  it('shows a name rather than an id when the patient is known, as a link to the card', async () => {
     range.mockResolvedValue([at(8, 0, 'a', 'p1')]);
 
     renderDashboard();
 
-    const card = await panel('Objednaní');
-    expect(await card.findByText('Jana Marková')).toBeInTheDocument();
+    const card = await shelf('Objednaní');
+    const name = await card.findByText('Jana Marková');
+    expect(name.closest('a')).toHaveAttribute('href', '/patients/p1');
     expect(card.queryByText(/^p1$/)).not.toBeInTheDocument();
     expect(getById).toHaveBeenCalledWith('p1');
+  });
+
+  it('opens the booking itself from the row', async () => {
+    range.mockResolvedValue([at(8, 0, 'a', 'p1')]);
+
+    renderDashboard();
+
+    const card = await shelf('Objednaní');
+    const open = await card.findByRole('link', { name: /Otevřít termín: Jana Marková/ });
+    expect(open).toHaveAttribute('href', '/kalendar/c1/termin/a');
   });
 
   it('does not ask for the same patients again on coming back', async () => {
@@ -157,32 +189,32 @@ describe('"today" in the panels', () => {
     const queryClient = new QueryClient();
 
     const first = renderDashboard(queryClient);
-    expect(await (await panel('Objednaní')).findByText('Anna Černá')).toBeInTheDocument();
+    expect(await (await shelf('Objednaní')).findByText('Anna Černá')).toBeInTheDocument();
     first.unmount();
 
     renderDashboard(queryClient);
-    expect(await (await panel('Objednaní')).findByText('Jana Marková')).toBeInTheDocument();
+    expect(await (await shelf('Objednaní')).findByText('Jana Marková')).toBeInTheDocument();
 
     expect(getById).toHaveBeenCalledTimes(2);
   });
 
-  it('shows the empty state when nobody is booked for today', async () => {
+  it('shows the empty state, with the next action, when nobody is booked for today', async () => {
     range.mockResolvedValue([at(8, 4, 'a'), at(9, 5, 'b')]);
 
     renderDashboard();
 
-    const card = await panel('Objednaní');
+    const card = await shelf('Objednaní');
     expect(await card.findByText('Na dnešek nikdo objednaný.')).toBeInTheDocument();
+    expect(card.getByRole('button', { name: 'Objednat termín' })).toBeInTheDocument();
   });
 });
 
 /*
- * The day's facts at the top (board restyle, 3. 10. 2026): the KPI cards count
- * the same lists the panels show, so the number and the list can never
- * disagree. Cancelled and no-show rows are not "objednáno"; a missing
- * questionnaire is counted once per appointment that still stands.
+ * The day's facts at the top: the figures count the same lists the shelves show, so the number and the list can never
+ * disagree. Cancelled and no-show rows are not "objednáno"; a missing questionnaire is counted once per appointment that
+ * still stands.
  */
-describe('the KPI cards', () => {
+describe('the figures', () => {
   it('count standing appointments, the waiting room and missing paperwork', async () => {
     range.mockResolvedValue([
       at(8, 0, 'a', 'p1', false), // Scheduled, paperwork missing
@@ -193,32 +225,80 @@ describe('the KPI cards', () => {
 
     renderDashboard();
 
-    const kpi = async (label: string) =>
-      within((await screen.findByText(label)).closest('.MuiPaper-root') as HTMLElement);
+    expect((await metric('Dnes objednáno')).getByText('2')).toBeInTheDocument();
+    expect((await metric('V čekárně')).getByText('1')).toBeInTheDocument();
+    expect((await metric('Chybí podklady')).getByText('2')).toBeInTheDocument();
+  });
 
-    expect((await kpi('Dnes objednáno')).getByText('2')).toBeInTheDocument();
-    expect((await kpi('V čekárně')).getByText('1')).toBeInTheDocument();
-    expect((await kpi('Chybí podklady')).getByText('2')).toBeInTheDocument();
+  it('each one is a link to where it is worked on', async () => {
+    renderDashboard();
+    const booked = await screen.findByRole('link', { name: /^Dnes objednáno/ });
+    expect(booked).toHaveAttribute('href', '/dnes');
+    expect(await screen.findByRole('link', { name: /^Kartotéka/ })).toHaveAttribute('href', '/patients');
   });
 });
 
-describe('Notifikace', () => {
-  it('flags an appointment whose paperwork is not ready', async () => {
+describe('Vyžaduje pozornost', () => {
+  it('flags an appointment whose paperwork is not ready, as a link to the place that fixes it', async () => {
     range.mockResolvedValue([at(8, 0, 'a', 'p1', false)]);
 
     renderDashboard();
 
-    const card = await panel('Notifikace');
-    expect(await card.findByText(/Chybí podklady/)).toBeInTheDocument();
+    const card = await shelf('Vyžaduje pozornost');
+    const group = (await card.findByText('Dnes bez podkladů')).closest('[data-attention]') as HTMLElement;
+    expect(group).toHaveAttribute('data-attention', 'paperworkToday');
+    const row = await within(group).findByRole('link', { name: /Jana Marková/ });
+    expect(row).toHaveAttribute('href', '/kalendar/c1/termin/a');
+    expect(row).toHaveTextContent(/chybí dotazník/);
   });
 
-  it('says all is clear when every appointment has its paperwork', async () => {
+  it('says all is clear when every source answered and nothing waits', async () => {
     range.mockResolvedValue([at(8, 0, 'a', 'p1', true)]);
 
     renderDashboard();
 
-    const card = await panel('Notifikace');
-    expect(await card.findByText(/žádné notifikace/i)).toBeInTheDocument();
+    const card = await shelf('Vyžaduje pozornost');
+    expect(await card.findByText(/Vše vyřízeno/)).toBeInTheDocument();
+  });
+
+  it('counts what other lists say: overdue invoices (with the permission), club inquiries and registrations waiting', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'patients.register', 'billing.manage']));
+    getInvoices.mockResolvedValue([
+      {
+        id: 'i1', patientId: 'p1', patientName: 'Jana Marková', invoiceNumber: 'FA-1', status: 'Issued', totalCzk: 1000, paidCzk: 0, remainingCzk: 1000,
+        currency: 'CZK', issueDateUtc: '2020-01-01T10:00:00Z', dueDateUtc: '2020-01-15T10:00:00Z', items: [],
+      },
+    ]);
+    listClubOrders.mockResolvedValue([{ id: 'o1', clubId: 'c1', clubName: 'FC Sparta', status: 'Requested', totalSeats: 12, submittedAtUtc: '2026-10-01T10:00:00Z' }]);
+    fetchIntakeQueue.mockResolvedValue([{ intakeId: 'x', referenceNumber: 'REG-1', givenName: 'Eva', familyName: 'Nová', submittedAtUtc: '2026-10-02T10:00:00Z' }]);
+
+    renderDashboard();
+
+    const card = await shelf('Vyžaduje pozornost');
+    expect(await card.findByText('Faktury po splatnosti')).toBeInTheDocument();
+    expect(await card.findByText('Poptávky klubů')).toBeInTheDocument();
+    expect(await card.findByText('Registrace ke kontrole')).toBeInTheDocument();
+    expect(card.getByRole('link', { name: /Faktura FA-1/ })).toHaveAttribute('href', '/billing');
+    expect(card.getByRole('link', { name: /FC Sparta/ })).toHaveAttribute('href', '/clubs/objednavky');
+    expect(card.getByRole('link', { name: /Eva Nová/ })).toHaveAttribute('href', '/intake-review');
+  });
+
+  it('does not ask for invoices, registrations or health without the permission', async () => {
+    renderDashboard();
+    await shelf('Vyžaduje pozornost');
+    expect(getInvoices).not.toHaveBeenCalled();
+    expect(fetchIntakeQueue).not.toHaveBeenCalled();
+  });
+
+  it('says it could not look instead of "all clear" when the only source fails', async () => {
+    listClubOrders.mockRejectedValue(new Error('500'));
+
+    renderDashboard();
+
+    const card = await shelf('Vyžaduje pozornost');
+    expect(await card.findByRole('alert')).toHaveTextContent(/nepodařilo načíst/);
+    expect(card.queryByText(/Vše vyřízeno/)).not.toBeInTheDocument();
+    expect(card.getByRole('button', { name: 'Zkusit znovu' })).toBeInTheDocument();
   });
 });
 
@@ -228,104 +308,92 @@ describe('Nový pacient', () => {
 
     renderDashboard();
 
-    expect(await screen.findByRole('button', { name: 'Nový pacient' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Nový pacient' })).toHaveAttribute('href', '/patients/register');
   });
 
   it('is not offered to somebody who may not', async () => {
     renderDashboard();
-    await screen.findByText('Vyhledání pacienta');
+    await screen.findByText('Najít pacienta');
 
-    expect(screen.queryByRole('button', { name: 'Nový pacient' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Nový pacient' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Najít pacienta', () => {
+  it('searches the register as the person types and links each result to its card', async () => {
+    search.mockResolvedValue([{ id: 'p1', firstName: 'Jana', lastName: 'Marková', dateOfBirth: '1990-01-02' }]);
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+
+    renderDashboard();
+    await user.type(await screen.findByLabelText('Vyhledání pacienta'), 'Mark');
+
+    expect(await screen.findByText('Marková Jana')).toBeInTheDocument();
+    expect(search).toHaveBeenCalledWith('Mark');
   });
 });
 
 /*
- * Three layouts (Etapa 2, rule 3): the same plocha at 390 / 834 / 1440.
- * Phone: every row a card, the main action pinned at the bottom. Tablet: the
- * lists are tables of three columns. Desktop: four compact panels, the action
- * in the header.
+ * Three layouts: the same plocha at 390 / 834 / 1440. Phone: rows are cards in a list, the figures swipe, the main action
+ * is pinned at the bottom. Tablet and desktop: the shelves, no tables, the action in the header.
  */
 describe('three layouts', () => {
-  const panelAt = async (title: string) => {
-    const heading = await screen.findByText(title, { selector: '.MuiTypography-overline' });
-    return within(heading.closest('[data-panel]') as HTMLElement);
-  };
-
-  it('phone: rows are cards, KPIs sit two-up and "Otevřít kalendář" is pinned at the bottom', async () => {
+  it('phone: rows are a list of cards, the figures are a swipeable row and "Otevřít kalendář" is pinned at the bottom', async () => {
     setViewport(VIEWPORTS.phone);
     range.mockResolvedValue([at(8, 0, 'a', 'p1'), at(9, 1, 'b', 'p2')]);
 
     const { container } = renderDashboard();
 
-    const objednani = await panelAt('Objednaní');
-    const list = await objednani.findByRole('list', { name: 'Objednaní' });
-    expect(list).toHaveAttribute('data-layout', 'cards');
-    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    const objednani = await shelf('Objednaní');
+    const rows = await objednani.findByRole('list', { name: 'Objednaní' });
+    expect(within(rows).getAllByRole('listitem')).toHaveLength(2);
     expect(await objednani.findByText('Jana Marková')).toBeInTheDocument();
     expect(container.querySelector('table')).toBeNull();
 
-    expect(container.querySelector('[data-layout="kpi-2up"]')).not.toBeNull();
-    expect(container.querySelector('[data-layout="stack"]')).not.toBeNull();
+    expect(container.querySelector('[data-shelf="today-figures"]')).not.toBeNull();
 
     const pinned = screen.getByRole('region', { name: 'Hlavní akce' });
     expect(pinned).toHaveAttribute('data-pinned', 'true');
-    expect(within(pinned).getByRole('button', { name: 'Otevřít kalendář' })).toBeInTheDocument();
+    expect(within(pinned).getByRole('link', { name: 'Otevřít kalendář' })).toBeInTheDocument();
     /* The header no longer carries the same button: it is never drawn twice up there. */
-    const header = screen.getByRole('heading', { level: 1 }).closest('.MuiStack-root')!.parentElement!;
-    expect(within(header).queryByRole('button', { name: 'Otevřít kalendář' })).toBeNull();
+    const header = screen.getByRole('heading', { level: 1 }).closest('header') as HTMLElement;
+    expect(within(header).queryByRole('link', { name: 'Otevřít kalendář' })).toBeNull();
   });
 
-  it('phone: the search and "Nový pacient" are 44px targets', async () => {
+  it('phone: the search field and "Nový pacient" are 44px targets', async () => {
     setViewport(VIEWPORTS.phone);
     localStorage.setItem('permissions', JSON.stringify(['patients.view', 'patients.register']));
     renderDashboard();
 
-    const button = await screen.findByRole('button', { name: 'Nový pacient' });
+    const button = await screen.findByRole('link', { name: 'Nový pacient' });
     expect(getComputedStyle(button).minHeight).toBe('44px');
   });
 
-  it('tablet: the page fits the window - two panels across, each a card whose list scrolls inside it, nothing is pinned', async () => {
-    setViewport(VIEWPORTS.tablet);
-    range.mockResolvedValue([at(8, 0, 'a', 'p1')]);
+  it.each([['tablet', VIEWPORTS.tablet], ['desktop', VIEWPORTS.desktop]])(
+    '%s: shelves, no tables, the action in the header and the search button beside it',
+    async (_name, width) => {
+      setViewport(width);
+      range.mockResolvedValue([at(8, 0, 'a', 'p1')]);
 
-    const { container } = renderDashboard();
+      const { container } = renderDashboard();
 
-    const objednani = await panelAt('Objednaní');
-    expect(await objednani.findByText('Jana Marková')).toBeInTheDocument();
-    /* A compact list in a card (the page never scrolls; the list does), not a table that makes the page taller. */
-    expect(container.querySelector('table')).toBeNull();
-    expect(container.querySelectorAll('[data-panel]')).toHaveLength(4);
+      expect(await (await shelf('Objednaní')).findByText('Jana Marková')).toBeInTheDocument();
+      expect(container.querySelector('table')).toBeNull();
+      for (const id of ['today-figures', 'attention', 'find-patient', 'booked', 'waiting', 'recents']) {
+        expect(container.querySelector(`[data-shelf="${id}"]`), id).not.toBeNull();
+      }
+      expect(screen.queryByRole('region', { name: 'Hlavní akce' })).toBeNull();
+      expect(screen.getByRole('link', { name: 'Otevřít kalendář' })).toHaveAttribute('href', '/planovani');
+      expect(screen.getByRole('button', { name: 'Hledat' })).toBeInTheDocument();
+    },
+  );
 
-    expect(container.querySelector('[data-layout="tablet"]')).not.toBeNull();
-    expect(screen.queryByRole('region', { name: 'Hlavní akce' })).toBeNull();
-    expect(screen.getAllByRole('button', { name: 'Otevřít kalendář' }).length).toBeGreaterThan(0);
-  });
-
-  it('desktop: four compact panels, no tables, the action in the header', async () => {
-    setViewport(VIEWPORTS.desktop);
-    range.mockResolvedValue([at(8, 0, 'a', 'p1')]);
-
-    const { container } = renderDashboard();
-
-    expect(await (await panelAt('Objednaní')).findByText('Jana Marková')).toBeInTheDocument();
-    expect(container.querySelector('[data-layout="four"]')).not.toBeNull();
-    expect(container.querySelectorAll('[data-panel]')).toHaveLength(4);
-    expect(container.querySelector('table')).toBeNull();
-    expect(screen.queryByRole('region', { name: 'Hlavní akce' })).toBeNull();
-    expect(screen.getAllByRole('button', { name: 'Otevřít kalendář' }).length).toBeGreaterThan(0);
-  });
-
-  it('phone: one list at a time - the chips choose it, and an empty one says so in a card instead of a blank gap', async () => {
-    setViewport(VIEWPORTS.phone);
-    const { container } = renderDashboard();
-
-    /* The first list is showing; the others are one tap away, not stacked under it. */
-    await panelAt('Objednaní');
-    expect(container.querySelectorAll('[data-panel]')).toHaveLength(1);
-    fireEvent.click(await screen.findByRole('button', { name: /^Čekárna/ }));
-    const card = await panelAt('Čekárna');
-    expect(container.querySelectorAll('[data-panel]')).toHaveLength(1);
-    expect(await card.findByText('Čekárna je prázdná.')).toBeInTheDocument();
+  it('every shelf is a labelled region with its own heading', async () => {
+    renderDashboard();
+    await shelf('Objednaní');
+    for (const name of ['Dnes', 'Vyžaduje pozornost', 'Najít pacienta', 'Objednaní', 'Čekárna', 'Připnuté a nedávné']) {
+      expect(screen.getByRole('region', { name }), name).toBeInTheDocument();
+    }
   });
 });
 
@@ -335,12 +403,7 @@ describe('three layouts', () => {
  * catalogue last. A cancellation and a no-show earn nothing.
  */
 describe('the prices on the plocha', () => {
-  const kpi = async (label: string) =>
-    within((await screen.findByText(label)).closest('.MuiPaper-root') as HTMLElement);
-  const panelAt = async (title: string) =>
-    within((await screen.findByText(title, { selector: '.MuiTypography-overline' })).closest('[data-panel]') as HTMLElement);
-
-  it('sums today\'s standing visits into a "Dnes" tile, agreed prices included', async () => {
+  it('sums today\'s standing visits into a "Dnes" figure, agreed prices included', async () => {
     range.mockResolvedValue([
       { ...at(8, 0, 'a', 'p1'), agreedPriceCzk: null, listPriceCzk: 1600 },  // the list stands
       { ...at(9, 2, 'b', 'p2'), agreedPriceCzk: 1200, listPriceCzk: 1600 },  // agreed, checked in
@@ -352,14 +415,14 @@ describe('the prices on the plocha', () => {
     renderDashboard();
 
     /* 1 600 + 1 200 + the catalogue's 900, once the catalogue has answered. */
-    expect(await (await kpi('Dnes')).findByText('3 700 Kč')).toBeInTheDocument();
+    expect(await (await metric('Dnes')).findByText(withText('3 700 Kč'))).toBeInTheDocument();
     expect(listActivities).toHaveBeenCalledTimes(1);
   });
 
   it('asks for the catalogue only when some row carries no price', async () => {
     range.mockResolvedValue([{ ...at(8, 0, 'a', 'p1'), agreedPriceCzk: null, listPriceCzk: 1600 }]);
     renderDashboard();
-    expect((await kpi('Dnes')).getByText('1 600 Kč')).toBeInTheDocument();
+    expect((await metric('Dnes')).getByText(withText('1 600 Kč'))).toBeInTheDocument();
     expect(listActivities).not.toHaveBeenCalled();
   });
 
@@ -374,10 +437,8 @@ describe('the prices on the plocha', () => {
 
       renderDashboard();
 
-      expect(await (await panelAt('Objednaní')).findByText('Kontrola · 1 200 Kč (upraveno)')).toBeInTheDocument();
-      /* A phone shows one list at a time: the chip brings the waiting room up. */
-      if (width === VIEWPORTS.phone) fireEvent.click(await screen.findByRole('button', { name: /^Čekárna/ }));
-      expect(await (await panelAt('Čekárna')).findByText('Kontrola · 1 600 Kč')).toBeInTheDocument();
+      expect(await (await shelf('Objednaní')).findByText(withText('Kontrola · 1 200 Kč (upraveno)'))).toBeInTheDocument();
+      expect(await (await shelf('Čekárna')).findByText(withText('Kontrola · 1 600 Kč'))).toBeInTheDocument();
     },
   );
 });
