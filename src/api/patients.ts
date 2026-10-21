@@ -91,8 +91,9 @@ export const patientsApi = {
     return res.data?.value ?? res.data;
   },
 
-  search: async (query: string): Promise<Patient[]> => {
-    const res = await client.get(`/api/patients/search?q=${encodeURIComponent(query)}`);
+  /** `options.signal` cancels a search the next keystroke has made stale (the command palette). */
+  search: async (query: string, options: { signal?: AbortSignal } = {}): Promise<Patient[]> => {
+    const res = await client.get(`/api/patients/search?q=${encodeURIComponent(query)}`, { signal: options.signal });
     const d = res.data;
     return extractItems<Patient>(d).map(withContacts);
   },
