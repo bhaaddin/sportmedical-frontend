@@ -38,7 +38,6 @@ export const SCREENS = [
   ['^/billing$', 'src/pages/Billing.tsx', true],
   ['^/patients/[0-9a-fA-F-]{8,}$', 'src/pages/patients/PatientLayout.tsx', true],
   ['^/clubs/objednavky$', 'src/pages/clubs/orders/ClubOrdersPage.tsx', true],
-  ['^/clubs/rezervace$', 'src/pages/clubs/ClubReservationsPage.tsx', true],
   ['^/clubs/hraci$', 'src/pages/clubs/ClubPlayersPage.tsx', true],
   ['^/clubs/statistiky$', 'src/pages/clubs/ClubStatsPage.tsx', true],
   ['^/clubs/fakturace$', 'src/pages/clubs/ClubBillingPage.tsx', true],

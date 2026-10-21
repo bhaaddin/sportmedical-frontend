@@ -10,7 +10,7 @@ import type { PlannerView } from '../../state/plannerState';
 import type { BoundPlannerActions } from '../../state/PlannerStoreProvider';
 import { ClubOrderSwitcher } from '../../club/ClubOrderSwitcher';
 import { categoryWithPrice, serviceWithPrice } from '../categoryPrice';
-import { normalizeFilter, plannerServices } from '../../model/services';
+import { normalizeFilter, plannerServices, usesServiceFilter } from '../../model/services';
 import { Icon } from '../Icons';
 import { formatZoom, ZOOM_MAX, ZOOM_MIN } from './boardZoom';
 
@@ -60,8 +60,9 @@ export function BoardToolbar({
   /** The main planner filters by služba (R1); a club's own board keeps filtering by the činnosti of its order. */
   serviceFilter?: boolean;
 }) {
-  const services = serviceFilter ? plannerServices(categories) : [];
-  const value = serviceFilter ? normalizeFilter(filter, categories) : filter;
+  const byService = usesServiceFilter(categories, !serviceFilter);
+  const services = byService ? plannerServices(categories) : [];
+  const value = byService ? normalizeFilter(filter, categories) : filter;
   const chosenService = services.find((s) => s.id === value);
   const chosen = categories.find((c) => c.id === filter);
   return (
@@ -89,8 +90,8 @@ export function BoardToolbar({
           ))}
         </div>
         <label className="filter-select">
-          <span className="sr-only">{serviceFilter ? 'Filtrovat podle služby' : 'Filtrovat podle činnosti'}</span>
-          {serviceFilter ? (
+          <span className="sr-only">{byService ? 'Filtrovat podle služby' : 'Filtrovat podle činnosti'}</span>
+          {byService ? (
             <select id="activity-filter" value={value} title={chosenService ? serviceWithPrice(chosenService) : undefined} onChange={(e) => act.setFilter(e.target.value)}>
               <option value="all">Všechny služby</option>
               {services.map((s) => <option key={s.id} value={s.id} title={serviceWithPrice(s)}>{serviceWithPrice(s)}</option>)}

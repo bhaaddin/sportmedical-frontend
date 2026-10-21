@@ -74,3 +74,9 @@ export function inFilter(categories: readonly PlannerCategory[], filter: string,
 
 /** The same for a whole context. */
 export const inFilterCtx = (ctx: Pick<PlannerContext, 'categories'>, filter: string, categoryId: CategoryId): boolean => inFilter(ctx.categories, filter, categoryId);
+
+/**
+ * The main planner filters by služba; a club's own board by the činnosti of its order, and a catalogue whose činnosti name no služba
+ * at all (an old record, the demo) keeps the činnost list rather than offering an empty one.
+ */
+export const usesServiceFilter = (categories: readonly PlannerCategory[], clubMode: boolean): boolean => !clubMode && plannerServices(categories).length > 0;

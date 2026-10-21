@@ -41,6 +41,7 @@ import {
   orderCategoryIds,
   plannerServices,
   publicEventDetailModel,
+  usesServiceFilter,
   slotMinutesOf,
   sourceFor,
   type CategoryId,
@@ -516,9 +517,10 @@ function FullListBody({ initialCategory }: { initialCategory: CategoryId | 'all'
   const ctx = useMemo(() => listedContext(base, club), [base, club]);
   const [query, setQuery] = useState('');
   /* R1: outside a club's order the filter lists služby (a činnost it was opened for is read as its služba) */
-  const services = club ? [] : plannerServices(base.categories);
+  const services = usesServiceFilter(base.categories, club) ? plannerServices(base.categories) : [];
+  const byService = services.length > 0;
   const [categoryId, setCategoryId] = useState<CategoryId | 'all'>(() => {
-    if (club || initialCategory === 'all') return initialCategory;
+    if (!byService || initialCategory === 'all') return initialCategory;
     return services.find((s) => s.id === initialCategory || s.categoryIds.includes(initialCategory))?.id ?? 'all';
   });
   const [date, setDate] = useState('');
@@ -530,9 +532,9 @@ function FullListBody({ initialCategory }: { initialCategory: CategoryId | 'all'
     <div data-testid="agenda-full">
       <div className="agenda-full-tools">
         <input id="agenda-full-search" type="search" placeholder="Hledat činnost, datum nebo čas…" aria-label="Hledat termín" value={query} onChange={(e) => setQuery(e.target.value)} />
-        <select id="agenda-full-type" aria-label={club ? 'Filtr činností' : 'Filtr služeb'} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-          <option value="all">{club ? 'Všechny činnosti' : 'Všechny služby'}</option>
-          {club
+        <select id="agenda-full-type" aria-label={byService ? 'Filtr služeb' : 'Filtr činností'} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+          <option value="all">{byService ? 'Všechny služby' : 'Všechny činnosti'}</option>
+          {!byService
             ? categories.map((id) => <option key={id} value={id}>{categoryOrFallback(ctx, id).name}</option>)
             : services.map((s) => <option key={s.id} value={s.id}>{serviceWithPrice(s)}</option>)}
         </select>

@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { usePlannerActions, usePlannerSelector } from '../../../state/PlannerStoreProvider';
 import { usePlannerCtx } from '../../context';
 import { categoryWithPrice, serviceWithPrice } from '../../categoryPrice';
-import { normalizeFilter, plannerServices } from '../../../model/services';
+import { normalizeFilter, plannerServices, usesServiceFilter } from '../../../model/services';
 import { usePlannerModelState } from '../../context';
 import type { DialogRenderer } from '../../dialogRegistry';
 
@@ -15,7 +15,7 @@ function FilterPickerForm({ close }: { close: () => void }) {
   const filter = usePlannerSelector((s) => s.filter);
   const { catalogue } = usePlannerModelState();
   /* the main planner filters by služba (R1); a club's own board keeps the činnosti of its order */
-  const byService = !(catalogue?.capabilities.mode ? catalogue.capabilities.mode === 'club' : ctx.demands.length > 0);
+  const byService = usesServiceFilter(ctx.categories, catalogue?.capabilities.mode ? catalogue.capabilities.mode === 'club' : ctx.demands.length > 0);
   const [value, setValue] = useState<string>(byService ? normalizeFilter(filter, ctx.categories) : filter);
   return (
     <>

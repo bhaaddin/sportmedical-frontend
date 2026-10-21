@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_FILTER, inFilter, normalizeFilter, plannerServices, serviceKey } from './services';
+import { ALL_FILTER, inFilter, normalizeFilter, plannerServices, serviceKey, usesServiceFilter } from './services';
 import type { PlannerCategory } from './types';
 
 const cat = (id: string, serviceId: string | null, serviceName: string, priceCzk: number | null = null): PlannerCategory => ({
@@ -57,5 +57,13 @@ describe('inFilter / normalizeFilter (R1)', () => {
     expect(normalizeFilter('', categories)).toBe('all');
     expect(normalizeFilter(null, categories)).toBe('all');
     expect(normalizeFilter(undefined, categories)).toBe('all');
+  });
+});
+
+describe('usesServiceFilter (R1)', () => {
+  it('the main planner filters by služba, a club board by činnost, and a catalogue without any služba keeps the činnost list', () => {
+    expect(usesServiceFilter(categories, false)).toBe(true);
+    expect(usesServiceFilter(categories, true)).toBe(false);
+    expect(usesServiceFilter([cat('x', null, ''), cat('y', null, '')], false)).toBe(false);
   });
 });
