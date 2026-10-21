@@ -165,6 +165,42 @@ describe.each([['phone', VIEWPORTS.phone], ['tablet', VIEWPORTS.tablet], ['deskt
       await waitFor(() => expect(createUnregistered).toHaveBeenCalledWith(expect.objectContaining({ agreedPriceCzk: null })));
     });
 
+    it('R15a: the moment a činnost is picked the price and the total stand; a changed price offers an optional reason that travels in the note', async () => {
+      const user = userEvent.setup();
+      open();
+      await toStep2(user);
+      expect(screen.queryByLabelText('Cena')).toBeNull();
+      await user.click(await screen.findByRole('radio', { name: 'Základní' }));
+      expect(priceBox().value).toBe('1600');
+      expect(total()).toBe('1 600 Kč');
+      /* no reason while the list price stands */
+      expect(screen.queryByLabelText('Důvod úpravy (nepovinné)')).toBeNull();
+      await user.clear(priceBox());
+      await user.type(priceBox(), '1000');
+      const reason = screen.getByLabelText('Důvod úpravy (nepovinné)');
+      expect(reason.closest('.MuiInputBase-root')).toHaveStyle({ minHeight: '44px' });
+      await user.type(reason, 'sleva pro kamaráda');
+      await screen.findByText('Slot je volný. Nekoliduje s žádnou rezervací ani s obědem.');
+      await user.click(screen.getByRole('button', { name: 'Objednat termín' }));
+      await waitFor(() => expect(createUnregistered).toHaveBeenCalledTimes(1));
+      expect(createUnregistered).toHaveBeenCalledWith(expect.objectContaining({ agreedPriceCzk: 1000, note: 'Důvod úpravy ceny: sleva pro kamaráda' }));
+    });
+
+    it('R15a: a reason is dropped when the list price is restored (nothing to explain)', async () => {
+      const user = userEvent.setup();
+      open();
+      await toStep2(user);
+      await user.click(await screen.findByRole('radio', { name: 'Základní' }));
+      await user.clear(priceBox());
+      await user.type(priceBox(), '1000');
+      await user.type(screen.getByLabelText('Důvod úpravy (nepovinné)'), 'zbytečný');
+      await user.click(screen.getByRole('button', { name: 'Vrátit ceník' }));
+      expect(screen.queryByLabelText('Důvod úpravy (nepovinné)')).toBeNull();
+      await screen.findByText('Slot je volný. Nekoliduje s žádnou rezervací ani s obědem.');
+      await user.click(screen.getByRole('button', { name: 'Objednat termín' }));
+      await waitFor(() => expect(createUnregistered).toHaveBeenCalledWith(expect.objectContaining({ agreedPriceCzk: null, note: null })));
+    });
+
     it('step 2: another činnost starts from its own list price; a činnost without one reads "ceník cenu neuvádí"', async () => {
       const user = userEvent.setup();
       open();

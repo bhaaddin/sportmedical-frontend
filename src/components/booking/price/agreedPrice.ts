@@ -63,6 +63,9 @@ export const PRICE_TEXT = {
   byList: 'podle ceníku',
   adjusted: (list: number | null) => `upraveno (ceník ${priceWord(list)})`,
   restore: 'Vrátit ceník',
+  reason: 'Důvod úpravy (nepovinné)',
+  reasonHint: 'např. sleva pro známého',
+  reasonNote: 'Důvod úpravy ceny',
   invalid: 'Zadejte částku v Kč — celé koruny nebo dvě desetinná místa, ne méně než 0.',
   noList: 'ceník cenu neuvádí',
 };

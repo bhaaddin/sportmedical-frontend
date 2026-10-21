@@ -17,12 +17,17 @@ export function AgreedPriceField({
   disabled = false,
   fullWidth = false,
   testId = 'agreed-price',
+  reason,
+  onReasonChange,
 }: {
   value: PriceState;
   onChange: (typed: string | null) => void;
   disabled?: boolean;
   fullWidth?: boolean;
   testId?: string;
+  /** R15a: why the amount differs from the list (optional). Shown only while it differs and the owner can carry it. */
+  reason?: string;
+  onReasonChange?: (reason: string) => void;
 }) {
   const view = priceView(value);
   const shown = value.typed ?? amountText(value.listPriceCzk);
@@ -69,8 +74,30 @@ export function AgreedPriceField({
           </Link>
         ) : null}
       </Stack>
+      {onReasonChange && view.adjusted && !view.invalid ? (
+        <TextField
+          fullWidth
+          size="small"
+          disabled={disabled}
+          value={reason ?? ''}
+          onChange={(e) => onReasonChange(e.target.value)}
+          label={PRICE_TEXT.reason}
+          placeholder={PRICE_TEXT.reasonHint}
+          slotProps={{ input: { sx: { minHeight: 44 } }, htmlInput: { maxLength: 200, 'data-testid': `${testId}-reason` } }}
+          sx={{ mt: 1 }}
+        />
+      ) : null}
     </Box>
   );
+}
+
+/** The note that carries the reason to the booking: the desk's own note, then "Důvod úpravy ceny: …" - only when the price was changed and a reason typed. */
+export function noteWithPriceReason(note: string | null, adjusted: boolean, reason: string): string | null {
+  const why = reason.trim();
+  if (!adjusted || why === '') return note;
+  const line = `${PRICE_TEXT.reasonNote}: ${why}`;
+  return note === null || note.trim() === '' ? line : `${note}
+${line}`;
 }
 
 export default AgreedPriceField;

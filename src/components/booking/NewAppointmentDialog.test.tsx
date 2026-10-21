@@ -767,7 +767,7 @@ describe('staff starts and "Jiný čas"', () => {
     );
   });
 
-  it('"Jiný čas": any minute typed is booked without an override reason', async () => {
+  it('"Jiný čas": a typed minute that the availability lists is booked; one it does not list is never booked (R15b)', async () => {
     withChained();
     renderManual({ initialCalendarId: 'c1' });
     await typeTime('08:00');
@@ -777,13 +777,22 @@ describe('staff starts and "Jiný čas"', () => {
     expect(screen.getByRole('button', { name: 'Objednat termín' })).toBeDisabled();
 
     const free = screen.getByTestId('free-time');
+    // 10:05 is not on the list: the notice stays, the nearest free times are offered, nothing can be booked
     await userEvent.type(within(free).getByLabelText('Jiný čas'), '10:05');
     await userEvent.click(within(free).getByRole('button', { name: 'Použít tento čas' }));
+    expect(await screen.findByText(/V 10:05 tuto činnost nabídnout nelze/)).toBeInTheDocument();
+    expect(screen.queryByText(/je mimo nabídku/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Objednat termín' })).toBeDisabled();
+    expect(create).not.toHaveBeenCalled();
 
-    expect(await screen.findByText(/Čas 10:05 je mimo nabídku/)).toBeInTheDocument();
+    // 09:40 is listed (a chained start): typing it makes it the chosen, bookable time
+    await userEvent.clear(within(free).getByLabelText('Jiný čas'));
+    await userEvent.type(within(free).getByLabelText('Jiný čas'), '09:40');
+    await userEvent.click(within(free).getByRole('button', { name: 'Použít tento čas' }));
+    expect(await screen.findByText('Slot je volný. Nekoliduje s žádnou rezervací ani s obědem.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Objednat termín' }));
     await waitFor(() =>
-      expect(create).toHaveBeenCalledWith(expect.objectContaining({ startUtc: '2026-09-24T08:05:00.000Z', overrideReason: undefined })),
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ startUtc: '2026-09-24T07:40:00.000Z', overrideReason: undefined })),
     );
   });
 
@@ -809,7 +818,7 @@ describe('staff starts and "Jiný čas"', () => {
     await pickPatient();
     await pickActivity();
     const free = await screen.findByTestId('free-time');
-    await userEvent.type(within(free).getByLabelText('Jiný čas'), '15:50');
+    await userEvent.type(within(free).getByLabelText('Jiný čas'), '09:40');
     await userEvent.click(within(free).getByRole('button', { name: 'Použít tento čas' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Objednat termín' }));
     expect(await screen.findByText('Do tohoto času se celá délka činnosti nevejde.')).toBeInTheDocument();
@@ -824,7 +833,7 @@ describe('staff starts and "Jiný čas"', () => {
     await pickPatient();
     await pickActivity();
     const free = await screen.findByTestId('free-time');
-    await userEvent.type(within(free).getByLabelText('Jiný čas'), '10:05');
+    await userEvent.type(within(free).getByLabelText('Jiný čas'), '09:40');
     await userEvent.click(within(free).getByRole('button', { name: 'Použít tento čas' }));
     const calls = getAvailability.mock.calls.length;
     await userEvent.click(await screen.findByRole('button', { name: 'Objednat termín' }));
@@ -881,17 +890,17 @@ describe('a time chosen by a gesture (reviewer 2.1)', () => {
     expect(screen.getByTestId('nearest-free')).toHaveTextContent('Nejbližší volný čas 10:15');
   });
 
-  it('"Zkusit přesně" books the exact chosen minute and lets the server decide', async () => {
+  it('R15b: there is no "Zkusit přesně"; a start the availability refuses offers only the nearest free time and cannot be booked', async () => {
     getAvailability.mockResolvedValue(DAYS.empty!.offer);
     renderDialog({ initialStart: '2026-09-24T09:05' });
     await pickPatient();
     await pickActivity();
-    await userEvent.click(await screen.findByTestId('try-exactly'));
-    expect(await screen.findByText(/Čas 09:05 je mimo nabídku/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Objednat termín' }));
-    await waitFor(() =>
-      expect(create).toHaveBeenCalledWith(expect.objectContaining({ startUtc: '2026-09-24T07:05:00.000Z' })),
-    );
+    await screen.findByTestId('chosen-time-not-offered');
+    expect(screen.queryByTestId('try-exactly')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Zkusit přesně/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('nearest-free')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Objednat termín' })).toBeDisabled();
+    expect(create).not.toHaveBeenCalled();
   });
 
   it('an offered chosen start is booked directly: no notice, no list, no time field', async () => {

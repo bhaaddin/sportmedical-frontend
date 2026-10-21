@@ -46,7 +46,7 @@ import { DrawerFrame } from "./drawer/DrawerFrame";
 import { ModeCards } from "./drawer/ModeCards";
 import { BubbleFrame } from "./NewAppointmentDialog.bubble";
 import type { BubbleAnchor } from "./NewAppointmentDialog.bubble.logic";
-import { AgreedPriceField } from "./price/AgreedPriceField";
+import { AgreedPriceField, noteWithPriceReason } from "./price/AgreedPriceField";
 import { priceView } from "./price/agreedPrice";
 import { PatientSearch } from "./patient/PatientSearch";
 import { PatientFilled } from "./patient/PatientFilled";
@@ -199,7 +199,7 @@ const TEXT = {
   chained: "po předchozí rezervaci",
   chainedNow: "Začíná hned po předchozí rezervaci (s pauzou, kterou ordinace nastavila).",
   freeTime: "Jiný čas",
-  freeTimeHelp: "Napište přesný začátek (HH:mm). Rezervace se uloží, pokud se do něj vejde celá délka činnosti; jinak vám server napíše proč.",
+  freeTimeHelp: "Napište začátek (HH:mm). Objednat lze jen čas z nabídky; když tam není, nabídneme nejbližší volné časy.",
   freeTimeUse: "Použít tento čas",
   freeTimeBad: "Zadejte čas ve tvaru HH:mm, například 09:40.",
   freeTimeActive: (time: string) =>
@@ -209,7 +209,6 @@ const TEXT = {
   notFitsChosen: (time: string, name: string, minutes: number) =>
     `V ${time} se ${name} (${minutes} min) nevejde — čas je obsazený, v pauze nebo mimo pracovní dobu.`,
   nearestFree: (time: string) => `Nejbližší volný čas ${time}`,
-  tryExactly: (time: string) => `Zkusit přesně ${time}`,
   noneFreeThatDay: "V tento den už pro tuto činnost není volný čas.",
   overrideTimeIs: (when: string) => `Objedná se na ${when}, mimo nabídku.`,
   sms: (phone: string | null) => `Poslat SMS s potvrzením${phone ? ` na ${phone}` : ""}`,
@@ -581,8 +580,11 @@ export function NewAppointmentDialog({
    * own list price again. What goes on the wire is `price.agreedPriceCzk`.
    */
   const [priceTyped, setPriceTyped] = useState<string | null>(null);
+  /* R15a: an optional reason for a changed price; it travels in the booking's note. */
+  const [priceReason, setPriceReason] = useState("");
   useEffect(() => {
     setPriceTyped(null);
+    setPriceReason("");
   }, [chosenActivityId]);
   const listPriceCzk = activity?.priceCzk ?? null;
   const price = priceView({ listPriceCzk, typed: priceTyped });
@@ -594,11 +596,11 @@ export function NewAppointmentDialog({
       appointmentsApi.getAvailability(effectiveCalendarId, activity?.id ?? "", date, date, { staffStarts: true }),
     enabled: open && startUtc !== null && activity !== null,
   });
-  /* "Jiný čas": the desk typed a minute that is not on the list; the server decides whether the whole length fits. */
-  const [freeStart, setFreeStart] = useState(false);
+  /* "Jiný čas": a minute typed by hand. It is only ever booked when the availability calculation lists it (R15b): nothing
+     here lets a start through that the server's list does not hold - a minute that is not listed gets the nearest free ones. */
   const [freeDraft, setFreeDraft] = useState("");
   const listed = isStartOffered(availabilityQuery.data, startUtc);
-  const offered = listed || (freeStart && startUtc !== null);
+  const offered = listed;
   const currentSlot = (availabilityQuery.data ?? []).find(
     (s) => startUtc !== null && Date.parse(s.startUtc) === Date.parse(startUtc),
   );
@@ -635,7 +637,7 @@ export function NewAppointmentDialog({
 
   const book = useMutation({
     mutationFn: async (input: { overrideReason?: string }): Promise<BookedView> => {
-      const noteOrNull = note.trim() === "" ? null : note.trim();
+      const noteOrNull = noteWithPriceReason(note.trim() === "" ? null : note.trim(), price.adjusted, priceReason);
 
       /* A registered patient goes through the ordinary booking, with its patient
          checks and its warnings. An event with nobody behind it goes through
@@ -780,7 +782,13 @@ export function NewAppointmentDialog({
   /* "CENA", shown the moment a činnost is chosen - on step 2 and under the four facts alike. */
   const priceField =
     activity !== null ? (
-      <AgreedPriceField value={{ listPriceCzk, typed: priceTyped }} onChange={setPriceTyped} disabled={booking} />
+      <AgreedPriceField
+        value={{ listPriceCzk, typed: priceTyped }}
+        onChange={setPriceTyped}
+        disabled={booking}
+        reason={priceReason}
+        onReasonChange={mode === "quick" ? undefined : setPriceReason}
+      />
     ) : null;
   const serviceField = serviceGate ? (
     <Box component="section" data-testid="service-first">
@@ -871,7 +879,6 @@ export function NewAppointmentDialog({
 
   /* Any change to the time drops the dragged end: it no longer describes it. */
   const changeTime = (next: string) => {
-    setFreeStart(false);
     setTime(next);
     setSelectionEnd(null);
     setOverriding(false);
@@ -880,7 +887,6 @@ export function NewAppointmentDialog({
 
   const changeDate = (next: string) => {
     if (!next) return;
-    setFreeStart(false);
     setDate(next);
     setSelectionEnd(null);
     setOverriding(false);
@@ -888,7 +894,6 @@ export function NewAppointmentDialog({
   };
 
   const resetBooking = () => {
-    setFreeStart(false);
     setFreeDraft('');
     setStep(1);
     setMode("database");
@@ -1343,7 +1348,7 @@ export function NewAppointmentDialog({
               }}
             >
               <CheckCircleOutline fontSize="small" />
-              <Typography variant="body2">{listed ? TEXT.free : TEXT.freeTimeActive(time)}</Typography>
+              <Typography variant="body2">{TEXT.free}</Typography>
             </Stack>
             {listed && currentSlot?.kinds?.includes("chained") ? (
               <Typography variant="caption" sx={{ color: "text.secondary" }} data-testid="chained-note">
@@ -1365,9 +1370,6 @@ export function NewAppointmentDialog({
                         {TEXT.nearestFree(nearestOffered)}
                       </Button>
                     ) : null}
-                    <Button size="small" variant="outlined" disabled={booking} onClick={() => setFreeStart(true)} data-testid="try-exactly">
-                      {TEXT.tryExactly(time)}
-                    </Button>
                   </Stack>
                 </Stack>
               ) : (
@@ -1427,7 +1429,6 @@ export function NewAppointmentDialog({
                       const typed = normalizeTime(freeDraft.trim().padStart(5, "0"));
                       if (typed === "") return;
                       changeTime(typed);
-                      setFreeStart(true);
                     }}
                     sx={{ minHeight: 40 }}
                   >
