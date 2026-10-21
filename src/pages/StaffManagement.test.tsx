@@ -140,3 +140,21 @@ describe('editing an employee', () => {
     expect(await screen.findByText('Účet s tímto e-mailem už existuje.')).toBeInTheDocument();
   });
 });
+
+describe('arriving from Zabezpečení a zálohy', () => {
+  it('marks the account named in ?user=, and no other', async () => {
+    window.history.pushState({}, '', '/staff-management?user=u2');
+    try {
+      render(<StaffManagement />);
+
+      const petr = (await screen.findByText('Petr Starý')).closest('tr') as HTMLElement;
+      const jana = (await screen.findByText('Jana Nová')).closest('tr') as HTMLElement;
+
+      expect(petr).toHaveAttribute('aria-current', 'true');
+      expect(petr).toHaveAttribute('data-user-id', 'u2');
+      expect(jana).not.toHaveAttribute('aria-current');
+    } finally {
+      window.history.pushState({}, '', '/');
+    }
+  });
+});

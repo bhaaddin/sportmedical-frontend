@@ -33,6 +33,7 @@ import {
 import { SettingsCrumbs } from './settings/SettingsFrame';
 import { useSettingsSearch } from '../components/shell/settingsSearch';
 import { GroupIcon } from '../components/settings/groupIcons';
+import { SecurityStatusChip } from '../components/settings/SecurityStatusChip';
 import {
   DESKTOP_UP, TABLET_UP, TYPE, focusRing, rowSx, settingsGrey, settingsHover, settingsLine,
 } from '../components/settings/settingsStyle';
@@ -233,6 +234,7 @@ function GroupPage({ groupId }: { groupId: string }) {
                   <Typography sx={TYPE.itemName}>{item.label}</Typography>
                   <Typography sx={TYPE.caption}>{item.description}</Typography>
                 </Box>
+                {item.id === 'zabezpeceni-zalohy' && <SecurityStatusChip />}
                 <ChevronRight sx={{ color: settingsGrey, flexShrink: 0 }} aria-hidden />
               </Box>
             </Box>

@@ -487,6 +487,15 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         requires: 'settings.clinic.manage',
       },
       {
+        id: 'zabezpeceni-zalohy',
+        label: 'Zabezpečení a zálohy',
+        description: 'Skutečný stav záloh, účtů a prostředí; odhlášení lidí, klíče pro hlášení záloh, export konfigurace a návod k obnově',
+        to: '/nastaveni/zabezpeceni-a-zalohy',
+        scope: null,
+        keywords: ['záloha', 'zálohy', 'zálohování', 'obnova', 'backup', 'restore', 'bezpečnost', '2fa', 'dvoufázové', 'odhlásit', 'klíč', 'šifrování', 'gdpr', 'únik'],
+        requires: 'settings.clinic.manage',
+      },
+      {
         id: 'zdravi',
         label: 'Zdraví systému',
         description: 'Chyby, přihlášená zařízení a stav služeb',

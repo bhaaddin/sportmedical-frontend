@@ -66,6 +66,8 @@ export default function StaffManagement() {
   /* Only somebody who may manage roles can give out or take the Owner role;
      the server refuses it for everybody else, so it is not offered either. */
   const canManageOwners = usePermission('roles.manage');
+  /* "Otevřít účet" in Zabezpečení a zálohy arrives here with ?user=<id>: that row is scrolled to and marked. */
+  const highlighted = new URLSearchParams(window.location.search).get('user');
   /* Absences are settings.clinic.manage on the server, like the timetable. */
   const canManageAbsences = usePermission('settings.clinic.manage');
   const assignableRoles = USER_ACCOUNT_ROLES.filter((r) => r !== 'Owner' || canManageOwners);
@@ -90,6 +92,11 @@ export default function StaffManagement() {
   const [resetting, setResetting] = useState<UserAccount | null>(null);
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (highlighted === null || loading) return;
+    document.querySelector(`[data-user-id="${CSS.escape(highlighted)}"]`)?.scrollIntoView?.({ block: 'center' });
+  }, [highlighted, loading, accounts]);
 
   const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
 
@@ -321,7 +328,13 @@ export default function StaffManagement() {
                 accounts.map((acc) => {
                   const name = nameOf(acc);
                   return (
-                    <TableRow key={acc.userId} sx={{ opacity: acc.isActive ? 1 : 0.6 }}>
+                    <TableRow
+                      key={acc.userId}
+                      data-user-id={acc.userId}
+                      aria-current={highlighted === acc.userId ? 'true' : undefined}
+                      selected={highlighted === acc.userId}
+                      sx={{ opacity: acc.isActive ? 1 : 0.6 }}
+                    >
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Avatar sx={{ bgcolor: ROLE_COLORS[acc.role] ?? '#90A4AE', width: 36, height: 36, fontSize: 14 }}>
