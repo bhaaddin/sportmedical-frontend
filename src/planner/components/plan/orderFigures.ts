@@ -14,10 +14,11 @@
  */
 import {
   categoryOrFallback,
+  countsForOrder,
+  isUnsavedPast,
   orderCategoryIds,
   plannedFrom,
   slotMinutesOf,
-  sourceFor,
   timeAsMinutes,
   timeLeft,
   type CategoryId,
@@ -91,6 +92,10 @@ export interface OrderFigures {
   lostCzk: number | null;
   /** Club terms of the ordered činnosti and the seats of those created in this session. */
   termCount: number;
+  /** Terms the save would write: those of today or later (a saved window of the past is history, not a write). */
+  savableTerms: number;
+  /** Terms of the order that lie in the past and were never saved: they count for nothing and are never written. */
+  pastIgnored: number;
   newSlots: number;
   /** Every player of every činnost has a place. */
   complete: boolean;
@@ -163,7 +168,7 @@ export function orderTerms(ctx: PlannerContext, orderId?: string | null): Planne
   const ids = orderCategoryIds(ctx);
   return ctx.sessions.filter(
     (s) =>
-      sourceFor(s) === 'club' &&
+      countsForOrder(ctx, s) &&
       ids.includes(s.categoryId) &&
       (orderId == null || s.orderId == null || s.orderId === orderId),
   );
@@ -240,6 +245,8 @@ export function orderFigures(ctx: PlannerContext, options: FigureOptions = {}): 
     spareSeats: list.reduce((n, f) => n + f.spareSeats, 0),
     lostCzk: lostParts.length === 0 || lostParts.some((p) => p === null) ? null : lostParts.reduce<number>((n, p) => n + (p ?? 0), 0),
     termCount: terms.length,
+    savableTerms: terms.filter((s) => s.date >= ctx.today).length,
+    pastIgnored: ctx.sessions.filter((s) => s.origin !== 'public' && !s.foreign && orderCategoryIds(ctx).includes(s.categoryId) && (options.orderId == null || s.orderId == null || s.orderId === options.orderId) && isUnsavedPast(ctx, s)).length,
     newSlots: terms.filter((s) => !baselineIds.has(s.id)).reduce((n, s) => n + Number(s.capacity || 0), 0),
     complete: requested > 0 && planned >= requested,
     additive,

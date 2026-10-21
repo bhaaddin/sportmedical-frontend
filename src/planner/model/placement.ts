@@ -11,7 +11,7 @@
  * pointer in as FRACTIONS of the board (0..1) so the CSS scale of the stage
  * cannot matter (see `components/PlannerStage.tsx` for `pointerCoords`).
  */
-import { demandOf, slotMinutesOf } from './context';
+import { PAST_REFUSAL, demandOf, slotMinutesOf } from './context';
 import { plannedFrom, plannedOf } from './order';
 import { addDays, clamp, minutesAsTime, timeAsMinutes } from './time';
 import type {
@@ -95,6 +95,8 @@ export function validatePlacement(
   const demand = categoryId ? demandOf(ctx, categoryId) : undefined;
   if (!categoryId || !demand) return { ok: false, reason: 'Vyberte činnost' };
   if (!/\d{4}-\d\d-\d\d/.test(date)) return { ok: false, reason: 'Chybné datum' };
+  /* The order never keeps a past day (`ordersRangesOf`): a term there can not be saved, so it is refused here. */
+  if (date < ctx.today) return { ok: false, reason: PAST_REFUSAL };
   const st = timeAsMinutes(start);
   const en = timeAsMinutes(end);
   const w = win(ctx);

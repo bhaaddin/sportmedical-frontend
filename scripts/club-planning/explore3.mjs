@@ -1,0 +1,10 @@
+import { launch, newPage, login, shot, buttons, findOrMakeClub, startClubOrder } from './lib.mjs';
+const b = await launch();
+const p = await newPage(b, 'desktop');
+await login(p);
+const club = await findOrMakeClub(p);
+await startClubOrder(p, club.id, { 'Základní sportovní prohlídka': 7, 'Komplexní sportovní prohlídka': 5 });
+await shot(p, 'x-planning');
+console.log((await buttons(p)).filter((x) => !x.startsWith('mini-day')).join('\n'));
+console.log(p.errors);
+await b.close();

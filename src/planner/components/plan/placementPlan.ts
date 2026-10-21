@@ -8,6 +8,7 @@
  * `orderFigures`. With a parallel capacity of 1 both give the same answer (pinned in the tests).
  */
 import {
+  PAST_REFUSAL,
   addDays,
   clamp,
   minutesAsTime,
@@ -71,6 +72,7 @@ export function planValidation(
     return { ok: false, reason: `Čas musí být v intervalu ${windowLabel(ctx)}` };
   }
   if (p.quantity <= 0 || !Number.isInteger(p.quantity)) return { ok: false, reason: 'Neplatný počet slotů' };
+  if (p.date < ctx.today) return { ok: false, reason: PAST_REFUSAL };
   const mark = dayMarks[p.date];
   if (mark?.closed) return { ok: false, reason: `V tento den je zavřeno${mark.label ? ` (${mark.label})` : ''}.` };
   if (!extra && p.quantity > f.remainingSlots) return { ok: false, reason: `Zbývá pouze ${f.remaining} osob. Zkraťte časový úsek.` };

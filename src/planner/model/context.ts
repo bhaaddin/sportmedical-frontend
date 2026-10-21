@@ -85,3 +85,23 @@ export function makeContext(partial: Partial<PlannerContext> & Pick<PlannerConte
     ...partial,
   };
 }
+
+/**
+ * A club term nobody has saved and that lies before today. The order's ranges drop past days (`ordersRangesOf`), so
+ * such a term can never be written: it is not planned, and the planner must neither count it nor accept it. A term the
+ * server already holds (a club block behind it, or a baseline session) is history and stays counted.
+ */
+export const isUnsavedPast = (
+  ctx: Pick<PlannerContext, 'today'> & Partial<Pick<PlannerContext, 'baselineSessions'>>,
+  e: Pick<PlannerSession, 'id' | 'date' | 'clubBlockId'>,
+): boolean =>
+  e.date < ctx.today && !e.clubBlockId && !(ctx.baselineSessions ?? []).some((b) => b.id === e.id);
+
+/** The ONE definition of a term that is part of the order's plan: a club term, not an unsaved past one. */
+export const countsForOrder = (
+  ctx: Pick<PlannerContext, 'today'> & Partial<Pick<PlannerContext, 'baselineSessions'>>,
+  e: PlannerSession,
+): boolean => sourceFor(e) === 'club' && !e.foreign && !isUnsavedPast(ctx, e);
+
+/** The reason a day before today is refused where a term is placed, moved or edited. */
+export const PAST_REFUSAL = 'Termín v minulosti nelze naplánovat. Vyberte dnešní nebo pozdější den.';

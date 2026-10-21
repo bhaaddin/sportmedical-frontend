@@ -17,8 +17,8 @@ import { planSelection, planStart, planValidation, seatsOf } from './placementPl
 const komplexni: PlannerCategory = { id: 'k', name: 'Komplexní sportovní prohlídka', iconKey: 'heart', color: '#00f1dc', slotMinutes: 60, parallelCapacity: 1, priceCzk: 1600 };
 const spiro: PlannerCategory = { id: 's', name: 'Spiroergometrické vyšetření', iconKey: 'run', color: '#0f94ff', slotMinutes: 90, parallelCapacity: 1, priceCzk: 900 };
 
-const term = (id: string, date: string, start: string, end: string, categoryId: string, capacity: number): PlannerSession => ({
-  id, date, start, end, categoryId, capacity, booked: 0, showInList: true, createdByPlanner: true,
+const term = (id: string, date: string, start: string, end: string, categoryId: string, capacity: number, extra: Partial<PlannerSession> = {}): PlannerSession => ({
+  id, date, start, end, categoryId, capacity, booked: 0, showInList: true, createdByPlanner: true, ...extra,
 });
 
 const ownerCtx = (sessions: PlannerSession[], extra: Partial<PlannerContext> = {}): PlannerContext =>
@@ -29,6 +29,8 @@ const ownerCtx = (sessions: PlannerSession[], extra: Partial<PlannerContext> = {
       { categoryId: 's', requested: 50, baselinePlanned: 0 },
     ],
     sessions,
+    /* the file's terms are mid-November: "today" is before them (a term before today can not be saved, see the end) */
+    today: '2026-11-01',
     ...extra,
   });
 
@@ -130,7 +132,7 @@ describe('orderFigures · agrees with the prototype model on the sample order (l
 });
 
 describe('planSelection · the drag, whole slots of the armed činnost', () => {
-  const ctx = ownerCtx([term('w1', '2026-11-13', '08:00', '14:00', 's', 4)], { today: '2026-11-10' });
+  const ctx = ownerCtx([term('w1', '2026-11-13', '08:00', '14:00', 's', 4)], { today: '2026-11-08' });
   const figures = orderFigures(ctx);
   const weekStart = '2026-11-09';
   const at = (minute: number) => ({ x: 0.5, y: (minute - 420) / 720 });
@@ -189,5 +191,48 @@ describe('planSelection · the drag, whole slots of the armed činnost', () => {
     const f = orderFigures(ownerCtx([], { categories: [two, spiro] }));
     expect(seatsOf(f.byId.get('k')!, 3)).toBe(6);
     expect(seatsOf({ ...f.byId.get('k')!, remaining: 5 }, 3)).toBe(5);
+  });
+});
+
+describe('one definition of planned: what can not be saved is not counted (owner bug 21. 10. 2026)', () => {
+  const zk = (sessions: PlannerSession[]) =>
+    makeContext({
+      categories: [
+        { id: 'z', name: 'Základní', iconKey: 'heart', color: '#00f1dc', slotMinutes: 40, parallelCapacity: 1 },
+        { id: 'k', name: 'Komplexní', iconKey: 'heart', color: '#00f1dc', slotMinutes: 60, parallelCapacity: 1 },
+      ],
+      demands: [{ categoryId: 'z', requested: 7, baselinePlanned: 0 }, { categoryId: 'k', requested: 5, baselinePlanned: 0 }],
+      sessions,
+      today: '2026-10-21',
+    });
+
+  it('new terms on past days plan nothing - 0 / 12, not 12 / 12', () => {
+    const f = orderFigures(zk([term('p1', '2026-10-19', '08:00', '12:40', 'z', 7), term('p2', '2026-10-20', '08:00', '13:00', 'k', 5)]));
+    expect(f).toMatchObject({ requested: 12, planned: 0, remaining: 12, percent: 0, complete: false, termCount: 0, savableTerms: 0 });
+  });
+
+  it('the same terms on future days plan everything and are all savable', () => {
+    const f = orderFigures(zk([term('p1', '2026-10-22', '08:00', '12:40', 'z', 7), term('p2', '2026-10-23', '08:00', '13:00', 'k', 5)]));
+    expect(f).toMatchObject({ requested: 12, planned: 12, remaining: 0, percent: 100, complete: true, termCount: 2, savableTerms: 2 });
+  });
+
+  it('a saved window in the past still counts (history), but there is nothing left to save', () => {
+    const f = orderFigures(zk([term('h1', '2026-10-05', '08:00', '12:40', 'z', 7, { clubBlockId: 'b1' }), term('h2', '2026-10-06', '08:00', '13:00', 'k', 5, { clubBlockId: 'b2' })]));
+    expect(f).toMatchObject({ planned: 12, complete: true, termCount: 2, savableTerms: 0 });
+  });
+
+  it('a mix: past new + future new -> only the future one counts; the past one is reported as ignored', () => {
+    const f = orderFigures(zk([term('p1', '2026-10-19', '08:00', '12:40', 'z', 7), term('p2', '2026-10-23', '08:00', '10:40', 'z', 4)]));
+    expect(f.byId.get('z')).toMatchObject({ planned: 4, remaining: 3 });
+    expect(f).toMatchObject({ savableTerms: 1, pastIgnored: 1 });
+  });
+
+  it('the drag preview on a past day is refused with the reason, whatever the činnost needs', () => {
+    const ctx = zk([]);
+    const figures = orderFigures(ctx);
+    const v = planValidation(ctx, figures, { date: '2026-10-20', categoryId: 'z', start: '08:00', end: '08:40', quantity: 1 });
+    expect(v.ok).toBe(false);
+    expect(v.reason).toMatch(/minulosti/);
+    expect(planValidation(ctx, figures, { date: '2026-10-21', categoryId: 'z', start: '08:00', end: '08:40', quantity: 1 }).ok).toBe(true);
   });
 });

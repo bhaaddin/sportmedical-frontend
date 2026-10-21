@@ -17,6 +17,7 @@
 import {
   categoryOrFallback,
   demandOf,
+  isUnsavedPast,
   orderCategoryIds,
   slotMinutesOf,
   sourceFor,
@@ -49,7 +50,7 @@ import type {
  * simply the sum of the club sessions' capacity for the činnost.
  */
 export function plannedFrom(
-  ctx: Pick<PlannerContext, 'demands' | 'baselineSessions'>,
+  ctx: Pick<PlannerContext, 'demands' | 'baselineSessions'> & Partial<Pick<PlannerContext, 'today'>>,
   sessions: readonly PlannerSession[],
   categoryId: CategoryId,
 ): number {
@@ -64,6 +65,8 @@ export function plannedFrom(
     if (now?.categoryId === categoryId && sourceFor(now) === 'club') value += Number(now.capacity || 0);
   }
   for (const e of sessions) {
+    /* A new term before today can never be saved (the order drops past days): it is not planned. */
+    if (ctx.today !== undefined && isUnsavedPast({ today: ctx.today, baselineSessions: ctx.baselineSessions }, e)) continue;
     if (!baselineIds.has(e.id) && sourceFor(e) === 'club' && e.categoryId === categoryId) {
       value += Number(e.capacity || 0);
     }
