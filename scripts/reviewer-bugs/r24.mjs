@@ -22,7 +22,7 @@ const n = await chips.count();
 for (let i = 2; i < n; i++) await chips.nth(i).click();
 await page.waitForTimeout(900);
 out('columns per day', await page.evaluate(() => document.querySelector('#day-board')?.getAttribute('data-subs')));
-out('heading chips of Wed', await page.evaluate(() => [...document.querySelectorAll('.day-title[data-day="' + seedDay(2) + '"] .day-calendar')].map((e) => e.textContent)));
+out('heading chips of Wed', await page.evaluate((d) => [...document.querySelectorAll('.day-title[data-day="' + d + '"] .day-calendar')].map((e) => e.textContent), seedDay(2)));
 await shot(page, `${tag}-2.4-${size}-1-two-columns`);
 // the cards of Wed sit in their own calendar's column
 const geo = await page.evaluate(() => {

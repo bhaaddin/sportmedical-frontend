@@ -164,7 +164,21 @@ mini ring and month tile all show the new colour, then reset).
 
 ## Verification
 
-(see the end of this file)
+Run in this worktree after the last commit (outputs read from the log tails):
+
+* `npm run typecheck`: exit 0.
+* `npx vitest run --testTimeout=30000`: 448 test files passed (1 skipped), 8420 tests passed (7 skipped), 0 failed; `src/planner/model/golden.test.ts` 29/29 passed.
+* `PRERENDER_API_URL=off npm run build`: exit 0.
+* `node scripts/bundle-budget.mjs`: ok. Planner first load 243.2 kB brotli against a limit of 247.8 kB (unchanged limit). `claude/clean` measured 245.3 kB in a temporary worktree;
+  this branch added 6.2 kB until the club order panel (`ClubOrderDetailPanel`) became a lazy chunk, which brought it to 243.2 kB, so the baseline was not raised.
+* Reproduction / "after" scripts (own Chromium, `scripts/reviewer-bugs/`, three layouts): r21 (2.1), r22 (2.2: one row per cinnost in the mini flyout, agenda, day list, month, day panel, phone),
+  r23 (2.3), r24 + r24b (2.4: selector, two columns, per-calendar click opens the right calendar), r25-* (2.5: 0 failing contrast samples in dark/forest at 390, 820, 1440 and in light/orange at 1440
+  after the fix; the unchanged app on `:3000` had 3, 2 and 3 failing samples in light/orange, e.g. 3.36:1 and 3.56:1 for the accent text and 3.3:1 for the contained button on hover), r26 (2.6: preview,
+  AA guard, save, board card / agenda chip / mini ring / month tile in the new colour, reset).
+* Club planning must stay intact (`BASE=http://localhost:3003`): `scripts/club-planning/e2e.mjs` 34 checks ok at the three sizes; `motion-check.mjs` all passed; `deck-check.mjs` ALL OK. `e2e.mjs` also reports
+  "no console errors" as failing on `:3003`, and only because of 152 HTTP 403 answers for `@fontsource` font files: Vite refuses to serve files that the `node_modules` junction resolves outside this worktree
+  (`/@fs/C:/Users/Matko/sportmedical-frontend/node_modules/...`). The same e2e on the unchanged `:3000` has 0 such errors and 14 ok checks, and no other console error occurred. It is a property of this
+  verification set-up, not of the code.
 
 ## Open risks
 
