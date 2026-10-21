@@ -65,6 +65,12 @@ export function ClubCard({ row, ordersLoading, billableCzk, summaryRequest = tru
       onPrefetch();
     }, HOVER_INTENT_MS);
   };
+  /* A click that came before the pointer had rested warms the screen at once (nothing new when it is already warm). */
+  const open = () => {
+    cancelIntent();
+    if (onPrefetch !== undefined && row.club.isActive) onPrefetch();
+    onOpen();
+  };
   useEffect(() => cancelIntent, []);
   /* The club as one whole from the server; the block totals stand in when that call fails or says nothing. */
   const summary = useClubSummary(row.club.id, row.club.isActive && summaryRequest).data;
@@ -87,11 +93,11 @@ export function ClubCard({ row, ordersLoading, billableCzk, summaryRequest = tru
       onMouseLeave={cancelIntent}
       onFocus={showIntent}
       onBlur={cancelIntent}
-      onClick={onOpen}
+      onClick={open}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          onOpen();
+          open();
         }
       }}
     >

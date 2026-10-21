@@ -178,7 +178,7 @@ export const queryClient = createQueryClient();
 onWriteSucceeded((write) => markStaleAfterWrite(queryClient, write));
 
 /* Opened straight on a calendar or club screen: start its reference reads while its code is still arriving. */
-if (typeof window !== 'undefined') warmForPath(queryClient, window.location.pathname);
+if (typeof window !== 'undefined') warmForPath(queryClient, window.location.pathname, window.location.search, window.history.state);
 
 /* The server answered again after a gap: reload everything on screen. */
 connection.onRecovered(() => {

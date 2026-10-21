@@ -6,15 +6,22 @@
  * It decides nothing about planning itself: the session is `editSessionFor(root)` exactly as the old "Upravit termíny"
  * built it; a club without an order (or a group that is not Confirmed) gives no session and the stage runs in the
  * club's context only (`ApiDataSource.clubContext`).
+ *
+ * Speed (see `planner/club/clubStageReads.ts`): on entry every read of the screen starts at once (`prefetchClubScreen`,
+ * a no-op for what the club list's card already warmed), and the moment the orders are known the stage's own reads
+ * start too - while the catalogue, the code and the first draw are still on their way - instead of one after the other
+ * once the stage has drawn.
  */
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef } from 'react';
 import { clubBlocksApi, fetchBlockableActivities, type ClubBlockView } from '../../api/clubBlocks';
 import { clubOrdersApi, type ClubOrderView } from '../../api/clubOrders';
 import { clubsApi, type Club } from '../../api/clubs';
+import { prefetchClubScreen } from '../../api/warmReads';
 import { editSessionFor } from '../../components/clubs/order/editSession';
 import type { PickSession } from '../../components/clubs/order/pickSession';
-import { clubGroups, openingDate, selectedGroup, type ClubGroup } from './clubGroups';
+import type { ClubGroup } from './clubGroups';
+import { clubSelection, prefetchClubStage } from './clubStageReads';
 
 export type ClubPlannerStatus = 'loading' | 'error' | 'notFound' | 'ready';
 
@@ -41,8 +48,18 @@ export interface ClubPlannerData {
 export function useClubPlannerData(
   clubId: string,
   today: string,
-  wanted: { orderId: string | null; blockId: string | null },
+  /** `session`: a session the router state hands over (it replaces the group's own on the stage). */
+  wanted: { orderId: string | null; blockId: string | null; session?: PickSession | null },
 ): ClubPlannerData {
+  const queryClient = useQueryClient();
+  /* Route entry: everything the screen reads starts now, in one wave (what is already fresh asks nothing). Before the
+     queries below mount, so a copy shared from the club list is in place when they look. */
+  const entered = useRef<string | null>(null);
+  if (entered.current !== clubId) {
+    entered.current = clubId;
+    prefetchClubScreen(queryClient, clubId, { route: false, stage: false });
+  }
+
   const clubQuery = useQuery({
     queryKey: ['clubs', 'one', clubId],
     queryFn: () => clubsApi.getById(clubId),
@@ -60,18 +77,25 @@ export function useClubPlannerData(
   });
 
   const orders = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
-  const groups = useMemo(() => clubGroups(orders, today), [orders, today]);
   const blocks = useMemo(() => (blocksQuery.data ?? []).filter((b) => b.clubId === clubId), [blocksQuery.data, clubId]);
 
-  /* A window the caller names (the calendar's "Otevřít klub") picks the group that owns it. */
-  const owner = useMemo(
-    () => (wanted.blockId === null ? null : groups.find((g) => g.blockIds.includes(wanted.blockId as string)) ?? null),
-    [groups, wanted.blockId],
+  /* Which group is in view and the day the board opens on (a window the caller names picks the group that owns it). */
+  const routed = wanted.session ?? null;
+  const selection = useMemo(
+    () => clubSelection(orders, blocks, today, { orderId: wanted.orderId, blockId: wanted.blockId, session: routed }),
+    [orders, blocks, today, wanted.orderId, wanted.blockId, routed],
   );
-  const selected = useMemo(
-    () => (wanted.orderId === null && owner !== null ? owner : selectedGroup(groups, wanted.orderId)),
-    [groups, wanted.orderId, owner],
-  );
+  const { groups, selected, openOn } = selection;
+
+  /* The stage's reads, as soon as the orders are known (once per distinct start; the cache keeps it from asking twice). */
+  const ordersKnown = ordersQuery.data !== undefined;
+  const startKey = ordersKnown ? JSON.stringify([clubId, selection.start.openOn, selection.start.session?.serviceId ?? null, selection.start.session?.order?.id ?? null, selection.start.session?.order?.blocks ?? null]) : null;
+  const startRef = useRef(selection.start);
+  startRef.current = selection.start;
+  useEffect(() => {
+    if (startKey === null) return;
+    void prefetchClubStage(queryClient, startRef.current).catch(() => undefined);
+  }, [queryClient, startKey]);
 
   const needsCatalogue = selected?.editable === true;
   const catalogueQuery = useQuery({
@@ -85,11 +109,6 @@ export function useClubPlannerData(
     () => (selected?.editable && catalogueQuery.data ? editSessionFor(selected.root, catalogueQuery.data, today) : null),
     [selected, catalogueQuery.data, today],
   );
-
-  const blockDate = wanted.blockId === null
-    ? null
-    : (orders.flatMap((o) => o.blocks).find((b) => b.id === wanted.blockId) ?? blocks.find((b) => b.id === wanted.blockId))?.fromDate ?? null;
-  const openOn = blockDate ?? session?.editOrder?.firstDate ?? openingDate(selected, groups, today);
 
   const failed = clubQuery.isError && clubQuery.data === undefined;
   const status: ClubPlannerStatus = failed
