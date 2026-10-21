@@ -130,3 +130,15 @@
 .sm-planner .s41-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; background: var(--tone); flex: none; vertical-align: baseline; }
 .sm-planner .s41-activity-name { display: inline-flex; align-items: center; }
 .sm-planner .s41-money-line > span { display: inline-flex; align-items: center; }
+
+/* R9 - a strip that shows three or more cards makes each one narrow: the name wraps to two lines instead of hiding the part that tells packages apart. */
+.sm-planner[data-layout='desktop'] #planning-cards .adaptive-deck.mode-scroll .plan-card-name {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-size: 13.5px;
+  line-height: 1.15;
+  text-align: center;
+}

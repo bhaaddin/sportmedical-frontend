@@ -19,6 +19,8 @@ import { boardGeometry, cardBox, hourLabels, minuteAtY, yOfMinute } from './boar
 import {
   DECK_CARD_GAP,
   DECK_CARD_WIDTH,
+  DECK_MIN_CARD_WIDTH,
+  compactVisibleCount,
   DESIGN_BOARD,
   DESIGN_STAGE,
   boardMetricsOf,
@@ -96,33 +98,41 @@ describe('board metrics', () => {
   });
 });
 
-describe('deckVisibleCount: as many činnost cards as fit', () => {
-  it('shows the file\'s two cards in the file\'s deck and never fewer', () => {
-    // viewport 652.4 minus its 2 x 12 px padding
-    expect(deckVisibleCount(652.4 - 24)).toBe(2);
+describe('deckVisibleCount: every činnost card that fits (R9)', () => {
+  it('shows THREE cards in the club strip (the owner saw 2 of 3) and never fewer than two', () => {
+    // viewport 652.4 minus its 2 x 12 px padding - the strip of the club planner at 1440 px
+    expect(deckVisibleCount(652.4 - 24)).toBe(3);
     expect(deckVisibleCount(0)).toBe(2);
     expect(deckVisibleCount(300)).toBe(2);
-    expect(deckVisibleCount(2 * DECK_CARD_WIDTH + DECK_CARD_GAP)).toBe(2);
+    expect(deckVisibleCount(2 * DECK_MIN_CARD_WIDTH + DECK_CARD_GAP)).toBe(2);
   });
 
-  it('adds cards when the deck is wider and is monotonic', () => {
-    const at = (cards: number) => cards * DECK_CARD_WIDTH + (cards - 1) * DECK_CARD_GAP;
-    expect(deckVisibleCount(at(3))).toBe(3);
-    expect(deckVisibleCount(at(4))).toBe(4);
-    expect(deckVisibleCount(at(5))).toBe(5);
+  it('adds a card exactly when it fits at the minimum width, and is monotonic', () => {
+    const at = (cards: number) => cards * DECK_MIN_CARD_WIDTH + (cards - 1) * DECK_CARD_GAP;
+    for (const n of [2, 3, 4, 5, 8]) expect(deckVisibleCount(at(n))).toBe(n);
+    expect(deckVisibleCount(at(3) - 1)).toBe(2);
+    expect(deckVisibleCount(at(4) - 1)).toBe(3);
     let last = 0;
     for (let w = 400; w < 2400; w += 25) {
       const n = deckVisibleCount(w);
       expect(n).toBeGreaterThanOrEqual(last);
       last = n;
     }
-    // the card keeps about the file's width: within 20 % of 309.7 px
-    for (let w = 628; w < 2400; w += 31) {
+    // no room is left over: every card is between the minimum and 1.55 x the minimum wide, and fits whole
+    for (let w = 460; w < 2400; w += 31) {
       const n = deckVisibleCount(w);
       const card = (w - (n - 1) * DECK_CARD_GAP) / n;
-      expect(card).toBeGreaterThan(DECK_CARD_WIDTH * 0.8);
-      expect(card).toBeLessThan(DECK_CARD_WIDTH * 1.25);
+      expect(card).toBeGreaterThanOrEqual(DECK_MIN_CARD_WIDTH - 1e-6);
+      expect(card).toBeLessThan(DECK_MIN_CARD_WIDTH * 1.55);
     }
+  });
+
+  it('the compact strip: 2 on a phone, 4 on a tablet, never fewer than two', () => {
+    expect(compactVisibleCount(346)).toBe(2);
+    expect(compactVisibleCount(756)).toBe(4);
+    expect(compactVisibleCount(1136)).toBe(6);
+    expect(compactVisibleCount(0)).toBe(2);
+    expect(compactVisibleCount(200)).toBe(2);
   });
 
   it('the carousel model follows the visible count (2 = the prototype\'s answers)', () => {

@@ -22,7 +22,6 @@
  * prototype's ~700 answers) is the file exactly.
  */
 import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useState, type ReactNode, type RefObject } from 'react';
-import { cardsThatFit } from '../model/order';
 
 /** The file's stage. */
 export const STAGE_WIDTH = 1672;
@@ -87,14 +86,29 @@ export const DESIGN_BOARD: BoardMetrics = {
  */
 export const DECK_CARD_WIDTH = 309.7;
 export const DECK_CARD_GAP = 9;
-/** The file shows two cards at a time; a wider deck shows more of them at about the same width. */
+/** The file shows two cards at a time; a deck that has the room shows every card that fits (R9). */
 export const DECK_MIN_VISIBLE = 2;
+/**
+ * The narrowest a činnost card may be drawn on the desktop stage (design px; the file's own card is 309.7). A strip that
+ * is 640 design px wide - the club planner at 1440 px, beside the summary card - holds THREE of them, which the file's
+ * width did not (owner, 21. 10. 2026: "only 2 of 3 cards visible").
+ */
+export const DECK_MIN_CARD_WIDTH = 200;
+/** The narrowest card of the compact strip (phone / tablet, CSS px) and its gap - the phone's two cards are 167 px wide. */
+export const COMPACT_MIN_CARD_WIDTH = 160;
+export const COMPACT_CARD_GAP = 8;
 
-/** Cards that fit a deck viewport whose content (inside the padding) is `contentWidth` design px wide. */
+/** Cards that fit a deck viewport whose content (inside the padding) is `contentWidth` design px wide: every one that is at least the minimum wide. */
 export function deckVisibleCount(contentWidth: number): number {
   if (!(contentWidth > 0)) return DECK_MIN_VISIBLE;
-  const fit = Math.round((contentWidth + DECK_CARD_GAP) / (DECK_CARD_WIDTH + DECK_CARD_GAP));
+  const fit = Math.floor((contentWidth + DECK_CARD_GAP + 0.5) / (DECK_MIN_CARD_WIDTH + DECK_CARD_GAP));
   return Math.max(DECK_MIN_VISIBLE, fit);
+}
+
+/** The same for the compact strip: 2 on a phone (346 px), 4 on a tablet (756 px). */
+export function compactVisibleCount(contentWidth: number): number {
+  if (!(contentWidth > 0)) return DECK_MIN_VISIBLE;
+  return Math.max(DECK_MIN_VISIBLE, Math.floor((contentWidth + COMPACT_CARD_GAP + 0.5) / (COMPACT_MIN_CARD_WIDTH + COMPACT_CARD_GAP)));
 }
 
 /**
@@ -196,11 +210,10 @@ export function useBoardMetrics(bodyRef: RefObject<HTMLElement | null>, enabled 
 }
 
 /**
- * The deck's viewport padding (planner.css v29) the card width is measured inside. The desktop stage sizes its cards from
- * the count (`--deck-n`), so it uses the file's card width (`deckVisibleCount`); the compact strip (phone / tablet) draws
- * every card at half the strip, so there the real card is measured (`cardsThatFit`) - the desktop formula once claimed four
- * cards on a 1200 px tablet that showed two, and the third činnost could not be reached. `quantity` re-measures when the
- * cards change.
+ * The deck's viewport padding (planner.css v29) the card width is measured inside. How many činnost cards fit is a count from
+ * the strip's width alone (`deckVisibleCount` on the desktop stage, `compactVisibleCount` on the phone / tablet strip); the
+ * cards are then drawn from that count (`--deck-n` / `--deck-nc`), so nothing depends on a card that is already drawn.
+ * `quantity` re-measures when the cards change.
  */
 export function useDeckVisible(viewportRef: RefObject<HTMLElement | null>, quantity = 0): number {
   const ctx = useContext(MetricsContext);
@@ -217,14 +230,8 @@ export function useDeckVisible(viewportRef: RefObject<HTMLElement | null>, quant
       const border = cs.boxSizing === 'border-box';
       const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
       const content = border ? w - pad : w;
-      let next = deckVisibleCount(content);
-      const card = vp.closest('.is-compact') ? vp.querySelector<HTMLElement>('.plan-card') : null;
-      if (card) {
-        const track = card.parentElement;
-        const gap = track ? parseFloat(getComputedStyle(track).columnGap) || parseFloat(getComputedStyle(track).gap) || 0 : 0;
-        const fit = cardsThatFit(content, layoutSize(card).width, gap);
-        if (fit > 0) next = fit;
-      }
+      /* a count from the width alone: the card is drawn from the count (`--deck-n`), never the other way round */
+      const next = vp.closest('.is-compact') ? compactVisibleCount(content) : deckVisibleCount(content);
       setLocal(next);
       publish?.(next);
     };

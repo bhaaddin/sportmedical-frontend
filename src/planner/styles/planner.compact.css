@@ -743,8 +743,9 @@
 }
 .sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .mode-scroll .adaptive-card-track::after { display: none !important; }
 .sm-planner.is-compact #dashboard.live-mode #planning-cards.planning-cards .adaptive-card-track > .plan-card {
-  flex: 0 0 calc((100cqw - 2px - 8px) / 2) !important;
-  width: calc((100cqw - 2px - 8px) / 2) !important;
+  /* R9: every card that fits (--deck-nc: 2 on a phone, more on a tablet), never fewer than two */
+  flex: 0 0 calc((100cqw - 2px - (var(--deck-nc, 2) - 1) * 8px) / var(--deck-nc, 2)) !important;
+  width: calc((100cqw - 2px - (var(--deck-nc, 2) - 1) * 8px) / var(--deck-nc, 2)) !important;
   min-width: 0 !important;
   height: 128px !important;
   min-height: 128px !important;

@@ -6,7 +6,7 @@
  *   - the escalator: arming / completing a card moves the strip so the next open card slides in, by the smallest move.
  */
 import { describe, expect, it } from 'vitest';
-import { DECK_CARD_GAP, DECK_CARD_WIDTH, deckVisibleCount } from '../components/PlannerMetrics';
+import { DECK_CARD_GAP, DECK_CARD_WIDTH, compactVisibleCount, deckVisibleCount } from '../components/PlannerMetrics';
 import {
   cardsThatFit,
   carouselModel,
@@ -29,7 +29,7 @@ const desktopContents = [628.4, 700, 980, 1290, 1600, 1950];
 const compactContents = [346, 756, 1136];
 const WIDTHS: { name: string; visible: number }[] = [
   ...desktopContents.map((w) => ({ name: `desktop ${w}`, visible: deckVisibleCount(w) })),
-  ...compactContents.map((w) => ({ name: `compact ${w}`, visible: cardsThatFit(w, (w - 2 - 8) / 2, 8) })),
+  ...compactContents.map((w) => ({ name: `compact ${w}`, visible: compactVisibleCount(w) })),
   { name: 'one at a time', visible: 1 },
 ];
 const QUANTITIES = range(8).map((i) => i + 1);
@@ -48,10 +48,11 @@ describe('cardsThatFit: whole cards in the strip, from the measured card', () =>
     expect(cardsThatFit(content, card, gap)).toBe(expected);
   });
 
-  it('the compact strip shows two whole cards at every width (the 1200 px tablet once claimed four)', () => {
-    for (const w of [320, 346, 500, 756, 1000, 1136, 1250]) expect(cardsThatFit(w, (w - 2 - 8) / 2, 8)).toBe(2);
-    // the bug: the desktop formula on a compact strip
-    expect(deckVisibleCount(1136)).toBeGreaterThan(2);
+  it('the compact strip shows every card that fits: 2 on a phone, 4 on a tablet (R9)', () => {
+    expect(compactVisibleCount(346)).toBe(2);
+    expect(compactVisibleCount(756)).toBe(4);
+    // the old bug (a desktop formula on a compact strip) cannot come back: the compact count is its own formula
+    expect(compactVisibleCount(1136)).toBe(6);
   });
 });
 

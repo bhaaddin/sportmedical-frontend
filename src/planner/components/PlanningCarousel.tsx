@@ -363,6 +363,17 @@ function PlanningDeck() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deck.index, deck.showCarousel, visible, quantity, instant]);
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
+  /* R9: a card whose width changes (the strip found room for another one, a window resize, the card's own transition) is
+     measured again when it has settled - otherwise the card that has just become reachable stays at opacity 0. */
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => queueVisibility());
+    observer.observe(vp);
+    vp.querySelectorAll('.plan-card').forEach((card) => observer.observe(card));
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quantity, visible]);
 
   /* The strip -> the store: a swipe, a trackpad or a drag that comes to rest on another page tells the store (the page
      the user went to; it ends the armed činnost like the arrows). A scroll the strip made itself rests on the store's page. */
@@ -525,7 +536,7 @@ function PlanningDeck() {
       ref={hostRef}
       id="planning-cards"
       className={`planning-cards${focusOn ? ' activity-focus-on' : ''}`}
-      style={standard ? { display: 'none' } : ({ '--deck-n': deckColumns(visible, quantity) } as CSSProperties)}
+      style={standard ? { display: 'none' } : ({ '--deck-n': deckColumns(visible, quantity), '--deck-nc': Math.max(2, deckColumns(visible, quantity)) } as CSSProperties)}
       data-standard={standard ? 'true' : undefined}
       aria-label="Výběr činnosti pro přetažení do kalendáře"
       data-testid="planning-carousel"
