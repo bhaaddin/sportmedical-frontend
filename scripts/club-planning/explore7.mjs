@@ -1,0 +1,23 @@
+import { launch, newPage, login, shot, dragBoard, clickCard, toasts, findOrMakeClub, startClubOrder } from './lib.mjs';
+const b = await launch();
+const p = await newPage(b, 'desktop');
+await login(p);
+const club = await findOrMakeClub(p);
+await startClubOrder(p, club.id, { 'Základní sportovní prohlídka': 7, 'Komplexní sportovní prohlídka': 5 });
+await clickCard(p, 'Základní sportovní prohlídka');
+const d = await dragBoard(p, { day: 0, min: 8 * 60 }, { min: 12 * 60 + 40 });
+await shot(p, 'x-past-refused-drag');
+await d.up();
+await shot(p, 'x-past-refused-after');
+console.log('toasts', await toasts(p));
+// Thursday across the lunch break: 08:30 -> 13:30
+const e = await dragBoard(p, { day: 3, min: 8 * 60 + 30 }, { min: 14 * 60 });
+await shot(p, 'x-lunch-drag');
+await e.up();
+await p.waitForTimeout(500);
+const ok = p.locator('[data-testid=pick-ask] button', { hasText: 'Potvrdit' });
+if (await ok.count()) await ok.first().click();
+await p.waitForTimeout(800);
+await shot(p, 'x-lunch-after');
+console.log('toasts', await toasts(p));
+await b.close();
