@@ -298,9 +298,9 @@ export default function PatientLayout() {
       entities={connected}
       /* The calendar opens its booking drawer on `newAppointment` and takes this patient as the one being booked. */
       primaryAction={{ label: 'Objednat termín', onClick: () => navigate('/planovani', { state: { newAppointment: Date.now(), patientId: id } }) }}
+      titleAddon={<PinButton entity={{ kind: 'patient', id, label: fullName }} />}
       actions={(
         <>
-          <PinButton entity={{ kind: 'patient', id, label: fullName }} />
           {mayEdit && (
             <Button variant="outlined" component={RouterLink} to={`/patients/${id}/edit`} sx={TARGET_SX}>
               Upravit kartu

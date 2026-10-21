@@ -129,6 +129,9 @@ export function Shelf({
           gap: '12px',
           overflowX: 'auto',
           overscrollBehaviorX: 'contain',
+          /* Cards that arrive in front of the visible ones (a more urgent group, a late answer) must not scroll the row past
+             themselves: the browser's scroll anchoring did exactly that, and the most urgent card ended up off to the left. */
+          overflowAnchor: 'none',
           scrollSnapType: 'x proximity',
           scrollPaddingInline: phone ? '16px' : 0,
           /* The first card's shadow and a focus ring are not clipped by the scroller. */
@@ -197,7 +200,7 @@ export function Shelf({
       </Box>
 
       {state === 'loading' && (
-        <Box aria-busy="true" aria-label={`${title}: načítám`} sx={layout === 'row' ? { ...sizing, maskImage: 'none' } : sizing}>
+        <Box role="status" aria-busy="true" aria-label={`${title}: načítám`} sx={layout === 'row' ? { ...sizing, maskImage: 'none' } : sizing}>
           {layout === 'list' || layout === 'board' || layout === 'free' ? (
             <SoftCard sx={{ p: 1.5 }}><Skeleton height={44} /><Skeleton height={44} /><Skeleton height={44} /></SoftCard>
           ) : (

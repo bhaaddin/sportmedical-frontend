@@ -47,6 +47,8 @@ export interface PageFrameProps {
   badges?: ReactNode;
   /** Something before the title: a back button, an avatar. */
   leading?: ReactNode;
+  /** Something right after the title, small: a pin. */
+  titleAddon?: ReactNode;
   /** Hide the palette button (a page that is itself a search). */
   search?: boolean;
   /** Fit the window (tablet and desktop): the body takes the height left under the header, so a `grow` shelf can scroll inside. */
@@ -91,7 +93,7 @@ function PrimaryButton({ action }: { action: NonNullable<PageFrameProps['primary
     : <Button onClick={action.onClick} {...common}>{action.label}</Button>;
 }
 
-export function PageFrame({ title, purpose, breadcrumb, primaryAction, actions, entities, badges, leading, search = true, fit = false, children }: PageFrameProps) {
+export function PageFrame({ title, purpose, breadcrumb, primaryAction, actions, entities, badges, leading, titleAddon, search = true, fit = false, children }: PageFrameProps) {
   const hasChips = badges !== undefined || (entities !== undefined && entities.length > 0);
   const device = useDevice();
   const phone = device === 'phone';
@@ -113,7 +115,10 @@ export function PageFrame({ title, purpose, breadcrumb, primaryAction, actions, 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
           {leading}
           <Box sx={{ minWidth: 0 }}>
-            <Typography variant="h4" component="h1" sx={{ fontSize: { xs: 24, md: 28 }, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.2, overflowWrap: 'anywhere' }}>{title}</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+              <Typography variant="h4" component="h1" sx={{ fontSize: { xs: 24, md: 28 }, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.2, overflowWrap: 'anywhere' }}>{title}</Typography>
+              {titleAddon}
+            </Box>
             {purpose !== undefined && <Typography sx={{ ...MUTED_SX, mt: 0.25, fontSize: 15 }}>{purpose}</Typography>}
           </Box>
         </Box>

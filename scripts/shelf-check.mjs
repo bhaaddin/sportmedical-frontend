@@ -42,6 +42,8 @@ const VIEWPORTS = (process.env.VP ?? '390x844,820x1180,1440x900,1920x1080').spli
 });
 const PAGES = (process.env.PAGES ?? 'prehled,patients,patient').split(',');
 const POPULATED = (process.env.POPULATED ?? '1') !== '0';
+/* Which parts to run (default all): pages, palette, accent, motion, populated. */
+const SECTIONS = new Set((process.env.SECTIONS ?? 'pages,palette,accent,motion,populated').split(','));
 mkdirSync(OUT, { recursive: true });
 
 const login = readFileSync(process.env.DEV_LOGIN ?? 'C:/Users/Matko/SportMedical.Booking/.dev-login.txt', 'utf8');
@@ -126,7 +128,10 @@ const smallTargets = (min) => {
     if (r.width === 0 || r.height === 0) continue;
     const cs = getComputedStyle(el);
     if (cs.visibility === 'hidden' || cs.display === 'none' || el.closest('[aria-hidden="true"]') !== null || el.hasAttribute('disabled')) continue;
-    /* a stretched card link is the whole card; a link that is only text is as wide as its words */
+    /* a stretched card link's ::after covers the whole card: its hit area is the card, not the words */
+    const after = getComputedStyle(el, '::after');
+    if (after.position === 'absolute' && after.content !== 'none' && after.content !== 'normal') continue;
+    /* a link that is only text is as wide as its words */
     const isTextLink = el.tagName === 'A' && !el.querySelector('svg, img') && (el.textContent || '').trim().length > 0 && el.children.length === 0;
     const tooSmall = r.height < min - 0.5 || (!isTextLink && r.width < min - 0.5);
     if (!tooSmall) continue;
@@ -216,9 +221,11 @@ async function checkPage(ctxFactory, vp, name, label = '') {
 const contextFor = (extra = {}) => async (vp) =>
   browser.newContext({ storageState: STATE, viewport: { width: vp.width, height: vp.height }, locale: 'cs-CZ', ...extra });
 
-for (const vp of VIEWPORTS) {
-  console.log(`== ${vp.label}`);
-  for (const name of PAGES) await checkPage(contextFor(), vp, name);
+if (SECTIONS.has('pages')) {
+  for (const vp of VIEWPORTS) {
+    console.log(`== ${vp.label}`);
+    for (const name of PAGES) await checkPage(contextFor(), vp, name);
+  }
 }
 
 /* ------------------------------ the palette, the peek, timed ------------------------------ */
@@ -307,16 +314,29 @@ async function peek(vp) {
   const problems = [];
   watch(page, problems);
   await openPage(page, 'patients');
+  /* Measured inside the page, so Playwright's own overhead is not counted: from the pointer arriving on the chip to the
+     tooltip being in the document, and to its facts being there. */
+  await page.evaluate(() => {
+    window.__peek = { enter: 0, shown: 0, facts: 0 };
+    document.addEventListener('pointerover', (e) => {
+      if (window.__peek.enter === 0 && e.target instanceof Element && e.target.closest('a[data-entity="patient"]')) window.__peek.enter = performance.now();
+    }, true);
+    new MutationObserver(() => {
+      const tip = document.querySelector('[role=tooltip][id]');
+      if (tip !== null && window.__peek.shown === 0) window.__peek.shown = performance.now();
+      if (tip !== null && window.__peek.facts === 0 && /Ročník|Telefon|Příští termín/.test(tip.textContent ?? '')) window.__peek.facts = performance.now();
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
   const chip = page.locator('a[data-entity="patient"]').first();
   await chip.hover();
-  const t = Date.now();
-  await page.waitForSelector('[role=tooltip][id]', { timeout: 10000 });
-  const openMs = Date.now() - t;
-  await page.waitForFunction(() => /Ročník|Telefon|Příští termín/.test(document.querySelector('[role=tooltip][id]')?.textContent ?? ''), null, { timeout: 10000 });
-  const factsMs = Date.now() - t;
+  await page.waitForFunction(() => window.__peek.facts > 0, null, { timeout: 10000 });
+  const m = await page.evaluate(() => window.__peek);
+  const openMs = Math.round(m.shown - m.enter);
+  const factsMs = Math.round(m.facts - m.enter);
   await page.screenshot({ path: join(OUT, `peek-${vp.label}.png`) });
   report.timing[vp.label] = { ...(report.timing[vp.label] ?? {}), peekOpenAfterHoverMs: openMs, peekFactsMs: factsMs };
-  ok(where, `the peek opens ${openMs} ms after the pointer rests (350 ms is the designed pause) and has its facts after ${factsMs} ms`);
+  ok(where, `the peek is in the document ${openMs} ms after the pointer arrives (350 ms is the designed pause) and has its facts after ${factsMs} ms`);
+  if (openMs < 330) fail(where, `the peek opened after ${openMs} ms: faster than its designed pause`);
   await page.mouse.move(5, 5);
   await page.waitForSelector('[role=tooltip][id]', { state: 'detached', timeout: 5000 }).catch(() => fail(where, 'the peek did not close when the pointer left'));
   /* keyboard: Tab to a chip opens it, Escape closes it */
@@ -328,10 +348,12 @@ async function peek(vp) {
   await ctx.close();
 }
 
-console.log('== palette, peek');
-for (const vp of VIEWPORTS) {
-  await paletteAndPeek(vp);
-  await peek(vp);
+if (SECTIONS.has('palette')) {
+  console.log('== palette, peek');
+  for (const vp of VIEWPORTS) {
+    await paletteAndPeek(vp);
+    await peek(vp);
+  }
 }
 
 /* ------------------------------ one accent swap ------------------------------ */
@@ -353,12 +375,12 @@ async function accentSwap() {
 
   const paint = () => page.evaluate(() => {
     const rail = [...document.querySelectorAll('section[data-shelf]')].map((s) => s.querySelector(':scope > div[aria-hidden="true"]')).find(Boolean);
-    const count = document.querySelector('section[data-shelf] [aria-label^="Počet"]');
+    const count = document.querySelector('section[data-shelf="new-patients"] [aria-label^="Počet"]');
     const primary = document.querySelector('header a[href="/planovani"]');
     return {
       rail: rail ? getComputedStyle(rail).backgroundImage : null,
       count: count ? getComputedStyle(count).color : null,
-      primary: primary ? getComputedStyle(primary).backgroundColor : null,
+      primary: primary ? `${getComputedStyle(primary).backgroundImage}|${getComputedStyle(primary).backgroundColor}` : null,
     };
   });
 
@@ -393,8 +415,10 @@ async function accentSwap() {
   await ctx.close();
 }
 
-console.log('== accent');
-await accentSwap();
+if (SECTIONS.has('accent')) {
+  console.log('== accent');
+  await accentSwap();
+}
 
 /* ------------------------------ the Animace setting is honoured ------------------------------ */
 
@@ -429,8 +453,10 @@ async function motionModes() {
   }
 }
 
-console.log('== motion');
-await motionModes();
+if (SECTIONS.has('motion')) {
+  console.log('== motion');
+  await motionModes();
+}
 
 /* ------------------------------ populated, from MOCKS in a private context ------------------------------ */
 
@@ -485,6 +511,10 @@ async function populatedPass() {
     if (m.docScrollY > 1) fail(`${vp.label} ${where}`, `the document scrolls by ${m.docScrollY}px`);
     if (m.clipped.length > 0) fail(`${vp.label} ${where}`, `content is clipped: ${m.clipped.join(' | ')}`);
     const cards = await page.locator('[data-card="attention"]').count();
+    const first = await page.locator('[data-card="attention"]').first().getAttribute('data-severity');
+    const scrolled = await page.evaluate(() => document.querySelector('[data-shelf="attention"] [role="list"]')?.scrollLeft ?? -1);
+    if (first !== 'high') fail(`${vp.label} ${where}`, `the first attention card is "${first}", the most urgent should come first`);
+    if (scrolled > 1) fail(`${vp.label} ${where}`, `the attention row is scrolled ${Math.round(scrolled)}px: the most urgent card is off to the left`);
     if (cards < 4) fail(`${vp.label} ${where}`, `the attention shelf shows ${cards} cards, expected at least 4`);
     else ok(`${vp.label} ${where}`, `${cards} attention cards, ${await page.locator('[data-row="appointment"]').count()} rows of today's work`);
     if (vp.width < 1280) {
@@ -498,7 +528,7 @@ async function populatedPass() {
   }
 }
 
-if (POPULATED) {
+if (POPULATED && SECTIONS.has('populated')) {
   console.log('== populated (mocked answers, private context)');
   await populatedPass();
 }
