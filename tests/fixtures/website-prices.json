@@ -10,10 +10,10 @@
     { "website": "Komplexní diagnostika", "ours": "Komplexní diagnostika", "priceCzk": 2000 },
     { "website": "Komplexní diagnostika + Vo2max", "ours": "Komplexní diagnostika + VO₂max analýza", "priceCzk": 5000 },
     { "website": "Vo2max", "ours": "VO₂max analýza", "priceCzk": 3500 },
-    { "website": "Individuální kompenzační plán", "ours": "Individuální videoinstruovaný kompenzační plán", "priceCzk": 1000 },
+    { "website": "Individuální kompenzační plán", "ours": "Sestavení individuálního videoinstruovaného kompenzačního plánu", "priceCzk": 1000 },
     { "website": "InBody základní měření", "ours": "Základní InBody měření", "priceCzk": 500 },
     { "website": "InBody komplexní měření + konzultace", "ours": "InBody komplexní měření + odborná konzultace", "priceCzk": 1200 },
     { "website": "Sestavení výživového plánu", "ours": "Sestavení personalizovaného výživového plánu", "priceCzk": 2500 },
-    { "website": "Balíček 5 měření InBody", "ours": "Zvýhodněný balíček 5 měření InBody (základní)", "priceCzk": 2000 }
+    { "website": "Balíček 5 měření InBody", "ours": "Zvýhodněný Balíček 5 Měření (Základní)", "priceCzk": 2000 }
   ]
 }
