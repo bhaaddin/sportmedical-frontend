@@ -424,3 +424,19 @@
 
 /* the Den / Měsíc list covers the whole board, the sticky hour column (z-index 20) included */
 .sm-planner .planner .alternate-view { z-index: 30; }
+
+/* Den list: a činnost with several bookings / terms is one group row that opens to its members (reviewer 2.2). */
+.sm-planner .alt-row.is-group { width: 100%; text-align: left; border: 0; border-bottom: 1px solid #124155; border-left: 3px solid var(--group-tone, #3d7a8c); color: inherit; font: inherit; font-size: 14px; }
+.sm-planner .alt-row .alt-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 9px; background: var(--group-tone, #6e91a5); box-shadow: 0 0 6px var(--group-tone, transparent); vertical-align: baseline; }
+.sm-planner .alt-row .alt-count { margin-left: 8px; font-weight: 800; color: hsl(from #bff7f1 var(--sm-hsl, h s l)); }
+.sm-planner .alt-row .alt-chevron { margin-left: 10px; color: #9bc2d6; }
+.sm-planner .alt-members { border-left: 3px solid var(--group-tone, #3d7a8c); background: #001c2e; }
+.sm-planner .alt-members .alt-row { padding-left: 40px; font-size: 13px; }
+
+/* Month tile: the day by činnost ("Komplexní prohlídka ×10"), two lines and a "+n", not a count of terms (reviewer 2.2). */
+.sm-planner .month-tile .tile-activities { display: block; margin-top: 7px; }
+.sm-planner .month-tile .tile-activity { display: flex; align-items: center; gap: 5px; margin-top: 3px; color: #e3f2f9; font-size: 10.5px; line-height: 1.25; white-space: nowrap; overflow: hidden; }
+.sm-planner .month-tile .tile-activity i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--tile-tone, #6e91a5); box-shadow: 0 0 5px var(--tile-tone, transparent); }
+.sm-planner .month-tile .tile-activity-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sm-planner .month-tile .tile-activity b { flex: none; font-weight: 800; color: hsl(from #bff7f1 var(--sm-hsl, h s l)); }
+.sm-planner .month-tile .tile-activity-more { color: #9bc2d6; }

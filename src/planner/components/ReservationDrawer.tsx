@@ -16,7 +16,8 @@ import { Suspense, lazy, useEffect, useRef, useState, type CSSProperties } from 
 import { usePlannerCommands } from '../data/usePlannerCommands';
 import { plannerKeys } from '../data/PlannerDataSource';
 import { usePlannerData } from '../data/PlannerDataProvider';
-import { reservationDrawerModel, sourceFor, type DrawerTab, type IsoDate, type PlannerSession } from '../model';
+import { reservationDrawerModel, sourceFor, summariseDay, slotsText, countMark, type DrawerTab, type IsoDate, type PlannerSession } from '../model';
+import { foldCards } from './dialogs/reservation/foldCards';
 import { usePlannerActions, usePlannerSelector } from '../state/PlannerStoreProvider';
 import { Icon } from './Icons';
 import { usePlannerCtx, usePlannerModelState } from './context';
@@ -104,7 +105,9 @@ function DrawerBody({ date, tab }: { date: IsoDate; tab: DrawerTab }) {
 
   const groups = records.records ? groupDayRecords(records.records) : [];
   const clubWindows = groups.filter((g) => g.id === 'clubWindows');
-  const cards = model.cards;
+  /* A činnost's individual bookings are ONE card / one timing row (reviewer 2.2). */
+  const cards = foldCards(ctx, model.cards);
+  const daySummary = summariseDay(ctx, ctx.sessions, date);
   const confirmedPct = model.confirmedPercent;
 
   return (
@@ -207,7 +210,7 @@ function DrawerBody({ date, tab }: { date: IsoDate; tab: DrawerTab }) {
                   <EventCard
                     key={card.id}
                     card={card}
-                    actions={{
+                    actions={card.folded ? undefined : {
                       onDetail: () => openSessionDetail(card.id),
                       simulate: simulate ? { onClub: () => simulateBooking(card.id, 'club'), onPublic: () => simulateBooking(card.id, 'public') } : undefined,
                     }}
@@ -223,14 +226,18 @@ function DrawerBody({ date, tab }: { date: IsoDate; tab: DrawerTab }) {
           ) : (
             <>
               <div className="rd-section-title">NAČASOVÁNÍ DNE <em>{model.plannedLabel.toLocaleUpperCase('cs-CZ')} NAPLÁNOVÁNO</em></div>
-              {model.timing.map((row) => (
-                <div className="rd-mini-grid" key={row.categoryId}>
-                  <div style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                    <span><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: row.color, marginRight: 8 }} />{row.name}</span>
-                    <strong>{row.duration} · {row.slotsLabel}</strong>
+              {model.timing.map((row) => {
+                /* the činnost's slots by the summaries' one rule (people of the bookings, capacity of the windows) */
+                const summed = daySummary.groups.find((g) => g.categoryId === row.categoryId);
+                return (
+                  <div className="rd-mini-grid" key={row.categoryId}>
+                    <div style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                      <span><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: row.color, marginRight: 8 }} />{row.name}{summed ? <b data-testid="rd-timing-count">{countMark(summed) ? ` ${countMark(summed)}` : ''}</b> : null}</span>
+                      <strong>{row.duration} · {summed ? slotsText(summed.slots) : row.slotsLabel}</strong>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               <div className="rd-section-title">TERMÍNY <em>PLÁN + REZERVACE</em></div>
               <div className="rd-event-list">
                 {cards.map((card) => <EventCard key={card.id} card={card} />)}

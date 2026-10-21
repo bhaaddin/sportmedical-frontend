@@ -148,10 +148,16 @@ describe('mini-calendar flyout', () => {
     expect(tip().querySelectorAll('.tday-bar i')).toHaveLength(2);
     expect(tip().querySelectorAll('.tday-event')).toHaveLength(2);
     expect(tip()).toHaveTextContent('Sportovní prohlídky');
-    expect(tip()).toHaveTextContent('08:00–10:00 · Klub');
-    expect(tip()).toHaveTextContent('10:30–12:00 · Veřejné');
+    /* one row per činnost with its slots (reviewer 2.2); the entries behind a row show when it is opened */
+    expect(tip()).toHaveTextContent('08:00–10:0012 slotů');
+    expect(tip()).toHaveTextContent('10:30–12:008 slotů');
+    expect(tip().querySelector('.tday-members')).toBeNull();
+    fireEvent.click(tip().querySelectorAll('button.tday-event')[0]!);
+    expect(tip().querySelector('.tday-members')).toHaveTextContent('08:00–10:00Klub12 slotů');
+    fireEvent.click(tip().querySelectorAll('button.tday-event')[1]!);
+    expect(tip()).toHaveTextContent('10:30–12:00Veřejné8 slotů');
     expect(tip()).toHaveTextContent('Naplánováno 3 h 30 min');
-    expect(tip().querySelector('.tday-stats')).toHaveTextContent('2Termíny20Sloty3 h 30 minPlánovaný čas');
+    expect(tip().querySelector('.tday-stats')).toHaveTextContent('2Činnosti20Sloty3 h 30 minPlánovaný čas');
     expect(cell).toHaveClass('is-hover-anchor');
 
     fireEvent.mouseLeave(cell);

@@ -15,3 +15,4 @@ export * from './placement';
 export * from './edit';
 export * from './overlays';
 export * from './mini';
+export * from './activityGroups';

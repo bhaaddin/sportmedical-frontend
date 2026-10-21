@@ -618,6 +618,8 @@ export interface AgendaRowModel {
   slots: number;
   slotLabel: string;
   title: string;
+  /** A činnost's several bookings / terms of one day folded into this row (reviewer 2.2): the ids behind it. */
+  group?: { count: number; entryIds: string[] };
 }
 
 /* -------------------------------------------------------------------------- */

@@ -4,12 +4,47 @@
  * row per day with the figures written out, a tap opens that day. The old calendar's `PhoneCalendar` in the planner's
  * own classes (`phone.css`); "Týden" stays the board with one day at a time. Every target is at least 44 px tall.
  */
-import { useRef, type TouchEvent } from 'react';
+import { useRef, useState, type TouchEvent } from 'react';
 import { InquiryChip } from './AlternateView';
 import { PLANNER_TEXT } from '../../text';
 import type { InquiryRef } from '../../model/inquiries';
 import type { PhoneEntry, PhoneMonthRow, StripDayModel } from './phoneModel';
 import './phone.css';
+
+/** One entry of the phone's day list; a folded činnost (`members`) opens to its rows. */
+function PhoneEntryRow({ entry, onOpenEntry, member = false }: { entry: PhoneEntry; onOpenEntry: (entry: PhoneEntry, point: { x: number; y: number }) => void; member?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const folded = entry.members !== null;
+  return (
+    <li className={member ? 'is-member' : undefined}>
+      <button
+        type="button"
+        className={`phone-entry${folded ? ' is-group' : ''}`}
+        data-kind={entry.kind}
+        data-event={entry.id}
+        data-testid={folded ? 'phone-group' : `phone-entry-${entry.id}`}
+        aria-expanded={folded ? open : undefined}
+        onClick={(event) => (folded ? setOpen((v) => !v) : onOpenEntry(entry, { x: event.clientX, y: event.clientY }))}
+      >
+        <span className="phone-entry-bar" style={entry.colour ? { background: entry.colour } : undefined} aria-hidden="true" />
+        <span className="phone-entry-time">{entry.timeLabel}</span>
+        <span className="phone-entry-main">
+          <strong>{entry.title}</strong>
+          {entry.sub ? <small>{entry.sub}</small> : null}
+        </span>
+        <span className="phone-entry-tail">
+          {entry.tail ? <span>{entry.tail}{folded ? <span aria-hidden="true"> {open ? '▴' : '▾'}</span> : null}</span> : null}
+          {entry.priceText ? <small>{entry.priceText}</small> : null}
+        </span>
+      </button>
+      {folded && open ? (
+        <ul className="phone-entries phone-members" data-testid="phone-group-members">
+          {(entry.members ?? []).map((m) => <PhoneEntryRow key={m.key} entry={m} onOpenEntry={onOpenEntry} member />)}
+        </ul>
+      ) : null}
+    </li>
+  );
+}
 
 export function PhoneAgenda({
   heading,
@@ -87,29 +122,7 @@ export function PhoneAgenda({
       ) : null}
       {entries.length ? (
         <ul className="phone-entries" aria-label={PLANNER_TEXT.phone.dayList} data-testid="phone-day-list">
-          {entries.map((entry) => (
-            <li key={entry.key}>
-              <button
-                type="button"
-                className="phone-entry"
-                data-kind={entry.kind}
-                data-event={entry.id}
-                data-testid={`phone-entry-${entry.id}`}
-                onClick={(event) => onOpenEntry(entry, { x: event.clientX, y: event.clientY })}
-              >
-                <span className="phone-entry-bar" style={entry.colour ? { background: entry.colour } : undefined} aria-hidden="true" />
-                <span className="phone-entry-time">{entry.timeLabel}</span>
-                <span className="phone-entry-main">
-                  <strong>{entry.title}</strong>
-                  {entry.sub ? <small>{entry.sub}</small> : null}
-                </span>
-                <span className="phone-entry-tail">
-                  {entry.tail ? <span>{entry.tail}</span> : null}
-                  {entry.priceText ? <small>{entry.priceText}</small> : null}
-                </span>
-              </button>
-            </li>
-          ))}
+          {entries.map((entry) => <PhoneEntryRow key={entry.key} entry={entry} onOpenEntry={onOpenEntry} />)}
         </ul>
       ) : (
         <div className="empty-info" data-testid="phone-empty">
@@ -151,7 +164,9 @@ export function PhoneMonthList({ heading, rows, onPick, hint }: { heading: strin
               <span className="phone-month-body">
                 {r.flag ? <span className="phone-month-flag">{r.flag}</span> : null}
                 {r.blocked ? <span className="phone-month-flag" data-testid={`phone-month-blocked-${r.date}`}>{PLANNER_TEXT.days.blockedTile}</span> : null}
-                {r.countLabel ? <span>{r.countLabel}</span> : null}
+                {r.activities.length > 0
+                  ? r.activities.map((line) => <span key={line} className="phone-month-activity" data-testid={`phone-month-activity-${r.date}`}>{line}</span>)
+                  : r.countLabel ? <span>{r.countLabel}</span> : null}
                 {r.clubs.map((line) => <span key={line} className="phone-month-club" data-testid={`phone-month-club-${r.date}`}>{line}</span>)}
                 {r.inquiry ? <span className="phone-month-inquiry" data-testid={`phone-month-inquiry-${r.date}`}>{r.inquiry}</span> : null}
                 {!r.countLabel && !r.flag && !r.blocked && r.clubs.length === 0 && !r.inquiry ? <span className="phone-month-none">{PLANNER_TEXT.phone.noBookings}</span> : null}

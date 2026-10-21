@@ -41,6 +41,16 @@ export function MiniDayTooltip() {
   const model = openDate ? dayTooltipModel(ctx, openDate, pinned) : null;
   const visible = model !== null;
   const [top, setTop] = useState<number>(() => miniTooltipTop(0));
+  /* The činnosti opened to their entries; a flyout of another day starts closed. */
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => setOpenGroups(new Set()), [openDate]);
+  const toggleGroup = (key: string) =>
+    setOpenGroups((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   // `top` follows the cell of the open day (design pixels: the stage is scaled, the rects are not).
   useLayoutEffect(() => {
@@ -154,21 +164,43 @@ export function MiniDayTooltip() {
             </div>
             <div className="tday-caption"><span>{model.plannedLabel}</span><span>{model.referenceLabel}</span></div>
             <div className="tday-stats">
-              <div className="tday-stat"><strong>{model.stats.terms}</strong><span>Termíny</span></div>
-              <div className="tday-stat"><strong>{model.stats.slots}</strong><span>Sloty</span></div>
+              <div className="tday-stat"><strong>{model.groups.length}</strong><span>{model.groups.length === 1 ? 'Činnost' : model.groups.length >= 2 && model.groups.length <= 4 ? 'Činnosti' : 'Činností'}</span></div>
+              <div className="tday-stat"><strong>{model.groups.reduce((n, g) => n + g.slots, 0)}</strong><span>Sloty</span></div>
               <div className="tday-stat"><strong>{model.stats.plannedTime}</strong><span>Plánovaný čas</span></div>
             </div>
-            <div className="tday-events">
-              {model.events.map((event) => (
-                <div className="tday-event" key={event.id} style={{ '--tone': event.tone } as React.CSSProperties}>
-                  <i />
-                  <div>
-                    <strong>{event.name}</strong>
-                    <small>{event.meta}</small>
+            <div className="tday-events" data-testid="tday-groups">
+              {model.groups.map((group) => {
+                const open = openGroups.has(group.key);
+                return (
+                  <div className="tday-group" key={group.key} data-testid="tday-group" data-category={group.categoryId} style={{ '--tone': group.tone } as React.CSSProperties}>
+                    <button
+                      type="button"
+                      className="tday-event"
+                      aria-expanded={open}
+                      aria-label={`${group.title}, ${group.slotsLabel}, ${group.timeLabel}. ${open ? 'Skrýt' : 'Zobrazit'} jednotlivé záznamy`}
+                      onClick={() => toggleGroup(group.key)}
+                    >
+                      <i />
+                      <div>
+                        <strong>{group.name}{group.countMark ? <b className="tday-count" data-testid="tday-count">{group.countMark}</b> : null}</strong>
+                        <small>{group.timeLabel}</small>
+                      </div>
+                      <span>{group.slotsLabel}<em aria-hidden="true">{open ? '▴' : '▾'}</em></span>
+                    </button>
+                    {open ? (
+                      <ul className="tday-members" data-testid="tday-members">
+                        {group.entries.map((entry) => (
+                          <li key={entry.id}>
+                            <span>{entry.time}</span>
+                            <span className="tday-member-who">{entry.names.length > 0 ? entry.names.slice(0, 3).join(', ') + (entry.names.length > 3 ? ` +${entry.names.length - 3}` : '') : entry.source}</span>
+                            <span>{entry.slotsLabel}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </div>
-                  <span>{event.slotsLabel}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="tday-actions">
               <button type="button" data-tooltip-day={model.date} onClick={() => { controller.hide(); act.selectDay(model.date); }}>

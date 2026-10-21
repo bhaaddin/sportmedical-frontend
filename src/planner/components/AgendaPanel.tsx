@@ -59,7 +59,12 @@ export function AgendaPanel() {
   const m = agendaView(ctx, agenda, { weekStart, selectedDate }, catalogue?.capabilities.mode, figures.live);
   const openTerm = (row: AgendaRowModel) => {
     act.focusDate(row.date, true);
-    act.openDialog({ kind: 'agendaDetail', id: row.id });
+    /* A činnost's several bookings of the day are one row: it opens the day (its people are in the day panel), not one of them. */
+    if (row.group) {
+      act.openReservationDrawer(row.date);
+      act.setDrawerTab('bookings');
+    }
+    else act.openDialog({ kind: 'agendaDetail', id: row.id });
   };
   return (
     <section className="appointments agenda-panel" id="agenda-panel" aria-label={m.standard ? 'Přehled termínů' : 'Přehled plánovaných termínů'} data-testid="agenda-panel" data-agenda-standard={m.standard ? 'true' : undefined}>

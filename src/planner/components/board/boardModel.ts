@@ -32,6 +32,8 @@ import { pragueDateKey } from '../../../utils/time';
 import {
   addDays,
   agendaSlotLabel,
+  alternateEvents,
+  slotsOfSession,
   termWord,
   categoryOrFallback,
   dayViewModel,
@@ -600,12 +602,93 @@ export interface DayRowModel {
   priceText: string | null;
   /** The činnost's colour (`#RRGGBB`) for the phone's list; null when the činnost is unknown. */
   colour: string | null;
+  /** The činnost the row is of (what rows are summed by, reviewer 2.2); null when it has none. */
+  categoryId: string | null;
+  /** Slots the row adds to a summary: the people of a booking (heads), the capacity of a term. */
+  slots: number;
 }
 
 export interface DayListModel {
   heading: string;
   rows: DayRowModel[];
   empty: string | null;
+}
+
+/**
+ * Rows of one činnost folded into one (reviewer 2.2): "Komplexní prohlídka ×10 · 10 slotů", expandable to the rows behind it.
+ * Bookings and terms are folded apart (a club's window is not an individual's booking); a lone row stays what it is.
+ */
+export interface DayRowGroup {
+  key: string;
+  kind: 'booking' | 'session';
+  categoryId: string;
+  name: string;
+  colour: string | null;
+  /** People for bookings, terms for terms. */
+  count: number;
+  slots: number;
+  sortStart: number;
+  /** "08:00 – 17:00". */
+  timeLabel: string;
+  rows: DayRowModel[];
+}
+
+export type DayListItem = { type: 'row'; row: DayRowModel } | { type: 'group'; group: DayRowGroup };
+
+/** The first and the last minute of a "HH:mm – HH:mm" label. */
+const spanOfLabel = (label: string): [string, string] => {
+  const [from = '', to = ''] = label.split('–').map((part) => part.trim());
+  return [from, to];
+};
+
+/** The Den list as items: a činnost with several bookings (or several terms) is one group, everything else a row. */
+export function groupDayRows(rows: readonly DayRowModel[]): DayListItem[] {
+  const by = new Map<string, DayRowModel[]>();
+  for (const r of rows) {
+    if (r.categoryId === null) continue;
+    const key = `${r.kind}|${r.categoryId}`;
+    const list = by.get(key);
+    if (list) list.push(r);
+    else by.set(key, [r]);
+  }
+  const folded = new Map<string, DayRowGroup>();
+  for (const [key, members] of by) {
+    if (members.length < 2) continue;
+    const first = members[0]!;
+    let from = '99:99';
+    let to = '';
+    for (const m of members) {
+      const [a, b] = spanOfLabel(m.timeLabel);
+      if (a !== '' && a < from) from = a;
+      if (b > to) to = b;
+    }
+    folded.set(key, {
+      key: `group:${key}`,
+      kind: first.kind === 'booking' ? 'booking' : 'session',
+      categoryId: first.categoryId as string,
+      name: first.kind === 'booking' ? (first.sub ?? first.name) : first.name,
+      colour: first.colour,
+      /* people for bookings (a booking of three heads is three), terms for terms */
+      count: first.kind === 'booking' ? members.reduce((n, m) => n + m.slots, 0) : members.length,
+      slots: members.reduce((n, m) => n + m.slots, 0),
+      sortStart: Math.min(...members.map((m) => m.sortStart)),
+      timeLabel: `${from} – ${to}`,
+      rows: members,
+    });
+  }
+  const items: DayListItem[] = [];
+  const placed = new Set<string>();
+  for (const r of rows) {
+    const key = r.categoryId === null ? null : `${r.kind}|${r.categoryId}`;
+    const group = key === null ? undefined : folded.get(key);
+    if (group === undefined) {
+      items.push({ type: 'row', row: r });
+    } else if (!placed.has(group.key)) {
+      placed.add(group.key);
+      items.push({ type: 'group', group });
+    }
+  }
+  return items.sort((a, b) => (a.type === 'row' ? a.row.sortStart : a.group.sortStart) - (b.type === 'row' ? b.row.sortStart : b.group.sortStart));
 }
 
 /** The "Den" list: the sessions of the day (the prototype's rows) with the day's bookings among them. */
@@ -636,6 +719,8 @@ export function dayListModel(
       tail: r.occupancy,
       priceText: shownPrice(null, category.priceCzk ?? null).text,
       colour: cleanHex(category.color),
+      categoryId: session.categoryId === '' ? null : session.categoryId,
+      slots: slotsOfSession(session),
     });
   }
   for (const a of bookings) {
@@ -654,6 +739,8 @@ export function dayListModel(
       tail: statusWord(a),
       priceText: shownPrice(a, category?.priceCzk ?? null).text,
       colour: cleanHex(category?.color),
+      categoryId: a.activityId || null,
+      slots: a.headcount && a.headcount > 0 ? a.headcount : 1,
     });
   }
   rows.sort((a, b) => a.sortStart - b.sortStart || a.key.localeCompare(b.key));
@@ -674,6 +761,17 @@ export interface MonthTileModel {
   blocked: boolean;
   /** The windows of clubs on this day ("FK Slaný · 08:00–16:00"), one line each - the club order shows in the month. */
   clubs: string[];
+  /** The day by činnost (reviewer 2.2): "Komplexní prohlídka ×10", not a count of terms; the order of the činnosti. */
+  activities: TileActivity[];
+}
+
+/** One činnost of a day as the month tile sums it: people for bookings, terms for terms; slots as the summaries count them. */
+export interface TileActivity {
+  categoryId: string;
+  name: string;
+  colour: string | null;
+  count: number;
+  slots: number;
 }
 
 export interface MonthListModel {
@@ -699,6 +797,32 @@ export function monthTilesModel(
     const day = pragueDateKey(a.startUtc);
     extra.set(day, (extra.get(day) ?? 0) + 1);
   }
+  /* The day's činnosti: the sessions the tile counts plus the real bookings, summed per činnost (one rule: groupByActivity's). */
+  const mix = new Map<string, Map<string, TileActivity>>();
+  const addTo = (day: string, id: string, name: string, colour: string | null, count: number, slots: number) => {
+    let perDay = mix.get(day);
+    if (!perDay) mix.set(day, (perDay = new Map()));
+    const have = perDay.get(id);
+    if (have) {
+      have.count += count;
+      have.slots += slots;
+    } else perDay.set(id, { categoryId: id, name, colour, count, slots });
+  };
+  for (const e of alternateEvents(ctx, filter)) {
+    if (e.categoryId === '' || (publicIds && publicIds.has(e.id))) continue;
+    const category = categoryOrFallback(ctx, e.categoryId);
+    addTo(e.date, e.categoryId, category.name, cleanHex(category.color), 1, slotsOfSession(e));
+  }
+  for (const a of bookings) {
+    if (filter !== 'all' && a.activityId !== filter) continue;
+    const category = ctx.categories.find((c) => c.id === a.activityId);
+    const heads = a.headcount && a.headcount > 0 ? a.headcount : 1;
+    addTo(pragueDateKey(a.startUtc), a.activityId, category?.name ?? a.activityName, cleanHex(category?.color), heads, heads);
+  }
+  const order = (id: string) => {
+    const at = ctx.categories.findIndex((c) => c.id === id);
+    return at === -1 ? Number.MAX_SAFE_INTEGER : at;
+  };
   const hidden = new Map<string, number>();
   if (publicIds) {
     for (const s of ctx.sessions) {
@@ -722,6 +846,7 @@ export function monthTilesModel(
         inquiries: extras.inquiries?.get(t.date) ?? [],
         blocked: extras.blockedDays?.has(t.date) ?? false,
         clubs: extras.clubLines?.get(t.date) ?? [],
+        activities: [...(mix.get(t.date)?.values() ?? [])].sort((a, b) => order(a.categoryId) - order(b.categoryId) || a.name.localeCompare(b.name, 'cs')),
       };
     }),
   };

@@ -3,12 +3,13 @@
  * the week board (`renderAlternative`). With the real calendar the day's bookings are among the
  * rows and the tiles count them too; closed days are named on their tile.
  */
-import type { CSSProperties, RefObject } from 'react';
+import { useState, type CSSProperties, type RefObject } from 'react';
 import { FRESH_MS, usePickedDays } from '../../motion/planFx';
 import { inRange, rangePill } from '../../../components/booking/calendar/model';
 import { inquiryLabel, inquiryTileLabel, inquiryTitle, type InquiryRef } from '../../model/inquiries';
 import { PLANNER_TEXT } from '../../text';
-import type { DayListModel, MonthListModel } from './boardModel';
+import { groupDayRows, type DayListModel, type DayRowGroup, type DayRowModel, type MonthListModel } from './boardModel';
+import { agendaSlotLabel } from '../../model';
 import './month/month.css';
 import { DayTray, MonthTools } from './month/MonthSelectionUi';
 import type { DaySelectApi } from './month/useDaySelect';
@@ -23,6 +24,68 @@ export function InquiryChip({ inquiry, onOpen }: { inquiry: InquiryRef; onOpen?:
     </button>
   ) : (
     <span className={className} {...common}>{inquiryLabel(inquiry)}</span>
+  );
+}
+
+/** One row of the Den list: a booking or a term; opens its record. */
+function DayRow({ row, onOpen, member = false }: { row: DayRowModel; onOpen: (row: DayRowModel) => void; member?: boolean }) {
+  return (
+    <div
+      className={`alt-row${row.kind === 'booking' ? ' is-booking' : ''}${member ? ' is-member' : ''}`}
+      data-event={row.id}
+      data-kind={row.kind}
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(row)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen(row);
+        }
+      }}
+    >
+      <span>{row.timeLabel}</span>
+      <strong>
+        {row.name}
+        {row.sub ? <span className="alt-sub">{row.sub}</span> : null}
+        {row.priceText ? <span className="alt-price">{row.priceText}</span> : null}
+      </strong>
+      <span>{row.tail}</span>
+    </div>
+  );
+}
+
+/**
+ * A činnost with several bookings (or terms) on the day as ONE row - "Komplexní prohlídka ×10 · 10 slotů" - that opens
+ * to the rows behind it (reviewer 2.2). Thirty people for one examination keep the day's list short.
+ */
+function DayGroupRow({ group, onOpen }: { group: DayRowGroup; onOpen: (row: DayRowModel) => void }) {
+  const [open, setOpen] = useState(false);
+  const mark = group.count > 1 ? ` ×${group.count}` : '';
+  return (
+    <div className="alt-group" data-testid="day-group" data-category={group.categoryId} data-kind={group.kind}>
+      <button
+        type="button"
+        className={`alt-row is-group${group.kind === 'booking' ? ' is-booking' : ''}`}
+        aria-expanded={open}
+        aria-label={`${group.name}${mark}, ${group.slots} ${agendaSlotLabel(group.slots)}, ${group.timeLabel}. ${open ? 'Skrýt' : 'Zobrazit'} jednotlivé záznamy`}
+        style={group.colour ? ({ '--group-tone': group.colour } as CSSProperties) : undefined}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span>{group.timeLabel}</span>
+        <strong>
+          <i className="alt-dot" aria-hidden="true" />
+          {group.name}
+          <span className="alt-count" data-testid="day-group-count">{mark.trim()}</span>
+        </strong>
+        <span>{group.slots} {agendaSlotLabel(group.slots)}<span className="alt-chevron" aria-hidden="true">{open ? '▴' : '▾'}</span></span>
+      </button>
+      {open ? (
+        <div className="alt-members" data-testid="day-group-members">
+          {group.rows.map((row) => <DayRow key={row.key} row={row} onOpen={onOpen} member />)}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -49,31 +112,9 @@ export function DayList({
         </div>
       ) : null}
       {model.rows.length ? (
-        model.rows.map((row) => (
-          <div
-            key={row.key}
-            className={`alt-row${row.kind === 'booking' ? ' is-booking' : ''}`}
-            data-event={row.id}
-            data-kind={row.kind}
-            role="button"
-            tabIndex={0}
-            onClick={() => onOpen(row)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onOpen(row);
-              }
-            }}
-          >
-            <span>{row.timeLabel}</span>
-            <strong>
-              {row.name}
-              {row.sub ? <span className="alt-sub">{row.sub}</span> : null}
-              {row.priceText ? <span className="alt-price">{row.priceText}</span> : null}
-            </strong>
-            <span>{row.tail}</span>
-          </div>
-        ))
+        groupDayRows(model.rows).map((item) =>
+          item.type === 'group' ? <DayGroupRow key={item.group.key} group={item.group} onOpen={onOpen} /> : <DayRow key={item.row.key} row={item.row} onOpen={onOpen} />,
+        )
       ) : (
         <div className="empty-info">
           {model.empty}
@@ -143,7 +184,18 @@ export function MonthMatrix({ model, onPick, selection }: { model: MonthListMode
                 <span className="range-pill" data-testid="range-pill" aria-hidden="true">{rangePill(highlight)}</span>
               ) : null}
               <span className="date-num">{t.dayNumber}</span>
-              {t.countLabel ? <small>{t.countLabel}</small> : null}
+              {t.activities.length > 0 ? (
+                <span className="tile-activities" data-testid={`tile-activities-${t.date}`} title={t.activities.map((a) => `${a.name}${a.count > 1 ? ` ×${a.count}` : ''} · ${a.slots} ${agendaSlotLabel(a.slots)}`).join(' · ')}>
+                  {t.activities.slice(0, 2).map((a) => (
+                    <small key={a.categoryId} className="tile-activity" data-testid="tile-activity" style={a.colour ? ({ '--tile-tone': a.colour } as CSSProperties) : undefined}>
+                      <i aria-hidden="true" />
+                      <span className="tile-activity-name">{a.name}</span>
+                      {a.count > 1 ? <b>{`×${a.count}`}</b> : null}
+                    </small>
+                  ))}
+                  {t.activities.length > 2 ? <small className="tile-activity tile-activity-more">{`+${t.activities.length - 2}`}</small> : null}
+                </span>
+              ) : t.countLabel ? <small>{t.countLabel}</small> : null}
               {t.flag ? <small className="tile-flag" style={{ color: '#e7cba9' }}>{t.flag}</small> : null}
               {t.clubs.slice(0, 2).map((line) => <small key={line} className="tile-club" data-testid={`tile-club-${t.date}`} title={t.clubs.join(' · ')}>{line}</small>)}
               {t.clubs.length > 2 ? <small className="tile-club tile-club-more" title={t.clubs.join(' · ')}>{`+${t.clubs.length - 2}`}</small> : null}

@@ -133,7 +133,7 @@ export function weekEventsModel(
 }
 
 /** Sessions the alternates (day / month) list, filtered and chronological. */
-function alternateEvents(ctx: PlannerContext, filter: CategoryId | 'all'): PlannerSession[] {
+export function alternateEvents(ctx: PlannerContext, filter: CategoryId | 'all'): PlannerSession[] {
   const ordered = orderCategoryIds(ctx);
   return ctx.sessions
     .filter((e) => (sourceFor(e) === 'public' || ordered.includes(e.categoryId)) && (filter === 'all' || e.categoryId === filter))

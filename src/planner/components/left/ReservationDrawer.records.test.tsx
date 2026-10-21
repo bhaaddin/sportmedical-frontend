@@ -137,8 +137,15 @@ describe('real records of the day', () => {
     const groups = await within(panel()).findByTestId('rd-records');
     const ids = [...groups.querySelectorAll('[data-record-group]')].map((g) => g.getAttribute('data-record-group'));
     expect(ids).toEqual(['clubWindows', 'individuals']);
+    /* the two bookings of one činnost are ONE fold (reviewer 2.2); the windows are rows of their own */
     const rows = within(groups).getAllByTestId('rd-record');
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(2);
+    const fold = within(groups).getByTestId('rd-fold');
+    expect(fold).toHaveTextContent('Sportovní prohlídky ×3');
+    expect(flat(fold)).toContain('1 200 Kč');
+    expect(within(fold).queryByTestId('rd-fold-members')).toBeNull();
+    fireEvent.click(within(fold).getByRole('button', { name: /Zobrazit jednotlivé rezervace/ }));
+    const members = within(within(fold).getByTestId('rd-fold-members')).getAllByTestId('rd-record');
     expect(rows[0]).toHaveTextContent('FK Slaný');
     expect(rows[0]).toHaveTextContent('08:00–14:00');
     expect(rows[0]).toHaveTextContent('4 / 10 zapsáno');
@@ -146,11 +153,11 @@ describe('real records of the day', () => {
     await waitFor(() => expect(flat(rows[0]!)).toContain('800 Kč'));
     expect(rows[1]).toHaveTextContent('SK Říčany');
     expect(rows[1]).toHaveTextContent('bez ceny');
-    expect(rows[2]).toHaveTextContent('Jana Nováková');
-    expect(flat(rows[2]!)).toContain('1 200 Kč');
-    expect(rows[3]).toHaveTextContent('2 osob');
-    expect(rows[3]).toHaveTextContent('bez ceny');
-    expect(rows[3]).toHaveAccessibleName(expect.stringContaining('bez ceny'));
+    expect(members[0]).toHaveTextContent('Jana Nováková');
+    expect(flat(members[0]!)).toContain('1 200 Kč');
+    expect(members[1]).toHaveTextContent('2 osob');
+    expect(members[1]).toHaveTextContent('bez ceny');
+    expect(members[1]).toHaveAccessibleName(expect.stringContaining('bez ceny'));
     const total = within(groups).getByTestId('rd-day-total');
     expect(total).toHaveTextContent('Celkem dnes:');
     expect(flat(total)).toContain('2 000 Kč');
@@ -168,6 +175,8 @@ describe('real records of the day', () => {
   it('opens a booking in the appointment detail with its calendar', async () => {
     const m = await mount({ source: realSource() });
     open(m, '2026-11-18', 'bookings');
+    const fold = await within(panel()).findByTestId('rd-fold');
+    fireEvent.click(within(fold).getByRole('button', { name: /Zobrazit jednotlivé rezervace/ }));
     const rows = await within(panel()).findAllByTestId('rd-record');
     fireEvent.click(rows.find((r) => r.getAttribute('data-record') === 'appointment:a-1')!);
     const detail = await screen.findByTestId('appointment-detail');

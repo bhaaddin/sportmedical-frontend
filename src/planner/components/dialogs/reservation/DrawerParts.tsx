@@ -3,11 +3,11 @@
  * club occupancy overview, shared by both. They only draw what `model/booking.ts` computed; the real records
  * under a card (`RecordRow`) are the new part: one row per booking / club window, each opening its record.
  */
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { BreakdownPart, DayEventCardModel } from '../../../model';
 import { PRICE_LINE_TEXT, formatCzk } from '../../../../components/booking/grid/appointmentPrice';
-import type { DayRecord, DayRecordGroup } from './dayRecords';
-import { recordsTotal } from './dayRecords';
+import type { DayRecord, DayRecordGroup, RecordFold } from './dayRecords';
+import { foldRecords, recordsTotal } from './dayRecords';
 
 const css = (vars: Record<string, string>): CSSProperties => vars as CSSProperties;
 
@@ -93,6 +93,35 @@ export function RecordRow({ record, onOpen }: { record: DayRecord; onOpen: (reco
   );
 }
 
+/** A činnost's bookings as one line - "Komplexní prohlídka ×10" - that opens to the people (reviewer 2.2). */
+export function RecordFoldRow({ fold, onOpen }: { fold: RecordFold; onOpen: (record: DayRecord) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rd-fold" data-testid="rd-fold" data-fold={fold.key} style={css({ '--tone': fold.tone })}>
+      <button
+        type="button"
+        className="rd-record rd-fold-head"
+        aria-expanded={open}
+        aria-label={`${fold.title}, ${fold.start}–${fold.end}, ${fold.priceText}. ${open ? 'Skrýt' : 'Zobrazit'} jednotlivé rezervace`}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <i className="rd-record-dot" aria-hidden="true" />
+        <span className="rd-record-copy">
+          <b>{fold.title}</b>
+          <small>{fold.start}–{fold.end}</small>
+        </span>
+        <span className={`rd-record-price${fold.priceCzk !== null ? '' : ' is-none'}`}>{fold.priceText}</span>
+        <span className="rd-record-open" aria-hidden="true">{open ? 'Skrýt ▴' : 'Lidé ▾'}</span>
+      </button>
+      {open ? (
+        <div className="rd-fold-members" data-testid="rd-fold-members">
+          {fold.records.map((record) => <RecordRow key={record.key} record={record} onOpen={onOpen} />)}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** The day's records by source, each group with its heading; the day total of what has a price. */
 export function RecordGroups({ groups, onOpen }: { groups: DayRecordGroup[]; onOpen: (record: DayRecord) => void }) {
   const all = groups.flatMap((g) => g.records);
@@ -102,7 +131,9 @@ export function RecordGroups({ groups, onOpen }: { groups: DayRecordGroup[]; onO
         <section key={group.id} data-record-group={group.id}>
           <div className="rd-section-title">{group.title} <em>{group.records.length}</em></div>
           <div className="rd-record-list">
-            {group.records.map((record) => <RecordRow key={record.key} record={record} onOpen={onOpen} />)}
+            {foldRecords(group.records).map((item) =>
+              item.type === 'fold' ? <RecordFoldRow key={item.fold.key} fold={item.fold} onOpen={onOpen} /> : <RecordRow key={item.record.key} record={item.record} onOpen={onOpen} />,
+            )}
           </div>
         </section>
       ))}

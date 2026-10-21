@@ -55,6 +55,8 @@ export interface DayRecord {
   /** "upraveno (ceník 1 600 Kč)" when the agreed price differs from the list. */
   priceCaption: string | null;
   priceCzk: number | null;
+  /** People the row stands for: heads of a booking (a group booking of three is 3), 0 for a club window. */
+  heads: number;
 }
 
 const NEUTRAL_TONE = '#6e91a5';
@@ -91,6 +93,7 @@ export function dayRecordsOf(ctx: PlannerContext, date: IsoDate): DayRecord[] {
           priceText: priceWord(a.priceCzk),
           priceCaption: null,
           priceCzk: a.priceCzk,
+          heads: Math.max(1, a.heads),
         });
       }
     } else if (isClubWindow(s)) {
@@ -119,6 +122,7 @@ export function dayRecordsOf(ctx: PlannerContext, date: IsoDate): DayRecord[] {
         priceText: '…',
         priceCaption: null,
         priceCzk: null,
+        heads: 0,
         booked: s.booked,
         capacity: s.capacity,
       });
@@ -198,4 +202,69 @@ export function groupDayRecords(records: readonly DayRecord[]): DayRecordGroup[]
  */
 export function recordsTotal(records: readonly DayRecord[]): number {
   return records.reduce((n, r) => n + (r.priceCzk ?? 0), 0);
+}
+
+/* ------------------------------ folding for the drawer (reviewer 2.2) ------------------------------ */
+
+/** A činnost's several bookings of the day as ONE line, opening to the rows behind it. */
+export interface RecordFold {
+  key: string;
+  categoryId: CategoryId;
+  /** "Komplexní prohlídka ×10" */
+  title: string;
+  tone: string;
+  /** People (a booking of three heads is three): the "×N". */
+  count: number;
+  start: ClockTime;
+  end: ClockTime;
+  /** The sum of the priced rows ("12 000 Kč"), "bez ceny" when none has a price. */
+  priceText: string;
+  priceCzk: number | null;
+  records: DayRecord[];
+}
+
+export type RecordItem = { type: 'record'; record: DayRecord } | { type: 'fold'; fold: RecordFold };
+
+/**
+ * The rows of one source group, bookings of one činnost folded (two or more) into a line each; windows and lone bookings stay
+ * rows. The rows behind a fold keep their order and every one still opens its own record.
+ */
+export function foldRecords(records: readonly DayRecord[]): RecordItem[] {
+  const by = new Map<string, DayRecord[]>();
+  for (const r of records) {
+    if (r.window || r.categoryId === null) continue;
+    const list = by.get(r.categoryId);
+    if (list) list.push(r);
+    else by.set(r.categoryId, [r]);
+  }
+  const items: RecordItem[] = [];
+  const done = new Set<string>();
+  for (const r of records) {
+    const members = r.window || r.categoryId === null ? undefined : by.get(r.categoryId);
+    if (!members || members.length < 2) {
+      items.push({ type: 'record', record: r });
+      continue;
+    }
+    if (done.has(r.categoryId as string)) continue;
+    done.add(r.categoryId as string);
+    const priced = members.filter((m) => m.priceCzk !== null);
+    const total = priced.length ? priced.reduce((n, m) => n + (m.priceCzk ?? 0), 0) : null;
+    const people = members.reduce((n, m) => n + Math.max(1, m.heads), 0);
+    items.push({
+      type: 'fold',
+      fold: {
+        key: `fold:${r.categoryId}`,
+        categoryId: r.categoryId as CategoryId,
+        title: `${r.title} ×${people}`,
+        tone: r.tone,
+        count: people,
+        start: members.map((m) => m.start).sort()[0] as ClockTime,
+        end: members.map((m) => m.end).sort().at(-1) as ClockTime,
+        priceText: priceWord(total),
+        priceCzk: total,
+        records: members,
+      },
+    });
+  }
+  return items;
 }

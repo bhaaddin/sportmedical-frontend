@@ -15,13 +15,14 @@ import { dayOfWeekOf } from '../../../utils/time';
 import type { DayMark, IsoDate, WeekHeadModel } from '../../model';
 import { inquiryTileLabel, type InquiryRef } from '../../model/inquiries';
 import { PLANNER_TEXT } from '../../text';
-import type { BoardWindowModel, DayRowModel, MonthTileModel } from './boardModel';
+import { agendaSlotLabel } from '../../model';
+import { groupDayRows, type BoardWindowModel, type DayRowModel, type MonthTileModel } from './boardModel';
 
 /* -------------------------------------------------------------------------- */
 /* The day                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export type PhoneEntryKind = 'booking' | 'session' | 'club' | 'block';
+export type PhoneEntryKind = 'booking' | 'session' | 'club' | 'block' | 'group';
 
 export interface PhoneEntry {
   key: string;
@@ -39,11 +40,13 @@ export interface PhoneEntry {
   colour: string | null;
   /** The window a club / block entry stands for (a tap opens the club's popover or the block). */
   window: BoardWindowModel | null;
+  /** A činnost with several bookings / terms on the day, folded into this one entry (reviewer 2.2): the entries behind it. */
+  members: PhoneEntry[] | null;
 }
 
 /** The day's rows and the day's windows, in one list ordered by when they start. */
 export function phoneEntries(rows: readonly DayRowModel[], windows: readonly BoardWindowModel[], day: IsoDate): PhoneEntry[] {
-  const out: PhoneEntry[] = rows.map((r) => ({
+  const entryOf = (r: DayRowModel): PhoneEntry => ({
     key: r.key,
     kind: r.kind,
     id: r.id,
@@ -55,7 +58,28 @@ export function phoneEntries(rows: readonly DayRowModel[], windows: readonly Boa
     priceText: r.priceText,
     colour: r.colour,
     window: null,
-  }));
+    members: null,
+  });
+  /* A činnost with several bookings (or terms) is ONE entry that opens to the rows behind it. */
+  const out: PhoneEntry[] = groupDayRows(rows).map((item) => {
+    if (item.type === 'row') return entryOf(item.row);
+    const g = item.group;
+    const mark = g.count > 1 ? ` ×${g.count}` : '';
+    return {
+      key: g.key,
+      kind: 'group',
+      id: g.key,
+      sortStart: g.sortStart,
+      timeLabel: g.timeLabel,
+      title: `${g.name}${mark}`,
+      sub: null,
+      tail: `${g.slots} ${agendaSlotLabel(g.slots)}`,
+      priceText: null,
+      colour: g.colour,
+      window: null,
+      members: g.rows.map(entryOf),
+    };
+  });
   for (const w of windows) {
     if (w.day !== day) continue;
     const club = w.kind === 'club';
@@ -71,6 +95,7 @@ export function phoneEntries(rows: readonly DayRowModel[], windows: readonly Boa
       priceText: null,
       colour: club ? w.colour : null,
       window: w,
+      members: null,
     });
   }
   return out.sort((a, b) => a.sortStart - b.sortStart || a.key.localeCompare(b.key));
@@ -184,6 +209,8 @@ export interface PhoneMonthRow {
   /** "Poptávka · Dukla, Slavia" */
   inquiry: string | null;
   clubs: string[];
+  /** The day by činnost: "Komplexní prohlídka ×10 · 10 slotů" - one line each, never one per booking. */
+  activities: string[];
 }
 
 /** The days of the shown month (the other months' tiles are only the matrix's padding), one row each. */
@@ -205,5 +232,6 @@ export function phoneMonthRows(
       blocked: t.blocked,
       inquiry: t.inquiries.length ? inquiryTileLabel(t.inquiries) : null,
       clubs: clubLines.get(t.date) ?? [],
+      activities: t.activities.map((a) => `${a.name}${a.count > 1 ? ` ×${a.count}` : ''} · ${a.slots} ${agendaSlotLabel(a.slots)}`),
     }));
 }

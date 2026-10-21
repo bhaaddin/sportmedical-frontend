@@ -16,7 +16,10 @@ import {
   addDays,
   categoryOrFallback,
   dateOf,
+  groupByActivity,
+  groupTitle,
   printable,
+  slotsOfSession,
   termWord,
   type AgendaPanelModel,
   type AgendaUi,
@@ -48,6 +51,32 @@ function standardEvents(ctx: PlannerContext): PlannerSession[] {
     .filter((e) => e.showInList !== false && e.categoryId !== '')
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start) || a.id.localeCompare(b.id));
+}
+
+/**
+ * The standard lists' rows: one per činnost and day (reviewer 2.2) - "26. 10. Komplexní prohlídka ×10 · 10 slotů" - instead of one
+ * per booking. A činnost with one entry on the day keeps its own row (and its detail); several fold into a group row.
+ */
+function groupedRows(ctx: PlannerContext, events: readonly PlannerSession[]): AgendaView['activityRows'] {
+  const byId = new Map(events.map((e) => [e.id, e]));
+  return groupByActivity(ctx, events, { perDay: true }).map((g) => {
+    const single = g.entries.length === 1 ? byId.get(g.entries[0]!.id) : undefined;
+    if (single) return { ...agendaRowModel(ctx, single), slots: g.slots, slotLabel: agendaSlotLabel(g.slots) };
+    const first = byId.get(g.entries[0]!.id)!;
+    const base = agendaRowModel(ctx, first);
+    const title = groupTitle(g);
+    const date = dateOf(g.date as IsoDate);
+    return {
+      ...base,
+      id: `group:${g.key}`,
+      name: title,
+      timeRange: `${g.start}–${g.end}`,
+      slots: g.slots,
+      slotLabel: agendaSlotLabel(g.slots),
+      title: `${title} · ${printable(date)} ${g.start}–${g.end} · ${g.slots} ${agendaSlotLabel(g.slots)}`,
+      group: { count: g.count, entryIds: g.entries.map((e) => e.id) },
+    };
+  });
 }
 
 /** A term of the order being planned: not another club's window and not the booking of an individual. */
@@ -92,7 +121,9 @@ export function agendaView(
   let filtered = all;
   if (ui.scope === 'day') filtered = all.filter((e) => e.date === view.selectedDate);
   else if (ui.scope === 'week') filtered = all.filter((e) => e.date >= first && e.date <= last);
-  const slotsOf = (list: readonly PlannerSession[]) => list.reduce((n, e) => n + Math.max(0, Number(e.capacity) || 0), 0);
+  /* Slots by the one rule of the summaries: the people of a booking, the capacity of a window (never a booking's free parallel seats). */
+  const slotsOf = (list: readonly PlannerSession[]) => list.reduce((n, e) => n + slotsOfSession(e), 0);
+  const countOf = (list: readonly PlannerSession[]) => groupByActivity(ctx, list).reduce((n, g) => n + g.count, 0);
   const allSlots = slotsOf(all);
   const typeSlots = slotsOf(typeEvents);
   const cat = type ? categoryOrFallback(ctx, type) : null;
@@ -103,7 +134,7 @@ export function agendaView(
     mode: ui.mode,
     scope: ui.scope,
     categoryId: type,
-    totalCount: all.length,
+    totalCount: countOf(all),
     chips: chipCategories.map((c) => ({
       categoryId: c.id,
       label: c.shortName ?? c.name,
@@ -119,12 +150,12 @@ export function agendaView(
           planned: typeSlots,
           requested: allSlots,
           fillPercent: allSlots ? Math.min(100, (typeSlots / allSlots) * 100) : 0,
-          termCountLabel: `${typeEvents.length} ${termWord(typeEvents.length)}`,
+          termCountLabel: `${countOf(typeEvents)} ${termWord(countOf(typeEvents))}`,
           remainingLabel: `${share} % všech slotů`,
         }
       : null,
-    termCaption: `${typeEvents.length} ${termWord(typeEvents.length)}`,
-    activityRows: typeEvents.map((e) => agendaRowModel(ctx, e)),
+    termCaption: `${countOf(typeEvents)} ${termWord(countOf(typeEvents))}`,
+    activityRows: groupedRows(ctx, typeEvents),
     activityEmpty: 'Pro tuto činnost zatím nejsou v kalendáři žádné termíny.',
     scopeNote:
       ui.scope === 'day'
@@ -133,17 +164,17 @@ export function agendaView(
           ? 'Aktuální týden'
           : 'Zobrazené období',
     allTotals: {
-      terms: filtered.length,
-      termsLabel: termWord(filtered.length),
+      terms: countOf(filtered),
+      termsLabel: termWord(countOf(filtered)),
       slots: slotsOf(filtered),
       slotsLabel: `${agendaSlotLabel(slotsOf(filtered))} celkem`,
     },
-    allRows: filtered.map((e) => agendaRowModel(ctx, e)),
+    allRows: groupedRows(ctx, filtered),
     allEmpty: 'V tomto období nejsou v kalendáři žádné termíny.',
     footerStatus:
       ui.mode === 'activities'
-        ? `${typeEvents.length} ${termWord(typeEvents.length)} v přehledu`
-        : `${all.length} termínů v kalendáři`,
+        ? `${countOf(typeEvents)} ${termWord(countOf(typeEvents))} v přehledu`
+        : `${countOf(all)} termínů v kalendáři`,
   };
 }
 

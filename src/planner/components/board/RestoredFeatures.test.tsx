@@ -645,7 +645,8 @@ describe('the phone: Měsíc is a list of days', () => {
   it('writes out what a day holds: bookings, the club\'s window, the inquiry, a day blocked whole', async () => {
     const list = await openPhoneMonth();
     await waitFor(() => expect(within(list).getByTestId('phone-month-club-2026-12-09')).toHaveTextContent('FK Slaný · 08:00–16:00'));
-    expect(within(list).getByTestId('phone-month-day-2026-12-09')).toHaveTextContent('1 termín'); // b2
+    /* the day by činnost (reviewer 2.2), not a count of terms: b2 is one Fyzio booking */
+    expect(within(list).getByTestId('phone-month-activity-2026-12-09')).toHaveTextContent('Fyzio · 1 slot');
     expect(within(list).getByTestId('phone-month-inquiry-2026-12-10')).toHaveTextContent('Poptávka · Dukla');
     expect(within(list).getByTestId('phone-month-blocked-2026-12-15')).toHaveTextContent('Blokováno');
     expect(within(list).getByTestId('phone-month-day-2026-12-20')).toHaveTextContent('Žádné rezervace');

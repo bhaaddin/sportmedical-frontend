@@ -6,6 +6,7 @@
  * reference day capacity), not a reservation view: reservations are the
  * separate drill-down in `booking.ts`.
  */
+import { groupByActivity, groupTitle, slotsText, spanText, countMark, type GroupEntryKind } from './activityGroups';
 import { categoryOrFallback, dayEvents, minutesOf, sourceFor } from './context';
 import { clockDuration, dateOf, printable, weekdayFull } from './time';
 import type {
@@ -146,6 +147,25 @@ export interface TooltipEventModel {
   slotsLabel: string;
 }
 
+/** One činnost of the day in the flyout (reviewer 2.2): the row, and the entries behind it for when it is opened. */
+export interface TooltipGroupModel {
+  key: string;
+  categoryId: CategoryId;
+  name: string;
+  /** "Komplexní prohlídka ×10". */
+  title: string;
+  tone: string;
+  /** "×10", or "" for a single one. */
+  countMark: string;
+  /** Slots of the činnost that day (people of the bookings, capacity of the windows). */
+  slots: number;
+  /** "10 slotů". */
+  slotsLabel: string;
+  /** "08:00–17:20". */
+  timeLabel: string;
+  entries: { id: string; kind: GroupEntryKind; /** "08:00–09:00" */ time: string; /** "Klub" / "Veřejné" / "Objednávka" */ source: string; slotsLabel: string; names: string[] }[];
+}
+
 export interface DayTooltipModel {
   date: IsoDate;
   pinned: boolean;
@@ -157,7 +177,11 @@ export interface DayTooltipModel {
   referenceLabel: string;
   stats: { terms: number; slots: number; plannedTime: string };
   events: TooltipEventModel[];
+  /** The same day summed per činnost - what the flyout draws; `events` is the prototype's per-term list (golden). */
+  groups: TooltipGroupModel[];
 }
+
+const SOURCE_WORD: Record<GroupEntryKind, string> = { club: 'Klub', term: 'Veřejné', booking: 'Objednávka' };
 
 /** Hover / pinned flyout of a day; null when the day has no terms (the prototype shows nothing). */
 export function dayTooltipModel(ctx: PlannerContext, date: IsoDate, pinned: boolean): DayTooltipModel | null {
@@ -185,6 +209,18 @@ export function dayTooltipModel(ctx: PlannerContext, date: IsoDate, pinned: bool
       tone: categoryOrFallback(ctx, e.categoryId).color,
       meta: `${e.start}–${e.end} · ${sourceFor(e) === 'public' ? 'Veřejné' : 'Klub'}`,
       slotsLabel: `${e.capacity} slotů`,
+    })),
+    groups: groupByActivity(ctx, p.entries).map((g) => ({
+      key: g.key,
+      categoryId: g.categoryId,
+      name: g.name,
+      title: groupTitle(g),
+      tone: g.tone,
+      countMark: countMark(g),
+      slots: g.slots,
+      slotsLabel: slotsText(g.slots),
+      timeLabel: spanText(g),
+      entries: g.entries.map((e) => ({ id: e.id, kind: e.kind, time: `${e.start}–${e.end}`, source: SOURCE_WORD[e.kind], slotsLabel: slotsText(e.slots), names: e.names })),
     })),
   };
 }

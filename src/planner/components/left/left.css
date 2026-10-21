@@ -66,3 +66,14 @@
  * month arrows (their box is 41 px wide there, 35 px without it).
  */
 .sm-planner .month-buttons .icon-button { padding: 1px 6px; }
+
+/* Day flyout: one row per činnost that opens to its entries (reviewer 2.2). The list scrolls inside the card; the card never outgrows the stage. */
+.sm-planner #mini-day-tooltip .tday-events { max-height: 150px; }
+.sm-planner .tday-group { display: block; }
+.sm-planner .tday-group > button.tday-event { width: 100%; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.sm-planner .tday-group > button.tday-event:hover { border-color: hsl(from #13e7d6 var(--sm-hsl, h s l)); }
+.sm-planner .tday-event .tday-count { margin-left: 6px; font-weight: 800; color: hsl(from #bff7f1 var(--sm-hsl, h s l)); }
+.sm-planner .tday-event > span em { font-style: normal; margin-left: 6px; color: #9bc2d6; }
+.sm-planner .tday-members { list-style: none; margin: 3px 0 2px 14px; padding: 0 0 0 8px; border-left: 2px solid var(--tone, #3d7a8c); display: flex; flex-direction: column; gap: 3px; }
+.sm-planner .tday-members li { display: grid; grid-template-columns: 78px minmax(0, 1fr) auto; gap: 8px; font-size: 10.5px; color: #b6d9e6; }
+.sm-planner .tday-members .tday-member-who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e3f2f9; }
