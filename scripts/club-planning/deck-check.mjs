@@ -38,12 +38,20 @@ const check = (ok, what) => {
   console.log(`${ok ? '  ok ' : '  FAIL'} ${what}`);
 };
 
+/** A valid Czech IČO (weights 8..2, mod 11) - a deactivated test club keeps its IČO taken. */
+function randomIco() {
+  const d = Array.from({ length: 7 }, (_, i) => (i === 0 ? 1 + Math.floor(Math.random() * 9) : Math.floor(Math.random() * 10)));
+  const r = d.reduce((s, x, i) => s + x * (8 - i), 0) % 11;
+  return d.join('') + String(r === 0 ? 1 : r === 1 ? 0 : 11 - r);
+}
+
 async function findOrMakeClub(page) {
   const clubs = (await api(page, 'GET', '/api/clubs')).json ?? [];
-  const found = clubs.find((c) => c.name === CLUB_NAME);
+  // DELETE only deactivates a club (the API has no hard delete) and an inactive club cannot take an order: use an active one
+  const found = clubs.find((c) => c.name === CLUB_NAME && c.isActive !== false);
   if (found) return found;
   const r = await api(page, 'POST', '/api/clubs', {
-    name: CLUB_NAME, ico: '25596641', paymentTermsDays: 14, contactPerson: 'Test Deck', contactEmail: 'zz-test-deck@example.invalid', contactPhone: '+420777000111',
+    name: CLUB_NAME, ico: randomIco(), paymentTermsDays: 14, contactPerson: 'Test Deck', contactEmail: 'zz-test-deck@example.invalid', contactPhone: '+420777000111',
   });
   if (r.status !== 201) throw new Error(`club not created: ${r.status}`);
   return r.json;
@@ -256,7 +264,7 @@ try {
 } finally {
   if (!process.env.KEEP_CLUB) {
     const del = await api(setup, 'DELETE', `/api/clubs/${club.id}`);
-    console.log(`\nremoved ${CLUB_NAME}: ${del.status}`);
+    console.log(`\ndeactivated ${CLUB_NAME} ${club.id}: ${del.status}`);
   }
   await browser.close();
 }
