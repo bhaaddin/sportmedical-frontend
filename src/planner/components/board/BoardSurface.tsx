@@ -686,9 +686,14 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     () => (calendar && view === 'month' ? blockedDaysOf(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.blocksByCalendar) : new Set<string>()),
     [calendar, view, calendarMonth],
   );
+  /* The windows of clubs, per day of the month: the club order is visible in the month, not only in the week. */
+  const monthClubLines = useMemo(
+    () => (calendar && view === 'month' && !phone ? clubLinesByDay(monthCells(calendarMonth), calendar.calendars.map((c) => c.id), calendar.blocksByCalendar, lunchOfMarks(dayMarks), config.excludeClubBlockIds) : undefined),
+    [calendar, view, phone, calendarMonth, dayMarks, config.excludeClubBlockIds],
+  );
   const monthTiles = useMemo(
-    () => monthTilesModel(ctx, calendarMonth, filter, calendar ? move.appointments : [], dayMarks, calendar !== null, { inquiries, blockedDays }),
-    [ctx, calendarMonth, filter, calendar, move.appointments, dayMarks, inquiries, blockedDays],
+    () => monthTilesModel(ctx, calendarMonth, filter, calendar ? move.appointments : [], dayMarks, calendar !== null, { inquiries, blockedDays, ...(monthClubLines ? { clubLines: monthClubLines } : {}) }),
+    [ctx, calendarMonth, filter, calendar, move.appointments, dayMarks, inquiries, blockedDays, monthClubLines],
   );
   const [inquiryPop, setInquiryPop] = useState<{ day: IsoDate; x: number; y: number } | null>(null);
 

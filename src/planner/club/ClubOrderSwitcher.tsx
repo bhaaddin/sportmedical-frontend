@@ -13,11 +13,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { ORDER_STATUS_LABEL } from '../../api/clubOrders';
 import { windowDates } from '../../components/clubs/orders/orderWindows';
+import { useOptionalPlannerModel } from '../components/context';
 import { Icon } from '../components/Icons';
 import { usePlannerActions } from '../state/PlannerStoreProvider';
 import { groupPlayers, groupServices, type ClubGroup } from './clubGroups';
 import { useClubPlanner, type ClubPlannerValue } from './ClubPlannerContext';
 import './club.css';
+
+/**
+ * What the switcher reads. A new order on the stage (`adhoc: 'new'`) is "Nová objednávka" only until it is saved: the
+ * data source then holds the saved order (`savedCode`) and the label says so at once, without a reload.
+ */
+export function switcherLabel(input: { adhoc: 'new' | 'edit' | null; selectedCode: string | null; savedCode: string | null }): string {
+  if (input.adhoc === 'new') return input.savedCode ? `Objednávka ${input.savedCode}` : 'Nová objednávka';
+  return input.selectedCode !== null ? `Objednávka ${input.selectedCode}` : 'Žádná objednávka';
+}
 
 const groupWhen = (g: ClubGroup): string => (g.firstDate === null ? 'bez termínů' : windowDates(g.firstDate, g.lastDate ?? g.firstDate));
 
@@ -42,9 +52,9 @@ function Switcher({ club }: { club: ClubPlannerValue }) {
   }, [open]);
 
   const { groups, selected, adhoc } = club;
-  const label = adhoc === 'new'
-    ? 'Nová objednávka'
-    : selected !== null ? `Objednávka ${selected.code}` : 'Žádná objednávka';
+  const savedCode = useOptionalPlannerModel()?.order?.code ?? null;
+  const label = switcherLabel({ adhoc, selectedCode: selected?.code ?? null, savedCode });
+  const draftSaved = adhoc === 'new' && savedCode !== null;
 
   return (
     <div className="planner-actions club-switch" ref={root} data-testid="club-order-switcher">
@@ -65,8 +75,8 @@ function Switcher({ club }: { club: ClubPlannerValue }) {
         <div className="club-switch-menu" role="menu" aria-label="Objednávky klubu" data-testid="club-order-menu">
           {adhoc === 'new' ? (
             <button type="button" role="menuitemradio" aria-checked="true" className="club-switch-item is-active" data-testid="club-order-new-draft" onClick={() => setOpen(false)}>
-              <b>Nová objednávka (rozpracovaná)</b>
-              <small>{club.club.name} · ještě nevytvořena</small>
+              <b>{draftSaved ? `Objednávka ${savedCode} (uložená)` : 'Nová objednávka (rozpracovaná)'}</b>
+              <small>{club.club.name} · {draftSaved ? 'uložena, na plátně' : 'ještě nevytvořena'}</small>
             </button>
           ) : null}
           {groups.length === 0 && adhoc !== 'new' ? <div className="club-switch-empty">Klub zatím nemá žádnou objednávku.</div> : null}

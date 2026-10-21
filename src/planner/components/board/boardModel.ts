@@ -672,6 +672,8 @@ export interface MonthTileModel {
   inquiries: InquiryRef[];
   /** Every calendar on screen is blocked for the whole day by hand ("Zablokovat celé dny"). */
   blocked: boolean;
+  /** The windows of clubs on this day ("FK Slaný · 08:00–16:00"), one line each - the club order shows in the month. */
+  clubs: string[];
 }
 
 export interface MonthListModel {
@@ -687,7 +689,7 @@ export function monthTilesModel(
   bookings: readonly DayAppointment[],
   dayMarks: Readonly<Record<string, DayMark>>,
   hideCalendarBacked: boolean,
-  extras: { inquiries?: ReadonlyMap<string, InquiryRef[]>; blockedDays?: ReadonlySet<string> } = {},
+  extras: { inquiries?: ReadonlyMap<string, InquiryRef[]>; blockedDays?: ReadonlySet<string>; clubLines?: ReadonlyMap<string, string[]> } = {},
 ): MonthListModel {
   const base = monthViewModel(ctx, calendarMonth, filter);
   const publicIds = hideCalendarBacked ? new Set(ctx.sessions.filter(isCalendarBacked).map((s) => s.id)) : null;
@@ -719,6 +721,7 @@ export function monthTilesModel(
         flag: mark?.closed ? mark.label?.trim() || 'Zavřeno' : null,
         inquiries: extras.inquiries?.get(t.date) ?? [],
         blocked: extras.blockedDays?.has(t.date) ?? false,
+        clubs: extras.clubLines?.get(t.date) ?? [],
       };
     }),
   };

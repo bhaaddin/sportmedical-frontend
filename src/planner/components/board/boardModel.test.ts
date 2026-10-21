@@ -333,3 +333,12 @@ describe('colours', () => {
     expect(withAlpha('not-a-colour', 0.5)).toBe('not-a-colour');
   });
 });
+
+describe('monthTilesModel · the club order is visible in the month', () => {
+  it('a day with a club window carries its line; days without carry none', () => {
+    const ctx = makeContext({ categories: [], sessions: [], today: '2026-10-21' });
+    const model = monthTilesModel(ctx, '2027-01-01', 'all', [], {}, true, { clubLines: new Map([['2027-01-26', ['ZZ test plánování · 08:00–18:00']]]) });
+    expect(model.tiles.find((t) => t.date === '2027-01-26')?.clubs).toEqual(['ZZ test plánování · 08:00–18:00']);
+    expect(model.tiles.find((t) => t.date === '2027-01-27')?.clubs).toEqual([]);
+  });
+});

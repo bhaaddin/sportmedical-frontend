@@ -22,6 +22,11 @@ export function PlannerModelProvider({ children }: { children: ReactNode }) {
   return <ModelContext.Provider value={model}>{children}</ModelContext.Provider>;
 }
 
+/** The model when a provider is above, else null (the board toolbar is also drawn on its own in tests). */
+export function useOptionalPlannerModel(): PlannerModel | null {
+  return useContext(ModelContext);
+}
+
 export function usePlannerModelState(): PlannerModel {
   const model = useContext(ModelContext);
   if (!model) throw new Error('Planner panels must render inside <PlannerModelProvider>.');
