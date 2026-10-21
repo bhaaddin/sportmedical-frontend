@@ -57,4 +57,17 @@ describe('bubbleMaxHeight', () => {
     expect(bubbleMaxHeight(900)).toBe(900 - 2 * BUBBLE_MARGIN);
     expect(bubbleMaxHeight(100)).toBe(240);
   });
+
+  it('points a tall marked range at where it starts, not at its middle (reviewer 2.5: "the popup sits too low")', () => {
+    /* a drag from 08:00 over six hours: 660 px tall, starting 140 px from the top */
+    const tall = { x: 300, y: 140, width: 160, height: 660 };
+    const p = placeBubble(tall, viewport, size);
+    expect(p.side).toBe('right');
+    /* centred on the middle (470) the bubble would start at 170; pointing at the head (176) it sits at the top of the range */
+    expect(p.caret).toBeGreaterThanOrEqual(22);
+    expect(p.top + p.caret).toBeLessThan(tall.y + 60);
+    /* a short slot is unchanged: centred on itself */
+    const short = placeBubble({ x: 300, y: 400, width: 160, height: 40 }, viewport, size);
+    expect(short.top + short.caret).toBe(420);
+  });
 });

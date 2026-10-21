@@ -31,7 +31,7 @@ import { useDevice } from "../../layout/useDevice";
 import { BookingApiError } from "../../api/apiError";
 import { isKnownPaperworkReason } from "../../api/bookingContracts";
 import { usePermission } from "../../auth/usePermission";
-import { DESIGN, SectionLabel, SoftCard } from "../ui";
+import { DESIGN, SectionLabel, SoftCard, headSurface } from "../ui";
 import {
   addDaysToDateOnly,
   formatDateOnly,
@@ -1652,7 +1652,7 @@ export function NewAppointmentDialog({
         value={value}
         placeholder="—"
         slotProps={{
-          input: { readOnly: true, sx: { bgcolor: DESIGN.head } },
+          input: { readOnly: true, sx: { bgcolor: (t) => headSurface(t) } },
           htmlInput: { "aria-label": label, tabIndex: -1 },
         }}
       />

@@ -35,7 +35,14 @@ const tooltipSlotProps = {
     },
   },
   arrow: { sx: { color: '#042c3d' } },
-} as const;
+  /* Hangs off the hovered card; turns to another side instead of leaving the screen (a card at the top of the stage gets it below). */
+  popper: {
+    modifiers: [
+      { name: 'flip', options: { fallbackPlacements: ['bottom', 'right', 'left'], padding: 8 } },
+      { name: 'preventOverflow', options: { padding: 8, altAxis: true, tether: false } },
+    ],
+  },
+};
 
 const cardStyle = (card: SessionCardModel | BookingCardModel): CSSProperties =>
   ({

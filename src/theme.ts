@@ -2,11 +2,13 @@ import { createTheme, alpha, type Theme } from '@mui/material/styles';
 import {
   DEFAULT_ACCENT_HEX,
   IDENTITY_SHIFT,
+  accentInk,
   deriveShift,
   lightTints,
   onAccentText,
   sanitizeAccent,
   shiftCssColors,
+  tintOf,
   type AccentShift,
 } from './accent';
 
@@ -195,6 +197,16 @@ export function shiftOf(theme: Theme): AccentShift {
   return theme.smShift ?? IDENTITY_SHIFT;
 }
 
+/** The sunken header / footer surface of a panel for the theme's mode: the board's pale grey in light, a faint cyan veil on the glass in dark. */
+export function headSurface(theme: Theme): string {
+  return theme.palette.mode === 'light' ? DESIGN.head : alpha(darkOf(theme).cyan, 0.07);
+}
+
+/** The accent as TEXT for the theme's mode (>= AA on the surface): the pick darkened where needed in light, the bright primary in dark. */
+export function accentInkOf(theme: Theme): string {
+  return theme.palette.mode === 'light' ? accentInk(theme.palette.primary.main) : theme.palette.primary.main;
+}
+
 /** Light mode's accent tints a theme was built with (the board's forest tints for a theme not made by buildTheme). */
 export function tintsOf(theme: Theme): { hover: string; selected: string; softBg: string; softLine: string } {
   return theme.smTints ?? lightTints(DEFAULT_ACCENT_HEX);
@@ -231,6 +243,8 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
   /* A cyan-family literal, moved to the accent (a no-op for the default accent). */
   const c = (value: string): string => shiftCssColors(value, shift);
   const tints = lightTints(accentColor);
+  /* The accent as text on a light surface (AA); the dark theme's primary is already bright on the glass. */
+  const inkAccent = light ? accentInk(accentColor) : D.cyan;
   const onAccent = onAccentText(accentColor);
   /* The colour the interface is drawn in: the doctor's accent in light, the accent's cyan family in dark. */
   const primary = light ? accentColor : D.cyan;
@@ -255,7 +269,12 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
     palette: {
       mode,
       primary: light
-        ? { main: accentColor, contrastText: onAccent }
+        ? {
+            main: accentColor,
+            contrastText: onAccent,
+            /* A fill that takes dark ink (orange, teal) must get LIGHTER on hover: MUI's default (darker) drops dark ink below AA. */
+            ...(onAccent === '#FFFFFF' ? {} : { dark: tintOf(accentColor, 0.86) }),
+          }
         : { main: D.cyan, light: D.aqua, dark: c('#00ADAB'), contrastText: D.onCyan },
       secondary: { main: light ? '#2B3440' : '#D6EAF4' },
       background: { default: page, paper },
@@ -310,6 +329,9 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
       MuiCssBaseline: {
         styleOverrides: {
           html: { colorScheme: mode },
+          /* ACCENT_SOFT (a selected card, a soft panel) reads these two; in dark they are tinted glass, never the light mode's pale fill
+             (white text on a pale fill was the "white on light when hovering" of the booking bubble). AccentRootVars sets them only in light. */
+          ...(light ? {} : { ':root': { '--sm-soft-bg': c('rgba(0, 230, 228, 0.14)'), '--sm-soft-line': c('rgba(0, 224, 232, 0.5)') } }),
           body: {
             backgroundColor: page,
             color: ink,
@@ -436,7 +458,7 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
               ...(light ? {} : { backgroundImage: c('linear-gradient(105deg, #07576B, #074154)'), boxShadow: `0 0 12px ${c('rgba(4, 235, 221, 0.21)')}` }),
             },
             '&.MuiButton-colorPrimary': {
-              color: light ? primary : '#DDFFFF',
+              color: light ? inkAccent : '#DDFFFF',
               borderColor: light ? alpha(primary, 0.35) : c('rgba(50, 181, 199, 0.79)'),
             },
             '&.MuiButton-colorError': {
@@ -445,7 +467,7 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
               ...(light ? {} : { backgroundImage: 'none' }),
             },
           },
-          text: { '&:hover': { backgroundColor: hover } },
+          text: { '&:hover': { backgroundColor: hover }, ...(light ? { '&.MuiButton-colorPrimary': { color: inkAccent } } : {}) },
         },
       },
       MuiIconButton: {

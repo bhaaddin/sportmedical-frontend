@@ -3,7 +3,7 @@ import { Box, Drawer, IconButton, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import ArrowBack from "@mui/icons-material/ArrowBack";
 import Close from "@mui/icons-material/Close";
-import { DESIGN } from "../../ui";
+import { DESIGN, headSurface } from "../../ui";
 import { useDevice } from "../../../layout/useDevice";
 import { usePanelLayout, type PanelLayout } from "./usePanelLayout";
 
@@ -241,7 +241,7 @@ export function DrawerFrame({
             pb: full ? "max(16px, env(safe-area-inset-bottom))" : 2,
             borderTop: "1px solid",
             borderColor: "divider",
-            bgcolor: DESIGN.head,
+            bgcolor: (t) => headSurface(t),
             ...touchRules,
           }}
         >

@@ -3,7 +3,7 @@ import { Box, Button, Snackbar, Stack, Typography } from "@mui/material";
 import CheckCircleOutline from "@mui/icons-material/CheckCircleOutlineOutlined";
 import ContentCopy from "@mui/icons-material/ContentCopy";
 import { useDevice } from "../../../layout/useDevice";
-import { DESIGN, SectionLabel, SoftCard } from "../../ui";
+import { DESIGN, SectionLabel, SoftCard, headSurface } from "../../ui";
 import { formatLongPragueDate } from "../appointmentEdit";
 import { pragueClock } from "../NewAppointmentDialog.logic";
 import { deadlineSentence } from "./quickBooking";
@@ -129,7 +129,7 @@ export function QuickBookedPanel({ view }: { view: QuickBookedView }) {
               fontFamily: "monospace",
               fontSize: 13,
               wordBreak: "break-all",
-              bgcolor: DESIGN.head,
+              bgcolor: (t) => headSurface(t),
               border: "1px solid",
               borderColor: "divider",
               borderRadius: 2.5,

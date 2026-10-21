@@ -303,6 +303,21 @@ export function darken(accentHex: string, amount: number): string {
   return toHex(blend(rgb, '#000000', amount));
 }
 
+/**
+ * The accent as TEXT on light surfaces: the pick itself when it already reads (>= AA on white and on its own soft tint),
+ * otherwise the pick darkened a step at a time until it does (teal and orange are 3.4-3.7:1 as picked). The fill keeps the
+ * pick; only text, outlines of text buttons and links use this.
+ */
+export function accentInk(accentHex: string): string {
+  let ink = normalizeHex(accentHex) ?? DEFAULT_ACCENT_HEX;
+  for (let step = 0; step < 24; step += 1) {
+    const reads = contrastRatio(ink, '#FFFFFF') >= AA && contrastRatio(ink, lightTints(ink).softBg) >= AA;
+    if (reads) return ink;
+    ink = darken(ink, 0.06);
+  }
+  return ink;
+}
+
 /** Light mode's tints of the accent. The default accent keeps the board's exact hand-picked values. */
 export function lightTints(accentHex: string): { hover: string; selected: string; softBg: string; softLine: string } {
   if (normalizeHex(accentHex) === DEFAULT_ACCENT_HEX.toUpperCase() || normalizeHex(accentHex) === null) {

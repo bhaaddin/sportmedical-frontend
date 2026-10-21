@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Alert, Box, Button, IconButton, Modal, Stack, Typography } from "@mui/material";
 import ArrowBack from "@mui/icons-material/ArrowBack";
 import Close from "@mui/icons-material/Close";
-import { DESIGN } from "../ui";
+import { DESIGN, headSurface } from "../ui";
 import { useDevice } from "../../layout/useDevice";
 import {
   BUBBLE_WIDTH,
@@ -216,7 +216,7 @@ export function BubbleFrame({
               py: 1.5,
               borderTop: "1px solid",
               borderColor: "divider",
-              bgcolor: DESIGN.head,
+              bgcolor: (t) => headSurface(t),
               borderBottomLeftRadius: "12px",
               borderBottomRightRadius: "12px",
               ...touchRules,

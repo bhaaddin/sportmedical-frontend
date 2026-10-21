@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Box } from "@mui/material";
 import { useDevice, type Device } from "../../layout/useDevice";
-import { DESIGN } from "../ui";
+import { DESIGN, headSurface } from "../ui";
 
 /*
  * Where the appointment detail and its edit form live, per device (Etapa 2,
@@ -72,7 +72,7 @@ export function DockedBar({ children, label }: { children: ReactNode; label: str
         pb: "max(12px, env(safe-area-inset-bottom))",
         borderTop: "1px solid",
         borderColor: "divider",
-        bgcolor: DESIGN.head,
+        bgcolor: (t) => headSurface(t),
         display: "flex",
         flexDirection: "column",
         gap: 1,

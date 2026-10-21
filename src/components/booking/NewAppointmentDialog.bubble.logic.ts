@@ -45,6 +45,8 @@ export const BUBBLE_MARGIN = 16;
 export const BUBBLE_GAP = 12;
 /** The caret is 14 px wide; it never sits in the rounded corner. */
 export const CARET_SIZE = 14;
+/** How far below the top of a marked range the bubble points at most (px). */
+export const ANCHOR_HEAD = 36;
 const CARET_INSET = 22;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), Math.max(min, max));
@@ -57,7 +59,9 @@ export function placeBubble(
   gap: number = BUBBLE_GAP,
 ): BubblePlacement {
   const centerX = anchor.x + anchor.width / 2;
-  const centerY = anchor.y + anchor.height / 2;
+  /* A tall marked range (a drag over hours): the bubble belongs to where the desk started, not to the middle of it,
+     which on a long range lies far down the screen ("the popup sits too low"). Short slots keep their centre. */
+  const centerY = anchor.y + Math.min(anchor.height / 2, ANCHOR_HEAD);
   const maxLeft = viewport.width - margin - size.width;
   const maxTop = viewport.height - margin - size.height;
 
