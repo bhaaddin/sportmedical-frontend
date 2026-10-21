@@ -1,0 +1,11 @@
+import { launch, newPage, login, shot, buttons, findOrMakeClub, startClubOrder } from './lib.mjs';
+const b = await launch();
+const p = await newPage(b, 'tablet');
+await login(p);
+const club = await findOrMakeClub(p);
+await startClubOrder(p, club.id, { 'Základní sportovní prohlídka': 18 });
+await p.getByRole('button', { name: 'Týden', exact: true }).first().click();
+await p.waitForTimeout(800);
+console.log((await buttons(p)).filter((x) => /den|dní|Týden|Měsíc|Po|Út/.test(x)).join('\n'));
+await shot(p, 'x-tablet-week');
+await b.close();

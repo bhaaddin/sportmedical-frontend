@@ -48,14 +48,14 @@ async function weekChecks(browser, club, size, S) {
   /* a fresh page: a reload would bring back the order of the first part (the session lives in the history state) */
   const page = await newPage(browser, size);
   await login(page);
-  await startClubOrder(page, club.id, { 'Základní sportovní prohlídka': 9 });
+  await startClubOrder(page, club.id, { 'Základní sportovní prohlídka': 18 });
   /* the week of 11. - 17. 1. 2027, by the board's own arrows (the mini calendar is a sheet on tablet and phone) */
   await page.getByRole('button', { name: 'Týden', exact: true }).first().click();
   for (let i = 0; i < 30 && (await page.locator('.day-title[data-day="2027-01-12"]').count()) === 0; i++) {
     await page.getByRole('button', { name: 'Následující týden' }).first().click();
     await page.waitForTimeout(250);
   }
-  if (size === 'tablet') await page.getByRole('button', { name: '7 dní' }).click();
+  if (size === 'tablet') await page.locator('[data-testid=compact-fit-week]').click();
   await page.waitForTimeout(500);
   await clickCard(page, 'Základní sportovní prohlídka');
   const wk = await text(page, '.board-week-heading, .week-title, #week-range, [data-testid=week-range]').catch(() => '');
@@ -73,6 +73,12 @@ async function weekChecks(browser, club, size, S) {
   check(times.length >= 2 && overlaps.length === 0, `the drop is two terms and none touches the lunch break (${times.join(', ')})`);
   await shot(page, S('7-week-dropped'));
   check(num2(await text(page, '.plan-card .plan-num')) === 9, 'the card reads 9 / 9 after the drop');
+
+  /* a click on a day's heading takes the whole day - up to the need: 18 - 9 = 9 more slots */
+  await page.locator('.day-title[data-day="2027-01-13"]').click();
+  await page.waitForTimeout(1200);
+  check(num2(await text(page, '.plan-card .plan-num')) === 18, `a click on the heading of the day takes it, stopping at the need (${await text(page, '.plan-card .plan-num')})`);
+  await shot(page, S('8-week-heading-pick'));
 
   /* a fulfilled činnost: another press on the board is refused, the figure stays */
   const before = await text(page, '.plan-card .plan-num');
