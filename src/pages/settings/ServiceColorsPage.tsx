@@ -32,6 +32,9 @@ import { SettingsAsideCard, SettingsScreen } from './SettingsFrame';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 import { PaletteEditor } from './colors/PaletteEditor';
 import { PaletteChoice } from './colors/PaletteChoice';
+import { ActivityColorEditor } from './colors/ActivityColorEditor';
+import { invalidateColorCaches } from '../../colors/invalidateColors';
+import { activityColor } from '../../colors/activityColor';
 import { ServiceColorList } from './colors/ServiceColorList';
 import {
   drawnColor, hasPaletteErrors, normalizeHex, paletteSignature, toRows, validatePalette, type PaletteRow,
@@ -131,9 +134,9 @@ export default function ServiceColorsPage() {
 
   /* ── Colouring a služba or a činnost: saved at once ── */
   const [popover, setPopover] = useState<{ anchor: HTMLElement; target: Target } | null>(null);
+  /* A colour changed: every screen that draws a činnost or a služba refreshes (board, club windows, mini calendar, lists, legends). */
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ['settings', 'service-colors', 'services'] });
-    void queryClient.invalidateQueries({ queryKey: ['settings', 'service-colors', 'activities'] });
+    void invalidateColorCaches(queryClient);
   };
   const colorService = useMutation({
     mutationFn: ({ service, hex }: { service: ClinicService; hex: string }) =>
@@ -161,8 +164,8 @@ export default function ServiceColorsPage() {
 
   return (
     <SettingsScreen
-      title="Barvy služeb"
-      subtitle="Každá služba má svou barvu, její činnosti jsou v odstínech téže barvy — stejně v kalendáři, legendách i štítcích."
+      title="Barvy služeb a činností"
+      subtitle="Každá služba má svou barvu a každá činnost buď její odstín, nebo vlastní barvu — stejnou v kalendáři, oknech klubů, legendách i štítcích."
       scope="calendar"
       save={{ dirty, saving: savePalette.isPending, onSave: submit, onDiscard: discard }}
       loading={rows === null && !paletteQuery.isError}
@@ -189,7 +192,8 @@ export default function ServiceColorsPage() {
           <SoftCard component="section" aria-labelledby="barvy-sluzby">
             <Typography id="barvy-sluzby" component="h2" sx={TYPE.sectionTitle}>Služby a činnosti</Typography>
             <Typography sx={[TYPE.caption, { mt: 0.5, mb: 2, maxWidth: 720 }]}>
-              Klepnutím na barvu služby ji změníte. Činnosti mají odstín služby; klepnutím na činnost jí dáte vlastní barvu.
+              Klepnutím na barvu služby ji změníte. Činnosti mají odstín služby; klepnutím na činnost jí dáte vlastní barvu z palety nebo
+              jakoukoli jinou, uvidíte náhled a můžete se vrátit k výchozímu odstínu.
             </Typography>
             {servicesQuery.isError || activitiesQuery.isError ? (
               <Alert severity="error" action={<Button color="inherit" size="small" sx={{ minHeight: 44 }} onClick={() => { void servicesQuery.refetch(); void activitiesQuery.refetch(); }}>Zkusit znovu</Button>}>
@@ -213,22 +217,29 @@ export default function ServiceColorsPage() {
             anchorEl={popover?.anchor ?? null}
             onClose={() => setPopover(null)}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-            slotProps={{ paper: { sx: { p: 2, maxWidth: 'min(92vw, 360px)' } } }}
+            slotProps={{ paper: { sx: { p: 2, maxWidth: 'min(92vw, 400px)' } } }}
           >
-            {target !== null && (
+            {target !== null && target.kind === 'activity' && (
+              <ActivityColorEditor
+                key={target.activity.id}
+                activityName={target.activity.name}
+                palette={palette}
+                value={target.activity.colorHex ?? null}
+                fallback={activityColor({ effectiveColorHex: target.activity.colorHex ? null : target.activity.effectiveColorHex }, services.find((s) => s.id === target.activity.clinicServiceId)?.colorHex ?? null)}
+                busy={colorActivity.isPending}
+                onChange={(hex) => { colorActivity.mutate({ activity: target.activity, hex }); setPopover(null); }}
+              />
+            )}
+            {target !== null && target.kind === 'service' && (
               <Stack spacing={1.5}>
-                <Typography sx={TYPE.itemName}>
-                  {target.kind === 'service' ? `Barva služby ${target.service.name}` : `Barva činnosti ${target.activity.name}`}
-                </Typography>
+                <Typography sx={TYPE.itemName}>{`Barva služby ${target.service.name}`}</Typography>
                 <PaletteChoice
                   palette={palette}
-                  value={target.kind === 'service' ? target.service.colorHex : target.activity.colorHex ?? null}
+                  value={target.service.colorHex}
                   onPick={(hex) => {
-                    if (target.kind === 'service') colorService.mutate({ service: target.service, hex });
-                    else colorActivity.mutate({ activity: target.activity, hex });
+                    colorService.mutate({ service: target.service, hex });
                     setPopover(null);
                   }}
-                  onClear={target.kind === 'activity' ? () => { colorActivity.mutate({ activity: target.activity, hex: null }); setPopover(null); } : undefined}
                 />
               </Stack>
             )}

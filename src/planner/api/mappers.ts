@@ -22,6 +22,7 @@ import type { ClubOrderView, OrderRange } from '../../api/clubOrders';
 import type { Club, ClubManager } from '../../api/clubs';
 import type { ClinicHoliday } from '../../api/holidays';
 import { dayMark as gridDayMark } from '../../components/booking/grid/dayMarks';
+import { activityColor } from '../../colors/activityColor';
 import { shownPrice } from '../../components/booking/grid/appointmentPrice';
 import { drawnBlocksOfDay } from '../../components/booking/grid/clubWindows';
 import {
@@ -86,8 +87,8 @@ export function eachDay(from: IsoDate, to: IsoDate): IsoDate[] {
 /* -------------------------------------------------------------------------- */
 
 export function categoryOf(activity: Activity, service: ClinicService | undefined): PlannerCategory {
-  const color =
-    cleanHex(activity.effectiveColorHex) ?? cleanHex(activity.colorHex) ?? cleanHex(activity.color) ?? cleanHex(service?.colorHex) ?? NEUTRAL_COLOR;
+  /* the one colour of a činnost (src/colors/activityColor.ts) - the same the board's cards, windows and lists draw */
+  const color = activityColor(activity, service?.colorHex, NEUTRAL_COLOR);
   return {
     id: activity.id,
     name: activity.name,

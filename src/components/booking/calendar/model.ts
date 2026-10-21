@@ -1,3 +1,4 @@
+import { activityColorOrNull } from "../../../colors/activityColor";
 import type { Activity, Calendar, DayAppointment, PreviewDay } from "../../../api/bookingContracts";
 import { statusTally } from "../../../api/bookingContracts";
 import { addDaysToDateOnly, dayOfWeekOf, pragueDateKey, type DateOnly } from "../../../utils/time";
@@ -57,7 +58,8 @@ export function activityInfoOf(activity: Activity): ActivityInfo {
     id: activity.id,
     name: activity.name,
     serviceId: activity.clinicServiceId,
-    colorHex: cleanHex(activity.effectiveColorHex) ?? cleanHex(activity.colorHex),
+    /* the calendar never drew the legacy `color`: only what the server computed (effective) or the činnost owns */
+    colorHex: activityColorOrNull({ effectiveColorHex: activity.effectiveColorHex, colorHex: activity.colorHex }),
     sortOrder: activity.sortOrder,
     durationMinutes: activity.durationMinutes,
     parallelCapacity: activity.parallelCapacity && activity.parallelCapacity > 0 ? activity.parallelCapacity : 1,

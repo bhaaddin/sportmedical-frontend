@@ -23,8 +23,8 @@ import { BookingApiError } from '../../api/apiError';
 import type { DocumentTemplate } from '../../api/documents';
 import { useIsPhone } from '../../layout/useDevice';
 import { TYPE, settingsLine } from '../../components/settings/settingsStyle';
-import { PaletteChoice } from '../settings/colors/PaletteChoice';
-import { normalizeHex } from '../settings/colors/colorLogic';
+import { ActivityColorEditor } from '../settings/colors/ActivityColorEditor';
+import { activityColor } from '../../colors/activityColor';
 
 const whole = (text: string): number | null => (/^\d+$/.test(text.trim()) ? Number(text.trim()) : null);
 
@@ -83,7 +83,6 @@ export default function ActivityExtrasDialog({
     }
   };
 
-  const shown = color ?? activity.effectiveColorHex ?? serviceColor;
 
   return (
     <Dialog open onClose={saving ? undefined : onClose} fullScreen={phone} maxWidth="sm" fullWidth aria-labelledby="cinnost-nastaveni-title">
@@ -130,11 +129,15 @@ export default function ActivityExtrasDialog({
             <Typography sx={[TYPE.caption, { mt: 0.5, mb: 1 }]}>
               Bez vlastní barvy se činnost kreslí v odstínu své služby. Barvu si můžete vybrat z palety.
             </Typography>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
-              <Box role="img" aria-label={`Teď: ${shown === null ? 'bez barvy' : normalizeHex(shown)}`} sx={{ width: 24, height: 24, borderRadius: '6px', border: '1px solid', borderColor: settingsLine, bgcolor: shown ?? 'transparent' }} />
-              <Typography sx={TYPE.itemName}>{color === null ? 'Odstín služby' : 'Vlastní barva'}</Typography>
-            </Stack>
-            <PaletteChoice palette={palette} value={color} onPick={setColor} onClear={color === null ? undefined : () => setColor(null)} ariaLabel="Barva činnosti" />
+            <ActivityColorEditor
+              activityName={activity.name}
+              palette={palette}
+              value={color}
+              fallback={activityColor({ effectiveColorHex: activity.colorHex ? null : activity.effectiveColorHex }, serviceColor)}
+              onChange={setColor}
+              busy={saving}
+              groupLabel="Barva činnosti"
+            />
           </Box>
 
           <Box>

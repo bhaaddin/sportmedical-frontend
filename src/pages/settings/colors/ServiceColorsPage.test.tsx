@@ -199,7 +199,7 @@ describe('ServiceColorsPage', () => {
     m.getPalette.mockRejectedValueOnce(refused(500, {}));
     renderPage();
     expect(await screen.findByText('Paletu barev se nepodařilo načíst.')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Barvy služeb' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Barvy služeb a činností' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Zkusit znovu/ }));
     expect(await screen.findByLabelText('Barva 1 jako text')).toHaveValue('#0D5C52');
   });

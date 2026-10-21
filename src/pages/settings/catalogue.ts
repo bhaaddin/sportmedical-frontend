@@ -220,8 +220,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       },
       {
         id: 'barvy-sluzeb',
-        label: 'Barvy služeb',
-        description: 'Barva každé služby a paleta, ze které se nové služby barví samy — stejná v kalendáři, legendách i štítcích',
+        label: 'Barvy služeb a činností',
+        description: 'Barva každé služby i každé činnosti (z palety, nebo vlastní, s náhledem) a paleta, ze které se nové služby barví samy — stejná v kalendáři, legendách i štítcích',
         to: '/nastaveni/barvy-sluzeb',
         scope: 'service-colors',
         keywords: ['barva', 'barvy', 'paleta', 'odstín', 'legenda', 'kalendář', 'služba', 'činnost'],

@@ -1,3 +1,4 @@
+import { activityColor } from '../colors/activityColor';
 import client from './client';
 import { AxiosError } from 'axios';
 import { z } from 'zod';
@@ -523,7 +524,7 @@ export async function fetchBlockableActivities(): Promise<BlockableActivity[]> {
         name: str(a.name) ?? '',
         durationMinutes: num(a.durationMinutes),
         clinicServiceId: str(a.clinicServiceId),
-        colorHex: str(a.effectiveColorHex) ?? str(a.colorHex) ?? str(a.color) ?? '#B3B9C0',
+        colorHex: activityColor({ effectiveColorHex: str(a.effectiveColorHex), colorHex: str(a.colorHex), color: str(a.color) }, null, '#B3B9C0'),
         parallelCapacity: Math.max(1, num(a.parallelCapacity, 1)),
       }))
       .filter((a) => a.id !== '');

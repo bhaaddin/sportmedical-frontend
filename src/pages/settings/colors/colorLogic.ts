@@ -4,6 +4,7 @@
  */
 import { HEX_COLOR, MIN_PALETTE_SIZE } from '../../../api/serviceColors';
 import { MAX_PALETTE_SIZE } from '../../../api/fieldLimits';
+import { activityColor } from '../../../colors/activityColor';
 
 /** "0d5c52", "#0d5c52" -> "#0D5C52"; anything that is not six hex digits comes back unchanged (trimmed). */
 export function normalizeHex(text: string): string {
@@ -48,5 +49,5 @@ export function drawnColor(
   serviceColor: string | null,
   fallback: string,
 ): string {
-  return activity.effectiveColorHex ?? activity.colorHex ?? serviceColor ?? fallback;
+  return activityColor(activity, serviceColor, fallback);
 }

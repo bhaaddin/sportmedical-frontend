@@ -36,6 +36,7 @@ import { TYPE } from '../../../components/settings/settingsStyle';
 import ActivityExtrasDialog from '../../cenik/ActivityExtrasDialog';
 import { useDevice } from '../../../layout/useDevice';
 import { kc } from './format';
+import { activityColorOrNull } from '../../../colors/activityColor';
 import DeleteFlow, { type DeleteTarget } from './DeleteFlow';
 
 export const ACTIVITIES_KEY = ['activities'] as const;
@@ -126,7 +127,7 @@ function ActivityCard({
 }) {
   const device = useDevice();
   const price = priceItems.find((p) => p.id === activity.serviceItemId) ?? null;
-  const colour = activity.effectiveColorHex ?? activity.colorHex ?? activity.color;
+  const colour = activityColorOrNull(activity);
   const disabled = saving || !canEdit || !activity.isActive;
   const columns = device === 'desktop' ? 'repeat(4, 1fr)' : '1fr';
 

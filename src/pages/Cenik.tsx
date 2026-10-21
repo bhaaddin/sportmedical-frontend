@@ -33,7 +33,8 @@ import {
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Alert,
 } from '@mui/material';
 import { Search, Add } from '@mui/icons-material';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateColorCaches } from '../colors/invalidateColors';
 import { servicesApi } from '../api/services';
 import { activitiesApi } from '../api/activities';
 import { clinicServicesApi } from '../api/clinicServices';
@@ -50,6 +51,7 @@ import { StatusChip, SoftCard, DESIGN } from '../components/ui';
 import { FitPage } from '../components/ui/fit';
 import { ResponsiveDataList, type DataColumn } from '../components/ui/ResponsiveDataList';
 import { TYPE } from '../components/settings/settingsStyle';
+import { activityColorOrNull } from '../colors/activityColor';
 
 const NBSP = ' ';
 /** "2 200 Kč" with a non-breaking space before the unit (brief, rule 9). */
@@ -85,6 +87,7 @@ export default function Cenik() {
   useEffect(load, [load]);
 
   /* The činnosti under the rows. None of this blocks the price list itself. */
+  const queryClient = useQueryClient();
   const activitiesQuery = useQuery({ queryKey: ACTIVITIES_KEY, queryFn: async () => (await activitiesApi.list()).activities, retry: false });
   const clinicServicesQuery = useQuery({ queryKey: CLINIC_SERVICES_KEY, queryFn: clinicServicesApi.list, retry: false });
   const templatesQuery = useQuery({ queryKey: TEMPLATES_KEY, queryFn: () => documentsApi.getTemplates(), retry: false, enabled: mayEdit });
@@ -95,7 +98,7 @@ export default function Cenik() {
   const serviceColorOf = (activity: Activity): string | null =>
     clinicServices.find((s) => s.id === activity.clinicServiceId)?.colorHex ?? null;
   const drawnColor = (activity: Activity): string | null =>
-    activity.effectiveColorHex ?? activity.colorHex ?? serviceColorOf(activity);
+    activityColorOrNull(activity) ?? serviceColorOf(activity);
   const activitiesOf = (item: ServiceItem): Activity[] =>
     activities.filter((a) => a.serviceItemId === item.id && a.isActive).sort((a, b) => a.sortOrder - b.sortOrder);
   /* The row's colour is its služba's: the first činnost billed by it says which. */
@@ -294,7 +297,7 @@ export default function Cenik() {
           templatesFailed={templatesQuery.isError}
           palette={paletteQuery.data?.palette ?? []}
           onClose={() => setEditingActivity(null)}
-          onSaved={() => { void activitiesQuery.refetch(); }}
+          onSaved={() => { void activitiesQuery.refetch(); void invalidateColorCaches(queryClient); }}
         />
       )}
 
