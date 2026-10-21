@@ -22,6 +22,8 @@ import type { OrderFigures } from '../../plan/orderFigures';
 import { orderTerms } from '../../plan/orderFigures';
 import { usePlanFigures } from '../../plan/usePlanFigures';
 import { writeMessage } from '../../plan/usePlanCommit';
+import { absoluteLink, usePublicSiteBase } from '../../../../components/clubs/orders/absoluteLink';
+import { CopyButton } from '../../../../components/clubs/orders/CopyButton';
 import { createFlowStore, useFlow } from './flowStore';
 import { useCopy } from './shared';
 
@@ -45,10 +47,18 @@ function usePublished(): { url: string | null; generated: boolean; busy: boolean
   return state.owner === source ? state : { url: null, generated: false, busy: false };
 }
 
+/**
+ * The club's link as it is shown, copied and written into the e-mail: the FULL address (the admin-set public
+ * address, else this app's origin) + the route the server's token belongs to (`/klub-objednavka/:token`) - the
+ * same helper the order panel uses. The server may hand out a bare path; it is never shown as one.
+ */
 function useLink(): string | null {
   const { order } = usePlannerModelState();
   const state = usePublished();
-  return state.url ?? order?.linkUrl ?? null;
+  const base = usePublicSiteBase();
+  const raw = state.url ?? order?.linkUrl ?? null;
+  const full = absoluteLink(raw, base);
+  return full === '' ? null : full;
 }
 
 function PublishBody() {
@@ -116,8 +126,11 @@ function PublishSide({ profileEmail, generated, link, figures }: { profileEmail:
       <div className="pub-kicker">02 / VYGENEROVÁNÍ A PUBLIKACE</div>
       <div className="pub-side-heading">Klubový přihlašovací formulář</div>
       <div className="pub-side-desc">Po publikaci získá klub stabilní soukromý odkaz. Sportovci se přihlašují na konkrétní sloty. Pozdější změny termínů se projeví ve stejném odkazu.</div>
-      <div className="pub-link" id="adaptive-link-label" data-testid="publish-link">
-        {link ?? (generated ? 'ODKAZ ZATÍM NEVZNIKÁ · ukázkový zdroj dat' : 'Odkaz zatím nevygenerován')}
+      <div className="pub-link-row">
+        <div className="pub-link" id="adaptive-link-label" data-testid="publish-link" data-url={link ?? ''}>
+          {link ?? (generated ? 'ODKAZ ZATÍM NEVZNIKÁ · ukázkový zdroj dat' : 'Odkaz zatím nevygenerován')}
+        </div>
+        <CopyButton text={link ?? ''} ariaLabel="Zkopírovat odkaz pro klub" testId="publish-link-copy" />
       </div>
       <div className="pub-actions">
         <button type="button" id="pub-see-form" onClick={() => act.openDialog({ kind: 'formPreview' })}>Náhled formuláře</button>
@@ -196,6 +209,10 @@ function EmailPreviewBody() {
       <div className="pub-kicker">PŘED PŘÍPADNÝM ODESLÁNÍM</div>
       <div className="pub-side-heading">Náhled e-mailu klubu</div>
       <p className="pub-side-desc">Komu: {profile.contactEmail || 'kontaktní e-mail není vyplněn'}<br />Předmět: {mail.subject}</p>
+      <div className="pub-link-row">
+        <div className="pub-link" data-testid="email-link" data-url={link ?? ''}>{link ?? 'Odkaz zatím nebyl vygenerován - vygenerujte ho v „Připravit formulář“.'}</div>
+        <CopyButton text={link ?? ''} ariaLabel="Zkopírovat odkaz pro klub" testId="email-link-copy" />
+      </div>
       <div className="pub-email-body" data-testid="email-draft">{mail.body}</div>
       <div className="pub-actions">
         <button type="button" className="primary" id="pub-copy-email" onClick={() => void copy(mail.body, 'Text e-mailu zkopírován.', 'Nepodařilo se zkopírovat; označte text ručně.')}>Kopírovat text e-mailu</button>

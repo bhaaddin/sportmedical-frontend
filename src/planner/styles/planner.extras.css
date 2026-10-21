@@ -101,3 +101,24 @@
 .sm-planner #dashboard.live-mode .club-unified-header.is-slim .club-user-bell .icon { width: 19px !important; height: 19px !important; }
 .sm-planner #dashboard.live-mode .club-unified-header.is-slim .club-user-avatar { width: 30px !important; height: 30px !important; }
 .sm-planner #dashboard.live-mode .club-unified-header.is-slim .club-user-name { font-size: 13px !important; }
+
+/* R11 - the club link (publish dialog and e-mail preview): the full address in a readable size, the copy button beside it. */
+.sm-planner .pub-link-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin: 13px 0;
+  flex-wrap: wrap;
+}
+.sm-planner .pub-link-row .pub-link {
+  flex: 1 1 150px;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #e6fbff;
+  display: flex;
+  align-items: center;
+  overflow-wrap: anywhere;
+}
+.sm-planner .pub-link-row .MuiButton-root { min-height: 44px; }

@@ -1,0 +1,40 @@
+/* R11: generate the club link in the planner finish/publish flow and read what is shown; then open it. */
+import { launch, newPage, login, findOrMakeClub, startClubOrder, shot, BASE, waitPlanner } from './lib.mjs';
+const browser = await launch();
+const page = await newPage(browser, 'desktop');
+await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE }).catch(() => {});
+await login(page);
+const club = (await (await import('./lib.mjs')).api(page, 'GET', '/api/clubs')).json.find((c) => c.name === 'ZZ test plánování');
+await startClubOrder(page, club.id, { 'Základní sportovní prohlídka': 2 });
+await shot(page, 'r11-0-planner');
+const launchBtn = page.locator('button:has-text("Připravit formulář"):visible').first();
+await launchBtn.click();
+await page.waitForTimeout(800);
+await shot(page, 'r11-1-publish');
+console.log('before:', (await page.locator('[data-testid=publish-link]').innerText()).trim());
+await page.click('#pub-generate');
+await page.waitForTimeout(2500);
+const shown = (await page.locator('[data-testid=publish-link]').innerText()).trim();
+console.log('after generate:', shown);
+await shot(page, 'r11-2-generated');
+await page.click('[data-testid=publish-link-copy]');
+await page.waitForTimeout(300);
+console.log('copy button state:', await page.locator('[data-testid=publish-link-copy]').getAttribute('data-copy-state'), '| clipboard:', (await page.evaluate(() => navigator.clipboard.readText()).catch((e) => 'ERR ' + e.message)).replace(/[A-Za-z0-9_-]{30,}/, '<tok>'));
+await shot(page, 'r11-2b-copied');
+await page.waitForTimeout(2300);
+console.log('state after 2.3 s:', await page.locator('[data-testid=publish-link-copy]').getAttribute('data-copy-state'));
+await page.click('#pub-copy');
+console.log('Kopírovat odkaz clipboard:', (await page.evaluate(() => navigator.clipboard.readText()).catch((e) => 'ERR ' + e.message)).replace(/[A-Za-z0-9_-]{30,}/, '<tok>'));
+await page.click('#pub-see-email');
+await page.waitForTimeout(600);
+console.log('email link line:', (await page.locator('[data-testid=email-draft]').innerText()).split('\n').filter((l) => /klub|ODKAZ/i.test(l)).join(' | '));
+await shot(page, 'r11-3-email');
+if (/^https?:\/\//.test(shown)) {
+  const p2 = await newPage(browser, 'desktop');
+  await p2.goto(shown.replace(/^https?:\/\/[^/]+/, BASE));
+  await p2.waitForTimeout(4000);
+  console.log('open link ->', (await p2.locator('body').innerText()).slice(0, 200).replace(/\s+/g, ' '));
+  await shot(p2, 'r11-4-opened');
+}
+console.log('errors', page.errors);
+await browser.close();

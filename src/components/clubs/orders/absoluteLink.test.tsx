@@ -48,15 +48,15 @@ describe('absoluteLink', () => {
 });
 
 describe('LinkCopyRow', () => {
-  it('shows the short public link and copies the full one with one click', async () => {
+  it('shows the FULL public link (R11: with https://) and copies it with one click', async () => {
     readSettings.mockResolvedValue({ 'pub.siteUrl': 'https://www.sportmedical.cz' });
     const user = userEvent.setup();
     render(<LinkCopyRow label="Odkaz na formulář" path="/klub-objednavka/tok" testId="row" />);
     await waitFor(() => expect(screen.getByTestId('row')).toHaveAttribute('data-url', 'https://www.sportmedical.cz/klub-objednavka/tok'));
-    expect(screen.getByTestId('row')).toHaveTextContent('www.sportmedical.cz/klub-objednavka/tok');
-    expect(screen.getByTestId('row')).not.toHaveTextContent('https://');
+    expect(screen.getByTestId('row')).toHaveTextContent('https://www.sportmedical.cz/klub-objednavka/tok');
     await user.click(screen.getByRole('button', { name: 'Zkopírovat: Odkaz na formulář' }));
     await waitFor(async () => expect(await navigator.clipboard.readText()).toBe('https://www.sportmedical.cz/klub-objednavka/tok'));
+    await waitFor(() => expect(screen.getByTestId('row-copy')).toHaveTextContent('Zkopírováno'));
   });
 
   it('uses this app origin while no public address is set', async () => {

@@ -2,18 +2,15 @@
  * A club link shown short and copied with one click. The address is always built by `absoluteLink`, so the form
  * link, the registration link and a block's link all read the same way (and use the admin-set public address).
  */
-import { Box, Button, Stack, Typography } from '@mui/material';
-import { ContentCopy } from '@mui/icons-material';
+import { Box, Stack, Typography } from '@mui/material';
 import toast from 'react-hot-toast';
-import { absoluteLink, shortLink, usePublicSiteBase } from './absoluteLink';
+import { absoluteLink, usePublicSiteBase } from './absoluteLink';
+import { copyToClipboard } from './clipboard';
+import { CopyButton } from './CopyButton';
 
 export async function copyText(text: string, ok = 'Odkaz zkopírován'): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast.success(ok);
-  } catch {
-    toast.error('Odkaz se nepodařilo zkopírovat');
-  }
+  if (await copyToClipboard(text)) toast.success(ok);
+  else toast.error('Odkaz se nepodařilo zkopírovat');
 }
 
 export function LinkCopyRow({ label, path, testId, big = false }: {
@@ -38,18 +35,9 @@ export function LinkCopyRow({ label, path, testId, big = false }: {
             fontFamily: 'monospace', fontSize: big ? 16 : 14, overflowWrap: 'anywhere', display: 'flex', alignItems: 'center',
           }}
         >
-          {url === '' ? 'Odkaz zatím není k dispozici.' : shortLink(url)}
+          {url === '' ? 'Odkaz zatím není k dispozici.' : url}
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<ContentCopy />}
-          disabled={url === ''}
-          onClick={() => void copyText(url)}
-          aria-label={`Zkopírovat: ${label}`}
-          sx={{ minHeight: 44, flexShrink: 0 }}
-        >
-          Zkopírovat
-        </Button>
+        <CopyButton text={url} ariaLabel={`Zkopírovat: ${label}`} testId={testId ? `${testId}-copy` : undefined} />
       </Stack>
     </Box>
   );

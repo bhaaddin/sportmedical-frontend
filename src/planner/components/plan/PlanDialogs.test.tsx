@@ -220,6 +220,32 @@ describe('publish · the real invitation, the e-mail draft on the clipboard, not
     expect(screen.getByText(/Na klubovou objednávku|Vyberte si požadované vyšetření/)).toBeInTheDocument();
   });
 
+  it('R11 - a bare path from the server is shown, copied and mailed as the FULL address, with a copy button beside it', async () => {
+    const source = ownerSource({ sessions: owner() });
+    vi.spyOn(source, 'publishForm').mockResolvedValue({ url: '/klub-objednavka/tok-123', generated: true });
+    mountPlanner(source);
+    await screen.findByTestId('planning-carousel');
+    fireEvent.click(document.querySelector('[data-publish-launch]')!);
+    const dialog = await screen.findByTestId('planner-dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vygenerovat odkaz' }));
+    const full = `${window.location.origin}/klub-objednavka/tok-123`;
+    await waitFor(() => expect(screen.getByTestId('publish-link')).toHaveTextContent(full));
+    // the copy button beside the link copies the full address and says so for two seconds
+    const beside = screen.getByTestId('publish-link-copy');
+    fireEvent.click(beside);
+    await waitFor(() => expect(clipboard.writeText).toHaveBeenLastCalledWith(full));
+    await waitFor(() => expect(beside).toHaveTextContent('Zkopírováno'));
+    // "Kopírovat odkaz" copies the same full address
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Kopírovat odkaz' }));
+    await waitFor(() => expect(clipboard.writeText).toHaveBeenLastCalledWith(full));
+    // the e-mail preview holds the full link, and so does the copied text
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Náhled e-mailu' }));
+    expect(await screen.findByTestId('email-draft')).toHaveTextContent(full);
+    expect(screen.getByTestId('email-link')).toHaveTextContent(full);
+    fireEvent.click(screen.getByRole('button', { name: 'Kopírovat text e-mailu' }));
+    await waitFor(() => expect(clipboard.writeText).toHaveBeenLastCalledWith(expect.stringContaining(full)));
+  });
+
   it('a failed link says why and keeps the dialog', async () => {
     const source = ownerSource({ sessions: owner() });
     vi.spyOn(source, 'publishForm').mockRejectedValue(new PlannerWriteError('network', 'Odkaz pro klub se nepodařilo vytvořit.'));
