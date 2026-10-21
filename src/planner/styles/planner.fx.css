@@ -82,3 +82,35 @@ html[data-motion='reduced'] .sm-planner .phone-month,
 html[data-motion='reduced'] .sm-planner .alternative-head ~ * {
   animation: plan-fade-in var(--sm-dur-quick, 140ms) ease-out both;
 }
+
+/* ── the need counter: the ring fills smoothly (the percentage is a typed property, so it can be transitioned) ── */
+@property --pct {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 0%;
+}
+html[data-motion='full'] .sm-planner .plan-card,
+html[data-motion='reduced'] .sm-planner .plan-card {
+  transition: transform 0.18s, box-shadow 0.18s, filter 0.18s, border-color 0.18s, --pct 360ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+/* ── "splněno": the ring closes, the card glows once and settles; the tick pops. Then calm. ── */
+@keyframes plan-done-glow {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--tone, currentColor) 70%, transparent), 0 4px 18px #000b; }
+  40% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--tone, currentColor) 28%, transparent), 0 0 34px color-mix(in srgb, var(--tone, currentColor) 70%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent, 0 4px 18px #000b; }
+}
+@keyframes plan-tick-pop {
+  0% { opacity: 0; transform: scale(0.4); }
+  60% { opacity: 1; transform: scale(1.18); }
+  100% { opacity: 1; transform: scale(1); }
+}
+html[data-motion='full'] .sm-planner .plan-card.just-done {
+  animation: plan-done-glow 1100ms var(--sm-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+html[data-motion='full'] .sm-planner .plan-card.just-done .plan-check {
+  animation: plan-tick-pop 520ms var(--sm-ease-pop, cubic-bezier(0.34, 1.4, 0.64, 1)) 120ms both;
+}
+html[data-motion='reduced'] .sm-planner .plan-card.just-done .plan-check {
+  animation: plan-fade-in var(--sm-dur-base, 320ms) ease-out both;
+}

@@ -30,6 +30,7 @@ import {
 import { useMotionPreference } from '../../motion/useMotionPreference';
 import { usePlannerActions, usePlannerSelector } from '../state/PlannerStoreProvider';
 import { Icon } from './Icons';
+import { TickNumber } from '../motion/TickNumber';
 import { usePlannerCtx, usePlannerModelState, usePlannerProfile } from './context';
 import { personsWord, type CategoryFigure } from './plan/orderFigures';
 import { orderSummary } from './plan/orderSummary';
@@ -149,6 +150,19 @@ function PlanCard({ figure: f, live, added, active, fresh, chart, restoring, onS
   const shown = previewing ? live : f;
   const done = f.done;
   const percent = shown.percent;
+  /* "Splněno": the moment a činnost is fulfilled the ring closes, the card glows and locks, then it is calm again. */
+  const wasDone = useRef(done);
+  const [justDone, setJustDone] = useState(false);
+  useEffect(() => {
+    if (done && !wasDone.current) {
+      setJustDone(true);
+      const timer = window.setTimeout(() => setJustDone(false), 1500);
+      wasDone.current = true;
+      return () => window.clearTimeout(timer);
+    }
+    wasDone.current = done;
+    return undefined;
+  }, [done]);
   const remainingText = previewing
     ? shown.remaining === 0 ? '✓ Tímto naplníte požadavek' : `Zbývá ${shown.remaining} osob`
     : done ? '✓ Požadavek splněn' : `Zbývá ${f.remaining} osob`;
@@ -158,7 +172,7 @@ function PlanCard({ figure: f, live, added, active, fresh, chart, restoring, onS
   return (
     <button
       type="button"
-      className={`plan-card${active ? ' is-selected' : ''}${done ? ' is-complete' : ''}${previewing ? ' is-previewing' : ''}${previewing && shown.remaining === 0 ? ' will-complete' : ''}${restoring ? ' focus-restoring' : ''}${fresh ? ' is-fresh' : ''}`}
+      className={`plan-card${active ? ' is-selected' : ''}${done ? ' is-complete' : ''}${previewing ? ' is-previewing' : ''}${previewing && shown.remaining === 0 ? ' will-complete' : ''}${restoring ? ' focus-restoring' : ''}${fresh ? ' is-fresh' : ''}${justDone ? ' just-done' : ''}`}
       data-plan-type={f.categoryId}
       data-fresh={fresh ? 'true' : undefined}
       style={{ '--tone': f.color, '--pct': `${Math.min(100, percent)}%` } as CSSProperties}
@@ -182,7 +196,7 @@ function PlanCard({ figure: f, live, added, active, fresh, chart, restoring, onS
           <span className="plan-card-body">
             <span className="plan-ring"><b>{percent}%</b></span>
             <span>
-              <strong className="plan-num">{shown.planned} <span>/ {f.requested}</span></strong>
+              <strong className="plan-num"><TickNumber value={shown.planned} /> <span>/ {f.requested}</span></strong>
               <small className="plan-remaining">{remainingText}</small>
               <small className="plan-duration">{f.slotMinutes} min / osoba · {timeLeft(shown.remainingMinutes)}</small>
             </span>

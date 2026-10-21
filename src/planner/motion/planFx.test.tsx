@@ -84,3 +84,32 @@ describe('planner.fx.css', () => {
     });
   });
 });
+
+describe('TickNumber', () => {
+  it('without the motion attribute (tests, no script) the number is simply the new number', async () => {
+    const { TickNumber } = await import('./TickNumber');
+    const { rerender, container } = render(<TickNumber value={7} />);
+    expect(container).toHaveTextContent('7');
+    rerender(<TickNumber value={12} />);
+    expect(container).toHaveTextContent('12');
+  });
+
+  it('under "vypnuto" and "omezené" it jumps; under "plné" it ticks and ends exactly on the value', async () => {
+    const { TickNumber } = await import('./TickNumber');
+    for (const mode of ['off', 'reduced']) {
+      document.documentElement.setAttribute('data-motion', mode);
+      const { rerender, container, unmount } = render(<TickNumber value={3} />);
+      rerender(<TickNumber value={9} />);
+      expect(container).toHaveTextContent('9');
+      unmount();
+    }
+    document.documentElement.setAttribute('data-motion', 'full');
+    const { rerender, container } = render(<TickNumber value={3} />);
+    expect(container).toHaveTextContent('3');
+    rerender(<TickNumber value={9} />);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700));
+    });
+    expect(container).toHaveTextContent('9');
+  });
+});
