@@ -245,13 +245,14 @@ export interface AgendaDetailModel {
 }
 
 /** `openAgendaDetail`: a club term (planning view, never reservations). */
-export function agendaDetailModel(ctx: PlannerContext, e: PlannerSession): AgendaDetailModel {
+export function agendaDetailModel(ctx: PlannerContext, e: PlannerSession, remainingOverride?: number): AgendaDetailModel {
   const c = categoryOrFallback(ctx, e.categoryId);
   const slot = slotMinutesOf(ctx, e.categoryId);
   const date = dateOf(e.date);
   const duration = Math.max(0, timeAsMinutes(e.end) - timeAsMinutes(e.start));
   const requested = demandOf(ctx, e.categoryId)?.requested ?? 0;
-  const remaining = Math.max(0, requested - plannedOf(ctx, e.categoryId));
+  /* The order's one calculation passes its own `remaining` (players, lanes, past terms); without it the model's pool sum. */
+  const remaining = remainingOverride ?? Math.max(0, requested - plannedOf(ctx, e.categoryId));
   const club = sourceFor(e) === 'club';
   const note = club
     ? `V objednávce zbývá naplánovat ${remaining} ${agendaSlotLabel(remaining)} pro tuto činnost.`

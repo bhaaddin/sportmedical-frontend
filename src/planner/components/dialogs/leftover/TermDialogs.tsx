@@ -55,6 +55,7 @@ import { usePlannerCtx, usePlannerModelState } from '../../context';
 import type { DialogContent, DialogRenderer } from '../../dialogRegistry';
 import { Icon } from '../../Icons';
 import { isTermOfOrder } from '../../left/agendaView';
+import { usePlanFigures } from '../../plan/usePlanFigures';
 import { writeMessage } from '../../plan/usePlanCommit';
 import { createFlowStore, useFlow } from '../plan/flowStore';
 import { AppointmentRecord } from '../reservation/useRecordOpener';
@@ -214,7 +215,8 @@ function ClubOrderOnly({ session }: { session: PlannerSession }) {
 
 function DraftBody({ session }: { session: PlannerSession }) {
   const ctx = usePlannerCtx();
-  const m = agendaDetailModel(ctx, session);
+  const { base } = usePlanFigures();
+  const m = agendaDetailModel(ctx, session, base.byId.get(session.categoryId)?.remaining);
   return (
     <div data-testid="term-draft">
       <div className="agenda-detail-hero" style={tone(m.tone)}>
