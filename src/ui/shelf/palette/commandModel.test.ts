@@ -105,6 +105,12 @@ describe('what is offered, and to whom', () => {
     expect(cashier).toContain('Účetní export');
   });
 
+  it('offers "Nový pacient" once: the action wins over the page that opens the same address', () => {
+    const rows = staticCommands(['patients.view', 'patients.register']).filter((c) => c.label === 'Nový pacient');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].group).toBe('action');
+  });
+
   it('names a page once even when the sidebar and the top level both list it', () => {
     const pages = staticCommands(['patients.view']).filter((c) => c.group === 'page');
     const addresses = pages.map((c) => `${c.to}|${JSON.stringify(c.state ?? null)}`);

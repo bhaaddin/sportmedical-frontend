@@ -54,6 +54,26 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
     }
   }, [open]);
 
+  /* The field has the focus every time the palette opens. `autoFocus` alone only works the first time: on a later open the
+     dialog's own focus trap got there first, and a Ctrl+K - Enter would have gone to the dialog and opened nothing. The field
+     is inside a portal that mounts after this effect, so it is asked for a few frames. */
+  useEffect(() => {
+    if (!open) return undefined;
+    let tries = 0;
+    let frame = 0;
+    const focus = () => {
+      const field = inputRef.current;
+      if (field !== null) {
+        field.focus();
+        if (document.activeElement === field) return;
+      }
+      tries += 1;
+      if (tries < 12) frame = requestAnimationFrame(focus);
+    };
+    frame = requestAnimationFrame(focus);
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+
   /* The first row is the active one whenever the list changes under the typing. */
   useEffect(() => { setActive(0); }, [query]);
 

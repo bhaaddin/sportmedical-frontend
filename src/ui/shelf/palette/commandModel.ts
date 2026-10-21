@@ -177,7 +177,8 @@ export function staticCommands(held: readonly string[]): Command[] {
   const out: Command[] = [];
   for (const c of [...ACTIONS, ...PAGES]) {
     if (!allowed(c)) continue;
-    const key = `${c.group}|${c.to}|${JSON.stringify(c.state ?? null)}`;
+    /* Same address and state = the same thing: an action wins over the page it opens ("Nový pacient"). */
+    const key = `${c.to}|${JSON.stringify(c.state ?? null)}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(c);

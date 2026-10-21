@@ -320,7 +320,7 @@ function OwnerDashboard() {
                       {avatarLead(p)}
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography sx={{ fontSize: 15, fontWeight: 600 }}>{p.lastName} {p.firstName}</Typography>
-                        <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>nar. {czechDob(p.dateOfBirth)}</Typography>
+                        {czechDob(p.dateOfBirth) !== '' && <Typography sx={{ fontSize: 14, color: 'text.secondary' }}>nar. {czechDob(p.dateOfBirth)}</Typography>}
                       </Box>
                       <ArrowForward sx={{ fontSize: 18, color: 'text.disabled' }} />
                     </ListItemButton>
@@ -389,7 +389,7 @@ function OwnerDashboard() {
             <EntityCard
               key={p.id}
               entity={{ kind: 'patient', id: p.id, label: `${p.lastName} ${p.firstName}` }}
-              subtitle={`nar. ${czechDob(p.dateOfBirth)}`}
+              subtitle={czechDob(p.dateOfBirth) === '' ? undefined : `nar. ${czechDob(p.dateOfBirth)}`}
             />
           ))}
         </Shelf>

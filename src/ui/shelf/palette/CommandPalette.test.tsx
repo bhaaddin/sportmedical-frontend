@@ -283,6 +283,21 @@ describe('the keyboard', () => {
     expect(input()).toHaveValue('');
     expect(within(screen.getByRole('listbox')).getAllByRole('option').length).toBeGreaterThan(3);
   });
+
+  it('has the field focused on every open, not only the first (Ctrl+K, Enter must work the second time too)', async () => {
+    const onClose = vi.fn();
+    const tree = (open: boolean) => (
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter><CommandPalette open={open} onClose={onClose} /></MemoryRouter>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(tree(true));
+    await waitFor(() => expect(input()).toHaveFocus());
+    rerender(tree(false));
+    await waitFor(() => expect(screen.queryByRole('combobox')).toBeNull());
+    rerender(tree(true));
+    await waitFor(() => expect(input()).toHaveFocus());
+  });
 });
 
 describe('on a phone', () => {
