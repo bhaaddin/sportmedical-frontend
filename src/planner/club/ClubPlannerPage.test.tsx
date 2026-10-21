@@ -6,7 +6,9 @@ import type { Calendar, PreviewDay } from '../../api/bookingContracts';
 import type { ClubBlockView } from '../../api/clubBlocks';
 import type { PickSession } from '../../components/clubs/order/pickSession';
 import { setViewport, VIEWPORTS } from '../../test/viewport';
-import { addDaysToDateOnly } from '../../utils/time';
+import { addDaysToDateOnly, pragueDateKey } from '../../utils/time';
+import { createInitialState } from '../state/plannerState';
+import { selectVisibleRange } from '../state/selectors';
 import { boardSettings } from '../components/board/boardSettings';
 import { DemoDataSource } from '../data/DemoDataSource';
 
@@ -559,6 +561,31 @@ describe('everything the old club page offered is reachable from the overview', 
     expect(within(overview).getByTestId('club-empty')).toHaveTextContent('Tento klub zatím nemá hromadnou rezervaci.');
     expect(within(overview).getByTestId('club-orders-list')).toHaveTextContent('Zatím žádná objednávka');
     expect(screen.getByRole('dialog', { name: 'Přehled klubu a objednávek' })).toBeInTheDocument();
+  });
+});
+
+describe('loading the club screen', () => {
+  it('shows its loading state in the page box until the club and its orders are here, then the planner', async () => {
+    let answer: (rows: ClubOrderView[]) => void = () => undefined;
+    vi.mocked(clubOrdersApi.list).mockImplementation(() => new Promise((resolve) => (answer = resolve)));
+    mount();
+    const loading = await screen.findByTestId('club-planner-loading');
+    expect(loading).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByTestId('planner-page')).toBeNull();
+    answer([orderA, orderA2, orderB, orderI, orderX]);
+    expect(await screen.findByTestId('planner-page')).toHaveAttribute('data-mode', 'club');
+    expect(screen.queryByTestId('club-planner-loading')).toBeNull();
+    /* the orders were read once: the entry warm-up and the screen share the request */
+    expect(vi.mocked(clubOrdersApi.list).mock.calls.filter(([f]) => (f as { clubId?: string } | undefined)?.clubId === 'club-1')).toHaveLength(1);
+  });
+
+  it("starts the stage's reads as soon as the orders are known: the visible range of the order's window", async () => {
+    mount();
+    await screen.findByTestId('planner-page');
+    /* orderA's window is 2099-11-05: the month and week around it, for its calendar */
+    const range = selectVisibleRange(createInitialState({ today: pragueDateKey(new Date()), selectedDate: '2099-11-05' }));
+    await waitFor(() => expect(appointmentsApi.range).toHaveBeenCalledWith(range.from, range.to, ['c1']));
+    expect(workingHoursApi.preview).toHaveBeenCalledWith('c1', expect.any(String), expect.any(String));
   });
 });
 
