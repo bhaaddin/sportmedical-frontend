@@ -205,7 +205,7 @@ describe('"today" on the shelves', () => {
 
     const card = await shelf('Objednaní');
     expect(await card.findByText('Na dnešek nikdo objednaný.')).toBeInTheDocument();
-    expect(card.getByRole('link', { name: 'Objednat termín' })).toHaveAttribute('href', '/planovani');
+    expect(card.getByRole('button', { name: 'Objednat termín' })).toBeInTheDocument();
   });
 });
 

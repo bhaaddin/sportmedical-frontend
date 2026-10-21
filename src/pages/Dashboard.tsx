@@ -347,7 +347,7 @@ function OwnerDashboard() {
           maxHeight="min(46dvh, 440px)"
           loading={loading}
           empty={booked.length === 0}
-          emptyState={{ text: 'Na dnešek nikdo objednaný.', action: { label: 'Objednat termín', to: '/planovani', state: { newAppointment: Date.now() } } }}
+          emptyState={{ text: 'Na dnešek nikdo objednaný.', action: { label: 'Objednat termín', onClick: () => navigate('/planovani', { state: { newAppointment: Date.now() } }) } }}
           viewAll={{ to: '/dnes', label: 'Dnešní přehled' }}
         >
           {booked.map(row)}

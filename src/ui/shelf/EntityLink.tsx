@@ -143,7 +143,7 @@ function useAccess(entity: EntityRef): boolean {
 export function EntityChip({ entity, peek = true, onNavigate, size = 'md' }: Common & { size?: 'sm' | 'md' }) {
   const allowed = useAccess(entity);
   const target = entityTarget(entity);
-  const anchor = useRef<HTMLAnchorElement | null>(null);
+  const [anchorEl, setAnchorEl] = useState<HTMLAnchorElement | null>(null);
   const popId = useId();
   const { open, handlers, keepOpen } = usePeekState(peek && allowed);
   const Icon = ENTITY_ICON[entity.kind];
@@ -174,7 +174,7 @@ export function EntityChip({ entity, peek = true, onNavigate, size = 'md' }: Com
     <>
       <Box
         component={RouterLink}
-        ref={anchor}
+        ref={setAnchorEl}
         to={target.to}
         state={target.state}
         data-entity={entity.kind}
@@ -192,7 +192,7 @@ export function EntityChip({ entity, peek = true, onNavigate, size = 'md' }: Com
       >
         {pill}
       </Box>
-      {open && anchor.current !== null && <PeekCard entity={entity} anchorEl={anchor.current} id={popId} keepOpen={keepOpen} />}
+      {open && anchorEl !== null && <PeekCard entity={entity} anchorEl={anchorEl} id={popId} keepOpen={keepOpen} />}
     </>
   );
 }
@@ -200,7 +200,7 @@ export function EntityChip({ entity, peek = true, onNavigate, size = 'md' }: Com
 export function EntityLink({ entity, children, peek = true, onNavigate }: Common & { children?: ReactNode }) {
   const allowed = useAccess(entity);
   const target = entityTarget(entity);
-  const anchor = useRef<HTMLAnchorElement | null>(null);
+  const [anchorEl, setAnchorEl] = useState<HTMLAnchorElement | null>(null);
   const popId = useId();
   const { open, handlers, keepOpen } = usePeekState(peek && allowed);
   const text = children ?? entity.label;
@@ -210,7 +210,7 @@ export function EntityLink({ entity, children, peek = true, onNavigate }: Common
     <>
       <Box
         component={RouterLink}
-        ref={anchor}
+        ref={setAnchorEl}
         to={target.to}
         state={target.state}
         data-entity={entity.kind}
@@ -227,7 +227,7 @@ export function EntityLink({ entity, children, peek = true, onNavigate }: Common
       >
         {text}
       </Box>
-      {open && anchor.current !== null && <PeekCard entity={entity} anchorEl={anchor.current} id={popId} keepOpen={keepOpen} />}
+      {open && anchorEl !== null && <PeekCard entity={entity} anchorEl={anchorEl} id={popId} keepOpen={keepOpen} />}
     </>
   );
 }

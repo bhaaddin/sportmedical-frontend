@@ -81,15 +81,15 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
     }
   };
 
-  let rowIndex = -1;
+  /* The row number of a command in the flat order the arrow keys walk. */
+  const indexOfCommand = new Map(flat.map((c, i) => [c.id, i]));
   const renderSection = (section: CommandSection) => (
     <Box key={section.id} role="group" aria-labelledby={`${listId}-h-${section.id}`} sx={{ pb: 0.5 }}>
       <Typography id={`${listId}-h-${section.id}`} sx={{ px: 2, pt: 1.25, pb: 0.5, fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', ...MUTED_SX }}>
         {section.title}
       </Typography>
       {section.commands.map((command) => {
-        rowIndex += 1;
-        const index = rowIndex;
+        const index = indexOfCommand.get(command.id) ?? 0;
         const selected = index === active;
         return (
           <Box
