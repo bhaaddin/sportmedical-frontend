@@ -431,4 +431,61 @@ action) - add to them, do not reorder; each has a test per branch.
 
 ## 10. Measured (Phase 1)
 
-See the section appended by the verification run below (bundle, timings, screenshots).
+Branch `ui/shelf` from `claude/clean` 100c7fd, not pushed. Own headless Chromium against a Vite dev server on the dev API (the machine was
+busy with other agents, so absolute times are an upper bound). Raw numbers: `design/shelf/report.json`.
+
+**Bundle** (brotli, `npm run build:check`; before = 100c7fd, after = this branch; `PRERENDER_API_URL=off npm run build` passes)
+
+| Group | Before | After | |
+|---|---|---|---|
+| application entry | 257.8 kB | 258.7 kB | +0.9 (the shortcut listener and a `lazy()`) |
+| public entry | 317.6 kB | 318.4 kB | +0.8 |
+| sign-in | 5.6 kB | 5.6 kB | - |
+| staff portal (shell) | 64.2 kB | 63.2 kB | -1.0 (the old palette left the shell) |
+| **Přehled** | 43.4 kB | **63.2 kB** | **+19.8, intended**: the shelf system (`shelf` chunk 10.6), recents/entities (2.7), what the attention shelf reads (club orders 2.3, invoice rules 1.5, ...) - every later page reuses these chunks. Baseline raised in `scripts/bundle-budget.json` (44 401 -> 64 683 B), the others pass on the old numbers |
+| planner | 234.0 kB | 234.5 kB | +0.5 |
+| command palette (lazy) | - | 5.6 kB | fetched in idle time after the first paint, never in a first load |
+| peek card's data (lazy) | - | 1.8 kB | fetched on the first hover or focus of a chip |
+
+Lesson that cost 31 kB in the entry before it was found: `@popperjs/core` had no vendor group, so the bundler put it in a shared chunk with the
+API (`appointments`, zod ~100 kB raw) and the MUI vendor chunk imported that - **every** entry then downloaded zod. `vite.config.ts` now
+puts `@popperjs` in the `mui` group. If `app-entry` jumps in a future change, `node scripts/chunk-report.mjs` shows who imports what.
+
+**Interaction timing** (`scripts/shelf-check.mjs`; dev server, so the first open includes fetching the palette chunk from Vite)
+
+| | 390x844 | 820x1180 | 1440x900 | 1920x1080 |
+|---|---|---|---|---|
+| Ctrl+K -> palette open, field focused | 349 ms | 371 ms | 368 ms | 368 ms |
+| search button -> open (second open) | 88 ms | 89 ms | 95 ms | 92 ms |
+| type "Test" -> first patient row (200 ms debounce + server) | 527 ms | 538 ms | 523 ms | 532 ms |
+| ArrowDown -> selection moves | same frame | same frame | same frame | same frame |
+| Enter on "Nová objednávka" -> calendar route | 34 ms | 31 ms | 32 ms | 34 ms |
+| Esc -> palette gone (exit transition) | 233 ms | 223 ms | 226 ms | 227 ms |
+| pointer arrives on a chip -> peek in the document | - | - | 384 ms | 379 ms |
+| ... -> facts in the peek (one request) | - | - | 408 ms | 402 ms |
+
+(The peek's designed pause is 350 ms; the rest is the render.) A figure counts up once (`CountUp`), the cascade is 22 ms per card for at most 14
+cards, a press dips in one frame.
+
+**Checks that ran green** (4 viewports x Přehled, Pacienti, a patient's card, plus a populated pass from mocks in a private context)
+- the document never scrolls (vertically or sideways) - 12 of 12; nothing is clipped by the region's right edge;
+- no console error, no page error, no failed request;
+- every touch target in the page is 44 px at 390 and 820 (phone, tablet); at 1440 and 1920 nothing is under 32 px except the register's
+  16 px-high name links (the whole row is the target there; listed as a NOTE, not a failure);
+- one h1 per page, every shelf a region named by its heading;
+- the palette: Ctrl+K, the button, type, arrows, Esc, Enter - on all four viewports; the peek: mouse and keyboard (Tab opens, Esc closes);
+- one accent swap through Nastavení (Fialová): the rail, the count pill and the primary button all moved, then put back;
+- the Animace setting: `vypnuto` leaves no inline transform/opacity on a shelf, `omezené` writes no transform, `plné` settles clean;
+- populated: five attention cards (overdue invoice, no paperwork today, club inquiry, registrations, failed messages), the most urgent first,
+  five rows of today's work, at 390, 820, 1440 and 1920.
+
+**Tests**: `npm run typecheck` clean; the whole suite **7 771 passed, 7 skipped (as before), 423 files** (before: 7 654 / 414); the 16 files this work
+added or changed hold 249 tests (`src/ui/shelf/*`, `UniversalSearch`, `Dashboard`, `PatientList.shelf`, `PatientCard.shelf`). `npm run build` and
+`npm run build:check` pass.
+
+**Screenshots** (`design/shelf/*.jpg`, JPEG q82): `prehled-`, `patients-`, `patient-` x 390x844, 820x1180, 1440x900, 1920x1080;
+`palette-open-`, `palette-typed-` x 4; `peek-` x 2; `prehled-accent-default-` / `-purple-`; `prehled-populated-` x 4 (**mocked answers**, not the dev data).
+
+**Not verified**: Safari, Firefox, a real phone or touch (the pointer rules are tested with a mouse and synthetic touch events); a production build
+under load (the numbers are a dev server); the settings pages (Phase 2); a screen reader (the structure - regions, headings, `combobox` /
+`option`, named controls - is asserted, but nobody listened to it).

@@ -1,0 +1,414 @@
+{
+  "base": "http://localhost:3101",
+  "at": "2026-10-21T09:51:42.673Z",
+  "pages": {
+    "390x844 prehled": {
+      "regionScroll": 871,
+      "shelves": [
+        {
+          "id": "today-figures",
+          "state": "ready",
+          "heading": "Dnes"
+        },
+        {
+          "id": "attention",
+          "state": "ready",
+          "heading": "Vyžaduje pozornost"
+        },
+        {
+          "id": "find-patient",
+          "state": "ready",
+          "heading": "Najít pacienta"
+        },
+        {
+          "id": "booked",
+          "state": "empty",
+          "heading": "Objednaní"
+        },
+        {
+          "id": "waiting",
+          "state": "empty",
+          "heading": "Čekárna"
+        },
+        {
+          "id": "recents",
+          "state": "empty",
+          "heading": "Připnuté a nedávné"
+        },
+        {
+          "id": "new-patients",
+          "state": "ready",
+          "heading": "Nově v kartotéce"
+        }
+      ]
+    },
+    "390x844 patients": {
+      "regionScroll": 602,
+      "shelves": [
+        {
+          "id": "register",
+          "state": "ready",
+          "heading": "Kartotéka"
+        }
+      ]
+    },
+    "390x844 patient": {
+      "regionScroll": 1452,
+      "shelves": [
+        {
+          "id": "related",
+          "state": "ready",
+          "heading": "Související"
+        },
+        {
+          "id": "personal",
+          "state": "ready",
+          "heading": "Osobní údaje"
+        },
+        {
+          "id": "visits",
+          "state": "ready",
+          "heading": "Historie návštěv"
+        },
+        {
+          "id": "results",
+          "state": "ready",
+          "heading": "Výsledky"
+        },
+        {
+          "id": "next",
+          "state": "ready",
+          "heading": "Příští termín"
+        },
+        {
+          "id": "alerts",
+          "state": "ready",
+          "heading": "Upozornění"
+        }
+      ]
+    },
+    "820x1180 prehled": {
+      "regionScroll": 269,
+      "shelves": [
+        {
+          "id": "today-figures",
+          "state": "ready",
+          "heading": "Dnes"
+        },
+        {
+          "id": "attention",
+          "state": "ready",
+          "heading": "Vyžaduje pozornost"
+        },
+        {
+          "id": "find-patient",
+          "state": "ready",
+          "heading": "Najít pacienta"
+        },
+        {
+          "id": "booked",
+          "state": "empty",
+          "heading": "Objednaní"
+        },
+        {
+          "id": "waiting",
+          "state": "empty",
+          "heading": "Čekárna"
+        },
+        {
+          "id": "recents",
+          "state": "empty",
+          "heading": "Připnuté a nedávné"
+        },
+        {
+          "id": "new-patients",
+          "state": "ready",
+          "heading": "Nově v kartotéce"
+        }
+      ]
+    },
+    "820x1180 patients": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "register",
+          "state": "ready",
+          "heading": "Kartotéka"
+        }
+      ]
+    },
+    "820x1180 patient": {
+      "regionScroll": 835,
+      "shelves": [
+        {
+          "id": "related",
+          "state": "ready",
+          "heading": "Související"
+        },
+        {
+          "id": "personal",
+          "state": "ready",
+          "heading": "Osobní údaje"
+        },
+        {
+          "id": "visits",
+          "state": "ready",
+          "heading": "Historie návštěv"
+        },
+        {
+          "id": "results",
+          "state": "ready",
+          "heading": "Výsledky"
+        },
+        {
+          "id": "next",
+          "state": "ready",
+          "heading": "Příští termín"
+        },
+        {
+          "id": "alerts",
+          "state": "ready",
+          "heading": "Upozornění"
+        }
+      ]
+    },
+    "1440x900 prehled": {
+      "regionScroll": 99,
+      "shelves": [
+        {
+          "id": "today-figures",
+          "state": "ready",
+          "heading": "Dnes"
+        },
+        {
+          "id": "attention",
+          "state": "ready",
+          "heading": "Vyžaduje pozornost"
+        },
+        {
+          "id": "find-patient",
+          "state": "ready",
+          "heading": "Najít pacienta"
+        },
+        {
+          "id": "booked",
+          "state": "empty",
+          "heading": "Objednaní"
+        },
+        {
+          "id": "waiting",
+          "state": "empty",
+          "heading": "Čekárna"
+        },
+        {
+          "id": "recents",
+          "state": "empty",
+          "heading": "Připnuté a nedávné"
+        },
+        {
+          "id": "new-patients",
+          "state": "ready",
+          "heading": "Nově v kartotéce"
+        }
+      ]
+    },
+    "1440x900 patients": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "register",
+          "state": "ready",
+          "heading": "Kartotéka"
+        }
+      ]
+    },
+    "1440x900 patient": {
+      "regionScroll": 391,
+      "shelves": [
+        {
+          "id": "related",
+          "state": "ready",
+          "heading": "Související"
+        },
+        {
+          "id": "personal",
+          "state": "ready",
+          "heading": "Osobní údaje"
+        },
+        {
+          "id": "visits",
+          "state": "ready",
+          "heading": "Historie návštěv"
+        },
+        {
+          "id": "results",
+          "state": "ready",
+          "heading": "Výsledky"
+        },
+        {
+          "id": "next",
+          "state": "ready",
+          "heading": "Příští termín"
+        },
+        {
+          "id": "alerts",
+          "state": "ready",
+          "heading": "Upozornění"
+        }
+      ]
+    },
+    "1920x1080 prehled": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "today-figures",
+          "state": "ready",
+          "heading": "Dnes"
+        },
+        {
+          "id": "attention",
+          "state": "ready",
+          "heading": "Vyžaduje pozornost"
+        },
+        {
+          "id": "find-patient",
+          "state": "ready",
+          "heading": "Najít pacienta"
+        },
+        {
+          "id": "booked",
+          "state": "empty",
+          "heading": "Objednaní"
+        },
+        {
+          "id": "waiting",
+          "state": "empty",
+          "heading": "Čekárna"
+        },
+        {
+          "id": "recents",
+          "state": "empty",
+          "heading": "Připnuté a nedávné"
+        },
+        {
+          "id": "new-patients",
+          "state": "ready",
+          "heading": "Nově v kartotéce"
+        }
+      ]
+    },
+    "1920x1080 patients": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "register",
+          "state": "ready",
+          "heading": "Kartotéka"
+        }
+      ]
+    },
+    "1920x1080 patient": {
+      "regionScroll": 211,
+      "shelves": [
+        {
+          "id": "related",
+          "state": "ready",
+          "heading": "Související"
+        },
+        {
+          "id": "personal",
+          "state": "ready",
+          "heading": "Osobní údaje"
+        },
+        {
+          "id": "visits",
+          "state": "ready",
+          "heading": "Historie návštěv"
+        },
+        {
+          "id": "results",
+          "state": "ready",
+          "heading": "Výsledky"
+        },
+        {
+          "id": "next",
+          "state": "ready",
+          "heading": "Příští termín"
+        },
+        {
+          "id": "alerts",
+          "state": "ready",
+          "heading": "Upozornění"
+        }
+      ]
+    }
+  },
+  "timing": {
+    "390x844": {
+      "openByShortcutMs": 349,
+      "typeToPatientRowMs": 527,
+      "closeByEscapeMs": 233,
+      "openByButtonMs": 88,
+      "enterToRouteMs": 34
+    },
+    "820x1180": {
+      "openByShortcutMs": 371,
+      "typeToPatientRowMs": 538,
+      "closeByEscapeMs": 223,
+      "openByButtonMs": 89,
+      "enterToRouteMs": 31
+    },
+    "1440x900": {
+      "openByShortcutMs": 368,
+      "typeToPatientRowMs": 523,
+      "closeByEscapeMs": 226,
+      "openByButtonMs": 95,
+      "enterToRouteMs": 32,
+      "peekOpenAfterHoverMs": 384,
+      "peekFactsMs": 408
+    },
+    "1920x1080": {
+      "openByShortcutMs": 368,
+      "typeToPatientRowMs": 532,
+      "closeByEscapeMs": 227,
+      "openByButtonMs": 92,
+      "enterToRouteMs": 34,
+      "peekOpenAfterHoverMs": 379,
+      "peekFactsMs": 402
+    }
+  },
+  "accent": {
+    "before": {
+      "rail": "linear-gradient(90deg, rgba(0, 230, 228, 0.9) 0%, rgba(0, 230, 228, 0.35) 38%, rgba(0, 230, 228, 0) 92%)",
+      "count": "rgb(35, 242, 231)",
+      "primary": "linear-gradient(105deg, rgb(36, 248, 224), rgb(6, 203, 187))|rgba(0, 0, 0, 0)"
+    },
+    "after": {
+      "rail": "linear-gradient(90deg, rgba(183, 147, 245, 0.9) 0%, rgba(183, 147, 245, 0.35) 38%, rgba(183, 147, 245, 0) 92%)",
+      "count": "rgb(193, 170, 242)",
+      "primary": "linear-gradient(105deg, rgb(190, 171, 244), rgb(172, 142, 241))|rgba(0, 0, 0, 0)"
+    }
+  },
+  "motion": {
+    "vypnuto": {
+      "attr": "off",
+      "styled": [],
+      "count": 0
+    },
+    "omezené": {
+      "attr": "reduced",
+      "styled": [],
+      "count": 0
+    },
+    "plné": {
+      "attr": "full",
+      "styled": [],
+      "count": 0
+    }
+  },
+  "failures": [],
+  "notes": [
+    "1440x900 patients: 7 target(s) under 32 px: a 78x16 Petr Dvořák | a 70x16 Test Etapa | a 66x16 Jan Novák | a 115x16 Tomáš Procházka",
+    "1920x1080 patients: 7 target(s) under 32 px: a 78x16 Petr Dvořák | a 70x16 Test Etapa | a 66x16 Jan Novák | a 115x16 Tomáš Procházka"
+  ]
+}

@@ -191,8 +191,8 @@ async function checkPage(ctxFactory, vp, name, label = '') {
   }
   await openPage(page, name, href);
 
-  const shot = join(OUT, `${name}${label}-${vp.label}.png`);
-  await page.screenshot({ path: shot });
+  const shot = join(OUT, `${name}${label}-${vp.label}.jpg`);
+  await page.screenshot({ path: shot, type: 'jpeg', quality: 82 });
   const m = await page.evaluate(measurePage);
   report.pages[where] = { regionScroll: m.regionScroll, shelves: m.shelves };
 
@@ -248,7 +248,7 @@ async function paletteAndPeek(vp) {
   const focused = await page.evaluate(() => document.activeElement?.getAttribute('role') === 'combobox');
   if (!focused) fail(where, 'the search field is not focused when the palette opens');
   else ok(where, `Ctrl+K opens the palette in ${timing.openByShortcutMs} ms with the field focused`);
-  await page.screenshot({ path: join(OUT, `palette-open-${vp.label}.png`) });
+  await page.screenshot({ path: join(OUT, `palette-open-${vp.label}.jpg`), type: 'jpeg', quality: 82 });
 
   const optionsBefore = await page.locator('[role=option]').count();
   if (optionsBefore < 3) fail(where, `the opening view lists ${optionsBefore} rows`);
@@ -261,7 +261,7 @@ async function paletteAndPeek(vp) {
     .then(() => { timing.typeToPatientRowMs = Date.now() - t1; })
     .catch(() => fail(where, 'typing "Test" brought no patient row'));
   await page.waitForTimeout(500);
-  await page.screenshot({ path: join(OUT, `palette-typed-${vp.label}.png`) });
+  await page.screenshot({ path: join(OUT, `palette-typed-${vp.label}.jpg`), type: 'jpeg', quality: 82 });
 
   /* 3. the arrows move the selection, the active descendant follows */
   const before = await page.evaluate(() => document.querySelector('[role=combobox]').getAttribute('aria-activedescendant'));
@@ -333,7 +333,7 @@ async function peek(vp) {
   const m = await page.evaluate(() => window.__peek);
   const openMs = Math.round(m.shown - m.enter);
   const factsMs = Math.round(m.facts - m.enter);
-  await page.screenshot({ path: join(OUT, `peek-${vp.label}.png`) });
+  await page.screenshot({ path: join(OUT, `peek-${vp.label}.jpg`), type: 'jpeg', quality: 82 });
   report.timing[vp.label] = { ...(report.timing[vp.label] ?? {}), peekOpenAfterHoverMs: openMs, peekFactsMs: factsMs };
   ok(where, `the peek is in the document ${openMs} ms after the pointer arrives (350 ms is the designed pause) and has its facts after ${factsMs} ms`);
   if (openMs < 330) fail(where, `the peek opened after ${openMs} ms: faster than its designed pause`);
@@ -386,7 +386,7 @@ async function accentSwap() {
 
   await openPage(page, 'prehled');
   const before = await paint();
-  await page.screenshot({ path: join(OUT, `prehled-accent-default-${vp.label}.png`) });
+  await page.screenshot({ path: join(OUT, `prehled-accent-default-${vp.label}.jpg`), type: 'jpeg', quality: 82 });
 
   await page.goto(`${BASE}/settings`);
   await page.waitForLoadState('networkidle').catch(() => undefined);
@@ -396,7 +396,7 @@ async function accentSwap() {
   await page.waitForTimeout(500);
   await openPage(page, 'prehled');
   const after = await paint();
-  await page.screenshot({ path: join(OUT, `prehled-accent-purple-${vp.label}.png`) });
+  await page.screenshot({ path: join(OUT, `prehled-accent-purple-${vp.label}.jpg`), type: 'jpeg', quality: 82 });
 
   for (const key of ['rail', 'count', 'primary']) {
     if (before[key] === null || after[key] === null) fail(where, `could not measure ${key}`);
@@ -506,7 +506,7 @@ async function populatedPass() {
     const problems = [];
     watch(page, problems);
     await openPage(page, 'prehled');
-    await page.screenshot({ path: join(OUT, `prehled-populated-${vp.label}.png`) });
+    await page.screenshot({ path: join(OUT, `prehled-populated-${vp.label}.jpg`), type: 'jpeg', quality: 82 });
     const m = await page.evaluate(measurePage);
     if (m.docScrollY > 1) fail(`${vp.label} ${where}`, `the document scrolls by ${m.docScrollY}px`);
     if (m.clipped.length > 0) fail(`${vp.label} ${where}`, `content is clipped: ${m.clipped.join(' | ')}`);
