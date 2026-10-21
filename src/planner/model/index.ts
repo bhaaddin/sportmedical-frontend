@@ -16,3 +16,4 @@ export * from './edit';
 export * from './overlays';
 export * from './mini';
 export * from './activityGroups';
+export * from './services';

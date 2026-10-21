@@ -94,7 +94,7 @@ export function categoryOf(activity: Activity, service: ClinicService | undefine
     name: activity.name,
     iconKey: DEFAULT_ICON,
     color,
-    ...(service ? { subtitle: service.name } : {}),
+    ...(service ? { subtitle: service.name, serviceId: service.id, serviceName: service.name } : {}),
     slotMinutes: activity.durationMinutes,
     parallelCapacity: activity.parallelCapacity && activity.parallelCapacity > 0 ? activity.parallelCapacity : 1,
     priceCzk: activity.priceCzk ?? null,

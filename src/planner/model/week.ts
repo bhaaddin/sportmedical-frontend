@@ -7,6 +7,7 @@
  * placed the first demo week by hand) is deliberately not ported.
  */
 import { categoryOrFallback, orderCategoryIds, sourceFor } from './context';
+import { inFilter } from './services';
 import {
   addDays,
   dateOf,
@@ -101,7 +102,7 @@ export function weekEventsModel(
     (e) =>
       isInWeek(weekStart, e.date) &&
       (sourceFor(e) === 'public' || ordered.includes(e.categoryId)) &&
-      (filter === 'all' || e.categoryId === filter),
+      inFilter(ctx.categories, filter, e.categoryId),
   );
   for (const e of visible) {
     const col = Math.round((dateOf(e.date).getTime() - ws.getTime()) / 86400000);
@@ -136,7 +137,7 @@ export function weekEventsModel(
 export function alternateEvents(ctx: PlannerContext, filter: CategoryId | 'all'): PlannerSession[] {
   const ordered = orderCategoryIds(ctx);
   return ctx.sessions
-    .filter((e) => (sourceFor(e) === 'public' || ordered.includes(e.categoryId)) && (filter === 'all' || e.categoryId === filter))
+    .filter((e) => (sourceFor(e) === 'public' || ordered.includes(e.categoryId)) && inFilter(ctx.categories, filter, e.categoryId))
     .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
 }
 

@@ -18,6 +18,7 @@ import {
   sourceFor,
 } from './context';
 import { plannedOf } from './order';
+import { inFilter } from './services';
 import {
   addDays,
   agendaHours,
@@ -193,7 +194,7 @@ export function agendaFullListModel(ctx: PlannerContext, f: AgendaFullFilter): A
   const filtered = agendaEvents(ctx).filter((e) => {
     const name = categoryOrFallback(ctx, e.categoryId).name;
     const searchable = `${name} ${dayCode(e.date)} ${printable(dateOf(e.date))} ${e.date} ${e.start} ${e.end}`.toLocaleLowerCase('cs-CZ');
-    return (f.categoryId === 'all' || e.categoryId === f.categoryId) && (!f.date || e.date === f.date) && (!q || searchable.includes(q));
+    return inFilter(ctx.categories, f.categoryId, e.categoryId) && (!f.date || e.date === f.date) && (!q || searchable.includes(q));
   });
   const totalSlots = filtered.reduce((n, e) => n + Math.max(0, Number(e.capacity) || 0), 0);
   const minutes = filtered.reduce((n, e) => n + Math.max(0, timeAsMinutes(e.end) - timeAsMinutes(e.start)), 0);

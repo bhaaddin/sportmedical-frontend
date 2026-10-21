@@ -19,6 +19,7 @@ import { isTerminalStatus, statusTally, type Calendar, type DayAppointment, type
 import { shownPrice } from '../../../components/booking/grid/appointmentPrice';
 import { drawnBlocksOfDay } from '../../../components/booking/grid/clubWindows';
 import { formatMinutes, MINUTES_PER_DAY, parseTimeOfDay, pragueMinuteOfDay, spanOnDay, touchesDay, type MinuteRange } from '../../../components/booking/grid/timeRange';
+import { inFilter } from '../../model/services';
 import type { InquiryRef } from '../../model/inquiries';
 import {
   cleanHex,
@@ -355,7 +356,7 @@ function bookingCards(
   const split = calendar.split ?? null;
   const subs = split ? split.length : 1;
   for (const a of calendar.appointments) {
-    if (filter !== 'all' && a.activityId !== filter) continue;
+    if (!inFilter(ctx.categories, filter, a.activityId)) continue;
     const day = pragueDateKey(a.startUtc);
     const col = days.indexOf(day);
     if (col < 0) continue;
@@ -801,7 +802,7 @@ export function dayListModel(
   }
   for (const a of bookings) {
     if (pragueDateKey(a.startUtc) !== selectedDate) continue;
-    if (filter !== 'all' && a.activityId !== filter) continue;
+    if (!inFilter(ctx.categories, filter, a.activityId)) continue;
     const span = spanOnDay(a.startUtc, a.endUtc, selectedDate);
     const category = ctx.categories.find((c) => c.id === a.activityId);
     rows.push({
@@ -885,7 +886,7 @@ export function monthTilesModel(
   const publicIds = hideCalendarBacked ? new Set(ctx.sessions.filter(isCalendarBacked).map((s) => s.id)) : null;
   const extra = new Map<string, number>();
   for (const a of bookings) {
-    if (filter !== 'all' && a.activityId !== filter) continue;
+    if (!inFilter(ctx.categories, filter, a.activityId)) continue;
     const day = pragueDateKey(a.startUtc);
     extra.set(day, (extra.get(day) ?? 0) + 1);
   }
@@ -906,7 +907,7 @@ export function monthTilesModel(
     addTo(e.date, e.categoryId, category.name, cleanHex(category.color), 1, slotsOfSession(e));
   }
   for (const a of bookings) {
-    if (filter !== 'all' && a.activityId !== filter) continue;
+    if (!inFilter(ctx.categories, filter, a.activityId)) continue;
     const category = ctx.categories.find((c) => c.id === a.activityId);
     const heads = a.headcount && a.headcount > 0 ? a.headcount : 1;
     addTo(pragueDateKey(a.startUtc), a.activityId, category?.name ?? a.activityName, cleanHex(category?.color), heads, heads);
@@ -919,7 +920,7 @@ export function monthTilesModel(
   const perCalendar = new Map<string, Map<string, number>>();
   if (columns) {
     for (const a of bookings) {
-      if (filter !== 'all' && a.activityId !== filter) continue;
+      if (!inFilter(ctx.categories, filter, a.activityId)) continue;
       if (!a.calendarId) continue;
       const day = pragueDateKey(a.startUtc);
       let row = perCalendar.get(day);
@@ -931,7 +932,7 @@ export function monthTilesModel(
   if (publicIds) {
     for (const s of ctx.sessions) {
       if (!publicIds.has(s.id)) continue;
-      if (filter !== 'all' && s.categoryId !== filter) continue;
+      if (!inFilter(ctx.categories, filter, s.categoryId)) continue;
       hidden.set(s.date, (hidden.get(s.date) ?? 0) + 1);
     }
   }

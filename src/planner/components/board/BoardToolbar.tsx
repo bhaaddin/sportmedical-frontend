@@ -9,7 +9,8 @@ import type { WeekHeadModel, PlannerCategory } from '../../model';
 import type { PlannerView } from '../../state/plannerState';
 import type { BoundPlannerActions } from '../../state/PlannerStoreProvider';
 import { ClubOrderSwitcher } from '../../club/ClubOrderSwitcher';
-import { categoryWithPrice } from '../categoryPrice';
+import { categoryWithPrice, serviceWithPrice } from '../categoryPrice';
+import { normalizeFilter, plannerServices } from '../../model/services';
 import { Icon } from '../Icons';
 import { formatZoom, ZOOM_MAX, ZOOM_MIN } from './boardZoom';
 
@@ -43,6 +44,7 @@ export function BoardToolbar({
   entry,
   filterActive,
   zoomControl,
+  serviceFilter = true,
 }: {
   head: WeekHeadModel;
   view: PlannerView;
@@ -55,7 +57,12 @@ export function BoardToolbar({
   filterActive: boolean;
   /** The zoom group next to the gear; absent where the board is not zoomable. */
   zoomControl?: BoardZoomControl;
+  /** The main planner filters by služba (R1); a club's own board keeps filtering by the činnosti of its order. */
+  serviceFilter?: boolean;
 }) {
+  const services = serviceFilter ? plannerServices(categories) : [];
+  const value = serviceFilter ? normalizeFilter(filter, categories) : filter;
+  const chosenService = services.find((s) => s.id === value);
   const chosen = categories.find((c) => c.id === filter);
   return (
     <div className="planner-toolbar">
@@ -82,11 +89,18 @@ export function BoardToolbar({
           ))}
         </div>
         <label className="filter-select">
-          <span className="sr-only">Filtrovat podle činnosti</span>
-          <select id="activity-filter" value={filter} title={chosen ? categoryWithPrice(chosen) : undefined} onChange={(e) => act.setFilter(e.target.value)}>
-            <option value="all">Všechny činnosti</option>
-            {categories.map((c) => <option key={c.id} value={c.id} title={categoryWithPrice(c)}>{categoryWithPrice(c)}</option>)}
-          </select>
+          <span className="sr-only">{serviceFilter ? 'Filtrovat podle služby' : 'Filtrovat podle činnosti'}</span>
+          {serviceFilter ? (
+            <select id="activity-filter" value={value} title={chosenService ? serviceWithPrice(chosenService) : undefined} onChange={(e) => act.setFilter(e.target.value)}>
+              <option value="all">Všechny služby</option>
+              {services.map((s) => <option key={s.id} value={s.id} title={serviceWithPrice(s)}>{serviceWithPrice(s)}</option>)}
+            </select>
+          ) : (
+            <select id="activity-filter" value={filter} title={chosen ? categoryWithPrice(chosen) : undefined} onChange={(e) => act.setFilter(e.target.value)}>
+              <option value="all">Všechny činnosti</option>
+              {categories.map((c) => <option key={c.id} value={c.id} title={categoryWithPrice(c)}>{categoryWithPrice(c)}</option>)}
+            </select>
+          )}
           <Icon name="chevron-down" />
         </label>
         {zoomControl ? (

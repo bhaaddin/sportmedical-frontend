@@ -59,6 +59,9 @@ export interface PlannerCategory {
   parallelCapacity?: number | null;
   /** List price in CZK from the price list, null when the API does not say. */
   priceCzk?: number | null;
+  /** The služba (ClinicService) the činnost belongs to: what the main planner's filter lists (R1). */
+  serviceId?: string | null;
+  serviceName?: string;
 }
 
 /**

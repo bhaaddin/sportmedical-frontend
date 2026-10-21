@@ -39,6 +39,7 @@ import {
   categoryOrFallback,
   newEventDefaults,
   orderCategoryIds,
+  plannerServices,
   publicEventDetailModel,
   slotMinutesOf,
   sourceFor,
@@ -53,6 +54,7 @@ import type { PlannerModel } from '../../../state/usePlannerModel';
 import { useSafeNavigate } from '../../board/useSafeNavigate';
 import { usePlannerCtx, usePlannerModelState } from '../../context';
 import type { DialogContent, DialogRenderer } from '../../dialogRegistry';
+import { serviceWithPrice } from '../../categoryPrice';
 import { Icon } from '../../Icons';
 import { isTermOfOrder } from '../../left/agendaView';
 import { usePlanFigures } from '../../plan/usePlanFigures';
@@ -513,7 +515,12 @@ function FullListBody({ initialCategory }: { initialCategory: CategoryId | 'all'
   const club = catalogue?.capabilities.mode ? catalogue.capabilities.mode === 'club' : base.demands.length > 0;
   const ctx = useMemo(() => listedContext(base, club), [base, club]);
   const [query, setQuery] = useState('');
-  const [categoryId, setCategoryId] = useState<CategoryId | 'all'>(initialCategory);
+  /* R1: outside a club's order the filter lists služby (a činnost it was opened for is read as its služba) */
+  const services = club ? [] : plannerServices(base.categories);
+  const [categoryId, setCategoryId] = useState<CategoryId | 'all'>(() => {
+    if (club || initialCategory === 'all') return initialCategory;
+    return services.find((s) => s.id === initialCategory || s.categoryIds.includes(initialCategory))?.id ?? 'all';
+  });
   const [date, setDate] = useState('');
   const categories: CategoryId[] = club
     ? orderCategoryIds(ctx)
@@ -523,9 +530,11 @@ function FullListBody({ initialCategory }: { initialCategory: CategoryId | 'all'
     <div data-testid="agenda-full">
       <div className="agenda-full-tools">
         <input id="agenda-full-search" type="search" placeholder="Hledat činnost, datum nebo čas…" aria-label="Hledat termín" value={query} onChange={(e) => setQuery(e.target.value)} />
-        <select id="agenda-full-type" aria-label="Filtr činností" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-          <option value="all">Všechny činnosti</option>
-          {categories.map((id) => <option key={id} value={id}>{categoryOrFallback(ctx, id).name}</option>)}
+        <select id="agenda-full-type" aria-label={club ? 'Filtr činností' : 'Filtr služeb'} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+          <option value="all">{club ? 'Všechny činnosti' : 'Všechny služby'}</option>
+          {club
+            ? categories.map((id) => <option key={id} value={id}>{categoryOrFallback(ctx, id).name}</option>)
+            : services.map((s) => <option key={s.id} value={s.id}>{serviceWithPrice(s)}</option>)}
         </select>
         <input id="agenda-full-date" type="date" aria-label="Filtr data" value={date} onChange={(e) => setDate(e.target.value)} />
         <button type="button" className="agenda-full-reset" id="agenda-full-reset" onClick={() => { setQuery(''); setCategoryId('all'); setDate(''); }}>Vymazat</button>

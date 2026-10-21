@@ -42,7 +42,7 @@ import type { ClubOrderView } from '../../../api/clubOrders';
 import { DESIGN, accentLiteral } from '../../../theme';
 import { pragueDateKey } from '../../../utils/time';
 import { errorText } from '../../../components/booking/errorText';
-import { addDays, monthCells, weekHeadModel, type IsoDate } from '../../model';
+import { addDays, monthCells, normalizeFilter, weekHeadModel, type IsoDate } from '../../model';
 import { blockableRanges } from '../../model/daySelect';
 import { PLANNER_TEXT } from '../../text';
 import { plannerKeys } from '../../data/PlannerDataSource';
@@ -135,6 +135,13 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
 
   const view = usePlannerSelector((s) => s.view);
   const filter = usePlannerSelector((s) => s.filter);
+  /* R1: the main planner filters by služba; a club's own board filters by the činnosti of its order */
+  const byService = !(catalogue?.capabilities.mode ? catalogue.capabilities.mode === 'club' : ctx.demands.length > 0);
+  /* a saved / stale value that is no služba of this catalogue (an old činnost id) goes back to 'all' */
+  const filterFixed = byService ? normalizeFilter(filter, ctx.categories) : filter;
+  useEffect(() => {
+    if (filterFixed !== filter) act.setFilter(filterFixed);
+  }, [filterFixed, filter, act]);
   const weekStart = usePlannerSelector((s) => s.weekStart);
   const selectedDate = usePlannerSelector((s) => s.selectedDate);
   const calendarMonth = usePlannerSelector((s) => s.calendarMonth);
@@ -785,7 +792,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
       data-real-calendar={calendar ? 'true' : 'false'}
       data-layout={standardLayout ? 'standard' : 'club'}
     >
-      <BoardToolbar head={head} view={view} filter={filter} categories={ctx.categories} today={ctx.today} act={act} entry={entry} filterActive={filterActive} zoomControl={zoomControl} />
+      <BoardToolbar head={head} view={view} filter={filter} categories={ctx.categories} today={ctx.today} act={act} entry={entry} filterActive={filterActive} zoomControl={zoomControl} serviceFilter={byService} />
       {config.mode === 'standard' && config.realCalendar ? <CalendarStrip columns={columns} /> : null}
       <div
         id="week-board"
