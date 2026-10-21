@@ -59,6 +59,7 @@ const PatientFormPage = lazy(() => import('./pages/PatientForm'));
 const PatientRegistrationPage = lazy(() => import('./pages/PatientRegistration'));
 const AvailabilityPage = lazy(() => import('./pages/Availability'));
 const SystemHealthPage = lazy(() => import('./pages/SystemHealth'));
+const SecurityCenterPage = lazy(() => import('./pages/settings/SecurityCenterPage'));
 const StaffManagementPage = lazy(() => import('./pages/StaffManagement'));
 const AuditLogPage = lazy(() => import('./pages/AuditLog'));
 /* Booking phase 1, stage 1: calendars, access and activities */
@@ -502,6 +503,7 @@ export default function StaffApp() {
           <Route path="/nepritomnosti" element={<RequirePermission of="settings.clinic.manage"><EmployeeAbsencesPage /></RequirePermission>} />
           <Route path="/admin" element={<RequirePermission of="settings.clinic.manage"><AdminPage /></RequirePermission>} />
           <Route path="/system-health" element={<RequirePermission of="settings.clinic.manage"><SystemHealthPage /></RequirePermission>} />
+          <Route path="/nastaveni/zabezpeceni-a-zalohy" element={<RequirePermission of="settings.clinic.manage"><SecurityCenterPage /></RequirePermission>} />
           <Route path="/staff-management" element={<RequirePermission of="users.manage"><StaffManagementPage /></RequirePermission>} />
           <Route path="/audit-log" element={<RequirePermission of="settings.clinic.manage"><AuditLogPage /></RequirePermission>} />
           <Route path="/settings" element={<SettingsPage />} />

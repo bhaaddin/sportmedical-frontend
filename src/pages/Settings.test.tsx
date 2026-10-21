@@ -211,7 +211,8 @@ describe('the three layouts', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Systém' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Uživatelé a práva/ })).toHaveAttribute('href', '/staff-management');
-    expect(screen.getByRole('link', { name: /Zabezpečení/ })).toHaveAttribute('href', '/nastaveni/zabezpeceni');
+    expect(screen.getByRole('link', { name: /^Zabezpečení(?! a zálohy)/ })).toHaveAttribute('href', '/nastaveni/zabezpeceni');
+    expect(screen.getByRole('link', { name: /Zabezpečení a zálohy/ })).toHaveAttribute('href', '/nastaveni/zabezpeceni-a-zalohy');
     expect(screen.getByRole('link', { name: /Historie změn/ })).toHaveAttribute('href', '/nastaveni/historie-zmen');
   });
 });

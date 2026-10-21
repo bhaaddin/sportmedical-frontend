@@ -1,0 +1,79 @@
+{
+  "label": "green",
+  "base": "http://localhost:3002",
+  "motion": "as stored",
+  "layouts": [
+    {
+      "layout": "phone-390x844",
+      "documentScrolls": false,
+      "scrollHeight": 844,
+      "innerHeight": 844,
+      "horizontalOverflow": false,
+      "small": [],
+      "lights": [
+        "backups=green",
+        "accounts=red",
+        "environment=amber",
+        "activity=green"
+      ],
+      "shelves": [
+        "backups",
+        "accounts",
+        "environment",
+        "activity",
+        "not-measured"
+      ],
+      "text": 6386,
+      "consoleErrors": [],
+      "failedRequests": []
+    },
+    {
+      "layout": "tablet-820x1180",
+      "documentScrolls": false,
+      "scrollHeight": 1180,
+      "innerHeight": 1180,
+      "horizontalOverflow": false,
+      "small": [],
+      "lights": [
+        "backups=green",
+        "accounts=red",
+        "environment=amber",
+        "activity=green"
+      ],
+      "shelves": [
+        "backups",
+        "accounts",
+        "environment",
+        "activity",
+        "not-measured"
+      ],
+      "text": 6350,
+      "consoleErrors": [],
+      "failedRequests": []
+    },
+    {
+      "layout": "desktop-1440x900",
+      "documentScrolls": false,
+      "scrollHeight": 900,
+      "innerHeight": 900,
+      "horizontalOverflow": false,
+      "small": [],
+      "lights": [
+        "backups=green",
+        "accounts=red",
+        "environment=amber",
+        "activity=green"
+      ],
+      "shelves": [
+        "backups",
+        "accounts",
+        "environment",
+        "activity",
+        "not-measured"
+      ],
+      "text": 6573,
+      "consoleErrors": [],
+      "failedRequests": []
+    }
+  ]
+}
