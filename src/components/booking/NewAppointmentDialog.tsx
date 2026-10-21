@@ -205,6 +205,13 @@ const TEXT = {
   freeTimeActive: (time: string) =>
     `Čas ${time} je mimo nabídku. Rezervace se přesto pokusí uložit — server ověří, že se vejde celá délka činnosti.`,
   noneThatDay: "V tento den už pro tuto činnost není volný čas. Zkuste jiné datum.",
+  /* A start the desk chose itself (a click, a drag, a free slot, "Příští volný termín"): no list of times, one sentence. */
+  notFitsChosen: (time: string, name: string, minutes: number) =>
+    `V ${time} se ${name} (${minutes} min) nevejde — čas je obsazený, v pauze nebo mimo pracovní dobu.`,
+  nearestFree: (time: string) => `Nejbližší volný čas ${time}`,
+  tryExactly: (time: string) => `Zkusit přesně ${time}`,
+  noneFreeThatDay: "V tento den už pro tuto činnost není volný čas.",
+  changeWhen: "Změnit termín",
   overrideTimeIs: (when: string) => `Objedná se na ${when}, mimo nabídku.`,
   sms: (phone: string | null) => `Poslat SMS s potvrzením${phone ? ` na ${phone}` : ""}`,
   smsUnavailable: "SMS zatím nejsou aktivní (připravujeme).",
@@ -599,6 +606,19 @@ export function NewAppointmentDialog({
   const alternatives = (availabilityQuery.data ?? []).filter(
     (s) => !isStartOffered([s], startUtc),
   );
+  /* The one offered start nearest to the chosen one (the later one wins a tie): what a chosen time falls back to. */
+  const nearestOffered = useMemo(() => {
+    if (startUtc === null) return null;
+    const wanted = Date.parse(startUtc);
+    let best: { startUtc: string; gap: number } | null = null;
+    for (const s of alternatives) {
+      const at = Date.parse(s.startUtc);
+      const gap = Math.abs(at - wanted);
+      if (best === null || gap < best.gap || (gap === best.gap && at > Date.parse(best.startUtc))) best = { startUtc: s.startUtc, gap };
+    }
+    return best === null ? null : pragueClock(best.startUtc);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availabilityQuery.data, startUtc]);
 
   /* The picked patient's contacts, for the SMS line; the same query the card reads. */
   const patientCard = usePatientCard(patient?.id ?? null, patient !== null);
@@ -1334,6 +1354,25 @@ export function NewAppointmentDialog({
             </Stack>
           ) : (
             <Stack spacing={1}>
+              {fromGrid && activity !== null ? (
+                <Stack spacing={1} data-testid="chosen-time-not-offered">
+                  <Alert severity="info">{TEXT.notFitsChosen(time, activity.name, activity.durationMinutes)}</Alert>
+                  {nearestOffered === null ? (
+                    <Typography variant="body2" sx={{ color: "text.secondary" }}>{TEXT.noneFreeThatDay}</Typography>
+                  ) : null}
+                  <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75 }}>
+                    {nearestOffered !== null ? (
+                      <Button size="small" variant="outlined" disabled={booking} onClick={() => changeTime(nearestOffered)} data-testid="nearest-free">
+                        {TEXT.nearestFree(nearestOffered)}
+                      </Button>
+                    ) : null}
+                    <Button size="small" variant="outlined" disabled={booking} onClick={() => setFreeStart(true)} data-testid="try-exactly">
+                      {TEXT.tryExactly(time)}
+                    </Button>
+                  </Stack>
+                </Stack>
+              ) : (
+              <>
               <Alert severity="info">{TEXT.notOffered(time)}</Alert>
               {alternatives.length > 0 ? (
                 <Box>
@@ -1397,6 +1436,8 @@ export function NewAppointmentDialog({
                   </Button>
                 </Stack>
               </Stack>
+              </>
+              )}
 
               {/*
                 6.4. Not an ordinary action: only a role that may override
@@ -1668,6 +1709,37 @@ export function NewAppointmentDialog({
         {priceField ? <Box sx={{ mt: 2 }}>{priceField}</Box> : null}
       </Box>
 
+      {/* A time the desk chose itself (a click, a drag, a free slot): shown as the slot, not as fields to fill in again. */}
+      {fromGrid && !editingWhen && whenComplete ? (
+        <SoftCard tone="soft" sx={{ p: 1.5 }} data-testid="chosen-slot">
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 700, lineHeight: 1.3 }}>
+                {slotTitle(date, time, untilClock || selectionEnd)}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                {[activity ? `${activity.durationMinutes} min` : "", calendar?.name].filter(Boolean).join(" · ")}
+              </Typography>
+            </Box>
+            <Button
+              variant="outlined"
+              size="small"
+              aria-haspopup="menu"
+              aria-expanded={changeAnchor !== null}
+              disabled={seekingFree}
+              onClick={(e) => setChangeAnchor(e.currentTarget)}
+            >
+              {seekingFree ? TEXT.seeking : TEXT.change}
+            </Button>
+          </Stack>
+          {changeMenu}
+          {whenNote ? (
+            <Typography variant="caption" sx={{ color: "warning.dark", display: "block", mt: 1 }}>
+              {whenNote}
+            </Typography>
+          ) : null}
+        </SoftCard>
+      ) : (
       <Box
         sx={{
           display: "grid",
@@ -1712,6 +1784,7 @@ export function NewAppointmentDialog({
         {readOnlyField(TEXT.duration, activity ? `${activity.durationMinutes} min` : "")}
         {readOnlyField(TEXT.until, untilClock)}
       </Box>
+      )}
 
       {dayNotice}
 
