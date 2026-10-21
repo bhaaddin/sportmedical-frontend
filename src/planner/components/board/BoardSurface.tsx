@@ -12,7 +12,7 @@
  *               (`planning.selectedCategoryId !== null`) or one of those gestures runs, this component
  *               keeps its hands off the board.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { Button, ClickAwayListener, Paper, Popover, Popper, useTheme } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -443,6 +443,14 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const maySelectDays = clubDays || (calendar !== null && (calendar.mayBook || calendar.mayBlock) && config.mode === 'standard' && !phone && view === 'month');
   const select = useDaySelect(ctx.today, maySelectDays, monthSurface);
   const dayPick = useDayPick();
+  /* Club planning, week: a click on a day's heading takes that whole day (Shift: from the last day taken to this one). */
+  const clubWeekDays = calendar !== null && calendar.mayBook && config.mode === 'club' && view === 'week';
+  const lastPickedDay = useRef<IsoDate | null>(null);
+  const pickHeadingDay = (date: IsoDate, shift: boolean) => {
+    const from = shift && lastPickedDay.current !== null ? lastPickedDay.current : date;
+    lastPickedDay.current = date;
+    void dayPick.pick([{ from: from < date ? from : date, to: from < date ? date : from }]);
+  };
   /* The phone's month is a list: a tap on a row takes that whole day for the order (the day itself opens from the week strip). */
   const clubPhoneDays = calendar !== null && calendar.mayBook && config.mode === 'club' && phone && view === 'month';
   /* A drag over several days plans them at once; places added with Ctrl / Shift wait for the tray's button. */
@@ -772,6 +780,25 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                   data-day={d.date}
                   data-col={i}
                   aria-current={isToday ? 'date' : undefined}
+                  {...(clubWeekDays
+                    ? {
+                        role: 'button',
+                        tabIndex: 0,
+                        'data-pick-day': 'true',
+                        title: flag ?? PLANNER_TEXT.days.headingHint,
+                        'aria-label': `${PLANNER_TEXT.days.headingLabel(`${d.weekName} ${d.label}`)}${flag ? ` - ${flag}` : ''}`,
+                        onClick: (e: ReactMouseEvent<HTMLDivElement>) => {
+                          if ((e.target as HTMLElement).closest('.day-inquiry')) return;
+                          pickHeadingDay(d.date, e.shiftKey);
+                        },
+                        onKeyDown: (e: ReactKeyboardEvent<HTMLDivElement>) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            pickHeadingDay(d.date, e.shiftKey);
+                          }
+                        },
+                      }
+                    : {})}
                 >
                   {d.weekName}
                   <strong>{d.label}</strong>

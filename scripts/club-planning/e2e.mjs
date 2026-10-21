@@ -49,16 +49,14 @@ async function weekChecks(browser, club, size, S) {
   const page = await newPage(browser, size);
   await login(page);
   await startClubOrder(page, club.id, { 'Základní sportovní prohlídka': 9 });
-  for (let i = 0; i < 8; i++) {
-    const head = (await text(page, '.mini-title, #mini-title, [data-testid=mini-title]').catch(() => '')) || '';
-    if (/Leden 2027/i.test(head) || (await page.locator('[data-testid="mini-day-2027-01-12"]').count()) > 0) break;
-    await page.getByRole('button', { name: 'Následující měsíc' }).first().click();
-    await page.waitForTimeout(500);
-  }
-  await page.locator('[data-testid="mini-day-2027-01-12"]').first().click();
-  await page.waitForTimeout(800);
+  /* the week of 11. - 17. 1. 2027, by the board's own arrows (the mini calendar is a sheet on tablet and phone) */
   await page.getByRole('button', { name: 'Týden', exact: true }).first().click();
-  await page.waitForTimeout(600);
+  for (let i = 0; i < 30 && (await page.locator('.day-title[data-day="2027-01-12"]').count()) === 0; i++) {
+    await page.getByRole('button', { name: 'Následující týden' }).first().click();
+    await page.waitForTimeout(250);
+  }
+  if (size === 'tablet') await page.getByRole('button', { name: '7 dní' }).click();
+  await page.waitForTimeout(500);
   await clickCard(page, 'Základní sportovní prohlídka');
   const wk = await text(page, '.board-week-heading, .week-title, #week-range, [data-testid=week-range]').catch(() => '');
   void wk;

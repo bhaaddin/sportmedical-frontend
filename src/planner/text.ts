@@ -29,6 +29,8 @@ export const PLANNER_TEXT = {
     hint: 'Další dny přidáte tažením s klávesou Ctrl, ⌘ nebo Shift.',
     clubHint: 'Klepnutím na den ho naplánujete celý. Tažením vyberete víc dnů, s klávesou Ctrl, ⌘ nebo Shift přidáte další místa.',
     planDays: 'Naplánovat vybrané dny',
+    headingHint: 'Klepnutím naplánujete celý den (Shift: od posledního vzatého dne)',
+    headingLabel: (day: string) => `Naplánovat celý den ${day}`,
     phoneClubHint: 'Klepnutím na den ho naplánujete celý. Vzaté dny vrátíte tlačítkem Zpět.',
     additiveMode: 'Vybrat víc dnů',
     additiveModeHint: 'Každé klepnutí přidá den do výběru.',
