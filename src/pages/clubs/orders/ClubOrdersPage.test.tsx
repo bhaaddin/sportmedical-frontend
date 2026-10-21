@@ -201,9 +201,9 @@ describe('detail and actions', () => {
     expect(within(detail).getByText('Platí klub (jedna faktura)')).toBeInTheDocument();
     expect(within(detail).getByRole('link', { name: '+420 603 221 004' })).toHaveAttribute('href', 'tel:+420603221004');
     expect(within(detail).getByRole('link', { name: 'jan@fkslany.cz' })).toHaveAttribute('href', 'mailto:jan@fkslany.cz');
-    /* Etapa 12: the internal history sits behind a button, collapsed by default. */
-    await user.click(within(detail).getByTestId('order-history-wrap-toggle'));
-    expect(within(detail).getByText('Formulář odeslán')).toBeInTheDocument();
+    /* The history is not on the order: a button in the panel's head leads to its own page. */
+    expect(within(detail).queryByText('Formulář odeslán')).not.toBeInTheDocument();
+    expect(screen.getByTestId('order-history-button')).toHaveTextContent('Historie (1)');
 
     const actions = screen.getByTestId('order-actions');
     expect(within(actions).getByRole('button', { name: 'Upravit' })).toBeInTheDocument();

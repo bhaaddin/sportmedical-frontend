@@ -101,6 +101,7 @@ const AppointmentLinkPage = lazy(() => import('./pages/booking/AppointmentLinkPa
 const CashierPage = lazy(() => import('./pages/CashierPage'));
 const ClubsPage = lazy(() => import('./pages/ClubsPage'));
 const ClubOrdersPage = lazy(() => import('./pages/clubs/orders/ClubOrdersPage'));
+const ClubOrderHistoryPage = lazy(() => import('./pages/clubs/orders/ClubOrderHistoryPage'));
 const ClubReservationsPage = lazy(() => import('./pages/clubs/ClubReservationsPage'));
 const ClubPlayersPage = lazy(() => import('./pages/clubs/ClubPlayersPage'));
 const ClubStatsPage = lazy(() => import('./pages/clubs/ClubStatsPage'));
@@ -469,6 +470,7 @@ export default function StaffApp() {
           <Route path="/cashier" element={<RequirePermission of="billing.manage"><CashierPage /></RequirePermission>} />
           <Route path="/clubs" element={<ClubsPage />} />
           <Route path="/clubs/objednavky" element={<ClubOrdersPage />} />
+          <Route path="/clubs/objednavky/:orderId/historie" element={<ClubOrderHistoryPage />} />
           <Route path="/clubs/rezervace" element={<ClubReservationsPage />} />
           <Route path="/clubs/hraci" element={<ClubPlayersPage />} />
           <Route path="/clubs/statistiky" element={<ClubStatsPage />} />

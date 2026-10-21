@@ -1,9 +1,12 @@
 /*
  * The detail of one club order: summary, requested terms against the confirmed windows, činnosti with
- * registered/seats and price per line, the price quote, payment, the club person, the history - and the
+ * registered/seats and price per line, the price quote, payment, the club person - and the
  * actions that the status allows. Right drawer on a tablet, full screen on a phone; `docked` (the orders page from
  * 1024 px) draws the same head, body and actions as a panel beside the list that fills the height it is given and
  * scrolls its body itself, so the page stays one screen.
+ *
+ * The order's history is NOT in this panel: the "Historie" button in the head opens it on a page of its own
+ * (`/clubs/objednavky/:orderId/historie`, pages/clubs/orders/ClubOrderHistoryPage.tsx).
  *
  * It owns the dialogs it opens (process / edit through ClubOrderDialog, confirm cancel), so the orders page
  * and the club overview open it the same way.
@@ -14,7 +17,7 @@ import {
   Alert, Box, Button, Drawer,
   IconButton, LinearProgress, Link, Skeleton, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography,
 } from '@mui/material';
-import { Close, ExpandMore } from '@mui/icons-material';
+import { Close, History } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { fetchBlockableActivities } from '../../../api/clubBlocks';
@@ -23,7 +26,6 @@ import { clubOrdersApi, ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL } from '../../.
 import type { ClubOrderView } from '../../../api/clubOrders';
 import { useIsPhone } from '../../../layout/useDevice';
 import { formatCzk } from '../../../pages/clubs/clubOrders';
-import { formatPragueDateTime } from '../../../utils/time';
 import { SectionLabel, SoftCard, StatusChip } from '../../ui';
 import { todayInPrague } from '../blockLogic';
 import { ClubOrderDialog } from '../order/ClubOrderDialog';
@@ -36,7 +38,6 @@ import { UncoveredNotice } from './UncoveredNotice';
 import { RemoveWindowDialog } from './RemoveWindowDialog';
 import { orderWindows, termsWord } from './orderWindows';
 import { ClubLinksBlock } from './ClubLinksBlock';
-import { ClubVisibleHistory } from './ClubVisibleHistory';
 import { WriteToClubDialog } from './WriteToClubDialog';
 import { OfferedDaysBlock } from './OfferedDaysBlock';
 import { ClubInvoiceDialog } from './ClubInvoiceDialog';
@@ -52,38 +53,6 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
       <SectionLabel>{title}</SectionLabel>
       {children}
     </SoftCard>
-  );
-}
-
-/**
- * A history block collapsed by default: a button opens it in place, showing the same content a test already expects
- * (the content keeps its own `data-testid`, unchanged). `count === 0` still shows the button, worded plainly with no
- * number. The button text itself carries the open/closed state; `labelOpen` defaults to "Skrýt".
- */
-function CollapsibleBlock({ title, count, labelClosed, labelOpen = 'Skrýt', contentTestId, children }: {
-  title: string;
-  count: number;
-  /** Shown collapsed when `count > 0`; when `count === 0` the plain `title` is shown instead (no number). */
-  labelClosed: string;
-  labelOpen?: string;
-  contentTestId: string;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Block title={title}>
-      <Button
-        data-testid={`${contentTestId}-toggle`}
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-controls={contentTestId}
-        sx={{ minHeight: 44, justifyContent: 'space-between', width: '100%', textAlign: 'left', px: 1 }}
-        endIcon={<ExpandMore sx={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />}
-      >
-        {open ? labelOpen : (count > 0 ? labelClosed : title)}
-      </Button>
-      {open ? <Box id={contentTestId} sx={{ mt: 1.5 }}>{children}</Box> : null}
-    </Block>
   );
 }
 
@@ -184,10 +153,6 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
               ) : null}
             </Stack>
           ) : null}
-        </Block>
-
-        <Block title="Odkazy pro klub">
-          <ClubLinksBlock order={order} />
         </Block>
 
         {hasGroup(order) ? (
@@ -331,36 +296,9 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
           )}
         </Block>
 
-        {order.status !== 'Invited' ? (
-          <CollapsibleBlock
-            title="Co vidí klub"
-            count={order.history.filter((h) => h.visibleToClub === true).length}
-            labelClosed={`Zobrazit, co vidí klub (${order.history.filter((h) => h.visibleToClub === true).length})`}
-            contentTestId="club-visible"
-          >
-            <ClubVisibleHistory history={order.history} />
-          </CollapsibleBlock>
-        ) : null}
-
-        <CollapsibleBlock
-          title="Historie"
-          count={order.history.length}
-          labelClosed={`Zobrazit historii (${order.history.length})`}
-          contentTestId="order-history-wrap"
-        >
-          {order.history.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">Bez záznamů.</Typography>
-          ) : (
-            <Stack component="ol" spacing={1} sx={{ m: 0, p: 0, listStyle: 'none' }} data-testid="order-history">
-              {order.history.map((h, i) => (
-                <Box component="li" key={i} sx={{ borderLeft: '2px solid', borderColor: 'divider', pl: 1.5 }}>
-                  <Typography variant="caption" color="text.secondary">{h.atUtc !== '' ? formatPragueDateTime(h.atUtc) : ''}{h.user !== '' ? ` · ${h.user}` : ''}</Typography>
-                  <Typography variant="body2">{h.text}</Typography>
-                </Box>
-              ))}
-            </Stack>
-          )}
-        </CollapsibleBlock>
+        <Block title="Odkazy pro klub">
+          <ClubLinksBlock order={order} />
+        </Block>
       </Stack>
     );
   };
@@ -452,6 +390,17 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
         <Typography component="h2" sx={{ fontSize: 18, fontWeight: 700 }} noWrap>{order?.clubName ?? 'Objednávka klubu'}</Typography>
         {order !== undefined ? <StatusChip tone={STATUS_TONE[order.status]} size="sm">{ORDER_STATUS_LABEL[order.status]}</StatusChip> : null}
       </Box>
+      {order !== undefined ? (
+        <Button
+          variant="outlined"
+          startIcon={<History />}
+          onClick={() => navigate(`/clubs/objednavky/${order.id}/historie`)}
+          data-testid="order-history-button"
+          sx={{ minHeight: 44, whiteSpace: 'nowrap' }}
+        >
+          {order.history.length > 0 ? `Historie (${order.history.length})` : 'Historie'}
+        </Button>
+      ) : null}
       <IconButton aria-label="Zavřít detail" onClick={onClose} sx={{ width: 44, height: 44 }}><Close /></IconButton>
     </Stack>
   );
