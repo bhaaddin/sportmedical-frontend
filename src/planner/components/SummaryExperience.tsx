@@ -22,6 +22,7 @@ import { S41Icon } from './plan/S41Icon';
 import { usePlanFigures } from './plan/usePlanFigures';
 import type { SummarySheet } from '../state/plannerState';
 import { timeLeft } from '../model';
+import { onDarkSurface } from '../../colors/activityColor';
 import './plan/plan.css';
 
 const FLOW: { id: SummarySheet | 'publish'; label: string }[] = [
@@ -35,15 +36,15 @@ function ProgressRow({ item, detail }: { item: CategoryFigure; detail: boolean }
   const pct = Math.max(0, Math.min(100, item.percent));
   if (!detail) {
     return (
-      <div className="s41-activity-row" title={`${item.name}: ${item.planned}/${item.requested} ${personsWord(item.requested)}`}>
-        <span className="s41-activity-name">{item.name}</span>
+      <div className="s41-activity-row" style={{ '--tone': onDarkSurface(item.color) } as CSSProperties} title={`${item.name}: ${item.planned}/${item.requested} ${personsWord(item.requested)}`}>
+        <span className="s41-activity-name"><i className="s41-swatch" aria-hidden="true" />{item.name}</span>
         <span className="s41-activity-bar"><span style={{ '--value': `${pct}%` } as CSSProperties} /></span>
         <span className="s41-activity-pct">{pct}%</span>
       </div>
     );
   }
   return (
-    <div className="s41-detail-row" style={{ '--tone': item.color } as CSSProperties}>
+    <div className="s41-detail-row" data-testid="s41-detail-row" style={{ '--tone': onDarkSurface(item.color) } as CSSProperties}>
       <div className="s41-detail-line"><span className="s41-detail-name"><i />{item.name}</span><strong>{item.planned} / {item.requested}</strong></div>
       <div className="s41-detail-bar"><i style={{ '--pct': `${pct}%` } as CSSProperties} /></div>
       <div className="s41-detail-sub">{detailLine(item)}</div>
@@ -127,6 +128,7 @@ function SummaryScene({ sheet }: { sheet: SummarySheet }) {
   const remainingPct = t.requested ? Math.max(0, 100 - t.percent) : 0;
   void remainingPct;
   const sourceBars = summary.topRows;
+  const colorOf = useMemo(() => new Map(base.list.map((f) => [f.categoryId, f.color] as const)), [base.list]);
 
   return (
     <div className="s41-scene" role="dialog" aria-modal="true" aria-labelledby="s41-heading">
@@ -210,7 +212,7 @@ function SummaryScene({ sheet }: { sheet: SummarySheet }) {
                   {base.list.length ? base.list.map((r) => <ProgressRow key={r.categoryId} item={r} detail />) : <div className="s41-activity-empty">Objednávka nemá žádné činnosti.</div>}
                   <div className="s41-sheet-money">
                     {money.lines.filter((l) => l.seats > 0).map((l) => (
-                      <div key={l.categoryId} className="s41-money-line"><span>{l.name} · {l.seats} × {moneyText(l.unitCzk)}</span><strong>{moneyText(l.valueCzk)}</strong></div>
+                      <div key={l.categoryId} className="s41-money-line" style={{ '--tone': onDarkSurface(colorOf.get(l.categoryId) ?? '') } as CSSProperties}><span><i className="s41-swatch" aria-hidden="true" />{l.name} · {l.seats} × {moneyText(l.unitCzk)}</span><strong>{moneyText(l.valueCzk)}</strong></div>
                     ))}
                     <div className="s41-money-line is-total"><span>{money.totalCzk !== null ? 'Cena objednávky' : 'Cena podle ceníku'}</span><strong>{moneyText(money.totalCzk ?? money.listCzk)}</strong></div>
                     {discountLine(money) ? <small>{discountLine(money)}</small> : null}

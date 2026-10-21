@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { AA, contrastRatio } from '../accent';
 import {
-  BLACK, DARK_SURFACE, GUARD_TEXT, INK, LIGHT_SURFACE, NEUTRAL_ACTIVITY_COLOR, WHITE, activityColor, activityColorOrNull, cleanHex, guardActivityColor, ownActivityColor, textOnColor, typedHex,
+  BLACK, DARK_SURFACE, GUARD_TEXT, INK, LIGHT_SURFACE, NEUTRAL_ACTIVITY_COLOR, WHITE, activityColor, activityColorOrNull, cleanHex, guardActivityColor, ownActivityColor, textOnColor, typedHex, onDarkSurface,
 } from './activityColor';
 
 /* the clinic's own default palette (Nastavení -> serviceColors, as the dev API ships it) */
@@ -132,5 +132,29 @@ describe('the guard', () => {
     expect(g.onDark).toBeCloseTo(contrastRatio('#E9C46A', DARK_SURFACE), 6);
     expect(g.onLight).toBeCloseTo(contrastRatio('#E9C46A', LIGHT_SURFACE), 6);
     expect(g.text?.color).toBe(INK);
+  });
+});
+
+describe('onDarkSurface - a činnost mark that shows on the dark stage (R12)', () => {
+  it('keeps a colour that already stands out and lightens one that does not, in the same hue', () => {
+    expect(onDarkSurface('#29e1c9')).toBe('#29E1C9');
+    const lifted = onDarkSurface('#09423B');
+    expect(lifted).not.toBe('#09423B');
+    expect(contrastRatio(lifted, DARK_SURFACE)).toBeGreaterThanOrEqual(3);
+    // still greenish: green is the strongest channel
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(lifted.slice(i, i + 2), 16));
+    expect(g).toBeGreaterThan(r!);
+    expect(g).toBeGreaterThanOrEqual(b!);
+  });
+
+  it('three shades of one služba stay three different marks, all visible', () => {
+    const marks = ['#17A291', '#09423B', '#29E1C9'].map((c) => onDarkSurface(c));
+    expect(new Set(marks).size).toBe(3);
+    for (const m of marks) expect(contrastRatio(m, DARK_SURFACE)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('every awkward colour ends up visible; garbage becomes the neutral colour', () => {
+    for (const c of AWKWARD) expect(contrastRatio(onDarkSurface(c), DARK_SURFACE)).toBeGreaterThanOrEqual(3);
+    expect(onDarkSurface('nonsense')).toBe(NEUTRAL_ACTIVITY_COLOR);
   });
 });

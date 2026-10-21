@@ -131,3 +131,24 @@ export function guardActivityColor(input: string): ActivityColorGuard {
   if (onLight < MIN_VISIBLE_RATIO) problems.push(GUARD_TEXT.tooLight);
   return { ok: problems.length === 0, hex, text, textAA: text.ratio >= AA, onDark, onLight, problems };
 }
+
+/* ------------------------------------------------------------------------------------- a colour that shows on the dark stage */
+
+const channels = (hex: string): [number, number, number] => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
+const toHex = (c: number[]): string => `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+
+/**
+ * The činnost's colour as a mark (dot, stripe, bar) on a dark surface: the colour itself when it already stands out
+ * (`min` is the WCAG 1.4.11 ratio for a graphic), otherwise the same hue lightened step by step until it does. A very
+ * dark shade of a služba's colour (#09423B) is otherwise invisible on the dark stage, so three činnosti read as one.
+ */
+export function onDarkSurface(color: string, min = 3, surface: string = DARK_SURFACE): string {
+  const hex = cleanHex(color) ?? NEUTRAL_ACTIVITY_COLOR;
+  if (contrastRatio(hex, surface) >= min) return hex.toUpperCase();
+  const base = channels(hex);
+  for (let step = 1; step <= 20; step++) {
+    const mixed = toHex(base.map((v) => v + ((255 - v) * step) / 20));
+    if (contrastRatio(mixed, surface) >= min) return mixed;
+  }
+  return '#FFFFFF';
+}

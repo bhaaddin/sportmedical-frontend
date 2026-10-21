@@ -122,3 +122,11 @@
   overflow-wrap: anywhere;
 }
 .sm-planner .pub-link-row .MuiButton-root { min-height: 44px; }
+
+/* R12 - the summary's činnost rows: every činnost in its own colour (stripe, swatch, bar), visible on the dark stage even at 0 %. */
+.sm-planner #dashboard .s41-detail-row { border-left: 4px solid var(--tone); }
+.sm-planner #dashboard .s41-detail-name i { height: 14px; width: 14px; flex: none; box-shadow: 0 0 0 2px #001421, 0 0 0 3px var(--tone); }
+.sm-planner #dashboard .s41-detail-bar { background: color-mix(in srgb, var(--tone) 24%, #1d3d52); }
+.sm-planner .s41-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; background: var(--tone); flex: none; vertical-align: baseline; }
+.sm-planner .s41-activity-name { display: inline-flex; align-items: center; }
+.sm-planner .s41-money-line > span { display: inline-flex; align-items: center; }

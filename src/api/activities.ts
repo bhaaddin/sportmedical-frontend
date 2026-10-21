@@ -11,6 +11,32 @@ import {
   type ActivitySaveResult,
 } from './bookingContracts';
 import { questionnaireRequirementToWire } from './bookingContracts';
+import { priceOf, type PriceItem } from '../components/booking/price/priceOf';
+import { servicesApi } from './services';
+
+/** The price list, read at most once a minute for the fallback below (a failed read just means no fallback). */
+let priceItems: { at: number; items: Promise<PriceItem[]> } | null = null;
+const readPriceItems = (): Promise<PriceItem[]> => {
+  const now = Date.now();
+  if (priceItems === null || now - priceItems.at > 60_000) {
+    priceItems = { at: now, items: servicesApi.getAll().catch(() => { priceItems = null; return [] as PriceItem[]; }) };
+  }
+  return priceItems.items;
+};
+
+/** For tests: forget the cached price list. */
+export const resetActivityPriceItems = (): void => { priceItems = null; };
+
+/**
+ * R8: every active činnost without a price gets the one `priceOf` finds (link, then name). Every screen reads
+ * `priceCzk` from this list, so they all agree and none says "bez ceny" for an item the price list prices.
+ */
+async function withListPrices(result: ActivityListResult): Promise<ActivityListResult> {
+  if (!result.activities.some((a) => a.isActive && a.priceCzk === null)) return result;
+  const items = await readPriceItems();
+  if (items.length === 0) return result;
+  return { ...result, activities: result.activities.map((a) => (a.priceCzk === null && a.isActive ? { ...a, priceCzk: priceOf(a, items) } : a)) };
+}
 
 /** Activities - booking contract 4.3, screen 5.6. An activity has no break of its own. */
 
@@ -65,7 +91,7 @@ export const activitiesApi = {
   list: (): Promise<ActivityListResult> =>
     request(async () => {
       const res = await client.get('/api/activities');
-      return parseResponse(activityListResultSchema, res.data);
+      return withListPrices(parseResponse(activityListResultSchema, res.data));
     }),
 
   /**
