@@ -4,7 +4,8 @@
  * add it to a club order). A click without travelling marks that one slot. On touch a press held
  * 380 ms starts the drag and a tap marks one slot; moving first is a scroll.
  *
- * The drag lives in one day (the column it began in) and snaps to the step of the chosen
+ * The drag lives in one day (the column it began in - and, when the day is split per calendar, in that calendar's
+ * sub-column: a mark always belongs to the calendar of the column it started in) and snaps to the step of the chosen
  * resolution (or the calendar's own, whichever is finer), exactly as the old grid's `SubColumn`.
  * It never starts on a card or a window, on a closed day, or while the planning layer owns the
  * pointer (`paused`).
@@ -12,12 +13,14 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import type { MinuteRange } from '../../../components/booking/grid/timeRange';
 import type { IsoDate } from '../../model';
-import { columnAtFraction, minuteAtY, selectionRange, type BoardGeometry } from './boardGeometry';
+import { cellAtFraction, minuteAtY, selectionRange, type BoardGeometry } from './boardGeometry';
 
 const LONG_PRESS_MS = 380;
 
 export interface BoardSelection {
   col: number;
+  /** The calendar's sub-column of the day (0 when the day is not split). */
+  sub: number;
   day: IsoDate;
   range: MinuteRange;
   /** Client position where the pointer was let go (the popover opens there). */
@@ -32,13 +35,16 @@ export interface UseBoardSelectionArgs {
   /** Minutes of one slot in the drag. */
   step: number;
   enabled: boolean;
-  /** Can this day be marked at all (not closed)? */
-  dayOpen: (day: IsoDate) => boolean;
+  /** How many calendar columns each day is split into (1 = not split). */
+  subs?: number;
+  /** Can this day (and, when split, this calendar's column of it) be marked at all (not closed)? */
+  dayOpen: (day: IsoDate, sub: number) => boolean;
   onSelect: (selection: BoardSelection) => void;
 }
 
 interface Drag {
   col: number;
+  sub: number;
   anchor: number;
   current: number;
 }
@@ -48,7 +54,7 @@ export function useBoardSelection(args: UseBoardSelectionArgs) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
   dragRef.current = drag;
-  const touch = useRef<{ x: number; y: number; col: number; minute: number; timer: number | undefined; dragging: boolean } | null>(null);
+  const touch = useRef<{ x: number; y: number; col: number; sub: number; minute: number; timer: number | undefined; dragging: boolean } | null>(null);
   const latest = useRef(args);
   latest.current = args;
 
@@ -70,20 +76,20 @@ export function useBoardSelection(args: UseBoardSelectionArgs) {
     return () => node.removeEventListener('touchmove', onTouchMove);
   }, [boardRef]);
 
-  const locate = (event: { clientX: number; clientY: number }): { col: number; minute: number } | null => {
+  const locate = (event: { clientX: number; clientY: number }): { col: number; sub: number; minute: number } | null => {
     const board = boardRef.current;
     if (!board) return null;
     const rect = board.getBoundingClientRect();
     const scaleY = rect.height > 0 ? rect.height / g.height : 1;
-    const col = columnAtFraction(rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0);
-    return { col, minute: minuteAtY(g, Math.max(0, (event.clientY - rect.top) / scaleY)) };
+    const { col, sub } = cellAtFraction(rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0, latest.current.subs ?? 1);
+    return { col, sub, minute: minuteAtY(g, Math.max(0, (event.clientY - rect.top) / scaleY)) };
   };
 
-  const finish = (col: number, anchor: number, end: number, x: number, y: number) => {
+  const finish = (col: number, sub: number, anchor: number, end: number, x: number, y: number) => {
     const a = latest.current;
     const day = a.days[col];
     if (!day) return;
-    a.onSelect({ col, day, range: selectionRange(a.geometry, anchor, end, a.step), x, y });
+    a.onSelect({ col, sub, day, range: selectionRange(a.geometry, anchor, end, a.step), x, y });
   };
 
   const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
@@ -93,12 +99,12 @@ export function useBoardSelection(args: UseBoardSelectionArgs) {
     const at = locate(event);
     if (!at) return;
     const day = a.days[at.col];
-    if (!day || !a.dayOpen(day)) return;
+    if (!day || !a.dayOpen(day, at.sub)) return;
     if (event.pointerType === 'touch' || event.pointerType === 'pen') {
-      const press = { x: event.clientX, y: event.clientY, col: at.col, minute: at.minute, dragging: false, timer: undefined as number | undefined };
+      const press = { x: event.clientX, y: event.clientY, col: at.col, sub: at.sub, minute: at.minute, dragging: false, timer: undefined as number | undefined };
       press.timer = window.setTimeout(() => {
         press.dragging = true;
-        setDrag({ col: at.col, anchor: at.minute, current: at.minute });
+        setDrag({ col: at.col, sub: at.sub, anchor: at.minute, current: at.minute });
       }, LONG_PRESS_MS);
       touch.current = press;
       return;
@@ -111,7 +117,7 @@ export function useBoardSelection(args: UseBoardSelectionArgs) {
         /* a pointer the browser no longer tracks; the drag still works inside the board */
       }
     }
-    setDrag({ col: at.col, anchor: at.minute, current: at.minute });
+    setDrag({ col: at.col, sub: at.sub, anchor: at.minute, current: at.minute });
     event.preventDefault();
   };
 
@@ -137,7 +143,7 @@ export function useBoardSelection(args: UseBoardSelectionArgs) {
       window.clearTimeout(press.timer);
       if (!press.dragging) {
         /* A tap on a free place: that one slot is the selection. */
-        finish(press.col, press.minute, press.minute, event.clientX, event.clientY);
+        finish(press.col, press.sub, press.minute, press.minute, event.clientX, event.clientY);
         return;
       }
     }
@@ -145,7 +151,7 @@ export function useBoardSelection(args: UseBoardSelectionArgs) {
     if (!current) return;
     const at = locate(event);
     setDrag(null);
-    finish(current.col, current.anchor, at ? at.minute : current.current, event.clientX, event.clientY);
+    finish(current.col, current.sub, current.anchor, at ? at.minute : current.current, event.clientX, event.clientY);
   };
 
   const onPointerCancel = () => {
@@ -164,6 +170,6 @@ export function useBoardSelection(args: UseBoardSelectionArgs) {
     return () => window.removeEventListener('keydown', onKey);
   }, [drag]);
 
-  const live = drag ? { col: drag.col, range: selectionRange(g, drag.anchor, drag.current, args.step) } : null;
+  const live = drag ? { col: drag.col, sub: drag.sub, range: selectionRange(g, drag.anchor, drag.current, args.step) } : null;
   return { live, handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel } };
 }

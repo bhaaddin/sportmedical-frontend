@@ -142,13 +142,33 @@ export function columnAtFraction(fraction: number, columns = 7): number {
   return Math.min(columns - 1, Math.max(0, Math.floor(fraction * columns)));
 }
 
-/** `style.left` / `style.width` of a card in `col`, `lane` of `lanes` - the prototype's strings when `lanes` is 1. */
-export function cardLeftWidth(col: number, lane: number, lanes: number): { left: string; width: string } {
-  if (lanes <= 1) return { left: `calc(${col} * 100% / 7 + 3px)`, width: 'calc(100% / 7 - 6px)' };
-  return {
-    left: `calc(${col} * 100% / 7 + ${lane} * (100% / 7) / ${lanes} + 3px)`,
-    width: `calc((100% / 7) / ${lanes} - 6px)`,
-  };
+/**
+ * The day column and - when the day is split into one column per calendar (reviewer 2.4) - the calendar's sub-column under
+ * a horizontal fraction of the board. `subs` 1 is the plain week: `sub` is always 0.
+ */
+export function cellAtFraction(fraction: number, subs = 1, columns = 7): { col: number; sub: number } {
+  const count = Math.max(1, Math.floor(subs));
+  const x = Math.min(columns * count - 1, Math.max(0, Math.floor(fraction * columns * count)));
+  return { col: Math.floor(x / count), sub: x % count };
+}
+
+/**
+ * `style.left` / `style.width` of a card in `col`, `lane` of `lanes` - the prototype's strings when `lanes` is 1. With a day
+ * split into `subs` calendar columns the card lives in column `sub` of them and the lanes divide THAT column.
+ */
+export function cardLeftWidth(col: number, lane: number, lanes: number, sub = 0, subs = 1): { left: string; width: string } {
+  if (subs <= 1) {
+    if (lanes <= 1) return { left: `calc(${col} * 100% / 7 + 3px)`, width: 'calc(100% / 7 - 6px)' };
+    return {
+      left: `calc(${col} * 100% / 7 + ${lane} * (100% / 7) / ${lanes} + 3px)`,
+      width: `calc((100% / 7) / ${lanes} - 6px)`,
+    };
+  }
+  /* the sub-column is (100% / 7) / subs wide and starts at (col * subs + sub) of them; a gap of 2px each side keeps the neighbours apart */
+  const unit = `(100% / 7 / ${subs})`;
+  const origin = `calc((${col} * ${subs} + ${sub}) * ${unit}`;
+  if (lanes <= 1) return { left: `${origin} + 2px)`, width: `calc(${unit} - 4px)` };
+  return { left: `${origin} + ${lane} * ${unit} / ${lanes} + 2px)`, width: `calc(${unit} / ${lanes} - 4px)` };
 }
 
 /** Snap a wall-clock minute DOWN to a step ("slot" the pointer is in). */

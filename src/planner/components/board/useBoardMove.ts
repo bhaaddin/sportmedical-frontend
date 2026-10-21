@@ -42,11 +42,14 @@ import { localDateTime, rangeToInstants, spanOnDay, touchesDay, type MinuteRange
 import { pragueDateKey } from '../../../utils/time';
 import type { DayMark, IsoDate } from '../../model';
 import type { BoardCalendarData } from './boardCalendar';
-import { columnAtFraction, type BoardGeometry } from './boardGeometry';
+import { cellAtFraction, type BoardGeometry } from './boardGeometry';
 import type { BookingCardModel } from './boardModel';
 
 export interface MoveTarget {
   col: number;
+  /** The calendar's sub-column the pointer is over (0 of 1 when the day is not split). */
+  sub: number;
+  subs: number;
   day: IsoDate;
   calendarId: string;
   range: MinuteRange;
@@ -114,6 +117,8 @@ export interface UseBoardMoveArgs {
   days: readonly IsoDate[];
   calendar: BoardCalendarData | null;
   dayMarks: Readonly<Record<string, DayMark>>;
+  /** The calendars each day is split into, in column order (reviewer 2.4); null / absent for the one-column week. */
+  split?: readonly string[] | null;
   /** Minutes between the grid lines of the chosen resolution. */
   resolutionStep: number;
   /** The planning layer owns the pointer (a činnost is armed). */
@@ -216,9 +221,14 @@ export function useBoardMove(args: UseBoardMoveArgs) {
     if (!calendarRow) return null;
     const rect = board.getBoundingClientRect();
     const scaleY = rect.height > 0 ? rect.height / g.height : 1;
-    const col = columnAtFraction(rect.width > 0 ? (x - rect.left) / rect.width : 0);
+    const split = latestArgs.current.split ?? null;
+    const subs = split ? split.length : 1;
+    const { col, sub } = cellAtFraction(rect.width > 0 ? (x - rect.left) / rect.width : 0, subs);
     const day = days[col];
     if (!day) return null;
+    /* A booking stays in its own calendar: over another calendar's column the move is refused, and says why. */
+    const ownSub = split ? Math.max(0, split.indexOf(fromCalendarId)) : 0;
+    const sameCalendar = split === null || sub === ownSub;
     const range = snapMove({
       pointerOffsetPx: (y - rect.top) / scaleY,
       grabMinutes: press.grabMinutes,
@@ -237,7 +247,7 @@ export function useBoardMove(args: UseBoardMoveArgs) {
       appointment: press.appointment,
       range,
       dayKey: day,
-      sameColumn: true,
+      sameColumn: sameCalendar,
       open,
       row,
       blocks: (cal.blocksByCalendar.get(fromCalendarId) ?? []).filter((b) => touchesDay(b.startUtc, b.endUtc, day)),
@@ -246,7 +256,7 @@ export function useBoardMove(args: UseBoardMoveArgs) {
       ),
       capacity: activity?.parallelCapacity ?? 1,
     });
-    return { col, day, calendarId: fromCalendarId, range, refusal };
+    return { col, sub, subs, day, calendarId: fromCalendarId, range, refusal };
   };
 
   const toMoveRequest = (appointment: DayAppointment, target: MoveTarget): GridMoveRequest => {

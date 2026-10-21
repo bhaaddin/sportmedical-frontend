@@ -113,3 +113,5 @@
   overflow-wrap: anywhere;
 }
 .sm-planner .phone-month-count { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.sm-planner .phone-month-calendars { color: #b9d5e2; font-size: 11.5px; }

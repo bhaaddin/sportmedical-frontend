@@ -9,7 +9,7 @@ const row = (over: Partial<DayRowModel>): DayRowModel => ({
   key: 'booking:b1', kind: 'booking', id: 'b1', sortStart: 9 * 60, timeLabel: '09:00 – 09:30', name: 'Pacient b1', sub: 'Prohlídka', tail: 'Objednán', priceText: null, colour: '#00f1dc', categoryId: 'a1', slots: 1, ...over,
 });
 const win = (over: Partial<BoardWindowModel>): BoardWindowModel => ({
-  key: 'window:c1:k1:2026-11-18', kind: 'club', col: 2, day: '2026-11-18', top: 0, height: 10, lane: 0, lanes: 1, left: '0', width: '1', label: 'FK Slaný',
+  key: 'window:c1:k1:2026-11-18', kind: 'club', col: 2, sub: 0, subs: 1, day: '2026-11-18', top: 0, height: 10, lane: 0, lanes: 1, left: '0', width: '1', label: 'FK Slaný',
   timeLabel: '08:00–16:00', start: 480, end: 960, colour: '#2E7D32', block: {} as TimeBlock, allBlocks: [], calendarId: 'c1', calendarName: 'Ordinace 1', clubDates: null, ...over,
 });
 
@@ -64,7 +64,7 @@ describe('the week strip', () => {
 
 describe('the month list', () => {
   const tile = (date: string, over: Partial<MonthTileModel> = {}): MonthTileModel => ({
-    date, dayNumber: Number(date.slice(8, 10)), otherMonth: false, count: 0, countLabel: null, flag: null, inquiries: [], blocked: false, clubs: [], activities: [], ...over,
+    date, dayNumber: Number(date.slice(8, 10)), otherMonth: false, count: 0, countLabel: null, flag: null, inquiries: [], blocked: false, clubs: [], activities: [], calendars: [], ...over,
   });
 
   it('is one row per day of the month, with the figures written out', () => {

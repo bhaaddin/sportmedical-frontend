@@ -10,12 +10,14 @@
  * horizontal scroller (`planner.compact.css`): every maths the board does - the marking of free time, the move of a
  * booking, the placement of a club window - is a ratio of the board's own rectangle, so nothing in it changes.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { weekHeadModel, type IsoDate } from '../../model';
 import { usePlannerActions, usePlannerSelector } from '../../state/PlannerStoreProvider';
 import { PLANNER_TEXT } from '../../text';
 import { useBoardConfig } from '../board/boardConfig';
+import { columnChips } from '../board/calendarColumns';
+import { useBoardSettings } from '../board/boardSettings';
 import { useInquiries } from '../board/useInquiries';
 import { Icon } from '../Icons';
 import { usePlannerCtx, usePlannerModelState } from '../context';
@@ -127,6 +129,8 @@ export function BoardStrip({ mainRef, fit, onFit, sidebarOpen, sidebarPinned, on
   const days = useMemo(() => head.days.map((d) => d.date), [head]);
   const config = useBoardConfig();
   const inquiries = useInquiries(config.inquiryOrderId ?? null, config.realCalendar);
+  /* Reviewer 2.4: the day is split per calendar; with one day shown the week's headings are gone, so the chips go here. */
+  const splitColumns = useBoardSettings().columns;
 
   useDaySnap(mainRef, fit, days, view);
 
@@ -186,6 +190,16 @@ export function BoardStrip({ mainRef, fit, onFit, sidebarOpen, sidebarPinned, on
               </button>
             );
           })}
+        </div>
+      ) : null}
+      {view === 'week' && fit === 'day' && splitColumns ? (
+        <div className="compact-calendars" role="group" aria-label="Kalendáře ve sloupcích dne" data-testid="compact-calendars" style={{ '--subs': splitColumns.length } as CSSProperties}>
+          {columnChips(splitColumns).map((chip) => (
+            <span key={chip.id} className="compact-calendar" data-calendar-id={chip.id} title={chip.name} style={{ '--cal': chip.colour } as CSSProperties}>
+              <i aria-hidden="true" />
+              <span>{chip.name}</span>
+            </span>
+          ))}
         </div>
       ) : null}
     </div>,

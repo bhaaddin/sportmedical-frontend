@@ -10,15 +10,14 @@ const NAME = 'ZZ reviewer test (smazat)';
 const b = await launch(); const page = await newPage(b); await login(page);
 const cals = (await api(page, 'GET', '/api/calendars')).json.data.filter((c) => c.isActive && !c.name.startsWith('ZZ'));
 const acts = (await api(page, 'GET', '/api/activities')).json.data.activities.filter((a) => a.isActive);
-const range = async (cal, from, to) => (await api(page, 'GET', `/api/calendars/${cal.id}/appointments?from=${from}&to=${to}`));
 if (clean) {
   let n = 0;
-  for (const cal of cals) {
-    const r = await range(cal, WEEK[0], WEEK[4]);
-    const rows = r.json?.data ?? r.json ?? [];
-    for (const a of Array.isArray(rows) ? rows : (rows.appointments ?? [])) {
-      if ((a.patientName ?? a.name ?? a.eventName ?? '').includes('ZZ reviewer')) { const d = await api(page, 'DELETE', `/api/calendars/${cal.id}/appointments/${a.id}`); if (d.status < 300) n++; }
-    }
+  const day = await api(page, 'GET', `/api/day?from=${WEEK[0]}&to=${WEEK[4]}`);
+  const rows = day.json?.data ?? day.json ?? [];
+  for (const a of Array.isArray(rows) ? rows : []) {
+    if (!(a.patientName ?? '').includes('ZZ reviewer') && !(a.eventName ?? '').includes('ZZ reviewer')) continue;
+    const d = await api(page, 'DELETE', `/api/calendars/${a.calendarId}/appointments/${a.id}`);
+    if (d.status < 300) n++;
   }
   console.log('cancelled', n);
   await b.close(); process.exit(0);
@@ -34,14 +33,14 @@ let made = 0;
 for (const [d, calName, actPart, count] of plan) {
   const cal = cals.find((c) => c.name === calName); const act = acts.find((a) => a.name.includes(actPart));
   if (!cal || !act) { console.log('skip', calName, actPart); continue; }
-  const av = await api(page, 'GET', `/api/calendars/${cal.id}/availability?activityId=${act.id}&from=${WEEK[d]}&to=${WEEK[d]}&forPublic=false&staffStarts=true`);
-  const slots = (av.json?.data ?? av.json ?? []);
   let ok = 0;
-  for (const s of slots) {
-    if (ok >= count) break;
-    // take non-overlapping starts: availability is refreshed per booking, so just try and let the server refuse a clash
-    const r = await api(page, 'POST', `/api/calendars/${cal.id}/appointments/unregistered`, { calendarId: cal.id, activityId: act.id, startUtc: s.startUtc, name: NAME, phone: null, note: null });
-    if (r.status < 300) { ok++; made++; }
+  /* one booking at a time, the availability read again after each (so no two bookings of a činnost share a start) */
+  for (let k = 0; k < count; k++) {
+    const av = await api(page, 'GET', `/api/calendars/${cal.id}/availability?activityId=${act.id}&from=${WEEK[d]}&to=${WEEK[d]}&forPublic=false&staffStarts=true`);
+    const slot = (av.json?.data ?? av.json ?? [])[0];
+    if (!slot) break;
+    const r = await api(page, 'POST', `/api/calendars/${cal.id}/appointments/unregistered`, { calendarId: cal.id, activityId: act.id, startUtc: slot.startUtc, name: NAME, phone: null, note: null });
+    if (r.status < 300) { ok++; made++; } else break;
   }
   console.log(WEEK[d], calName, act.name, 'created', ok, '/', count);
 }

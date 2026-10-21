@@ -97,6 +97,8 @@ import { useNextFree } from './useNextFree';
 import { inquiryLabel, inquiryTitle } from '../../model/inquiries';
 import { useClubPlanner } from '../../club/ClubPlannerContext';
 import { useSafeNavigate } from './useSafeNavigate';
+import { calendarColumns, calendarOfColumn, columnChips } from './calendarColumns';
+import { CalendarStrip } from './CalendarStrip';
 import './board.css';
 
 const hatchOf = (hex: string, strong: number, weak: number) =>
@@ -188,6 +190,22 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   }, [windowTop, standardLayout]);
   const head = useMemo(() => weekHeadModel(weekStart, ctx.window), [weekStart, ctx.window]);
   const days = head.days.map((d) => d.date);
+  /* Reviewer 2.4: two or three calendars on screen split every day of the standard calendar into one column per calendar. */
+  const columns = useMemo(() => calendarColumns(calendar?.calendars ?? [], config.mode === 'standard'), [calendar?.calendars, config.mode]);
+  const split = useMemo(() => (columns ? columns.map((c) => c.id) : null), [columns]);
+  const subs = columns ? columns.length : 1;
+  /* The compact layouts head the columns of the one day they show: they read the calendars from the store. */
+  useEffect(() => {
+    boardSettings.publishColumns(columns ? columns.map((c) => ({ id: c.id, name: c.name, color: c.color, serviceId: c.clinicServiceId ?? null })) : null);
+    return () => boardSettings.publishColumns(null);
+  }, [columns]);
+  const calendarOpen = useCallback(
+    (calendarId: string, day: IsoDate) => {
+      const row = calendar?.previewByCalendar.get(calendarId)?.get(day);
+      return row === undefined || row.isOpen;
+    },
+    [calendar],
+  );
 
   const boardRef = useRef<HTMLDivElement | null>(null);
   /* Two fingers on the board are a pinch (zoom), never a mark, a move or a placement. */
@@ -229,6 +247,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     days,
     calendar,
     dayMarks,
+    split,
     resolutionStep: snapStep,
     paused: planningOwnsPointer || pinching,
     onCommit: commitMove,
@@ -256,11 +275,13 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
               mayBook: calendar.mayBook,
               excludeClubId: config.excludeClubId,
               ...(config.excludeClubBlockIds ? { excludeClubBlockIds: config.excludeClubBlockIds } : {}),
+              split,
+              isOpen: calendarOpen,
             }
           : null,
         nowMinute,
       }),
-    [ctx, weekStart, filter, geometry, dayMarks, catalogue, calendar, move.appointments, config.excludeClubId, config.excludeClubBlockIds, nowMinute],
+    [ctx, weekStart, filter, geometry, dayMarks, catalogue, calendar, move.appointments, config.excludeClubId, config.excludeClubBlockIds, nowMinute, split, calendarOpen],
   );
 
   /* ---- zoom: 1x = the 12 hours fill the body; above, the body scrolls and the time under the pointer stays put ---- */
@@ -465,8 +486,13 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
 
   /** The calendar a marked time belongs to: the first that works that day (and is not off for the worker). */
   const calendarFor = useCallback(
-    (day: IsoDate, range: MinuteRange): { id: string; name: string } | null => {
+    (day: IsoDate, range: MinuteRange, sub = 0): { id: string; name: string } | null => {
       if (!calendar) return null;
+      /* a split day: a mark belongs to the calendar of the column it was made in */
+      if (columns) {
+        const own = calendarOfColumn(columns, sub);
+        return own ? { id: own.id, name: own.name } : null;
+      }
       const works = (row: { isOpen: boolean; startTime: string | null; endTime: string | null } | undefined) => {
         if (!row) return true;
         if (!row.isOpen) return false;
@@ -477,7 +503,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
       const pick = open ?? calendar.calendars[0];
       return pick ? { id: pick.id, name: pick.name } : null;
     },
-    [calendar],
+    [calendar, columns],
   );
 
   const selection = useBoardSelection({
@@ -486,10 +512,11 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     days,
     step,
     enabled: mayMark && view === 'week' && !planningOwnsPointer && !pinching && move.moving === null,
-    dayOpen: (day) => !(dayMarks[day]?.closed ?? false),
+    subs,
+    dayOpen: (day, sub) => !(dayMarks[day]?.closed ?? false) && (columns === null || calendarOpen(columns[sub]?.id ?? '', day)),
     onSelect: (sel) => {
       setSelected(null);
-      const cal = calendarFor(sel.day, sel.range);
+      const cal = calendarFor(sel.day, sel.range, sel.sub);
       setPending({ ...sel, calendarId: cal?.id ?? null, calendarName: cal?.name ?? null });
     },
   });
@@ -665,7 +692,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const labels = hourLabels(geometry, lineStep);
   const visibleCards = model.cards;
 
-  const pendingRange = selection.live ?? (pending ? { col: pending.col, range: pending.range } : null);
+  const pendingRange = selection.live ?? (pending ? { col: pending.col, sub: pending.sub, range: pending.range } : null);
   const ghost = move.moving?.target ?? null;
   const filterActive = settings.ticked !== null || settings.serviceSet !== null || settings.employeeId !== null;
 
@@ -692,8 +719,8 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     [calendar, view, phone, calendarMonth, dayMarks, config.excludeClubBlockIds],
   );
   const monthTiles = useMemo(
-    () => monthTilesModel(ctx, calendarMonth, filter, calendar ? move.appointments : [], dayMarks, calendar !== null, { inquiries, blockedDays, ...(monthClubLines ? { clubLines: monthClubLines } : {}) }),
-    [ctx, calendarMonth, filter, calendar, move.appointments, dayMarks, inquiries, blockedDays, monthClubLines],
+    () => monthTilesModel(ctx, calendarMonth, filter, calendar ? move.appointments : [], dayMarks, calendar !== null, { inquiries, blockedDays, calendarColumns: columns, ...(monthClubLines ? { clubLines: monthClubLines } : {}) }),
+    [ctx, calendarMonth, filter, calendar, move.appointments, dayMarks, inquiries, blockedDays, monthClubLines, columns],
   );
   const [inquiryPop, setInquiryPop] = useState<{ day: IsoDate; x: number; y: number } | null>(null);
 
@@ -744,6 +771,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const boardStyle = {
     height: `${geometry.height}px`,
     '--hour-step': `${geometry.pxPerHour}px`,
+    '--subs': subs,
     ...(stepPx ? { '--step-px': `${stepPx}px` } : {}),
     '--now-color': nowColor,
     '--now-edge': withAlpha(nowColor, 0.55),
@@ -758,6 +786,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
       data-layout={standardLayout ? 'standard' : 'club'}
     >
       <BoardToolbar head={head} view={view} filter={filter} categories={ctx.categories} today={ctx.today} act={act} entry={entry} filterActive={filterActive} zoomControl={zoomControl} />
+      {config.mode === 'standard' && config.realCalendar ? <CalendarStrip columns={columns} /> : null}
       <div
         id="week-board"
         className="week-board"
@@ -769,7 +798,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         data-testid="week-board"
         onKeyDown={onBoardKey}
       >
-        <div className="board-head">
+        <div className="board-head" data-subs={subs > 1 ? subs : undefined}>
           <div className="time-head" />
           <div id="day-headings" className="day-headings">
             {head.days.map((d, i) => {
@@ -807,6 +836,16 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                 >
                   {d.weekName}
                   <strong>{d.label}</strong>
+                  {columns ? (
+                    <span className="day-calendars" data-testid={`day-calendars-${d.date}`} style={{ '--subs': subs } as CSSProperties}>
+                      {columnChips(columns).map((chip) => (
+                        <span key={chip.id} className="day-calendar" data-calendar-id={chip.id} title={chip.name} style={{ '--cal': chip.colour } as CSSProperties}>
+                          <i aria-hidden="true" />
+                          <span>{chip.name}</span>
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
                   {asked.length ? (
                     <button
                       type="button"
@@ -852,6 +891,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
             data-moving={move.moving ? 'true' : undefined}
             id="day-board"
             data-testid="day-board"
+            data-subs={subs > 1 ? subs : undefined}
             data-zoom={settings.zoom}
             data-step={lineStep}
             data-snap={snapStep}
@@ -908,6 +948,16 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                 </div>
               ))}
             </div>
+
+            {model.calendarShades.length ? (
+              <div className="board-calendar-shades" aria-hidden="true" data-testid="board-calendar-shades">
+                {model.calendarShades.map((c) => (
+                  <div key={c.key} className="board-calendar-shade" data-testid={`calendar-closed-${c.calendarId}-${c.day}`} title={`${c.calendarName}: ${c.label}`} style={{ '--col': c.col, '--sub': c.sub, '--subs': c.subs, '--shade-line': withAlpha(holiday, 0.7), '--shade-hatch': hatchOf(holiday, 0.22, 0.07) } as CSSProperties}>
+                    <span className="board-sticky">{c.label}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
             {model.windows.length ? (
               <div className="board-windows" data-testid="board-windows">
@@ -975,6 +1025,8 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                 data-testid="board-selection"
                 style={{
                   '--col': pendingRange.col,
+                  '--sub': pendingRange.sub,
+                  '--subs': subs,
                   top: (pendingRange.range.start - geometry.startMinutes) * geometry.pxPerMinute,
                   height: Math.max(11, (pendingRange.range.end - pendingRange.range.start) * geometry.pxPerMinute),
                 } as CSSProperties}
@@ -988,7 +1040,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
 
             {ghost ? (
               <>
-                <div className={`move-lanes board-move-lanes${ghost.refusal ? ' is-invalid' : ''}`} style={{ '--col': ghost.col } as CSSProperties} aria-hidden="true" />
+                <div className={`move-lanes board-move-lanes${ghost.refusal ? ' is-invalid' : ''}`} style={{ '--col': ghost.col, '--sub': ghost.sub, '--subs': ghost.subs } as CSSProperties} aria-hidden="true" />
                 <div
                   className={`move-ghost board-move-ghost${ghost.refusal ? ' not-allowed' : ''}`}
                   data-testid="move-ghost"
@@ -996,6 +1048,8 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                   aria-hidden="true"
                   style={{
                     '--col': ghost.col,
+                    '--sub': ghost.sub,
+                    '--subs': ghost.subs,
                     ...toneVars(move.moving ? (model.cards.find((c) => c.kind === 'booking' && c.appointment.id === move.moving!.appointment.id)?.tone ?? ghostTone) : ghostTone),
                     '--move-tone': 'var(--ev-border)',
                     top: (ghost.range.start - geometry.startMinutes) * geometry.pxPerMinute,

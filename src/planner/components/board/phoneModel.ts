@@ -211,6 +211,8 @@ export interface PhoneMonthRow {
   clubs: string[];
   /** The day by činnost: "Komplexní prohlídka ×10 · 10 slotů" - one line each, never one per booking. */
   activities: string[];
+  /** The day by calendar when the week splits per calendar (reviewer 2.4): "Ordinace 1 3 · Diagnostika 5"; null otherwise. */
+  calendarLine: string | null;
 }
 
 /** The days of the shown month (the other months' tiles are only the matrix's padding), one row each. */
@@ -233,5 +235,6 @@ export function phoneMonthRows(
       inquiry: t.inquiries.length ? inquiryTileLabel(t.inquiries) : null,
       clubs: clubLines.get(t.date) ?? [],
       activities: t.activities.map((a) => `${a.name}${a.count > 1 ? ` ×${a.count}` : ''} · ${a.slots} ${agendaSlotLabel(a.slots)}`),
+      calendarLine: t.calendars.some((c) => c.count > 0) ? t.calendars.map((c) => `${c.name} ${c.count}`).join(' · ') : null,
     }));
 }

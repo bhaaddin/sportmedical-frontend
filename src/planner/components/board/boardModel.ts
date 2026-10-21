@@ -70,6 +70,9 @@ interface CardCommon {
   compact: boolean;
   lane: number;
   lanes: number;
+  /** The calendar's sub-column of the day when the day is split per calendar (reviewer 2.4); 0 of 1 otherwise. */
+  sub: number;
+  subs: number;
   left: string;
   width: string;
   name: string;
@@ -118,6 +121,8 @@ export type BoardCardModel = SessionCardModel | BookingCardModel;
 export interface BoardOverflowModel {
   key: string;
   col: number;
+  sub: number;
+  subs: number;
   day: IsoDate;
   top: number;
   height: number;
@@ -131,6 +136,9 @@ export interface BoardWindowModel {
   key: string;
   kind: 'club' | 'manual';
   col: number;
+  /** The calendar's sub-column of the day when the day is split per calendar; 0 of 1 otherwise. */
+  sub: number;
+  subs: number;
   day: IsoDate;
   top: number;
   height: number;
@@ -167,6 +175,18 @@ export interface DayShadeModel {
   lunch: { top: number; height: number; from: string; to: string } | null;
 }
 
+/** A calendar that does not work on a day the others do: its sub-column is hatched (reviewer 2.4). */
+export interface CalendarShadeModel {
+  key: string;
+  day: IsoDate;
+  col: number;
+  sub: number;
+  subs: number;
+  calendarId: string;
+  calendarName: string;
+  label: string;
+}
+
 export interface NowLineModel {
   col: number;
   day: IsoDate;
@@ -187,6 +207,13 @@ export interface BoardCalendarInput {
   excludeClubId?: string | null;
   /** Windows (club block ids) drawn as session cards of the edited order: skipped, the club's other ones are drawn. */
   excludeClubBlockIds?: ReadonlySet<string>;
+  /**
+   * Reviewer 2.4: the ids of the calendars each day is split into (one column per calendar, in this order), or null for the
+   * one-column week. The caller decides when two or more calendars on screen split; the model only follows it.
+   */
+  split?: readonly string[] | null;
+  /** Does this calendar work that day? Absent = it does. A closed one is hatched in its own sub-column while the day is open. */
+  isOpen?: (calendarId: string, day: IsoDate) => boolean;
 }
 
 export interface BoardModel {
@@ -197,6 +224,10 @@ export interface BoardModel {
   folded: BoardCardModel[];
   windows: BoardWindowModel[];
   shades: DayShadeModel[];
+  /** Per-calendar hatching of a split week; empty otherwise. */
+  calendarShades: CalendarShadeModel[];
+  /** The calendars the days are split into, in column order; empty when the week is one column per day. */
+  columns: Calendar[];
   nowLine: NowLineModel | null;
 }
 
@@ -289,6 +320,8 @@ function sessionCards(
       compact: box.compact,
       lane: 0,
       lanes: 1,
+      sub: 0,
+      subs: 1,
       ...cardLeftWidth(m.col, 0, 1),
       name: m.name,
       iconKey: m.iconKey,
@@ -319,6 +352,8 @@ function bookingCards(
 ): BookingCardModel[] {
   const out: BookingCardModel[] = [];
   const calendarById = new Map(calendar.calendars.map((c) => [c.id, c]));
+  const split = calendar.split ?? null;
+  const subs = split ? split.length : 1;
   for (const a of calendar.appointments) {
     if (filter !== 'all' && a.activityId !== filter) continue;
     const day = pragueDateKey(a.startUtc);
@@ -327,6 +362,7 @@ function bookingCards(
     const span = spanOnDay(a.startUtc, a.endUtc, day);
     const box = cardBox(g, span.start, Math.max(span.end, span.start + 1));
     const cal = a.calendarId ? calendarById.get(a.calendarId) : undefined;
+    const sub = split && a.calendarId ? Math.max(0, split.indexOf(a.calendarId)) : 0;
     const category = ctx.categories.find((c) => c.id === a.activityId);
     const tone = colourOfActivity(calendar.catalogue, a.activityId, cal?.color ?? '#6e91a5');
     const price = shownPrice(a, category?.priceCzk ?? null);
@@ -345,7 +381,9 @@ function bookingCards(
       compact: box.compact,
       lane: 0,
       lanes: 1,
-      ...cardLeftWidth(col, 0, 1),
+      sub,
+      subs,
+      ...cardLeftWidth(col, 0, 1, sub, subs),
       name: rowName ?? a.activityName,
       iconKey: category?.iconKey ?? 'calendar',
       tone,
@@ -365,42 +403,48 @@ function bookingCards(
   return out;
 }
 
-/** Put the day's cards into lanes; past three lanes the rest fold into a "+N" chip. */
+/** Put the day's cards into lanes (per calendar column when the day is split); past three lanes the rest fold into a "+N" chip. */
 function layoutCards(
   cards: BoardCardModel[],
   days: readonly IsoDate[],
+  subs = 1,
 ): { cards: BoardCardModel[]; overflow: BoardOverflowModel[]; folded: BoardCardModel[] } {
   const placedCards: BoardCardModel[] = [];
   const overflow: BoardOverflowModel[] = [];
   const folded: BoardCardModel[] = [];
   for (let col = 0; col < days.length; col++) {
-    const dayCards = cards.filter((c) => c.col === col);
-    if (dayCards.length === 0) continue;
-    const layout = layoutLanes(
-      dayCards.map((c) => ({ id: c.key, start: c.startMinute, end: Math.max(c.endMinute, c.startMinute + 1) })),
-    );
-    for (const c of dayCards) {
-      const p = layout.placed.get(c.key);
-      if (!p) {
-        folded.push(c); // folded into a "+N" chip
-        continue;
+    for (let sub = 0; sub < subs; sub++) {
+      /* a card of a plain session (no calendar) is not in any sub-column: it shares the first one's lanes, full width */
+      const dayCards = cards.filter((c) => c.col === col && (subs <= 1 ? true : c.subs <= 1 ? sub === 0 : c.sub === sub));
+      if (dayCards.length === 0) continue;
+      const layout = layoutLanes(
+        dayCards.map((c) => ({ id: c.key, start: c.startMinute, end: Math.max(c.endMinute, c.startMinute + 1) })),
+      );
+      for (const c of dayCards) {
+        const p = layout.placed.get(c.key);
+        if (!p) {
+          folded.push(c); // folded into a "+N" chip
+          continue;
+        }
+        placedCards.push({ ...c, lane: p.lane, lanes: p.lanes, ...cardLeftWidth(c.col, p.lane, p.lanes, c.sub, c.subs) });
       }
-      placedCards.push({ ...c, lane: p.lane, lanes: p.lanes, ...cardLeftWidth(c.col, p.lane, p.lanes) });
-    }
-    for (const chip of layout.overflow) {
-      const first = dayCards.find((c) => c.key === chip.ids[0])!;
-      const inChip = dayCards.filter((c) => chip.ids.includes(c.key));
-      const top = Math.min(...inChip.map((c) => c.top));
-      const bottom = Math.max(...inChip.map((c) => c.top + c.height));
-      overflow.push({
-        key: chip.key,
-        col,
-        day: first.day,
-        top,
-        height: Math.max(18, bottom - top),
-        ...cardLeftWidth(col, chip.lane, chip.lanes),
-        keys: chip.ids,
-      });
+      for (const chip of layout.overflow) {
+        const first = dayCards.find((c) => c.key === chip.ids[0])!;
+        const inChip = dayCards.filter((c) => chip.ids.includes(c.key));
+        const top = Math.min(...inChip.map((c) => c.top));
+        const bottom = Math.max(...inChip.map((c) => c.top + c.height));
+        overflow.push({
+          key: chip.key,
+          col,
+          sub,
+          subs,
+          day: first.day,
+          top,
+          height: Math.max(18, bottom - top),
+          ...cardLeftWidth(col, chip.lane, chip.lanes, sub, subs),
+          keys: chip.ids,
+        });
+      }
     }
   }
   return { cards: placedCards, overflow, folded };
@@ -418,6 +462,8 @@ function windowModels(
   fallbackColour: string,
 ): BoardWindowModel[] {
   const out: BoardWindowModel[] = [];
+  const split = calendar.split ?? null;
+  const subs = split ? split.length : 1;
   for (let col = 0; col < days.length; col++) {
     const day = days[col]!;
     const lunchFrom = minutesOfClock(marks[day]?.lunch?.from);
@@ -433,7 +479,8 @@ function windowModels(
         const club = block.kind === 'club';
         if (club && calendar.excludeClubId && block.clubId === calendar.excludeClubId) continue;
         if (club && calendar.excludeClubBlockIds && block.clubBlockId && calendar.excludeClubBlockIds.has(block.clubBlockId)) continue;
-        if (club) {
+        /* the same club window in two calendars is ONE window on a one-column day, and one in each column on a split day */
+        if (club && !split) {
           const key = `${block.clubBlockId ?? block.id}|${span.start}|${span.end}`;
           if (seenClub.has(key)) continue;
           seenClub.add(key);
@@ -445,6 +492,8 @@ function windowModels(
           key: `window:${cal.id}:${block.id}:${day}`,
           kind: club ? 'club' : 'manual',
           col,
+          sub: split ? Math.max(0, split.indexOf(cal.id)) : 0,
+          subs,
           day,
           top: box.top,
           height: box.height,
@@ -462,18 +511,22 @@ function windowModels(
       }
     }
     if (dayWindows.length === 0) continue;
-    const layout = layoutLanes(
-      dayWindows.map((w, i) => ({
-        id: String(i),
-        start: Math.round(w.top),
-        end: Math.max(Math.round(w.top + w.height), Math.round(w.top) + 1),
-      })),
-      8,
-    );
-    dayWindows.forEach((w, i) => {
-      const p = layout.placed.get(String(i)) ?? { lane: 0, lanes: 1 };
-      out.push({ ...w, lane: p.lane, lanes: p.lanes, ...cardLeftWidth(w.col, p.lane, p.lanes) });
-    });
+    for (let sub = 0; sub < subs; sub++) {
+      const inColumn = dayWindows.filter((w) => w.sub === sub);
+      if (inColumn.length === 0) continue;
+      const layout = layoutLanes(
+        inColumn.map((w, i) => ({
+          id: String(i),
+          start: Math.round(w.top),
+          end: Math.max(Math.round(w.top + w.height), Math.round(w.top) + 1),
+        })),
+        8,
+      );
+      inColumn.forEach((w, i) => {
+        const p = layout.placed.get(String(i)) ?? { lane: 0, lanes: 1 };
+        out.push({ ...w, lane: p.lane, lanes: p.lanes, ...cardLeftWidth(w.col, p.lane, p.lanes, w.sub, w.subs) });
+      });
+    }
   }
   return out;
 }
@@ -507,6 +560,25 @@ function dayShades(days: readonly IsoDate[], marks: Readonly<Record<string, DayM
       before,
       after,
       lunch,
+    });
+  });
+  return out;
+}
+
+/** A calendar closed on a day that is open for the clinic: its sub-column is hatched ("Zavřeno"). */
+function calendarShades(
+  days: readonly IsoDate[],
+  marks: Readonly<Record<string, DayMark>>,
+  calendars: readonly Calendar[],
+  isOpen: ((calendarId: string, day: IsoDate) => boolean) | undefined,
+): CalendarShadeModel[] {
+  if (!isOpen) return [];
+  const out: CalendarShadeModel[] = [];
+  days.forEach((day, col) => {
+    if (marks[day]?.closed) return; /* a closed day is hatched whole already */
+    calendars.forEach((cal, sub) => {
+      if (isOpen(cal.id, day)) return;
+      out.push({ key: `calshade:${cal.id}:${day}`, day, col, sub, subs: calendars.length, calendarId: cal.id, calendarName: cal.name, label: 'Zavřeno' });
     });
   });
   return out;
@@ -569,7 +641,9 @@ export function buildBoardModel(input: BuildBoardInput): BoardModel {
   const days = weekDays(weekStart);
   const sessions = sessionCards(ctx, weekStart, filter, g, days, calendar !== null);
   const bookings = calendar ? bookingCards(ctx, days, filter, g, calendar) : [];
-  const laid = layoutCards([...sessions, ...bookings], days);
+  const split = calendar?.split ?? null;
+  const columns = split ? split.map((id) => calendar!.calendars.find((c) => c.id === id)).filter((c): c is Calendar => c !== undefined) : [];
+  const laid = layoutCards([...sessions, ...bookings], days, split ? split.length : 1);
   const windows = calendar ? windowModels(days, dayMarks, g, calendar, '#6e91a5') : [];
   return {
     days,
@@ -578,6 +652,8 @@ export function buildBoardModel(input: BuildBoardInput): BoardModel {
     folded: laid.folded,
     windows,
     shades: dayShades(days, dayMarks, g),
+    calendarShades: split && calendar ? calendarShades(days, dayMarks, columns, calendar.isOpen) : [],
+    columns,
     nowLine: nowLineModel(days, dayMarks, g, ctx.today, input.nowMinute),
   };
 }
@@ -763,6 +839,16 @@ export interface MonthTileModel {
   clubs: string[];
   /** The day by činnost (reviewer 2.2): "Komplexní prohlídka ×10", not a count of terms; the order of the činnosti. */
   activities: TileActivity[];
+  /** The day by calendar when the week splits per calendar (reviewer 2.4): a count under each calendar's chip; empty otherwise. */
+  calendars: TileCalendar[];
+}
+
+/** One calendar of a split month: how many bookings the day has in it. */
+export interface TileCalendar {
+  id: string;
+  name: string;
+  colour: string | null;
+  count: number;
 }
 
 /** One činnost of a day as the month tile sums it: people for bookings, terms for terms; slots as the summaries count them. */
@@ -787,7 +873,13 @@ export function monthTilesModel(
   bookings: readonly DayAppointment[],
   dayMarks: Readonly<Record<string, DayMark>>,
   hideCalendarBacked: boolean,
-  extras: { inquiries?: ReadonlyMap<string, InquiryRef[]>; blockedDays?: ReadonlySet<string>; clubLines?: ReadonlyMap<string, string[]> } = {},
+  extras: {
+    inquiries?: ReadonlyMap<string, InquiryRef[]>;
+    blockedDays?: ReadonlySet<string>;
+    clubLines?: ReadonlyMap<string, string[]>;
+    /** The calendars the days are split into (reviewer 2.4): each tile counts its bookings per calendar. */
+    calendarColumns?: readonly Pick<Calendar, 'id' | 'name' | 'color'>[] | null;
+  } = {},
 ): MonthListModel {
   const base = monthViewModel(ctx, calendarMonth, filter);
   const publicIds = hideCalendarBacked ? new Set(ctx.sessions.filter(isCalendarBacked).map((s) => s.id)) : null;
@@ -823,6 +915,18 @@ export function monthTilesModel(
     const at = ctx.categories.findIndex((c) => c.id === id);
     return at === -1 ? Number.MAX_SAFE_INTEGER : at;
   };
+  const columns = extras.calendarColumns ?? null;
+  const perCalendar = new Map<string, Map<string, number>>();
+  if (columns) {
+    for (const a of bookings) {
+      if (filter !== 'all' && a.activityId !== filter) continue;
+      if (!a.calendarId) continue;
+      const day = pragueDateKey(a.startUtc);
+      let row = perCalendar.get(day);
+      if (!row) perCalendar.set(day, (row = new Map()));
+      row.set(a.calendarId, (row.get(a.calendarId) ?? 0) + (a.headcount && a.headcount > 0 ? a.headcount : 1));
+    }
+  }
   const hidden = new Map<string, number>();
   if (publicIds) {
     for (const s of ctx.sessions) {
@@ -847,6 +951,9 @@ export function monthTilesModel(
         blocked: extras.blockedDays?.has(t.date) ?? false,
         clubs: extras.clubLines?.get(t.date) ?? [],
         activities: [...(mix.get(t.date)?.values() ?? [])].sort((a, b) => order(a.categoryId) - order(b.categoryId) || a.name.localeCompare(b.name, 'cs')),
+        calendars: columns
+          ? columns.map((c) => ({ id: c.id, name: c.name, colour: cleanHex(c.color), count: perCalendar.get(t.date)?.get(c.id) ?? 0 }))
+          : [],
       };
     }),
   };

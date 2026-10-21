@@ -61,6 +61,11 @@ export interface BoardSettingsState {
   serviceSet: ReadonlySet<string> | null;
   employeeId: string | null;
   facets: BoardFacets;
+  /**
+   * The calendars every day of the week is split into (reviewer 2.4), in column order, published by the board; null while the
+   * week is one column per day. The compact layouts read it to head the columns of the one day they show.
+   */
+  columns: readonly FacetCalendar[] | null;
 }
 
 const EMPTY_FACETS: BoardFacets = { calendars: [], employees: [], services: [] };
@@ -107,12 +112,13 @@ export interface BoardSettingsStore {
   showAllServices(): void;
   setEmployee(id: string | null): void;
   publishFacets(facets: BoardFacets): void;
+  publishColumns(columns: readonly FacetCalendar[] | null): void;
   /** Back to the defaults (tests; the zoom is re-read from storage). */
   reset(): void;
 }
 
 export function createBoardSettings(getStorage: () => Storage | null = browserStorage): BoardSettingsStore {
-  let state: BoardSettingsState = { zoom: readZoom(getStorage()), ticked: null, serviceSet: null, employeeId: null, facets: EMPTY_FACETS };
+  let state: BoardSettingsState = { zoom: readZoom(getStorage()), ticked: null, serviceSet: null, employeeId: null, facets: EMPTY_FACETS, columns: null };
   const listeners = new Set<() => void>();
   const set = (patch: Partial<BoardSettingsState>) => {
     state = { ...state, ...patch };
@@ -174,9 +180,12 @@ export function createBoardSettings(getStorage: () => Storage | null = browserSt
         JSON.stringify(facets) === JSON.stringify(state.facets);
       if (!same) set({ facets });
     },
+    publishColumns(columns) {
+      if (JSON.stringify(columns) !== JSON.stringify(state.columns)) set({ columns });
+    },
     reset() {
       topMinute = null;
-      set({ zoom: readZoom(getStorage()), ticked: null, serviceSet: null, employeeId: null, facets: EMPTY_FACETS });
+      set({ zoom: readZoom(getStorage()), ticked: null, serviceSet: null, employeeId: null, facets: EMPTY_FACETS, columns: null });
     },
   };
 }

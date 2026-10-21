@@ -78,7 +78,9 @@ const TODAY = '2026-12-09'; // Wednesday
 const ROW = 455 / 720;
 const yOf = (minute: number) => (minute - 420) * ROW;
 const BOARD_WIDTH = 700;
-const colX = (col: number) => col * (BOARD_WIDTH / 7) + 50;
+/* Two calendars on screen split every day into two columns (reviewer 2.4): `colX` is the FIRST calendar's column of a day, `col2X` the second's. */
+const colX = (col: number) => col * (BOARD_WIDTH / 7) + 25;
+const col2X = (col: number) => col * (BOARD_WIDTH / 7) + 75;
 
 const SESSION: PickSession = {
   clubId: 'club1', clubName: 'FK Slaný', serviceId: 's1', serviceName: 'Diagnostika', activities: [], paymentMethod: 'ClubInvoice', note: '',
@@ -221,6 +223,17 @@ describe('/planovani draws the clinic\'s real calendar', () => {
       open: true, initialDate: '2026-12-10', initialCalendarId: 'c1', initialStart: '2026-12-10T13:00', initialEnd: '2026-12-10T14:30',
       anchor: { x: 111, y: 222, width: 90, height: 33 },
     });
+  });
+
+  it('the same marked time in the second calendar column opens the booking on THAT calendar (reviewer 2.4)', async () => {
+    mount();
+    await screen.findByTestId('board-booking-b1');
+    fireEvent.pointerDown(board(), { button: 0, pointerType: 'mouse', clientX: col2X(3), clientY: yOf(13 * 60), pointerId: 1 });
+    fireEvent.pointerMove(board(), { pointerType: 'mouse', clientX: col2X(3), clientY: yOf(14 * 60), pointerId: 1 });
+    fireEvent.pointerUp(board(), { pointerType: 'mouse', clientX: col2X(3), clientY: yOf(14 * 60), pointerId: 1 });
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Objednat pacienta/ }));
+    const props = JSON.parse((await screen.findByTestId('new-appointment')).dataset.props!);
+    expect(props).toMatchObject({ initialDate: '2026-12-10', initialCalendarId: 'c2', initialStart: '2026-12-10T13:00' });
   });
 
   it('moving a booking asks first; "Přesunout" sends it with notifyPatient as the checkbox says', async () => {

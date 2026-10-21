@@ -167,6 +167,7 @@ export function PhoneMonthList({ heading, rows, onPick, hint }: { heading: strin
                 {r.activities.length > 0
                   ? r.activities.map((line) => <span key={line} className="phone-month-activity" data-testid={`phone-month-activity-${r.date}`}>{line}</span>)
                   : r.countLabel ? <span>{r.countLabel}</span> : null}
+                {r.calendarLine ? <span className="phone-month-calendars" data-testid={`phone-month-calendars-${r.date}`}>{r.calendarLine}</span> : null}
                 {r.clubs.map((line) => <span key={line} className="phone-month-club" data-testid={`phone-month-club-${r.date}`}>{line}</span>)}
                 {r.inquiry ? <span className="phone-month-inquiry" data-testid={`phone-month-inquiry-${r.date}`}>{r.inquiry}</span> : null}
                 {!r.countLabel && !r.flag && !r.blocked && r.clubs.length === 0 && !r.inquiry ? <span className="phone-month-none">{PLANNER_TEXT.phone.noBookings}</span> : null}

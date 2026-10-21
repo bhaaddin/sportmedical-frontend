@@ -440,3 +440,132 @@
 .sm-planner .month-tile .tile-activity-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .sm-planner .month-tile .tile-activity b { flex: none; font-weight: 800; color: hsl(from #bff7f1 var(--sm-hsl, h s l)); }
 .sm-planner .month-tile .tile-activity-more { color: #9bc2d6; }
+
+/* ======================= one column per calendar (reviewer 2.4) ======================= */
+/* A day split into its calendars: the chips under the day's name, the lines between the columns, the marks that follow the column. */
+.sm-planner .board-head[data-subs] { height: 66px; }
+.sm-planner .board-head[data-subs] .day-title { justify-content: flex-start; padding-top: 6px; gap: 1px; }
+.sm-planner .day-calendars {
+  display: grid;
+  grid-template-columns: repeat(var(--subs, 2), minmax(0, 1fr));
+  gap: 2px;
+  width: calc(100% - 6px);
+  margin-top: 4px;
+  line-height: 1;
+}
+.sm-planner .day-calendar {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 3px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--cal, #6e91a5) 70%, transparent);
+  background: color-mix(in srgb, var(--cal, #6e91a5) 16%, #001521);
+  color: #e9f6fb;
+  font-size: 9.5px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+.sm-planner .day-calendar i { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--cal, #6e91a5); }
+.sm-planner .day-calendar > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* faint lines between the calendar columns of a day, drawn over the file's day lines */
+.sm-planner .day-board[data-subs] .grid-lines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0, transparent calc(100% / (7 * var(--subs)) - 1px), rgba(79, 161, 190, 0.2) calc(100% / (7 * var(--subs)) - 1px), rgba(79, 161, 190, 0.2) calc(100% / (7 * var(--subs))));
+}
+.sm-planner .day-board[data-subs] .board-selection,
+.sm-planner .day-board[data-subs] .board-move-ghost {
+  left: calc((var(--col) * var(--subs) + var(--sub, 0)) * 100% / (7 * var(--subs)) + 2px);
+  width: calc(100% / (7 * var(--subs)) - 4px);
+}
+.sm-planner .day-board[data-subs] .board-move-lanes {
+  left: calc((var(--col) * var(--subs) + var(--sub, 0)) * 100% / (7 * var(--subs)));
+  width: calc(100% / (7 * var(--subs)));
+}
+.sm-planner .board-calendar-shades { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.sm-planner .board-calendar-shade {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: calc((var(--col) * var(--subs) + var(--sub)) * 100% / (7 * var(--subs)) + 2px);
+  width: calc(100% / (7 * var(--subs)) - 4px);
+  border-radius: 5px;
+  border: 1px dashed var(--shade-line);
+  background-image: var(--shade-hatch);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10px;
+  font-size: 10px;
+  font-weight: 650;
+  color: #f4e6d2;
+}
+/* the club windows and blocks follow their calendar's column through their own left / width (cardLeftWidth) */
+
+/* the calendar selector under the toolbar */
+.sm-planner .calendar-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px 10px;
+  flex-wrap: wrap;
+  padding: 0 8px 7px;
+  min-height: 38px;
+}
+.sm-planner .calendar-strip-label { font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #9bc2d6; }
+.sm-planner .calendar-strip-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.sm-planner .calendar-chip {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border-radius: 99px;
+  border: 1px solid #306077;
+  background: #021c2d;
+  color: #a9c3d2;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.sm-planner .calendar-chip i { flex: none; width: 9px; height: 9px; border-radius: 50%; background: transparent; border: 2px solid var(--cal, #6e91a5); }
+.sm-planner .calendar-chip.is-on { color: #f2fbff; border-color: color-mix(in srgb, var(--cal, #6e91a5) 75%, transparent); background: color-mix(in srgb, var(--cal, #6e91a5) 18%, #001521); }
+.sm-planner .calendar-chip.is-on i { background: var(--cal, #6e91a5); }
+.sm-planner .calendar-chip:hover { border-color: hsl(from #15b3be var(--sm-hsl, h s l)); }
+.sm-planner .calendar-chip.is-all { border-style: dashed; color: #d6eaf4; }
+.sm-planner .calendar-strip-hint { font-size: 11.5px; color: #e7cba9; }
+.sm-planner.is-compact .calendar-strip { padding: 4px 6px 8px; }
+.sm-planner.is-compact .calendar-chip { min-height: 44px; padding: 0 14px; font-size: 13.5px; }
+
+/* Month tile of a split week: a count under each calendar's chip, in the calendar's own colour (reviewer 2.4). */
+.sm-planner .month-tile .tile-calendars { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.sm-planner .month-tile .tile-calendar { display: inline-flex; align-items: center; gap: 4px; margin: 0; padding: 1px 6px; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--cal, #6e91a5) 70%, transparent); background: color-mix(in srgb, var(--cal, #6e91a5) 16%, #001521); color: #e9f6fb; font-size: 10.5px; line-height: 1.3; }
+.sm-planner .month-tile .tile-calendar i { width: 6px; height: 6px; border-radius: 50%; background: var(--cal, #6e91a5); }
+.sm-planner .month-tile .tile-calendar b { font-weight: 800; }
+
+/* One day shown (tablet / phone): the chips of the calendar columns above the board, aligned with the hour column's width. */
+.sm-planner .compact-calendars { display: grid; grid-template-columns: repeat(var(--subs, 2), minmax(0, 1fr)); gap: 4px; padding: 0 0 6px 48px; }
+.sm-planner .compact-calendar {
+  min-width: 0;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--cal, #6e91a5) 70%, transparent);
+  background: color-mix(in srgb, var(--cal, #6e91a5) 16%, #001521);
+  color: #eef8fc;
+  font-size: 12px;
+  font-weight: 700;
+}
+.sm-planner .compact-calendar i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--cal, #6e91a5); }
+.sm-planner .compact-calendar > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sm-planner.is-compact .planner .board-head[data-subs] { height: 70px; }
+.sm-planner.is-compact .calendar-strip-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+.sm-planner.is-compact .calendar-chip { flex: none; }

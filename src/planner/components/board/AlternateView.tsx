@@ -199,6 +199,16 @@ export function MonthMatrix({ model, onPick, selection }: { model: MonthListMode
               {t.flag ? <small className="tile-flag" style={{ color: '#e7cba9' }}>{t.flag}</small> : null}
               {t.clubs.slice(0, 2).map((line) => <small key={line} className="tile-club" data-testid={`tile-club-${t.date}`} title={t.clubs.join(' · ')}>{line}</small>)}
               {t.clubs.length > 2 ? <small className="tile-club tile-club-more" title={t.clubs.join(' · ')}>{`+${t.clubs.length - 2}`}</small> : null}
+              {t.calendars.length > 0 ? (
+                <span className="tile-calendars" data-testid={`tile-calendars-${t.date}`} aria-label={t.calendars.map((c) => `${c.name}: ${c.count}`).join(', ')}>
+                  {t.calendars.map((c) => (
+                    <small key={c.id} className="tile-calendar" data-calendar-id={c.id} title={`${c.name}: ${c.count}`} style={c.colour ? ({ '--cal': c.colour } as CSSProperties) : undefined}>
+                      <i aria-hidden="true" />
+                      <b>{c.count}</b>
+                    </small>
+                  ))}
+                </span>
+              ) : null}
               {t.blocked ? <small className="tile-blocked" data-testid={`tile-blocked-${t.date}`}>{PLANNER_TEXT.days.blockedTile}</small> : null}
               {t.inquiries.length ? (
                 <small className="tile-inquiry" data-testid={`tile-inquiry-${t.date}`} title={t.inquiries.map(inquiryTitle).join(' · ')}>
