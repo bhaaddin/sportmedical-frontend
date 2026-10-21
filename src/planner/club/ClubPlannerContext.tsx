@@ -9,7 +9,7 @@
  * draw exactly as before there).
  */
 import { useQueryClient } from '@tanstack/react-query';
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { Suspense, createContext, lazy, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { clubsApi, type Club } from '../../api/clubs';
@@ -22,7 +22,10 @@ import { fetchBlockableActivities } from '../../api/clubBlocks';
 import { todayInPrague } from '../../components/clubs/blockLogic';
 import { CancelOrderDialog } from '../../components/clubs/orders/CancelOrderDialog';
 import { ChangePlayersDialog } from '../../components/clubs/orders/ChangePlayersDialog';
-import { ClubOrderDetailPanel } from '../../components/clubs/orders/ClubOrderDetailPanel';
+/* The order's own panel opens on demand: it is a chunk of its own, not part of the planner's first load (bundle budget). */
+const ClubOrderDetailPanel = lazy(() =>
+  import('../../components/clubs/orders/ClubOrderDetailPanel').then((m) => ({ default: m.ClubOrderDetailPanel })),
+);
 import { MergeOrdersDialog } from '../../components/clubs/detail/MergeOrdersDialog';
 import { mergeableRoots } from '../../components/clubs/detail/orderGroups';
 import type { ClubGroup } from './clubGroups';
@@ -168,7 +171,11 @@ export function ClubPlannerProvider({ data, club, adhoc, planning, children }: {
         onPhone={() => { setEntry(false); newReservation(); }}
         onInvited={(invited) => { reload(); setOpenOrderId(invited.id); }}
       />
-      {openOrderId !== null ? <ClubOrderDetailPanel orderId={openOrderId} onClose={() => setOpenOrderId(null)} onChanged={reload} /> : null}
+      {openOrderId !== null ? (
+        <Suspense fallback={null}>
+          <ClubOrderDetailPanel orderId={openOrderId} onClose={() => setOpenOrderId(null)} onChanged={reload} />
+        </Suspense>
+      ) : null}
       {players !== null ? (
         <ChangePlayersDialog
           order={players.order}
