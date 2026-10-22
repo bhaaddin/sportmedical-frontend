@@ -33,19 +33,21 @@ export const HISTORY_KIND_LABEL: Record<HistoryKind, string> = {
 export function classifyHistoryText(text: string): HistoryKind[] {
   const kinds = new Set<HistoryKind>();
   const t = text.trim();
+  /* What the desk typed ("Zpráva ordinace: ...", "Důvod: ...") is the person's own words, not the event: it never decides the kind. */
+  const head = t.replace(/(?:^|\s)(?:Zpráva ordinace:|Důvod:)[\s\S]*$/, '').trim();
 
   if (
-    /^Objednávka (založena|zadána|potvrzena|zrušena|dokončena)/.test(t)
-    || /^Objednávka byla zrušena ordinací/.test(t)
-    || /^Klub odeslal objednávku/.test(t)
-    || /Odkaz na formulář čeká/.test(t)
-    || /^Ordinace potvrdila termíny/.test(t)
+    /^Objednávka (založena|zadána|potvrzena|zrušena|dokončena)/.test(head)
+    || /^Objednávka byla zrušena ordinací/.test(head)
+    || /^Klub odeslal objednávku/.test(head)
+    || /Odkaz na formulář čeká/.test(head)
+    || /^Ordinace potvrdila termíny/.test(head)
   ) kinds.add('status');
-  if (/dodatk|dodatek|slouč|spolu s hlavní objednávkou/i.test(t)) kinds.add('addendum');
-  if (/faktur/i.test(t)) kinds.add('invoice');
+  if (/dodatk|dodatek|slouč|spolu s hlavní objednávkou/i.test(head)) kinds.add('addendum');
+  if (/faktur/i.test(head)) kinds.add('invoice');
   if (/Zpráva ordinace:/.test(t)) kinds.add('message');
-  if (/hráč|sportovc|místa \(/i.test(t)) kinds.add('players');
-  if (/termín|časov[ée]+ bloky|uvolněn|uvolnila|Nabídnuté dny|Nabídnuto \d|v kalendáři/i.test(t)) kinds.add('window');
+  if (/hráč|sportovc|místa \(/i.test(head)) kinds.add('players');
+  if (/termín|časov[ée]+ bloky|uvolněn|uvolnila|Nabídnuté dny|Nabídnuto \d|v kalendáři/i.test(head)) kinds.add('window');
 
   return kinds.size === 0 ? ['other'] : HISTORY_KINDS.filter((kind) => kinds.has(kind));
 }

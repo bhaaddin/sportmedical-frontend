@@ -85,6 +85,13 @@ describe('classifyHistoryText - the wording the backend writes', () => {
     expect(kindsOf(text)).toEqual(expected);
   });
 
+  it("the desk's own words never decide the kind (a reason or a message may say anything)", () => {
+    expect(kindsOf('Objednávka byla zrušena ordinací. Zpráva ordinace: Dodatek už nepotřebujeme.')).toEqual(['status', 'message']);
+    expect(kindsOf('Zpráva ordinace: Prosíme o doložení seznamu hráčů.')).toEqual(['message']);
+    expect(kindsOf('Objednávka zrušena. Důvod: Klub zrušil termín i fakturu.')).toEqual(['status']);
+    expect(kindsOf('Dodatek KO-AAAA0002 zrušen. Důvod: hráči odpadli.')).toEqual(['addendum']);
+  });
+
   it('never returns an empty list and keeps the chip order', () => {
     for (const text of ['', 'x', 'Objednávka zrušena, zrušeno 3 rezervací sportovců.']) {
       const kinds = classifyHistoryText(text);
