@@ -134,6 +134,7 @@ async function flow(browser, size) {
   const off = await anim('off');
   check(full === 'guide-pulse' && reduced === 'none' && off === 'none', `(c) the pulse plays only under plné (plné ${full}, omezené ${reduced}, vypnuto ${off})`);
   await page.evaluate((m) => { document.documentElement.dataset.motion = m ?? 'full'; }, motion);
+  await page.waitForTimeout(700); // the card's own entrance restarts when the motion attribute is put back
   const settled = await page.evaluate(() => { const el = document.querySelector('.completion-card'); const cs = getComputedStyle(el); return { opacity: cs.opacity, anim: cs.animationName, state: cs.animationPlayState, transform: cs.transform }; });
   check(settled.opacity === '1', `(c) the card is fully opaque when settled (${JSON.stringify(settled)})`);
   await snap(page, size, 'c-prepare');
