@@ -262,7 +262,8 @@ describe('the calendar selector', () => {
     expect(chip('c1')).toHaveAttribute('aria-pressed', 'true');
     expect(chip('c2')).toHaveAttribute('aria-pressed', 'true');
     expect(chip('c1').style.getPropertyValue('--cal')).toBe('#0EA5E9');
-    expect(screen.queryByTestId('calendar-chip-all')).toBeNull();
+    /* R20: "Všechny" is always there, selected while nothing is narrowed */
+    expect(screen.getByTestId('calendar-chip-all')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('calendar-strip')).toHaveAttribute('data-split', 'true');
   });
 
@@ -375,10 +376,13 @@ describe('R2: the selector is by služba, činnosti are inside, per-činnost cal
     withServices(A, B);
     mount();
     await screen.findByTestId('calendar-strip');
-    expect(chip('s1')).toHaveTextContent('Sportovní lékařské prohlídky');
+    expect(chip('s1')).toHaveTextContent('Lékařské prohlídky');
     expect(chip('s2')).toHaveTextContent('Sportovní diagnostika');
+    expect(chip('s1').title).toContain('Sportovní lékařské prohlídky');
+    expect(chip('s1').querySelector('svg use')).not.toBeNull();
     expect(chip('s1').style.getPropertyValue('--cal')).toBe('#11AA11');
-    expect(screen.getByTestId('calendar-strip')).toHaveTextContent('Služby');
+    expect(screen.getByTestId('calendar-strip')).toHaveTextContent('Kalendáře');
+    expect(screen.getByTestId('calendar-strip')).not.toHaveTextContent('Služby');
     /* the column heads say the same */
     const heads = within(screen.getByTestId('day-calendars-2026-12-09'));
     expect(heads.getByText('Sportovní lékařské prohlídky')).toBeInTheDocument();
@@ -403,7 +407,7 @@ describe('R2: the selector is by služba, činnosti are inside, per-činnost cal
     expect(screen.getByTestId('board-booking-l1')).toBeInTheDocument();
     /* both služby shown = "Všechny" again (the clinic has two), so the pills fold away with the narrowing */
     expect(screen.queryByTestId('calendar-strip-pills')).toBeNull();
-    expect(screen.queryByTestId('calendar-chip-all')).toBeNull();
+    expect(screen.getByTestId('calendar-chip-all')).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('a služba with a second (per-činnost) calendar is still ONE chip and ONE column; its bookings ride in that column and nothing is dropped', async () => {

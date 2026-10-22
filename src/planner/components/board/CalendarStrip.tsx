@@ -1,7 +1,8 @@
 /*
- * CalendarStrip - the selector of the standard calendar (R2): one toggle chip per SLUŽBA of the clinic, in the služba's own name and
- * colour, right under the toolbar. It is not a list of calendars and never of činnosti: the owner said "I click a služba and see its
- * calendar; two clicks, two calendars side by side; each služba contains its činnosti".
+ * CalendarStrip - the selector of the standard calendar, "Kalendáře" (R20; R2 made it by služba): one toggle chip per calendar
+ * group of the clinic - an ICON from the planner's set (`calendarIcon.ts`, chosen by keywords, neutral fallback), the calendar's own
+ * name ("Ordinace 1") and the služba's colour - plus "Všechny", right under the toolbar. Never a list of činnosti: "I click a
+ * calendar and see it; two clicks, two calendars side by side; each služba contains its činnosti".
  *
  *   - one click shows only that služba's calendar (from "Všechny"); a click on a second služba adds a column to every day (the
  *     split of fix 2.4); a click on a shown one hides it; hiding the last one is "Všechny" again (`toggleGroupSet`);
@@ -15,16 +16,18 @@ import type { CSSProperties } from 'react';
 import type { Calendar } from '../../../api/bookingContracts';
 import { MAX_CALENDAR_COLUMNS } from './calendarColumns';
 import { boardSettings, useBoardSettings } from './boardSettings';
+import { calendarIconName, CALENDAR_ICON_FALLBACK } from './calendarIcon';
+import { Icon } from '../Icons';
 import { groupOn, groupsOnScreen } from './serviceGroups';
 
 export const CALENDAR_STRIP_TEXT = {
-  label: 'Služby',
-  group: 'Zobrazené služby',
+  label: 'Kalendáře',
+  group: 'Zobrazené kalendáře',
   all: 'Všechny',
-  allTitle: 'Zobrazit všechny služby',
+  allTitle: 'Zobrazit všechny kalendáře',
   activities: 'Činnosti zobrazených služeb',
-  hint: (max: number) => `Víc než ${max} služby se do sloupců dne nevejdou - vyberte jich nejvýše ${max}.`,
-  chipTitle: (name: string, on: boolean) => (on ? `${name}: zobrazena (klepnutím skryjete)` : `${name}: skryta (klepnutím zobrazíte)`),
+  hint: (max: number) => `Víc než ${max} kalendáře se do sloupců dne nevejdou - vyberte jich nejvýše ${max}.`,
+  chipTitle: (name: string, on: boolean) => (on ? `${name}: zobrazen (klepnutím skryjete)` : `${name}: skryt (klepnutím zobrazíte)`),
 } as const;
 
 export function CalendarStrip({ columns }: { columns: readonly Calendar[] | null }) {
@@ -49,20 +52,27 @@ export function CalendarStrip({ columns }: { columns: readonly Calendar[] | null
               data-testid={`calendar-chip-${group.id}`}
               data-calendar-id={group.primaryId}
               data-service-id={group.serviceId ?? undefined}
-              title={CALENDAR_STRIP_TEXT.chipTitle(group.name, on)}
+              title={group.name !== group.calendarName ? `${CALENDAR_STRIP_TEXT.chipTitle(group.calendarName, on)} - ${group.name}` : CALENDAR_STRIP_TEXT.chipTitle(group.calendarName, on)}
               style={{ '--cal': group.colour } as CSSProperties}
               onClick={() => boardSettings.clickGroup(group.id, groups)}
             >
-              <i aria-hidden="true" />
-              <span>{group.name}</span>
+              <Icon name={calendarIconName(group.calendarName, group.name)} className="icon calendar-chip-icon" />
+              <span>{group.calendarName}</span>
             </button>
           );
         })}
-        {settings.ticked !== null ? (
-          <button type="button" className="calendar-chip is-all" data-testid="calendar-chip-all" title={CALENDAR_STRIP_TEXT.allTitle} onClick={() => boardSettings.showAllCalendars()}>
-            <span>{CALENDAR_STRIP_TEXT.all}</span>
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className={`calendar-chip is-all${settings.ticked === null ? ' is-on' : ''}`}
+          aria-pressed={settings.ticked === null}
+          data-testid="calendar-chip-all"
+          title={CALENDAR_STRIP_TEXT.allTitle}
+          style={{ '--cal': '#8fb6c9' } as CSSProperties}
+          onClick={() => boardSettings.showAllCalendars()}
+        >
+          <Icon name={CALENDAR_ICON_FALLBACK} className="icon calendar-chip-icon" />
+          <span>{CALENDAR_STRIP_TEXT.all}</span>
+        </button>
       </div>
       {columns === null && shownCount > MAX_CALENDAR_COLUMNS ? (
         <span className="calendar-strip-hint" data-testid="calendar-strip-hint">{CALENDAR_STRIP_TEXT.hint(MAX_CALENDAR_COLUMNS)}</span>

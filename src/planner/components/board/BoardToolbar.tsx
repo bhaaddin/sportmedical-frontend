@@ -9,8 +9,7 @@ import type { WeekHeadModel, PlannerCategory } from '../../model';
 import type { PlannerView } from '../../state/plannerState';
 import type { BoundPlannerActions } from '../../state/PlannerStoreProvider';
 import { ClubOrderSwitcher } from '../../club/ClubOrderSwitcher';
-import { categoryWithPrice, serviceWithPrice } from '../categoryPrice';
-import { normalizeFilter, plannerServices, usesServiceFilter } from '../../model/services';
+import { categoryWithPrice } from '../categoryPrice';
 import { Icon } from '../Icons';
 import { formatZoom, ZOOM_MAX, ZOOM_MIN } from './boardZoom';
 
@@ -57,13 +56,9 @@ export function BoardToolbar({
   filterActive: boolean;
   /** The zoom group next to the gear; absent where the board is not zoomable. */
   zoomControl?: BoardZoomControl;
-  /** The main planner filters by služba (R1); a club's own board keeps filtering by the činnosti of its order. */
+  /** The main planner has no filter dropdown (R20: the Kalendáře chips are its selector); a club's own board (`false`) keeps filtering by the činnosti of its order. */
   serviceFilter?: boolean;
 }) {
-  const byService = usesServiceFilter(categories, !serviceFilter);
-  const services = byService ? plannerServices(categories) : [];
-  const value = byService ? normalizeFilter(filter, categories) : filter;
-  const chosenService = services.find((s) => s.id === value);
   const chosen = categories.find((c) => c.id === filter);
   return (
     <div className="planner-toolbar">
@@ -89,21 +84,17 @@ export function BoardToolbar({
             <button key={v.value} data-view={v.value} className={view === v.value ? 'active' : undefined} onClick={() => act.setView(v.value)}>{v.label}</button>
           ))}
         </div>
-        <label className="filter-select">
-          <span className="sr-only">{byService ? 'Filtrovat podle služby' : 'Filtrovat podle činnosti'}</span>
-          {byService ? (
-            <select id="activity-filter" value={value} title={chosenService ? serviceWithPrice(chosenService) : undefined} onChange={(e) => act.setFilter(e.target.value)}>
-              <option value="all">Všechny služby</option>
-              {services.map((s) => <option key={s.id} value={s.id} title={serviceWithPrice(s)}>{serviceWithPrice(s)}</option>)}
-            </select>
-          ) : (
+        {/* R20: the main calendar has no filter dropdown any more - the Kalendáře chips under the toolbar are its one selector. A club's own board keeps its činnost list. */}
+        {serviceFilter ? null : (
+          <label className="filter-select">
+            <span className="sr-only">Filtrovat podle činnosti</span>
             <select id="activity-filter" value={filter} title={chosen ? categoryWithPrice(chosen) : undefined} onChange={(e) => act.setFilter(e.target.value)}>
               <option value="all">Všechny činnosti</option>
               {categories.map((c) => <option key={c.id} value={c.id} title={categoryWithPrice(c)}>{categoryWithPrice(c)}</option>)}
             </select>
-          )}
-          <Icon name="chevron-down" />
-        </label>
+            <Icon name="chevron-down" />
+          </label>
+        )}
         {zoomControl ? (
           <div className="view-segment zoom-segment" role="group" aria-label="Přiblížení časové osy" data-testid="board-zoom">
             <button type="button" data-zoom-command="out" title="Oddálit (−)" aria-label="Oddálit" disabled={zoomControl.zoom <= ZOOM_MIN} onClick={() => zoomControl.onStep(-1)}>−</button>

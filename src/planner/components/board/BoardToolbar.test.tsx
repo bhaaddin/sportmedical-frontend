@@ -14,37 +14,21 @@ const categories: PlannerCategory[] = [
   { id: 'a4', name: 'Další prohlídka', iconKey: 'heart', color: '#00f1dc', slotMinutes: 30, priceCzk: 1600, serviceId: 's1b', serviceName: 'sportovni lekarske prohlidky' },
 ];
 
-describe('BoardToolbar R1 - the filter lists služby, one entry each, with the price', () => {
+describe('BoardToolbar - no filter dropdown on the main calendar (R20), the club board keeps its činnost list', () => {
   const mount = (filter: string, serviceFilter?: boolean) =>
     render(
       <BoardToolbar head={weekHeadModel('2026-11-16')} view="week" filter={filter} categories={categories} today="2026-11-16" act={{} as BoundPlannerActions} entry={null} filterActive={false} {...(serviceFilter === undefined ? {} : { serviceFilter })} />,
     );
   const options = () => [...(document.getElementById('activity-filter') as HTMLSelectElement).options];
 
-  it('says "Všechny služby", lists only služby once (deduplicated by name without accents/case), "od" when činnosti differ', () => {
+  it('the main calendar has no "Všechny služby" select at all - the Kalendáře chips are its selector', () => {
     mount('all');
-    const text = options().map((o) => o.textContent);
-    expect(text).toHaveLength(3);
-    expect(text[0]).toBe('Všechny služby');
-    expect(text[1]).toMatch(/^Sportovní lékařské prohlídky · od 1\s600\sKč$/);
-    expect(text[2]).toBe('Fyzioterapie a regenerace · bez ceny');
-    expect(text.join('|')).not.toContain('Základní prohlídka');
-    expect(options()[1]!.title).toBe(text[1]);
-    expect(options()[1]!.value).toBe('s1');
-  });
-
-  it('names the chosen služba with its price as the tooltip of the closed select, and labels it for a screen reader', () => {
-    mount('s1');
-    expect(document.getElementById('activity-filter')!.getAttribute('title')).toMatch(/^Sportovní lékařské prohlídky · od 1\s600\sKč$/);
-    expect(screen.getByText('Filtrovat podle služby')).toBeTruthy();
-  });
-
-  it('a stale value (an old činnost id, a služba that is gone) reads as "Všechny služby"', () => {
-    mount('a1');
-    expect((document.getElementById('activity-filter') as HTMLSelectElement).value).toBe('all');
-    cleanup();
-    mount('s-gone');
-    expect((document.getElementById('activity-filter') as HTMLSelectElement).value).toBe('all');
+    expect(document.getElementById('activity-filter')).toBeNull();
+    expect(screen.queryByText('Všechny služby')).toBeNull();
+    expect(screen.queryByText('Filtrovat podle služby')).toBeNull();
+    /* the rest of the toolbar is still there */
+    expect(screen.getByText('Týden')).toBeTruthy();
+    expect(screen.getByLabelText('Nastavení')).toBeTruthy();
   });
 
   it("a club's own board keeps the činnosti of its order, with their prices", () => {

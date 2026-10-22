@@ -36,6 +36,8 @@ export interface ServiceGroup {
   id: string;
   serviceId: string | null;
   name: string;
+  /** The primary calendar's own name ("Ordinace 1", "Diagnostika"): what the Kalendáře chips say (R20). */
+  calendarName: string;
   /** `#RRGGBB`. */
   colour: string;
   /** Every calendar of the group, primary first. */
@@ -75,6 +77,7 @@ export function serviceGroups(
       id: key,
       serviceId: service ? service.id : null,
       name: service ? service.name : primary.name,
+      calendarName: primary.name,
       colour: colourOf(service?.colorHex) ?? colourOf(primary.color) ?? FALLBACK,
       calendarIds: list.map((c) => c.id),
       primaryId: primary.id,
