@@ -18,7 +18,7 @@ export function ExportGate({ children }: { children: (blocked: boolean) => React
   return (
     <Tooltip title={access.reason ?? ''} enterTouchDelay={0} leaveTouchDelay={4000}>
       {/* A disabled button swallows pointer events; the wrapper is what the hover and the long press land on. */}
-      <Box component="span" tabIndex={0} role="group" aria-label={access.reason ?? undefined} data-testid="export-blocked" sx={{ display: 'inline-flex', minHeight: 44, alignItems: 'center' }}>
+      <Box component="span" tabIndex={0} role="group" aria-label={access.reason ?? undefined} data-testid="export-blocked" sx={{ display: 'inline-flex', minHeight: 44, alignItems: 'center', cursor: 'not-allowed', '& button': { opacity: 0.45 } }}>
         {children(true)}
       </Box>
     </Tooltip>
