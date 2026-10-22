@@ -4,7 +4,7 @@
  * row per day with the figures written out, a tap opens that day. The old calendar's `PhoneCalendar` in the planner's
  * own classes (`phone.css`); "Týden" stays the board with one day at a time. Every target is at least 44 px tall.
  */
-import { useRef, useState, type TouchEvent } from 'react';
+import { useRef, useState, type CSSProperties, type TouchEvent } from 'react';
 import { InquiryChip } from './AlternateView';
 import { PLANNER_TEXT } from '../../text';
 import type { InquiryRef } from '../../model/inquiries';
@@ -94,7 +94,8 @@ export function PhoneAgenda({
           <button
             key={d.date}
             type="button"
-            className={`phone-strip-day${d.selected ? ' is-selected' : ''}${d.today ? ' is-today' : ''}${d.closed ? ' is-closed' : ''}`}
+            className={`phone-strip-day${d.selected ? ' is-selected' : ''}${d.today ? ' is-today' : ''}${d.closed ? ' is-closed' : ''}${d.lock ? ` is-lock is-lock-${d.lock.kind}` : ''}`}
+            style={d.lock ? ({ '--lock-fill': d.lock.fill, '--lock-ink': d.lock.ink } as CSSProperties) : undefined}
             data-testid={`phone-strip-${d.date}`}
             data-day={d.date}
             aria-pressed={d.selected}
@@ -150,7 +151,8 @@ export function PhoneMonthList({ heading, rows, onPick, hint }: { heading: strin
           <li key={r.date}>
             <button
               type="button"
-              className={`phone-month-row${r.today ? ' is-today' : ''}${r.flag ? ' is-closed' : ''}`}
+              className={`phone-month-row${r.today ? ' is-today' : ''}${r.flag ? ' is-closed' : ''}${r.lock ? ` is-lock is-lock-${r.lock.kind}` : ''}`}
+              style={r.lock ? ({ '--lock-fill': r.lock.fill, '--lock-ink': r.lock.ink } as CSSProperties) : undefined}
               data-testid={`phone-month-day-${r.date}`}
               data-day={r.date}
               aria-current={r.today ? 'date' : undefined}
@@ -162,7 +164,7 @@ export function PhoneMonthList({ heading, rows, onPick, hint }: { heading: strin
                 <b>{r.dayNumber}</b>
               </span>
               <span className="phone-month-body">
-                {r.flag ? <span className="phone-month-flag">{r.flag}</span> : null}
+                {r.flag ? <span className="phone-month-flag">{r.lock ? r.lock.label : r.flag}</span> : null}
                 {r.blocked ? <span className="phone-month-flag" data-testid={`phone-month-blocked-${r.date}`}>{PLANNER_TEXT.days.blockedTile}</span> : null}
                 {r.activities.length > 0
                   ? r.activities.map((line) => <span key={line} className="phone-month-activity" data-testid={`phone-month-activity-${r.date}`}>{line}</span>)

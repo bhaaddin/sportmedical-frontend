@@ -8,6 +8,7 @@ import { FRESH_MS, usePickedDays } from '../../motion/planFx';
 import { inRange, rangePill } from '../../../components/booking/calendar/model';
 import { inquiryLabel, inquiryTileLabel, inquiryTitle, type InquiryRef } from '../../model/inquiries';
 import { PLANNER_TEXT } from '../../text';
+import { Icon } from '../Icons';
 import { groupDayRows, type DayListModel, type DayRowGroup, type DayRowModel, type MonthListModel } from './boardModel';
 import { agendaSlotLabel } from '../../model';
 import './month/month.css';
@@ -162,13 +163,13 @@ export function MonthMatrix({ model, onPick, selection }: { model: MonthListMode
             <button
               key={t.date}
               type="button"
-              className={`month-tile${lit || placed === 'active' ? ' is-picked' : placed === 'past' ? ' is-picked-past' : ''}`}
+              className={`month-tile${lit || placed === 'active' ? ' is-picked' : placed === 'past' ? ' is-picked-past' : ''}${t.lock ? ` is-lock is-lock-${t.lock.kind}` : ''}`}
               data-day={t.date}
               data-range-day={select ? t.date : undefined}
               data-picked={lit || placed === 'active' ? 'true' : placed === 'past' ? 'past' : undefined}
               data-inquiry={t.inquiries.length ? 'true' : undefined}
               data-fx={rippleOf.has(t.date) ? 'picked' : undefined}
-              style={{ opacity: t.otherMonth ? 0.42 : 1, ...(rippleOf.has(t.date) ? { '--ripple-i': rippleOf.get(t.date) } : {}) } as CSSProperties}
+              style={{ opacity: t.otherMonth ? 0.42 : 1, ...(t.lock ? { '--lock-fill': t.lock.fill, '--lock-ink': t.lock.ink } : {}), ...(rippleOf.has(t.date) ? { '--ripple-i': rippleOf.get(t.date) } : {}) } as CSSProperties}
               onPointerDown={(event) => {
                 if (select && event.button === 0) select.begin(t.date, event);
               }}
@@ -196,7 +197,13 @@ export function MonthMatrix({ model, onPick, selection }: { model: MonthListMode
                   {t.activities.length > 2 ? <small className="tile-activity tile-activity-more">{`+${t.activities.length - 2}`}</small> : null}
                 </span>
               ) : t.countLabel ? <small>{t.countLabel}</small> : null}
-              {t.flag ? <small className="tile-flag" style={{ color: '#e7cba9' }}>{t.flag}</small> : null}
+              {t.lock ? (
+                <small className="tile-flag" data-testid={`tile-lock-${t.date}`} data-lock={t.lock.kind}>
+                  <Icon name="lock" />
+                  <span>{t.lock.label}</span>
+                  {t.lock.reason ? <em>{t.lock.reason}</em> : null}
+                </small>
+              ) : t.flag ? <small className="tile-flag">{t.flag}</small> : null}
               {t.clubs.slice(0, 2).map((line) => <small key={line} className="tile-club" data-testid={`tile-club-${t.date}`} title={t.clubs.join(' · ')}>{line}</small>)}
               {t.clubs.length > 2 ? <small className="tile-club tile-club-more" title={t.clubs.join(' · ')}>{`+${t.clubs.length - 2}`}</small> : null}
               {t.calendars.length > 0 ? (

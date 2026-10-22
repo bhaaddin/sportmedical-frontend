@@ -434,6 +434,8 @@ export interface DayMark {
   closed: boolean;
   /** Name of the holiday / closure, Czech, from the holidays settings. */
   label?: string | null;
+  /** R6: a public holiday / clinic closure ('holiday', drawn red) or an ordinary day off ('closed', drawn grey); absent = 'closed'. */
+  kind?: 'holiday' | 'closed';
   /** Working hours of the clinic that day; null = no hours known. */
   hours?: { from: ClockTime; to: ClockTime } | null;
   /** Lunch break; null = none. */

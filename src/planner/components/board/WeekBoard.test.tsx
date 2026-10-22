@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -1048,5 +1050,73 @@ describe("hand-overs by router state (the calendar page's landings)", () => {
     expect(within(services).getByRole('checkbox', { name: /Diagnostika/ })).not.toBeChecked();
     fireEvent.click(within(services).getByRole('button', { name: 'Všechny služby' }));
     await screen.findByTestId('board-booking-b1');
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+/* R6: a locked day is ONE opaque block                                       */
+/* ------------------------------------------------------------------------ */
+
+describe('a locked day (R6)', () => {
+  /* the day marks come from the planner's data source: a holiday (red) or a day off (grey) on the Wednesday */
+  let wednesday: 'holiday' | 'closed' = 'holiday';
+  class Locked extends DemoDataSource {
+    async listDayMarks(range: { from: string; to: string }) {
+      const marks = await super.listDayMarks(range);
+      return marks.map((m) => (m.date === '2026-12-09' ? { date: m.date, closed: true, kind: wednesday, label: wednesday === 'holiday' ? 'Den testu' : 'Nepracovní den', hours: null, lunch: null } : m));
+    }
+  }
+  const closeWednesday = (kind: 'holiday' | 'closed') => {
+    wednesday = kind;
+    return new Locked({ today: TODAY });
+  };
+
+  it('a holiday is a red block with the lock and its label; no card, window or lunch is drawn on it, the bookings are listed as text', async () => {
+    const source = closeWednesday('holiday');
+    blocks = [{ id: 'k1', startUtc: '2026-12-09T08:00:00Z', endUtc: '2026-12-09T09:00:00Z', reason: 'Školení' } as TimeBlock];
+    mount({ source });
+    const block = await screen.findByTestId('closed-2026-12-09');
+    expect(block).toHaveAttribute('data-lock', 'holiday');
+    expect(block.style.getPropertyValue('--lock-fill')).toBe('#C62828');
+    expect(block).toHaveTextContent('Svátek · Den testu');
+    expect(block.querySelector('use')?.getAttribute('href')).toBe('#icon-lock');
+    /* nothing of the day is drawn over or through it */
+    expect(screen.queryByTestId('board-booking-b2')).toBeNull();
+    expect(screen.queryByTestId('lunch-2026-12-09')).toBeNull();
+    expect(document.querySelectorAll('[data-testid^="board-window-"][data-testid$="-2026-12-09"]')).toHaveLength(0);
+    expect(screen.queryByText('Školení')).toBeNull();
+    /* ... but the booking that is there is not lost: it is a line of text INSIDE the block */
+    expect(await screen.findByTestId('closed-hidden-2026-12-09')).toHaveTextContent('10:00 – 10:30 Pacient b2');
+    /* the other days are untouched */
+    expect(screen.getByTestId('board-booking-b1')).toBeInTheDocument();
+    expect(screen.getByTestId('lunch-2026-12-08')).toBeInTheDocument();
+  });
+
+  it('a day off is the calm grey block with "Zavřeno"; the holiday and the day off are two looks', async () => {
+    const source = closeWednesday('closed');
+    mount({ source });
+    const block = await screen.findByTestId('closed-2026-12-09');
+    expect(block).toHaveAttribute('data-lock', 'closed');
+    expect(block.style.getPropertyValue('--lock-fill')).toBe('#3F4852');
+    expect(block).toHaveTextContent('Zavřeno');
+  });
+
+  it('draws the block above the hour lines and the finer grid, solid, with no hatch and no dashes (the stylesheet says so)', async () => {
+    const source = closeWednesday('holiday');
+    mount({ source });
+    await screen.findByTestId('closed-2026-12-09');
+    const layers = [...board().children].map((c) => c.className.split(' ')[0]);
+    expect(layers.indexOf('grid-lines')).toBeLessThan(layers.indexOf('board-shading'));
+    expect(layers.indexOf('board-shading')).toBeLessThan(layers.indexOf('grid-events'));
+    const css = readFileSync(resolve(__dirname, 'board.css'), 'utf8').replace(/\r\n/g, '\n');
+    const rule = /\.sm-planner \.board-shade\.board-lock \{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(rule).toMatch(/background:\s*var\(--lock-fill\)/); // an opaque fill
+    expect(rule).toMatch(/background-image:\s*none/); // no hatch
+    expect(rule).toMatch(/border:\s*0/); // no dashed frame
+    expect(rule).toMatch(/top:\s*0;[\s\S]*bottom:\s*0/); // the whole column
+    expect(rule).not.toMatch(/opacity|rgba\(0, 0, 0, 0\)|transparent/);
+    expect(/\.sm-planner \.board-shading \{[^}]*z-index:\s*1/.test(css)).toBe(true);
+    expect(/\.sm-planner \.grid-lines\{[^}]*z-index:0/.test(readFileSync(resolve(__dirname, '../../styles/planner.css'), 'utf8'))).toBe(true);
+    expect(/\.sm-planner \.board-substeps \{[^}]*z-index:\s*0/.test(css)).toBe(true);
   });
 });

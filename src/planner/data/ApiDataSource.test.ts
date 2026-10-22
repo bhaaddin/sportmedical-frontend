@@ -392,7 +392,7 @@ describe('day marks and day budget', () => {
     const marks = await make(state).source.listDayMarks({ from: '2026-11-16', to: '2026-11-17' });
     expect(marks).toEqual([
       { date: '2026-11-16', closed: false, label: null, hours: { from: '08:00', to: '18:00' }, lunch: { from: '12:00', to: '12:30' } },
-      { date: '2026-11-17', closed: true, label: 'Den boje za svobodu a demokracii', hours: null, lunch: null },
+      { date: '2026-11-17', closed: true, kind: 'holiday', label: 'Den boje za svobodu a demokracii', hours: null, lunch: null },
     ]);
   });
 

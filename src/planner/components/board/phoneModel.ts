@@ -15,6 +15,7 @@ import { dayOfWeekOf } from '../../../utils/time';
 import type { DayMark, IsoDate, WeekHeadModel } from '../../model';
 import { inquiryTileLabel, type InquiryRef } from '../../model/inquiries';
 import { PLANNER_TEXT } from '../../text';
+import { lockedDayLook, type LockedDayLook } from '../../model/dayLock';
 import { agendaSlotLabel } from '../../model';
 import { groupDayRows, type BoardWindowModel, type DayRowModel, type MonthTileModel } from './boardModel';
 
@@ -115,6 +116,8 @@ export interface StripDayModel {
   selected: boolean;
   closed: boolean;
   flag: string | null;
+  /** R6: the day's locked look (red holiday / grey closed), null while open. */
+  lock: LockedDayLook | null;
   inquiries: number;
   clubs: { name: string; colour: string }[];
 }
@@ -128,6 +131,7 @@ export function weekStripModel(input: {
   rowCount: (date: IsoDate) => number;
   windows: readonly BoardWindowModel[];
   inquiries: ReadonlyMap<string, InquiryRef[]>;
+  holidayColor?: string | null;
 }): StripDayModel[] {
   return input.days.map((d) => {
     const mark = input.dayMarks[d.date];
@@ -147,6 +151,7 @@ export function weekStripModel(input: {
       selected: d.date === input.selected,
       closed: mark?.closed ?? false,
       flag: mark?.closed ? mark.label?.trim() || 'Zavřeno' : null,
+      lock: mark?.closed ? lockedDayLook(mark, input.holidayColor) : null,
       inquiries: input.inquiries.get(d.date)?.length ?? 0,
       clubs: [...clubs].map(([name, colour]) => ({ name, colour })),
     };
@@ -205,6 +210,7 @@ export interface PhoneMonthRow {
   count: number;
   countLabel: string | null;
   flag: string | null;
+  lock: LockedDayLook | null;
   blocked: boolean;
   /** "Poptávka · Dukla, Slavia" */
   inquiry: string | null;
@@ -231,6 +237,7 @@ export function phoneMonthRows(
       count: t.count,
       countLabel: t.countLabel,
       flag: t.flag,
+      lock: t.lock,
       blocked: t.blocked,
       inquiry: t.inquiries.length ? inquiryTileLabel(t.inquiries) : null,
       clubs: clubLines.get(t.date) ?? [],

@@ -119,6 +119,8 @@ export interface UseBoardMoveArgs {
   dayMarks: Readonly<Record<string, DayMark>>;
   /** The calendars each day is split into, in column order (reviewer 2.4); null / absent for the one-column week. */
   split?: readonly string[] | null;
+  /** R2: calendar id -> the calendar whose column it is drawn in. */
+  alias?: ReadonlyMap<string, string>;
   /** Minutes between the grid lines of the chosen resolution. */
   resolutionStep: number;
   /** The planning layer owns the pointer (a činnost is armed). */
@@ -227,7 +229,7 @@ export function useBoardMove(args: UseBoardMoveArgs) {
     const day = days[col];
     if (!day) return null;
     /* A booking stays in its own calendar: over another calendar's column the move is refused, and says why. */
-    const ownSub = split ? Math.max(0, split.indexOf(fromCalendarId)) : 0;
+    const ownSub = split ? Math.max(0, split.indexOf(latestArgs.current.alias?.get(fromCalendarId) ?? fromCalendarId)) : 0;
     const sameCalendar = split === null || sub === ownSub;
     const range = snapMove({
       pointerOffsetPx: (y - rect.top) / scaleY,

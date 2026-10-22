@@ -99,6 +99,8 @@ import { useClubPlanner } from '../../club/ClubPlannerContext';
 import { useSafeNavigate } from './useSafeNavigate';
 import { calendarColumns, calendarOfColumn, columnChips } from './calendarColumns';
 import { CalendarStrip } from './CalendarStrip';
+import { Icon } from '../Icons';
+import { CLOSED_DAY_TEXT, DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor, lockedDayLook } from '../../model/dayLock';
 import './board.css';
 
 const hatchOf = (hex: string, strong: number, weak: number) =>
@@ -199,14 +201,28 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const head = useMemo(() => weekHeadModel(weekStart, ctx.window), [weekStart, ctx.window]);
   const days = head.days.map((d) => d.date);
   /* Reviewer 2.4: two or three calendars on screen split every day of the standard calendar into one column per calendar. */
-  const columns = useMemo(() => calendarColumns(calendar?.calendars ?? [], config.mode === 'standard'), [calendar?.calendars, config.mode]);
+  /* R2: one column per SLUŽBA - a služba's extra calendars ride in its primary's column (`calendar.alias`). */
+  const columns = useMemo(() => {
+    const alias = calendar?.alias;
+    const representatives = (calendar?.calendars ?? []).filter((c) => (alias?.get(c.id) ?? c.id) === c.id);
+    return calendarColumns(representatives, config.mode === 'standard');
+  }, [calendar?.calendars, calendar?.alias, config.mode]);
+  /* ... and its head, its month-tile count and its compact chip carry the SLUŽBA's own name and colour, not the calendar's ("Ordinace 1"). */
+  const namedColumns = useMemo(() => {
+    if (!columns) return null;
+    const groupOf = new Map((calendar?.groups ?? []).filter((g) => g.serviceId !== null).flatMap((g) => g.calendarIds.map((id) => [id, g] as const)));
+    return columns.map((c) => {
+      const g = groupOf.get(c.id);
+      return g ? { ...c, name: g.name, color: g.colour } : c;
+    });
+  }, [columns, calendar?.groups]);
   const split = useMemo(() => (columns ? columns.map((c) => c.id) : null), [columns]);
   const subs = columns ? columns.length : 1;
   /* The compact layouts head the columns of the one day they show: they read the calendars from the store. */
   useEffect(() => {
-    boardSettings.publishColumns(columns ? columns.map((c) => ({ id: c.id, name: c.name, color: c.color, serviceId: c.clinicServiceId ?? null })) : null);
+    boardSettings.publishColumns(namedColumns ? namedColumns.map((c) => ({ id: c.id, name: c.name, color: c.color, serviceId: c.clinicServiceId ?? null })) : null);
     return () => boardSettings.publishColumns(null);
-  }, [columns]);
+  }, [namedColumns]);
   const calendarOpen = useCallback(
     (calendarId: string, day: IsoDate) => {
       const row = calendar?.previewByCalendar.get(calendarId)?.get(day);
@@ -256,6 +272,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     calendar,
     dayMarks,
     split,
+    ...(calendar?.alias ? { alias: calendar.alias } : {}),
     resolutionStep: snapStep,
     paused: planningOwnsPointer || pinching,
     onCommit: commitMove,
@@ -273,7 +290,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         filter,
         geometry,
         dayMarks,
-        dayMarkColors: catalogue?.dayMarkColors ?? { holiday: '#E7CBA9', lunch: '#CBD1D8' },
+        dayMarkColors: catalogue?.dayMarkColors ?? { holiday: DEFAULT_HOLIDAY_COLOR, lunch: '#CBD1D8' },
         calendar: calendar
           ? {
               calendars: calendar.calendars,
@@ -284,6 +301,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
               excludeClubId: config.excludeClubId,
               ...(config.excludeClubBlockIds ? { excludeClubBlockIds: config.excludeClubBlockIds } : {}),
               split,
+              ...(calendar.alias ? { alias: calendar.alias } : {}),
               isOpen: calendarOpen,
             }
           : null,
@@ -692,7 +710,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   ) : null;
 
   /* ---- styles that come from the data ---- */
-  const holiday = catalogue?.dayMarkColors.holiday ?? '#E7CBA9';
+  const holiday = effectiveHolidayColor(catalogue?.dayMarkColors.holiday);
   const lunch = catalogue?.dayMarkColors.lunch ?? '#CBD1D8';
   const nowColor = calendar?.display.nowLineColor ?? CALENDAR_DISPLAY_OFFLINE.nowLineColor;
   const stepPx = stepLineHeight(geometry, lineStep);
@@ -727,8 +745,8 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     [calendar, view, phone, calendarMonth, dayMarks, config.excludeClubBlockIds],
   );
   const monthTiles = useMemo(
-    () => monthTilesModel(ctx, calendarMonth, filter, calendar ? move.appointments : [], dayMarks, calendar !== null, { inquiries, blockedDays, calendarColumns: columns, ...(monthClubLines ? { clubLines: monthClubLines } : {}) }),
-    [ctx, calendarMonth, filter, calendar, move.appointments, dayMarks, inquiries, blockedDays, monthClubLines, columns],
+    () => monthTilesModel(ctx, calendarMonth, filter, calendar ? move.appointments : [], dayMarks, calendar !== null, { inquiries, blockedDays, calendarColumns: namedColumns, holidayColor: catalogue?.dayMarkColors.holiday, ...(monthClubLines ? { clubLines: monthClubLines } : {}) }),
+    [ctx, calendarMonth, filter, calendar, move.appointments, dayMarks, inquiries, blockedDays, monthClubLines, namedColumns, catalogue],
   );
   const [inquiryPop, setInquiryPop] = useState<{ day: IsoDate; x: number; y: number } | null>(null);
 
@@ -746,9 +764,10 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         rowCount: (date) => dayListModel(ctx, date, filter, bookings, statusWord, calendar !== null).rows.length,
         windows: model.windows,
         inquiries,
+        holidayColor: catalogue?.dayMarkColors.holiday,
       }),
     };
-  }, [phone, view, calendar, move.appointments, dayRows, model.windows, selectedDate, head, ctx, dayMarks, filter, statusWord, inquiries]);
+  }, [phone, view, calendar, move.appointments, dayRows, model.windows, selectedDate, head, ctx, dayMarks, filter, statusWord, inquiries, catalogue]);
   const phoneMonth = useMemo(() => {
     if (!phone || view !== 'month') return null;
     const lines = calendar
@@ -813,10 +832,12 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
               const mark = dayMarks[d.date];
               const isToday = d.date === ctx.today;
               const flag = mark?.closed ? mark.label?.trim() || 'Zavřeno' : null;
+              const lock = mark?.closed ? lockedDayLook(mark, holiday) : null;
               const asked = inquiries.get(d.date) ?? [];
               return (
                 <div
-                  className={`day-title${isToday ? ' is-today' : ''}${mark?.closed ? ' is-closed' : ''}${asked.length ? ' has-inquiry' : ''}`}
+                  className={`day-title${isToday ? ' is-today' : ''}${mark?.closed ? ' is-closed' : ''}${lock ? ` is-lock is-lock-${lock.kind}` : ''}${asked.length ? ' has-inquiry' : ''}`}
+                  style={lock ? ({ '--lock-fill': lock.fill, '--lock-ink': lock.ink } as CSSProperties) : undefined}
                   title={flag ?? undefined}
                   key={d.date}
                   data-day={d.date}
@@ -846,7 +867,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                   <strong>{d.label}</strong>
                   {columns ? (
                     <span className="day-calendars" data-testid={`day-calendars-${d.date}`} style={{ '--subs': subs } as CSSProperties}>
-                      {columnChips(columns).map((chip) => (
+                      {columnChips(namedColumns ?? columns).map((chip) => (
                         <span key={chip.id} className="day-calendar" data-calendar-id={chip.id} title={chip.name} style={{ '--cal': chip.colour } as CSSProperties}>
                           <i aria-hidden="true" />
                           <span>{chip.name}</span>
@@ -940,17 +961,26 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                       Oběd
                     </div>
                   ) : null}
-                  {s.closed ? (
+                  {s.closed && s.lock ? (
+                    /* R6: ONE opaque block over the whole column - no hour lines, no hatch, no cards seen through it. */
                     <div
-                      className="board-shade is-closed"
-                      style={{
-                        '--col': s.col,
-                        '--shade-line': withAlpha(holiday, 0.7),
-                        '--shade-hatch': hatchOf(holiday, 0.22, 0.07),
-                      } as CSSProperties}
+                      className={`board-shade is-closed board-lock is-${s.lock.kind}`}
+                      style={{ '--col': s.col, '--lock-fill': s.lock.fill, '--lock-ink': s.lock.ink } as CSSProperties}
                       data-testid={`closed-${s.day}`}
+                      data-lock={s.lock.kind}
+                      title={s.lock.reason ? `${s.lock.label} - ${s.lock.reason}` : s.lock.label}
                     >
-                      <span className="board-sticky">{s.closedLabel}</span>
+                      <span className="board-sticky board-lock-label">
+                        <Icon name="lock" />
+                        <strong>{s.lock.label}</strong>
+                        {s.lock.reason ? <small>{s.lock.reason}</small> : null}
+                        {s.hidden.length > 0 ? (
+                          <span className="board-lock-booked" data-testid={`closed-hidden-${s.day}`}>
+                            {s.hidden.slice(0, 4).map((line) => <small key={line}>{line}</small>)}
+                            {s.hidden.length > 4 ? <small>{`+${s.hidden.length - 4}`}</small> : null}
+                          </span>
+                        ) : null}
+                      </span>
                     </div>
                   ) : null}
                 </div>
@@ -960,7 +990,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
             {model.calendarShades.length ? (
               <div className="board-calendar-shades" aria-hidden="true" data-testid="board-calendar-shades">
                 {model.calendarShades.map((c) => (
-                  <div key={c.key} className="board-calendar-shade" data-testid={`calendar-closed-${c.calendarId}-${c.day}`} title={`${c.calendarName}: ${c.label}`} style={{ '--col': c.col, '--sub': c.sub, '--subs': c.subs, '--shade-line': withAlpha(holiday, 0.7), '--shade-hatch': hatchOf(holiday, 0.22, 0.07) } as CSSProperties}>
+                  <div key={c.key} className="board-calendar-shade" data-testid={`calendar-closed-${c.calendarId}-${c.day}`} title={`${c.calendarName}: ${c.label}`} style={{ '--col': c.col, '--sub': c.sub, '--subs': c.subs, '--shade-line': withAlpha(CLOSED_DAY_TEXT, 0.7), '--shade-hatch': hatchOf(CLOSED_DAY_TEXT, 0.22, 0.07) } as CSSProperties}>
                     <span className="board-sticky">{c.label}</span>
                   </div>
                 ))}

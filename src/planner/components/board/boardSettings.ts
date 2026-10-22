@@ -16,6 +16,7 @@
  * workers of the rota, the služby), because only the board has read them.
  */
 import { useSyncExternalStore } from 'react';
+import { toggleGroupSet, type ServiceGroup } from './serviceGroups';
 import {
   clampZoom,
   presetOf,
@@ -49,6 +50,8 @@ export interface FacetService {
 }
 export interface BoardFacets {
   calendars: FacetCalendar[];
+  /** R2: the služby of the clinic (one chip each), each with the calendars it runs. */
+  groups: ServiceGroup[];
   employees: FacetEmployee[];
   services: FacetService[];
 }
@@ -68,7 +71,7 @@ export interface BoardSettingsState {
   columns: readonly FacetCalendar[] | null;
 }
 
-const EMPTY_FACETS: BoardFacets = { calendars: [], employees: [], services: [] };
+const EMPTY_FACETS: BoardFacets = { calendars: [], groups: [], employees: [], services: [] };
 
 /** The stored zoom; a saved value of the first version is migrated and written under the new key once. */
 function readZoom(storage: Storage | null): number {
@@ -106,6 +109,8 @@ export interface BoardSettingsStore {
   /** Tick / untick one calendar (`allIds` = every calendar, to fold "all ticked" back into `null`). */
   toggleCalendar(id: string, allIds: readonly string[]): void;
   onlyCalendar(id: string): void;
+  /** R2: a click on a služba's chip (see `toggleGroupSet`): one click shows only it, a second služba adds a column. */
+  clickGroup(id: string, groups: readonly ServiceGroup[]): void;
   showAllCalendars(): void;
   toggleService(id: string, allIds: readonly string[]): void;
   onlyService(id: string): void;
@@ -165,6 +170,7 @@ export function createBoardSettings(getStorage: () => Storage | null = browserSt
       set({ ticked: fold(next, allIds) });
     },
     onlyCalendar: (id) => set({ ticked: new Set([id]) }),
+    clickGroup: (id, groups) => set({ ticked: toggleGroupSet(state.ticked, groups, id) }),
     showAllCalendars: () => set({ ticked: null }),
     toggleService(id, allIds) {
       const next = new Set(state.serviceSet ?? allIds);

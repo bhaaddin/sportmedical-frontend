@@ -269,10 +269,12 @@ describe('the calendar selector', () => {
   it('one calendar on screen is one column again; "Všechny" brings the split back', async () => {
     mount();
     await screen.findByTestId('board-booking-l1');
-    fireEvent.click(chip('c2'));
+    /* R2: from "Všechny" ONE click shows only that služba */
+    fireEvent.click(chip('c1'));
     await waitFor(() => expect(board()).not.toHaveAttribute('data-subs'));
     expect(document.querySelectorAll('.day-calendars')).toHaveLength(0);
     expect(chip('c2')).toHaveAttribute('aria-pressed', 'false');
+    expect(chip('c1')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByTestId('board-booking-d1')).toBeNull(); /* the hidden calendar's bookings are not drawn */
     /* the remaining calendar's booking is back to the file's one-column strings */
     expect(screen.getByTestId('board-booking-l1').style.left).toBe('calc(28.5714% + 3px)'); /* 2 * 100% / 7 + 3px, as in the file */
@@ -285,7 +287,7 @@ describe('the calendar selector', () => {
   it('a selection made with one calendar books that calendar, with no column to choose', async () => {
     mount();
     await screen.findByTestId('board-booking-l1');
-    fireEvent.click(chip('c1'));
+    fireEvent.click(chip('c2'));
     await waitFor(() => expect(board()).not.toHaveAttribute('data-subs'));
     fireEvent.pointerDown(board(), { button: 0, pointerType: 'mouse', clientX: 4 * DAY_W + 30, clientY: yOf(10 * 60), pointerId: 1 });
     fireEvent.pointerUp(board(), { pointerType: 'mouse', clientX: 4 * DAY_W + 30, clientY: yOf(10 * 60), pointerId: 1 });
@@ -305,7 +307,10 @@ describe('the calendar selector', () => {
     await screen.findByTestId('board-booking-l1');
     expect(board()).not.toHaveAttribute('data-subs');
     expect(screen.getByTestId('calendar-strip-hint')).toHaveTextContent('nejvýše 3');
-    fireEvent.click(chip('c4'));
+    /* one click shows one služba, the next two add their columns: three is the most a day holds */
+    fireEvent.click(chip('c1'));
+    fireEvent.click(chip('c2'));
+    fireEvent.click(chip('c3'));
     await waitFor(() => expect(board()).toHaveAttribute('data-subs', '3'));
     expect(screen.queryByTestId('calendar-strip-hint')).toBeNull();
   });
@@ -347,5 +352,72 @@ describe('the month and the day list of a split week', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Měsíc' }));
     await screen.findByTestId('month-matrix');
     expect(document.querySelectorAll('.tile-calendars')).toHaveLength(0);
+  });
+});
+
+describe('R2: the selector is by služba, činnosti are inside, per-činnost calendars are not columns', () => {
+  const svc = (id: string, name: string, colorHex: string | null, sortOrder: number) => ({ id, name, description: '', sortOrder, isActive: true, activities: 1, calendars: 1, colorHex });
+  const withServices = (a: Calendar, b: Calendar) => {
+    setCalendars([a, b]);
+    vi.mocked(clinicServicesApi.list).mockResolvedValue([svc('s1', 'Sportovní lékařské prohlídky', '#11AA11', 0), svc('s2', 'Sportovní diagnostika', null, 1)]);
+    vi.mocked(activitiesApi.list).mockResolvedValue({
+      activities: [
+        { id: 'a1', name: 'Základní prohlídka', clinicServiceId: 's1', isActive: true, sortOrder: 0, durationMinutes: 30, colorHex: '#11AA11', effectiveColorHex: '#11AA11', parallelCapacity: 1 },
+        { id: 'a2', name: 'VO2max', clinicServiceId: 's2', isActive: true, sortOrder: 0, durationMinutes: 30, colorHex: '#7C3AED', effectiveColorHex: '#7C3AED', parallelCapacity: 1 },
+      ],
+      warnings: [],
+    } as never);
+  };
+  const A = { ...LEK, clinicServiceId: 's1' };
+  const B = { ...DIA, clinicServiceId: 's2' };
+
+  it('the chips carry the SLUŽBA name and colour, not the calendar\'s ("Lékařské prohlídky" is a calendar)', async () => {
+    withServices(A, B);
+    mount();
+    await screen.findByTestId('calendar-strip');
+    expect(chip('s1')).toHaveTextContent('Sportovní lékařské prohlídky');
+    expect(chip('s2')).toHaveTextContent('Sportovní diagnostika');
+    expect(chip('s1').style.getPropertyValue('--cal')).toBe('#11AA11');
+    expect(screen.getByTestId('calendar-strip')).toHaveTextContent('Služby');
+    /* the column heads say the same */
+    const heads = within(screen.getByTestId('day-calendars-2026-12-09'));
+    expect(heads.getByText('Sportovní lékařské prohlídky')).toBeInTheDocument();
+    expect(heads.getByText('Sportovní diagnostika')).toBeInTheDocument();
+  });
+
+  it('one click shows ONE služba, a second click adds its column, the činnosti appear inside as pills (not as calendars)', async () => {
+    withServices(A, B);
+    mount();
+    await screen.findByTestId('board-booking-l1');
+    expect(board()).toHaveAttribute('data-subs', '2');
+    expect(screen.queryByTestId('calendar-strip-pills')).toBeNull(); // with every služba on screen they would be the whole price list
+    fireEvent.click(chip('s2'));
+    await waitFor(() => expect(board()).not.toHaveAttribute('data-subs'));
+    expect(screen.queryByTestId('board-booking-l1')).toBeNull();
+    expect(screen.getByTestId('board-booking-d1')).toBeInTheDocument();
+    const pills = screen.getByTestId('calendar-strip-pills');
+    expect([...pills.querySelectorAll('.calendar-pill')].map((p) => p.textContent)).toEqual(['VO2max']);
+    expect(document.querySelectorAll('.calendar-chip:not(.is-all)')).toHaveLength(2); /* činnosti are never chips of their own */
+    fireEvent.click(chip('s1'));
+    await waitFor(() => expect(board()).toHaveAttribute('data-subs', '2'));
+    expect(screen.getByTestId('board-booking-l1')).toBeInTheDocument();
+    /* both služby shown = "Všechny" again (the clinic has two), so the pills fold away with the narrowing */
+    expect(screen.queryByTestId('calendar-strip-pills')).toBeNull();
+    expect(screen.queryByTestId('calendar-chip-all')).toBeNull();
+  });
+
+  it('a služba with a second (per-činnost) calendar is still ONE chip and ONE column; its bookings ride in that column and nothing is dropped', async () => {
+    const extra = { ...cal('c5', 'Jen spiro', 5, '#999999'), clinicServiceId: 's2' };
+    withServices(A, B);
+    setCalendars([A, B, extra]);
+    appointments = [lek, dia, appt('x1', 'c5', '2026-12-09T09:00:00Z', '2026-12-09T09:30:00Z')];
+    mount();
+    await screen.findByTestId('board-booking-l1');
+    expect(document.querySelectorAll('.calendar-chip:not(.is-all)')).toHaveLength(2);
+    expect(board()).toHaveAttribute('data-subs', '2'); // two služby, not three calendars
+    /* the extra calendar's booking is drawn in the služba's column (the second), beside the primary's */
+    expect(screen.getByTestId('board-booking-x1').style.left).toContain('(4 + 1)');
+    expect(screen.getByTestId('board-booking-d1').style.left).toContain('(4 + 1)');
+    expect(screen.getByTestId('board-booking-l1').style.left).toContain('(4 + 0)');
   });
 });

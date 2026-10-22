@@ -36,6 +36,7 @@ import {
 import type { CalendarDisplaySettings, CalendarView } from '../../api/displaySettings';
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 import { BookingSlotsCard } from './BookingSlotsCard';
+import { DEFAULT_HOLIDAY_COLOR, holidayColorProblem } from '../../planner/model/dayLock';
 
 const VIEW_LABELS: Record<CalendarView, string> = {
   day: 'Den',
@@ -92,6 +93,8 @@ export default function CalendarDisplayPage() {
   const draft = edited ?? query.data.settings;
   const errors = save.isError ? fieldErrorsOf(save.error) : {};
   const lunchProblem = lunchBreakProblem(draft.lunchFrom ?? '', draft.lunchTo ?? '');
+  /* R6: the holiday colour must read (AA text on it) and stand out from a closed day's grey; a failing colour is refused here, not saved. */
+  const holidayProblem = holidayColorProblem(draft.holidayColor);
   const set = <K extends keyof CalendarDisplaySettings>(key: K, value: CalendarDisplaySettings[K]) => {
     setSaved(false);
     setDraft({ ...draft, [key]: value });
@@ -108,7 +111,7 @@ export default function CalendarDisplayPage() {
         saving: save.isPending,
         onSave: () => {
           setLunchTried(true);
-          if (lunchProblem === null) save.mutate(draft);
+          if (lunchProblem === null && holidayProblem === null) save.mutate(draft);
         },
         onDiscard: () => { setSaved(false); setLunchTried(false); setDraft(null); },
       }}
@@ -225,18 +228,18 @@ export default function CalendarDisplayPage() {
 
             <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
               <TextField
-                label="Barva volných dnů a svátků"
+                label="Barva svátků"
                 value={draft.holidayColor}
                 onChange={(event) => set('holidayColor', event.target.value)}
-                error={errors.holidayColor !== undefined}
-                helperText={errors.holidayColor ?? 'Celý den se vykreslí touto barvou. Vyberte si vlastní — třeba jemnou šedou nebo červenou pro svátky.'}
+                error={errors.holidayColor !== undefined || holidayProblem !== null}
+                helperText={errors.holidayColor ?? holidayProblem ?? `Zavřený svátek se v kalendáři vykreslí celý touto barvou (výchozí ${DEFAULT_HOLIDAY_COLOR}, výrazná červená, na všech barevných variantách stejná). Víkendy a zavřené dny jsou klidně šedé.`}
                 sx={{ flexGrow: 1 }}
               />
               <Box
                 component="input"
                 type="color"
-                aria-label="Vybrat barvu volných dnů"
-                value={/^#[0-9a-fA-F]{6}$/.test(draft.holidayColor) ? draft.holidayColor : '#64748B'}
+                aria-label="Vybrat barvu svátků"
+                value={/^#[0-9a-fA-F]{6}$/.test(draft.holidayColor) ? draft.holidayColor : DEFAULT_HOLIDAY_COLOR}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   set('holidayColor', event.target.value.toUpperCase())}
                 sx={{ width: 56, height: 56, flexShrink: 0, border: 'none', background: 'none', cursor: 'pointer', p: 0 }}

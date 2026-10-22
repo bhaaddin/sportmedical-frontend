@@ -189,7 +189,9 @@ export function dayMarkOf(date: IsoDate, previews: Previews, holiday: ClinicHoli
     }
   }
   const label = mark.closed ? (mark.detail || mark.label || null) : null;
-  return { date, closed: mark.closed, label, hours, lunch };
+  /* R6: a day with a holiday of its own (statutory or the clinic's closure) is red; a weekend / day off is grey. */
+  const kind: DayMark['kind'] = mark.redNumber ? 'holiday' : 'closed';
+  return { date, closed: mark.closed, ...(mark.closed ? { kind } : {}), label, hours, lunch };
 }
 
 /**

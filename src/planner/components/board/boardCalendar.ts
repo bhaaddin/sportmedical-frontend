@@ -35,6 +35,7 @@ import {
 import { useCalendarCatalogue } from '../../../components/booking/calendar/useCalendarCatalogue';
 import { pragueDateKey } from '../../../utils/time';
 import { boardSettings, useBoardSettings, type FacetCalendar, type FacetEmployee, type FacetService } from './boardSettings';
+import { aliasMap, serviceGroups, type GroupActivity } from './serviceGroups';
 
 export interface BoardCalendarData {
   /** Calendars and bookings have been read at least once. */
@@ -45,6 +46,13 @@ export interface BoardCalendarData {
   allCalendars: Calendar[];
   /** The calendars the filters leave on screen. */
   calendars: Calendar[];
+  /**
+   * R2: every calendar id -> the primary calendar of its služba (the column it is drawn in). A služba with several calendars is one
+   * column; the others ride in the primary's column and are never columns of their own.
+   */
+  alias: ReadonlyMap<string, string>;
+  /** The služba groups of the clinic, in order. */
+  groups: ReturnType<typeof serviceGroups>;
   calendarById: ReadonlyMap<string, Calendar>;
   /** The bookings the filters leave on screen, any day of the window. */
   appointments: DayAppointment[];
@@ -105,9 +113,23 @@ export function useBoardCalendar(days: readonly string[]): BoardCalendarData {
     [previewQuery.data],
   );
 
+  const groups = useMemo(
+    () =>
+      serviceGroups(
+        calendars,
+        (servicesQuery.data ?? []).filter((s) => s.isActive).map((s) => ({ id: s.id, name: s.name, colorHex: catalogue.services.get(s.id)?.colorHex ?? s.colorHex ?? null })),
+        (serviceId): GroupActivity[] =>
+          [...catalogue.activities.values()]
+            .filter((a) => a.serviceId === serviceId && a.isActive)
+            .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'cs'))
+            .map((a) => ({ id: a.id, name: a.name, colour: a.colorHex ?? cleanHex(catalogue.services.get(serviceId)?.colorHex) ?? '#6e91a5' })),
+      ),
+    [calendars, servicesQuery.data, catalogue],
+  );
+
   const ticksApply = useMemo(() => visibleCalendars(calendars, settings.ticked, null), [calendars, settings.ticked]);
   const serviceSet = settings.serviceSet;
-  const shown = useMemo(
+  const shownBase = useMemo(
     () =>
       ticksApply.filter((calendar) => {
         if (serviceSet === null) return true;
@@ -122,6 +144,17 @@ export function useBoardCalendar(days: readonly string[]): BoardCalendarData {
       }),
     [ticksApply, serviceSet, days, previewByCalendar, catalogue],
   );
+  const shown = shownBase;
+  /* R2: a služba is ONE column - the calendars of it that are on screen ride in the first one's column (the gear may still hide a single calendar). */
+  const alias = useMemo(() => {
+    const onScreen = new Set(shown.map((c) => c.id));
+    return aliasMap(
+      groups
+        .map((g) => ({ calendarIds: g.calendarIds.filter((id) => onScreen.has(id)), primaryId: '' }))
+        .filter((g) => g.calendarIds.length > 0)
+        .map((g) => ({ ...g, primaryId: g.calendarIds[0]! })),
+    );
+  }, [groups, shown]);
 
   const blockLists = useQueries({
     queries: shown.map((calendar) => ({
@@ -158,6 +191,7 @@ export function useBoardCalendar(days: readonly string[]): BoardCalendarData {
   }, [appointmentsQuery.data, shownIds, calendarById, catalogue, serviceSet, previewByCalendar, employeeId]);
 
   /* The workers follow the služba, not the ticked calendars (as the page does). */
+
   const facets = useMemo(() => {
     const serviceCalendars = calendars.filter(
       (c) => serviceSet === null || (c.clinicServiceId !== null && serviceSet.has(c.clinicServiceId)),
@@ -179,8 +213,8 @@ export function useBoardCalendar(days: readonly string[]): BoardCalendarData {
       name: s.name,
       color: catalogue.services.get(s.id)?.colorHex ?? cleanHex(calendars.find((c) => c.clinicServiceId === s.id)?.color) ?? '#6e91a5',
     }));
-    return { calendars: calendarFacets, employees, services: serviceFacets };
-  }, [calendars, serviceSet, previewByCalendar, employeeId, services, catalogue]);
+    return { calendars: calendarFacets, groups, employees, services: serviceFacets };
+  }, [calendars, serviceSet, previewByCalendar, employeeId, services, catalogue, groups]);
 
   useEffect(() => {
     boardSettings.publishFacets(facets);
@@ -192,6 +226,8 @@ export function useBoardCalendar(days: readonly string[]): BoardCalendarData {
     error,
     allCalendars: calendars,
     calendars: shown,
+    alias,
+    groups,
     calendarById,
     appointments,
     blocksByCalendar,

@@ -1055,3 +1055,6 @@
 /* the phone's lists are one long page inside the planner's own scroller: no second scroller in the middle, the strip of the week stays in view */
 .sm-planner[data-layout='phone'] .planner .alternate-view { max-height: none; overflow: visible; min-height: 0; }
 .sm-planner[data-layout='phone'] .planner .phone-strip { position: sticky; top: 0; z-index: 5; background: #001727; }
+
+/* R6: the compact day buttons wear the same opaque locked-day fill as the board (inline --lock-fill / --lock-ink; see board.css .is-lock) */
+.sm-planner.is-compact .compact-day.is-lock.is-lock.is-lock { background: var(--lock-fill); background-image: none; color: var(--lock-ink); }

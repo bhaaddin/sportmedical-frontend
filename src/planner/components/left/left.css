@@ -31,6 +31,10 @@
   flex: none;
   border: 1.5px solid currentColor;
 }
+/* R6: the legend swatches are the same solid fills as the blocks (holiday red / closed grey) */
+.sm-planner .legend-closed.is-holiday, .sm-planner .legend-closed.is-closed { border: 0; background: var(--legend-fill); }
+/* a holiday's number sits on its red disc (the same literal red as the board's block) */
+.sm-planner .day-number[data-lock="holiday"] { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; border-radius: 50%; }
 
 /* Day records under a booking card of the reservation drawer. */
 .sm-planner .rd-record-list { display: grid; gap: 6px; margin-top: 10px; }
@@ -77,3 +81,6 @@
 .sm-planner .tday-members { list-style: none; margin: 3px 0 2px 14px; padding: 0 0 0 8px; border-left: 2px solid var(--tone, #3d7a8c); display: flex; flex-direction: column; gap: 3px; }
 .sm-planner .tday-members li { display: grid; grid-template-columns: 78px minmax(0, 1fr) auto; gap: 8px; font-size: 10.5px; color: #b6d9e6; }
 .sm-planner .tday-members .tday-member-who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e3f2f9; }
+
+/* R6: with a holiday AND a closed day in view the legend has four entries: it wraps instead of clipping the last one */
+.sm-planner .spectrum-legend { flex-wrap: wrap; row-gap: 4px; justify-content: flex-start; column-gap: 12px; }

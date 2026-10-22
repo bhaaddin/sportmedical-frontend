@@ -105,6 +105,28 @@
   color: #f4e6d2;
   text-shadow: 0 1px 3px #001a2d;
 }
+/* R6: a locked day (holiday = red, closed = grey) is ONE opaque block over the whole column: a solid fill (inline `--lock-fill`, a
+   literal, so the accent never shifts it), no hatch, no border dashes, above the hour lines and the finer grid (z-index 0) and
+   above the rugby decoration; its label stays in view while a zoomed-in day scrolls. */
+.sm-planner .board-shade.board-lock {
+  top: 0;
+  bottom: 0;
+  left: calc(var(--col) * 100% / 7);
+  width: calc(100% / 7);
+  border: 0;
+  border-radius: 0;
+  background: var(--lock-fill);
+  background-image: none;
+  color: var(--lock-ink);
+  text-shadow: none;
+  align-items: flex-start;
+  padding: 10px 6px 0;
+  box-shadow: inset 1px 0 0 rgba(0, 0, 0, 0.35), inset -1px 0 0 rgba(0, 0, 0, 0.35);
+}
+.sm-planner .board-lock-label { gap: 3px; text-align: center; line-height: 1.2; }
+.sm-planner .board-lock-label .icon { width: 18px; height: 18px; }
+.sm-planner .board-lock-label strong { font-size: 12.5px; font-weight: 700; letter-spacing: 0.02em; }
+.sm-planner .board-lock-label small { font-size: 11px; font-weight: 600; opacity: 0.92; }
 .sm-planner .board-shade.is-lunch {
   left: calc(var(--col) * 100% / 7 + 3px);
   width: calc(100% / 7 - 6px);
@@ -569,3 +591,37 @@
 .sm-planner.is-compact .planner .board-head[data-subs] { height: 70px; }
 .sm-planner.is-compact .calendar-strip-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
 .sm-planner.is-compact .calendar-chip { flex: none; }
+
+/* ---- R6: one locked-day look everywhere - the same opaque fill (inline `--lock-fill` / `--lock-ink`, literals the accent never shifts) ----
+   The class is repeated so it wins over the generated hatch rules (`.day-title.is-closed`, `.phone-strip-day.is-closed`, ...) without !important. */
+.sm-planner .is-lock.is-lock.is-lock {
+  background: var(--lock-fill);
+  background-image: none;
+  color: var(--lock-ink);
+  border-color: var(--lock-fill);
+}
+.sm-planner .is-lock.is-lock.is-lock * { color: inherit; text-shadow: none; }
+.sm-planner .day-title.is-lock.is-lock.is-lock strong { background: transparent; box-shadow: none; }
+.sm-planner .month-tile.is-lock.is-lock.is-lock .date-num { color: var(--lock-ink); }
+.sm-planner .month-tile .tile-flag { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 7px; font-weight: 700; font-size: 11px; line-height: 1.25; color: var(--lock-ink, inherit); }
+.sm-planner .month-tile .tile-flag .icon { width: 13px; height: 13px; flex: none; }
+.sm-planner .month-tile .tile-flag em { flex-basis: 100%; font-style: normal; font-weight: 600; font-size: 10.5px; opacity: 0.92; }
+.sm-planner .phone-month-row.is-lock.is-lock.is-lock .phone-month-flag { color: var(--lock-ink); }
+/* the bookings a locked day still holds are listed as text inside the block (never as cards over it) */
+.sm-planner .board-lock-booked { display: flex; flex-direction: column; gap: 1px; margin-top: 6px; padding-top: 6px; border-top: 1px solid color-mix(in srgb, var(--lock-ink) 35%, transparent); max-width: 100%; }
+.sm-planner .board-lock-booked small { font-size: 10.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- R2: the služba chips can be long ("Zvýhodněné balíčky - prohlídka + diagnostika"): one line, cut with an ellipsis (the title carries the whole name) ---- */
+.sm-planner .calendar-chip > span { min-width: 0; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sm-planner .calendar-strip-pills { flex-basis: 100%; display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; overflow-x: auto; scrollbar-width: none; }
+.sm-planner .calendar-pill { flex: none; display: inline-flex; align-items: center; gap: 5px; min-height: 22px; padding: 0 9px; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--cal, #6e91a5) 55%, transparent); background: color-mix(in srgb, var(--cal, #6e91a5) 14%, #001521); color: #e3f2f9; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.sm-planner .calendar-pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--cal, #6e91a5); }
+/* a phone has no room for a third row of chrome: the pills are a desktop / tablet aid */
+@media (max-width: 767px) { .sm-planner .calendar-strip-pills { display: none; } }
+
+/* R2: a služba's name is longer than a calendar's: the column head may take two lines before it is cut (the title keeps the whole name) */
+.sm-planner .board-head[data-subs] { height: 76px; }
+.sm-planner.is-compact .planner .board-head[data-subs] { height: 80px; }
+.sm-planner .day-calendar { align-items: flex-start; }
+.sm-planner .day-calendar > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; white-space: normal; line-height: 1.12; overflow: hidden; text-align: left; overflow-wrap: anywhere; }
+.sm-planner .day-calendar i { margin-top: 2px; }

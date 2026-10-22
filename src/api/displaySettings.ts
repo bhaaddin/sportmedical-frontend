@@ -16,6 +16,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { client } from './client';
 import type { Permission } from '../auth/usePermission';
+import { DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor } from '../planner/model/dayLock';
 
 /* ── Calendar ─────────────────────────────────────────────────────── */
 
@@ -118,15 +119,25 @@ export const CALENDAR_DISPLAY_OFFLINE: CalendarDisplaySettings = {
   dayEndHour: 19,
   /* The board's colours (3. 10. 2026), the same ones the server opens with. */
   nowLineColor: '#C0392B',
-  holidayColor: '#E7CBA9',
+  /* R6: a fixed strong red, independent of the accent (the server's old beige default is replaced, see `effectiveHolidayColor`). */
+  holidayColor: DEFAULT_HOLIDAY_COLOR,
   lunchColor: '#CBD1D8',
   hoverFields: ['patientName', 'activity', 'status', 'phone', 'paperwork'],
 };
 
 export const readCalendarDisplay = async (): Promise<CalendarDisplayResponse> => {
   const { data } = await client.get<CalendarDisplayResponse>('/api/v1/settings/calendar-display');
-  return data;
+  return withHolidayRed(data);
 };
+
+/** R6: the server's old beige holiday default (and a stored colour that fails the guard) is shown and drawn as the fixed red. */
+function withHolidayRed(data: CalendarDisplayResponse): CalendarDisplayResponse {
+  return {
+    ...data,
+    settings: { ...data.settings, holidayColor: effectiveHolidayColor(data.settings.holidayColor) },
+    defaults: { ...data.defaults, holidayColor: DEFAULT_HOLIDAY_COLOR },
+  };
+}
 
 export const saveCalendarDisplay = async (
   settings: CalendarDisplaySettings,
@@ -135,7 +146,7 @@ export const saveCalendarDisplay = async (
     '/api/v1/settings/calendar-display',
     settings,
   );
-  return data;
+  return withHolidayRed(data);
 };
 
 export const CALENDAR_DISPLAY_QUERY_KEY = ['settings', 'calendar-display'] as const;

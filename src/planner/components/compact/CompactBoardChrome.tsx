@@ -17,6 +17,7 @@ import { usePlannerActions, usePlannerSelector } from '../../state/PlannerStoreP
 import { PLANNER_TEXT } from '../../text';
 import { useBoardConfig } from '../board/boardConfig';
 import { columnChips } from '../board/calendarColumns';
+import { lockedDayLook } from '../../model/dayLock';
 import { useBoardSettings } from '../board/boardSettings';
 import { useInquiries } from '../board/useInquiries';
 import { Icon } from '../Icons';
@@ -120,7 +121,7 @@ export interface BoardStripProps {
 
 export function BoardStrip({ mainRef, fit, onFit, sidebarOpen, sidebarPinned, onOpenSidebar, openerRef }: BoardStripProps) {
   const ctx = usePlannerCtx();
-  const { dayMarks } = usePlannerModelState();
+  const { dayMarks, catalogue } = usePlannerModelState();
   const act = usePlannerActions();
   const weekStart = usePlannerSelector((s) => s.weekStart);
   const selectedDate = usePlannerSelector((s) => s.selectedDate);
@@ -173,15 +174,17 @@ export function BoardStrip({ mainRef, fit, onFit, sidebarOpen, sidebarPinned, on
             const mark = dayMarks[d.date];
             const selected = d.date === selectedDate;
             const asked = inquiries.get(d.date)?.length ?? 0;
+            const lock = mark?.closed ? lockedDayLook(mark, catalogue?.dayMarkColors.holiday) : null;
             return (
               <button
                 key={d.date}
                 type="button"
-                className={`compact-day${selected ? ' is-selected' : ''}${d.date === ctx.today ? ' is-today' : ''}${mark?.closed ? ' is-closed' : ''}${asked ? ' has-inquiry' : ''}`}
+                className={`compact-day${selected ? ' is-selected' : ''}${d.date === ctx.today ? ' is-today' : ''}${mark?.closed ? ' is-closed' : ''}${lock ? ` is-lock is-lock-${lock.kind}` : ''}${asked ? ' has-inquiry' : ''}`}
+                style={lock ? ({ '--lock-fill': lock.fill, '--lock-ink': lock.ink } as CSSProperties) : undefined}
                 data-day={d.date}
                 aria-pressed={selected}
                 aria-current={d.date === ctx.today ? 'date' : undefined}
-                aria-label={`${d.weekName} ${d.label}${mark?.closed ? ' – zavřeno' : ''}${asked ? ` – ${PLANNER_TEXT.inquiry.flagLabel(asked).toLowerCase()}` : ''}`}
+                aria-label={`${d.weekName} ${d.label}${lock ? ` – ${lock.label}` : ''}${asked ? ` – ${PLANNER_TEXT.inquiry.flagLabel(asked).toLowerCase()}` : ''}`}
                 onClick={() => act.focusDate(d.date, false)}
               >
                 <span>{d.weekName}</span>

@@ -27,12 +27,13 @@ import {
 import { usePlannerActions, usePlannerSelector, usePlannerStore } from '../state/PlannerStoreProvider';
 import { selectActivePreview } from '../state/selectors';
 import { Icon } from './Icons';
+import { CLOSED_DAY_TEXT, DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor, lockedDayLook } from '../model/dayLock';
 import { usePlannerCtx, usePlannerModelState } from './context';
 import { MiniDayButton } from './left/MiniDayButton';
 import { getMiniController } from './left/miniController';
 import './left/left.css';
 
-const FALLBACK_HOLIDAY_COLOR = '#ff6b6b';
+const FALLBACK_HOLIDAY_COLOR = DEFAULT_HOLIDAY_COLOR;
 
 export function MiniCalendarPanel() {
   const ctx = usePlannerCtx();
@@ -49,7 +50,9 @@ export function MiniCalendarPanel() {
   const cells = useMemo(() => monthCells(calendarMonth), [calendarMonth]);
   const monthDate = useMemo(() => dateOf(calendarMonth), [calendarMonth]);
   const zoom = miniZoomFocus(mini, cells);
-  const holidayColor = catalogue?.dayMarkColors.holiday ?? FALLBACK_HOLIDAY_COLOR;
+  const holidayColor = effectiveHolidayColor(catalogue?.dayMarkColors.holiday ?? FALLBACK_HOLIDAY_COLOR);
+  const holidayLook = lockedDayLook({ kind: 'holiday', label: null }, holidayColor);
+  const closedLook = lockedDayLook({ kind: 'closed', label: null }, holidayColor);
 
   const [focusedDate, setFocusedDate] = useState<IsoDate | null>(null);
   const pendingFocus = useRef<IsoDate | null>(null);
@@ -82,7 +85,8 @@ export function MiniCalendarPanel() {
     return cells.find((d) => sameMonth(dateOf(d), monthDate)) ?? cells[0]!;
   })();
 
-  const closedAnyInView = cells.some((d) => dayMarks[d]?.closed && sameMonth(dateOf(d), monthDate));
+  const closedAnyInView = cells.some((d) => dayMarks[d]?.closed && dayMarks[d]?.kind !== 'holiday' && sameMonth(dateOf(d), monthDate));
+  const holidayAnyInView = cells.some((d) => dayMarks[d]?.closed && dayMarks[d]?.kind === 'holiday' && sameMonth(dateOf(d), monthDate));
 
   const onDayClick = (date: IsoDate, hasTerms: boolean, event: React.MouseEvent<HTMLButtonElement>) => {
     const plan = miniDayClickPlan(store.getState().mini, date, hasTerms);
@@ -176,7 +180,11 @@ export function MiniCalendarPanel() {
               otherMonth={!sameMonth(dateOf(date), monthDate)}
               previewing={!!preview && preview.date === date}
               today={date === ctx.today}
-              closed={mark?.closed ? { label: mark.label ?? null, color: holidayColor } : null}
+              closed={mark?.closed
+                ? mark.kind === 'holiday'
+                  ? { label: mark.label ?? null, color: holidayColor, kind: 'holiday', fill: holidayLook.fill, ink: holidayLook.ink }
+                  : { label: mark.label ?? null, color: CLOSED_DAY_TEXT, kind: 'closed' }
+                : null}
               tabbable={date === tabbableDate}
               onClick={(event) => onDayClick(date, model.hasTerms, event)}
               onEnter={() => controller.show(date)}
@@ -191,10 +199,13 @@ export function MiniCalendarPanel() {
         })}
       </div>
       <div className="calendar-legend spectrum-legend">
-        <span><i className="legend-spectrum" /><strong>PRSTENEC</strong> plánované činnosti</span>
-        <span><i className="legend-liquid" /><strong>LIQUID</strong> využití dne</span>
+        <span title="Prstenec: plánované činnosti"><i className="legend-spectrum" /><strong>PRSTENEC</strong>{holidayAnyInView || closedAnyInView ? null : ' plánované činnosti'}</span>
+        <span title="Liquid: využití dne"><i className="legend-liquid" /><strong>LIQUID</strong>{holidayAnyInView || closedAnyInView ? null : ' využití dne'}</span>
+        {holidayAnyInView ? (
+          <span data-testid="mini-legend-holiday" style={{ '--legend-fill': holidayLook.fill } as React.CSSProperties}><i className="legend-closed is-holiday" /><strong>SVÁTEK</strong></span>
+        ) : null}
         {closedAnyInView ? (
-          <span data-testid="mini-legend-closed" style={{ color: holidayColor }}><i className="legend-closed" /><strong>ZAVŘENO</strong></span>
+          <span data-testid="mini-legend-closed" style={{ '--legend-fill': closedLook.fill } as React.CSSProperties}><i className="legend-closed is-closed" /><strong>ZAVŘENO</strong></span>
         ) : null}
       </div>
     </div>

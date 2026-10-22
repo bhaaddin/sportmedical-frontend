@@ -14,7 +14,7 @@ export interface MiniDayButtonProps {
   previewing: boolean;
   today: boolean;
   /** The day is closed (holiday, closure, absence) and in which colour its number is drawn. */
-  closed: { label: string | null; color: string } | null;
+  closed: { label: string | null; color: string; kind?: 'holiday' | 'closed'; fill?: string; ink?: string } | null;
   tabbable: boolean;
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onEnter: () => void;
@@ -39,7 +39,7 @@ export function MiniDayButton({
   if (today) classes.push('is-today');
   if (closed) classes.push('is-closed');
   const ariaLabel = closed
-    ? `${model.ariaLabel} · Zavřeno${closed.label ? `: ${closed.label}` : ''}`
+    ? `${model.ariaLabel} · ${closed.kind === 'holiday' ? 'Svátek' : 'Zavřeno'}${closed.label ? `: ${closed.label}` : ''}`
     : model.ariaLabel;
   const { ring } = model;
   return (
@@ -84,7 +84,11 @@ export function MiniDayButton({
             </span>
           </>
         ) : null}
-        <span className="day-number" style={closed ? { color: closed.color } : undefined}>{model.dayNumber}</span>
+        <span
+          className="day-number"
+          data-lock={closed?.kind}
+          style={closed ? (closed.kind === 'holiday' && closed.fill ? { color: closed.ink ?? closed.color, background: closed.fill } : { color: closed.color }) : undefined}
+        >{model.dayNumber}</span>
       </span>
     </button>
   );

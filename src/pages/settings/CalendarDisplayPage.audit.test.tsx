@@ -94,7 +94,7 @@ describe.each([['phone', VIEWPORTS.phone], ['tablet', VIEWPORTS.tablet], ['deskt
       expect(screen.getByRole('combobox', { name: 'Den začíná v' })).toHaveTextContent('07:00');
       expect(screen.getByRole('combobox', { name: 'Den končí v' })).toHaveTextContent('19:00');
       expect(screen.getByLabelText('Barva čáry „teď“')).toHaveValue('#C0392B');
-      expect(screen.getByLabelText('Barva volných dnů a svátků')).toHaveValue('#E7CBA9');
+      expect(screen.getByLabelText('Barva svátků')).toHaveValue('#C62828');
       expect(screen.getByLabelText('Barva obědové pauzy')).toHaveValue('#CBD1D8');
     });
 
@@ -129,7 +129,8 @@ describe('each control builds its field of the PUT', () => {
     await user.click(screen.getByRole('option', { name: 'Měsíc' }));
     await user.click(saveButton());
     await waitFor(() => expect(put).toHaveBeenCalled());
-    expect(sent()).toEqual({ ...SERVER.settings, defaultView: 'month' });
+    /* R6: the server's old beige holiday default is read (and written back) as the fixed red */
+    expect(sent()).toEqual({ ...SERVER.settings, holidayColor: '#C62828', defaultView: 'month' });
   });
 
   it('offers only the row lengths the server named, and sends the chosen one as a number', async () => {
@@ -168,24 +169,25 @@ describe('each control builds its field of the PUT', () => {
   });
 
   it.each([
-    ['Barva čáry „teď“', 'nowLineColor', 'Vybrat barvu čáry'],
-    ['Barva volných dnů a svátků', 'holidayColor', 'Vybrat barvu volných dnů'],
-    ['Barva obědové pauzy', 'lunchColor', 'Vybrat barvu obědové pauzy'],
-  ])('%s: typed text and the native picker both end up in %s', async (label, field, pickerLabel) => {
+    ['Barva čáry „teď“', 'nowLineColor', 'Vybrat barvu čáry', '#112233', '#aabbcc'],
+    /* R6: a holiday colour must pass the guard (AA text, visible on both surfaces, not grey) */
+    ['Barva svátků', 'holidayColor', 'Vybrat barvu svátků', '#B71C1C', '#d32f2f'],
+    ['Barva obědové pauzy', 'lunchColor', 'Vybrat barvu obědové pauzy', '#112233', '#aabbcc'],
+  ])('%s: typed text and the native picker both end up in %s', async (label, field, pickerLabel, typed, picked) => {
     const user = userEvent.setup();
     mount();
     const text = await screen.findByLabelText(label);
     await user.clear(text);
-    await user.type(text, '#112233');
+    await user.type(text, typed);
     await user.click(saveButton());
     await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
-    expect(sent()[field]).toBe('#112233');
+    expect(sent()[field]).toBe(typed);
 
     /* The picker answers lower case; the screen sends what the server stores, upper case. */
-    fireEvent.change(screen.getByLabelText(pickerLabel), { target: { value: '#aabbcc' } });
+    fireEvent.change(screen.getByLabelText(pickerLabel), { target: { value: picked } });
     await user.click(saveButton());
     await waitFor(() => expect(put).toHaveBeenCalledTimes(2));
-    expect(put.mock.calls[1][1][field]).toBe('#AABBCC');
+    expect(put.mock.calls[1][1][field]).toBe(picked.toUpperCase());
   });
 
   it('never loses the lunch break the screen does not edit (a PUT without it writes "" over both)', async () => {
@@ -348,7 +350,7 @@ describe('saving', () => {
     expect(put).not.toHaveBeenCalled();
     await user.click(saveButton());
     await waitFor(() => expect(put).toHaveBeenCalled());
-    expect(sent()).toEqual(SERVER.defaults);
+    expect(sent()).toEqual({ ...SERVER.defaults, holidayColor: '#C62828' });
   });
 });
 

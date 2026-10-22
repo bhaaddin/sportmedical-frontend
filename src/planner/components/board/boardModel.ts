@@ -20,6 +20,7 @@ import { shownPrice } from '../../../components/booking/grid/appointmentPrice';
 import { drawnBlocksOfDay } from '../../../components/booking/grid/clubWindows';
 import { formatMinutes, MINUTES_PER_DAY, parseTimeOfDay, pragueMinuteOfDay, spanOnDay, touchesDay, type MinuteRange } from '../../../components/booking/grid/timeRange';
 import { inFilter } from '../../model/services';
+import { lockedDayLook, type LockedDayLook } from '../../model/dayLock';
 import type { InquiryRef } from '../../model/inquiries';
 import {
   cleanHex,
@@ -168,6 +169,10 @@ export interface DayShadeModel {
   closed: boolean;
   /** Reason written on a closed day. */
   closedLabel: string | null;
+  /** R6: a public holiday / clinic closure ('holiday', red) or an ordinary day off ('closed', grey); null while the day is open. */
+  lock: LockedDayLook | null;
+  /** The bookings / terms of a locked day, written as text lines INSIDE the opaque block ("08:00 Základní prohlídka"): no card is drawn, but nobody booked there disappears. */
+  hidden: string[];
   /** A day without working hours (and not closed): shaded whole, quietly. */
   noHours: boolean;
   /** Outside working hours: above the opening and below the closing. */
@@ -213,6 +218,8 @@ export interface BoardCalendarInput {
    * one-column week. The caller decides when two or more calendars on screen split; the model only follows it.
    */
   split?: readonly string[] | null;
+  /** R2: calendar id -> the calendar whose column it is drawn in (a služba's extra calendars ride in its primary's column). */
+  alias?: ReadonlyMap<string, string>;
   /** Does this calendar work that day? Absent = it does. A closed one is hatched in its own sub-column while the day is open. */
   isOpen?: (calendarId: string, day: IsoDate) => boolean;
 }
@@ -363,7 +370,7 @@ function bookingCards(
     const span = spanOnDay(a.startUtc, a.endUtc, day);
     const box = cardBox(g, span.start, Math.max(span.end, span.start + 1));
     const cal = a.calendarId ? calendarById.get(a.calendarId) : undefined;
-    const sub = split && a.calendarId ? Math.max(0, split.indexOf(a.calendarId)) : 0;
+    const sub = split && a.calendarId ? Math.max(0, split.indexOf(calendar.alias?.get(a.calendarId) ?? a.calendarId)) : 0;
     const category = ctx.categories.find((c) => c.id === a.activityId);
     const tone = colourOfActivity(calendar.catalogue, a.activityId, cal?.color ?? '#6e91a5');
     const price = shownPrice(a, category?.priceCzk ?? null);
@@ -493,7 +500,7 @@ function windowModels(
           key: `window:${cal.id}:${block.id}:${day}`,
           kind: club ? 'club' : 'manual',
           col,
-          sub: split ? Math.max(0, split.indexOf(cal.id)) : 0,
+          sub: split ? Math.max(0, split.indexOf(calendar.alias?.get(cal.id) ?? cal.id)) : 0,
           subs,
           day,
           top: box.top,
@@ -536,7 +543,7 @@ function windowModels(
 /* Day shading and the now-line                                                */
 /* -------------------------------------------------------------------------- */
 
-function dayShades(days: readonly IsoDate[], marks: Readonly<Record<string, DayMark>>, g: BoardGeometry): DayShadeModel[] {
+function dayShades(days: readonly IsoDate[], marks: Readonly<Record<string, DayMark>>, g: BoardGeometry, holidayColor?: string | null, hiddenOn?: ReadonlyMap<IsoDate, string[]>): DayShadeModel[] {
   const out: DayShadeModel[] = [];
   days.forEach((day, col) => {
     const mark = marks[day];
@@ -557,6 +564,8 @@ function dayShades(days: readonly IsoDate[], marks: Readonly<Record<string, DayM
       col,
       closed: mark.closed,
       closedLabel: mark.closed ? (mark.label?.trim() || 'Zavřeno') : null,
+      lock: mark.closed ? lockedDayLook(mark, holidayColor) : null,
+      hidden: mark.closed ? (hiddenOn?.get(day) ?? []) : [],
       noHours: !mark.closed && !hasHours,
       before,
       after,
@@ -640,19 +649,27 @@ export const minuteNow = (now: Date): number => pragueMinuteOfDay(now);
 export function buildBoardModel(input: BuildBoardInput): BoardModel {
   const { ctx, weekStart, filter, geometry: g, dayMarks, calendar } = input;
   const days = weekDays(weekStart);
-  const sessions = sessionCards(ctx, weekStart, filter, g, days, calendar !== null);
-  const bookings = calendar ? bookingCards(ctx, days, filter, g, calendar) : [];
+  /* R6: a locked day (holiday / closure / day off) is ONE opaque block - no card, window or hour line is drawn on it. */
+  const lockedDays = new Set(days.filter((d) => dayMarks[d]?.closed));
+  const hiddenOn = new Map<IsoDate, string[]>();
+  const unlocked = <T extends { day: IsoDate; timeLabel: string; name: string }>(card: T): boolean => {
+    if (!lockedDays.has(card.day)) return true;
+    hiddenOn.set(card.day, [...(hiddenOn.get(card.day) ?? []), `${card.timeLabel} ${card.name}`]);
+    return false;
+  };
+  const sessions = sessionCards(ctx, weekStart, filter, g, days, calendar !== null).filter(unlocked);
+  const bookings = (calendar ? bookingCards(ctx, days, filter, g, calendar) : []).filter(unlocked);
   const split = calendar?.split ?? null;
   const columns = split ? split.map((id) => calendar!.calendars.find((c) => c.id === id)).filter((c): c is Calendar => c !== undefined) : [];
   const laid = layoutCards([...sessions, ...bookings], days, split ? split.length : 1);
-  const windows = calendar ? windowModels(days, dayMarks, g, calendar, '#6e91a5') : [];
+  const windows = calendar ? windowModels(days, dayMarks, g, calendar, '#6e91a5').filter((w) => !lockedDays.has(w.day)) : [];
   return {
     days,
     cards: laid.cards,
     overflow: laid.overflow,
     folded: laid.folded,
     windows,
-    shades: dayShades(days, dayMarks, g),
+    shades: dayShades(days, dayMarks, g, input.dayMarkColors?.holiday, hiddenOn),
     calendarShades: split && calendar ? calendarShades(days, dayMarks, columns, calendar.isOpen) : [],
     columns,
     nowLine: nowLineModel(days, dayMarks, g, ctx.today, input.nowMinute),
@@ -832,6 +849,8 @@ export interface MonthTileModel {
   countLabel: string | null;
   /** Reason the day is closed (holiday ...), from the day marks. */
   flag: string | null;
+  /** R6: the locked day's look (holiday red / closed grey) - the tile is drawn as the same opaque block; null while the day is open. */
+  lock: LockedDayLook | null;
   /** Club inquiries (orders that block no time yet) asking for or offering this day. */
   inquiries: InquiryRef[];
   /** Every calendar on screen is blocked for the whole day by hand ("Zablokovat celé dny"). */
@@ -878,6 +897,8 @@ export function monthTilesModel(
     inquiries?: ReadonlyMap<string, InquiryRef[]>;
     blockedDays?: ReadonlySet<string>;
     clubLines?: ReadonlyMap<string, string[]>;
+    /** R6: the holiday colour of the display settings (the default red when none). */
+    holidayColor?: string | null;
     /** The calendars the days are split into (reviewer 2.4): each tile counts its bookings per calendar. */
     calendarColumns?: readonly Pick<Calendar, 'id' | 'name' | 'color'>[] | null;
   } = {},
@@ -948,6 +969,7 @@ export function monthTilesModel(
         count,
         countLabel: count ? `${count} ${termWord(count)}` : null,
         flag: mark?.closed ? mark.label?.trim() || 'Zavřeno' : null,
+        lock: mark?.closed ? lockedDayLook(mark, extras.holidayColor) : null,
         inquiries: extras.inquiries?.get(t.date) ?? [],
         blocked: extras.blockedDays?.has(t.date) ?? false,
         clubs: extras.clubLines?.get(t.date) ?? [],
