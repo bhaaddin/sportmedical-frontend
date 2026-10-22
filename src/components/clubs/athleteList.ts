@@ -10,6 +10,7 @@
 import type { ClubBlockAthlete, ClubBlockAthleteStatus } from '../../api/clubBlocks';
 import type { ChipTone } from '../ui';
 import { pragueHHMM } from '../../pages/clubs/clubOrders';
+import { downloadCsv } from '../../utils/download';
 import { pragueDateKey } from '../../utils/time';
 import { formatCzk } from './order/orderFormat';
 
@@ -112,15 +113,7 @@ export function athletesCsvFilename(blockTitle: string): string {
   return `sportovci-${slug === '' ? 'blok' : slug}.csv`;
 }
 
-/** Hands the file to the browser: UTF-8 with a BOM, so Excel reads the Czech letters. */
-export function downloadAthletesCsv(athletes: readonly ClubBlockAthlete[], blockTitle: string): void {
-  const blob = new Blob(['\uFEFF', athletesToCsv(athletes)], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = athletesCsvFilename(blockTitle);
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+/** Saves the list through the one download helper: UTF-8 with a BOM so Excel reads the Czech letters, gated and audited. */
+export function downloadAthletesCsv(athletes: readonly ClubBlockAthlete[], blockTitle: string): Promise<boolean> {
+  return downloadCsv('athletes-csv', athletesCsvFilename(blockTitle), athletesToCsv(athletes), athletes.length);
 }

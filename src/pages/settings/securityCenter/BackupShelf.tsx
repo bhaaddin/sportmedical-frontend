@@ -25,16 +25,11 @@ import {
 } from './model';
 import { BIG, Fact, Shelf, Sparkline } from './parts';
 import { ConfigCheckDialog, ReporterKeysDialog } from './BackupDialogs';
+import { ExportGate } from '../../../components/ui/ExportGate';
+import { EXPORT_FORBIDDEN_MESSAGE, ExportForbiddenError, saveBlob } from '../../../utils/download';
 
 function saveFile(file: DownloadedFile): void {
-  const url = URL.createObjectURL(file.blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = file.fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  saveBlob(file.blob, file.fileName);
 }
 
 const REASON_TONE = { red: 'red', amber: 'beige', info: 'blue' } as const;
@@ -66,7 +61,7 @@ export function BackupShelf({
     try {
       saveFile(await (kind === 'kit' ? securityCenterApi.recoveryKit() : securityCenterApi.configExport()));
     } catch (error) {
-      setProblem(securityErrorText(toSecurityCenterError(error)));
+      setProblem(error instanceof ExportForbiddenError ? EXPORT_FORBIDDEN_MESSAGE : securityErrorText(toSecurityCenterError(error)));
     } finally {
       setBusy(null);
     }
@@ -181,12 +176,20 @@ export function BackupShelf({
         <Button variant="contained" startIcon={<VpnKey />} onClick={() => setKeysOpen(true)} sx={BIG}>
           Klíče pro hlášení záloh ({activeKeys})
         </Button>
-        <Button variant="outlined" startIcon={<Download />} onClick={() => void download('kit')} disabled={busy !== null} sx={BIG}>
-          Návod k obnově
-        </Button>
-        <Button variant="outlined" startIcon={<Download />} onClick={() => void download('export')} disabled={busy !== null} sx={BIG}>
-          Export konfigurace
-        </Button>
+        <ExportGate>
+          {(blocked) => (
+            <Button variant="outlined" startIcon={<Download />} onClick={() => void download('kit')} disabled={blocked || busy !== null} sx={BIG}>
+              Návod k obnově
+            </Button>
+          )}
+        </ExportGate>
+        <ExportGate>
+          {(blocked) => (
+            <Button variant="outlined" startIcon={<Download />} onClick={() => void download('export')} disabled={blocked || busy !== null} sx={BIG}>
+              Export konfigurace
+            </Button>
+          )}
+        </ExportGate>
         <Button variant="outlined" startIcon={<FactCheck />} onClick={() => picker.current?.click()} disabled={busy !== null} sx={BIG}>
           Zkontrolovat soubor konfigurace
         </Button>

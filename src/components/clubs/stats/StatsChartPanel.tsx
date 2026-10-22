@@ -15,6 +15,7 @@ import { FIT_FILL_SX, FIT_SCROLL_SX } from '../../ui/fit';
 import { useIsPhone } from '../../../layout/useDevice';
 import { csvFileName, toCsv, type CsvCell, type Period } from '../../../pages/statistics/aggregate';
 import { downloadCsv } from '../../../pages/statistics/csv';
+import { ExportGate } from '../../ui/ExportGate';
 
 /** What a bar needs on the page: the least height one category row gets, and the room for the axis and legend. */
 export const BAR_ROW = 34;
@@ -61,9 +62,13 @@ export function StatsChartPanel({ chart, period }: { chart: StatsChart; period: 
             <ToggleButton value="chart" sx={{ px: 1.5, py: 0.25, fontSize: 12, ...target }}>Graf</ToggleButton>
             <ToggleButton value="table" sx={{ px: 1.5, py: 0.25, fontSize: 12, ...target }}>Tabulka</ToggleButton>
           </ToggleButtonGroup>
-          <Button size="small" variant="outlined" sx={target} disabled={!exportable} onClick={() => downloadCsv(csvFileName(chart.title, period), toCsv(chart.columns, chart.rows))}>
-            Export CSV
-          </Button>
+          <ExportGate>
+            {(blocked) => (
+              <Button size="small" variant="outlined" sx={target} disabled={blocked || !exportable} onClick={() => void downloadCsv(csvFileName(chart.title, period), toCsv(chart.columns, chart.rows), 'club-statistics-csv')}>
+                Export CSV
+              </Button>
+            )}
+          </ExportGate>
         </Stack>
       </Stack>
 

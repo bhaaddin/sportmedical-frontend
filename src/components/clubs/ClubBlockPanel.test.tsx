@@ -14,6 +14,11 @@ import { setViewport, VIEWPORTS } from '../../test/viewport';
 import { pragueWallClockToInstant } from '../../utils/time';
 import type { ClubBlockAthlete, ClubBlockView } from '../../api/clubBlocks';
 import { athletesToCsv } from './athleteList';
+vi.mock('../../api/exports', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../api/exports')>();
+  return { ...actual, exportsApi: { policy: vi.fn(), authorize: vi.fn().mockResolvedValue(undefined) } };
+});
+
 
 const getBlock = vi.fn();
 const update = vi.fn();
@@ -154,7 +159,7 @@ describe('what a block shows', () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     open();
     await user.click(await screen.findByRole('button', { name: 'Stáhnout seznam' }));
-    expect(createUrl).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(createUrl).toHaveBeenCalledTimes(1));
     const blob = createUrl.mock.calls[0][0] as Blob;
     expect(blob.type).toBe('text/csv;charset=utf-8');
     expect(click).toHaveBeenCalled();

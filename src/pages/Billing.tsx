@@ -41,7 +41,8 @@ import {
 import type { InvoiceFilter } from './billing/invoiceView';
 import { hasPrefill, readNavState, wantsNewInvoice } from './billing/invoicePrefill';
 import type { BillingNavState } from './billing/invoicePrefill';
-import { openPdfBlob, pdfFileName } from './billing/openPdf';
+import { pdfFileName } from './billing/openPdf';
+import { download } from '../utils/download';
 import { FitPage, FIT_FILL_SX, STICKY_HEAD_SX } from '../components/ui/fit';
 
 /** The permission that lets somebody approve or reject an invoice above a discount limit. */
@@ -220,9 +221,10 @@ export default function Billing() {
   const handlePdf = async (inv: Invoice) => {
     setBusyId(inv.id);
     try {
-      openPdfBlob(await billingApi.getInvoicePdf(inv.id), pdfFileName(inv.invoiceNumber));
-    } catch {
-      toast.error('PDF se nepodařilo načíst');
+      await download(
+        { kind: 'invoice-pdf', fileName: pdfFileName(inv.invoiceNumber), open: true, failureMessage: 'PDF se nepodařilo načíst' },
+        { kind: 'fetch', fetch: () => billingApi.getInvoicePdf(inv.id) },
+      );
     } finally {
       setBusyId(null);
     }
