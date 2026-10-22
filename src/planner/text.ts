@@ -73,7 +73,7 @@ export const PLANNER_TEXT = {
     },
     strip: {
       title: 'Činností je víc, než se vejde',
-      text: (hidden: number) => `Ještě ${hidden} ${hidden === 1 ? 'je' : 'jich je'} za okrajem karet. Listujte šipkou nebo tažením. Když jednu naplníte, pás se posune sám.`,
+      text: (hidden: number) => `Za okrajem karet ${hidden === 1 ? 'je ještě 1 činnost' : hidden < 5 ? `jsou ještě ${hidden} činnosti` : `je ještě ${hidden} činností`}. Listujte šipkou nebo tažením. Když jednu naplníte, pás se posune sám.`,
     },
     callout: {
       next: (name: string) => `Další: ${name}`,

@@ -83,3 +83,12 @@ describe('the three steps of the publish dialog', () => {
     expect(publishSteps({ generated: true, previewed: true, copied: true }).say).toBe(T.done);
   });
 });
+
+describe('the strip hint counts in Czech', () => {
+  const t = PLANNER_TEXT.guide.strip.text;
+  it('1, 2-4 and 5 or more činností', () => {
+    expect(t(1)).toContain('je ještě 1 činnost.');
+    expect(t(3)).toContain('jsou ještě 3 činnosti.');
+    expect(t(6)).toContain('je ještě 6 činností.');
+  });
+});
