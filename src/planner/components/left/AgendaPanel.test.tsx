@@ -225,3 +225,32 @@ describe('AgendaPanel prices (the owner rule - a činnost never stands without i
     expect(document.querySelector('[data-agenda-type="medical"]')!.hasAttribute('title')).toBe(false);
   });
 });
+
+describe('R20: the MAIN calendar has no agenda under the mini calendar; a club screen keeps its panel', () => {
+  const withMode = (mode: 'standard' | 'club') => {
+    class Moded extends DemoDataSource {
+      async getCatalogue(): Promise<PlannerCatalogue> {
+        const c = await super.getCatalogue();
+        return { ...c, capabilities: { ...c.capabilities, mode } };
+      }
+    }
+    return new Moded({ today: '2026-11-10' });
+  };
+
+  it('the standard (main) calendar draws no agenda panel at all - no pills, card or term list', async () => {
+    mountPanels(<div data-testid="host"><AgendaPanel /></div>, { source: withMode('standard') });
+    await screen.findByTestId('host');
+    expect(screen.queryByTestId('agenda-panel')).toBeNull();
+    expect(document.getElementById('agenda-activity-chips')).toBeNull();
+    expect(document.getElementById('agenda-activity-kpi')).toBeNull();
+    expect(document.getElementById('agenda-activity-list')).toBeNull();
+    expect(screen.queryByText(/TERMÍNY ČINNOSTI V KALENDÁŘI/)).toBeNull();
+  });
+
+  it("a club's order screen keeps the panel exactly as it was", async () => {
+    mountPanels(<AgendaPanel />, { source: withMode('club') });
+    await screen.findByTestId('agenda-panel');
+    expect(document.querySelectorAll('#agenda-activity-chips .agenda-chip').length).toBeGreaterThan(0);
+    expect(text('agenda-activity-kpi')).toHaveTextContent('Sportovní prohlídky');
+  });
+});

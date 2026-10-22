@@ -63,6 +63,10 @@ export function AgendaPanel() {
   const club = useClubPlanner();
   const overview = club !== null && !club.planning;
   const clubCtx = overview ? { ...ctx, sessions: ctx.sessions.filter((s) => s.clubBlockId != null && club.data.blocks.some((b) => b.id === s.clubBlockId)) } : ctx;
+  /* R20: the MAIN calendar's left column is the mini calendar alone - no činnosti pills, card or term list under it. A club's screen
+     (order or overview) keeps its panel. */
+  const mainCalendar = club === null && catalogue?.capabilities.mode === 'standard';
+  if (mainCalendar) return null;
   const m = agendaView(clubCtx, agenda, { weekStart, selectedDate }, overview ? 'standard' : catalogue?.capabilities.mode, figures.live);
   /* R3: the standard sidebar is the činnosti list alone */
   const tabs = !m.standard;
