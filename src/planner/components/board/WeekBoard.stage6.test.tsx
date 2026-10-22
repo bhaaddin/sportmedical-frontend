@@ -185,6 +185,7 @@ describe('R15c (e) shortcuts', () => {
   it('N opens a new booking on the next free slot, T goes to today, the arrows move the period', async () => {
     mount();
     await screen.findByTestId('board-booking-b1');
+    await screen.findByTestId('board-shortcuts-on');
     const first = headingText();
     key('ArrowRight');
     await waitFor(() => expect(headingText()).not.toBe(first));
@@ -202,6 +203,7 @@ describe('R15c (e) shortcuts', () => {
   it('D / W / M switch the view, and the arrows follow the view (a day, a week, a month)', async () => {
     mount();
     await screen.findByTestId('board-booking-b1');
+    await screen.findByTestId('board-shortcuts-on');
     key('m');
     await waitFor(() => expect(document.querySelector('.view-segment [data-view="month"]')).toHaveClass('active'));
     key('d');
@@ -218,6 +220,7 @@ describe('R15c (e) shortcuts', () => {
   it('? lists the shortcuts in a pop-out, Esc closes it', async () => {
     mount();
     await screen.findByTestId('board-booking-b1');
+    await screen.findByTestId('board-shortcuts-on');
     key('?', { shiftKey: true });
     const help = await screen.findByTestId('board-shortcuts');
     expect(help).toHaveTextContent('Nová rezervace');
@@ -229,6 +232,7 @@ describe('R15c (e) shortcuts', () => {
   it('does nothing while typing in a field, with Ctrl/Alt, or while a dialog holds the focus', async () => {
     mount();
     await screen.findByTestId('board-booking-b1');
+    await screen.findByTestId('board-shortcuts-on');
     const headingBefore = headingText();
     const input = document.createElement('input');
     document.body.appendChild(input);
@@ -252,7 +256,7 @@ describe('R15c (e) shortcuts', () => {
     dlg.remove();
   });
 
-  it('are off on the demo planner and on a club board (the older planner-wide N is untouched there)', async () => {
+  it('are off on the demo planner and on a club\'s own board (the older planner-wide N is untouched there)', async () => {
     mount({ real: false });
     await screen.findByTestId('week-board-panel');
     key('?', { shiftKey: true });

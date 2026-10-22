@@ -85,22 +85,7 @@ export function undoReducer(state: UndoState, event: UndoEvent): UndoState {
 /** Whole seconds left, never negative. */
 export const secondsLeft = (entry: UndoEntry | null, now: number): number => (entry === null ? 0 : Math.max(0, Math.ceil((entry.expiresAt - now) / 1000)));
 
-/** What the cancelled booking looks like to the rule: the fields of a read appointment that matter. */
-export interface CancelledBookingFacts {
-  patientId: string;
-  unregisteredName?: string | null;
-  quickRegistrationPending?: boolean | null;
-  partnerName?: string | null;
-  clubDiscountPercent?: number | null;
-}
-
-/** Can the cancel be undone by creating the booking again? (See the file's header for what that means.) */
-export function cancelUndoable(a: CancelledBookingFacts): boolean {
-  if (a.quickRegistrationPending === true) return false;
-  if ((a.partnerName ?? '') !== '' || (a.clubDiscountPercent ?? 0) > 0) return false;
-  if (a.patientId !== '' && a.patientId !== '00000000-0000-0000-0000-000000000000') return true;
-  return (a.unregisteredName ?? '').trim() !== '';
-}
+export { cancelUndoable, type CancelledBookingFacts } from './undoRules';
 
 export const UNDO_TEXT = {
   moved: 'Termín přesunut.',

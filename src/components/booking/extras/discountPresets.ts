@@ -60,5 +60,4 @@ export function activePresetId(listCzk: number | null, typed: string | null, pre
   return presets.find((p) => discountedCzk(listCzk, p.percent) === value)?.id ?? null;
 }
 
-/** A price of 0 Kč is a gift: it books only with a reason (whether it came from the preset or was typed). */
-export const freeNeedsReason = (agreedPriceCzk: number | null, reason: string): boolean => agreedPriceCzk === 0 && reason.trim() === '';
+export { freeNeedsReason } from './priceRules';

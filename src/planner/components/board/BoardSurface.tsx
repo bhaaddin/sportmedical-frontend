@@ -83,9 +83,8 @@ import {
 } from './boardModel';
 import { boardSettings, useBoardSettings } from './boardSettings';
 import { useBoardMove, type BoardNotice } from './useBoardMove';
-import { useBoardUndo } from './useBoardUndo';
-import { cancelUndoable, UNDO_TEXT } from './undoState';
-import { useBoardShortcuts } from './useBoardShortcuts';
+import { cancelUndoable } from './undoRules';
+import type { UndoOp } from './undoState';
 import type { Appointment } from '../../../api/bookingContracts';
 import { useBoardNow } from './useBoardNow';
 import { useBoardSelection, type BoardSelection } from './useBoardSelection';
@@ -110,7 +109,10 @@ import { CLOSED_DAY_TEXT, DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor, lockedDa
 import './board.css';
 
 /* R4 (and R17 / R13): new pop-outs are loaded when first needed, so the planner chunk keeps its budget */
+/* R15c: the undo bar and the keyboard shortcuts load on first use / after the first paint, not with the planner */
 const ShortcutsHelp = lazy(() => import('./ShortcutsHelp').then((m) => ({ default: m.ShortcutsHelp })));
+const BoardUndo = lazy(() => import('./BoardUndo').then((m) => ({ default: m.BoardUndo })));
+const BoardShortcuts = lazy(() => import('./BoardShortcuts').then((m) => ({ default: m.BoardShortcuts })));
 const ClubBlockPopover = lazy(() => import('../../../components/booking/calendar/ClubBlockPopover').then((m) => ({ default: m.ClubBlockPopover })));
 /* R17 / R4: the lunch controls and the clash drawing are layers of their own, loaded only when a Stage 2 server and the setting ask for them */
 /* The appointment's detail opens on a click: loaded then (as `useRecordOpener` already does for the reservation drawer) */
@@ -271,16 +273,17 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   }, [queryClient, refreshPlanner]);
 
   /* R15c (d): a move and a cancel can be taken back for 30 s (the last one only); see undoState.ts for what a cancel can and cannot give back */
-  const undo = useBoardUndo({ refresh: refreshCalendar, notify: showNotice, describeError: (error) => errorText(error, t) });
+  const [undoEntry, setUndoEntry] = useState<{ op: UndoOp; seq: number } | null>(null);
+  const armUndo = useCallback((op: UndoOp) => setUndoEntry((prev) => ({ op, seq: (prev?.seq ?? 0) + 1 })), []);
   const armCancelUndo = useCallback(
     (a: Appointment) => {
       if (!cancelUndoable(a)) {
         showNotice({ text: 'Rezervace zrušena. Tohle zrušení už nejde vrátit zpět (klubový termín, nedokončená rychlá registrace nebo host bez jména) - vytvořte rezervaci znovu.', tone: 'info' });
         return;
       }
-      undo.arm({ kind: 'cancel', calendarId: a.calendarId, activityId: a.activityId, startUtc: a.startUtc, patientId: a.patientId || null, name: a.unregisteredName ?? null, phone: a.unregisteredPhone ?? null, note: a.note ?? null, agreedPriceCzk: a.agreedPriceCzk ?? null });
+      armUndo({ kind: 'cancel', calendarId: a.calendarId, activityId: a.activityId, startUtc: a.startUtc, patientId: a.patientId || null, name: a.unregisteredName ?? null, phone: a.unregisteredPhone ?? null, note: a.note ?? null, agreedPriceCzk: a.agreedPriceCzk ?? null });
     },
-    [undo.arm, showNotice],
+    [armUndo, showNotice],
   );
 
   /* ---- a selected card shows its summary; the click goes on to the detail ---- */
@@ -291,11 +294,11 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const commitMove = useCallback(
     async (move: GridMoveRequest) => {
       const notice = await appointmentsApi.reschedule(move.calendarId, move.appointment.id, move.startUtc, undefined, { notifyPatient: move.notifyPatient });
-      undo.arm({ kind: 'move', calendarId: move.calendarId, appointmentId: move.appointment.id, fromStartUtc: move.appointment.startUtc, notifyPatient: move.notifyPatient });
+      armUndo({ kind: 'move', calendarId: move.calendarId, appointmentId: move.appointment.id, fromStartUtc: move.appointment.startUtc, notifyPatient: move.notifyPatient });
       await refreshCalendar();
       return notice;
     },
-    [refreshCalendar, undo.arm],
+    [refreshCalendar, armUndo],
   );
   const move = useBoardMove({
     boardRef,
@@ -327,7 +330,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
       setBusyMove({ ...current, working: true });
       try {
         await appointmentsApi.reschedule(current.request.calendarId, current.request.appointment.id, current.request.startUtc, reason, { notifyPatient: current.request.notifyPatient });
-        undo.arm({ kind: 'move', calendarId: current.request.calendarId, appointmentId: current.request.appointment.id, fromStartUtc: current.request.appointment.startUtc, notifyPatient: current.request.notifyPatient });
+        armUndo({ kind: 'move', calendarId: current.request.calendarId, appointmentId: current.request.appointment.id, fromStartUtc: current.request.appointment.startUtc, notifyPatient: current.request.notifyPatient });
         await refreshCalendar();
         setBusyMove(null);
         showNotice({ text: 'Termín přesunut. Výjimka je zapsaná v historii rezervace.', tone: 'info' });
@@ -339,7 +342,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         }
       }
     },
-    [busyMove, refreshCalendar, showNotice, t, undo.arm],
+    [busyMove, refreshCalendar, showNotice, t, armUndo],
   );
 
   /* ---- the model ---- */
@@ -683,7 +686,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
   const [helpOpen, setHelpOpen] = useState(false);
   const onClubScreenForKeys = useClubPlanner() !== null;
   const shortcutsOn = calendar !== null && config.mode === 'standard' && !onClubScreenForKeys;
-  useBoardShortcuts(shortcutsOn, {
+  const shortcutHandlers = {
     new: () => {
       if (!mayBook) showNotice({ text: 'Nemáte oprávnění vytvářet rezervace.', tone: 'error' });
       else void bookNextFree();
@@ -695,7 +698,7 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     week: () => act.setView('week'),
     month: () => act.setView('month'),
     help: () => setHelpOpen((open) => !open),
-  });
+  };
   const calendarReady = calendar !== null && calendar.ready && calendar.calendars.length > 0;
   useEffect(() => {
     if (!config.realCalendar || newAppointmentKey === null || handled.current.newAppointment === newAppointmentKey) return;
@@ -1556,13 +1559,15 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         </Suspense>
       ) : null}
 
-      {undo.armed && undo.op ? (
-        <div className="board-undo" role="status" data-testid="board-undo" data-kind={undo.op.kind} title={undo.op.kind === 'cancel' ? UNDO_TEXT.cancelHint : undefined}>
-          <span className="undo-text">{undo.op.kind === 'move' ? UNDO_TEXT.moved : UNDO_TEXT.cancelled}</span>
-          <span className="undo-left" data-testid="board-undo-left">{UNDO_TEXT.left(undo.seconds)}</span>
-          <button type="button" className="undo-run" data-testid="board-undo-run" disabled={undo.running} onClick={undo.run}>{UNDO_TEXT.action}</button>
-          <button type="button" className="undo-dismiss" aria-label={UNDO_TEXT.dismiss} disabled={undo.running} onClick={undo.dismiss}>×</button>
-        </div>
+      {undoEntry !== null ? (
+        <Suspense fallback={null}>
+          <BoardUndo entry={undoEntry} refresh={refreshCalendar} notify={showNotice} describeError={(error) => errorText(error, t)} />
+        </Suspense>
+      ) : null}
+      {shortcutsOn ? (
+        <Suspense fallback={null}>
+          <BoardShortcuts handlers={shortcutHandlers} />
+        </Suspense>
       ) : null}
       {helpOpen ? (
         <Suspense fallback={null}>

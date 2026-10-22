@@ -179,3 +179,10 @@ describe('R15c (e) the shortcut map', () => {
     expect(['x', 'Enter', ' ', 'Escape', '1'].map((k) => shortcutOf(ev(k)))).toEqual([null, null, null, null, null]);
   });
 });
+
+describe('the palette event used by the "/" shortcut', () => {
+  it('is the UniversalSearch event (the hook does not import that module, so the string is pinned here)', async () => {
+    const { OPEN_SEARCH_EVENT } = await import('../../UniversalSearch');
+    expect(OPEN_SEARCH_EVENT).toBe('sm-open-search');
+  });
+});

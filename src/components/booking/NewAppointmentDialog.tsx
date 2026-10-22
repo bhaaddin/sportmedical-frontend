@@ -51,7 +51,7 @@ import { BubbleFrame } from "./NewAppointmentDialog.bubble";
 import type { BubbleAnchor } from "./NewAppointmentDialog.bubble.logic";
 import { AgreedPriceField, noteWithPriceReason } from "./price/AgreedPriceField";
 import { priceView } from "./price/agreedPrice";
-import { freeNeedsReason } from "./extras/discountPresets";
+import { freeNeedsReason } from "./extras/priceRules";
 import { OFF, readConfirmChannel, saveConfirmChannel, storedUserId } from "./extras/confirmChannel";
 import { NEAREST_TEXT, nearestFreeFor } from "./extras/nearestFreeSearch";
 /* R15c: the extras of the booking flow load only when the dialog shows them */

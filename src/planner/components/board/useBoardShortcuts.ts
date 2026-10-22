@@ -8,7 +8,10 @@
  */
 import { useEffect, useRef } from 'react';
 import { shortcutOf, type ShortcutAction } from '../../../components/booking/extras/shortcutMap';
-import { openUniversalSearch } from '../../../components/UniversalSearch';
+
+/* The palette's own event (`OPEN_SEARCH_EVENT` of UniversalSearch.tsx - a test pins the two together): importing that module here would put the palette into the planner's first load. */
+const OPEN_SEARCH_EVENT = 'sm-open-search';
+const openUniversalSearch = (): void => void window.dispatchEvent(new Event(OPEN_SEARCH_EVENT));
 
 export type ShortcutHandlers = Partial<Record<ShortcutAction, () => void>>;
 
