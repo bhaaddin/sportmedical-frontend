@@ -67,22 +67,8 @@ export function boardGeometry(
 }
 
 /** Distance from the top of the timeline of a wall-clock minute. */
-export const yOfMinute = (g: BoardGeometry, minute: number): number => (minute - g.startMinutes) * g.pxPerMinute;
-
-/** The wall-clock minute at `y` px from the top of the timeline (not clamped). */
-export const minuteAtY = (g: BoardGeometry, y: number): number => g.startMinutes + y / g.pxPerMinute;
-
-/** Top and height of a span, cut to the window; the height is never below `minHeight`. */
-export function boxOfSpan(
-  g: BoardGeometry,
-  start: number,
-  end: number,
-  minHeight = 0,
-): { top: number; height: number } {
-  const from = Math.max(start, g.startMinutes);
-  const to = Math.min(end, g.endMinutes);
-  return { top: yOfMinute(g, from), height: Math.max(minHeight, Math.max(0, to - from) * g.pxPerMinute) };
-}
+export { boxOfSpan, minuteAtY, yOfMinute } from './spanBox';
+import { yOfMinute } from './spanBox';
 
 /** A session card's box exactly like `weekEventsModel` (the same 25 px floor), at any zoom. */
 export function cardBox(g: BoardGeometry, start: number, end: number): { top: number; height: number; compact: boolean } {

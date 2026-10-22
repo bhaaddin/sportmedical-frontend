@@ -1,11 +1,14 @@
 import { Alert, Box, Button, Popover, Skeleton, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Suspense, lazy } from "react";
 import { clubBlocksApi } from "../../../api/clubBlocks";
-import { clubOrdersApi, type ClubOrderView, type ReleaseUnfilledResult } from "../../../api/clubOrders";
+import { clubOrdersApi, type ClubOrderView } from "../../../api/clubOrders";
 import type { TimeBlock } from "../../../api/bookingContracts";
-import { HOLD_TEXT, holdLabel, holdStateOf, releaseFailedText, releaseSummary, seatsLabel } from "../../../planner/components/board/clubHold";
+import { holdLabel, holdStateOf, seatsLabel } from "../../../planner/components/board/clubHold";
+
+/* R13: the release of the unfilled part is a panel of its own, loaded only when a hold is shown */
+const ReleasePanel = lazy(() => import("./ReleasePanel"));
 import { DESIGN } from "../../../theme";
 import { orderCode } from "../../clubs/order/orderFormat";
 import { orderWindows, shortSplit, termsWord } from "../../clubs/orders/orderWindows";
@@ -60,9 +63,6 @@ export function ClubBlockPopover({
   const colour = cleanHex(pick?.colorHex) ?? DESIGN.faint;
   const holdBlock = pick?.block ?? null;
   const hold = holdBlock ? holdStateOf(holdBlock) : null;
-  const [released, setReleased] = useState<ReleaseUnfilledResult | null>(null);
-  const [confirming, setConfirming] = useState<'all' | 'expired' | null>(null);
-  const [releaseError, setReleaseError] = useState<string | null>(null);
 
   /* The calendar's block row carries no order: the block (cheap) says which order it belongs to. */
   const blockQuery = useQuery({
@@ -85,21 +85,7 @@ export function ClubBlockPopover({
   const ownedByOrder = orderId !== null && orderId !== "";
   /* the block of the main board carries its order itself (stage 2); older servers need the block read above */
   const effectiveOrderId = holdBlock?.clubOrderId || orderId || '';
-  const release = useMutation({
-    mutationFn: (onlyExpired: boolean) => clubOrdersApi.releaseUnfilled(effectiveOrderId, { onlyExpired }),
-    onSuccess: (result) => {
-      setReleased(result);
-      setConfirming(null);
-      setReleaseError(null);
-      onReleased?.();
-    },
-    onError: (error) => {
-      setConfirming(null);
-      setReleaseError(releaseFailedText(error));
-    },
-  });
-  /* the action exists where the server told us about the hold (a Stage 2 server), for a confirmed order, for who may edit bookings */
-  const canRelease = mayRelease && hold !== null && effectiveOrderId !== '' && released === null;
+  const canRelease = mayRelease && hold !== null && effectiveOrderId !== '';
 
   const windows = order === undefined ? [] : orderWindows(order);
   const title = !pick
@@ -167,45 +153,15 @@ export function ClubBlockPopover({
               <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}>{CAL_TEXT.clubPopover.hint}</Typography>
             )}
           </Box>
-          {released !== null ? (
-            <Alert severity="success" sx={{ m: 1.25, mb: 0 }} data-testid="club-popover-released">
-              {releaseSummary(released)}
-            </Alert>
-          ) : null}
-          {releaseError !== null ? (
-            <Alert severity="error" sx={{ m: 1.25, mb: 0 }} data-testid="club-popover-release-error">
-              {releaseError}
-            </Alert>
-          ) : null}
-          {confirming !== null ? (
-            <Box data-testid="club-popover-release-confirm" sx={{ m: 1.25, mb: 0, p: 1.25, border: "1px solid", borderColor: "warning.main", borderRadius: 2 }}>
-              <Typography sx={{ fontSize: 13 }}>{HOLD_TEXT.releaseConfirm(confirming === "expired")}</Typography>
-              <Box sx={{ display: "flex", gap: 1, mt: 1, justifyContent: "flex-end" }}>
-                <Button onClick={() => setConfirming(null)} disabled={release.isPending} sx={{ minHeight: 44 }}>
-                  {HOLD_TEXT.back}
-                </Button>
-                <Button color="warning" variant="contained" disabled={release.isPending} onClick={() => release.mutate(confirming === "expired")} sx={{ minHeight: 44 }}>
-                  {HOLD_TEXT.releaseGo}
-                </Button>
-              </Box>
-            </Box>
+          {canRelease && hold !== null ? (
+            <Suspense fallback={null}>
+              <ReleasePanel orderId={effectiveOrderId} hold={hold} onReleased={onReleased} />
+            </Suspense>
           ) : null}
           <Box sx={{ display: "flex", gap: 1, p: 1.25, justifyContent: "flex-end", flexWrap: "wrap" }}>
             <Button onClick={onClose} sx={{ minHeight: 44 }}>
               {CAL_TEXT.clubPopover.close}
             </Button>
-            {canRelease && confirming === null ? (
-              <>
-                {hold === "expired" ? (
-                  <Button variant="outlined" color="warning" onClick={() => setConfirming("expired")} sx={{ minHeight: 44 }} data-testid="club-release-expired">
-                    {HOLD_TEXT.releaseExpired}
-                  </Button>
-                ) : null}
-                <Button variant="outlined" color="warning" onClick={() => setConfirming("all")} sx={{ minHeight: 44 }} data-testid="club-release">
-                  {HOLD_TEXT.release}
-                </Button>
-              </>
-            ) : null}
             {ownedByOrder ? (
               <>
                 {order !== undefined && order.status === "Confirmed" && onEditTerms !== undefined ? (

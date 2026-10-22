@@ -37,7 +37,7 @@ import type { CalendarDisplaySettings, CalendarView } from '../../api/displaySet
 import { fieldErrorsOf, problemMessageOf } from './settingsProblem';
 import { BookingSlotsCard } from './BookingSlotsCard';
 import { SingleWorkerCard } from './SingleWorkerCard';
-import { DEFAULT_HOLIDAY_COLOR, holidayColorProblem } from '../../planner/model/dayLock';
+import { DEFAULT_HOLIDAY_COLOR, holidayColorProblem } from '../../colors/dayLock';
 
 const VIEW_LABELS: Record<CalendarView, string> = {
   day: 'Den',

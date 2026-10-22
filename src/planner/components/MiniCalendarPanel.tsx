@@ -30,7 +30,7 @@ import { Icon } from './Icons';
 import { useQuery } from '@tanstack/react-query';
 import { clubBlocksApi } from '../../api/clubBlocks';
 import { clubDaysOf } from './left/miniClubs';
-import { CLOSED_DAY_TEXT, DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor, lockedDayLook } from '../model/dayLock';
+import { CLOSED_DAY_TEXT, DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor, lockedDayLook } from '../../colors/dayLock';
 import { usePlannerCtx, usePlannerModelState } from './context';
 import { MiniDayButton } from './left/MiniDayButton';
 import { getMiniController } from './left/miniController';

@@ -5,28 +5,27 @@
  * `conflictKind` ("appointment" | "clubBlock"), `calendarName`, `activityName`, `startUtc` / `endUtc`, `overridable`. A club block names
  * its činnosti, never a player. `403 worker.busy.override_forbidden` answers an override by someone who may not make one.
  *
- * Nothing here ever shows the server's raw text of an unknown shape; the Czech sentence is built from the structured fields.
+ * Nothing here ever shows the server's raw text of an unknown shape; the Czech sentence is built from the structured fields. (Read by
+ * hand, not with a schema: this file is in the planner's first load and a detail object of five strings needs no library.)
  */
-import { z } from 'zod';
 import { BookingApiError } from './apiError';
 import { pragueDateKey } from '../utils/time';
 
 export const WORKER_BUSY = 'worker.busy';
 export const WORKER_BUSY_OVERRIDE_FORBIDDEN = 'worker.busy.override_forbidden';
 
-const detailsSchema = z.object({
-  conflictKind: z.enum(['appointment', 'clubBlock']).catch('appointment'),
-  conflictId: z.string().nullish().transform((v) => v ?? null),
-  calendarId: z.string().nullish().transform((v) => v ?? null),
-  calendarName: z.string().nullish().transform((v) => v ?? null),
-  activityName: z.string().nullish().transform((v) => v ?? null),
-  startUtc: z.string().nullish().transform((v) => v ?? null),
-  endUtc: z.string().nullish().transform((v) => v ?? null),
-  workerUserId: z.string().nullish().transform((v) => v ?? null),
-  overridable: z.boolean().nullish().transform((v) => v === true),
-  conflictCount: z.number().int().nullish().transform((v) => v ?? null),
-});
-export type WorkerBusyDetails = z.infer<typeof detailsSchema>;
+export interface WorkerBusyDetails {
+  conflictKind: 'appointment' | 'clubBlock';
+  conflictId: string | null;
+  calendarId: string | null;
+  calendarName: string | null;
+  activityName: string | null;
+  startUtc: string | null;
+  endUtc: string | null;
+  workerUserId: string | null;
+  overridable: boolean;
+  conflictCount: number | null;
+}
 
 export interface WorkerBusy {
   details: WorkerBusyDetails;
@@ -34,11 +33,28 @@ export interface WorkerBusy {
   overridable: boolean;
 }
 
-/** Is this the `worker.busy` refusal? (409 + code; an unparsable detail still counts - the clash is real, the text is generic.) */
+const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v : null);
+
+function readDetails(raw: unknown): WorkerBusyDetails {
+  const r = (raw !== null && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  return {
+    conflictKind: r.conflictKind === 'clubBlock' ? 'clubBlock' : 'appointment',
+    conflictId: text(r.conflictId),
+    calendarId: text(r.calendarId),
+    calendarName: text(r.calendarName),
+    activityName: text(r.activityName),
+    startUtc: text(r.startUtc),
+    endUtc: text(r.endUtc),
+    workerUserId: text(r.workerUserId),
+    overridable: r.overridable === true,
+    conflictCount: typeof r.conflictCount === 'number' && Number.isInteger(r.conflictCount) ? r.conflictCount : null,
+  };
+}
+
+/** Is this the `worker.busy` refusal? (409 + code; an unusable detail still counts - the clash is real, the text is generic.) */
 export function workerBusyOf(error: unknown): WorkerBusy | null {
   if (!(error instanceof BookingApiError) || error.code !== WORKER_BUSY) return null;
-  const parsed = detailsSchema.safeParse(error.details ?? {});
-  const details = parsed.success ? parsed.data : detailsSchema.parse({});
+  const details = readDetails(error.details);
   return { details, overridable: details.overridable };
 }
 

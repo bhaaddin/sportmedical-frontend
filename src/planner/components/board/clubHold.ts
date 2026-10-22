@@ -19,34 +19,9 @@ export const HOLD_TEXT = {
   waiting: 'Čeká na hráče',
   full: 'Obsazeno',
   expired: 'Hold vypršel',
-  release: 'Uvolnit nevyplněné',
-  releaseExpired: 'Uvolnit jen vypršené',
   reserved: (club: string) => `Rezervováno pro klub ${club}`,
   holdUntil: (day: string) => `Držení do ${day}`,
-  releaseConfirm: (onlyExpired: boolean) =>
-    onlyExpired
-      ? 'Uvolní se jen ty části, jejichž držení vypršelo a které nikdo nevyplnil. Zapsaní hráči a jejich termíny se nemění.'
-      : 'Uvolní se čas, který hráči nevyplnili: část bez hráčů zmizí, část s hráči se zkrátí po posledního z nich. Zapsaní hráči a jejich termíny se nemění.',
-  releaseGo: 'Uvolnit',
-  back: 'Zpět',
-  releaseFailed: 'Čas se nepodařilo uvolnit. Zkuste to prosím znovu.',
 } as const;
-
-/** What the owner is told after the release (contract: windows removed / shortened, minutes given back). */
-export function releaseSummary(r: { windowsRemoved: number; windowsShortened: number; minutesReleased: number; stretchesKept: number; blockCancelled: boolean }): string {
-  if (r.windowsRemoved === 0 && r.windowsShortened === 0) return 'Není co uvolnit: všechen držený čas je vyplněný, nebo už byl uvolněn.';
-  const parts = [`Uvolněno ${r.minutesReleased} min`];
-  if (r.windowsRemoved > 0) parts.push(`odstraněno ${r.windowsRemoved}`);
-  if (r.windowsShortened > 0) parts.push(`zkráceno ${r.windowsShortened}`);
-  if (r.stretchesKept > 0) parts.push(`ponecháno ${r.stretchesKept}`);
-  return `${parts.join(', ')}.${r.blockCancelled ? ' Blokace klubu tím zanikla.' : ''}`;
-}
-
-/** The sentence for a refused release: the server's own text (it is Czech), else the generic one. */
-export function releaseFailedText(error: unknown): string {
-  const message = error instanceof Error ? error.message.trim() : '';
-  return message !== '' && !/^Request failed/i.test(message) ? message : HOLD_TEXT.releaseFailed;
-}
 
 /** The block's hold state, or null when the server says nothing about it (an older build, or a manual block). */
 export function holdStateOf(block: Pick<TimeBlock, 'kind' | 'playersMissing' | 'windowEmpty' | 'holdExpired' | 'seats' | 'registered'>): HoldState | null {

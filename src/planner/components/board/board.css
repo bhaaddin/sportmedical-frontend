@@ -651,7 +651,7 @@
 .sm-planner .board-window.is-club .icon { width: 12px; height: 12px; opacity: 0.9; }
 .sm-planner .board-window .win-code { font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em; opacity: 0.9; white-space: nowrap; }
 .sm-planner .board-window .win-hold { margin-top: 2px; padding: 1px 7px; border-radius: 99px; font-size: 9.5px; font-weight: 800; letter-spacing: 0.03em; white-space: nowrap; color: #e9f6fb; background: rgba(0, 20, 33, 0.78); border: 1px solid currentColor; }
-.sm-planner .board-window .win-hold[data-hold='full'] { color: #9ff2cf; }
+.sm-planner .board-window .win-hold[data-hold='full'] { color: #b6f2a2; }
 .sm-planner .board-window .win-hold[data-hold='waiting'] { color: #ffe08a; }
 .sm-planner .board-window .win-hold[data-hold='expired'] { color: #ffb4a8; }
 .sm-planner .board-window[data-hold='expired'] { border-top-style: dashed; border-right-style: dashed; border-bottom-style: dashed; }
@@ -693,3 +693,27 @@
   pointer-events: none;
 }
 .sm-planner .board-shade.board-lunch-ghost.is-invalid { border-color: #ff8a80; background: rgba(255, 138, 128, 0.22); color: #ffd7d3; }
+/* the club bar's words are cut with an ellipsis (the tile's title carries them all); a long line must never widen a column of the month */
+.sm-planner .month-matrix { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.sm-planner .month-tile { min-width: 0; }
+.sm-planner .month-tile .tile-club.is-held { min-width: 0; }
+.sm-planner .month-tile .tile-club.is-held > span { min-width: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; white-space: normal; overflow-wrap: anywhere; line-height: 1.2; }
+.sm-planner .month-tile .tile-club.is-held { align-items: flex-start; }
+
+/* ---- R17: the click targets over the lunch bands live in their own layer (loaded with a Stage 2 server); the band itself is drawn by the board ---- */
+.sm-planner .board-lunch-layer { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.sm-planner .board-lunch-hit {
+  position: absolute;
+  left: calc(var(--col) * 100% / 7 + 3px);
+  width: calc(100% / 7 - 6px);
+  min-height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
+  border-radius: 5px;
+}
+.sm-planner .board-lunch-hit:hover { background: rgba(255, 255, 255, 0.08); }
+.sm-planner .board-lunch-hit:focus-visible { outline: 2px solid hsl(from #23f2e7 var(--sm-hsl, h s l)); outline-offset: 1px; }

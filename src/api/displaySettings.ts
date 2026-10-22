@@ -16,7 +16,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { client } from './client';
 import type { Permission } from '../auth/usePermission';
-import { DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor } from '../planner/model/dayLock';
+import { DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor } from '../colors/dayLock';
 
 /* ── Calendar ─────────────────────────────────────────────────────── */
 

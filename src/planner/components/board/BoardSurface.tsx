@@ -19,7 +19,6 @@ import { useTranslation } from 'react-i18next';
 import { appointmentsApi } from '../../../api/appointments';
 import { statusName, type DayAppointment, type TimeBlock } from '../../../api/bookingContracts';
 import { CALENDAR_DISPLAY_OFFLINE } from '../../../api/displaySettings';
-import { AppointmentDetail } from '../../../components/booking/AppointmentDetail';
 import { NewAppointmentDialog } from '../../../components/booking/NewAppointmentDialog';
 import { AppointmentHoverCard } from '../../../components/booking/grid/AppointmentHoverCard';
 import { BlockDetailDialog, BlockReasonDialog, type BlockTarget } from '../../../components/booking/grid/BlockDialogs';
@@ -31,7 +30,7 @@ import { localDateTime, pragueMinuteOfDay, spanLabel, spanOnDay, touchesDay, typ
 import type { GridMoveRequest } from '../../../components/booking/grid/moveRequest';
 import { MoveConfirmDialog } from '../../../components/booking/calendar/MoveConfirmDialog';
 import { AddToClubOrderDialog } from '../../../components/booking/calendar/AddToClubOrderDialog';
-import { ClubBlockPopover, type ClubBlockPick } from '../../../components/booking/calendar/ClubBlockPopover';
+import type { ClubBlockPick } from '../../../components/booking/calendar/ClubBlockPopover';
 import { SelectionPopover } from '../../../components/booking/calendar/SelectionPopover';
 import { dayCount, daysWord, rangeDates } from '../../../components/booking/calendar/model';
 import type { PickedRange } from '../../../components/booking/calendar/multiSelect';
@@ -52,8 +51,6 @@ import { PlanningBoardLayer } from '../PlanningBoardLayer';
 import { useStage } from '../PlannerStage';
 import { DESIGN_TIMELINE_HEIGHT, useBoardMetrics } from '../PlannerMetrics';
 import { usePlannerCtx, usePlannerModelState } from '../context';
-import { DayList, MonthMatrix } from './AlternateView';
-import { PhoneAgenda, PhoneMonthList } from './PhoneAgenda';
 import { clubItemsByDay, clubLinesByDay, lunchOfMarks, phoneEntries, phoneMonthRows, weekStripModel } from './phoneModel';
 import { BookingCard, SessionCard, WindowBlock } from './BoardCards';
 import { BoardToolbar } from './BoardToolbar';
@@ -100,16 +97,21 @@ import { useSafeNavigate } from './useSafeNavigate';
 import { calendarColumns, calendarOfColumn, columnChips } from './calendarColumns';
 import { CalendarStrip } from './CalendarStrip';
 import { Icon } from '../Icons';
+import { DayList, MonthMatrix } from './AlternateView';
+import { PhoneAgenda, PhoneMonthList } from './PhoneAgenda';
 import { clubHolding, clubReservedText } from './clubHold';
-import { useLunch } from './useLunch';
-import { LUNCH_TEXT, clockOf } from './lunchModel';
 import { LunchBandEl } from './BoardCards';
 import { isOverrideForbidden, workerBusyOf, type WorkerBusy } from '../../../api/workerBusy';
-import { CLOSED_DAY_TEXT, DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor, lockedDayLook } from '../../model/dayLock';
+import { CLOSED_DAY_TEXT, DEFAULT_HOLIDAY_COLOR, effectiveHolidayColor, lockedDayLook } from '../../../colors/dayLock';
 import './board.css';
 
 /* R4 (and R17 / R13): new pop-outs are loaded when first needed, so the planner chunk keeps its budget */
-const LunchPopover = lazy(() => import('./LunchPopover').then((m) => ({ default: m.LunchPopover })));
+const ClubBlockPopover = lazy(() => import('../../../components/booking/calendar/ClubBlockPopover').then((m) => ({ default: m.ClubBlockPopover })));
+/* R17 / R4: the lunch controls and the clash drawing are layers of their own, loaded only when a Stage 2 server and the setting ask for them */
+/* The appointment's detail opens on a click: loaded then (as `useRecordOpener` already does for the reservation drawer) */
+const AppointmentDetail = lazy(() => import('../../../components/booking/AppointmentDetail').then((m) => ({ default: m.AppointmentDetail })));
+const LunchLayer = lazy(() => import('./LunchLayer'));
+const ClashLayer = lazy(() => import('./ClashLayer'));
 const WorkerBusyDialog = lazy(() => import('../../../components/booking/WorkerBusyNotice').then((m) => ({ default: m.WorkerBusyDialog })));
 
 const hatchOf = (hex: string, strong: number, weak: number) =>
@@ -341,7 +343,6 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
               ...(config.excludeClubBlockIds ? { excludeClubBlockIds: config.excludeClubBlockIds } : {}),
               split,
               ...(calendar.alias ? { alias: calendar.alias } : {}),
-              workerRule: calendar.workerRule,
               isOpen: calendarOpen,
             }
           : null,
@@ -593,24 +594,6 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
     },
   });
 
-  /* ---- R17: the lunch band is clickable and draggable (one-day exceptions of the weekly lunch) ---- */
-  const lunchCtl = useLunch({
-    calendar,
-    standard: config.mode === 'standard',
-    days,
-    dayMarks,
-    geometry,
-    boardRef,
-    step: snapStep,
-    calendarOpen,
-    paused: planningOwnsPointer || pinching || move.moving !== null,
-    notify: showNotice,
-    refresh: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['grid-preview'] });
-      await refreshCalendar();
-    },
-  });
-
   /* ---- what the popover's actions open ---- */
   const [booking, setBooking] = useState<{ key: number; prefill: BookingPrefill } | null>(null);
   const openBooking = useCallback((prefill: BookingPrefill) => setBooking((c) => ({ key: (c?.key ?? 0) + 1, prefill })), []);
@@ -785,6 +768,8 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
 
   const pendingRange = selection.live ?? (pending ? { col: pending.col, sub: pending.sub, range: pending.range } : null);
   const ghost = move.moving?.target ?? null;
+  /* the lunch controls exist for a user who may book or edit, in the standard calendar, on a Stage 2 server */
+  const lunchOn = calendar !== null && config.mode === 'standard' && calendar.stage2 && (calendar.mayBlock || calendar.mayBook);
   const dayLabelOf = (day: IsoDate): string => {
     const d = head.days.find((x) => x.date === day);
     return d ? `${d.weekName} ${d.label}` : day;
@@ -1025,7 +1010,6 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                       box={s.lunch}
                       state={s.lunch.moved ? 'moved' : 'weekly'}
                       colour={lunch}
-                      handlers={lunchCtl.bandHandlers({ day: s.day, from: s.lunch.from, to: s.lunch.to, state: s.lunch.moved ? 'moved' : 'weekly', original: s.lunch.original ?? null })}
                     />
                   ) : null}
                   {s.lunchRemoved ? (
@@ -1035,7 +1019,6 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                       box={s.lunchRemoved}
                       state="removed"
                       colour={lunch}
-                      handlers={lunchCtl.bandHandlers({ day: s.day, from: s.lunchRemoved.from, to: s.lunchRemoved.to, state: 'removed', original: null })}
                     />
                   ) : null}
                   {s.closed && s.lock ? (
@@ -1074,21 +1057,43 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
               </div>
             ) : null}
 
-            {model.clashes.length ? (
-              <div className="board-clashes" aria-hidden="true" data-testid="board-clashes">
-                {model.clashes.map((c) => (
-                  <div
-                    key={c.key}
-                    className="board-clash"
-                    data-testid={`clash-${c.calendarId}-${c.day}-${c.sourceId}`}
-                    data-source-id={c.sourceId}
-                    title={`Pracovník je zaneprázdněn - ${c.reason}`}
-                    style={{ '--col': c.col, '--sub': c.sub, '--subs': c.subs, top: c.top, height: c.height } as CSSProperties}
-                  >
-                    <span className="board-sticky"><Icon name="lock" /><b>Zaneprázdněn</b><small>{c.reason}</small></span>
-                  </div>
-                ))}
-              </div>
+            {calendar?.workerRule.on && split !== null ? (
+              <Suspense fallback={null}>
+                <ClashLayer
+                  days={days}
+                  split={split}
+                  {...(calendar.alias ? { alias: calendar.alias } : {})}
+                  calendars={calendar.calendars}
+                  appointments={move.appointments}
+                  blocksByCalendar={calendar.blocksByCalendar}
+                  workerRule={calendar.workerRule}
+                  dayMarks={dayMarks}
+                  geometry={geometry}
+                />
+              </Suspense>
+            ) : null}
+
+            {lunchOn ? (
+              <Suspense fallback={null}>
+                <LunchLayer
+                  calendar={calendar!}
+                  days={days}
+                  dayMarks={dayMarks}
+                  shades={model.shades}
+                  geometry={geometry}
+                  boardRef={boardRef}
+                  step={snapStep}
+                  calendarOpen={calendarOpen}
+                  paused={planningOwnsPointer || pinching || move.moving !== null}
+                  notify={showNotice}
+                  refresh={async () => {
+                    await queryClient.invalidateQueries({ queryKey: ['grid-preview'] });
+                    await refreshCalendar();
+                  }}
+                  dayLabelOf={dayLabelOf}
+                  onBook={(prefill) => openBooking(prefill)}
+                />
+              </Suspense>
             ) : null}
 
             {model.windows.length ? (
@@ -1167,16 +1172,6 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
                   <b>{spanLabel(pendingRange.range)}</b>
                   <small>{pendingRange.range.end - pendingRange.range.start} min</small>
                 </div>
-              </div>
-            ) : null}
-
-            {lunchCtl.drag ? (
-              <div
-                className={`board-shade board-lunch-ghost${lunchCtl.drag.problem ? ' is-invalid' : ''}`}
-                data-testid="lunch-drag-ghost"
-                style={{ '--col': days.indexOf(lunchCtl.drag.day), ...boxOfSpan(geometry, lunchCtl.drag.start, lunchCtl.drag.start + lunchCtl.drag.length) } as CSSProperties}
-              >
-                <span>{lunchCtl.drag.problem ?? `${LUNCH_TEXT.band} ${clockOf(lunchCtl.drag.start)}`}</span>
               </div>
             ) : null}
 
@@ -1364,28 +1359,6 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         ) : null}
       </Popper>
 
-      {lunchCtl.popover ? (
-        <Suspense fallback={null}>
-          <LunchPopover
-            band={lunchCtl.popover.band}
-            dateLabel={dayLabelOf(lunchCtl.popover.band.day)}
-            targets={lunchCtl.popover.targets}
-            hours={lunchCtl.popover.hours}
-            bookings={lunchCtl.popover.bookings}
-            mayEdit={lunchCtl.mayEdit}
-            mayBook={lunchCtl.mayBook}
-            point={lunchCtl.popover.point}
-            onMove={(startTime) => lunchCtl.moveTo(lunchCtl.popover!.band.day, startTime)}
-            onRemove={() => lunchCtl.removeToday(lunchCtl.popover!.band.day)}
-            onRestore={() => lunchCtl.restore(lunchCtl.popover!.band.day)}
-            onBook={(calendarId) => {
-              const band = lunchCtl.popover!.band;
-              openBooking({ initialDate: band.day, initialCalendarId: calendarId, initialStart: `${band.day}T${band.from}`, initialEnd: `${band.day}T${band.to}`, intoLunch: true });
-            }}
-            onClose={lunchCtl.closePopover}
-          />
-        </Suspense>
-      ) : null}
       {busyMove ? (
         <Suspense fallback={null}>
           <WorkerBusyDialog
@@ -1497,16 +1470,20 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
         />
       ) : null}
 
-      <ClubBlockPopover
-        pick={clubPick}
-        today={ctx.today}
-        onOpen={goBlock}
-        onOpenOrder={goOrder}
-        {...(calendar?.mayBook && nav.available ? { onEditTerms: (order: ClubOrderView) => void editTerms(order) } : {})}
-        onClose={() => setClubPick(null)}
-        mayRelease={calendar?.mayBlock ?? false}
-        onReleased={() => void refreshCalendar()}
-      />
+      {clubPick ? (
+        <Suspense fallback={null}>
+          <ClubBlockPopover
+            pick={clubPick}
+            today={ctx.today}
+            onOpen={goBlock}
+            onOpenOrder={goOrder}
+            {...(calendar?.mayBook && nav.available ? { onEditTerms: (order: ClubOrderView) => void editTerms(order) } : {})}
+            onClose={() => setClubPick(null)}
+            mayRelease={calendar?.mayBlock ?? false}
+            onReleased={() => void refreshCalendar()}
+          />
+        </Suspense>
+      ) : null}
 
       <ClubOrderEntry
         open={entryOpen && (calendar?.mayBook ?? false)}
@@ -1529,14 +1506,16 @@ export function BoardSurface({ calendar }: { calendar: BoardCalendarData | null 
       ) : null}
 
       {openApp?.calendarId ? (
-        <AppointmentDetail
-          appointmentId={openApp.id}
-          calendarId={openApp.calendarId}
-          calendar={calendar?.calendarById.get(openApp.calendarId)}
-          open
-          onClose={() => setOpenId(null)}
-          onChanged={() => void refreshCalendar()}
-        />
+        <Suspense fallback={null}>
+          <AppointmentDetail
+            appointmentId={openApp.id}
+            calendarId={openApp.calendarId}
+            calendar={calendar?.calendarById.get(openApp.calendarId)}
+            open
+            onClose={() => setOpenId(null)}
+            onChanged={() => void refreshCalendar()}
+          />
+        </Suspense>
       ) : null}
     </section>
   );

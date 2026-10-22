@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Avatar,
@@ -30,8 +30,8 @@ import { patientPreRegistrationApi } from "../../api/patientPreRegistration";
 import { useDevice } from "../../layout/useDevice";
 import { BookingApiError } from "../../api/apiError";
 import { isOverrideForbidden, workerBusyOf } from "../../api/workerBusy";
-import { lunchErrorText, lunchExceptionsApi } from "../../api/lunchExceptions";
-import { WorkerBusyNotice } from "./WorkerBusyNotice";
+/* R4 / R17: both are loaded when first needed (a refusal, a booking into the lunch) so the planner keeps its budget */
+const WorkerBusyNotice = lazy(() => import("./WorkerBusyNotice").then((m) => ({ default: m.WorkerBusyNotice })));
 import { isKnownPaperworkReason } from "../../api/bookingContracts";
 import { usePermission } from "../../auth/usePermission";
 import { DESIGN, SectionLabel, SoftCard, headSurface } from "../ui";
@@ -658,6 +658,7 @@ export function NewAppointmentDialog({
       let view: BookedView;
       if (intoLunch) {
         /* R17: the day's lunch goes and the booking comes, in one call that is undone as a whole when the booking is refused */
+        const { lunchExceptionsApi } = await import("../../api/lunchExceptions");
         const booked = await lunchExceptionsApi.bookIntoLunch(effectiveCalendarId, {
           ...(patient !== null ? { patientId: patient.id } : { name: eventName.trim() }),
           activityId: activity?.id ?? "",
@@ -1637,7 +1638,9 @@ export function NewAppointmentDialog({
           {conflict ? (
             workerBusyOf(conflict) !== null ? (
               <Box sx={{ mt: 1.5 }}>
-                <WorkerBusyNotice busy={workerBusyOf(conflict)!} working={booking} forbidden={overrideForbidden} onOverride={(reason) => submitBooking(reason)} onClose={() => setConflict(null)} />
+                <Suspense fallback={null}>
+                  <WorkerBusyNotice busy={workerBusyOf(conflict)!} working={booking} forbidden={overrideForbidden} onOverride={(reason) => submitBooking(reason)} onClose={() => setConflict(null)} />
+                </Suspense>
               </Box>
             ) : (
               <Alert severity="info" sx={{ mt: 1.5 }} onClose={() => setConflict(null)}>
@@ -1830,7 +1833,9 @@ export function NewAppointmentDialog({
 
       {conflict ? (
         workerBusyOf(conflict) !== null ? (
-          <WorkerBusyNotice busy={workerBusyOf(conflict)!} working={booking} forbidden={overrideForbidden} onOverride={(reason) => submitBooking(reason)} onClose={() => setConflict(null)} />
+          <Suspense fallback={null}>
+            <WorkerBusyNotice busy={workerBusyOf(conflict)!} working={booking} forbidden={overrideForbidden} onOverride={(reason) => submitBooking(reason)} onClose={() => setConflict(null)} />
+          </Suspense>
         ) : (
           <Alert severity="info" onClose={() => setConflict(null)}>
             {errorText(conflict, t)}

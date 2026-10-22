@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { TimeBlock } from '../../../api/bookingContracts';
 import { clubDaysOf } from '../left/miniClubs';
 import type { ClubBlockView } from '../../../api/clubBlocks';
-import { clubHolding, clubItemText, clubReservedText, holdLabel, holdStateOf, releaseFailedText, releaseSummary, seatsLabel } from './clubHold';
+import { clubHolding, clubItemText, clubReservedText, holdLabel, holdStateOf, seatsLabel } from './clubHold';
+import { releaseFailedText, releaseSummary } from './clubRelease';
 import { clubItemsByDay, clubLinesByDay } from './phoneModel';
 
 const block = (over: Partial<TimeBlock> = {}): TimeBlock =>

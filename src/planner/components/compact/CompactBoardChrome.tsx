@@ -17,7 +17,7 @@ import { usePlannerActions, usePlannerSelector } from '../../state/PlannerStoreP
 import { PLANNER_TEXT } from '../../text';
 import { useBoardConfig } from '../board/boardConfig';
 import { columnChips } from '../board/calendarColumns';
-import { lockedDayLook } from '../../model/dayLock';
+import { lockedDayLook } from '../../../colors/dayLock';
 import { useBoardSettings } from '../board/boardSettings';
 import { useInquiries } from '../board/useInquiries';
 import { Icon } from '../Icons';

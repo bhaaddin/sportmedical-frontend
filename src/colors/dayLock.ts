@@ -10,9 +10,9 @@
  * hour lines, the time labels, the hatch or the booking cards is drawn through it. Pure rules, no DOM; the board, the month
  * tile, the mini calendar, the phone strip and the legend all take their colours from here.
  */
-import { AA, contrastRatio, parseColor, rgbToHsl } from '../../accent';
-import { DARK_SURFACE, LIGHT_SURFACE, MIN_VISIBLE_RATIO, onDarkSurface, textOnColor, typedHex } from '../../colors/activityColor';
-import type { DayMark } from './types';
+import { AA, contrastRatio, parseColor, rgbToHsl } from '../accent';
+import { DARK_SURFACE, LIGHT_SURFACE, MIN_VISIBLE_RATIO, onDarkSurface, textOnColor, typedHex } from './activityColor';
+import type { DayMark } from '../planner/model/types';
 
 /** The default holiday colour: a strong red, white ink on it reads at 5.6:1. */
 export const DEFAULT_HOLIDAY_COLOR = '#C62828';

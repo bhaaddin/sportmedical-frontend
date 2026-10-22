@@ -19,13 +19,15 @@ import { boardSettings } from './boardSettings';
  */
 
 const lunchApi = vi.hoisted(() => ({ list: vi.fn(), set: vi.fn(), restore: vi.fn(), bookIntoLunch: vi.fn() }));
+let stage2: { singleWorkerAtATime?: boolean; workerExceptions?: string[] } = { singleWorkerAtATime: false, workerExceptions: [] };
 vi.mock('../../../api/lunchExceptions', async (importActual) => {
   const actual = await importActual<typeof import('../../../api/lunchExceptions')>();
   return { ...actual, lunchExceptionsApi: lunchApi };
 });
 vi.mock('../../../api/bookingSlots', async (importActual) => {
   const actual = await importActual<typeof import('../../../api/bookingSlots')>();
-  return { ...actual, readBookingSlots: vi.fn(async () => ({ settings: { examinationPauseMinutes: 0 }, defaults: { examinationPauseMinutes: 0 }, minMinutes: 0, maxMinutes: 240 })) };
+  /* a Stage 2 server: the booking-slots answer carries the shared-worker fields (which is how the board knows the lunch routes exist) */
+  return { ...actual, readBookingSlots: vi.fn(async () => ({ settings: { examinationPauseMinutes: 0, ...stage2 }, defaults: { examinationPauseMinutes: 0 }, minMinutes: 0, maxMinutes: 240 })) };
 });
 vi.mock('../../../api/calendars', () => ({ calendarsApi: { list: vi.fn() } }));
 vi.mock('../../../api/clinicServices', () => ({ clinicServicesApi: { list: vi.fn() } }));
@@ -112,11 +114,10 @@ function mount() {
 
 const grant = (...p: string[]) => window.localStorage.setItem('permissions', JSON.stringify(p));
 const band = (day: string) => screen.findByTestId(`lunch-${day}`);
-/* the band is first drawn as a div and becomes a button once the probe has answered: return the button, not the stale div */
+/* the band is drawn by the board; the click target over it (its own lazy layer) appears once a Stage 2 server has confirmed the lunch routes */
 const clickable = async (day: string) => {
   await band(day);
-  await waitFor(() => expect(screen.getByTestId(`lunch-${day}`).tagName).toBe('BUTTON'));
-  return screen.getByTestId(`lunch-${day}`);
+  return screen.findByTestId(`lunch-hit-${day}`);
 };
 
 beforeEach(() => {
@@ -125,6 +126,7 @@ beforeEach(() => {
   window.localStorage.clear();
   grant('bookings.create', 'bookings.edit');
   boardSettings.reset();
+  stage2 = { singleWorkerAtATime: false, workerExceptions: [] };
   appointments = [];
   stubLayout();
   vi.mocked(calendarsApi.list).mockResolvedValue([cal('c1', 'Lékařské prohlídky', 1, 's1'), cal('c2', 'Sportovní diagnostika', 2, 's2')]);
@@ -161,17 +163,28 @@ describe('R17: the lunch band is a button only where it can work', () => {
   it('on a server with the lunch routes the band is clickable', async () => {
     mount();
     const el = await clickable('2026-12-09');
-    expect(el).toHaveTextContent('Oběd');
+    expect(screen.getByTestId('lunch-2026-12-09')).toHaveTextContent('Oběd');
     expect(el).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(el).toHaveAttribute('aria-label', 'Oběd, 12:00–12:30');
   });
 
-  it('an older server (the routes answer 404) keeps the band as it was: drawn, not clickable', async () => {
+  it('an older server (booking-slots has no Stage 2 fields) keeps the band as it was and is never asked for the lunch routes', async () => {
+    stage2 = {};
+    mount();
+    await band('2026-12-09');
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.queryByTestId('lunch-hit-2026-12-09')).toBeNull();
+    expect(lunchApi.list).not.toHaveBeenCalled(); // no request that would only 404 into the console
+    expect(screen.queryByTestId('lunch-popover')).toBeNull();
+  });
+
+  it('a server that has the fields but answers the lunch routes with 404 keeps the band drawn and not clickable', async () => {
     lunchApi.list.mockRejectedValue(new BookingApiError('notFound', 404));
     mount();
-    const el = await band('2026-12-09');
+    await band('2026-12-09');
+    await waitFor(() => expect(lunchApi.list).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 30));
-    expect(el.tagName).toBe('DIV');
-    expect(screen.queryByTestId('lunch-popover')).toBeNull();
+    expect(screen.queryByTestId('lunch-hit-2026-12-09')).toBeNull();
   });
 
   it('every working weekday of the week carries the band, Friday included', async () => {
@@ -187,9 +200,9 @@ describe('R17: the lunch band is a button only where it can work', () => {
   it('a user who may neither edit nor book sees the band only', async () => {
     grant('patients.view');
     mount();
-    const el = await band('2026-12-09');
+    await band('2026-12-09');
     await new Promise((r) => setTimeout(r, 30));
-    expect(el.tagName).toBe('DIV');
+    expect(screen.queryByTestId('lunch-hit-2026-12-09')).toBeNull();
   });
 });
 
@@ -209,6 +222,19 @@ describe('R17: the pop-out of a click on the lunch', () => {
     expect(lunchApi.set).toHaveBeenCalledWith('c2', '2026-12-09', { kind: 'moved', startTime: '15:30' });
     await waitFor(() => expect(screen.queryByTestId('lunch-popover')).toBeNull());
     expect(await screen.findByTestId('board-notice')).toHaveTextContent('Oběd přesunut jen pro tento den.');
+  });
+
+  it('the lunch belongs to the clinic: with ONE služba on screen the change still goes to every open calendar', async () => {
+    mount();
+    await clickable('2026-12-09');
+    fireEvent.click(await screen.findByTestId('calendar-chip-s1'));
+    await waitFor(() => expect(boardSettings.getState().ticked?.size).toBe(1));
+    fireEvent.click(await clickable('2026-12-09'));
+    const popover = await screen.findByTestId('lunch-popover');
+    fireEvent.change(within(popover).getByTestId('lunch-start'), { target: { value: '13:00' } });
+    fireEvent.click(within(popover).getByTestId('lunch-move-go'));
+    await waitFor(() => expect(lunchApi.set).toHaveBeenCalledTimes(2));
+    expect(lunchApi.set.mock.calls.map((c) => c[0]).sort()).toEqual(['c1', 'c2']);
   });
 
   it('refuses a move over a booking before it asks the server', async () => {
@@ -266,8 +292,8 @@ describe('R17: a day that carries an exception says so and can be put back', () 
   it('a moved lunch reads "Oběd · přesunut", shows where it was and "Vrátit na původní čas" restores it', async () => {
     mount();
     const el = await clickable('2026-12-10');
-    expect(el).toHaveTextContent('Oběd · přesunut');
-    expect(el).toHaveAttribute('data-lunch', 'moved');
+    expect(screen.getByTestId('lunch-2026-12-10')).toHaveTextContent('Oběd · přesunut');
+    expect(screen.getByTestId('lunch-2026-12-10')).toHaveAttribute('data-lunch', 'moved');
     fireEvent.click(el);
     const popover = await screen.findByTestId('lunch-popover');
     expect(within(popover).getByTestId('lunch-state')).toHaveTextContent('Oběd · přesunut');
@@ -280,8 +306,8 @@ describe('R17: a day that carries an exception says so and can be put back', () 
   it('a removed lunch leaves a dashed "smazán dnes" ghost where it was; its pop-out only brings it back', async () => {
     mount();
     const el = await clickable('2026-12-11');
-    expect(el).toHaveTextContent('Oběd · smazán dnes');
-    expect(el).toHaveAttribute('data-lunch', 'removed');
+    expect(screen.getByTestId('lunch-2026-12-11')).toHaveTextContent('Oběd · smazán dnes');
+    expect(screen.getByTestId('lunch-2026-12-11')).toHaveAttribute('data-lunch', 'removed');
     fireEvent.click(el);
     const popover = await screen.findByTestId('lunch-popover');
     expect(within(popover).queryByTestId('lunch-move')).toBeNull();

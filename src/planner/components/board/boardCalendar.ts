@@ -36,7 +36,7 @@ import { useCalendarCatalogue } from '../../../components/booking/calendar/useCa
 import { pragueDateKey } from '../../../utils/time';
 import { boardSettings, useBoardSettings, type FacetCalendar, type FacetEmployee, type FacetService } from './boardSettings';
 import { aliasMap, serviceGroups, type GroupActivity } from './serviceGroups';
-import { BOOKING_SLOTS_QUERY_KEY, readBookingSlots } from '../../../api/bookingSlots';
+import { BOOKING_SLOTS_QUERY_KEY, hasSingleWorkerSetting, readBookingSlots } from '../../../api/bookingSlots';
 import type { RosterWorker } from './workerClash';
 
 export interface BoardCalendarData {
@@ -55,6 +55,8 @@ export interface BoardCalendarData {
   alias: ReadonlyMap<string, string>;
   /** The služba groups of the clinic, in order. */
   groups: ReturnType<typeof serviceGroups>;
+  /** The server is a Stage 2 build (booking-slots carries the shared-worker fields): the lunch routes exist too. */
+  stage2: boolean;
   /**
    * R4: the shared-worker rule as the settings hold it (absent / off = today's behaviour). `workerOf` is the rota's worker of a
    * calendar on a day (null = nobody, the calendar is the resource); `exceptions` are the people the rule does not apply to.
@@ -251,6 +253,7 @@ export function useBoardCalendar(days: readonly string[]): BoardCalendarData {
     alias,
     groups,
     workerRule,
+    stage2: hasSingleWorkerSetting(slots),
     calendarById,
     appointments,
     blocksByCalendar,

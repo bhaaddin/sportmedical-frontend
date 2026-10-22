@@ -229,12 +229,13 @@ describe('the board on the demo data (the file)', () => {
     expect(alternate).toHaveAttribute('hidden');
     fireEvent.click(screen.getByRole('button', { name: 'Den' }));
     expect(alternate).not.toHaveAttribute('hidden');
-    expect(alternate).toHaveTextContent('Pá 20. 11. 2026 · Denní přehled');
+    /* the Den / Měsíc views are lazy: they appear a moment after the click */
+    await waitFor(() => expect(alternate).toHaveTextContent('Pá 20. 11. 2026 · Denní přehled'));
     expect(alternate).toHaveTextContent('Fyzioterapie');
     expect(alternate).toHaveTextContent('Kondiční diagnostika');
     expect(alternate).toHaveTextContent('12/12');
     fireEvent.click(screen.getByRole('button', { name: 'Měsíc' }));
-    expect(alternate.querySelectorAll('.month-tile')).toHaveLength(42);
+    await waitFor(() => expect(alternate.querySelectorAll('.month-tile')).toHaveLength(42));
     expect(alternate).toHaveTextContent('Listopad 2026 · Měsíční přehled');
     fireEvent.click(alternate.querySelector('[data-day="2026-11-18"]')!);
     expect(alternate).toHaveTextContent('St 18. 11. 2026 · Denní přehled'); // a tile opens that day
@@ -246,7 +247,7 @@ describe('the board on the demo data (the file)', () => {
     mount({ real: false, initialDate: '2026-11-24' });
     await screen.findByTestId('board-body');
     fireEvent.click(screen.getByRole('button', { name: 'Den' }));
-    expect(screen.getByTestId('alternate-view')).toHaveTextContent('Na vybraný den zatím nejsou vytvořené termíny.');
+    await waitFor(() => expect(screen.getByTestId('alternate-view')).toHaveTextContent('Na vybraný den zatím nejsou vytvořené termíny.'));
     fireEvent.click(screen.getByRole('button', { name: '+ Vytvořit termín' }));
     expect(screen.getByTestId('toast-layer')).toHaveTextContent('Nejprve vyberte činnost z dolních karet.');
   });
@@ -595,7 +596,7 @@ describe('the real calendar on the board', () => {
     ];
     mount();
     fireEvent.click(await screen.findByTestId('board-window-k1-2026-12-10'));
-    expect(JSON.parse(screen.getByTestId('club-popover').dataset.pick!)).toMatchObject({ clubBlockId: 'cb1', clubId: 'club1', clubName: 'FK Slaný' });
+    expect(JSON.parse((await screen.findByTestId('club-popover')).dataset.pick!)).toMatchObject({ clubBlockId: 'cb1', clubId: 'club1', clubName: 'FK Slaný' });
     fireEvent.click(screen.getByTestId('board-window-m1-2026-12-11'));
     const detail = await screen.findByRole('dialog', { name: /Zablokovaný čas/ });
     expect(detail).toHaveTextContent('Školení');
@@ -799,7 +800,8 @@ describe('clicking a booking', () => {
     expect(summary).toHaveTextContent('Pacient b1');
     expect(card).toHaveClass('is-selected');
     fireEvent.click(within(summary).getByRole('button', { name: 'Otevřít detail' }));
-    expect(screen.getByTestId('appointment-detail')).toHaveAttribute('data-id', 'b1');
+    /* the detail is a lazy dialog: it appears a moment after the click */
+    expect(await screen.findByTestId('appointment-detail')).toHaveAttribute('data-id', 'b1');
     expect(screen.getByTestId('appointment-detail')).toHaveAttribute('data-calendar', 'c1');
   });
 
@@ -808,7 +810,7 @@ describe('clicking a booking', () => {
     const card = await screen.findByTestId('board-booking-b2');
     fireEvent.click(card, { detail: 1 });
     fireEvent.click(card, { detail: 2 });
-    expect(screen.getByTestId('appointment-detail')).toHaveAttribute('data-id', 'b2');
+    expect(await screen.findByTestId('appointment-detail')).toHaveAttribute('data-id', 'b2');
   });
 
   it('Esc closes the summary', async () => {

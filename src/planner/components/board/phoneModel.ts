@@ -16,7 +16,7 @@ import type { DayMark, IsoDate, WeekHeadModel } from '../../model';
 import { inquiryTileLabel, type InquiryRef } from '../../model/inquiries';
 import { PLANNER_TEXT } from '../../text';
 import { clubColourOf, clubItemText, holdLabel, holdStateOf, type ClubDayItem } from './clubHold';
-import { lockedDayLook, type LockedDayLook } from '../../model/dayLock';
+import { lockedDayLook, type LockedDayLook } from '../../../colors/dayLock';
 import { agendaSlotLabel } from '../../model';
 import { groupDayRows, type BoardWindowModel, type DayRowModel, type MonthTileModel } from './boardModel';
 

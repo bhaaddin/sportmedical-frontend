@@ -14,7 +14,8 @@ import { drawnBlocksOfDay } from '../../../components/booking/grid/clubWindows';
 import { formatMinutes, spanOnDay, touchesDay } from '../../../components/booking/grid/timeRange';
 import { pragueDateKey } from '../../../utils/time';
 import type { IsoDate } from '../../model';
-import { boxOfSpan, type BoardGeometry } from './boardGeometry';
+import type { BoardGeometry } from './boardGeometry';
+import { boxOfSpan } from './spanBox';
 
 export interface RosterWorker {
   id: string;

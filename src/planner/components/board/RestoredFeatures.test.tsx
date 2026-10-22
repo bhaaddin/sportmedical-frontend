@@ -220,7 +220,8 @@ describe('club inquiries on the days they ask for', () => {
     mount();
     await screen.findByTestId('day-inquiry-2026-12-10');
     click('Měsíc');
-    expect(screen.getByTestId('tile-inquiry-2026-12-10')).toHaveTextContent('Poptávka · Dukla, Slavia');
+    /* the month matrix is a lazy view: it appears a moment after the click */
+    expect(await screen.findByTestId('tile-inquiry-2026-12-10')).toHaveTextContent('Poptávka · Dukla, Slavia');
     expect(screen.getByTestId('tile-inquiry-2026-12-11')).toHaveTextContent('Poptávka · Dukla');
     expect(screen.getByTestId('tile-inquiry-2026-12-17')).toHaveTextContent('Poptávka · Slavia');
     expect(screen.queryByTestId('tile-inquiry-2026-12-12')).toBeNull();
@@ -231,7 +232,7 @@ describe('club inquiries on the days they ask for', () => {
     mount({ initialDate: '2026-12-10' });
     await screen.findByTestId('day-inquiry-2026-12-10');
     click('Den');
-    const list = screen.getByTestId('day-inquiries');
+    const list = await screen.findByTestId('day-inquiries');
     expect(within(list).getAllByRole('button').map((b) => b.textContent)).toEqual(['Poptávka · Dukla', 'Poptávka · Slavia']);
     fireEvent.click(within(list).getByTestId('inquiry-chip-o1'));
     expect(lastLocation()).toMatchObject({ path: '/clubs/objednavky', state: { openOrderId: 'o1' } });
@@ -590,7 +591,7 @@ describe('the phone: Den is an agenda of the day under the week\'s strip', () =>
     await within(agenda()).findByTestId('phone-entry-b2');
     await waitFor(() => expect(within(agenda()).getAllByRole('button').some((b) => b.getAttribute('data-kind') === 'club')).toBe(true));
     fireEvent.click(within(agenda()).getAllByRole('button').find((b) => b.getAttribute('data-kind') === 'club')!);
-    expect(JSON.parse(screen.getByTestId('club-popover').dataset.pick!)).toMatchObject({ clubBlockId: 'cb1', clubName: 'FK Slaný' });
+    expect(JSON.parse((await screen.findByTestId('club-popover')).dataset.pick!)).toMatchObject({ clubBlockId: 'cb1', clubName: 'FK Slaný' });
     fireEvent.click(within(agenda()).getAllByRole('button').find((b) => b.getAttribute('data-kind') === 'block')!);
     expect(await screen.findByRole('dialog', { name: /Zablokovaný čas/ })).toHaveTextContent('Školení');
   });

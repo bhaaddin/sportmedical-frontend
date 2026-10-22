@@ -3,9 +3,9 @@
  * refuses a failing holiday colour, and the rule that the default does not move with the accent.
  */
 import { describe, expect, it } from 'vitest';
-import { AA, contrastRatio, deriveShift, shiftColor } from '../../accent';
-import { DARK_SURFACE, LIGHT_SURFACE, MIN_VISIBLE_RATIO } from '../../colors/activityColor';
-import { THEME_ACCENTS, buildTheme } from '../../theme';
+import { AA, contrastRatio, deriveShift, shiftColor } from '../accent';
+import { DARK_SURFACE, LIGHT_SURFACE, MIN_VISIBLE_RATIO } from './activityColor';
+import { THEME_ACCENTS, buildTheme } from '../theme';
 import {
   CLOSED_DAY_TEXT,
   CLOSED_FILL,
