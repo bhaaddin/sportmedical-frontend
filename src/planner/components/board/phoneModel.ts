@@ -103,7 +103,7 @@ export function phoneEntries(rows: readonly DayRowModel[], windows: readonly Boa
       priceText: null,
       colour: club ? w.colour : null,
       window: w,
-      acts: club ? distinctActivities(w.frame) : [],
+      acts: club ? distinctActivities(w.frame ?? []) : [],
       members: null,
     });
   }

@@ -780,7 +780,7 @@
   width: min(320px, calc(100% - 28px));
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid #1c6b82;
+  border: 1px solid hsl(from #1c6b82 var(--sm-hsl, h s l));
   background: #052a3c;
   color: #e7f4ff;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
@@ -807,7 +807,7 @@
   gap: 10px;
   padding: 6px 8px 6px 14px;
   border-radius: 12px;
-  border: 1px solid #1c6b82;
+  border: 1px solid hsl(from #1c6b82 var(--sm-hsl, h s l));
   background: #052a3c;
   color: #e7f4ff;
   font-size: 13px;
@@ -817,6 +817,6 @@
 .sm-planner .board-undo[data-tone='error'] { background: #4b1525; border-color: #ec667a; color: #ffd2d7; }
 .sm-planner .board-undo .undo-text { min-width: 0; overflow-wrap: anywhere; }
 .sm-planner .board-undo .undo-left { font-variant-numeric: tabular-nums; opacity: 0.8; font-weight: 500; white-space: nowrap; }
-.sm-planner .board-undo button { min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 9px; border: 1px solid #23f2e7; background: transparent; color: #bff7f1; font: inherit; font-weight: 800; cursor: pointer; }
+.sm-planner .board-undo button { min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 9px; border: 1px solid hsl(from #23f2e7 var(--sm-hsl, h s l)); background: transparent; color: hsl(from #bff7f1 var(--sm-hsl, h s l)); font: inherit; font-weight: 800; cursor: pointer; }
 .sm-planner .board-undo button.undo-dismiss { border-color: transparent; color: inherit; font-size: 18px; }
 .sm-planner .board-undo button:disabled { opacity: 0.55; cursor: progress; }
