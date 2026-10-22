@@ -1,11 +1,11 @@
 /*
  * The navigation on the planner routes (`/planovani`, `/planner-lab`): there is NO sidebar and NO tablet rail there -
  * the stage is the whole screen and brings its own panels - so the shell keeps one compact "Menu" button at the left of
- * the where-am-I row. It opens the very same navigation the sidebar had (Všechny sekce, the section's entries,
- * "Nová objednávka", the account widget) as a slide-over drawer: scrim, Esc and a tap outside close it, focus returns
+ * the where-am-I row. It opens the full list of pages (the icon rail's entries with the same icons, the section's own screens, the account
+ * widget) as a slide-over drawer: scrim, Esc and a tap outside close it, focus returns
  * to the button.
  *
- * Drawn by `DesktopSidebar` / `TabletRail` in place of themselves (they own the nav model). The button itself is
+ * Drawn by `IconRail` in place of itself (they own the nav model). The button itself is
  * portalled into the where-am-I row's slot (SidebarSlot.tsx), and the page's left margin that the sidebar/rail used to
  * claim is given back here.
  *
@@ -22,7 +22,6 @@ import { Button, GlobalStyles } from '@mui/material';
 import type { Theme } from '@mui/material/styles';
 import { ArrowBack, Menu as MenuIcon } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { NewOrderChooser } from '../booking/NewOrderChooser';
 import { NavDrawer } from './Sidebar';
 import { clubIdOfRoute } from './plannerRoutes';
 import { usePlannerMenuEl } from './SidebarSlot';
@@ -52,7 +51,6 @@ export function PlannerMenu({ nav }: { nav: ShellNav }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const onClubScreen = clubIdOfRoute(useLocation().pathname) !== null;
-  const [chooser, setChooser] = useState(false);
   const slot = usePlannerMenuEl();
 
   const button = (
@@ -93,8 +91,7 @@ export function PlannerMenu({ nav }: { nav: ShellNav }) {
         </>,
         slot,
       ) : null}
-      <NavDrawer nav={nav} open={open} onClose={() => setOpen(false)} onNewOrder={() => setChooser(true)} />
-      <NewOrderChooser open={chooser} onClose={() => setChooser(false)} />
+      <NavDrawer nav={nav} open={open} onClose={() => setOpen(false)} />
     </>
   );
 }

@@ -1,22 +1,17 @@
 /*
- * The plocha (owner/admin home), built as shelves: Dnes (five figures), Vyžaduje pozornost, Najít pacienta, Objednaní,
- * Čekárna, Připnuté a nedávné, Nově v kartotéce. The behaviours worth pinning are the ones that were bugs before:
+ * Přehled (Stage 4, R18): four calm blocks - Dnes, Vyžaduje pozornost, Tento týden, Kluby k vyřízení - and nothing else.
+ * What is pinned here:
  *
- *  - "today" means today: the booking API is asked for a one-day range, because
- *    the old scheduling endpoint ignored its range and counted every appointment
- *    that ever existed.
- *  - cancelled and no-show rows are not today's work; a completed one is not in
- *    the waiting room.
- *  - a name, not an id, wherever the patient is known, and each fetched once.
- *  - the register's total, not the length of its first page.
- *  - nothing about patients is asked, or shown, without the permission to see
- *    them; "Nový pacient" only for somebody who may register one.
- *
- * and the new ones: the attention shelf counts what the figures count, every case on it is a link, and a source that
- * cannot be read is said rather than turned into an all-clear.
+ *  - the screen is only those blocks: no figure cards, no lookup box, no today lists, no pinned/recent, no new patients,
+ *    no "Otevřít kalendář", no icons, and at most 7 distinct elements (it has 5);
+ *  - ONE request answers the day and the week (the Prague week, Monday to Sunday);
+ *  - "today" means today: a cancellation and a no-show are not the day's work, the waiting room is CheckedIn only;
+ *  - a name, not an id; nothing about patients is asked without the permission to see them;
+ *  - a source that cannot be read is SAID (with a retry) - never drawn as zero bookings, "Vše vyřízeno" or "Žádná poptávka".
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, within, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { setViewport, VIEWPORTS } from '../test/viewport';
@@ -42,19 +37,24 @@ vi.mock('../api/intakeReview', async (importOriginal) => ({ ...(await importOrig
 const PEOPLE: Record<string, { id: string; firstName: string; lastName: string; dateOfBirth: string }> = {
   p1: { id: 'p1', firstName: 'Jana', lastName: 'Marková', dateOfBirth: '1990-01-02' },
   p2: { id: 'p2', firstName: 'Anna', lastName: 'Černá', dateOfBirth: '1985-06-07' },
+  p3: { id: 'p3', firstName: 'Petr', lastName: 'Dvořák', dateOfBirth: '1992-11-03' },
 };
 
+/* Thursday 22. 10. 2026, 12:00 in Prague. Only `Date` is faked: timers and promises stay real. */
+const NOW = '2026-10-22T10:00:00Z';
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(NOW));
   vi.stubGlobal('requestAnimationFrame', () => 1);
   vi.stubGlobal('cancelAnimationFrame', () => {});
   localStorage.clear();
   localStorage.setItem('permissions', JSON.stringify(['patients.view']));
-  getById.mockReset().mockImplementation((id: string) =>
-    PEOPLE[id] ? Promise.resolve(PEOPLE[id]) : Promise.reject(new Error('404')));
+  getById.mockReset().mockImplementation((id: string) => (PEOPLE[id] ? Promise.resolve(PEOPLE[id]) : Promise.reject(new Error('404'))));
   list.mockReset().mockResolvedValue({ items: [], totalCount: 137, page: 1, pageSize: 1 });
   search.mockReset().mockResolvedValue([]);
   range.mockReset().mockResolvedValue([]);
-  listActivities.mockReset().mockResolvedValue({ activities: [{ id: 'a1', name: 'Kontrola', priceCzk: 900 }] });
+  listActivities.mockReset().mockResolvedValue({ activities: [] });
   listClubOrders.mockReset().mockResolvedValue([]);
   checkRequired.mockReset().mockResolvedValue({ allRequiredPresent: true, requirements: [] });
   getInvoices.mockReset().mockResolvedValue([]);
@@ -62,36 +62,30 @@ beforeEach(() => {
   setViewport(VIEWPORTS.desktop);
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 const { default: Dashboard } = await import('./Dashboard');
 
 /** Status codes as the contract numbers them: 0 Scheduled, 1 Confirmed, 2 CheckedIn, 3 Completed, 4 Cancelled, 5 NoShow. */
-const at = (hourUtc: number, status: number, id: string, patientId = 'p1', paperworkReady = true) => ({
+const at = (day: string, hourUtc: number, status: number, id: string, patientId = 'p1', patientName: string | null = null) => ({
   id,
   calendarId: 'c1',
   patientId,
   activityId: 'a1',
   activityName: 'Kontrola',
-  startUtc: `2026-09-29T${String(hourUtc).padStart(2, '0')}:00:00Z`,
-  endUtc: `2026-09-29T${String(hourUtc).padStart(2, '0')}:30:00Z`,
+  startUtc: `${day}T${String(hourUtc).padStart(2, '0')}:00:00Z`,
+  endUtc: `${day}T${String(hourUtc).padStart(2, '0')}:30:00Z`,
   status,
   isRunningLate: false,
   checkedInUtc: null,
-  paperwork: { ready: paperworkReady, missing: paperworkReady ? [] : ['questionnaire_missing'] },
+  paperwork: { ready: true, missing: [] },
+  patientName,
 });
+const TODAY = '2026-10-22';
 
-/** A shelf by its title (a `<section>` named by its heading). */
-const shelf = async (title: string) => within(await screen.findByRole('region', { name: title }));
-
-/** Czech figures use non-breaking spaces; compare what a person reads. */
-const plain = (text: string | null) => (text ?? '').replace(/\s+/g, ' ').trim();
-const withText = (text: string) => (_: string, el: Element | null) => el !== null && el.children.length === 0 && plain(el.textContent) === text;
-
-const metric = async (label: string) => {
-  const heading = await screen.findByText(label, { selector: '[data-card="metric"] *' });
-  return within(heading.closest('[data-card="metric"]') as HTMLElement);
-};
-
-const renderDashboard = (queryClient = new QueryClient()) =>
+const renderDashboard = (queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) =>
   render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
@@ -100,345 +94,303 @@ const renderDashboard = (queryClient = new QueryClient()) =>
     </QueryClientProvider>,
   );
 
-describe('the patient register total', () => {
-  it('shows the register\'s total in the header, not the length of one page', async () => {
+/** A block by its heading (a `<section>` named by it). */
+const block = async (name: string) => within(await screen.findByRole('region', { name }));
+
+describe('the screen is four blocks and nothing else', () => {
+  it('has Dnes, Vyžaduje pozornost, Tento týden and Kluby k vyřízení - and no more than 7 elements (it has 5)', async () => {
+    range.mockResolvedValue([at(TODAY, 11, 1, 'a')]);
     renderDashboard();
-    expect(await screen.findByText(/137 pacientů v registru/)).toBeInTheDocument();
-    expect(list).toHaveBeenCalledWith({ pageSize: 1 });
+    await block('Dnes');
+    for (const name of ['Dnes', 'Tento týden']) expect(screen.getByRole('region', { name })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Vyžaduje pozornost' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Kluby k vyřízení' })).toBeInTheDocument();
+    const elements = document.querySelectorAll('[data-ov]');
+    expect(elements.length).toBeLessThanOrEqual(7);
+    expect(Array.from(elements).map((e) => e.getAttribute('data-ov')).sort()).toEqual(['block', 'chart', 'header', 'list', 'list']);
   });
 
-  it('asks nothing about patients, and shows no total, without the permission to see them', async () => {
-    localStorage.setItem('permissions', JSON.stringify([]));
-    range.mockResolvedValue([at(8, 0, 'a', 'p1')]);
-
+  it('has none of what it used to carry', async () => {
+    range.mockResolvedValue([at(TODAY, 11, 1, 'a')]);
     renderDashboard();
-    await screen.findByText('Najít pacienta');
-
+    await block('Dnes');
+    for (const gone of ['Najít pacienta', 'Objednaní', 'Čekárna', 'Připnuté a nedávné', 'Nově v kartotéce', 'Kartotéka', 'Chybí podklady']) {
+      expect(screen.queryByRole('region', { name: gone })).not.toBeInTheDocument();
+      expect(screen.queryByText(gone)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByRole('link', { name: 'Otevřít kalendář' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     expect(screen.queryByText(/pacientů v registru/)).not.toBeInTheDocument();
-    expect(list).not.toHaveBeenCalled();
-    expect(getById).not.toHaveBeenCalled();
-    expect(search).not.toHaveBeenCalled();
-    expect(screen.queryByRole('region', { name: 'Nově v kartotéce' })).not.toBeInTheDocument();
   });
-});
 
-describe('"today" on the shelves', () => {
-  it('asks the booking API for today, and for one day only', async () => {
+  it('has no quick-action buttons of its own: Nová objednávka, Nový pacient and Hledat are the top bar\'s', async () => {
     renderDashboard();
-    await screen.findByRole('region', { name: 'Objednaní' });
-
-    const today = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const expected = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-
-    expect(range).toHaveBeenCalledWith(expected, expected);
-  });
-
-  it('lists in Objednaní only appointments that still stand', async () => {
-    range.mockResolvedValue([
-      at(8, 0, 'a', 'p1'), // Scheduled -> Objednaní
-      at(9, 3, 'b', 'p2'), // Completed -> not
-      at(1, 4, 'c', 'p2'), // Cancelled -> not
-      at(3, 5, 'e', 'p2'), // NoShow -> not
-    ]);
-
-    renderDashboard();
-
-    const card = await shelf('Objednaní');
-    expect(await card.findByText('Jana Marková')).toBeInTheDocument();
-    expect(card.queryByText('Anna Černá')).not.toBeInTheDocument();
-  });
-
-  it('puts only a checked-in patient in Čekárna, not a completed one', async () => {
-    range.mockResolvedValue([
-      at(8, 2, 'a', 'p1'), // CheckedIn -> Čekárna
-      at(9, 3, 'b', 'p2'), // Completed -> not the waiting room
-    ]);
-
-    renderDashboard();
-
-    const card = await shelf('Čekárna');
-    expect(await card.findByText('Jana Marková')).toBeInTheDocument();
-    expect(card.queryByText('Anna Černá')).not.toBeInTheDocument();
-  });
-
-  it('shows a name rather than an id when the patient is known, as a link to the card', async () => {
-    range.mockResolvedValue([at(8, 0, 'a', 'p1')]);
-
-    renderDashboard();
-
-    const card = await shelf('Objednaní');
-    const name = await card.findByText('Jana Marková');
-    expect(name.closest('a')).toHaveAttribute('href', '/patients/p1');
-    expect(card.queryByText(/^p1$/)).not.toBeInTheDocument();
-    expect(getById).toHaveBeenCalledWith('p1');
-  });
-
-  it('opens the booking itself from the row', async () => {
-    range.mockResolvedValue([at(8, 0, 'a', 'p1')]);
-
-    renderDashboard();
-
-    const card = await shelf('Objednaní');
-    const open = await card.findByRole('link', { name: /Otevřít termín: Jana Marková/ });
-    expect(open).toHaveAttribute('href', '/kalendar/c1/termin/a');
-  });
-
-  it('does not ask for the same patients again on coming back', async () => {
-    range.mockResolvedValue([at(8, 0, 'a', 'p1'), at(9, 0, 'b', 'p2')]);
-    const queryClient = new QueryClient();
-
-    const first = renderDashboard(queryClient);
-    expect(await (await shelf('Objednaní')).findByText('Anna Černá')).toBeInTheDocument();
-    first.unmount();
-
-    renderDashboard(queryClient);
-    expect(await (await shelf('Objednaní')).findByText('Jana Marková')).toBeInTheDocument();
-
-    expect(getById).toHaveBeenCalledTimes(2);
-  });
-
-  it('shows the empty state, with the next action, when nobody is booked for today', async () => {
-    range.mockResolvedValue([at(8, 4, 'a'), at(9, 5, 'b')]);
-
-    renderDashboard();
-
-    const card = await shelf('Objednaní');
-    expect(await card.findByText('Na dnešek nikdo objednaný.')).toBeInTheDocument();
-    expect(card.getByRole('button', { name: 'Objednat termín' })).toBeInTheDocument();
-  });
-});
-
-/*
- * The day's facts at the top: the figures count the same lists the shelves show, so the number and the list can never
- * disagree. Cancelled and no-show rows are not "objednáno"; a missing questionnaire is counted once per appointment that
- * still stands.
- */
-describe('the figures', () => {
-  it('count standing appointments, the waiting room and missing paperwork', async () => {
-    range.mockResolvedValue([
-      at(8, 0, 'a', 'p1', false), // Scheduled, paperwork missing
-      at(9, 1, 'b', 'p2', true),  // Confirmed
-      at(10, 2, 'c', 'p1', false), // CheckedIn -> waiting, paperwork missing
-      at(11, 4, 'd', 'p2', false), // Cancelled -> counts nowhere
-    ]);
-
-    renderDashboard();
-
-    expect((await metric('Dnes objednáno')).getByText('2')).toBeInTheDocument();
-    expect((await metric('V čekárně')).getByText('1')).toBeInTheDocument();
-    expect((await metric('Chybí podklady')).getByText('2')).toBeInTheDocument();
-  });
-
-  it('each one is a link to where it is worked on', async () => {
-    renderDashboard();
-    const booked = await screen.findByRole('link', { name: /^Dnes objednáno/ });
-    expect(booked).toHaveAttribute('href', '/dnes');
-    expect(await screen.findByRole('link', { name: /^Kartotéka/ })).toHaveAttribute('href', '/patients');
-  });
-});
-
-describe('Vyžaduje pozornost', () => {
-  it('flags an appointment whose paperwork is not ready, as a link to the place that fixes it', async () => {
-    range.mockResolvedValue([at(8, 0, 'a', 'p1', false)]);
-
-    renderDashboard();
-
-    const card = await shelf('Vyžaduje pozornost');
-    const group = (await card.findByText('Dnes bez podkladů')).closest('[data-attention]') as HTMLElement;
-    expect(group).toHaveAttribute('data-attention', 'paperworkToday');
-    const row = await within(group).findByRole('link', { name: /Jana Marková/ });
-    expect(row).toHaveAttribute('href', '/kalendar/c1/termin/a');
-    expect(row).toHaveTextContent(/chybí dotazník/);
-  });
-
-  it('says all is clear when every source answered and nothing waits', async () => {
-    range.mockResolvedValue([at(8, 0, 'a', 'p1', true)]);
-
-    renderDashboard();
-
-    const card = await shelf('Vyžaduje pozornost');
-    expect(await card.findByText(/Vše vyřízeno/)).toBeInTheDocument();
-  });
-
-  it('counts what other lists say: overdue invoices (with the permission), club inquiries and registrations waiting', async () => {
-    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'patients.register', 'billing.manage']));
-    getInvoices.mockResolvedValue([
-      {
-        id: 'i1', patientId: 'p1', patientName: 'Jana Marková', invoiceNumber: 'FA-1', status: 'Issued', totalCzk: 1000, paidCzk: 0, remainingCzk: 1000,
-        currency: 'CZK', issueDateUtc: '2020-01-01T10:00:00Z', dueDateUtc: '2020-01-15T10:00:00Z', items: [],
-      },
-    ]);
-    listClubOrders.mockResolvedValue([{ id: 'o1', clubId: 'c1', clubName: 'FC Sparta', status: 'Requested', totalSeats: 12, submittedAtUtc: '2026-10-01T10:00:00Z' }]);
-    fetchIntakeQueue.mockResolvedValue([{ intakeId: 'x', referenceNumber: 'REG-1', givenName: 'Eva', familyName: 'Nová', submittedAtUtc: '2026-10-02T10:00:00Z' }]);
-
-    renderDashboard();
-
-    const card = await shelf('Vyžaduje pozornost');
-    expect(await card.findByText('Faktury po splatnosti')).toBeInTheDocument();
-    expect(await card.findByText('Poptávky klubů')).toBeInTheDocument();
-    expect(await card.findByText('Registrace ke kontrole')).toBeInTheDocument();
-    expect(card.getByRole('link', { name: /Faktura FA-1/ })).toHaveAttribute('href', '/billing');
-    expect(card.getByRole('link', { name: /FC Sparta/ })).toHaveAttribute('href', '/clubs/objednavky');
-    expect(card.getByRole('link', { name: /Eva Nová/ })).toHaveAttribute('href', '/intake-review');
-  });
-
-  it('does not ask for invoices, registrations or health without the permission', async () => {
-    renderDashboard();
-    await shelf('Vyžaduje pozornost');
-    expect(getInvoices).not.toHaveBeenCalled();
-    expect(fetchIntakeQueue).not.toHaveBeenCalled();
-  });
-
-  it('says it could not look instead of "all clear" when the only source fails', async () => {
-    listClubOrders.mockRejectedValue(new Error('500'));
-
-    renderDashboard();
-
-    const card = await shelf('Vyžaduje pozornost');
-    expect(await card.findByRole('alert')).toHaveTextContent(/nepodařilo načíst/);
-    expect(card.queryByText(/Vše vyřízeno/)).not.toBeInTheDocument();
-    expect(card.getByRole('button', { name: 'Zkusit znovu' })).toBeInTheDocument();
-  });
-});
-
-describe('Nový pacient', () => {
-  it('is offered to somebody who may register a patient', async () => {
-    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'patients.register']));
-
-    renderDashboard();
-
-    expect(await screen.findByRole('link', { name: 'Nový pacient' })).toHaveAttribute('href', '/patients/register');
-  });
-
-  it('is not offered to somebody who may not', async () => {
-    renderDashboard();
-    await screen.findByText('Najít pacienta');
-
-    expect(screen.queryByRole('link', { name: 'Nový pacient' })).not.toBeInTheDocument();
-  });
-});
-
-describe('Najít pacienta', () => {
-  it('searches the register as the person types and links each result to its card', async () => {
-    search.mockResolvedValue([{ id: 'p1', firstName: 'Jana', lastName: 'Marková', dateOfBirth: '1990-01-02' }]);
-    const { default: userEvent } = await import('@testing-library/user-event');
-    const user = userEvent.setup();
-
-    renderDashboard();
-    await user.type(await screen.findByLabelText('Vyhledání pacienta'), 'Mark');
-
-    expect(await screen.findByText('Marková Jana')).toBeInTheDocument();
-    expect(search).toHaveBeenCalledWith('Mark');
-  });
-});
-
-/*
- * Three layouts: the same plocha at 390 / 834 / 1440. Phone: rows are cards in a list, the figures swipe, the main action
- * is pinned at the bottom. Tablet and desktop: the shelves, no tables, the action in the header.
- */
-describe('three layouts', () => {
-  it('phone: rows are a list of cards, the figures are a swipeable row and "Otevřít kalendář" is pinned at the bottom', async () => {
-    setViewport(VIEWPORTS.phone);
-    range.mockResolvedValue([at(8, 0, 'a', 'p1'), at(9, 1, 'b', 'p2')]);
-
-    const { container } = renderDashboard();
-
-    const objednani = await shelf('Objednaní');
-    const rows = await objednani.findByRole('list', { name: 'Objednaní' });
-    expect(within(rows).getAllByRole('listitem')).toHaveLength(2);
-    expect(await objednani.findByText('Jana Marková')).toBeInTheDocument();
-    expect(container.querySelector('table')).toBeNull();
-
-    expect(container.querySelector('[data-shelf="today-figures"]')).not.toBeNull();
-
-    const pinned = screen.getByRole('region', { name: 'Hlavní akce' });
-    expect(pinned).toHaveAttribute('data-pinned', 'true');
-    expect(within(pinned).getByRole('link', { name: 'Otevřít kalendář' })).toBeInTheDocument();
-    /* The header no longer carries the same button: it is never drawn twice up there. */
-    const header = screen.getByRole('heading', { level: 1 }).closest('header') as HTMLElement;
-    expect(within(header).queryByRole('link', { name: 'Otevřít kalendář' })).toBeNull();
-  });
-
-  it('phone: the search field and "Nový pacient" are 44px targets', async () => {
-    setViewport(VIEWPORTS.phone);
-    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'patients.register']));
-    renderDashboard();
-
-    const button = await screen.findByRole('link', { name: 'Nový pacient' });
-    expect(getComputedStyle(button).minHeight).toBe('44px');
-  });
-
-  it.each([['tablet', VIEWPORTS.tablet], ['desktop', VIEWPORTS.desktop]])(
-    '%s: shelves, no tables, the action in the header and the search button beside it',
-    async (_name, width) => {
-      setViewport(width);
-      range.mockResolvedValue([at(8, 0, 'a', 'p1')]);
-
-      const { container } = renderDashboard();
-
-      expect(await (await shelf('Objednaní')).findByText('Jana Marková')).toBeInTheDocument();
-      expect(container.querySelector('table')).toBeNull();
-      for (const id of ['today-figures', 'attention', 'find-patient', 'booked', 'waiting', 'recents']) {
-        expect(container.querySelector(`[data-shelf="${id}"]`), id).not.toBeNull();
-      }
-      expect(screen.queryByRole('region', { name: 'Hlavní akce' })).toBeNull();
-      expect(screen.getByRole('link', { name: 'Otevřít kalendář' })).toHaveAttribute('href', '/planovani');
-      expect(screen.getByRole('button', { name: 'Hledat' })).toBeInTheDocument();
-    },
-  );
-
-  it('every shelf is a labelled region with its own heading', async () => {
-    renderDashboard();
-    await shelf('Objednaní');
-    for (const name of ['Dnes', 'Vyžaduje pozornost', 'Najít pacienta', 'Objednaní', 'Čekárna', 'Připnuté a nedávné']) {
-      expect(screen.getByRole('region', { name }), name).toBeInTheDocument();
+    await block('Dnes');
+    for (const name of ['Nová objednávka', 'Nový pacient', 'Hledat']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
     }
   });
+
+  it('draws no icon: an icon only where it carries meaning, and nothing here needs one', async () => {
+    range.mockResolvedValue([at(TODAY, 11, 1, 'a')]);
+    listClubOrders.mockResolvedValue([{ id: 'o1', clubId: 'c', clubName: 'FK Slaný', status: 'Requested', totalSeats: 10, submittedAtUtc: '2026-10-20T08:00:00Z' }]);
+    renderDashboard();
+    await screen.findByText('FK Slaný');
+    expect(document.querySelectorAll('[data-overview] svg')).toHaveLength(0);
+  });
+
+  it('greets the person by first name', async () => {
+    localStorage.setItem('user', JSON.stringify({ firstName: 'Jana' }));
+    renderDashboard();
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(/Jana/);
+  });
 });
 
-/*
- * Etapa 12, "ceny všude": the plocha says what the day earns and what each
- * visit costs - the agreed price first, the row's list price next, the
- * catalogue last. A cancellation and a no-show earn nothing.
- */
-describe('the prices on the plocha', () => {
-  it('sums today\'s standing visits into a "Dnes" figure, agreed prices included', async () => {
+describe('1. Dnes', () => {
+  it('asks for the Prague week in ONE request (Monday to Sunday) - it answers the day and the chart', async () => {
+    renderDashboard();
+    await block('Dnes');
+    await waitFor(() => expect(range).toHaveBeenCalled());
+    expect(range).toHaveBeenCalledTimes(1);
+    expect(range).toHaveBeenCalledWith('2026-10-19', '2026-10-25');
+  });
+
+  it('shows how many today, who is next and who waits - not another day, not a cancellation, not a no-show', async () => {
     range.mockResolvedValue([
-      { ...at(8, 0, 'a', 'p1'), agreedPriceCzk: null, listPriceCzk: 1600 },  // the list stands
-      { ...at(9, 2, 'b', 'p2'), agreedPriceCzk: 1200, listPriceCzk: 1600 },  // agreed, checked in
-      at(10, 0, 'c', 'p1'),                                                  // no price on the row: the catalogue's 900
-      { ...at(11, 4, 'd', 'p2'), agreedPriceCzk: null, listPriceCzk: 1600 }, // cancelled: nothing
-      { ...at(12, 5, 'e', 'p2'), agreedPriceCzk: null, listPriceCzk: 1600 }, // no-show: nothing
+      at(TODAY, 6, 3, 'done', 'p1'),
+      at(TODAY, 7, 2, 'wait', 'p2'),
+      at(TODAY, 11, 1, 'next', 'p3'),
+      at(TODAY, 13, 0, 'later', 'p1'),
+      at(TODAY, 9, 4, 'cancelled', 'p2'),
+      at(TODAY, 9, 5, 'noshow', 'p2'),
+      at('2026-10-21', 9, 1, 'yesterday', 'p1'),
+      at('2026-10-23', 9, 1, 'tomorrow', 'p1'),
     ]);
-
     renderDashboard();
-
-    /* 1 600 + 1 200 + the catalogue's 900, once the catalogue has answered. */
-    expect(await (await metric('Dnes')).findByText(withText('3 700 Kč'))).toBeInTheDocument();
-    expect(listActivities).toHaveBeenCalledTimes(1);
+    const day = await block('Dnes');
+    await waitFor(() => expect(day.getByTestId('today-count')).toHaveTextContent('4'));
+    expect(day.getByTestId('next-time')).toHaveTextContent('13:00');
+    expect(await day.findByRole('link', { name: 'Petr Dvořák' })).toHaveAttribute('href', '/patients/p3');
+    const waiting = within(day.getByTestId('waiting'));
+    expect(await waiting.findByRole('link', { name: 'Anna Černá, 09:00' })).toHaveAttribute('href', '/patients/p2');
+    expect(waiting.queryByText('Jana Marková')).not.toBeInTheDocument();
   });
 
-  it('asks for the catalogue only when some row carries no price', async () => {
-    range.mockResolvedValue([{ ...at(8, 0, 'a', 'p1'), agreedPriceCzk: null, listPriceCzk: 1600 }]);
+  it('shows a name, not an id; each patient is fetched once', async () => {
+    range.mockResolvedValue([at(TODAY, 11, 1, 'a', 'p1'), at(TODAY, 12, 1, 'b', 'p1'), at(TODAY, 13, 1, 'c', 'p2')]);
     renderDashboard();
-    expect((await metric('Dnes')).getByText(withText('1 600 Kč'))).toBeInTheDocument();
-    expect(listActivities).not.toHaveBeenCalled();
+    await waitFor(() => expect(getById).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('p1')).not.toBeInTheDocument();
   });
 
-  it.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet], ['phone', VIEWPORTS.phone]])(
-    '%s: every row in Objednaní and Čekárna carries its price under the činnost',
-    async (_n, width) => {
-      setViewport(width);
-      range.mockResolvedValue([
-        { ...at(8, 0, 'a', 'p1'), agreedPriceCzk: 1200, listPriceCzk: 1600 },
-        { ...at(9, 2, 'b', 'p2'), agreedPriceCzk: null, listPriceCzk: 1600 },
-      ]);
+  it('says so when nobody is booked: zero, and no "next" line', async () => {
+    renderDashboard();
+    const day = await block('Dnes');
+    await waitFor(() => expect(day.getByTestId('today-count')).toHaveTextContent('0'));
+    expect(day.getByText('Na dnešek nikdo objednaný')).toBeInTheDocument();
+    expect(day.queryByText('Další')).not.toBeInTheDocument();
+  });
 
-      renderDashboard();
+  it('says nobody else is coming once the booked visits are over', async () => {
+    range.mockResolvedValue([at(TODAY, 6, 3, 'done', 'p1')]);
+    renderDashboard();
+    const day = await block('Dnes');
+    expect(await day.findByText('Dnes už nikdo další')).toBeInTheDocument();
+  });
 
-      expect(await (await shelf('Objednaní')).findByText(withText('Kontrola · 1 200 Kč (upraveno)'))).toBeInTheDocument();
-      expect(await (await shelf('Čekárna')).findByText(withText('Kontrola · 1 600 Kč'))).toBeInTheDocument();
-    },
-  );
+  it('shows a slot with no register entry by the name it was taken under, not as a link', async () => {
+    range.mockResolvedValue([at(TODAY, 11, 1, 'walk', '', 'Host bez karty')]);
+    renderDashboard();
+    const day = await block('Dnes');
+    expect(await day.findByText('Host bez karty')).toBeInTheDocument();
+    expect(day.queryByRole('link', { name: 'Host bez karty' })).not.toBeInTheDocument();
+  });
+
+  it('links "Dnešní přehled" - the lists live one click away, not on this screen', async () => {
+    range.mockResolvedValue([at(TODAY, 11, 1, 'a')]);
+    renderDashboard();
+    const day = await block('Dnes');
+    expect(await day.findByRole('link', { name: 'Dnešní přehled' })).toHaveAttribute('href', '/dnes');
+  });
+
+  it('asks nothing about patients, and links none, without the permission to see them', async () => {
+    localStorage.setItem('permissions', JSON.stringify([]));
+    range.mockResolvedValue([at(TODAY, 11, 1, 'a', 'p3', 'Petr D.')]);
+    renderDashboard();
+    const day = await block('Dnes');
+    expect(await day.findByText('Petr D.')).toBeInTheDocument();
+    expect(day.queryByRole('link', { name: 'Petr D.' })).not.toBeInTheDocument();
+    expect(getById).not.toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
+    expect(search).not.toHaveBeenCalled();
+    expect(checkRequired).not.toHaveBeenCalled();
+  });
+
+  it('a failed week is SAID, with a retry - never zero bookings', async () => {
+    range.mockRejectedValue(new Error('500'));
+    renderDashboard();
+    const day = await block('Dnes');
+    expect(await day.findByText('Dnešní termíny se nepodařilo načíst.')).toBeInTheDocument();
+    expect(day.queryByTestId('today-count')).not.toBeInTheDocument();
+    range.mockResolvedValue([at(TODAY, 11, 1, 'a')]);
+    await userEvent.setup().click(day.getByRole('button', { name: 'Zkusit znovu' }));
+    await waitFor(() => expect(day.getByTestId('today-count')).toHaveTextContent('1'));
+  });
+});
+
+describe('3. Tento týden', () => {
+  it('is ONE chart of seven bars with today marked, each bar saying its day and count', async () => {
+    range.mockResolvedValue([at('2026-10-19', 8, 3, 'm1'), at('2026-10-19', 9, 3, 'm2'), at(TODAY, 11, 1, 't1'), at('2026-10-24', 9, 0, 's1')]);
+    renderDashboard();
+    const week = await block('Tento týden');
+    const bars = await week.findAllByRole('listitem');
+    expect(bars).toHaveLength(7);
+    expect(week.getByRole('list')).toHaveAccessibleName('Termíny po dnech tohoto týdne');
+    await waitFor(() => expect(bars[0]).toHaveAccessibleName(/^Po .*: 2$/));
+    expect(bars[3]).toHaveAccessibleName(/^Čt .*: 1$/);
+    expect(bars.filter((b) => b.getAttribute('aria-current') === 'date')).toEqual([bars[3]]);
+    expect(week.getByText('4 termíny')).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-ov="chart"]')).toHaveLength(1);
+  });
+
+  it('shows the count of a day in a tooltip on hover', async () => {
+    range.mockResolvedValue([at('2026-10-20', 8, 3, 'x'), at('2026-10-20', 9, 3, 'y'), at('2026-10-20', 10, 3, 'z')]);
+    renderDashboard();
+    const week = await block('Tento týden');
+    await waitFor(() => expect(week.getAllByRole('listitem')[1]).toHaveAccessibleName(/: 3$/));
+    await userEvent.setup().hover(week.getAllByRole('listitem')[1]);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/Út .*: 3 termíny/);
+  });
+
+  it('a failed week is said, not drawn as seven empty bars', async () => {
+    range.mockRejectedValue(new Error('500'));
+    renderDashboard();
+    const week = await block('Tento týden');
+    expect(await week.findByText('Vytížení týdne se nepodařilo načíst.')).toBeInTheDocument();
+    expect(week.queryByRole('listitem')).not.toBeInTheDocument();
+  });
+});
+
+describe('2. Vyžaduje pozornost', () => {
+  const overdue = (n: number) => Array.from({ length: n }, (_, i) => ({
+    id: `i${i}`, patientId: 'p1', patientName: 'Jana Marková', invoiceNumber: `FA-${i}`, status: 'Issued', totalCzk: 1000, paidCzk: 0, remainingCzk: 1000,
+    currency: 'CZK', issueDateUtc: '2026-09-01T10:00:00Z', dueDateUtc: '2026-10-01T10:00:00Z', items: [],
+  }));
+
+  it('lists what needs a person - one row per area with its count, a link to where it is fixed', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'billing.manage']));
+    getInvoices.mockResolvedValue(overdue(2));
+    renderDashboard();
+    const attention = await block('Vyžaduje pozornost');
+    const row = await attention.findByRole('link', { name: /Faktury po splatnosti/ });
+    expect(row).toHaveAttribute('href', '/billing');
+    expect(row).toHaveTextContent('2');
+  });
+
+  it('collapses to one quiet line - "Vše vyřízeno" - when every source answered and nothing waits', async () => {
+    renderDashboard();
+    const line = await screen.findByText('Vše vyřízeno');
+    const section = line.closest('section') as HTMLElement;
+    expect(section).toHaveAttribute('data-ov-state', 'clear');
+    expect(within(section).queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('NEVER says "Vše vyřízeno" when the week could not be read: that is a failure with a retry', async () => {
+    range.mockRejectedValue(new Error('500'));
+    renderDashboard();
+    const attention = await block('Vyžaduje pozornost');
+    expect(await attention.findByText('Co vyžaduje pozornost se nepodařilo načíst.')).toBeInTheDocument();
+    expect(attention.queryByText('Vše vyřízeno')).not.toBeInTheDocument();
+    expect(attention.getByRole('button', { name: 'Zkusit znovu' })).toBeInTheDocument();
+  });
+
+  it('NEVER says "Vše vyřízeno" when a source failed and found nothing', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'billing.manage']));
+    getInvoices.mockRejectedValue(new Error('500'));
+    renderDashboard();
+    const attention = await block('Vyžaduje pozornost');
+    expect(await attention.findByText('Co vyžaduje pozornost se nepodařilo načíst.')).toBeInTheDocument();
+    expect(attention.queryByText('Vše vyřízeno')).not.toBeInTheDocument();
+  });
+
+  it('keeps what it found and says that a part could not be read when one source failed', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'billing.manage', 'patients.register']));
+    getInvoices.mockResolvedValue(overdue(1));
+    fetchIntakeQueue.mockRejectedValue(new Error('500'));
+    renderDashboard();
+    const attention = await block('Vyžaduje pozornost');
+    expect(await attention.findByRole('link', { name: /Faktury po splatnosti/ })).toBeInTheDocument();
+    expect(await attention.findByText(/Část údajů se nenačetla/)).toBeInTheDocument();
+  });
+
+  it('does not repeat the clubs: their requests are the other block', async () => {
+    listClubOrders.mockResolvedValue([{ id: 'o1', clubId: 'c', clubName: 'FK Slaný', status: 'Requested', totalSeats: 10, submittedAtUtc: '2026-10-20T08:00:00Z' }]);
+    renderDashboard();
+    await screen.findByText('Vše vyřízeno');
+    expect(screen.getByRole('region', { name: 'Vyžaduje pozornost' })).not.toHaveTextContent(/Poptávky klubů/);
+  });
+
+  it('shows at most three rows; the rest is behind "Zobrazit vše" in a pop-out', async () => {
+    localStorage.setItem('permissions', JSON.stringify(['patients.view', 'billing.manage', 'patients.register', 'settings.clinic.manage']));
+    getInvoices.mockResolvedValue(overdue(1));
+    fetchIntakeQueue.mockResolvedValue([{ intakeId: 'x', referenceNumber: 'R1', givenName: 'Eva', familyName: 'Nová', submittedAtUtc: '2026-10-20T08:00:00Z' }]);
+    /* paperwork not ready today -> a third group; the day list has one such booking */
+    range.mockResolvedValue([{ ...at(TODAY, 11, 1, 'a'), paperwork: { ready: false, missing: ['questionnaire_missing'] } }]);
+    renderDashboard();
+    const attention = await block('Vyžaduje pozornost');
+    await waitFor(() => expect(attention.getAllByRole('link')).toHaveLength(3));
+    /* Three rows only - with three groups there is nothing to fold away. */
+    expect(attention.queryByRole('button', { name: 'Zobrazit vše' })).not.toBeInTheDocument();
+  });
+});
+
+describe('4. Kluby k vyřízení', () => {
+  const order = (n: number, club: string, seats: number, day: number) => ({
+    id: `o${n}`, clubId: `c${n}`, clubName: club, status: 'Requested', totalSeats: seats, submittedAtUtc: `2026-10-${String(day).padStart(2, '0')}T08:00:00Z`,
+  });
+
+  it('shows the count and the three oldest requests, each a link to the order, the rest behind "Zobrazit vše"', async () => {
+    listClubOrders.mockResolvedValue([order(3, 'SK Třetí', 9, 21), order(1, 'FK První', 14, 18), order(4, 'FC Čtvrtý', 12, 22), order(2, 'TJ Druhý', 22, 20)]);
+    renderDashboard();
+    const clubs = await block('Kluby k vyřízení');
+    expect(await clubs.findByText('FK První')).toBeInTheDocument();
+    expect(clubs.getAllByRole('link').slice(0, 3).map((a) => a.textContent)).toEqual(['FK První14 míst', 'TJ Druhý22 míst', 'SK Třetí9 míst']);
+    expect(clubs.queryByText('FC Čtvrtý')).not.toBeInTheDocument();
+    expect(clubs.getByRole('link', { name: 'Zobrazit vše (4)' })).toHaveAttribute('href', '/clubs/objednavky');
+    expect(clubs.getByText('4')).toBeInTheDocument();
+  });
+
+  it('asks for the unanswered requests only', async () => {
+    renderDashboard();
+    await block('Kluby k vyřízení');
+    await waitFor(() => expect(listClubOrders).toHaveBeenCalledWith({ status: 'Requested' }));
+  });
+
+  it('collapses to one quiet line - "Žádná poptávka" - when the source answered and nothing waits', async () => {
+    renderDashboard();
+    const line = await screen.findByText('Žádná poptávka');
+    const section = line.closest('section') as HTMLElement;
+    expect(section).toHaveAttribute('data-ov-state', 'clear');
+    expect(within(section).queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('NEVER says "Žádná poptávka" when the list could not be read', async () => {
+    listClubOrders.mockRejectedValue(new Error('500'));
+    renderDashboard();
+    const clubs = await block('Kluby k vyřízení');
+    expect(await clubs.findByText('Poptávky klubů se nepodařilo načíst.')).toBeInTheDocument();
+    expect(clubs.queryByText('Žádná poptávka')).not.toBeInTheDocument();
+  });
+});
+
+describe('at the other two widths', () => {
+  it.each([['tablet', VIEWPORTS.tablet], ['phone', VIEWPORTS.phone]] as const)('%s: the same four blocks and the same five elements', async (_name, width) => {
+    setViewport(width);
+    range.mockResolvedValue([at(TODAY, 11, 1, 'a')]);
+    renderDashboard();
+    await block('Dnes');
+    expect(document.querySelectorAll('[data-ov]')).toHaveLength(5);
+    expect(screen.getAllByRole('region').map((r) => r.getAttribute('aria-label') ?? r.getAttribute('aria-labelledby') !== null)).toHaveLength(4);
+  });
 });

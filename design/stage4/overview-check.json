@@ -1,0 +1,642 @@
+{
+ "tag": "after",
+ "at": "2026-10-22T11:14:55.184Z",
+ "failures": [],
+ "results": [
+  {
+   "mode": "full",
+   "size": "390x844",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 8,
+   "charts": 1,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "color:rgb(0, 230, 228)",
+     "color:rgb(35, 242, 231)",
+     "bg:rgb(0, 230, 228)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 11.98,
+    "need": 4.5,
+    "adj": 2.6616621596252843,
+    "text": "Zobrazit vše (4)",
+    "color": "rgb(0, 230, 228)",
+    "bg": "rgb(0,20,33)"
+   },
+   "contrastSkippedOnGradient": 0,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  },
+  {
+   "mode": "full",
+   "size": "820x1180",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 12,
+   "charts": 1,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "bg:rgb(0, 230, 228)",
+     "color:rgb(35, 242, 231)",
+     "border:rgb(6, 65, 90)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 11.98,
+    "need": 4.5,
+    "adj": 2.6616621596252843,
+    "text": "Zobrazit vše (4)",
+    "color": "rgb(0, 230, 228)",
+    "bg": "rgb(0,20,33)"
+   },
+   "contrastSkippedOnGradient": 1,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  },
+  {
+   "mode": "full",
+   "size": "1440x900",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 12,
+   "charts": 1,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "bg:rgb(0, 230, 228)",
+     "color:rgb(35, 242, 231)",
+     "border:rgb(6, 65, 90)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 11.98,
+    "need": 4.5,
+    "adj": 2.6616621596252843,
+    "text": "Zobrazit vše (4)",
+    "color": "rgb(0, 230, 228)",
+    "bg": "rgb(0,20,33)"
+   },
+   "contrastSkippedOnGradient": 1,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  },
+  {
+   "mode": "full",
+   "size": "1920x1080",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 12,
+   "charts": 1,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "bg:rgb(0, 230, 228)",
+     "color:rgb(35, 242, 231)",
+     "border:rgb(6, 65, 90)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 11.98,
+    "need": 4.5,
+    "adj": 2.6616621596252843,
+    "text": "Zobrazit vše (4)",
+    "color": "rgb(0, 230, 228)",
+    "bg": "rgb(0,20,33)"
+   },
+   "contrastSkippedOnGradient": 1,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  },
+  {
+   "mode": "quiet",
+   "size": "390x844",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 8,
+   "charts": 1,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "color:rgb(0, 230, 228)",
+     "bg:rgb(0, 230, 228)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 9.26,
+    "need": 4.5,
+    "adj": 2.057421275207734,
+    "text": "Žádná poptávka",
+    "color": "rgb(163, 185, 206)",
+    "bg": "rgb(0,20,33)"
+   },
+   "contrastSkippedOnGradient": 0,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  },
+  {
+   "mode": "quiet",
+   "size": "820x1180",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 12,
+   "charts": 1,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "bg:rgb(0, 230, 228)",
+     "color:rgb(35, 242, 231)",
+     "border:rgb(6, 65, 90)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 9.26,
+    "need": 4.5,
+    "adj": 2.057421275207734,
+    "text": "Žádná poptávka",
+    "color": "rgb(163, 185, 206)",
+    "bg": "rgb(0,20,33)"
+   },
+   "contrastSkippedOnGradient": 1,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  },
+  {
+   "mode": "quiet",
+   "size": "1440x900",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 12,
+   "charts": 1,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "bg:rgb(0, 230, 228)",
+     "color:rgb(35, 242, 231)",
+     "border:rgb(6, 65, 90)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 9.26,
+    "need": 4.5,
+    "adj": 2.057421275207734,
+    "text": "Žádná poptávka",
+    "color": "rgb(163, 185, 206)",
+    "bg": "rgb(0,20,33)"
+   },
+   "contrastSkippedOnGradient": 1,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  },
+  {
+   "mode": "quiet",
+   "size": "1920x1080",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 12,
+   "charts": 1,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "bg:rgb(0, 230, 228)",
+     "color:rgb(35, 242, 231)",
+     "border:rgb(6, 65, 90)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 9.26,
+    "need": 4.5,
+    "adj": 2.057421275207734,
+    "text": "Žádná poptávka",
+    "color": "rgb(163, 185, 206)",
+    "bg": "rgb(0,20,33)"
+   },
+   "contrastSkippedOnGradient": 1,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  },
+  {
+   "mode": "fail",
+   "size": "390x844",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 8,
+   "charts": 1,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "color:rgb(0, 230, 228)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 11.98,
+    "need": 4.5,
+    "adj": 2.6616621596252843,
+    "text": "Zkusit znovu",
+    "color": "rgb(0, 230, 228)",
+    "bg": "rgb(0,20,33)"
+   },
+   "contrastSkippedOnGradient": 0,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  },
+  {
+   "mode": "fail",
+   "size": "820x1180",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 12,
+   "charts": 1,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "bg:rgb(0, 230, 228)",
+     "color:rgb(35, 242, 231)",
+     "border:rgb(6, 65, 90)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 11.98,
+    "need": 4.5,
+    "adj": 2.6616621596252843,
+    "text": "Zkusit znovu",
+    "color": "rgb(0, 230, 228)",
+    "bg": "rgb(0,20,33)"
+   },
+   "contrastSkippedOnGradient": 1,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  },
+  {
+   "mode": "fail",
+   "size": "1440x900",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 12,
+   "charts": 1,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "bg:rgb(0, 230, 228)",
+     "color:rgb(35, 242, 231)",
+     "border:rgb(6, 65, 90)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 11.98,
+    "need": 4.5,
+    "adj": 2.6616621596252843,
+    "text": "Zkusit znovu",
+    "color": "rgb(0, 230, 228)",
+    "bg": "rgb(0,20,33)"
+   },
+   "contrastSkippedOnGradient": 1,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  },
+  {
+   "mode": "fail",
+   "size": "1920x1080",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 12,
+   "charts": 1,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "bg:rgb(0, 230, 228)",
+     "color:rgb(35, 242, 231)",
+     "border:rgb(6, 65, 90)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 11.98,
+    "need": 4.5,
+    "adj": 2.6616621596252843,
+    "text": "Zkusit znovu",
+    "color": "rgb(0, 230, 228)",
+    "bg": "rgb(0,20,33)"
+   },
+   "contrastSkippedOnGradient": 1,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  },
+  {
+   "mode": "light",
+   "size": "390x844",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 8,
+   "charts": 1,
+   "colours": [
+    "0-40",
+    "160-200"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "color:rgb(13, 92, 82)",
+     "bg:rgb(13, 92, 82)"
+    ],
+    "0-40": [
+     "color:rgb(155, 59, 27)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 6.95,
+    "need": 4.5,
+    "adj": 1.5447281794420107,
+    "text": "Zobrazit vše (4)",
+    "color": "rgb(13, 92, 82)",
+    "bg": "rgb(239,241,244)"
+   },
+   "contrastSkippedOnGradient": 0,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  },
+  {
+   "mode": "light",
+   "size": "820x1180",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 12,
+   "charts": 1,
+   "colours": [
+    "0-40",
+    "160-200"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "bg:rgb(13, 92, 82)",
+     "color:rgb(13, 92, 82)"
+    ],
+    "0-40": [
+     "color:rgb(155, 59, 27)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 6.95,
+    "need": 4.5,
+    "adj": 1.5447281794420107,
+    "text": "Zobrazit vše (4)",
+    "color": "rgb(13, 92, 82)",
+    "bg": "rgb(239,241,244)"
+   },
+   "contrastSkippedOnGradient": 0,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  },
+  {
+   "mode": "light",
+   "size": "1440x900",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 12,
+   "charts": 1,
+   "colours": [
+    "0-40",
+    "160-200"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "bg:rgb(13, 92, 82)",
+     "color:rgb(13, 92, 82)",
+     "border:rgba(13, 92, 82, 0.35)"
+    ],
+    "0-40": [
+     "color:rgb(155, 59, 27)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 6.95,
+    "need": 4.5,
+    "adj": 1.5447281794420107,
+    "text": "Zobrazit vše (4)",
+    "color": "rgb(13, 92, 82)",
+    "bg": "rgb(239,241,244)"
+   },
+   "contrastSkippedOnGradient": 0,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  },
+  {
+   "mode": "light",
+   "size": "1920x1080",
+   "elements": 5,
+   "parts": {
+    "blocks": 5,
+    "cards": 0,
+    "standaloneButtons": 0
+   },
+   "chrome": 12,
+   "charts": 1,
+   "colours": [
+    "0-40",
+    "160-200"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "bg:rgb(13, 92, 82)",
+     "color:rgb(13, 92, 82)",
+     "border:rgba(13, 92, 82, 0.35)"
+    ],
+    "0-40": [
+     "color:rgb(155, 59, 27)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 6.95,
+    "need": 4.5,
+    "adj": 1.5447281794420107,
+    "text": "Zobrazit vše (4)",
+    "color": "rgb(13, 92, 82)",
+    "bg": "rgb(239,241,244)"
+   },
+   "contrastSkippedOnGradient": 0,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  }
+ ]
+}

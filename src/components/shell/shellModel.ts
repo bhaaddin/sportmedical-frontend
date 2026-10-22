@@ -9,10 +9,15 @@ export function isActivePath(pathname: string, path: string): boolean {
 }
 
 /*
- * The sidebar is contextual: where you are decides what hangs under the open
- * entry. This is the model of the three entries whose children are the
- * working screens of that area (pure data - the icons are attached in
- * `App.tsx`, which owns the menu the shell reads).
+ * The Menu drawer is contextual: where you are decides what hangs under the open
+ * entry. This is the model of the entries whose children are the working
+ * screens of that area (pure data - the icons are attached in `StaffApp.tsx`,
+ * which owns the menu the shell reads).
+ *
+ * Stage 4 (R19): there is no sidebar any more, and nothing here STARTS something -
+ * "Nový pacient", "Rychlá registrace", "Nová objednávka" live only in the top action
+ * bar (components/shell/ActionBar.tsx) and on the page that owns them. `shortcut`
+ * is kept for any future entry that must never be drawn as the current screen.
  *
  *  - `shortcut`   a link that starts something on its target screen (it
  *                 carries `state`) and is never drawn as "the screen you are on";
@@ -38,12 +43,9 @@ export const SECTION_CHILDREN: Record<ContextualParent, ChildSpec[]> = {
     { text: 'Dnešní přehled', path: '/dnes' },
     { text: 'Přehled podle služeb', path: '/prehled-sluzeb' },
     { text: 'Dostupnost', path: '/availability' },
-    { text: 'Klubová objednávka', path: '/planovani', state: { openClubOrder: true }, shortcut: true },
   ],
   '/patients': [
     { text: 'Přehled pacientů', path: '/patients' },
-    { text: 'Nový pacient', path: '/patients/register', requires: 'patients.register' },
-    { text: 'Rychlá registrace', path: '/patients/register?mode=quick', requires: 'patients.register', shortcut: true },
     { text: 'Kontrola registrací', path: '/intake-review', requires: 'patients.register' },
   ],
   '/clubs': [

@@ -1,6 +1,7 @@
 /*
- * The planner routes have no sidebar and no rail: the stage is the whole screen, the shell keeps one "Menu" button in
- * the where-am-I row that opens the same navigation as a slide-over. Every other route keeps its normal navigation.
+ * The planner routes have no icon rail: the stage is the whole screen, the shell keeps one "Menu" button in
+ * the where-am-I row that opens the full list of pages as a slide-over (the same icons as the rail). Every other route
+ * keeps the icon rail and the top action bar.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, waitFor } from '@testing-library/react';
@@ -76,7 +77,6 @@ describe('isPlannerRoute', () => {
 describe.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet]] as const)("a club's own screen at %s", (_name, width) => {
   it('/clubs/<id>: no sidebar, no rail, the Menu button and "Zpět na kluby" in the where-am-I row', async () => {
     renderShell('/clubs/club-1', width);
-    expect(document.querySelector('[data-shell="sidebar"]')).not.toBeInTheDocument();
     expect(document.querySelector('[data-shell="rail"]')).not.toBeInTheDocument();
     expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '0px' });
     const row = screen.getByLabelText('Kde jsem');
@@ -85,8 +85,7 @@ describe.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet]] as 
     expect(screen.getByTestId('path')).toHaveTextContent('/clubs');
     expect(screen.getByTestId('path').textContent).toBe('/clubs');
     /* ...and the list is an ordinary page again, with the navigation */
-    if (width === VIEWPORTS.desktop) expect(document.querySelector('[data-shell="sidebar"]')).toBeInTheDocument();
-    else expect(document.querySelector('[data-shell="rail"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-shell="rail"]')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Zpět na kluby' })).not.toBeInTheDocument();
   });
 
@@ -106,9 +105,8 @@ describe.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet]] as 
 });
 
 describe.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet]] as const)('planner routes at %s', (_name, width) => {
-  it.each(['/planovani', '/planner-lab', '/planner-lab/page'])('%s: no sidebar, no rail, the page starts at the left edge', (route) => {
+  it.each(['/planovani', '/planner-lab', '/planner-lab/page'])('%s: no rail, the page starts at the left edge', (route) => {
     renderShell(route, width);
-    expect(document.querySelector('[data-shell="sidebar"]')).not.toBeInTheDocument();
     expect(document.querySelector('[data-shell="rail"]')).not.toBeInTheDocument();
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: /Hlavní navigace|Sekce/ })).not.toBeInTheDocument();
@@ -124,7 +122,12 @@ describe.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet]] as 
     expect(menuButton()).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('opens the whole navigation as a drawer: every link, the big button and the account widget', async () => {
+  it('has no action bar on the stage (it brings its own controls)', () => {
+    renderShell('/planovani', width);
+    expect(document.querySelector('[data-shell="actions"]')).not.toBeInTheDocument();
+  });
+
+  it('opens the full list of pages as a drawer: the entries with icons, the section screens and the account widget - and no action entries', async () => {
     renderShell('/planovani', width);
     await userEvent.click(menuButton());
     const drawer = await screen.findByRole('dialog', { name: 'Menu' });
@@ -134,11 +137,15 @@ describe.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet]] as 
     expect(within(drawer).getByRole('heading', { name: 'Kalendář' })).toBeInTheDocument();
     for (const [name, href] of [
       ['Kalendář', '/planovani'], ['Dnešní přehled', '/dnes'], ['Přehled podle služeb', '/prehled-sluzeb'],
-      ['Dostupnost', '/availability'], ['Klubová objednávka', '/planovani'],
+      ['Dostupnost', '/availability'],
     ]) {
       expect(within(drawer).getByRole('link', { name })).toHaveAttribute('href', href);
     }
-    expect(within(drawer).getByRole('button', { name: 'Nová objednávka' })).toBeInTheDocument();
+    /* R19: an action lives only in the top action bar and on the page that owns it. */
+    for (const action of ['Nová objednávka', 'Nový pacient', 'Rychlá registrace', 'Klubová objednávka']) {
+      expect(within(drawer).queryByRole('button', { name: action })).not.toBeInTheDocument();
+      expect(within(drawer).queryByRole('link', { name: action })).not.toBeInTheDocument();
+    }
     expect(within(drawer).getByRole('button', { name: 'Účet a vzhled' })).toBeInTheDocument();
     expect(within(drawer).getByRole('button', { name: 'Hledat' })).toBeInTheDocument();
   });
@@ -166,32 +173,24 @@ describe.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet]] as 
     expect(screen.getByTestId('path')).toHaveTextContent('/dnes');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument());
     /* ...and on the next route the normal navigation is back. */
-    if (width === VIEWPORTS.desktop) expect(document.querySelector('[data-shell="sidebar"]')).toBeInTheDocument();
-    else expect(document.querySelector('[data-shell="rail"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-shell="rail"]')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Menu' })).not.toBeInTheDocument();
-  });
-
-  it('Nová objednávka in the drawer opens the chooser', async () => {
-    renderShell('/planovani', width);
-    await userEvent.click(menuButton());
-    const drawer = await screen.findByRole('dialog', { name: 'Menu' });
-    await userEvent.click(within(drawer).getByRole('button', { name: 'Nová objednávka' }));
-    expect(screen.getByTestId('order-chooser')).toBeInTheDocument();
   });
 });
 
-describe('everywhere else the navigation is as before', () => {
-  it.each(['/dnes', '/clubs', '/prehled'])('desktop %s: the sidebar, no Menu button', (route) => {
+describe('everywhere else the icon rail and the action bar are there', () => {
+  it.each(['/dnes', '/clubs', '/prehled'])('desktop %s: the icon rail and the action bar, no Menu button', (route) => {
     renderShell(route, VIEWPORTS.desktop);
-    expect(document.querySelector('[data-shell="sidebar"]')).toBeInTheDocument();
-    expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '258px' });
+    expect(document.querySelector('[data-shell="rail"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-shell="actions"]')).toBeInTheDocument();
+    expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '56px' });
     expect(screen.queryByRole('button', { name: 'Menu' })).not.toBeInTheDocument();
   });
 
-  it('tablet /clubs: the rail', () => {
+  it('tablet /clubs: the same icon rail', () => {
     renderShell('/clubs', VIEWPORTS.tablet);
     expect(document.querySelector('[data-shell="rail"]')).toBeInTheDocument();
-    expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '72px' });
+    expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '56px' });
   });
 
   it('phone /planovani keeps the bottom navigation and gets no Menu button', () => {

@@ -14,6 +14,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Box } from '@mui/material';
 import { accentLiteral } from '../../theme';
 import { PATIENT_SECTIONS, sectionPath } from '../../pages/patients/sections';
+import { ActionBar } from './ActionBar';
 import { PlannerMenuSlot } from './SidebarSlot';
 import { isPlannerRoute } from './plannerRoutes';
 import type { SettingsItemAt } from './settingsTypes';
@@ -45,6 +46,9 @@ export function computeCrumbs({
     crumbs.push({ label: 'Pacienti', to: '/patients' }, { label: 'Karta pacienta', to: `/patients/${patientId}` });
     if (section && section.path !== '') crumbs.push({ label: section.label });
     if (pathname.endsWith('/edit')) crumbs.push({ label: 'Úprava karty' });
+  } else if (pathname === '/patients/register') {
+    /* No longer a child in the menu (R19: an action lives in the top bar), but still a place with a name. */
+    crumbs.push({ label: 'Pacienti', to: '/patients' }, { label: 'Nový pacient' });
   } else if (pathname.startsWith('/kalendar/')) {
     crumbs.push({ label: 'Kalendář', to: '/planovani' }, { label: 'Termín' });
   } else {
@@ -77,13 +81,13 @@ export function useDocumentTitle(crumbs: Crumb[]): void {
 
 /** The crumb line over the page (tablet and desktop). */
 export function WhereAmI({ crumbs }: { crumbs: Crumb[] }) {
-  /* On the planner routes there is no sidebar: this row also holds the Menu button that opens the navigation. */
+  /* On the planner routes there is no rail: this row also holds the Menu button that opens the navigation, and the stage
+     brings its own controls, so the action bar is not drawn there. Everywhere else the row ends in the action bar (R19). */
   const planner = isPlannerRoute(useLocation().pathname);
-  if (crumbs.length === 0 && !planner) return null;
   return (
     <Box
       aria-label="Kde jsem"
-      sx={(t) => ({ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1.5, fontSize: 13, color: 'text.secondary', flexWrap: 'wrap', ...(t.palette.mode === 'dark' ? { fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase' } : {}) })}
+      sx={(t) => ({ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1.5, minHeight: planner ? undefined : 44, flexShrink: 0, fontSize: 13, color: 'text.secondary', flexWrap: 'wrap', ...(t.palette.mode === 'dark' ? { fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase' } : {}) })}
     >
       {planner && <PlannerMenuSlot />}
       {crumbs.length > 0 && (
@@ -92,6 +96,7 @@ export function WhereAmI({ crumbs }: { crumbs: Crumb[] }) {
           <Trail crumbs={crumbs} />
         </>
       )}
+      {!planner && <ActionBar />}
     </Box>
   );
 }

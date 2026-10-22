@@ -1,7 +1,7 @@
 import { Box, Typography, CircularProgress } from '@mui/material';
 import { useLocation } from 'react-router-dom';
 import { isPlannerRoute } from './plannerRoutes';
-import { RAIL_WIDTH, SIDEBAR_WIDTH, sideGlass } from './shellStyles';
+import { RAIL_WIDTH, sideGlass } from './shellStyles';
 
 /* ── Loading spinner for Suspense ── */
 export function PageLoader() {
@@ -22,7 +22,7 @@ export function PageLoader() {
 
 /**
  * What stands in for the staff portal while its script arrives (App.tsx): the empty frame of the navigation
- * (the sidebar on a desktop, the rail on a tablet, nothing on a phone, nothing on the planner's own full-screen
+ * (the slim icon rail from a tablet up, nothing on a phone, nothing on the planner's own full-screen
  * routes) around the same spinner. The shell then appears in place instead of replacing a bare spinner, so
  * nothing jumps when it arrives.
  */
@@ -46,13 +46,12 @@ export function StaffShellPlaceholder() {
             borderRight: '1px solid',
             borderColor: 'divider',
             '@media (min-width: 768px)': { display: 'block', width: RAIL_WIDTH },
-            '@media (min-width: 1280px)': { width: SIDEBAR_WIDTH },
             ...sideGlass(t),
           })}
         />
       )}
       <Box
-        sx={framed ? { '@media (min-width: 768px)': { ml: `${RAIL_WIDTH}px` }, '@media (min-width: 1280px)': { ml: `${SIDEBAR_WIDTH}px` } } : undefined}
+        sx={framed ? { '@media (min-width: 768px)': { ml: `${RAIL_WIDTH}px` } } : undefined}
       >
         <PageLoader />
       </Box>

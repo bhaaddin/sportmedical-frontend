@@ -38,9 +38,14 @@ describe('childrenFor', () => {
     ]);
   });
 
-  it('keeps the club-order shortcut on the calendar, with its marker', () => {
-    const shortcut = SECTION_CHILDREN['/planovani'].find((c) => c.shortcut);
-    expect(shortcut).toMatchObject({ path: '/planovani', state: { openClubOrder: true } });
+  it('R19: no entry STARTS something - Nový pacient, Rychlá registrace and Klubová objednávka are not menu children', () => {
+    const texts = Object.values(SECTION_CHILDREN).flat().map((c) => c.text);
+    for (const action of ['Nový pacient', 'Rychlá registrace', 'Klubová objednávka', 'Nová objednávka']) expect(texts).not.toContain(action);
+    expect(Object.values(SECTION_CHILDREN).flat().some((c) => c.shortcut)).toBe(false);
+  });
+
+  it('gives Pacienti the overview and the registration check, nothing that starts a registration', () => {
+    expect(childrenFor('/patients')?.items.map((c) => c.text)).toEqual(['Přehled pacientů', 'Kontrola registrací']);
   });
 
   it('gives Fakturace its three screens', () => {
@@ -61,8 +66,13 @@ describe('activeChildPath', () => {
     expect(activeChildPath('/clubs', clubs, false)).toBe('/clubs');
     expect(activeChildPath('/clubs/abc', clubs, false)).toBe('/clubs');
     expect(activeChildPath('/clubs/hraci', clubs, false)).toBe('/clubs/hraci');
-    expect(activeChildPath('/planovani', asMenu('/planovani'), false)).toBe('/planovani'); /* the Klubová objednávka shortcut never wins */
-    expect(activeChildPath('/patients/register', asMenu('/patients'), false)).toBe('/patients/register');
+    expect(activeChildPath('/planovani', asMenu('/planovani'), false)).toBe('/planovani');
+    /* The registration page is inside Pacienti, and the overview is the child that is lit there. */
+    expect(activeChildPath('/patients/register', asMenu('/patients'), false)).toBe('/patients');
+    expect(activeChildPath('/intake-review', asMenu('/patients'), false)).toBe('/intake-review');
+    /* A shortcut (should one return) is never the screen. */
+    const withShortcut: MenuEntry[] = [{ text: 'Start', path: '/planovani', icon: null, shortcut: true }, { text: 'Kalendář', path: '/planovani', icon: null }];
+    expect(activeChildPath('/planovani', withShortcut, false)).toBe('/planovani');
   });
 });
 

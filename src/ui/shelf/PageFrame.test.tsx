@@ -59,10 +59,13 @@ describe('PageFrame', () => {
     expect(screen.getAllByRole('link', { name: 'Nový pacient' })).toHaveLength(1);
   });
 
-  it('has the palette button on a desktop and a tablet, and it asks the shell to open the palette', async () => {
+  it('has no palette button of its own by default (the action bar of the shell has it), and one when the page asks for it', async () => {
+    const { unmount } = renderFrame(<PageFrame title="A" />);
+    expect(screen.queryByRole('button', { name: 'Hledat' })).toBeNull();
+    unmount();
     const heard = vi.fn();
     window.addEventListener(OPEN_SEARCH_EVENT, heard);
-    renderFrame(<PageFrame title="A" />);
+    renderFrame(<PageFrame title="A" search />);
     const button = screen.getByRole('button', { name: 'Hledat' });
     expect(button).toHaveAttribute('aria-keyshortcuts', 'Control+K Meta+K');
     await userEvent.setup().click(button);
@@ -70,14 +73,9 @@ describe('PageFrame', () => {
     window.removeEventListener(OPEN_SEARCH_EVENT, heard);
   });
 
-  it('has no palette button on a phone (its top bar has one) and none when the page asks for none', () => {
+  it('has no palette button on a phone even when asked (its top bar has one)', () => {
     setViewport(VIEWPORTS.phone);
-    const { unmount } = renderFrame(<PageFrame title="A" />);
-    expect(screen.queryByRole('button', { name: 'Hledat' })).toBeNull();
-    unmount();
-
-    setViewport(VIEWPORTS.desktop);
-    renderFrame(<PageFrame title="A" search={false} />);
+    renderFrame(<PageFrame title="A" search />);
     expect(screen.queryByRole('button', { name: 'Hledat' })).toBeNull();
   });
 
