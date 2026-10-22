@@ -221,8 +221,12 @@ async function stripFlow(browser, size) {
   await login(page);
   const club = await findOrMakeClub(page);
   const t0 = Date.now();
-  await startOrder(page, club.id, 'Sportovní diagnostika', { 'Základní diagnostika': 2, 'Komplexní diagnostika': 2, 'VO₂max analýza': 2, 'Individuální videoinstruovaný kompenzační plán': 2 });
-  check((await page.locator('#planning-cards .plan-card').count()) === 4, '(f) the order has 4 činnosti');
+  /* 4 činnosti do not fit on the phone (2 cards) and the desktop (3); the tablet shows 4, so it takes 5 */
+  const five = { 'Komplexní prohlídka + Základní diagnostika': 2, 'Komplexní prohlídka + Komplexní diagnostika': 2, 'Spiroergometrie + Základní diagnostika': 2, 'Spiroergometrie + Komplexní diagnostika': 2, 'Komplexní diagnostika + VO₂max analýza': 2 };
+  const four = { 'Základní diagnostika': 2, 'Komplexní diagnostika': 2, 'VO₂max analýza': 2, 'Individuální videoinstruovaný kompenzační plán': 2 };
+  const wanted = size === 'tablet' ? 5 : 4;
+  await startOrder(page, club.id, wanted === 5 ? 'Zvýhodněné balíčky' : 'Sportovní diagnostika', wanted === 5 ? five : four);
+  check((await page.locator('#planning-cards .plan-card').count()) === wanted, `(f) the order has ${wanted} činnosti`);
   await page.waitForSelector('[data-testid=guide-hint]', { timeout: 20000 });
   const first = await page.locator('[data-testid=guide-hint]').getAttribute('data-hint');
   const tStart = Date.now();
