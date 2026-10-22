@@ -1,14 +1,12 @@
 /*
- * The shell at the three widths the design board calls for: which navigation
- * exists (bottom bar, rail or sidebar), and what it does.
+ * The shell at the three widths the design board calls for (Stage 4, R19: the labelled sidebar is gone): which navigation
+ * exists (bottom bar or the slim icon rail), what the top action bar offers, and what each does.
  *
- *   390   phone    bottom bar + top bar + "Více" sheet - no sidebar
- *   834   tablet   72px rail that opens as an overlay
- *   1440  desktop  258px sidebar with text
+ *   390   phone    bottom bar + top bar + "Více" sheet
+ *   834   tablet   56px icon rail + the action bar; "Všechny stránky" opens the drawer
+ *   1440  desktop  the same icon rail and action bar (the content takes the width the sidebar used to hold)
  *
- * The invariant under all of it: one navigation at a time. No two `nav`
- * landmarks carrying the main entries, and in settings the main entries are
- * not drawn at all.
+ * The invariant under all of it: one navigation at a time. No two `nav` landmarks carrying the main entries.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, waitFor, fireEvent } from '@testing-library/react';
@@ -81,268 +79,204 @@ beforeEach(() => {
   document.title = '';
 });
 
-describe('desktop (1440): the full sidebar', () => {
-  it('has the sidebar and nothing else: no rail, no bottom bar, one navigation', () => {
-    renderShell('/dnes', VIEWPORTS.desktop);
-    expect(document.querySelector('[data-shell="sidebar"]')).toBeInTheDocument();
-    expect(document.querySelector('[data-shell="rail"]')).not.toBeInTheDocument();
+describe.each([['desktop (1440)', VIEWPORTS.desktop], ['tablet (834)', VIEWPORTS.tablet]] as const)('%s: the slim icon rail', (_name, width) => {
+  it('has the rail only: no sidebar, no bottom bar, one navigation, 56px, the content starts at 56px as a pixel value', () => {
+    renderShell('/dnes', width);
+    const rail = document.querySelector('[data-shell="rail"]') as HTMLElement;
+    expect(rail).toBeInTheDocument();
+    expect(rail).toHaveStyle({ width: '56px' });
+    expect(document.querySelector('[data-shell="sidebar"]')).not.toBeInTheDocument();
     expect(document.querySelector('[data-shell="bottombar"]')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Více' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Otevřít menu' })).not.toBeInTheDocument();
     expect(mainNavs()).toHaveLength(1);
     expect(screen.getAllByRole('navigation')).toHaveLength(1);
+    expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '56px' });
   });
 
-  it('is 258px wide and the content starts at 258px, as a pixel value', () => {
-    renderShell('/dnes', VIEWPORTS.desktop);
-    expect(document.querySelector('[data-shell="sidebar"]')).toHaveStyle({ width: '258px' });
-    expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '258px' });
-  });
-
-  it('shows the brand, the big button and the five entries with text on the overview', () => {
-    renderShell('/prehled', VIEWPORTS.desktop);
+  it('has NO labelled sidebar: no text entries, no "Nová objednávka" / "Nový pacient" / "Rychlá registrace" among the navigation links', () => {
+    renderShell('/prehled', width);
     const nav = mainNavs()[0];
-    for (const name of ['Kalendář', 'Pacienti', 'Kluby a týmy', 'Fakturace', 'Nastavení']) {
-      const link = within(nav).getByRole('link', { name });
-      expect(getComputedStyle(link).minHeight).toBe('44px');
+    expect(within(nav).queryByText('Kluby a týmy')).not.toBeInTheDocument();
+    expect(nav.textContent?.replace(/\s/g, '') ?? '').not.toMatch(/Kalendář|Pacienti|Fakturace|Nastavení/);
+    for (const action of ['Nová objednávka', 'Nový pacient', 'Rychlá registrace']) {
+      expect(within(nav).queryByRole('link', { name: action })).not.toBeInTheDocument();
+      expect(within(nav).queryByRole('button', { name: action })).not.toBeInTheDocument();
     }
-    /* The brand opens the staff overview. '/' is the public site now and is never a link of the staff shell. */
-    expect(screen.getByRole('link', { name: 'SportMedical — přehled' })).toHaveAttribute('href', '/prehled');
-    expect(screen.getByRole('button', { name: 'Nová objednávka' })).toBeInTheDocument();
   });
 
-  it('has no Výsledky section anywhere in the navigation', () => {
-    renderShell('/prehled', VIEWPORTS.desktop);
+  it('has the five icons and the logo, every target 44px, the brand leading to the overview', () => {
+    renderShell('/prehled', width);
+    const nav = mainNavs()[0];
+    for (const name of ['Kalendář', 'Pacienti', 'Kluby', 'Fakturace', 'Nastavení']) {
+      const link = within(nav).getByRole('link', { name });
+      expect(getComputedStyle(link).width).toBe('44px');
+      expect(getComputedStyle(link).height).toBe('44px');
+    }
+  });
+
+  it('the logo is the way home - and not a link on the overview itself', () => {
+    const { unmount } = renderShell('/dnes', width);
+    /* The brand opens the staff overview. '/' is the public site now and is never a link of the staff shell. */
+    expect(within(mainNavs()[0]).getByRole('link', { name: 'SportMedical — přehled' })).toHaveAttribute('href', '/prehled');
+    unmount();
+    renderShell('/prehled', width);
+    const here = within(mainNavs()[0]).getByRole('link', { name: 'SportMedical — přehled (tady jste)' });
+    expect(here).toHaveAttribute('aria-current', 'page');
+    expect(here).toHaveAttribute('aria-disabled', 'true');
+    expect(here).not.toHaveAttribute('href');
+  });
+
+  it('has no Výsledky section anywhere in the navigation', async () => {
+    renderShell('/prehled', width);
     expect(screen.queryByRole('link', { name: 'Výsledky' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Všechny stránky' }));
     expect(screen.queryByRole('link', { name: 'Zranění' })).not.toBeInTheDocument();
   });
 
-  it('inside a section the whole sidebar is that section: title, way back, its own items only', () => {
-    renderShell('/dnes', VIEWPORTS.desktop);
-    const nav = mainNavs()[0];
-    expect(screen.getByTestId('section-title')).toHaveTextContent('Kalendář');
-    expect(screen.getByRole('link', { name: 'Všechny sekce' })).toHaveAttribute('href', '/prehled');
-    expect(within(nav).getByRole('link', { name: 'Dnešní přehled' })).toHaveAttribute('aria-current', 'page');
-    for (const name of ['Kalendář', 'Přehled podle služeb', 'Dostupnost']) {
-      expect(within(nav).getByRole('link', { name })).toBeInTheDocument();
-    }
-    for (const name of ['Pacienti', 'Kluby a týmy', 'Fakturace', 'Nastavení', 'Nový pacient', 'Pokladna']) {
-      expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
-    }
+  it('keeps the diagnostic form inside the Pacienti area', async () => {
+    renderShell('/diagnostics/new', width);
+    await userEvent.click(screen.getByRole('button', { name: 'Všechny stránky' }));
+    expect(within(await screen.findByRole('dialog', { name: 'Menu' })).getByTestId('section-title')).toHaveTextContent('Pacienti');
   });
 
-  it('keeps the diagnostic form inside the Pacienti section', () => {
-    renderShell('/diagnostics/new', VIEWPORTS.desktop);
-    expect(screen.getByTestId('section-title')).toHaveTextContent('Pacienti');
-  });
-
-  it('shows a patient file\'s sections under Pacienti', () => {
-    renderShell('/patients/p-1/terminy', VIEWPORTS.desktop);
-    const nav = mainNavs()[0];
-    expect(screen.getByTestId('section-title')).toHaveTextContent('Pacienti');
+  it("shows a patient file's sections under Pacienti in the drawer", async () => {
+    renderShell('/patients/p-1/terminy', width);
+    await userEvent.click(screen.getByRole('button', { name: 'Všechny stránky' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Menu' });
+    expect(within(drawer).getByTestId('section-title')).toHaveTextContent('Pacienti');
     for (const name of ['Přehled', 'Termíny', 'Faktury', 'Dokumenty', 'Historie']) {
-      expect(within(nav).getByRole('link', { name })).toBeInTheDocument();
+      expect(within(drawer).getByRole('link', { name })).toBeInTheDocument();
     }
-    expect(within(nav).getByRole('link', { name: 'Termíny' })).toHaveAttribute('href', '/patients/p-1/terminy');
-    expect(within(nav).getByRole('link', { name: 'Termíny' })).toHaveAttribute('aria-current', 'page');
+    expect(within(drawer).getByRole('link', { name: 'Termíny' })).toHaveAttribute('href', '/patients/p-1/terminy');
+    expect(within(drawer).getByRole('link', { name: 'Termíny' })).toHaveAttribute('aria-current', 'page');
     /* The patient list's own screens stay above the file's sections, never lit on a file. */
-    expect(within(nav).getByRole('link', { name: 'Přehled pacientů' })).not.toHaveAttribute('aria-current');
+    expect(within(drawer).getByRole('link', { name: 'Přehled pacientů' })).not.toHaveAttribute('aria-current');
   });
 
   it('hides what this person may not open', () => {
-    renderShell('/prehled', VIEWPORTS.desktop, []);
+    renderShell('/prehled', width, []);
     const nav = mainNavs()[0];
     expect(within(nav).queryByRole('link', { name: 'Pacienti' })).not.toBeInTheDocument();
     expect(within(nav).queryByRole('link', { name: 'Fakturace' })).not.toBeInTheDocument();
     expect(within(nav).getByRole('link', { name: 'Kalendář' })).toBeInTheDocument();
   });
 
-  it('has the account row: name, role, search and the bell', async () => {
-    renderShell('/dnes', VIEWPORTS.desktop);
-    expect(screen.getByRole('button', { name: 'Účet a vzhled' })).toHaveTextContent('Jana Nováková');
-    expect(screen.getByRole('button', { name: 'Účet a vzhled' })).toHaveTextContent('Recepce');
-    expect(screen.getByRole('button', { name: 'Oznámení' })).toBeInTheDocument();
+  it('has the account and the bell at the foot of the rail, the search in the action bar', async () => {
+    renderShell('/dnes', width);
+    const nav = mainNavs()[0];
+    expect(within(nav).getByRole('button', { name: 'Účet a vzhled' })).toBeInTheDocument();
+    expect(within(nav).getByRole('button', { name: 'Oznámení' })).toBeInTheDocument();
+    expect(within(nav).queryByRole('button', { name: /^Hledat/ })).not.toBeInTheDocument();
     const opened = vi.fn();
     window.addEventListener(OPEN_SEARCH_EVENT, opened);
-    await userEvent.click(screen.getByRole('button', { name: 'Hledat' }));
+    const actions = document.querySelector('[data-shell="actions"]') as HTMLElement;
+    await userEvent.click(within(actions).getByRole('button', { name: /^Hledat/ }));
     expect(opened).toHaveBeenCalledTimes(1);
     window.removeEventListener(OPEN_SEARCH_EVENT, opened);
   });
 
-  it('Nová objednávka opens the chooser and does not navigate', async () => {
-    renderShell('/patients', VIEWPORTS.desktop);
+  it('Nová objednávka (top action bar) opens the chooser and does not navigate', async () => {
+    renderShell('/patients', width);
     expect(screen.queryByTestId('order-chooser')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Nová objednávka' }));
+    const actions = document.querySelector('[data-shell="actions"]') as HTMLElement;
+    await userEvent.click(within(actions).getByRole('button', { name: 'Nová objednávka' }));
     expect(screen.getByTestId('order-chooser')).toBeInTheDocument();
     expect(path()).toBe('/patients');
     await userEvent.click(screen.getByRole('button', { name: 'zavřít výběr' }));
     expect(screen.queryByTestId('order-chooser')).not.toBeInTheDocument();
   });
 
-  it('draws the page\'s slot content in the sidebar', () => {
-    renderShell('/dnes', VIEWPORTS.desktop);
-    expect(screen.getByTestId('has-slot')).toHaveTextContent('true');
-    const slot = document.querySelector('[data-sidebar-slot]') as HTMLElement;
-    expect(within(slot).getByText('mini kalendář')).toBeInTheDocument();
+  it('draws no sidebar slot: a page draws its own content (there is no sidebar to portal into)', () => {
+    renderShell('/dnes', width);
+    expect(screen.getByTestId('has-slot')).toHaveTextContent('false');
+    expect(document.querySelector('[data-sidebar-slot]')).not.toBeInTheDocument();
+    expect(screen.queryByText('mini kalendář')).not.toBeInTheDocument();
   });
 
   it('draws the crumb line and names the tab', () => {
-    renderShell('/clubs/hraci', VIEWPORTS.desktop);
+    renderShell('/clubs/hraci', width);
     const crumbs = screen.getByLabelText('Kde jsem');
     expect(crumbs).toHaveTextContent('Kluby a týmy');
     expect(crumbs).toHaveTextContent('Hráči');
     expect(document.title).toBe('Hráči · SportMedical');
   });
-});
 
-/*
- * A tall slot: twelve legend rows, as the calendar's SLUŽBY legend would draw
- * them with many services. jsdom lays nothing out, so the bounding boxes are
- * checked in the browser; here the STRUCTURE that makes them right is pinned:
- * the slot's rows live inside the one scrolling box, the account row is a
- * flex footer after that box (never positioned over it), and the "more below"
- * fade follows the box's scroll state.
- */
-function TallProbe() {
-  return (
-    <SidebarPortal>
-      <section aria-label="Služby">
-        {Array.from({ length: 12 }, (_, i) => (
-          <label key={i} data-testid="legend-row">
-            <input type="checkbox" defaultChecked /> Služba {i + 1}
-          </label>
-        ))}
-      </section>
-    </SidebarPortal>
-  );
-}
-
-function renderTallSidebar(width: number, height: number) {
-  setViewport(width, height);
-  localStorage.setItem('permissions', JSON.stringify(EVERYTHING));
-  localStorage.setItem('user', JSON.stringify({ firstName: 'Jana', lastName: 'Nováková', role: 'Recepce' }));
-  return render(
-    <ThemePrefsContext.Provider value={{ accent: '#0D5C52', mode: 'light', setAccent: () => undefined, setMode: () => undefined }}>
-      <ThemeProvider theme={buildTheme('#0D5C52', 'light')}>
-        <MemoryRouter initialEntries={['/dnes']}>
-          <Layout><TallProbe /></Layout>
-        </MemoryRouter>
-      </ThemeProvider>
-    </ThemePrefsContext.Provider>,
-  );
-}
-
-const scrollBox = () => document.querySelector('[data-shell="sidebar"] [data-shell-scroll]') as HTMLElement;
-const footer = () => screen.getByRole('button', { name: 'Účet a vzhled' }).parentElement as HTMLElement;
-
-/** Pretend the box is `scrollHeight` tall inside `clientHeight`, scrolled to `scrollTop`. */
-function fakeScroll(el: HTMLElement, scrollHeight: number, clientHeight: number, scrollTop: number) {
-  Object.defineProperty(el, 'scrollHeight', { configurable: true, value: scrollHeight });
-  Object.defineProperty(el, 'clientHeight', { configurable: true, value: clientHeight });
-  Object.defineProperty(el, 'scrollTop', { configurable: true, writable: true, value: scrollTop });
-  fireEvent.scroll(el);
-}
-
-describe('desktop: a tall slot never ends up under the account row', () => {
-  for (const [w, h] of [[1440, 900], [1280, 700]] as const) {
-    it(`${w}×${h}: the rows sit in the scrolling box, the account row is a footer after it`, () => {
-      renderTallSidebar(w, h);
-      const aside = document.querySelector('[data-shell="sidebar"]') as HTMLElement;
-      expect(getComputedStyle(aside).display).toBe('flex');
-      expect(getComputedStyle(aside).flexDirection).toBe('column');
-
-      const rows = screen.getAllByTestId('legend-row');
-      expect(rows).toHaveLength(12);
-      const box = scrollBox();
-      for (const row of rows) expect(box.contains(row)).toBe(true);
-      const boxStyle = getComputedStyle(box);
-      expect(boxStyle.overflowY).toBe('auto');
-      expect(boxStyle.minHeight).toBe('0px');
-      expect(boxStyle.flexGrow).toBe('1');
-      /* Room under the last row, so it never sits flush against the footer's divider. */
-      expect(parseFloat(boxStyle.paddingBottom)).toBeGreaterThanOrEqual(8);
-
-      /* The footer: still there, after the scrolling region in the column, in normal flow and not shrinking. */
-      const foot = footer();
-      expect(foot).toBeInTheDocument();
-      expect(foot.parentElement).toBe(aside);
-      expect(box.compareDocumentPosition(foot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(box.contains(foot)).toBe(false);
-      const footStyle = getComputedStyle(foot);
-      expect(footStyle.position).toBe('static');
-      expect(footStyle.flexShrink).toBe('0');
-      expect(within(foot).getByRole('button', { name: 'Hledat' })).toBeInTheDocument();
-      expect(within(foot).getByRole('button', { name: 'Oznámení' })).toBeInTheDocument();
-    });
-  }
-
-  it('shows the "more below" fade only while rows are hidden under the bottom edge', () => {
-    renderTallSidebar(1280, 700);
-    const box = scrollBox();
-    const hint = document.querySelector('[data-shell="sidebar"] [data-shell-scroll-hint]') as HTMLElement;
-    expect(hint).toBeInTheDocument();
-    expect(getComputedStyle(hint).pointerEvents).toBe('none');
-
-    fakeScroll(box, 722, 437, 0);
-    expect(box).toHaveAttribute('data-more-below');
-    expect(getComputedStyle(hint).opacity).toBe('1');
-
-    fakeScroll(box, 722, 437, 285);
-    expect(box).not.toHaveAttribute('data-more-below');
-    expect(getComputedStyle(hint).opacity).toBe('0');
-
-    fakeScroll(box, 437, 437, 0);
-    expect(box).not.toHaveAttribute('data-more-below');
-  });
-
-  it('the last row can be toggled', async () => {
-    renderTallSidebar(1280, 700);
-    const last = screen.getAllByTestId('legend-row').at(-1) as HTMLElement;
-    const tick = within(last).getByRole('checkbox');
-    expect(tick).toBeChecked();
-    await userEvent.click(tick);
-    expect(tick).not.toBeChecked();
-  });
-
-  it('tablet and phone draw no slot, so nothing can be covered there', () => {
-    renderTallSidebar(VIEWPORTS.tablet, 700);
-    expect(screen.queryAllByTestId('legend-row')).toHaveLength(0);
-    expect(document.querySelector('[data-shell="sidebar"]')).not.toBeInTheDocument();
-  });
-
-  it('phone: no slot either', () => {
-    renderTallSidebar(VIEWPORTS.phone, 700);
-    expect(screen.queryAllByTestId('legend-row')).toHaveLength(0);
-    expect(document.querySelector('[data-shell="sidebar"]')).not.toBeInTheDocument();
-  });
-
-  it('the tablet overlay keeps the same footer-after-scroll-box column', async () => {
-    renderTallSidebar(VIEWPORTS.tablet, 700);
-    await userEvent.click(screen.getByRole('button', { name: 'Otevřít menu' }));
-    const overlay = await screen.findByRole('dialog', { name: 'Menu' });
-    const box = overlay.querySelector('[data-shell-scroll]') as HTMLElement;
-    expect(box).toBeInTheDocument();
-    expect(getComputedStyle(box).overflowY).toBe('auto');
-    const foot = within(overlay).getByRole('button', { name: 'Účet a vzhled' }).parentElement as HTMLElement;
-    expect(box.contains(foot)).toBe(false);
-    expect(box.compareDocumentPosition(foot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(getComputedStyle(foot).position).toBe('static');
+  it('names the registration page: Pacienti › Nový pacient', () => {
+    renderShell('/patients/register', width);
+    expect(screen.getByLabelText('Kde jsem')).toHaveTextContent('Nový pacient');
+    expect(document.title).toBe('Nový pacient · SportMedical');
   });
 });
 
-describe('settings replace the navigation', () => {
-  it('desktop: the settings sidebar stands where the main one was, never beside it', async () => {
+describe('the top action bar', () => {
+  it('desktop: Hledat, Nový pacient, Rychlá registrace and Nová objednávka, 44px each, in the where-am-I row', () => {
+    renderShell('/prehled', VIEWPORTS.desktop);
+    const actions = document.querySelector('[data-shell="actions"]') as HTMLElement;
+    expect(screen.getByLabelText('Kde jsem')).toContainElement(actions);
+    expect(within(actions).getByRole('button', { name: 'Hledat' })).toHaveAttribute('aria-keyshortcuts', 'Control+K Meta+K');
+    expect(within(actions).getByRole('link', { name: 'Nový pacient' })).toHaveAttribute('href', '/patients/register');
+    expect(within(actions).getByRole('link', { name: 'Rychlá registrace' })).toHaveAttribute('href', '/patients/register?mode=quick');
+    expect(within(actions).getByRole('button', { name: 'Nová objednávka' })).toBeInTheDocument();
+    for (const item of [...within(actions).getAllByRole('button'), ...within(actions).getAllByRole('link')]) {
+      expect(getComputedStyle(item).minHeight).toBe('44px');
+    }
+  });
+
+  it('tablet: the first three are icon buttons with an accessible name', () => {
+    renderShell('/prehled', VIEWPORTS.tablet);
+    const actions = document.querySelector('[data-shell="actions"]') as HTMLElement;
+    expect(within(actions).getByRole('button', { name: /^Hledat/ })).toBeInTheDocument();
+    expect(within(actions).getByRole('link', { name: 'Nový pacient' })).toBeInTheDocument();
+    expect(within(actions).getByRole('link', { name: 'Rychlá registrace' })).toBeInTheDocument();
+    expect(within(actions).getByRole('button', { name: 'Nová objednávka' })).toBeInTheDocument();
+    expect(within(actions).queryByText('Nový pacient')).not.toBeInTheDocument();
+  });
+
+  it('does not offer Nový pacient where the screen owns it (Pacienti, the registration page)', () => {
+    const { unmount } = renderShell('/patients', VIEWPORTS.desktop);
+    let actions = document.querySelector('[data-shell="actions"]') as HTMLElement;
+    expect(within(actions).queryByRole('link', { name: 'Nový pacient' })).not.toBeInTheDocument();
+    expect(within(actions).getByRole('link', { name: 'Rychlá registrace' })).toBeInTheDocument();
+    unmount();
+    renderShell('/patients/register', VIEWPORTS.desktop);
+    actions = document.querySelector('[data-shell="actions"]') as HTMLElement;
+    expect(within(actions).queryByRole('link', { name: 'Nový pacient' })).not.toBeInTheDocument();
+  });
+
+  it('hides the registrations from someone who may not register patients', () => {
+    renderShell('/prehled', VIEWPORTS.desktop, ['patients.view']);
+    const actions = document.querySelector('[data-shell="actions"]') as HTMLElement;
+    expect(within(actions).queryByRole('link', { name: 'Nový pacient' })).not.toBeInTheDocument();
+    expect(within(actions).queryByRole('link', { name: 'Rychlá registrace' })).not.toBeInTheDocument();
+    expect(within(actions).getByRole('button', { name: 'Nová objednávka' })).toBeInTheDocument();
+  });
+
+  it('is not drawn on a phone (its top bar has them) nor in settings', () => {
+    const { unmount } = renderShell('/prehled', VIEWPORTS.phone);
+    expect(document.querySelector('[data-shell="actions"]')).not.toBeInTheDocument();
+    unmount();
+    renderShell('/svatky', VIEWPORTS.desktop);
+    expect(document.querySelector('[data-shell="actions"]')).not.toBeInTheDocument();
+  });
+});
+
+describe('settings: the rail stays, the settings list stands beside it', () => {
+  it('desktop: Nastavení is lit in the rail, the settings groups stand beside it, never a second main navigation', async () => {
     renderShell('/patients', VIEWPORTS.desktop);
-    expect(mainNavs()).toHaveLength(1);
+    expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '56px' });
     await userEvent.click(screen.getByRole('button', { name: 'jdi do nastavení' }));
     expect(path()).toBe('/svatky');
 
-    expect(mainNavs()).toHaveLength(0);
+    expect(mainNavs()).toHaveLength(1);
+    const rail = mainNavs()[0];
+    expect(within(rail).getByRole('link', { name: 'Nastavení' })).not.toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('button', { name: 'Nová objednávka' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Zpět do aplikace' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Hledat v nastavení' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Nastavení — oddíly' })).toBeInTheDocument();
-    expect(screen.getAllByRole('navigation')).toHaveLength(1);
+    expect(document.querySelector('[data-shell="settings-side"]')).toBeInTheDocument();
+    /* The rail and the settings groups: 56 + 258. */
+    expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '314px' });
     /* The settings screens draw their own breadcrumb; the shell's line is not repeated. */
     expect(screen.queryByLabelText('Kde jsem')).not.toBeInTheDocument();
     expect(screen.getByTestId('has-slot')).toHaveTextContent('false');
@@ -350,12 +284,13 @@ describe('settings replace the navigation', () => {
 
     await userEvent.click(screen.getByRole('link', { name: 'Zpět do aplikace' }));
     expect(path()).toBe('/patients');
-    expect(mainNavs()).toHaveLength(1);
+    expect(document.querySelector('[data-shell="settings-side"]')).not.toBeInTheDocument();
+    expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '56px' });
   });
 
   it('a /nastaveni/ address is settings too, even before the catalogue knows it', () => {
     renderShell('/nastaveni/neco-noveho', VIEWPORTS.desktop);
-    expect(mainNavs()).toHaveLength(0);
+    expect(document.querySelector('[data-shell="settings-side"]')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Zpět do aplikace' })).toHaveAttribute('href', '/prehled');
   });
 
@@ -370,98 +305,58 @@ describe('settings replace the navigation', () => {
     expect(path()).toBe('/settings');
   });
 
-  it('tablet: the rail offers "Zpět", and its overlay holds the settings sidebar', async () => {
+  it('tablet: the rail stays (no settings panel beside it) and its drawer holds the settings list', async () => {
     renderShell('/svatky', VIEWPORTS.tablet);
-    expect(mainNavs()).toHaveLength(0);
-    expect(screen.getByRole('link', { name: 'Zpět do aplikace' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Otevřít menu' }));
+    expect(document.querySelector('[data-shell="settings-side"]')).not.toBeInTheDocument();
+    expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '56px' });
+    await userEvent.click(screen.getByRole('button', { name: 'Všechny stránky' }));
     const overlay = await screen.findByRole('dialog', { name: 'Nastavení — menu' });
+    expect(within(overlay).getByRole('link', { name: 'Zpět do aplikace' })).toBeInTheDocument();
     expect(within(overlay).getByRole('textbox', { name: 'Hledat v nastavení' })).toBeInTheDocument();
     expect(within(overlay).queryByRole('link', { name: 'Pacienti' })).not.toBeInTheDocument();
   });
 });
 
-describe('tablet (834): the rail', () => {
-  it('has the rail only: icons with labels, no children, content offset by 72px', () => {
-    renderShell('/prehled', VIEWPORTS.tablet);
-    expect(document.querySelector('[data-shell="rail"]')).toBeInTheDocument();
-    expect(document.querySelector('[data-shell="sidebar"]')).not.toBeInTheDocument();
-    expect(document.querySelector('[data-shell="bottombar"]')).not.toBeInTheDocument();
-    expect(mainNavs()).toHaveLength(1);
-    expect(document.querySelector('[data-shell="rail"]')).toHaveStyle({ width: '72px' });
-    expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '72px' });
-    const rail = mainNavs()[0];
-    expect(within(rail).getByRole('link', { name: 'Kluby a týmy' })).toHaveTextContent('Kluby');
-    expect(within(rail).queryByRole('link', { name: 'Dnešní přehled' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Nová objednávka' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Hledat' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Oznámení' })).toBeInTheDocument();
-    expect(screen.getByTestId('has-slot')).toHaveTextContent('false');
-    expect(screen.queryByText('mini kalendář')).not.toBeInTheDocument();
-  });
-
-  it('inside a section the rail holds "Všechny sekce" and that section own screens', () => {
-    renderShell('/dnes', VIEWPORTS.tablet);
-    const rail = mainNavs()[0];
-    expect(within(rail).getByRole('link', { name: 'Všechny sekce' })).toHaveAttribute('href', '/prehled');
-    for (const name of ['Kalendář', 'Dnešní přehled', 'Přehled podle služeb', 'Dostupnost']) {
-      expect(within(rail).getByRole('link', { name })).toBeInTheDocument();
-    }
-    expect(within(rail).queryByRole('link', { name: 'Pacienti' })).not.toBeInTheDocument();
-    expect(within(rail).queryByRole('link', { name: 'Kluby a týmy' })).not.toBeInTheDocument();
-  });
-
-  it('opens the full sidebar as an overlay: still one navigation, children shown', async () => {
-    renderShell('/dnes', VIEWPORTS.tablet);
-    expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Otevřít menu' }));
-    const overlay = await screen.findByRole('dialog', { name: 'Menu' });
-    expect(within(overlay).getByRole('button', { name: 'Nová objednávka' })).toBeInTheDocument();
-    expect(within(overlay).getByRole('link', { name: 'Dnešní přehled' })).toBeInTheDocument();
-    expect(mainNavs()).toHaveLength(1);
-    /* The overlay does not push the content. */
-    expect(screen.getByRole('main', { hidden: true })).toHaveStyle({ marginLeft: '72px' });
-  });
-
-  it('closes on navigation', async () => {
-    renderShell('/dnes', VIEWPORTS.tablet);
-    await userEvent.click(screen.getByRole('button', { name: 'Otevřít menu' }));
-    const overlay = await screen.findByRole('dialog', { name: 'Menu' });
-    await userEvent.click(within(overlay).getByRole('link', { name: 'Dnešní přehled' }));
-    expect(path()).toBe('/dnes');
+describe('the drawer behind "Všechny stránky"', () => {
+  it('opens on a click, closes on navigation, on Esc and on a tap outside', async () => {
+    renderShell('/clubs', VIEWPORTS.tablet);
+    const button = screen.getByRole('button', { name: 'Všechny stránky' });
+    expect(button).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(button);
+    let drawer = await screen.findByRole('dialog', { name: 'Menu' });
+    await userEvent.click(within(drawer).getByRole('link', { name: 'Hráči' }));
+    expect(path()).toBe('/clubs/hraci');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument());
-  });
 
-  it('closes on Esc and on a tap outside it', async () => {
-    renderShell('/dnes', VIEWPORTS.tablet);
-    await userEvent.click(screen.getByRole('button', { name: 'Otevřít menu' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Všechny stránky' }));
     await screen.findByRole('dialog', { name: 'Menu' });
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument());
 
-    await userEvent.click(screen.getByRole('button', { name: 'Otevřít menu' }));
-    await screen.findByRole('dialog', { name: 'Menu' });
+    await userEvent.click(screen.getByRole('button', { name: 'Všechny stránky' }));
+    drawer = await screen.findByRole('dialog', { name: 'Menu' });
     fireEvent.click(document.querySelector('.MuiBackdrop-root') as Element);
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument());
-    expect(path()).toBe('/dnes');
   });
 
-  it('shows the patient file\'s sections in the overlay', async () => {
-    renderShell('/patients/p-1', VIEWPORTS.tablet);
-    await userEvent.click(screen.getByRole('button', { name: 'Otevřít menu' }));
-    const overlay = await screen.findByRole('dialog', { name: 'Menu' });
-    expect(within(overlay).getByRole('link', { name: 'Termíny' })).toHaveAttribute('href', '/patients/p-1/terminy');
+  it('carries the same icons as the rail on its entries', async () => {
+    renderShell('/prehled', VIEWPORTS.desktop);
+    await userEvent.click(screen.getByRole('button', { name: 'Všechny stránky' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Menu' });
+    for (const name of ['Kalendář', 'Pacienti', 'Kluby a týmy', 'Fakturace', 'Nastavení']) {
+      expect(within(drawer).getByRole('link', { name }).querySelector('svg')).not.toBeNull();
+    }
   });
 });
 
 describe('phone (390): the bottom bar', () => {
-  it('has the bottom bar and the top bar only: no sidebar, no rail, no content offset', () => {
+  it('has the bottom bar and the top bar only: no rail, no content offset', () => {
     renderShell('/planovani', VIEWPORTS.phone);
     expect(document.querySelector('[data-shell="bottombar"]')).toBeInTheDocument();
     expect(document.querySelector('[data-shell="topbar"]')).toBeInTheDocument();
-    expect(document.querySelector('[data-shell="sidebar"]')).not.toBeInTheDocument();
     expect(document.querySelector('[data-shell="rail"]')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Otevřít menu' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Všechny stránky' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('navigation')).toHaveLength(1);
     expect(mainNavs()).toHaveLength(1);
     expect(screen.getByRole('main')).toHaveStyle({ marginLeft: '0px' });
@@ -520,10 +415,11 @@ describe('phone (390): the bottom bar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Více' }));
     const sheet = await screen.findByRole('dialog', { name: 'Více' });
     expect(within(sheet).getByRole('button', { name: 'Nová objednávka' })).toBeInTheDocument();
-    for (const name of ['Přehled', 'Nastavení', 'Pokladna', 'Dnešní přehled', 'Nový pacient']) {
+    for (const name of ['Přehled', 'Nastavení', 'Pokladna', 'Dnešní přehled']) {
       expect(within(sheet).getByRole('link', { name })).toBeInTheDocument();
     }
     expect(within(sheet).queryByRole('link', { name: 'Výsledky' })).not.toBeInTheDocument();
+    expect(within(sheet).queryByRole('link', { name: 'Nový pacient' })).not.toBeInTheDocument();
     expect(within(sheet).getByRole('button', { name: 'Odhlásit se' })).toBeInTheDocument();
     expect(within(sheet).getByRole('button', { name: 'Tmavý režim' })).toBeInTheDocument();
     /* The sheet is not a second navigation landmark. */

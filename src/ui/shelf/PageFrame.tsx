@@ -8,8 +8,9 @@
  *
  * The header says what the page is (one h1), what it is for (one line), where it sits (an optional breadcrumb - the shell
  * already draws one on tablet and desktop, so use it only where the shell does not), what to do first (the primary action)
- * and what it is connected to (entity chips, each opening the thing with a peek). On tablet and desktop it carries the
- * search button that opens the command palette (Ctrl/Cmd+K); a phone has that button in its top bar. On a phone the
+ * and what it is connected to (entity chips, each opening the thing with a peek). The search button of the
+ * command palette (Ctrl/Cmd+K) is the shell's: the top action bar on a tablet and desktop, the top bar on a phone (R19), so
+ * a page draws it only when it asks for it (`search`). On a phone the
  * primary action is pinned at the bottom (PinnedActionBar), above the shell's navigation.
  *
  * The frame does not scroll the document and does not fit the window: the shell's #fit-region is the one scroller, so a page
@@ -49,7 +50,7 @@ export interface PageFrameProps {
   leading?: ReactNode;
   /** Something right after the title, small: a pin. */
   titleAddon?: ReactNode;
-  /** Hide the palette button (a page that is itself a search). */
+  /** Draw a palette button in the header too (off by default: the shell's action bar / top bar already has one). */
   search?: boolean;
   /** Fit the window (tablet and desktop): the body takes the height left under the header, so a `grow` shelf can scroll inside. */
   fit?: boolean;
@@ -93,7 +94,7 @@ function PrimaryButton({ action }: { action: NonNullable<PageFrameProps['primary
     : <Button onClick={action.onClick} {...common}>{action.label}</Button>;
 }
 
-export function PageFrame({ title, purpose, breadcrumb, primaryAction, actions, entities, badges, leading, titleAddon, search = true, fit = false, children }: PageFrameProps) {
+export function PageFrame({ title, purpose, breadcrumb, primaryAction, actions, entities, badges, leading, titleAddon, search = false, fit = false, children }: PageFrameProps) {
   const hasChips = badges !== undefined || (entities !== undefined && entities.length > 0);
   const device = useDevice();
   const phone = device === 'phone';

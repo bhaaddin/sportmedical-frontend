@@ -1,32 +1,25 @@
 /*
- * The full sidebar (desktop ≥1280, and the tablet's overlay when it is opened).
+ * The Menu drawer (R19: there is no sidebar any more) and the settings' own group list.
  *
- * Taken from the board's artboards (Main.dc.html, P-Pacient.dc.html): 258px,
- * white, a hairline on its right, padding 22/20; the brand as text, a 44px
- * button "Nová objednávka", the six entries as 44px rows (the open one on the
- * soft accent with accent text at 600), and what hangs under the OPEN entry
- * indented beneath it - nothing is shown for the others. Between the
- * navigation and the account row sits the slot a page can portal into (the
- * calendar's mini calendar and service legend, see SidebarSlot.tsx).
+ * `NavDrawer` is the slide-over every width can open: the tablet's and desktop's "Všechny stránky" icon at the foot of the
+ * rail (IconRail.tsx) and the planner routes' "Menu" button. It holds the FULL list of pages - the brand (home), the
+ * entries with the same icons as the rail, and inside an area that area's own screens - plus the account row. It starts no
+ * action: "Nový pacient", "Nová objednávka" and "Hledat" are in the top action bar (ActionBar.tsx).
  *
- * On a settings route the whole content is replaced - never two sidebars:
- * "← Zpět do aplikace", the brand, the settings search and its groups.
+ * On a settings route the drawer's content is the settings one ("<- Zpět do aplikace", the title, the search and the
+ * groups) and `SettingsSide` shows that same list as a fixed panel beside the rail on desktop - never two lists at once.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Avatar, Box, Button, ButtonBase, Drawer, IconButton } from '@mui/material';
+import { Avatar, Box, ButtonBase, Drawer, IconButton } from '@mui/material';
 import { alpha, type Theme } from '@mui/material/styles';
 import { ArrowBack, Search } from '@mui/icons-material';
 import NotificationCenter from '../NotificationCenter';
 import { openUniversalSearch } from '../UniversalSearch';
 import { SettingsNav } from '../../pages/settings/SettingsFrame';
-import { NewOrderChooser } from '../booking/NewOrderChooser';
-import { SidebarSlot } from './SidebarSlot';
-import { PlannerMenu } from './PlannerMenu';
-import { isPlannerRoute } from './plannerRoutes';
 import { STAFF_HOME_PATH } from '../../web/sitePaths';
 import { childIsActive, entryState, mainEntries, sectionGroups, sectionOf } from './shellModel';
-import { SIDEBAR_WIDTH, activeBg, activeGlow, focusRing, sideGlass } from './shellStyles';
+import { RAIL_WIDTH, SIDEBAR_WIDTH, activeBg, activeGlow, focusRing, sideGlass } from './shellStyles';
 import type { MenuEntry, ShellNav } from './shellTypes';
 
 /** The row every entry shares: 44px, 14px, the open one soft with accent text. */
@@ -74,20 +67,6 @@ export function Brand({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-/** "Nová objednávka": opens the chooser (the shell variant owns its state). */
-export function NewAppointmentButton({ onNewOrder, onNavigate }: { onNewOrder: () => void; onNavigate?: () => void }) {
-  return (
-    <Button
-      variant="contained"
-      fullWidth
-      onClick={() => { onNavigate?.(); onNewOrder(); }}
-      sx={{ height: 44, minHeight: 44, flexShrink: 0, fontSize: 14 }}
-    >
-      Nová objednávka
-    </Button>
-  );
-}
-
 /** The six entries, and under the open one what belongs to it. */
 export function MainNav({ nav, onNavigate }: { nav: ShellNav; onNavigate?: () => void }) {
   return (
@@ -101,8 +80,9 @@ export function MainNav({ nav, onNavigate }: { nav: ShellNav; onNavigate?: () =>
               to={entry.path}
               onClick={onNavigate}
               aria-current={state.self ? 'page' : undefined}
-              sx={rowSx(state.self, state.childActive)}
+              sx={[rowSx(state.self, state.childActive), { gap: '12px', '& svg': { fontSize: 20, flexShrink: 0 } }]}
             >
+              {entry.icon}
               {entry.text}
             </Box>
             {state.inSection && state.items.length > 0 && (
@@ -129,8 +109,9 @@ export function MainNav({ nav, onNavigate }: { nav: ShellNav; onNavigate?: () =>
                       state={child.state}
                       onClick={onNavigate}
                       aria-current={active ? 'page' : undefined}
-                      sx={rowSx(active, false, true)}
+                      sx={[rowSx(active, false, true), { gap: '10px', '& svg': { fontSize: 18, flexShrink: 0 } }]}
                     >
+                      {child.icon}
                       {child.text}
                     </Box>
                   );
@@ -196,8 +177,9 @@ export function SectionNav({ nav, entry, onNavigate }: { nav: ShellNav; entry: M
                 state={child.state}
                 onClick={onNavigate}
                 aria-current={active ? 'page' : undefined}
-                sx={rowSx(active)}
+                sx={[rowSx(active), { gap: '12px', '& svg': { fontSize: 20, flexShrink: 0 } }]}
               >
+                {child.icon}
                 {child.text}
               </Box>
             );
@@ -329,21 +311,17 @@ export function AccountRow({ nav }: { nav: ShellNav }) {
 }
 
 /**
- * The sidebar's content for one width. `onNavigate` runs on every link, so an
- * overlay can close itself even when the click does not change the address.
+ * The drawer's content. `onNavigate` runs on every link, so the drawer can close itself even when the click does not change
+ * the address. `account` is false for the settings panel beside the rail (the rail already carries the account).
  */
 export function SidebarBody({
   nav,
   onNavigate,
-  onNewOrder,
-  withSlot,
+  account = true,
 }: {
   nav: ShellNav;
   onNavigate?: () => void;
-  /** Opens the "Nová objednávka" chooser. */
-  onNewOrder: () => void;
-  /** Draw the page's slot (desktop only; tablet and phone pages show that content themselves). */
-  withSlot: boolean;
+  account?: boolean;
 }) {
   if (nav.settingsMode) {
     return (
@@ -376,7 +354,7 @@ export function SidebarBody({
         <SidebarScrollArea>
           <SettingsNav plain query={nav.settingsQuery} onQueryChange={nav.onSettingsQueryChange} />
         </SidebarScrollArea>
-        <AccountRow nav={nav} />
+        {account && <AccountRow nav={nav} />}
       </>
     );
   }
@@ -394,34 +372,26 @@ export function SidebarBody({
       ) : (
         <Brand onNavigate={onNavigate} />
       )}
-      <Box sx={{ mt: '22px', flexShrink: 0 }}>
-        <NewAppointmentButton onNewOrder={onNewOrder} onNavigate={onNavigate} />
-      </Box>
       <SidebarScrollArea>
         {section ? <SectionNav nav={nav} entry={section} onNavigate={onNavigate} /> : <MainNav nav={nav} onNavigate={onNavigate} />}
-        {withSlot && <SidebarSlot />}
       </SidebarScrollArea>
-      <AccountRow nav={nav} />
+      {account && <AccountRow nav={nav} />}
     </>
   );
 }
 
-/** The desktop sidebar: fixed to the left edge, 258px, full height. */
-export function DesktopSidebar({ nav }: { nav: ShellNav }) {
-  const [chooser, setChooser] = useState(false);
-  /* The planner's stage is the whole screen: no sidebar, a Menu button in the top row instead. */
-  if (isPlannerRoute(nav.pathname)) return <PlannerMenu nav={nav} />;
+/** The settings' own group list as a fixed panel beside the rail (desktop and tablet): a list of setting groups, not a navigation. */
+export function SettingsSide({ nav }: { nav: ShellNav }) {
   return (
-    <>
     <Box
       component="aside"
-      aria-label={nav.settingsMode ? 'Nastavení' : 'Postranní panel'}
-      data-shell="sidebar"
+      aria-label="Nastavení"
+      data-shell="settings-side"
       sx={[{
         position: 'fixed',
         top: 0,
         bottom: 0,
-        left: 0,
+        left: RAIL_WIDTH,
         width: SIDEBAR_WIDTH,
         boxSizing: 'border-box',
         bgcolor: 'background.paper',
@@ -432,31 +402,27 @@ export function DesktopSidebar({ nav }: { nav: ShellNav }) {
         pb: '14px',
         display: 'flex',
         flexDirection: 'column',
-        zIndex: (t) => t.zIndex.drawer,
+        zIndex: (t) => t.zIndex.drawer - 1,
       }, sideGlass]}
     >
-      <SidebarBody nav={nav} withSlot onNewOrder={() => setChooser(true)} />
+      <SidebarBody nav={nav} account={false} />
     </Box>
-    <NewOrderChooser open={chooser} onClose={() => setChooser(false)} />
-    </>
   );
 }
 
 /**
- * The full navigation as a slide-over (scrim, Esc and a tap outside close it, focus returns to whatever opened it):
- * the tablet's menu button and the planner routes' "Menu" button both open this. The drawer's own surface is the
- * theme's `MuiDrawer` glass, the same tokens as the sidebar.
+ * The full list of pages as a slide-over (scrim, Esc and a tap outside close it, focus returns to whatever opened it):
+ * the rail's "Všechny stránky" button and the planner routes' "Menu" button both open this. The drawer's own surface is the
+ * theme's `MuiDrawer` glass.
  */
 export function NavDrawer({
   nav,
   open,
   onClose,
-  onNewOrder,
 }: {
   nav: ShellNav;
   open: boolean;
   onClose: () => void;
-  onNewOrder: () => void;
 }) {
   return (
     <Drawer
@@ -482,7 +448,7 @@ export function NavDrawer({
         },
       }}
     >
-      <SidebarBody nav={nav} onNavigate={onClose} withSlot={false} onNewOrder={onNewOrder} />
+      <SidebarBody nav={nav} onNavigate={onClose} />
     </Drawer>
   );
 }

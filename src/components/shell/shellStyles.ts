@@ -1,10 +1,10 @@
 import { alpha, type Theme } from '@mui/material/styles';
 import { DARK, DESIGN, darkOf, tintsOf } from '../../theme';
 
-/** The full sidebar's width, from the board (Main.dc.html: flex 0 0 258px). */
+/** The width of the Menu drawer and of the settings groups' panel (the former sidebar: Main.dc.html flex 0 0 258px). */
 export const SIDEBAR_WIDTH = 258;
-/** The tablet rail's resting width. */
-export const RAIL_WIDTH = 72;
+/** The slim icon rail's width (desktop and tablet; R19). */
+export const RAIL_WIDTH = 56;
 /** The phone's top bar and the bottom bar's content height. */
 export const BAR_HEIGHT = 56;
 

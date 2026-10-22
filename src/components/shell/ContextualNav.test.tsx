@@ -1,7 +1,8 @@
 /*
- * D10: the sidebar reacts to where you are, the settings groups fold, and every
- * "Nová objednávka" opens the chooser. Rendered through the real Layout at the
- * three widths (390 / 834 / 1440), like Shell.test.tsx.
+ * D10, as of Stage 4 (R19): the icon rail has no children, so "where you are" shows in the Menu drawer ("Všechny stránky"
+ * on desktop and tablet, "Více" on a phone): inside an area the drawer is that area's own screens. The settings groups
+ * still fold, and "Nová objednávka" lives in the top action bar. Rendered through the real Layout at the three widths
+ * (390 / 834 / 1440), like Shell.test.tsx.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
@@ -55,74 +56,71 @@ function renderShell(path: string, width: number) {
 }
 
 const path = () => screen.getByTestId('path').textContent;
-const mainNav = () =>
-  screen.getAllByRole('navigation').filter((n) => /^(Hlavní navigace|Sekce )/.test(n.getAttribute('aria-label') ?? ''))[0];
+/** The drawer behind "Všechny stránky" (desktop and tablet). */
+async function openDrawer() {
+  await userEvent.click(screen.getByRole('button', { name: 'Všechny stránky' }));
+  return screen.findByRole('dialog', { name: 'Menu' });
+}
 
 beforeEach(() => {
   localStorage.clear();
 });
 
-describe('contextual sidebar (1440)', () => {
-  it('shows only the children of the entry you are in', () => {
+describe('contextual drawer (1440)', () => {
+  it('shows only the children of the entry you are in', async () => {
     renderShell('/clubs/hraci', VIEWPORTS.desktop);
-    const nav = mainNav();
+    const drawer = await openDrawer();
     for (const name of ['Přehled klubů', 'Objednávky klubů', 'Hráči', 'Statistiky', 'Fakturace']) {
-      expect(within(nav).getAllByRole('link', { name }).length).toBeGreaterThan(0);
+      expect(within(drawer).getAllByRole('link', { name }).length).toBeGreaterThan(0);
     }
-    expect(within(nav).queryByRole('link', { name: 'Dnešní přehled' })).not.toBeInTheDocument();
-    expect(within(nav).queryByRole('link', { name: 'Nový pacient' })).not.toBeInTheDocument();
-    expect(within(nav).getByRole('link', { name: 'Hráči' })).toHaveAttribute('aria-current', 'page');
-    expect(within(nav).getByRole('link', { name: 'Přehled klubů' })).not.toHaveAttribute('aria-current');
+    expect(within(drawer).queryByRole('link', { name: 'Dnešní přehled' })).not.toBeInTheDocument();
+    expect(within(drawer).queryByRole('link', { name: 'Nový pacient' })).not.toBeInTheDocument();
+    expect(within(drawer).getByRole('link', { name: 'Hráči' })).toHaveAttribute('aria-current', 'page');
+    expect(within(drawer).getByRole('link', { name: 'Přehled klubů' })).not.toHaveAttribute('aria-current');
   });
 
-  it('the club screen is a planner route: no sidebar - the Menu drawer lights the club overview', async () => {
+  it('the club screen is a planner route: no rail - the Menu drawer lights the club overview', async () => {
     renderShell('/clubs/some-club-id', VIEWPORTS.desktop);
-    expect(document.querySelector('[data-shell="sidebar"]')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-shell="rail"]')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Menu' }));
     const drawer = await screen.findByRole('dialog', { name: 'Menu' });
     expect(within(drawer).getByRole('link', { name: 'Přehled klubů' })).toHaveAttribute('aria-current', 'page');
   });
 
-  it('Pacienti: overview, new patient, registration check', () => {
+  it('Pacienti: the overview and the registration check - no entry that starts a registration', async () => {
     renderShell('/patients', VIEWPORTS.desktop);
-    const nav = mainNav();
-    expect(within(nav).getByRole('link', { name: 'Přehled pacientů' })).toHaveAttribute('aria-current', 'page');
-    expect(within(nav).getByRole('link', { name: 'Nový pacient' })).toHaveAttribute('href', '/patients/register');
-    expect(within(nav).getByRole('link', { name: 'Kontrola registrací' })).toHaveAttribute('href', '/intake-review');
-    expect(within(nav).getByRole('link', { name: 'Rychlá registrace' })).toHaveAttribute('href', '/patients/register?mode=quick');
-    expect(within(nav).queryByRole('link', { name: 'Objednávky klubů' })).not.toBeInTheDocument();
+    const drawer = await openDrawer();
+    expect(within(drawer).getByRole('link', { name: 'Přehled pacientů' })).toHaveAttribute('aria-current', 'page');
+    expect(within(drawer).getByRole('link', { name: 'Kontrola registrací' })).toHaveAttribute('href', '/intake-review');
+    for (const action of ['Nový pacient', 'Rychlá registrace']) expect(within(drawer).queryByRole('link', { name: action })).not.toBeInTheDocument();
+    expect(within(drawer).queryByRole('link', { name: 'Objednávky klubů' })).not.toBeInTheDocument();
   });
 
-  it('Kalendář: the club-order shortcut opens the calendar with a marker and is never current', async () => {
+  it('Kalendář: its screens are in the drawer, the club order is not (the calendar owns it)', async () => {
     renderShell('/dnes', VIEWPORTS.desktop);
-    expect(within(mainNav()).getByRole('link', { name: 'Dnešní přehled' })).toHaveAttribute('aria-current', 'page');
-    const shortcut = within(mainNav()).getByRole('link', { name: 'Klubová objednávka' });
-    expect(shortcut).not.toHaveAttribute('aria-current');
-    await userEvent.click(shortcut);
-    expect(path()).toBe('/planovani');
-    expect(JSON.parse(screen.getByTestId('state').textContent ?? 'null')).toEqual({ openClubOrder: true });
-    /* The calendar is the planner: the stage is the whole screen, so no sidebar is drawn there any more. */
-    expect(document.querySelector('[data-shell="sidebar"]')).not.toBeInTheDocument();
+    const drawer = await openDrawer();
+    expect(within(drawer).getByRole('link', { name: 'Dnešní přehled' })).toHaveAttribute('aria-current', 'page');
+    expect(within(drawer).queryByRole('link', { name: 'Klubová objednávka' })).not.toBeInTheDocument();
   });
 
-  it('draws no children of other areas on a plain page', () => {
+  it('draws no children of other areas on a plain page', async () => {
     renderShell('/billing', VIEWPORTS.desktop);
     expect(screen.queryByRole('link', { name: 'Hráči' })).not.toBeInTheDocument();
+    const drawer = await openDrawer();
+    expect(within(drawer).queryByRole('link', { name: 'Hráči' })).not.toBeInTheDocument();
   });
 });
 
 describe('contextual navigation (834 / 390)', () => {
-  it('tablet: rail button and overlay open the chooser; the overlay shows the active entry children', async () => {
+  it('tablet: the action bar opens the chooser; the drawer shows the active entry children', async () => {
     renderShell('/clubs', VIEWPORTS.tablet);
     await userEvent.click(screen.getByRole('button', { name: 'Nová objednávka' }));
     expect(screen.getByTestId('order-chooser')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'zavřít výběr' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Otevřít menu' }));
-    const overlay = await screen.findByRole('dialog', { name: 'Menu' });
+    const overlay = await openDrawer();
     expect(within(overlay).getByRole('link', { name: 'Objednávky klubů' })).toHaveAttribute('href', '/clubs/objednavky');
     expect(within(overlay).queryByRole('link', { name: 'Dnešní přehled' })).not.toBeInTheDocument();
-    await userEvent.click(within(overlay).getByRole('button', { name: 'Nová objednávka' }));
-    expect(screen.getByTestId('order-chooser')).toBeInTheDocument();
+    expect(within(overlay).queryByRole('button', { name: 'Nová objednávka' })).not.toBeInTheDocument();
   });
 
   it('phone: Kluby leads to /clubs and its children are in the Více sheet', async () => {
@@ -188,21 +186,21 @@ describe('settings sidebar groups', () => {
 });
 
 /*
- * Choosing a section replaces the WHOLE navigation with that section's own
- * items - at every width - with a way back to all sections and the title.
+ * Inside an area the drawer is that area's own items - at every width - with a way back to all sections and the title.
+ * (The icon rail itself never has children.)
  */
 const SECTIONS: Array<{ path: string; title: string; items: Array<[string, string]>; foreign: string[] }> = [
   {
     path: '/dnes',
     title: 'Kalendář',
-    items: [['Kalendář', '/planovani'], ['Dnešní přehled', '/dnes'], ['Přehled podle služeb', '/prehled-sluzeb'], ['Dostupnost', '/availability'], ['Klubová objednávka', '/planovani']],
-    foreign: ['Nový pacient', 'Objednávky klubů', 'Pokladna'],
+    items: [['Kalendář', '/planovani'], ['Dnešní přehled', '/dnes'], ['Přehled podle služeb', '/prehled-sluzeb'], ['Dostupnost', '/availability']],
+    foreign: ['Nový pacient', 'Klubová objednávka', 'Objednávky klubů', 'Pokladna'],
   },
   {
     path: '/patients',
     title: 'Pacienti',
-    items: [['Přehled pacientů', '/patients'], ['Nový pacient', '/patients/register'], ['Kontrola registrací', '/intake-review']],
-    foreign: ['Dnešní přehled', 'Objednávky klubů', 'Pokladna'],
+    items: [['Přehled pacientů', '/patients'], ['Kontrola registrací', '/intake-review']],
+    foreign: ['Nový pacient', 'Rychlá registrace', 'Dnešní přehled', 'Objednávky klubů', 'Pokladna'],
   },
   {
     path: '/clubs',
@@ -218,31 +216,21 @@ const SECTIONS: Array<{ path: string; title: string; items: Array<[string, strin
   },
 ];
 
-describe.each(SECTIONS)('section $title replaces the whole navigation', ({ path: start, title, items, foreign }) => {
-  it('desktop (1440): title, way back, own items, nothing of the others', () => {
-    renderShell(start, VIEWPORTS.desktop);
-    expect(screen.getByTestId('section-title')).toHaveTextContent(title);
-    expect(screen.getByRole('link', { name: 'Všechny sekce' })).toHaveAttribute('href', '/prehled');
-    const nav = mainNav();
-    for (const [name, href] of items) expect(within(nav).getByRole('link', { name })).toHaveAttribute('href', href);
-    for (const name of foreign) expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
+describe.each(SECTIONS)('area $title: the drawer is only this area', ({ path: start, title, items, foreign }) => {
+  it.each([['desktop (1440)', VIEWPORTS.desktop], ['tablet (834)', VIEWPORTS.tablet]] as const)('%s: title, way back, own items, nothing of the others', async (_n, width) => {
+    renderShell(start, width);
+    /* The rail itself has no children: only icons. */
+    const rail = document.querySelector('[data-shell="rail"]') as HTMLElement;
+    const iconNames = ['Kalendář', 'Pacienti', 'Kluby', 'Fakturace', 'Nastavení'];
+    for (const [name] of items) if (!iconNames.includes(name)) expect(within(rail).queryByRole('link', { name })).not.toBeInTheDocument();
+    const drawer = await openDrawer();
+    expect(within(drawer).getByRole('heading', { name: title })).toBeInTheDocument();
+    expect(within(drawer).getByRole('link', { name: 'Všechny sekce' })).toHaveAttribute('href', '/prehled');
+    for (const [name, href] of items) expect(within(drawer).getByRole('link', { name })).toHaveAttribute('href', href);
+    for (const name of foreign) expect(within(drawer).queryByRole('link', { name })).not.toBeInTheDocument();
     for (const other of ['Nastavení', 'Pacienti', 'Kluby a týmy']) {
-      if (other !== title) expect(screen.queryByRole('link', { name: other })).not.toBeInTheDocument();
+      if (other !== title) expect(within(drawer).queryByRole('link', { name: other })).not.toBeInTheDocument();
     }
-  });
-
-  it('tablet (834): the rail and the overlay both hold only this section', async () => {
-    renderShell(start, VIEWPORTS.tablet);
-    const rail = mainNav();
-    expect(within(rail).getByRole('link', { name: 'Všechny sekce' })).toHaveAttribute('href', '/prehled');
-    for (const [name, href] of items) expect(within(rail).getByRole('link', { name })).toHaveAttribute('href', href);
-    for (const name of foreign) expect(within(rail).queryByRole('link', { name })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Otevřít menu' }));
-    const overlay = await screen.findByRole('dialog', { name: 'Menu' });
-    expect(within(overlay).getByRole('heading', { name: title })).toBeInTheDocument();
-    expect(within(overlay).getByRole('link', { name: 'Všechny sekce' })).toHaveAttribute('href', '/prehled');
-    for (const [name, href] of items) expect(within(overlay).getByRole('link', { name })).toHaveAttribute('href', href);
-    for (const name of foreign) expect(within(overlay).queryByRole('link', { name })).not.toBeInTheDocument();
   });
 
   it('phone (390): the Více sheet holds the way back, the title and only this section', async () => {
@@ -256,23 +244,26 @@ describe.each(SECTIONS)('section $title replaces the whole navigation', ({ path:
   });
 });
 
-describe('Přehled is the home: every section is one tap away, none is open', () => {
-  it.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet]] as const)('%s', (_name, width) => {
+describe('Přehled is the home: the icons lead to every area, none is open', () => {
+  it.each([['desktop', VIEWPORTS.desktop], ['tablet', VIEWPORTS.tablet]] as const)('%s', async (_name, width) => {
     renderShell('/prehled', width);
-    const nav = mainNav();
-    for (const name of ['Kalendář', 'Pacienti', 'Kluby a týmy', 'Fakturace', 'Nastavení']) {
-      expect(within(nav).getByRole('link', { name })).toBeInTheDocument();
+    const rail = screen.getByRole('navigation', { name: 'Hlavní navigace' });
+    for (const name of ['Kalendář', 'Pacienti', 'Kluby', 'Fakturace', 'Nastavení']) {
+      expect(within(rail).getByRole('link', { name })).toBeInTheDocument();
     }
-    expect(screen.queryByRole('link', { name: 'Všechny sekce' })).not.toBeInTheDocument();
+    /* Přehled is the logo, and on Přehled it is not a link. */
+    expect(within(rail).queryByRole('link', { name: 'SportMedical — přehled' })).not.toBeInTheDocument();
+    const drawer = await openDrawer();
+    expect(within(drawer).queryByRole('link', { name: 'Všechny sekce' })).not.toBeInTheDocument();
   });
 
-  it('desktop: every entry leads to its section and the sidebar changes', async () => {
+  it('desktop: an icon leads to its area, and "Všechny sekce" in the drawer leads home', async () => {
     renderShell('/prehled', VIEWPORTS.desktop);
-    await userEvent.click(within(mainNav()).getByRole('link', { name: 'Kluby a týmy' }));
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'Hlavní navigace' })).getByRole('link', { name: 'Kluby' }));
     expect(path()).toBe('/clubs');
-    expect(screen.getByTestId('section-title')).toHaveTextContent('Kluby a týmy');
-    await userEvent.click(screen.getByRole('link', { name: 'Všechny sekce' }));
+    const drawer = await openDrawer();
+    expect(within(drawer).getByTestId('section-title')).toHaveTextContent('Kluby a týmy');
+    await userEvent.click(within(drawer).getByRole('link', { name: 'Všechny sekce' }));
     expect(path()).toBe('/prehled');
-    expect(screen.queryByTestId('section-title')).not.toBeInTheDocument();
   });
 });

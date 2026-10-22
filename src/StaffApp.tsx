@@ -18,8 +18,7 @@ import { settingsItemAt } from './pages/settings/catalogue';
 import { useState, useMemo, lazy, Suspense, useRef, useEffect } from 'react';
 import { SettingsSearchContext } from './components/shell/settingsSearch';
 import { SidebarSlotProvider } from './components/shell/SidebarSlot';
-import { DesktopSidebar } from './components/shell/Sidebar';
-import { TabletRail } from './components/shell/TabletRail';
+import { IconRail } from './components/shell/IconRail';
 import { PhoneBottomBar, PhoneTopBar, PHONE_BOTTOM_BAR, PHONE_TOP_BAR } from './components/shell/PhoneShell';
 import { AccountMenu } from './components/shell/AccountMenu';
 import { WhereAmI, computeCrumbs, useDocumentTitle } from './components/shell/whereAmI';
@@ -218,12 +217,11 @@ function readUser(): { firstName?: string; lastName?: string; role?: string } {
 /*
  * The shell: one of three navigations, chosen by width, never two at once.
  *
- *   ≥1280  a fixed 258px sidebar with text            (components/shell/Sidebar)
- *   768+   a 72px rail that opens as an overlay        (components/shell/TabletRail)
- *   ≤767   a bottom bar, a top bar and a "Více" sheet  (components/shell/PhoneShell)
+ *   ≥768   a slim 56px ICON rail (R19) and, in the where-am-I row, the action bar   (components/shell/IconRail, ActionBar);
+ *          "Všechny stránky" opens the full list as a drawer                         (components/shell/Sidebar: NavDrawer)
+ *   ≤767   a bottom bar, a top bar and a "Více" sheet                                (components/shell/PhoneShell)
  *
- * On a settings route the navigation's content is replaced by the settings
- * one; the main entries are not drawn at all there.
+ * On a settings route the rail stays (Nastavení lit) and the settings' own group list stands beside it on desktop.
  */
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -310,18 +308,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const settingsNeedsFrame = settingsHere !== null && SETTINGS_UNFRAMED.has(settingsHere.item.to);
 
   /* The area's offset is a pixel STRING: sx `ml` with a number is spacing × 8. */
-  const marginLeft = device === 'desktop' ? `${SIDEBAR_WIDTH}px` : device === 'tablet' ? `${RAIL_WIDTH}px` : '0px';
+  const marginLeft = device === 'phone' ? '0px' : `${RAIL_WIDTH + (settingsMode && device === 'desktop' ? SIDEBAR_WIDTH : 0)}px`;
 
   return (
     <SettingsSearchContext.Provider value={settingsSearch}>
-      <SidebarSlotProvider available={device === 'desktop' && !settingsMode}>
+      <SidebarSlotProvider available={false}>
         <Box sx={fit ? { height: '100dvh', overflow: 'hidden' } : { minHeight: '100vh' }}>
           <a href="#main-content" className="skip-link">
             Přeskočit na hlavní obsah
           </a>
 
-          {device === 'desktop' && <DesktopSidebar nav={nav} />}
-          {device === 'tablet' && <TabletRail nav={nav} />}
+          {device !== 'phone' && <IconRail nav={nav} />}
           {device === 'phone' && (
             <>
               <PhoneTopBar nav={nav} crumbs={settingsMode ? [{ label: 'Nastavení' }] : crumbs} />
