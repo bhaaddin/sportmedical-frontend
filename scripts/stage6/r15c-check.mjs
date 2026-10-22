@@ -209,7 +209,7 @@ for (const size of sizes) {
         ok(/30 s|29 s/.test(await page.textContent('[data-testid=board-undo-left]')), 'desktop: a move arms a 30 s undo');
         const moved = (await api(page, 'GET', `/api/calendars/${calendar.id}/appointments/${madeId}`)).json;
         ok((moved.data ?? moved).startUtc !== startBefore, 'desktop: the booking really moved');
-        await shot(page, 'r15c-undo-bar-desktop');
+
         await page.click('[data-testid=board-undo-run]');
         await page.waitForSelector('[data-testid=board-undo]', { state: 'detached', timeout: 15000 });
         const back = (await api(page, 'GET', `/api/calendars/${calendar.id}/appointments/${madeId}`)).json;
