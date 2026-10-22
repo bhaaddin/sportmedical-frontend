@@ -13,6 +13,7 @@ import { PageHeader, SoftCard } from '../../components/ui';
 import { FitBody, FitPage } from '../../components/ui/fit';
 import { pragueDateKey } from '../../utils/time';
 import { buildStatisticsCsv, downloadCsv, statisticsCsvFileName } from '../statistics/csv';
+import { ExportGate } from '../../components/ui/ExportGate';
 import { LoadError, RangeFilter } from './subpages/common';
 import { rangeFor, type DateRange, type RangeKey } from './subpages/range';
 
@@ -58,7 +59,7 @@ export default function ClubStatsPage() {
       ],
       period,
     );
-    downloadCsv(statisticsCsvFileName('kluby', period), csv);
+    void downloadCsv(statisticsCsvFileName('kluby', period), csv, 'club-statistics-csv');
   };
 
   return (
@@ -70,7 +71,7 @@ export default function ClubStatsPage() {
           <>
             {/* The period sits in the header on a tablet and a desktop (one row of height saved), in its own card on a phone. */}
             {!phone && <RangeFilter value={rangeKey} custom={custom} onChange={setRangeKey} onCustom={setCustom} />}
-            <Button variant="outlined" disabled={!stats || isEmptyStats(stats)} onClick={exportCsv}>Export CSV</Button>
+            <ExportGate>{(blocked) => <Button variant="outlined" disabled={blocked || !stats || isEmptyStats(stats)} onClick={exportCsv}>Export CSV</Button>}</ExportGate>
           </>
         )}
         mb={2}

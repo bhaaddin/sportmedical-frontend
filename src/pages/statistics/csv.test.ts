@@ -1,4 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
+const { authorize } = vi.hoisted(() => ({ authorize: vi.fn() }));
+vi.mock('../../api/exports', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../api/exports')>();
+  return { ...actual, exportsApi: { policy: vi.fn(), authorize } };
+});
 import { buildStatisticsCsv, downloadCsv, statisticsCsvFileName } from './csv';
 
 const period = { from: '2026-10-01', to: '2026-10-31' };
@@ -55,14 +60,19 @@ describe('statisticsCsvFileName', () => {
 });
 
 describe('downloadCsv', () => {
-  it('hands a UTF-8 Blob to a one-off link and frees it again', async () => {
+  it('goes through the one download helper: asks first, hands a UTF-8 Blob to a one-off link and frees it again', async () => {
     const createObjectURL = vi.fn((_b: Blob) => 'blob:x');
     const revokeObjectURL = vi.fn();
     Object.assign(URL, { createObjectURL, revokeObjectURL });
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    downloadCsv('a.csv', '﻿x;y\r\n');
+    authorize.mockResolvedValue(undefined);
+
+    expect(await downloadCsv('a.csv', 'x;y\r\n1;2\r\n')).toBe(true);
+
+    expect(authorize).toHaveBeenCalledWith('statistics-csv', 1);
     expect(createObjectURL.mock.calls[0][0].type).toBe('text/csv;charset=utf-8');
     expect(click).toHaveBeenCalledTimes(1);
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:x');
     click.mockRestore();
   });

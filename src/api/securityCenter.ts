@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { AxiosError } from 'axios';
 import client from './client';
 import { parseResponse } from './bookingContracts';
+import { ExportForbiddenError, isExportForbidden } from '../utils/download';
 
 /* ══════════════════════════════════════════════════════════════
    Zabezpečení a zálohy (Nastavení -> Systém).
@@ -322,6 +323,16 @@ async function guarded<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
+/** Like `guarded`, but a refused download (403 `export.forbidden`, its body is a Blob) stays recognisable as such. */
+async function guardedDownload<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (await isExportForbidden(error)) throw new ExportForbiddenError();
+    throw toSecurityCenterError(error);
+  }
+}
+
 export interface DownloadedFile {
   blob: Blob;
   fileName: string;
@@ -370,13 +381,13 @@ export const securityCenterApi = {
 
   /** The file name is made here: a cross-origin browser does not see Content-Disposition. */
   configExport: (): Promise<DownloadedFile> =>
-    guarded(async () => {
+    guardedDownload(async () => {
       const res = await client.get('/api/system/security/config-export', { responseType: 'blob' });
       return { blob: res.data as Blob, fileName: `sportmedical-konfigurace-${stamp()}.json` };
     }),
 
   recoveryKit: (): Promise<DownloadedFile> =>
-    guarded(async () => {
+    guardedDownload(async () => {
       const res = await client.get('/api/system/security/recovery-kit', { responseType: 'blob' });
       return { blob: res.data as Blob, fileName: 'obnova-sportmedical.md' };
     }),

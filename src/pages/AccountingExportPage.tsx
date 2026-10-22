@@ -15,6 +15,8 @@ import { PinnedActionBar } from '../components/ui/PinnedActionBar';
 import { useDevice } from '../layout/useDevice';
 import { ListSkeleton, LoadError } from './sports/LoadStates';
 import { useTouchSx } from './sports/touch';
+import { ExportGate } from '../components/ui/ExportGate';
+import { download, isExportForbidden, EXPORT_FORBIDDEN_MESSAGE } from '../utils/download';
 
 /* The three formats the API has an exporter for, used until it lists its own. */
 const FALLBACK_FORMATS: ExportForm['format'][] = ['CSV', 'PohodaXml', 'MoneyS3Xml'];
@@ -55,16 +57,13 @@ export default function AccountingExportPage() {
     try {
       const result = await doExport.mutateAsync(exportCommandFrom(form));
       toast.success(`Export hotový (${result.recordCount} záznamů)`);
-      const blob = await accountingExportApi.download(result.id);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = result.fileName || 'export';
-      a.click();
-      URL.revokeObjectURL(url);
+      await download(
+        { kind: 'accounting', fileName: result.fileName || 'export', failureMessage: 'Stažení selhalo' },
+        { kind: 'fetch', fetch: () => accountingExportApi.download(result.id) },
+      );
       refetch();
-    } catch {
-      toast.error('Export selhal');
+    } catch (error) {
+      toast.error((await isExportForbidden(error)) ? EXPORT_FORBIDDEN_MESSAGE : 'Export selhal');
     }
   };
 
@@ -79,25 +78,21 @@ export default function AccountingExportPage() {
     }
   };
 
-  const download = async (id: string, name: string) => {
-    try {
-      const blob = await accountingExportApi.download(id);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = name;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error('Stažení selhalo');
-    }
-  };
+  const saveExport = (id: string, name: string) =>
+    download(
+      { kind: 'accounting', fileName: name, failureMessage: 'Stažení selhalo' },
+      { kind: 'fetch', fetch: () => accountingExportApi.download(id) },
+    );
 
   const actions = (h: ExportResult) => (
     <Stack direction="row" spacing={0.5} sx={{ justifyContent: 'flex-end', whiteSpace: 'nowrap' }}>
-      <Button size="small" variant="text" sx={touch} onClick={() => download(h.id, h.fileName)}>
-        Stáhnout
-      </Button>
+      <ExportGate>
+        {(blocked) => (
+          <Button size="small" variant="text" sx={touch} disabled={blocked} onClick={() => void saveExport(h.id, h.fileName)}>
+            Stáhnout
+          </Button>
+        )}
+      </ExportGate>
       <Button size="small" variant="text" sx={{ color: 'error.main', ...touch }} onClick={() => remove(h.id)}>
         Smazat
       </Button>
@@ -116,9 +111,13 @@ export default function AccountingExportPage() {
   ];
 
   const exportButton = (
-    <Button variant="contained" onClick={runExport} disabled={doExport.isPending} fullWidth={device !== 'desktop'} sx={touch}>
-      Exportovat
-    </Button>
+    <ExportGate>
+      {(blocked) => (
+        <Button variant="contained" onClick={runExport} disabled={blocked || doExport.isPending} fullWidth={device !== 'desktop'} sx={touch}>
+          Exportovat
+        </Button>
+      )}
+    </ExportGate>
   );
 
   return (
@@ -199,9 +198,13 @@ export default function AccountingExportPage() {
                   {madeAt(h)} · {h.recordCount} záznamů
                 </Typography>
                 <Stack direction="row" spacing={1} sx={{ '& .MuiButton-root': { flex: 1 } }}>
-                  <Button variant="outlined" sx={{ minHeight: 44 }} onClick={() => download(h.id, h.fileName)}>
-                    Stáhnout
-                  </Button>
+                  <ExportGate>
+                    {(blocked) => (
+                      <Button variant="outlined" sx={{ minHeight: 44 }} disabled={blocked} onClick={() => void saveExport(h.id, h.fileName)}>
+                        Stáhnout
+                      </Button>
+                    )}
+                  </ExportGate>
                   <Button variant="outlined" color="error" sx={{ minHeight: 44 }} onClick={() => remove(h.id)}>
                     Smazat
                   </Button>

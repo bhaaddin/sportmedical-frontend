@@ -308,7 +308,7 @@ describe('per-employee permissions', () => {
   it('has a label for every permission the server sent the owner at sign-in', () => {
     for (const permission of [
       'billing.approve', 'billing.manage', 'bookings.cancel', 'bookings.create', 'bookings.edit', 'communication.manage',
-      'documents.manage', 'documents.view', 'patients.edit', 'patients.export', 'patients.register',
+      'documents.manage', 'documents.view', 'exports.download', 'patients.edit', 'patients.export', 'patients.register',
       'patients.sensitive_identity.view', 'patients.view', 'patients.view_all', 'questionnaires.manage', 'roles.manage',
       'settings.clinic.manage', 'users.manage',
     ]) {
