@@ -16,6 +16,7 @@ import { formatDateOnly } from "../../../utils/time";
 import { errorText } from "../errorText";
 import { foundPatientsWord, initials } from "../NewAppointmentDialog.logic";
 import { PatientInfoButton } from "./PatientInfoButton";
+import { usePhoneSearch } from "../extras/usePhoneSearch";
 import {
   MIN_QUERY_LENGTH,
   displayName,
@@ -56,10 +57,15 @@ export function PatientSearch({
 }) {
   const { t } = useTranslation();
   const [text, setText] = useState("");
-  const search = usePatientTypeahead(text, enabled);
+  /* R15c (f): a telephone number is matched in the browser (never sent as a query); anything else is the name search */
+  const phoneSearch = usePhoneSearch(text, enabled);
+  const nameSearch = usePatientTypeahead(phoneSearch.active ? "" : text, enabled);
+  const search = phoneSearch.active
+    ? { hits: phoneSearch.hits, truncated: false, isFetching: phoneSearch.isFetching, isSettled: phoneSearch.isSettled, error: phoneSearch.error, refetch: phoneSearch.refetch }
+    : nameSearch;
   const duplicates = duplicateNameIds(search.hits);
   const shown = search.hits.slice(0, SHOWN);
-  const typedEnough = text.trim().length >= MIN_QUERY_LENGTH;
+  const typedEnough = phoneSearch.active || text.trim().length >= MIN_QUERY_LENGTH;
   const settled = typedEnough && search.isSettled && !search.isFetching && !search.error;
 
   return (
@@ -97,7 +103,7 @@ export function PatientSearch({
 
       {!typedEnough ? (
         <Typography variant="caption" sx={{ color: "text.secondary" }}>
-          Začněte psát jméno nebo příjmení — systém nabídne pacienty, které už zná.
+          Začněte psát jméno nebo příjmení — systém nabídne pacienty, které už zná. Najdete je i podle telefonního čísla.
         </Typography>
       ) : search.error ? (
         <Alert
@@ -192,9 +198,11 @@ export function PatientSearch({
         </Stack>
       ) : null}
 
-      {typedEnough && (search.truncated || search.hits.length > SHOWN) ? (
+      {typedEnough && (search.truncated || search.hits.length > SHOWN || (phoneSearch.active && phoneSearch.scanned !== null && search.isSettled)) ? (
         <Typography variant="caption" sx={{ color: "text.secondary" }}>
-          Zobrazena jen část shod — upřesněte jméno.
+          {phoneSearch.active && phoneSearch.scanned !== null
+            ? `Prohledáno prvních ${phoneSearch.scanned} pacientů — hledejte podle jména.`
+            : "Zobrazena jen část shod — upřesněte jméno."}
         </Typography>
       ) : null}
     </Stack>

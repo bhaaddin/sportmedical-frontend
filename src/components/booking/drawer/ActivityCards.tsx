@@ -3,6 +3,7 @@ import { Box, ButtonBase, Link, Radio, Stack, Typography } from "@mui/material";
 import { ACCENT_SOFT } from "../../ui";
 import type { Activity } from "../../../api/bookingContracts";
 import { priceWord } from "../price/agreedPrice";
+import { NEAREST_TEXT } from "../extras/nearestFreeSearch";
 
 /**
  * "ČINNOST" as the board draws it: one radio card per činnost - the name, and
@@ -22,12 +23,17 @@ export function ActivityCards({
   value,
   onChange,
   disabled = false,
+  onNearest,
+  nearestBusyId = null,
 }: {
   offered: Activity[];
   others: Activity[];
   value: string;
   onChange: (id: string) => void;
   disabled?: boolean;
+  /** R15c (b): "Nejbližší volný termín" under each činnost - chooses it and goes to its first free start. */
+  onNearest?: (id: string) => void;
+  nearestBusyId?: string | null;
 }) {
   const [showAll, setShowAll] = useState(false);
   const rows = showAll ? [...offered, ...others] : offered;
@@ -40,8 +46,8 @@ export function ActivityCards({
           const selected = a.id === value;
           const onOffer = offeredIds.has(a.id);
           return (
+            <Box key={a.id}>
             <ButtonBase
-              key={a.id}
               role="radio"
               aria-checked={selected}
               aria-label={a.name}
@@ -82,6 +88,20 @@ export function ActivityCards({
                 </Typography>
               </Box>
             </ButtonBase>
+            {onNearest ? (
+              <Link
+                component="button"
+                type="button"
+                underline="hover"
+                disabled={disabled || nearestBusyId !== null}
+                data-testid={`nearest-free-${a.id}`}
+                onClick={() => onNearest(a.id)}
+                sx={{ ml: 1.5, mt: 0.25, minHeight: 44, display: "inline-flex", alignItems: "center", fontSize: 13, fontWeight: 600 }}
+              >
+                {nearestBusyId === a.id ? NEAREST_TEXT.seeking : NEAREST_TEXT.button}
+              </Link>
+            ) : null}
+            </Box>
           );
         })}
       </Stack>
