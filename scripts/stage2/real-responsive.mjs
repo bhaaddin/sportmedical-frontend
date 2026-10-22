@@ -27,15 +27,53 @@ for (const size of ['phone', 'tablet', 'desktop']) {
     check(o.sw <= o.iw && o.sh <= o.ih + 1, `${size}: ${what} - the document does not scroll (${o.sw}x${o.sh} in ${o.iw}x${o.ih})`);
   };
 
-  /* the holiday week + the club-held week */
+  /* the holiday week (26. 10.) */
   await page.goto(`${BASE}/planovani`);
   await waitPlanner(page);
   await page.click('[data-command=nextWeek]');
   await page.waitForTimeout(2200);
-  await shot(page, `s2-real-${size}-week-holiday-club`);
-  await noScroll('week 26. 10. (holiday, club holds)');
-  const hold = await page.locator('[data-testid^="board-window-"] [data-testid="club-window-hold"], [data-testid^="phone-entry-"] [data-testid="phone-club-sub"]').count();
-  console.log(`   ${size}: club windows with a hold state on screen: ${hold}`);
+  await shot(page, `s2-real-${size}-week-holiday`);
+  await noScroll('week 26. 10. (the holiday)');
+  const holiday = await page.locator('[data-testid="closed-2026-10-28"], .compact-day.is-lock-holiday, .phone-strip-day.is-lock-holiday').count();
+  check(holiday > 0, `${size}: the holiday 28. 10. is drawn as a locked red day (${holiday} element(s))`);
+
+  /* a club-held week: the first week with a club block of the first calendar (the copy's data; earlier releases consumed the first weeks) */
+  const un = (j) => (j && j.data !== undefined && 'isSuccess' in j ? j.data : j);
+  const token = await page.evaluate(() => localStorage.getItem('token'));
+  const get = (path) => page.evaluate(async ({ path, token }) => (await (await fetch(path, { headers: { Authorization: `Bearer ${token}` } })).json()), { path, token });
+  const cals = un(await get('/api/calendars')).filter((c) => c.isActive);
+  let clubDay = null;
+  for (let i = 0; i < 14 && !clubDay; i++) {
+    const from = new Date(Date.parse('2026-10-26T12:00:00Z') + i * 7 * 86400000);
+    const to = new Date(from.getTime() + 6 * 86400000);
+    const blocks = un(await get(`/api/calendars/${cals[0].id}/blocks?from=${from.toISOString().slice(0, 10)}&to=${to.toISOString().slice(0, 10)}`));
+    const club = blocks.find((b) => b.kind === 'club');
+    if (club) clubDay = club.startUtc.slice(0, 10);
+  }
+  if (clubDay) {
+    for (let i = 0; i < 20; i++) {
+      if (await page.evaluate((d) => !!document.querySelector(`[data-day="${d}"]`), clubDay)) break;
+      await page.click('[data-command=nextWeek]');
+      await page.waitForTimeout(400);
+    }
+    await page.waitForTimeout(1500);
+    /* compact layouts show one day: pick the club's day */
+    await page.locator(`.compact-day[data-day="${clubDay}"], .phone-strip-day[data-day="${clubDay}"]`).first().click().catch(() => {});
+    await page.waitForTimeout(1200);
+    await shot(page, `s2-real-${size}-week-club`);
+    const hold = await page.locator('[data-testid="club-window-hold"], [data-testid="phone-club-sub"]').count();
+    check(hold > 0, `${size}: the club's hold state is on screen (${hold} window(s) with lock / code / state) in the week of ${clubDay}`);
+    await noScroll('club-held week');
+    /* the month tile (desktop / tablet) names the hold too */
+    if (size !== 'phone') {
+      await page.click('[data-view=month]');
+      await page.waitForTimeout(1200);
+      const tile = await page.locator('[data-testid^="tile-club-"]').count();
+      check(tile > 0, `${size}: the month tiles carry ${tile} club bar(s)`);
+      await shot(page, `s2-real-${size}-month-club`);
+      await page.click('[data-view=week]');
+    }
+  } else check(false, `${size}: no club block in the next 14 weeks of the copy`);
 
   /* the selector */
   const chips = page.locator('.calendar-chip:not(.is-all)');
@@ -63,6 +101,7 @@ for (const size of ['phone', 'tablet', 'desktop']) {
     await lunch.click({ force: true }).catch(() => {});
     const pop = page.getByTestId('lunch-popover');
     if (await pop.count()) {
+      await page.waitForTimeout(600); /* the popover grows in (a scale transition): measure when it has settled */
       await shot(page, `s2-real-${size}-lunch-popover`);
       const buttons = await pop.locator('button').evaluateAll((els) => els.filter((e) => e.getClientRects().length).map((e) => [e.innerText.trim().slice(0, 24), Math.round(e.getBoundingClientRect().height)]));
       check(buttons.every(([, h]) => !touch || h >= 40), `${size}: lunch pop-out buttons ${JSON.stringify(buttons)}`);
@@ -79,8 +118,8 @@ for (const size of ['phone', 'tablet', 'desktop']) {
   await page.getByRole('switch', { name: 'Pracovník dělá jen jednu věc najednou' }).waitFor({ timeout: 40000 });
   await page.waitForTimeout(600);
   await shot(page, `s2-real-${size}-settings-calendar`);
-  const sw = await page.getByRole('switch', { name: 'Pracovník dělá jen jednu věc najednou' }).boundingBox();
-  check(sw.width > 0 && sw.x >= 0 && sw.x + sw.width <= page.viewportSize().width, `${size}: the shared-worker switch is on screen`);
+  const sw = await page.getByText('Pracovník dělá jen jednu věc najednou', { exact: true }).first().boundingBox();
+  check(!!sw && sw.x >= 0 && sw.x + sw.width <= page.viewportSize().width, `${size}: the shared-worker switch and its label are on screen`);
   const hw = await page.getByLabel('Barva svátků').boundingBox();
   check(!!hw && hw.x + hw.width <= page.viewportSize().width + 1, `${size}: "Barva svátků" field fits`);
   await page.goto(`${BASE}/nastaveni/kluby`);

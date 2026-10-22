@@ -173,7 +173,7 @@ async function r4() {
 /* ----------------------------------------------------------------------------------------------------------- R17 */
 async function r17() {
   console.log('\n== R17 ==');
-  const day = await cleanDay('2026-12-01', ['2026-12-24', '2026-12-25', '2026-12-26']);
+  const day = await cleanDay('2026-12-01', ['2026-12-21', '2026-12-22', '2026-12-23', '2026-12-24', '2026-12-25', '2026-12-26', '2026-12-28', '2026-12-29', '2026-12-30', '2026-12-31']);
   console.log(`   clean day: ${day}`);
   for (const c of cals) await A('DELETE', `/api/calendars/${c.id}/lunch-exceptions/${day}`); /* a known start: the weekly lunch everywhere */
   await weekOf(day);
@@ -183,9 +183,17 @@ async function r17() {
   await page.getByTestId(`lunch-hit-${day}`).waitFor({ timeout: 30000 });
   check(true, 'UI: on the real server the lunch band has its click target (a Stage 2 server, the probe found the lunch routes)');
   /* Friday (any weekday) has the lunch band */
-  const days = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="lunch-"]')].map((e) => e.getAttribute('data-testid').slice(6)));
-  const fri = days.find((d) => new Date(`${d}T12:00:00Z`).getUTCDay() === 5);
-  check(days.length >= 5 && !!fri, `UI: the week shows the lunch on ${days.length} working days, Friday included (${fri})`);
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid^="lunch-2"]').length >= 5, null, { timeout: 30000 }).catch(() => {});
+  const days = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="lunch-2"]')].map((e) => e.getAttribute('data-testid').slice(6)));
+  /* the weekdays of this week on which the server says the clinic works with a lunch (the planner draws the lunch where the open calendars share one) */
+  const monday = (await page.evaluate(() => document.querySelector('[data-day]')?.getAttribute('data-day'))) ?? day;
+  const expected = [];
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(Date.parse(`${monday}T12:00:00Z`) + i * 86400000).toISOString().slice(0, 10);
+    const rows = await Promise.all(cals.map(async (c) => un((await A('GET', `/api/calendars/${c.id}/preview?from=${d}&to=${d}`)).json)?.[0]));
+    if (rows.every((r) => r?.isOpen && r.breakStart)) expected.push(d);
+  }
+  check(days.length === expected.length && expected.every((d) => days.includes(d)), `UI: the week shows the lunch on exactly the ${expected.length} working days the server gives one (${days.length})${expected.some((d) => new Date(`${d}T12:00:00Z`).getUTCDay() === 5) ? ', Friday included' : ''}`);
   await page.getByTestId(`lunch-hit-${day}`).click();
   const pop = page.getByTestId('lunch-popover');
   await pop.waitFor();
@@ -253,8 +261,17 @@ async function r17() {
 /* ----------------------------------------------------------------------------------------------------------- R13 */
 async function r13() {
   console.log('\n== R13 ==');
-  const week = '2026-10-26';
-  const blocks = un((await A('GET', `/api/calendars/${byName('Ordinace 1').id}/blocks?from=${week}&to=2026-11-01`)).json);
+  /* the first week (from 26. 10.) that still has a club block - the release below consumes the copy's data, so a rerun uses the next one */
+  let week = '2026-10-26';
+  for (let i = 0; i < 12; i++) {
+    const from = new Date(Date.parse('2026-10-26T12:00:00Z') + i * 7 * 86400000);
+    const to = new Date(from.getTime() + 6 * 86400000);
+    const found = un((await A('GET', `/api/calendars/${byName('Ordinace 1').id}/blocks?from=${from.toISOString().slice(0, 10)}&to=${to.toISOString().slice(0, 10)}`)).json).some((b) => b.kind === 'club');
+    if (found) { week = from.toISOString().slice(0, 10); break; }
+  }
+  const weekEnd = new Date(Date.parse(`${week}T12:00:00Z`) + 6 * 86400000).toISOString().slice(0, 10);
+  console.log(`   week with a club hold: ${week}`);
+  const blocks = un((await A('GET', `/api/calendars/${byName('Ordinace 1').id}/blocks?from=${week}&to=${weekEnd}`)).json);
   const club = blocks.find((b) => b.kind === 'club');
   check(!!club && !!club.orderCode && club.clubOrderId && typeof club.playersMissing === 'boolean' && 'holdExpired' in club, `API: club blocks carry the contract fields (${club?.orderCode}, playersMissing=${club?.playersMissing}, holdExpired=${club?.holdExpired}, holdUntilUtc=${club?.holdUntilUtc ?? '-'})`);
   const manual = blocks.find((b) => b.kind === 'manual');
@@ -287,7 +304,7 @@ async function r13() {
   check(/zapsáno|Čeká|Hold|Obsazeno/.test(holdLine), `UI popover: "${holdLine}"`);
   await shot(page, 's2-real-r13-popover');
   /* release the expired holds of that order (this copy of the database only) */
-  const before = un((await A('GET', `/api/calendars/${byName('Ordinace 1').id}/blocks?from=${week}&to=2026-11-01`)).json).filter((b) => b.kind === 'club' && b.clubOrderId === club.clubOrderId).length;
+  const before = un((await A('GET', `/api/calendars/${byName('Ordinace 1').id}/blocks?from=${week}&to=${weekEnd}`)).json).filter((b) => b.kind === 'club' && b.clubOrderId === club.clubOrderId).length;
   const releaseBtn = page.getByTestId('club-release');
   check((await releaseBtn.count()) === 1, 'UI popover: "Uvolnit nevyplněné" is offered (bookings.edit, server sent hold data)');
   await releaseBtn.click();
@@ -295,7 +312,7 @@ async function r13() {
   const done = page.getByTestId('club-popover-released');
   await done.waitFor({ timeout: 20000 });
   const said = await done.innerText();
-  const afterBlocks = un((await A('GET', `/api/calendars/${byName('Ordinace 1').id}/blocks?from=${week}&to=2026-11-01`)).json).filter((b) => b.kind === 'club' && b.clubOrderId === club.clubOrderId).length;
+  const afterBlocks = un((await A('GET', `/api/calendars/${byName('Ordinace 1').id}/blocks?from=${week}&to=${weekEnd}`)).json).filter((b) => b.kind === 'club' && b.clubOrderId === club.clubOrderId).length;
   check(afterBlocks < before || /Není co uvolnit/.test(said), `UI+API: release answered "${said}" (club windows of the order in that week: ${before} -> ${afterBlocks})`);
   const again = await A('POST', `/api/v1/club-orders/${club.clubOrderId}/release-unfilled`, { onlyExpired: false });
   check(again.status === 200 && again.json.windowsRemoved === 0 && again.json.windowsShortened === 0, 'API: a second release changes nothing (idempotent)');
