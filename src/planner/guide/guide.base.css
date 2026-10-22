@@ -29,10 +29,10 @@
   background: #08374b;
   border: 1px solid hsl(from #296679 var(--sm-hsl, h s l));
 }
-.sm-planner .completion-actions button.completion-primary[data-completion-prepare] { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 0%, transparent), 0 0 0 2px hsl(from #13eac7 var(--sm-hsl, h s l) / 0.5); }
+.sm-planner .completion-actions button.completion-primary[data-completion-prepare] { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 0%, transparent), 0 0 0 2px color-mix(in srgb, hsl(from #13eac7 var(--sm-hsl, h s l)) 50%, transparent); }
 @keyframes guide-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 hsl(from #13eac7 var(--sm-hsl, h s l) / 0.55); }
-  60% { box-shadow: 0 0 0 9px hsl(from #13eac7 var(--sm-hsl, h s l) / 0); }
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, hsl(from #13eac7 var(--sm-hsl, h s l)) 55%, transparent); }
+  60% { box-shadow: 0 0 0 9px color-mix(in srgb, hsl(from #13eac7 var(--sm-hsl, h s l)) 0%, transparent); }
 }
 html[data-motion='full'] .sm-planner .completion-actions button.completion-primary[data-completion-prepare],
 html[data-motion='full'] .sm-planner .s42-primary-action[data-ready='true'],
