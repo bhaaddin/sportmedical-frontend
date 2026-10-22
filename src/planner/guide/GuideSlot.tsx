@@ -8,6 +8,7 @@ import { usePlannerSelector } from '../state/PlannerStoreProvider';
 import { usePlannerMetrics } from '../components/PlannerMetrics';
 import { useStage } from '../components/PlannerStage';
 import { usePlanFigures } from '../components/plan/usePlanFigures';
+import { useClubPlanner } from '../club/ClubPlannerContext';
 import type { HintInput } from './hints';
 
 const GuideHost = lazy(() => import('./GuideHost'));
@@ -21,6 +22,9 @@ export function GuideSlot() {
   const page = usePlannerSelector((s) => s.carousel.index);
   const { layout } = useStage();
   const { deckVisible } = usePlannerMetrics();
+  /* A club's overview (no order on the stage) is not planning: the deck there is the quick actions, nothing to hint at. */
+  const club = useClubPlanner();
+  const overview = club !== null && !club.planning;
 
   /* The person moved the strip (arrow, swipe, the escalator): the strip hint has nothing left to say. */
   const firstPage = useRef(page);
@@ -28,7 +32,7 @@ export function GuideSlot() {
   useEffect(() => { if (page !== firstPage.current) setStripUsed(true); }, [page]);
 
   const activities = base.list.length;
-  if (activities === 0) return null;
+  if (activities === 0 || overview) return null;
   const input: HintInput = {
     active: true,
     activities,
