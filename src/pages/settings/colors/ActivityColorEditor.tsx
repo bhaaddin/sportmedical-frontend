@@ -6,7 +6,9 @@
  *   vlastní barva  any #RRGGBB, typed or picked, checked as it is typed;
  *   náhled         live, before anything is saved: the činnost as a pill with the text that reads on it (and how well), as a card
  *                  on the dark calendar, and as a dot on the light page - the three places it is drawn;
- *   obnovit        back to the default: the shade of the služba (the own colour is cleared).
+ *   obnovit        back to the default: the činnost's own distinct default colour (src/colors/defaultActivityColors.ts; the own colour is cleared).
+ *
+ * The same editor colours a služba or a kalendář (`subject`): same palette, same guard, same live preview, a reset to that subject's default.
  *
  * The guard (`guardActivityColor`) refuses what could not be seen on the dark calendar or the light page; the text colour on the
  * fill is chosen to read at AA, so a colour never makes its own label illegible. `onChange(hex)` is called when a colour is
@@ -18,6 +20,7 @@ import { Check as CheckIcon } from '@mui/icons-material';
 import { AA } from '../../../accent';
 import { DARK_SURFACE, GUARD_TEXT, LIGHT_SURFACE, NEUTRAL_ACTIVITY_COLOR, cleanHex, guardActivityColor, textOnColor, typedHex } from '../../../colors/activityColor';
 import { TYPE, settingsLine } from '../../../components/settings/settingsStyle';
+import { FIELD_EDGE } from '../../../theme';
 
 export const COLOR_EDITOR_TEXT = {
   palette: 'Paleta barev',
@@ -25,17 +28,19 @@ export const COLOR_EDITOR_TEXT = {
   custom: 'Jiná barva (#RRGGBB)',
   customHelp: 'Zadejte #RRGGBB, například #E9C46A.',
   apply: 'Použít tuto barvu',
-  reset: 'Použít odstín služby',
-  resetHint: 'Obnoví výchozí barvu: odstín, který činnosti dává její služba',
+  reset: 'Použít výchozí barvu',
+  resetHint: 'Obnoví výchozí barvu: každá činnost má svůj vlastní výrazný odstín, který se nemění',
   preview: 'Náhled',
   previewPill: 'Štítek činnosti',
   previewBoard: 'Na tmavém kalendáři',
   previewLight: 'Na světlé stránce',
   contrast: (ratio: number) => `Text na barvě: ${ratio.toFixed(1).replace('.', ',')} : 1 (${ratio >= AA ? 'splňuje AA' : 'pod AA'})`,
-  inherited: 'Odstín služby',
+  inherited: 'Výchozí barva',
   own: 'Vlastní barva',
   disabledSwatch: 'Tato barva by nebyla vidět',
 } as const;
+
+const SUBJECT_TITLE = { 'činnost': 'Barva činnosti', 'služba': 'Barva služby', 'kalendář': 'Barva kalendáře' } as const;
 
 const fmt = (ratio: number): string => ratio.toFixed(1).replace('.', ',');
 
@@ -47,13 +52,19 @@ export function ActivityColorEditor({
   onChange,
   busy = false,
   groupLabel = COLOR_EDITOR_TEXT.palette,
+  subject = 'činnost',
+  resetHint = COLOR_EDITOR_TEXT.resetHint,
 }: {
+  /** The name shown in the title and the preview (the činnost's, the služba's, the kalendář's). */
   activityName: string;
+  /** What is being coloured; only the title and the reset's hint change. */
+  subject?: 'činnost' | 'služba' | 'kalendář';
+  resetHint?: string;
   /** The clinic's palette (#RRGGBB each). */
   palette: readonly string[];
   /** The činnost's own colour, or null when it takes its služba's shade. */
   value: string | null;
-  /** The colour it is drawn in without an own colour (the služba's shade): what "Obnovit výchozí" gives back. */
+  /** The colour it is drawn in without an own colour (its default): what "Použít výchozí barvu" gives back. */
   fallback: string | null;
   onChange: (hex: string | null) => void;
   busy?: boolean;
@@ -71,7 +82,7 @@ export function ActivityColorEditor({
 
   return (
     <Stack spacing={2} data-testid="activity-color-editor" sx={{ minWidth: 0 }}>
-      <Typography sx={TYPE.itemName}>{`Barva činnosti ${activityName}`}</Typography>
+      <Typography sx={TYPE.itemName}>{`${SUBJECT_TITLE[subject]} ${activityName}`}</Typography>
 
       <Box role="group" aria-label={groupLabel} sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
         {palette.map((entry) => {
@@ -121,7 +132,7 @@ export function ActivityColorEditor({
           value={(guard.hex ?? current ?? typedHex(fallback) ?? NEUTRAL_ACTIVITY_COLOR).toLowerCase()}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft(e.target.value.toUpperCase())}
           disabled={busy}
-          sx={{ width: 44, height: 40, p: 0, border: '1px solid', borderColor: settingsLine, borderRadius: 1, bgcolor: 'transparent', cursor: 'pointer' }}
+          sx={{ width: 44, height: 40, p: 0, border: '1px solid', borderColor: (t) => FIELD_EDGE[t.palette.mode], borderRadius: 1, bgcolor: 'transparent', cursor: 'pointer' }}
         />
       </Stack>
 
@@ -163,7 +174,7 @@ export function ActivityColorEditor({
           variant="outlined"
           color="inherit"
           disabled={busy || current === null}
-          title={COLOR_EDITOR_TEXT.resetHint}
+          title={resetHint}
           onClick={() => { setDraft(''); onChange(null); }}
           sx={{ minHeight: 44, fontWeight: 600 }}
           data-testid="color-reset"

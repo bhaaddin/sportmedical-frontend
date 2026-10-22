@@ -13,6 +13,7 @@ import {
 import { questionnaireRequirementToWire } from './bookingContracts';
 import { priceOf, type PriceItem } from '../components/booking/price/priceOf';
 import { servicesApi } from './services';
+import { registerActivityIds } from '../colors/defaultActivityColors';
 
 /** The price list, read at most once a minute for the fallback below (a failed read just means no fallback). */
 let priceItems: { at: number; items: Promise<PriceItem[]> } | null = null;
@@ -91,7 +92,10 @@ export const activitiesApi = {
   list: (): Promise<ActivityListResult> =>
     request(async () => {
       const res = await client.get('/api/activities');
-      return withListPrices(parseResponse(activityListResultSchema, res.data));
+      const parsed = parseResponse(activityListResultSchema, res.data);
+      /* the default činnost colours are spread over the whole list (src/colors/defaultActivityColors.ts) */
+      registerActivityIds(parsed.activities.map((a) => a.id));
+      return withListPrices(parsed);
     }),
 
   /**

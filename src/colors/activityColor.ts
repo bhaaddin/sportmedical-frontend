@@ -15,6 +15,7 @@
  * #RRGGBB typed in; both pass the same guard (`guardActivityColor`) before they are saved.
  */
 import { AA, contrastRatio } from '../accent';
+import { defaultActivityColor } from './defaultActivityColors';
 
 /** A činnost nobody coloured anywhere. */
 export const NEUTRAL_ACTIVITY_COLOR = '#6E91A5';
@@ -37,6 +38,8 @@ export function typedHex(input: string | null | undefined): string | null {
 
 /** The colour fields of a činnost, as the API sends them (every one may be missing). */
 export interface ActivityColourFields {
+  /** With the id, a činnost nobody coloured gets its own DISTINCT default (`defaultActivityColors.ts`) instead of the služba's shade. */
+  id?: string | null;
   effectiveColorHex?: string | null;
   colorHex?: string | null;
   /** The legacy colour of the pre-C1 screens. */
@@ -50,9 +53,7 @@ export function activityColor(
   fallback: string = NEUTRAL_ACTIVITY_COLOR,
 ): string {
   return (
-    cleanHex(activity?.effectiveColorHex) ??
-    cleanHex(activity?.colorHex) ??
-    cleanHex(activity?.color) ??
+    activityColorOrNull(activity) ??
     cleanHex(serviceColor) ??
     cleanHex(fallback) ??
     NEUTRAL_ACTIVITY_COLOR
@@ -61,7 +62,12 @@ export function activityColor(
 
 /** The činnost's own colour in the order above, or null when the činnost itself carries none (the služba's / the caller's colour is then up to the caller). */
 export function activityColorOrNull(activity: ActivityColourFields | null | undefined): string | null {
-  return cleanHex(activity?.effectiveColorHex) ?? cleanHex(activity?.colorHex) ?? cleanHex(activity?.color);
+  const own = cleanHex(activity?.colorHex);
+  if (own !== null) return own;
+  /* R12: no colour of its own -> the distinct default of this id, never the služba's shade the server sends as `effectiveColorHex`. */
+  const id = (activity?.id ?? '').trim();
+  if (id !== '') return defaultActivityColor(id);
+  return cleanHex(activity?.effectiveColorHex) ?? cleanHex(activity?.color);
 }
 
 /** The činnost's OWN colour (what the setting stores), or null when it takes its služba's shade. */

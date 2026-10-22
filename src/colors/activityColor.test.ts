@@ -2,6 +2,7 @@
  * Reviewer 2.6 - one colour per činnost, the same everywhere: where it comes from (the order), what text goes on it, and the guard
  * that refuses a colour nobody could see. Contrast tables are computed with the same WCAG formula the theme tests use.
  */
+import { defaultActivityColor } from './defaultActivityColors';
 import { describe, expect, it } from 'vitest';
 import { AA, contrastRatio } from '../accent';
 import {
@@ -31,7 +32,8 @@ describe('cleanHex and typedHex', () => {
 describe('where the colour of a činnost comes from', () => {
   const service = '#2563EB';
   it('the server\'s effective colour wins, then the own colour, then the legacy one, then the služba\'s, then grey', () => {
-    expect(activityColor({ effectiveColorHex: '#111111', colorHex: '#222222', color: '#333333' }, service)).toBe('#111111');
+    expect(activityColor({ effectiveColorHex: '#111111', colorHex: '#222222', color: '#333333' }, service)).toBe('#222222');
+    expect(activityColor({ effectiveColorHex: '#111111', colorHex: null, color: '#333333' }, service)).toBe('#111111');
     expect(activityColor({ effectiveColorHex: null, colorHex: '#222222', color: '#333333' }, service)).toBe('#222222');
     expect(activityColor({ colorHex: null, color: '#333333' }, service)).toBe('#333333');
     expect(activityColor({}, service)).toBe('#2563EB');
@@ -65,10 +67,10 @@ describe('where the colour of a činnost comes from', () => {
     const info = activityInfoOf(activity);
     expect(info.colorHex?.toUpperCase()).toBe('#E9C46A');
     expect(colourOfActivity({ activities: new Map([['a1', info]]), services: new Map() }, 'a1', '#999999').toUpperCase()).toBe('#E9C46A');
-    /* no colour on the činnost: both fall to the služba's, the calendar's own colour only when there is no služba colour either */
+    /* no colour on the činnost: both draw its distinct default (R12), never the služba's shade */
     const plain = { ...(base as object) } as never;
-    expect(categoryOf(plain, { id: 's1', colorHex: '#2563EB' } as never).color.toUpperCase()).toBe('#2563EB');
-    expect(colourOfActivity({ activities: new Map([['a1', activityInfoOf(plain)]]), services: new Map([['s1', { id: 's1', name: 'S', colorHex: '#2563EB', sortOrder: 0, isActive: true }]]) }, 'a1', '#999999')).toBe('#2563EB');
+    expect(categoryOf(plain, { id: 's1', colorHex: '#2563EB' } as never).color.toUpperCase()).toBe(defaultActivityColor('a1'));
+    expect(colourOfActivity({ activities: new Map([['a1', activityInfoOf(plain)]]), services: new Map([['s1', { id: 's1', name: 'S', colorHex: '#2563EB', sortOrder: 0, isActive: true }]]) }, 'a1', '#999999')).toBe(defaultActivityColor('a1'));
   });
 });
 

@@ -8,6 +8,13 @@ export interface ThemePrefs {
   mode: ThemeMode;
   setAccent: (color: string) => void;
   setMode: (mode: ThemeMode) => void;
+  /**
+   * R15d: the planner's own tint (Nastavení -> Barvy). `null` = the planner follows the accent (the default). Remembered in this
+   * browser like the accent itself: the clinic-wide copy needs one backend field (docs/stage3b-2026-10.md). Optional so a test
+   * context need not name it.
+   */
+  plannerTint?: string | null;
+  setPlannerTint?: (color: string | null) => void;
 }
 
 export const ACCENT_STORAGE_KEY = 'sm-theme-accent';
@@ -21,6 +28,7 @@ export const ACCENT_STORAGE_KEY = 'sm-theme-accent';
  * server-side account preference to migrate - the mode only ever lived in localStorage.
  * The public site and the club/patient portals draw their own themes and are not affected.
  */
+export const PLANNER_TINT_STORAGE_KEY = 'sm-planner-tint';
 export const MODE_STORAGE_KEY = 'sm-theme-mode-v2';
 export const LEGACY_MODE_STORAGE_KEY = 'sm-theme-mode';
 export const DEFAULT_MODE: ThemeMode = 'dark';
@@ -56,5 +64,17 @@ export function readStoredMode(): ThemeMode {
     return stored === 'light' || stored === 'dark' ? stored : DEFAULT_MODE;
   } catch {
     return DEFAULT_MODE;
+  }
+}
+
+/** The saved planner tint: a colour that works as a button on the light page, else (nothing saved, junk) `null` = follow the accent. */
+export function readStoredPlannerTint(): string | null {
+  try {
+    const raw = localStorage.getItem(PLANNER_TINT_STORAGE_KEY);
+    if (raw === null) return null;
+    const clean = sanitizeAccent(raw);
+    return clean === DEFAULT_ACCENT && raw.trim().toUpperCase() !== DEFAULT_ACCENT ? null : clean;
+  } catch {
+    return null;
   }
 }

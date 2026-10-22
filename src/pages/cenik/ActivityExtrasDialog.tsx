@@ -127,13 +127,13 @@ export default function ActivityExtrasDialog({
           <Box component="section" aria-labelledby="cinnost-barva">
             <Typography id="cinnost-barva" component="h3" sx={TYPE.label}>Barva</Typography>
             <Typography sx={[TYPE.caption, { mt: 0.5, mb: 1 }]}>
-              Bez vlastní barvy se činnost kreslí v odstínu své služby. Barvu si můžete vybrat z palety.
+              Bez vlastní barvy má činnost svou výchozí, výraznou a trvalou barvu. Barvu si můžete vybrat z palety.
             </Typography>
             <ActivityColorEditor
               activityName={activity.name}
               palette={palette}
               value={color}
-              fallback={activityColor({ effectiveColorHex: activity.colorHex ? null : activity.effectiveColorHex }, serviceColor)}
+              fallback={activityColor({ id: activity.id, colorHex: null, effectiveColorHex: null }, serviceColor)}
               onChange={setColor}
               busy={saving}
               groupLabel="Barva činnosti"

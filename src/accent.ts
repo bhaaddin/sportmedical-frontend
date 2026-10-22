@@ -343,8 +343,10 @@ const rgbTriplet = (color: string): string => {
  *   --sm-on-accent     the text colour on that fill
  *   --sm-tint-*        light mode's soft backgrounds (hover, selected, soft card)
  */
-export function accentVariables(accentInput: string, mode: 'light' | 'dark'): Record<string, string | null> {
+export function accentVariables(accentInput: string, mode: 'light' | 'dark', plannerTintInput?: string | null): Record<string, string | null> {
   const accent = sanitizeAccent(accentInput);
+  /* R15d: the planner's own tint. Unset = it follows the accent; set = the planner stage (its CSS, dark and light) draws in it while the rest of the app keeps the accent. */
+  const planner = plannerTintInput === undefined || plannerTintInput === null ? accent : sanitizeAccent(plannerTintInput);
   const vars: Record<string, string | null> = {
     [SHIFT_VAR]: null,
     '--sm-accent': null,
@@ -353,15 +355,26 @@ export function accentVariables(accentInput: string, mode: 'light' | 'dark'): Re
     '--sm-accent-hover': null,
     '--sm-accent-active': null,
     '--sm-accent-rgb': null,
+    '--sm-accent-ink': null,
     '--sm-on-accent': null,
     '--sm-tint-hover': null,
     '--sm-tint-selected': null,
     '--sm-soft-bg': null,
     '--sm-soft-line': null,
+    '--sm-planner-accent': null,
+    '--sm-planner-accent-ink': null,
+    '--sm-planner-on-accent': null,
   };
+  /* the planner stage: the dark prototype's cyan family is shifted to the tint; the light layer reads the tint as plain colours */
+  if (planner !== DEFAULT_ACCENT_HEX.toUpperCase()) {
+    vars[SHIFT_VAR] = shiftExpression(deriveShift(planner));
+    if (mode === 'light') {
+      vars['--sm-planner-accent'] = planner;
+      vars['--sm-planner-accent-ink'] = accentInk(planner);
+      vars['--sm-planner-on-accent'] = onAccentText(planner);
+    }
+  }
   if (accent === DEFAULT_ACCENT_HEX.toUpperCase()) return vars;
-  const shift = deriveShift(accent);
-  vars[SHIFT_VAR] = shiftExpression(shift);
   if (mode === 'light') {
     const tints = lightTints(accent);
     vars['--sm-accent'] = accent;
@@ -370,12 +383,14 @@ export function accentVariables(accentInput: string, mode: 'light' | 'dark'): Re
     vars['--sm-accent-hover'] = tintOf(accent, 0.85);
     vars['--sm-accent-active'] = darken(accent, 0.1);
     vars['--sm-accent-rgb'] = rgbTriplet(accent);
+    vars['--sm-accent-ink'] = accentInk(accent);
     vars['--sm-on-accent'] = onAccentText(accent);
     vars['--sm-tint-hover'] = tints.hover;
     vars['--sm-tint-selected'] = tints.selected;
     vars['--sm-soft-bg'] = tints.softBg;
     vars['--sm-soft-line'] = tints.softLine;
   } else {
+    const shift = deriveShift(accent);
     const main = shiftColor(CYAN, shift);
     vars['--sm-accent'] = main;
     vars['--sm-accent-light'] = shiftColor('#23F2E7', shift);

@@ -89,3 +89,24 @@ export const calendarsApi = {
 };
 
 export default calendarsApi;
+
+/**
+ * The input that saves a kalendář exactly as it was read, with `patch` on top. `PUT` is the whole calendar (a field left out is
+ * cleared), so every screen that changes one thing - Nastavení -> Barvy changes only the colour - goes through this.
+ */
+export function calendarToInput(calendar: Calendar, patch: Partial<CalendarInput> = {}): CalendarInput {
+  return {
+    name: calendar.name,
+    color: calendar.color,
+    location: calendar.location,
+    displayStepMinutes: calendar.displayStepMinutes,
+    isActive: calendar.isActive,
+    sortOrder: calendar.sortOrder,
+    clinicServiceId: calendar.clinicServiceId,
+    publicMinimumNoticeMinutes: calendar.publicMinimumNoticeMinutes,
+    publicHorizonDays: calendar.publicHorizonDays,
+    publicHoldMinutes: calendar.publicHoldMinutes,
+    publicCancellationHours: calendar.publicCancellationHours,
+    ...patch,
+  };
+}

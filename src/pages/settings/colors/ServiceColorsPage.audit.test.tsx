@@ -17,7 +17,12 @@ import { MAX_PALETTE_SIZE } from '../../../api/fieldLimits';
 import { MIN_PALETTE_SIZE } from '../../../api/serviceColors';
 import { drawnColor, hasPaletteErrors, isHex, normalizeHex, paletteSignature, toRows, validatePalette } from './colorLogic';
 
-const m = vi.hoisted(() => ({ getPalette: vi.fn(), putPalette: vi.fn(), listServices: vi.fn(), updateService: vi.fn(), listActivities: vi.fn(), updateActivity: vi.fn() }));
+const m = vi.hoisted(() => ({ getPalette: vi.fn(), putPalette: vi.fn(), listServices: vi.fn(), updateService: vi.fn(), listActivities: vi.fn(), updateActivity: vi.fn(), listCalendars: vi.fn() }));
+
+vi.mock('../../../api/calendars', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/calendars')>()),
+  calendarsApi: { list: m.listCalendars, update: vi.fn() },
+}));
 
 vi.mock('../../../api/serviceColors', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/serviceColors')>()),
@@ -55,6 +60,7 @@ beforeEach(() => {
   m.putPalette.mockReset().mockImplementation(async (settings) => settings);
   m.listServices.mockReset().mockResolvedValue(SERVICES);
   m.updateService.mockReset().mockResolvedValue(SERVICES[0]);
+  m.listCalendars.mockReset().mockResolvedValue([]);
   m.listActivities.mockReset().mockResolvedValue({ activities: [activityRow({}), activityRow({ id: 'a2', name: 'Komplexní', colorHex: '#AA5500', effectiveColorHex: '#AA5500' })], warnings: [] });
   m.updateActivity.mockReset().mockResolvedValue({ activity: {}, warnings: [] });
 });
@@ -72,7 +78,8 @@ describe('normalizeHex / isHex / drawnColor', () => {
   });
 
   it('draws a činnost in the server’s computed colour, else its own, else its služba’s, else the fallback', () => {
-    expect(drawnColor({ effectiveColorHex: '#111111', colorHex: '#222222' }, '#333333', '#444444')).toBe('#111111');
+    expect(drawnColor({ effectiveColorHex: '#111111', colorHex: '#222222' }, '#333333', '#444444')).toBe('#222222');
+    expect(drawnColor({ effectiveColorHex: '#111111', colorHex: null }, '#333333', '#444444')).toBe('#111111');
     expect(drawnColor({ effectiveColorHex: null, colorHex: '#222222' }, '#333333', '#444444')).toBe('#222222');
     expect(drawnColor({ colorHex: null }, '#333333', '#444444')).toBe('#333333');
     expect(drawnColor({}, null, '#444444')).toBe('#444444');
@@ -203,21 +210,21 @@ describe('colouring a služba and a činnost (saved at once)', () => {
     });
   });
 
-  it('"Použít odstín služby" sends colorHex null for a činnost with a colour of its own', async () => {
+  it('"Použít výchozí barvu" sends colorHex null for a činnost with a colour of its own', async () => {
     const user = userEvent.setup();
     renderScreen(<ServiceColorsPage />, '/nastaveni/barvy-sluzeb');
     await user.click(await screen.findByRole('button', { name: 'Změnit barvu činnosti Komplexní' }));
-    await user.click(await screen.findByRole('button', { name: 'Použít odstín služby' }));
+    await user.click(await screen.findByRole('button', { name: 'Použít výchozí barvu' }));
     await waitFor(() => expect(m.updateActivity).toHaveBeenCalled());
     expect(m.updateActivity.mock.calls[0][1]).toMatchObject({ colorHex: null, parallelCapacity: 2 });
   });
 
-  it('offers no "back to the služba’s shade" for a služba', async () => {
+  it('offers "Použít výchozí barvu" for a služba too: the palette colour at its position', async () => {
     const user = userEvent.setup();
     renderScreen(<ServiceColorsPage />, '/nastaveni/barvy-sluzeb');
     await user.click(await screen.findByRole('button', { name: 'Změnit barvu služby Prohlídky' }));
     await screen.findByRole('group', { name: 'Paleta barev' });
-    expect(screen.queryByRole('button', { name: 'Použít odstín služby' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Použít výchozí barvu' })).toBeInTheDocument();
   });
 
   it('offers the palette as the server holds it, so a new colour is available at once', async () => {

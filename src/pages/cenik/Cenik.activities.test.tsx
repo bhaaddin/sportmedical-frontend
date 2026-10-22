@@ -4,6 +4,7 @@
  * the shade of its služba) and how many it serves at once - in the three
  * layouts, with validation and the whole činnost sent back untouched.
  */
+import { defaultActivityColor } from '../../colors/defaultActivityColors';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -105,7 +106,8 @@ describe.each(Object.entries(VIEWPORTS))('Ceník at %s (%i px)', (name, width) =
 
     // the row carries the colour of its služba; each činnost its own or its shade
     expect(screen.getByRole('img', { name: 'Barva položky Základní prohlídka: #0D5C52' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Barva činnosti Základní: #3E7D74' })).toBeInTheDocument();
+    /* no colour of its own: its distinct default (R12), not the služba's shade the server sends */
+    expect(screen.getByRole('img', { name: `Barva činnosti Základní: ${defaultActivityColor('a-1')}` })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Barva činnosti Komplexní: #AA5500' })).toBeInTheDocument();
     expect(screen.getAllByText(/1\s200\sKč/).length).toBeGreaterThan(0);
   });
@@ -182,14 +184,14 @@ describe('Ceník - činnosti', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
-  it('clears the own colour with "Použít odstín služby"', async () => {
+  it('clears the own colour with "Použít výchozí barvu"', async () => {
     const user = userEvent.setup();
     renderCenik();
     await user.click(await screen.findByRole('button', { name: 'Upravit činnost Komplexní' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Vlastní barva')).toBeInTheDocument();
-    await user.click(within(dialog).getByRole('button', { name: 'Použít odstín služby' }));
-    expect(within(dialog).getByText('Odstín služby')).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Použít výchozí barvu' }));
+    expect(within(dialog).getByText('Výchozí barva')).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Uložit činnost' }));
     await waitFor(() => expect(m.updateActivity).toHaveBeenCalledTimes(1));
     expect(m.updateActivity.mock.calls[0][1]).toMatchObject({ colorHex: null, parallelCapacity: 3, requiredDocumentTemplateIds: ['t-1'] });

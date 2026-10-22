@@ -45,7 +45,7 @@ export const hasPaletteErrors = (e: PaletteErrors): boolean => e.general !== nul
 
 /** The colour a činnost is drawn in: the server's computed one, else its own, else its služba's. */
 export function drawnColor(
-  activity: { effectiveColorHex?: string | null; colorHex?: string | null },
+  activity: { id?: string | null; effectiveColorHex?: string | null; colorHex?: string | null },
   serviceColor: string | null,
   fallback: string,
 ): string {

@@ -11,11 +11,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { setViewport, VIEWPORTS } from '../../../test/viewport';
 import ServiceColorsPage from '../ServiceColorsPage';
+import { defaultActivityColor } from '../../../colors/defaultActivityColors';
 import { hasPaletteErrors, normalizeHex, toRows, validatePalette } from './colorLogic';
 
 const m = vi.hoisted(() => ({
   getPalette: vi.fn(), putPalette: vi.fn(), listServices: vi.fn(), updateService: vi.fn(), listActivities: vi.fn(), updateActivity: vi.fn(),
+  listCalendars: vi.fn(), updateCalendar: vi.fn(),
 }));
+vi.mock('../../../api/calendars', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../api/calendars')>();
+  return { ...actual, calendarsApi: { ...actual.calendarsApi, list: m.listCalendars, update: m.updateCalendar } };
+});
 
 vi.mock('../../../api/serviceColors', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../api/serviceColors')>();
@@ -72,6 +78,8 @@ beforeEach(() => {
   m.updateService.mockReset().mockResolvedValue(SERVICES[0]);
   m.listActivities.mockReset().mockResolvedValue(ACTIVITIES);
   m.updateActivity.mockReset().mockResolvedValue({ activity: ACTIVITIES.activities[0], warnings: [] });
+  m.listCalendars.mockReset().mockResolvedValue([]);
+  m.updateCalendar.mockReset();
 });
 
 describe.each(Object.entries(VIEWPORTS))('Barvy služeb at %s (%i px)', (name, width) => {
@@ -104,7 +112,8 @@ describe('ServiceColorsPage', () => {
     expect(within(own).getByText('vlastní')).toBeInTheDocument();
     expect(within(await screen.findByRole('button', { name: 'Změnit barvu činnosti Základní' })).queryByText('vlastní')).not.toBeInTheDocument();
     const dot = (await screen.findByRole('button', { name: 'Změnit barvu činnosti Základní' })).querySelector('span[aria-hidden]') as HTMLElement;
-    expect(dot).toHaveStyle({ backgroundColor: '#3E7D74' });
+    /* no colour of its own: its distinct default (R12), not the služba's shade the server sends */
+    expect(dot).toHaveStyle({ backgroundColor: defaultActivityColor('a-1') });
   });
 
   it('says that a new služba is coloured automatically', async () => {
@@ -173,7 +182,7 @@ describe('ServiceColorsPage', () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(await screen.findByRole('button', { name: 'Změnit barvu činnosti Základní' }));
-    expect(screen.queryByRole('button', { name: 'Použít odstín služby' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Použít výchozí barvu' })).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Barva #9B3B1B' }));
     await waitFor(() => expect(m.updateActivity).toHaveBeenCalledTimes(1));
     const [id, body] = m.updateActivity.mock.calls[0];
@@ -184,11 +193,11 @@ describe('ServiceColorsPage', () => {
     });
   });
 
-  it('takes the own colour back with "Použít odstín služby"', async () => {
+  it('takes the own colour back with "Použít výchozí barvu"', async () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(await screen.findByRole('button', { name: 'Změnit barvu činnosti Komplexní' }));
-    await user.click(screen.getByRole('button', { name: 'Použít odstín služby' }));
+    await user.click(screen.getByRole('button', { name: 'Použít výchozí barvu' }));
     await waitFor(() => expect(m.updateActivity).toHaveBeenCalledTimes(1));
     expect(m.updateActivity.mock.calls[0][0]).toBe('a-2');
     expect(m.updateActivity.mock.calls[0][1]).toMatchObject({ colorHex: null, parallelCapacity: 2 });
@@ -199,7 +208,7 @@ describe('ServiceColorsPage', () => {
     m.getPalette.mockRejectedValueOnce(refused(500, {}));
     renderPage();
     expect(await screen.findByText('Paletu barev se nepodařilo načíst.')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Barvy služeb a činností' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Barvy' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Zkusit znovu/ }));
     expect(await screen.findByLabelText('Barva 1 jako text')).toHaveValue('#0D5C52');
   });

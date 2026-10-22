@@ -5,9 +5,11 @@ import { buildTheme, type ThemeMode } from './theme';
 import {
   ACCENT_STORAGE_KEY,
   MODE_STORAGE_KEY,
+  PLANNER_TINT_STORAGE_KEY,
   ThemePrefsContext,
   readStoredAccent,
   readStoredMode,
+  readStoredPlannerTint,
 } from './themePrefs';
 
 /**
@@ -22,6 +24,7 @@ import {
 export function ThemePrefsProvider({ children }: { children: ReactNode }) {
   const [accent, setAccentState] = useState<string>(readStoredAccent);
   const [mode, setModeState] = useState<ThemeMode>(readStoredMode);
+  const [plannerTint, setPlannerTintState] = useState<string | null>(readStoredPlannerTint);
 
   const setAccent = useCallback((color: string) => {
     /* Only a usable colour is kept: a junk value would otherwise be stored and read back as the default next time anyway. */
@@ -34,17 +37,27 @@ export function ThemePrefsProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(MODE_STORAGE_KEY, next); } catch { /* private mode */ }
   }, []);
 
+  const setPlannerTint = useCallback((color: string | null) => {
+    const next = color === null ? null : sanitizeAccent(color);
+    setPlannerTintState(next);
+    try {
+      if (next === null) localStorage.removeItem(PLANNER_TINT_STORAGE_KEY);
+      else localStorage.setItem(PLANNER_TINT_STORAGE_KEY, next);
+    } catch { /* private mode */ }
+  }, []);
+
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
       if (event.key === ACCENT_STORAGE_KEY || event.key === null) setAccentState(readStoredAccent());
       if (event.key === MODE_STORAGE_KEY || event.key === null) setModeState(readStoredMode());
+      if (event.key === PLANNER_TINT_STORAGE_KEY || event.key === null) setPlannerTintState(readStoredPlannerTint());
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   const activeTheme = useMemo(() => buildTheme(accent, mode), [accent, mode]);
-  const value = useMemo(() => ({ accent, mode, setAccent, setMode }), [accent, mode, setAccent, setMode]);
+  const value = useMemo(() => ({ accent, mode, setAccent, setMode, plannerTint, setPlannerTint }), [accent, mode, setAccent, setMode, plannerTint, setPlannerTint]);
   return (
     <ThemePrefsContext.Provider value={value}>
       <ThemeProvider theme={activeTheme}>{children}</ThemeProvider>

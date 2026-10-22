@@ -23,6 +23,7 @@ import {
   lightTints,
   normalizeHex,
   onAccentText,
+  accentInk,
   parseColor,
   relativeLuminance,
   rgbToHsl,
@@ -510,13 +511,39 @@ describe('light mode helpers', () => {
 describe('accentVariables - what the staff app puts on the document root', () => {
   const ALL = [
     '--sm-hsl', '--sm-accent', '--sm-accent-light', '--sm-accent-dark', '--sm-accent-hover', '--sm-accent-active',
-    '--sm-accent-rgb', '--sm-on-accent', '--sm-tint-hover', '--sm-tint-selected', '--sm-soft-bg', '--sm-soft-line',
+    '--sm-accent-rgb', '--sm-accent-ink', '--sm-on-accent', '--sm-tint-hover', '--sm-tint-selected', '--sm-soft-bg', '--sm-soft-line',
+    '--sm-planner-accent', '--sm-planner-accent-ink', '--sm-planner-on-accent',
   ];
 
   it.each(['light', 'dark'] as const)('the default accent sets nothing in %s (the stylesheets\' fallbacks are the default look)', (mode) => {
     const vars = accentVariables(DEFAULT_ACCENT_HEX, mode);
     expect(Object.keys(vars).sort()).toEqual([...ALL].sort());
     expect(Object.values(vars).every((v) => v === null)).toBe(true);
+  });
+
+  describe('the planner tint (R15d)', () => {
+    it('unset, the planner follows the accent: the shift is the accent itself', () => {
+      expect(accentVariables('#2563EB', 'dark', null)['--sm-hsl']).toBe(shiftExpression(deriveShift('#2563EB')));
+      expect(accentVariables('#2563EB', 'dark', null)['--sm-planner-accent']).toBeNull();
+    });
+    it('set, the planner stage is drawn in the tint while the rest keeps the accent', () => {
+      const dark = accentVariables('#2563EB', 'dark', '#EA580C');
+      expect(dark['--sm-hsl']).toBe(shiftExpression(deriveShift('#EA580C')));
+      expect(dark['--sm-accent']).toBe(accentVariables('#2563EB', 'dark')['--sm-accent']);
+      const light = accentVariables('#2563EB', 'light', '#EA580C');
+      expect(light['--sm-planner-accent']).toBe('#EA580C');
+      expect(light['--sm-planner-accent-ink']).toBe(accentInk('#EA580C'));
+      expect(light['--sm-planner-on-accent']).toBe(onAccentText('#EA580C'));
+      expect(light['--sm-accent']).toBe('#2563EB');
+    });
+    it('a tint on the default accent still reaches the planner; a tint equal to the default sets nothing for it', () => {
+      expect(accentVariables(DEFAULT_ACCENT_HEX, 'light', '#7C3AED')['--sm-planner-accent']).toBe('#7C3AED');
+      expect(accentVariables('#2563EB', 'light', DEFAULT_ACCENT_HEX)['--sm-planner-accent']).toBeNull();
+      expect(accentVariables('#2563EB', 'dark', DEFAULT_ACCENT_HEX)['--sm-hsl']).toBeNull();
+    });
+    it('a junk tint is the default one', () => {
+      expect(accentVariables('#2563EB', 'light', 'red')['--sm-planner-accent']).toBeNull();
+    });
   });
 
   it.each(['light', 'dark'] as const)('a junk accent sets nothing in %s either', (mode) => {

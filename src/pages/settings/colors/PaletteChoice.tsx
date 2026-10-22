@@ -10,7 +10,7 @@ import { normalizeHex } from './colorLogic';
 import { TYPE } from '../../../components/settings/settingsStyle';
 
 export function PaletteChoice({
-  palette, value, onPick, onClear, clearLabel = 'Použít odstín služby', ariaLabel = 'Paleta barev',
+  palette, value, onPick, onClear, clearLabel = 'Použít výchozí barvu', ariaLabel = 'Paleta barev',
 }: {
   palette: readonly string[];
   /** The colour in force, or null when there is none of its own. */

@@ -59,7 +59,7 @@ export function activityInfoOf(activity: Activity): ActivityInfo {
     name: activity.name,
     serviceId: activity.clinicServiceId,
     /* the calendar never drew the legacy `color`: only what the server computed (effective) or the činnost owns */
-    colorHex: activityColorOrNull({ effectiveColorHex: activity.effectiveColorHex, colorHex: activity.colorHex }),
+    colorHex: activityColorOrNull({ id: activity.id, effectiveColorHex: activity.effectiveColorHex, colorHex: activity.colorHex }),
     sortOrder: activity.sortOrder,
     durationMinutes: activity.durationMinutes,
     parallelCapacity: activity.parallelCapacity && activity.parallelCapacity > 0 ? activity.parallelCapacity : 1,
