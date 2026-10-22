@@ -12,7 +12,7 @@ Source: Matko's HTML board (`C:\Users\Matko\Downloads\SportMedical — 10 směr�
 | page | `#EFF1F4` | main background |
 | paper | `#FFFFFF` | sidebar, cards, dialogs |
 | line | `#E2E6EA` (strong `#DCE0E5`) | every border; cards have a 1px border and **no shadow** |
-| ink / muted / faint | `#1A1D21` / `#67707A` / `#B3B9C0` | text |
+| ink / muted / faint | `#1A1D21` / `#626B75` / `#B3B9C0` | text |
 | table head | bg `#F4F6F7`, 11px/700 uppercase, letter-spacing .08em, muted | all tables |
 | accent (default) | forest `#0D5C52`; alt slate `#2B3440` | buttons, selected states, active nav |
 | soft accent | bg `#F4F8F7`, line `#C9D6D3` | active nav pill, slot summary card |

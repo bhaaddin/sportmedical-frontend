@@ -79,8 +79,8 @@ describe('contextual drawer (1440)', () => {
     expect(within(drawer).getByRole('link', { name: 'Přehled klubů' })).not.toHaveAttribute('aria-current');
   });
 
-  it('the club screen is a planner route: no rail - the Menu drawer lights the club overview', async () => {
-    renderShell('/clubs/some-club-id', VIEWPORTS.desktop);
+  it('a club calendar is a planner route: no rail - the Menu drawer lights the clubs overview', async () => {
+    renderShell('/clubs/some-club-id/kalendar', VIEWPORTS.desktop);
     expect(document.querySelector('[data-shell="rail"]')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Menu' }));
     const drawer = await screen.findByRole('dialog', { name: 'Menu' });

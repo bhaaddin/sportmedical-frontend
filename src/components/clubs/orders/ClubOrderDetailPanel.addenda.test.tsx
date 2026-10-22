@@ -148,7 +148,7 @@ describe('Přidat další službu / další hráče', () => {
     await screen.findByTestId('order-detail');
     await user.click(screen.getByRole('button', { name: 'Přidat další službu / další hráče' }));
     const probe = await screen.findByTestId('state');
-    expect(probe).toHaveTextContent('/planovani');
+    expect(probe).toHaveTextContent('/clubs/club-1/kalendar');
     expect(probe).toHaveTextContent(
       JSON.stringify({ pickOrder: { clubId: 'club-1', parent: { orderId: ROOT_ID, clubId: 'club-1', clubName: 'FK Slaný', paymentMethod: 'ClubInvoice' } } }),
     );

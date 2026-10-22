@@ -1,5 +1,5 @@
 /*
- * `/clubs/:clubId` - one club's screen: the planner in club mode (see `PlannerPage`, `club/`). The clubs LIST and the
+ * `/clubs/:clubId/kalendar` - one club's screen: the planner in club mode (see `PlannerPage`, `club/`). The clubs LIST and the
  * other clubs pages keep the application shell; this route is a planner route (`plannerRoutes.ts`), so the shell draws
  * no sidebar around it, only the "Menu" button.
  *

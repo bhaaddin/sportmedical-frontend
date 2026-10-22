@@ -117,7 +117,7 @@ export interface ApiDataSourceOptions {
   /** The clinic's today (Prague date). */
   today?: IsoDate;
   /**
-   * A club's own screen (`/clubs/:clubId`) without an order that can be edited right now (the club has no order yet,
+   * A club's own screen (`/clubs/:clubId/kalendar`) without an order that can be edited right now (the club has no order yet,
    * or the order in view is waiting for the club / done): the planner still is in club mode - the club's header, an
    * empty deck, its windows on the board - but nothing is planned and nothing is written.
    */

@@ -1,5 +1,5 @@
 /*
- * What a club's planner screen (`/clubs/:clubId`) reads: the club, its orders folded into groups, the group in view and
+ * What a club's planner screen (`/clubs/:clubId/kalendar`) reads: the club, its orders folded into groups, the group in view and
  * - when that group can be edited - the `PickSession` that puts it on the stage. The same API clients and query keys
  * the old club page used (`['club-orders', clubId, '', '']`), so every order change refreshes both.
  *

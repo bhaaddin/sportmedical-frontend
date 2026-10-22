@@ -44,7 +44,7 @@ export const DESIGN = {
   font: '"Public Sans", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
   ink: '#1A1D21',
   inkSoft: '#14181C',
-  muted: '#67707A',
+  muted: '#626B75',
   faint: '#B3B9C0',
   line: '#E2E6EA',
   lineStrong: '#DCE0E5',

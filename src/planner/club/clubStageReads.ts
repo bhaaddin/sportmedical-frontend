@@ -1,7 +1,7 @@
 /*
  * THE READS THE CLUB SCREEN'S STAGE STARTS FROM, STARTED AS SOON AS THE CLUB'S ORDERS ARE KNOWN
  *
- * Opening `/clubs/:clubId` used to be a serial chain: the club's orders -> (code, draw) -> the order -> the preview of
+ * Opening `/clubs/:clubId/kalendar` used to be a serial chain: the club's orders -> (code, draw) -> the order -> the preview of
  * its days -> the days, blocks, club windows and previews of the visible range -> the board's own week. Each level
  * waited for the one before, so the screen cost the SUM of six round trips. Nothing after the orders really depends on
  * anything but the orders and the calendar list, so this file works out - from those two answers alone - every read

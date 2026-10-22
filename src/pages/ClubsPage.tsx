@@ -5,9 +5,9 @@
  *
  * This is the LIST of clubs. A card shows a reservation or a block running, who to
  * call, how many athletes it brings and the discount the administrator gave it.
- * Opening a card goes to the club's own screen, `/clubs/:clubId` - the planner in
- * club mode (planner/ClubPlannerPage): the club's header, its orders on the board,
- * and every action of the old detail page reachable from there.
+ * Opening a card goes to the club's own PAGE, `/clubs/:clubId` (pages/clubs/overview):
+ * the statistics, the orders, the players. Its "Kalendář" button opens the planner in
+ * club mode, `/clubs/:clubId/kalendar` (planner/ClubPlannerPage).
  *
  * The data is what the API answers. Payers come from `/api/clubs`, club blocks
  * from `/api/v1/club-blocks` (C4), reservations are the partner orders of every
@@ -18,8 +18,8 @@
  *
  * Router state this page understands (all optional, spent once read):
  *
- *   { clubId }                       go to that club's screen (`/clubs/:clubId`)
- *   { clubId, clubBlockId }          ... and land on that block
+ *   { clubId }                       go to that club's page (`/clubs/:clubId`)
+ *   { clubId, clubBlockId }          go to that club's calendar (`/clubs/:clubId/kalendar`) and land on that block
  *   { clubBlockId }                  the same, the club is found from the block
  *   { openOrderId } / { newOrder }   open an order's detail / the new-order chooser
  *
@@ -53,7 +53,8 @@ import { buildClubRow } from './clubs/clubRow';
 import type { ClubRow } from './clubs/clubRow';
 import { ClubCard } from './clubs/ClubCard';
 import { useClubSummaries } from '../components/clubs/orders/ClubSummaryCard';
-import { prefetchClubScreen } from '../api/warmReads';
+import { prefetchClubPage } from '../api/warmReads';
+import { clubCalendarPath, clubPagePath } from '../components/shell/plannerRoutes';
 import { PayerDialog } from './clubs/PayerDialog';
 import { PinnedActions } from './clubs/PinnedActions';
 import { ClubOrderEntry } from '../components/clubs/order/ClubOrderEntry';
@@ -209,14 +210,15 @@ export default function ClubsPage() {
       return;
     }
     if (handoff?.clubId !== undefined) {
-      navigate(`/clubs/${handoff.clubId}`, { replace: true, state: handoffBlockId !== null ? { clubBlockId: handoffBlockId } : null });
+      /* a window to land on means the calendar; a bare club is its page */
+      navigate(handoffBlockId !== null ? clubCalendarPath(handoff.clubId) : clubPagePath(handoff.clubId), { replace: true, state: handoffBlockId !== null ? { clubBlockId: handoffBlockId } : null });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- a hand-over is read once, on arrival
   }, []);
   useEffect(() => {
     if (handoff?.clubId !== undefined || handoffBlockId === null || blocksQuery.data === undefined) return;
     const owner = blocksQuery.data.find((b) => b.id === handoffBlockId)?.clubId;
-    if (owner !== undefined && owner !== '') navigate(`/clubs/${owner}`, { replace: true, state: { clubBlockId: handoffBlockId } });
+    if (owner !== undefined && owner !== '') navigate(clubCalendarPath(owner), { replace: true, state: { clubBlockId: handoffBlockId } });
     else navigate(location.pathname, { replace: true, state: null });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- as above: once the blocks are known
   }, [blocksQuery.data]);
@@ -231,7 +233,7 @@ export default function ClubsPage() {
         open={entry !== null}
         defaultClubId={entry?.clubId}
         onClose={() => setEntry(null)}
-        onPhone={(startClubId) => navigate('/planovani', { state: { pickOrder: startClubId !== undefined ? { clubId: startClubId } : true } })}
+        onPhone={(startClubId) => navigate(startClubId !== undefined ? clubCalendarPath(startClubId) : '/planovani', { state: { pickOrder: startClubId !== undefined ? { clubId: startClubId } : true } })}
         onInvited={(invited) => { reload(); setOpenOrderId(invited.id); }}
       />
       {openOrderId !== null ? (
@@ -363,8 +365,8 @@ export default function ClubsPage() {
                 ordersLoading={ordersLoading}
                 summaryRequest={summaryMode === 'single'}
                 billableCzk={clubOrdersQuery.isLoading ? undefined : (billableByClub.get(row.club.id) ?? null)}
-                onOpen={() => navigate(`/clubs/${row.club.id}`)}
-                onPrefetch={() => prefetchClubScreen(queryClient, row.club.id)}
+                onOpen={() => navigate(clubPagePath(row.club.id))}
+                onPrefetch={() => prefetchClubPage(queryClient, row.club.id)}
               />
             ))}
           </Box>

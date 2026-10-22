@@ -5,7 +5,7 @@
  * "Sloučit do jedné objednávky". Nothing here is new logic: every dialog is the one the old club page mounted, every
  * action calls what that page called; the planner only reaches them from its own buttons.
  *
- * Mounted by `PlannerPage` on `/clubs/:clubId` (`useClubPlanner()` is null on every other route, so the planner's panels
+ * Mounted by `PlannerPage` on `/clubs/:clubId/kalendar` (`useClubPlanner()` is null on every other route, so the planner's panels
  * draw exactly as before there).
  */
 import { useQueryClient } from '@tanstack/react-query';

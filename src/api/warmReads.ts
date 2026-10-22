@@ -28,11 +28,13 @@ import { activitiesApi } from './activities';
 import { calendarsApi } from './calendars';
 import { readPublicClinic } from './clinicSettings';
 import { clinicServicesApi } from './clinicServices';
-import { clubBlocksApi, fetchBlockableActivities } from './clubBlocks';
+import { clubBlocksApi, fetchBlockableActivities, type ClubBlockView } from './clubBlocks';
 import { clubOrdersApi, type ClubOrderView } from './clubOrders';
 import { CLUB_SETTINGS_QUERY_KEY, clubSettingsApi, clubsApi, type Club } from './clubs';
 import { CALENDAR_DISPLAY_QUERY_KEY, readCalendarDisplay } from './displaySettings';
 import { holidaysApi } from './holidays';
+import { normalizeSummary } from '../components/clubs/orders/orderLogic';
+import { newestOrderIds } from '../pages/clubs/overview/clubOverviewModel';
 
 /** How long the pointer rests on a card before it counts as an intention to open it. */
 export const HOVER_INTENT_MS = 200;
@@ -96,19 +98,8 @@ const ordersOf = (clubId: string) => () => clubOrdersApi.list({ clubId });
 export const clubRoute = { load: () => import('../planner/ClubPlannerPage') };
 const NO_WINDOWS: never[] = [];
 
-/**
- * The reads of a club's own screen (`/clubs/:clubId`, see `useClubPlannerData` and `planner/club/clubStageReads.ts`),
- * all started together instead of one after the other:
- *   - the club and its orders - taken from the club list's answers when they are here (`/api/clubs` and the unfiltered
- *     `club-orders` carry exactly what `/api/clubs/{id}` and `club-orders?clubId=` return), each still asked once
- *     behind the shared copy;
- *   - the club windows, the činnost catalogue an edited order needs (`/api/activities`: the very request the reference
- *     činnosti make, the HTTP layer shares it), the reference data and the settings;
- *   - the screen's code (the lazy route), and
- *   - as soon as the orders are known: everything the stage reads when it draws (the order, its days, the visible range,
- *     the board's week, the inquiries).
- */
-export function prefetchClubScreen(queryClient: QueryClient, clubId: string, options: ClubScreenWarmOptions = {}): void {
+/** The club, its orders and the club windows: what the club's page AND the club's calendar both start from. */
+function warmClubCore(queryClient: QueryClient, clubId: string): { orders: Promise<ClubOrderView[]>; blocks: Promise<ClubBlockView[]> } {
   seedFrom<Club[], Club>(
     queryClient,
     ['clubs', 'one', clubId],
@@ -128,6 +119,43 @@ export function prefetchClubScreen(queryClient: QueryClient, clubId: string, opt
   const blocks = queryClient.fetchQuery({ queryKey: ['club-blocks', 'list'], queryFn: () => clubBlocksApi.list() });
   warm(orders);
   warm(blocks);
+  return { orders, blocks };
+}
+
+/** The club page's code: the lazy route module, fetched ahead of the click. */
+export const clubPageRoute = { load: () => import('../pages/clubs/overview/ClubOverviewPage') };
+
+/** The query key of a club's summary - the one `useClubSummary` reads (`components/clubs/orders/ClubSummaryCard`, pinned by a test). */
+const clubSummaryKey = (clubId: string) => ['club-summary', clubId] as const;
+
+/**
+ * The reads of a club's own PAGE (`/clubs/:clubId/kalendar`, pages/clubs/overview): the club, its orders and windows (taken from the
+ * club list's answers when they are fresh), its summary, the history of the orders touched last, and the page's code. Nothing of the calendar - its code and stage
+ * reads start when the pointer rests on the page's "Kalendář" button (`prefetchClubScreen`).
+ */
+export function prefetchClubPage(queryClient: QueryClient, clubId: string): void {
+  const { orders } = warmClubCore(queryClient, clubId);
+  /* "Poslední změny": the list answers carry no history, so the few orders touched last are read one by one - started the
+     moment the orders are known, not after the page has drawn (the same key and read as the page's own). */
+  warm(orders.then((list) => Promise.all(newestOrderIds(list).map((id) => queryClient.prefetchQuery({ queryKey: ['club-order', id], queryFn: () => clubOrdersApi.get(id), staleTime: 60_000 })))));
+  warm(queryClient.prefetchQuery({ queryKey: clubSummaryKey(clubId), queryFn: async () => normalizeSummary(await clubOrdersApi.clubSummary(clubId)), staleTime: 60_000 }));
+  warm(clubPageRoute.load());
+}
+
+/**
+ * The reads of a club's own screen (`/clubs/:clubId/kalendar`, see `useClubPlannerData` and `planner/club/clubStageReads.ts`),
+ * all started together instead of one after the other:
+ *   - the club and its orders - taken from the club list's answers when they are here (`/api/clubs` and the unfiltered
+ *     `club-orders` carry exactly what `/api/clubs/{id}` and `club-orders?clubId=` return), each still asked once
+ *     behind the shared copy;
+ *   - the club windows, the činnost catalogue an edited order needs (`/api/activities`: the very request the reference
+ *     činnosti make, the HTTP layer shares it), the reference data and the settings;
+ *   - the screen's code (the lazy route), and
+ *   - as soon as the orders are known: everything the stage reads when it draws (the order, its days, the visible range,
+ *     the board's week, the inquiries).
+ */
+export function prefetchClubScreen(queryClient: QueryClient, clubId: string, options: ClubScreenWarmOptions = {}): void {
+  const { orders, blocks } = warmClubCore(queryClient, clubId);
   warm(queryClient.prefetchQuery({ queryKey: ['club-block-activities'], queryFn: fetchBlockableActivities }));
   warmReferenceData(queryClient, options.year);
   if (options.stage === false) return;

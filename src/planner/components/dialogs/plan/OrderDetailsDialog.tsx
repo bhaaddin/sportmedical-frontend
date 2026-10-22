@@ -3,9 +3,9 @@
  * and by the command panel): the order činnost by činnost with "Plánovat →" (arms that činnost), the overall
  * ring, and the way back to the club.
  *
- * On a club's own screen (`/clubs/:clubId`) the same dialog also carries the rest of the club - the figures, the
+ * On a club's own screen (`/clubs/:clubId/kalendar`) the same dialog also carries the rest of the club - the figures, the
  * orders with their actions, the breakdown by služba, the windows, links and history, the older reservations, the
- * club's actions (`club/ClubOverviewSections`) - and its way back is "Zpět na kluby".
+ * club's actions (`club/ClubOverviewSections`) - and its way back is "Zpět na klub" (the club's page).
  */
 import type { CSSProperties } from 'react';
 import { timeLeft } from '../../../model';
@@ -78,14 +78,12 @@ function OrderDetailsBody() {
 function OrderDetailsFooter({ close }: { close: () => void }) {
   const { order, profile } = usePlannerModelState();
   const club = useClubPlanner();
-  const toClub = useGoToClub(order?.clubId ?? profile?.clubId ?? null);
-  const toList = useGoToClub(null);
+  /* on a club's calendar the way back is that club's page; elsewhere the club of the order in view */
+  const toClub = useGoToClub(club?.club.id ?? order?.clubId ?? profile?.clubId ?? null);
   return (
     <>
       <button type="button" className="app-button" data-close="1" onClick={close}>Zavřít</button>
-      {club !== null ? (
-        toList ? <button type="button" className="app-button" id="from-overview-clubs" onClick={toList}>Zpět na kluby</button> : null
-      ) : toClub ? <button type="button" className="app-button" id="from-overview-club" onClick={toClub}>Zpět na klub</button> : null}
+      {toClub ? <button type="button" className="app-button" id="from-overview-club" onClick={toClub}>Zpět na klub</button> : null}
       <button type="button" className="app-button primary" id="from-overview-continue" onClick={close}>Pokračovat do kalendáře →</button>
     </>
   );

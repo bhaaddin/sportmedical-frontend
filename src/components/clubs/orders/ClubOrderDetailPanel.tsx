@@ -25,6 +25,7 @@ import type { ClubBlockView } from '../../../api/clubBlocks';
 import { clubOrdersApi, ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL } from '../../../api/clubOrders';
 import type { ClubOrderView } from '../../../api/clubOrders';
 import { useIsPhone } from '../../../layout/useDevice';
+import { clubCalendarPath } from '../../shell/plannerRoutes';
 import { formatCzk } from '../../../pages/clubs/clubOrders';
 import { SectionLabel, SoftCard, StatusChip } from '../../ui';
 import { todayInPrague } from '../blockLogic';
@@ -106,10 +107,10 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
     onChanged?.();
   };
 
-  /* "Upravit termíny": the calendar in pick mode, prefilled with every window of this order (and, from "Přidat hráče / rozšířit", the new numbers). */
+  /* "Upravit termíny": the club's calendar in pick mode, prefilled with every window of this order (and, from "Přidat hráče / rozšířit", the new numbers). */
   const editTerms = (o: ClubOrderView, activities?: CoverageActivity[]) => {
     setPlayersOpen(null);
-    navigate('/planovani', { state: { pickOrder: { start: editSessionFor(o, activitiesQuery.data ?? [], todayInPrague(), activities) } } });
+    navigate(clubCalendarPath(o.clubId), { state: { pickOrder: { start: editSessionFor(o, activitiesQuery.data ?? [], todayInPrague(), activities) } } });
   };
 
   const body = () => {
@@ -304,7 +305,7 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
   };
 
   const addAddendum = (o: ClubOrderView) =>
-    navigate('/planovani', {
+    navigate(clubCalendarPath(o.clubId), {
       state: { pickOrder: { clubId: o.clubId, parent: { orderId: o.groupId, clubId: o.clubId, clubName: o.clubName, paymentMethod: o.paymentMethod } } },
     });
 
@@ -470,7 +471,7 @@ export function ClubOrderDetailPanel({ orderId: initialId, initialOrder, onClose
           processOrder={dialog === 'process' ? order : undefined}
           onEditTerms={(session) => {
             setDialog(null);
-            navigate('/planovani', { state: { pickOrder: { start: session } } });
+            navigate(order !== undefined ? clubCalendarPath(order.clubId) : '/planovani', { state: { pickOrder: { start: session } } });
           }}
           onSaved={() => { setDialog(null); refresh(); }}
         />

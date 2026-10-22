@@ -1,0 +1,90 @@
+{
+  "base": "http://localhost:3009",
+  "at": "2026-10-22T12:46:22.512Z",
+  "runs": {
+    "1920x1080 list->page timing": {
+      "headingMs": 43,
+      "calendarMs": 864
+    },
+    "1920x1080 populated dark": {
+      "regionScroll": 159,
+      "shelves": [
+        {
+          "id": "club-stats",
+          "state": "ready",
+          "heading": "Statistiky"
+        },
+        {
+          "id": "club-orders",
+          "state": "ready",
+          "heading": "Objednávky"
+        },
+        {
+          "id": "club-next-terms",
+          "state": "ready",
+          "heading": "Nejbližší termíny"
+        },
+        {
+          "id": "club-changes",
+          "state": "ready",
+          "heading": "Poslední změny"
+        },
+        {
+          "id": "club-players",
+          "state": "ready",
+          "heading": "Hráči"
+        },
+        {
+          "id": "club-links",
+          "state": "ready",
+          "heading": "Odkazy"
+        }
+      ],
+      "contrast": {
+        "checked": 2,
+        "skipped": 147,
+        "bad": 0
+      }
+    },
+    "1920x1080 empty dark": {
+      "regionScroll": 0,
+      "shelves": [
+        {
+          "id": "club-stats",
+          "state": "ready",
+          "heading": "Statistiky"
+        },
+        {
+          "id": "club-orders",
+          "state": "empty",
+          "heading": "Objednávky"
+        },
+        {
+          "id": "club-next-terms",
+          "state": "empty",
+          "heading": "Nejbližší termíny"
+        },
+        {
+          "id": "club-changes",
+          "state": "empty",
+          "heading": "Poslední změny"
+        },
+        {
+          "id": "club-players",
+          "state": "ready",
+          "heading": "Hráči"
+        },
+        {
+          "id": "club-links",
+          "state": "empty",
+          "heading": "Odkazy"
+        }
+      ],
+      "contrast": {
+        "checked": 4,
+        "skipped": 46,
+        "bad": 0
+      }
+    }
+  }
+}

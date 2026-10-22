@@ -88,7 +88,8 @@ export function PaletteTrigger() {
 }
 
 function PrimaryButton({ action }: { action: NonNullable<PageFrameProps['primaryAction']> }) {
-  const common = { variant: 'contained' as const, startIcon: action.icon, sx: { ...TARGET_SX, whiteSpace: 'nowrap' as const } };
+  const intent = action.onIntent === undefined ? {} : { onPointerEnter: action.onIntent, onFocus: action.onIntent, onTouchStart: action.onIntent };
+  const common = { variant: 'contained' as const, startIcon: action.icon, sx: { ...TARGET_SX, whiteSpace: 'nowrap' as const }, ...intent };
   return action.to !== undefined
     ? <Button component={RouterLink} to={action.to} state={action.state} {...common}>{action.label}</Button>
     : <Button onClick={action.onClick} {...common}>{action.label}</Button>;

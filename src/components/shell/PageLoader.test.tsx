@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { StaffShellPlaceholder } from './PageLoader';
@@ -27,9 +27,12 @@ describe('StaffShellPlaceholder (shown while the staff portal arrives)', () => {
     expect(screen.getByText('SPORTMEDICAL')).toBeInTheDocument();
   });
 
-  it('draws no frame on a club\'s own screen', () => {
-    at('/clubs/942e2676-d730-4a13-8016-17f95abd26e2');
+  it("draws no frame on a club's calendar, and keeps it for the club's page", () => {
+    at('/clubs/942e2676-d730-4a13-8016-17f95abd26e2/kalendar');
     expect(screen.queryByTestId('staff-shell-placeholder')).toBeNull();
+    cleanup();
+    at('/clubs/942e2676-d730-4a13-8016-17f95abd26e2');
+    expect(screen.getByTestId('staff-shell-placeholder')).toBeInTheDocument();
   });
 
   it('keeps the frame for the clubs list and its section pages', () => {

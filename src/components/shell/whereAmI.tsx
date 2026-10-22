@@ -16,7 +16,7 @@ import { accentLiteral } from '../../theme';
 import { PATIENT_SECTIONS, sectionPath } from '../../pages/patients/sections';
 import { ActionBar } from './ActionBar';
 import { PlannerMenuSlot } from './SidebarSlot';
-import { isPlannerRoute } from './plannerRoutes';
+import { clubIdOfRoute, clubPageIdOfRoute, clubPagePath, isPlannerRoute } from './plannerRoutes';
 import type { SettingsItemAt } from './settingsTypes';
 import type { MenuEntry } from './shellTypes';
 
@@ -49,6 +49,12 @@ export function computeCrumbs({
   } else if (pathname === '/patients/register') {
     /* No longer a child in the menu (R19: an action lives in the top bar), but still a place with a name. */
     crumbs.push({ label: 'Pacienti', to: '/patients' }, { label: 'Nový pacient' });
+  } else if (clubPageIdOfRoute(pathname) !== null || clubIdOfRoute(pathname) !== null) {
+    /* a club's page, and its calendar one step further: the middle crumb leads back to the page (the phone has no other way) */
+    const calendarOf = clubIdOfRoute(pathname);
+    crumbs.push({ label: 'Kluby a týmy', to: '/clubs' });
+    if (calendarOf !== null) crumbs.push({ label: 'Klub', to: clubPagePath(calendarOf) }, { label: 'Kalendář' });
+    else crumbs.push({ label: 'Klub' });
   } else if (pathname.startsWith('/kalendar/')) {
     crumbs.push({ label: 'Kalendář', to: '/planovani' }, { label: 'Termín' });
   } else {
