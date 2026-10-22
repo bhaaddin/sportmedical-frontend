@@ -9,13 +9,9 @@
 import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PLANNER_TEXT } from '../text';
-import { usePlannerSelector } from '../state/PlannerStoreProvider';
-import { useStage } from '../components/PlannerStage';
-import { usePlannerMetrics } from '../components/PlannerMetrics';
-import { usePlanFigures } from '../components/plan/usePlanFigures';
 import {
   chooseHint, hintKeyOf, loadMemory, markSeen, mute, saveMemory, wants,
-  NO_CLOCK, type HintClock, type HintId, type HintInput, type HintLayout, type HintMemory,
+  NO_CLOCK, type HintClock, type HintId, type HintInput, type HintMemory,
 } from './hints';
 import './guide.css';
 
@@ -37,37 +33,12 @@ export function textOf(id: HintId, variant: string, hidden: number): { title: st
   return { title: T.start.title, text: s[variant] ?? T.start.board };
 }
 
-export default function GuideHost() {
-  const { base } = usePlanFigures();
-  const view = usePlannerSelector((s) => s.view);
-  const armed = usePlannerSelector((s) => s.planning.selectedCategoryId !== null);
-  const calloutOpen = usePlannerSelector((s) => s.planning.completion !== null);
-  const dialogOpen = usePlannerSelector((s) => s.dialog !== null || s.summary.open);
-  const page = usePlannerSelector((s) => s.carousel.index);
-  const { layout } = useStage();
-  const { deckVisible } = usePlannerMetrics();
-
+/** `input` is what the planner state says (read by `GuideSlot`, which stays in the planner's own chunk); this chunk only decides and draws. */
+export default function GuideHost({ input }: { input: HintInput }) {
   const key = useMemo(() => hintKeyOf(rawUser()), []);
   const [memory, setMemory] = useState<HintMemory>(() => loadMemory(storageOf(), key));
   const [, tick] = useReducer((n: number) => n + 1, 0);
   const clock = useRef<HintClock>(NO_CLOCK);
-  const firstPage = useRef(page);
-  const [stripUsed, setStripUsed] = useState(false);
-  useEffect(() => { if (page !== firstPage.current) setStripUsed(true); }, [page]);
-
-  const activities = base.list.length;
-  const input: HintInput = {
-    active: activities > 0,
-    activities,
-    planned: base.planned,
-    armed,
-    view,
-    layout: layout as HintLayout,
-    hiddenCards: Math.max(0, activities - deckVisible),
-    stripUsed,
-    dialogOpen,
-    calloutOpen,
-  };
   const choice = chooseHint(input, memory, Date.now(), clock.current);
 
   /* Remember what happened to the hint that was on screen, and note the one that appears. */
