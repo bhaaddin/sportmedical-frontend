@@ -23,5 +23,8 @@
 html[data-motion='full'] .sm-planner .guide-hint { animation: guide-hint-in 240ms ease-out both; }
 html[data-motion='reduced'] .sm-planner .guide-hint { animation: plan-fade-in 140ms ease-out both; }
 
+/* the compact layouts draw the board in a layer of their own: the hint is above it, below the dock, the completion card and the dialogs */
+.sm-planner.is-compact .guide-hint { z-index: calc(var(--compact-layer-z, 20) - 4); }
+
 /* the phone: the strip lies below the fold, so the hint appears with it - right above its cards, never over them */
 .sm-planner[data-layout='phone'] .guide-hint { right: 12px; left: 12px; width: auto; max-width: 460px; margin: 0 auto; }

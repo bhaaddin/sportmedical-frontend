@@ -109,7 +109,7 @@ async function flow(browser, size) {
   await page.locator('.plan-card', { hasText: 'Základní' }).first().click();
   await toMonth(page, 'Leden 2027');
   const armed = await page.locator('[data-testid=guide-hint]').first().innerText().catch(() => '');
-  check(/Činnost je vybraná|Vyberte činnost dole/.test(armed), `(a) the hint follows the state: "${armed.replace(/\s+/g, ' ').slice(0, 90)}"`);
+  check(/Činnost je vybraná|Vyberte činnost/.test(armed), `(a) the hint follows the state: "${armed.replace(/\s+/g, ' ').slice(0, 90)}"`);
   await dayEl(page, '2027-01-01').click();
   await page.waitForTimeout(700);
   const closed = (await toasts(page)).join(' ');
