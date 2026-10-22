@@ -121,7 +121,7 @@ describe.each([['phone'], ['tablet'], ['desktop']] as const)('order detail · %s
     const user = userEvent.setup();
     mount(make());
     await user.click(await screen.findByRole('button', { name: 'Upravit termíny' }));
-    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('/planovani'));
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('/clubs/club-1/kalendar'));
     const start = (navigated as { pickOrder: { start: { editOrder: { mode: string; orderId: string; blocks: { id: string }[] }; activities: { activityId: string; seats: number; minutesPerSeat: number }[]; serviceId: string } } }).pickOrder.start;
     expect(start.editOrder.mode).toBe('edit');
     expect(start.editOrder.orderId).toBe(ID);
@@ -212,7 +212,7 @@ describe('Přidat hráče / rozšířit and Odebrat hráče', () => {
     expect(within(surplus).getByTestId('change-players-surplus-text')).toHaveTextContent('Navíc 19 slotů');
     expect(within(dialog).queryByRole('button', { name: 'Uložit' })).toBeNull();
     await user.click(within(dialog).getByTestId('change-players-edit-terms'));
-    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('/planovani'));
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('/clubs/club-1/kalendar'));
     const start = (navigated as { pickOrder: { start: { activities: { activityId: string; seats: number }[] } } }).pickOrder.start;
     expect(start.activities.map((a) => [a.activityId, a.seats])).toEqual([['a-1', 5], ['a-2', 4]]);
     expect(update).toHaveBeenCalledTimes(1);
@@ -256,7 +256,7 @@ describe('Přidat hráče / rozšířit and Odebrat hráče', () => {
     expect(within(dialog).getByTestId('change-players-enlarge')).toBeInTheDocument();
     expect(within(short).queryByRole('button', { name: 'Upravit termíny' })).toBeNull();
     await user.click(within(dialog).getByRole('button', { name: 'Pokračovat: vybrat termíny' }));
-    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('/planovani'));
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('/clubs/club-1/kalendar'));
     const start = (navigated as { pickOrder: { start: { activities: { activityId: string; seats: number }[]; editOrder: { mode: string } } } }).pickOrder.start;
     expect(start.editOrder.mode).toBe('edit');
     expect(start.activities.map((a) => [a.activityId, a.seats])).toEqual([['a-1', 40], ['a-2', 4]]);

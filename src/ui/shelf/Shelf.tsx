@@ -33,6 +33,8 @@ export interface ShelfAction {
   state?: Record<string, unknown>;
   /** ... or a handler. */
   onClick?: () => void;
+  /** The pointer rests on it / it gets focus / a finger lands: warm what the target needs (code, reads). Never a write. */
+  onIntent?: () => void;
 }
 
 export interface ShelfProps {

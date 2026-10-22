@@ -39,6 +39,7 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const PlannerLabPage = lazy(() => import('./planner/PlannerLabPage'));
 const PlannerPage = lazy(() => import('./planner/PlannerPage'));
 const ClubPlannerPage = lazy(() => import('./planner/ClubPlannerPage'));
+const ClubOverviewPage = lazy(() => import('./pages/clubs/overview/ClubOverviewPage'));
 const FeedbackReviewPage = lazy(() => import('./pages/FeedbackReviewPage'));
 const IntakeReviewQueue = lazy(() => import('./pages/IntakeReviewQueue'));
 const DashboardPage = lazy(() => import('./pages/Dashboard'));
@@ -476,7 +477,9 @@ export default function StaffApp() {
           <Route path="/clubs/hraci" element={<ClubPlayersPage />} />
           <Route path="/clubs/statistiky" element={<ClubStatsPage />} />
           <Route path="/clubs/fakturace" element={<ClubBillingPage />} />
-          <Route path="/clubs/:clubId" element={<ClubPlannerPage />} />
+          {/* Stage 5a (R7): a club has its own PAGE first; its calendar (the planner) is one click further. An old /clubs/:clubId bookmark is the page. */}
+          <Route path="/clubs/:clubId" element={<ClubOverviewPage />} />
+          <Route path="/clubs/:clubId/kalendar" element={<ClubPlannerPage />} />
           <Route path="/accounting-export" element={<RequirePermission of="billing.manage"><AccountingExportPage /></RequirePermission>} />
           <Route path="/intake-review" element={<RequirePermission of="patients.register"><IntakeReviewQueue /></RequirePermission>} />
           <Route path="/planovani" element={<PlannerPage />} />

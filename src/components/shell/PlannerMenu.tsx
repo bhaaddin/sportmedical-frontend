@@ -9,8 +9,8 @@
  * portalled into the where-am-I row's slot (SidebarSlot.tsx), and the page's left margin that the sidebar/rail used to
  * claim is given back here.
  *
- * On a club's own screen (`/clubs/:clubId`) a second button of the same tokens, "Zpět na kluby", stands next to Menu and
- * leads to the clubs list (the list keeps the normal shell with its sidebar).
+ * On a club's calendar (`/clubs/:clubId/kalendar`) a second button of the same tokens, "Zpět na klub", stands next to Menu and
+ * leads to the club's own page (an ordinary page with the normal shell).
  *
  * Button tokens are copied from the prototype's `#club-edit-link` (the secondary header button in
  * `design/planner-v65.html`): 32px, radius 7px, 1px #32b5c7c9, gradient 105deg #063649 -> #072a3d, ink #ddffff,
@@ -24,7 +24,7 @@ import { ArrowBack, Menu as MenuIcon } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { NewOrderChooser } from '../booking/NewOrderChooser';
 import { NavDrawer } from './Sidebar';
-import { clubIdOfRoute } from './plannerRoutes';
+import { clubIdOfRoute, clubPagePath } from './plannerRoutes';
 import { usePlannerMenuEl } from './SidebarSlot';
 import type { ShellNav } from './shellTypes';
 import { accentLiteral } from '../../theme';
@@ -51,7 +51,7 @@ const buttonSx = (t: Theme) => ({
 export function PlannerMenu({ nav }: { nav: ShellNav }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const onClubScreen = clubIdOfRoute(useLocation().pathname) !== null;
+  const clubId = clubIdOfRoute(useLocation().pathname);
   const [chooser, setChooser] = useState(false);
   const slot = usePlannerMenuEl();
 
@@ -78,16 +78,16 @@ export function PlannerMenu({ nav }: { nav: ShellNav }) {
       {slot !== null ? createPortal(
         <>
           {button}
-          {onClubScreen ? (
+          {clubId !== null ? (
             <Button
               variant="outlined"
               size="small"
               data-testid="club-back-button"
               startIcon={<ArrowBack sx={{ fontSize: '15px !important' }} />}
-              onClick={() => navigate('/clubs')}
+              onClick={() => navigate(clubPagePath(clubId))}
               sx={buttonSx}
             >
-              Zpět na kluby
+              Zpět na klub
             </Button>
           ) : null}
         </>,

@@ -20,6 +20,7 @@ describe('childrenFor', () => {
     ['/clubs', '/clubs'],
     ['/clubs/objednavky', '/clubs'],
     ['/clubs/abc-123', '/clubs'],
+    ['/clubs/abc-123/kalendar', '/clubs'],
     ['/billing', '/billing'],
     ['/cashier', '/billing'],
     ['/accounting-export', '/billing'],

@@ -12,7 +12,7 @@
  *                nothing             standard ordering: the same board, the header shows the clinic's own data
  *   board      `realCalendar`: the board reads the clinic's real calendar (bookings, blocks, filters) on top of
  *              the planner's data, and offers "Nová objednávka" / "Klubová objednávka".
- *   club       `/clubs/:clubId` (`clubId` prop): the same screen for ONE club - its data in the header, the club's
+ *   club       `/clubs/:clubId/kalendar` (`clubId` prop): the same screen for ONE club - its data in the header, the club's
  *              windows on the board, every action of the old club page reachable from the planner (see `club/`).
  *              It OPENS AS THE CLUB'S OVERVIEW (reviewer 2.3): the same layout in the club's context
  *              (`ApiDataSource.clubContext`), the order the switcher names (`?order=`) in view and the quick actions
@@ -57,12 +57,12 @@ function hashOf(text: string): string {
   return h.toString(36);
 }
 
-/** The planner as a page: the everyday calendar on `/planovani`, one club's screen on `/clubs/:clubId`. */
+/** The planner as a page: the everyday calendar on `/planovani`, one club's screen on `/clubs/:clubId/kalendar`. */
 export default function PlannerPage({ clubId }: { clubId?: string } = {}) {
   return clubId ? <ClubPlannerScreen clubId={clubId} /> : <PlannerScreen club={null} />;
 }
 
-/** `/clubs/:clubId`: load the club and its orders, then draw the planner in the club's context. */
+/** `/clubs/:clubId/kalendar`: load the club and its orders, then draw the planner in the club's context. */
 function ClubPlannerScreen({ clubId }: { clubId: string }) {
   const location = useLocation();
   const [params] = useSearchParams();

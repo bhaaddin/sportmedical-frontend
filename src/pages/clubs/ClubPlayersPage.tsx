@@ -5,6 +5,7 @@
 import { useMemo, useState } from 'react';
 import { Box, Button, Link, Skeleton, Stack, TextField, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { ATHLETE_STATUSES, clubBlocksApi, type ClubBlockAthleteStatus } from '../../api/clubBlocks';
 import { clubOrdersApi } from '../../api/clubOrders';
 import { ATHLETE_STATUS_LABEL, ATHLETE_STATUS_TONE, athletePriceText } from '../../components/clubs/athleteList';
@@ -17,7 +18,9 @@ import { ClubDot, LoadError, SelectFilter } from './subpages/common';
 import { collectPlayers, filterPlayers, playersToCsv, telHref, type PlayerRow } from './subpages/players';
 
 export default function ClubPlayersPage() {
-  const [clubId, setClubId] = useState('');
+  /* `?clubId=` (the club page's "Zobrazit hráče") pre-filters the list to that club. */
+  const location = useLocation();
+  const [clubId, setClubId] = useState(() => new URLSearchParams(location.search).get('clubId') ?? '');
   const [activity, setActivity] = useState('');
   const [status, setStatus] = useState<'' | ClubBlockAthleteStatus>('');
   const [search, setSearch] = useState('');

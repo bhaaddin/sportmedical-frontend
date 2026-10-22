@@ -13,7 +13,7 @@ import { boardSettings } from '../components/board/boardSettings';
 import { DemoDataSource } from '../data/DemoDataSource';
 
 /*
- * A club's own screen, `/clubs/:clubId`: the planner in club mode. What it reads (the club, its orders folded into
+ * A club's own screen, `/clubs/:clubId/kalendar`: the planner in club mode. What it reads (the club, its orders folded into
  * groups), which group is on the stage, the order switcher, the empty deck for a club with nothing to plan, and that
  * every action the old club page had is reachable from the overview dialog. The dialogs the actions open are the
  * existing ones; they are stubbed here to see that they get the right order and intent.
@@ -152,10 +152,10 @@ function mount(entry: { pathname?: string; search?: string; state?: unknown } = 
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[{ pathname: '/clubs/club-1', ...entry }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/clubs/club-1/kalendar', ...entry }]}>
         <LocationProbe />
         <Routes>
-          <Route path="/clubs/:clubId" element={<ClubPlannerPage />} />
+          <Route path="/clubs/:clubId/kalendar" element={<ClubPlannerPage />} />
           <Route path="/clubs" element={<div data-testid="clubs-list" />} />
           <Route path="*" element={<div data-testid="elsewhere" />} />
         </Routes>
@@ -214,7 +214,7 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
-describe('/clubs/:clubId - the planner in club mode', () => {
+describe('/clubs/:clubId/kalendar - the planner in club mode', () => {
   it("opens the club's own screen: club mode, the club's header, the club as the source's context", async () => {
     mount();
     const page = await screen.findByTestId('planner-page');
@@ -325,7 +325,7 @@ describe('/clubs/:clubId - the planner in club mode', () => {
   it('the setup form is asked for on this screen: a { clubId } hand-off, no session yet', async () => {
     mount({ state: { pickOrder: { clubId: 'club-1' } } });
     await screen.findByTestId('planner-page');
-    expect(where().dataset.path).toBe('/clubs/club-1');
+    expect(where().dataset.path).toBe('/clubs/club-1/kalendar');
   });
 });
 
@@ -395,7 +395,7 @@ describe('the order switcher', () => {
     expect(entry).toHaveAttribute('data-club', 'club-1');
     fireEvent.click(within(entry).getByRole('button', { name: 'Vyplním sám' }));
     await waitFor(() => expect(JSON.parse(where().dataset.state!)).toEqual({ pickOrder: { clubId: 'club-1' } }));
-    expect(where().dataset.path).toBe('/clubs/club-1');
+    expect(where().dataset.path).toBe('/clubs/club-1/kalendar');
     expect(screen.queryByTestId('entry-stub')).toBeNull();
   });
 
@@ -490,13 +490,13 @@ describe('everything the old club page offered is reachable from the overview', 
     expect(figures).toHaveTextContent('Splatnost14 dní');
   });
 
-  it('is the dialog of the order overview: a title that says "klub", and a way back to the list', async () => {
+  it('is the dialog of the order overview: a title that says "klub", and a way back to the club page', async () => {
     mount();
     await openOverview();
     const dialog = screen.getByRole('dialog', { name: /Přehled/ });
     expect(dialog).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Zpět na kluby' }));
-    await waitFor(() => expect(where().dataset.path).toBe('/clubs'));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Zpět na klub' }));
+    await waitFor(() => expect(where().dataset.path).toBe('/clubs/club-1'));
   });
 
   it('one row per group with its actions; Přidat hráče / Odebrat hráče / Zrušit / Otevřít open the existing dialogs for the root', async () => {

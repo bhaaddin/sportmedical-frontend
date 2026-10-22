@@ -74,7 +74,7 @@ describe('warmForPath', () => {
   });
 
   it('starts every read of a club screen for its own address at once: club, orders, windows, catalogue, account, settings', async () => {
-    warmForPath(new QueryClient(), `/clubs/${CLUB}`);
+    warmForPath(new QueryClient(), `/clubs/${CLUB}/kalendar`);
     await settle();
     expect(m.clubById).toHaveBeenCalledWith(CLUB);
     expect(m.orders).toHaveBeenCalledWith({ clubId: CLUB });
@@ -89,7 +89,7 @@ describe('warmForPath', () => {
   it('starts the stage of the order the address names once the orders are known', async () => {
     const rows = [order('o-1', CLUB)];
     m.orders.mockResolvedValue(rows);
-    warmForPath(new QueryClient(), `/clubs/${CLUB}`, '?order=o-1', { usr: { clubBlockId: 'b-9' }, key: 'x' });
+    warmForPath(new QueryClient(), `/clubs/${CLUB}/kalendar`, '?order=o-1', { usr: { clubBlockId: 'b-9' }, key: 'x' });
     await settle();
     expect(side.selection).toHaveBeenCalledWith(rows, [], expect.any(String), { orderId: 'o-1', blockId: 'b-9' });
     expect(side.stage).toHaveBeenCalledTimes(1);

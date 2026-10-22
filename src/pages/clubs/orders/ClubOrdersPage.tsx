@@ -22,6 +22,7 @@ import { clubsApi } from '../../../api/clubs';
 import { clubOrdersApi, ORDER_STATUSES, ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL } from '../../../api/clubOrders';
 import type { ClubOrderView } from '../../../api/clubOrders';
 import { useDevice } from '../../../layout/useDevice';
+import { clubCalendarPath } from '../../../components/shell/plannerRoutes';
 import { formatPricedSeats, orderTotalCzk, priceText } from '../../../components/clubs/orders/orderMoney';
 import { FilterChips, PageHeader, SoftCard, StatusChip } from '../../../components/ui';
 import { FIT_FILL_SX, FIT_SCROLL_SX, FitBody, FitPage } from '../../../components/ui/fit';
@@ -256,7 +257,7 @@ export default function ClubOrdersPage() {
         open={entryOpen}
         defaultClubId={entryClubId}
         onClose={() => setEntryOpen(false)}
-        onPhone={(startClubId) => navigate('/planovani', { state: { pickOrder: startClubId !== undefined ? { clubId: startClubId } : true } })}
+        onPhone={(startClubId) => navigate(startClubId !== undefined ? clubCalendarPath(startClubId) : '/planovani', { state: { pickOrder: startClubId !== undefined ? { clubId: startClubId } : true } })}
         onInvited={() => void ordersQuery.refetch()}
       />
     </FitPage>
