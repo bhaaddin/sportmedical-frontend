@@ -1,0 +1,173 @@
+{
+ "tag": "before",
+ "at": "2026-10-22T11:16:52.499Z",
+ "failures": [],
+ "results": [
+  {
+   "mode": "real",
+   "size": "390x844",
+   "elements": 9,
+   "parts": {
+    "blocks": 4,
+    "cards": 4,
+    "standaloneButtons": 1
+   },
+   "chrome": 8,
+   "charts": 0,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "border:rgba(50, 181, 199, 0.79)",
+     "border:rgba(0, 230, 228, 0.34)",
+     "border:rgba(6, 65, 90, 0.8)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 17.79,
+    "need": 4.5,
+    "adj": 3.954138450721327,
+    "text": "Najít pacienta",
+    "color": "rgb(244, 250, 255)",
+    "bg": "rgb(0,20,33)"
+   },
+   "contrastSkippedOnGradient": 1,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 871,
+   "consoleErrors": []
+  },
+  {
+   "mode": "real",
+   "size": "820x1180",
+   "elements": 13,
+   "parts": {
+    "blocks": 7,
+    "cards": 6,
+    "standaloneButtons": 0
+   },
+   "chrome": 10,
+   "charts": 0,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "bg:rgb(0, 230, 228)",
+     "color:rgb(35, 242, 231)",
+     "border:rgba(50, 181, 199, 0.79)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 16.43,
+    "need": 4.5,
+    "adj": 3.650816790399919,
+    "text": "Všichni pacienti",
+    "color": "rgb(221, 255, 255)",
+    "bg": "rgb(2,28,45)"
+   },
+   "contrastSkippedOnGradient": 1,
+   "smallTargets": [],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 252,
+   "consoleErrors": []
+  },
+  {
+   "mode": "real",
+   "size": "1440x900",
+   "elements": 19,
+   "parts": {
+    "blocks": 8,
+    "cards": 11,
+    "standaloneButtons": 0
+   },
+   "chrome": 10,
+   "charts": 0,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "bg:rgb(0, 230, 228)",
+     "color:rgb(35, 242, 231)",
+     "border:rgba(50, 181, 199, 0.79)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 11.98,
+    "need": 4.5,
+    "adj": 2.6616621596252843,
+    "text": "Všichni pacienti",
+    "color": "rgb(0, 230, 228)",
+    "bg": "rgb(0,20,33)"
+   },
+   "contrastSkippedOnGradient": 1,
+   "smallTargets": [
+    "Hledat 40x40",
+    "31 nepřečtených oznámení 40x40"
+   ],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 82,
+   "consoleErrors": []
+  },
+  {
+   "mode": "real",
+   "size": "1920x1080",
+   "elements": 20,
+   "parts": {
+    "blocks": 8,
+    "cards": 12,
+    "standaloneButtons": 0
+   },
+   "chrome": 10,
+   "charts": 0,
+   "colours": [
+    "160-200",
+    "320-360"
+   ],
+   "colourSamples": {
+    "160-200": [
+     "bg:rgb(0, 230, 228)",
+     "color:rgb(35, 242, 231)",
+     "border:rgba(50, 181, 199, 0.79)"
+    ],
+    "320-360": [
+     "color:rgb(255, 123, 152)"
+    ]
+   },
+   "contrastWorst": {
+    "ratio": 16.9,
+    "need": 4.5,
+    "adj": 3.7560691696096384,
+    "text": "Zkušební Karel",
+    "color": "rgb(244, 250, 255)",
+    "bg": "rgb(0,26,42)"
+   },
+   "contrastSkippedOnGradient": 1,
+   "smallTargets": [
+    "Hledat 40x40",
+    "31 nepřečtených oznámení 40x40"
+   ],
+   "docScroll": 0,
+   "hOverflow": 0,
+   "fitRegionScroll": 0,
+   "consoleErrors": []
+  }
+ ]
+}

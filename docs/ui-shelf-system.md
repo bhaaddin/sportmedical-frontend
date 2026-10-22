@@ -8,7 +8,11 @@ connected product**: pages organised like a **shelf** (titled rows of cards, eac
 This document is the guide for the people (and agents) who convert the other pages. Phase 1 built the foundation and proved it
 on two pilot areas: **Přehled** (`/prehled`) and **Pacienti** (`/patients`, `/patients/:id`). Branch `ui/shelf`, not pushed.
 
-Everything lives in `src/ui/shelf/`. Read this file, then `src/pages/Dashboard.tsx` and `src/pages/PatientList.tsx` - two
+> **Stage 4 (2026-10-22):** Přehled is no longer built from shelves - it is four calm blocks (`src/pages/overview/`, see `docs/stage4-2026-10.md`),
+> and the labelled sidebar is gone (one slim icon rail + the top action bar). `PageFrame` no longer draws a Hledat button by default.
+> The text below describes the shelf system as the other pages still use it; for Přehled read the Stage 4 document.
+
+Everything lives in `src/ui/shelf/`. Read this file, then `src/pages/PatientList.tsx` - two
 finished examples.
 
 ## 1. Anatomy
@@ -341,7 +345,7 @@ hub and the clinic's own texts, rules, templates), **A7** Systém a bezpečnost 
 
 | # | Path | Screen | Current state | Target shelves | Connections it should expose | Area | Prio |
 |---|---|---|---|---|---|---|---|
-| 1 | `/prehled` | Přehled | **Done (pilot)** | Dnes, Vyžaduje pozornost, Najít pacienta, Objednaní, Čekárna, Připnuté a nedávné, Nově v kartotéce | patients, bookings, invoices, club orders, intake | A1 | done |
+| 1 | `/prehled` | Přehled | **Redone in Stage 4** (no shelves) | Dnes, Vyžaduje pozornost, Tento týden, Kluby k vyřízení (was: Dnes, Vyžaduje pozornost, Najít pacienta, Objednaní, Čekárna, Připnuté a nedávné, Nově v kartotéce) | patients, bookings, invoices, club orders, intake | A1 | done |
 | 2 | `/planner-lab` | Planner lab (dev, localhost only) | planner demo | **Out** - the planner's lab | - | - | out |
 | 3 | `/patients` | Pacienti | **Done (pilot)** | Čeká na vás (intake), Naposledy otevření, Kartotéka (grow) | patient chips + peek, intake queue | A2 | done |
 | 4 | `/patients/register` | Nový pacient (1576 lines) | FitPage + PageHeader + SoftCard form | PageFrame; Údaje pacienta (board), Souhlasy, Podobní pacienti (EntityCards of possible duplicates), Po uložení (ActionCards: objednat, karta) | duplicates -> patient chips; after save -> card, booking, quick link | A2 | P1 |

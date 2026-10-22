@@ -130,7 +130,7 @@ function OwnerDashboard() {
 
   return (
     <FitPage data-overview="">
-      <Box component="header" data-ov="header" sx={{ display: 'flex', alignItems: 'baseline', gap: 2, flexWrap: 'wrap', mb: { xs: 2, md: 4 } }}>
+      <Box component="header" data-ov="header" sx={{ display: 'flex', alignItems: 'baseline', gap: 2, flexWrap: 'wrap', mb: { xs: 1.5, md: 4 } }}>
         <Typography component="h1" sx={{ fontSize: { xs: 24, md: 28 }, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
           {getGreeting()}, {user.firstName || 'Doktore'}
         </Typography>
@@ -141,16 +141,16 @@ function OwnerDashboard() {
         data-ov-grid=""
         sx={{
           display: 'grid',
-          gap: { xs: 2.5, sm: 5, md: 7 },
+          gap: { xs: 2, sm: 5, md: 7 },
           width: '100%',
           gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1.5fr) minmax(300px, 1fr)' },
           alignItems: 'stretch',
           flex: { md: '1 1 0' },
           minHeight: 0,
-          pb: { xs: 2, md: 1 },
+          pb: { xs: 0, md: 1 },
         }}
       >
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2.5, sm: 5, md: 6 }, minWidth: 0, minHeight: 0 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, sm: 5, md: 6 }, minWidth: 0, minHeight: 0 }}>
           <TodayHero block={day} onRetry={retryWeek} />
           <WeekChart block={week} onRetry={retryWeek} />
         </Box>
@@ -158,7 +158,7 @@ function OwnerDashboard() {
           sx={(t) => ({
             display: 'flex',
             flexDirection: 'column',
-            gap: { xs: 2.5, sm: 5, md: 5 },
+            gap: { xs: 2, sm: 5, md: 5 },
             minWidth: 0,
             alignSelf: 'start',
             [t.breakpoints.up('md')]: { borderLeft: '1px solid', borderColor: t.palette.divider, pl: 7 },

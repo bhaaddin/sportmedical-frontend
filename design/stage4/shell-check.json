@@ -1,0 +1,1126 @@
+{
+ "at": "2026-10-22T11:25:08.731Z",
+ "failures": [],
+ "rows": [
+  {
+   "size": "390x844",
+   "prehled": {
+    "sidebar": false,
+    "railWidth": null,
+    "mainLeft": 0,
+    "mainWidth": 390,
+    "railLabels": [],
+    "railHasText": 0,
+    "railTargets": [],
+    "here": [],
+    "bottomBar": true,
+    "actions": [],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "patients": {
+    "sidebar": false,
+    "railWidth": null,
+    "mainLeft": 0,
+    "mainWidth": 390,
+    "railLabels": [],
+    "railHasText": 0,
+    "railTargets": [],
+    "here": [],
+    "bottomBar": true,
+    "actions": [],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "clubs": {
+    "sidebar": false,
+    "railWidth": null,
+    "mainLeft": 0,
+    "mainWidth": 390,
+    "railLabels": [],
+    "railHasText": 0,
+    "railTargets": [],
+    "here": [],
+    "bottomBar": true,
+    "actions": [],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "billing": {
+    "sidebar": false,
+    "railWidth": null,
+    "mainLeft": 0,
+    "mainWidth": 390,
+    "railLabels": [],
+    "railHasText": 0,
+    "railTargets": [],
+    "here": [],
+    "bottomBar": true,
+    "actions": [],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "settings": {
+    "sidebar": false,
+    "railWidth": null,
+    "mainLeft": 0,
+    "mainWidth": 390,
+    "railLabels": [],
+    "railHasText": 0,
+    "railTargets": [],
+    "here": [],
+    "bottomBar": true,
+    "actions": [],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "planovani": {
+    "sidebar": false,
+    "railWidth": null,
+    "mainLeft": 0,
+    "mainWidth": 390,
+    "railLabels": [],
+    "railHasText": 0,
+    "railTargets": [],
+    "here": [],
+    "bottomBar": true,
+    "actions": [],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "bottomBar": [
+    [
+     "Kalendář",
+     56
+    ],
+    [
+     "Pacienti",
+     56
+    ],
+    [
+     "Kluby a týmy",
+     56
+    ],
+    [
+     "Fakturace",
+     56
+    ],
+    [
+     "Více",
+     56
+    ]
+   ]
+  },
+  {
+   "size": "820x1180",
+   "prehled": {
+    "sidebar": false,
+    "railWidth": 56,
+    "mainLeft": 56,
+    "mainWidth": 764,
+    "railLabels": [
+     "SportMedical — přehled (tady jste)",
+     "Kalendář",
+     "Pacienti",
+     "Kluby",
+     "Fakturace",
+     "Nastavení"
+    ],
+    "railHasText": 0,
+    "railTargets": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "here": [
+     {
+      "label": "SportMedical — přehled (tady jste)",
+      "href": null
+     }
+    ],
+    "bottomBar": false,
+    "actions": [
+     "Hledat (Ctrl K)",
+     "Nový pacient",
+     "Rychlá registrace",
+     "Nová objednávka"
+    ],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "patients": {
+    "sidebar": false,
+    "railWidth": 56,
+    "mainLeft": 56,
+    "mainWidth": 764,
+    "railLabels": [
+     "SportMedical — přehled",
+     "Kalendář",
+     "Pacienti (tady jste)",
+     "Kluby",
+     "Fakturace",
+     "Nastavení"
+    ],
+    "railHasText": 0,
+    "railTargets": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "here": [
+     {
+      "label": "Pacienti (tady jste)",
+      "href": null
+     }
+    ],
+    "bottomBar": false,
+    "actions": [
+     "Hledat (Ctrl K)",
+     "Rychlá registrace",
+     "Nová objednávka"
+    ],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "clubs": {
+    "sidebar": false,
+    "railWidth": 56,
+    "mainLeft": 56,
+    "mainWidth": 764,
+    "railLabels": [
+     "SportMedical — přehled",
+     "Kalendář",
+     "Pacienti",
+     "Kluby (tady jste)",
+     "Fakturace",
+     "Nastavení"
+    ],
+    "railHasText": 0,
+    "railTargets": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "here": [
+     {
+      "label": "Kluby (tady jste)",
+      "href": null
+     }
+    ],
+    "bottomBar": false,
+    "actions": [
+     "Hledat (Ctrl K)",
+     "Nový pacient",
+     "Rychlá registrace",
+     "Nová objednávka"
+    ],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "billing": {
+    "sidebar": false,
+    "railWidth": 56,
+    "mainLeft": 56,
+    "mainWidth": 764,
+    "railLabels": [
+     "SportMedical — přehled",
+     "Kalendář",
+     "Pacienti",
+     "Kluby",
+     "Fakturace (tady jste)",
+     "Nastavení"
+    ],
+    "railHasText": 0,
+    "railTargets": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "here": [
+     {
+      "label": "Fakturace (tady jste)",
+      "href": null
+     }
+    ],
+    "bottomBar": false,
+    "actions": [
+     "Hledat (Ctrl K)",
+     "Nový pacient",
+     "Rychlá registrace",
+     "Nová objednávka"
+    ],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "settings": {
+    "sidebar": false,
+    "railWidth": 56,
+    "mainLeft": 56,
+    "mainWidth": 764,
+    "railLabels": [
+     "SportMedical — přehled",
+     "Kalendář",
+     "Pacienti",
+     "Kluby",
+     "Fakturace",
+     "Nastavení (tady jste)"
+    ],
+    "railHasText": 0,
+    "railTargets": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "here": [
+     {
+      "label": "Nastavení (tady jste)",
+      "href": null
+     }
+    ],
+    "bottomBar": false,
+    "actions": [],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "planovani": {
+    "sidebar": false,
+    "railWidth": null,
+    "mainLeft": 0,
+    "mainWidth": 820,
+    "railLabels": [],
+    "railHasText": 0,
+    "railTargets": [],
+    "here": [],
+    "bottomBar": false,
+    "actions": [],
+    "menuButton": true,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "tooltips": {
+    "hover": "Kluby",
+    "focus": "Kalendář"
+   },
+   "drawer": {
+    "links": [
+     "SportMedical",
+     "Kalendář",
+     "Pacienti",
+     "Kluby a týmy",
+     "Fakturace",
+     "Nastavení"
+    ],
+    "icons": 5,
+    "buttons": [
+     "Účet a vzhled",
+     "Hledat",
+     "31 nepřečtených oznámení"
+    ]
+   },
+   "plannerDrawer": [
+    "Všechny sekce",
+    "Kalendář",
+    "Dnešní přehled",
+    "Přehled podle služeb",
+    "Dostupnost",
+    "Účet a vzhled",
+    "Hledat",
+    "31 nepřečtených oznámení"
+   ]
+  },
+  {
+   "size": "1440x900",
+   "prehled": {
+    "sidebar": false,
+    "railWidth": 56,
+    "mainLeft": 56,
+    "mainWidth": 1384,
+    "railLabels": [
+     "SportMedical — přehled (tady jste)",
+     "Kalendář",
+     "Pacienti",
+     "Kluby",
+     "Fakturace",
+     "Nastavení"
+    ],
+    "railHasText": 0,
+    "railTargets": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "here": [
+     {
+      "label": "SportMedical — přehled (tady jste)",
+      "href": null
+     }
+    ],
+    "bottomBar": false,
+    "actions": [
+     "Hledat",
+     "Nový pacient",
+     "Rychlá registrace",
+     "Nová objednávka"
+    ],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "patients": {
+    "sidebar": false,
+    "railWidth": 56,
+    "mainLeft": 56,
+    "mainWidth": 1384,
+    "railLabels": [
+     "SportMedical — přehled",
+     "Kalendář",
+     "Pacienti (tady jste)",
+     "Kluby",
+     "Fakturace",
+     "Nastavení"
+    ],
+    "railHasText": 0,
+    "railTargets": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "here": [
+     {
+      "label": "Pacienti (tady jste)",
+      "href": null
+     }
+    ],
+    "bottomBar": false,
+    "actions": [
+     "Hledat",
+     "Rychlá registrace",
+     "Nová objednávka"
+    ],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "clubs": {
+    "sidebar": false,
+    "railWidth": 56,
+    "mainLeft": 56,
+    "mainWidth": 1384,
+    "railLabels": [
+     "SportMedical — přehled",
+     "Kalendář",
+     "Pacienti",
+     "Kluby (tady jste)",
+     "Fakturace",
+     "Nastavení"
+    ],
+    "railHasText": 0,
+    "railTargets": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "here": [
+     {
+      "label": "Kluby (tady jste)",
+      "href": null
+     }
+    ],
+    "bottomBar": false,
+    "actions": [
+     "Hledat",
+     "Nový pacient",
+     "Rychlá registrace",
+     "Nová objednávka"
+    ],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "billing": {
+    "sidebar": false,
+    "railWidth": 56,
+    "mainLeft": 56,
+    "mainWidth": 1384,
+    "railLabels": [
+     "SportMedical — přehled",
+     "Kalendář",
+     "Pacienti",
+     "Kluby",
+     "Fakturace (tady jste)",
+     "Nastavení"
+    ],
+    "railHasText": 0,
+    "railTargets": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "here": [
+     {
+      "label": "Fakturace (tady jste)",
+      "href": null
+     }
+    ],
+    "bottomBar": false,
+    "actions": [
+     "Hledat",
+     "Nový pacient",
+     "Rychlá registrace",
+     "Nová objednávka"
+    ],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "settings": {
+    "sidebar": false,
+    "railWidth": 56,
+    "mainLeft": 314,
+    "mainWidth": 1126,
+    "railLabels": [
+     "SportMedical — přehled",
+     "Kalendář",
+     "Pacienti",
+     "Kluby",
+     "Fakturace",
+     "Nastavení (tady jste)"
+    ],
+    "railHasText": 0,
+    "railTargets": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "here": [
+     {
+      "label": "Nastavení (tady jste)",
+      "href": null
+     }
+    ],
+    "bottomBar": false,
+    "actions": [],
+    "menuButton": false,
+    "settingsSide": true,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "planovani": {
+    "sidebar": false,
+    "railWidth": null,
+    "mainLeft": 0,
+    "mainWidth": 1440,
+    "railLabels": [],
+    "railHasText": 0,
+    "railTargets": [],
+    "here": [],
+    "bottomBar": false,
+    "actions": [],
+    "menuButton": true,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "tooltips": {
+    "hover": "Kluby",
+    "focus": "Kalendář"
+   },
+   "drawer": {
+    "links": [
+     "SportMedical",
+     "Kalendář",
+     "Pacienti",
+     "Kluby a týmy",
+     "Fakturace",
+     "Nastavení"
+    ],
+    "icons": 5,
+    "buttons": [
+     "Účet a vzhled",
+     "Hledat",
+     "31 nepřečtených oznámení"
+    ]
+   },
+   "plannerDrawer": [
+    "Všechny sekce",
+    "Kalendář",
+    "Dnešní přehled",
+    "Přehled podle služeb",
+    "Dostupnost",
+    "Účet a vzhled",
+    "Hledat",
+    "31 nepřečtených oznámení"
+   ]
+  },
+  {
+   "size": "1920x1080",
+   "prehled": {
+    "sidebar": false,
+    "railWidth": 56,
+    "mainLeft": 56,
+    "mainWidth": 1864,
+    "railLabels": [
+     "SportMedical — přehled (tady jste)",
+     "Kalendář",
+     "Pacienti",
+     "Kluby",
+     "Fakturace",
+     "Nastavení"
+    ],
+    "railHasText": 0,
+    "railTargets": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "here": [
+     {
+      "label": "SportMedical — přehled (tady jste)",
+      "href": null
+     }
+    ],
+    "bottomBar": false,
+    "actions": [
+     "Hledat",
+     "Nový pacient",
+     "Rychlá registrace",
+     "Nová objednávka"
+    ],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "patients": {
+    "sidebar": false,
+    "railWidth": 56,
+    "mainLeft": 56,
+    "mainWidth": 1864,
+    "railLabels": [
+     "SportMedical — přehled",
+     "Kalendář",
+     "Pacienti (tady jste)",
+     "Kluby",
+     "Fakturace",
+     "Nastavení"
+    ],
+    "railHasText": 0,
+    "railTargets": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "here": [
+     {
+      "label": "Pacienti (tady jste)",
+      "href": null
+     }
+    ],
+    "bottomBar": false,
+    "actions": [
+     "Hledat",
+     "Rychlá registrace",
+     "Nová objednávka"
+    ],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "clubs": {
+    "sidebar": false,
+    "railWidth": 56,
+    "mainLeft": 56,
+    "mainWidth": 1864,
+    "railLabels": [
+     "SportMedical — přehled",
+     "Kalendář",
+     "Pacienti",
+     "Kluby (tady jste)",
+     "Fakturace",
+     "Nastavení"
+    ],
+    "railHasText": 0,
+    "railTargets": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "here": [
+     {
+      "label": "Kluby (tady jste)",
+      "href": null
+     }
+    ],
+    "bottomBar": false,
+    "actions": [
+     "Hledat",
+     "Nový pacient",
+     "Rychlá registrace",
+     "Nová objednávka"
+    ],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "billing": {
+    "sidebar": false,
+    "railWidth": 56,
+    "mainLeft": 56,
+    "mainWidth": 1864,
+    "railLabels": [
+     "SportMedical — přehled",
+     "Kalendář",
+     "Pacienti",
+     "Kluby",
+     "Fakturace (tady jste)",
+     "Nastavení"
+    ],
+    "railHasText": 0,
+    "railTargets": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "here": [
+     {
+      "label": "Fakturace (tady jste)",
+      "href": null
+     }
+    ],
+    "bottomBar": false,
+    "actions": [
+     "Hledat",
+     "Nový pacient",
+     "Rychlá registrace",
+     "Nová objednávka"
+    ],
+    "menuButton": false,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "settings": {
+    "sidebar": false,
+    "railWidth": 56,
+    "mainLeft": 314,
+    "mainWidth": 1606,
+    "railLabels": [
+     "SportMedical — přehled",
+     "Kalendář",
+     "Pacienti",
+     "Kluby",
+     "Fakturace",
+     "Nastavení (tady jste)"
+    ],
+    "railHasText": 0,
+    "railTargets": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "here": [
+     {
+      "label": "Nastavení (tady jste)",
+      "href": null
+     }
+    ],
+    "bottomBar": false,
+    "actions": [],
+    "menuButton": false,
+    "settingsSide": true,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "planovani": {
+    "sidebar": false,
+    "railWidth": null,
+    "mainLeft": 0,
+    "mainWidth": 1920,
+    "railLabels": [],
+    "railHasText": 0,
+    "railTargets": [],
+    "here": [],
+    "bottomBar": false,
+    "actions": [],
+    "menuButton": true,
+    "settingsSide": false,
+    "docScroll": 0,
+    "hOverflow": 0
+   },
+   "tooltips": {
+    "hover": "Kluby",
+    "focus": "Kalendář"
+   },
+   "drawer": {
+    "links": [
+     "SportMedical",
+     "Kalendář",
+     "Pacienti",
+     "Kluby a týmy",
+     "Fakturace",
+     "Nastavení"
+    ],
+    "icons": 5,
+    "buttons": [
+     "Účet a vzhled",
+     "Hledat",
+     "31 nepřečtených oznámení"
+    ]
+   },
+   "plannerDrawer": [
+    "Všechny sekce",
+    "Kalendář",
+    "Dnešní přehled",
+    "Přehled podle služeb",
+    "Dostupnost",
+    "Účet a vzhled",
+    "Hledat",
+    "31 nepřečtených oznámení"
+   ]
+  }
+ ]
+}

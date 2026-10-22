@@ -263,7 +263,7 @@ export function WeekChart({ block, onRetry }: { block: WeekBlock; onRetry: () =>
           role="list"
           aria-label="Termíny po dnech tohoto týdne"
           aria-busy={block.status === 'loading' ? 'true' : undefined}
-          sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: { xs: 1, md: 1.5 }, alignItems: 'end', height: { xs: 96, sm: 170, md: 'auto' }, flex: { md: '1 1 0' }, minHeight: { md: 150 } }}
+          sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: { xs: 1, md: 1.5 }, alignItems: 'end', height: { xs: 88, sm: 170, md: 'auto' }, flex: { md: '1 1 0' }, minHeight: { md: 150 } }}
         >
           {block.days.map((d) => {
             const ratio = block.status === 'ready' ? d.count / block.max : 0;
