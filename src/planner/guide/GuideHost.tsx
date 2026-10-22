@@ -6,7 +6,8 @@
  * Never a sidebar, never over the board's controls, `pointer-events` only on the card itself.
  * The memory is per person in `localStorage` (a blocked or junk storage is an empty memory, never an error).
  */
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { PLANNER_TEXT } from '../text';
 import { usePlannerSelector } from '../state/PlannerStoreProvider';
 import { useStage } from '../components/PlannerStage';
@@ -86,7 +87,14 @@ export default function GuideHost() {
     return () => window.clearTimeout(id);
   }, [choice.waitMs]);
 
-  if (!choice.hint) return null;
+  /* The pop-out sits in the strip's own box, right above its cards, so it can never cover a card or a control. */
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    const el = document.getElementById('planning-cards');
+    if (el !== host) setHost(el);
+  });
+
+  if (!choice.hint || !host) return null;
   const { title, text } = textOf(choice.hint, choice.variant, input.hiddenCards);
   const close = () => {
     const next = markSeen(memory, choice.hint!);
@@ -98,12 +106,13 @@ export default function GuideHost() {
     setMemory(next);
     saveMemory(storageOf(), key, next);
   };
-  return (
+  return createPortal(
     <aside className="guide-hint" role="note" aria-live="polite" data-testid="guide-hint" data-hint={choice.hint} data-variant={choice.variant}>
       <button type="button" className="guide-hint-close" aria-label={T.close} data-guide-close="" onClick={close}>×</button>
       <div className="guide-hint-title">{title}</div>
       <p className="guide-hint-text">{text}</p>
       <button type="button" className="guide-hint-mute" title={T.muteTitle} data-guide-mute="" onClick={silence}>{T.mute}</button>
-    </aside>
+    </aside>,
+    host,
   );
 }

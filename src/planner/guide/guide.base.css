@@ -39,9 +39,8 @@ html[data-motion='full'] .sm-planner .s42-primary-action[data-ready='true'],
 html[data-motion='full'] .sm-planner .oc-create.ready {
   animation: guide-pulse 2.6s ease-out 0.6s infinite;
 }
-@media (max-width: 767px) {
-  .sm-planner .completion-actions button { min-height: 44px; }
-}
+.sm-planner.is-compact .completion-actions button { min-height: 46px; }
+.sm-planner.is-compact .completion-close { width: 46px; height: 46px; right: 2px; top: 2px; font-size: 22px; }
 
 /* ── the publish dialog: three numbered steps ── */
 .sm-planner .pub-steps { list-style: none; margin: 12px 0 6px; padding: 0; display: grid; gap: 6px; }
@@ -70,8 +69,6 @@ html[data-motion='full'] .sm-planner .oc-create.ready {
 }
 .sm-planner .pub-why { flex: 1 1 100%; color: hsl(from #f5d68a var(--sm-hsl, h s l)); font-size: 11.5px; line-height: 1.4; }
 .sm-planner .pub-extras { opacity: 0.9; }
-@media (max-width: 767px) {
-  .sm-planner .pub-actions button { min-height: 44px; }
-}
+.sm-planner.is-compact .pub-actions button { min-height: 44px; }
 html[data-motion='full'] .sm-planner .pub-step.is-current { animation: guide-step-in 260ms ease-out both; }
 @keyframes guide-step-in { from { transform: translateX(-4px); opacity: 0.6; } to { transform: none; opacity: 1; } }
