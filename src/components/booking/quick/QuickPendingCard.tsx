@@ -1,6 +1,7 @@
-import { Box, Button, Stack, Tooltip, Typography } from "@mui/material";
+import { Box, Button, Stack, Tooltip, Typography, useTheme } from "@mui/material";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import { DESIGN, StatusChip } from "../../ui";
+import { StatusChip } from "../../ui";
+import { toneColors } from "../../../theme";
 import { useCompletionLink } from "./useCompletionLink";
 import { useNow } from "./useNow";
 import {
@@ -33,7 +34,8 @@ export function QuickPendingCard({
   const now = useNow();
   const link = useCompletionLink(patientId);
   const view = deadlineUtc ? deadlineView(deadlineUtc, now) : null;
-  const tone = view?.tone === "red" ? DESIGN.tone.red : DESIGN.tone.beige;
+  const theme = useTheme();
+  const tone = toneColors(theme, view?.tone === "red" ? "red" : "beige");
   const expired = view?.expired === true;
   const canMail = Boolean(email) && !expired;
 
@@ -92,7 +94,7 @@ export function QuickPendingCard({
               size="small"
               disabled={link.pending || expired}
               onClick={() => void link.copy()}
-              sx={{ bgcolor: tone.fg, color: "#FFFFFF", "&:hover": { bgcolor: tone.fg } }}
+              sx={{ bgcolor: tone.fg, color: theme.palette.getContrastText(tone.fg), "&:hover": { bgcolor: tone.fg } }}
             >
               {link.copied ? "Zkopírováno" : "Zkopírovat odkaz"}
             </Button>
@@ -141,7 +143,7 @@ export function QuickPendingCard({
             </Typography>
           ) : null}
           {link.failed ? (
-            <Typography variant="caption" sx={{ display: "block", mt: 0.75, color: DESIGN.tone.red.fg }}>
+            <Typography variant="caption" sx={{ display: "block", mt: 0.75, color: tone.fg }}>
               Odkaz se nepodařilo vygenerovat. Zkuste to prosím znovu.
             </Typography>
           ) : null}

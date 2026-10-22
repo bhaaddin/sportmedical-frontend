@@ -57,7 +57,7 @@ export default function NetworkBanner() {
             <Box
               role="alert"
               sx={{
-                bgcolor: serverDown ? '#C62828' : '#ED6C02', color: '#fff', px: 3, py: 1,
+                bgcolor: serverDown ? 'error.main' : 'warning.main', color: serverDown ? 'error.contrastText' : 'warning.contrastText', px: 3, py: 1,
                 display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', columnGap: 1, rowGap: 0.25,
               }}
             >
@@ -65,7 +65,7 @@ export default function NetworkBanner() {
               <Typography variant="body2" sx={{ fontWeight: 600 }}>
                 {serverDown ? SERVER_UNREACHABLE_TEXT : OFFLINE_TEXT}
               </Typography>
-              {serverDown && <CircularProgress size={14} sx={{ color: '#fff', ml: 1 }} />}
+              {serverDown && <CircularProgress size={14} sx={{ color: 'inherit', ml: 1 }} />}
               {serverDown && (
                 <Typography variant="caption" data-testid="server-waking-hint" sx={{ width: '100%', textAlign: 'center', opacity: 0.9, lineHeight: 1.3 }}>
                   {SERVER_WAKING_HINT}

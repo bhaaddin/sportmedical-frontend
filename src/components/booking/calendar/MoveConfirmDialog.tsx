@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Alert, Box, Button, Checkbox, FormControlLabel, Popover, Typography } from "@mui/material";
-import { alpha } from "@mui/material/styles";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { appointmentsApi } from "../../../api/appointments";
@@ -193,7 +192,7 @@ export function MoveConfirmDialog({
           color="inherit"
           disabled={save.isPending}
           onClick={onClose}
-          sx={{ flex: 1, minHeight: 44, borderColor: alpha("#000", 0.25), color: "text.secondary" }}
+          sx={{ flex: 1, minHeight: 44, borderColor: "divider", color: "text.secondary" }}
         >
           {GRID_TEXT.moveCancel}
         </Button>

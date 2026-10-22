@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Box, Button, Drawer, Popover } from "@mui/material";
-import { alpha } from "@mui/material/styles";
 import type { Device } from "../../../layout/useDevice";
 import { DESIGN } from "../../../theme";
 
@@ -158,7 +157,7 @@ export function BubbleButton({
       disabled={disabled}
       onClick={onClick}
       data-testid={testId}
-      sx={{ flex: 1, minWidth: 120, minHeight: 44, ...(primary ? {} : { borderColor: alpha("#000", 0.25), color: "text.secondary" }) }}
+      sx={{ flex: 1, minWidth: 120, minHeight: 44, ...(primary ? {} : { borderColor: "divider", color: "text.secondary" }) }}
     >
       {children}
     </Button>

@@ -2,8 +2,48 @@
  "components": {
   "MuiAlert": {
    "styleOverrides": {
+    "filled": {
+     "&.MuiAlert-colorError": {
+      "backgroundColor": "#FF6B88",
+      "color": "#001E2C"
+     },
+     "&.MuiAlert-colorInfo": {
+      "backgroundColor": "#5BB0FF",
+      "color": "#001E2C"
+     },
+     "&.MuiAlert-colorSuccess": {
+      "backgroundColor": "#00E5C6",
+      "color": "#001E2C"
+     },
+     "&.MuiAlert-colorWarning": {
+      "backgroundColor": "#FFB21F",
+      "color": "#001E2C"
+     }
+    },
     "icon": {
      "opacity": 0.9
+    },
+    "outlined": {
+     "&.MuiAlert-colorError": {
+      "backgroundColor": "transparent",
+      "borderColor": "rgba(255, 25, 80, 0.5)",
+      "color": "#FF7B98"
+     },
+     "&.MuiAlert-colorInfo": {
+      "backgroundColor": "transparent",
+      "borderColor": "rgba(17, 140, 255, 0.5)",
+      "color": "#6DB5FF"
+     },
+     "&.MuiAlert-colorSuccess": {
+      "backgroundColor": "transparent",
+      "borderColor": "rgba(0, 229, 198, 0.45)",
+      "color": "#4DF2DA"
+     },
+     "&.MuiAlert-colorWarning": {
+      "backgroundColor": "transparent",
+      "borderColor": "rgba(255, 178, 31, 0.45)",
+      "color": "#FFC857"
+     }
     },
     "root": {
      "alignItems": "center",
@@ -247,8 +287,29 @@
      "backgroundColor": "rgba(0, 230, 228, 0.35)"
     },
     ":root": {
+     "--sm-pop-border": "rgba(0, 224, 232, 0.5)",
+     "--sm-pop-hover": "rgba(0, 230, 228, 0.09)",
+     "--sm-pop-muted": "#A3B9CE",
+     "--sm-pop-paper": "#042C3D",
+     "--sm-pop-selected": "rgba(0, 230, 228, 0.14)",
+     "--sm-pop-text": "#F4FAFF",
      "--sm-soft-bg": "rgba(0, 230, 228, 0.14)",
-     "--sm-soft-line": "rgba(0, 224, 232, 0.5)"
+     "--sm-soft-line": "rgba(0, 224, 232, 0.5)",
+     "--sm-tone-beige-bg": "rgba(255, 178, 31, 0.12)",
+     "--sm-tone-beige-fg": "#FFC857",
+     "--sm-tone-beige-line": "rgba(255, 178, 31, 0.45)",
+     "--sm-tone-blue-bg": "rgba(17, 140, 255, 0.14)",
+     "--sm-tone-blue-fg": "#6DB5FF",
+     "--sm-tone-blue-line": "rgba(17, 140, 255, 0.5)",
+     "--sm-tone-green-bg": "rgba(0, 229, 198, 0.12)",
+     "--sm-tone-green-fg": "#4DF2DA",
+     "--sm-tone-green-line": "rgba(0, 229, 198, 0.45)",
+     "--sm-tone-grey-bg": "rgba(163, 185, 206, 0.10)",
+     "--sm-tone-grey-fg": "#BCD0E1",
+     "--sm-tone-grey-line": "rgba(163, 185, 206, 0.30)",
+     "--sm-tone-red-bg": "rgba(255, 25, 80, 0.14)",
+     "--sm-tone-red-fg": "#FF7B98",
+     "--sm-tone-red-line": "rgba(255, 25, 80, 0.5)"
     },
     "@media (max-width: 1279.95px)": {
      "body .MuiButton-root": {
@@ -448,7 +509,7 @@
     },
     "root": {
      "& .MuiOutlinedInput-notchedOutline": {
-      "borderColor": "#22546A"
+      "borderColor": "#4A8BA5"
      },
      "&.Mui-focused": {
       "boxShadow": "0 0 0 3px rgba(0, 230, 228, 0.14)"
@@ -526,6 +587,22 @@
    "styleOverrides": {
     "root": {
      "borderRadius": 8
+    }
+   }
+  },
+  "MuiSnackbarContent": {
+   "styleOverrides": {
+    "root": {
+     "& .MuiSnackbarContent-action .MuiButton-root": {
+      "color": "#23F2E7",
+      "minHeight": 32,
+      "textDecoration": "underline"
+     },
+     "backgroundColor": "#042C3D",
+     "border": "1px solid rgba(0, 224, 232, 0.5)",
+     "borderRadius": 10,
+     "boxShadow": "0 28px 90px rgba(0, 0, 0, 0.66), 0 0 35px rgba(0, 226, 228, 0.23), inset 0 0 30px rgba(1, 132, 172, 0.09)",
+     "color": "#F4FAFF"
     }
    }
   },

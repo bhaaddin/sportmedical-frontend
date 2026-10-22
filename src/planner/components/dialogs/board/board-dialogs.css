@@ -5,7 +5,7 @@
 .sm-planner .board-settings .resolution-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .sm-planner .board-settings .resolution-group .app-button { min-height: 34px; padding: 0 12px; font-size: 13px; }
 .sm-planner .board-settings .resolution-group .app-button[aria-pressed='true'] {
-  background: linear-gradient(160deg, hsl(from #026755 var(--sm-hsl, h s l)), hsl(from #00a89b var(--sm-hsl, h s l)));
+  background: linear-gradient(160deg, hsl(from #026755 var(--sm-hsl, h s l)), hsl(from #00857b var(--sm-hsl, h s l)));
   border-color: hsl(from #06cacf var(--sm-hsl, h s l));
   box-shadow: 0 0 12px hsl(from #00a79b66 var(--sm-hsl, h s l));
 }

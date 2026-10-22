@@ -30,7 +30,7 @@ import { documentsApi, INVALIDATION_REASON_LABEL } from '../../api/documents';
 import type { PatientDocument } from '../../api/documents';
 import DocumentActions from './DocumentActions';
 import { formatDateOnly } from '../../utils/time';
-import { DESIGN, SectionLabel, SoftCard } from '../ui';
+import { TONE_CSS, SectionLabel, SoftCard } from '../ui';
 
 export interface MedicalReportsProps {
   documents: PatientDocument[];
@@ -164,8 +164,8 @@ export default function MedicalReports({
                   key={doc.id}
                   sx={{
                     border: '1px solid',
-                    borderColor: waiting ? DESIGN.tone.beige.line : 'divider',
-                    bgcolor: waiting ? DESIGN.tone.beige.bg : 'transparent',
+                    borderColor: waiting ? TONE_CSS.beige.line : 'divider',
+                    bgcolor: waiting ? TONE_CSS.beige.bg : 'transparent',
                     borderRadius: 2,
                     p: 1.5,
                   }}

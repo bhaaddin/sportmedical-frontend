@@ -5,7 +5,7 @@
  */
 import { Box, Typography } from '@mui/material';
 import type { Invoice } from '../../api/billing';
-import { DESIGN, SectionLabel } from '../ui';
+import { TONE_CSS, SectionLabel } from '../ui';
 import InvoicePayments from '../../pages/billing/InvoicePayments';
 import { PENDING_PAY_REASON } from './InvoiceActions';
 import { czDate, czk } from '../../pages/billing/money';
@@ -25,9 +25,9 @@ export default function InvoiceDetails({ invoice }: { invoice: Invoice }) {
           sx={{
             p: 1.5,
             borderRadius: 2,
-            bgcolor: DESIGN.tone.beige.bg,
-            border: `1px solid ${DESIGN.tone.beige.line}`,
-            color: DESIGN.tone.beige.fg,
+            bgcolor: TONE_CSS.beige.bg,
+            border: `1px solid ${TONE_CSS.beige.line}`,
+            color: TONE_CSS.beige.fg,
           }}
         >
           <Typography variant="body2" sx={{ color: 'inherit', fontWeight: 600 }}>
@@ -41,9 +41,9 @@ export default function InvoiceDetails({ invoice }: { invoice: Invoice }) {
           sx={{
             p: 1.5,
             borderRadius: 2,
-            bgcolor: DESIGN.tone.red.bg,
-            border: `1px solid ${DESIGN.tone.red.line}`,
-            color: DESIGN.tone.red.fg,
+            bgcolor: TONE_CSS.red.bg,
+            border: `1px solid ${TONE_CSS.red.line}`,
+            color: TONE_CSS.red.fg,
           }}
         >
           <Typography variant="body2" sx={{ color: 'inherit', fontWeight: 600 }}>

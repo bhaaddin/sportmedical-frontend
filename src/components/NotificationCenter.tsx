@@ -17,7 +17,7 @@ import {
   Info, Delete, DoneAll, Settings, ExpandMore, ExpandLess,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { ACCENT_SOFT, DESIGN } from './ui';
+import { ACCENT_SOFT, DESIGN, TONE_CSS } from './ui';
 import { useNotificationFeed, type FeedNotification } from './notifications/useNotificationFeed';
 import {
   buildNotificationSections,
@@ -37,28 +37,28 @@ export type Notification = FeedNotification;
 const NOTIFICATION_CONFIG: Record<string, { icon: React.ReactNode; color: string; bgColor: string }> = {
   appointment: {
     icon: <CalendarMonth sx={{ fontSize: 18 }} />,
-    color: DESIGN.tone.green.fg,
-    bgColor: DESIGN.tone.green.bg,
+    color: TONE_CSS.green.fg,
+    bgColor: TONE_CSS.green.bg,
   },
   document: {
     icon: <Description sx={{ fontSize: 18 }} />,
-    color: DESIGN.tone.blue.fg,
-    bgColor: DESIGN.tone.blue.bg,
+    color: TONE_CSS.blue.fg,
+    bgColor: TONE_CSS.blue.bg,
   },
   system: {
     icon: <Settings sx={{ fontSize: 18 }} />,
-    color: DESIGN.tone.grey.fg,
-    bgColor: DESIGN.tone.grey.bg,
+    color: TONE_CSS.grey.fg,
+    bgColor: TONE_CSS.grey.bg,
   },
   alert: {
     icon: <Warning sx={{ fontSize: 18 }} />,
-    color: DESIGN.tone.red.fg,
-    bgColor: DESIGN.tone.red.bg,
+    color: TONE_CSS.red.fg,
+    bgColor: TONE_CSS.red.bg,
   },
   info: {
     icon: <Info sx={{ fontSize: 18 }} />,
-    color: DESIGN.tone.beige.fg,
-    bgColor: DESIGN.tone.beige.bg,
+    color: TONE_CSS.beige.fg,
+    bgColor: TONE_CSS.beige.bg,
   },
 };
 

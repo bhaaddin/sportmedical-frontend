@@ -177,7 +177,7 @@ export function DrawerFrame({
             "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: -2 },
           }}
         >
-          <Box aria-hidden="true" sx={{ width: 40, height: 4, borderRadius: 2, bgcolor: DESIGN.line }} />
+          <Box aria-hidden="true" sx={{ width: 40, height: 4, borderRadius: 2, bgcolor: 'divider' }} />
         </Box>
       ) : null}
 

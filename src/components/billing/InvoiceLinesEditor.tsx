@@ -8,7 +8,7 @@ import { Add, Check, Remove } from '@mui/icons-material';
 import type { Activity } from '../../api/bookingContracts';
 import type { DraftLine } from '../../pages/billing/invoicePrefill';
 import { czk } from '../../pages/billing/money';
-import { ACCENT_SOFT, DESIGN } from '../ui';
+import { ACCENT_SOFT, TONE_CSS } from '../ui';
 
 export const MAX_QUANTITY = 10000;
 
@@ -36,7 +36,7 @@ export default function InvoiceLinesEditor({
     <Box sx={{ display: 'grid', gap: 1.5 }}>
       {failed && (
         <Box role="alert" sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Typography variant="body2" sx={{ color: DESIGN.tone.red.fg }}>Ceník se nepodařilo načíst.</Typography>
+          <Typography variant="body2" sx={{ color: TONE_CSS.red.fg }}>Ceník se nepodařilo načíst.</Typography>
           <Button size="small" variant="outlined" onClick={onRetry}>Zkusit znovu</Button>
         </Box>
       )}

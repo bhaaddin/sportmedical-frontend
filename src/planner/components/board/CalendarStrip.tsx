@@ -18,6 +18,7 @@ import { MAX_CALENDAR_COLUMNS } from './calendarColumns';
 import { boardSettings, useBoardSettings } from './boardSettings';
 import { calendarIconName, CALENDAR_ICON_FALLBACK } from './calendarIcon';
 import { Icon } from '../Icons';
+import { textOnColor } from '../../../colors/activityColor';
 import { groupOn, groupsOnScreen } from './serviceGroups';
 
 export const CALENDAR_STRIP_TEXT = {
@@ -53,7 +54,7 @@ export function CalendarStrip({ columns }: { columns: readonly Calendar[] | null
               data-calendar-id={group.primaryId}
               data-service-id={group.serviceId ?? undefined}
               title={group.name !== group.calendarName ? `${CALENDAR_STRIP_TEXT.chipTitle(group.calendarName, on)} - ${group.name}` : CALENDAR_STRIP_TEXT.chipTitle(group.calendarName, on)}
-              style={{ '--cal': group.colour } as CSSProperties}
+              style={{ '--cal': group.colour, '--cal-ink': textOnColor(group.colour).color } as CSSProperties}
               onClick={() => boardSettings.clickGroup(group.id, groups)}
             >
               <Icon name={calendarIconName(group.calendarName, group.name)} className="icon calendar-chip-icon" />
@@ -67,7 +68,7 @@ export function CalendarStrip({ columns }: { columns: readonly Calendar[] | null
           aria-pressed={settings.ticked === null}
           data-testid="calendar-chip-all"
           title={CALENDAR_STRIP_TEXT.allTitle}
-          style={{ '--cal': '#8fb6c9' } as CSSProperties}
+          style={{ '--cal': '#8fb6c9', '--cal-ink': textOnColor('#8fb6c9').color } as CSSProperties}
           onClick={() => boardSettings.showAllCalendars()}
         >
           <Icon name={CALENDAR_ICON_FALLBACK} className="icon calendar-chip-icon" />

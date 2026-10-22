@@ -34,7 +34,7 @@ import { isOverrideForbidden, workerBusyOf } from "../../api/workerBusy";
 const WorkerBusyNotice = lazy(() => import("./WorkerBusyNotice").then((m) => ({ default: m.WorkerBusyNotice })));
 import { isKnownPaperworkReason } from "../../api/bookingContracts";
 import { usePermission } from "../../auth/usePermission";
-import { DESIGN, SectionLabel, SoftCard, headSurface } from "../ui";
+import { TONE_CSS, SectionLabel, SoftCard, headSurface } from "../ui";
 import {
   addDaysToDateOnly,
   formatDateOnly,
@@ -1376,10 +1376,10 @@ export function NewAppointmentDialog({
                 px: 1.5,
                 py: 1.25,
                 borderRadius: 2.5,
-                bgcolor: DESIGN.tone.green.bg,
-                color: DESIGN.tone.green.fg,
+                bgcolor: TONE_CSS.green.bg,
+                color: TONE_CSS.green.fg,
                 border: "1px solid",
-                borderColor: DESIGN.tone.green.line,
+                borderColor: TONE_CSS.green.line,
               }}
             >
               <CheckCircleOutline fontSize="small" />
@@ -1485,8 +1485,8 @@ export function NewAppointmentDialog({
                     spacing={1}
                     sx={{
                       border: "1px solid",
-                      borderColor: DESIGN.tone.beige.line,
-                      bgcolor: DESIGN.tone.beige.bg,
+                      borderColor: TONE_CSS.beige.line,
+                      bgcolor: TONE_CSS.beige.bg,
                       borderRadius: 2.5,
                       p: 2,
                     }}

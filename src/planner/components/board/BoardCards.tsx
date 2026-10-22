@@ -21,21 +21,23 @@ import { AppointmentHoverCard } from '../../../components/booking/grid/Appointme
 import { DOUBLE_TAP_MS, DRAG_THRESHOLD_PX } from '../../../components/booking/grid/moveDrag';
 import { Icon } from '../Icons';
 import { holdLabel, holdStateOf, seatsLabel } from './clubHold';
-import { accentCss } from '../../../accent';
+import type { Theme } from '@mui/material/styles';
+import { DESIGN, darkOf } from '../../../theme';
 import { toneVars, withAlpha, type BookingCardModel, type BoardWindowModel, type SessionCardModel } from './boardModel';
 
 const tooltipSlotProps = {
   tooltip: {
-    sx: {
-      bgcolor: '#042c3d',
-      color: '#eaf7ff',
-      border: `1px solid ${accentCss('#19708a')}`,
-      boxShadow: '0 10px 30px #000c',
+    /* the pop-out surface tokens (theme.ts popoutTokens, set on :root in both modes): a dark glass tooltip in dark, a white one in light */
+    sx: (t: Theme) => ({
+      bgcolor: 'var(--sm-pop-paper)',
+      color: 'var(--sm-pop-text)',
+      border: '1px solid var(--sm-pop-border)',
+      boxShadow: t.palette.mode === 'dark' ? darkOf(t).floatingGlow : DESIGN.shadow.menu,
       p: 1,
       fontSize: 12,
-    },
+    }),
   },
-  arrow: { sx: { color: '#042c3d' } },
+  arrow: { sx: { color: 'var(--sm-pop-paper)' } },
   /* Hangs off the hovered card; turns to another side instead of leaving the screen (a card at the top of the stage gets it below). */
   popper: {
     modifiers: [
@@ -259,9 +261,9 @@ export function WindowBlock({ window: w, onOpen }: { window: BoardWindowModel; o
     width: w.width,
     top: `${w.top}px`,
     height: `${w.height}px`,
-    '--win-line': manual ? 'rgba(180, 203, 220, 0.5)' : withAlpha(w.colour, 0.8),
+    '--win-line': manual ? 'color-mix(in srgb, var(--sm-pop-muted) 55%, transparent)' : withAlpha(w.colour, 0.8),
     '--win-hatch': `repeating-linear-gradient(135deg, ${withAlpha(w.colour, manual ? 0.1 : 0.24)} 0px, ${withAlpha(w.colour, manual ? 0.1 : 0.24)} 7px, ${withAlpha(w.colour, 0.06)} 7px, ${withAlpha(w.colour, 0.06)} 14px)`,
-    borderLeftColor: manual ? 'rgba(180, 203, 220, 0.5)' : w.colour,
+    borderLeftColor: manual ? 'color-mix(in srgb, var(--sm-pop-muted) 55%, transparent)' : w.colour,
   } as CSSProperties;
   return (
     <button

@@ -575,7 +575,7 @@ function BlockPreview({
   range: string | null;
   players: number | null;
 }) {
-  const ink = color !== null ? inkOn(color) : DESIGN.inkSoft;
+  const ink = color !== null ? inkOn(color) : 'inherit';
   return (
     <SoftCard sx={{ p: 2.25 }} data-testid="block-preview">
       <SectionLabel>Náhled v kalendáři</SectionLabel>
@@ -587,8 +587,8 @@ function BlockPreview({
           px: 1.25,
           py: 1,
           borderLeft: '3px solid',
-          borderColor: color ?? DESIGN.appointment.edge,
-          bgcolor: color ?? DESIGN.appointment.bg,
+          borderColor: color ?? 'text.secondary',
+          bgcolor: color ?? 'action.selected',
           color: ink,
         }}
       >

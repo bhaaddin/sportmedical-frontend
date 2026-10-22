@@ -15,7 +15,7 @@ import type { ClubOrderStats } from '../../../api/clubOrders';
 import { FilterChips, SectionLabel, SoftCard, StatusChip } from '../../ui';
 import { FIT_FILL_SX } from '../../ui/fit';
 import { alpha } from '@mui/material/styles';
-import { DARK, DESIGN, darkOf, toneColors } from '../../../theme';
+import { DARK, DESIGN, TONE_CSS, darkOf, toneColors } from '../../../theme';
 import { ResponsiveDataList, type DataColumn } from '../../ui/ResponsiveDataList';
 import { useIsPhone } from '../../../layout/useDevice';
 import type { Period } from '../../../pages/statistics/aggregate';
@@ -70,7 +70,7 @@ export function ClubStatsView({ stats, period, revenue = null, revenueLoading = 
   const axis = { fontSize: 12, fill: theme.palette.text.secondary };
   const dark = theme.palette.mode === 'dark';
   const gridLine = dark ? theme.palette.divider : DESIGN.line;
-  const missingFill = dark ? DARK.amber : DESIGN.tone.beige.line;
+  const missingFill = dark ? DARK.amber : TONE_CSS.beige.line;
   const tooltipStyle = dark
     ? { contentStyle: { background: theme.palette.background.paper, border: '1px solid ' + theme.palette.divider, borderRadius: 8, color: theme.palette.text.primary }, cursor: { fill: alpha(darkOf(theme).cyan, 0.08) } }
     : {};

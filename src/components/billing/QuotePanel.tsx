@@ -6,7 +6,7 @@
  */
 import { Box, Button, CircularProgress, Divider, Stack, Typography } from '@mui/material';
 import type { PriceQuote } from '../../api/billing';
-import { DESIGN, SectionLabel, SoftCard } from '../ui';
+import { TONE_CSS, SectionLabel, SoftCard } from '../ui';
 import { czk } from '../../pages/billing/money';
 import { formatPercent } from '../../pages/billing/invoiceView';
 import DiscountRows from './DiscountRows';
@@ -35,7 +35,7 @@ export default function QuotePanel({
 
       {status === 'error' && (
         <Box role="alert" sx={{ display: 'grid', gap: 1 }}>
-          <Typography variant="body2" sx={{ color: DESIGN.tone.red.fg }}>
+          <Typography variant="body2" sx={{ color: TONE_CSS.red.fg }}>
             {error && error !== '' ? error : 'Cenu se nepodařilo spočítat.'}
           </Typography>
           {onRetry && (
@@ -92,9 +92,9 @@ export default function QuotePanel({
               sx={{
                 p: 1.5,
                 borderRadius: 2,
-                bgcolor: DESIGN.tone.beige.bg,
-                border: `1px solid ${DESIGN.tone.beige.line}`,
-                color: DESIGN.tone.beige.fg,
+                bgcolor: TONE_CSS.beige.bg,
+                border: `1px solid ${TONE_CSS.beige.line}`,
+                color: TONE_CSS.beige.fg,
               }}
             >
               <Typography variant="body2" sx={{ fontWeight: 700, color: 'inherit' }}>

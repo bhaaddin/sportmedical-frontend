@@ -7,7 +7,7 @@ import { Send, ArrowBack, ArrowForward, Check } from '@mui/icons-material';
 import { diagnosticsApi } from '../api/diagnostics';
 import type { CreateSessionRequest, DiagnosticSession } from '../api/diagnostics';
 import { DiagnosticFormSkeleton } from '../components/SkeletonLoader';
-import { DESIGN, PageHeader, SectionLabel, SoftCard, StatusChip, type ChipTone } from '../components/ui';
+import { TONE_CSS, PageHeader, SectionLabel, SoftCard, StatusChip, type ChipTone } from '../components/ui';
 import toast from 'react-hot-toast';
 import { PinnedActionBar } from '../components/ui/PinnedActionBar';
 import { useIsPhone } from '../layout/useDevice';
@@ -128,7 +128,7 @@ function MetricField({ label, value, onChange, min, max, unit, zones }: {
         <Box sx={{ display: 'flex', gap: 0.5, mt: 0.75 }}>
           {zones.map(z => {
             const active = value >= z.from && value <= z.to;
-            const tone = z.tone === 'primary' ? DESIGN.tone.grey : DESIGN.tone[z.tone];
+            const tone = z.tone === 'primary' ? TONE_CSS.grey : TONE_CSS[z.tone];
             return (
               <Box key={z.label} sx={{ flex: 1, height: 3, borderRadius: 1, bgcolor: active ? tone.fg : tone.bg }} />
             );

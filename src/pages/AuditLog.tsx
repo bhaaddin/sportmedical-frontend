@@ -17,7 +17,7 @@ import {
   ExpandMore as ExpandIcon, ExpandLess as CollapseIcon
 } from '@mui/icons-material';
 import client from '../api/client';
-import { DESIGN, KpiCard, StatusChip, type ChipTone } from '../components/ui';
+import { TONE_CSS, KpiCard, StatusChip, type ChipTone } from '../components/ui';
 import { SettingsScreen } from './settings/SettingsFrame';
 import { stateAfter, stateBefore, toneOfAction, topActions } from './auditLogModel';
 
@@ -219,7 +219,7 @@ export default function AuditLog() {
                               <Grid container spacing={2}>
                                 {before !== null && (
                                   <Grid size={{ xs: 12, sm: 6 }}>
-                                    <Typography variant="overline" sx={{ color: DESIGN.tone.red.fg }}>Před</Typography>
+                                    <Typography variant="overline" sx={{ color: TONE_CSS.red.fg }}>Před</Typography>
                                     <Paper sx={{ p: 1, mt: 0.5, maxHeight: 200, overflow: 'auto' }}>
                                       <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
                                         {JSON.stringify(before, null, 2)}
@@ -229,7 +229,7 @@ export default function AuditLog() {
                                 )}
                                 {after !== null && (
                                   <Grid size={{ xs: 12, sm: 6 }}>
-                                    <Typography variant="overline" sx={{ color: DESIGN.tone.green.fg }}>Po</Typography>
+                                    <Typography variant="overline" sx={{ color: TONE_CSS.green.fg }}>Po</Typography>
                                     <Paper sx={{ p: 1, mt: 0.5, maxHeight: 200, overflow: 'auto' }}>
                                       <pre style={{ margin: 0, fontSize: 11, fontFamily: 'monospace' }}>
                                         {JSON.stringify(after, null, 2)}

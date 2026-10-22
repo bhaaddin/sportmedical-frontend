@@ -22,7 +22,7 @@ import { StatusChip } from '../../components/ui/StatusChip';
 import { ENTITY_LABEL, entityTarget, mayOpen, refKey, type EntityRef } from './entities';
 import { ENTITY_ICON, ENTITY_TONE, EntityBadge } from './entityMeta';
 import { toneOf } from './shelfStyle';
-import { darkOf } from '../../theme';
+import { DESIGN, darkOf } from '../../theme';
 
 const OPEN_DELAY_MOUSE = 350;
 const OPEN_DELAY_FOCUS = 150;
@@ -82,7 +82,7 @@ function PeekCard({ entity, anchorEl, id, keepOpen }: { entity: EntityRef; ancho
             sx={(t) => ({
               width: 280, maxWidth: 'calc(100vw - 24px)', p: 1.5, borderRadius: '14px', border: '1px solid',
               borderColor: t.palette.mode === 'dark' ? darkOf(t).panelLine : t.palette.divider,
-              boxShadow: t.palette.mode === 'dark' ? darkOf(t).floatingGlow : '0 12px 32px rgba(20, 24, 28, 0.14)',
+              boxShadow: t.palette.mode === 'dark' ? darkOf(t).floatingGlow : DESIGN.shadow.menu,
               ...(t.palette.mode === 'dark' ? { backgroundImage: 'none', bgcolor: darkOf(t).glass } : {}),
             })}
           >

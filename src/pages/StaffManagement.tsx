@@ -320,7 +320,7 @@ export default function StaffManagement() {
               {accounts.length === 0 && !loadFailed ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
-                    <PersonIcon sx={{ fontSize: 48, color: '#ddd', mb: 1 }} />
+                    <PersonIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
                     <Typography color="text.secondary">Žádné účty</Typography>
                   </TableCell>
                 </TableRow>

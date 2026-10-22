@@ -13,7 +13,7 @@
 import { useState } from 'react';
 import { Box, Button, Collapse, Stack, Typography } from '@mui/material';
 import type { AppointmentRequirementDto } from '../../api/documents';
-import { DESIGN, SectionLabel, SoftCard } from '../ui';
+import { TONE_CSS, SectionLabel, SoftCard } from '../ui';
 import { CompletionLinkButton } from '../booking/patient/CompletionLinkButton';
 import { PortalLinkButton } from '../booking/patient/PortalLinkButton';
 import { expiringSoon, requirementLine, stillMissing, validityText } from '../../pages/patients/paperworkStanding';
@@ -23,9 +23,9 @@ function Notice({ children }: { children: React.ReactNode }) {
   return (
     <Box
       sx={{
-        bgcolor: DESIGN.tone.beige.bg,
-        color: DESIGN.tone.beige.fg,
-        border: `1px solid ${DESIGN.tone.beige.line}`,
+        bgcolor: TONE_CSS.beige.bg,
+        color: TONE_CSS.beige.fg,
+        border: `1px solid ${TONE_CSS.beige.line}`,
         borderRadius: 2,
         px: 1.5,
         py: 1.25,

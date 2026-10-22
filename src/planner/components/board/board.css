@@ -734,7 +734,7 @@
   stroke: currentColor;
 }
 .sm-planner .calendar-chip.is-on { background: color-mix(in srgb, var(--cal, #6e91a5) 26%, #001521); border-color: var(--cal, #6e91a5); color: #fff; box-shadow: 0 0 0 1px color-mix(in srgb, var(--cal, #6e91a5) 45%, transparent), 0 0 10px color-mix(in srgb, var(--cal, #6e91a5) 30%, transparent); }
-.sm-planner .calendar-chip.is-on .calendar-chip-icon { background: var(--cal, #6e91a5); border-color: transparent; color: #04141f; }
+.sm-planner .calendar-chip.is-on .calendar-chip-icon { background: var(--cal, #6e91a5); border-color: transparent; color: var(--cal-ink, #04141f); }
 .sm-planner .calendar-chip:not(.is-on) { opacity: 0.78; }
 .sm-planner .calendar-chip.is-all { border-style: solid; }
 .sm-planner .calendar-chip > span { max-width: 18ch; }

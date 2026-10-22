@@ -44,7 +44,7 @@ export const DESIGN = {
   font: '"Public Sans", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
   ink: '#1A1D21',
   inkSoft: '#14181C',
-  muted: '#626B75',
+  muted: '#5A636D',
   faint: '#B3B9C0',
   line: '#E2E6EA',
   lineStrong: '#DCE0E5',
@@ -144,6 +144,9 @@ export const ACCENT_SOFT = {
   line: 'var(--sm-soft-line, #C9D6D3)',
 } as const;
 
+/** The border of an input / select, >= 3:1 against every surface a field sits on (WCAG 1.4.11): the prototype's #22546A was 2.3:1, the board's #E2E6EA 1.2:1. */
+export const FIELD_EDGE = { light: '#7C858F', dark: '#4A8BA5' } as const;
+
 export type DarkTokens = Widen<typeof DARK>;
 
 /**
@@ -217,9 +220,60 @@ export function accentLiteral(theme: Theme, literal: string): string {
   return shiftCssColors(literal, shiftOf(theme));
 }
 
+/**
+ * The soft status tones as CSS values that follow the mode: the theme sets `--sm-tone-<tone>-<bg|fg|line>` on `:root` (light: the
+ * board's pastels, dark: tinted glass), so a component that has no theme at hand - or writes `sx={{ bgcolor: ... }}` with a plain
+ * string - never paints a light pastel on the dark app. The fallback is the light value.
+ */
+export const TONE_CSS = Object.fromEntries(
+  (Object.keys(DESIGN.tone) as Array<keyof typeof DESIGN.tone>).map((k) => [
+    k,
+    { bg: `var(--sm-tone-${k}-bg, ${DESIGN.tone[k].bg})`, fg: `var(--sm-tone-${k}-fg, ${DESIGN.tone[k].fg})`, line: `var(--sm-tone-${k}-line, ${DESIGN.tone[k].line})` },
+  ]),
+) as Record<keyof typeof DESIGN.tone, { bg: string; fg: string; line: string }>;
+
 /** One of the soft status tones for the theme's mode: the board's pastels in light, tinted glass in dark. */
 export function toneColors(theme: Theme, tone: keyof typeof DESIGN.tone): { bg: string; fg: string; line: string } {
   return theme.palette.mode === 'light' ? DESIGN.tone[tone] : DARK.tone[tone];
+}
+
+/**
+ * ONE surface token set for everything that floats (R5): dialog, menu, popover, select list, autocomplete list, drawer, the
+ * planner's own dialogs and bubbles. The MUI paper overrides below and the CSS custom properties `--sm-pop-*` (set on `:root`
+ * by the theme in BOTH modes, so a stylesheet or a piece of inline CSS can read them) come from here, and the contrast tests
+ * read the same table - a pop-out component must take these, never a colour of its own (src/theme.popouts.guard.test.ts).
+ */
+export interface PopoutTokens {
+  /** The colour a pop-out's text is judged against: the solid surface, or - on the dark glass gradient - each of its stops (see `stops`). */
+  paper: string;
+  /** Every colour the surface paints (a gradient has three): text must read on all of them. */
+  stops: string[];
+  border: string;
+  text: string;
+  muted: string;
+  /** A hovered item over the surface (translucent, composite it over `paper`). */
+  hover: string;
+  /** A selected item over the surface. */
+  selected: string;
+}
+
+export function popoutTokens(accentInput: string, mode: ThemeMode): PopoutTokens {
+  const accent = sanitizeAccent(accentInput);
+  const shift = deriveShift(accent);
+  if (mode === 'light') {
+    return { paper: DESIGN.paper, stops: [DESIGN.paper], border: DESIGN.line, text: DESIGN.ink, muted: DESIGN.muted, hover: '#F4F6F7', selected: lightTints(accent).selected };
+  }
+  const D = darkTokens(shift);
+  const c = (value: string): string => shiftCssColors(value, shift);
+  return {
+    paper: '#042C3D',
+    stops: ['#042C3D', '#001523', '#011B2D'],
+    border: c('rgba(0, 224, 232, 0.5)'),
+    text: D.white,
+    muted: D.muted,
+    hover: alpha(D.cyan, 0.09),
+    selected: alpha(D.cyan, 0.14),
+  };
 }
 
 /**
@@ -257,9 +311,10 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
   const hover = light ? '#F4F6F7' : alpha(D.cyan, 0.09);
   /* A card's outline: the board's hairline in light, the glass panel's teal edge in dark. */
   const edge = light ? line : D.panelLine;
-  const menuEdge = light ? line : c('rgba(0, 224, 232, 0.5)');
+  const menuEdge = popoutTokens(accentColor, mode).border;
   /* What floats (menus, popovers, dialogs): the board's white with a shadow, the prototype's lit glass in dark. */
   const floating = light ? {} : { backgroundImage: D.floating };
+  const pop = popoutTokens(accentColor, mode);
   const toneFor = (tone: keyof typeof DESIGN.tone) => (light ? DESIGN.tone[tone] : D.tone[tone]);
 
   return createTheme({
@@ -331,7 +386,19 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
           html: { colorScheme: mode },
           /* ACCENT_SOFT (a selected card, a soft panel) reads these two; in dark they are tinted glass, never the light mode's pale fill
              (white text on a pale fill was the "white on light when hovering" of the booking bubble). AccentRootVars sets them only in light. */
-          ...(light ? {} : { ':root': { '--sm-soft-bg': c('rgba(0, 230, 228, 0.14)'), '--sm-soft-line': c('rgba(0, 224, 232, 0.5)') } }),
+          ':root': {
+            ...(light ? {} : { '--sm-soft-bg': c('rgba(0, 230, 228, 0.14)'), '--sm-soft-line': c('rgba(0, 224, 232, 0.5)') }),
+            /* the pop-out surface tokens (popoutTokens): the same values the MUI paper overrides use, for CSS that has no theme at hand */
+            '--sm-pop-paper': pop.paper,
+            '--sm-pop-border': pop.border,
+            '--sm-pop-text': pop.text,
+            '--sm-pop-muted': pop.muted,
+            '--sm-pop-hover': pop.hover,
+            '--sm-pop-selected': pop.selected,
+            ...Object.fromEntries((Object.keys(DESIGN.tone) as Array<keyof typeof DESIGN.tone>).flatMap((k) => [
+              [`--sm-tone-${k}-bg`, toneFor(k).bg], [`--sm-tone-${k}-fg`, toneFor(k).fg], [`--sm-tone-${k}-line`, toneFor(k).line],
+            ])),
+          },
           body: {
             backgroundColor: page,
             color: ink,
@@ -613,7 +680,7 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
           root: {
             borderRadius: DESIGN.radius.lg,
             backgroundColor: light ? paper : D.field,
-            '& .MuiOutlinedInput-notchedOutline': { borderColor: light ? line : D.fieldLine },
+            '& .MuiOutlinedInput-notchedOutline': { borderColor: FIELD_EDGE[mode] },
             '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: alpha(primary, 0.5) },
             '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2, borderColor: primary },
             ...(light ? {} : { '&.Mui-focused': { boxShadow: `0 0 0 3px ${alpha(D.cyan, 0.14)}` } }),
@@ -746,7 +813,33 @@ export function buildTheme(accentInput: string, mode: ThemeMode): Theme {
                   },
                 }),
           },
+          /* MUI derives the outlined text from `palette.x.light`, which is a translucent tint here (alpha .14: invisible on the glass),
+             and the filled fill from a darkened `main`: both are set explicitly so every severity reads in both modes (R5). */
+          outlined: {
+            '&.MuiAlert-colorSuccess': { color: toneFor('green').fg, borderColor: toneFor('green').line, backgroundColor: 'transparent' },
+            '&.MuiAlert-colorWarning': { color: toneFor('beige').fg, borderColor: toneFor('beige').line, backgroundColor: 'transparent' },
+            '&.MuiAlert-colorError': { color: toneFor('red').fg, borderColor: toneFor('red').line, backgroundColor: 'transparent' },
+            '&.MuiAlert-colorInfo': { color: toneFor('blue').fg, borderColor: toneFor('blue').line, backgroundColor: 'transparent' },
+          },
+          filled: {
+            '&.MuiAlert-colorSuccess': { backgroundColor: light ? '#27603A' : D.green, color: light ? '#FFFFFF' : D.onCyan },
+            '&.MuiAlert-colorWarning': { backgroundColor: light ? '#8A5A2F' : D.amber, color: light ? '#FFFFFF' : D.onCyan },
+            '&.MuiAlert-colorError': { backgroundColor: light ? '#9B3B1B' : '#FF6B88', color: light ? '#FFFFFF' : D.onCyan },
+            '&.MuiAlert-colorInfo': { backgroundColor: light ? '#2B5C9B' : '#5BB0FF', color: light ? '#FFFFFF' : D.onCyan },
+          },
           icon: { opacity: 0.9 },
+        },
+      },
+      MuiSnackbarContent: {
+        styleOverrides: {
+          root: {
+            borderRadius: DESIGN.radius.lg,
+            backgroundColor: light ? DESIGN.inkSoft : pop.paper,
+            color: light ? '#FFFFFF' : D.white,
+            ...(light ? {} : { border: `1px solid ${pop.border}`, boxShadow: D.floatingGlow }),
+            /* the action sits on the dark snackbar of light mode and on the glass of dark mode: white / aqua, never the accent that may be dark */
+            '& .MuiSnackbarContent-action .MuiButton-root': { color: light ? '#FFFFFF' : D.aqua, textDecoration: 'underline', minHeight: 32 },
+          },
         },
       },
       MuiTooltip: {

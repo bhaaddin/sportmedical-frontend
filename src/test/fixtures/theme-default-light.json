@@ -2,8 +2,48 @@
  "components": {
   "MuiAlert": {
    "styleOverrides": {
+    "filled": {
+     "&.MuiAlert-colorError": {
+      "backgroundColor": "#9B3B1B",
+      "color": "#FFFFFF"
+     },
+     "&.MuiAlert-colorInfo": {
+      "backgroundColor": "#2B5C9B",
+      "color": "#FFFFFF"
+     },
+     "&.MuiAlert-colorSuccess": {
+      "backgroundColor": "#27603A",
+      "color": "#FFFFFF"
+     },
+     "&.MuiAlert-colorWarning": {
+      "backgroundColor": "#8A5A2F",
+      "color": "#FFFFFF"
+     }
+    },
     "icon": {
      "opacity": 0.9
+    },
+    "outlined": {
+     "&.MuiAlert-colorError": {
+      "backgroundColor": "transparent",
+      "borderColor": "#E3C3BA",
+      "color": "#9B3B1B"
+     },
+     "&.MuiAlert-colorInfo": {
+      "backgroundColor": "transparent",
+      "borderColor": "#C4D6EE",
+      "color": "#2B5C9B"
+     },
+     "&.MuiAlert-colorSuccess": {
+      "backgroundColor": "transparent",
+      "borderColor": "#C7DACB",
+      "color": "#27603A"
+     },
+     "&.MuiAlert-colorWarning": {
+      "backgroundColor": "transparent",
+      "borderColor": "#E7CBA9",
+      "color": "#8A5A2F"
+     }
     },
     "root": {
      "alignItems": "center",
@@ -157,6 +197,29 @@
    "styleOverrides": {
     "::selection": {
      "backgroundColor": "rgba(13, 92, 82, 0.18)"
+    },
+    ":root": {
+     "--sm-pop-border": "#E2E6EA",
+     "--sm-pop-hover": "#F4F6F7",
+     "--sm-pop-muted": "#5A636D",
+     "--sm-pop-paper": "#FFFFFF",
+     "--sm-pop-selected": "#D7E9E5",
+     "--sm-pop-text": "#1A1D21",
+     "--sm-tone-beige-bg": "#FBF1E7",
+     "--sm-tone-beige-fg": "#8A5A2F",
+     "--sm-tone-beige-line": "#E7CBA9",
+     "--sm-tone-blue-bg": "#E3ECF7",
+     "--sm-tone-blue-fg": "#2B5C9B",
+     "--sm-tone-blue-line": "#C4D6EE",
+     "--sm-tone-green-bg": "#E2EBE4",
+     "--sm-tone-green-fg": "#27603A",
+     "--sm-tone-green-line": "#C7DACB",
+     "--sm-tone-grey-bg": "#EFF1F4",
+     "--sm-tone-grey-fg": "#4A5564",
+     "--sm-tone-grey-line": "#DCE0E5",
+     "--sm-tone-red-bg": "#F5E0D8",
+     "--sm-tone-red-fg": "#9B3B1B",
+     "--sm-tone-red-line": "#E3C3BA"
     },
     "@media (max-width: 1279.95px)": {
      "body .MuiButton-root": {
@@ -335,7 +398,7 @@
     },
     "root": {
      "& .MuiOutlinedInput-notchedOutline": {
-      "borderColor": "#E2E6EA"
+      "borderColor": "#7C858F"
      },
      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
       "borderColor": "#0D5C52",
@@ -411,6 +474,20 @@
     }
    }
   },
+  "MuiSnackbarContent": {
+   "styleOverrides": {
+    "root": {
+     "& .MuiSnackbarContent-action .MuiButton-root": {
+      "color": "#FFFFFF",
+      "minHeight": 32,
+      "textDecoration": "underline"
+     },
+     "backgroundColor": "#14181C",
+     "borderRadius": 10,
+     "color": "#FFFFFF"
+    }
+   }
+  },
   "MuiSwitch": {
    "styleOverrides": {
     "root": {
@@ -427,7 +504,7 @@
      "&.Mui-selected": {
       "color": "#0D5C52"
      },
-     "color": "#626B75",
+     "color": "#5A636D",
      "fontSize": 14,
      "fontWeight": 600,
      "minHeight": 44,
@@ -457,7 +534,7 @@
      "& .MuiTableCell-head": {
       "backgroundColor": "#F4F6F7",
       "borderBottom": "1px solid #E2E6EA",
-      "color": "#626B75",
+      "color": "#5A636D",
       "fontSize": 11,
       "fontWeight": 700,
       "letterSpacing": "0.08em",
@@ -636,7 +713,7 @@
   "text": {
    "disabled": "#B3B9C0",
    "primary": "#1A1D21",
-   "secondary": "#626B75"
+   "secondary": "#5A636D"
   },
   "tonalOffset": 0.2,
   "warning": {

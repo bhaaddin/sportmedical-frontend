@@ -35,6 +35,8 @@ import { usePageArrival } from './motion/PageTransition';
 
 /* ── Lazy-loaded routes (code-split per page) ── */
 const NotFound = lazy(() => import('./pages/NotFound'));
+/* DEV only: the pop-out gallery the contrast audit reads (scripts/stage3b); the condition is a build-time constant, so a production bundle has neither the route nor the module. */
+const PopoutGallery = import.meta.env.DEV ? lazy(() => import('./dev/PopoutGallery')) : null;
 const PlannerLabPage = lazy(() => import('./planner/PlannerLabPage'));
 const PlannerPage = lazy(() => import('./planner/PlannerPage'));
 const ClubPlannerPage = lazy(() => import('./planner/ClubPlannerPage'));
@@ -423,6 +425,7 @@ export default function StaffApp() {
     <Layout>
       <Suspense fallback={<PageLoader />}>
         <Routes>
+          {PopoutGallery ? <Route path="/audit/popouts" element={<PopoutGallery />} /> : null}
           <Route path="/prehled" element={<DashboardPage />} />
           <Route path="/planner-lab" element={<PlannerLabPage />} />
           <Route path="/patients" element={<RequirePermission of="patients.view"><PatientList /></RequirePermission>} />

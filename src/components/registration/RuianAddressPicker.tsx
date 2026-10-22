@@ -28,6 +28,7 @@
  * this one control.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { alpha } from '@mui/material/styles';
 import {
   Alert, Autocomplete, Box, Chip, CircularProgress, Stack, TextField, Typography,
 } from '@mui/material';
@@ -202,7 +203,7 @@ export default function RuianAddressPicker({
       <Box
         sx={{
           border: '1px solid', borderColor: 'success.main', borderRadius: 2,
-          bgcolor: 'rgba(46,125,50,0.05)', p: 2,
+          bgcolor: (t) => alpha(t.palette.success.main, 0.07), p: 2,
           display: 'flex', gap: 1.5, alignItems: 'flex-start',
         }}
       >

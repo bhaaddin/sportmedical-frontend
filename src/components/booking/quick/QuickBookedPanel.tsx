@@ -3,7 +3,7 @@ import { Box, Button, Snackbar, Stack, Typography } from "@mui/material";
 import CheckCircleOutline from "@mui/icons-material/CheckCircleOutlineOutlined";
 import ContentCopy from "@mui/icons-material/ContentCopy";
 import { useDevice } from "../../../layout/useDevice";
-import { DESIGN, SectionLabel, SoftCard, headSurface } from "../../ui";
+import { TONE_CSS, SectionLabel, SoftCard, headSurface } from "../../ui";
 import { formatLongPragueDate } from "../appointmentEdit";
 import { pragueClock } from "../NewAppointmentDialog.logic";
 import { deadlineSentence } from "./quickBooking";
@@ -84,10 +84,10 @@ export function QuickBookedPanel({ view }: { view: QuickBookedView }) {
           px: 2,
           py: 1.5,
           borderRadius: 2.5,
-          bgcolor: DESIGN.tone.green.bg,
-          color: DESIGN.tone.green.fg,
+          bgcolor: TONE_CSS.green.bg,
+          color: TONE_CSS.green.fg,
           border: "1px solid",
-          borderColor: DESIGN.tone.green.line,
+          borderColor: TONE_CSS.green.line,
         }}
       >
         <CheckCircleOutline fontSize="small" sx={{ mt: "2px" }} />
@@ -105,10 +105,10 @@ export function QuickBookedPanel({ view }: { view: QuickBookedView }) {
             px: 2,
             py: 1.5,
             borderRadius: 2.5,
-            bgcolor: DESIGN.tone.beige.bg,
+            bgcolor: TONE_CSS.beige.bg,
             border: "1px solid",
-            borderColor: DESIGN.tone.beige.line,
-            color: DESIGN.tone.beige.fg,
+            borderColor: TONE_CSS.beige.line,
+            color: TONE_CSS.beige.fg,
           }}
         >
           <Typography sx={{ fontWeight: 700, color: "inherit" }}>
@@ -151,7 +151,7 @@ export function QuickBookedPanel({ view }: { view: QuickBookedView }) {
             {copied ? "Zkopírováno" : "Kopírovat"}
           </Button>
           {failed ? (
-            <Typography variant="caption" sx={{ color: DESIGN.tone.red.fg }}>
+            <Typography variant="caption" sx={{ color: TONE_CSS.red.fg }}>
               Schránka není dostupná — označte adresu výše a zkopírujte ji ručně.
             </Typography>
           ) : null}

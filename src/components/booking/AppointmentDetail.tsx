@@ -51,7 +51,7 @@ import {
   isLate,
   pragueDateKey,
 } from "../../utils/time";
-import { DESIGN, SectionLabel, SoftCard, StatusChip } from "../ui";
+import { TONE_CSS, SectionLabel, SoftCard, StatusChip } from "../ui";
 import { AsyncSection } from "./AsyncSection";
 import { AvailabilityPanel } from "./AvailabilityPicker";
 import { errorText } from "./errorText";
@@ -418,13 +418,13 @@ function DetailBody({
       <Box
         sx={{
           border: "1px solid",
-          borderColor: DESIGN.tone.red.line,
-          bgcolor: DESIGN.tone.red.bg,
+          borderColor: TONE_CSS.red.line,
+          bgcolor: TONE_CSS.red.bg,
           borderRadius: 2.5,
           p: 2,
         }}
       >
-        <Typography variant="body2" sx={{ mb: 1, color: DESIGN.tone.red.fg }}>
+        <Typography variant="body2" sx={{ mb: 1, color: TONE_CSS.red.fg }}>
           {t("booking.detail.cancelIsFinal")}
         </Typography>
         <TextField
@@ -1246,12 +1246,12 @@ function RegistrationWarning({
   return (
     <Box
       sx={{
-        bgcolor: DESIGN.tone.beige.bg,
+        bgcolor: TONE_CSS.beige.bg,
         border: "1px solid",
-        borderColor: DESIGN.tone.beige.line,
+        borderColor: TONE_CSS.beige.line,
         borderRadius: 3,
         p: 2,
-        color: DESIGN.tone.beige.fg,
+        color: TONE_CSS.beige.fg,
       }}
     >
       <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
@@ -1271,9 +1271,9 @@ function RegistrationWarning({
                 disabled={issue.isPending}
                 onClick={() => void copyLink()}
                 sx={{
-                  bgcolor: DESIGN.tone.beige.fg,
-                  color: "#FFFFFF",
-                  "&:hover": { bgcolor: DESIGN.tone.beige.fg },
+                  bgcolor: "warning.main",
+                  color: "warning.contrastText",
+                  "&:hover": { bgcolor: "warning.main" },
                 }}
               >
                 {copied ? "Zkopírováno" : "Zkopírovat odkaz na registraci"}
@@ -1286,8 +1286,8 @@ function RegistrationWarning({
                     disabled={issue.isPending || !canSend}
                     onClick={() => void sendAgain()}
                     sx={{
-                      color: DESIGN.tone.beige.fg,
-                      borderColor: DESIGN.tone.beige.line,
+                      color: TONE_CSS.beige.fg,
+                      borderColor: TONE_CSS.beige.line,
                       bgcolor: "transparent",
                     }}
                   >
@@ -1306,7 +1306,7 @@ function RegistrationWarning({
                 wordBreak: "break-all",
                 bgcolor: "background.paper",
                 border: "1px solid",
-                borderColor: DESIGN.tone.beige.line,
+                borderColor: TONE_CSS.beige.line,
                 borderRadius: 2,
                 px: 1.25,
                 py: 0.75,
@@ -1323,7 +1323,7 @@ function RegistrationWarning({
             </Typography>
           ) : null}
           {issue.isError ? (
-            <Typography variant="caption" sx={{ display: "block", mt: 0.75, color: DESIGN.tone.red.fg }}>
+            <Typography variant="caption" sx={{ display: "block", mt: 0.75, color: TONE_CSS.red.fg }}>
               {linkErrorText(issue.error)}
             </Typography>
           ) : null}
@@ -1563,7 +1563,7 @@ function StatusButton({
         onClick={() => (confirmText ? setConfirming(true) : onClick())}
         sx={{
           minHeight: minHeight ?? (variant === "contained" ? 46 : 44),
-          ...(variant === "contained" ? { color: "#FFFFFF" } : {}),
+          ...(variant === "contained" ? { color: "secondary.contrastText" } : {}),
         }}
       >
         {label}
@@ -1912,9 +1912,9 @@ function EditMode({
             py: 1.5,
             borderRadius: 2.5,
             border: "1px solid",
-            borderColor: slotLine.tone === "grey" ? "divider" : DESIGN.tone[slotLine.tone].line,
-            bgcolor: slotLine.tone === "grey" ? "background.default" : DESIGN.tone[slotLine.tone].bg,
-            color: slotLine.tone === "grey" ? "text.primary" : DESIGN.tone[slotLine.tone].fg,
+            borderColor: slotLine.tone === "grey" ? "divider" : TONE_CSS[slotLine.tone].line,
+            bgcolor: slotLine.tone === "grey" ? "background.default" : TONE_CSS[slotLine.tone].bg,
+            color: slotLine.tone === "grey" ? "text.primary" : TONE_CSS[slotLine.tone].fg,
           }}
         >
           <AccessTimeIcon fontSize="small" sx={{ color: "inherit", opacity: 0.8 }} />
@@ -1958,7 +1958,7 @@ function EditMode({
             color="secondary"
             disabled={busy || !hasChanges || !dateValid || !timeValid}
             onClick={() => onSave(plan)}
-            sx={{ color: "#FFFFFF", minHeight: 48, fontSize: 15 }}
+            sx={{ color: "secondary.contrastText", minHeight: 48, fontSize: 15 }}
           >
             Uložit změny
           </Button>
@@ -2004,7 +2004,7 @@ function EditMode({
               color="secondary"
               disabled={busy || !hasChanges || !dateValid || !timeValid}
               onClick={() => onSave(plan)}
-              sx={{ color: "#FFFFFF", minHeight: 44 }}
+              sx={{ color: "secondary.contrastText", minHeight: 44 }}
             >
               Uložit změny
             </Button>

@@ -12,7 +12,7 @@ import { memo } from 'react';
 import { Box, Button, Link, Stack, TextField, Typography } from '@mui/material';
 import { OpenInNew as OpenIcon } from '@mui/icons-material';
 import { StatusChip } from '../../../components/ui';
-import { DESIGN } from '../../../theme';
+import { DESIGN, TONE_CSS } from '../../../theme';
 import { TYPE, settingsLine } from '../../../components/settings/settingsStyle';
 import { cloudinaryWidth } from '../../../site/cloudinary';
 import type { SlotDef } from '../../../site/slotTypes';
@@ -92,12 +92,12 @@ function Preview({ def, value }: { def: SlotDef; value: AdminSlot | undefined })
         gap: 0.5,
         p: 2,
         textAlign: 'center',
-        bgcolor: DESIGN.tone.grey.bg,
+        bgcolor: TONE_CSS.grey.bg,
         border: '1px dashed',
         borderColor: DESIGN.hatch.closedLine,
       }}
     >
-      <Typography sx={[TYPE.itemName, { color: DESIGN.tone.grey.fg }]}>{placeholderSentence(def)}</Typography>
+      <Typography sx={[TYPE.itemName, { color: TONE_CSS.grey.fg }]}>{placeholderSentence(def)}</Typography>
       {def.caption !== undefined && def.caption !== '' && (
         <Typography sx={TYPE.caption}>Na webu: {def.caption}</Typography>
       )}
