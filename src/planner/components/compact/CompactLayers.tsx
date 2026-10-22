@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AgendaPanel } from '../AgendaPanel';
 import { ClubHeader, type ClubHeaderMode, type ClubHeaderProps } from '../ClubHeader';
 import { CompletionCallout } from '../CompletionCallout';
+import { GuideSlot } from '../../guide/GuideSlot';
 import { DialogLayer } from '../DialogLayer';
 import { MiniCalendarPanel } from '../MiniCalendarPanel';
 import { MiniDayTooltip } from '../MiniDayTooltip';
@@ -99,6 +100,7 @@ export function CompactLayers({ layout, user, headerMode }: CompactLayersProps) 
       <SummaryExperience />
       <Toast />
       <CompletionCallout />
+      <GuideSlot />
     </>
   );
 }

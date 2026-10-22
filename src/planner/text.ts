@@ -54,4 +54,55 @@ export const PLANNER_TEXT = {
     openDay: 'Otevřít den',
     today: 'Dnes',
   },
+  /*
+   * The club planning guide (stage 5c): small pop-outs that say what to do next, the steps of the publish dialog, and
+   * the plain sentence a refusal ends with. Plain Czech, no jargon, one sentence per idea.
+   */
+  guide: {
+    close: 'Zavřít nápovědu',
+    mute: 'Nezobrazovat',
+    muteTitle: 'Přestat zobrazovat tyto nápovědy (uloží se pro vás)',
+    start: {
+      title: 'Jak začít',
+      /* the week and day boards */
+      board: 'Vyberte činnost dole a táhněte v kalendáři. Klepnutí na den v měsíci vezme celý den.',
+      month: 'Vyberte činnost dole a klepněte na den: vezme se celý. Tažením vyberete víc dnů najednou.',
+      phone: 'Vyberte činnost v kartách níže a klepněte na den: vezme se celý. Vzít zpět jde tlačítkem Zpět.',
+      armedBoard: 'Činnost je vybraná. Teď táhněte v kalendáři přes čas termínu.',
+      armedMonth: 'Činnost je vybraná. Teď klepněte na den: vezme se celý.',
+    },
+    strip: {
+      title: 'Činností je víc, než se vejde',
+      text: (hidden: number) => `Za okrajem karet ${hidden === 1 ? 'je ještě 1 činnost' : hidden < 5 ? `jsou ještě ${hidden} činnosti` : `je ještě ${hidden} činností`}. Listujte šipkou nebo tažením. Když jednu naplníte, pás se posune sám.`,
+    },
+    callout: {
+      next: (name: string) => `Další: ${name}`,
+      nextSentence: (name: string) => `Pokračujte činností ${name}. Pás karet se posune k ní.`,
+      prepare: 'Připravit formulář',
+      prepareSentence: 'Dál se otevře okno: vygenerujete odkaz pro klub, prohlédnete e-mail a odkaz pošlete sami.',
+      review: 'Prohlédnout plán',
+      close: 'Zavřít',
+    },
+    steps: {
+      title: 'Tři kroky k odeslání',
+      one: 'Odkaz vygenerován',
+      two: 'Náhled e-mailu',
+      three: 'Odeslat nebo zkopírovat',
+      locked2: 'Nejdřív vygenerujte odkaz (krok 1).',
+      locked3: 'Nejdřív si prohlédněte e-mail (krok 2).',
+      now1: 'Začněte tlačítkem „Vygenerovat odkaz“.',
+      now2: 'Teď si prohlédněte e-mail, který klub dostane.',
+      now3: 'Zkopírujte odkaz nebo text e-mailu a pošlete ho klubu. Plánovač nic neodesílá.',
+      done: 'Hotovo. Odkaz máte zkopírovaný, pošlete ho klubu.',
+      state: { done: 'hotovo', current: 'teď', locked: 'čeká' },
+    },
+    advice: {
+      needMet: 'Potřebujete ještě jeden termín? Použijte „Přidat termín navíc“.',
+      lunch: 'Začněte po pauze nebo skončete před ní.',
+      otherDay: 'Zvolte jiný den.',
+      noFree: 'Zvolte jiný den nebo kratší úsek.',
+      busy: 'Zvolte jiný čas nebo jiný den.',
+      past: 'Zvolte dnešní nebo pozdější den.',
+    },
+  },
 } as const;

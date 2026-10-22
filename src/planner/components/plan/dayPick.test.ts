@@ -63,6 +63,16 @@ describe('planDays · one whole day', () => {
     expect(p.parts).toEqual([]);
     expect(p.fulfilled).toBe(true);
     expect(describeDayPick(p).text).toMatch(/už mají termín.*nepotřebuje/);
+    expect(describeDayPick(p).text).toMatch(/Přidat termín navíc/); // and says what to do instead
+  });
+
+  it('a refused pick ends with what to do instead (closed day, past day, no free slot)', () => {
+    const closed = plan(ctxOf(3, 2), [D1], null, { [D1]: open(D1, { closed: true, label: 'Svátek' }) });
+    expect(describeDayPick(closed).text).toMatch(/zavřeno.*Zvolte jiný den\.$/);
+    const past = plan(ctxOf(3, 2), ['2026-10-19'], null, marksOf('2026-10-19'));
+    expect(describeDayPick(past).text).toMatch(/v minulosti.*Zvolte dnešní nebo pozdější den\.$/);
+    const noHours = plan(ctxOf(3, 2), [D1], null, { [D1]: { date: D1, closed: false, hours: null, lunch: null } as DayMark });
+    expect(describeDayPick(noHours).text).toMatch(/Zvolte jiný den\.$/);
   });
 
   it('free time only: another term of the day is never overlapped', () => {

@@ -102,7 +102,7 @@ describe('placement drag · the file\'s live preview, validated, counted per či
     expect(document.getElementById('drag-hud')).toHaveTextContent('TERMÍN NELZE VYTVOŘIT');
     expect(document.getElementById('drag-hud')).toHaveTextContent('Čas se překrývá s již vytvořeným termínem.');
     release(b, at(1, 640));
-    expect(await screen.findByText('Čas se překrývá s již vytvořeným termínem.')).toBeInTheDocument();
+    expect(await screen.findByText(/Čas se překrývá s již vytvořeným termínem\./)).toBeInTheDocument();
     expect(source.snapshotSessions()).toHaveLength(1);
   });
 
@@ -383,7 +383,7 @@ describe('pulling the edge of a term · the confirmation', () => {
     expect(document.getElementById('term-resize-hud')).toHaveClass('is-invalid');
     expect(document.getElementById('term-resize-hud')).toHaveTextContent('V objednávce zbývá pouze 1 míst pro tuto činnost.');
     release(b, { clientX: from.clientX, clientY: from.clientY + px(180) + 1 });
-    expect(await screen.findAllByText('V objednávce zbývá pouze 1 míst pro tuto činnost.')).not.toHaveLength(0);
+    expect(await screen.findAllByText(/V objednávce zbývá pouze 1 míst pro tuto činnost\./)).not.toHaveLength(0);
     expect(screen.queryByTestId('planner-dialog')).toBeNull();
   });
 });
