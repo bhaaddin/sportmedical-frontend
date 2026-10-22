@@ -8,7 +8,8 @@
  * Nothing here ever shows the server's raw text of an unknown shape; the Czech sentence is built from the structured fields. (Read by
  * hand, not with a schema: this file is in the planner's first load and a detail object of five strings needs no library.)
  */
-import { BookingApiError } from './apiError';
+/** Any error that carries the problem body's `code` / `details` (the booking calls' `BookingApiError`, a club order call's `ClubOrderError`). */
+const problemOf = (error: unknown): { code?: unknown; details?: unknown } | null => (error !== null && typeof error === 'object' && 'code' in error ? (error as { code?: unknown; details?: unknown }) : null);
 import { pragueDateKey } from '../utils/time';
 
 export const WORKER_BUSY = 'worker.busy';
@@ -53,13 +54,14 @@ function readDetails(raw: unknown): WorkerBusyDetails {
 
 /** Is this the `worker.busy` refusal? (409 + code; an unusable detail still counts - the clash is real, the text is generic.) */
 export function workerBusyOf(error: unknown): WorkerBusy | null {
-  if (!(error instanceof BookingApiError) || error.code !== WORKER_BUSY) return null;
-  const details = readDetails(error.details);
+  const problem = problemOf(error);
+  if (problem === null || problem.code !== WORKER_BUSY) return null;
+  const details = readDetails(problem.details);
   return { details, overridable: details.overridable };
 }
 
 /** `403 worker.busy.override_forbidden`: the override was sent by somebody who may not make it. */
-export const isOverrideForbidden = (error: unknown): boolean => error instanceof BookingApiError && error.code === WORKER_BUSY_OVERRIDE_FORBIDDEN;
+export const isOverrideForbidden = (error: unknown): boolean => problemOf(error)?.code === WORKER_BUSY_OVERRIDE_FORBIDDEN;
 
 const clock = (utc: string | null): string | null => {
   if (!utc) return null;

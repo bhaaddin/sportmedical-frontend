@@ -10,7 +10,7 @@
  * Per Etapa 9's "club in one place" rule a club ORDER is still only ever CREATED via "Klubová objednávka" - this
  * dialog never offers that; it only attaches time to an order that already exists.
  */
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import {
   Alert, Autocomplete, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, List,
   ListItemButton, TextField, Typography,
@@ -24,6 +24,7 @@ import type { Club } from '../../../api/clubs';
 import { ClubOrderError, clubOrdersApi } from '../../../api/clubOrders';
 import type { ClubOrderView } from '../../../api/clubOrders';
 import { useDevice } from '../../../layout/useDevice';
+import { isOverrideForbidden, workerBusyOf, type WorkerBusy } from '../../../api/workerBusy';
 import type { DateOnly } from '../../../utils/time';
 import { invalidateClubWorld } from '../../clubs/clubWorld';
 import { editBlockRefs } from '../../clubs/order/editSession';
@@ -35,6 +36,8 @@ import { ordersRangesOf, pickedCalendarIds, picksFromRanges } from './pickLogic'
 import { pickedLabel, type PickedRange, type PickedTime } from './multiSelect';
 
 const STALE = 60 * 1000;
+/* R4 / R17: the owner's override with a reason - the same panel as the booking dialog, loaded only when a refusal needs it */
+const WorkerBusyNotice = lazy(() => import('../WorkerBusyNotice').then((m) => ({ default: m.WorkerBusyNotice })));
 
 /** The order's current windows, as picks a fresh `update` call can be built from (same recipe as `usePickOrder.start`). */
 function existingPicks(order: ClubOrderView): PickedTime[] {
@@ -158,6 +161,8 @@ export function AddToClubOrderDialog({ marked, calendars, serviceId, today, onCl
 
   const [failure, setFailure] = useState<{ message: string; conflict: string | null } | null>(null);
   const [affected, setAffected] = useState<{ message: string; list: ClubOrderError['affectedAthletes'] } | null>(null);
+  /* R4: the worker is busy in another calendar: the clash is named, and an owner / administrator may go over it with a reason */
+  const [busy, setBusy] = useState<{ busy: WorkerBusy; forbidden: boolean } | null>(null);
 
   const picks = useMemo(
     () => (order === null ? [] : [...existingPicks(order), ...markedPicks(marked, calendars, allowed)]),
@@ -167,16 +172,32 @@ export function AddToClubOrderDialog({ marked, calendars, serviceId, today, onCl
   const calendarIds = useMemo(() => pickedCalendarIds(picks), [picks]);
 
   const save = useMutation({
-    mutationFn: (cancelAffectedAthletes: boolean) => {
+    mutationFn: (input: { cancelAffected: boolean; overrideReason?: string }) => {
       if (order === null) throw new ClubOrderError('Vyberte objednávku.');
-      return clubOrdersApi.update(order.id, { ranges, calendarIds }, cancelAffectedAthletes);
+      return input.overrideReason === undefined
+        ? clubOrdersApi.update(order.id, { ranges, calendarIds }, input.cancelAffected)
+        : clubOrdersApi.update(order.id, { ranges, calendarIds }, input.cancelAffected, input.overrideReason);
     },
     onSuccess: async (saved) => {
+      setBusy(null);
       await invalidateClubWorld(queryClient);
       toast.success(`Přidáno do objednávky ${orderCode(saved.id)}.`);
       onAdded(saved);
     },
     onError: (error) => {
+      const refused = workerBusyOf(error);
+      if (refused !== null) {
+        setFailure(null);
+        setAffected(null);
+        setBusy({ busy: refused, forbidden: false });
+        return;
+      }
+      if (isOverrideForbidden(error)) {
+        setFailure(null);
+        setBusy((cur) => (cur ? { ...cur, forbidden: true } : cur));
+        return;
+      }
+      setBusy(null);
       const e = error instanceof ClubOrderError ? error : new ClubOrderError('Nepodařilo se přidat do objednávky.');
       if (e.status === 409 && e.affectedAthletes.length > 0) {
         setFailure(null);
@@ -198,12 +219,14 @@ export function AddToClubOrderDialog({ marked, calendars, serviceId, today, onCl
     setAllowedIds(null);
     setFailure(null);
     setAffected(null);
+    setBusy(null);
   };
   const chooseOrder = (next: ClubOrderView) => {
     setOrder(next);
     setAllowedIds(null);
     setFailure(null);
     setAffected(null);
+    setBusy(null);
   };
 
   return (
@@ -275,6 +298,16 @@ export function AddToClubOrderDialog({ marked, calendars, serviceId, today, onCl
               </Box>
             </Alert>
           ) : null}
+          {busy !== null ? (
+            <Suspense fallback={null}>
+              <WorkerBusyNotice
+                busy={busy.busy}
+                forbidden={busy.forbidden}
+                working={pending}
+                onOverride={(reason) => save.mutate({ cancelAffected: affected !== null, overrideReason: reason })}
+              />
+            </Suspense>
+          ) : null}
           {failure !== null ? (
             <Alert severity="error" data-testid="add-to-club-failure">
               {failure.message}
@@ -289,7 +322,7 @@ export function AddToClubOrderDialog({ marked, calendars, serviceId, today, onCl
         <Button
           variant="contained"
           color={affected !== null ? 'error' : 'primary'}
-          onClick={() => save.mutate(affected !== null)}
+          onClick={() => save.mutate({ cancelAffected: affected !== null })}
           disabled={pending || order === null}
           data-testid="add-to-club-confirm"
           sx={{ minHeight: 44, flex: desktop ? undefined : 2 }}

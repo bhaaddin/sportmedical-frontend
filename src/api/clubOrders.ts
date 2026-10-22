@@ -232,6 +232,8 @@ export class ClubOrderError extends Error {
   addenda: OrderAddendumSummary[] = [];
   /** Etapa 12 merge: the order the refusal is about, when the server names one (e.g. the one already invoiced). */
   orderId: string | null = null;
+  /** The problem body's `details` (stage 2: the clashing commitment of a `worker.busy` refusal); undefined when the server sent none. */
+  details: unknown = undefined;
   constructor(message: string, status?: number, code?: string, affected: ClubOrderError['affectedAthletes'] = [], fields: Record<string, string[]> = {}) {
     super(message);
     this.name = 'ClubOrderError';
@@ -419,6 +421,7 @@ function toError(error: unknown): ClubOrderError {
   const err = new ClubOrderError(message, response?.status, typeof data.code === 'string' ? data.code : undefined, affected, fields);
   err.addenda = arr<unknown>(data.addenda).map(toAddendum);
   err.orderId = typeof data.orderId === 'string' && data.orderId !== '' ? data.orderId : null;
+  err.details = data.details;
   return err;
 }
 
@@ -490,8 +493,12 @@ export const clubOrdersApi = {
       return toRelease(unwrap((await client.post(`${BASE}/${id}/release-unfilled`, body)).data));
     }),
 
-  update: (id: string, input: OrderUpdateInput, cancelAffectedAthletes = false): Promise<ClubOrderView> =>
-    call(async () => toOrder(unwrap((await client.put(`${BASE}/${id}`, input, { params: cancelAffectedAthletes ? { cancelAffectedAthletes: true } : undefined })).data))),
+  /** `overrideReason` (stage 2, R4): an owner / administrator's reason to go over a `worker.busy` refusal - a query parameter, as the contract says. */
+  update: (id: string, input: OrderUpdateInput, cancelAffectedAthletes = false, overrideReason?: string): Promise<ClubOrderView> =>
+    call(async () => {
+      const params = { ...(cancelAffectedAthletes ? { cancelAffectedAthletes: true } : {}), ...(overrideReason ? { overrideReason } : {}) };
+      return toOrder(unwrap((await client.put(`${BASE}/${id}`, input, { params: Object.keys(params).length > 0 ? params : undefined })).data));
+    }),
 
   confirm: (id: string, input: { calendarIds: string[]; ranges: OrderRange[] }): Promise<ClubOrderView> =>
     call(async () => toOrder(unwrap((await client.post(`${BASE}/${id}/confirm`, input)).data))),

@@ -244,3 +244,78 @@ describe('saving the merge', () => {
     expect(screen.getByTestId('add-to-club-confirm')).toBeDisabled();
   });
 });
+
+describe('R4: the worker is busy (worker.busy) - the owner may go over it with a reason', () => {
+  const busyError = (over: Record<string, unknown> = {}) => {
+    const e = new ClubOrderError('Pracovník je zaneprázdněn.', 409, 'worker.busy');
+    e.details = { conflictKind: 'appointment', calendarName: 'Diagnostika', activityName: 'Spiroergometrie', startUtc: '2026-11-05T08:00:00Z', endUtc: '2026-11-05T08:45:00Z', overridable: true, conflictCount: 1, ...over };
+    return e;
+  };
+  async function reachSave() {
+    const user = await chooseClub();
+    await user.click(await screen.findByTestId('add-to-club-order-row'));
+    await user.click(screen.getByTestId('add-to-club-confirm'));
+    return user;
+  }
+
+  it('names the clash (calendar, činnost, time - never a patient) and, for a user who may, offers the override with a reason', async () => {
+    window.localStorage.setItem('permissions', JSON.stringify(['settings.clinic.manage']));
+    update.mockRejectedValueOnce(busyError());
+    mount();
+    const user = await reachSave();
+    expect(await screen.findByTestId('worker-busy-message')).toHaveTextContent('Spiroergometrie v kalendáři Diagnostika');
+    expect(screen.queryByTestId('add-to-club-failure')).toBeNull();
+    const confirm = screen.getByRole('button', { name: 'Přesto potvrdit (správce)' });
+    expect(confirm).toBeDisabled(); // a reason is needed
+    await user.type(screen.getByLabelText('Důvod výjimky'), 'dohodnuto s lékařem');
+    update.mockResolvedValueOnce(make());
+    await user.click(confirm);
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+    expect(update.mock.calls[1]).toEqual(['o-1', expect.any(Object), false, 'dohodnuto s lékařem']);
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+    expect(screen.queryByTestId('worker-busy')).toBeNull();
+    window.localStorage.removeItem('permissions');
+  });
+
+  it('the first save never carries a reason (the override is only ever a second, deliberate step)', async () => {
+    update.mockRejectedValueOnce(busyError());
+    mount();
+    await reachSave();
+    await screen.findByTestId('worker-busy');
+    expect(update.mock.calls[0]).toHaveLength(3);
+  });
+
+  it('somebody who may not override is told to ask the owner and gets no override control', async () => {
+    window.localStorage.setItem('permissions', JSON.stringify(['bookings.edit']));
+    update.mockRejectedValueOnce(busyError());
+    mount();
+    await reachSave();
+    await screen.findByTestId('worker-busy');
+    expect(screen.queryByTestId('worker-busy-override')).toBeNull();
+    expect(screen.getByText('Přepsat zaneprázdněného pracovníka smí jen správce.')).toBeInTheDocument();
+    window.localStorage.removeItem('permissions');
+  });
+
+  it('a refused override (403 worker.busy.override_forbidden) says so and keeps the clash on screen', async () => {
+    window.localStorage.setItem('permissions', JSON.stringify(['settings.clinic.manage']));
+    update.mockRejectedValueOnce(busyError());
+    mount();
+    const user = await reachSave();
+    await user.type(await screen.findByLabelText('Důvod výjimky'), 'důvod');
+    update.mockRejectedValueOnce(new ClubOrderError('x', 403, 'worker.busy.override_forbidden'));
+    await user.click(screen.getByRole('button', { name: 'Přesto potvrdit (správce)' }));
+    expect(await screen.findByTestId('worker-busy-forbidden')).toBeInTheDocument();
+    expect(screen.getByTestId('worker-busy-message')).toBeInTheDocument();
+    window.localStorage.removeItem('permissions');
+  });
+
+  it('a clash the server says is not overridable has no override either', async () => {
+    window.localStorage.setItem('permissions', JSON.stringify(['settings.clinic.manage']));
+    update.mockRejectedValueOnce(busyError({ overridable: false }));
+    mount();
+    await reachSave();
+    await screen.findByTestId('worker-busy');
+    expect(screen.queryByTestId('worker-busy-override')).toBeNull();
+    window.localStorage.removeItem('permissions');
+  });
+});
