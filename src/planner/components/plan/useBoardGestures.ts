@@ -13,6 +13,7 @@
  * asks the patient). The pure rules are the model's (`edit.ts`, `placement.ts`), counted per činnost by
  * `placementPlan.ts`; the writes are done by the confirm dialogs and `usePlanCommit`.
  */
+import { withAdvice } from '../../guide/advice';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import {
   beginMove,
@@ -211,7 +212,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
         if (!drag.started || !proposal) return;
         if (!proposal.validation.ok) {
           planFx.refuse();
-          act.toast(proposal.validation.reason || 'Přesun nebyl možný. Termín zůstal beze změny.');
+          act.toast(withAdvice(proposal.validation.reason || 'Přesun nebyl možný. Termín zůstal beze změny.'));
           return;
         }
         const model = moveConfirmModel(ctx, proposal as MovePreview);
@@ -227,7 +228,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
         if (!drag.started || !proposal || !proposal.added) return;
         if (!proposal.validation.ok) {
           planFx.refuse();
-          act.toast(proposal.validation.reason);
+          act.toast(withAdvice(proposal.validation.reason));
           return;
         }
         act.openDialog({ kind: 'expandConfirm', proposal });
@@ -240,7 +241,7 @@ export function useBoardGestures(board: HTMLElement | null, inputs: GestureInput
         if (!result) return;
         if (!result.validation.ok) {
           planFx.refuse();
-          act.toast(result.validation.reason);
+          act.toast(withAdvice(result.validation.reason));
           return;
         }
         if (wantsAsk && !p.extraArmed) {

@@ -275,8 +275,8 @@ describe('PlanningCarousel · the owner\'s case, counted per činnost', () => {
     await waitFor(() => expect(callout).not.toHaveAttribute('hidden'));
     expect(callout).toHaveTextContent('Požadavek naplněn');
     expect(callout).toHaveTextContent('20 / 20 osob');
-    // "Jiná činnost" arms the next one that is not complete
-    fireEvent.click(within(callout).getByRole('button', { name: 'Jiná činnost' }));
+    // the highlighted button names the next činnost that is not complete and arms it
+    fireEvent.click(within(callout).getByRole('button', { name: /Další: Spiroergometrické vyšetření/ }));
     expect(card('s')).toHaveClass('is-selected');
   });
 

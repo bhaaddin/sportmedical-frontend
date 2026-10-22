@@ -658,7 +658,7 @@ function PlanningDeck() {
           </div>
           <div className="s42-summary-actions">
             <button type="button" className="s42-back-action" data-summary-back="" title={kicker ? `Zpět k objednávce klubu ${kicker}` : 'Zpět k objednávce'}><S41Icon name="back" /><span>Zpět</span></button>
-            <button type="button" className="s42-primary-action" data-publish-launch=""><S41Icon name="document" /><span>Připravit formulář</span><S41Icon name="next" /></button>
+            <button type="button" className="s42-primary-action" data-publish-launch="" data-ready={t.remaining === 0 ? 'true' : undefined}><S41Icon name="document" /><span>Připravit formulář</span><S41Icon name="next" /></button>
           </div>
         </aside>
       </section>

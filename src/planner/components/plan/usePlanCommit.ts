@@ -11,11 +11,12 @@ import { PlannerWriteError } from '../../data/PlannerDataSource';
 import { minutesAsTime, planToastCaption, slotMinutesOf, type PlannerContext } from '../../model';
 import { usePlannerActions, usePlannerStore } from '../../state/PlannerStoreProvider';
 import { planFx } from '../../motion/planFx';
+import { withAdvice } from '../../guide/advice';
 import { orderFigures, previewFigures, previewWindow, previewWindows, type OrderFigures } from './orderFigures';
 import type { PlanPart } from '../../../components/booking/calendar/pickPlan';
 
 export const writeMessage = (error: unknown, fallback = 'Změnu se nepodařilo uložit.'): string =>
-  error instanceof PlannerWriteError || error instanceof Error ? error.message || fallback : fallback;
+  withAdvice(error instanceof PlannerWriteError || error instanceof Error ? error.message || fallback : fallback);
 
 export interface DropInput {
   date: string;

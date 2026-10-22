@@ -31,6 +31,7 @@ import { AgendaPanel } from './AgendaPanel';
 import { ClubHeader, type ClubHeaderMode, type ClubHeaderProps } from './ClubHeader';
 import { PlannerAccountProvider } from './dialogs/generic/account';
 import { CompletionCallout } from './CompletionCallout';
+import { GuideSlot } from '../guide/GuideSlot';
 import { DialogLayer } from './DialogLayer';
 import { MiniCalendarPanel } from './MiniCalendarPanel';
 import { MiniDayTooltip } from './MiniDayTooltip';
@@ -87,6 +88,7 @@ export function PlannerLayers({ user, headerMode }: { user?: ClubHeaderProps['us
       <SummaryExperience />
       <Toast />
       <CompletionCallout />
+      <GuideSlot />
     </>
   );
 }
