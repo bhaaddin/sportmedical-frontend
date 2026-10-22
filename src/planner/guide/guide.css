@@ -28,4 +28,4 @@ html[data-motion='reduced'] .sm-planner .guide-hint { animation: plan-fade-in 14
   position: fixed; z-index: calc(var(--compact-layer-z) - 3); left: 12px; right: 12px; width: auto; max-width: 460px; margin: 0 auto; top: auto;
   bottom: calc(var(--compact-bottom-bar) + 84px);
 }
-.sm-planner[data-layout='phone']:has(.compact-dock:not([data-standard='true'])) .guide-hint { bottom: calc(var(--compact-bottom-bar) + 156px); }
+.sm-planner[data-layout='phone']:has(.compact-dock:not([data-standard='true'])) .guide-hint { bottom: calc(var(--compact-bottom-bar) + 210px); }
